@@ -179,7 +179,7 @@ EOF
     answer yes
     panel lt_cutter_install
     assert 'dialogs | grep -q "does not compile" && [ ! -e "$W/cgi/cataloguing/cutter_calculator.pl" ] && [ "$(pre_backups)" = "0" ]' "$(dialogs | tail -2)"
-    local item='"15" "$(t "✂  Cutter Calculator")"'
+    local item='"15" "$(t "🧮  Cutter Calculator")"'
     assert 'grep -qF "$item" "$KEI_REPO/installer" && grep -qF "15) function_cutter ;;" "$KEI_REPO/installer"'
 }
 
