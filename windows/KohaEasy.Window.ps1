@@ -2,7 +2,7 @@
 # A native Windows window, so it keeps working when Koha does not: it reads
 # Debian's services through wsl.exe and never needs Koha's web server.
 # Dark, in cards, from top to bottom:
-#   * a header with the green Koha logo
+#   * a header with the green koha.nexus logo
 #   * a banner, by exception: green with the time of the check and the
 #     latest backup when every component runs; when one fails it turns red
 #     and names it, and Start Koha while Koha is off. Details opens the
@@ -252,7 +252,7 @@ if (Test-Path -LiteralPath $logoFile) {
         $logo = New-Object System.Windows.Forms.PictureBox
         $logo.Image = [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream(, [System.IO.File]::ReadAllBytes($logoFile))))
         $logo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-        $logo.Size = New-Object System.Drawing.Size(140, 40)
+        $logo.Size = New-Object System.Drawing.Size(226, 40)
         $logo.Margin = New-Object System.Windows.Forms.Padding(0)
         $logoTip = New-Object System.Windows.Forms.ToolTip
         $logoTip.SetToolTip($logo, (T 'The Koha name and logo belong to the Koha community.'))
