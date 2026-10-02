@@ -89,14 +89,14 @@ trap on_exit EXIT
 unshield_signals
 
 PANEL_VERSION=" 1.4.0"
-UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/refs/heads/main/installer"
+UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
 # 2. LANGUAGE / IDIOMA
 # ======================================================================
 CONFIG_DIR="/etc/koha-easy-install"
 TRANSLATION_CONFIG="${CONFIG_DIR}/translation.conf"
-LANG_REPO_URL="https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/refs/heads/main/lang"
+LANG_REPO_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/lang"
 _SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_PATH")" 2>/dev/null && pwd)"
 
@@ -556,9 +556,10 @@ kei_plain_args() {
 # Every dialog gets the panel's look, geometry and translated buttons.
 # Options given by the caller come later on the command line, so they still
 # win (e.g. --cancel-button "Back").
-# The panel's name in the panel language (pt-BR: "Koha descomplicado :
-# instalação e gestão"; the other languages keep the English name).
-panel_name() { t "Koha Easy Installer & Manager"; }
+# The panel's name in the panel language (pt-BR: "koha.nexus : Assistente
+# inteligente e gratuito para facilitar a gestão de bibliotecas"; the other
+# languages keep the English name).
+panel_name() { t "koha.nexus : A smart, free and easy-to-use assistant for library management"; }
 
 # Dialog program: "dialog" when it is installed (it takes mouse clicks:
 # buttons, menu items, check boxes), else whiptail (keyboard only).
@@ -2370,9 +2371,18 @@ create_safety_backup() {
 # ======================================================================
 # FILE EXPLORER
 # ======================================================================
+# Both pickers start in the home of the user who opened the panel (the one
+# behind sudo, see REAL_HOME), and fall back there when START is missing.
+picker_start_dir() {
+    local dir
+    for dir in "${1:-}" "${REAL_HOME:-}" /root /; do
+        [ -n "$dir" ] && [ -d "$dir" ] && { printf '%s' "$dir"; return 0; }
+    done
+}
+
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current="${1:-/}" exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -2381,7 +2391,7 @@ select_file() {
         for e in $exts; do fexpr+=(-o -iname "*.${e}"); done
         fexpr=("${fexpr[@]:1}")
     fi
-    [ -d "$current" ] || current="/"
+    current=$(picker_start_dir "${1:-}")
     while true; do
         items=()
         [ "$current" != "/" ] && items+=(".." "$(t "[Back]")")
@@ -2412,9 +2422,9 @@ select_file() {
 }
 
 select_directory() {
-    local current="${1:-/}" choice dirs=() marker
+    local current choice dirs=() marker
     marker=">>> $(t "SAVE HERE") <<<"
-    [ -d "$current" ] || current="/"
+    current=$(picker_start_dir "${1:-}")
     while true; do
         dirs=("$marker" "$current")
         [ "$current" != "/" ] && dirs+=(".." "$(t "[Back]")")
@@ -4073,7 +4083,7 @@ install_panel_copy() {
 }
 
 # ----------------------------------------------------------------------
-# Linux desktop launcher: "Koha descomplicado" in the applications menu
+# Linux desktop launcher: "koha.nexus" in the applications menu
 # (and on the desktop) of the user who ran the panel with sudo; it opens
 # the panel in a terminal. Only on native Linux with a graphical desktop.
 # ----------------------------------------------------------------------
@@ -4093,9 +4103,9 @@ launcher_entry() {
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Koha Easy Installer & Manager
-Name[pt_BR]=Koha descomplicado : instalação e gestão
-Name[pt]=Koha descomplicado : instalação e gestão
+Name=koha.nexus : A smart, free and easy-to-use assistant for library management
+Name[pt_BR]=koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas
+Name[pt]=koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas
 Comment=Install and manage Koha
 Comment[pt_BR]=Instalar e gerir o Koha
 Exec=sudo /usr/local/bin/config.sh
@@ -11486,7 +11496,7 @@ lt_br_abnt() {
     fi
     listing=""
     prompt_yes_no "$title" "$(t 'Records found: ${n}\n\nAdd the call numbers and the number of copies under each reference (collection listing)?\n\nChoose No for a plain bibliography (e.g. for students or the MEC evaluators).')" 14 74 defaultno && listing="--listing"
-    dir=$(select_directory "/root") || return 0
+    dir=$(select_directory "$REAL_HOME") || return 0
     tools_workdir || return 1
     _lt_br_abnt_run "$bib" "$cond" "$caption" "$listing" "$dir"
     local rc=$?
@@ -12787,9 +12797,9 @@ lt_cat_load() {
         "cutter" "Cutter-Sanborn" \
         "cdd"    "$(t "CDD (Dewey) schedule: number and caption per line")") || return 0
     if [ "$kind" = "pha" ]; then
-        file=$(select_file "/root" "txt csv tsv pdf" "$(t "Pick the table file (.txt, .csv, .tsv, or the PDF of the book, even scanned):")" "$(t "Table")") || return 0
+        file=$(select_file "$REAL_HOME" "txt csv tsv pdf" "$(t "Pick the table file (.txt, .csv, .tsv, or the PDF of the book, even scanned):")" "$(t "Table")") || return 0
     else
-        file=$(select_file "/root" "txt csv tsv" "$(t "Pick the table file (.txt, .csv or .tsv):")" "$(t "Table")") || return 0
+        file=$(select_file "$REAL_HOME" "txt csv tsv" "$(t "Pick the table file (.txt, .csv or .tsv):")" "$(t "Table")") || return 0
     fi
     if [ ! -r "$file" ] || [ ! -s "$file" ]; then
         msg_error "" "$(t "The file is empty or cannot be read.\nNothing was changed.")" 10 70
@@ -16644,7 +16654,7 @@ function_cdd() {
 
 lt_cdd_build() {
     local file
-    file=$(select_file "/root" "pdf txt" "$(t "Pick your copy of the CDD (.pdf, or .txt with the text of the PDF):")" "$(t "CDD file")") || return 0
+    file=$(select_file "$REAL_HOME" "pdf txt" "$(t "Pick your copy of the CDD (.pdf, or .txt with the text of the PDF):")" "$(t "CDD file")") || return 0
     tools_locked _lt_cdd_build "$file" || return 0
     if ! cdd_installed && prompt_yes_no "$(t "CDD lookup")" "$(t "Install the CDD lookup page in the staff interface now?")" 9 70; then
         lt_cdd_install
