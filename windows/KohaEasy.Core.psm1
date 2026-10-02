@@ -2300,9 +2300,9 @@ function Export-KohaDiagnostics {
 function Get-KohaIconPath { return [System.IO.Path]::Combine((Get-KohaPath Bin), 'koha.ico') }
 
 # The application's title on the Koha window, its header, the dialogs and
-# the Koha shortcut's tooltip ("Koha descomplicado : instalação e gestão"
-# in Portuguese).
-function Get-KohaAppTitle { return (T 'Koha Easy Installer & Manager') }
+# the Koha shortcut's tooltip (in Portuguese, "koha.nexus : Assistente
+# inteligente e gratuito para facilitar a gestão de bibliotecas").
+function Get-KohaAppTitle { return (T 'koha.nexus : A smart, free and easy-to-use assistant for library management') }
 
 # The icon of the program shortcuts: KohaEasy.exe's own icon (koha.ico,
 # built into the program the shortcuts start) while KohaEasy.exe is in use,

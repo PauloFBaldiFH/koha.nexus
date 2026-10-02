@@ -556,9 +556,10 @@ kei_plain_args() {
 # Every dialog gets the panel's look, geometry and translated buttons.
 # Options given by the caller come later on the command line, so they still
 # win (e.g. --cancel-button "Back").
-# The panel's name in the panel language (pt-BR: "Koha descomplicado :
-# instalação e gestão"; the other languages keep the English name).
-panel_name() { t "Koha Easy Installer & Manager"; }
+# The panel's name in the panel language (pt-BR: "koha.nexus : Assistente
+# inteligente e gratuito para facilitar a gestão de bibliotecas"; the other
+# languages keep the English name).
+panel_name() { t "koha.nexus : A smart, free and easy-to-use assistant for library management"; }
 
 # Dialog program: "dialog" when it is installed (it takes mouse clicks:
 # buttons, menu items, check boxes), else whiptail (keyboard only).
@@ -4044,7 +4045,7 @@ install_panel_copy() {
 }
 
 # ----------------------------------------------------------------------
-# Linux desktop launcher: "Koha descomplicado" in the applications menu
+# Linux desktop launcher: "koha.nexus" in the applications menu
 # (and on the desktop) of the user who ran the panel with sudo; it opens
 # the panel in a terminal. Only on native Linux with a graphical desktop.
 # ----------------------------------------------------------------------
@@ -4064,9 +4065,9 @@ launcher_entry() {
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Koha Easy Installer & Manager
-Name[pt_BR]=Koha descomplicado : instalação e gestão
-Name[pt]=Koha descomplicado : instalação e gestão
+Name=koha.nexus : A smart, free and easy-to-use assistant for library management
+Name[pt_BR]=koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas
+Name[pt]=koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas
 Comment=Install and manage Koha
 Comment[pt_BR]=Instalar e gerir o Koha
 Exec=sudo /usr/local/bin/config.sh
