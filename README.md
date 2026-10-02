@@ -123,7 +123,7 @@ Open **PowerShell** (Start menu, type *PowerShell*; no need to run it as adminis
 [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
 
-If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first.
+If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first. Double-click it as usual, not **Run as administrator**: Windows asks for permission only for the steps that need it. If Windows blocks it with no **Run anyway** button (Smart App Control on Windows 11, or a company policy), right-click the file > **Properties**, tick **Unblock** and click **OK**, or use the PowerShell line above, which is never blocked this way.
 
 The installer does everything else and shows each step in plain language:
 
