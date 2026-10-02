@@ -41,6 +41,7 @@ class Bridge:
     def __init__(self, env: PanelEnv):
         self.env = env
         self._verbs: set[str] | None = None
+        self._actions: set[str] | None = None
 
     # ------------------------------------------------------------------
     # Capabilities
@@ -62,6 +63,15 @@ class Bridge:
                 if m:
                     self._verbs = {v.strip() for v in m.group(1).split("|")}
         return verb in self._verbs
+
+    def has_action(self, action: str) -> bool:
+        """True when the installer in use knows `--run action`
+        (panel_action_function); an unknown one only prints an error."""
+        if self.env.demo:
+            return True
+        if self._actions is None:
+            self._actions = installer_actions(self.env.installer)
+        return action in self._actions
 
     def _argv(self, *args: str) -> list[str]:
         if not self.env.installer:
@@ -148,6 +158,16 @@ class Bridge:
             if len(parts) == 3:
                 rows.append((parts[0], int(parts[1] or 0), int(parts[2] or 0)))
         return rows
+
+
+def installer_actions(installer) -> set[str]:
+    """The --run actions of an installer file (panel_action_function)."""
+    try:
+        text = installer.read_text(encoding="utf-8", errors="replace") if installer else ""
+    except OSError:
+        return set()
+    m = re.search(r"^panel_action_function\(\) \{(.*?)^\}", text, re.S | re.M)
+    return set(re.findall(r"^\s+([a-z][a-z0-9-]*)\)\s+echo", m.group(1), re.M)) if m else set()
 
 
 # ----------------------------------------------------------------------

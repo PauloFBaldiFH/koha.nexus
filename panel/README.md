@@ -51,6 +51,30 @@ it (a subprocess is terminated), and `on_done` gets a `TaskResult`.
 `PacmanLoader` is a normal widget too: the dashboard uses the one-line form
 inline while it reads the status.
 
+## Module 1: AI setup (`a`)
+
+`views/ai.py` sets up the AI the cataloguing tools use:
+
+* **Provider selector** (radio list, mouse or arrows): Local Ollama, Google
+  Gemini, OpenAI, Anthropic Claude, or any OpenAI-compatible server.
+* **API key** in a password field. Saved to `vision.conf` (the file the
+  staff interface reads) and, per provider, to `ai-keys.conf` next to it,
+  both mode 0600; switching provider brings the saved key back. A saved key
+  is never put back in a widget: the field stays empty (empty = keep it) and
+  shows `••••` plus the last four characters.
+* **Local Ollama box**: checks that Ollama answers and whether the model is
+  downloaded, downloads it (`/api/pull`, with a real progress bar), and shows
+  the install command when nothing answers.
+* **Test connection** (F5) lists the provider's models with the same
+  endpoints as the staff interface's own test; **Save** (ctrl+s) refuses the
+  same problems the Perl side does (bad URL, key over plain http, missing key).
+* **Next step: MARC Replace**: once a provider is saved, opens the
+  installer's MARC Replace routine (`config.sh --run marc-replace`, or
+  `library-tools` with an older installer) to install or manage the page
+  whose "AI cataloguing" tab uses this provider.
+
+Every network call above is a thread job behind the Pac-Man loader.
+
 ## Layout
 
 ```
@@ -62,7 +86,9 @@ kei_panel/
   i18n.py           t() over the same lang/*.cache files and _MENU_PT
   glyphs.py         plain symbols for the classic Windows console
   env.py            installer path, language, KEI_PLAIN_GLYPHS rule
-  aiconf.py         vision.conf of the AI cataloguing tabs
+  aiconf.py         vision.conf of the AI cataloguing tabs, ai-keys.conf, key masking
+  aiclient.py       connection test and local Ollama (version, models, pull), blocking
+  marcreplace.py    is the MARC Replace page installed, which --run action opens it
   widgets/          PacmanLoader, StatusCard, ActionCard
   screens/          MainScreen, LoadingScreen, ConfirmScreen, ResultScreen
   views/            dashboard, section (generic), backup, database, ai
