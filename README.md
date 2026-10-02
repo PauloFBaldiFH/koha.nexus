@@ -8,6 +8,8 @@
 
 # Koha Easy Installer & Manager
 
+**koha.nexus : A smart, free and easy-to-use assistant for library management**
+
 A single Bash script that installs, tunes and maintains the **[Koha](https://koha-community.org/) Integrated Library System** on Debian/Ubuntu, through a friendly menu-driven control panel (whiptail, dark theme) available in **22 languages**.
 
 It was born from real-life experience facing technical barriers in collection management, and is designed for libraries without budget for expensive commercial systems or dedicated technical support.

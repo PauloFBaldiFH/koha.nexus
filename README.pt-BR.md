@@ -8,6 +8,8 @@
 
 # Koha Easy Installer & Manager
 
+**koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas**
+
 Um único script Bash que instala, ajusta e mantém o **[Koha](https://koha-community.org/), sistema integrado de gestão de bibliotecas**, no Debian/Ubuntu, por meio de um painel de controle com menus (whiptail, tema escuro) disponível em **22 idiomas**.
 
 Nasceu da experiência real com as barreiras técnicas da gestão de acervos e foi pensado para bibliotecas sem orçamento para sistemas comerciais caros ou suporte técnico dedicado.
