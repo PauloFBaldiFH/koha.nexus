@@ -130,6 +130,74 @@ Button.small {
     margin-right: 2;
 }
 
+/* ---- AI setup (views/ai.py) ---------------------------------------- */
+#ai-body {
+    height: auto;
+    margin-bottom: 1;
+}
+#ai-providers {
+    width: 35;
+    height: auto;
+    border: round $panel-lighten-2;
+    background: $surface;
+    padding: 0 1;
+    margin-right: 2;
+}
+#ai-providers:focus-within {
+    border: round $primary;
+}
+#ai-details {
+    width: 1fr;
+    height: auto;
+}
+.ai-box {
+    height: auto;
+    border: round $panel-lighten-2;
+    border-title-color: $text;
+    border-title-style: bold;
+    background: $surface;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+.ai-box:focus-within {
+    border: round $primary;
+}
+#view-ai .view-prompt, #ai-ollama-state, .ai-note {
+    width: 1fr;
+}
+.ai-note {
+    color: $text-muted;
+    padding-top: 1;
+}
+#ai-ollama {
+    border: round $warning;
+}
+#ai-ollama .form-buttons {
+    padding-top: 1;
+}
+#ai-cards {
+    grid-rows: 5;
+}
+#ai-cards .status-card {
+    height: 5;
+}
+#ai-hook {
+    border: round $success;
+    padding: 1;
+}
+#ai-hook-text {
+    width: 1fr;
+    padding-top: 1;
+    padding-right: 2;
+}
+.-narrow #ai-body {
+    layout: vertical;
+}
+.-narrow #ai-providers {
+    width: 1fr;
+    margin: 0 0 1 0;
+}
+
 /* ---- loading modal (Pac-Man) --------------------------------------- */
 LoadingScreen {
     align: center middle;
@@ -200,6 +268,8 @@ ConfirmScreen, ResultScreen {
 
 /* ---- classic Windows console / Linux console: ASCII borders ------- */
 App.-plain .status-card,
+App.-plain .ai-box,
+App.-plain #ai-providers,
 App.-plain .action-card,
 App.-plain #loader-box,
 App.-plain .dialog,

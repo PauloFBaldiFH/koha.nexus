@@ -57,8 +57,11 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance"),
         Entry("📋  Essential SQL reports pack", "library-tools"),
     ), view="database", key="t"),
-    # New screen: settings of the AI cataloguing tabs (staff web UI).
-    Section("ai", "🪄  AI cataloguing", "🪄  AI cataloguing", view="ai", key="a"),
+    # New screen (Module 1): AI provider setup for the cataloguing tabs of
+    # the staff web UI; its MARC Replace hook opens the routine below.
+    Section("ai", "🪄  AI cataloguing", "🪄  AI cataloguing", entries=(
+        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace"),
+    ), view="ai", key="a"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", verb=("--rebuild-search-index",),

@@ -22459,6 +22459,7 @@ panel_action_function() {
         interoperability)   echo function_interoperability ;;
         clock)              echo function_configure_clock ;;
         library-tools)      echo function_library_tools ;;
+        marc-replace)       echo function_marc_replace ;;
         monitor)            echo function_run_monitor ;;
         links)              echo function_run_links ;;
         mc)                 echo function_run_mc ;;
