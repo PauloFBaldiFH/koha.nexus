@@ -1,0 +1,35 @@
+<yazgfs>
+<!-- Test fixture: the parts of a Debian koha-conf.xml the panel reads.
+     Like the real file, Zebra's <server> sections come first and have
+     <config> elements of their own; the main <config> section is last. -->
+<listen id="biblioserver">unix:/var/run/koha/library/bibliosocket</listen>
+<server id="biblioserver" listenref="biblioserver">
+    <directory>/var/lib/koha/library/biblios</directory>
+    <config>/etc/koha/sites/library/zebra-biblios-dom.cfg</config>
+    <cql2rpn>/etc/koha/zebradb/pqf.properties</cql2rpn>
+</server>
+<serverinfo id="biblioserver">
+    <user>kohauser</user>
+    <password>zebrastripes</password>
+</serverinfo>
+<config>
+ <db_scheme>mysql</db_scheme>
+ <database>koha_library</database>
+ <hostname>localhost</hostname>
+ <port>3306</port>
+ <user>koha_library</user>
+ <pass>KeiTest-Pass_42</pass>
+ <memcached_servers>127.0.0.1:11211</memcached_servers>
+ <memcached_namespace>koha_library</memcached_namespace>
+
+ <!-- Elasticsearch Configuration (present by default, even on Zebra) -->
+ <elasticsearch>
+     <server>localhost:9200</server> <!-- may be repeated to include all servers on your cluster -->
+     <index_name>koha_library</index_name>
+     <!--
+     <userinfo>elastic:CHANGEME</userinfo>
+     -->
+     <cxn_pool>Static</cxn_pool>
+ </elasticsearch>
+</config>
+</yazgfs>

@@ -1,0 +1,214 @@
+#!/bin/bash
+# Test double for the Koha command-line scripts used by the library tools
+# (stage_file.pl, commit_file.pl, import_patrons.pl, update_patrons_category.pl,
+# delete_patrons.pl, batch_anonymise.pl, search_for_data_inconsistencies.pl,
+# koha-preferences).
+# Installed by tests/run.sh as symlinks under /usr/share/koha/bin, on
+# disposable test machines only. They change the test database the way Koha
+# would and print Koha's report lines, so the panel's dry-run / confirmation
+# logic runs for real. Every call goes to /run/kei-mock/calls.log with the
+# number of PRE-* safety backups present at that moment ("[pre=N]");
+# /run/kei-mock/fail/<script> makes a script fail.
+S=/run/kei-mock
+DB=koha_library
+name=$(basename "$0")
+ARGS=("$@")
+pre=$(find /var/backups/koha_sql -maxdepth 1 -name 'PRE-*' 2>/dev/null | wc -l)
+printf '%s %s [pre=%s]\n' "$name" "$*" "$pre" >> "$S/calls.log"
+[ -e "$S/fail/$name" ] && { echo "$name: simulated failure" >&2; exit 1; }
+
+sql() { mysql -Nse "$1" "$DB"; }
+csv_row() {   # csv_row LINE: fields of a CSV line (quotes handled) in ROW
+    local line="$1" i c q=0 cur=""
+    ROW=()
+    for ((i = 0; i < ${#line}; i++)); do
+        c="${line:i:1}"
+        if [ "$q" = 1 ]; then
+            if [ "$c" = '"' ]; then
+                if [ "${line:i+1:1}" = '"' ]; then cur+='"'; i=$((i + 1)); else q=0; fi
+            else cur+="$c"; fi
+        elif [ "$c" = '"' ]; then q=1
+        elif [ "$c" = "," ]; then ROW+=("$cur"); cur=""
+        else cur+="$c"; fi
+    done
+    ROW+=("$cur")
+}
+opt() {   # opt NAME: value given to --NAME
+    local a prev=""
+    for a in "${ARGS[@]}"; do
+        [ "$prev" = "--$1" ] && { printf '%s' "$a"; return 0; }
+        prev="$a"
+    done
+    return 1
+}
+has() { local a; for a in "${ARGS[@]}"; do [ "$a" = "$1" ] && return 0; done; return 1; }
+
+case "$name" in
+stage_file.pl)
+    f=$(opt file) || exit 0
+    [ -r "$f" ] || { echo "$0: cannot open input file $f" >&2; exit 2; }
+    cp -f "$f" "$S/last-staged.mrc"
+    if [ "$(opt format)" = "MARCXML" ]; then
+        n=$(grep -o '<record[ >]' "$f" | wc -l)
+    else
+        n=$(tr -cd '\035' < "$f" | wc -c)
+    fi
+    sql "INSERT INTO import_batches (num_records, import_status, record_type, file_name, comments)
+         VALUES ($n, 'staged', 'biblio', '$f', '$(opt comment)');"
+    id=$(sql "SELECT MAX(import_batch_id) FROM import_batches;")
+    for ((i = 0; i < n; i++)); do sql "INSERT INTO import_records (import_batch_id, status) VALUES ($id, 'staged');"; done
+    printf '... staging MARC records -- please wait\n... finished staging MARC records\n\n'
+    printf 'MARC record staging report\n------------------------------------\n'
+    printf 'Input file:                 %s\nRecord type:                biblio\n' "$f"
+    printf 'Number of input records:    %s\nNumber of valid records:    %s\nNumber of invalid records:  0\n' "$n" "$n"
+    if has --match; then echo "Number of records matched:  0"
+    else echo "Incoming records not matched against existing records (--match option not supplied)"; fi
+    printf 'Number of items parsed:  %s\n\nBatch number assigned:  %s\n\n' "$n" "$id"
+    ;;
+commit_file.pl)
+    b=$(opt batch-number)
+    st=$(sql "SELECT import_status FROM import_batches WHERE import_batch_id = ${b:-0};")
+    [ -n "$st" ] || { echo "$0: import batch $b does not exist in database" >&2; exit 2; }
+    if has --revert; then
+        [ "$st" = "imported" ] || { echo "$0: import batch $b status is '$st', and therefore cannot be imported" >&2; exit 2; }
+        n=0
+        while read -r bib; do
+            [ -n "$bib" ] || continue
+            sql "DELETE FROM biblio WHERE biblionumber = $bib;"; n=$((n + 1))
+        done < "$S/batch-$b.biblios"
+        sql "UPDATE import_records SET status = 'reverted' WHERE import_batch_id = $b;
+             UPDATE import_items ii JOIN import_records ir USING (import_record_id) SET ii.status = 'reverted' WHERE ir.import_batch_id = $b;
+             UPDATE import_batches SET import_status = 'reverted' WHERE import_batch_id = $b;"
+        printf '... reverting batch -- please wait\n... finished reverting batch\n\n'
+        printf 'MARC record import report\n----------------------------------------\n'
+        printf 'Batch number:                    %s\nNumber of records deleted:       %s\nNumber of errors:                0\n' "$b" "$n"
+        printf 'Number of records reverted:      0\nNumber of records ignored:       0\nNumber of items deleted:         %s\n\n' "$n"
+    else
+        case "$st" in staged|reverted) ;; *) echo "$0: import batch $b status is '$st', and therefore cannot be imported" >&2; exit 2 ;; esac
+        : > "$S/batch-$b.biblios"
+        n=0
+        for rec in $(sql "SELECT import_record_id FROM import_records WHERE import_batch_id = $b;"); do
+            bib=$(sql "INSERT INTO biblio (title, author, datecreated) VALUES ('IMPORTED batch $b', 'mock', CURDATE()); SELECT LAST_INSERT_ID();")
+            sql "INSERT INTO items (biblionumber, barcode, homebranch) VALUES ($bib, 'IMP-$b-$rec', 'CPL');
+                 INSERT INTO import_items (import_record_id, status) VALUES ($rec, 'imported');
+                 UPDATE import_records SET status = 'imported' WHERE import_record_id = $rec;"
+            echo "$bib" >> "$S/batch-$b.biblios"; n=$((n + 1))
+        done
+        sql "UPDATE import_batches SET import_status = 'imported' WHERE import_batch_id = $b;"
+        printf '... importing MARC records -- please wait\n... finished importing MARC records\n\n'
+        printf 'MARC record import report\n----------------------------------------\n'
+        printf 'Batch number:                    %s\nNumber of new records added:     %s\n' "$b" "$n"
+        printf 'Number of records replaced:      0\nNumber of records ignored:       0\nNumber of items added:           %s\n' "$n"
+        printf 'Number of items replaced:        0\nNumber of items ignored:         0\n'
+    fi
+    ;;
+import_patrons.pl)
+    f=$(opt file); m=$(opt matchpoint)
+    [ -n "$f" ] && [ -n "$m" ] || { echo "--file and --matchpoint are required" >&2; exit 2; }
+    declare -A def=()
+    prev=""
+    for a in "${ARGS[@]}"; do [ "$prev" = "--default" ] && def[${a%%=*}]="${a#*=}"; prev="$a"; done
+    has --confirm || echo "Running in dry-run mode, provide --confirm to apply the changes" >&2
+    IFS= read -r line < "$f"; csv_row "${line%$'\r'}"; head=("${ROW[@]}")
+    imported=0; overwritten=0; skipped=0; invalid=0
+    while IFS= read -r line; do
+        csv_row "${line%$'\r'}"; row=("${ROW[@]}")
+        declare -A r=()
+        for i in "${!head[@]}"; do r[${head[i]}]="${row[i]:-}"; done
+        key="${r[$m]:-}"
+        if [ -z "$key" ] || [ -z "${r[surname]:-}" ]; then invalid=$((invalid + 1)); unset r; continue; fi
+        if [ "$(sql "SELECT COUNT(*) FROM borrowers WHERE $m = '$key';")" != "0" ]; then
+            if has --overwrite; then
+                overwritten=$((overwritten + 1))
+                has --confirm && sql "UPDATE borrowers SET surname = '${r[surname]}' WHERE $m = '$key';"
+            else
+                skipped=$((skipped + 1))
+            fi
+        else
+            imported=$((imported + 1))
+            has --confirm && sql "INSERT INTO borrowers (cardnumber, surname, firstname, branchcode, categorycode)
+                VALUES ('${r[cardnumber]:-}', '${r[surname]}', '${r[firstname]:-}', '${r[branchcode]:-${def[branchcode]}}', '${r[categorycode]:-${def[categorycode]}}');"
+        fi
+        unset r
+    done < <(tail -n +2 "$f")
+    if has -v; then
+        printf '\nImport complete:\nImported:    %s\nOverwritten: %s\nSkipped:     %s\nInvalid:     %s\nTotal:       %s\n\n' \
+            "$imported" "$overwritten" "$skipped" "$invalid" $((imported + overwritten + skipped + invalid))
+    fi
+    ;;
+update_patrons_category.pl)
+    from=$(opt from); to=$(opt to)
+    [ -n "$from" ] && [ -n "$to" ] || { echo "Must supply category from and to (-f & -t)"; exit 1; }
+    [ "$(sql "SELECT COUNT(*) FROM categories WHERE categorycode IN ('$from', '$to');")" = "2" ] || { echo "Categories not found" >&2; exit 255; }
+    cond="categorycode = '$from'"
+    b=$(opt branch) && cond+=" AND branchcode = '$b'"
+    has --too_old && cond+=" AND dateofbirth < DATE_SUB(CURDATE(), INTERVAL 18 YEAR)"
+    rb=$(opt regbefore) && cond+=" AND dateenrolled <= '$rb'"
+    has --confirm || echo "No actions will be taken (test mode)"
+    echo "Will update patrons from $from to $to with conditions below (if any)"
+    found=$(sql "SELECT COUNT(*) FROM borrowers WHERE $cond;")
+    word="WOULD HAVE Updated"; has --confirm && word="Updated"
+    sql "SELECT CONCAT(COALESCE(firstname, ''), ' ', surname) FROM borrowers WHERE $cond;" | while read -r who; do
+        echo "$word $who from $from to $to"
+    done
+    updated=0
+    if has --confirm; then
+        sql "UPDATE borrowers SET categorycode = '$to' WHERE $cond;"
+        updated=$found
+    fi
+    echo "$found found, $updated updated"
+    ;;
+delete_patrons.pl)
+    eb=$(opt expired_before); nb=$(opt not_borrowed_since)
+    cond="(flags IS NULL OR flags = 0) AND categorycode <> 'S'
+          AND borrowernumber NOT IN (SELECT borrowernumber FROM issues)"
+    [ -n "$eb" ] && cond+=" AND dateexpiry < '$eb'"
+    [ -n "$nb" ] && cond+=" AND borrowernumber NOT IN (SELECT borrowernumber FROM old_issues WHERE borrowernumber IS NOT NULL AND issuedate >= '$nb')"
+    c=$(opt category_code) && cond+=" AND categorycode = '$c'"
+    if ! has --confirm; then
+        echo "Doing a dry run; no patron records will actually be deleted."
+        echo "Run again with --confirm to delete the records."
+    fi
+    ids=$(sql "SELECT borrowernumber FROM borrowers WHERE $cond;")
+    n=$(printf '%s\n' $ids | grep -c .)
+    echo "$n patrons match conditions"
+    for id in $ids; do
+        printf 'Testing that we can delete patron %s... ' "$id"
+        has --confirm && sql "DELETE FROM borrowers WHERE borrowernumber = $id;"
+        echo "OK"
+    done
+    if has --confirm; then echo "$n patrons deleted"; else echo "$n patrons would have been deleted"; fi
+    ;;
+batch_anonymise.pl)
+    d=$(opt days)
+    [ -n "$d" ] || { echo "The days parameter is mandatory."; exit 1; }
+    has -v && echo "Checkouts and holds before $(date -d "-$d days" +%F) will be anonymised."
+    loans=$(sql "UPDATE old_issues o JOIN borrowers b ON b.borrowernumber = o.borrowernumber SET o.borrowernumber = NULL
+                 WHERE b.privacy <> 0 AND o.returndate < DATE_SUB(CURDATE(), INTERVAL $d DAY); SELECT ROW_COUNT();")
+    holds=$(sql "UPDATE old_reserves r JOIN borrowers b ON b.borrowernumber = r.borrowernumber SET r.borrowernumber = NULL
+                 WHERE b.privacy <> 0 AND r.timestamp < DATE_SUB(CURDATE(), INTERVAL $d DAY); SELECT ROW_COUNT();")
+    has -v && { echo "$loans checkouts anonymised."; echo "$holds holds anonymised."; }
+    ;;
+koha-preferences)
+    cmd="${ARGS[0]:-}"; pref="${ARGS[1]:-}"; val="${ARGS[2]:-}"
+    [ -n "$(sql "SELECT 1 FROM systempreferences WHERE variable = '$pref';")" ] || { echo "No such preference $pref" >&2; exit 2; }
+    case "$cmd" in
+        get) sql "SELECT value FROM systempreferences WHERE variable = '$pref';" ;;
+        set)
+            [ "$(sql "SELECT value FROM systempreferences WHERE variable = '$pref';")" = "$val" ] && exit 3
+            sql "UPDATE systempreferences SET value = '$val' WHERE variable = '$pref';" ;;
+        *) echo "usage: koha-preferences get|set PREF [VALUE]" >&2; exit 1 ;;
+    esac
+    ;;
+search_for_data_inconsistencies.pl)
+    bad=$(sql "SELECT itemnumber FROM items WHERE homebranch IS NULL;")
+    if [ -n "$bad" ]; then
+        echo "== Items without home or holding library =="
+        for i in $bad; do echo "* Item with itemnumber=$i does not have home and holding library defined"; done
+        echo "=> Edit these items and set valid homebranch and/or holdingbranch"
+    fi
+    ;;
+*)
+    echo "koha-script: unknown script $name" >&2; exit 2 ;;
+esac
+exit 0

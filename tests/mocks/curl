@@ -1,0 +1,15 @@
+#!/bin/bash
+# Test double for curl (tests/ only): requests to Elasticsearch on
+# 127.0.0.1:9200 answer only when /run/kei-mock/es-up exists; every other
+# request goes to the real curl.
+for a in "$@"; do
+    case "$a" in
+        *127.0.0.1:9200*|*localhost:9200*)
+            echo "curl $*" >> /run/kei-mock/calls.log
+            [ -e /run/kei-mock/es-up ] || { echo "curl: (7) Failed to connect to 127.0.0.1 port 9200" >&2; exit 7; }
+            echo '{"count":0,"tagline":"You Know, for Search"}'
+            exit 0
+            ;;
+    esac
+done
+exec /usr/bin/curl "$@"

@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Test double for the WhatsApp gateway (Evolution API and a generic one),
+the Telegram Bot API and the vision models of the AI cataloguing (OpenAI-
+compatible /v1/chat/completions and /v1/models, Ollama /api/chat and
+/api/tags), used by tests/modules.bats on disposable machines.
+
+    http-mock PORT STATE_DIR
+
+Every request is appended to STATE_DIR/http.log as one JSON line (method,
+path, apikey / authorization headers, JSON body). STATE_DIR/http-fail makes
+the WhatsApp endpoints answer 500. Telegram: a token containing "BAD" is
+refused (401); getUpdates returns the updates of STATE_DIR/tg-updates.json
+whose update_id is at least the requested offset. Vision: the answer of the
+model is the text of STATE_DIR/vision-reply.txt; STATE_DIR/vision-fail
+makes it answer 500; the images of a request are logged by their size.
+"""
+import json
+import os
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+PORT, STATE = int(sys.argv[1]), sys.argv[2]
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def reply(self, code, data):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def vision(self, body):
+        if os.path.exists(os.path.join(STATE, "vision-fail")):
+            return self.reply(500, {"error": {"message": "model crashed"}})
+        with open(os.path.join(STATE, "vision-reply.txt"), encoding="utf-8") as f:
+            text = f.read()
+        if self.path == "/api/chat":
+            return self.reply(200, {"model": body.get("model"), "message": {"role": "assistant", "content": text}, "done": True})
+        return self.reply(200, {"choices": [{"index": 0, "message": {"role": "assistant", "content": text}}]})
+
+    def do_GET(self):
+        with open(os.path.join(STATE, "http.log"), "a", encoding="utf-8") as log:
+            log.write(json.dumps({"method": "GET", "path": self.path, "authorization": self.headers.get("Authorization")}) + "\n")
+        if self.path == "/v1/models":
+            return self.reply(200, {"data": [{"id": "vision-test"}, {"id": "other"}]})
+        if self.path == "/api/tags":
+            return self.reply(200, {"models": [{"name": "qwen2.5vl:7b"}]})
+        return self.reply(404, {"error": "not found"})
+
+    def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        try:
+            body = json.loads(raw.decode("utf-8")) if raw else {}
+        except ValueError:
+            body = {"_raw": raw.decode("utf-8", "replace")}
+        if self.path in ("/v1/chat/completions", "/api/chat"):
+            logged = json.loads(json.dumps(body))
+            for m in logged.get("messages", []):
+                if isinstance(m.get("content"), list):
+                    for c in m["content"]:
+                        if c.get("type") == "image_url":
+                            c["image_url"] = "bytes:%d" % len(c["image_url"]["url"])
+                if "images" in m:
+                    m["images"] = ["bytes:%d" % len(i) for i in m["images"]]
+            with open(os.path.join(STATE, "http.log"), "a", encoding="utf-8") as log:
+                log.write(json.dumps({"path": self.path, "authorization": self.headers.get("Authorization"), "body": logged}, ensure_ascii=False) + "\n")
+            return self.vision(body)
+        with open(os.path.join(STATE, "http.log"), "a", encoding="utf-8") as log:
+            log.write(json.dumps({"path": self.path, "apikey": self.headers.get("apikey"),
+                                  "authorization": self.headers.get("Authorization"),
+                                  "body": body}, ensure_ascii=False) + "\n")
+        if self.path.startswith("/bot"):
+            token, _, method = self.path[4:].partition("/")
+            if "BAD" in token:
+                return self.reply(401, {"ok": False, "error_code": 401, "description": "Unauthorized"})
+            if method == "getMe":
+                return self.reply(200, {"ok": True, "result": {"id": 42, "is_bot": True, "username": "biblioteca_teste_bot"}})
+            if method == "getUpdates":
+                updates = []
+                path = os.path.join(STATE, "tg-updates.json")
+                if os.path.exists(path):
+                    with open(path, encoding="utf-8") as f:
+                        updates = json.load(f)
+                offset = int(body.get("offset") or 0)
+                return self.reply(200, {"ok": True, "result": [u for u in updates if u["update_id"] >= offset]})
+            if method == "sendMessage":
+                return self.reply(200, {"ok": True, "result": {"message_id": 1, "chat": {"id": body.get("chat_id")}}})
+            return self.reply(404, {"ok": False, "description": "Not Found"})
+        if os.path.exists(os.path.join(STATE, "http-fail")):
+            return self.reply(500, {"error": "gateway down"})
+        return self.reply(201, {"key": {"id": "MSG1"}, "status": "PENDING"})
+
+
+HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

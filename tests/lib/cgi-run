@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+# Runs a CGI script like the web server would (tests only):
+#   cgi-run SCRIPT GET|POST [name=value ...] [name=@FILE ...]
+# GET puts the parameters in QUERY_STRING; POST sends them as
+# multipart/form-data (name=@FILE uploads FILE). The session cookie is
+# CGISESSID=SESSID1 (see the Koha test doubles). The script output goes
+# to stdout; the Koha doubles come from PERL5LIB.
+use strict;
+use warnings;
+
+my ( $script, $method, @params ) = @ARGV;
+die "usage: cgi-run SCRIPT GET|POST [name=value | name=\@FILE ...]\n" unless $script && $method;
+my $enc = sub { my $s = shift; $s =~ s/([^A-Za-z0-9_.~-])/sprintf('%%%02X', ord $1)/ge; return $s };
+$ENV{HTTP_COOKIE}     = 'CGISESSID=SESSID1';
+$ENV{REQUEST_METHOD}  = $method;
+$ENV{SCRIPT_NAME}     = '/cgi-bin/koha/tools/marc_replace.pl';
+$ENV{SERVER_NAME}     = 'localhost';
+$ENV{SERVER_PORT}     = 8080;
+$ENV{GATEWAY_INTERFACE} = 'CGI/1.1';
+my $body = '';
+if ( $method eq 'GET' ) {
+    $ENV{QUERY_STRING} = join '&', map { my ( $k, $v ) = split /=/, $_, 2; $enc->($k) . '=' . $enc->( $v // '' ) } @params;
+} else {
+    my $b = 'keiBoundary7MA4YWxkTrZu0gW';
+    for my $p (@params) {
+        my ( $k, $v ) = split /=/, $p, 2;
+        $v //= '';
+        if ( $v =~ s/^@// ) {
+            open( my $fh, '<:raw', $v ) or die "$v: $!\n";
+            my $data = do { local $/; <$fh> };
+            close $fh;
+            ( my $name = $v ) =~ s{.*/}{};
+            $body .= "--$b\r\nContent-Disposition: form-data; name=\"$k\"; filename=\"$name\"\r\nContent-Type: application/octet-stream\r\n\r\n$data\r\n";
+        } else {
+            $body .= "--$b\r\nContent-Disposition: form-data; name=\"$k\"\r\n\r\n$v\r\n";
+        }
+    }
+    $body .= "--$b--\r\n";
+    $ENV{CONTENT_TYPE}   = "multipart/form-data; boundary=$b";
+    $ENV{CONTENT_LENGTH} = length $body;
+    $ENV{QUERY_STRING}   = '';
+}
+open( my $run, '|-', $^X, $script ) or die "cannot run $script: $!\n";
+binmode $run;
+print {$run} $body;
+close $run;
+exit( $? >> 8 );

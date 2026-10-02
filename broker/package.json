@@ -1,0 +1,24 @@
+{
+  "name": "kei-broker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Koha Easy Installer subdomain broker (Cloudflare Worker): provisions library subdomains and Cloudflare Tunnels without exposing the account API token.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build:local": "wrangler deploy --dry-run --outdir .wrangler/e2e-build",
+    "test:e2e": "npm run build:local && node test/e2e/run.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply kei-broker --local",
+    "db:migrate": "wrangler d1 migrations apply kei-broker --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260928.1",
+    "miniflare4": "npm:miniflare@^4.20260730.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.143.0"
+  }
+}
