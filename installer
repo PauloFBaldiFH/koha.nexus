@@ -201,23 +201,23 @@ declare -A _MENU_PT=(
     ["Error"]="Erro"
     ["Warning"]="Aviso"
     ["Select an option:"]="Selecione uma opção:"
-    ["⚙  Install Koha server"]="⚙  Instalar servidor Koha"
-    ["ℹ  View first-access credentials"]="ℹ  Visualizar credenciais de primeiro acesso"
-    ["↻  Restore database"]="↻  Restaurar base de dados"
-    ["▣  Backup center"]="▣  Central de cópias de segurança"
-    ["⌁  Search engine & indexing"]="⌁  Motor de busca e indexação"
-    ["☁  Publish system to internet"]="☁  Publicar sistema na Internet"
-    ["◈  Diagnostics & maintenance center"]="◈  Diagnóstico e manutenção"
-    ["⚠  Security center"]="⚠  Central de segurança"
-    ["⚙  Koha settings & parameters"]="⚙  Configurações e parâmetros do Koha"
-    ["▦  Library tools"]="▦  Ferramentas da biblioteca"
-    ["▤  General tools"]="▤  Ferramentas gerais"
-    ["⏱  Schedules & cron tasks"]="⏱  Tarefas agendadas e automações"
-    ["✦  Koha languages"]="✦  Idiomas do Koha e do Painel"
-    ["⟳  Update center"]="⟳  Central de atualizações"
-    ["ℹ  About the program & support"]="ℹ  Sobre o programa e suporte"
-    ["↻  Reboot server"]="↻  Reiniciar servidor"
-    ["✖  Exit"]="✖  Sair"
+    ["📦  Install Koha server"]="📦  Instalar servidor Koha"
+    ["🔑  View first-access credentials"]="🔑  Visualizar credenciais de primeiro acesso"
+    ["📥  Restore database"]="📥  Restaurar base de dados"
+    ["💾  Backup center"]="💾  Central de cópias de segurança"
+    ["🔍  Search engine & indexing"]="🔍  Motor de busca e indexação"
+    ["🌐  Publish system to internet"]="🌐  Publicar sistema na Internet"
+    ["🩺  Diagnostics & maintenance center"]="🩺  Diagnóstico e manutenção"
+    ["🔒  Security center"]="🔒  Central de segurança"
+    ["🔧  Koha settings & parameters"]="🔧  Configurações e parâmetros do Koha"
+    ["📚  Library tools"]="📚  Ferramentas da biblioteca"
+    ["🧰  General tools"]="🧰  Ferramentas gerais"
+    ["⏰  Schedules & cron tasks"]="⏰  Tarefas agendadas e automações"
+    ["🌍  Koha languages"]="🌍  Idiomas do Koha e do Painel"
+    ["🔄  Update center"]="🔄  Central de atualizações"
+    ["💡  About the program & support"]="💡  Sobre o programa e suporte"
+    ["🔁  Reboot server"]="🔁  Reiniciar servidor"
+    ["🚪  Exit"]="🚪  Sair"
 )
 
 # NOTE: the helpers below use "__t_" local names on purpose. Values are read
@@ -518,8 +518,11 @@ ui_layout() {
 declare -A KEI_GLYPH_ASCII=(
     ["✔"]="+" ["✓"]="+" ["☑"]="+" ["✖"]="x" ["●"]="*" ["•"]="*" ["◆"]="*"
     ["⚠"]="!" ["→"]="->" ["⇄"]="<->" ["↔"]="<->"
+    ["✅"]="+" ["❌"]="x" ["❗"]="!" ["🔹"]="*" ["⭐"]="*"
+    ["🟢"]="+" ["🔴"]="x" ["⚪"]="-" ["⬜"]="-"
 )
-KEI_GLYPH_ICONS=("⚙" "ℹ" "↻" "↶" "▣" "▤" "▦" "⌁" "⌕" "☁" "◈" "◌" "◷" "⏱" "✦" "★" "⟳" "⇩" "✉" "✎" "✏" "📖" "📋" "🪄" "️")
+KEI_GLYPH_ICONS=("⚙" "ℹ" "↻" "↶" "▣" "▤" "▦" "⌁" "⌕" "☁" "◈" "◌" "◷" "⏱" "✦" "★" "⟳" "⇩" "✉" "✎" "✏" "📖" "📋" "🪄" "️"
+    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🎓" "🎭" "🏠" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
 KEI_GLYPH_SED=""
 for _g in "${!KEI_GLYPH_ASCII[@]}"; do KEI_GLYPH_SED+="s/${_g}/${KEI_GLYPH_ASCII[$_g]}/g;"; done
 for _g in "${KEI_GLYPH_ICONS[@]}"; do KEI_GLYPH_SED+="s/${_g} *//g;"; done
@@ -1598,7 +1601,7 @@ tui_celebrate() {
         printf '   %s%s%s%s%s' "$REPLY" "$TUI_GRN" "$TUI_BLD" "$(t "Your library is ready!")" "$TUI_RST"
         tui_icon "✨"; printf ' %s\n' "$REPLY"
     else
-        tui_icon "⚠"
+        tui_icon "❗"
         printf '   %s%s%s%s\n' "$REPLY" "$TUI_YEL" "$(t 'Koha was installed, but the final check found ${fails} problem(s).')" "$TUI_RST"
     fi
     printf '   %s%s%s\n\n' "$TUI_DIM" "$rule" "$TUI_RST"
@@ -2465,11 +2468,11 @@ v_reset() {
         echo "======================================================================"
     } > "$VALIDATION_LOG"
 }
-# Status markers: ✔ ok, ⚠ warning, ✖ failure, ● information.
-v_ok()   { V_OK=$((V_OK+1));    printf '✔ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
-v_warn() { V_WARN=$((V_WARN+1)); printf '⚠ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
-v_fail() { V_FAIL=$((V_FAIL+1)); printf '✖ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
-v_info() { printf '● %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
+# Status markers: ✅ ok, ❗ warning, ❌ failure, 🔹 information.
+v_ok()   { V_OK=$((V_OK+1));    printf '✅ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
+v_warn() { V_WARN=$((V_WARN+1)); printf '❗ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
+v_fail() { V_FAIL=$((V_FAIL+1)); printf '❌ %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
+v_info() { printf '🔹 %s\n' "$1" | tee -a "$VALIDATION_LOG"; }
 
 validate_command() {
     local msg
@@ -2974,7 +2977,7 @@ validate_pre_installation() {
     if [ "$V_FAIL" -ne 0 ]; then
         local err_list
         local fail_tag
-        fail_tag="✖ "
+        fail_tag="❌ "
         err_list=$(awk -v tag="$fail_tag" 'index($0, tag) == 1 { print substr($0, length(tag) + 1) }' "$VALIDATION_LOG" | head -n 4)
         
         local fail_msg
@@ -6176,8 +6179,8 @@ function_manage_crons() {
             --menu "$(t "The Cron service runs routine maintenance and backup jobs without human intervention.")" 18 78 4 \
             "1" "$(t "📖 Understand what each automated task does")" \
             "2" "$(t "📋 View active tasks and schedules")" \
-            "3" "$(t "⚙️ Restore/Regenerate default schedules")" \
-            "4" "$(t "✏️ Edit schedules manually (Advanced - nano)")" \
+            "3" "$(t "🔄 Restore/Regenerate default schedules")" \
+            "4" "$(t "📝 Edit schedules manually (Advanced - nano)")" \
             3>&1 1>&2 2>&3) || return 0
 
         [ -z "$cron_choice" ] && return 0
@@ -7177,12 +7180,12 @@ function_configure_cloudflare() {
         choice=$(whiptail --title "$(t "Cloudflare Tunnel Manager")" \
             --cancel-button "$(t "Back")" \
             --menu "$(t "Tunnel Status: \$tunnel_active\n\nCloudflare Tunnel safely exposes Koha without opening ports.\n\nWhat do you want to do?")" 20 78 6 \
-            "1" "$(t "★  Free Address (no domain needed)")" \
-            "2" "$(t "⚙  Use My Own Domain (Cloudflare account)")" \
-            "3" "$(t "ℹ  View Public Links and Security Status")" \
-            "4" "$(t "▣  Share the Catalog Link (QR code, link)")" \
-            "5" "$(t "↻  Restart Tunnel Service")" \
-            "6" "$(t "✖  Disable and Remove Tunnel (Go Offline)")" \
+            "1" "$(t "🆓  Free Address (no domain needed)")" \
+            "2" "$(t "🏠  Use My Own Domain (Cloudflare account)")" \
+            "3" "$(t "🔗  View Public Links and Security Status")" \
+            "4" "$(t "📱  Share the Catalog Link (QR code, link)")" \
+            "5" "$(t "🔁  Restart Tunnel Service")" \
+            "6" "$(t "🛑  Disable and Remove Tunnel (Go Offline)")" \
             3>&1 1>&2 2>&3)
         [[ $? -ne 0 ]] && break
 
@@ -7381,7 +7384,7 @@ function_google_search_console() {
     esac
 
     msg_info "$(t "FINAL GOOGLE CHECKLIST")" \
-        "$(t "AUTOMATICALLY BY THE PANEL:\n\n[✓] OPAC checked\n[✓] OpacMetaRobots checked\n[✓] Koha sitemap located/generated when possible\n[✓] Public sitemap tested\n[✓] robots.txt tested\n\nMANUALLY IN GOOGLE:\n\n[ ] Property added\n[ ] Property verified\n[ ] Sitemap submitted\n[ ] Homepage tested with URL Inspection\n[ ] Indexing requested if necessary\n\nIMPORTANT:\nSearch Console helps Google discover the catalog, but it does not guarantee that every page will be indexed or appear immediately in search results.")" 25 92
+        "$(t "AUTOMATICALLY BY THE PANEL:\n\n✅ OPAC checked\n✅ OpacMetaRobots checked\n✅ Koha sitemap located/generated when possible\n✅ Public sitemap tested\n✅ robots.txt tested\n\nMANUALLY IN GOOGLE:\n\n⬜ Property added\n⬜ Property verified\n⬜ Sitemap submitted\n⬜ Homepage tested with URL Inspection\n⬜ Indexing requested if necessary\n\nIMPORTANT:\nSearch Console helps Google discover the catalog, but it does not guarantee that every page will be indexed or appear immediately in search results.")" 25 92
 
     log "Google Search Console assistant executed for OPAC: $opac_url"
 }
@@ -7770,21 +7773,21 @@ function_deep_maintenance() {
 # ======================================================================
 # 21. DETAILED STATUS
 # ======================================================================
-# "✔ active", "✖ failed" or "● inactive" for the status screen.
+# "🟢 active", "🔴 failed" or "⚪ inactive" for the status screen.
 st_mark() {
     case "$1" in
-        active) printf '✔ %s' "$1" ;;
-        failed) printf '✖ %s' "$1" ;;
-        *)      printf '● %s' "${1:-unknown}" ;;
+        active) printf '🟢 %s' "$1" ;;
+        failed) printf '🔴 %s' "$1" ;;
+        *)      printf '⚪ %s' "${1:-unknown}" ;;
     esac
 }
 
 function_detailed_status() {
     local engine idx pend docs bibs plack email
     engine=$(get_search_engine)
-    if is_koha_indexer_running; then idx="✔ $(t "running")"; else idx="● $(t "stopped")"; fi
-    if plack_running; then plack="✔ $(t "running")"; else plack="✖ $(t "stopped")"; fi
-    if [ -e "$KOHA_EMAIL_FLAG" ]; then email="✔ koha-email-enable"; else email="● $(t "not configured")"; fi
+    if is_koha_indexer_running; then idx="🟢 $(t "running")"; else idx="⚪ $(t "stopped")"; fi
+    if plack_running; then plack="🟢 $(t "running")"; else plack="🔴 $(t "stopped")"; fi
+    if [ -e "$KOHA_EMAIL_FLAG" ]; then email="🟢 koha-email-enable"; else email="⚪ $(t "not configured")"; fi
     pend=$(get_pending_es_jobs)
     docs=$(get_total_es_documents)
     bibs=$(get_total_biblios)
@@ -8233,7 +8236,7 @@ function_fail2ban_status() {
     for jail in sshd apache-auth apache-badbots; do
         info+="=== ${jail} ===\n$(fail2ban-client status "$jail" 2>/dev/null || t 'jail inactive')\n\n"
     done
-    whiptail --title "$(t '⚠ Fail2ban')" --scrolltext --msgbox "$(printf '%b' "$info")" 24 78 || true
+    whiptail --title "$(t '🚨 Fail2ban')" --scrolltext --msgbox "$(printf '%b' "$info")" 24 78 || true
 }
 
 function_staff_firewall() {
@@ -8317,7 +8320,7 @@ function_ufw_rules() {
     fi
     rules=$(ufw status verbose 2>/dev/null)
     [ -z "$rules" ] && rules="$(t "UFW firewall is not installed. Install Koha first (option 1).")"
-    whiptail --title "$(t '☑ UFW')" --scrolltext --msgbox "$rules" 24 78 || true
+    whiptail --title "$(t '🧱 UFW')" --scrolltext --msgbox "$rules" 24 78 || true
 }
 
 # ======================================================================
@@ -8396,8 +8399,8 @@ function_about() {
     txt_about+="  * Pix (Brazil)  : 076.650.449.21\n"
     txt_about+="  * Bitcoin (BTC) : bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx\n\n"
     txt_about+="$(t "If this project helped you:")\n"
-    txt_about+="  ★ $(t "Star the repository on GitHub!")\n"
-    txt_about+="  ★ $(t "Share it with colleagues and other institutions.")\n\n"
+    txt_about+="  ⭐ $(t "Star the repository on GitHub!")\n"
+    txt_about+="  ⭐ $(t "Share it with colleagues and other institutions.")\n\n"
     txt_about+="$(t "Official Repository:")\n"
     txt_about+="  https://github.com/BibliotecaPalotina/koha-easy-install\n\n"
     txt_about+="----------------------------------------------------------------------\n"
@@ -8648,7 +8651,7 @@ _lt_marc_import_run() {
         MAGIC_N_RECS=$((MAGIC_N_RECS + added)); MAGIC_N_REPL=$((MAGIC_N_REPL + replaced)); MAGIC_N_ITEMS=$((MAGIC_N_ITEMS + items))
         return 0
     fi
-    msg_ok "$(t '✔ Batch ${batch} imported.\n\nNew records: ${added}\nReplaced records: ${replaced}\nItems added: ${items}\n\nThe new titles are indexed automatically in a few minutes.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 16 76
+    msg_ok "$(t '✅ Batch ${batch} imported.\n\nNew records: ${added}\nReplaced records: ${replaced}\nItems added: ${items}\n\nThe new titles are indexed automatically in a few minutes.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 16 76
 }
 
 lt_marc_undo() {
@@ -8685,7 +8688,7 @@ _lt_marc_undo_run() {
     gone=$(tools_num "$log" "Number of items deleted:")
     errors=$(tools_num "$log" "Number of errors:")
     log "tools: MARC batch $batch reverted (deleted=$deleted reverted=$reverted items=$gone errors=$errors)"
-    msg_ok "$(t '✔ Batch ${batch} undone.\n\nRecords deleted: ${deleted}\nRecords restored to their previous version: ${reverted}\nItems deleted: ${gone}\nErrors (e.g. items on loan): ${errors}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 16 76
+    msg_ok "$(t '✅ Batch ${batch} undone.\n\nRecords deleted: ${deleted}\nRecords restored to their previous version: ${reverted}\nItems deleted: ${gone}\nErrors (e.g. items on loan): ${errors}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 16 76
 }
 
 # ----------------------------------------------------------------------
@@ -8750,7 +8753,7 @@ _lt_reports_install() {
     for i in "${!RP_KEY[@]}"; do
         key="${RP_KEY[i]}"; mark="[${tag}:${key}]"
         if ! mysql --default-character-set=utf8mb4 "$DB_NAME" -e "EXPLAIN $(reports_sample_params "${RP_SQL[i]}")" >/dev/null 2>> "$log"; then
-            printf '⚠ %s — %s\n' "${RP_NAME[i]}" "$(t "skipped: not compatible with this Koha version")" >> "$log"
+            printf '❗ %s — %s\n' "${RP_NAME[i]}" "$(t "skipped: not compatible with this Koha version")" >> "$log"
             continue
         fi
         if [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.saved_sql WHERE LOCATE($(sql_quote "$mark"), notes) > 0;")" = "0" ]; then
@@ -8774,7 +8777,7 @@ _lt_reports_install() {
         msg_error "" "$(t 'None of the reports is compatible with this Koha version. Nothing was changed.\n\nLog: ${log}')" 11 74
         return 1
     fi
-    { printf '\n'; grep -E '^(●|⚠) ' "$log"; } > "${TOOLS_WORK}/preview.txt"
+    { printf '\n'; grep -E '^(●|❗) ' "$log"; } > "${TOOLS_WORK}/preview.txt"
     ui_textbox "$(t "Preview (dry run)")" "${TOOLS_WORK}/preview.txt"
     prompt_yes_no "$title" "$(t 'New reports: ${created}\nReports to update: ${updated}\n\nInstall them now? A verified backup is made first.')" 12 70 defaultno || return 0
     tools_safety_backup "$backup" || return 1
@@ -8783,7 +8786,7 @@ _lt_reports_install() {
         return 1
     fi
     log "tools: reports pack $tag installed (new=$created updated=$updated)"
-    msg_ok "$(t '✔ Reports installed: ${ok}\n\nIn Koha: Reports > Saved reports.\nSafety backup: ${TOOLS_PRE}')" 12 74
+    msg_ok "$(t '✅ Reports installed: ${ok}\n\nIn Koha: Reports > Saved reports.\nSafety backup: ${TOOLS_PRE}')" 12 74
 }
 
 _lt_reports_remove() {   # _lt_reports_remove TAG TITLE BACKUP
@@ -8804,7 +8807,7 @@ _lt_reports_remove() {   # _lt_reports_remove TAG TITLE BACKUP
         return 1
     fi
     log "tools: reports pack $tag removed ($n)"
-    msg_ok "$(t '✔ Reports removed: ${n}')" 8 60
+    msg_ok "$(t '✅ Reports removed: ${n}')" 8 60
 }
 
 # ----------------------------------------------------------------------
@@ -8848,7 +8851,7 @@ _lt_patron_import_run() {
         MAGIC_N_NEW=$((MAGIC_N_NEW + n_new)); MAGIC_N_UPD=$((MAGIC_N_UPD + n_upd))
         return 0
     fi
-    msg_ok "$(t '✔ Patrons imported: ${n_new} new, ${n_upd} updated.\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
+    msg_ok "$(t '✅ Patrons imported: ${n_new} new, ${n_upd} updated.\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
 }
 
 lt_patron_category() {
@@ -8905,7 +8908,7 @@ _lt_patron_category_run() {
     fi
     moved=$(tools_output "$log" | sed -n 's/^[0-9][0-9]* found, \([0-9][0-9]*\) updated.*/\1/p' | tail -n 1)
     log "tools: patrons moved $from -> $to (${moved:-0})"
-    msg_ok "$(t '✔ Patrons moved from ${from} to ${to}: ${moved}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
+    msg_ok "$(t '✅ Patrons moved from ${from} to ${to}: ${moved}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
 }
 
 # ----------------------------------------------------------------------
@@ -8923,7 +8926,7 @@ lt_data_quality() {
         return 1
     fi
     if [ -z "$(tools_output "$log" | tr -d '[:space:]')" ]; then
-        msg_ok "$(t '✔ No inconsistencies found.\n\nLog: ${log}')" 10 72
+        msg_ok "$(t '✅ No inconsistencies found.\n\nLog: ${log}')" 10 72
         return 0
     fi
     ui_textbox "$(t "Catalog data-quality check")" "$log"
@@ -8968,7 +8971,7 @@ _lt_anonymise_run() {
     fi
     loans=$(tools_lead "$log" "checkouts anonymised"); holds=$(tools_lead "$log" "holds anonymised")
     log "tools: history anonymised (loans=$loans holds=$holds, ${days} days)"
-    msg_ok "$(t '✔ Anonymised: ${loans} loan(s) and ${holds} hold(s).\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
+    msg_ok "$(t '✅ Anonymised: ${loans} loan(s) and ${holds} hold(s).\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
 }
 
 lt_privacy_delete() {
@@ -9012,7 +9015,7 @@ _lt_delete_run() {
     fi
     gone=$(tools_lead "$log" "patrons deleted")
     log "tools: patrons deleted ($gone, expired before $day)"
-    msg_ok "$(t '✔ Patrons deleted: ${gone}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
+    msg_ok "$(t '✅ Patrons deleted: ${gone}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 12 76
 }
 
 # ----------------------------------------------------------------------
@@ -9035,23 +9038,23 @@ function_library_tools() {
     require_koha || return 0
     local opt
     while true; do
-        opt=$(whiptail --title "$(t "▦  Library tools")" --cancel-button "$(t "Back")" \
+        opt=$(whiptail --title "$(t "📚  Library tools")" --cancel-button "$(t "Back")" \
             --menu "$(t "Changes are always previewed first and protected by a verified backup.")" 0 0 0 \
             "1" "$(t "🪄  Magic Import Tool (drop anything here)")" \
-            "2" "$(t "↶  Undo a MARC import")" \
-            "3" "$(t "▤  Essential SQL reports pack")" \
-            "4" "$(t "⇄  School-year turnover (patron categories)")" \
-            "5" "$(t "◈  Catalog data-quality check")" \
-            "6" "$(t "◌  Privacy (LGPD): anonymise old history")" \
-            "7" "$(t "✖  Privacy (LGPD): delete old patrons")" \
-            "8" "$(t "▤  View tool logs")" \
-            "9" "$(t "◆  Brazil: localization")" \
-            "10" "$(t "✉  Messaging: WhatsApp and Telegram")" \
-            "11" "$(t "✎  Cataloguing aids: PHA, Cutter, CDD")" \
-            "12" "$(t "⇄  Replace a MARC record (staff tool)")" \
-            "13" "$(t "⌕  CDD lookup in the cataloguing (staff tool)")" \
-            "14" "$(t "⌁  Koha plugins (turn on or off)")" \
-            "15" "$(t "✂  Cutter Calculator")" 3>&1 1>&2 2>&3) || return 0
+            "2" "$(t "🔙  Undo a MARC import")" \
+            "3" "$(t "📋  Essential SQL reports pack")" \
+            "4" "$(t "🎓  School-year turnover (patron categories)")" \
+            "5" "$(t "🧪  Catalog data-quality check")" \
+            "6" "$(t "🎭  Privacy (LGPD): anonymise old history")" \
+            "7" "$(t "🚮  Privacy (LGPD): delete old patrons")" \
+            "8" "$(t "📜  View tool logs")" \
+            "9" "$(t "🌎  Brazil: localization")" \
+            "10" "$(t "💬  Messaging: WhatsApp and Telegram")" \
+            "11" "$(t "📝  Cataloguing aids: PHA, Cutter, CDD")" \
+            "12" "$(t "🔀  Replace a MARC record (staff tool)")" \
+            "13" "$(t "🔎  CDD lookup in the cataloguing (staff tool)")" \
+            "14" "$(t "🧩  Koha plugins (turn on or off)")" \
+            "15" "$(t "🧮  Cutter Calculator")" 3>&1 1>&2 2>&3) || return 0
         case "$opt" in
             1) lt_magic_import ;;
             2) lt_marc_undo ;;
@@ -9849,7 +9852,7 @@ _lt_br_bfdb_circ() {
         MAGIC_N_LOANS=$((MAGIC_N_LOANS + old + new)); MAGIC_N_HOLDS=$((MAGIC_N_HOLDS + held))
         return 0
     fi
-    msg_ok "$(t '✔ Loans and holds added.\n\nReturned loans: ${old}\nOpen loans: ${new}\nHolds: ${held}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 15 76
+    msg_ok "$(t '✅ Loans and holds added.\n\nReturned loans: ${old}\nOpen loans: ${new}\nHolds: ${held}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 15 76
 }
 
 # ----------------------------------------------------------------------
@@ -10555,7 +10558,7 @@ SQL
         msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
         return 1
     fi
-    msg_ok "$(t '✔ Label templates installed: ${n}\n\nIn Koha: Tools > Label creator > Manage > Templates / Layouts.\nSafety backup: ${TOOLS_PRE}')" 12 76
+    msg_ok "$(t '✅ Label templates installed: ${n}\n\nIn Koha: Tools > Label creator > Manage > Templates / Layouts.\nSafety backup: ${TOOLS_PRE}')" 12 76
 }
 
 _lt_br_labels_remove() {
@@ -10575,7 +10578,7 @@ _lt_br_labels_remove() {
         msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
         return 1
     fi
-    msg_ok "$(t "✔ The panel's label templates were removed.")" 8 64
+    msg_ok "$(t "✅ The panel's label templates were removed.")" 8 64
 }
 
 # Catalogue card (ficha catalográfica, AACR2): an XSLT that imports Koha's
@@ -10872,7 +10875,7 @@ _lt_br_ficha_on() {
         return 1
     fi
     log "tools: catalogue card enabled ($n languages)"
-    msg_ok "$(t '✔ The catalogue card is shown below each record (${n} language(s)).\n\nSafety backup: ${TOOLS_PRE}')" 11 72
+    msg_ok "$(t '✅ The catalogue card is shown below each record (${n} language(s)).\n\nSafety backup: ${TOOLS_PRE}')" 11 72
 }
 
 _lt_br_ficha_off() {
@@ -10894,7 +10897,7 @@ _lt_br_ficha_off() {
     rm -f "$FICHA_STATE"
     case "$FICHA_DIR" in /var/lib/koha/*/kei-xslt) rm -rf "$FICHA_DIR" ;; esac
     log "tools: catalogue card disabled"
-    msg_ok "$(t "✔ Koha's default detail view is back.")" 8 64
+    msg_ok "$(t "✅ Koha's default detail view is back.")" 8 64
 }
 
 # ----------------------------------------------------------------------
@@ -11015,7 +11018,7 @@ _lt_br_holidays_add() {
     after=$(br_holiday_count "$table" "$year")
     added=$((after - before))
     log "tools: holidays $year added ($added rows, $table)"
-    msg_ok "$(t '✔ Closed days added to the calendar: ${added}\n\nIn Koha: Tools > Calendar.\nSafety backup: ${TOOLS_PRE}')" 11 72
+    msg_ok "$(t '✅ Closed days added to the calendar: ${added}\n\nIn Koha: Tools > Calendar.\nSafety backup: ${TOOLS_PRE}')" 11 72
 }
 
 # Rows the panel added for a year (all libraries).
@@ -11052,7 +11055,7 @@ _lt_br_holidays_remove() {
     fi
     memcached_flush || true
     log "tools: holidays $year removed ($n rows)"
-    msg_ok "$(t '✔ Closed days removed: ${n}')" 8 60
+    msg_ok "$(t '✅ Closed days removed: ${n}')" 8 60
 }
 
 # ----------------------------------------------------------------------
@@ -11554,7 +11557,7 @@ _lt_br_abnt_run() {
     head -n 60 "$text" > "$TOOLS_WORK/abnt-preview.txt"
     ui_textbox "$(t "ABNT references (NBR 6023)")" "$TOOLS_WORK/abnt-preview.txt"
     log "tools: ABNT references written ($refs) in $dir"
-    msg_ok "$(t '✔ References: ${refs}\nWithout a publication date: ${undated} (NBR 6023 asks for an estimated date in brackets, e.g. [2010?])\nRecords not read: ${bad}\n\nOpen the HTML file in Word or LibreOffice:\n${html}\n${text}')" 15 76
+    msg_ok "$(t '✅ References: ${refs}\nWithout a publication date: ${undated} (NBR 6023 asks for an estimated date in brackets, e.g. [2010?])\nRecords not read: ${bad}\n\nOpen the HTML file in Word or LibreOffice:\n${html}\n${text}')" 15 76
 }
 
 # ----------------------------------------------------------------------
@@ -11564,14 +11567,14 @@ function_brazil_tools() {
     require_koha || return 0
     local opt
     while true; do
-        opt=$(whiptail --title "$(t "◆  Brazil: localization")" --cancel-button "$(t "Back")" \
+        opt=$(whiptail --title "$(t "🌎  Brazil: localization")" --cancel-button "$(t "Back")" \
             --menu "$(t "Optional presets for Brazilian libraries. Nothing is applied until you choose it here. The migrations (Biblivre, SophiA, Pergamum, Biblioteca Fácil, ISIS, spreadsheets) are in Library tools > Magic Import Tool.")" 0 0 0 \
-            "1" "$(t "✔  Check patron CPFs (modulo 11)")" \
-            "2" "$(t "▤  Pimaco label templates")" \
-            "3" "$(t "▤  Cataloguing card (ficha catalográfica)")" \
-            "4" "$(t "◷  Brazilian holidays in the calendar")" \
-            "5" "$(t "▤  Government census reports (MEC/INEP/IBGE)")" \
-            "6" "$(t "▤  ABNT references and bibliographies (NBR 6023)")" 3>&1 1>&2 2>&3) || return 0
+            "1" "$(t "🆔  Check patron CPFs (modulo 11)")" \
+            "2" "$(t "🔖  Pimaco label templates")" \
+            "3" "$(t "📇  Cataloguing card (ficha catalográfica)")" \
+            "4" "$(t "📅  Brazilian holidays in the calendar")" \
+            "5" "$(t "📈  Government census reports (MEC/INEP/IBGE)")" \
+            "6" "$(t "📑  ABNT references and bibliographies (NBR 6023)")" 3>&1 1>&2 2>&3) || return 0
         case "$opt" in
             1) lt_br_cpf_audit ;;
             2) lt_br_labels ;;
@@ -12020,7 +12023,7 @@ function_messaging() {
     require_database || return 0
     local opt
     while true; do
-        opt=$(ui_menu "$(t "✉  Messaging: WhatsApp and Telegram")" "$(msg_status_text)" \
+        opt=$(ui_menu "$(t "💬  Messaging: WhatsApp and Telegram")" "$(msg_status_text)" \
             "1" "$(t "WhatsApp gateway (Evolution API or other)")" \
             "2" "$(t "Telegram bot")" \
             "3" "$(t "Country and area code of the phone numbers")" \
@@ -12052,7 +12055,7 @@ lt_msg_whatsapp() {
         msg_conf_set whatsapp off || return 1
         msg_cron_write
         log "messaging: WhatsApp off"
-        msg_ok "$(t "✔ WhatsApp is off.")"
+        msg_ok "$(t "✅ WhatsApp is off.")"
         return 0
     fi
     type=$(ui_menu "WhatsApp" "$(t "Gateway type:")" \
@@ -12081,7 +12084,7 @@ lt_msg_whatsapp() {
         msg_error "" "$(t "The settings could not be saved.\nNothing was changed.")" 9 70; return 1; }
     msg_cron_write
     log "messaging: WhatsApp on ($type $url)"
-    msg_ok "$(t "✔ WhatsApp is on. Send a test message to check the gateway.")" 9 72
+    msg_ok "$(t "✅ WhatsApp is on. Send a test message to check the gateway.")" 9 72
 }
 
 lt_msg_telegram() {
@@ -12093,7 +12096,7 @@ lt_msg_telegram() {
         msg_conf_set telegram off || return 1
         msg_cron_write
         log "messaging: Telegram off"
-        msg_ok "$(t "✔ Telegram is off.")"
+        msg_ok "$(t "✅ Telegram is off.")"
         return 0
     fi
     token=$(ui_input "Telegram" "$(t "Bot token (from @BotFather):")" "$(msg_conf tg_token)") || return 0
@@ -12123,7 +12126,7 @@ TGCHECK
     msg_conf_set telegram on tg_bot "$bot" || return 1
     msg_cron_write
     log "messaging: Telegram on (@$bot)"
-    msg_ok "$(t '✔ Telegram is on: @${bot}\n\nTell the patrons to open https://t.me/${bot}, tap Start and share their phone number. The link is made within two minutes.')" 12 74
+    msg_ok "$(t '✅ Telegram is on: @${bot}\n\nTell the patrons to open https://t.me/${bot}, tap Start and share their phone number. The link is made within two minutes.')" 12 74
 }
 
 # Country menu: common calling codes, or any other code.
@@ -12151,7 +12154,7 @@ lt_msg_country() {
     fi
     msg_install_files && msg_conf_init && msg_conf_set country "$cc" area "$area" || return 1
     log "messaging: numbers +$cc area $area"
-    msg_ok "$(t '✔ Numbers without a country code are read as +${cc} ${area}.')" 9 72
+    msg_ok "$(t '✅ Numbers without a country code are read as +${cc} ${area}.')" 9 72
 }
 
 # Brazilian area codes (DDD) in use.
@@ -12221,7 +12224,7 @@ MSGTEST
         local channel
         channel=$(tools_output "$log" | sed -n 's/^Channel: //p')
         log "messaging: test message sent ($channel)"
-        msg_ok "$(t '✔ Test message sent through ${channel}.')" 9 70
+        msg_ok "$(t '✅ Test message sent through ${channel}.')" 9 70
     else
         ui_textbox "$(t "Send a test message")" "$log"
         msg_error "" "$(t 'The message was not sent. The reason is in the log:\n${log}')" 10 74
@@ -12263,9 +12266,9 @@ _lt_msg_notices_set() {
     msg_cron_write
     log "messaging: Koha notices $mode (SMSSendDriver=$value)"
     if [ "$mode" = "on" ]; then
-        msg_ok "$(t '✔ The Koha notices of the SMS type now go through WhatsApp and Telegram (queue sent every two minutes).\n\nSee What Koha needs to send the notices.\nSafety backup: ${TOOLS_PRE}')" 13 76
+        msg_ok "$(t '✅ The Koha notices of the SMS type now go through WhatsApp and Telegram (queue sent every two minutes).\n\nSee What Koha needs to send the notices.\nSafety backup: ${TOOLS_PRE}')" 13 76
     else
-        msg_ok "$(t '✔ The Koha notices are no longer sent through WhatsApp and Telegram.\n\nSafety backup: ${TOOLS_PRE}')" 11 72
+        msg_ok "$(t '✅ The Koha notices are no longer sent through WhatsApp and Telegram.\n\nSafety backup: ${TOOLS_PRE}')" 11 72
     fi
 }
 
@@ -12299,19 +12302,19 @@ lt_msg_check() {
     {
         printf '%s\n\n' "$(t "What Koha needs to send the notices through WhatsApp and Telegram:")"
         v=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = 'SMSSendDriver';")
-        printf '  %s SMSSendDriver = %s\n' "$([ "$v" = "$MSG_DRIVER" ] && echo "[✔]" || echo "[ ]")" "${v:-—}"
+        printf '  %s SMSSendDriver = %s\n' "$([ "$v" = "$MSG_DRIVER" ] && echo "✅" || echo "⬜")" "${v:-—}"
         for pref in EnhancedMessagingPreferences EnhancedMessagingPreferencesOPAC; do
             v=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = '${pref}';")
-            [ -n "$v" ] && printf '  %s %s = %s\n' "$([ "$v" = "1" ] && echo "[✔]" || echo "[ ]")" "$pref" "$v"
+            [ -n "$v" ] && printf '  %s %s = %s\n' "$([ "$v" = "1" ] && echo "✅" || echo "⬜")" "$pref" "$v"
         done
         printf '\n%s\n' "$(t "Notices with an SMS version (used for WhatsApp and Telegram):")"
         for code in $MSG_LETTERS; do
             module="${code#*:}"; code="${code%%:*}"
             n=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.letter WHERE module = '${module}' AND code = '${code}' AND message_transport_type = 'sms';")
-            printf '  %s %s\n' "$([ "${n:-0}" -gt 0 ] 2>/dev/null && echo "[✔]" || echo "[ ]")" "$code"
+            printf '  %s %s\n' "$([ "${n:-0}" -gt 0 ] 2>/dev/null && echo "✅" || echo "⬜")" "$code"
         done
         n=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.overduerules_transport_types WHERE message_transport_type = 'sms';")
-        printf '\n  %s %s: %s\n' "$([ "${n:-0}" -gt 0 ] 2>/dev/null && echo "[✔]" || echo "[ ]")" "$(t "Overdue rules with SMS (Tools > Overdue notice/status triggers)")" "${n:-0}"
+        printf '\n  %s %s: %s\n' "$([ "${n:-0}" -gt 0 ] 2>/dev/null && echo "✅" || echo "⬜")" "$(t "Overdue rules with SMS (Tools > Overdue notice/status triggers)")" "${n:-0}"
         n=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.borrowers WHERE smsalertnumber IS NOT NULL AND smsalertnumber <> '';")
         printf '  %s: %s\n' "$(t "Patrons with an SMS number")" "${n:-0}"
         n=$(run_sql "SELECT COUNT(DISTINCT p.borrowernumber) FROM ${DB_NAME}.borrower_message_preferences p JOIN ${DB_NAME}.borrower_message_transport_preferences t ON t.borrower_message_preference_id = p.borrower_message_preference_id WHERE t.message_transport_type = 'sms' AND p.borrowernumber IS NOT NULL;")
@@ -12352,7 +12355,7 @@ _lt_msg_letters() {
     fi
     added=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.letter WHERE message_transport_type = 'sms' AND lang = 'default' AND branchcode = '' AND code IN ($(printf "'%s'," "$@" | sed 's/,$//'));")
     log "messaging: SMS notices created ($*)"
-    msg_ok "$(t '✔ SMS notices ready: ${added}\n\nIn Koha: Tools > Notices and slips.\nSafety backup: ${TOOLS_PRE}')" 11 72
+    msg_ok "$(t '✅ SMS notices ready: ${added}\n\nIn Koha: Tools > Notices and slips.\nSafety backup: ${TOOLS_PRE}')" 11 72
 }
 
 # Patrons' SMS numbers checked with the same rules as the driver (read-only
@@ -12423,7 +12426,7 @@ _lt_msg_phones_fix() {
     fi
     local fixed="$1"
     log "messaging: $fixed SMS number(s) corrected"
-    msg_ok "$(t '✔ Numbers corrected: ${fixed}\n\nSafety backup: ${TOOLS_PRE}')" 10 70
+    msg_ok "$(t '✅ Numbers corrected: ${fixed}\n\nSafety backup: ${TOOLS_PRE}')" 10 70
 }
 
 lt_msg_remove() {
@@ -12439,7 +12442,7 @@ lt_msg_remove() {
     rmdir "$KEI_PERL_DIR/SMS/Send/KohaEasy" 2>/dev/null
     rm -rf "$MSG_DATA"
     log "messaging: module removed"
-    msg_ok "$(t "✔ The messaging module was removed.")"
+    msg_ok "$(t "✅ The messaging module was removed.")"
 }
 
 # ======================================================================
@@ -12863,7 +12866,7 @@ lt_cat_load() {
     mkdir -p "$CAT_DIR" && chmod 755 "$CAT_DIR"
     install -m 644 "$new" "$(cat_table_path "$kind").new" && mv -f "$(cat_table_path "$kind").new" "$(cat_table_path "$kind")" || return 1
     log "cataloguing: $kind table loaded ($entries entries from $file)"
-    msg_ok "$(t '✔ Table loaded: ${entries} entries.')" 8 60
+    msg_ok "$(t '✅ Table loaded: ${entries} entries.')" 8 60
 }
 
 lt_cat_remove() {
@@ -12877,7 +12880,7 @@ lt_cat_remove() {
     prompt_yes_no "$(t "Remove a table")" "$(t "Remove this table from the server? The catalogue is not changed.")" 9 70 defaultno || return 0
     rm -f "$(cat_table_path "$kind")"
     log "cataloguing: $kind table removed"
-    msg_ok "$(t "✔ Table removed.")"
+    msg_ok "$(t "✅ Table removed.")"
 }
 
 function_cataloguing() {
@@ -12885,7 +12888,7 @@ function_cataloguing() {
     local opt status
     while true; do
         status="$(t "Loaded tables"): PHA $(cat_table_count pha), Cutter-Sanborn $(cat_table_count cutter), CDD $(cat_table_count cdd)"
-        opt=$(ui_menu "$(t "✎  Cataloguing aids: PHA, Cutter, CDD")" "$(t "Read-only helpers: nothing in the catalogue is changed.")"$'\n'"$status" \
+        opt=$(ui_menu "$(t "📝  Cataloguing aids: PHA, Cutter, CDD")" "$(t "Read-only helpers: nothing in the catalogue is changed.")"$'\n'"$status" \
             "1" "$(t "Author notation (PHA or Cutter-Sanborn)")" \
             "2" "$(t "Author notation of a catalogue record")" \
             "3" "$(t "CDD: look up a number or a subject")" \
@@ -15238,7 +15241,7 @@ function_marc_replace() {
     local opt status
     while true; do
         if mr_installed; then status="$(t "Installed"): /cgi-bin/koha/tools/marc_replace.pl"; else status="$(t "Not installed.")"; fi
-        opt=$(ui_menu "$(t "⇄  Replace a MARC record (staff tool)")" "$(t "A page of the staff interface that replaces a record by its biblionumber with a .mrc or .xml file or pasted text, showing a preview first. The items are never changed and the previous version is saved.")"$'\n\n'"$status" \
+        opt=$(ui_menu "$(t "🔀  Replace a MARC record (staff tool)")" "$(t "A page of the staff interface that replaces a record by its biblionumber with a .mrc or .xml file or pasted text, showing a preview first. The items are never changed and the previous version is saved.")"$'\n\n'"$status" \
             "1" "$(t "Install or update the page")" \
             "2" "$(t "Remove the page")" \
             "3" "$(t "Versions saved by the page")") || return 0
@@ -15298,7 +15301,7 @@ _lt_mr_install() {
     [ "$updating" = "1" ] && plack_restart
     url="/cgi-bin/koha/tools/marc_replace.pl"
     log "marc_replace: page installed (link=$link)"
-    msg_ok "$(t '✔ Page installed. In the staff interface: ${url}\n\nPrevious versions of the replaced records: ${MR_DIR}')" 11 76
+    msg_ok "$(t '✅ Page installed. In the staff interface: ${url}\n\nPrevious versions of the replaced records: ${MR_DIR}')" 11 76
 }
 
 lt_mr_remove() {
@@ -15326,7 +15329,7 @@ _lt_mr_remove() {
     rmdir "$MR_PM_DIR" 2>/dev/null || true
     plack_restart
     log "marc_replace: page removed"
-    msg_ok "$(t "✔ The page was removed.")"
+    msg_ok "$(t "✅ The page was removed.")"
 }
 
 lt_mr_versions() {
@@ -16658,7 +16661,7 @@ function_cdd() {
         else
             index="$(t "Index: not built yet.")"
         fi
-        opt=$(ui_menu "$(t "⌕  CDD lookup in the cataloguing (staff tool)")" "$(t "A page of the staff interface to search the CDD while cataloguing: by number or subject, with the hierarchy and how many titles of the library use each class, and a CDD button next to the class fields that puts the number in the record. The CDD is not distributed with the panel: the index is built from the library's own copy (the PDF or its text) and stays on this server.")"$'\n\n'"$index"$'\n'"$status" \
+        opt=$(ui_menu "$(t "🔎  CDD lookup in the cataloguing (staff tool)")" "$(t "A page of the staff interface to search the CDD while cataloguing: by number or subject, with the hierarchy and how many titles of the library use each class, and a CDD button next to the class fields that puts the number in the record. The CDD is not distributed with the panel: the index is built from the library's own copy (the PDF or its text) and stays on this server.")"$'\n\n'"$index"$'\n'"$status" \
             "1" "$(t "Build the index from your CDD file (PDF or text)")" \
             "2" "$(t "Install or update the page")" \
             "3" "$(t "Remove the page (the index is kept)")") || return 0
@@ -16732,7 +16735,7 @@ _lt_cdd_build() {
     chmod 640 "$CDD_INFO"
     log "cdd: index built from ${file##*/} ($n schedule entries, $tables table entries, $terms subjects)"
     ed=${ed:-?}
-    msg_ok "$(t '✔ CDD index built: ${n} entries of the schedules, ${tables} of the tables and ${terms} subjects of the alphabetical list (edition ${ed}).\n\nIt stays on this server only: ${CDD_DB}')" 12 76
+    msg_ok "$(t '✅ CDD index built: ${n} entries of the schedules, ${tables} of the tables and ${terms} subjects of the alphabetical list (edition ${ed}).\n\nIt stays on this server only: ${CDD_DB}')" 12 76
 }
 
 lt_cdd_install() {
@@ -16782,7 +16785,7 @@ _lt_cdd_install() {
     url="/cgi-bin/koha/cataloguing/cdd_lookup.pl"
     [ -s "$CDD_DB" ] || note="$(t "The page asks for the index until it is built (option 1).")"
     log "cdd: page installed (link=$link)"
-    msg_ok "$(t '✔ Page installed. In the staff interface: ${url}')"${note:+$'\n\n'"$note"} 11 76
+    msg_ok "$(t '✅ Page installed. In the staff interface: ${url}')"${note:+$'\n\n'"$note"} 11 76
 }
 
 lt_cdd_remove() {
@@ -16807,7 +16810,7 @@ _lt_cdd_remove() {
     rm -f "$CDD_FILE" "$CDD_STATE" "$CDD_PM"
     plack_restart
     log "cdd: page removed"
-    msg_ok "$(t "✔ The page was removed.")"
+    msg_ok "$(t "✅ The page was removed.")"
 }
 
 # ======================================================================
@@ -16971,7 +16974,7 @@ function_koha_plugins() {
         if plugins_enabled; then state="$(t "on")"; else state="$(t "off")"; fi
         if plugins_restricted; then source="$(t "only the plugin repositories")"; else source="$(t ".kpz upload and the plugin repositories")"; fi
         status="$(t 'Now: ${state}')"$'\n'"$(t 'Installation: ${source}')"$'\n'"$(t "Folder"): $(plugins_dir)"
-        opt=$(ui_menu "$(t "⌁  Koha plugins (turn on or off)")" "$(t "Koha's own plugin system (Administration > Manage plugins). Turning it off keeps the plugins and their data: turned on again, they come back as they were.")"$'\n\n'"$status" \
+        opt=$(ui_menu "$(t "🧩  Koha plugins (turn on or off)")" "$(t "Koha's own plugin system (Administration > Manage plugins). Turning it off keeps the plugins and their data: turned on again, they come back as they were.")"$'\n\n'"$status" \
             "1" "$(t "Turn Koha plugins on")" \
             "2" "$(t "Turn Koha plugins off")" \
             "3" "$(t "Where plugins can be installed from")" \
@@ -17028,9 +17031,9 @@ _lt_plugins_set() {   # _lt_plugins_set 1|0
     plugins_reload
     log "plugins: enable_plugins=$want (previous koha-conf.xml: $PLUGINS_BAK)"
     if [ "$want" = "1" ]; then
-        msg_ok "$(t "✔ Koha plugins are on: Administration > Manage plugins in the staff interface.")" 9 72
+        msg_ok "$(t "✅ Koha plugins are on: Administration > Manage plugins in the staff interface.")" 9 72
     else
-        msg_ok "$(t "✔ Koha plugins are off. The plugins and their data were kept.")" 8 70
+        msg_ok "$(t "✅ Koha plugins are off. The plugins and their data were kept.")" 8 70
     fi
 }
 
@@ -17061,9 +17064,9 @@ _lt_plugins_source() {   # _lt_plugins_source open|restricted
     plugins_reload
     log "plugins: plugins_restricted=$want (previous koha-conf.xml: $PLUGINS_BAK)"
     if [ "$want" = "1" ]; then
-        msg_ok "$(t "✔ Plugins can only be installed from the plugin repositories.")" 8 70
+        msg_ok "$(t "✅ Plugins can only be installed from the plugin repositories.")" 8 70
     else
-        msg_ok "$(t "✔ Plugins can be uploaded as .kpz files or installed from the plugin repositories.")" 9 72
+        msg_ok "$(t "✅ Plugins can be uploaded as .kpz files or installed from the plugin repositories.")" 9 72
     fi
 }
 
@@ -21135,9 +21138,9 @@ magic_summary() {
         return 0
     fi
     if [ "$asked" -eq 0 ]; then
-        text=$(t '✔ Successfully imported ${recs} bibliographic record(s), ${items} item(s) and ${pats} patron(s) with zero manual mapping required.')
+        text=$(t '✅ Successfully imported ${recs} bibliographic record(s), ${items} item(s) and ${pats} patron(s) with zero manual mapping required.')
     else
-        text=$(t '✔ Successfully imported ${recs} bibliographic record(s), ${items} item(s) and ${pats} patron(s). Questions answered: ${asked} (remembered for the next file with the same columns).')
+        text=$(t '✅ Successfully imported ${recs} bibliographic record(s), ${items} item(s) and ${pats} patron(s). Questions answered: ${asked} (remembered for the next file with the same columns).')
     fi
     text+="\n\n$(t 'Records replaced: ${repl}\nPatrons updated: ${upd}\nLoans: ${loans}\nHolds: ${holds}\n\nUndo the records: Library tools > Undo a MARC import.\nSafety backups: ${DIR_SQL}\nLog: ${log}')"
     msg_ok "$text" 20 78
@@ -21949,7 +21952,7 @@ function_cutter() {
         n=$(cat_table_count pha)
         if [ "$n" -gt 0 ]; then table+=$'\n'"$(t 'PHA table: ${n} entries.')"; else table+=$'\n'"$(t "PHA table: not loaded yet.")"; fi
         if cutter_installed; then status="$(t "Installed"): /cgi-bin/koha/cataloguing/cutter_calculator.pl"; else status="$(t "Not installed.")"; fi
-        opt=$(ui_menu "$(t "✂  Cutter Calculator")" "$(t "The call number of a record: the class (CDD, CDU or the library's own codes, from the record or suggested from the catalogue) and the author number from the Cutter-Sanborn or the PHA table of the library, here or in Koha's cataloguing, where the Call number and Cutter buttons put it in the record (with the letter of the title, the edition and the copy as set in the gear of the page). The tables are not distributed with the panel: load the copy of your library (Cutter-Sanborn as text, e.g. 848 Assis; PHA as text or the PDF of the book, even scanned).")"$'\n\n'"$table"$'\n'"$status" \
+        opt=$(ui_menu "$(t "🧮  Cutter Calculator")" "$(t "The call number of a record: the class (CDD, CDU or the library's own codes, from the record or suggested from the catalogue) and the author number from the Cutter-Sanborn or the PHA table of the library, here or in Koha's cataloguing, where the Call number and Cutter buttons put it in the record (with the letter of the title, the edition and the copy as set in the gear of the page). The tables are not distributed with the panel: load the copy of your library (Cutter-Sanborn as text, e.g. 848 Assis; PHA as text or the PDF of the book, even scanned).")"$'\n\n'"$table"$'\n'"$status" \
             "1" "$(t "Calculate a Cutter number")" \
             "2" "$(t "Load the Cutter-Sanborn table")" \
             "3" "$(t "Load the PHA table (text, or the PDF of the book)")" \
@@ -22271,7 +22274,7 @@ _lt_cutter_install() {
     url="/cgi-bin/koha/cataloguing/cutter_calculator.pl"
     [ -s "$(cat_table_path cutter)" ] || [ -s "$(cat_table_path pha)" ] || note="$(t "The page asks for a table until one is loaded (options 2 and 3).")"
     log "cutter: page installed (link=$link)"
-    msg_ok "$(t '✔ Page installed. In the staff interface: ${url}')"${note:+$'\n\n'"$note"} 11 76
+    msg_ok "$(t '✅ Page installed. In the staff interface: ${url}')"${note:+$'\n\n'"$note"} 11 76
 }
 
 lt_cutter_remove() {
@@ -22301,7 +22304,7 @@ _lt_cutter_remove() {
     fi
     plack_restart
     log "cutter: page removed"
-    msg_ok "$(t "✔ The page was removed.")"
+    msg_ok "$(t "✅ The page was removed.")"
 }
 
 # Loaded with "source installer" (tests/): functions only, no menu.
@@ -22437,24 +22440,24 @@ while true; do
     menu_prompt=$(t 'Select an option:')
     [ -z "$menu_prompt" ] && menu_prompt="Select an option:"
 
-    m1=$(t '⚙  Install Koha server')
-    m2=$(t 'ℹ  View first-access credentials')
-    m3=$(t '↻  Restore database')
-    m4=$(t '▣  Backup center')
-    m5=$(t '⌁  Search engine & indexing')
-    m6=$(t '☁  Publish system to internet')
-    m7=$(t '◈  Diagnostics & maintenance center')
-    m8=$(t '⚠  Security center')
-    m9=$(t '⚙  Koha settings & parameters')
-    m10=$(t '▦  Library tools')
-    m11=$(t '▤  General tools')
-    m12=$(t '⏱  Schedules & cron tasks')
-    m13=$(t '✦  Koha languages')
-    m14=$(t '⟳  Update center')
-    m15=$(t 'ℹ  About the program & support')
-    m16=$(t '↻  Reboot server')
-    host_can reboot || m16=$(t '↻  Restart Koha services')
-    m17=$(t '✖  Exit')
+    m1=$(t '📦  Install Koha server')
+    m2=$(t '🔑  View first-access credentials')
+    m3=$(t '📥  Restore database')
+    m4=$(t '💾  Backup center')
+    m5=$(t '🔍  Search engine & indexing')
+    m6=$(t '🌐  Publish system to internet')
+    m7=$(t '🩺  Diagnostics & maintenance center')
+    m8=$(t '🔒  Security center')
+    m9=$(t '🔧  Koha settings & parameters')
+    m10=$(t '📚  Library tools')
+    m11=$(t '🧰  General tools')
+    m12=$(t '⏰  Schedules & cron tasks')
+    m13=$(t '🌍  Koha languages')
+    m14=$(t '🔄  Update center')
+    m15=$(t '💡  About the program & support')
+    m16=$(t '🔁  Reboot server')
+    host_can reboot || m16=$(t '🔁  Restart Koha services')
+    m17=$(t '🚪  Exit')
 
     MAIN_OPT=$(whiptail --title "${title_dash}" \
         --cancel-button "${exit_btn}" \
@@ -22488,11 +22491,11 @@ while true; do
         2) function_view_credentials ;;
         3) function_restore_database ;;
         4)
-            SUB_OPT=$(whiptail --title "$(t '▣ Backup Center')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '💾 Backup Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a backup routine:')" 17 76 3 \
-                "1" "$(t '▣  Generate manual backup and download to PC')" \
-                "2" "$(t '☁  Configure cloud backup (Google Drive)')" \
-                "3" "$(t '✓  Test integrity of latest backup')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '💾  Generate manual backup and download to PC')" \
+                "2" "$(t '📤  Configure cloud backup (Google Drive)')" \
+                "3" "$(t '🧾  Test integrity of latest backup')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_manual_backup ;;
                 2) function_configure_rclone ;;
@@ -22500,21 +22503,21 @@ while true; do
             esac
             ;;
         5)
-            SUB_OPT=$(whiptail --title "$(t '⌁ Search Engine & Indexing')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🔍 Search Engine & Indexing')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose an action:')" 16 76 2 \
-                "1" "$(t '↔  Toggle search engine (Zebra ⇄ Elasticsearch)')" \
-                "2" "$(t '⟳  Repair / rebuild indexing')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '🔃  Toggle search engine (Zebra ⇄ Elasticsearch)')" \
+                "2" "$(t '🔨  Repair / rebuild indexing')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_toggle_search_engine ;;
                 2) function_repair_indexing ;;
             esac
             ;;
         6)
-            SUB_OPT=$(whiptail --title "$(t '☁ Publish System to Internet')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🌐 Publish System to Internet')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a publishing method:')" 17 76 3 \
-                "1" "$(t '☁  Cloudflare Tunnel Manager (Recommended)')" \
-                "2" "$(t '⌁  Free SSL certificate (Certbot / Apache)')" \
-                "3" "$(t '⌕  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '🌉  Cloudflare Tunnel Manager (Recommended)')" \
+                "2" "$(t '🔏  Free SSL certificate (Certbot / Apache)')" \
+                "3" "$(t '🔎  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_configure_cloudflare ;;
                 2) function_configure_ssl ;;
@@ -22522,14 +22525,14 @@ while true; do
             esac
             ;;
         7)
-            SUB_OPT=$(whiptail --title "$(t '◈ Diagnostics & Maintenance Center')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🩺 Diagnostics & Maintenance Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 20 76 6 \
-                "1" "$(t '◈  Detailed server & Koha status')" \
-                "2" "$(t '✓  Full system health check')" \
-                "3" "$(t '▤  View latest validation report')" \
-                "4" "$(t '⌁  Real-time Apache log auditing')" \
-                "5" "$(t '⚙  Deep database optimization & log cleanup')" \
-                "6" "$(t '↻  Restart / repair Koha services (Memcached, Plack)')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '📡  Detailed server & Koha status')" \
+                "2" "$(t '🏥  Full system health check')" \
+                "3" "$(t '📄  View latest validation report')" \
+                "4" "$(t '📜  Real-time Apache log auditing')" \
+                "5" "$(t '🧹  Deep database optimization & log cleanup')" \
+                "6" "$(t '🔁  Restart / repair Koha services (Memcached, Plack)')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_detailed_status ;;
                 2) function_validate_system ;;
@@ -22540,12 +22543,12 @@ while true; do
             esac
             ;;
         8)
-            SUB_OPT=$(whiptail --title "$(t '⚠ Security Center')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🔒 Security Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a security routine:')" 18 76 4 \
-                "1" "$(t '⚠  Fail2ban status (intrusion attempts)')" \
-                "2" "$(t '▣  Staff firewall (restrict port 8080)')" \
-                "3" "$(t '↻  Rotate database password')" \
-                "4" "$(t '☑  Show active UFW rules')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '🚨  Fail2ban status (intrusion attempts)')" \
+                "2" "$(t '🚧  Staff firewall (restrict port 8080)')" \
+                "3" "$(t '🔐  Rotate database password')" \
+                "4" "$(t '🧱  Show active UFW rules')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_fail2ban_status ;;
                 2) function_staff_firewall ;;
@@ -22554,13 +22557,13 @@ while true; do
             esac
             ;;
         9)
-            SUB_OPT=$(whiptail --title "$(t '⚙ Koha Settings & Parameters')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🔧 Koha Settings & Parameters')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a parameter:')" 19 76 5 \
-                "1" "$(t '⚙  Server sizing (memory / workers)')" \
-                "2" "$(t '✉  Configure email and circulation notices')" \
-                "3" "$(t '★  Create super librarian')" \
-                "4" "$(t '↔  Enable interoperability (SIP2 and Z39.50)')" \
-                "5" "$(t '⏱  Clock and timezone (NTP)')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '📏  Server sizing (memory / workers)')" \
+                "2" "$(t '📧  Configure email and circulation notices')" \
+                "3" "$(t '👑  Create super librarian')" \
+                "4" "$(t '🔌  Enable interoperability (SIP2 and Z39.50)')" \
+                "5" "$(t '🕒  Clock and timezone (NTP)')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_size_server ;;
                 2) function_configure_emails ;;
@@ -22571,11 +22574,11 @@ while true; do
             ;;
         10) function_library_tools ;;
         11)
-            SUB_OPT=$(whiptail --title "$(t '▤ General Tools')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🧰 General Tools')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 17 76 3 \
-                "1" "$(t '▤  Resource monitoring (Htop / Nethogs)')" \
-                "2" "$(t '⌁  Terminal web browser (Links)')" \
-                "3" "$(t '▣  File explorer (Midnight Commander)')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '📊  Resource monitoring (Htop / Nethogs)')" \
+                "2" "$(t '🌐  Terminal web browser (Links)')" \
+                "3" "$(t '📂  File explorer (Midnight Commander)')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_run_monitor ;;
                 2) function_run_links ;;
@@ -22585,10 +22588,10 @@ while true; do
         12) function_manage_crons ;;
         13) function_install_languages ;;
         14)
-            SUB_OPT=$(whiptail --title "$(t '⟳ Update Center')" --cancel-button "$(t 'Back')" \
+            SUB_OPT=$(whiptail --title "$(t '🔄 Update Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose what to update:')" 16 76 2 \
-                "1" "$(t '⟳  Update OS packages & Koha schemas')" \
-                "2" "$(t '↻  Update this panel via GitHub')" 3>&1 1>&2 2>&3) || continue
+                "1" "$(t '🆙  Update OS packages & Koha schemas')" \
+                "2" "$(t '🆕  Update this panel via GitHub')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_update_system ;;
                 2) function_autoupdate ;;
