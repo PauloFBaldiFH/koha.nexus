@@ -7885,7 +7885,8 @@ kei_status_json() {
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key
 # names a password, token or secret, <pass> elements, HTTP authorization
-# headers, user:password@ in URLs and Google tokens (ya29., 1//).
+# headers, user:password@ in URLs, Google tokens (ya29., 1//) and Google
+# API keys (AIza..., e.g. the Gemini key of the AI cataloguing).
 kei_redact() {
     sed -E \
         -e "s#(<(pass|password|user_pass|encryption_key|api_key)>)[^<]*(</[a-z_]+>)#\1${KEI_DIAG_REDACT}\3#Ig" \
@@ -7894,7 +7895,8 @@ kei_redact() {
         -e "s#(bearer|basic)[[:space:]]+[A-Za-z0-9._~+/=-]{8,}#\1 ${KEI_DIAG_REDACT}#Ig" \
         -e "s#://[^/@[:space:]:]+:[^/@[:space:]]+@#://${KEI_DIAG_REDACT}@#g" \
         -e "s#ya29\.[A-Za-z0-9._-]+#${KEI_DIAG_REDACT}#g" \
-        -e "s#1//[A-Za-z0-9._-]{20,}#${KEI_DIAG_REDACT}#g"
+        -e "s#1//[A-Za-z0-9._-]{20,}#${KEI_DIAG_REDACT}#g" \
+        -e "s#AIza[A-Za-z0-9_-]{30,}#${KEI_DIAG_REDACT}#g"
 }
 
 # Last $2 lines (default 400) of a log, redacted, into $3. Missing logs are skipped.
@@ -12884,7 +12886,7 @@ MR_VISION_KEYS="tab_replace tab_vision tab_settings v_title v_intro v_img_cover 
     r_cip_notation r_nonfiling src_cip src_model isbn_ok isbn_bad v_new_confirm v_add v_dups v_dup_ok \
     v_err_dup v_added v_twice v_err_busy v_err_add v_err_image v_err_noimg v_err_model v_add_items \
     v_edit v_another e_URL e_TOKEN_PLAIN e_NO_TOKEN e_NO_IMAGES e_UNREACHABLE e_HTTP e_EMPTY e_NO_JSON \
-    s_title s_intro s_perm s_provider p_openai p_anthropic p_ollama p_compatible s_url s_model s_token \
+    s_title s_intro s_perm s_provider p_openai p_anthropic p_gemini p_ollama p_compatible s_url s_model s_token \
     s_token_saved s_token_clear s_timeout s_max_px s_lang s_org s_country s_table t_auto t_none s_ddc_ed \
     s_instructions s_instructions_hint s_instructions_default v_note v_note_hint v_note_example \
     s_save s_test s_saved s_err_save s_err_perm s_test_ok s_test_fail ddc0 ddc1 ddc2 ddc3 ddc4 ddc5 ddc6 \
@@ -13786,7 +13788,7 @@ sub render_settings {
         . '<label for="provider">' . h( $T{s_provider} ) . '</label>'
         . $sel->( 'provider', $c->{provider}, map { [ $_, $T{"p_$_"} // $_ ] } @KohaEasy::Cataloguing::Vision::PROVIDERS )
         . '<label for="url">' . h( $T{s_url} ) . '</label>' . $text->( 'url', $c->{url}, 'text', $d->{url} )
-        . '<p class="hint">Ollama: http://localhost:11434 &middot; LM Studio: http://localhost:1234/v1</p>'
+        . '<p class="hint">Ollama: http://localhost:11434 &middot; LM Studio: http://localhost:1234/v1 &middot; Gemini: https://generativelanguage.googleapis.com/v1beta/openai</p>'
         . '<label for="model">' . h( $T{s_model} ) . '</label>' . $text->( 'model', $c->{model}, 'text', $d->{model} )
         . '<label for="token">' . h( $T{s_token} ) . '</label>'
         . '<input type="password" id="token" name="token" value="" autocomplete="new-password">'
@@ -13803,7 +13805,7 @@ sub render_settings {
         . '<label for="ddc_edition">' . h( $T{s_ddc_ed} ) . '</label>' . $text->( 'ddc_edition', $c->{ddc_edition}, 'text' )
         . '<label for="instructions">' . h( $T{s_instructions} ) . '</label>'
         . '<p class="hint">' . h( $T{s_instructions_hint} ) . '</p>'
-        . '<textarea id="instructions" name="instructions" rows="18">' . h($instructions) . '</textarea>'
+        . '<textarea id="instructions" name="instructions" rows="30">' . h($instructions) . '</textarea>'
         . '<p><input type="checkbox" id="instructions_default" name="instructions_default" value="1"> <label class="inline" for="instructions_default">' . h( $T{s_instructions_default} ) . '</label></p>'
         . '<button type="submit" name="op" value="cud-vision-settings">' . h( $T{s_save} ) . '</button> '
         . '<button type="submit" name="op" value="cud-vision-test">' . h( $T{s_test} ) . '</button>'
@@ -13879,6 +13881,9 @@ package KohaEasy::Cataloguing::Vision;
 # Providers:
 #   openai      OpenAI Chat Completions (https://api.openai.com/v1)
 #   anthropic   Anthropic Messages API (https://api.anthropic.com)
+#   gemini      Google Gemini API, through its OpenAI-compatible endpoint
+#               (https://generativelanguage.googleapis.com/v1beta/openai),
+#               with an API key from Google AI Studio
 #   ollama      Ollama native API, local (http://localhost:11434)
 #   compatible  any OpenAI-compatible server: LM Studio, vLLM, llama.cpp,
 #               LocalAI, OpenRouter... (http://localhost:1234/v1)
@@ -13890,6 +13895,7 @@ package KohaEasy::Cataloguing::Vision;
 use strict;
 use warnings;
 use utf8;
+use Fcntl qw( O_CREAT O_EXCL O_WRONLY );
 use HTTP::Tiny;
 use JSON::PP;
 use MIME::Base64 qw( encode_base64 );
@@ -13900,10 +13906,11 @@ our $VERSION = '1';
 our %DEFAULTS = (
     openai     => { url => 'https://api.openai.com/v1', model => 'gpt-4.1-mini' },
     anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5' },
+    gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-2.5-flash' },
     ollama     => { url => 'http://localhost:11434',    model => 'qwen2.5vl:7b' },
     compatible => { url => 'http://localhost:1234/v1',  model => '' },
 );
-our @PROVIDERS = qw( openai anthropic ollama compatible );
+our @PROVIDERS = qw( openai anthropic gemini ollama compatible );
 
 # Settings the page and the panel may write (key=value lines, see load_conf).
 our @CONF_KEYS = qw( provider url model token timeout max_px lang org_code table ddc_edition country );
@@ -13954,7 +13961,10 @@ sub with_defaults {
 sub save_conf {
     my ( $path, $c ) = @_;
     my $tmp = "$path.tmp$$";
-    open( my $fh, '>:encoding(UTF-8)', $tmp ) or die "cannot write $tmp: $!\n";
+    unlink $tmp;
+    # Created 0600 (never readable by others, not even for a moment).
+    sysopen( my $fh, $tmp, O_WRONLY | O_CREAT | O_EXCL, 0600 ) or die "cannot write $tmp: $!\n";
+    binmode( $fh, ':encoding(UTF-8)' );
     chmod 0600, $tmp;
     print {$fh} "# koha-easy-installer: AI cataloguing settings (marc_replace.pl / Library tools)\n";
     for my $k (@CONF_KEYS) {
@@ -13985,7 +13995,7 @@ sub endpoint_problem {
     my ( $scheme, $host ) = ( lc $1, lc $2 );
     my $token = $c->{token} // '';
     return 'TOKEN_PLAIN' if $scheme eq 'http' && $token ne '' && !_is_local_host($host);
-    return 'NO_TOKEN'    if $token eq '' && ( $c->{provider} eq 'anthropic' || ( $c->{provider} eq 'openai' && !_is_local_host($host) ) );
+    return 'NO_TOKEN'    if $token eq '' && ( $c->{provider} eq 'anthropic' || $c->{provider} eq 'gemini' || ( $c->{provider} eq 'openai' && !_is_local_host($host) ) );
     return '';
 }
 
@@ -13997,6 +14007,11 @@ sub _base {
     $u =~ s{/+$}{};
     if ( $c->{provider} eq 'anthropic' ) { $u =~ s{/v1$}{}; return $u }
     if ( $c->{provider} eq 'ollama' )    { $u =~ s{/(api|v1)$}{}; return $u }
+    if ( $c->{provider} eq 'gemini' ) {    # the OpenAI-compatible endpoint of the Gemini API
+        $u .= '/v1beta/openai' if $u =~ m{^https?://[^/]+$};
+        $u .= '/openai'        if $u =~ m{/v1(beta)?$};
+        return $u;
+    }
     $u .= '/v1' if $u =~ m{^https?://[^/]+$};    # OpenAI-compatible servers live under /v1
     return $u;
 }
@@ -14099,16 +14114,40 @@ You are an experienced professional library cataloguer. Catalogue the book in th
 - Chief source: the title page. Then the verso of the title page and its cataloguing-in-publication (CIP) block, then the cover.
 - Use the context of the book (genre, audience, country, period, series) to choose precise subject headings and the Dewey class, but never invent data that is not printed.
 - Names in the inverted form of the authority files (Surname, Forename); compound surnames follow the national rules.
-Example of a well-catalogued record (MARC 21):
-020 __ |a 9788508040350
-082 04 |a 869.3 |2 23
-100 1_ |a Assis, Machado de, |d 1839-1908.
-245 10 |a Dom Casmurro / |c Machado de Assis.
-250 __ |a 3. ed.
-260 __ |a São Paulo : |b Ática, |c 1997.
-300 __ |a 208 p. ; |c 21 cm.
-490 0_ |a Bom livro ; |v 12
-650 _4 |a Romance brasileiro.
+- The example below shows every field the library uses. Fill each one the photos support, with the same indicators, subfields and punctuation; leave out the ones that do not apply to this book (no translation: no 041, 240, 500 "Tradução de" or translator; no series: no 490 and 830; no illustrations: no "il.").
+- Libraries following RDA use 264 _1 instead of 260 and spell out the terms (448 páginas : ilustrações), without "[S.l.]" / "[s.n.]".
+Example of a complete, well-catalogued record (MARC 21). Delete the fields your library does not use:
+020 __ |a 9788501118950 |q (broch.)
+040 __ |a BR-RjBN |b por |c BR-RjBN
+041 1_ |a por |h spa
+043 __ |a s-ck---
+082 04 |a 863 |2 23
+090 __ |a 863 |b G216c
+100 1_ |a García Márquez, Gabriel, |d 1927-2014.
+240 10 |a Cien años de soledad. |l Português
+245 10 |a Cem anos de solidão : |b romance / |c Gabriel García Márquez ; tradução de Eric Nepomuceno ; ilustrações de Luisa Rivera.
+246 30 |a 100 anos de solidão
+250 __ |a 108. ed.
+260 __ |a Rio de Janeiro : |b Record, |c 2019.
+300 __ |a 448 p. : |b il. ; |c 23 cm.
+336 __ |a texto |b txt |2 rdacontent
+337 __ |a não mediado |b n |2 rdamedia
+338 __ |a volume |b nc |2 rdacarrier
+490 1_ |a Coleção grandes romances ; |v 5
+500 __ |a Tradução de: Cien años de soledad.
+504 __ |a Inclui bibliografia.
+505 0_ |a Cem anos de solidão -- Árvore genealógica dos Buendía -- Cronologia.
+520 __ |a Romance que narra a saga de sete gerações da família Buendía na cidade imaginária de Macondo.
+521 __ |a Público adulto.
+546 __ |a Texto em português, traduzido do espanhol.
+650 _4 |a Ficção colombiana.
+650 _4 |a Famílias |v Ficção.
+651 _4 |a Colômbia |v Ficção.
+655 _4 |a Realismo mágico (Literatura).
+700 1_ |a Nepomuceno, Eric, |d 1948- |e tradutor.
+700 1_ |a Rivera, Luisa, |e ilustradora.
+830 _0 |a Coleção grandes romances ; |v 5.
+942 __ |c LIVRO |2 ddc
 TXT
 }
 
@@ -14213,9 +14252,11 @@ sub _call {
     return ( $res, $data );
 }
 
-# Error text from the usual JSON error bodies (OpenAI, Anthropic, Ollama).
+# Error text from the usual JSON error bodies (OpenAI, Anthropic, Ollama,
+# Gemini, which may wrap the object in a list).
 sub _api_error {
     my ( $res, $data ) = @_;
+    $data = $data->[0] if ref $data eq 'ARRAY';
     if ( ref $data eq 'HASH' ) {
         my $e = $data->{error};
         return _short( $e->{message} ) if ref $e eq 'HASH' && defined $e->{message};
@@ -14266,6 +14307,12 @@ sub _request_body {
         # their default temperature.
         $body{response_format}       = { type => 'json_object' };
         $body{max_completion_tokens} = 4000;
+    } elsif ( $c->{provider} eq 'gemini' ) {
+        # JSON mode; the "thinking" of the Gemini 2.5+ models counts
+        # against max_tokens, hence the larger limit.
+        $body{response_format} = { type => 'json_object' };
+        $body{temperature}     = 0;
+        $body{max_tokens}      = 8192;
     } else {
         $body{temperature} = 0;
         $body{max_tokens}  = 2000;
@@ -14451,6 +14498,7 @@ sub check_connection {
         ? ( $c->{provider} eq 'ollama' ? map { $_->{name} // '' } @{ $data->{models} || [] } : map { $_->{id} // '' } @{ $data->{data} || [] } )
         : ();
     my $m = $c->{model};
+    s{^models/}{} for @ids;    # Gemini lists "models/gemini-..."
     my $found = grep { $_ eq $m || ( $c->{provider} eq 'ollama' && $m !~ /:/ && $_ eq "$m:latest" ) } @ids;
     return ( 1, sprintf( 'OK %s (%d models); %s: %s', $url, scalar @ids, $m, $found ? 'found' : 'NOT FOUND' ) );
 }
@@ -15038,16 +15086,17 @@ mr_text() {
         e_EMPTY)          t "the model gave an empty answer." ;;
         e_NO_JSON)        t "the answer of the model was not the expected data:" ;;
         s_title)          t "Settings of the AI model" ;;
-        s_intro)          t "A vision model reads the photos: a cloud service with an API token (OpenAI, Anthropic or any OpenAI-compatible service) or a model on the library's own network (Ollama or LM Studio with a vision model, e.g. qwen2.5vl, llama3.2-vision or gemma3). The photos are sent only to the address below." ;;
+        s_intro)          t "A vision model reads the photos: a cloud service with an API key (OpenAI, Anthropic, Google Gemini or any OpenAI-compatible service) or a model on the library's own network (Ollama or LM Studio with a vision model, e.g. qwen2.5vl, llama3.2-vision or gemma3). The photos are sent only to the address below." ;;
         s_perm)           t "Only staff allowed to change the system preferences can see and change these settings." ;;
         s_provider)       t "Service" ;;
         p_openai)         t "OpenAI (API token)" ;;
         p_anthropic)      t "Anthropic Claude (API token)" ;;
+        p_gemini)         t "Google Gemini (API key from Google AI Studio)" ;;
         p_ollama)         t "Ollama (local)" ;;
         p_compatible)     t "OpenAI-compatible: LM Studio, vLLM, llama.cpp, OpenRouter" ;;
         s_url)            t "Address (empty: the default of the service)" ;;
         s_model)          t "Model (empty: the default of the service)" ;;
-        s_token)          t "API token (not needed for a local model)" ;;
+        s_token)          t "API token or key (Gemini: the key of Google AI Studio; not needed for a local model)" ;;
         s_token_saved)    t "A token is saved and is never shown. Leave the field empty to keep it." ;;
         s_token_clear)    t "Remove the saved token" ;;
         s_timeout)        t "Time limit of the model (seconds)" ;;
@@ -15060,7 +15109,7 @@ mr_text() {
         t_none)           t "None" ;;
         s_ddc_ed)         t "CDD edition (field 082)" ;;
         s_instructions)   t "Cataloguing instructions for the model" ;;
-        s_instructions_hint) t "Sent with every book, before the fixed answer format. Write the rules and the practice of the library; {language} becomes the language of cataloguing. Empty: the default instructions." ;;
+        s_instructions_hint) t "Sent with every book, before the fixed answer format. Write the rules and the practice of the library; {language} becomes the language of cataloguing. The default brings a complete example record with the fields in common use: delete the ones the library does not use. Empty: the default instructions." ;;
         s_instructions_default) t "Restore the default instructions" ;;
         v_note)           t "Instructions for this book only (optional)" ;;
         v_note_hint)      t "Sent with these photos only and never saved: the next book starts with an empty field." ;;
