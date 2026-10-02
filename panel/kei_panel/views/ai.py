@@ -24,7 +24,6 @@ stays empty and shows the saved key masked; empty means "keep it".
 
 from __future__ import annotations
 
-import tempfile
 import time
 from pathlib import Path
 
@@ -33,7 +32,7 @@ from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Button, Input, Label, RadioButton, RadioSet
 
-from .. import aiclient, aiconf, marcreplace
+from .. import aiclient, aiconf, assistant, marcreplace
 from ..i18n import t
 from ..tasks import Reporter, TaskFailed, TaskResult, run_with_loader
 from ..widgets.cards import StatusCard
@@ -56,9 +55,7 @@ class AIView(SectionView):
     # Files
     # ------------------------------------------------------------------
     def conf_file(self) -> Path:
-        if self.app.env.demo:
-            return Path(tempfile.gettempdir()) / "kei-demo-ai" / "vision.conf"
-        return aiconf.conf_path(self.app.env.instance)
+        return assistant.conf_file(self.app.env)
 
     def saved(self) -> dict[str, str]:
         return aiconf.load(self.conf_file())
