@@ -118,7 +118,7 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     panel eval 'tunnel_public_hosts'
     assert '[ "$output" = "t-palotina-pr.example.org -" ]' "staff stays local while remote access is off: $output"
     panel function_view_credentials
-    assert 'dialogs | grep -q "https://t-palotina-pr.example.org"' "$(dialogs)"
+    assert 'echo "$output" | grep -qx "https://t-palotina-pr.example.org"' "value alone on its line: $output"
 }
 
 @test "B03 remote staff access: edge password on, then off; password never shown" {
