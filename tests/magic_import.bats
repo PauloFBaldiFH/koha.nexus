@@ -121,7 +121,7 @@ bf_circ_schema() {
     assert 'preview | grep -q "^== books.mrc  (ISO 2709, 3 record(s), encoding UTF-8)" && preview | grep -q "^Items: 1 in 952, as Koha keeps them"' "$(preview)"
     assert '! dialogs | grep -q "MENU \[🪄  Magic Import Tool\]"' "no question, and no library or item type for records that bring their own items"
     assert 'dialogs | grep -q "Records: 3\\\\n  Items: 1\\\\n  Patrons: 0"' "$(dialogs)"
-    assert 'dialogs | grep -q "^OK ✔ Successfully imported 3 bibliographic record(s), 3 item(s) and 0 patron(s) with zero manual mapping required"' "$(dialogs | tail -2)"
+    assert 'dialogs | grep -q "^OK ✅ Successfully imported 3 bibliographic record(s), 3 item(s) and 0 patron(s) with zero manual mapping required"' "$(dialogs | tail -2)"
     assert '[ "$(bibs)" = "203" ]'
     assert '[ -z "$(ls -d /tmp/koha_tools.* 2>/dev/null)" ]' "the work folder must be removed on exit"
 }
@@ -260,7 +260,7 @@ PY
     local f="$KEI_S/last-staged.mrc"
     assert 'preview | grep -q "encoding ISO_8859-1, your answer" && preview | grep -q "^Items: field 945 moved to 952, one item per field:" && preview | grep -qx "  945 \$b -> 952 \$p, barcode: T-100, T-101"' "$(preview)"
     assert 'marc_dump "$f" | grep -qx "245 10 \$a José de Alencar" && marc_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p T-101"' "$(marc_dump "$f")"
-    assert 'dialogs | grep -q "^OK ✔ .*Questions answered: 2"' "$(dialogs | tail -1)"
+    assert 'dialogs | grep -q "^OK ✅ .*Questions answered: 2"' "$(dialogs | tail -1)"
 }
 
 @test "I20 an item field in another system's layout: every subfield read from its values, library and item type checked against Koha" {
@@ -375,7 +375,7 @@ XML
     assert '[ "$(tools_sql "SELECT CONCAT(firstname, \"|\", surname) FROM borrowers WHERE cardnumber = \"52998224725\";")" = "Ana|Maria Souza" ]'
     assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"11144477735\";")" = "Lima" ]'
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM borrowers WHERE cardnumber = \"12345678900\";")" = "0" ]' "invalid CPFs are not imported"
-    assert 'dialogs | grep -q "^OK ✔ Successfully imported 0 bibliographic record(s), 0 item(s) and 2 patron(s) with zero manual mapping required"'
+    assert 'dialogs | grep -q "^OK ✅ Successfully imported 0 bibliographic record(s), 0 item(s) and 2 patron(s) with zero manual mapping required"'
 }
 
 @test "I09 patrons with a card number column: the CPF goes to the CPF attribute" {
@@ -443,7 +443,7 @@ XML
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p 5001 \$i 5001 \$d 2023-03-15"' "Excel dates read: $(xml_dump "$f" | grep ^952)"
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM borrowers WHERE cardnumber IN (\"52998224725\", \"11144477735\", \"A1\", \"A2\", \"A3\");")" = "5" ]' "$(tools_sql "SELECT cardnumber, surname FROM borrowers;")"
     assert '[ -n "$(ls /etc/koha-easy-install/import-profiles/*.tsv)" ] && [ "$(stat -c %a /etc/koha-easy-install/import-profiles)" = "700" ]'
-    assert 'dialogs | grep -q "^OK ✔ Successfully imported 3 bibliographic record(s), 3 item(s) and 5 patron(s). Questions answered: 2"' "$(dialogs | tail -1)"
+    assert 'dialogs | grep -q "^OK ✅ Successfully imported 3 bibliographic record(s), 3 item(s) and 5 patron(s). Questions answered: 2"' "$(dialogs | tail -1)"
     # The same columns in an ODS: no question this time.
     rm -f "$KEI_S/dialogs.log" "$KEI_S/textboxes.log"
     export KEI_SELECT_FILE="$W/fx/biblioteca.ods"
