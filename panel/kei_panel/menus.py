@@ -61,6 +61,8 @@ SECTIONS: tuple[Section, ...] = (
     # the staff web UI; its MARC Replace hook opens the routine below.
     Section("ai", "🪄  AI cataloguing", "🪄  AI cataloguing", entries=(
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace"),
+        # Module 2: the chat on the Koha staff home page (in place of the news).
+        Entry("💬  AI assistant on the staff home page", "ai-assistant"),
     ), view="ai", key="a"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle"),

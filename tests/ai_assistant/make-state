@@ -1,0 +1,20 @@
+#!/bin/bash
+# Builds the files of the AI assistant tests (tests only):
+#   make-state STATE_DIR MODEL_PORT
+# The page and the module made by the panel (with the folders pointed at
+# STATE_DIR), the IntranetUserJS block, the sample Koha database (SQLite),
+# readonly.cnf and the AI settings (vision.conf) of a scripted model.
+set -e
+S="$1"; PORT="$2"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
+mkdir -p "$S/lib/KohaEasy" "$S/kei-ai" "$S/mr"
+printf 'AIA_DIR=%q\nMR_DIR=%q\nMR_FILE=%q\nSYS_LANG=en\n' "$S/kei-ai" "$S/mr" "$S/mr/marc_replace.pl" > "$S/extra.sh"
+KEI_EXTRA="$S/extra.sh" bash "$REPO/tests/lib/panel.sh" aia_pm > "$S/lib/KohaEasy/Assistant.pm"
+KEI_EXTRA="$S/extra.sh" bash "$REPO/tests/lib/panel.sh" ai_assistant_script > "$S/ai_assistant.pl"
+KEI_EXTRA="$S/extra.sh" bash "$REPO/tests/lib/panel.sh" aia_js_block > "$S/userjs.js"
+rm -f "$S/koha.db"
+perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]", "", "", { RaiseError => 1, sqlite_unicode => 1 });
+    open my $f, "<:utf8", $ARGV[1] or die; local $/; $d->do($_) for grep { /\S/ } split /;\n/, <$f>' "$S/koha.db" "$HERE/koha.sql"
+printf 'dsn=dbi:SQLite:dbname=%s\nuser=\npassword=\n' "$S/koha.db" > "$S/kei-ai/readonly.cnf"
+printf 'provider=compatible\nurl=http://127.0.0.1:%s/v1\nmodel=scripted\ntimeout=20\n' "$PORT" > "$S/mr/vision.conf"

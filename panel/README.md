@@ -75,31 +75,6 @@ inline while it reads the status.
 
 Every network call above is a thread job behind the Pac-Man loader.
 
-## Module 2: AI assistant (dashboard)
-
-`widgets/assistant.py` puts a chat under the dashboard's status cards. It
-uses the provider saved in Module 1 and answers questions about the
-catalogue, patrons, saved reports, system preferences and panel screens.
-
-* **Read-only below the prompt.** Queries run as `kei_ai_ro`, a MariaDB
-  account with `SELECT` only (no `sessions`/`api_keys`, no password
-  columns), created once by **Set up read-only access**; its option file is
-  `/etc/koha-easy-install/ai-readonly.cnf` (0600). Free SQL also passes
-  `assistant/sqlguard.py` (one `SELECT`, no `INTO`/locks/`SLEEP`, `LIMIT 50`).
-* **Changes are proposals.** The model can only call `propose_change`; the
-  panel shows the exact SQL or panel routine with **Confirm** / **Cancel**.
-  SQL is one single-table `UPDATE`/`INSERT`/`DELETE` with a real `WHERE`,
-  run through `koha-mysql` in a transaction with `LIMIT` = the previewed
-  row count, after `--backup-now` when the installer has it.
-* **Blue links.** `[[biblio:12|Title]]` in an answer is a clickable blue
-  link and a chip under it (Tab / Enter, ctrl+o for the first). Only ids a
-  tool really returned become links; they open a record card (or switch
-  panel screen for `page:` links).
-* Each question is one thread job behind the Pac-Man loader; `--demo` uses
-  a scripted model and an SQLite copy of a few Koha tables.
-
-The system prompt is `assistant/prompt.py`.
-
 ## Layout
 
 ```
@@ -114,10 +89,8 @@ kei_panel/
   aiconf.py         vision.conf of the AI cataloguing tabs, ai-keys.conf, key masking
   aiclient.py       connection test and local Ollama (version, models, pull), blocking
   marcreplace.py    is the MARC Replace page installed, which --run action opens it
-  assistant/        Module 2: prompt, provider chat, agent loop, tools, SQL guard,
-                    read-only DB account, links, running confirmed changes
-  widgets/          PacmanLoader, StatusCard, ActionCard, AssistantPanel
-  screens/          MainScreen, LoadingScreen, ConfirmScreen, ResultScreen, RecordScreen
+  widgets/          PacmanLoader, StatusCard, ActionCard
+  screens/          MainScreen, LoadingScreen, ConfirmScreen, ResultScreen
   views/            dashboard, section (generic), backup, database, ai
   panel.tcss        all styling
 tests/              pytest, headless (no Koha needed)

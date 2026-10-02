@@ -1,6 +1,4 @@
-"""DashboardView: Koha's state at a glance, read from --status-json,
-and under it the AI assistant (Module 2, widgets/assistant.py), where the
-whiptail panel showed its static news.
+"""DashboardView: Koha's state at a glance, read from --status-json.
 
 The status is loaded in a worker with a one-line Pac-Man inside the view
 (the same PacmanLoader as the modal, compact): a quick read does not need
@@ -16,7 +14,6 @@ from textual.containers import Grid, Horizontal
 from textual.widgets import Button, Label
 
 from ..i18n import t
-from ..widgets.assistant import AssistantPanel
 from ..widgets.cards import StatusCard
 from ..widgets.pacman import PacmanLoader
 from .base import SectionView
@@ -58,7 +55,6 @@ class DashboardView(SectionView):
             yield StatusCard(t("Disk free"), id="card-disk")
             yield StatusCard(t("Memory available"), id="card-memory")
             yield StatusCard(t("Services"), id="card-services")
-        yield AssistantPanel(id="assistant")
 
     def on_mount(self) -> None:
         self.refresh_data()
