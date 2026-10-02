@@ -1,0 +1,89 @@
+"""KohaPanelApp: the Textual panel."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Callable
+
+from textual.app import App
+from textual.binding import Binding
+
+from .bridge import Bridge, BridgeError
+from .env import PanelEnv
+from .i18n import Translator, install, t
+from .menus import Entry
+from .screens.dialogs import ConfirmScreen, ResultScreen
+from .screens.main import MainScreen
+from .tasks import TaskResult, run_with_loader, verb_job
+
+
+class KohaPanelApp(App):
+    CSS_PATH = Path(__file__).with_name("panel.tcss")
+    TITLE = "koha.nexus"
+    BINDINGS = [
+        Binding("q", "quit", t("Exit")),
+        Binding("question_mark", "help", "Help", show=False),
+    ]
+
+    def __init__(self, env: PanelEnv):
+        install(Translator(env.lang, env.installer, env.plain))
+        super().__init__()
+        self.env = env
+        self.bridge = Bridge(env)
+
+    def on_mount(self) -> None:
+        # Classic console / Linux console: ASCII borders (panel.tcss, App.-plain).
+        self.set_class(self.env.plain, "-plain")
+        self.theme = "textual-dark"
+        self.push_screen(MainScreen())
+        if self.env.demo:
+            self.notify("Demo mode: nothing is run on this machine.", timeout=4)
+
+    def on_resize(self, event) -> None:
+        # 80-column SSH sessions: two cards per row instead of three.
+        self.set_class(event.size.width < 110, "-narrow")
+
+    # ------------------------------------------------------------------
+    # Running a menu entry: the one place that decides how
+    # ------------------------------------------------------------------
+    def runs_in_background(self, entry: Entry) -> bool:
+        return entry.kind == "background" or bool(entry.verb and self.bridge.supports(entry.verb[0]))
+
+    def run_entry(self, entry: Entry, after: Callable[[], None] | None = None) -> None:
+        label = t(entry.label)
+        if not self.runs_in_background(entry):
+            try:
+                rc = self.bridge.run_interactive(self, entry.action)
+            except BridgeError as e:
+                self.notify(str(e), severity="error")
+                return
+            if rc not in (0, None):
+                self.notify(f"{label}: exit {rc}", severity="warning")
+            if after:
+                after()
+            return
+
+        def start(confirmed: bool | None = True) -> None:
+            if not confirmed:
+                return
+
+            def done(result: TaskResult) -> None:
+                if result.ok:
+                    self.notify(f"{label}: {t('Done!')}", timeout=5)
+                elif not result.cancelled:
+                    self.task_failed(label, result)
+                if after:
+                    after()
+
+            run_with_loader(self, label, verb_job(self.bridge, entry.verb), on_done=done)
+
+        if entry.confirm:
+            self.push_screen(ConfirmScreen(label, t(entry.confirm)), callback=start)
+        else:
+            start()
+
+    def task_failed(self, title: str, result: TaskResult) -> None:
+        if result.cancelled:
+            self.notify(f"{title}: {t('Cancelled')}", severity="warning")
+        else:
+            self.push_screen(ResultScreen(title, result))

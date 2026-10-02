@@ -1,0 +1,3 @@
+# The Textual panel (prototype). Installed into its own venv by the panel,
+# never into the system Python: see panel/README.md.
+textual>=8.2,<9
