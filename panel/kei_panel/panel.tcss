@@ -1,0 +1,212 @@
+/* koha.nexus panel: every style in one place.
+   Colours are theme variables ($primary, $panel...), so true-colour
+   terminals get the full palette and 256/16-colour ones a close match. */
+
+Screen {
+    background: $background;
+}
+
+#body {
+    height: 1fr;
+}
+
+/* ---- sidebar ------------------------------------------------------- */
+#sidebar {
+    width: 42;
+    height: 1fr;
+    border: none;
+    border-right: tall $panel-lighten-1;
+    background: $panel;
+    padding: 1 0;
+}
+#sidebar > .option-list--option {
+    padding: 0 1;
+}
+#sidebar:focus > .option-list--option-highlighted {
+    background: $primary;
+    text-style: bold;
+}
+
+/* ---- views --------------------------------------------------------- */
+#views {
+    width: 1fr;
+    height: 1fr;
+}
+.view {
+    padding: 1 2;
+}
+.view-head {
+    height: auto;
+}
+.view-head .view-title {
+    width: 1fr;
+}
+.view-title {
+    text-style: bold;
+    color: $text;
+    padding-bottom: 1;
+}
+.view-prompt {
+    color: $text-muted;
+    padding-bottom: 1;
+}
+Button.small {
+    min-width: 12;
+    height: 3;
+}
+
+/* ---- status cards -------------------------------------------------- */
+.status-grid {
+    grid-size: 3;
+    grid-gutter: 1 2;
+    grid-rows: 6;
+    height: auto;
+    margin-bottom: 1;
+}
+.status-card {
+    height: 6;
+    border: round $panel-lighten-2;
+    padding: 0 1;
+    background: $surface;
+}
+.status-card .card-title { color: $text-muted; }
+.status-card .card-value { text-style: bold; color: $text; }
+.status-card .card-note  { color: $text-muted; }
+.status-card.-ok   { border: round $success; }
+.status-card.-warn { border: round $warning; }
+.status-card.-bad  { border: round $error; }
+
+#status-loader {
+    margin-bottom: 1;
+}
+
+/* ---- action cards -------------------------------------------------- */
+.card-grid {
+    grid-size: 3;
+    grid-gutter: 1 2;
+    grid-rows: 7;
+    height: auto;
+}
+.action-card {
+    border: round $panel-lighten-2;
+    background: $surface;
+    padding: 0 1;
+    height: 7;
+}
+.action-card:hover {
+    border: round $primary-lighten-2;
+    background: $boost;
+}
+.action-card:focus {
+    border: thick $primary;
+    background: $boost;
+}
+.action-card .action-icon { text-style: bold; }
+.action-card .action-text { text-style: bold; color: $text; }
+.action-card .action-hint { color: $text-muted; padding-top: 1; }
+
+/* ---- tables & forms ------------------------------------------------ */
+#tables {
+    height: 20;
+    margin-bottom: 1;
+}
+.form-grid {
+    grid-size: 2;
+    grid-columns: 18 1fr;
+    grid-rows: 3;
+    grid-gutter: 0 1;
+    height: auto;
+    max-width: 100;
+}
+.form-grid > Label {
+    padding-top: 1;
+    color: $text-muted;
+}
+.form-buttons {
+    height: auto;
+    padding-top: 1;
+}
+.form-buttons Button {
+    margin-right: 2;
+}
+
+/* ---- loading modal (Pac-Man) --------------------------------------- */
+LoadingScreen {
+    align: center middle;
+    background: $background 70%;
+}
+#loader-box {
+    width: 76;
+    max-width: 95%;
+    height: auto;
+    border: round $warning;
+    background: $surface;
+    padding: 1 2;
+}
+#loader-title {
+    text-style: bold;
+    padding-bottom: 1;
+}
+#loader-box PacmanLoader {
+    margin-bottom: 1;
+}
+#loader-meta {
+    height: 1;
+}
+#loader-status {
+    width: 1fr;
+    color: $text-muted;
+}
+#loader-clock {
+    width: auto;
+    color: $text-muted;
+}
+#loader-log {
+    height: 10;
+    margin-top: 1;
+    border: round $panel-lighten-2;
+}
+#loader-buttons {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+#loader-buttons Button {
+    margin-left: 2;
+}
+
+/* ---- dialogs ------------------------------------------------------- */
+ConfirmScreen, ResultScreen {
+    align: center middle;
+    background: $background 70%;
+}
+.dialog {
+    width: 70;
+    max-width: 95%;
+    height: auto;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+.dialog.-error { border: round $error; }
+.dialog-title { text-style: bold; padding-bottom: 1; }
+.dialog-body { padding-bottom: 1; }
+.dialog-log { height: 12; border: round $panel-lighten-2; }
+.dialog-buttons { height: auto; align-horizontal: right; padding-top: 1; }
+.dialog-buttons Button { margin-left: 2; }
+
+/* ---- narrow terminals (80 columns over SSH) ----------------------- */
+.-narrow .status-grid, .-narrow .card-grid { grid-size: 2; }
+
+/* ---- classic Windows console / Linux console: ASCII borders ------- */
+App.-plain .status-card,
+App.-plain .action-card,
+App.-plain #loader-box,
+App.-plain .dialog,
+App.-plain #loader-log,
+App.-plain .dialog-log {
+    border: ascii $panel-lighten-2;
+}
+App.-plain .action-card:focus { border: ascii $primary; }
+App.-plain #sidebar { border-right: ascii $panel-lighten-1; }
+.-narrow #sidebar { width: 28; }
