@@ -89,14 +89,14 @@ trap on_exit EXIT
 unshield_signals
 
 PANEL_VERSION=" 1.4.0"
-UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/refs/heads/main/installer"
+UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
 # 2. LANGUAGE / IDIOMA
 # ======================================================================
 CONFIG_DIR="/etc/koha-easy-install"
 TRANSLATION_CONFIG="${CONFIG_DIR}/translation.conf"
-LANG_REPO_URL="https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/refs/heads/main/lang"
+LANG_REPO_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/lang"
 _SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_PATH")" 2>/dev/null && pwd)"
 

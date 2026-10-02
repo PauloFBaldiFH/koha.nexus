@@ -48,15 +48,15 @@ It was born from real-life experience facing technical barriers in collection ma
 ## Installation
 
 ```bash
-wget https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/refs/heads/main/installer
+wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
 sudo bash installer
 ```
 
 Or clone the repository (this keeps the translation files next to the script and works offline):
 
 ```bash
-git clone https://github.com/PauloFBaldiFH/Koha-Easy-Installer.git
-cd Koha-Easy-Installer
+git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
 sudo bash installer
 ```
 
@@ -120,10 +120,10 @@ Koha runs inside a Debian system in **WSL 2** (the Windows Subsystem for Linux),
 Open **PowerShell** (Start menu, type *PowerShell*; no need to run it as administrator), paste this line and press Enter:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/main/windows/install.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
 
-If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/Koha-Easy-Installer/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first.
+If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first.
 
 The installer does everything else and shows each step in plain language:
 
@@ -134,7 +134,7 @@ The installer does everything else and shows each step in plain language:
 5. It creates your Debian user with `sudo` rights and enables systemd. On Windows 11 22H2 or later it also adds mirrored networking and `hostAddressLoopback` to your `.wslconfig`, keeping your own settings and a backup. Then it restarts Debian and waits until systemd is fully running before going on.
 6. Before Koha is installed, it builds `KohaEasy.exe` and creates the scheduled tasks, the **Koha** icon (desktop and Start menu) and the status icon, so there is a way into Koha even if the next step stops half-way. It says where the Koha icon is, with Windows' reason when a shortcut could not be made. Then it opens the Koha control panel. The panel's own tools download with a single status line ("Downloading the panel dependencies..."); the package manager's output goes only to `/var/log/koha-easy-install/apt.log`, or to the screen with `--verbose`. Choose your language, then **1 – Install Koha server** (it asks for the timezone), and leave the panel with **Exit** when it finishes. If Koha is not fully installed, the installer says which check failed.
 7. It asks whether Koha should start when you sign in to Windows. Then it builds `KohaEasy.exe`, creates the scheduled tasks, the shortcuts and the status icon, gives Debian's own Start menu entry and Windows Terminal profile the Koha icon, opens Koha to the library network (Windows asks for permission once), starts Koha, tests the library network and opens the staff interface. It shows the addresses other PCs use, by this PC's name and by its address. From then on, the **Koha** icon on the desktop starts Koha when it is off and opens the Koha window. Running the one-line command again is safe: it updates `KohaEasy.exe`, the scheduled tasks, the shortcuts and the status icon, brings the library network settings of an earlier version up to date (Windows asks for permission once), finishes a Koha install that stopped half-way (saying which check failed), and if Koha does not start it prints what Debian reports and saves the diagnostics on the desktop. When `.wslconfig` gets new settings, or Koha still runs with an earlier version's window, Koha is stopped cleanly and started again. If the Koha icon or the status icon is still missing, this command checks each part step by step, prints every error in full and saves the result in `C:\KohaEasy\logs\diagnose-<date>.txt`:
-   `irm https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/main/windows/diagnose.ps1 | iex`
+   `irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/diagnose.ps1 | iex`
 
 Running it again is safe: it continues from the last step it finished. An install made by an earlier version, whose Debian was called `KohaEasy`, is renamed to `koha` with its data kept. The first-access user and password are in the control panel, option 2. Everything is kept in `C:\KohaEasy`, with the installer's log in `C:\KohaEasy\logs`.
 

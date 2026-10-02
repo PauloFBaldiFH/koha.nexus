@@ -4,7 +4,7 @@
 #   the shortcuts and starts the tray again, and prints every error in full
 #   (type, message, line and stack). Run it in Windows PowerShell as the
 #   signed-in user (not as administrator):
-#   irm https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/main/windows/diagnose.ps1 | iex
+#   irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/diagnose.ps1 | iex
 #
 # Everything shown is also saved in C:\KohaEasy\logs\diagnose-<date>.txt
 # (no passwords are read). ASCII only: it must survive "irm | iex".

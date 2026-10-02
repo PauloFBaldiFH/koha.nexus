@@ -2,7 +2,7 @@
 #
 #   How to install Koha on Windows: this line, in PowerShell (no
 #   administrator needed; Windows asks for permission when a step needs it):
-#   [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/Koha-Easy-Installer/main/windows/install.ps1 | iex
+#   [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 #   or a double-click on windows\Install-Koha.cmd, which runs the same line.
 #
 # It copies the Windows tools, the panel and its dictionaries to
@@ -31,7 +31,7 @@ try {
 
 function Install-KohaEasyBootstrap {
     $ErrorActionPreference = 'Stop'
-    $repo = 'PauloFBaldiFH/Koha-Easy-Installer'
+    $repo = 'PauloFBaldiFH/koha.nexus'
     $branch = 'main'
     if ($env:KOHAEASY_BRANCH) { $branch = $env:KOHAEASY_BRANCH }
     $root = 'C:\KohaEasy'
