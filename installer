@@ -1218,12 +1218,23 @@ EOF
     return 0
 }
 
-msg_info() { whiptail --title "$1" --msgbox "$2" "${3:-12}" "${4:-74}"; }
-msg_ok() { whiptail --title "$(t "OK")" --msgbox "$1" "${2:-10}" "${3:-70}"; }
+# Message boxes are drawn on stdout. A function whose answer is read with
+# $(...) (e.g. kind=$(cat_pick_kind)) has its stdout captured: the box would
+# wait for OK where nobody can see it and the panel would look frozen, so it
+# goes to the terminal instead.
+ui_msgbox() {
+    if [ ! -t 1 ] && { : >/dev/tty; } 2>/dev/null; then
+        whiptail "$@" >/dev/tty
+    else
+        whiptail "$@"
+    fi
+}
+msg_info() { ui_msgbox --title "$1" --msgbox "$2" "${3:-12}" "${4:-74}"; }
+msg_ok() { ui_msgbox --title "$(t "OK")" --msgbox "$1" "${2:-10}" "${3:-70}"; }
 msg_error() {
     local title="${1:-}"
     [ -z "$title" ] && title="$(t "Error")"
-    whiptail --title "$title" --msgbox "$2" "${3:-10}" "${4:-74}"
+    ui_msgbox --title "$title" --msgbox "$2" "${3:-10}" "${4:-74}"
 }
 
 prompt_yes_no() {
