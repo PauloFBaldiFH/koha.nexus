@@ -1054,6 +1054,35 @@ systemd_is_pid1() { [ -d "$KEI_SYSTEMD_RUNDIR" ]; }
 
 detect_platform
 
+# The Linux user behind a WSL panel. The Windows tools open the panel with
+# "wsl -u root", so there is no SUDO_USER and REAL_USER is root: the user is
+# the distro's default ([user] default in wsl.conf, set by the Windows
+# installer), else the first regular account (UID 1000+) with a home.
+wsl_default_user() {
+    local u="" h uid shell
+    [ -r "$KEI_WSL_CONF" ] && u=$(awk -F= '
+        /^[[:space:]]*\[/ { s = tolower($0); gsub(/[][[:space:]\r]/, "", s); next }
+        s == "user" && $1 ~ /^[[:space:]]*default[[:space:]]*$/ { v = $2; gsub(/[[:space:]\r"]/, "", v); print v; exit }
+    ' "$KEI_WSL_CONF" 2>/dev/null)
+    if [ -n "$u" ] && [ "$u" != "root" ] && getent passwd "$u" >/dev/null 2>&1; then
+        printf '%s' "$u"; return 0
+    fi
+    while IFS=: read -r u _ uid _ _ h shell; do
+        [[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ge 1000 ] && [ "$uid" -lt 60000 ] || continue
+        case "$shell" in */nologin|*/false) continue ;; esac
+        [ -d "$h" ] && { printf '%s' "$u"; return 0; }
+    done < <(getent passwd 2>/dev/null | sort -t: -k3,3n)
+    return 1
+}
+
+if is_wsl && [ "$REAL_USER" = "root" ]; then
+    _wsl_user=$(wsl_default_user) && {
+        _wsl_home=$(getent passwd "$_wsl_user" 2>/dev/null | cut -d: -f6)
+        [ -n "$_wsl_home" ] && [ -d "$_wsl_home" ] && { REAL_USER="$_wsl_user"; REAL_HOME="$_wsl_home"; }
+    }
+    unset _wsl_user _wsl_home
+fi
+
 # Plain symbols (see kei_plain_text) when the Windows installer asked for
 # them, or under WSL outside Windows Terminal (which marks its sessions with
 # WT_SESSION). A value other than 0 or 1 is ignored.
