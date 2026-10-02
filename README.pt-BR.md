@@ -123,7 +123,7 @@ Abra o **PowerShell** (menu Iniciar, digite *PowerShell*; não precisa ser como 
 [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
 
-Se preferir dois cliques, baixe o [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, a seta no canto superior direito da página) e dê dois cliques nele. Ele roda exatamente a mesma linha, então a instalação é idêntica. O arquivo não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo**. É texto puro, então você pode abri-lo no Bloco de Notas e lê-lo antes.
+Se preferir dois cliques, baixe o [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, a seta no canto superior direito da página) e dê dois cliques nele. Ele roda exatamente a mesma linha, então a instalação é idêntica. O arquivo não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo**. É texto puro, então você pode abri-lo no Bloco de Notas e lê-lo antes. Dê dois cliques normalmente, sem **Executar como administrador**: o Windows pede permissão só nas etapas que precisam. Se o Windows bloquear o arquivo sem o botão **Executar assim mesmo** (Controle Inteligente de Aplicativos do Windows 11, ou uma política da empresa), clique com o botão direito no arquivo > **Propriedades**, marque **Desbloquear** e clique em **OK**, ou use a linha do PowerShell acima, que não é bloqueada dessa forma.
 
 O instalador faz todo o resto e mostra cada etapa em linguagem simples:
 
