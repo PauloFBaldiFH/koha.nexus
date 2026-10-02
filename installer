@@ -1055,6 +1055,35 @@ systemd_is_pid1() { [ -d "$KEI_SYSTEMD_RUNDIR" ]; }
 
 detect_platform
 
+# The Linux user behind a WSL panel. The Windows tools open the panel with
+# "wsl -u root", so there is no SUDO_USER and REAL_USER is root: the user is
+# the distro's default ([user] default in wsl.conf, set by the Windows
+# installer), else the first regular account (UID 1000+) with a home.
+wsl_default_user() {
+    local u="" h uid shell
+    [ -r "$KEI_WSL_CONF" ] && u=$(awk -F= '
+        /^[[:space:]]*\[/ { s = tolower($0); gsub(/[][[:space:]\r]/, "", s); next }
+        s == "user" && $1 ~ /^[[:space:]]*default[[:space:]]*$/ { v = $2; gsub(/[[:space:]\r"]/, "", v); print v; exit }
+    ' "$KEI_WSL_CONF" 2>/dev/null)
+    if [ -n "$u" ] && [ "$u" != "root" ] && getent passwd "$u" >/dev/null 2>&1; then
+        printf '%s' "$u"; return 0
+    fi
+    while IFS=: read -r u _ uid _ _ h shell; do
+        [[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ge 1000 ] && [ "$uid" -lt 60000 ] || continue
+        case "$shell" in */nologin|*/false) continue ;; esac
+        [ -d "$h" ] && { printf '%s' "$u"; return 0; }
+    done < <(getent passwd 2>/dev/null | sort -t: -k3,3n)
+    return 1
+}
+
+if is_wsl && [ "$REAL_USER" = "root" ]; then
+    _wsl_user=$(wsl_default_user) && {
+        _wsl_home=$(getent passwd "$_wsl_user" 2>/dev/null | cut -d: -f6)
+        [ -n "$_wsl_home" ] && [ -d "$_wsl_home" ] && { REAL_USER="$_wsl_user"; REAL_HOME="$_wsl_home"; }
+    }
+    unset _wsl_user _wsl_home
+fi
+
 # Plain symbols (see kei_plain_text) when the Windows installer asked for
 # them, or under WSL outside Windows Terminal (which marks its sessions with
 # WT_SESSION). A value other than 0 or 1 is ignored.
@@ -4550,37 +4579,56 @@ get_ssh_login() {
     fi
 }
 
+# Prints the credentials as plain terminal text instead of a whiptail box:
+# each value sits alone on its line, flush left, so a triple-click (or a
+# drag) copies exactly the URL, user or password, with no border, label or
+# padding glued to it and no wrap inserted by the dialog.
+_cred_head() { printf '%s%s%s\n' "$TUI_BLD" "$1" "$TUI_RST"; }
+_cred_item() {
+    local label="${1%:}"
+    label="${label%"${label##*[! ]}"}"
+    printf '%s%s:%s\n%s\n' "$TUI_DIM" "$label" "$TUI_RST" "$2"
+}
+
 function_view_credentials() {
     require_koha || return 0
-    local ip cf_section="" cf_opac cf_staff ssh_login
+    local ip cf_opac cf_staff ssh_login rule head
     ip=$(get_server_ip)
     ssh_login=$(get_ssh_login "$ip")
 
     read -r cf_opac cf_staff < <(tunnel_public_hosts)
     [ "$cf_opac" = "-" ] && cf_opac=""
     [ "$cf_staff" = "-" ] && cf_staff=""
+
+    tui_rep "$TUI_LINE" 60; rule=$REPLY
+    clear
+    printf '%s%s%s\n' "$TUI_YEL" "$(t "Access Credentials")" "$TUI_RST"
+    printf '%s%s%s\n\n' "$TUI_DIM" "$rule" "$TUI_RST"
+
+    _cred_head "$(t "ON THIS MACHINE (localhost):")"
+    _cred_item "$(t "OPAC  (catalog)       :")" "http://localhost:80"
+    _cred_item "$(t "Staff (administration):")" "http://localhost:8080"
+    echo ""
+    _cred_head "$(t "FROM OTHER COMPUTERS ON THE NETWORK:")"
+    _cred_item "$(t "OPAC  (catalog)       :")" "http://${ip}:80"
+    _cred_item "$(t "Staff (administration):")" "http://${ip}:8080"
+    echo ""
     if [ -n "$cf_opac" ] || [ -n "$cf_staff" ]; then
-        cf_section="$(t "\n[ INTERNET / CLOUDFLARE TUNNEL ]\n")"
-        [ -n "$cf_opac" ] && cf_section+="  $(t "OPAC  (catalog)       :") https://${cf_opac}\n"
-        [ -n "$cf_staff" ] && cf_section+="  $(t "Staff (administration):") https://${cf_staff}\n"
+        head=$(t "\n[ INTERNET / CLOUDFLARE TUNNEL ]\n")
+        _cred_head "${head//\\n/}"
+        [ -n "$cf_opac" ] && _cred_item "$(t "OPAC  (catalog)       :")" "https://${cf_opac}"
+        [ -n "$cf_staff" ] && _cred_item "$(t "Staff (administration):")" "https://${cf_staff}"
+        echo ""
     fi
-
-    local body
-    body="$(t "ON THIS MACHINE (localhost):")\n"
-    body+="  $(t "OPAC  (catalog)       :") http://localhost:80\n"
-    body+="  $(t "Staff (administration):") http://localhost:8080\n\n"
-    body+="$(t "FROM OTHER COMPUTERS ON THE NETWORK:")\n"
-    body+="  $(t "OPAC  (catalog)       :") http://${ip}:80\n"
-    body+="  $(t "Staff (administration):") http://${ip}:8080\n"
-    body+="${cf_section}\n"
-    body+="$(t "SSH ACCESS (remote terminal):")\n"
-    body+="  ssh ${ssh_login}\n\n"
-    body+="$(t "DATABASE CREDENTIALS (1st Access / Web Installer):")\n"
-    body+="  $(t "User :") ${DB_NAME}\n"
-    body+="  $(t "Pass :") $(get_database_password)\n\n"
-    body+="$(t "Full file:") ${CREDENTIALS_FILE}"
-
-    whiptail --title "$(t "Access Credentials")" --scrolltext --msgbox "$body" 25 78 || true
+    _cred_head "$(t "SSH ACCESS (remote terminal):")"
+    printf '%s\n\n' "ssh ${ssh_login}"
+    _cred_head "$(t "DATABASE CREDENTIALS (1st Access / Web Installer):")"
+    _cred_item "$(t "User :")" "${DB_NAME}"
+    _cred_item "$(t "Pass :")" "$(get_database_password)"
+    echo ""
+    _cred_item "$(t "Full file:")" "${CREDENTIALS_FILE}"
+    printf '%s%s%s\n' "$TUI_DIM" "$rule" "$TUI_RST"
+    pause_terminal
 }
 
 # ======================================================================
