@@ -2341,9 +2341,18 @@ create_safety_backup() {
 # ======================================================================
 # FILE EXPLORER
 # ======================================================================
+# Both pickers start in the home of the user who opened the panel (the one
+# behind sudo, see REAL_HOME), and fall back there when START is missing.
+picker_start_dir() {
+    local dir
+    for dir in "${1:-}" "${REAL_HOME:-}" /root /; do
+        [ -n "$dir" ] && [ -d "$dir" ] && { printf '%s' "$dir"; return 0; }
+    done
+}
+
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current="${1:-/}" exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -2352,7 +2361,7 @@ select_file() {
         for e in $exts; do fexpr+=(-o -iname "*.${e}"); done
         fexpr=("${fexpr[@]:1}")
     fi
-    [ -d "$current" ] || current="/"
+    current=$(picker_start_dir "${1:-}")
     while true; do
         items=()
         [ "$current" != "/" ] && items+=(".." "$(t "[Back]")")
@@ -2383,9 +2392,9 @@ select_file() {
 }
 
 select_directory() {
-    local current="${1:-/}" choice dirs=() marker
+    local current choice dirs=() marker
     marker=">>> $(t "SAVE HERE") <<<"
-    [ -d "$current" ] || current="/"
+    current=$(picker_start_dir "${1:-}")
     while true; do
         dirs=("$marker" "$current")
         [ "$current" != "/" ] && dirs+=(".." "$(t "[Back]")")
@@ -11457,7 +11466,7 @@ lt_br_abnt() {
     fi
     listing=""
     prompt_yes_no "$title" "$(t 'Records found: ${n}\n\nAdd the call numbers and the number of copies under each reference (collection listing)?\n\nChoose No for a plain bibliography (e.g. for students or the MEC evaluators).')" 14 74 defaultno && listing="--listing"
-    dir=$(select_directory "/root") || return 0
+    dir=$(select_directory "$REAL_HOME") || return 0
     tools_workdir || return 1
     _lt_br_abnt_run "$bib" "$cond" "$caption" "$listing" "$dir"
     local rc=$?
@@ -12758,9 +12767,9 @@ lt_cat_load() {
         "cutter" "Cutter-Sanborn" \
         "cdd"    "$(t "CDD (Dewey) schedule: number and caption per line")") || return 0
     if [ "$kind" = "pha" ]; then
-        file=$(select_file "/root" "txt csv tsv pdf" "$(t "Pick the table file (.txt, .csv, .tsv, or the PDF of the book, even scanned):")" "$(t "Table")") || return 0
+        file=$(select_file "$REAL_HOME" "txt csv tsv pdf" "$(t "Pick the table file (.txt, .csv, .tsv, or the PDF of the book, even scanned):")" "$(t "Table")") || return 0
     else
-        file=$(select_file "/root" "txt csv tsv" "$(t "Pick the table file (.txt, .csv or .tsv):")" "$(t "Table")") || return 0
+        file=$(select_file "$REAL_HOME" "txt csv tsv" "$(t "Pick the table file (.txt, .csv or .tsv):")" "$(t "Table")") || return 0
     fi
     if [ ! -r "$file" ] || [ ! -s "$file" ]; then
         msg_error "" "$(t "The file is empty or cannot be read.\nNothing was changed.")" 10 70
@@ -16615,7 +16624,7 @@ function_cdd() {
 
 lt_cdd_build() {
     local file
-    file=$(select_file "/root" "pdf txt" "$(t "Pick your copy of the CDD (.pdf, or .txt with the text of the PDF):")" "$(t "CDD file")") || return 0
+    file=$(select_file "$REAL_HOME" "pdf txt" "$(t "Pick your copy of the CDD (.pdf, or .txt with the text of the PDF):")" "$(t "CDD file")") || return 0
     tools_locked _lt_cdd_build "$file" || return 0
     if ! cdd_installed && prompt_yes_no "$(t "CDD lookup")" "$(t "Install the CDD lookup page in the staff interface now?")" 9 70; then
         lt_cdd_install
