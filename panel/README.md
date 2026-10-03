@@ -1,10 +1,11 @@
 # koha.nexus panel: Textual prototype
 
-A Textual front end for the bash panel (`../installer`). `sudo config.sh`
-opens it instead of the whiptail menu whenever it can, and the whiptail
-panel stays the fallback.
+A Textual front end for the bash panel (`../installer`). It is opt-in:
+`sudo KEI_UI=textual config.sh` opens it instead of the classic menu, which
+stays the default and the fallback (most routines still use the classic
+dialogs, so the new panel is not the default until they are ported).
 
-## How config.sh starts it
+## How config.sh starts it (with KEI_UI=textual)
 
 1. The sources are installed under `/usr/local/lib/koha-easy-installer/panel`:
    copied from `panel/` next to the installer (a git clone, or the copy the
@@ -20,11 +21,13 @@ panel stays the fallback.
    (config.sh skips its whiptail box) and starts again in it.
 5. If the set-up fails (offline server, Python older than 3.9), the panel
    crashes, or it draws nothing within 60 s (`KEI_PANEL_START_TIMEOUT`), a box
-   says why and the classic panel opens; it is tried again at the next start.
+   says why and the classic panel opens; it is tried again at the next
+   start with `KEI_UI=textual`.
    Textual draws on stderr, so config.sh never redirects it: the app writes
    its own tracebacks to `/var/log/koha-easy-install/new-panel.log`.
 
-`KEI_UI=whiptail sudo config.sh` always opens the classic panel;
+Without `KEI_UI=textual`, `sudo config.sh` opens the classic panel directly
+(`KEI_UI=whiptail` also picks whiptail over `dialog` for it).
 
 ## Try it without Koha
 
@@ -72,6 +75,34 @@ it (a subprocess is terminated), and `on_done` gets a `TaskResult`.
 `PacmanLoader` is a normal widget too: the dashboard uses the one-line form
 inline while it reads the status.
 
+## Ported routines (no whiptail)
+
+A ported routine asks its questions in the panel's own screens (folder and
+file pickers, choices, confirmations), then runs in the installer as
+`config.sh --task NAME ARGS` behind Pac-Man. The installer answers in a
+line protocol (`@@step`, `@@done`, `@@note`, `@@msg`, `@@result`, see
+"PANEL TASKS" in `installer`), so its own texts and translations are shown
+and its checks (locks, safety copy, rollback) stay in one place. Menu
+entries with `kind="native"` use `routines/`; an installer without `--task`
+keeps the classic routine.
+
+The classic panel stays the default until every section is ported:
+
+| Phase | Section | State |
+| --- | --- | --- |
+| 1 | Backup center (manual backup, integrity test, cloud backup) and Restore | done |
+| 2 | Database tables and maintenance (optimization, SQL reports pack) | next |
+| 3 | Install Koha server, first-access credentials | |
+| 4 | Diagnostics (status, health check, validation report, services, Apache log) | |
+| 5 | Search engine and indexing | |
+| 6 | Security center | |
+| 7 | Koha settings and parameters | |
+| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
+| 9 | Schedules, languages, updates, library tools, about, reboot | |
+
+Full-screen programs of their own (rclone's wizard, htop, links, Midnight
+Commander) keep the terminal, as they would in any panel.
+
 ## Module 1: AI setup (`a`)
 
 `views/ai.py` sets up the AI the cataloguing tools use:
@@ -110,8 +141,11 @@ kei_panel/
   aiconf.py         vision.conf of the AI cataloguing tabs, ai-keys.conf, key masking
   aiclient.py       connection test and local Ollama (version, models, pull), blocking
   marcreplace.py    is the MARC Replace page installed, which --run action opens it
+  demo.py           simulated --task answers (demo mode, tests)
+  routines/         ported routines: backup, restore, cloud backup
   widgets/          PacmanLoader, StatusCard, ActionCard
-  screens/          MainScreen, LoadingScreen, ConfirmScreen, ResultScreen
+  screens/          MainScreen, LoadingScreen, dialogs (confirm, choice, input,
+                    message), PathPickerScreen
   views/            dashboard, section (generic), backup, database, ai
   panel.tcss        all styling
 tests/              pytest, headless (no Koha needed)

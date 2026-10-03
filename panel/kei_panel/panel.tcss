@@ -244,7 +244,7 @@ LoadingScreen {
 }
 
 /* ---- dialogs ------------------------------------------------------- */
-ConfirmScreen, ResultScreen {
+ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -257,6 +257,46 @@ ConfirmScreen, ResultScreen {
     padding: 1 2;
 }
 .dialog.-error { border: round $error; }
+.dialog.-ok { border: round $success; }
+.dialog.-wide { width: 96; max-height: 90%; }
+.dialog-scroll { height: auto; max-height: 24; }
+.dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
+.dialog-note { color: $text-muted; }
+.dialog-prompt { padding-top: 1; text-style: bold; }
+.dialog-error { color: $error; height: auto; }
+.dialog-detail { height: auto; }
+.detail-label { width: 26; color: $text-muted; }
+.detail-value { width: 1fr; text-style: bold; }
+.dialog-command {
+    background: $boost;
+    color: $warning;
+    padding: 0 1;
+    margin-top: 1;
+}
+#loader-notice {
+    border: round $warning;
+    padding: 0 1;
+    margin: 1 0;
+    height: auto;
+}
+#picker-box {
+    width: 96%;
+    height: 90%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+#picker-body { height: 1fr; }
+#picker-main { width: 1fr; }
+#picker-shortcuts { height: auto; }
+#picker-shortcuts Button { min-width: 8; margin-right: 1; }
+#picker-tree { height: 1fr; border: round $panel-lighten-2; }
+#picker-help {
+    width: 44;
+    border: round $panel-lighten-2;
+    padding: 0 1;
+    margin-left: 1;
+}
 .dialog-title { text-style: bold; padding-bottom: 1; }
 .dialog-body { padding-bottom: 1; }
 .dialog-log { height: 12; border: round $panel-lighten-2; }
@@ -273,6 +313,10 @@ App.-plain #ai-providers,
 App.-plain .action-card,
 App.-plain #loader-box,
 App.-plain .dialog,
+App.-plain #picker-box,
+App.-plain #picker-tree,
+App.-plain #picker-help,
+App.-plain #loader-notice,
 App.-plain #loader-log,
 App.-plain .dialog-log {
     border: ascii $panel-lighten-2;

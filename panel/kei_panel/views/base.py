@@ -35,7 +35,8 @@ class SectionView(VerticalScroll):
             return
         with Grid(classes="card-grid"):
             for entry in self.section.entries:
-                yield ActionCard(entry, background=self.panel.runs_in_background(entry))
+                yield ActionCard(entry, background=self.panel.runs_in_background(entry),
+                                 native=self.panel.is_native(entry))
 
     def compose(self) -> ComposeResult:
         yield from self.heading()

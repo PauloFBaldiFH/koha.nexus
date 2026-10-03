@@ -41,16 +41,22 @@ class ActionCard(Static, can_focus=True):
 
     BINDINGS = [("enter", "choose", "Open"), ("space", "choose", "Open")]
 
-    def __init__(self, entry: Entry, background: bool = False):
+    def __init__(self, entry: Entry, background: bool = False, native: bool = False):
         super().__init__(classes="action-card")
         self.entry = entry
         self.background = background
+        self.native = native
 
     def compose(self) -> ComposeResult:
         icon, text = split_icon(t(self.entry.label))
         yield Label(icon or ">", classes="action-icon")
         yield Label(text, classes="action-text")
-        hint = t("Runs in the background") if self.background else t("Opens the guided routine")
+        if self.native:
+            hint = t("Step by step, in this panel")
+        elif self.background:
+            hint = t("Runs in the background")
+        else:
+            hint = t("Opens the classic screens")
         yield Label(hint, classes="action-hint")
 
     def on_click(self) -> None:

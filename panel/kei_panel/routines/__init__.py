@@ -1,0 +1,29 @@
+"""Routines ported to the panel: their questions are Textual screens, their
+work runs as `config.sh --task` behind the Pac-Man loader, their answers
+come back as a result screen. No whiptail box is opened.
+
+Each routine is an async function (app) run in a worker, so a flow reads
+top to bottom with `await app.push_screen_wait(...)`. ROUTINES maps the
+menu's --run action to it; menus.Entry(kind="native") marks the entries.
+An installer without `--task` (older than the panel) keeps the classic
+routine (app.run_entry falls back to it).
+"""
+
+from __future__ import annotations
+
+from typing import Awaitable, Callable
+
+from . import backup
+
+Routine = Callable[[object], Awaitable[None]]
+
+ROUTINES: dict[str, Routine] = {
+    "backup-manual": backup.manual_backup,
+    "backup-test": backup.test_backup,
+    "backup-cloud": backup.cloud_backup,
+    "restore": backup.restore,
+}
+
+
+def has(action: str) -> bool:
+    return action in ROUTINES

@@ -9,6 +9,10 @@ Two ways in, matching the two kinds of menu entries:
   stream(argv, reporter)        runs a non-interactive installer verb as an
       async subprocess (inside a worker, see tasks.py), feeding each output
       line to the loader's log; cancelling the worker kills the process.
+  task(name, *args, reporter)   a routine ported to the panel: its questions
+      were asked in the panel's own screens, the routine runs as
+      `config.sh --task name args` with no dialog and answers in the @@
+      protocol (installer: "PANEL TASKS"), parsed into a TaskOutcome.
 
 Demo mode (--demo / KEI_PANEL_DEMO=1) answers with simulated data, so the
 panel can be developed and tested without root or Koha.
@@ -21,7 +25,8 @@ import json
 import re
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable
 
 from .env import PanelEnv
 
@@ -35,6 +40,92 @@ _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
 
 class BridgeError(RuntimeError):
     pass
+
+
+def unescape(text: str) -> str:
+    """The installer's texts carry new lines as a literal \\n (whiptail
+    reads it so); the protocol does the same for real new lines."""
+    return text.replace("\\n", "\n")
+
+
+@dataclass
+class TaskOutcome:
+    """What a `--task` routine said: its exit code, the boxes it would have
+    shown (kind, title, text) and its @@result values."""
+    rc: int = 0
+    messages: list[tuple[str, str, str]] = field(default_factory=list)
+    results: dict[str, str] = field(default_factory=dict)
+    lists: dict[str, list[str]] = field(default_factory=dict)
+    steps: list[tuple[str, int | None]] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return self.rc == 0 and not any(kind == "error" for kind, _, _ in self.messages)
+
+    def last(self, *kinds: str) -> tuple[str, str, str] | None:
+        for msg in reversed(self.messages):
+            if not kinds or msg[0] in kinds:
+                return msg
+        return None
+
+    def get(self, key: str, default: str = "") -> str:
+        return self.results.get(key, default)
+
+    def feed(self, line: str, reporter: "Reporter | None" = None,
+             on_result: Callable[[str, str], None] | None = None) -> None:
+        """One output line of the routine."""
+        def log(text: str) -> None:
+            if reporter:
+                reporter.log(text)
+
+        def status(text: str) -> None:
+            if reporter:
+                reporter.status(text)
+
+        if not line.startswith("@@"):
+            log(line)
+            return
+        tag, _, rest = line[2:].partition(" ")
+        if tag == "step":
+            self.steps.append((rest, None))
+            status(rest)
+            log(f"> {rest}")
+            if reporter and self.total_steps:
+                reporter.progress(min(len(self.steps) - 1, self.total_steps), self.total_steps)
+        elif tag == "done":
+            rc_text, _, label = rest.partition(" ")
+            rc = int(rc_text) if rc_text.lstrip("-").isdigit() else 1
+            for i in range(len(self.steps) - 1, -1, -1):
+                if self.steps[i][0] == label and self.steps[i][1] is None:
+                    self.steps[i] = (label, rc)
+                    break
+            log(f"{'ok' if rc == 0 else 'FAILED'}  {label}")
+            if reporter and self.total_steps:
+                reporter.progress(min(len(self.steps), self.total_steps), self.total_steps)
+        elif tag in ("note", "title"):
+            text = unescape(rest)
+            status(text.splitlines()[0] if text else "")
+            log(text)
+        elif tag == "msg":
+            kind, _, rest = rest.partition(" ")
+            title, _, text = rest.partition("\t")
+            text = unescape(text)
+            self.messages.append((kind, title, text))
+            log(f"[{title}] {text}")
+        elif tag == "ask":
+            title, _, text = rest.partition("\t")
+            log(f"[{title}] {unescape(text)}")
+        elif tag == "result":
+            key, _, value = rest.partition("=")
+            value = unescape(value)
+            self.results[key] = value
+            self.lists.setdefault(key, []).append(value)
+            if on_result:
+                on_result(key, value)
+        else:
+            log(line)
+
+    total_steps: int = 0
 
 
 class Bridge:
@@ -95,16 +186,26 @@ class Bridge:
     # ------------------------------------------------------------------
     # Background verbs
     # ------------------------------------------------------------------
-    async def stream(self, argv: list[str], reporter: "Reporter") -> int:
-        """Run argv, every output line to reporter.log; returns the exit code."""
+    async def stream(self, argv: list[str], reporter: "Reporter | None",
+                     on_line: Callable[[str], None] | None = None,
+                     env: dict[str, str] | None = None) -> int:
+        """Run argv, every output line to reporter.log (or on_line); returns
+        the exit code."""
+        child_env = self.env.child_env()
+        if env:
+            child_env.update(env)
         proc = await asyncio.create_subprocess_exec(
             *argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT, env=self.env.child_env())
+            stderr=asyncio.subprocess.STDOUT, env=child_env, limit=1 << 20)
         assert proc.stdout is not None
         try:
             async for raw in proc.stdout:
                 line = _ANSI.sub("", raw.decode("utf-8", errors="replace")).rstrip()
-                if line:
+                if not line:
+                    continue
+                if on_line:
+                    on_line(line)
+                elif reporter:
                     reporter.log(line)
             return await proc.wait()
         except asyncio.CancelledError:
@@ -115,6 +216,31 @@ class Bridge:
             except asyncio.TimeoutError:
                 proc.kill()
             raise
+
+    async def task(self, name: str, *args: str, reporter: "Reporter | None" = None,
+                   env: dict[str, str] | None = None, total_steps: int = 0,
+                   on_result: Callable[[str, str], None] | None = None) -> TaskOutcome:
+        """A ported routine: `config.sh --task name args` (see the module doc).
+        env carries what must stay off the command line (a token)."""
+        out = TaskOutcome(total_steps=total_steps)
+        if self.env.demo:
+            from .demo import demo_task
+            return await demo_task(out, name, args, reporter, on_result)
+        out.rc = await self.stream(self._argv("--task", name, *args), reporter,
+                                   on_line=lambda line: out.feed(line, reporter, on_result), env=env)
+        return out
+
+    def supports_tasks(self) -> bool:
+        return self.supports("--task")
+
+    def run_command_interactive(self, app: "App", argv: list[str]) -> int:
+        """A third-party program with its own full-screen wizard (rclone
+        config): the terminal is handed over, as for the classic routines."""
+        if self.env.demo:
+            app.notify(f"[demo] {' '.join(argv)}", timeout=3)
+            return 0
+        with app.suspend():
+            return subprocess.run(argv, env=self.env.child_env(), check=False).returncode
 
     async def run_verb(self, verb: tuple[str, ...], reporter: "Reporter") -> int:
         if self.env.demo:
