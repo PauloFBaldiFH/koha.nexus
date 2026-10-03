@@ -102,8 +102,8 @@ The classic panel stays the default until every section is ported:
 | 3 | Install Koha server, first-access credentials | done |
 | 4 | Diagnostics (status, health check, validation report, services, Apache log) | done |
 | 5 | Search engine and indexing | done |
-| 6 | Security center | next |
-| 7 | Koha settings and parameters | |
+| 6 | Security center | done |
+| 7 | Koha settings and parameters | next |
 | 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
 | 9 | Schedules, languages, updates, library tools, about, reboot | |
 
