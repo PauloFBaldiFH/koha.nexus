@@ -35,7 +35,7 @@ MAX_LIBRARIES_PER_DAY = "0"
 # PBKDF2-SHA256 iterations for the staff gate password (workerd allows at
 # most 100000). Only login requests hash; lower it if the plan's CPU limit
 # rejects logins. Existing passwords keep the count they were saved with.
-PBKDF2_ITERATIONS = "100000"
+PBKDF2_ITERATIONS = "20000"
 
 [[d1_databases]]
 binding = "DB"

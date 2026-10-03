@@ -282,7 +282,7 @@ export async function putStaffCredentials(request: Request, env: Env, body: Arra
   if (!Array.isArray(cidrs) || cidrs.length > 20 || cidrs.some((c) => typeof c !== "string" || !parseCidr(c))) {
     throw new HttpError(400, "allow_cidrs must be a list of up to 20 CIDR ranges");
   }
-  const iterations = Number(env.PBKDF2_ITERATIONS || "100000");
+  const iterations = Number(env.PBKDF2_ITERATIONS || "20000");
   const salt = randomBytes(16);
   const hash = await pbkdf2(b.password, salt, iterations);
   await env.DB.prepare(
