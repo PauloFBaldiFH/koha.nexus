@@ -59,12 +59,13 @@ Button.small {
 .status-grid {
     grid-size: 3;
     grid-gutter: 1 2;
-    grid-rows: 6;
+    grid-rows: auto;
     height: auto;
     margin-bottom: 1;
 }
 .status-card {
-    height: 6;
+    height: auto;
+    min-height: 6;
     border: round $panel-lighten-2;
     padding: 0 1;
     background: $surface;
@@ -72,6 +73,8 @@ Button.small {
 .status-card .card-title { color: $text-muted; }
 .status-card .card-value { text-style: bold; color: $text; }
 .status-card .card-note  { color: $text-muted; }
+/* Long values and notes wrap inside the card instead of being cut off. */
+.status-card Label { width: 1fr; }
 .status-card.-ok   { border: round $success; }
 .status-card.-warn { border: round $warning; }
 .status-card.-bad  { border: round $error; }
@@ -84,15 +87,18 @@ Button.small {
 .card-grid {
     grid-size: 3;
     grid-gutter: 1 2;
-    grid-rows: 7;
+    grid-rows: auto;
     height: auto;
 }
 .action-card {
     border: round $panel-lighten-2;
     background: $surface;
     padding: 0 1;
-    height: 7;
+    height: auto;
+    min-height: 7;
 }
+/* Long labels wrap on two or three lines instead of being cut off. */
+.action-card Label { width: 1fr; }
 .action-card:hover {
     border: round $primary-lighten-2;
     background: $boost;
@@ -121,6 +127,24 @@ Button.small {
 .form-grid > Label {
     padding-top: 1;
     color: $text-muted;
+}
+.form-row {
+    height: auto;
+}
+.form-row .form-label {
+    width: 14;
+    padding-top: 1;
+    color: $text-muted;
+}
+.form-row Input {
+    width: 1fr;
+}
+#ai-tabs {
+    height: auto;
+}
+#ai-tabs TabPane {
+    height: auto;
+    padding: 1 0 0 0;
 }
 .form-buttons {
     height: auto;
@@ -175,11 +199,8 @@ Button.small {
 #ai-ollama .form-buttons {
     padding-top: 1;
 }
-#ai-cards {
-    grid-rows: 5;
-}
 #ai-cards .status-card {
-    height: 5;
+    min-height: 5;
 }
 #ai-hook {
     border: round $success;
@@ -190,10 +211,10 @@ Button.small {
     padding-top: 1;
     padding-right: 2;
 }
-.-narrow #ai-body {
+.-narrow #ai-body, .-stacked #ai-body {
     layout: vertical;
 }
-.-narrow #ai-providers {
+.-narrow #ai-providers, .-stacked #ai-providers {
     width: 1fr;
     margin: 0 0 1 0;
 }
@@ -216,6 +237,7 @@ LoadingScreen {
     padding-bottom: 1;
 }
 #loader-box PacmanLoader {
+    height: 1;
     margin-bottom: 1;
 }
 #loader-meta {

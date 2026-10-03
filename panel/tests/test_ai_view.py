@@ -72,7 +72,7 @@ def test_gemini_key_test_save_and_marc_hook(demo_dir):
 
             await pilot.click("#ai-p-ollama")
             await pilot.pause(0.1)
-            assert q("#ai-ollama").display and not q("#ai-token").display
+            assert q("#ai-ollama").display and not q("#ai-token-row").display
             assert q("#ai-url").value == "http://localhost:11434"
             await pilot.click("#ai-p-gemini")                       # back: saved settings return
             await pilot.pause(0.1)

@@ -27,5 +27,10 @@ def installed(demo: bool = False) -> bool:
     return demo or page_file().is_file()
 
 
+def assistant_installed(demo: bool = False) -> bool:
+    """The AI assistant of the staff home page (installer: aia_installed)."""
+    return demo or page_file().with_name("ai_assistant.pl").is_file()
+
+
 def action(bridge) -> str:
     return ACTION if bridge.has_action(ACTION) else FALLBACK_ACTION

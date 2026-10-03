@@ -1,3 +1,6 @@
+import os
+
+import pytest
 """vision.conf / ai-keys.conf: the same rules as the Perl side, keys kept private."""
 
 import stat
@@ -53,3 +56,18 @@ def test_endpoint_problems_match_the_perl_rules():
 
 def test_selector_lists_every_provider_once():
     assert sorted(aiconf.SELECTOR_ORDER) == sorted(aiconf.PROVIDERS) == sorted(aiconf.LABELS)
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason="chown needs root")
+def test_staff_interface_can_read_what_the_panel_saves(tmp_path):
+    # /var/lib/koha/<instance> belongs to the instance user, who runs Plack.
+    instance = tmp_path / "library"
+    instance.mkdir()
+    os.chown(instance, 1234, 1234)
+    conf = instance / "kei-marc-replace" / "vision.conf"
+    c = aiconf.with_defaults({"provider": "openai", "token": "sk-test-1234"})
+    aiconf.save_all(conf, c)
+    assert (conf.stat().st_uid, conf.parent.stat().st_uid) == (1234, 1234)
+    assert conf.stat().st_mode & 0o777 == 0o600
+    # The keys of the other providers stay the panel's (root) only.
+    assert aiconf.keys_path(conf).stat().st_uid == 0
