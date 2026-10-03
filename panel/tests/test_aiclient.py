@@ -62,7 +62,7 @@ def test_base_matches_the_perl_side():
     assert aiclient.base({"provider": "gemini", "url": "https://g.example.com/v1beta"}) == \
         "https://g.example.com/v1beta/openai"
     assert aiclient.base({"provider": "ollama", "url": "http://localhost:11434/api"}) == \
-        "http://localhost:11434"
+        "http://127.0.0.1:11434"
 
 
 def test_ollama_models_and_latest_tag(server):

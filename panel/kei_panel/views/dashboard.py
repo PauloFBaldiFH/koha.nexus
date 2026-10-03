@@ -41,6 +41,39 @@ def age(epoch: int | None) -> str:
     return f"{secs // 86400} d"
 
 
+# The components the Koha window on Windows lists, in the order Koha needs
+# them (KohaServices in windows/KohaEasy.Core.psm1), then the staff page.
+COMPONENTS = (
+    ("mariadb", "MariaDB"),
+    ("apache2", "Apache"),
+    ("rabbitmq-server", "RabbitMQ"),
+    ("memcached", "Memcached"),
+    ("koha-common", "Koha (koha-common)"),
+)
+
+# kei_overall_state in the installer: ok | degraded | stopped | not_installed.
+OVERALL = {
+    "ok": ("Running", "ok"),
+    "running": ("Running", "ok"),
+    "degraded": ("Attention", "warn"),
+    "stopped": ("Stopped", "bad"),
+    "not_installed": ("not installed", "warn"),
+}
+
+
+def unit_state(active: str | None) -> tuple[str, str]:
+    """systemctl is-active as the Koha window shows it: text and card state."""
+    if active == "active":
+        return "Running", "ok"
+    if active in ("activating", "reloading"):
+        return "Starting", "warn"
+    if active == "failed":
+        return "Failed", "bad"
+    if active in ("inactive", "deactivating"):
+        return "Stopped", "bad"
+    return "Unknown", "warn"
+
+
 class DashboardView(SectionView):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="view-head"):
@@ -50,11 +83,13 @@ class DashboardView(SectionView):
                            id="status-loader")
         with Grid(classes="status-grid"):
             yield StatusCard(t("Koha"), id="card-state")
-            yield StatusCard(t("Staff / OPAC"), id="card-http")
             yield StatusCard(t("Last backup"), id="card-backup")
             yield StatusCard(t("Disk free"), id="card-disk")
-            yield StatusCard(t("Memory available"), id="card-memory")
-            yield StatusCard(t("Services"), id="card-services")
+        yield Label(t("Components"), classes="view-prompt")
+        with Grid(classes="status-grid", id="components"):
+            for unit, name in COMPONENTS:
+                yield StatusCard(t(name), id=f"card-{unit}")
+            yield StatusCard(t("HTTP response"), id="card-http")
 
     def on_mount(self) -> None:
         self.refresh_data()
@@ -79,15 +114,11 @@ class DashboardView(SectionView):
             self.show(status)
 
     def show(self, s: dict) -> None:
-        state = s.get("state", "unknown")
-        good = state == "running"
+        text, state = OVERALL.get(s.get("state", ""), ("Unknown", "bad"))
+        m = s.get("memory", {})
         self.query_one("#card-state", StatusCard).set(
-            state.replace("_", " "), f"v{s.get('panel_version', '?')} · {s.get('platform', '')}",
-            "ok" if good else "bad")
-        http = s.get("http", {})
-        ok_http = http.get("staff") == 200 and http.get("opac") == 200
-        self.query_one("#card-http", StatusCard).set(
-            f"{http.get('staff', '-')} / {http.get('opac', '-')}", "HTTP", "ok" if ok_http else "warn")
+            t(text), f"v{s.get('panel_version', '?')} · {s.get('platform', '')}"
+            f" · {t('Memory available')} {human_bytes(m.get('available'))}", state)
         b = s.get("backup", {})
         self.query_one("#card-backup", StatusCard).set(
             age(b.get("last_epoch")), b.get("last_file") or "-",
@@ -97,11 +128,13 @@ class DashboardView(SectionView):
         self.query_one("#card-disk", StatusCard).set(
             human_bytes(free), f"/ {human_bytes(total)}",
             "bad" if total and free / total < 0.1 else "ok")
-        m = s.get("memory", {})
-        self.query_one("#card-memory", StatusCard).set(
-            human_bytes(m.get("available")), f"/ {human_bytes(m.get('total'))}")
         svcs = s.get("services", {})
-        down = [k for k in ("apache2", "mariadb", "memcached", "koha-common") if svcs.get(k) != "active"]
-        self.query_one("#card-services", StatusCard).set(
-            f"{sum(v == 'active' for v in svcs.values())}/{len(svcs)}",
-            ", ".join(down) if down else "apache2 · mariadb · memcached · koha", "bad" if down else "ok")
+        for unit, _name in COMPONENTS:
+            text, state = unit_state(svcs.get(unit))
+            self.query_one(f"#card-{unit}", StatusCard).set(t(text), unit, state)
+        http = s.get("http", {})
+        staff, opac = http.get("staff"), http.get("opac")
+        answers = isinstance(staff, int) and 0 < staff < 500
+        self.query_one("#card-http", StatusCard).set(
+            t("Answers (HTTP ${code})", code=staff) if answers else t("Does not answer"),
+            f"{t('Staff / OPAC')}: {staff or '-'} / {opac or '-'}", "ok" if answers else "bad")

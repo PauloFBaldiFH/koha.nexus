@@ -12,6 +12,7 @@ so a test passed here is a test the staff interface passes too.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,7 +41,9 @@ def base(c: dict[str, str]) -> str:
     if p == "ollama":
         for suffix in ("/api", "/v1"):
             u = u.removesuffix(suffix)
-        return u
+        # Ollama listens on 127.0.0.1 only; "localhost" may try IPv6 (::1)
+        # first, which hangs instead of failing on some WSL2 set-ups.
+        return re.sub(r"^(https?://)localhost(?=[:/]|$)", r"\g<1>127.0.0.1", u)
     if p == "gemini":
         if host_only:
             return u + "/v1beta/openai"
