@@ -130,13 +130,13 @@ O instalador faz todo o resto e mostra cada etapa em linguagem simples:
 1. Verifica o computador: Windows 10 versão 2004 ou mais recente, ou Windows 11; 64 bits; pelo menos 4 GB de memória (8 GB recomendados); pelo menos 10 GB livres no C:; virtualização ativada na BIOS.
 2. Pede um nome de usuário e uma senha para o Debian, antes de instalar qualquer coisa. Você os usa para abrir o Debian e com `sudo`; não são o login da equipe no Koha. A senha nunca é gravada nem registrada no log, e é pedida de novo se o Windows reiniciar antes de o Debian ficar pronto.
 3. Instala o WSL 2. O Windows pede permissão uma vez. Se o Windows precisar reiniciar, o instalador continua sozinho quando você entrar de novo.
-4. Pede ao WSL que instale o Debian da lista oficial do WSL da Microsoft como `koha` em `C:\KohaEasy\wsl`. Em um WSL mais antigo, baixa a mesma imagem, confere o SHA-256 e a importa.
+4. Pede ao WSL que instale o Debian da lista oficial do WSL da Microsoft como `koha` em `C:\Koha\wsl`. Em um WSL mais antigo, baixa a mesma imagem, confere o SHA-256 e a importa.
 5. Cria o seu usuário do Debian com permissão de `sudo` e ativa o systemd. No Windows 11 22H2 ou mais recente, também acrescenta a rede espelhada (mirrored) e o `hostAddressLoopback` ao seu `.wslconfig`, mantendo as suas configurações e uma cópia de segurança. Depois reinicia o Debian e espera o systemd estar funcionando por completo antes de seguir.
 6. Antes de instalar o Koha, compila o `KohaEasy.exe` e cria as tarefas agendadas, o ícone **Koha** (área de trabalho e menu Iniciar) e o ícone de status, para que haja um jeito de abrir o Koha mesmo se o passo seguinte parar no meio. Ele diz onde o ícone do Koha ficou, com o motivo dado pelo Windows quando um atalho não pôde ser criado. Depois abre o painel de controle do Koha. As ferramentas do próprio painel são baixadas com uma única linha de status ("Baixando dependências do painel..."); a saída do gerenciador de pacotes vai só para `/var/log/koha-easy-install/apt.log`, ou para a tela com `--verbose`. Escolha o idioma, depois **1 – Instalar servidor Koha** (ele pergunta o fuso horário), e saia do painel com **Sair** quando terminar. Se o Koha não ficar totalmente instalado, o instalador diz qual verificação falhou.
-7. Pergunta se o Koha deve iniciar quando você entrar no Windows. Depois compila o `KohaEasy.exe`, cria as tarefas agendadas, os atalhos e o ícone de status, coloca o ícone do Koha na entrada do Debian no menu Iniciar e no perfil do Terminal do Windows, abre o Koha para a rede da biblioteca (o Windows pede permissão uma vez), inicia o Koha, testa a rede da biblioteca e abre a interface da equipe. Mostra também os endereços que os outros computadores usam, pelo nome deste computador e pelo endereço dele. A partir daí, o ícone **Koha** na área de trabalho inicia o Koha quando ele está desligado e abre a janela do Koha. Rodar o comando de uma linha de novo é seguro: ele atualiza o `KohaEasy.exe`, as tarefas agendadas, os atalhos e o ícone de status, atualiza as configurações de rede da biblioteca feitas por uma versão anterior (o Windows pede permissão uma vez), termina uma instalação do Koha que parou no meio (dizendo qual verificação falhou) e, se o Koha não iniciar, mostra o que o Debian informa e salva o diagnóstico na área de trabalho. Quando o `.wslconfig` recebe configurações novas, ou o Koha ainda roda com a janela de uma versão anterior, o Koha é parado de forma limpa e iniciado de novo. Se o ícone do Koha ou o ícone de status ainda estiver faltando, este comando verifica cada parte passo a passo, mostra cada erro por completo e salva o resultado em `C:\KohaEasy\logs\diagnose-<data>.txt`:
+7. Pergunta se o Koha deve iniciar quando você entrar no Windows. Depois compila o `KohaEasy.exe`, cria as tarefas agendadas, os atalhos e o ícone de status, coloca o ícone do Koha na entrada do Debian no menu Iniciar e no perfil do Terminal do Windows, abre o Koha para a rede da biblioteca (o Windows pede permissão uma vez), inicia o Koha, testa a rede da biblioteca e abre a interface da equipe. Mostra também os endereços que os outros computadores usam, pelo nome deste computador e pelo endereço dele. A partir daí, o ícone **Koha** na área de trabalho inicia o Koha quando ele está desligado e abre a janela do Koha. Rodar o comando de uma linha de novo é seguro: ele atualiza o `KohaEasy.exe`, as tarefas agendadas, os atalhos e o ícone de status, atualiza as configurações de rede da biblioteca feitas por uma versão anterior (o Windows pede permissão uma vez), termina uma instalação do Koha que parou no meio (dizendo qual verificação falhou) e, se o Koha não iniciar, mostra o que o Debian informa e salva o diagnóstico na área de trabalho. Quando o `.wslconfig` recebe configurações novas, ou o Koha ainda roda com a janela de uma versão anterior, o Koha é parado de forma limpa e iniciado de novo. Se o ícone do Koha ou o ícone de status ainda estiver faltando, este comando verifica cada parte passo a passo, mostra cada erro por completo e salva o resultado em `C:\Koha\logs\diagnose-<data>.txt`:
    `irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/diagnose.ps1 | iex`
 
-Pode rodar de novo sem medo: ele continua da última etapa concluída. Uma instalação feita por uma versão anterior, em que o Debian se chamava `KohaEasy`, passa a se chamar `koha`, com os dados mantidos. O usuário e a senha de primeiro acesso ficam no painel de controle, opção 2. Tudo fica em `C:\KohaEasy`, e o log do instalador em `C:\KohaEasy\logs`.
+Pode rodar de novo sem medo: ele continua da última etapa concluída. Uma instalação feita por uma versão anterior, em que o Debian se chamava `KohaEasy`, passa a se chamar `koha`, com os dados mantidos. O usuário e a senha de primeiro acesso ficam no painel de controle, opção 2. Tudo fica em `C:\Koha`, e o log do instalador em `C:\Koha\logs`. Uma instalação feita antes de a pasta mudar de nome continua em `C:\KohaEasy`, e rodar o comando de novo a atualiza lá mesmo.
 
 O comportamento em um Windows real (o instalador, notificações, ícone de status, Agendador de Tarefas, `KohaEasy.exe`, o teste da rede da biblioteca e compactação do disco) ainda está sendo conferido em computadores físicos, então avise se algo parecer estranho.
 
@@ -182,7 +182,7 @@ Cada execução fica registrada em `/var/log/koha-easy-install/tools/` (só o ro
 
 ### 🪄 Ferramenta de Importação Mágica Maluca
 
-**Ferramentas da biblioteca > Ferramenta de Importação Mágica Maluca**: não questione, só jogue aqui o que você quer importar. É a entrada única para toda importação: o acervo, os exemplares, os leitores e os empréstimos e reservas do sistema antigo, vindos de um arquivo, de uma pasta ou de um arquivo compactado com tudo isso junto. Coloque-o na pasta `importar` da pasta pessoal do usuário do painel (no Windows também em `C:\KohaEasy\Importar`, criada na primeira vez que a ferramenta abre): o que estiver lá aparece primeiro, e **Outro arquivo** abre o explorador de arquivos.
+**Ferramentas da biblioteca > Ferramenta de Importação Mágica Maluca**: não questione, só jogue aqui o que você quer importar. É a entrada única para toda importação: o acervo, os exemplares, os leitores e os empréstimos e reservas do sistema antigo, vindos de um arquivo, de uma pasta ou de um arquivo compactado com tudo isso junto. Coloque-o na pasta `importar` da pasta pessoal do usuário do painel (no Windows também em `C:\Koha\Importar`, criada na primeira vez que a ferramenta abre): o que estiver lá aparece primeiro, e **Outro arquivo** abre o explorador de arquivos.
 
 O que ela lê, reconhecido pelos bytes de cada arquivo, nunca só pelo nome:
 
@@ -340,7 +340,7 @@ Os avisos por e-mail ficam com a agenda do próprio Koha (`koha-common`): avisos
 | `/var/backups/koha_sql`, `/var/backups/koha_marc` | Backups locais |
 | `/etc/koha-easy-install/` | Configurações do painel (idioma, backup) |
 | `/var/log/koha-easy-install/` | Logs do painel, do APT e das validações (`tools/`: ferramentas da biblioteca, só root) |
-| `~/importar` (`C:\KohaEasy\Importar` no Windows) | Pasta de entrada da Ferramenta de Importação Mágica Maluca |
+| `~/importar` (`C:\Koha\Importar` no Windows) | Pasta de entrada da Ferramenta de Importação Mágica Maluca |
 | `/etc/koha-easy-install/import-profiles/` | Respostas sobre colunas que a Ferramenta de Importação Mágica Maluca guarda |
 | `/var/lib/koha/library/kei-xslt/` | Folhas de estilo da ficha catalográfica (só enquanto a ficha estiver ativada) |
 | `/etc/koha/sites/library/kei-messaging.conf` | Configurações e tokens de WhatsApp / Telegram (só root e Koha) |
@@ -348,7 +348,7 @@ Os avisos por e-mail ficam com a agenda do próprio Koha (`koha-common`): avisos
 | `/etc/koha-easy-install/tables/` | Tabelas de autor e tabela da CDD carregadas pela biblioteca |
 | `/var/lib/koha/library/kei-marc-replace/` | Registros como estavam antes de cada substituição |
 | `/etc/koha-easy-install/windows.conf` | Só no Windows: o que as ferramentas do Windows informam ao painel (modo de rede, início automático...) |
-| `C:\KohaEasy\` | Só no Windows: `bin\` (scripts, `KohaEasy.exe` e `koha.ico`), `logs\`, `Backups\`, `state.json` |
+| `C:\Koha\` | Só no Windows: `Uninstall-Koha.cmd`, `bin\` (scripts, `KohaEasy.exe` e `koha.ico`), `logs\`, `Backups\`, `state.json` |
 
 A instalação mostra sete etapas numeradas, uma linha por tarefa com uma pequena barra de progresso do Pac-Man, e uma tela final com os endereços do catálogo e da interface da equipe. A saída dos comandos nunca aparece na tela: ela fica em `/var/log/koha-easy-install/apt.log`. Se uma tarefa falhar, o painel mostra a etapa que falhou, o que verificar e as últimas linhas desse log, que é o arquivo a enviar ao suporte de TI.
 
@@ -368,6 +368,8 @@ sudo bash uninstall.sh --yes    # sem perguntas (automação)
 ```
 
 Copie seus backups para outro lugar antes de executá-lo.
+
+No Windows, dê dois cliques no **Uninstall-Koha.cmd** em `C:\Koha`, ou use **Configurações > Aplicativos > Koha (koha.nexus) > Desinstalar**. Ele pede que você digite `KOHA` para confirmar e então remove o Debian `koha` (com os bancos de dados do Koha), os atalhos, o ícone de status, as tarefas agendadas, a regra do firewall (o Windows pede permissão uma vez) e a pasta. A pasta `Backups` é mantida, a menos que você escolha apagá-la também. O WSL e o seu `.wslconfig` continuam.
 
 ## Testes
 

@@ -130,13 +130,13 @@ The installer does everything else and shows each step in plain language:
 1. It checks the PC: Windows 10 version 2004 or later, or Windows 11; 64-bit; at least 4 GB of memory (8 GB recommended); at least 10 GB free on C:; virtualization turned on in the BIOS.
 2. It asks for a user name and password for Debian, before anything is installed. You use them to open Debian and with `sudo`; they are not the Koha staff login. The password is never saved or logged, and it is asked again if Windows restarts before Debian is ready.
 3. It installs WSL 2. Windows asks for permission once. If Windows needs a restart, the installer continues by itself after you sign in again.
-4. It has WSL install Debian from Microsoft's own WSL list as `koha` in `C:\KohaEasy\wsl`. On an older WSL it downloads the same image itself, checks its SHA-256 and imports it.
+4. It has WSL install Debian from Microsoft's own WSL list as `koha` in `C:\Koha\wsl`. On an older WSL it downloads the same image itself, checks its SHA-256 and imports it.
 5. It creates your Debian user with `sudo` rights and enables systemd. On Windows 11 22H2 or later it also adds mirrored networking and `hostAddressLoopback` to your `.wslconfig`, keeping your own settings and a backup. Then it restarts Debian and waits until systemd is fully running before going on.
 6. Before Koha is installed, it builds `KohaEasy.exe` and creates the scheduled tasks, the **Koha** icon (desktop and Start menu) and the status icon, so there is a way into Koha even if the next step stops half-way. It says where the Koha icon is, with Windows' reason when a shortcut could not be made. Then it opens the Koha control panel. The panel's own tools download with a single status line ("Downloading the panel dependencies..."); the package manager's output goes only to `/var/log/koha-easy-install/apt.log`, or to the screen with `--verbose`. Choose your language, then **1 – Install Koha server** (it asks for the timezone), and leave the panel with **Exit** when it finishes. If Koha is not fully installed, the installer says which check failed.
-7. It asks whether Koha should start when you sign in to Windows. Then it builds `KohaEasy.exe`, creates the scheduled tasks, the shortcuts and the status icon, gives Debian's own Start menu entry and Windows Terminal profile the Koha icon, opens Koha to the library network (Windows asks for permission once), starts Koha, tests the library network and opens the staff interface. It shows the addresses other PCs use, by this PC's name and by its address. From then on, the **Koha** icon on the desktop starts Koha when it is off and opens the Koha window. Running the one-line command again is safe: it updates `KohaEasy.exe`, the scheduled tasks, the shortcuts and the status icon, brings the library network settings of an earlier version up to date (Windows asks for permission once), finishes a Koha install that stopped half-way (saying which check failed), and if Koha does not start it prints what Debian reports and saves the diagnostics on the desktop. When `.wslconfig` gets new settings, or Koha still runs with an earlier version's window, Koha is stopped cleanly and started again. If the Koha icon or the status icon is still missing, this command checks each part step by step, prints every error in full and saves the result in `C:\KohaEasy\logs\diagnose-<date>.txt`:
+7. It asks whether Koha should start when you sign in to Windows. Then it builds `KohaEasy.exe`, creates the scheduled tasks, the shortcuts and the status icon, gives Debian's own Start menu entry and Windows Terminal profile the Koha icon, opens Koha to the library network (Windows asks for permission once), starts Koha, tests the library network and opens the staff interface. It shows the addresses other PCs use, by this PC's name and by its address. From then on, the **Koha** icon on the desktop starts Koha when it is off and opens the Koha window. Running the one-line command again is safe: it updates `KohaEasy.exe`, the scheduled tasks, the shortcuts and the status icon, brings the library network settings of an earlier version up to date (Windows asks for permission once), finishes a Koha install that stopped half-way (saying which check failed), and if Koha does not start it prints what Debian reports and saves the diagnostics on the desktop. When `.wslconfig` gets new settings, or Koha still runs with an earlier version's window, Koha is stopped cleanly and started again. If the Koha icon or the status icon is still missing, this command checks each part step by step, prints every error in full and saves the result in `C:\Koha\logs\diagnose-<date>.txt`:
    `irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/diagnose.ps1 | iex`
 
-Running it again is safe: it continues from the last step it finished. An install made by an earlier version, whose Debian was called `KohaEasy`, is renamed to `koha` with its data kept. The first-access user and password are in the control panel, option 2. Everything is kept in `C:\KohaEasy`, with the installer's log in `C:\KohaEasy\logs`.
+Running it again is safe: it continues from the last step it finished. An install made by an earlier version, whose Debian was called `KohaEasy`, is renamed to `koha` with its data kept. The first-access user and password are in the control panel, option 2. Everything is kept in `C:\Koha`, with the installer's log in `C:\Koha\logs`. An install made before the folder was renamed stays in `C:\KohaEasy`, and running the command again updates it there.
 
 Real-Windows behaviour (the installer, notifications, the tray, Task Scheduler, `KohaEasy.exe`, the library network test and disk compaction) is still being checked on physical machines, so please report anything odd.
 
@@ -182,7 +182,7 @@ Every run is logged in `/var/log/koha-easy-install/tools/` (readable by root onl
 
 ### 🪄 Magic Import Tool
 
-**Library tools > Magic Import Tool** (*Ferramenta de Importação Mágica Maluca* in Portuguese): don't question it, just drop here what you want to import. It is the one entry for every import: the collection, its copies, the patrons, and the loans and holds of the old system, from one file, a folder or an archive holding all of them. Put it in the `importar` folder of the panel user's home (on Windows also `C:\KohaEasy\Importar`, created the first time the tool opens): what waits there is offered first, and **Another file** opens the file explorer.
+**Library tools > Magic Import Tool** (*Ferramenta de Importação Mágica Maluca* in Portuguese): don't question it, just drop here what you want to import. It is the one entry for every import: the collection, its copies, the patrons, and the loans and holds of the old system, from one file, a folder or an archive holding all of them. Put it in the `importar` folder of the panel user's home (on Windows also `C:\Koha\Importar`, created the first time the tool opens): what waits there is offered first, and **Another file** opens the file explorer.
 
 What it reads, recognised from the bytes of each file, never from its name alone:
 
@@ -340,7 +340,7 @@ E-mail notices are left to Koha's own schedule (`koha-common`): overdue and adva
 | `/var/backups/koha_sql`, `/var/backups/koha_marc` | Local backups |
 | `/etc/koha-easy-install/` | Panel settings (language, backup) |
 | `/var/log/koha-easy-install/` | Panel, APT and validation logs (`tools/`: library tools, root only) |
-| `~/importar` (`C:\KohaEasy\Importar` on Windows) | Drop folder of the Magic Import Tool |
+| `~/importar` (`C:\Koha\Importar` on Windows) | Drop folder of the Magic Import Tool |
 | `/etc/koha-easy-install/import-profiles/` | Column answers the Magic Import Tool remembers |
 | `/var/lib/koha/library/kei-xslt/` | Cataloguing card stylesheets (only while the card is enabled) |
 | `/etc/koha/sites/library/kei-messaging.conf` | WhatsApp / Telegram settings and tokens (root and Koha only) |
@@ -348,7 +348,7 @@ E-mail notices are left to Koha's own schedule (`koha-common`): overdue and adva
 | `/etc/koha-easy-install/tables/` | Author tables and CDD schedule loaded by the library |
 | `/var/lib/koha/library/kei-marc-replace/` | Records as they were before each replacement |
 | `/etc/koha-easy-install/windows.conf` | Windows only: what the Windows tools tell the panel (network mode, automatic start...) |
-| `C:\KohaEasy\` | Windows only: `bin\` (scripts, `KohaEasy.exe` and `koha.ico`), `logs\`, `Backups\`, `state.json` |
+| `C:\Koha\` | Windows only: `Uninstall-Koha.cmd`, `bin\` (scripts, `KohaEasy.exe` and `koha.ico`), `logs\`, `Backups\`, `state.json` |
 
 The installation shows seven numbered steps, one line per task with a small Pac-Man progress bar, and a final screen with the addresses of the catalog and the staff interface. The commands' own output never reaches the screen: it is kept in `/var/log/koha-easy-install/apt.log`. If a task fails, the panel shows the failed step, what to check and the last lines of that log, which is the file to send to IT support.
 
@@ -368,6 +368,8 @@ sudo bash uninstall.sh --yes    # no questions (automation)
 ```
 
 Copy your backups somewhere else before running it.
+
+On Windows, double-click **Uninstall-Koha.cmd** in `C:\Koha`, or use **Settings > Apps > Koha (koha.nexus) > Uninstall**. It asks you to type `KOHA` to confirm, then removes the Debian `koha` (with the Koha databases), the shortcuts, the status icon, the scheduled tasks, the firewall rule (Windows asks for permission once) and the folder. The `Backups` folder is kept unless you choose to delete it too. WSL itself and your `.wslconfig` stay.
 
 ## Tests (for contributors)
 

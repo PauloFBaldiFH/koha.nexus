@@ -17170,7 +17170,7 @@ _lt_plugins_register() {
 # ----------------------------------------------------------------------
 # Library tools > 1, the one entry for every import. The operator drops a
 # file, a folder or an archive in a drop folder (importar in the home of the
-# panel's user; C:\KohaEasy\Importar on Windows) or picks it, and the engine
+# panel's user; C:\Koha\Importar on Windows) or picks it, and the engine
 # works out the rest. The engine is the kei_import Python package (standard
 # library and Debian packages only), written to the work folder and run as
 # the instance user through koha-shell, like Koha's own tools. It unpacks
@@ -17190,7 +17190,7 @@ _lt_plugins_register() {
 # the undo of Library tools.
 # ======================================================================
 MAGIC_PY="/usr/bin/python3"
-MAGIC_DROP_DIRS="${MAGIC_DROP_DIRS:-${REAL_HOME}/importar /mnt/c/KohaEasy/Importar}"
+MAGIC_DROP_DIRS="${MAGIC_DROP_DIRS:-${REAL_HOME}/importar /mnt/c/Koha/Importar /mnt/c/KohaEasy/Importar}"
 MAGIC_PROFILES="${CONF_DIR}/import-profiles"
 MAGIC_RUN=""
 MAGIC_RESTORE=""
@@ -20695,7 +20695,8 @@ magic_drop_dirs() {
     # shellcheck disable=SC2086  # a list of folders
     for d in $MAGIC_DROP_DIRS; do
         # The one in the home always; the others where their parent exists
-        # (C:\KohaEasy on Windows).
+        # (C:\Koha on Windows, or C:\KohaEasy for an install made before the
+        # folder was renamed).
         if [ "$first" = 1 ] && [ ! -d "$d" ]; then
             mkdir -p "$d" 2>/dev/null && chown "${REAL_USER:-root}:" "$d" 2>/dev/null
         elif [ ! -d "$d" ] && [ -d "${d%/*}" ]; then
@@ -20707,7 +20708,7 @@ magic_drop_dirs() {
     return 0
 }
 
-# A folder as the operator knows it: C:\KohaEasy\Importar, not /mnt/c/... (Windows).
+# A folder as the operator knows it: C:\Koha\Importar, not /mnt/c/... (Windows).
 magic_shown_path() {
     local p="$1"
     if [[ "$p" =~ ^/mnt/([a-z])(/.*)?$ ]]; then
