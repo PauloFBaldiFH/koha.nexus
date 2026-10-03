@@ -41,7 +41,7 @@ _INSTALL = [line for n, stage, steps in _STAGES
 
 _SCRIPTS: dict[str, list[str]] = {
     "info": [
-        "@@result real_user=root", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
+        "@@result real_user=root", "@@result timezone=America/Sao_Paulo", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
         "@@result dir_sql=/var/backups/koha_sql", "@@result koha_installed=yes",
         f"@@result newest={_NEWEST}", "@@result newest_date=2026-10-02 03:00",
         "@@result newest_size=46M", "@@result rclone=yes", "@@result rclone_remote=gdrive",
@@ -157,6 +157,24 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@result password=Xq7demoNewPassw0rd24ch", "@@result file=/root/koha_credentials.txt",
         "@@msg ok OK\tPassword rotated and Koha still responds.\\n\\nNew password: Xq7demoNewPassw0rd24ch"
         "\\n(/root/koha_credentials.txt)"],
+    "sizing": [
+        "@@choose Sizing\tDetected RAM: 7.7 GB\\nRecommended profile: 2\t2"
+        "\t1\t< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB\t2\t4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB"
+        "\t3\t8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB\t4\t16 GB+   - 6 Plack, 256MB cache, 2G InnoDB",
+        "@@note Applying profile 2...",
+        "@@msg ok OK\tProfile 2 applied.\\n\\nPlack: 3 workers\\nMemcached: 128 MB\\nMariaDB InnoDB: 768M"],
+    "email": ["@@msg info Email Setup\tE-mail is enabled for the instance (koha-email-enable)."],
+    "superlibrarian": [
+        "@@input Username\tUsername (login):\t\t", "@@input Card Number\tCard number:\t\t",
+        "@@input Password\tPassword (at least 8 characters):\t\tpassword",
+        "@@input Confirm Password\tType the password again:\t\tpassword",
+        "@@input First name\tFirst name:\tSuper\t", "@@input Surname\tSurname:\tAdmin\t",
+        "@@note Hashing the password...",
+        "@@msg ok OK\tSuper Librarian created successfully."],
+    "interoperability": [
+        "@@ask SIP2 & Z39.50\tEnable both and open the firewall ports?",
+        "@@msg ok OK\tZ39.50 and SIP2 were enabled successfully!"],
+    "clock": ["@@msg ok OK\tTimezone set to: Europe/Lisbon\\nCurrent time: 2026-10-03 17:00"],
     "db-maintenance": [
         "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
         "@@title Deep maintenance",
@@ -196,9 +214,11 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         if env.get("KEI_TASK_ANSWER") == "no" and out.asks:
             break
         out.feed(line.replace("{0}", args[0] if args else _HOME), reporter, on_result)
-        # Interactive: a "no" ends the routine (its usual `|| return 0`).
-        if ask and line.startswith("@@ask ") and not await ask(out, *out.asks[-1]):
-            break
+        # Interactive: a "no" or a cancel ends the routine (its usual `|| return 0`).
+        if ask and line.startswith(("@@ask ", "@@choose ", "@@input ")):
+            from .bridge import answer_prompt
+            if await answer_prompt(out, line, ask) in ("no", "cancel"):
+                break
         if pause:
             await asyncio.sleep(pause)
     return out

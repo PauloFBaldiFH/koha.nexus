@@ -351,3 +351,64 @@ def test_fail2ban_shows_the_jails():
             app.run_native("fail2ban")
             return (await _wait_for(pilot, TextScreen))._text
     assert "203.0.113.7" in asyncio.run(main())
+
+
+def test_sizing_menu_highlights_the_recommended_profile():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("sizing")
+            menu = await _wait_for(pilot, ChoiceScreen)
+            await pilot.pause(0.2)
+            from textual.widgets import OptionList
+            highlighted = menu.query_one(OptionList).highlighted
+            menu.dismiss("3")
+            done = await _wait_for(pilot, MessageScreen)
+            return highlighted, done._kind
+    highlighted, kind = asyncio.run(main())
+    assert highlighted == 1 and kind == "ok"
+
+
+def test_superlibrarian_asks_each_field_and_hides_passwords():
+    async def main():
+        app = _app()
+        hidden = []
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("superlibrarian")
+            for value in ["ana", "123", "s3cretpass", "s3cretpass", "Ana", "Silva"]:
+                form = await _wait_for(pilot, InputScreen)
+                await pilot.pause(0.1)
+                hidden.append(form._password)
+                form.query_one("#value").value = value
+                form.query_one("#ok").press()
+                await pilot.pause(0.2)
+            done = await _wait_for(pilot, MessageScreen)
+            return hidden, done._kind
+    hidden, kind = asyncio.run(main())
+    assert hidden == [False, False, True, True, False, False] and kind == "ok"
+
+
+def test_backing_out_of_a_menu_shows_nothing():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("sizing")
+            menu = await _wait_for(pilot, ChoiceScreen)
+            menu.dismiss(None)
+            await pilot.pause(0.5)
+            return type(app.screen).__name__
+    assert asyncio.run(main()) not in ("MessageScreen", "LoadingScreen", "ChoiceScreen")
+
+
+def test_clock_offers_the_current_zone():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("clock")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            text = confirm._question
+            confirm.query_one("#yes").press()
+            done = await _wait_for(pilot, MessageScreen)
+            return text, done._kind
+    text, kind = asyncio.run(main())
+    assert "America/Sao_Paulo" in text and kind == "ok"

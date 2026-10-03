@@ -37,8 +37,31 @@ if TYPE_CHECKING:
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
 
-# A question of an interactive routine: (outcome so far, title, text) -> yes?
-Asker = Callable[["TaskOutcome", str, str], Awaitable[bool]]
+# A question of an interactive routine: (outcome so far, kind, title, text,
+# extra) -> answer. kind "ask": yes/no (bool); "choose": extra is (default,
+# [(key, label)]), answer a key or None; "input": extra is (default,
+# password), answer the text or None (cancelled).
+Asker = Callable[["TaskOutcome", str, str, str, object], Awaitable[object]]
+
+_PROMPTS = ("@@ask ", "@@choose ", "@@input ")
+
+
+async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
+    """The reply line a routine waits for after a prompt line."""
+    tag, _, rest = line[2:].partition(" ")
+    if tag == "ask":
+        title, text = out.asks[-1]
+        return "yes" if await ask(out, "ask", title, text, None) else "no"
+    parts = rest.split("\t")
+    title, text, default = (parts + ["", "", ""])[:3]
+    if tag == "choose":
+        items = parts[3:]
+        options = list(zip(items[::2], items[1::2]))
+        key = await ask(out, "choose", title, unescape(text), (default, options))
+        return f"ok {key}" if key else "cancel"
+    password = len(parts) > 3 and parts[3] == "password"
+    value = await ask(out, "input", title, unescape(text), (default, password))
+    return "cancel" if value is None else f"ok {value}"
 
 
 class BridgeError(RuntimeError):
@@ -129,6 +152,8 @@ class TaskOutcome:
             title, _, text = rest.partition("\t")
             self.asks.append((title, unescape(text)))
             log(f"[{title}] {unescape(text)}")
+        elif tag in ("choose", "input"):
+            log(f"[{rest.split(chr(9))[0]}] ?")
         elif tag == "preview":
             title, _, text = rest.partition("\t")
             self.previews.append((title, unescape(text)))
@@ -226,7 +251,7 @@ class Bridge:
                     on_line(line)
                 elif reporter:
                     reporter.log(line)
-                if answer and proc.stdin and line.startswith("@@ask "):
+                if answer and proc.stdin and line.startswith(_PROMPTS):
                     reply = await answer(line)
                     try:
                         proc.stdin.write(f"{reply}\n".encode())
@@ -260,8 +285,7 @@ class Bridge:
             env = {**(env or {}), "KEI_TASK_INTERACTIVE": "1"}
 
             async def answer(line: str) -> str:
-                title, text = out.asks[-1]
-                return "yes" if await ask(out, title, text) else "no"
+                return await answer_prompt(out, line, ask)
         out.rc = await self.stream(self._argv("--task", name, *args), reporter,
                                    on_line=lambda line: out.feed(line, reporter, on_result), env=env,
                                    answer=answer)

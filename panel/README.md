@@ -91,7 +91,10 @@ Questions a routine asks halfway (`@@ask`) are answered in one of two ways:
 a dry run stops at its question), or `KEI_TASK_INTERACTIVE=1` makes the
 routine wait for each answer, which the panel asks in a confirm screen over
 the loader and writes to the routine's stdin (`ask=asker(app)` in
-`run_task`). Long installs announce their stages with `@@stage`.
+`run_task`). Menus and text boxes work the same way: routines call
+`ui_menu` / `ui_input` (whiptail in the classic panel), which become
+`@@choose` / `@@input` lines answered with `ok VALUE` or `cancel`. Long
+installs announce their stages with `@@stage`.
 
 The classic panel stays the default until every section is ported:
 
@@ -103,8 +106,8 @@ The classic panel stays the default until every section is ported:
 | 4 | Diagnostics (status, health check, validation report, services, Apache log) | done |
 | 5 | Search engine and indexing | done |
 | 6 | Security center | done |
-| 7 | Koha settings and parameters | next |
-| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
+| 7 | Koha settings and parameters | done |
+| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | next |
 | 9 | Schedules, languages, updates, library tools, about, reboot | |
 
 Full-screen programs of their own (rclone's wizard, htop, links, Midnight

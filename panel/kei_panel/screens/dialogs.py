@@ -85,9 +85,11 @@ class ChoiceScreen(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "back", t("Back"))]
 
-    def __init__(self, title: str, prompt: str, options: list[tuple[str, str]], note: str = ""):
+    def __init__(self, title: str, prompt: str, options: list[tuple[str, str]], note: str = "",
+                 default: str = ""):
         super().__init__()
         self._title, self._prompt, self._options, self._note = title, prompt, options, note
+        self._default = default
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
@@ -100,7 +102,11 @@ class ChoiceScreen(ModalScreen[str | None]):
                 yield Button(t("Back"), id="back")
 
     def on_mount(self) -> None:
-        self.query_one(OptionList).focus()
+        options = self.query_one(OptionList)
+        keys = [key for key, _ in self._options]
+        if self._default in keys:
+            options.highlighted = keys.index(self._default)
+        options.focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         event.stop()
@@ -116,18 +122,20 @@ class InputScreen(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
 
-    def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False):
+    def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False,
+                 value: str = ""):
         super().__init__()
         self._title, self._instructions, self._prompt = title, instructions, prompt
-        self._validate, self._password = validate, password
+        self._validate, self._password, self._value = validate, password, value
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
             yield Label(self._title, classes="dialog-title")
-            with VerticalScroll(classes="dialog-scroll"):
-                yield Static(self._instructions, classes="dialog-body", markup=False)
+            if self._instructions:
+                with VerticalScroll(classes="dialog-scroll"):
+                    yield Static(self._instructions, classes="dialog-body", markup=False)
             yield Label(self._prompt, classes="dialog-prompt")
-            yield Input(password=self._password, id="value")
+            yield Input(self._value, password=self._password, id="value")
             yield Label("", id="input-error", classes="dialog-error")
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")

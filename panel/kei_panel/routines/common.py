@@ -85,17 +85,25 @@ async def preview_then_run(app, title: str, loader_title: str, name: str, *args:
 
 def asker(app, danger: tuple[str, ...] = ()):
     """The questions of an interactive routine, asked over its loader while
-    it waits. An info box it showed just before the question (diagnostics)
-    is shown above it; its "View Report" question is answered yes silently,
-    so the report comes back as a preview that offer_report() shows later."""
+    it waits: yes/no (an info box it showed just before is shown above the
+    question), menus and text boxes. Its "View Report" question is answered
+    yes silently, so the report comes back as a preview that offer_report()
+    shows later."""
+    from ..screens.dialogs import ChoiceScreen, InputScreen
     shown: set[int] = set()
 
-    async def ask(out: TaskOutcome, title: str, text: str) -> bool:
+    async def ask(out: TaskOutcome, kind: str, title: str, text: str, extra):
+        if kind == "choose":
+            default, options = extra
+            return await app.push_screen_wait(ChoiceScreen(title, text, options, default=default))
+        if kind == "input":
+            default, password = extra
+            return await app.push_screen_wait(InputScreen(title, "", text, password=password, value=default))
         if title == t("View Report"):
             return True
         preview_title = preview = ""
-        for i, (kind, head, body) in enumerate(out.messages):
-            if kind == "info" and i not in shown:
+        for i, (msg_kind, head, body) in enumerate(out.messages):
+            if msg_kind == "info" and i not in shown:
                 shown.add(i)
                 preview_title, preview = head, body
         return await app.push_screen_wait(ConfirmScreen(title, text, danger=title in danger,
@@ -114,3 +122,18 @@ async def offer_report(app, result: TaskResult) -> None:
         tx("Do you want to see the validation report to investigate the issues now?")
     if await app.push_screen_wait(ConfirmScreen(t("View Report"), question)):
         await app.push_screen_wait(TextScreen(title or t("Diagnostic Report"), report))
+
+
+async def run_interactive(app, title: str, name: str, *args: str, danger: tuple[str, ...] = (),
+                          total_steps: int = 0, cancellable: bool = False, **kwargs) -> TaskResult | None:
+    """An interactive routine from start to end: its questions over the
+    loader, then its last box and the report it offered. None when the
+    person backed out before it changed anything (no box at all)."""
+    result = await run_task(app, title, name, *args, ask=asker(app, danger=danger), total_steps=total_steps,
+                            cancellable=cancellable, **kwargs)
+    out = result.value if isinstance(result.value, TaskOutcome) else None
+    if result.ok and out is not None and out.rc == 0 and not out.messages and not out.steps:
+        return None
+    await show_done(app, title, result)
+    await offer_report(app, result)
+    return result

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, diagnostics, install, search, security
+from . import backup, database, diagnostics, install, search, security, settings
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -37,6 +37,11 @@ ROUTINES: dict[str, Routine] = {
     "ufw": security.ufw,
     "staff-firewall": security.staff_firewall,
     "rotate-db-password": security.rotate_password,
+    "sizing": settings.sizing,
+    "email": settings.email,
+    "superlibrarian": settings.superlibrarian,
+    "interoperability": settings.interoperability,
+    "clock": settings.clock,
 }
 
 

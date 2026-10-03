@@ -1243,6 +1243,28 @@ msg_error() {
     ui_msgbox --title "$title" --msgbox "$2" "${3:-10}" "${4:-74}"
 }
 
+# ui_menu TITLE PROMPT DEFAULT KEY LABEL [KEY LABEL...]: the chosen key in
+# REPLY; returns 1 when cancelled. In a panel task (KEI_TASK) the menu is
+# asked by the panel (see kei_task_ui); without an interactive panel the
+# default is taken.
+ui_menu() {
+    local title="$1" prompt="$2" def="$3" n
+    shift 3
+    n=$(( $# / 2 ))
+    [ "$n" -gt 12 ] && n=12
+    REPLY=$(whiptail --title "$title" --cancel-button "$(t "Back")" ${def:+--default-item "$def"} \
+        --menu "$prompt" $(( n + 10 )) 78 "$n" "$@" 3>&1 1>&2 2>&3) || return 1
+    [ -n "$REPLY" ]
+}
+
+# ui_input TITLE PROMPT [DEFAULT] [password]: the typed value in REPLY;
+# returns 1 when cancelled.
+ui_input() {
+    local box="--inputbox"
+    [ "${4:-}" = "password" ] && box="--passwordbox"
+    REPLY=$(whiptail --title "$1" "$box" "$2" 10 70 ${3:+"$3"} 3>&1 1>&2 2>&3)
+}
+
 prompt_yes_no() {
     local title="${1:-$(t "Warning")}"
     local message="${2:-$(t "Continue?")}"
@@ -6039,15 +6061,13 @@ function_size_server() {
     elif [ "$ram_int" -lt 8 ];  then recommended=2
     elif [ "$ram_int" -lt 16 ]; then recommended=3
     else recommended=4; fi
-    profile=$(whiptail --title "$(t "Sizing")" \
-        --cancel-button "$(t "Back")" \
-        --default-item "$recommended" \
-        --menu "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" 18 76 4 \
+    ui_menu "$(t "Sizing")" "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" \
+        "$recommended" \
         "1" "< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB" \
         "2" "4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB" \
         "3" "8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB" \
-        "4" "16 GB+   - 6 Plack, 256MB cache, 2G InnoDB" 3>&1 1>&2 2>&3) || return 0
-    [ -z "$profile" ] && return 0
+        "4" "16 GB+   - 6 Plack, 256MB cache, 2G InnoDB" || return 0
+    profile=$REPLY
     case "$profile" in
         1) wk=2; mem=64;  db=512M ;;
         2) wk=3; mem=128; db=768M ;;
@@ -6589,7 +6609,8 @@ function_create_superlibrarian() {
         msg_error "" "$(t "There are no libraries or patron categories yet.\nFinish the Web Installer first.")" 10 74
         return 0
     fi
-    user=$(whiptail --title "$(t "Username")" --inputbox "$(t "Username (login):")" 9 60 3>&1 1>&2 2>&3) || return 0
+    ui_input "$(t "Username")" "$(t "Username (login):")" || return 0
+    user=$REPLY
     [ -z "$user" ] && return 0
     if ! [[ "$user" =~ ^[A-Za-z0-9._-]+$ ]]; then
         msg_error "" "$(t "Use only letters, numbers, dot, hyphen or underscore.")" 8 66
@@ -6602,7 +6623,8 @@ function_create_superlibrarian() {
     fi
 
     local cardnumber exists_card
-    cardnumber=$(whiptail --title "$(t "Card Number")" --inputbox "$(t "Card number for \$user:")" 9 60 3>&1 1>&2 2>&3) || return 0
+    ui_input "$(t "Card Number")" "$(t "Card number for \$user:")" || return 0
+    cardnumber=$REPLY
     [ -z "$cardnumber" ] && return 0
     if ! [[ "$cardnumber" =~ ^[A-Za-z0-9._-]+$ ]]; then
         msg_error "" "$(t "Use only letters, numbers, dot, hyphen or underscore.")" 8 66
@@ -6615,13 +6637,17 @@ function_create_superlibrarian() {
         return 0
     fi
 
-    pass=$(whiptail --title "$(t "Password")" --passwordbox "$(t "Password for \$user (at least 8 characters):")" 9 64 3>&1 1>&2 2>&3) || return 0
+    ui_input "$(t "Password")" "$(t "Password for \$user (at least 8 characters):")" "" password || return 0
+    pass=$REPLY
     [ "${#pass}" -lt 8 ] && { msg_error "" "$(t "Password too short (minimum 8 characters).")" 8 62; return 0; }
     local pass2
-    pass2=$(whiptail --title "$(t "Confirm Password")" --passwordbox "$(t "Type the password again:")" 9 64 3>&1 1>&2 2>&3) || return 0
+    ui_input "$(t "Confirm Password")" "$(t "Type the password again:")" "" password || return 0
+    pass2=$REPLY
     [ "$pass" != "$pass2" ] && { msg_error "" "$(t "Passwords do not match.")" 8 60; return 0; }
-    first_name=$(whiptail --title "$(t "First name")" --inputbox "$(t "First name:")" 9 60 "Super" 3>&1 1>&2 2>&3) || return 0
-    surname=$(whiptail --title "$(t "Surname")" --inputbox "$(t "Surname:")" 9 60 "Admin" 3>&1 1>&2 2>&3) || return 0
+    ui_input "$(t "First name")" "$(t "First name:")" "Super" || return 0
+    first_name=$REPLY
+    ui_input "$(t "Surname")" "$(t "Surname:")" "Admin" || return 0
+    surname=$REPLY
     clear
     display_explanation "Hashing the password..."
     local hash_script
@@ -7918,7 +7944,13 @@ choose_timezone() {
 
 function_configure_clock() {
     local tz cur_tz cur_time
-    if tz=$(choose_timezone) && [ -n "$tz" ]; then
+    if [ -n "${KEI_TASK:-}" ]; then
+        # The panel asked for the zone (KEI_TASK_TZ; empty keeps the current one).
+        tz="${KEI_TASK_TZ:-}"
+        if [ -n "$tz" ] && ! apply_timezone "$tz"; then
+            msg_error "" "$(t 'Could not apply the timezone ${tz}.')" 9 70
+        fi
+    elif tz=$(choose_timezone) && [ -n "$tz" ]; then
         if ! apply_timezone "$tz"; then
             msg_error "" "$(t 'Could not apply the timezone ${tz}.')" 9 70
         fi
@@ -24445,6 +24477,39 @@ kei_task_ui() {
         [ "${KEI_TASK_ANSWER:-yes}" = "yes" ]
     }
     ui_textbox() { kei_emit preview "${1:-}"$'\t'"$(head -c 200000 "$2" 2>/dev/null)"; }
+    # Menus and text boxes, asked by the panel when it is interactive:
+    # "@@choose TITLE<TAB>PROMPT<TAB>DEFAULT<TAB>KEY<TAB>LABEL..." and
+    # "@@input TITLE<TAB>PROMPT<TAB>DEFAULT<TAB>password"; the answer is
+    # "ok VALUE" or "cancel" on fd 7.
+    kei_answer() {
+        local answer
+        IFS= read -r answer <&7 || answer="cancel"
+        case "$answer" in
+            "ok "*) REPLY="${answer#ok }"; return 0 ;;
+            *)      REPLY=""; return 1 ;;
+        esac
+    }
+    ui_menu() {
+        local title="$1" prompt="$2" def="$3" items="" item
+        shift 3
+        if [ "${KEI_TASK_INTERACTIVE:-}" != "1" ]; then
+            REPLY="$def"
+            [ -n "$def" ]
+            return
+        fi
+        for item in "$@"; do items+=$'\t'"${item//$'\t'/ }"; done
+        kei_emit choose "${title}"$'\t'"${prompt}"$'\t'"${def}${items}"
+        kei_answer && [ -n "$REPLY" ]
+    }
+    ui_input() {
+        if [ "${KEI_TASK_INTERACTIVE:-}" != "1" ]; then
+            REPLY="${3:-}"
+            [ -n "$REPLY" ]
+            return
+        fi
+        kei_emit input "${1}"$'\t'"${2}"$'\t'"${3:-}"$'\t'"${4:-}"
+        kei_answer
+    }
     display_explanation() { kei_emit note "$(t "$1")"; }
     tui_title() { kei_emit title "$2"; }
     show_validation_report() {
@@ -24541,6 +24606,7 @@ kei_task_info() {
     kei_result real_user "${REAL_USER:-root}"
     kei_result real_home "${REAL_HOME:-/root}"
     kei_result server_ip "$(get_server_ip)"
+    kei_result timezone "$(get_current_timezone)"
     kei_result dir_sql "$DIR_SQL"
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
     newest=$(newest_sql_backup)
@@ -24695,6 +24761,11 @@ kei_task() {
         ufw)             function_ufw_rules ;;
         staff-firewall)  function_staff_firewall ;;
         rotate-db-password) function_rotate_db_password ;;
+        sizing)          function_size_server ;;
+        email)           function_configure_emails ;;
+        superlibrarian)  function_create_superlibrarian ;;
+        interoperability) function_interoperability ;;
+        clock)           function_configure_clock ;;
         status)
             local g label value
             while IFS=$'\t' read -r g label value; do

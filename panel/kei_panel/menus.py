@@ -93,11 +93,11 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧱  Show active UFW rules", "ufw", kind="native"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
-        Entry("📏  Server sizing (memory / workers)", "sizing"),
-        Entry("📧  Configure email and circulation notices", "email"),
-        Entry("👑  Create super librarian", "superlibrarian"),
-        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability"),
-        Entry("🕒  Clock and timezone (NTP)", "clock"),
+        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
+        Entry("📧  Configure email and circulation notices", "email", kind="native"),
+        Entry("👑  Create super librarian", "superlibrarian", kind="native"),
+        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
+        Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
     )),
     Section("library", "📚  Library tools", entries=(
         Entry("📚  Library tools", "library-tools"),)),
