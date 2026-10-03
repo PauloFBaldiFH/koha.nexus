@@ -76,7 +76,10 @@ class KohaPanelApp(App):
     def is_native(self, entry: Entry) -> bool:
         """Ported to the panel's own screens, and the installer can run it."""
         from . import routines
-        return entry.kind == "native" and routines.has(entry.action) and self.bridge.supports_tasks()
+        if not (entry.kind == "native" and routines.has(entry.action) and self.bridge.supports_tasks()):
+            return False
+        task = routines.task_of(entry.action)
+        return not task or self.bridge.has_task(task)
 
     def run_native(self, action: str, after: Callable[[], None] | None = None) -> None:
         from . import routines

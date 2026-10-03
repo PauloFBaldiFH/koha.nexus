@@ -39,14 +39,15 @@ def test_ok_needs_exit_zero_and_no_error_box():
 
 @pytest.mark.skipif(os.geteuid() != 0, reason="the installer runs as root")
 def test_installer_answers_in_the_protocol():
-    run = subprocess.run(["bash", str(INSTALLER), "--task", "info"], capture_output=True, text=True, timeout=60)
+    # The panel reads stdout and stderr as one stream (the protocol is on stderr).
+    both = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "text": True, "timeout": 60}
+    run = subprocess.run(["bash", str(INSTALLER), "--task", "info"], **both)
     out = TaskOutcome()
     for line in run.stdout.splitlines():
         out.feed(line)
     assert run.returncode == 0 and out.get("dir_sql") and out.get("server_ip")
-    bad = subprocess.run(["bash", str(INSTALLER), "--task", "no-such-task"], capture_output=True, text=True,
-                         timeout=60)
-    assert bad.returncode == 2 and bad.stdout.startswith("@@msg error")
+    bad = subprocess.run(["bash", str(INSTALLER), "--task", "no-such-task"], **both)
+    assert bad.returncode == 2 and "@@msg error" in bad.stdout
 
 
 def _app():
@@ -56,8 +57,11 @@ def _app():
 async def _wait_for(pilot, screen_type, tries=60):
     for _ in range(tries):
         await pilot.pause(0.1)
-        if isinstance(pilot.app.screen, screen_type):
-            return pilot.app.screen
+        screen = pilot.app.screen
+        # Mounted with its widgets (under load the screen comes before them).
+        if isinstance(screen, screen_type) and screen.is_mounted and screen.query("Button"):
+            await pilot.pause(0.05)
+            return screen
     raise AssertionError(f"{screen_type.__name__} never shown (on {type(pilot.app.screen).__name__})")
 
 

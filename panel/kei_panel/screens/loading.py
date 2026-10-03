@@ -91,6 +91,10 @@ class LoadingScreen(ModalScreen[TaskResult]):
         notice.update(text)
         notice.display = bool(text)
 
+    def set_cancellable(self, on: bool) -> None:
+        self.cancellable = on
+        self.query_one("#cancel").display = on
+
     def set_progress(self, fraction: float | None) -> None:
         self.query_one(PacmanLoader).progress = fraction
         self._update_clock()

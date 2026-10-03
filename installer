@@ -1243,11 +1243,11 @@ msg_error() {
     ui_msgbox --title "$title" --msgbox "$2" "${3:-10}" "${4:-74}"
 }
 
-# ui_menu TITLE PROMPT DEFAULT KEY LABEL [KEY LABEL...]: the chosen key in
+# ask_menu TITLE PROMPT DEFAULT KEY LABEL [KEY LABEL...]: the chosen key in
 # REPLY; returns 1 when cancelled. In a panel task (KEI_TASK) the menu is
 # asked by the panel (see kei_task_ui); without an interactive panel the
 # default is taken.
-ui_menu() {
+ask_menu() {
     local title="$1" prompt="$2" def="$3" n
     shift 3
     n=$(( $# / 2 ))
@@ -1257,9 +1257,9 @@ ui_menu() {
     [ -n "$REPLY" ]
 }
 
-# ui_input TITLE PROMPT [DEFAULT] [password]: the typed value in REPLY;
+# ask_input TITLE PROMPT [DEFAULT] [password]: the typed value in REPLY;
 # returns 1 when cancelled.
-ui_input() {
+ask_input() {
     local box="--inputbox"
     [ "${4:-}" = "password" ] && box="--passwordbox"
     REPLY=$(whiptail --title "$1" "$box" "$2" 10 70 ${3:+"$3"} 3>&1 1>&2 2>&3)
@@ -1492,7 +1492,8 @@ tui_run() {
         TUI_ANIM_PID=$!
     fi
     [ -n "${KEI_TASK:-}" ] && kei_emit step "$full"
-    "$@" >>"$TUI_LOG" 2>&1 </dev/null
+    # Its output goes to the log, where the panel cannot answer a question.
+    KEI_TASK_INTERACTIVE=0 "$@" >>"$TUI_LOG" 2>&1 </dev/null
     rc=$?
     tui_stop_anim
     if [ -n "${KEI_TASK:-}" ]; then
@@ -4149,12 +4150,13 @@ install_panel_copy() {
 # ----------------------------------------------------------------------
 # The new panel (Textual, Python): panel/ in the repository.
 # ----------------------------------------------------------------------
-# Opt-in: "sudo KEI_UI=textual config.sh" opens it instead of the classic
-# menu, which stays the default (most routines still use the classic
-# dialogs). It needs Python 3.9+, its own virtual environment with
-# Textual, and a terminal. The menus are drawn by Python; every routine
-# still runs here, started by the new panel as "config.sh --run <action>"
-# with this panel's lock descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
+# "sudo config.sh" opens it instead of the classic menu when it can:
+# Python 3.9+, its own virtual environment with Textual, and a terminal.
+# Every routine is a panel screen: it runs here as "config.sh --task ..."
+# (PANEL TASKS), its questions asked by the panel; only full-screen
+# programs (htop, links, mc) get the terminal, with this panel's lock
+# descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
+#   KEI_UI=whiptail (or dialog)  always the classic panel
 # Anything that fails (no network for the first set-up, an old Python, a
 # crash) opens the classic panel: it stays the safe way in.
 KEI_LIB_DIR="/usr/local/lib/koha-easy-installer"
@@ -4270,7 +4272,7 @@ kei_panel_setup_task() {
 kei_panel_explain_fallback() {
     local why="$1" log_file="${2:-$APT_LOG}" tail_txt
     tail_txt=$(tui_log_tail "$log_file" 4 2>/dev/null)
-    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start with KEI_UI=textual; without it, the classic panel opens directly. Log:") ${log_file}" 20 78
+    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start. KEI_UI=whiptail always opens the classic panel. Log:") ${log_file}" 20 78
 }
 
 # 0 when the new panel should be used, setting it up first if needed.
@@ -4280,7 +4282,7 @@ KEI_PANEL_STATE=""
 kei_panel_ready() {
     case "$KEI_PANEL_STATE" in ready) return 0 ;; no) return 1 ;; esac
     KEI_PANEL_STATE=no
-    [ "${KEI_UI:-}" = "textual" ] || return 1
+    case "${KEI_UI:-}" in whiptail|dialog) return 1 ;; esac
     [ -t 0 ] && [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] || return 1
     # Sources that came with this script replace the installed copy.
     if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
@@ -5481,14 +5483,10 @@ function_install_languages() {
     # LANGUAGE SELECTOR (native names)
     # ==================================================================
     local choice
-    choice=$(whiptail \
-        --title "$(t "Koha & Panel Languages")" \
-        --cancel-button "$(t "Back")" \
-        --default-item "${KOHA_PANEL_LANG_FULL:-pt-BR}" \
-        --menu "$(t "Choose the language to install in Koha and apply to this Panel:")" \
-        22 72 13 \
-        "${PANEL_LANG_ITEMS[@]}" \
-        3>&1 1>&2 2>&3) || return 0
+    ask_menu "$(t "Koha & Panel Languages")" \
+        "$(t "Choose the language to install in Koha and apply to this Panel:")" \
+        "${KOHA_PANEL_LANG_FULL:-pt-BR}" "${PANEL_LANG_ITEMS[@]}" || return 0
+    choice="$REPLY"
     [ -z "$choice" ] && return 0
 
     # ==================================================================
@@ -5496,6 +5494,7 @@ function_install_languages() {
     # ==================================================================
     set_panel_language "$choice"
     log "panel language set to $choice ($SYS_LANG)"
+    kei_result panel_lang "$choice"
 
     if ! is_koha_installed || ! mysql -e "USE ${DB_NAME};" >/dev/null 2>&1; then
         msg_info "$(t "Koha & Panel Languages")" \
@@ -6061,7 +6060,7 @@ function_size_server() {
     elif [ "$ram_int" -lt 8 ];  then recommended=2
     elif [ "$ram_int" -lt 16 ]; then recommended=3
     else recommended=4; fi
-    ui_menu "$(t "Sizing")" "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" \
+    ask_menu "$(t "Sizing")" "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" \
         "$recommended" \
         "1" "< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB" \
         "2" "4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB" \
@@ -6523,14 +6522,12 @@ function_manage_crons() {
 
     while true; do
         local cron_choice
-        cron_choice=$(whiptail --title "$(t "Schedules & Scheduled Tasks")" \
-            --cancel-button "$(t "Back")" \
-            --menu "$(t "The Cron service runs routine maintenance and backup jobs without human intervention.")" 18 78 4 \
+        cron_choice=$(ui_menu "$(t "Schedules & Scheduled Tasks")" \
+            "$(t "The Cron service runs routine maintenance and backup jobs without human intervention.")" \
             "1" "$(t "📖 Understand what each automated task does")" \
             "2" "$(t "📋 View active tasks and schedules")" \
             "3" "$(t "🔄 Restore/Regenerate default schedules")" \
-            "4" "$(t "📝 Edit schedules manually (Advanced - nano)")" \
-            3>&1 1>&2 2>&3) || return 0
+            "4" "$(t "📝 Edit schedules manually (Advanced - nano)")") || return 0
 
         [ -z "$cron_choice" ] && return 0
 
@@ -6545,13 +6542,21 @@ function_manage_crons() {
                 txt_help+="$(t "• E-mail notices (Koha's own schedule, once e-mail is enabled):\n  Overdue and advance notices daily, message queue every 15 minutes.\n\n")"
                 txt_help+="$(t "• Incremental Catalog Indexing (every 2 min):\n  Ensures new titles become searchable in the OPAC almost immediately.")"
 
-                whiptail --title "$(t "Automated Tasks Guide")" --scrolltext --msgbox "$txt_help" 22 80 2>/dev/null || true
+                if [ -n "${KEI_TASK:-}" ]; then
+                    msg_info "$(t "Automated Tasks Guide")" "$txt_help"
+                else
+                    whiptail --title "$(t "Automated Tasks Guide")" --scrolltext --msgbox "$txt_help" 22 80 2>/dev/null || true
+                fi
                 ;;
             2)
                 local current_content
                 current_content=$(cat "$CRON_TASKS" 2>/dev/null || echo "$(t "File not found.")")
-                whiptail --title "$(t "Active Tasks in /etc/cron.d/koha_tasks")" \
-                    --scrolltext --msgbox "$current_content" 24 82 2>/dev/null || true
+                if [ -n "${KEI_TASK:-}" ]; then
+                    ui_textbox "$(t "Active Tasks in /etc/cron.d/koha_tasks")" "$CRON_TASKS"
+                else
+                    whiptail --title "$(t "Active Tasks in /etc/cron.d/koha_tasks")" \
+                        --scrolltext --msgbox "$current_content" 24 82 2>/dev/null || true
+                fi
                 ;;
             3)
                 if prompt_yes_no "$(t "Regenerate Tasks")" \
@@ -6561,10 +6566,16 @@ function_manage_crons() {
                 fi
                 ;;
             4)
-                msg_info "$(t "Advanced Editor")" \
-                    "$(t "The schedule file will open in nano.\n\nChange only the NUMBERS in the first two columns (minute and hour).\nDo not delete the PATH line at the top.\n\nTo save: CTRL+O, ENTER, then CTRL+X.")" 16 76
                 cp -f "$CRON_TASKS" "${CRON_TASKS}.bak" 2>/dev/null
-                nano "$CRON_TASKS"
+                if [ -n "${KEI_TASK:-}" ]; then
+                    # The panel's own editor (Save / Cancel).
+                    kei_edit "$(t "Active Tasks in /etc/cron.d/koha_tasks")" "$CRON_TASKS" \
+                        "$(t "Change only the NUMBERS in the first two columns (minute and hour).\nDo not delete the PATH line at the top.")" || continue
+                else
+                    msg_info "$(t "Advanced Editor")" \
+                        "$(t "The schedule file will open in nano.\n\nChange only the NUMBERS in the first two columns (minute and hour).\nDo not delete the PATH line at the top.\n\nTo save: CTRL+O, ENTER, then CTRL+X.")" 16 76
+                    nano "$CRON_TASKS"
+                fi
                 chmod 644 "$CRON_TASKS"
                 if ! grep -q '^PATH=' "$CRON_TASKS"; then
                     sed -i "1i $CRON_PATH" "$CRON_TASKS"
@@ -6609,7 +6620,7 @@ function_create_superlibrarian() {
         msg_error "" "$(t "There are no libraries or patron categories yet.\nFinish the Web Installer first.")" 10 74
         return 0
     fi
-    ui_input "$(t "Username")" "$(t "Username (login):")" || return 0
+    ask_input "$(t "Username")" "$(t "Username (login):")" || return 0
     user=$REPLY
     [ -z "$user" ] && return 0
     if ! [[ "$user" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -6623,7 +6634,7 @@ function_create_superlibrarian() {
     fi
 
     local cardnumber exists_card
-    ui_input "$(t "Card Number")" "$(t "Card number for \$user:")" || return 0
+    ask_input "$(t "Card Number")" "$(t "Card number for \$user:")" || return 0
     cardnumber=$REPLY
     [ -z "$cardnumber" ] && return 0
     if ! [[ "$cardnumber" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -6637,16 +6648,16 @@ function_create_superlibrarian() {
         return 0
     fi
 
-    ui_input "$(t "Password")" "$(t "Password for \$user (at least 8 characters):")" "" password || return 0
+    ask_input "$(t "Password")" "$(t "Password for \$user (at least 8 characters):")" "" password || return 0
     pass=$REPLY
     [ "${#pass}" -lt 8 ] && { msg_error "" "$(t "Password too short (minimum 8 characters).")" 8 62; return 0; }
     local pass2
-    ui_input "$(t "Confirm Password")" "$(t "Type the password again:")" "" password || return 0
+    ask_input "$(t "Confirm Password")" "$(t "Type the password again:")" "" password || return 0
     pass2=$REPLY
     [ "$pass" != "$pass2" ] && { msg_error "" "$(t "Passwords do not match.")" 8 60; return 0; }
-    ui_input "$(t "First name")" "$(t "First name:")" "Super" || return 0
+    ask_input "$(t "First name")" "$(t "First name:")" "Super" || return 0
     first_name=$REPLY
-    ui_input "$(t "Surname")" "$(t "Surname:")" "Admin" || return 0
+    ask_input "$(t "Surname")" "$(t "Surname:")" "Admin" || return 0
     surname=$REPLY
     clear
     display_explanation "Hashing the password..."
@@ -6720,7 +6731,7 @@ $(t "ACTIVE SECURITY FEATURES:")
   • $(t "SSL Encryption: automatic secure HTTPS connections.")
 EOF
 
-    whiptail --title "$(t "Cloudflare Information")" --textbox "$tmp_cf" 20 76 2>/dev/null || true
+    ui_textbox "$(t "Cloudflare Information")" "$tmp_cf"
     rm -f "$tmp_cf"
 }
 
@@ -6855,13 +6866,13 @@ function_cloudflare_setup() {
     fi
 
     local dominio opac_sub staff_sub
-    dominio=$(whiptail --title "$(t "Your Domain")" --inputbox "$(t "Enter the domain you already activated in Cloudflare (e.g. bibliotecapalotina.org):")" 10 74 3>&1 1>&2 2>&3) || return 0
+    dominio=$(ui_input "$(t "Your Domain")" "$(t "Enter the domain you already activated in Cloudflare (e.g. bibliotecapalotina.org):")") || return 0
     [ -z "$dominio" ] && return 0
 
     dominio=$(printf '%s' "$dominio" | tr 'A-Z' 'a-z' | sed -e 's|^[a-z]*://||' -e 's|/.*$||' -e 's/[[:space:]]//g')
 
-    opac_sub=$(whiptail --title "OPAC" --inputbox "$(t "Public Catalog subdomain:")" 10 60 "catalog" 3>&1 1>&2 2>&3) || return 0
-    staff_sub=$(whiptail --title "Staff" --inputbox "$(t "Administration subdomain:")" 10 60 "admin" 3>&1 1>&2 2>&3) || return 0
+    opac_sub=$(ui_input "OPAC" "$(t "Public Catalog subdomain:")" "catalog") || return 0
+    staff_sub=$(ui_input "Staff" "$(t "Administration subdomain:")" "admin") || return 0
     opac_sub=$(printf '%s' "$opac_sub" | tr 'A-Z' 'a-z' | tr -d '[:space:]')
     staff_sub=$(printf '%s' "$staff_sub" | tr 'A-Z' 'a-z' | tr -d '[:space:]')
 
@@ -7430,9 +7441,9 @@ function_broker_staff_access() {
 
     user=$(ui_input "$(t "Remote staff access")" "$(t "User for the remote access (not a Koha user):")" "biblioteca") || return 0
     [[ "$user" =~ ^[A-Za-z0-9._@-]{3,64}$ ]] || { msg_error "" "$(t "Use 3 to 64 letters, numbers or . _ @ -")" 8 60; return 0; }
-    pass=$(whiptail --title "$(t "Password")" --passwordbox "$(t "Password for the remote access (at least 12 characters):")" 9 70 3>&1 1>&2 2>&3) || return 0
+    pass=$(ui_input "$(t "Password")" "$(t "Password for the remote access (at least 12 characters):")" "" password) || return 0
     [ ${#pass} -ge 12 ] || { msg_error "" "$(t "The password must have at least 12 characters.")" 8 60; return 0; }
-    pass2=$(whiptail --title "$(t "Confirm Password")" --passwordbox "$(t "Type the password again:")" 9 64 3>&1 1>&2 2>&3) || return 0
+    pass2=$(ui_input "$(t "Confirm Password")" "$(t "Type the password again:")" "" password) || return 0
     [ "$pass" = "$pass2" ] || { msg_error "" "$(t "The passwords do not match.")" 8 60; return 0; }
     cidrs=$(ui_input "$(t "Remote staff access")" "$(t "Allowed networks (optional), e.g. 200.10.0.0/16, separated by spaces. Leave blank to allow any network:")") || return 0
     for c in $cidrs; do
@@ -7494,6 +7505,10 @@ function_share_catalog_link() {
         choice=$(ui_menu "$(t "Share the catalog")" "$url" "${items[@]}") || return 0
         case "$choice" in
             qr)
+                if [ -n "${KEI_TASK:-}" ]; then
+                    ensure_qrencode >/dev/null && msg_info "$(t "Share the catalog")" "$(qrencode -t UTF8 -l M -m 2 "$url")"$'\n\n'"  $url"
+                    continue
+                fi
                 clear
                 ensure_qrencode && qrencode -t ANSIUTF8 -l M -m 2 "$url"
                 printf '\n  %s\n\n' "$url"
@@ -7510,6 +7525,10 @@ function_share_catalog_link() {
                 ;;
             browser) open_in_browser "$url" ;;
             link)
+                if [ -n "${KEI_TASK:-}" ]; then
+                    msg_info "$(t "Share the catalog")" "$(t "Link of the catalog:")"$'\n\n'"  $url"
+                    continue
+                fi
                 clear
                 printf '%s\n\n  %s\n\n' "$(t "Link of the catalog:")" "$url"
                 pause_terminal
@@ -7532,16 +7551,14 @@ function_configure_cloudflare() {
         systemctl is-active --quiet cloudflared && tunnel_active="$(t "ACTIVE")"
 
         local choice
-        choice=$(whiptail --title "$(t "Cloudflare Tunnel Manager")" \
-            --cancel-button "$(t "Back")" \
-            --menu "$(t "Tunnel Status: \$tunnel_active\n\nCloudflare Tunnel safely exposes Koha without opening ports.\n\nWhat do you want to do?")" 20 78 6 \
+        choice=$(ui_menu "$(t "Cloudflare Tunnel Manager")" \
+            "$(t "Tunnel Status: \$tunnel_active\n\nCloudflare Tunnel safely exposes Koha without opening ports.\n\nWhat do you want to do?")" \
             "1" "$(t "🆓  Free Address (no domain needed)")" \
             "2" "$(t "🏠  Use My Own Domain (Cloudflare account)")" \
             "3" "$(t "🔗  View Public Links and Security Status")" \
             "4" "$(t "📱  Share the Catalog Link (QR code, link)")" \
             "5" "$(t "🔁  Restart Tunnel Service")" \
-            "6" "$(t "🛑  Disable and Remove Tunnel (Go Offline)")" \
-            3>&1 1>&2 2>&3)
+            "6" "$(t "🛑  Disable and Remove Tunnel (Go Offline)")")
         [[ $? -ne 0 ]] && break
 
         case "$choice" in
@@ -7596,10 +7613,9 @@ function_google_search_console() {
         return 1
     fi
 
-    opac_url=$(whiptail \
-        --title "$(t "Google Search Console — OPAC address")" \
-        --inputbox "$(t "Enter the complete PUBLIC OPAC address.\n\nExample:\nhttps://catalog.example.org\n\nDo not enter localhost, 127.0.0.1 or a private IP address.")" \
-        15 80 "https://" 3>&1 1>&2 2>&3) || return 0
+    opac_url=$(ui_input "$(t "Google Search Console — OPAC address")" \
+        "$(t "Enter the complete PUBLIC OPAC address.\n\nExample:\nhttps://catalog.example.org\n\nDo not enter localhost, 127.0.0.1 or a private IP address.")" \
+        "https://") || return 0
 
     opac_url="${opac_url%/}"
     case "$opac_url" in
@@ -7696,17 +7712,15 @@ function_google_search_console() {
             "$(t "robots.txt did not respond.\n\nIt is recommended to make robots.txt correctly available on the public OPAC.")" 10 78
     fi
 
-    choice=$(whiptail \
-        --title "$(t "Google Search Console — Next steps")" \
-        --menu "$(t "Automatic preparation is complete.\n\nChoose what you want to do:")" \
-        20 88 7 \
+    choice=$(ui_menu "$(t "Google Search Console — Next steps")" \
+        "$(t "Automatic preparation is complete.\n\nChoose what you want to do:")" \
         "1" "$(t "Open Google Search Console instructions")" \
         "2" "$(t "Property verification — step by step")" \
         "3" "$(t "Submit sitemap — step by step")" \
         "4" "$(t "Request indexing — step by step")" \
         "5" "$(t "Run the checks again")" \
         "6" "$(t "Official Google links")" \
-        "7" "$(t "Back")" 3>&1 1>&2 2>&3) || return 0
+        "7" "$(t "Back")") || return 0
 
     case "$choice" in
         1)
@@ -7759,7 +7773,24 @@ function_configure_ssl() {
         return 1
     fi
     restore_apt_timers
-    if ! koha_ctl certbot --apache; then
+    local certbot_args=(--apache)
+    if [ -n "${KEI_TASK:-}" ]; then
+        # No terminal for Certbot's own questions: asked here first.
+        local domain email
+        domain=$(ui_input "$(t "SSL / HTTPS")" "$(t "Domain of this server (e.g. biblioteca.example.org):")") || return 0
+        domain=$(printf '%s' "$domain" | tr 'A-Z' 'a-z' | sed -e 's|^[a-z]*://||' -e 's|/.*$||' -e 's/[[:space:]]//g')
+        if ! [[ "$domain" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+            msg_error "" "$(t "Invalid domain.")" 8 60
+            return 1
+        fi
+        email=$(ui_input "$(t "SSL / HTTPS")" "$(t "E-mail for the certificate renewal notices:")") || return 0
+        if ! [[ "$email" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
+            msg_error "" "$(t "Invalid e-mail address.")" 8 60
+            return 1
+        fi
+        certbot_args+=(--non-interactive --agree-tos --redirect -m "$email" -d "$domain")
+    fi
+    if ! koha_ctl certbot "${certbot_args[@]}"; then
         msg_error "" "$(t "Certbot could not complete certificate issuance/configuration. Apache will not be reloaded automatically.")" 10 78
         return 1
     fi
@@ -8586,6 +8617,7 @@ function_autoupdate() {
         # Dictionaries are downloaded again on the next start (they are now
         # older than the panel); the bundled copy is dropped to force it.
         rm -f "${CONFIG_DIR}/lang/${SYS_LANG}.cache" 2>/dev/null || true
+        kei_result updated yes
         msg_ok "$(t "Panel updated successfully to v\${remote_version}!\n\nBackup of the old version saved at:\n\${backup}\n\nPress OK to exit. Open again with: sudo config.sh")" 14 78
         rm -f "$tmp_sha"
         exit 0
@@ -8806,7 +8838,7 @@ function_about() {
 
     printf '%b\n' "$txt_about" > "$tmp_about"
 
-    whiptail --title "$(t "About")" --textbox "$tmp_about" 25 78 2>/dev/null || true
+    ui_textbox "$(t "About")" "$tmp_about"
     rm -f "$tmp_about"
 }
 
@@ -8960,13 +8992,18 @@ tools_safety_backup() {
 }
 
 # Dialogs of the tools (the test battery replaces them).
+# In a panel task they are asked by the panel's own screens (kei_task_ui).
 ui_menu() {     # ui_menu TITLE TEXT TAG ITEM [TAG ITEM ...] -> chosen tag
     local title="$1" text="$2"
     shift 2
-    whiptail --title "$title" --menu "$text" 0 0 0 "$@" 3>&1 1>&2 2>&3
+    whiptail --title "$title" --cancel-button "$(t "Back")" --menu "$text" 0 0 0 "$@" 3>&1 1>&2 2>&3
 }
-ui_input() {    # ui_input TITLE TEXT [DEFAULT] -> typed text
-    whiptail --title "$1" --inputbox "$2" 0 0 "${3:-}" 3>&1 1>&2 2>&3
+ui_input() {    # ui_input TITLE TEXT [DEFAULT] [password] -> typed text
+    if [ "${4:-}" = "password" ]; then
+        whiptail --title "$1" --passwordbox "$2" 0 0 3>&1 1>&2 2>&3
+    else
+        whiptail --title "$1" --inputbox "$2" 0 0 "${3:-}" 3>&1 1>&2 2>&3
+    fi
 }
 ui_textbox() {  # ui_textbox TITLE FILE (scrollable)
     whiptail --title "$1" --scrolltext --textbox "$2" 0 0 3>&1 1>&2 2>&3 || true
@@ -9434,8 +9471,8 @@ function_library_tools() {
     require_koha || return 0
     local opt
     while true; do
-        opt=$(whiptail --title "$(t "📚  Library tools")" --cancel-button "$(t "Back")" \
-            --menu "$(t "Changes are always previewed first and protected by a verified backup.")" 0 0 0 \
+        opt=$(ui_menu "$(t "📚  Library tools")" \
+            "$(t "Changes are always previewed first and protected by a verified backup.")" \
             "1" "$(t "🪄  Magic Import Tool (drop anything here)")" \
             "2" "$(t "🔙  Undo a MARC import")" \
             "3" "$(t "📋  Essential SQL reports pack")" \
@@ -9451,7 +9488,7 @@ function_library_tools() {
             "13" "$(t "🔎  CDD lookup in the cataloguing (staff tool)")" \
             "14" "$(t "🧩  Koha plugins (turn on or off)")" \
             "15" "$(t "🧮  Cutter Calculator")" \
-            "16" "$(t "💬  AI assistant on the staff home page")" 3>&1 1>&2 2>&3) || return 0
+            "16" "$(t "💬  AI assistant on the staff home page")") || return 0
         case "$opt" in
             1) lt_magic_import ;;
             2) lt_marc_undo ;;
@@ -11965,14 +12002,14 @@ function_brazil_tools() {
     require_koha || return 0
     local opt
     while true; do
-        opt=$(whiptail --title "$(t "🌎  Brazil: localization")" --cancel-button "$(t "Back")" \
-            --menu "$(t "Optional presets for Brazilian libraries. Nothing is applied until you choose it here. The migrations (Biblivre, SophiA, Pergamum, Biblioteca Fácil, ISIS, spreadsheets) are in Library tools > Magic Import Tool.")" 0 0 0 \
+        opt=$(ui_menu "$(t "🌎  Brazil: localization")" \
+            "$(t "Optional presets for Brazilian libraries. Nothing is applied until you choose it here. The migrations (Biblivre, SophiA, Pergamum, Biblioteca Fácil, ISIS, spreadsheets) are in Library tools > Magic Import Tool.")" \
             "1" "$(t "🆔  Check patron CPFs (modulo 11)")" \
             "2" "$(t "🔖  Pimaco label templates")" \
             "3" "$(t "📇  Cataloguing card (ficha catalográfica)")" \
             "4" "$(t "📅  Brazilian holidays in the calendar")" \
             "5" "$(t "📈  Government census reports (MEC/INEP/IBGE)")" \
-            "6" "$(t "📑  ABNT references and bibliographies (NBR 6023)")" 3>&1 1>&2 2>&3) || return 0
+            "6" "$(t "📑  ABNT references and bibliographies (NBR 6023)")") || return 0
         case "$opt" in
             1) lt_br_cpf_audit ;;
             2) lt_br_labels ;;
@@ -24454,45 +24491,70 @@ kei_emit() {
     shift
     text="$*"
     text=${text//$'\r'/}
-    printf '@@%s %s\n' "$tag" "${text//$'\n'/\\n}"
+    # On stderr, which the panel reads with stdout: a menu whose answer is
+    # captured with $(...) still reaches it.
+    printf '@@%s %s\n' "$tag" "${text//$'\n'/\\n}" >&2
 }
 # A value for the panel (nothing outside a task).
 kei_result() { [ -n "${KEI_TASK:-}" ] && kei_emit result "$1=$2"; return 0; }
 
 # The dialogs of the classic panel, as protocol lines.
 kei_task_ui() {
-    msg_info() { kei_emit msg "info ${1}"$'\t'"${2}"; }
-    msg_ok() { kei_emit msg "ok $(t "OK")"$'\t'"${1}"; }
-    msg_error() { kei_emit msg "error ${1:-$(t "Error")}"$'\t'"${2}"; }
-    # KEI_TASK_INTERACTIVE=1: the panel answers each question on fd 7
-    # ("yes" or anything else); otherwise KEI_TASK_ANSWER answers them all.
+    # KEI_TASK_INTERACTIVE=1: the panel answers each question on the KEI_IN
+    # descriptor (the pipe it opened as stdin); otherwise KEI_TASK_ANSWER
+    # answers every yes/no, menus take their default and boxes are only
+    # reported.
+    kei_live() { [ "${KEI_TASK_INTERACTIVE:-}" = "1" ] && [ -n "${KEI_IN:-}" ]; }
+    kei_reply() { REPLY=""; IFS= read -r REPLY <&"$KEI_IN"; }
+    # A box: "@@say KIND TITLE<TAB>TEXT" waits until the person closed it.
+    kei_box() {
+        if kei_live; then
+            kei_emit say "${1} ${2}"$'\t'"${3}"
+            kei_reply || true
+        else
+            kei_emit msg "${1} ${2}"$'\t'"${3}"
+        fi
+        return 0
+    }
+    msg_info() { kei_box info "${1}" "${2}"; }
+    msg_ok() { kei_box ok "$(t "OK")" "${1}"; }
+    msg_error() { kei_box error "${1:-$(t "Error")}" "${2}"; }
     prompt_yes_no() {
-        local answer
         kei_emit ask "${1:-}"$'\t'"${2:-}"
-        if [ "${KEI_TASK_INTERACTIVE:-}" = "1" ]; then
-            IFS= read -r answer <&7 || answer="no"
-            [ "$answer" = "yes" ]
+        if kei_live; then
+            kei_reply || REPLY="no"
+            [ "$REPLY" = "yes" ]
             return
         fi
         [ "${KEI_TASK_ANSWER:-yes}" = "yes" ]
     }
-    ui_textbox() { kei_emit preview "${1:-}"$'\t'"$(head -c 200000 "$2" 2>/dev/null)"; }
+    # A long text: "@@view TITLE<TAB>TEXT" (waits), or a preview for later.
+    ui_textbox() {
+        local text
+        text=$(head -c 200000 "$2" 2>/dev/null)
+        if kei_live; then
+            kei_emit view "${1:-}"$'\t'"$text"
+            kei_reply || true
+        else
+            kei_emit preview "${1:-}"$'\t'"$text"
+        fi
+        return 0
+    }
     # Menus and text boxes, asked by the panel when it is interactive:
     # "@@choose TITLE<TAB>PROMPT<TAB>DEFAULT<TAB>KEY<TAB>LABEL..." and
     # "@@input TITLE<TAB>PROMPT<TAB>DEFAULT<TAB>password"; the answer is
-    # "ok VALUE" or "cancel" on fd 7.
+    # "ok VALUE" or "cancel".
     kei_answer() {
-        local answer
-        IFS= read -r answer <&7 || answer="cancel"
-        case "$answer" in
-            "ok "*) REPLY="${answer#ok }"; return 0 ;;
+        kei_reply || REPLY="cancel"
+        case "$REPLY" in
+            "ok "*) REPLY="${REPLY#ok }"; return 0 ;;
             *)      REPLY=""; return 1 ;;
         esac
     }
-    ui_menu() {
+    kei_choose() {   # TITLE PROMPT DEFAULT KEY LABEL... -> REPLY
         local title="$1" prompt="$2" def="$3" items="" item
         shift 3
-        if [ "${KEI_TASK_INTERACTIVE:-}" != "1" ]; then
+        if ! kei_live; then
             REPLY="$def"
             [ -n "$def" ]
             return
@@ -24501,14 +24563,76 @@ kei_task_ui() {
         kei_emit choose "${title}"$'\t'"${prompt}"$'\t'"${def}${items}"
         kei_answer && [ -n "$REPLY" ]
     }
-    ui_input() {
-        if [ "${KEI_TASK_INTERACTIVE:-}" != "1" ]; then
+    kei_typed() {    # TITLE PROMPT [DEFAULT] [password] -> REPLY
+        if ! kei_live; then
             REPLY="${3:-}"
             [ -n "$REPLY" ]
             return
         fi
         kei_emit input "${1}"$'\t'"${2}"$'\t'"${3:-}"$'\t'"${4:-}"
         kei_answer
+    }
+    # The two families of dialogs: ask_* (answer in REPLY) and the tools'
+    # ui_* (answer printed, read with $(...)).
+    ask_menu() { kei_choose "$@"; }
+    ask_input() { kei_typed "$@"; }
+    ui_menu() {
+        local title="$1" text="$2"
+        shift 2
+        kei_choose "$title" "$text" "" "$@" || return 1
+        printf '%s' "$REPLY"
+    }
+    ui_input() { kei_typed "$@" || return 1; printf '%s' "$REPLY"; }
+    # "@@check TITLE<TAB>PROMPT<TAB>KEY<TAB>LABEL<TAB>ON|OFF..." -> "ok K1<TAB>K2"
+    ui_checklist() {
+        local title="$1" text="$2" items="" item tag
+        shift 2
+        if ! kei_live; then
+            while [ $# -ge 3 ]; do [ "$3" = "ON" ] && printf '%s\n' "$1"; shift 3; done
+            return 0
+        fi
+        for item in "$@"; do items+=$'\t'"${item//$'\t'/ }"; done
+        kei_emit check "${title}"$'\t'"${text}${items}"
+        kei_answer || return 1
+        while IFS= read -r tag; do [ -n "$tag" ] && printf '%s\n' "$tag"; done <<< "${REPLY//$'\t'/$'\n'}"
+        return 0
+    }
+    # File and folder pickers: "@@file file|dir<TAB>TITLE<TAB>PROMPT<TAB>START<TAB>EXTS"
+    kei_pick() {
+        kei_live || return 1
+        kei_emit file "${1}"$'\t'"${2}"$'\t'"${3}"$'\t'"$(picker_start_dir "${4:-}")"$'\t'"${5:-}"
+        kei_answer && [ -n "$REPLY" ] || return 1
+        printf '%s' "$REPLY"
+    }
+    select_file() {
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz}"
+    }
+    select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
+    # A file to change by hand (the classic panel opens nano):
+    # "@@edit TITLE<TAB>PATH<TAB>NOTE"; the panel saves it, then answers "ok".
+    kei_edit() {
+        kei_live || return 1
+        kei_emit edit "${1}"$'\t'"${2}"$'\t'"${3:-}"
+        kei_answer
+    }
+    # A link to open while a tool waits for it (an authorization): shown in
+    # the loader, which may then be cancelled ("@@cancel on").
+    auth_link_session() {
+        local pid="$1" url="$2" hint="${4:-}" text
+        text="$(t "Open this address in a browser:")"$'\n'"${url}"
+        [ -n "$hint" ] && text+=$'\n\n'"$(printf '%b' "$hint")"
+        browser_opener >/dev/null 2>&1 && open_in_browser "$url" >/dev/null 2>&1
+        kei_result auth_url "$url"
+        kei_emit stage "$(t "Waiting for the authorization...")"$'\t'"$text"
+        kei_emit cancel on
+        trap 'kill "$pid" 2>/dev/null; exit 130' TERM INT HUP
+        wait "$pid" 2>/dev/null
+        local rc=$?
+        trap - TERM INT HUP
+        kei_emit cancel off
+        kei_emit stage ""
+        unshield_signals 2>/dev/null
+        return "$rc"
     }
     display_explanation() { kei_emit note "$(t "$1")"; }
     tui_title() { kei_emit title "$2"; }
@@ -24691,6 +24815,66 @@ kei_task_cloud_authorize() {
     validate_and_register_rclone "gdrive"
 }
 
+# The routine of each panel action (--run ACTION, and --task run ACTION
+# for the new panel); a fixed list, anything else is refused.
+panel_action_function() {
+    case "$1" in
+        install)            echo function_install_koha ;;
+        credentials)        echo function_view_credentials ;;
+        restore)            echo function_restore_database ;;
+        backup-manual)      echo function_manual_backup ;;
+        backup-cloud)       echo function_configure_rclone ;;
+        backup-test)        echo function_test_backup ;;
+        search-toggle)      echo function_toggle_search_engine ;;
+        search-repair)      echo function_repair_indexing ;;
+        cloudflare)         echo function_configure_cloudflare ;;
+        ssl)                echo function_configure_ssl ;;
+        search-console)     echo function_google_search_console ;;
+        status)             echo function_detailed_status ;;
+        health)             echo function_validate_system ;;
+        validation-report)  echo show_validation_report ;;
+        apache-log)         echo function_view_logs ;;
+        db-maintenance)     echo function_deep_maintenance ;;
+        repair-services)    echo function_repair_services ;;
+        fail2ban)           echo function_fail2ban_status ;;
+        staff-firewall)     echo function_staff_firewall ;;
+        rotate-db-password) echo function_rotate_db_password ;;
+        ufw)                echo function_ufw_rules ;;
+        sizing)             echo function_size_server ;;
+        email)              echo function_configure_emails ;;
+        superlibrarian)     echo function_create_superlibrarian ;;
+        interoperability)   echo function_interoperability ;;
+        clock)              echo function_configure_clock ;;
+        library-tools)      echo function_library_tools ;;
+        reports)            echo lt_reports ;;
+        magic-import)       echo lt_magic_import ;;
+        marc-undo)          echo lt_marc_undo ;;
+        patron-category)    echo lt_patron_category ;;
+        data-quality)       echo lt_data_quality ;;
+        privacy-anonymise)  echo lt_privacy_anonymise ;;
+        privacy-delete)     echo lt_privacy_delete ;;
+        tool-logs)          echo lt_view_logs ;;
+        brazil)             echo function_brazil_tools ;;
+        messaging)          echo function_messaging ;;
+        cataloguing)        echo function_cataloguing ;;
+        cdd)                echo function_cdd ;;
+        plugins)            echo function_koha_plugins ;;
+        cutter)             echo function_cutter ;;
+        marc-replace)       echo function_marc_replace ;;
+        ai-assistant)       echo function_ai_assistant ;;
+        monitor)            echo function_run_monitor ;;
+        links)              echo function_run_links ;;
+        mc)                 echo function_run_mc ;;
+        crons)              echo function_manage_crons ;;
+        languages)          echo function_install_languages ;;
+        update-system)      echo function_update_system ;;
+        update-panel)       echo function_autoupdate ;;
+        about)              echo function_about ;;
+        reboot)             echo function_reboot_server ;;
+        *)                  return 1 ;;
+    esac
+}
+
 kei_task() {
     local name="${1:-}"
     shift
@@ -24698,7 +24882,7 @@ kei_task() {
     kei_task_ui
     # Answers come on the pipe the panel opened as stdin; every command
     # reads /dev/null instead, so none can swallow or wait for an answer.
-    [ "${KEI_TASK_INTERACTIVE:-}" = "1" ] && exec 7<&0 </dev/null
+    [ "${KEI_TASK_INTERACTIVE:-}" = "1" ] && exec {KEI_IN}<&0 </dev/null
     log "panel task: $name"
     case "$name" in
         info)            kei_task_info ;;
@@ -24774,6 +24958,30 @@ kei_task() {
             return 0 ;;
         health)          function_validate_system ;;
         repair-services) function_repair_services ;;
+        run)
+            # Any other routine of the menu, its questions asked by the panel.
+            local fn
+            fn=$(panel_action_function "${1:-}") || {
+                kei_emit msg "error $(t "Error")"$'\t'"$(t "Unknown panel action:") ${1:-}"
+                return 2
+            }
+            restore_apt_timers
+            if [ "${1:-}" != "about" ]; then require_systemd || return 1; fi
+            case "$fn" in lt_*|function_brazil_tools|function_messaging|function_cataloguing|function_cdd|\
+                          function_koha_plugins|function_cutter) require_koha || return 1 ;; esac
+            "$fn" ;;
+        tool-install)
+            # A terminal program the panel then opens itself (htop, links, mc).
+            case "${1:-}" in
+                htop)  command -v htop >/dev/null 2>&1 && command -v nethogs >/dev/null 2>&1 \
+                           || install_tool "$(t "Installing htop and nethogs")" htop nethogs ;;
+                links) command -v links >/dev/null 2>&1 || install_tool "$(t "Installing the terminal web browser")" links ;;
+                mc)    command -v mc >/dev/null 2>&1 || install_tool "$(t "Installing Midnight Commander")" mc ;;
+                *)     return 2 ;;
+            esac
+            local rc=$?
+            kei_result iface "$(ip route 2>/dev/null | awk '/default/ {print $5; exit}')"
+            return "$rc" ;;
         apache-log)
             # The panel follows the file itself; here only where it is.
             local log_file
@@ -24855,50 +25063,6 @@ fi
 # terminal straight on the routine picked there: it runs that one routine,
 # then the panel ends, with no main menu. The names are a fixed list;
 # anything else is refused. Without --run nothing here applies.
-panel_action_function() {
-    case "$1" in
-        install)            echo function_install_koha ;;
-        credentials)        echo function_view_credentials ;;
-        restore)            echo function_restore_database ;;
-        backup-manual)      echo function_manual_backup ;;
-        backup-cloud)       echo function_configure_rclone ;;
-        backup-test)        echo function_test_backup ;;
-        search-toggle)      echo function_toggle_search_engine ;;
-        search-repair)      echo function_repair_indexing ;;
-        cloudflare)         echo function_configure_cloudflare ;;
-        ssl)                echo function_configure_ssl ;;
-        search-console)     echo function_google_search_console ;;
-        status)             echo function_detailed_status ;;
-        health)             echo function_validate_system ;;
-        validation-report)  echo show_validation_report ;;
-        apache-log)         echo function_view_logs ;;
-        db-maintenance)     echo function_deep_maintenance ;;
-        repair-services)    echo function_repair_services ;;
-        fail2ban)           echo function_fail2ban_status ;;
-        staff-firewall)     echo function_staff_firewall ;;
-        rotate-db-password) echo function_rotate_db_password ;;
-        ufw)                echo function_ufw_rules ;;
-        sizing)             echo function_size_server ;;
-        email)              echo function_configure_emails ;;
-        superlibrarian)     echo function_create_superlibrarian ;;
-        interoperability)   echo function_interoperability ;;
-        clock)              echo function_configure_clock ;;
-        library-tools)      echo function_library_tools ;;
-        reports)            echo lt_reports ;;
-        marc-replace)       echo function_marc_replace ;;
-        ai-assistant)       echo function_ai_assistant ;;
-        monitor)            echo function_run_monitor ;;
-        links)              echo function_run_links ;;
-        mc)                 echo function_run_mc ;;
-        crons)              echo function_manage_crons ;;
-        languages)          echo function_install_languages ;;
-        update-system)      echo function_update_system ;;
-        update-panel)       echo function_autoupdate ;;
-        about)              echo function_about ;;
-        reboot)             echo function_reboot_server ;;
-        *)                  return 1 ;;
-    esac
-}
 
 if [ "${1:-}" = "--run" ]; then
     _run_fn=$(panel_action_function "${2:-}") || {

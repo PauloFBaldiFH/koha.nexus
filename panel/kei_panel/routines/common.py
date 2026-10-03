@@ -41,6 +41,8 @@ async def show_failure(app, title: str, result: TaskResult) -> None:
         return
     out = result.value if isinstance(result.value, TaskOutcome) else None
     msg = out.last("error") if out else None
+    if out and out.already_said(msg):
+        return    # the person already read it while the routine ran
     body = msg[2] if msg else (result.error or (f"exit {out.rc}" if out else t("Unknown error.")))
     head = msg[1] if msg and msg[1] else title
     await app.push_screen_wait(MessageScreen(head, body, kind="error", log=result.log))
@@ -55,7 +57,10 @@ async def show_done(app, title: str, result: TaskResult, default: str = "") -> N
     if failed(result):
         await show_failure(app, title, result)
         return
-    kind, head, body = last_message(result.value, default or t("Done!"))
+    out = result.value
+    if out.already_said(out.last("ok", "info")):
+        return
+    kind, head, body = last_message(out, default or t("Done!"))
     await app.push_screen_wait(MessageScreen(head if head and head != "OK" else title, body, kind=kind))
 
 
@@ -89,7 +94,8 @@ def asker(app, danger: tuple[str, ...] = ()):
     question), menus and text boxes. Its "View Report" question is answered
     yes silently, so the report comes back as a preview that offer_report()
     shows later."""
-    from ..screens.dialogs import ChoiceScreen, InputScreen
+    from ..screens.dialogs import ChecklistScreen, ChoiceScreen, EditScreen, InputScreen, TextScreen
+    from ..screens.files import PathPickerScreen
     shown: set[int] = set()
 
     async def ask(out: TaskOutcome, kind: str, title: str, text: str, extra):
@@ -97,13 +103,33 @@ def asker(app, danger: tuple[str, ...] = ()):
             default, options = extra
             return await app.push_screen_wait(ChoiceScreen(title, text, options, default=default))
         if kind == "input":
+            # Empty is a valid answer (an optional field): the routine checks it.
             default, password = extra
-            return await app.push_screen_wait(InputScreen(title, "", text, password=password, value=default))
+            return await app.push_screen_wait(InputScreen(title, "", text, password=password, value=default,
+                                                          validate=lambda _v: ""))
+        if kind == "check":
+            return await app.push_screen_wait(ChecklistScreen(title, text, extra))
+        if kind == "file":
+            mode, start, exts = extra
+            suffixes = None if not exts or exts == ["*"] else tuple(f".{e.lower()}" for e in exts)
+            picked = await app.push_screen_wait(PathPickerScreen(
+                title, start or "/root", mode="dir" if mode == "dir" else "file", suffixes=suffixes,
+                help_text=text))
+            return str(picked) if picked else None
+        if kind == "edit":
+            return await app.push_screen_wait(EditScreen(title, extra, note=text))
+        if kind == "say":
+            await app.push_screen_wait(MessageScreen(title if title and title != "OK" else t("OK"), text,
+                                                     kind=extra if extra in ("ok", "info", "error") else "info"))
+            return True
+        if kind == "view":
+            await app.push_screen_wait(TextScreen(title, text))
+            return True
         if title == t("View Report"):
             return True
         preview_title = preview = ""
         for i, (msg_kind, head, body) in enumerate(out.messages):
-            if msg_kind == "info" and i not in shown:
+            if msg_kind == "info" and i not in shown and i not in out.said:
                 shown.add(i)
                 preview_title, preview = head, body
         return await app.push_screen_wait(ConfirmScreen(title, text, danger=title in danger,

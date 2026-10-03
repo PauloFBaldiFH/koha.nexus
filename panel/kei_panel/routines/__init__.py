@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, diagnostics, install, search, security, settings
+from . import backup, database, diagnostics, install, search, security, settings, tools
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -42,8 +42,52 @@ ROUTINES: dict[str, Routine] = {
     "superlibrarian": settings.superlibrarian,
     "interoperability": settings.interoperability,
     "clock": settings.clock,
+    "languages": tools.languages,
+    "update-panel": tools.update_panel,
+    "monitor": tools.monitor,
+    "links": tools.links,
+    "mc": tools.mc,
 }
+
+# The rest run their classic routine with `--task run ACTION`; the title is
+# the menu label's (an installer text).
+GENERIC: dict[str, str] = {
+    "cloudflare": "🌉  Cloudflare Tunnel Manager (Recommended)",
+    "ssl": "🔏  Free SSL certificate (Certbot / Apache)",
+    "search-console": "🔎  Google Search Console Assistant",
+    "library-tools": "📚  Library tools",
+    "magic-import": "🪄  Magic Import Tool (drop anything here)",
+    "marc-undo": "🔙  Undo a MARC import",
+    "patron-category": "🎓  School-year turnover (patron categories)",
+    "data-quality": "🧪  Catalog data-quality check",
+    "privacy-anonymise": "🎭  Privacy (LGPD): anonymise old history",
+    "privacy-delete": "🚮  Privacy (LGPD): delete old patrons",
+    "tool-logs": "📜  View tool logs",
+    "brazil": "🌎  Brazil: localization",
+    "messaging": "💬  Messaging: WhatsApp and Telegram",
+    "cataloguing": "📝  Cataloguing aids: PHA, Cutter, CDD",
+    "marc-replace": "🔀  Replace a MARC record (staff tool)",
+    "cdd": "🔎  CDD lookup in the cataloguing (staff tool)",
+    "plugins": "🧩  Koha plugins (turn on or off)",
+    "cutter": "🧮  Cutter Calculator",
+    "ai-assistant": "💬  AI assistant on the staff home page",
+    "crons": "⏰  Schedules & cron tasks",
+    "update-system": "🆙  Update OS packages & Koha schemas",
+    "about": "💡  About the program & support",
+    "reboot": "🔁  Reboot server",
+}
+for _action, _title in GENERIC.items():
+    ROUTINES.setdefault(_action, tools.generic(_action, _title))
 
 
 def has(action: str) -> bool:
     return action in ROUTINES
+
+
+def task_of(action: str) -> str:
+    """The `--task` the routine needs from the installer ("" = its own)."""
+    if action in GENERIC or action in ("languages", "update-panel"):
+        return "run"
+    if action in ("monitor", "links", "mc"):
+        return "tool-install"
+    return ""

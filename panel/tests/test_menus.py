@@ -18,7 +18,15 @@ def test_every_action_exists_in_the_installer():
 
 
 def test_every_bash_action_has_a_menu_entry():
-    assert installer_actions() - all_actions() == set()
+    # The Library tools menu of bash is the panel's section of its tools.
+    assert installer_actions() - all_actions() == {"library-tools"}
+
+
+def test_every_entry_is_native():
+    # The full port: no entry opens a whiptail routine any more.
+    from kei_panel import routines
+    left = [e.action for s in SECTIONS for e in s.entries if e.kind != "native" or not routines.has(e.action)]
+    assert not left, f"not ported: {left}"
 
 
 def test_existing_labels_are_installer_texts():
