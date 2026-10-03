@@ -24335,8 +24335,12 @@ lt_aia_changes() {
 #   @@note TEXT              a progress line (display_explanation)
 #   @@title TEXT             the routine's heading (tui_title)
 #   @@msg KIND TITLE<TAB>TEXT  the box it would show: ok, info or error
-#   @@ask TITLE<TAB>TEXT     a yes/no question: answered yes, the panel
-#                            asked it before starting
+#   @@ask TITLE<TAB>TEXT     a yes/no question: answered with
+#                            KEI_TASK_ANSWER (yes by default); the panel
+#                            first runs a routine with "no" to show its
+#                            preview and question, then again with "yes"
+#   @@preview TITLE<TAB>TEXT a text the routine would show in a scroll box
+#                            (a dry run's list of changes)
 #   @@result KEY=VALUE       a value for the panel's result screen
 # New lines inside a text travel as "\n". Only the routines listed in
 # kei_task are reachable; the panel's own lock is not taken (the routines
@@ -24358,7 +24362,8 @@ kei_task_ui() {
     msg_info() { kei_emit msg "info ${1}"$'\t'"${2}"; }
     msg_ok() { kei_emit msg "ok $(t "OK")"$'\t'"${1}"; }
     msg_error() { kei_emit msg "error ${1:-$(t "Error")}"$'\t'"${2}"; }
-    prompt_yes_no() { kei_emit ask "${1:-}"$'\t'"${2:-}"; return 0; }
+    prompt_yes_no() { kei_emit ask "${1:-}"$'\t'"${2:-}"; [ "${KEI_TASK_ANSWER:-yes}" = "yes" ]; }
+    ui_textbox() { kei_emit preview "${1:-}"$'\t'"$(head -c 200000 "$2" 2>/dev/null)"; }
     display_explanation() { kei_emit note "$(t "$1")"; }
     tui_title() { kei_emit title "$2"; }
     pause_terminal() { :; }
@@ -24491,6 +24496,13 @@ kei_task() {
             require_database || return 1
             rclone_prepare || return 1
             validate_and_register_rclone "${1:-}" ;;
+        db-maintenance)  function_deep_maintenance ;;
+        reports-install)
+            require_database || return 1
+            tools_locked _lt_reports_install reports_define "$REPORTS_TAG" "$(t "Essential reports pack")" REPORTS ;;
+        reports-remove)
+            require_database || return 1
+            tools_locked _lt_reports_remove "$REPORTS_TAG" "$(t "Essential reports pack")" REPORTS ;;
         *)
             kei_emit msg "error $(t "Error")"$'\t'"$(t "Unknown panel action:") $name"
             return 2 ;;
@@ -24592,6 +24604,7 @@ panel_action_function() {
         interoperability)   echo function_interoperability ;;
         clock)              echo function_configure_clock ;;
         library-tools)      echo function_library_tools ;;
+        reports)            echo lt_reports ;;
         marc-replace)       echo function_marc_replace ;;
         ai-assistant)       echo function_ai_assistant ;;
         monitor)            echo function_run_monitor ;;

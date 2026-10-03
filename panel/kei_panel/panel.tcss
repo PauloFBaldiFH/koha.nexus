@@ -260,6 +260,7 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 .dialog.-ok { border: round $success; }
 .dialog.-wide { width: 96; max-height: 90%; }
 .dialog-scroll { height: auto; max-height: 24; }
+.dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
 .dialog-note { color: $text-muted; }
 .dialog-prompt { padding-top: 1; text-style: bold; }

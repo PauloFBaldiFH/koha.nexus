@@ -57,6 +57,8 @@ class TaskOutcome:
     results: dict[str, str] = field(default_factory=dict)
     lists: dict[str, list[str]] = field(default_factory=dict)
     steps: list[tuple[str, int | None]] = field(default_factory=list)
+    asks: list[tuple[str, str]] = field(default_factory=list)
+    previews: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -114,7 +116,11 @@ class TaskOutcome:
             log(f"[{title}] {text}")
         elif tag == "ask":
             title, _, text = rest.partition("\t")
+            self.asks.append((title, unescape(text)))
             log(f"[{title}] {unescape(text)}")
+        elif tag == "preview":
+            title, _, text = rest.partition("\t")
+            self.previews.append((title, unescape(text)))
         elif tag == "result":
             key, _, value = rest.partition("=")
             value = unescape(value)
@@ -225,7 +231,7 @@ class Bridge:
         out = TaskOutcome(total_steps=total_steps)
         if self.env.demo:
             from .demo import demo_task
-            return await demo_task(out, name, args, reporter, on_result)
+            return await demo_task(out, name, args, reporter, on_result, env or {})
         out.rc = await self.stream(self._argv("--task", name, *args), reporter,
                                    on_line=lambda line: out.feed(line, reporter, on_result), env=env)
         return out

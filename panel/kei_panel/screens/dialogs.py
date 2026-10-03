@@ -18,13 +18,21 @@ from ..tasks import TaskResult
 class ConfirmScreen(ModalScreen[bool]):
     BINDINGS = [Binding("escape", "no", t("No")), Binding("y", "yes", t("Yes"))]
 
-    def __init__(self, title: str, question: str, danger: bool = False):
+    def __init__(self, title: str, question: str, danger: bool = False, preview: str = "",
+                 preview_title: str = ""):
         super().__init__()
         self._title, self._question, self._danger = title, question, danger
+        self._preview, self._preview_title = preview, preview_title
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog -error" if self._danger else "dialog"):
+        classes = "dialog -error" if self._danger else "dialog"
+        with Vertical(classes=classes + (" -wide" if self._preview else "")):
             yield Label(self._title, classes="dialog-title")
+            if self._preview:
+                if self._preview_title:
+                    yield Label(self._preview_title, classes="dialog-prompt")
+                with VerticalScroll(classes="dialog-scroll dialog-preview"):
+                    yield Static(self._preview.strip("\n"), markup=False)
             yield Static(self._question, classes="dialog-body", markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("Yes"), id="yes", variant="error" if self._danger else "primary")

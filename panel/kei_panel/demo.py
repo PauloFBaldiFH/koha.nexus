@@ -66,13 +66,33 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@msg ok OK\tCloud enabled and tested successfully.",
     ],
     "cloud-remotes": ["@@result remote=gdrive", "@@result remote=onedrive"],
+    "db-maintenance": [
+        "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
+        "@@title Deep maintenance",
+        "@@step Optimizing the database", "@@done 0 Optimizing the database",
+        "@@step Cleaning system logs", "@@done 0 Cleaning system logs",
+        "@@step Restarting Koha services", "@@done 0 Restarting Koha services",
+        "@@msg ok OK\tMaintenance completed successfully!",
+    ],
+    "reports-install": [
+        "@@preview Preview (dry run)\t● Overdue loans with patron contacts — new\\n● Lost items — update",
+        "@@ask Essential reports pack\tNew reports: 1\\nReports to update: 1\\n\\nInstall them now?",
+        "@@note Generating the backup...",
+        "@@msg ok OK\t✅ Reports installed: 2",
+    ],
+    "reports-remove": [
+        "@@preview Preview (dry run)\t● Overdue loans with patron contacts\\n● Lost items",
+        "@@ask Essential reports pack\tRemove the 2 report(s) of the pack?",
+        "@@note Generating the backup...",
+        "@@msg ok OK\t✅ Reports removed: 2",
+    ],
     "cloud-remote": ["@@note Testing the real cloud upload...",
                      "@@msg ok OK\tCloud enabled and tested successfully."],
 }
 
 
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
-                    on_result: Callable[[str, str], None] | None) -> "TaskOutcome":
+                    on_result: Callable[[str, str], None] | None, env: dict[str, str]) -> "TaskOutcome":
     lines = _SCRIPTS.get(name)
     if lines is None:
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
@@ -80,6 +100,9 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("info", "cloud-remotes") else 0.15
     for line in lines:
+        # KEI_TASK_ANSWER=no: the routine stops at its question, as in bash.
+        if env.get("KEI_TASK_ANSWER") == "no" and out.asks:
+            break
         out.feed(line.replace("{0}", args[0] if args else _HOME), reporter, on_result)
         if pause:
             await asyncio.sleep(pause)

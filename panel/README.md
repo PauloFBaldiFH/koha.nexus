@@ -91,8 +91,8 @@ The classic panel stays the default until every section is ported:
 | Phase | Section | State |
 | --- | --- | --- |
 | 1 | Backup center (manual backup, integrity test, cloud backup) and Restore | done |
-| 2 | Database tables and maintenance (optimization, SQL reports pack) | next |
-| 3 | Install Koha server, first-access credentials | |
+| 2 | Database tables and maintenance (optimization, SQL reports pack) | done |
+| 3 | Install Koha server, first-access credentials | next |
 | 4 | Diagnostics (status, health check, validation report, services, Apache log) | |
 | 5 | Search engine and indexing | |
 | 6 | Security center | |

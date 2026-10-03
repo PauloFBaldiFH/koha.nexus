@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup
+from . import backup, database
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -22,6 +22,8 @@ ROUTINES: dict[str, Routine] = {
     "backup-test": backup.test_backup,
     "backup-cloud": backup.cloud_backup,
     "restore": backup.restore,
+    "db-maintenance": database.deep_maintenance,
+    "reports": database.reports_pack,
 }
 
 
