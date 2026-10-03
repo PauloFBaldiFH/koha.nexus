@@ -65,7 +65,7 @@ Button.small {
 }
 .status-card {
     height: auto;
-    min-height: 6;
+    min-height: 5;
     border: round $panel-lighten-2;
     padding: 0 1;
     background: $surface;
@@ -266,7 +266,8 @@ LoadingScreen {
 }
 
 /* ---- dialogs ------------------------------------------------------- */
-ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen {
+ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
+TextScreen, ChecklistScreen, CredentialsScreen, EditScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -274,6 +275,7 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
     width: 70;
     max-width: 95%;
     height: auto;
+    max-height: 95%;
     border: round $primary;
     background: $surface;
     padding: 1 2;
@@ -281,6 +283,7 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 .dialog.-error { border: round $error; }
 .dialog.-ok { border: round $success; }
 .dialog.-wide { width: 96; max-height: 90%; }
+/* On a short terminal FitsScreen (screens/dialogs.py) lowers these. */
 .dialog-scroll { height: auto; max-height: 24; }
 .dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
@@ -323,12 +326,13 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 }
 .dialog-title { text-style: bold; padding-bottom: 1; }
 .dialog-body { padding-bottom: 1; }
-.dialog-log { height: 12; border: round $panel-lighten-2; }
+.dialog-log { height: 12; max-height: 30vh; min-height: 4; border: round $panel-lighten-2; }
 .dialog.-log { height: 90%; }
-.dialog-log.-tall { height: 1fr; min-height: 12; }
+.dialog-log.-inner { height: 10; max-height: 10; }
+.dialog-log.-tall { height: 1fr; max-height: 100%; min-height: 4; }
 .dialog-editor { height: 1fr; min-height: 10; }
-.dialog-buttons { height: auto; align-horizontal: right; padding-top: 1; }
-.dialog-buttons Button { margin-left: 2; }
+.dialog-buttons { height: auto; min-height: 4; align-horizontal: right; padding-top: 1; }
+.dialog-buttons Button { margin-left: 2; min-width: 12; height: 3; }
 
 /* ---- narrow terminals (80 columns over SSH) ----------------------- */
 .-narrow .status-grid, .-narrow .card-grid { grid-size: 2; }

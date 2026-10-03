@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.1"
+PANEL_VERSION=" 1.5.2"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -8311,7 +8311,7 @@ kei_status_json() {
     local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false
     local b_epoch b_size b_result b_file df_line d_total d_free mem_total mem_avail
     local r_epoch r_state r_finished r_db r_backup r_index
-    for svc in apache2 mariadb memcached koha-common cron elasticsearch cloudflared; do
+    for svc in apache2 mariadb memcached rabbitmq-server koha-common cron elasticsearch cloudflared; do
         state=$(systemctl is-active "$svc" 2>/dev/null | head -n1)
         [ -n "$state" ] || state="unknown"
         case "$svc" in apache2) apache="$state" ;; mariadb) db="$state" ;; koha-common) koha="$state" ;; esac
@@ -8400,7 +8400,7 @@ kei_export_diagnostics() {
     kei_diag_cmd "$out/system.txt" ss -tlnp
     kei_diag_cmd "$out/system.txt" systemctl --failed --no-pager
     kei_diag_cmd "$out/system.txt" dpkg-query -W koha-common mariadb-server apache2 elasticsearch cloudflared rclone
-    for svc in apache2 mariadb memcached koha-common cron elasticsearch cloudflared; do
+    for svc in apache2 mariadb memcached rabbitmq-server koha-common cron elasticsearch cloudflared; do
         kei_diag_cmd "$out/services.txt" systemctl status "$svc" --no-pager -n 30
     done
     kei_diag_cmd "$out/services.txt" journalctl -p err -b --no-pager -n 300
@@ -14272,7 +14272,7 @@ sub render_settings {
         . '<label for="provider">' . h( $T{s_provider} ) . '</label>'
         . $sel->( 'provider', $c->{provider}, map { [ $_, $T{"p_$_"} // $_ ] } @KohaEasy::Cataloguing::Vision::PROVIDERS )
         . '<label for="url">' . h( $T{s_url} ) . '</label>' . $text->( 'url', $c->{url}, 'text', $d->{url} )
-        . '<p class="hint">Ollama: http://localhost:11434 &middot; LM Studio: http://localhost:1234/v1 &middot; Gemini: https://generativelanguage.googleapis.com/v1beta/openai</p>'
+        . '<p class="hint">Ollama: http://127.0.0.1:11434 &middot; LM Studio: http://localhost:1234/v1 &middot; Gemini: https://generativelanguage.googleapis.com/v1beta/openai</p>'
         . '<label for="model">' . h( $T{s_model} ) . '</label>' . $text->( 'model', $c->{model}, 'text', $d->{model} )
         . '<label for="token">' . h( $T{s_token} ) . '</label>'
         . '<input type="password" id="token" name="token" value="" autocomplete="new-password">'
@@ -14368,7 +14368,7 @@ package KohaEasy::Cataloguing::Vision;
 #   gemini      Google Gemini API, through its OpenAI-compatible endpoint
 #               (https://generativelanguage.googleapis.com/v1beta/openai),
 #               with an API key from Google AI Studio
-#   ollama      Ollama native API, local (http://localhost:11434)
+#   ollama      Ollama native API, local (http://127.0.0.1:11434)
 #   compatible  any OpenAI-compatible server: LM Studio, vLLM, llama.cpp,
 #               LocalAI, OpenRouter... (http://localhost:1234/v1)
 #
@@ -14391,7 +14391,7 @@ our %DEFAULTS = (
     openai     => { url => 'https://api.openai.com/v1', model => 'gpt-4.1-mini' },
     anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5' },
     gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-2.5-flash' },
-    ollama     => { url => 'http://localhost:11434',    model => 'qwen2.5vl:7b' },
+    ollama     => { url => 'http://127.0.0.1:11434',    model => 'qwen2.5vl:7b' },
     compatible => { url => 'http://localhost:1234/v1',  model => '' },
 );
 our @PROVIDERS = qw( openai anthropic gemini ollama compatible );
@@ -14490,7 +14490,9 @@ sub _base {
     my $u = $c->{url};
     $u =~ s{/+$}{};
     if ( $c->{provider} eq 'anthropic' ) { $u =~ s{/v1$}{}; return $u }
-    if ( $c->{provider} eq 'ollama' )    { $u =~ s{/(api|v1)$}{}; return $u }
+    # Ollama listens on 127.0.0.1 only; "localhost" may try IPv6 (::1) first,
+    # which hangs instead of failing on some WSL2 set-ups.
+    if ( $c->{provider} eq 'ollama' )    { $u =~ s{/(api|v1)$}{}; $u =~ s{^(https?://)localhost(?=[:/]|$)}{${1}127.0.0.1}; return $u }
     if ( $c->{provider} eq 'gemini' ) {    # the OpenAI-compatible endpoint of the Gemini API
         $u .= '/v1beta/openai' if $u =~ m{^https?://[^/]+$};
         $u .= '/openai'        if $u =~ m{/v1(beta)?$};
@@ -22883,7 +22885,7 @@ our %DEFAULTS = (
     openai     => { url => 'https://api.openai.com/v1', model => 'gpt-4.1-mini' },
     anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5' },
     gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-2.5-flash' },
-    ollama     => { url => 'http://localhost:11434',    model => 'qwen2.5vl:7b' },
+    ollama     => { url => 'http://127.0.0.1:11434',    model => 'qwen2.5vl:7b' },
     compatible => { url => 'http://localhost:1234/v1',  model => '' },
 );
 
@@ -22932,7 +22934,7 @@ sub _base {
     my $host_only = ( $u =~ tr{/}{} ) == 2;
     my $p = $c->{provider};
     if ( $p eq 'anthropic' ) { $u =~ s{/v1$}{}; return $u }
-    if ( $p eq 'ollama' ) { $u =~ s{/(api|v1)$}{}; return $u }
+    if ( $p eq 'ollama' ) { $u =~ s{/(api|v1)$}{}; $u =~ s{^(https?://)localhost(?=[:/]|$)}{${1}127.0.0.1}; return $u }    # IPv4: see Vision.pm
     if ( $p eq 'gemini' ) {
         return "$u/v1beta/openai" if $host_only;
         return "$u/openai" if $u =~ m{/v1(beta)?$};
@@ -24062,7 +24064,7 @@ sub widget_js {
         q = $.trim(q || "");
         if (!q || busy) return;
         add({ role: "user", text: q });
-        box.find("textarea").val("");
+        box.find("textarea").val("").css("height", "");
         loading(true, T.thinking);
         post("cud-ask", { question: q }, function (r) { if (r.entry) add(r.entry); box.find("textarea").trigger("focus"); });
     }
@@ -24088,13 +24090,16 @@ sub widget_js {
     pac.appendChild(dots); pac.appendChild(el("span", "kei-ai-status"));
     box.append(pac);
     var form = el("form", "kei-ai-form");
-    var ta = el("textarea"); ta.rows = 2; ta.placeholder = T.placeholder; ta.setAttribute("aria-label", T.placeholder);
+    var ta = el("textarea"); ta.rows = 1; ta.placeholder = T.placeholder; ta.setAttribute("aria-label", T.placeholder);
     var send = el("button", "btn btn-primary kei-ai-send", T.send); send.type = "submit";
     form.appendChild(ta); form.appendChild(send);
     box.append(form);
 
     $(form).on("submit", function (e) { e.preventDefault(); ask(ta.value); });
     $(ta).on("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(ta.value); } });
+    // One line, growing with the text (Shift+Enter) up to about six lines.
+    function fit() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 2, 150) + "px"; }
+    $(ta).on("input", fit);
     $(wide).on("click", function () { box.toggleClass("kei-ai-wide"); $(wide).find("i").toggleClass("fa-expand fa-compress"); });
     $(document).on("keydown", function (e) { if (e.key === "Escape" && box.hasClass("kei-ai-wide")) $(wide).trigger("click"); });
     $(reset).on("click", function () { post("cud-reset", {}, function () { box.find(".kei-ai-log").empty(); greet(); }); });
@@ -24129,7 +24134,7 @@ sub widget_css {
 #kei-ai .kei-ai-icon { background: none; border: 0; color: #5c6670; padding: 2px 6px; border-radius: 4px; }
 #kei-ai .kei-ai-icon:hover, #kei-ai .kei-ai-icon:focus { background: #eef1f4; color: #222; }
 #kei-ai .kei-ai-setup { display: none; background: #fff6e0; border: 1px solid #f0c36d; border-radius: 4px; padding: 6px 8px; margin-bottom: 8px; font-size: .92em; }
-#kei-ai .kei-ai-log { height: 420px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+#kei-ai .kei-ai-log { flex: 1 1 auto; min-height: 120px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
 #kei-ai .kei-ai-msg { margin: 0 0 10px; }
 #kei-ai .kei-ai-who { font-size: .78em; text-transform: uppercase; letter-spacing: .04em; color: #6b7480; margin-bottom: 2px; }
 #kei-ai .kei-ai-user .kei-ai-who { color: #7a4fb3; }
@@ -24161,11 +24166,12 @@ sub widget_css {
 #kei-ai .kei-ai-dots i:nth-child(6) { animation-delay: 1s; }
 @keyframes kei-ai-eat { 0%, 15% { opacity: 0; } 30%, 100% { opacity: 1; } }
 #kei-ai .kei-ai-form { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
-#kei-ai .kei-ai-form textarea { flex: 1; font: inherit; resize: vertical; min-height: 38px; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
+#kei-ai .kei-ai-form textarea { flex: 1; box-sizing: border-box; font: inherit; line-height: 1.4; resize: none; height: 36px; min-height: 36px; max-height: 150px; overflow-y: auto; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
+#kei-ai .kei-ai-form .kei-ai-send { flex: none; box-sizing: border-box; height: 36px; padding: 0 16px; }
 #kei-ai .kei-ai-form textarea:focus { border-color: #0b62d6; outline: 2px solid #c9dcfa; }
 #kei-ai.kei-ai-wide { position: fixed; z-index: 1050; top: 70px; left: 50%; transform: translateX(-50%); width: min(820px, 96vw);
-    max-height: calc(100vh - 90px); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
-#kei-ai.kei-ai-wide .kei-ai-log { height: calc(100vh - 330px); max-height: none; }
+    height: calc(100vh - 90px); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
+#kei-ai.kei-ai-wide .kei-ai-log { min-height: 0; max-height: none; }
 KEICSS
 }
 AIAPL2
@@ -24409,6 +24415,41 @@ _lt_aia_install() {
     [ "$updating" = "1" ] && plack_restart
     log "ai_assistant: installed (account $AIA_RO_USER)"
     msg_ok "$(t '✅ The assistant is on the home page of the staff interface (reload the page).\n\nIt answers with the AI provider of AI cataloguing > AI settings.')" 11 76
+}
+
+# An assistant installed by an older panel: its page and module are brought
+# up to this version when the panel starts (look and fixes of the chat), with
+# no questions. Only when they differ, and only after they compile with this
+# Koha. The IntranetUserJS block is left to "Install or update the
+# assistant", which takes a verified backup first.
+aia_refresh() {
+    aia_installed || return 0
+    local work log
+    work=$(mktemp -d /tmp/koha_aia.XXXXXX) || return 0
+    mkdir -p "$work/lib/KohaEasy"
+    aia_pm > "$work/lib/KohaEasy/Assistant.pm"
+    ai_assistant_script > "$work/ai_assistant.pl"
+    if cmp -s "$work/ai_assistant.pl" "$AIA_FILE" && cmp -s "$work/lib/KohaEasy/Assistant.pm" "$AIA_PM_DIR/Assistant.pm"; then
+        rm -rf "$work"
+        return 0
+    fi
+    printf '%s\n' "$(t "Updating the AI assistant of the staff home page...")"
+    chmod 755 "$work" "$work/lib" "$work/lib/KohaEasy"
+    chmod 644 "$work/ai_assistant.pl" "$work/lib/KohaEasy/Assistant.pm"
+    log=$(tools_log ai-assistant-refresh)
+    if koha_exec "$log" perl-check /usr/bin/perl -c "$work/lib/KohaEasy/Assistant.pm" \
+       && koha_exec "$log" perl-check /usr/bin/perl -I"$work/lib" -c "$work/ai_assistant.pl" \
+       && install -o root -g root -m 644 "$work/lib/KohaEasy/Assistant.pm" "$AIA_PM_DIR/Assistant.pm.new" \
+       && mv -f "$AIA_PM_DIR/Assistant.pm.new" "$AIA_PM_DIR/Assistant.pm" \
+       && install -o root -g root -m 755 "$work/ai_assistant.pl" "${AIA_FILE}.new" \
+       && mv -f "${AIA_FILE}.new" "$AIA_FILE"; then
+        plack_restart
+        log "ai_assistant: refreshed to panel ${PANEL_VERSION# }"
+    else
+        log "ai_assistant: refresh skipped (see $log)"
+    fi
+    rm -rf "$work"
+    return 0
 }
 
 lt_aia_remove() {
@@ -24807,14 +24848,44 @@ kei_task_cloud_authorize() {
 
 # Ollama, the local AI of the cataloguing tools: its official script sets
 # up the "ollama" service on 127.0.0.1:11434.
-ollama_install_task() {
-    curl -fsSL https://ollama.com/install.sh | sh || return 1
-    systemctl enable --now ollama >/dev/null 2>&1 || true
+# 0 when Ollama answers on its local port (IPv4: it listens on 127.0.0.1).
+ollama_answers() {
+    curl -fsS --noproxy '*' --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1
+}
+
+# ollama_wait SECONDS: 0 as soon as Ollama answers.
+ollama_wait() {
     local i
-    for i in $(seq 1 20); do
-        curl -fsS --noproxy '*' --max-time 2 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && return 0
+    for i in $(seq 1 "$1"); do
+        ollama_answers && return 0
         sleep 1
     done
+    return 1
+}
+
+ollama_install_task() {
+    if ! command -v ollama >/dev/null 2>&1; then
+        # The install script unpacks a .tar.zst: without zstd it stops at once.
+        apt_install curl ca-certificates zstd || return 1
+        curl -fsSL https://ollama.com/install.sh | sh || return 1
+    fi
+    printf '>>> %s\n' "Starting the Ollama service"
+    systemctl enable ollama >/dev/null 2>&1 || true
+    systemctl restart ollama >/dev/null 2>&1 || true
+    ollama_wait 20 && return 0
+    # No service, or it does not come up (some WSL2 set-ups): started by
+    # hand in the background, kept up by cron after a restart.
+    printf '>>> %s\n' "The service did not answer: starting 'ollama serve' in the background"
+    systemctl stop ollama >/dev/null 2>&1 || true
+    pgrep -x ollama >/dev/null 2>&1 \
+        || OLLAMA_HOST=127.0.0.1:11434 setsid nohup ollama serve >> "${LOG_DIR}/ollama.log" 2>&1 < /dev/null &
+    if ollama_wait 30; then
+        printf '@reboot root OLLAMA_HOST=127.0.0.1:11434 %s serve >> %s 2>&1\n' \
+            "$(command -v ollama)" "${LOG_DIR}/ollama.log" > /etc/cron.d/koha-easy-ollama
+        chmod 644 /etc/cron.d/koha-easy-ollama
+        return 0
+    fi
+    printf '%s\n' "Ollama does not answer on http://127.0.0.1:11434 (log: ${LOG_DIR}/ollama.log)"
     return 1
 }
 
@@ -24974,18 +25045,18 @@ kei_task() {
                           function_koha_plugins|function_cutter) require_koha || return 1 ;; esac
             "$fn" ;;
         ollama-install)
-            # Ollama's own install script (AI cataloguing > Local Ollama).
+            # Ollama's own install script (AI cataloguing > Local Ollama),
+            # or only a start when it is installed but not answering.
             require_systemd || return 1
-            if command -v ollama >/dev/null 2>&1 && systemctl is-active --quiet ollama 2>/dev/null; then
+            if command -v ollama >/dev/null 2>&1 && ollama_answers; then
                 msg_ok "$(t "Ollama is already installed and running.")"
                 return 0
             fi
-            command -v curl >/dev/null 2>&1 || apt_install curl >/dev/null 2>&1
             if ! TUI_LOG="$APT_LOG" tui_run "$(t "Installing Ollama")" ollama_install_task; then
                 tui_fail_card "$(t "Installing Ollama")" "$APT_LOG"
                 return 1
             fi
-            msg_ok "$(t "Ollama is already installed and running.")" ;;
+            msg_ok "$(t "Ollama is installed and running.")" ;;
         tool-install)
             # A terminal program the panel then opens itself (htop, links, mc).
             case "${1:-}" in
@@ -25051,6 +25122,8 @@ is_koha_installed && upgrade_cron_tasks
 is_koha_installed && install_data_safety
 # Catalogue card enabled (Library tools > Brazil): stylesheets for new languages.
 is_koha_installed && ficha_refresh
+# AI assistant installed by an older panel: same page as this version.
+is_koha_installed && aia_refresh
 
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO

@@ -431,10 +431,10 @@ def installer_tasks(installer) -> set[str]:
 # Demo data
 # ----------------------------------------------------------------------
 _DEMO_STATUS = {
-    "schema": 1, "panel_version": "1.4.0", "platform": "wsl", "state": "running",
+    "schema": 1, "panel_version": "1.4.0", "platform": "wsl", "state": "ok",
     "koha_installed": True,
     "services": {"apache2": "active", "mariadb": "active", "memcached": "active",
-                 "koha-common": "active", "cron": "active", "elasticsearch": "inactive",
+                 "rabbitmq-server": "active", "koha-common": "active", "cron": "active", "elasticsearch": "inactive",
                  "cloudflared": "inactive"},
     "plack": True, "http": {"staff": 200, "opac": 200},
     "backup": {"last_file": "koha-library-20261002-0300.sql.gz", "last_epoch": 1790910000,

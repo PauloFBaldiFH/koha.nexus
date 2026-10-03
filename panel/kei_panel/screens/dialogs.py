@@ -15,7 +15,32 @@ from ..i18n import t
 from ..tasks import TaskResult
 
 
-class ConfirmScreen(ModalScreen[bool]):
+class FitsScreen:
+    """Keeps a dialog's buttons whole on a short terminal: its scrolling part
+    (long text, log, list of options) gets only the rows left over by the
+    title, the texts and the buttons, so it scrolls instead of pushing the
+    buttons off the dialog (a blank or cut "OK")."""
+
+    def on_mount(self) -> None:
+        self.call_after_refresh(self._fit)
+
+    def on_resize(self) -> None:
+        self.call_after_refresh(self._fit)
+
+    def _fit(self) -> None:
+        dialogs = list(self.query(".dialog"))
+        parts = list(self.query(".dialog-scroll, .dialog-options"))
+        if not dialogs or not parts or parts[0].parent is not dialogs[0]:
+            return
+        dialog, part = dialogs[0], parts[0]
+        others = sum(w.outer_size.height for w in dialog.children if w is not part and w.display)
+        room = int(self.size.height * 0.9) - dialog.styles.gutter.height - others \
+            - part.styles.gutter.height - part.styles.margin.height
+        cap = 24 if "dialog-scroll" in part.classes else 12
+        part.styles.max_height = max(3, min(cap, room)) + part.styles.gutter.height
+
+
+class ConfirmScreen(FitsScreen, ModalScreen[bool]):
     BINDINGS = [Binding("escape", "no", t("No")), Binding("y", "yes", t("Yes"))]
 
     def __init__(self, title: str, question: str, danger: bool = False, preview: str = "",
@@ -50,7 +75,7 @@ class ConfirmScreen(ModalScreen[bool]):
         self.dismiss(False)
 
 
-class ResultScreen(ModalScreen[None]):
+class ResultScreen(FitsScreen, ModalScreen[None]):
     """A failed task: what failed and the last lines of its output."""
 
     BINDINGS = [Binding("escape,enter", "close", t("OK"))]
@@ -63,9 +88,11 @@ class ResultScreen(ModalScreen[None]):
         r = self._result
         with Vertical(classes="dialog -error"):
             yield Label(self._title, classes="dialog-title")
-            yield Label(r.error or t("Cancelled"), classes="dialog-body")
-            log = RichLog(classes="dialog-log", wrap=True, markup=False)
-            yield log
+            # Text and log scroll together: on a short terminal they give
+            # way, never the OK button below them.
+            with VerticalScroll(classes="dialog-scroll"):
+                yield Label(r.error or t("Cancelled"), classes="dialog-body")
+                yield RichLog(classes="dialog-log -inner", wrap=True, markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
 
@@ -80,7 +107,7 @@ class ResultScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class ChoiceScreen(ModalScreen[str | None]):
+class ChoiceScreen(FitsScreen, ModalScreen[str | None]):
     """One of a few options (the whiptail --menu of a routine)."""
 
     BINDINGS = [Binding("escape", "back", t("Back"))]
@@ -117,7 +144,7 @@ class ChoiceScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class InputScreen(ModalScreen[str | None]):
+class InputScreen(FitsScreen, ModalScreen[str | None]):
     """Instructions and one value to type or paste (a token, a name)."""
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
@@ -159,7 +186,7 @@ class InputScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class MessageScreen(ModalScreen[None]):
+class MessageScreen(FitsScreen, ModalScreen[None]):
     """The end of a routine: what happened, its numbers, a command to copy
     and, when it went wrong, the last lines of its output."""
 
@@ -216,7 +243,7 @@ class MessageScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class CredentialsScreen(ModalScreen[None]):
+class CredentialsScreen(FitsScreen, ModalScreen[None]):
     """Addresses and passwords, grouped, each value on its own line with a
     Copy button (no border or label glued to what is copied)."""
 
@@ -265,7 +292,7 @@ class CredentialsScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class TextScreen(ModalScreen[None]):
+class TextScreen(FitsScreen, ModalScreen[None]):
     """A long text to read (a report), scrollable, with an OK button."""
 
     BINDINGS = [Binding("escape", "close", t("OK"))]
@@ -293,7 +320,7 @@ class TextScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class ChecklistScreen(ModalScreen[list[str] | None]):
+class ChecklistScreen(FitsScreen, ModalScreen[list[str] | None]):
     """Several options to tick (the whiptail --checklist of a routine)."""
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
