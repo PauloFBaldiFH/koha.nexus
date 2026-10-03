@@ -2,8 +2,8 @@
 
 The page itself (marc_replace.pl, with its "AI cataloguing" tab that reads
 vision.conf) is installed by the installer's function_marc_replace; the
-panel only tells whether it is there and opens that routine:
-`config.sh --run marc-replace`. An installer older than that action only
+panel only tells whether it is there and opens that routine
+(`config.sh --task run marc-replace`, its menus as panel screens). An installer older than that action only
 knows `library-tools`, whose menu has the same entry (12).
 """
 

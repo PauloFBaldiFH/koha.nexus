@@ -40,8 +40,9 @@ _INSTALL = [line for n, stage, steps in _STAGES
             + [x for step in steps for x in (f"@@step {step}", f"@@done 0 {step}")]]
 
 _SCRIPTS: dict[str, list[str]] = {
+    "tool-install": ["@@result iface=eth0"],
     "info": [
-        "@@result real_user=root", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
+        "@@result real_user=root", "@@result timezone=America/Sao_Paulo", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
         "@@result dir_sql=/var/backups/koha_sql", "@@result koha_installed=yes",
         f"@@result newest={_NEWEST}", "@@result newest_date=2026-10-02 03:00",
         "@@result newest_size=46M", "@@result rclone=yes", "@@result rclone_remote=gdrive",
@@ -157,6 +158,24 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@result password=Xq7demoNewPassw0rd24ch", "@@result file=/root/koha_credentials.txt",
         "@@msg ok OK\tPassword rotated and Koha still responds.\\n\\nNew password: Xq7demoNewPassw0rd24ch"
         "\\n(/root/koha_credentials.txt)"],
+    "sizing": [
+        "@@choose Sizing\tDetected RAM: 7.7 GB\\nRecommended profile: 2\t2"
+        "\t1\t< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB\t2\t4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB"
+        "\t3\t8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB\t4\t16 GB+   - 6 Plack, 256MB cache, 2G InnoDB",
+        "@@note Applying profile 2...",
+        "@@msg ok OK\tProfile 2 applied.\\n\\nPlack: 3 workers\\nMemcached: 128 MB\\nMariaDB InnoDB: 768M"],
+    "email": ["@@msg info Email Setup\tE-mail is enabled for the instance (koha-email-enable)."],
+    "superlibrarian": [
+        "@@input Username\tUsername (login):\t\t", "@@input Card Number\tCard number:\t\t",
+        "@@input Password\tPassword (at least 8 characters):\t\tpassword",
+        "@@input Confirm Password\tType the password again:\t\tpassword",
+        "@@input First name\tFirst name:\tSuper\t", "@@input Surname\tSurname:\tAdmin\t",
+        "@@note Hashing the password...",
+        "@@msg ok OK\tSuper Librarian created successfully."],
+    "interoperability": [
+        "@@ask SIP2 & Z39.50\tEnable both and open the firewall ports?",
+        "@@msg ok OK\tZ39.50 and SIP2 were enabled successfully!"],
+    "clock": ["@@msg ok OK\tTimezone set to: Europe/Lisbon\\nCurrent time: 2026-10-03 17:00"],
     "db-maintenance": [
         "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
         "@@title Deep maintenance",
@@ -182,23 +201,71 @@ _SCRIPTS: dict[str, list[str]] = {
 }
 
 
+# `--task run ACTION`: the classic routines, their boxes asked by the panel.
+_RUN: dict[str, list[str]] = {
+    "cloudflare": [
+        "@@choose Cloudflare Tunnel Manager\tTunnel Status: ACTIVE\\n\\nWhat do you want to do?\t"
+        "\t1\t🆓  Free Address (no domain needed)\t5\t🔁  Restart Tunnel Service",
+        "@@note Restarting Cloudflare Tunnel...",
+        "@@say ok OK\tService restarted successfully.",
+        "@@choose Cloudflare Tunnel Manager\tTunnel Status: ACTIVE\\n\\nWhat do you want to do?\t"
+        "\t1\t🆓  Free Address (no domain needed)\t5\t🔁  Restart Tunnel Service"],
+    "crons": [
+        "@@choose Schedules & Scheduled Tasks\tThe Cron service runs routine maintenance and backup jobs.\t"
+        "\t2\t📋 View active tasks and schedules\t4\t📝 Edit schedules manually (Advanced - nano)",
+        "@@edit Active Tasks in /etc/cron.d/koha_tasks\t{tmp}/koha_tasks\tChange only the NUMBERS.",
+        "@@say ok OK\tSchedules updated successfully."],
+    "brazil": [
+        "@@check Pimaco label templates\tChoose the templates:\t6180\tPimaco 6180\tON\t6181\tPimaco 6181\tOFF",
+        "@@say ok OK\tTemplates installed."],
+    "magic-import": [
+        "@@file file\tFile Explorer\tPick the file to import:\t{0}\t*",
+        "@@step Reading the file", "@@done 0 Reading the file",
+        "@@say ok OK\t120 records imported."],
+    "about": ["@@view About\tkoha.nexus\\n\\nCreated with dedication by Paulo F. Baldi FH."],
+    "reboot": ["@@ask Reboot\tReboot the server now?", "@@say info Reboot\tRebooting in 5 seconds..."],
+    "languages": [
+        "@@choose Koha & Panel Languages\tChoose the language:\tpt-BR\ten\tEnglish\tpt-BR\tPortuguês (Brasil)",
+        "@@result panel_lang=en", "@@say ok OK\tLanguage 'en' enabled successfully."],
+}
+_RUN_DEFAULT = ["@@step Working", "@@done 0 Working", "@@say ok OK\tDone (demo)."]
+
+
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
-    lines = _SCRIPTS.get(name)
+    if name == "run":
+        lines = [ln.replace("{tmp}", _demo_tmp()) for ln in _RUN.get(args[0] if args else "", _RUN_DEFAULT)]
+        args = ()
+    else:
+        lines = _SCRIPTS.get(name)
     if lines is None:
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2
         return out
-    pause = 0.0 if name in ("info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
+    pause = 0.0 if name in ("tool-install", "info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
     for line in lines:
         # KEI_TASK_ANSWER=no: the routine stops at its question, as in bash.
         if env.get("KEI_TASK_ANSWER") == "no" and out.asks:
             break
         out.feed(line.replace("{0}", args[0] if args else _HOME), reporter, on_result)
-        # Interactive: a "no" ends the routine (its usual `|| return 0`).
-        if ask and line.startswith("@@ask ") and not await ask(out, *out.asks[-1]):
-            break
+        # Interactive: a "no" or a cancel ends the routine (its usual `|| return 0`).
+        from .bridge import _PROMPTS, answer_prompt
+        if ask and line.startswith(_PROMPTS):
+            if await answer_prompt(out, line, ask) in ("no", "cancel"):
+                break
         if pause:
             await asyncio.sleep(pause)
     return out
+
+
+def _demo_tmp() -> str:
+    """A scratch folder for the demo's editable file (the schedules)."""
+    import tempfile
+    from pathlib import Path
+    folder = Path(tempfile.gettempdir()) / "kei-panel-demo"
+    folder.mkdir(exist_ok=True)
+    tasks = folder / "koha_tasks"
+    if not tasks.exists():
+        tasks.write_text("PATH=/usr/sbin:/usr/bin:/sbin:/bin\n0 23 * * * root /root/backup_sql.sh\n")
+    return str(folder)

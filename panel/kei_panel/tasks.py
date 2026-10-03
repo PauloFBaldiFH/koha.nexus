@@ -78,6 +78,10 @@ class Reporter:
         """A text the person must read while the task runs (a link to open)."""
         self._call(self._screen.set_notice, text)
 
+    def cancellable(self, on: bool) -> None:
+        """Shows or hides the loader's Cancel button while the task runs."""
+        self._call(self._screen.set_cancellable, on)
+
     def progress(self, current: float, total: float) -> None:
         """Switches Pac-Man to determinate mode (current of total)."""
         self._call(self._screen.set_progress, current / total if total else None)

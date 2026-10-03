@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, OptionList, RichLog, Static
+from textual.widgets import Button, Input, Label, OptionList, RichLog, SelectionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from ..i18n import t
@@ -85,9 +85,11 @@ class ChoiceScreen(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "back", t("Back"))]
 
-    def __init__(self, title: str, prompt: str, options: list[tuple[str, str]], note: str = ""):
+    def __init__(self, title: str, prompt: str, options: list[tuple[str, str]], note: str = "",
+                 default: str = ""):
         super().__init__()
         self._title, self._prompt, self._options, self._note = title, prompt, options, note
+        self._default = default
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
@@ -100,7 +102,11 @@ class ChoiceScreen(ModalScreen[str | None]):
                 yield Button(t("Back"), id="back")
 
     def on_mount(self) -> None:
-        self.query_one(OptionList).focus()
+        options = self.query_one(OptionList)
+        keys = [key for key, _ in self._options]
+        if self._default in keys:
+            options.highlighted = keys.index(self._default)
+        options.focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         event.stop()
@@ -116,18 +122,20 @@ class InputScreen(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
 
-    def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False):
+    def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False,
+                 value: str = ""):
         super().__init__()
         self._title, self._instructions, self._prompt = title, instructions, prompt
-        self._validate, self._password = validate, password
+        self._validate, self._password, self._value = validate, password, value
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
             yield Label(self._title, classes="dialog-title")
-            with VerticalScroll(classes="dialog-scroll"):
-                yield Static(self._instructions, classes="dialog-body", markup=False)
+            if self._instructions:
+                with VerticalScroll(classes="dialog-scroll"):
+                    yield Static(self._instructions, classes="dialog-body", markup=False)
             yield Label(self._prompt, classes="dialog-prompt")
-            yield Input(password=self._password, id="value")
+            yield Input(self._value, password=self._password, id="value")
             yield Label("", id="input-error", classes="dialog-error")
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
@@ -283,3 +291,82 @@ class TextScreen(ModalScreen[None]):
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
         self.dismiss(None)
+
+
+class ChecklistScreen(ModalScreen[list[str] | None]):
+    """Several options to tick (the whiptail --checklist of a routine)."""
+
+    BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
+
+    def __init__(self, title: str, prompt: str, options: list[tuple[str, str, bool]]):
+        super().__init__()
+        self._title, self._prompt, self._options = title, prompt, options
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog -wide"):
+            yield Label(self._title, classes="dialog-title")
+            if self._prompt:
+                yield Static(self._prompt, classes="dialog-body", markup=False)
+            yield SelectionList[str](*[(label, key, on) for key, label, on in self._options],
+                                     classes="dialog-options")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("OK"), id="ok", variant="primary")
+                yield Button(t("Cancel"), id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one(SelectionList).focus()
+
+    @on(Button.Pressed, "#ok")
+    def _accept(self) -> None:
+        self.dismiss(list(self.query_one(SelectionList).selected))
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class EditScreen(ModalScreen[bool]):
+    """A text file to change by hand (the classic panel opens nano): Save
+    writes it back, Cancel leaves it as it was."""
+
+    BINDINGS = [Binding("escape", "cancel", t("Cancel")), Binding("ctrl+s", "save", t("Save"))]
+
+    def __init__(self, title: str, path: str, note: str = ""):
+        super().__init__()
+        self._title, self._path, self._note = title, path, note
+
+    def compose(self) -> ComposeResult:
+        try:
+            with open(self._path, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            text = ""
+        with Vertical(classes="dialog -wide -log"):
+            yield Label(self._title, classes="dialog-title")
+            if self._note:
+                yield Static(self._note, classes="dialog-note", markup=False)
+            yield TextArea(text, id="editor", classes="dialog-editor", show_line_numbers=True)
+            yield Label("", id="edit-error", classes="dialog-error")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("Save"), id="save", variant="primary")
+                yield Button(t("Cancel"), id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#editor").focus()
+
+    @on(Button.Pressed, "#save")
+    def action_save(self) -> None:
+        text = self.query_one("#editor", TextArea).text
+        if text and not text.endswith("\n"):
+            text += "\n"
+        try:
+            with open(self._path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+        except OSError as exc:
+            self.query_one("#edit-error", Label).update(f"{self._path}: {exc.strerror}")
+            return
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self) -> None:
+        self.dismiss(False)

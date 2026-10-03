@@ -356,7 +356,9 @@ class AIView(SectionView):
 
 def _marc_entry(bridge):
     from ..menus import Entry
-    return Entry("🔀  Replace a MARC record (staff tool)", marcreplace.action(bridge))
+    # Native: its menus are panel screens (an installer without tasks keeps
+    # the classic routine, see app.is_native).
+    return Entry("🔀  Replace a MARC record (staff tool)", marcreplace.action(bridge), kind="native")
 
 
 def _demo_wait(reporter: Reporter, seconds: float) -> None:

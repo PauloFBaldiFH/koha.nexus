@@ -39,14 +39,15 @@ def test_ok_needs_exit_zero_and_no_error_box():
 
 @pytest.mark.skipif(os.geteuid() != 0, reason="the installer runs as root")
 def test_installer_answers_in_the_protocol():
-    run = subprocess.run(["bash", str(INSTALLER), "--task", "info"], capture_output=True, text=True, timeout=60)
+    # The panel reads stdout and stderr as one stream (the protocol is on stderr).
+    both = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "text": True, "timeout": 60}
+    run = subprocess.run(["bash", str(INSTALLER), "--task", "info"], **both)
     out = TaskOutcome()
     for line in run.stdout.splitlines():
         out.feed(line)
     assert run.returncode == 0 and out.get("dir_sql") and out.get("server_ip")
-    bad = subprocess.run(["bash", str(INSTALLER), "--task", "no-such-task"], capture_output=True, text=True,
-                         timeout=60)
-    assert bad.returncode == 2 and bad.stdout.startswith("@@msg error")
+    bad = subprocess.run(["bash", str(INSTALLER), "--task", "no-such-task"], **both)
+    assert bad.returncode == 2 and "@@msg error" in bad.stdout
 
 
 def _app():
@@ -56,8 +57,11 @@ def _app():
 async def _wait_for(pilot, screen_type, tries=60):
     for _ in range(tries):
         await pilot.pause(0.1)
-        if isinstance(pilot.app.screen, screen_type):
-            return pilot.app.screen
+        screen = pilot.app.screen
+        # Mounted with its widgets (under load the screen comes before them).
+        if isinstance(screen, screen_type) and screen.is_mounted and screen.query("Button"):
+            await pilot.pause(0.05)
+            return screen
     raise AssertionError(f"{screen_type.__name__} never shown (on {type(pilot.app.screen).__name__})")
 
 
@@ -351,3 +355,64 @@ def test_fail2ban_shows_the_jails():
             app.run_native("fail2ban")
             return (await _wait_for(pilot, TextScreen))._text
     assert "203.0.113.7" in asyncio.run(main())
+
+
+def test_sizing_menu_highlights_the_recommended_profile():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("sizing")
+            menu = await _wait_for(pilot, ChoiceScreen)
+            await pilot.pause(0.2)
+            from textual.widgets import OptionList
+            highlighted = menu.query_one(OptionList).highlighted
+            menu.dismiss("3")
+            done = await _wait_for(pilot, MessageScreen)
+            return highlighted, done._kind
+    highlighted, kind = asyncio.run(main())
+    assert highlighted == 1 and kind == "ok"
+
+
+def test_superlibrarian_asks_each_field_and_hides_passwords():
+    async def main():
+        app = _app()
+        hidden = []
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("superlibrarian")
+            for value in ["ana", "123", "s3cretpass", "s3cretpass", "Ana", "Silva"]:
+                form = await _wait_for(pilot, InputScreen)
+                await pilot.pause(0.1)
+                hidden.append(form._password)
+                form.query_one("#value").value = value
+                form.query_one("#ok").press()
+                await pilot.pause(0.2)
+            done = await _wait_for(pilot, MessageScreen)
+            return hidden, done._kind
+    hidden, kind = asyncio.run(main())
+    assert hidden == [False, False, True, True, False, False] and kind == "ok"
+
+
+def test_backing_out_of_a_menu_shows_nothing():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("sizing")
+            menu = await _wait_for(pilot, ChoiceScreen)
+            menu.dismiss(None)
+            await pilot.pause(0.5)
+            return type(app.screen).__name__
+    assert asyncio.run(main()) not in ("MessageScreen", "LoadingScreen", "ChoiceScreen")
+
+
+def test_clock_offers_the_current_zone():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("clock")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            text = confirm._question
+            confirm.query_one("#yes").press()
+            done = await _wait_for(pilot, MessageScreen)
+            return text, done._kind
+    text, kind = asyncio.run(main())
+    assert "America/Sao_Paulo" in text and kind == "ok"

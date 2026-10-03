@@ -1,11 +1,11 @@
-# koha.nexus panel: Textual prototype
+# koha.nexus panel (Textual)
 
-A Textual front end for the bash panel (`../installer`). It is opt-in:
-`sudo KEI_UI=textual config.sh` opens it instead of the classic menu, which
-stays the default and the fallback (most routines still use the classic
-dialogs, so the new panel is not the default until they are ported).
+The Textual front end of the bash panel (`../installer`). `sudo config.sh`
+opens it; the classic whiptail panel is the fallback when it cannot start,
+and `sudo KEI_UI=whiptail config.sh` always opens the classic one. Every
+routine of the menu is a panel screen: no whiptail box is opened from it.
 
-## How config.sh starts it (with KEI_UI=textual)
+## How config.sh starts it
 
 1. The sources are installed under `/usr/local/lib/koha-easy-installer/panel`:
    copied from `panel/` next to the installer (a git clone, or the copy the
@@ -22,12 +22,11 @@ dialogs, so the new panel is not the default until they are ported).
 5. If the set-up fails (offline server, Python older than 3.9), the panel
    crashes, or it draws nothing within 60 s (`KEI_PANEL_START_TIMEOUT`), a box
    says why and the classic panel opens; it is tried again at the next
-   start with `KEI_UI=textual`.
+   start.
    Textual draws on stderr, so config.sh never redirects it: the app writes
    its own tracebacks to `/var/log/koha-easy-install/new-panel.log`.
 
-Without `KEI_UI=textual`, `sudo config.sh` opens the classic panel directly
-(`KEI_UI=whiptail` also picks whiptail over `dialog` for it).
+`KEI_UI=whiptail` (or `dialog`) opens the classic panel directly.
 
 ## Try it without Koha
 
@@ -39,7 +38,7 @@ python3 -m kei_panel --demo        # simulated installer: no root, no Koha
 ```
 
 Keys: arrows / Tab / Enter everywhere, `d` dashboard, `b` backup, `t` database
-tables, `a` AI cataloguing, `q` exit, `ctrl+p` command palette. Every card
+tables, `a` AI cataloguing, `l` library tools, `q` exit, `ctrl+p` command palette. Every card
 and button also takes mouse clicks, and lists scroll with the wheel.
 
 ## How it talks to bash
@@ -48,7 +47,8 @@ and button also takes mouse clicks, and lists scroll with the wheel.
 
 | Menu entry kind | What happens |
 | --- | --- |
-| interactive (most routines today) | Textual suspends; `config.sh --run <action>` gets the real terminal and asks its whiptail questions as it does now; Textual comes back when it ends |
+| native (every entry) | the routine runs as `config.sh --task NAME ARGS` behind the Pac-Man loader; its questions are the panel's own screens (see below) |
+| interactive (only with an installer older than the panel) | Textual suspends; `config.sh --run <action>` gets the real terminal and asks its whiptail questions; Textual comes back when it ends |
 | background (an installer verb exists: `--rebuild-search-index`, `--status-json`...) | the verb runs as an async subprocess in a worker, behind the Pac-Man loader, its output streamed to the loader's log |
 
 The installer's own `KEI_CLI_MODE` line says which verbs exist, so when a
@@ -91,24 +91,46 @@ Questions a routine asks halfway (`@@ask`) are answered in one of two ways:
 a dry run stops at its question), or `KEI_TASK_INTERACTIVE=1` makes the
 routine wait for each answer, which the panel asks in a confirm screen over
 the loader and writes to the routine's stdin (`ask=asker(app)` in
-`run_task`). Long installs announce their stages with `@@stage`.
+`run_task`). Menus and text boxes work the same way: routines call
+`ask_menu` / `ask_input` (answer in `REPLY`) or the tools' `ui_menu` /
+`ui_input` (answer printed), whiptail in the classic panel, which become
+`@@choose` / `@@input` lines answered with `ok VALUE` or `cancel`. Long
+installs announce their stages with `@@stage`.
 
-The classic panel stays the default until every section is ported:
+The rest of the menu (publishing, library tools, schedules, languages,
+updates, about, reboot) runs its classic routine unchanged with
+`config.sh --task run ACTION`: in a task every dialog helper becomes a
+protocol line the panel answers, so each box is a panel screen:
+
+| Line | Classic dialog | Panel screen | Answer |
+| --- | --- | --- | --- |
+| `@@say KIND TITLE<TAB>TEXT` | `msg_ok` / `msg_info` / `msg_error` | message box | `ok` once closed |
+| `@@view TITLE<TAB>TEXT` | `ui_textbox` | long text | `ok` |
+| `@@check TITLE<TAB>PROMPT<TAB>KEY<TAB>LABEL<TAB>ON...` | `ui_checklist` | check list | `ok K1<TAB>K2` or `cancel` |
+| `@@file file\|dir<TAB>TITLE<TAB>PROMPT<TAB>START<TAB>EXTS` | `select_file` / `select_directory` | file or folder picker | `ok PATH` or `cancel` |
+| `@@edit TITLE<TAB>PATH<TAB>NOTE` | `nano` (schedules) | text editor (Save / Cancel) | `ok` or `cancel` |
+| `@@cancel on\|off` | | the loader's Cancel button (while an authorization link waits) | |
+
+The protocol goes to stderr, which the panel reads with stdout, so a menu
+whose answer is captured with `$(...)` still reaches it. A routine step run
+by `tui_run` (output to its log) never waits for an answer.
 
 | Phase | Section | State |
 | --- | --- | --- |
+
 | 1 | Backup center (manual backup, integrity test, cloud backup) and Restore | done |
 | 2 | Database tables and maintenance (optimization, SQL reports pack) | done |
 | 3 | Install Koha server, first-access credentials | done |
 | 4 | Diagnostics (status, health check, validation report, services, Apache log) | done |
 | 5 | Search engine and indexing | done |
 | 6 | Security center | done |
-| 7 | Koha settings and parameters | next |
-| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
-| 9 | Schedules, languages, updates, library tools, about, reboot | |
+| 7 | Koha settings and parameters | done |
+| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | done |
+| 9 | Schedules, languages, updates, library tools, general tools, about, reboot | done |
 
-Full-screen programs of their own (rclone's wizard, htop, links, Midnight
-Commander) keep the terminal, as they would in any panel.
+Full-screen programs of their own (htop, nethogs, links, Midnight Commander)
+get the terminal after their choice and installation are made in the
+panel, as they would in any panel.
 
 ## Module 1: AI setup (`a`)
 
@@ -128,8 +150,8 @@ Commander) keep the terminal, as they would in any panel.
   endpoints as the staff interface's own test; **Save** (ctrl+s) refuses the
   same problems the Perl side does (bad URL, key over plain http, missing key).
 * **Next step: MARC Replace**: once a provider is saved, opens the
-  installer's MARC Replace routine (`config.sh --run marc-replace`, or
-  `library-tools` with an older installer) to install or manage the page
+  installer's MARC Replace routine (`config.sh --task run marc-replace`, its
+  menus as panel screens; `library-tools` with an older installer) to install or manage the page
   whose "AI cataloguing" tab uses this provider.
 
 Every network call above is a thread job behind the Pac-Man loader.
@@ -149,10 +171,12 @@ kei_panel/
   aiclient.py       connection test and local Ollama (version, models, pull), blocking
   marcreplace.py    is the MARC Replace page installed, which --run action opens it
   demo.py           simulated --task answers (demo mode, tests)
-  routines/         ported routines: backup, restore, cloud backup
+  routines/         every routine: backup, database, install, diagnostics,
+                    search, security, settings, tools (the generic runner)
   widgets/          PacmanLoader, StatusCard, ActionCard
   screens/          MainScreen, LoadingScreen, dialogs (confirm, choice, input,
-                    message), PathPickerScreen
+                    message, check list, editor, text), PathPickerScreen,
+                    LogTailScreen
   views/            dashboard, section (generic), backup, database, ai
   panel.tcss        all styling
 tests/              pytest, headless (no Koha needed)

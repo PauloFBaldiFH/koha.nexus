@@ -63,9 +63,9 @@ SECTIONS: tuple[Section, ...] = (
     # New screen (Module 1): AI provider setup for the cataloguing tabs of
     # the staff web UI; its MARC Replace hook opens the routine below.
     Section("ai", "🪄  AI cataloguing", "🪄  AI cataloguing", entries=(
-        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace"),
+        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         # Module 2: the chat on the Koha staff home page (in place of the news).
-        Entry("💬  AI assistant on the staff home page", "ai-assistant"),
+        Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
     ), view="ai", key="a"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
@@ -73,9 +73,9 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("publish", "🌐  Publish system to internet", "🌐 Publish System to Internet",
             "Choose a publishing method:", (
-        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare"),
-        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl"),
-        Entry("🔎  Google Search Console Assistant", "search-console"),
+        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
+        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
+        Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
     )),
     Section("diagnostics", "🩺  Diagnostics & maintenance center", "🩺 Diagnostics & Maintenance Center",
             "Choose a tool:", (
@@ -93,31 +93,48 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧱  Show active UFW rules", "ufw", kind="native"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
-        Entry("📏  Server sizing (memory / workers)", "sizing"),
-        Entry("📧  Configure email and circulation notices", "email"),
-        Entry("👑  Create super librarian", "superlibrarian"),
-        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability"),
-        Entry("🕒  Clock and timezone (NTP)", "clock"),
+        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
+        Entry("📧  Configure email and circulation notices", "email", kind="native"),
+        Entry("👑  Create super librarian", "superlibrarian", kind="native"),
+        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
+        Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
     )),
-    Section("library", "📚  Library tools", entries=(
-        Entry("📚  Library tools", "library-tools"),)),
+    Section("library", "📚  Library tools", "📚  Library tools",
+            "Changes are always previewed first and protected by a verified backup.", (
+        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),
+        Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
+        Entry("📋  Essential SQL reports pack", "reports", kind="native"),
+        Entry("🎓  School-year turnover (patron categories)", "patron-category", kind="native"),
+        Entry("🧪  Catalog data-quality check", "data-quality", kind="native"),
+        Entry("🎭  Privacy (LGPD): anonymise old history", "privacy-anonymise", kind="native"),
+        Entry("🚮  Privacy (LGPD): delete old patrons", "privacy-delete", kind="native"),
+        Entry("📜  View tool logs", "tool-logs", kind="native"),
+        Entry("🌎  Brazil: localization", "brazil", kind="native"),
+        Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
+        Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native"),
+        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
+        Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native"),
+        Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
+        Entry("🧮  Cutter Calculator", "cutter", kind="native"),
+        Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
+    ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
-        Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor"),
-        Entry("🌐  Terminal web browser (Links)", "links"),
-        Entry("📂  File explorer (Midnight Commander)", "mc"),
+        Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
+        Entry("🌐  Terminal web browser (Links)", "links", kind="native"),
+        Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
     )),
     Section("crons", "⏰  Schedules & cron tasks", entries=(
-        Entry("⏰  Schedules & cron tasks", "crons"),)),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),)),
     Section("languages", "🌍  Koha languages", entries=(
-        Entry("🌍  Koha languages", "languages"),)),
+        Entry("🌍  Koha languages", "languages", kind="native"),)),
     Section("update", "🔄  Update center", "🔄 Update Center", "Choose what to update:", (
-        Entry("🆙  Update OS packages & Koha schemas", "update-system"),
-        Entry("🆕  Update this panel via GitHub", "update-panel"),
+        Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
+        Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
     )),
     Section("about", "💡  About the program & support", entries=(
-        Entry("💡  About the program & support", "about"),)),
+        Entry("💡  About the program & support", "about", kind="native"),)),
     Section("reboot", "🔁  Reboot server", entries=(
-        Entry("🔁  Reboot server", "reboot"),)),
+        Entry("🔁  Reboot server", "reboot", kind="native"),)),
 )
 
 

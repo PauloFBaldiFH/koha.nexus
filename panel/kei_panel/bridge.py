@@ -37,8 +37,58 @@ if TYPE_CHECKING:
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
 
-# A question of an interactive routine: (outcome so far, title, text) -> yes?
-Asker = Callable[["TaskOutcome", str, str], Awaitable[bool]]
+# A question of an interactive routine: (outcome so far, kind, title, text,
+# extra) -> answer. kind "ask": yes/no (bool); "choose": extra is (default,
+# [(key, label)]), answer a key or None; "input": extra is (default,
+# password), answer the text or None (cancelled); "check": extra is
+# [(key, label, on)], answer the ticked keys or None; "file": extra is
+# (mode "file"|"dir", start folder, extensions), answer a path or None;
+# "edit": extra is the file's path (text is a note), answer True once saved;
+# "say": a box to close (extra is its kind: ok, info, error); "view": a long
+# text to read.
+Asker = Callable[["TaskOutcome", str, str, str, object], Awaitable[object]]
+
+_PROMPTS = ("@@ask ", "@@choose ", "@@input ", "@@say ", "@@view ", "@@check ", "@@file ", "@@edit ")
+
+
+async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
+    """The reply line a routine waits for after a prompt line."""
+    tag, _, rest = line[2:].partition(" ")
+    if tag == "ask":
+        title, text = out.asks[-1]
+        return "yes" if await ask(out, "ask", title, text, None) else "no"
+    if tag == "say":
+        kind, title, text = out.messages[-1]
+        await ask(out, "say", title, text, kind)
+        return "ok"
+    if tag == "view":
+        title, text = out.previews[-1]
+        await ask(out, "view", title, text, None)
+        return "ok"
+    parts = rest.split("\t")
+    if tag == "check":
+        title, text = (parts + ["", ""])[:2]
+        items = parts[2:]
+        options = [(items[i], items[i + 1], items[i + 2].upper() == "ON") for i in range(0, len(items) - 2, 3)]
+        keys = await ask(out, "check", title, unescape(text), options)
+        return "cancel" if keys is None else "ok " + "\t".join(keys)
+    if tag == "file":
+        mode, title, text, start, exts = (parts + ["", "", "", "", ""])[:5]
+        path = await ask(out, "file", title, unescape(text), (mode, start, exts.split()))
+        return f"ok {path}" if path else "cancel"
+    if tag == "edit":
+        title, path, note = (parts + ["", "", ""])[:3]
+        saved = await ask(out, "edit", title, unescape(note), path)
+        return "ok" if saved else "cancel"
+    title, text, default = (parts + ["", "", ""])[:3]
+    if tag == "choose":
+        items = parts[3:]
+        options = list(zip(items[::2], items[1::2]))
+        key = await ask(out, "choose", title, unescape(text), (default, options))
+        return f"ok {key}" if key else "cancel"
+    password = len(parts) > 3 and parts[3] == "password"
+    value = await ask(out, "input", title, unescape(text), (default, password))
+    return "cancel" if value is None else f"ok {value}"
 
 
 class BridgeError(RuntimeError):
@@ -63,6 +113,17 @@ class TaskOutcome:
     asks: list[tuple[str, str]] = field(default_factory=list)
     previews: list[tuple[str, str]] = field(default_factory=list)
     stages: list[str] = field(default_factory=list)
+    # Indexes of the messages the person already closed while it ran.
+    said: set[int] = field(default_factory=set)
+
+    def already_said(self, msg: tuple[str, str, str] | None) -> bool:
+        """True when this box (the last one of its kind) was shown live."""
+        if msg is None:
+            return False
+        for i in range(len(self.messages) - 1, -1, -1):
+            if self.messages[i] is msg:
+                return i in self.said
+        return False
 
     @property
     def ok(self) -> bool:
@@ -119,17 +180,28 @@ class TaskOutcome:
             log(f"== {stage}")
             if reporter:
                 reporter.notice(f"{stage}\n{unescape(note)}" if note else stage)
-        elif tag == "msg":
+        elif tag in ("msg", "say"):
             kind, _, rest = rest.partition(" ")
             title, _, text = rest.partition("\t")
             text = unescape(text)
             self.messages.append((kind, title, text))
+            if tag == "say":
+                self.said.add(len(self.messages) - 1)
             log(f"[{title}] {text}")
         elif tag == "ask":
             title, _, text = rest.partition("\t")
             self.asks.append((title, unescape(text)))
             log(f"[{title}] {unescape(text)}")
-        elif tag == "preview":
+        elif tag in ("choose", "input", "check"):
+            log(f"[{rest.split(chr(9))[0]}] ?")
+        elif tag in ("file", "edit"):
+            log(f"[{(rest.split(chr(9)) + [''])[1]}] ?")
+        elif tag == "cancel":
+            # The routine waits for something outside (an authorization):
+            # the loader may be cancelled meanwhile.
+            if reporter:
+                reporter.cancellable(rest.strip() == "on")
+        elif tag in ("preview", "view"):
             title, _, text = rest.partition("\t")
             self.previews.append((title, unescape(text)))
         elif tag == "result":
@@ -150,6 +222,7 @@ class Bridge:
         self.env = env
         self._verbs: set[str] | None = None
         self._actions: set[str] | None = None
+        self._tasks: set[str] | None = None
 
     # ------------------------------------------------------------------
     # Capabilities
@@ -226,7 +299,7 @@ class Bridge:
                     on_line(line)
                 elif reporter:
                     reporter.log(line)
-                if answer and proc.stdin and line.startswith("@@ask "):
+                if answer and proc.stdin and line.startswith(_PROMPTS):
                     reply = await answer(line)
                     try:
                         proc.stdin.write(f"{reply}\n".encode())
@@ -260,8 +333,7 @@ class Bridge:
             env = {**(env or {}), "KEI_TASK_INTERACTIVE": "1"}
 
             async def answer(line: str) -> str:
-                title, text = out.asks[-1]
-                return "yes" if await ask(out, title, text) else "no"
+                return await answer_prompt(out, line, ask)
         out.rc = await self.stream(self._argv("--task", name, *args), reporter,
                                    on_line=lambda line: out.feed(line, reporter, on_result), env=env,
                                    answer=answer)
@@ -269,6 +341,14 @@ class Bridge:
 
     def supports_tasks(self) -> bool:
         return self.supports("--task")
+
+    def has_task(self, name: str) -> bool:
+        """True when the installer in use knows `--task name` (kei_task)."""
+        if self.env.demo:
+            return True
+        if self._tasks is None:
+            self._tasks = installer_tasks(self.env.installer)
+        return name in self._tasks
 
     def run_command_interactive(self, app: "App", argv: list[str]) -> int:
         """A third-party program with its own full-screen wizard (rclone
@@ -332,6 +412,19 @@ def installer_actions(installer) -> set[str]:
         return set()
     m = re.search(r"^panel_action_function\(\) \{(.*?)^\}", text, re.S | re.M)
     return set(re.findall(r"^\s+([a-z][a-z0-9-]*)\)\s+echo", m.group(1), re.M)) if m else set()
+
+
+def installer_tasks(installer) -> set[str]:
+    """The `--task` names of an installer file (kei_task)."""
+    try:
+        text = installer.read_text(encoding="utf-8", errors="replace") if installer else ""
+    except OSError:
+        return set()
+    m = re.search(r"^kei_task\(\) \{(.*?)^\}", text, re.S | re.M)
+    names: set[str] = set()
+    for group in re.findall(r"^        ([a-z][a-z0-9|-]*)\)", m.group(1), re.M) if m else []:
+        names.update(group.split("|"))
+    return names
 
 
 # ----------------------------------------------------------------------
