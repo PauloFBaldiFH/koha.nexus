@@ -40,6 +40,8 @@ _INSTALL = [line for n, stage, steps in _STAGES
             + [x for step in steps for x in (f"@@step {step}", f"@@done 0 {step}")]]
 
 _SCRIPTS: dict[str, list[str]] = {
+    "ollama-install": ["@@step Installing Ollama", "@@done 0 Installing Ollama",
+                       "@@msg ok OK\tOllama is already installed and running."],
     "tool-install": ["@@result iface=eth0"],
     "info": [
         "@@result real_user=root", "@@result timezone=America/Sao_Paulo", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",

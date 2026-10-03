@@ -86,20 +86,40 @@ def load(path: Path) -> dict[str, str]:
 
 def save(path: Path, c: dict[str, str]) -> None:
     lines = [f"{k}={_clean(c.get(k, ''))}" for k in CONF_KEYS]
-    _write_private(path, "# koha-easy-installer: AI cataloguing settings (marc_replace.pl / Library tools)", lines)
+    _write_private(path, "# koha-easy-installer: AI cataloguing settings (marc_replace.pl / Library tools)", lines,
+                   owner=staff_owner(path))
+
+
+def staff_owner(path: Path) -> tuple[int, int] | None:
+    """Who must read vision.conf: the staff interface (Plack) runs as the
+    instance user, the owner of /var/lib/koha/<instance>. A file the panel
+    (root) created as root:root 0600 would leave MARC Replace and the AI
+    assistant saying "the AI provider is not set up"."""
+    instance_dir = path.parent.parent
+    try:
+        st = instance_dir.stat()
+    except OSError:
+        return None
+    return (st.st_uid, st.st_gid) if st.st_uid != 0 else None
 
 
 def _clean(v: object) -> str:
     return str(v).replace("\r", "").replace("\n", "")
 
 
-def _write_private(path: Path, header: str, lines: list[str]) -> None:
-    """Atomic write, mode 0600, keeping the owner of an existing file."""
-    owner = None
-    if path.exists():
+def _write_private(path: Path, header: str, lines: list[str], owner: tuple[int, int] | None = None) -> None:
+    """Atomic write, mode 0600, owned by owner (else the owner of an existing
+    file is kept)."""
+    if owner is None and path.exists():
         st = path.stat()
         owner = (st.st_uid, st.st_gid)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.parent.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if owner and hasattr(os, "chown"):
+            try:
+                os.chown(path.parent, *owner)
+            except PermissionError:
+                pass
     tmp = path.with_name(f"{path.name}.tmp{os.getpid()}")
     tmp.unlink(missing_ok=True)
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

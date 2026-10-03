@@ -60,11 +60,12 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
         Entry("📋  Essential SQL reports pack", "reports", kind="native"),
     ), view="database", key="t"),
-    # New screen (Module 1): AI provider setup for the cataloguing tabs of
-    # the staff web UI; its MARC Replace hook opens the routine below.
-    Section("ai", "🪄  AI cataloguing", "🪄  AI cataloguing", entries=(
+    # New screen: everything AI in one place, two tabs. AI cataloguing
+    # (Module 1: provider setup for the cataloguing tabs of the staff web UI;
+    # its MARC Replace hook opens the routine below) and the AI assistant
+    # (Module 2: the chat on the Koha staff home page, same provider).
+    Section("ai", "🤖  AI", "🤖  AI", entries=(
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
-        # Module 2: the chat on the Koha staff home page (in place of the news).
         Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
     ), view="ai", key="a"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
@@ -112,11 +113,9 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🌎  Brazil: localization", "brazil", kind="native"),
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native"),
-        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native"),
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
         Entry("🧮  Cutter Calculator", "cutter", kind="native"),
-        Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
     ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
         Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),

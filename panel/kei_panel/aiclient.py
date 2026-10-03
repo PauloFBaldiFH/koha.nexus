@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Callable
@@ -61,17 +62,34 @@ def models_endpoint(c: dict[str, str]) -> tuple[str, dict[str, str]]:
     return b + "/models", headers
 
 
+def _open(req: urllib.request.Request, timeout: float):
+    """urlopen, but never through an HTTP proxy for this machine or the local
+    network (a proxy set for apt would answer for Ollama instead)."""
+    host = urllib.parse.urlsplit(req.full_url).hostname or ""
+    if aiconf.is_local_host(host):
+        return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+def _reason(e: Exception) -> str:
+    reason = getattr(e, "reason", e)
+    if isinstance(reason, ConnectionRefusedError) or "refused" in str(reason).lower():
+        return "nothing is answering at this address (connection refused)"
+    return str(reason)
+
+
 def _get_json(url: str, headers: dict[str, str], timeout: float):
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _open(req, timeout) as resp:
             return json.load(resp)
     except urllib.error.HTTPError as e:
         hint = {400: "invalid request or key", 401: "key refused", 403: "key refused",
                 404: "wrong address"}.get(e.code, "")
         raise RuntimeError(f"HTTP {e.code} from {url}" + (f" ({hint})" if hint else "")) from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise RuntimeError(f"{url}: {getattr(e, 'reason', e)}") from None
+        # The reason first: the Connection card only has room for a line.
+        raise RuntimeError(f"{_reason(e)} ({url})") from None
     except ValueError:
         raise RuntimeError(f"{url}: the answer is not JSON (is this the right address?)") from None
 
@@ -130,7 +148,7 @@ def ollama_pull(url: str, model: str, on_progress: Callable[[str, int, int], Non
     req = urllib.request.Request(b + "/api/pull", data=body, method="POST",
                                  headers={"User-Agent": UA, "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _open(req, timeout) as resp:
             for raw in resp:
                 if cancelled():
                     return
@@ -145,4 +163,4 @@ def ollama_pull(url: str, model: str, on_progress: Callable[[str, int, int], Non
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code} from {b}/api/pull") from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise RuntimeError(f"{b}/api/pull: {getattr(e, 'reason', e)}") from None
+        raise RuntimeError(f"{_reason(e)} ({b}/api/pull)") from None

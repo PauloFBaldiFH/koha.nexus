@@ -46,7 +46,7 @@ def test_async_job_animates_while_it_runs():
         return 42
     result, frames, screen = run(job)
     assert result.ok and result.value == 42
-    assert frames >= 6           # ~15 fps over ~0.8 s: the loop was never blocked
+    assert frames >= 6           # ~10 fps over ~0.8 s: the loop was never blocked
     assert screen != "LoadingScreen"
 
 

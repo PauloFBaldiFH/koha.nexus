@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.0"
+PANEL_VERSION=" 1.5.1"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -24092,13 +24092,6 @@ sub widget_js {
     var send = el("button", "btn btn-primary kei-ai-send", T.send); send.type = "submit";
     form.appendChild(ta); form.appendChild(send);
     box.append(form);
-    var ex = el("div", "kei-ai-examples");
-    $.each(T.examples || [], function (i, e) {
-        var b = el("button", "kei-ai-chip", e); b.type = "button";
-        $(b).on("click", function () { ask(e); });
-        ex.appendChild(b);
-    });
-    box.append(ex);
 
     $(form).on("submit", function (e) { e.preventDefault(); ask(ta.value); });
     $(ta).on("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(ta.value); } });
@@ -24170,9 +24163,6 @@ sub widget_css {
 #kei-ai .kei-ai-form { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
 #kei-ai .kei-ai-form textarea { flex: 1; font: inherit; resize: vertical; min-height: 38px; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
 #kei-ai .kei-ai-form textarea:focus { border-color: #0b62d6; outline: 2px solid #c9dcfa; }
-#kei-ai .kei-ai-examples { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-#kei-ai .kei-ai-chip { border: 1px solid #d6dbe1; background: #f7f8f9; border-radius: 12px; font-size: .8em; padding: 1px 9px; color: #3d4650; }
-#kei-ai .kei-ai-chip:hover, #kei-ai .kei-ai-chip:focus { border-color: #0b62d6; color: #0b62d6; }
 #kei-ai.kei-ai-wide { position: fixed; z-index: 1050; top: 70px; left: 50%; transform: translateX(-50%); width: min(820px, 96vw);
     max-height: calc(100vh - 90px); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
 #kei-ai.kei-ai-wide .kei-ai-log { height: calc(100vh - 330px); max-height: none; }
@@ -24815,6 +24805,19 @@ kei_task_cloud_authorize() {
     validate_and_register_rclone "gdrive"
 }
 
+# Ollama, the local AI of the cataloguing tools: its official script sets
+# up the "ollama" service on 127.0.0.1:11434.
+ollama_install_task() {
+    curl -fsSL https://ollama.com/install.sh | sh || return 1
+    systemctl enable --now ollama >/dev/null 2>&1 || true
+    local i
+    for i in $(seq 1 20); do
+        curl -fsS --noproxy '*' --max-time 2 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && return 0
+        sleep 1
+    done
+    return 1
+}
+
 # The routine of each panel action (--run ACTION, and --task run ACTION
 # for the new panel); a fixed list, anything else is refused.
 panel_action_function() {
@@ -24970,6 +24973,19 @@ kei_task() {
             case "$fn" in lt_*|function_brazil_tools|function_messaging|function_cataloguing|function_cdd|\
                           function_koha_plugins|function_cutter) require_koha || return 1 ;; esac
             "$fn" ;;
+        ollama-install)
+            # Ollama's own install script (AI cataloguing > Local Ollama).
+            require_systemd || return 1
+            if command -v ollama >/dev/null 2>&1 && systemctl is-active --quiet ollama 2>/dev/null; then
+                msg_ok "$(t "Ollama is already installed and running.")"
+                return 0
+            fi
+            command -v curl >/dev/null 2>&1 || apt_install curl >/dev/null 2>&1
+            if ! TUI_LOG="$APT_LOG" tui_run "$(t "Installing Ollama")" ollama_install_task; then
+                tui_fail_card "$(t "Installing Ollama")" "$APT_LOG"
+                return 1
+            fi
+            msg_ok "$(t "Ollama is already installed and running.")" ;;
         tool-install)
             # A terminal program the panel then opens itself (htop, links, mc).
             case "${1:-}" in

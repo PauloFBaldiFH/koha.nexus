@@ -1,5 +1,7 @@
 """AIView (Module 1): AI provider setup for the cataloguing tools.
 
+  [ AI cataloguing ][ AI assistant on the staff home page ]   tabs
+
   ┌ AI provider ─┐ ┌ Google Gemini ───────────────────────────┐
   │ ( ) Ollama   │ │ Server URL  [..........................] │
   │ (•) Gemini   │ │ Model       [gemini-2.5-flash..........] │
@@ -31,7 +33,7 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
-from textual.widgets import Button, Input, Label, RadioButton, RadioSet
+from textual.widgets import Button, Input, Label, RadioButton, RadioSet, TabbedContent, TabPane
 
 from .. import aiclient, aiconf, marcreplace
 from ..i18n import t
@@ -70,6 +72,13 @@ class AIView(SectionView):
         c = self.saved()
         self.provider = c["provider"]
         yield from self.heading()
+        with TabbedContent(id="ai-tabs"):
+            with TabPane(t("🪄  AI cataloguing"), id="ai-tab-cat"):
+                yield from self.compose_cataloguing(c)
+            with TabPane(t("💬  AI assistant"), id="ai-tab-assistant"):
+                yield from self.compose_assistant()
+
+    def compose_cataloguing(self, c: dict[str, str]) -> ComposeResult:
         yield Label(t("Choose the AI that reads the photos of a book's cover and title page and drafts "
                       "its MARC record in the staff interface."), classes="view-prompt")
         with Horizontal(id="ai-body"):
@@ -78,12 +87,14 @@ class AIView(SectionView):
                     yield RadioButton(t(aiconf.LABELS[p]), value=p == self.provider, id=f"ai-p-{p}")
             with Vertical(id="ai-details"):
                 with Vertical(id="ai-form", classes="ai-box"):
-                    with Grid(classes="form-grid"):
-                        yield Label(t("Server URL"))
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Server URL"), classes="form-label")
                         yield Input(c["url"], id="ai-url")
-                        yield Label(t("Model"))
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Model"), classes="form-label")
                         yield Input(c["model"], id="ai-model")
-                        yield Label(t("API key"), id="ai-token-label")
+                    with Horizontal(classes="form-row", id="ai-token-row"):
+                        yield Label(t("API key"), classes="form-label", id="ai-token-label")
                         yield Input("", password=True, id="ai-token")
                     yield Label("", id="ai-key-note", classes="ai-note")
                 with Vertical(id="ai-ollama", classes="ai-box"):
@@ -93,6 +104,7 @@ class AIView(SectionView):
                                 id="ai-ollama-hint", classes="ai-note")
                     with Horizontal(classes="form-buttons"):
                         yield Button(t("Check Ollama"), id="ai-ollama-check")
+                        yield Button(t("Install Ollama"), id="ai-ollama-install")
                         yield Button(t("Download the model"), id="ai-ollama-pull")
                 with Horizontal(classes="form-buttons"):
                     yield Button(t("Test connection"), id="ai-test", variant="primary")
@@ -105,12 +117,30 @@ class AIView(SectionView):
             yield Label("", id="ai-hook-text")
             yield Button(t("Open MARC Replace"), id="ai-marc", variant="primary")
 
+    def compose_assistant(self) -> ComposeResult:
+        yield Label(t("A chat on the home page of the Koha staff interface, in the place of the news block. "
+                      "Librarians ask in plain language about books, patrons, reports and settings; the answers "
+                      "link to the records. It only reads (a SELECT-only database account): a change it suggests "
+                      "is shown first, with the exact SQL or the Koha page, and only runs after a click on Confirm."),
+                    classes="view-prompt")
+        yield Label(t("It answers with the AI provider set up in AI cataloguing."), classes="view-prompt")
+        with Grid(classes="status-grid", id="ai-assistant-cards"):
+            yield StatusCard(t("Provider"), id="card-aia-provider")
+            yield StatusCard(t("💬  AI assistant on the staff home page"), id="card-aia-page")
+        with Horizontal(classes="form-buttons"):
+            yield Button(t("Install, update or remove the assistant"), id="ai-assistant", variant="primary")
+
     def on_mount(self) -> None:
         self.query_one("#ai-form").border_title = t(aiconf.LABELS[self.provider])
         self.query_one("#ai-ollama").border_title = t("Ollama on this server")
         self.query_one("#ai-hook").border_title = t("Next step: MARC Replace")
         self.apply_provider(self.provider, keep_fields=True)
         self.refresh_cards()
+
+    def on_resize(self) -> None:
+        # Beside the provider list the fields get too narrow to show a whole
+        # address ("ttp://localhost:11434"): stack them under it instead.
+        self.set_class(self.size.width < 110, "-stacked")
 
     # ------------------------------------------------------------------
     # Provider
@@ -136,8 +166,7 @@ class AIView(SectionView):
         self.query_one("#ai-form").border_title = t(aiconf.LABELS[provider])
         local = provider == "ollama"
         self.query_one("#ai-ollama").display = local
-        for w in ("#ai-token-label", "#ai-token"):
-            self.query_one(w).display = not local
+        self.query_one("#ai-token-row").display = not local
         self.show_key_note()
         self.refresh_cards()
 
@@ -177,6 +206,8 @@ class AIView(SectionView):
             "ai-save": self.action_save,
             "ai-test": self.action_test,
             "ai-ollama-check": self.check_ollama,
+            "ai-ollama-install": self.install_ollama,
+            "ai-assistant": self.open_assistant,
             "ai-ollama-pull": self.pull_model,
             "ai-marc": self.open_marc_replace,
         }
@@ -269,6 +300,24 @@ class AIView(SectionView):
         state.update(f"Ollama {version} · {len(check.models)} {t('models')} · {model}: {have}")
         self.refresh_cards()
 
+    def install_ollama(self) -> None:
+        """Ollama's own install script, run by the installer behind Pac-Man."""
+        from ..routines.common import failed, run_task, show_failure
+
+        async def flow() -> None:
+            title = t("Installing Ollama")
+            result = await run_task(self.app, title, "ollama-install")
+            if failed(result):
+                await show_failure(self.app, title, result)
+                return
+            self.check_ollama()
+        self.app.run_worker(flow(), group="routine", exclusive=True, exit_on_error=False)
+
+    def open_assistant(self) -> None:
+        from ..menus import Entry
+        self.app.run_entry(Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
+                           after=self.refresh_cards)
+
     def pull_model(self) -> None:
         conf = self.values()
         demo = self.app.env.demo
@@ -337,6 +386,13 @@ class AIView(SectionView):
         self.query_one("#card-ai-marc", StatusCard).set(
             t("Installed") if installed else t("Not installed."), "marc_replace.pl",
             "ok" if installed else "warn")
+
+        self.query_one("#card-aia-provider", StatusCard).set(
+            name if ready else t("Not set up"),
+            saved["model"] if ready else t("Set up and save an AI provider first."), "ok" if ready else "warn")
+        on_page = marcreplace.assistant_installed(self.app.env.demo)
+        self.query_one("#card-aia-page", StatusCard).set(
+            t("Installed") if on_page else t("Not installed."), "ai_assistant.pl", "ok" if on_page else "warn")
 
         text = self.query_one("#ai-hook-text", Label)
         button = self.query_one("#ai-marc", Button)
