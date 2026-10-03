@@ -1,10 +1,11 @@
 # koha.nexus panel: Textual prototype
 
-A Textual front end for the bash panel (`../installer`). `sudo config.sh`
-opens it instead of the whiptail menu whenever it can, and the whiptail
-panel stays the fallback.
+A Textual front end for the bash panel (`../installer`). It is opt-in:
+`sudo KEI_UI=textual config.sh` opens it instead of the classic menu, which
+stays the default and the fallback (most routines still use the classic
+dialogs, so the new panel is not the default until they are ported).
 
-## How config.sh starts it
+## How config.sh starts it (with KEI_UI=textual)
 
 1. The sources are installed under `/usr/local/lib/koha-easy-installer/panel`:
    copied from `panel/` next to the installer (a git clone, or the copy the
@@ -20,11 +21,13 @@ panel stays the fallback.
    (config.sh skips its whiptail box) and starts again in it.
 5. If the set-up fails (offline server, Python older than 3.9), the panel
    crashes, or it draws nothing within 60 s (`KEI_PANEL_START_TIMEOUT`), a box
-   says why and the classic panel opens; it is tried again at the next start.
+   says why and the classic panel opens; it is tried again at the next
+   start with `KEI_UI=textual`.
    Textual draws on stderr, so config.sh never redirects it: the app writes
    its own tracebacks to `/var/log/koha-easy-install/new-panel.log`.
 
-`KEI_UI=whiptail sudo config.sh` always opens the classic panel;
+Without `KEI_UI=textual`, `sudo config.sh` opens the classic panel directly
+(`KEI_UI=whiptail` also picks whiptail over `dialog` for it).
 
 ## Try it without Koha
 

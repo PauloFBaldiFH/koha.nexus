@@ -4109,12 +4109,12 @@ install_panel_copy() {
 # ----------------------------------------------------------------------
 # The new panel (Textual, Python): panel/ in the repository.
 # ----------------------------------------------------------------------
-# "sudo config.sh" opens it instead of the whiptail menu when it can:
-# Python 3.9+, its own virtual environment with Textual, and a terminal.
-# The menus are drawn by Python; every routine still runs here, started
-# by the new panel as "config.sh --run <action>" with this panel's lock
-# descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
-#   KEI_UI=whiptail (or dialog)  always the classic panel
+# Opt-in: "sudo KEI_UI=textual config.sh" opens it instead of the classic
+# menu, which stays the default (most routines still use the classic
+# dialogs). It needs Python 3.9+, its own virtual environment with
+# Textual, and a terminal. The menus are drawn by Python; every routine
+# still runs here, started by the new panel as "config.sh --run <action>"
+# with this panel's lock descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
 # Anything that fails (no network for the first set-up, an old Python, a
 # crash) opens the classic panel: it stays the safe way in.
 KEI_LIB_DIR="/usr/local/lib/koha-easy-installer"
@@ -4230,7 +4230,7 @@ kei_panel_setup_task() {
 kei_panel_explain_fallback() {
     local why="$1" log_file="${2:-$APT_LOG}" tail_txt
     tail_txt=$(tui_log_tail "$log_file" 4 2>/dev/null)
-    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start. KEI_UI=whiptail always opens the classic panel. Log:") ${log_file}" 20 78
+    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start with KEI_UI=textual; without it, the classic panel opens directly. Log:") ${log_file}" 20 78
 }
 
 # 0 when the new panel should be used, setting it up first if needed.
@@ -4240,7 +4240,7 @@ KEI_PANEL_STATE=""
 kei_panel_ready() {
     case "$KEI_PANEL_STATE" in ready) return 0 ;; no) return 1 ;; esac
     KEI_PANEL_STATE=no
-    case "${KEI_UI:-}" in whiptail|dialog) return 1 ;; esac
+    [ "${KEI_UI:-}" = "textual" ] || return 1
     [ -t 0 ] && [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] || return 1
     # Sources that came with this script replace the installed copy.
     if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
