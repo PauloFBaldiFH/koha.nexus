@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.2"
+PANEL_VERSION=" 1.5.3"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -13369,6 +13369,7 @@ MR_VISION_KEYS="tab_replace tab_vision tab_settings v_title v_intro v_img_cover 
     v_w_no_table v_w_isbn f_title f_authors f_publisher f_place f_year f_isbn r_isbn r_ddc r_notation \
     r_cip_notation r_nonfiling src_cip src_model isbn_ok isbn_bad v_new_confirm v_add v_dups v_dup_ok \
     v_err_dup v_added v_twice v_err_busy v_err_add v_err_image v_err_noimg v_err_model v_add_items \
+    v_replace_title v_replace_hint v_replace_bn v_replace_btn v_replace_this v_candidates \
     v_edit v_another e_URL e_TOKEN_PLAIN e_NO_TOKEN e_NO_IMAGES e_UNREACHABLE e_HTTP e_EMPTY e_NO_JSON \
     s_title s_intro s_perm s_provider p_openai p_anthropic p_gemini p_ollama p_compatible s_url s_model s_token \
     s_token_saved s_token_clear s_timeout s_max_px s_lang s_org s_country s_table t_auto t_none s_ddc_ed \
@@ -13743,11 +13744,13 @@ sub do_preview {
     my $body = '<h2>' . h( $T{title} ) . '</h2>';
     $body .= '<div class="msg warn"><b>' . h( $T{warnings} ) . '</b><br>' . join( '<br>', map { h($_) } @$warnings ) . '</div>' if @$warnings;
     $body .= '<p>' . h( $T{confirm} ) . '</p>';
-    $body .= '<h3>' . h( $T{current} ) . " ($biblionumber)</h3><p><b>" . h( $biblio->title ) . '</b> ' . h( $biblio->author // '' ) . '</p>';
+    $body .= '<p>' . h( $T{bn} ) . " $biblionumber: <b>" . h( $biblio->title ) . '</b> ' . h( $biblio->author // '' ) . '</p>';
     $body .= '<p>' . h( $T{items_kept} ) . " $items</p>";
     $body .= '<p>' . h( $T{items_dropped} ) . " $dropped</p>" if $dropped;
     $body .= '<p>' . h( $T{charset} ) . ' ' . h($charset) . '</p>';
-    $body .= '<h3>' . h( $T{new} ) . '</h3><pre>' . h( $record->as_formatted ) . '</pre>';
+    my $now = eval { MARC::Record->new_from_xml( $current, 'UTF-8', 'MARC21' ) };
+    $body .= '<div class="cmp"><div><h3>' . h( $T{current} ) . " ($biblionumber)</h3><pre>" . h( $now ? $now->as_formatted : '' ) . '</pre></div>'
+        . '<div><h3>' . h( $T{new} ) . '</h3><pre>' . h( $record->as_formatted ) . '</pre></div></div>';
     $body .= '<form method="post">'
         . '<input type="hidden" name="op" value="cud-replace">'
         . '<input type="hidden" name="csrf_token" value="' . h($token) . '">'
@@ -13835,6 +13838,10 @@ sub render_page {
     .ok { background: #dff0d8; color: #3c763d; }
     .err { background: #f2dede; color: #a94442; }
     .warn { background: #fcf8e3; color: #8a6d3b; }
+    .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cmp pre { font-size: 0.85em; }
+    \@media (max-width: 700px) { .cmp { grid-template-columns: 1fr; } }
+    ul.cands button { margin-top: 4px; padding: 4px 10px; }
   </style>
 </head>
 <body>
@@ -13964,6 +13971,8 @@ sub handle_vision {
         do_vision_preview($cgi);
     } elsif ( $op eq 'cud-vision-add' ) {
         do_vision_add($cgi);
+    } elsif ( $op eq 'cud-vision-replace' ) {
+        do_vision_replace($cgi);
     } else {
         do_vision($cgi);
     }
@@ -14106,7 +14115,7 @@ sub find_duplicates {
 }
 
 sub do_vision_preview {
-    my ($cgi) = @_;
+    my ( $cgi, $message ) = @_;
     my $text = $cgi->param('marctext') // '';
     my $back = sub { render_draft( $cgi, err_box( $_[0] ), $text, scalar $cgi->param('extraction') ) };
     if ( $text !~ /\S/ ) { $back->( $T{err_input} ); return }
@@ -14121,7 +14130,7 @@ sub do_vision_preview {
     my $nonce = sha1_hex( join ':', time, $$, rand(), csrf($cgi) );
     my $xml   = encode( 'UTF-8', $record->as_xml_record('MARC21') );
 
-    my $body = '<h2>' . h( $T{v_title} ) . '</h2><p>' . h( $T{v_new_confirm} ) . '</p>';
+    my $body = '<h2>' . h( $T{v_title} ) . '</h2>' . ( $message // '' ) . '<p>' . h( $T{v_new_confirm} ) . '</p>';
     $body .= '<p>' . h( $T{items_dropped} ) . " $dropped</p>" if $dropped;
     $body .= '<p>' . h( $T{v_framework} ) . ': ' . h( $fw eq '' ? $T{v_default_fw} : $fw ) . '</p>';
     if (@dups) {
@@ -14140,7 +14149,62 @@ sub do_vision_preview {
         . ( @dups ? '<p><input type="checkbox" id="allow_dup" name="allow_dup" value="1"> <label class="inline" for="allow_dup">' . h( $T{v_dup_ok} ) . '</label></p>' : '' )
         . '<input type="submit" value="' . h( $T{v_add} ) . '"> '
         . '<a href="marc_replace.pl?op=vision">' . h( $T{cancel} ) . '</a></form>';
+    $body .= vision_replace_form( $cgi, $text, $record, \@dups );
     render_page( $body, 'vision' );
+    return;
+}
+
+# Records with the same title (245 $a) as the draft: [ biblionumber, title ].
+sub same_title {
+    my ($record) = @_;
+    my $f = $record->field('245') or return;
+    ( my $t = $f->subfield('a') // '' ) =~ s/[\s\/:;,.=]+$//;
+    $t =~ s/^\s+//;
+    return if length $t < 3;
+    $t =~ s/([\\%_])/\\$1/g;
+    return @{ C4::Context->dbh->selectall_arrayref( 'SELECT biblionumber, title FROM biblio WHERE title LIKE ? ORDER BY biblionumber DESC LIMIT 5', undef, "$t%" ) || [] };
+}
+
+# The other way out of the preview: the draft replaces a record already in
+# the catalogue, through the replacement's own preview (both records side
+# by side), lock, comparison and saved version; the items are never touched.
+sub vision_replace_form {
+    my ( $cgi, $text, $record, $dups ) = @_;
+    my %seen;
+    my @cands = grep { !$seen{ $_->[0] }++ } @$dups, same_title($record);
+    my $form = '<h3>' . h( $T{v_replace_title} ) . '</h3><p class="hint">' . h( $T{v_replace_hint} ) . '</p>'
+        . '<form method="post">'
+        . '<input type="hidden" name="op" value="cud-vision-replace">'
+        . '<input type="hidden" name="csrf_token" value="' . h( csrf($cgi) ) . '">'
+        . '<input type="hidden" name="itemtype" value="' . h( scalar $cgi->param('itemtype') // '' ) . '">'
+        . '<input type="hidden" name="frameworkcode" value="' . h( framework_param( scalar $cgi->param('frameworkcode') ) ) . '">'
+        . '<input type="hidden" name="extraction" value="' . h( scalar $cgi->param('extraction') // '' ) . '">'
+        . '<textarea name="marctext" hidden>' . h($text) . '</textarea>'
+        . '<label for="target">' . h( $T{v_replace_bn} ) . '</label>'
+        . '<input type="text" id="target" name="target" placeholder="12345" inputmode="numeric">'
+        . '<input type="submit" value="' . h( $T{v_replace_btn} ) . '">';
+    if (@cands) {
+        $form .= '<p>' . h( $T{v_candidates} ) . '</p><ul class="cands">'
+            . join( '', map {
+                '<li><a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=' . h( $_->[0] ) . '" target="_blank">' . h( $_->[0] ) . '</a> '
+                    . h( $_->[1] // '' ) . ' <button type="submit" name="target_pick" value="' . h( $_->[0] ) . '">' . h( $T{v_replace_this} ) . '</button></li>'
+            } @cands )
+            . '</ul>';
+    }
+    return $form . '</form>';
+}
+
+# "Compare and replace" from the AI preview: the replacement's preview of
+# the draft against the chosen record.
+sub do_vision_replace {
+    my ($cgi) = @_;
+    my $bn = digits( scalar( $cgi->param('target_pick') ) || scalar( $cgi->param('target') ) );
+    my $biblio = $bn ne '' ? Koha::Biblios->find($bn) : undef;
+    if ( !$biblio ) {
+        do_vision_preview( $cgi, err_box( $bn eq '' ? $T{err_bn} : "$T{err_nobib} ($bn)" ) );
+        return;
+    }
+    do_preview( $cgi, $bn, $biblio );
     return;
 }
 
@@ -15552,6 +15616,12 @@ mr_text() {
         v_add)            t "Add to the catalogue" ;;
         v_dups)           t "Records with the same ISBN already in the catalogue:" ;;
         v_dup_ok)         t "Add it anyway (it is another record)" ;;
+        v_replace_title)  t "Or replace a record already in the catalogue" ;;
+        v_replace_hint)   t "The record with this biblionumber gets the content above. Its items, holds and loans stay as they are; the current version is saved first and you see both records before anything changes." ;;
+        v_replace_bn)     t "Biblionumber of the record to replace" ;;
+        v_replace_btn)    t "Compare and replace" ;;
+        v_replace_this)   t "Replace this one" ;;
+        v_candidates)     t "Records that look like this one:" ;;
         v_err_dup)        t "A record with the same ISBN is already in the catalogue. Nothing was added: tick the box if it really is another record." ;;
         v_added)          t "Record added." ;;
         v_twice)          t "This form was already sent: the record was added only once." ;;
@@ -15786,6 +15856,43 @@ _lt_mr_install() {
     url="/cgi-bin/koha/tools/marc_replace.pl"
     log "marc_replace: page installed (link=$link)"
     msg_ok "$(t '✅ Page installed. In the staff interface: ${url}\n\nPrevious versions of the replaced records: ${MR_DIR}')" 11 76
+}
+
+# The page installed by an older panel: the same page (and AI cataloguing
+# modules) as this version, checked with Koha's modules first. Run when the
+# panel starts, like aia_refresh.
+mr_refresh() {
+    mr_installed || return 0
+    local work log
+    work=$(mktemp -d /tmp/koha_mr.XXXXXX) || return 0
+    marc_replace_script > "$work/marc_replace.pl"
+    mr_pm_vision > "$work/Vision.pm"
+    mr_pm_rules > "$work/Rules.pm"
+    if cmp -s "$work/marc_replace.pl" "$MR_FILE" && cmp -s "$work/Vision.pm" "$MR_PM_DIR/Vision.pm" && cmp -s "$work/Rules.pm" "$MR_PM_DIR/Rules.pm"; then
+        rm -rf "$work"
+        return 0
+    fi
+    printf '%s\n' "$(t "Updating the Replace a MARC record page...")"
+    chmod 755 "$work"
+    chmod 644 "$work/marc_replace.pl" "$work/Vision.pm" "$work/Rules.pm"
+    log=$(tools_log marc-replace-refresh)
+    if koha_exec "$log" perl-check /usr/bin/perl -c "$work/marc_replace.pl" \
+       && koha_exec "$log" perl-check /usr/bin/perl -c "$work/Vision.pm" \
+       && koha_exec "$log" perl-check /usr/bin/perl -c "$work/Rules.pm" \
+       && mkdir -p "$MR_PM_DIR" \
+       && install -o root -g root -m 644 "$work/Vision.pm" "$MR_PM_DIR/Vision.pm.new" \
+       && install -o root -g root -m 644 "$work/Rules.pm" "$MR_PM_DIR/Rules.pm.new" \
+       && mv -f "$MR_PM_DIR/Vision.pm.new" "$MR_PM_DIR/Vision.pm" \
+       && mv -f "$MR_PM_DIR/Rules.pm.new" "$MR_PM_DIR/Rules.pm" \
+       && install -o root -g root -m 755 "$work/marc_replace.pl" "${MR_FILE}.new" \
+       && mv -f "${MR_FILE}.new" "$MR_FILE"; then
+        plack_restart
+        log "marc_replace: refreshed to panel ${PANEL_VERSION# }"
+    else
+        log "marc_replace: refresh skipped (see $log)"
+    fi
+    rm -rf "$work"
+    return 0
 }
 
 lt_mr_remove() {
@@ -22875,6 +22982,7 @@ our $MAX_STEPS     = 6;
 our $MAX_PROPOSAL  = 1000;
 our $RESULT_CHARS  = 6000;
 our $HISTORY_TURNS = 6;
+our $OLLAMA_CTX    = 16384;
 
 my $JSON = JSON::PP->new->utf8(0)->canonical(1)->allow_nonref(1);
 
@@ -22965,7 +23073,11 @@ sub request_body {
         return { model => $c->{model}, max_tokens => 2000, system => $system, messages => \@alt };
     }
     my @msgs = ( { role => 'system', content => $system }, @turns );
-    return { model => $c->{model}, stream => JSON::PP::false, format => 'json', options => { temperature => 0 }, messages => \@msgs }
+    # num_ctx: Ollama's default window (2048 or 4096 tokens) is smaller than
+    # the instructions plus one tool result, and Ollama silently drops the
+    # start of the prompt (the tools) to fit: the model then says it has no
+    # access to the database.
+    return { model => $c->{model}, stream => JSON::PP::false, format => 'json', options => { temperature => 0, num_ctx => $OLLAMA_CTX }, messages => \@msgs }
         if $p eq 'ollama';
     my %body = ( model => $c->{model}, messages => \@msgs );
     if    ( $p eq 'openai' ) { %body = ( %body, response_format => { type => 'json_object' }, max_completion_tokens => 4000 ) }
@@ -23244,6 +23356,9 @@ sub _title {
 # ----------------------------------------------------------------------
 # The tools
 # ----------------------------------------------------------------------
+# Small words of names that say nothing alone ("Machado de Assis").
+our %NAME_PARTICLE = map { $_ => 1 } qw( de da do das dos du del della di la le les el los van von der den the and );
+
 sub t_search_catalogue {
     my ( $ctx, $a ) = @_;
     my $terms = $a->{terms} // $a->{query} // [];
@@ -23251,10 +23366,22 @@ sub t_search_catalogue {
     my @terms = grep { length >= 2 } map { my $s = "$_"; $s =~ s/^\s+|\s+$//g; $s } grep { defined && !ref } @$terms;
     splice @terms, 8 if @terms > 8;
     die { error => 'give at least one search term of 2+ characters' } unless @terms;
-    # Koha keeps authors as "King, Stephen": "Stephen King" finds it too.
-    push @terms, map { my @w = split ' '; "$w[1], $w[0]" } grep { !/,/ && scalar( () = split ' ' ) == 2 } @terms;
+    # Koha keeps authors as "King, Stephen" or "Assis, Machado de": the name
+    # is tried inverted too, and a name of several words also matches when
+    # all its words are in the author (or the title), in any order.
+    my @names = grep { my @w = split ' '; !/,/ && @w >= 2 && @w <= 5 } @terms;
+    push @terms, map { my @w = split ' '; join ' ', "$w[-1],", @w[ 0 .. $#w - 1 ] } @names;
     my @cols = ( [ 'b.title', 3 ], [ 'b.author', 2 ], [ 'b.subtitle', 1 ], [ 'b.seriestitle', 1 ], [ 'b.abstract', 1 ], [ 'bi.isbn', 2 ] );
     my ( @cond, @score );
+    for my $n (@names) {
+        my @w = grep { length >= 3 && !$NAME_PARTICLE{ lc $_ } } split ' ', $n;
+        next unless @w >= 2;
+        for my $col ( 'b.author', 'b.title' ) {
+            my $all = '(' . join( ' AND ', map { "$col LIKE " . like($_) } @w ) . ')';
+            push @cond, $all;
+            push @score, "CASE WHEN $all THEN 2 ELSE 0 END";
+        }
+    }
     for my $t (@terms) {
         if ( length $t <= 3 ) {    # "It": a whole word of the title, or "Smith" matches too
             my $hit = sprintf '(b.title = %s OR b.title LIKE %s OR b.title LIKE %s OR b.title LIKE %s)',
@@ -23270,8 +23397,50 @@ sub t_search_catalogue {
     my $rows = _rows( $ctx, 'SELECT b.biblionumber, b.title, b.subtitle, b.author, b.copyrightdate, bi.isbn, ('
             . join( ' + ', @score ) . ') AS score FROM biblio b LEFT JOIN biblioitems bi ON bi.biblionumber = b.biblionumber WHERE '
             . join( ' OR ', @cond ) . ' ORDER BY score DESC, b.biblionumber DESC LIMIT 10' );
+    # Few hits: the whole MARC record too (subjects such as "Australian
+    # literature", contents and notes). Slower, so only then, and a search
+    # that runs out of time just keeps the hits above.
+    my @long = grep { length >= 4 } @terms;
+    if ( @$rows < 5 && @long ) {
+        my $seen = join ',', map { int $_->{biblionumber} } @$rows;
+        my $more = eval {
+            _rows( $ctx, 'SELECT b.biblionumber, b.title, b.subtitle, b.author, b.copyrightdate, bi.isbn FROM biblio b '
+                    . 'JOIN biblio_metadata m ON m.biblionumber = b.biblionumber LEFT JOIN biblioitems bi ON bi.biblionumber = b.biblionumber WHERE ('
+                    . join( ' OR ', map { 'm.metadata LIKE ' . like($_) } @long ) . ')'
+                    . ( $seen ne '' ? " AND b.biblionumber NOT IN ($seen)" : '' )
+                    . ' ORDER BY b.biblionumber DESC LIMIT ' . ( 10 - @$rows ) );
+        } || [];
+        $_->{found_in} = 'MARC record (subjects, notes, contents)' for @$more;
+        push @$rows, @$more;
+    }
+    _add_subjects( $ctx, $rows );
     $_->{link} = ref_link( $ctx, 'biblio', $_->{biblionumber}, _title($_) ) for @$rows;
     return { terms => \@terms, matches => $rows };
+}
+
+
+# The subject headings (6XX $a $v $x $y $z) of the records, from MARCXML.
+sub _add_subjects {
+    my ( $ctx, $rows ) = @_;
+    my @ids = grep { /^\d+$/ } map { $_->{biblionumber} // '' } @$rows;
+    return unless @ids;
+    my $meta = eval { _rows( $ctx, 'SELECT biblionumber, metadata FROM biblio_metadata WHERE biblionumber IN (' . join( ',', @ids ) . ')' ) } || [];
+    my %subjects;
+    for my $m (@$meta) {
+        my ( %seen, @s );
+        my $xml = $m->{metadata} // '';
+        while ( $xml =~ m{<(?:marc:)?datafield[^>]*\btag="6(?:00|10|11|30|48|50|51|55)"[^>]*>(.*?)</(?:marc:)?datafield>}gs ) {
+            my $field = $1;
+            my @parts = $field =~ m{<(?:marc:)?subfield[^>]*\bcode="[avxyz]"[^>]*>([^<]*)</(?:marc:)?subfield>}g;
+            for (@parts) { s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g; s/&apos;/'/g; s/&amp;/&/g; s/^\s+|[\s.]+$//g }
+            my $s = join ' -- ', grep { length } @parts;
+            push @s, $s if length $s && !$seen{ lc $s }++;
+        }
+        splice @s, 8 if @s > 8;
+        $subjects{ $m->{biblionumber} } = \@s if @s;
+    }
+    for (@$rows) { $_->{subjects} = $subjects{ $_->{biblionumber} } if $subjects{ $_->{biblionumber} // '' } }
+    return;
 }
 
 our %PATRON_ORDER = (
@@ -23328,6 +23497,7 @@ sub t_get_record {
                 . "bi.isbn, bi.publishercode FROM biblio b LEFT JOIN biblioitems bi ON bi.biblionumber = b.biblionumber WHERE b.biblionumber = $id" ) };
         die { error => "no biblio $id" } unless $r;
         $r->{items} = _rows( $ctx, "SELECT barcode, homebranch, itemcallnumber, onloan FROM items WHERE biblionumber = $id LIMIT 20" );
+        _add_subjects( $ctx, [$r] );
         $r->{link}  = ref_link( $ctx, 'biblio', $id, _title($r) );
         return $r;
     }
@@ -23443,7 +23613,7 @@ sub t_propose_change {
 
 # name => [ description, args, code, permission ('' = every staff user) ]
 our %TOOLS = (
-    search_catalogue => [ 'Find books in the catalogue. OR of all terms over title, author, subtitle, series, abstract and ISBN, best matches first.',
+    search_catalogue => [ 'Find books in the catalogue: by title, author (any order of the name), subtitle, series, abstract, ISBN and, when few match, subjects and notes of the MARC record. OR of all terms, best matches first, with their subjects.',
         { terms => 'list of up to 8 strings' }, \&t_search_catalogue, '' ],
     find_patrons => [ 'Find patrons (readers) by name, card, category, number of overdue loans and outstanding fines balance.',
         { name => 'optional', cardnumber => 'optional', category => 'optional', overdues_min => 'optional int', overdues_max => 'optional int',
@@ -23454,7 +23624,13 @@ our %TOOLS = (
     search_reports => [ 'Saved SQL reports by name, notes or SQL text.', { query => 'string' }, \&t_search_reports, 'reports' ],
     get_syspref    => [ 'System preferences by name or keyword in their explanation.', { query => 'string' }, \&t_get_syspref, 'prefs' ],
     find_page      => [ 'Staff interface pages that match a topic.', { query => 'string' }, \&t_find_page, '' ],
-    run_select     => [ 'Last resort: ONE read-only SELECT on the Koha MariaDB schema, max 50 rows.', { sql => 'string' }, \&t_run_select, 'sql' ],
+    run_select     => [ 'ONE read-only SELECT on the Koha MariaDB schema, max 50 rows: for counts, lists and anything the other tools do not cover. '
+            . 'Main tables: biblio(biblionumber, title, subtitle, author, copyrightdate, datecreated), biblioitems(biblionumber, isbn, publishercode, itemtype), '
+            . 'biblio_metadata(biblionumber, metadata = MARCXML: subjects, notes), items(itemnumber, biblionumber, barcode, homebranch, itemcallnumber, itype, '
+            . 'onloan, itemlost, withdrawn, dateaccessioned), borrowers(borrowernumber, cardnumber, firstname, surname, categorycode, branchcode, dateenrolled, '
+            . 'dateexpiry, lastseen), issues(borrowernumber, itemnumber, issuedate, date_due), old_issues(same + returndate), reserves(borrowernumber, '
+            . 'biblionumber, reservedate, found), accountlines(borrowernumber, amount, amountoutstanding, debit_type_code, date), branches(branchcode, '
+            . 'branchname), categories(categorycode, description), saved_sql(id, report_name, savedsql).', { sql => 'string' }, \&t_run_select, 'sql' ],
     propose_change => [ 'Prepare a change for the librarian to review and confirm. Runs nothing.',
         { kind => 'koha_page|sql', summary => 'one sentence', page => join( '|', sort keys %ACTION_PAGES ) . ' (koha_page)',
           id => 'record id for the page (koha_page)', sql => 'one single-table UPDATE/INSERT/DELETE with WHERE (sql)' },
@@ -23499,7 +23675,8 @@ You are the koha.nexus assistant, built into the home page of the staff interfac
 - You never pretend: if a tool returned nothing, you say so; you never invent a record, an id, a number or a setting.
 
 # What you can do
-You work ONLY through the tools below. You cannot see the database except through them.
+You are connected to this library's Koha database (MariaDB) through the tools below. They return live data (catalogue, items, patrons, loans, fines, saved reports, system preferences) as far as the librarian's own Koha permissions allow.
+Never answer that you have no access to the database, the catalogue or the patrons, and never tell the librarian to run the query themselves: call a tool. A question about books, authors, subjects, patrons, loans, fines, reports or settings ALWAYS starts with a tool call. A tool that is not in the list below means the librarian lacks that Koha permission: say so.
 {TOOLS}
 
 # How to answer: the JSON envelope
@@ -23510,8 +23687,11 @@ Call one tool at a time. At most {STEPS} tool calls per question; then answer wi
 
 # Searching well
 - Vague or abstract descriptions ("that book about the clown that became a movie"): first work out from your own knowledge which works it could be, then call search_catalogue ONCE with every candidate: original title, the Brazilian/Portuguese title, author name, character names, series (e.g. ["It", "A Coisa", "Stephen King", "Pennywise"]). If nothing matches, try one more round with broader terms before saying it is not in the catalogue.
+- Authors: give the name as the librarian wrote it ("Machado de Assis"); the tool also tries "Assis, Machado de" and the words in any order.
+- Subjects, genres, nationalities, periods ("Australian literature", "romance policial"): search the subject in English AND in Portuguese, with close variants (e.g. ["Australian literature", "Literatura australiana", "Australian fiction", "Ficção australiana"]). The tool looks into the subjects of the MARC records.
+- Counts and lists ("how many books by...", "books added this month", "loans per branch"): run_select with COUNT / GROUP BY, when it is in your tools.
 - Patron questions with conditions ("last patron with 4 overdue books and 144 reais in fines"): use find_patrons with structured filters. An exact number means min = max. Money is the patron's outstanding balance in the library's currency. "Last" means most recent activity unless the librarian says otherwise; say which reading you used.
-- Use run_select only when no other tool fits. Write MariaDB SQL for Koha's schema, one SELECT, no comments.
+- Use run_select when no other tool fits. Write MariaDB SQL for Koha's schema, one SELECT, no comments.
 - Do not run the same call twice. Do not fetch whole tables.
 
 # Links (mandatory)
@@ -23581,6 +23761,43 @@ sub parse_envelope {
     return {};
 }
 
+# "I have no access to the database": what a model says when it answers
+# without trying a tool (small local models do, and so does any model whose
+# instructions were cut off). English, Portuguese, Spanish and French.
+our $REFUSAL = qr/
+      \b(?:don'?t|do\ not|doesn'?t|does\ not|cannot|can'?t|unable\ to|not\ able\ to)\b[^.\n]{0,50}?\b(?:access|connect|query|look\ up)
+    | \b(?:no|without)\ (?:direct\ )?access\b
+    | \bn[ãa]o\ (?:tenho|possuo|consigo|posso|h[áa]|disponho)\b[^.\n]{0,50}?\b(?:acess|consult|conect|pesquis)
+    | \bsem\ acesso\b
+    | \bno\ (?:tengo|puedo)\b[^.\n]{0,50}?\b(?:acce|consult|conect)
+    | \bsin\ acceso\b
+    | \bn'ai\ pas\b[^.\n]{0,50}?\bacc[eè]s
+    | \bas\ an\ ai\b | \bcomo\ (?:uma\ )?(?:ia|intelig[êe]ncia\ artificial)\b
+/xi;
+
+our $NUDGE = 'You answered without calling a tool. You DO have live read access to this library\'s Koha database through the tools in your instructions; '
+    . 'nothing else is needed. Call the tool that fits the librarian\'s question now, as {"tool": "<name>", "args": {...}}.';
+
+sub refuses { my ($answer) = @_; return defined $answer && !ref $answer && $answer =~ $REFUSAL ? 1 : 0 }
+
+# Search terms of a question, for when the model will not search itself:
+# names in capitals ("Machado de Assis") whole, then the other long words.
+our %QUESTION_STOP = map { $_ => 1 } qw( about acervo algum alguma algo autor autora autores book books catalogue catálogo
+    como could does have livro livros temos there tem tenho what which with sobre quais qual quem onde quero queria
+    please favor biblioteca library from para pelo pela este esta isso that this mostre mostrar show find list liste encontre );
+
+sub question_terms {
+    my ($q) = @_;
+    my ( @terms, %seen );
+    my $cap = qr/\p{Lu}[\p{L}'-]+/;
+    while ( $q =~ /($cap(?:\s+(?:(?:de|da|do|dos|das|del|di|van|von|the|of)\s+)?$cap)+)/g ) { push @terms, $1 }
+    my $named = join ' ', @terms;
+    push @terms, grep { length >= 4 && !$QUESTION_STOP{ lc $_ } && index( $named, $_ ) < 0 } $q =~ /([\p{L}\d'-]+)/g;
+    @terms = grep { !$seen{ lc $_ }++ } @terms;
+    splice @terms, 6 if @terms > 6;
+    return \@terms;
+}
+
 # ask($ctx, $model, $history, $question, $lang): $model->(\@messages) returns
 # the model's text; $history holds the past questions and answers.
 # Returns { answer, steps, proposals } and appends the turn to $history.
@@ -23589,7 +23806,7 @@ sub ask {
     $ctx->{proposals} //= [];
     my $first = @{ $ctx->{proposals} };
     my @msgs = ( { role => 'system', content => system_prompt( $ctx, $lang ) }, @$history, { role => 'user', content => $question } );
-    my ( @steps, $answer );
+    my ( @steps, $answer, $nudged );
     for my $step ( 0 .. $MAX_STEPS ) {
         my $raw  = $model->( \@msgs );
         my $env  = parse_envelope($raw);
@@ -23599,6 +23816,23 @@ sub ask {
             if ( !defined $answer || ref $answer || $answer !~ /\S/ ) {
                 $answer = %$env ? 'I could not finish this answer. Please rephrase the question.' : $raw;
             }
+            # "No access" before trying anything: reminded once; then the
+            # catalogue is searched for it with the words of the question.
+            if ( !@steps && $step < $MAX_STEPS && refuses($answer) ) {
+                if ( !$nudged++ ) {
+                    push @msgs, { role => 'assistant', content => $raw // '' }, { role => 'user', content => $NUDGE };
+                    next;
+                }
+                my $terms = question_terms($question);
+                if (@$terms) {
+                    my $args = { terms => $terms };
+                    push @steps, 'search_catalogue';
+                    my $result = call_tool( $ctx, 'search_catalogue', $args );
+                    push @msgs, { role => 'assistant', content => $JSON->encode( { tool => 'search_catalogue', args => $args } ) },
+                        { role => 'user', content => "TOOL RESULT search_catalogue: $result\n\nAnswer the librarian's question with this result (or call another tool)." };
+                    next;
+                }
+            }
             last;
         }
         my $args = ref $env->{args} eq 'HASH' ? $env->{args} : {};
@@ -23607,7 +23841,9 @@ sub ask {
         push @msgs, { role => 'assistant', content => $JSON->encode($env) }, { role => 'user', content => "TOOL RESULT $name: $result" };
     }
     $answer =~ s/^\s+|\s+$//g;
-    push @$history, { role => 'user', content => $question }, { role => 'assistant', content => $JSON->encode( { answer => $answer } ) };
+    # A refusal is not kept: the next question would copy it.
+    push @$history, { role => 'user', content => $question }, { role => 'assistant', content => $JSON->encode( { answer => $answer } ) }
+        unless !@steps && refuses($answer);
     splice @$history, 0, @$history - 2 * $HISTORY_TURNS if @$history > 2 * $HISTORY_TURNS;
     return { answer => $answer, steps => \@steps, proposals => [ @{ $ctx->{proposals} }[ $first .. $#{ $ctx->{proposals} } ] ] };
 }
@@ -25124,6 +25360,8 @@ is_koha_installed && install_data_safety
 is_koha_installed && ficha_refresh
 # AI assistant installed by an older panel: same page as this version.
 is_koha_installed && aia_refresh
+# Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
+is_koha_installed && mr_refresh
 
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO
