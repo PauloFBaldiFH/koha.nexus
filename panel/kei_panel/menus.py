@@ -87,10 +87,10 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
     )),
     Section("security", "🔒  Security center", "🔒 Security Center", "Choose a security routine:", (
-        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban"),
-        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall"),
-        Entry("🔐  Rotate database password", "rotate-db-password"),
-        Entry("🧱  Show active UFW rules", "ufw"),
+        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
+        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
+        Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
+        Entry("🧱  Show active UFW rules", "ufw", kind="native"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
         Entry("📏  Server sizing (memory / workers)", "sizing"),

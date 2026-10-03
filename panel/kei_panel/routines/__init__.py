@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, diagnostics, install, search
+from . import backup, database, diagnostics, install, search, security
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -33,6 +33,10 @@ ROUTINES: dict[str, Routine] = {
     "repair-services": diagnostics.repair_services,
     "search-toggle": search.toggle,
     "search-repair": search.repair,
+    "fail2ban": security.fail2ban,
+    "ufw": security.ufw,
+    "staff-firewall": security.staff_firewall,
+    "rotate-db-password": security.rotate_password,
 }
 
 
