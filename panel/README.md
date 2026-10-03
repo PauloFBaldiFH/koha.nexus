@@ -86,6 +86,13 @@ and its checks (locks, safety copy, rollback) stay in one place. Menu
 entries with `kind="native"` use `routines/`; an installer without `--task`
 keeps the classic routine.
 
+Questions a routine asks halfway (`@@ask`) are answered in one of two ways:
+`KEI_TASK_ANSWER=no|yes` answers all of them (the preview-then-run pattern:
+a dry run stops at its question), or `KEI_TASK_INTERACTIVE=1` makes the
+routine wait for each answer, which the panel asks in a confirm screen over
+the loader and writes to the routine's stdin (`ask=asker(app)` in
+`run_task`). Long installs announce their stages with `@@stage`.
+
 The classic panel stays the default until every section is ported:
 
 | Phase | Section | State |
@@ -94,8 +101,8 @@ The classic panel stays the default until every section is ported:
 | 2 | Database tables and maintenance (optimization, SQL reports pack) | done |
 | 3 | Install Koha server, first-access credentials | done |
 | 4 | Diagnostics (status, health check, validation report, services, Apache log) | done |
-| 5 | Search engine and indexing | next |
-| 6 | Security center | |
+| 5 | Search engine and indexing | done |
+| 6 | Security center | next |
 | 7 | Koha settings and parameters | |
 | 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
 | 9 | Schedules, languages, updates, library tools, about, reboot | |

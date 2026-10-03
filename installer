@@ -24421,7 +24421,18 @@ kei_task_ui() {
     msg_info() { kei_emit msg "info ${1}"$'\t'"${2}"; }
     msg_ok() { kei_emit msg "ok $(t "OK")"$'\t'"${1}"; }
     msg_error() { kei_emit msg "error ${1:-$(t "Error")}"$'\t'"${2}"; }
-    prompt_yes_no() { kei_emit ask "${1:-}"$'\t'"${2:-}"; [ "${KEI_TASK_ANSWER:-yes}" = "yes" ]; }
+    # KEI_TASK_INTERACTIVE=1: the panel answers each question on fd 7
+    # ("yes" or anything else); otherwise KEI_TASK_ANSWER answers them all.
+    prompt_yes_no() {
+        local answer
+        kei_emit ask "${1:-}"$'\t'"${2:-}"
+        if [ "${KEI_TASK_INTERACTIVE:-}" = "1" ]; then
+            IFS= read -r answer <&7 || answer="no"
+            [ "$answer" = "yes" ]
+            return
+        fi
+        [ "${KEI_TASK_ANSWER:-yes}" = "yes" ]
+    }
     ui_textbox() { kei_emit preview "${1:-}"$'\t'"$(head -c 200000 "$2" 2>/dev/null)"; }
     display_explanation() { kei_emit note "$(t "$1")"; }
     tui_title() { kei_emit title "$2"; }
@@ -24608,6 +24619,9 @@ kei_task() {
     shift
     KEI_TASK="$name"
     kei_task_ui
+    # Answers come on the pipe the panel opened as stdin; every command
+    # reads /dev/null instead, so none can swallow or wait for an answer.
+    [ "${KEI_TASK_INTERACTIVE:-}" = "1" ] && exec 7<&0 </dev/null
     log "panel task: $name"
     case "$name" in
         info)            kei_task_info ;;
@@ -24664,6 +24678,8 @@ kei_task() {
         validation-report)
             show_validation_report ;;
         reboot)          reboot_now ;;
+        search-toggle)   function_toggle_search_engine ;;
+        search-repair)   function_repair_indexing ;;
         status)
             local g label value
             while IFS=$'\t' read -r g label value; do

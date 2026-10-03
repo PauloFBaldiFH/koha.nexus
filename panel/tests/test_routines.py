@@ -224,6 +224,7 @@ def test_credentials_have_one_copy_button_per_value():
         async with app.run_test(size=(140, 45)) as pilot:
             app.run_native("credentials")
             screen = await _wait_for(pilot, CredentialsScreen)
+            await pilot.pause(0.2)
             screen.query_one("#copy-6").press()
             await pilot.pause(0.1)
             return screen._values, len(screen.query(".detail-copy"))
@@ -273,3 +274,43 @@ def test_log_follow_shows_new_lines(tmp_path):
     lines = asyncio.run(main())
     text = "\n".join(lines)
     assert "old line 29" not in text and "old line 79" in text and "DBI connect failed" in text
+
+
+def test_search_repair_asks_over_the_loader_and_offers_the_report():
+    async def main():
+        app = _app()
+        seen = {}
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("search-repair")
+            repair = await _wait_for(pilot, ConfirmScreen)
+            seen["diag"] = repair._preview
+            repair.query_one("#yes").press()
+            await pilot.pause(0.3)
+            reindex = await _wait_for(pilot, ConfirmScreen)
+            seen["reindex"] = reindex._title
+            reindex.query_one("#yes").press()
+            done = await _wait_for(pilot, MessageScreen)
+            seen["done"] = done._kind
+            done.query_one("#ok").press()
+            offer = await _wait_for(pilot, ConfirmScreen)
+            offer.query_one("#yes").press()
+            report = await _wait_for(pilot, TextScreen)
+            seen["report"] = report._text
+        return seen
+    seen = asyncio.run(main())
+    assert "indexer is down" in seen["diag"] and seen["reindex"] == "Reindex"
+    assert seen["done"] == "ok" and "VALIDATION REPORT" in seen["report"]
+
+
+def test_search_toggle_no_changes_nothing():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("search-toggle")
+            question = await _wait_for(pilot, ConfirmScreen)
+            text = question._question
+            question.query_one("#no").press()
+            await pilot.pause(0.5)
+            return text, type(app.screen).__name__
+    text, screen = asyncio.run(main())
+    assert "ELASTICSEARCH" in text and screen not in ("MessageScreen", "LoadingScreen", "ConfirmScreen")

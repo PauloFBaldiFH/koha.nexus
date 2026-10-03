@@ -81,3 +81,36 @@ async def preview_then_run(app, title: str, loader_title: str, name: str, *args:
     result = await run_task(app, loader_title, name, *args, env={"KEI_TASK_ANSWER": "yes"},
                             total_steps=total_steps)
     await show_done(app, title, result)
+
+
+def asker(app, danger: tuple[str, ...] = ()):
+    """The questions of an interactive routine, asked over its loader while
+    it waits. An info box it showed just before the question (diagnostics)
+    is shown above it; its "View Report" question is answered yes silently,
+    so the report comes back as a preview that offer_report() shows later."""
+    shown: set[int] = set()
+
+    async def ask(out: TaskOutcome, title: str, text: str) -> bool:
+        if title == t("View Report"):
+            return True
+        preview_title = preview = ""
+        for i, (kind, head, body) in enumerate(out.messages):
+            if kind == "info" and i not in shown:
+                shown.add(i)
+                preview_title, preview = head, body
+        return await app.push_screen_wait(ConfirmScreen(title, text, danger=title in danger,
+                                                        preview=preview, preview_title=preview_title))
+    return ask
+
+
+async def offer_report(app, result: TaskResult) -> None:
+    """The validation report a routine produced, if the person wants it."""
+    from ..screens.dialogs import TextScreen
+    out = result.value if isinstance(result.value, TaskOutcome) else None
+    if not out or not out.previews:
+        return
+    title, report = out.previews[-1]
+    question = tx("Do you want to see the detailed system validation report now?") if out.ok else \
+        tx("Do you want to see the validation report to investigate the issues now?")
+    if await app.push_screen_wait(ConfirmScreen(t("View Report"), question)):
+        await app.push_screen_wait(TextScreen(title or t("Diagnostic Report"), report))

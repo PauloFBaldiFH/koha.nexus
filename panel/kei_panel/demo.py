@@ -118,6 +118,33 @@ _SCRIPTS: dict[str, list[str]] = {
     "repair-services": ["@@title Restarting Koha services", "@@step Restarting Koha services",
                         "@@done 0 Restarting Koha services",
                         "@@msg ok OK\tKoha services restarted.\\n\\nMemcached: active\\nPlack: running"],
+    "search-toggle": [
+        "@@ask Search Engine\tCurrent engine: ZEBRA.\\n\\nEnable ELASTICSEARCH? It brings advanced search and dynamic"
+        "\\nfacets, but needs about 1.5 GB more RAM and more disk.",
+        "@@title Switching the search engine to Elasticsearch",
+        *[x for step in ["Stopping Zebra", "Installing Elasticsearch 7", "Configuring Elasticsearch",
+                         "Starting Elasticsearch", "Declaring Elasticsearch in Koha", "Restarting Koha services",
+                         "Starting the indexer", "Reindexing the catalog", "Starting Koha (Plack)",
+                         "Checking that everything works"]
+          for x in (f"@@step {step}", f"@@done 0 {step}")],
+        "@@msg ok OK\tSystem now running on ELASTICSEARCH.\\n\\nThe indexer has automatic recovery and the "
+        "watchdog checks the queue every 5 minutes.",
+        "@@ask View Report\tDo you want to see the detailed system validation report now?",
+        _REPORT,
+    ],
+    "search-repair": [
+        "@@msg info Diagnostics\tElasticsearch (9200) : OK\\nIndexer              : STOPPED\\n"
+        "Pending jobs         : 412\\nGrowing queue + smaller index = indexer is down.",
+        "@@ask Repair\tReinstall the indexer service, flush the cache and restart everything?",
+        "@@title Repairing the search index",
+        "@@step Repairing the indexing services", "@@done 0 Repairing the indexing services",
+        "@@ask Reindex\tRebuild the whole index from scratch?\\nOn large catalogs this can take several minutes.",
+        "@@step Reindexing the catalog", "@@done 0 Reindexing the catalog",
+        "@@step Checking that everything works", "@@done 0 Checking that everything works",
+        "@@msg ok OK\tIndexer is running and catalog synchronized.\\nAdd a test record and search for it after ~10 seconds.",
+        "@@ask View Report\tDo you want to see the detailed system validation report now?",
+        _REPORT,
+    ],
     "db-maintenance": [
         "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
         "@@title Deep maintenance",
@@ -144,7 +171,8 @@ _SCRIPTS: dict[str, list[str]] = {
 
 
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
-                    on_result: Callable[[str, str], None] | None, env: dict[str, str]) -> "TaskOutcome":
+                    on_result: Callable[[str, str], None] | None, env: dict[str, str],
+                    ask=None) -> "TaskOutcome":
     lines = _SCRIPTS.get(name)
     if lines is None:
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
@@ -156,6 +184,9 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         if env.get("KEI_TASK_ANSWER") == "no" and out.asks:
             break
         out.feed(line.replace("{0}", args[0] if args else _HOME), reporter, on_result)
+        # Interactive: a "no" ends the routine (its usual `|| return 0`).
+        if ask and line.startswith("@@ask ") and not await ask(out, *out.asks[-1]):
+            break
         if pause:
             await asyncio.sleep(pause)
     return out
