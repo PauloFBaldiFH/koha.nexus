@@ -154,7 +154,8 @@ function Invoke-KohaEasyDiagnose {
             }
         } catch { Show-Err $_ }
         try {
-            $tasks = @(Get-ScheduledTask -TaskPath '\KohaEasy\' -ErrorAction Stop)
+            $tasks = @(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -like 'Koha - *' }) + @(Get-ScheduledTask -TaskPath '\KohaEasy\' -ErrorAction SilentlyContinue)
+            if ($tasks.Count -eq 0) { throw 'none' }
             foreach ($t in $tasks) { Say ('  task {0}: {1} | {2} {3}' -f $t.TaskName, $t.State, @($t.Actions)[0].Execute, @($t.Actions)[0].Arguments) }
         } catch { Say '  no KohaEasy tasks' 'Yellow' }
 

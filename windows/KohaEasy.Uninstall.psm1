@@ -55,7 +55,7 @@ function Stop-KohaWindowsSide {
 # it, elevated.
 function Test-KohaUninstallNeedsAdmin {
     $cfg = Get-KohaConfig
-    if (@(Get-ScheduledTask -TaskPath $cfg.TaskPath -ErrorAction SilentlyContinue).Count -gt 0) { return $true }
+    if (@(Get-KohaTasks).Count -gt 0 -or (Test-KohaOldTasksPresent)) { return $true }
     if (@(Get-NetFirewallRule -DisplayName $cfg.FirewallRule -ErrorAction SilentlyContinue).Count -gt 0) { return $true }
     try {
         if (@(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($cfg.WebPorts -contains $_.ListenPort) }).Count -gt 0) { return $true }
@@ -75,15 +75,11 @@ function Remove-KohaAdminParts {
 
 function Remove-KohaTasks {
     $cfg = Get-KohaConfig
-    foreach ($t in @(Get-ScheduledTask -TaskPath $cfg.TaskPath -ErrorAction SilentlyContinue)) {
+    foreach ($t in @(Get-KohaTasks)) {
         try { Unregister-ScheduledTask -TaskPath $cfg.TaskPath -TaskName $t.TaskName -Confirm:$false -ErrorAction Stop } catch { }
     }
-    # The empty task folder too.
-    try {
-        $svc = New-Object -ComObject 'Schedule.Service'
-        $svc.Connect()
-        $svc.GetFolder('\').DeleteFolder($cfg.TaskPath.Trim('\'), 0)
-    } catch { }
+    # The tasks of earlier versions, in \KohaEasy\, and that folder.
+    Remove-KohaOldTasks | Out-Null
 }
 
 function Remove-KohaShortcutFiles {
