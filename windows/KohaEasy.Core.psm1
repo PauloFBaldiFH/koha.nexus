@@ -16,10 +16,11 @@ $script:Cfg = @{
     Root        = 'C:\Koha'
     Distro      = 'koha'
     OldDistros  = @('KohaEasy')
-    TaskPath    = '\KohaEasy\'
-    KeepTask    = 'Keep Koha running'
-    SignInTask  = 'Start Koha at sign-in'
-    NetTask     = 'Koha network'
+    TaskPath    = '\'
+    KeepTask    = ('Koha - Keep Koha running ({0})' -f $env:USERNAME)
+    SignInTask  = ('Koha - Start Koha at sign-in ({0})' -f $env:USERNAME)
+    NetTask     = ('Koha - Network ({0})' -f $env:USERNAME)
+    OldTaskPath = '\KohaEasy\'
     FirewallRule = 'Koha (web, local network)'
     WebPorts    = @(80, 8080)
     PanelPath   = '/usr/local/bin/koha-panel'
@@ -1088,6 +1089,43 @@ function Register-KohaTasks {
     Register-ScheduledTask -TaskPath $script:Cfg.TaskPath -TaskName $script:Cfg.SignInTask -Action (New-KohaAction 'Start -Trigger logon') `
         -Trigger $logon -Principal $principal -Settings $signSettings -Force | Out-Null
     Set-KohaAutostart -Mode $Autostart | Out-Null
+    Remove-KohaOldTasks | Out-Null
+}
+
+# The tasks live in the root folder of Task Scheduler, named after this
+# Windows user: Windows lets any user add tasks there, while making a folder
+# of tasks (\KohaEasy\, used by earlier versions) needs administrator rights
+# ("Access denied" when the install ran without them). The old tasks are
+# removed here when Windows allows it, else by the next SetupNetwork, which
+# runs as administrator. Returns how many are left.
+function Remove-KohaOldTasks {
+    $old = @(Get-ScheduledTask -TaskPath $script:Cfg.OldTaskPath -ErrorAction SilentlyContinue)
+    $left = 0
+    foreach ($t in $old) {
+        try {
+            Stop-ScheduledTask -TaskPath $script:Cfg.OldTaskPath -TaskName $t.TaskName -ErrorAction SilentlyContinue
+            Unregister-ScheduledTask -TaskPath $script:Cfg.OldTaskPath -TaskName $t.TaskName -Confirm:$false -ErrorAction Stop
+        } catch { $left++ }
+    }
+    if ($old.Count -gt 0 -and $left -eq 0) {
+        try {
+            $svc = New-Object -ComObject 'Schedule.Service'
+            $svc.Connect()
+            $svc.GetFolder('\').DeleteFolder($script:Cfg.OldTaskPath.Trim('\'), 0)
+        } catch { }
+    }
+    if ($old.Count -gt 0) { Write-KohaLog ('tasks: {0} of the {1} old tasks in {2} removed' -f ($old.Count - $left), $old.Count, $script:Cfg.OldTaskPath) }
+    return $left
+}
+
+function Test-KohaOldTasksPresent {
+    return (@(Get-ScheduledTask -TaskPath $script:Cfg.OldTaskPath -ErrorAction SilentlyContinue).Count -gt 0)
+}
+
+# This user's Koha tasks (the root folder holds every other program's too).
+function Get-KohaTasks {
+    $names = @($script:Cfg.KeepTask, $script:Cfg.SignInTask, $script:Cfg.NetTask)
+    return @(Get-ScheduledTask -TaskPath $script:Cfg.TaskPath -ErrorAction SilentlyContinue | Where-Object { $names -contains $_.TaskName })
 }
 
 # Whether the keep-alive task is running now with another action than this
@@ -1425,6 +1463,24 @@ function Get-KohaHolderStartInfo {
 # setting restarts it one minute later.
 function Invoke-KohaRun {
     param([scriptblock]$Holder, [int]$WatchMs = 60000)
+    # One keep-alive at a time: an old "Keep Koha running" task in
+    # \KohaEasy\ that Windows did not let this user remove ends here.
+    $one = $null
+    try {
+        $one = New-Object System.Threading.Mutex($false, 'Local\KohaEasyKeepAlive')
+        if (-not $one.WaitOne(0)) {
+            Write-KohaLog 'keep-alive: another one is already running, exiting'
+            $one.Dispose()
+            return 0
+        }
+    } catch [System.Threading.AbandonedMutexException] {
+    } catch { $one = $null }
+    try { return (Invoke-KohaRunHeld -Holder $Holder -WatchMs $WatchMs) }
+    finally { if ($one) { try { $one.ReleaseMutex() } catch { }; $one.Dispose() } }
+}
+
+function Invoke-KohaRunHeld {
+    param([scriptblock]$Holder, [int]$WatchMs = 60000)
     $state = Get-KohaState
     if ($state.desired -ne 'running') {
         Write-KohaLog 'keep-alive: Koha is meant to be stopped, exiting'
@@ -1583,6 +1639,8 @@ function Set-KohaLanAccess {
         -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -Hidden
     Register-ScheduledTask -TaskPath $script:Cfg.TaskPath -TaskName $script:Cfg.NetTask -Action (New-KohaAction 'UpdatePortProxy') `
         -Principal $principal -Settings $settings -Force | Out-Null
+    # As administrator, the old tasks in \KohaEasy\ can always go.
+    Remove-KohaOldTasks | Out-Null
     # The task keeps this start (KohaEasy.exe, conhost...) until the next
     # SetupNetwork: Get-KohaLanSetupNeed compares it with the current one.
     Set-KohaState @{ netLaunch = (Get-KohaHiddenLaunch -Arguments 'UpdatePortProxy').Target } | Out-Null
@@ -1624,6 +1682,7 @@ function Get-KohaLanSetupNeed {
     $fw = Get-KohaFirewallFacts
     if (-not [bool]$fw.Rule -or $fw.HyperVRule -eq $false) { return 'repair' }
     if (-not (Test-KohaNetTaskRegistered)) { return 'repair' }
+    if (Test-KohaOldTasksPresent) { return 'update' }
     return ''
 }
 
@@ -2262,7 +2321,7 @@ function Export-KohaDiagnostics {
     }
     Save-KohaText (Join-Path $win 'state.json') ($state | ConvertTo-Json -Depth 5)
     Save-KohaText (Join-Path $win 'tasks.txt') (Invoke-KohaCapture {
-            Get-ScheduledTask -TaskPath $script:Cfg.TaskPath | ForEach-Object {
+            @(Get-KohaTasks) + @(Get-ScheduledTask -TaskPath $script:Cfg.OldTaskPath -ErrorAction SilentlyContinue) | ForEach-Object {
                 $_ | Select-Object TaskName, State | Format-List
                 $_ | Get-ScheduledTaskInfo | Select-Object LastRunTime, LastTaskResult, NextRunTime, NumberOfMissedRuns | Format-List
             }
