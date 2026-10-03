@@ -22,7 +22,7 @@ function check(cond, what) {
         check(await page.locator("#area-news").count() === 0, "the news block is gone");
         check(await page.locator(".col-md-3 > #kei-ai").count() === 1, "the chat is in the news column");
         check(await page.locator(".col-md-3 > #kei-ai + #area-quote").count() === 1, "in the place of the news, above the quote");
-        check(await page.locator("#kei-ai .kei-ai-chip").count() === 3, "three example questions");
+        check(await page.locator("#kei-ai .kei-ai-chip").count() === 0, "no example questions under the chat");
 
         await page.fill("#kei-ai textarea", "that book about the clown that was made into a movie...");
         await page.press("#kei-ai textarea", "Enter");
@@ -34,7 +34,8 @@ function check(cond, what) {
         const hrefs = await page.locator("#kei-ai a.kei-ai-link").evaluateAll((l) => l.map((a) => a.getAttribute("href")));
         check(hrefs.includes("/cgi-bin/koha/catalogue/detail.pl?biblionumber=2"), "A coisa links to its record");
 
-        await page.click("#kei-ai .kei-ai-chip:nth-child(2)");
+        await page.fill("#kei-ai textarea", "The last patron with 4 overdue books and 144 in fines");
+        await page.press("#kei-ai textarea", "Enter");
         await page.waitForSelector("#kei-ai a.kei-ai-link[href*='borrowernumber=101']");
         check(/4 overdue/.test(await page.locator("#kei-ai .kei-ai-assistant").last().innerText()), "the patron with 4 overdue and 144 in fines");
 

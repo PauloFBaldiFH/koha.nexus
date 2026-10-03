@@ -1,4 +1,5 @@
 CREATE TABLE biblio (biblionumber INTEGER PRIMARY KEY, title TEXT, subtitle TEXT, author TEXT, seriestitle TEXT, copyrightdate INTEGER, abstract TEXT, notes TEXT);
+CREATE TABLE biblio_metadata (id INTEGER PRIMARY KEY, biblionumber INTEGER, format TEXT, schema TEXT, metadata TEXT);
 CREATE TABLE biblioitems (biblioitemnumber INTEGER PRIMARY KEY, biblionumber INTEGER, isbn TEXT, publishercode TEXT);
 CREATE TABLE items (itemnumber INTEGER PRIMARY KEY, biblionumber INTEGER, barcode TEXT, homebranch TEXT, itemcallnumber TEXT, onloan TEXT);
 CREATE TABLE borrowers (borrowernumber INTEGER PRIMARY KEY, cardnumber TEXT, firstname TEXT, surname TEXT, categorycode TEXT, branchcode TEXT, email TEXT, phone TEXT, dateenrolled TEXT, dateexpiry TEXT, lastseen TEXT, password TEXT);
@@ -11,8 +12,11 @@ INSERT INTO biblio VALUES (1,'It','a novel','King, Stephen',NULL,1986,'Seven fri
  (3,'Dom Casmurro',NULL,'Assis, Machado de',NULL,1899,NULL,NULL),
  (4,'O pequeno príncipe',NULL,'Saint-Exupéry, Antoine de',NULL,1943,NULL,NULL),
  (5,'Drop dead gorgeous','a mystery','Smith, Jane',NULL,2001,NULL,NULL),
- (6,'Coraline',NULL,'Gaiman, Neil',NULL,2002,'Adaptado para o cinema em 2009.',NULL);
-INSERT INTO biblioitems VALUES (1,1,'9781501142970','Scribner'),(2,2,'9788556510785','Suma'),(3,3,'9788594318602','Penguin'),(4,4,'9788595081512','HarperCollins'),(5,5,'',''),(6,6,'9788551001189','Intrínseca');
+ (6,'Coraline',NULL,'Gaiman, Neil',NULL,2002,'Adaptado para o cinema em 2009.',NULL),
+ (7,'The thorn birds',NULL,'McCullough, Colleen',NULL,1977,NULL,NULL);
+INSERT INTO biblioitems VALUES (1,1,'9781501142970','Scribner'),(2,2,'9788556510785','Suma'),(3,3,'9788594318602','Penguin'),(4,4,'9788595081512','HarperCollins'),(5,5,'',''),(6,6,'9788551001189','Intrínseca'),(7,7,'9780060129569','Harper & Row');
+INSERT INTO biblio_metadata VALUES (3,3,'marcxml','MARC21','<record xmlns="http://www.loc.gov/MARC21/slim"><datafield tag="100" ind1="1" ind2=" "><subfield code="a">Assis, Machado de,</subfield><subfield code="d">1839-1908.</subfield></datafield><datafield tag="245" ind1="1" ind2="0"><subfield code="a">Dom Casmurro</subfield></datafield><datafield tag="650" ind1=" " ind2="4"><subfield code="a">Literatura brasileira</subfield><subfield code="x">Romance.</subfield></datafield></record>'),
+ (7,7,'marcxml','MARC21','<record xmlns="http://www.loc.gov/MARC21/slim"><datafield tag="100" ind1="1" ind2=" "><subfield code="a">McCullough, Colleen.</subfield></datafield><datafield tag="245" ind1="1" ind2="4"><subfield code="a">The thorn birds</subfield></datafield><datafield tag="650" ind1=" " ind2="0"><subfield code="a">Australian literature</subfield><subfield code="y">20th century.</subfield></datafield><datafield tag="651" ind1=" " ind2="0"><subfield code="a">Australia</subfield><subfield code="v">Fiction.</subfield></datafield></record>');
 INSERT INTO items VALUES (10,1,'0001','CPL','813 K52i',NULL),(11,2,'0002','CPL','813 K52c','2026-09-12'),(12,2,'0003','CPL','813 K52c','2026-09-17'),(13,3,'0004','CPL','869.3 A848d','2026-09-23'),(14,4,'0005','CPL','843 S135p','2026-09-02'),(15,6,'0006','CPL','823 G142c','2026-09-29'),(16,3,'0007','CPL','869.3 A848d','2026-09-28'),(17,4,'0008','CPL','843 S135p','2026-12-05'),(18,5,'0009','CPL','813 S642d','2026-09-27'),(19,6,'0010','CPL','823 G142c','2026-09-26');
 INSERT INTO borrowers VALUES (101,'C0101','Ana','Souza','ADULT','CPL','ana@example.org','','2024-03-01','2027-03-01','2026-10-01','$2a$08$x'),
  (102,'C0102','Bruno','Lima','ADULT','CPL','','','2023-05-10','2026-12-31','2026-09-27','$2a$08$y'),

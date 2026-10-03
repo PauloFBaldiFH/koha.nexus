@@ -32,7 +32,7 @@ is( scalar @{ KohaEasy::Assistant::t_find_patrons( $ctx, { overdues_min => 4, ov
 ok( $ctx->{refs}{'patron:101'}{url} =~ m{moremember\.pl\?borrowernumber=101$}, 'patron url' );
 my $t = KohaEasy::Assistant::call_tool($ctx,'run_select',{sql=>'SELECT password FROM borrowers'}); like($t, qr/refused/);
 $t = KohaEasy::Assistant::call_tool($ctx,'search_catalogue',{terms=>["x' OR '1'='1", "\\'; DROP TABLE biblio; --"]}); like($t, qr/"matches":\[\]/);
-is($dbh->selectrow_array('SELECT COUNT(*) FROM biblio'), 6, 'still 6');
+is($dbh->selectrow_array('SELECT COUNT(*) FROM biblio'), 7, 'still 7');
 $t = KohaEasy::Assistant::call_tool($ctx,'propose_change',{kind=>'sql',summary=>'Waive',sql=>'UPDATE accountlines SET amountoutstanding = 0 WHERE borrowernumber = 101'});
 like($t, qr/"rows":2/); is($ctx->{proposals}[0]{run_sql}, 'UPDATE accountlines SET amountoutstanding = 0 WHERE borrowernumber = 101 LIMIT 2');
 for my $bad ('DELETE FROM items','DELETE FROM items WHERE 1=1','DROP TABLE items','UPDATE borrowers SET password=1 WHERE borrowernumber=1','TRUNCATE items','DELETE FROM items WHERE itemnumber IN (SELECT 1)') {
@@ -58,7 +58,44 @@ like(KohaEasy::Assistant::system_prompt($lim,'pt'), qr/Brazilian Portuguese/); u
 my $body = KohaEasy::Assistant::request_body({provider=>'anthropic',model=>'m'}, [{role=>'system',content=>'S'},{role=>'user',content=>'a'},{role=>'user',content=>'b'}]);
 is(scalar @{$body->{messages}}, 1); is($body->{system}, 'S');
 is(KohaEasy::Assistant::endpoint({provider=>'gemini',url=>'https://generativelanguage.googleapis.com/v1beta/openai'}), 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
-is(KohaEasy::Assistant::endpoint({provider=>'ollama',url=>'http://localhost:11434'}), 'http://localhost:11434/api/chat');
+is(KohaEasy::Assistant::endpoint({provider=>'ollama',url=>'http://localhost:11434'}), 'http://127.0.0.1:11434/api/chat');
+is(KohaEasy::Assistant::request_body({provider=>'ollama',model=>'m'}, [{role=>'system',content=>'S'},{role=>'user',content=>'a'}])->{options}{num_ctx}, 16384, 'ollama: a window that holds the tools');
+
+# Authors as the librarian writes them; subjects of the MARC record.
+$r = KohaEasy::Assistant::t_search_catalogue( $ctx, { terms => ['Machado de Assis'] } );
+is( $r->{matches}[0]{biblionumber}, 3, 'Machado de Assis finds "Assis, Machado de"' );
+is_deeply( $r->{matches}[0]{subjects}, ['Literatura brasileira -- Romance'], 'with its subjects' );
+$r = KohaEasy::Assistant::t_search_catalogue( $ctx, { terms => [ 'Australian literature', 'Literatura australiana' ] } );
+is( $r->{matches}[0]{biblionumber}, 7, 'a subject of the MARC record' );
+like( $r->{matches}[0]{found_in}, qr/MARC/ );
+is_deeply( $r->{matches}[0]{subjects}, [ 'Australian literature -- 20th century', 'Australia -- Fiction' ] );
+like( KohaEasy::Assistant::call_tool( $ctx, 'get_record', { kind => 'biblio', id => 7 } ), qr/Australian literature/, 'get_record: subjects' );
+
+# "I have no access to the database": reminded, then it searches.
+@script = ( '{"answer":"Desculpe, não tenho acesso ao banco de dados da biblioteca."}',
+            '{"tool":"search_catalogue","args":{"terms":["Machado de Assis"]}}',
+            '{"answer":"[[biblio:3|Dom Casmurro]]"}' );
+my @seen;
+$hist = [];
+$res = KohaEasy::Assistant::ask( { %$ctx, refs => {}, proposals => [] }, sub { push @seen, [ @{ $_[0] } ]; shift @script }, $hist, 'Temos livros do Machado de Assis?', 'pt' );
+is( $res->{answer}, '[[biblio:3|Dom Casmurro]]', 'refusal: reminded once, then the tool' );
+like( $seen[1][-1]{content}, qr/DO have live read access/ );
+is_deeply( $res->{steps}, ['search_catalogue'] );
+@script = ( '{"answer":"I don\'t have access to your library database."}', '{"answer":"As an AI, I cannot access it."}', '{"answer":"[[biblio:7|The thorn birds]]"}' );
+@seen = ();
+$hist = [];
+$res = KohaEasy::Assistant::ask( { %$ctx, refs => {}, proposals => [] }, sub { push @seen, [ @{ $_[0] } ]; shift @script }, $hist, 'Do we have any Australian literature?', 'en' );
+is_deeply( $res->{steps}, ['search_catalogue'], 'refusing twice: the catalogue is searched for it' );
+like( $seen[2][-2]{content}, qr/"terms":\["Australian","literature"\]/ );
+like( $seen[2][-1]{content}, qr/thorn birds/ );
+@script = ( '{"answer":"I do not have access to the database."}', '{"answer":"I do not have access to the database."}' );
+$hist = [];
+$res = KohaEasy::Assistant::ask( { %$ctx, refs => {}, proposals => [] }, sub { shift @script // '{"answer":"I do not have access."}' }, $hist, 'ok?', 'en' );
+is( scalar @$hist, 0, 'a refusal is not kept in the history' );
+@script = ('{"answer":"Olá! Como posso ajudar?"}');
+$res = KohaEasy::Assistant::ask( { %$ctx, refs => {}, proposals => [] }, sub { shift @script }, $hist, 'oi', 'pt' );
+is( $res->{answer}, 'Olá! Como posso ajudar?', 'a greeting is not a refusal' );
+is_deeply( KohaEasy::Assistant::question_terms('Temos livros do Machado de Assis sobre o Rio de Janeiro?'), [ 'Machado de Assis', 'Rio de Janeiro' ] );
 
 # Never readable, whatever the account allows.
 for my $bad ( 'SELECT * FROM identity_providers', 'SELECT * FROM message_queue', 'SELECT secret FROM borrowers',
