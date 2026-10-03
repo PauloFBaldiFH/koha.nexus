@@ -145,6 +145,18 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@ask View Report\tDo you want to see the detailed system validation report now?",
         _REPORT,
     ],
+    "fail2ban": ["@@preview 🚨 Fail2ban\t=== sshd ===\\nStatus for the jail: sshd\\n|- Currently failed: 2\\n"
+                 "`- Currently banned: 1\\n   `- Banned IP list: 203.0.113.7"],
+    "ufw": ["@@preview 🧱 UFW\tStatus: active\\n\\nTo                         Action      From\\n"
+            "80/tcp                     ALLOW IN    Anywhere\\n8080/tcp                   DENY IN     Anywhere"],
+    "staff-firewall": ["@@ask Staff firewall\tBLOCK direct external access to 8080?",
+                       "@@msg ok OK\tPort 8080 now allowed only from 127.0.0.1 and the local network."],
+    "rotate-db-password": [
+        "@@ask Rotate Password\tA new strong password will be generated for the database user,\\nkoha-conf.xml "
+        "updated and services restarted.\\n\\nContinue?",
+        "@@result password=Xq7demoNewPassw0rd24ch", "@@result file=/root/koha_credentials.txt",
+        "@@msg ok OK\tPassword rotated and Koha still responds.\\n\\nNew password: Xq7demoNewPassw0rd24ch"
+        "\\n(/root/koha_credentials.txt)"],
     "db-maintenance": [
         "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
         "@@title Deep maintenance",

@@ -8589,6 +8589,10 @@ function_fail2ban_status() {
     for jail in sshd apache-auth apache-badbots; do
         info+="=== ${jail} ===\n$(fail2ban-client status "$jail" 2>/dev/null || t 'jail inactive')\n\n"
     done
+    if [ -n "${KEI_TASK:-}" ]; then
+        kei_emit preview "$(t '🚨 Fail2ban')"$'\t'"$(printf '%b' "$info")"
+        return 0
+    fi
     whiptail --title "$(t '🚨 Fail2ban')" --scrolltext --msgbox "$(printf '%b' "$info")" 24 78 || true
 }
 
@@ -8654,6 +8658,9 @@ function_rotate_db_password() {
         cred=$(<"$CREDENTIALS_FILE")
         printf '%s\n' "${cred//"$old_pass"/"$new_pass"}" > "$CREDENTIALS_FILE"
     fi
+    # From here the new password is in force, whatever the test says.
+    kei_result password "$new_pass"
+    kei_result file "$CREDENTIALS_FILE"
     systemctl restart memcached koha-common >/dev/null 2>&1
     plack_restart
     sleep 2
@@ -8673,6 +8680,10 @@ function_ufw_rules() {
     fi
     rules=$(ufw status verbose 2>/dev/null)
     [ -z "$rules" ] && rules="$(t "UFW firewall is not installed. Install Koha first (option 1).")"
+    if [ -n "${KEI_TASK:-}" ]; then
+        kei_emit preview "$(t '🧱 UFW')"$'\t'"$rules"
+        return 0
+    fi
     whiptail --title "$(t '🧱 UFW')" --scrolltext --msgbox "$rules" 24 78 || true
 }
 
@@ -24680,6 +24691,10 @@ kei_task() {
         reboot)          reboot_now ;;
         search-toggle)   function_toggle_search_engine ;;
         search-repair)   function_repair_indexing ;;
+        fail2ban)        function_fail2ban_status ;;
+        ufw)             function_ufw_rules ;;
+        staff-firewall)  function_staff_firewall ;;
+        rotate-db-password) function_rotate_db_password ;;
         status)
             local g label value
             while IFS=$'\t' read -r g label value; do

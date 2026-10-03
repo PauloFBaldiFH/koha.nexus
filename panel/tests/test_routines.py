@@ -314,3 +314,40 @@ def test_search_toggle_no_changes_nothing():
             return text, type(app.screen).__name__
     text, screen = asyncio.run(main())
     assert "ELASTICSEARCH" in text and screen not in ("MessageScreen", "LoadingScreen", "ConfirmScreen")
+
+
+def test_rotate_password_confirms_then_offers_copy():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("rotate-db-password")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            danger = confirm._danger
+            confirm.query_one("#yes").press()
+            done = await _wait_for(pilot, MessageScreen)
+            return danger, done._command
+    danger, command = asyncio.run(main())
+    assert danger and command == "Xq7demoNewPassw0rd24ch"
+
+
+def test_staff_firewall_is_a_choice_not_a_yes_no():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("staff-firewall")
+            choice = await _wait_for(pilot, ChoiceScreen)
+            keys = [k for k, _ in choice._options]
+            choice.dismiss("block")
+            done = await _wait_for(pilot, MessageScreen)
+            return keys, done._kind
+    keys, kind = asyncio.run(main())
+    assert keys == ["block", "open"] and kind == "ok"
+
+
+def test_fail2ban_shows_the_jails():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("fail2ban")
+            return (await _wait_for(pilot, TextScreen))._text
+    assert "203.0.113.7" in asyncio.run(main())
