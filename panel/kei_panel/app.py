@@ -35,6 +35,11 @@ class KohaPanelApp(App):
         # Classic console / Linux console: ASCII borders (panel.tcss, App.-plain).
         self.set_class(self.env.plain, "-plain")
         self.theme = "textual-dark"
+        if not self.env.demo and not self.env.language_chosen():
+            # New installation: the language first (config.sh restarts the app in it).
+            from .screens.language import LanguageScreen
+            self.push_screen(LanguageScreen(self.env.installer))
+            return
         self.push_screen(MainScreen())
         if self.env.demo:
             self.notify("Demo mode: nothing is run on this machine.", timeout=4)

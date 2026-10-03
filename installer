@@ -4115,7 +4115,6 @@ install_panel_copy() {
 # by the new panel as "config.sh --run <action>" with this panel's lock
 # descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
 #   KEI_UI=whiptail (or dialog)  always the classic panel
-#   KEI_UI=textual               the new panel, set up again if needed
 # Anything that fails (no network for the first set-up, an old Python, a
 # crash) opens the classic panel: it stays the safe way in.
 KEI_LIB_DIR="/usr/local/lib/koha-easy-installer"
@@ -4172,74 +4171,110 @@ kei_panel_src_current() {
     [ "$(cat "$KEI_PANEL_SRC/.panel-version" 2>/dev/null)" = "${PANEL_VERSION# }" ]
 }
 
-# The whole set-up, run under tui_run (Pac-Man on screen, output to the log).
+# The whole set-up, run under tui_run (Pac-Man on screen, output to the
+# log; it runs in the panel's own shell, so KEI_PANEL_WHY reaches the caller).
 kei_panel_setup_task() {
+    KEI_PANEL_WHY=""
     # Sources older than this script (only the installer was updated) or
     # none at all: fetched from GitHub; an old copy still works if offline.
     if ! kei_panel_src_ok "$KEI_PANEL_SRC" || ! kei_panel_src_current; then
-        if ! kei_panel_download_src; then
-            kei_panel_src_ok "$KEI_PANEL_SRC" || return 1
-            # Not asked again at every start while offline (kei_panel_ready).
-            mkdir -p "$KEI_LIB_DIR" && touch "$KEI_PANEL_FAILED"
+        if ! kei_panel_download_src && ! kei_panel_src_ok "$KEI_PANEL_SRC"; then
+            KEI_PANEL_WHY="$(t "Could not download the new panel from GitHub (no internet?).")"
+            return 1
         fi
     fi
-    command -v python3 >/dev/null 2>&1 || apt_install python3 || return 1
-    python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' || return 1
-    python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv || return 1
+    if ! command -v python3 >/dev/null 2>&1 && ! apt_install python3; then
+        KEI_PANEL_WHY="$(t "Could not install Python 3.")"
+        return 1
+    fi
+    if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))'; then
+        KEI_PANEL_WHY="$(t "This system's Python is older than 3.9.")"
+        return 1
+    fi
+    if ! python3 -c 'import ensurepip, venv' >/dev/null 2>&1 && ! apt_install python3-venv; then
+        KEI_PANEL_WHY="$(t "Could not install python3-venv.")"
+        return 1
+    fi
     kei_panel_venv_ok "$KEI_PANEL_SRC" && return 0
+    # pip checks HTTPS against the system's certificates (a proxy or
+    # antivirus that inspects HTTPS adds its own there), not only its own list.
+    local cert=""
+    [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
     # A venv is tied to its path: built in place, removed again on failure.
     rm -rf "$KEI_PANEL_VENV"
-    if python3 -m venv "$KEI_PANEL_VENV" \
-       && "$KEI_PANEL_VENV/bin/python" -m pip install --quiet --disable-pip-version-check \
-            -r "$KEI_PANEL_SRC/requirements.txt" \
+    if ! python3 -m venv "$KEI_PANEL_VENV"; then
+        KEI_PANEL_WHY="$(t "Could not create the Python environment (python3 -m venv).")"
+        return 1
+    fi
+    if PIP_CERT="${PIP_CERT:-$cert}" "$KEI_PANEL_VENV/bin/python" -m pip install --quiet \
+           --disable-pip-version-check --retries 2 --timeout 20 -r "$KEI_PANEL_SRC/requirements.txt" \
        && cp -f "$KEI_PANEL_SRC/requirements.txt" "$KEI_PANEL_VENV/.requirements" \
        && kei_panel_venv_ok "$KEI_PANEL_SRC"; then
         return 0
     fi
     rm -rf "$KEI_PANEL_VENV"
+    KEI_PANEL_WHY="$(t "Could not download Textual from pypi.org (no internet, or HTTPS blocked).")"
     return 1
 }
 
+# Why the classic panel opens instead: a box with the reason, the last
+# lines of the log and how to choose. Never a silent switch.
+kei_panel_explain_fallback() {
+    local why="$1" tail_txt
+    tail_txt=$(tui_log_tail "$APT_LOG" 4 2>/dev/null)
+    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start. KEI_UI=whiptail always opens the classic panel. Log: \${APT_LOG}")" 20 78
+}
+
 # 0 when the new panel should be used, setting it up first if needed.
+# Decided once per run (KEI_PANEL_STATE): the first-run language question
+# and the main menu both ask.
+KEI_PANEL_STATE=""
 kei_panel_ready() {
+    case "$KEI_PANEL_STATE" in ready) return 0 ;; no) return 1 ;; esac
+    KEI_PANEL_STATE=no
     case "${KEI_UI:-}" in whiptail|dialog) return 1 ;; esac
     [ -t 0 ] && [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] || return 1
     # Sources that came with this script replace the installed copy.
     if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
         kei_panel_install_src "${_SCRIPT_DIR}/panel" 2>/dev/null
     fi
-    local usable=1
-    kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_venv_ok "$KEI_PANEL_SRC" && usable=0
-    [ "$usable" = 0 ] && kei_panel_src_current && return 0
-    # A set-up that failed (offline server...) is tried again a day later,
-    # or at once with KEI_UI=textual; an older working copy is used meanwhile.
-    if [ "${KEI_UI:-}" != "textual" ] && [ -f "$KEI_PANEL_FAILED" ] \
-       && [ $(( $(date +%s) - $(stat -c %Y "$KEI_PANEL_FAILED" 2>/dev/null || echo 0) )) -lt 86400 ]; then
-        return "$usable"
+    if kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_src_current && kei_panel_venv_ok "$KEI_PANEL_SRC"; then
+        KEI_PANEL_STATE=ready
+        return 0
     fi
     clear
     printf '\n'
     if TUI_LOG="$APT_LOG" tui_run "$(t "Preparing the new panel")" kei_panel_setup_task; then
-        kei_panel_src_current && rm -f "$KEI_PANEL_FAILED"
+        rm -f "$KEI_PANEL_FAILED"
+        KEI_PANEL_STATE=ready
         return 0
     fi
-    mkdir -p "$KEI_LIB_DIR" && touch "$KEI_PANEL_FAILED"
-    log "new panel: set-up failed (see $APT_LOG)"
-    kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_venv_ok "$KEI_PANEL_SRC" && return 0
-    sleep 2
+    mkdir -p "$KEI_LIB_DIR" && printf '%s\n' "${KEI_PANEL_WHY:-?}" > "$KEI_PANEL_FAILED"
+    log "new panel: set-up failed: ${KEI_PANEL_WHY:-?} (see $APT_LOG)"
+    # An older copy that still works is used.
+    if kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_venv_ok "$KEI_PANEL_SRC"; then
+        KEI_PANEL_STATE=ready
+        return 0
+    fi
+    kei_panel_explain_fallback "${KEI_PANEL_WHY:-$(t "Unknown error.")}"
     return 1
 }
 
 # Runs the new panel. 0 = the librarian closed it; anything else (it could
-# not start or crashed) = the caller opens the classic panel.
+# not start or crashed) = the caller opens the classic panel. Exit code 3:
+# the language was chosen in the new panel's first screen; it starts again
+# in that language.
 kei_panel_run() {
     local rc
-    KEI_INSTALLER="$(readlink -f "$_SCRIPT_PATH")" KEI_PANEL_LOCK_FD=9 \
-        PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 \
-        "$KEI_PANEL_VENV/bin/python" -m kei_panel 2>>"$RUN_LOG"
-    rc=$?
-    log "new panel: exit $rc"
-    return "$rc"
+    while :; do
+        KEI_INSTALLER="$(readlink -f "$_SCRIPT_PATH")" KEI_PANEL_LOCK_FD=9 \
+            PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 \
+            "$KEI_PANEL_VENV/bin/python" -m kei_panel 2>>"$RUN_LOG"
+        rc=$?
+        log "new panel: exit $rc"
+        [ "$rc" = 3 ] || return "$rc"
+        set_panel_language "$(_read_lang_conf KOHA_PANEL_LANG_FULL)"
+    done
 }
 
 # ----------------------------------------------------------------------
@@ -24229,7 +24264,10 @@ is_koha_installed && ficha_refresh
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO
 # ======================================================================
-if [ ! -s "$TRANSLATION_CONFIG" ] || [ -z "$(_read_lang_conf KOHA_PANEL_LANG)" ]; then
+# The new panel asks it in its own first screen when it can run.
+kei_panel_language_set() { [ -s "$TRANSLATION_CONFIG" ] && [ -n "$(_read_lang_conf KOHA_PANEL_LANG)" ]; }
+kei_ask_panel_language() {
+    local _init_choice
     _init_choice=$(whiptail --title "Language / Idioma" \
         --nocancel \
         --default-item "pt-BR" \
@@ -24238,7 +24276,9 @@ if [ ! -s "$TRANSLATION_CONFIG" ] || [ -z "$(_read_lang_conf KOHA_PANEL_LANG)" ]
         3>&1 1>&2 2>&3)
     [ -z "$_init_choice" ] && _init_choice="pt-BR"
     set_panel_language "$_init_choice"
-    unset _init_choice
+}
+if ! kei_panel_language_set; then
+    if [ "${1:-}" = "--run" ] || ! kei_panel_ready; then kei_ask_panel_language; fi
 fi
 
 # ======================================================================
@@ -24311,8 +24351,9 @@ fi
 restore_apt_timers
 if kei_panel_ready; then
     kei_panel_run && { clear; exit 0; }
-    msg_info "$(t "Control Dashboard")" "$(t "The new panel could not start. The classic panel opens instead.\n\nDetails: \${RUN_LOG}")" 11 74
+    msg_info "$(t "Classic panel")" "$(t "The new panel could not start. The classic panel opens instead.\n\nDetails: \${RUN_LOG}")" 11 74
 fi
+kei_panel_language_set || kei_ask_panel_language
 
 # ======================================================================
 # MAIN MENU (17 OPTIONS)

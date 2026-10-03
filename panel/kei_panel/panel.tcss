@@ -280,3 +280,20 @@ App.-plain .dialog-log {
 App.-plain .action-card:focus { border: ascii $primary; }
 App.-plain #sidebar { border-right: ascii $panel-lighten-1; }
 .-narrow #sidebar { width: 28; }
+
+/* ---- first start: language ----------------------------------------- */
+LanguageScreen {
+    align: center middle;
+}
+#language-box {
+    width: 64;
+    max-width: 95%;
+    height: auto;
+    max-height: 90%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+}
+#language-title { text-style: bold; padding-bottom: 1; }
+#language-list { height: 22; }
+App.-plain #language-box { border: ascii $primary; }
