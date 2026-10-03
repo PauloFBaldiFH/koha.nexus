@@ -229,3 +229,47 @@ def test_credentials_have_one_copy_button_per_value():
             return screen._values, len(screen.query(".detail-copy"))
     values, buttons = asyncio.run(main())
     assert buttons == len(values) == 8 and values[6] == "demo-Pa55word"
+
+
+def test_status_is_a_native_table():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("status")
+            screen = await _wait_for(pilot, CredentialsScreen)
+            return [g for g, _ in screen._groups], len(screen.query(".detail-copy"))
+    groups, copies = asyncio.run(main())
+    assert groups == ["SERVICES", "SEARCH", "MACHINE", "BACKUP"] and copies == 0
+
+
+def test_health_shows_summary_and_report():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("health")
+            screen = await _wait_for(pilot, TextScreen)
+            return screen
+    screen = asyncio.run(main())
+    assert "No critical failures" in screen._body and "VALIDATION REPORT" in screen._text
+
+
+def test_log_follow_shows_new_lines(tmp_path):
+    from kei_panel.screens.logtail import LogTailScreen
+    log = tmp_path / "intranet-error.log"
+    log.write_text("".join(f"old line {i}\n" for i in range(80)))
+
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            screen = LogTailScreen("Apache", str(log), interval=0.1)
+            app.push_screen(screen)
+            await pilot.pause(0.3)
+            with log.open("a") as fh:
+                fh.write("[error] DBI connect failed\n")
+            await pilot.pause(0.5)
+            from textual.widgets import RichLog
+            lines = [strip.text for strip in screen.query_one(RichLog).lines]
+            return lines
+    lines = asyncio.run(main())
+    text = "\n".join(lines)
+    assert "old line 29" not in text and "old line 79" in text and "DBI connect failed" in text

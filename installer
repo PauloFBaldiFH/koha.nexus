@@ -8111,8 +8111,10 @@ st_mark() {
     esac
 }
 
-function_detailed_status() {
-    local engine idx pend docs bibs plack email
+# The server status as "GROUP<TAB>LABEL<TAB>VALUE" lines (the classic box
+# and the panel's status screen both read them).
+detailed_status_rows() {
+    local engine idx pend docs bibs plack email g
     engine=$(get_search_engine)
     if is_koha_indexer_running; then idx="🟢 $(t "running")"; else idx="⚪ $(t "stopped")"; fi
     if plack_running; then plack="🟢 $(t "running")"; else plack="🔴 $(t "stopped")"; fi
@@ -8120,35 +8122,48 @@ function_detailed_status() {
     pend=$(get_pending_es_jobs)
     docs=$(get_total_es_documents)
     bibs=$(get_total_biblios)
-    whiptail --title "$(t "Server Status")" --scrolltext --msgbox \
-"$(t "SERVICES")
-  Apache         : $(st_mark "$(systemctl is-active apache2 2>/dev/null)")
-  MariaDB        : $(st_mark "$(systemctl is-active mariadb 2>/dev/null)")
-  Memcached      : $(st_mark "$(systemctl is-active memcached 2>/dev/null)")
-  Koha common    : $(st_mark "$(systemctl is-active koha-common 2>/dev/null)")
-  Cron           : $(st_mark "$(systemctl is-active cron 2>/dev/null)")
-  Plack          : ${plack}
-  Zebra          : $(if is_koha_zebra_running; then st_mark active; else st_mark inactive; fi)
-  Elasticsearch  : $(st_mark "$(systemctl is-active elasticsearch 2>/dev/null)")
-  ES Indexer     : ${idx}
-  Cloudflare     : $(st_mark "$(systemctl is-active cloudflared 2>/dev/null)")
-  E-mail         : ${email}
+    g=$(t "SERVICES")
+    printf '%s\t%s\t%s\n' \
+        "$g" "Apache" "$(st_mark "$(systemctl is-active apache2 2>/dev/null)")" \
+        "$g" "MariaDB" "$(st_mark "$(systemctl is-active mariadb 2>/dev/null)")" \
+        "$g" "Memcached" "$(st_mark "$(systemctl is-active memcached 2>/dev/null)")" \
+        "$g" "Koha common" "$(st_mark "$(systemctl is-active koha-common 2>/dev/null)")" \
+        "$g" "Cron" "$(st_mark "$(systemctl is-active cron 2>/dev/null)")" \
+        "$g" "Plack" "$plack" \
+        "$g" "Zebra" "$(if is_koha_zebra_running; then st_mark active; else st_mark inactive; fi)" \
+        "$g" "Elasticsearch" "$(st_mark "$(systemctl is-active elasticsearch 2>/dev/null)")" \
+        "$g" "ES Indexer" "$idx" \
+        "$g" "Cloudflare" "$(st_mark "$(systemctl is-active cloudflared 2>/dev/null)")" \
+        "$g" "E-mail" "$email"
+    g=$(t "SEARCH")
+    printf '%s\t%s\t%s\n' \
+        "$g" "$(t "Engine")" "${engine:-?}" \
+        "$g" "$(t "Pending jobs")" "${pend:-0}" \
+        "$g" "$(t "Index/database")" "${docs:-?} / ${bibs:-?}"
+    g=$(t "MACHINE")
+    printf '%s\t%s\t%s\n' \
+        "$g" "$(t "Memory")" "$(free -h 2>/dev/null | awk 'NR==2{print $3" / "$2}')" \
+        "$g" "$(t "Disk (/)")" "$(df -h / 2>/dev/null | awk 'NR==2{print $4" '"$(t "free of")"' "$2}')" \
+        "$g" "$(t "Uptime")" "$(uptime -p 2>/dev/null)" \
+        "$g" "$(t "Timezone")" "$(get_current_timezone)" \
+        "$g" "IP" "$(get_server_ip)"
+    g=$(t "BACKUP")
+    printf '%s\t%s\t%s\n' \
+        "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" -name '*.sql.gz' -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
+        "$g" "$(t "Cloud")" "$(grep -o 'RCLONE_REMOTE="[^"]*"' "$BACKUP_CONF" 2>/dev/null | cut -d'"' -f2 | grep . || echo "$(t "not configured")")"
+}
 
-$(t "SEARCH")
-  $(t "Engine")         : ${engine:-?}
-  $(t "Pending jobs") : ${pend:-0}
-  $(t "Index/database")  : ${docs:-?} / ${bibs:-?}
-
-$(t "MACHINE")
-  $(t "Memory")       : $(free -h 2>/dev/null | awk 'NR==2{print $3" / "$2}')
-  $(t "Disk (/)")      : $(df -h / 2>/dev/null | awk 'NR==2{print $4" '"$(t "free of")"' "$2}')
-  $(t "Uptime")      : $(uptime -p 2>/dev/null)
-  $(t "Timezone")         : $(timedatectl show -p Timezone --value 2>/dev/null)
-  IP             : $(get_server_ip)
-
-$(t "BACKUP")
-  $(t "Latest SQL")    : $(find "$DIR_SQL" -name '*.sql.gz' -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 || echo '-')
-  $(t "Cloud")         : $(grep -o 'RCLONE_REMOTE="[^"]*"' "$BACKUP_CONF" 2>/dev/null | cut -d'"' -f2 | grep . || echo "$(t "not configured")")" 29 78 2>/dev/null || true
+function_detailed_status() {
+    local text="" group="" g label value
+    while IFS=$'\t' read -r g label value; do
+        if [ "$g" != "$group" ]; then
+            [ -n "$group" ] && text+=$'\n'
+            text+="${g}"$'\n'
+            group=$g
+        fi
+        text+=$(printf '  %-15s: %s' "$label" "$value")$'\n'
+    done < <(detailed_status_rows)
+    whiptail --title "$(t "Server Status")" --scrolltext --msgbox "${text%$'\n'}" 29 78 2>/dev/null || true
 }
 
 # ======================================================================
@@ -8423,6 +8438,21 @@ function_run_monitor() {
 # ======================================================================
 # 25. REAL-TIME LOG AUDITING
 # ======================================================================
+# The Apache error log of the staff interface (1) or the OPAC (2).
+apache_error_log() {
+    local log_file="/var/log/koha/${INSTANCE}/intranet-error.log"
+    [ "$1" = "2" ] && log_file="/var/log/koha/${INSTANCE}/opac-error.log"
+    # Older Koha packages logged under /var/log/apache2.
+    if [ ! -f "$log_file" ]; then
+        if [ "$1" = "2" ]; then
+            log_file="/var/log/apache2/koha_${INSTANCE}_opac_error.log"
+        else
+            log_file="/var/log/apache2/koha_${INSTANCE}_error.log"
+        fi
+    fi
+    printf '%s' "$log_file"
+}
+
 function_view_logs() {
     local opc
     opc=$(whiptail --title "$(t "Apache Log Auditing")" \
@@ -8435,16 +8465,8 @@ function_view_logs() {
     echo -e "\e[1;33m>>> $(t "Displaying the last 50 log lines in real-time...")\e[0m"
     echo -e "\e[1;33m>>> $(t "Press [CTRL+C] at any time to exit and return to the menu.")\e[0m\n"
     
-    local log_file="/var/log/koha/${INSTANCE}/intranet-error.log"
-    [ "$opc" = "2" ] && log_file="/var/log/koha/${INSTANCE}/opac-error.log"
-    # Older Koha packages logged under /var/log/apache2.
-    if [ ! -f "$log_file" ]; then
-        if [ "$opc" = "2" ]; then
-            log_file="/var/log/apache2/koha_${INSTANCE}_opac_error.log"
-        else
-            log_file="/var/log/apache2/koha_${INSTANCE}_error.log"
-        fi
-    fi
+    local log_file
+    log_file=$(apache_error_log "$opc")
     if [ ! -f "$log_file" ]; then
         msg_error "" "$(t "Log file not found: \${log_file}")" 9 76
         return 0
@@ -24642,6 +24664,23 @@ kei_task() {
         validation-report)
             show_validation_report ;;
         reboot)          reboot_now ;;
+        status)
+            local g label value
+            while IFS=$'\t' read -r g label value; do
+                kei_result row "${g}"$'\t'"${label}"$'\t'"${value}"
+            done < <(detailed_status_rows)
+            return 0 ;;
+        health)          function_validate_system ;;
+        repair-services) function_repair_services ;;
+        apache-log)
+            # The panel follows the file itself; here only where it is.
+            local log_file
+            log_file=$(apache_error_log "${1:-1}")
+            if [ ! -f "$log_file" ]; then
+                msg_error "" "$(t "Log file not found: \${log_file}")"
+                return 1
+            fi
+            kei_result file "$log_file" ;;
         *)
             kei_emit msg "error $(t "Error")"$'\t'"$(t "Unknown panel action:") $name"
             return 2 ;;

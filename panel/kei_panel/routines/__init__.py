@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, install
+from . import backup, database, diagnostics, install
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -26,6 +26,11 @@ ROUTINES: dict[str, Routine] = {
     "reports": database.reports_pack,
     "install": install.install_koha,
     "credentials": install.credentials,
+    "status": diagnostics.status,
+    "health": diagnostics.health,
+    "validation-report": diagnostics.validation_report,
+    "apache-log": diagnostics.apache_log,
+    "repair-services": diagnostics.repair_services,
 }
 
 
