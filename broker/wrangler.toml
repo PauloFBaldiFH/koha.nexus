@@ -1,0 +1,89 @@
+# Koha subdomain broker (Cloudflare Worker). See README.md.
+#
+# Fill in before the first deploy (none of these are secrets):
+#   CF_ACCOUNT_ID, CF_ZONE_ID  (dashboard: koha.nexus -> Overview, right column)
+#   database_id                (printed by `npx wrangler d1 create kei-broker`)
+# Secrets are never written here: `npx wrangler secret put CF_API_TOKEN`,
+# `ADMIN_TOKEN` and `STAFF_SESSION_KEY`.
+
+name = "kei-broker"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+workers_dev = false
+
+routes = [
+  # Public API and the /join page.
+  { pattern = "broker.koha.nexus", custom_domain = true },
+  # Edge gate in front of every staff hostname (<name>-admin.koha.nexus).
+  # OPAC hostnames do not match, so they never run this Worker.
+  { pattern = "*-admin.koha.nexus/*", zone_name = "koha.nexus" },
+]
+
+[vars]
+CF_ACCOUNT_ID = "REPLACE_WITH_ACCOUNT_ID"
+CF_ZONE_ID = "REPLACE_WITH_ZONE_ID"
+ZONE_NAME = "koha.nexus"
+BROKER_HOST = "broker.koha.nexus"
+# Prefix for every library name. Empty in production; "t-" in a test zone.
+NAME_PREFIX = ""
+STAFF_SUFFIX = "-admin"
+# "true": every request is approved at once under the first free valid name.
+# "false": an admin approves each request (/admin/enrollments).
+AUTO_APPROVE = "true"
+# Above 0: pause enrollment after that many new libraries in 24 hours.
+MAX_LIBRARIES_PER_DAY = "0"
+# PBKDF2-SHA256 iterations for the staff gate password (workerd allows at
+# most 100000). Only login requests hash; lower it if the plan's CPU limit
+# rejects logins. Existing passwords keep the count they were saved with.
+PBKDF2_ITERATIONS = "100000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kei-broker"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "PROVISIONER"
+class_name = "Provisioner"
+
+# SQLite-backed Durable Objects are available on the Workers Free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Provisioner"]
+
+[[queues.producers]]
+binding = "PROVISION_QUEUE"
+queue = "kei-provision"
+
+[[queues.consumers]]
+queue = "kei-provision"
+max_batch_size = 5
+max_batch_timeout = 1
+# The consumer counts attempts itself (rollback after 6) and retries with
+# backoff; this is only the outer bound before the dead-letter queue.
+max_retries = 10
+dead_letter_queue = "kei-provision-dlq"
+
+# Rate limiters (namespace_id: any integer, unique in the account).
+[[ratelimits]]
+name = "RL_DEVICE"
+namespace_id = "7301"
+simple = { limit = 3, period = 60 }
+
+[[ratelimits]]
+name = "RL_API"
+namespace_id = "7302"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "RL_STAFF"
+namespace_id = "7303"
+simple = { limit = 20, period = 60 }
+
+[triggers]
+# Hourly reconciliation and cleanup.
+crons = ["0 * * * *"]
+
+[observability]
+enabled = true

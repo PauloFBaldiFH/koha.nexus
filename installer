@@ -6925,7 +6925,7 @@ EOF
 #   broker-enroll.conf request waiting for approval (0600: holds its code)
 #   koha-broker.env    TUNNEL_TOKEN for the cloudflared service (0600)
 # ----------------------------------------------------------------------
-KEI_BROKER_URL="${KEI_BROKER_URL:-https://koha-broker.bibliotecamunicipalpalotina.org}"
+KEI_BROKER_URL="${KEI_BROKER_URL:-https://broker.koha.nexus}"
 TUNNEL_CONF="${CONF_DIR}/tunnel.conf"
 BROKER_KEY="${CONF_DIR}/broker.key"
 BROKER_ENROLL="${CONF_DIR}/broker-enroll.conf"
