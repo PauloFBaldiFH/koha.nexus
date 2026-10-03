@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Test double of a Koha staff interface for the AI assistant (tests only).
+
+    staff-mock PORT STATE_DIR
+
+  /cgi-bin/koha/mainpage.pl        the staff home page (intranet-main.tt) with
+                                   its news block, jQuery and STATE_DIR/userjs.js
+                                   as IntranetUserJS; ?nonews=1 without the news
+  /cgi-bin/koha/tools/ai_assistant.pl
+                                   STATE_DIR/ai_assistant.pl run as a CGI with
+                                   the Koha doubles of tests/ai_assistant/perl5
+                                   (session cookie CGISESSID=SESS1)
+  /v1/chat/completions             a scripted model (OpenAI-compatible) that
+                                   answers the example questions the way a
+                                   real model should; requests go to
+                                   STATE_DIR/model.log
+  any other /cgi-bin/koha/... page a stub naming the page (link targets)
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+
+PORT, STATE = int(sys.argv[1]), sys.argv[2]
+HERE = os.path.dirname(os.path.abspath(__file__))
+JQUERY = "/usr/share/javascript/jquery/jquery.min.js"
+
+PAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Koha staff interface</title>
+<meta name="csrf-token" content="tok-SESS1">
+<style>
+body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 14px; color: #333; background: #f3f4f4; }
+#header { background: #fff; border-bottom: 1px solid #ddd; padding: 8px 16px; display: flex; gap: 16px; align-items: center; }
+#header b { color: #408540; font-size: 18px; } #header a { color: #333; text-decoration: none; }
+#breadcrumbs { padding: 8px 16px; color: #666; font-size: 13px; }
+.container-fluid { padding: 0 16px; } .row { display: flex; gap: 16px; }
+.col-md-3 { flex: 0 0 calc(25% - 12px); min-width: 0; } .col-md-9 { flex: 1; }
+.page-section { background: #fff; border-radius: 6px; padding: 12px; margin-bottom: 1em; }
+.biglinks-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.biglinks-list a { display: block; background: #fff; border-radius: 6px; padding: 14px; color: #333; font-size: 16px; text-decoration: none; }
+.btn { border: 1px solid #ccc; border-radius: 4px; padding: 4px 10px; background: #fff; cursor: pointer; }
+.btn-primary { background: #408540; border-color: #408540; color: #fff; } .btn-warning { background: #ffc107; }
+.btn-danger { background: #c9302c; color: #fff; } .btn-sm { font-size: 12px; padding: 3px 8px; }
+h3 { margin: 0 0 8px; font-size: 17px; }
+</style>
+<script src="/js/jquery.js"></script></head>
+<body id="main_intranet-main" class="main">
+<div id="header"><b>Koha</b><a href="#">Circulation</a><a href="#">Patrons</a><a href="#">Search</a><a href="#">Cataloging</a><a href="#">More</a></div>
+<nav id="breadcrumbs">Home</nav>
+<div id="container-main" class="container-fluid"><div class="row">
+<div class="col-md-3">
+%NEWS%
+<div id="area-quote" class="page-section"><h3>Quote of the day</h3><p>"A library is a hospital for the mind." Anonymous</p></div>
+</div>
+<div class="col-md-9"><ul class="biglinks-list">
+<li><a href="/cgi-bin/koha/circ/circulation-home.pl">Circulation</a></li><li><a href="/cgi-bin/koha/members/members-home.pl">Patrons</a></li>
+<li><a href="/cgi-bin/koha/catalogue/advsearch.pl">Advanced search</a></li><li><a href="/cgi-bin/koha/cataloguing/cataloging-home.pl">Cataloging</a></li>
+<li><a href="/cgi-bin/koha/reports/reports-home.pl">Reports</a></li><li><a href="/cgi-bin/koha/tools/tools-home.pl">Tools</a></li>
+<li><a href="/cgi-bin/koha/acqui/acqui-home.pl">Acquisitions</a></li><li><a href="/cgi-bin/koha/admin/admin-home.pl">Koha administration</a></li>
+</ul></div>
+</div></div>
+<script>
+%USERJS%
+</script>
+</body></html>"""
+
+NEWS = """<div id="area-news" class="page-section"><h3><span class="news_title">News</span></h3>
+<div class="newsitem"><h4>Welcome to Koha</h4><p>Welcome to Koha. Koha is a full-featured open-source ILS.</p></div></div>"""
+
+
+def model_reply(messages):
+    """The example questions, answered the way a real model should."""
+    last = messages[-1]["content"]
+    if last.startswith("TOOL RESULT"):
+        return {"answer": answer_from(last)}
+    q = last.lower()
+    if any(w in q for w in ("clown", "palhaço", "palhaco")):
+        return {"tool": "search_catalogue", "args": {"terms": ["It", "A coisa", "Stephen King", "Pennywise"]}}
+    if any(w in q for w in ("waive", "perdo", "zerar")):
+        return {"tool": "propose_change", "args": {
+            "kind": "sql", "summary": "Waive the outstanding fines of Ana Souza (patron 101).",
+            "sql": "UPDATE accountlines SET amountoutstanding = 0 WHERE borrowernumber = 101 AND amountoutstanding > 0"}}
+    if any(w in q for w in ("write off", "pay")):
+        return {"tool": "propose_change", "args": {
+            "kind": "koha_page", "page": "patron_account", "id": "101",
+            "summary": "Write off the fines of Ana Souza on her accounting page."}}
+    if any(w in q for w in ("drop", "truncate")):
+        return {"answer": "I can't do that: structural commands are never allowed, not even as a proposal."}
+    if any(w in q for w in ("overdue", "atras", "fine", "multa")):
+        nums = [float(n.replace(",", ".")) for n in re.findall(r"\d+(?:[.,]\d+)?", q)]
+        args = {"order": "recent_activity", "limit": 1 if re.search(r"\b(last|último|ultimo)\b", q) else 5}
+        if nums:
+            args |= {"overdues_min": nums[0], "overdues_max": nums[0]}
+        if len(nums) > 1:
+            args |= {"fines_min": nums[1], "fines_max": nums[1]}
+        return {"tool": "find_patrons", "args": args}
+    if "password" in q:
+        return {"tool": "run_select", "args": {"sql": "SELECT password FROM borrowers"}}
+    return {"tool": "find_page", "args": {"query": last}}
+
+
+def answer_from(result):
+    name, _, body = result.removeprefix("TOOL RESULT ").partition(": ")
+    data = json.loads(body) if body.startswith("{") else {}
+    if "error" in data:
+        return f"That did not work: {data['error']}"
+    if name == "propose_change":
+        return "I prepared the change below. It runs only after you press **Confirm**."
+    rows = next((v for v in data.values() if isinstance(v, list) and v and isinstance(v[0], dict)), [])
+    if not rows:
+        return "I found nothing matching that."
+    if name == "find_patrons":
+        r = rows[0]
+        return (f"{r['link']} (card {r['cardnumber']}) has **{r['overdues']} overdue** loans and "
+                f"**{r['fines']}** in fines; last seen {(r.get('lastseen') or '-')[:10]}.\n"
+                "I read \"last\" as the most recent activity.")
+    if name == "search_catalogue":
+        top = [r for r in rows if r.get("score", 0) >= rows[0].get("score", 0) - 2][:3]
+        return ("It is **It** by Stephen King, the novel about Pennywise the clown (filmed in 1990 and 2017):\n"
+                + "\n".join(f"- {r['link']}" for r in top))
+    return "Here is what I found:\n" + "\n".join(f"- {r['link']}" for r in rows[:5])
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def send(self, code, ctype, body, headers=()):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        for k, v in headers:
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        self.route("GET")
+
+    def do_POST(self):
+        self.route("POST")
+
+    def route(self, method):
+        url = urlsplit(self.path)
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0)) if method == "POST" else b""
+        if url.path == "/js/jquery.js":
+            with open(JQUERY, "rb") as f:
+                return self.send(200, "application/javascript", f.read())
+        if url.path in ("/", "/cgi-bin/koha/mainpage.pl"):
+            try:
+                with open(os.path.join(STATE, "userjs.js"), encoding="utf-8") as f:
+                    userjs = f.read()
+            except OSError:
+                userjs = ""
+            html = PAGE.replace("%NEWS%", "" if "nonews" in url.query else NEWS).replace("%USERJS%", userjs)
+            return self.send(200, "text/html; charset=utf-8", html.encode())
+        if url.path == "/v1/chat/completions":
+            req = json.loads(body or b"{}")
+            with open(os.path.join(STATE, "model.log"), "a", encoding="utf-8") as f:
+                f.write(json.dumps(req, ensure_ascii=False) + "\n")
+            text = json.dumps(model_reply(req["messages"]), ensure_ascii=False)
+            return self.send(200, "application/json", json.dumps(
+                {"choices": [{"message": {"role": "assistant", "content": text}}]}).encode())
+        if url.path == "/cgi-bin/koha/tools/ai_assistant.pl":
+            return self.cgi(method, url.query, body)
+        if url.path.startswith("/cgi-bin/koha/"):
+            return self.send(200, "text/html; charset=utf-8",
+                             f"<h1 id='stub'>{url.path}?{url.query}</h1>".encode())
+        self.send(404, "text/plain", b"not found")
+
+    def cgi(self, method, query, body):
+        env = dict(os.environ, REQUEST_METHOD=method, QUERY_STRING=query, HTTP_COOKIE="CGISESSID=SESS1",
+                   CONTENT_TYPE=self.headers.get("Content-Type", ""), CONTENT_LENGTH=str(len(body)),
+                   SCRIPT_NAME="/cgi-bin/koha/tools/ai_assistant.pl", SERVER_NAME="localhost",
+                   SERVER_PORT=str(PORT), GATEWAY_INTERFACE="CGI/1.1",
+                   PERL5LIB=os.path.join(HERE, "perl5") + ":" + os.path.join(STATE, "lib"),
+                   KEI_AIA_DB=os.path.join(STATE, "koha.db"))
+        p = subprocess.run(["perl", os.path.join(STATE, "ai_assistant.pl")], input=body, env=env,
+                           capture_output=True, timeout=60)
+        with open(os.path.join(STATE, "cgi.log"), "ab") as f:
+            f.write(p.stderr)
+        head, _, out = p.stdout.partition(b"\r\n\r\n")
+        headers = [line.split(":", 1) for line in head.decode().split("\r\n") if ":" in line]
+        status = next((int(v.split()[0]) for k, v in headers if k.lower() == "status"), 200)
+        ctype = next((v.strip() for k, v in headers if k.lower() == "content-type"), "text/plain")
+        self.send(status, ctype, out)
+
+
+ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
