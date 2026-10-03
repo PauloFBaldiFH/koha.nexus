@@ -84,6 +84,22 @@ def find_installer() -> Path | None:
     return None
 
 
+def inherited_lock_fd() -> int | None:
+    """The panel lock descriptor handed down by config.sh (KEI_PANEL_LOCK_FD).
+
+    config.sh takes the panel lock, then starts this app; routines started
+    from here get the same descriptor, so they share the lock instead of
+    refusing to run as "already running in another session"."""
+    fd = os.environ.get("KEI_PANEL_LOCK_FD", "")
+    if not fd.isdigit():
+        return None
+    try:
+        os.fstat(int(fd))
+    except OSError:
+        return None
+    return int(fd)
+
+
 @dataclass
 class PanelEnv:
     installer: Path | None
@@ -92,6 +108,7 @@ class PanelEnv:
     demo: bool = False
     instance: str = INSTANCE
     no_color: bool = field(default_factory=lambda: bool(os.environ.get("NO_COLOR")))
+    lock_fd: int | None = field(default_factory=lambda: inherited_lock_fd())
 
     @classmethod
     def detect(cls, demo: bool = False) -> "PanelEnv":
@@ -106,4 +123,7 @@ class PanelEnv:
         as the Windows window passes it (env KEI_PLAIN_GLYPHS=0|1)."""
         env = dict(os.environ)
         env["KEI_PLAIN_GLYPHS"] = "1" if self.plain else "0"
+        env.pop("KEI_PANEL_LOCK_FD", None)
+        if self.lock_fd is not None:
+            env["KEI_PANEL_LOCK_FD"] = str(self.lock_fd)
         return env

@@ -1,17 +1,34 @@
 # koha.nexus panel: Textual prototype
 
-A Textual front end for the bash panel (`../installer`). It is a
-prototype that runs **next to** the whiptail/dialog panel: nothing in
-`installer` changes, and `sudo config.sh` still opens the classic panel.
+A Textual front end for the bash panel (`../installer`). `sudo config.sh`
+opens it instead of the whiptail menu whenever it can, and the whiptail
+panel stays the fallback.
 
-## Try it
+## How config.sh starts it
+
+1. The sources are installed under `/usr/local/lib/koha-easy-installer/panel`:
+   copied from `panel/` next to the installer (a git clone, or the copy the
+   Windows installer puts in Debian), or downloaded from GitHub when only the
+   installer reached the server.
+2. The first start builds a venv at `/usr/local/lib/koha-easy-installer/panel-venv`
+   with `requirements.txt` (installing `python3-venv` if needed), behind the
+   bash Pac-Man line "Preparing the new panel". Later starts skip this step.
+3. config.sh keeps the panel lock and runs `python -m kei_panel`; routines
+   started from the new panel run as `config.sh --run <action>` with that
+   lock descriptor handed down (`KEI_PANEL_LOCK_FD`).
+4. If the set-up fails (offline server, Python older than 3.9) or the panel
+   crashes, the classic panel opens. A failed set-up is retried a day later.
+
+`KEI_UI=whiptail sudo config.sh` always opens the classic panel;
+`KEI_UI=textual` retries the set-up at once.
+
+## Try it without Koha
 
 ```sh
 cd panel
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 python3 -m kei_panel --demo        # simulated installer: no root, no Koha
-sudo KEI_INSTALLER=/usr/local/bin/config.sh .venv/bin/python -m kei_panel   # a real server
 ```
 
 Keys: arrows / Tab / Enter everywhere, `d` dashboard, `b` backup, `t` database
