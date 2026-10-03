@@ -215,9 +215,10 @@ class CredentialsScreen(ModalScreen[None]):
     BINDINGS = [Binding("escape", "close", t("OK"))]
 
     def __init__(self, title: str, body: str, groups: list[tuple[str, list[tuple[str, str]]]],
-                 kind: str = "ok", note: str = ""):
+                 kind: str = "ok", note: str = "", copy: bool = True):
         super().__init__()
         self._title, self._body, self._groups, self._kind, self._note = title, body, groups, kind, note
+        self._copy = copy
         self._values: list[str] = []
 
     def compose(self) -> ComposeResult:
@@ -234,7 +235,8 @@ class CredentialsScreen(ModalScreen[None]):
                         with Horizontal(classes="dialog-detail"):
                             yield Label(label, classes="detail-label")
                             yield Static(value, classes="detail-value", markup=False)
-                            yield Button(t("Copy"), id=f"copy-{len(self._values) - 1}", classes="detail-copy")
+                            if self._copy:
+                                yield Button(t("Copy"), id=f"copy-{len(self._values) - 1}", classes="detail-copy")
                 if self._note:
                     yield Static(self._note, classes="dialog-note", markup=False)
             with Horizontal(classes="dialog-buttons"):
@@ -260,14 +262,16 @@ class TextScreen(ModalScreen[None]):
 
     BINDINGS = [Binding("escape", "close", t("OK"))]
 
-    def __init__(self, title: str, text: str, kind: str = "info"):
+    def __init__(self, title: str, text: str, kind: str = "info", body: str = ""):
         super().__init__()
-        self._title, self._text, self._kind = title, text, kind
+        self._title, self._text, self._kind, self._body = title, text, kind, body
 
     def compose(self) -> ComposeResult:
         classes = {"error": "dialog -wide -error", "ok": "dialog -wide -ok"}.get(self._kind, "dialog -wide -info")
         with Vertical(classes=classes):
             yield Label(self._title, classes="dialog-title")
+            if self._body:
+                yield Static(self._body, classes="dialog-body", markup=False)
             with VerticalScroll(classes="dialog-scroll dialog-preview"):
                 yield Static(self._text.strip("\n"), markup=False)
             with Horizontal(classes="dialog-buttons"):

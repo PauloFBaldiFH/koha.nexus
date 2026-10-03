@@ -24,10 +24,10 @@ def _num(out, key: str) -> int:
     return int(value) if value.isdigit() else 0
 
 
-def credential_groups(out) -> list[tuple[str, list[tuple[str, str]]]]:
+def credential_groups(out, key: str = "cred") -> list[tuple[str, list[tuple[str, str]]]]:
     """`@@result cred=GROUP<TAB>LABEL<TAB>VALUE` lines, grouped in order."""
     groups: list[tuple[str, list[tuple[str, str]]]] = []
-    for line in out.lists.get("cred", []):
+    for line in out.lists.get(key, []):
         group, _, rest = line.partition("\t")
         label, _, value = rest.partition("\t")
         if not groups or groups[-1][0] != group:

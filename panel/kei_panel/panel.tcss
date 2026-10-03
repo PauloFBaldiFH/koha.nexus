@@ -302,6 +302,8 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 .dialog-title { text-style: bold; padding-bottom: 1; }
 .dialog-body { padding-bottom: 1; }
 .dialog-log { height: 12; border: round $panel-lighten-2; }
+.dialog.-log { height: 90%; }
+.dialog-log.-tall { height: 1fr; min-height: 12; }
 .dialog-buttons { height: auto; align-horizontal: right; padding-top: 1; }
 .dialog-buttons Button { margin-left: 2; }
 

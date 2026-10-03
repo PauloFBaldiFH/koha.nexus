@@ -80,12 +80,12 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("diagnostics", "🩺  Diagnostics & maintenance center", "🩺 Diagnostics & Maintenance Center",
             "Choose a tool:", (
-        Entry("📡  Detailed server & Koha status", "status"),
-        Entry("🏥  Full system health check", "health"),
-        Entry("📄  View latest validation report", "validation-report"),
-        Entry("📜  Real-time Apache log auditing", "apache-log"),
+        Entry("📡  Detailed server & Koha status", "status", kind="native"),
+        Entry("🏥  Full system health check", "health", kind="native"),
+        Entry("📄  View latest validation report", "validation-report", kind="native"),
+        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
-        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services"),
+        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
     )),
     Section("security", "🔒  Security center", "🔒 Security Center", "Choose a security routine:", (
         Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban"),
