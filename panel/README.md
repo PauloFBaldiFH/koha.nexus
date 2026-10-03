@@ -16,11 +16,13 @@ panel stays the fallback.
 3. config.sh keeps the panel lock and runs `python -m kei_panel`; routines
    started from the new panel run as `config.sh --run <action>` with that
    lock descriptor handed down (`KEI_PANEL_LOCK_FD`).
-4. If the set-up fails (offline server, Python older than 3.9) or the panel
-   crashes, the classic panel opens. A failed set-up is retried a day later.
+4. On a new installation the new panel's first screen asks the panel language
+   (config.sh skips its whiptail box) and starts again in it.
+5. If the set-up fails (offline server, Python older than 3.9) or the panel
+   crashes, a box says why and the classic panel opens; the set-up is tried
+   again at the next start.
 
 `KEI_UI=whiptail sudo config.sh` always opens the classic panel;
-`KEI_UI=textual` retries the set-up at once.
 
 ## Try it without Koha
 

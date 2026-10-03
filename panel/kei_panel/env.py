@@ -118,6 +118,10 @@ class PanelEnv:
         return cls(installer=find_installer(), lang=normalize_panel_language(code),
                    plain=plain_glyphs_wanted(), demo=demo)
 
+    def language_chosen(self) -> bool:
+        """translation.conf names a panel language (else: first start)."""
+        return bool(read_lang_conf("KOHA_PANEL_LANG"))
+
     def child_env(self) -> dict[str, str]:
         """Environment for the installer: the glyph choice travels with it,
         as the Windows window passes it (env KEI_PLAIN_GLYPHS=0|1)."""
