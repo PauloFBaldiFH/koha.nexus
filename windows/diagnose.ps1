@@ -6,13 +6,15 @@
 #   signed-in user (not as administrator):
 #   irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/diagnose.ps1 | iex
 #
-# Everything shown is also saved in C:\KohaEasy\logs\diagnose-<date>.txt
+# Everything shown is also saved in C:\Koha\logs\diagnose-<date>.txt
 # (no passwords are read). ASCII only: it must survive "irm | iex".
 
 function Invoke-KohaEasyDiagnose {
     $ErrorActionPreference = 'Stop'
-    $root = 'C:\KohaEasy'
+    # C:\Koha, or C:\KohaEasy for an install made before the folder was renamed.
+    $root = 'C:\Koha'
     if ($env:KOHAEASY_ROOT) { $root = $env:KOHAEASY_ROOT }
+    elseif (-not (Test-Path -LiteralPath (Join-Path $root 'bin')) -and (Test-Path -LiteralPath 'C:\KohaEasy\bin')) { $root = 'C:\KohaEasy' }
     $bin = Join-Path $root 'bin'
     $logs = Join-Path $root 'logs'
     New-Item -ItemType Directory -Path $logs -Force -ErrorAction SilentlyContinue | Out-Null

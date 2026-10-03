@@ -13,7 +13,7 @@ Set-StrictMode -Version 2.0
 Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Lang.psm1')
 
 $script:Cfg = @{
-    Root        = 'C:\KohaEasy'
+    Root        = 'C:\Koha'
     Distro      = 'koha'
     OldDistros  = @('KohaEasy')
     TaskPath    = '\KohaEasy\'
@@ -37,7 +37,28 @@ $script:Cfg = @{
     WindowPath  = '/usr/local/bin/koha-window'
     LanSetup    = 2
 }
-if ($env:KOHAEASY_ROOT) { $script:Cfg.Root = $env:KOHAEASY_ROOT }
+
+# The Koha folder: KOHAEASY_ROOT when set; else the folder these scripts
+# were installed in (<root>\bin); else C:\Koha, or C:\KohaEasy when an
+# install made before the folder was renamed is there (its Debian disk is in
+# C:\KohaEasy\wsl, so it stays where it is).
+function Resolve-KohaRoot {
+    param(
+        [string]$EnvRoot = $env:KOHAEASY_ROOT,
+        [string]$ScriptDir = $PSScriptRoot,
+        [string]$NewRoot = 'C:\Koha',
+        [string]$OldRoot = 'C:\KohaEasy'
+    )
+    if ($EnvRoot) { return $EnvRoot }
+    if ($ScriptDir -and (Split-Path -Leaf $ScriptDir) -eq 'bin' -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($ScriptDir, 'KohaEasy.ps1')))) {
+        return (Split-Path -Parent $ScriptDir)
+    }
+    $isInstall = { param($r) (Test-Path -LiteralPath ([System.IO.Path]::Combine($r, 'state.json'))) -or (Test-Path -LiteralPath ([System.IO.Path]::Combine($r, 'bin', 'KohaEasy.ps1'))) }
+    if (-not (& $isInstall $NewRoot) -and (& $isInstall $OldRoot)) { return $OldRoot }
+    return $NewRoot
+}
+$script:Cfg.Root = Resolve-KohaRoot
+Set-KeiRoot $script:Cfg.Root
 
 # Set by the tray: notifications fall back to its balloon tips when Windows
 # toasts are unavailable.
@@ -2693,6 +2714,27 @@ function Set-KohaTrayAtSignIn {
 
 # The tray is the PowerShell running "KohaEasy.ps1 Tray" (whatever started it:
 # KohaEasy.exe, conhost or PowerShell itself).
+# The "Koha" entry of Settings > Apps (this user only, no administrator
+# rights): its Uninstall button runs "KohaEasy.ps1 Uninstall", like
+# Uninstall-Koha.cmd in the Koha folder.
+function Get-KohaUninstallKey { return 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\KohaEasy' }
+
+function Register-KohaUninstallEntry {
+    param([string]$Key = (Get-KohaUninstallKey))
+    $ps = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    New-Item -Path $Key -Force -ErrorAction Stop | Out-Null
+    $values = [ordered]@{
+        DisplayName     = 'Koha (koha.nexus)'
+        DisplayVersion  = [string]$script:KohaEasyVersion
+        Publisher       = 'koha.nexus'
+        DisplayIcon     = (Get-KohaIconPath)
+        InstallLocation = (Get-KohaPath Root)
+        UninstallString = ('"{0}" -NoProfile -ExecutionPolicy Bypass -File "{1}" Uninstall' -f $ps, (Get-KohaScriptPath))
+    }
+    foreach ($n in $values.Keys) { New-ItemProperty -Path $Key -Name $n -Value $values[$n] -PropertyType String -Force -ErrorAction Stop | Out-Null }
+    foreach ($n in 'NoModify', 'NoRepair') { New-ItemProperty -Path $Key -Name $n -Value 1 -PropertyType DWord -Force -ErrorAction Stop | Out-Null }
+}
+
 function Test-KohaTrayRunning {
     # The tray holds this mutex while it runs (KohaEasy.Tray.ps1).
     $m = $null

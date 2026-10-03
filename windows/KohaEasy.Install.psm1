@@ -641,6 +641,7 @@ function Install-KohaEntryPoints {
     Invoke-KohaSafeStep { Install-KohaLauncherStep }
     Invoke-KohaSafeStep { Register-KohaTasks -Autostart $mode }
     Invoke-KohaSafeStep { Install-KohaShortcuts }
+    Invoke-KohaSafeStep { Register-KohaUninstallEntry }
     Invoke-KohaSafeStep { Start-KohaTrayChecked }
 }
 
@@ -907,6 +908,7 @@ function Install-Koha {
         Invoke-KohaSafeStep { Register-KohaTasks -Autostart $mode }
         if (-not $entryDone) {
             Invoke-KohaSafeStep { Install-KohaShortcuts }
+            Invoke-KohaSafeStep { Register-KohaUninstallEntry }
             # The tray settles how Koha's tools start on this PC (KohaEasy.exe,
             # conhost, PowerShell) before the Koha network task and the
             # keep-alive task are started with it.
@@ -942,6 +944,7 @@ function Install-Koha {
         $outdated = Test-KohaKeepAliveOutdated
         Invoke-KohaSafeStep { Register-KohaTasks -Autostart ([string](Get-KohaState).autostart) }
         Invoke-KohaSafeStep { Install-KohaShortcuts }
+        Invoke-KohaSafeStep { Register-KohaUninstallEntry }
         # .wslconfig settings of this version (hostAddressLoopback) take
         # effect when WSL starts again, and a keep-alive task still running
         # with an older version's action keeps its window: Koha is stopped

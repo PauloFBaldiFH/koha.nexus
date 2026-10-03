@@ -6,14 +6,16 @@
 #   or a double-click on windows\Install-Koha.cmd, which runs the same line.
 #
 # It copies the Windows tools, the panel and its dictionaries to
-# C:\KohaEasy\bin (downloaded from GitHub with the
+# C:\Koha\bin (downloaded from GitHub with the
 # SHA-256 of the installer checked), then runs "KohaEasy.ps1 Install" in
 # Windows PowerShell 5.1: checks, the Debian user, WSL 2, Debian, systemd,
-# Koha, shortcuts, the library network.
-# Running it again continues where it stopped.
+# Koha, shortcuts, the library network. Uninstall-Koha.cmd, in C:\Koha,
+# removes it all again.
+# Running it again continues where it stopped. An install made before the
+# folder was renamed stays in C:\KohaEasy and is updated there.
 #
 # Options (environment variables): KOHAEASY_SOURCE (a local copy of the
-# repository), KOHAEASY_BRANCH (default main), KOHAEASY_ROOT (default C:\KohaEasy).
+# repository), KOHAEASY_BRANCH (default main), KOHAEASY_ROOT (default C:\Koha).
 # ASCII only: it must survive "irm | iex" in every Windows PowerShell.
 
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -34,8 +36,13 @@ function Install-KohaEasyBootstrap {
     $repo = 'PauloFBaldiFH/koha.nexus'
     $branch = 'main'
     if ($env:KOHAEASY_BRANCH) { $branch = $env:KOHAEASY_BRANCH }
-    $root = 'C:\KohaEasy'
+    $root = 'C:\Koha'
+    $old = 'C:\KohaEasy'
     if ($env:KOHAEASY_ROOT) { $root = $env:KOHAEASY_ROOT }
+    elseif (-not (Test-Path -LiteralPath (Join-Path $root 'state.json')) -and
+        ((Test-Path -LiteralPath (Join-Path $old 'state.json')) -or (Test-Path -LiteralPath (Join-Path $old 'bin\KohaEasy.ps1')))) {
+        $root = $old
+    }
     $bin = Join-Path $root 'bin'
     $tmp = $null
 
@@ -72,6 +79,7 @@ function Install-KohaEasyBootstrap {
     Copy-Item -Path (Join-Path $src 'windows\*') -Destination $bin -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $src 'installer'), (Join-Path $src 'installer.sha256') -Destination $bin -Force
     Copy-Item -Path (Join-Path $src 'lang\*.cache') -Destination (Join-Path $bin 'lang') -Force
+    Copy-Item -LiteralPath (Join-Path $src 'windows\Uninstall-Koha.cmd') -Destination $root -Force
     if ($tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 
     # The tray and toasts need Windows PowerShell 5.1, even when this ran in
@@ -91,9 +99,9 @@ function Install-KohaEasyBootstrap {
     if (-not $env:WT_SESSION -and $env:KOHAEASY_NO_WT -ne '1') {
         $wt = Get-Command 'wt.exe' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     }
-    # A Windows Terminal that is already open would not see KOHAEASY_ROOT,
-    # so a custom folder keeps the install in this window.
-    if ($wt -and $root -eq 'C:\KohaEasy') {
+    # A Windows Terminal that is already open would not see KOHAEASY_ROOT;
+    # KohaEasy.ps1 finds the folder from its own place (<root>\bin).
+    if ($wt) {
         try {
             Start-Process -FilePath $wt.Source -ArgumentList ('-w new --title Koha "{0}" {1} -Pause' -f $ps, $arg) | Out-Null
             Write-Host '[>] The installation continues in the new Windows Terminal window.' -ForegroundColor Cyan
@@ -110,7 +118,7 @@ try {
     $code = Install-KohaEasyBootstrap
     if ($code -eq -1) { }
     elseif ($code -eq 3) { Write-Host 'Restart Windows now. The installation continues after you sign in again.' -ForegroundColor Yellow }
-    elseif ($code -ne 0) { Write-Host ('The installation stopped (code {0}). Run the same command again to continue. Log: C:\KohaEasy\logs' -f $code) -ForegroundColor Red }
+    elseif ($code -ne 0) { Write-Host ('The installation stopped (code {0}). Run the same command again to continue. Log: {1}\logs' -f $code, $env:KOHAEASY_ROOT) -ForegroundColor Red }
 } catch {
     Write-Host ('[X] ' + $_.Exception.Message) -ForegroundColor Red
 }

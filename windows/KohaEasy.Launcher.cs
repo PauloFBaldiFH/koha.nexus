@@ -112,7 +112,7 @@ namespace KohaEasy
             return sb.ToString();
         }
 
-        // C:\KohaEasy\logs\koha-yyyyMMdd.log, the log of the PowerShell side.
+        // C:\Koha\logs\koha-yyyyMMdd.log, the log of the PowerShell side.
         static void Log(string dir, string message)
         {
             try

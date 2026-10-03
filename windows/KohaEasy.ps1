@@ -27,6 +27,8 @@
     KohaEasy.ps1 CreateShortcuts               Start menu "Koha" and desktop, with koha.ico
     KohaEasy.ps1 SetupNetwork                  firewall and port forwarding for the library network (admin)
     KohaEasy.ps1 UpdatePortProxy               action of the "Koha network" task (NAT networking)
+    KohaEasy.ps1 Uninstall [-Force]            removes Koha from this PC (Uninstall-Koha.cmd, Settings > Apps); -Force asks nothing and keeps the backups
+    KohaEasy.ps1 UninstallAdmin                the part of Uninstall that needs administrator rights (firewall, port forwarding, tasks)
     -Quiet: no dialog boxes (scheduled tasks).
     -Pause: Install waits for Enter before its window closes (Windows Terminal).
     -Hidden: started with no console (every shortcut, task and tray launch).
@@ -34,7 +36,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install')]
+    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install', 'Uninstall', 'UninstallAdmin')]
     [string]$Command = 'Status',
     [ValidateSet('user', 'logon')][string]$Trigger = 'user',
     [ValidateSet('logon', 'manual')][string]$Mode,
@@ -56,10 +58,10 @@ $ErrorActionPreference = 'Stop'
 # it in, and the installer reads it back when the tray does not come up.
 trap {
     $failure = '{0} failed: {1} | stack: {2}' -f $Command, $_.Exception.Message, ([string]$_.ScriptStackTrace -replace "`r?`n", ' <- ')
+    $logDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'logs'
+    if ($env:KOHAEASY_ROOT) { $logDir = Join-Path $env:KOHAEASY_ROOT 'logs' }
     try { Write-KohaLog $failure } catch {
         try {
-            $logDir = 'C:\KohaEasy\logs'
-            if ($env:KOHAEASY_ROOT) { $logDir = Join-Path $env:KOHAEASY_ROOT 'logs' }
             New-Item -ItemType Directory -Path $logDir -Force | Out-Null
             Add-Content -LiteralPath (Join-Path $logDir ('koha-{0}.log' -f (Get-Date -Format 'yyyyMMdd'))) -Value ('{0} | {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failure)
         } catch { }
@@ -67,7 +69,7 @@ trap {
     if (@('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'SafeShutdown') -contains $Command -and -not $Quiet) {
         try {
             Add-Type -AssemblyName System.Windows.Forms
-            [void][System.Windows.Forms.MessageBox]::Show(('Koha: {0}{1}{1}C:\KohaEasy\logs' -f $_.Exception.Message, [Environment]::NewLine), 'Koha', 'OK', 'Error')
+            [void][System.Windows.Forms.MessageBox]::Show(('Koha: {0}{1}{1}{2}' -f $_.Exception.Message, [Environment]::NewLine, $logDir), 'Koha', 'OK', 'Error')
         } catch { }
     }
     break
@@ -282,6 +284,20 @@ switch ($Command) {
     }
     'UpdatePortProxy' {
         if ((Update-KohaPortProxy) -eq 'failed') { exit 1 }
+        exit 0
+    }
+    'Uninstall' {
+        Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Uninstall.psm1') -Force
+        $code = [int](@(Uninstall-Koha -Yes:$Force) | Select-Object -Last 1)
+        if (-not $Force) {
+            Write-Host ''
+            try { Read-Host (T 'Press Enter to close this window.') | Out-Null } catch { }
+        }
+        exit $code
+    }
+    'UninstallAdmin' {
+        Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Uninstall.psm1') -Force
+        Remove-KohaAdminParts
         exit 0
     }
     'Install' {

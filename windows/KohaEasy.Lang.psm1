@@ -49,18 +49,27 @@ function Import-KeiLanguage {
     }
 }
 
+# The Koha folder of this PC (C:\Koha, or C:\KohaEasy for an install made
+# before the rename). Texts name it as C:\KohaEasy, so the dictionaries keep
+# their entries; T shows the real folder.
+$script:KeiRoot = ''
+function Set-KeiRoot { param([string]$Path) $script:KeiRoot = [string]$Path }
+
 # Translated text. Placeholders are {0}, {1}...: a translation that lost or
 # added one is ignored, so "-f" never throws on a bad dictionary entry.
 function T {
     param([Parameter(Mandatory = $true, Position = 0)][string]$Text)
-    if (-not $script:KeiDictionary.ContainsKey($Text)) { return $Text }
-    $tr = $script:KeiDictionary[$Text]
-    $want = @([regex]::Matches($Text, '\{\d+\}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
-    $have = @([regex]::Matches($tr, '\{\d+\}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
-    if (($want -join ',') -ne ($have -join ',')) { return $Text }
-    return $tr
+    $out = $Text
+    if ($script:KeiDictionary.ContainsKey($Text)) {
+        $tr = $script:KeiDictionary[$Text]
+        $want = @([regex]::Matches($Text, '\{\d+\}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+        $have = @([regex]::Matches($tr, '\{\d+\}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+        if (($want -join ',') -eq ($have -join ',')) { $out = $tr }
+    }
+    if ($script:KeiRoot -and $script:KeiRoot -ne 'C:\KohaEasy') { $out = $out.Replace('C:\KohaEasy', $script:KeiRoot) }
+    return $out
 }
 
 function Get-KeiLanguage { return $script:KeiLanguage }
 
-Export-ModuleMember -Function ConvertTo-KeiLanguageCode, Import-KeiLanguage, T, Get-KeiLanguage
+Export-ModuleMember -Function ConvertTo-KeiLanguageCode, Import-KeiLanguage, T, Get-KeiLanguage, Set-KeiRoot
