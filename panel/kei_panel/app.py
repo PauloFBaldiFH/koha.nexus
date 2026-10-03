@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import traceback
 from pathlib import Path
 from typing import Callable
 
@@ -9,7 +11,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from .bridge import Bridge, BridgeError
-from .env import PanelEnv
+from .env import PanelEnv, log_error
 from .i18n import Translator, install, t
 from .menus import Entry
 from .screens.dialogs import ConfirmScreen, ResultScreen
@@ -31,7 +33,24 @@ class KohaPanelApp(App):
         self.env = env
         self.bridge = Bridge(env)
 
+    def _handle_exception(self, error: Exception) -> None:
+        # Textual shows the traceback on the terminal after it exits; config.sh
+        # then covers it with the classic panel, so it is kept in the log too.
+        log_error("".join(traceback.format_exception(type(error), error, error.__traceback__)))
+        super()._handle_exception(error)
+
+    def _signal_started(self) -> None:
+        """The first screen is on the terminal: config.sh's start-up watchdog
+        (KEI_PANEL_READY_FILE) stands down."""
+        path = os.environ.get("KEI_PANEL_READY_FILE")
+        if path:
+            try:
+                Path(path).touch()
+            except OSError:
+                pass
+
     def on_mount(self) -> None:
+        self.call_after_refresh(self._signal_started)
         # Classic console / Linux console: ASCII borders (panel.tcss, App.-plain).
         self.set_class(self.env.plain, "-plain")
         self.theme = "textual-dark"

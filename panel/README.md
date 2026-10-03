@@ -18,9 +18,11 @@ panel stays the fallback.
    lock descriptor handed down (`KEI_PANEL_LOCK_FD`).
 4. On a new installation the new panel's first screen asks the panel language
    (config.sh skips its whiptail box) and starts again in it.
-5. If the set-up fails (offline server, Python older than 3.9) or the panel
-   crashes, a box says why and the classic panel opens; the set-up is tried
-   again at the next start.
+5. If the set-up fails (offline server, Python older than 3.9), the panel
+   crashes, or it draws nothing within 60 s (`KEI_PANEL_START_TIMEOUT`), a box
+   says why and the classic panel opens; it is tried again at the next start.
+   Textual draws on stderr, so config.sh never redirects it: the app writes
+   its own tracebacks to `/var/log/koha-easy-install/new-panel.log`.
 
 `KEI_UI=whiptail sudo config.sh` always opens the classic panel;
 
