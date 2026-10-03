@@ -44,9 +44,9 @@ class Section:
 SECTIONS: tuple[Section, ...] = (
     Section("dashboard", "Control Dashboard", view="dashboard", key="d"),
     Section("install", "📦  Install Koha server", entries=(
-        Entry("📦  Install Koha server", "install"),)),
+        Entry("📦  Install Koha server", "install", kind="native"),)),
     Section("credentials", "🔑  View first-access credentials", entries=(
-        Entry("🔑  View first-access credentials", "credentials"),)),
+        Entry("🔑  View first-access credentials", "credentials", kind="native"),)),
     Section("restore", "📥  Restore database", entries=(
         Entry("📥  Restore database", "restore", kind="native"),)),
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (

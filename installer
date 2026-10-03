@@ -2920,16 +2920,9 @@ es_arch_supported() {
     return 1
 }
 
-validate_pre_installation() {
-    local welcome_body
-    welcome_body="$(t "This project democratizes collection management, automating the setup of a robust, fast and free infrastructure for libraries.")\n\n"
-    welcome_body+="$(t "The wizard will install and tune MariaDB, Apache, Memcached and Koha.")\n\n"
-    welcome_body+="$(t "Estimated time: 10 to 30 minutes.")\n"
-    welcome_body+="$(t "Please do not close the terminal during installation.")"
-
-    msg_info "$(t "Welcome to Koha Easy Installer!")" "$welcome_body" 16 78
-    
-    clear
+# The pre-installation checks, without dialogs (the panel shows them its
+# own way). Sets V_OK/V_WARN/V_FAIL, KEI_BUSY_PORTS and KEI_PORT_INFO.
+install_precheck() {
     local free_disk p
     v_reset "pre-installation"
     [ "$EUID" -eq 0 ] && v_ok "Root OK." || v_fail "Root: $(t "insufficient privileges")."
@@ -2966,34 +2959,53 @@ validate_pre_installation() {
     elif [ "${free_disk:-0}" -ge 5120 ] 2>/dev/null; then v_warn "$(t "Disk"): ${free_disk} MB ($(t "tight for Elasticsearch"))."
     else v_fail "$(t "Disk"): ${free_disk:-0} MB ($(t "recommended minimum: 5 GB"))."; fi
 
-    local busy_ports=() proc_info=""
+    KEI_BUSY_PORTS=() KEI_PORT_INFO=""
     for p in 80 8080; do
         if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "([.:]$p)\$"; then
             local p_owner
             p_owner=$(ss -lntp 2>/dev/null | grep -E "([.:]$p)[[:space:]]" | grep -oP 'users:\(\("\K[^"]+' | head -n1)
-            busy_ports+=("$p")
-            proc_info+="- $(t "Port") $p: ${p_owner:-$(t "unknown process")}\n"
+            KEI_BUSY_PORTS+=("$p")
+            KEI_PORT_INFO+="- $(t "Port") $p: ${p_owner:-$(t "unknown process")}\n"
             v_warn "TCP $p $(t "already in use by") '${p_owner:-$(t "unknown")}'."
         else
             v_ok "TCP $p $(t "free")."
         fi
     done
+}
 
-    if [ ${#busy_ports[@]} -gt 0 ]; then
+# Stops what holds ports 80 and 8080 (Apache, nginx or anything else).
+install_free_ports() {
+    local p
+    display_explanation "Stopping web services to free ports 80 and 8080..."
+    systemctl stop apache2 nginx 2>/dev/null || true
+    for p in "${KEI_BUSY_PORTS[@]}"; do
+        fuser -k "${p}/tcp" >/dev/null 2>&1 || true
+    done
+    sleep 1
+    v_ok "$(t "Ports 80 and 8080 freed successfully.")"
+}
+
+validate_pre_installation() {
+    local welcome_body
+    welcome_body="$(t "This project democratizes collection management, automating the setup of a robust, fast and free infrastructure for libraries.")\n\n"
+    welcome_body+="$(t "The wizard will install and tune MariaDB, Apache, Memcached and Koha.")\n\n"
+    welcome_body+="$(t "Estimated time: 10 to 30 minutes.")\n"
+    welcome_body+="$(t "Please do not close the terminal during installation.")"
+
+    msg_info "$(t "Welcome to Koha Easy Installer!")" "$welcome_body" 16 78
+    
+    clear
+    install_precheck
+
+    if [ ${#KEI_BUSY_PORTS[@]} -gt 0 ]; then
         local release_msg
         release_msg="$(printf "%s\n\n%b\n%s" \
             "$(t "The following ports required by Koha are currently in use:")" \
-            "$proc_info" \
+            "$KEI_PORT_INFO" \
             "$(t "Do you want to stop the occupying services to free the ports automatically?")")"
 
         if prompt_yes_no "$(t "Occupied Ports Detected")" "$release_msg" 15 76; then
-            display_explanation "Stopping web services to free ports 80 and 8080..."
-            systemctl stop apache2 nginx 2>/dev/null || true
-            for p in "${busy_ports[@]}"; do
-                fuser -k "${p}/tcp" >/dev/null 2>&1 || true
-            done
-            sleep 1
-            v_ok "$(t "Ports 80 and 8080 freed successfully.")"
+            install_free_ports
         fi
     fi
 
@@ -4648,12 +4660,17 @@ install_task_remove_previous() {
 }
 
 function_install_koha() {
-    validate_pre_installation || return 1
+    # The panel (--task install) has already checked the system, asked the
+    # questions and passes the answers: KEI_TASK_TZ, KEI_TASK_REINSTALL.
+    [ -n "${KEI_TASK:-}" ] || validate_pre_installation || return 1
 
     # Asked on Windows (WSL) too: the zone WSL copied from Windows is offered
     # first, so due dates and circulation logs follow the library's clock.
     local tz
-    if tz=$(choose_timezone) && [ -n "$tz" ]; then
+    if [ -n "${KEI_TASK:-}" ]; then
+        tz="${KEI_TASK_TZ:-}"
+        [ -n "$tz" ] && { apply_timezone "$tz" || echo "$(t '[WARN] Could not apply the timezone ${tz}.')"; }
+    elif tz=$(choose_timezone) && [ -n "$tz" ]; then
         apply_timezone "$tz" || echo "$(t '[WARN] Could not apply the timezone ${tz}.')"
     fi
 
@@ -4697,16 +4714,25 @@ function_install_koha() {
     [ "$(run_sql "SELECT 1 FROM information_schema.schemata WHERE schema_name='${DB_NAME}';")" = "1" ] && exists="yes"
 
     if [ "$exists" = "yes" ]; then
-        prompt_yes_no "$(t "Instance already exists")" \
-            "$(t "A Koha installation already exists on this machine.\n\nREINSTALLING DELETES the \${DB_NAME} database and all configuration.\nThis CANNOT be undone by this script.\n\nContinue to the final confirmation?")" 16 76 || { restore_apt_timers; return 0; }
+        if [ -n "${KEI_TASK:-}" ]; then
+            # The panel asked both questions; it sends the typed word.
+            if [ "${KEI_TASK_REINSTALL:-}" != "REINSTALL" ]; then
+                restore_apt_timers
+                msg_error "$(t "Instance already exists")" "$(t "Wrong confirmation. Nothing was deleted.")"
+                return 1
+            fi
+        else
+            prompt_yes_no "$(t "Instance already exists")" \
+                "$(t "A Koha installation already exists on this machine.\n\nREINSTALLING DELETES the \${DB_NAME} database and all configuration.\nThis CANNOT be undone by this script.\n\nContinue to the final confirmation?")" 16 76 || { restore_apt_timers; return 0; }
 
-        local confirm
-        confirm=$(whiptail --title "$(t "FINAL CONFIRMATION")" --inputbox \
-            "$(t "Type exactly the word below to erase everything:\n\nREINSTALL")" 12 66 3>&1 1>&2 2>&3) || { restore_apt_timers; return 0; }
-        if [ "$confirm" != "REINSTALL" ]; then
-            restore_apt_timers
-            msg_info "$(t "Cancelled")" "$(t "Wrong confirmation. Nothing was deleted.")" 8 62
-            return 0
+            local confirm
+            confirm=$(whiptail --title "$(t "FINAL CONFIRMATION")" --inputbox \
+                "$(t "Type exactly the word below to erase everything:\n\nREINSTALL")" 12 66 3>&1 1>&2 2>&3) || { restore_apt_timers; return 0; }
+            if [ "$confirm" != "REINSTALL" ]; then
+                restore_apt_timers
+                msg_info "$(t "Cancelled")" "$(t "Wrong confirmation. Nothing was deleted.")" 8 62
+                return 0
+            fi
         fi
 
         if ! backup_lock_acquire; then
@@ -4776,6 +4802,17 @@ function_install_koha() {
     restore_apt_timers
     tui_run "$(t "Checking that everything works")" install_task_check
     log "installation complete (ok=$V_OK warn=$V_WARN fail=$V_FAIL)"
+
+    if [ -n "${KEI_TASK:-}" ]; then
+        # The panel shows the addresses, the report and the reboot question.
+        host_can reboot || tui_run "$(t "Restarting Koha services")" restart_koha_stack || true
+        kei_result v_ok "$V_OK"
+        kei_result v_warn "$V_WARN"
+        kei_result v_fail "$V_FAIL"
+        kei_result can_reboot "$(host_can reboot && echo yes || echo no)"
+        kei_credentials
+        return 0
+    fi
 
     tui_celebrate "$ip" "$V_FAIL"
     printf '   %s %s\n' "$(t "User:")" "${DB_NAME}"
@@ -24366,12 +24403,92 @@ kei_task_ui() {
     ui_textbox() { kei_emit preview "${1:-}"$'\t'"$(head -c 200000 "$2" 2>/dev/null)"; }
     display_explanation() { kei_emit note "$(t "$1")"; }
     tui_title() { kei_emit title "$2"; }
+    show_validation_report() {
+        [ -s "$VALIDATION_LOG" ] || VALIDATION_LOG=$(find "$LOG_DIR" -maxdepth 1 -name 'validacao-*.log' -size +0 \
+            -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+        if [ -z "$VALIDATION_LOG" ] || [ ! -s "$VALIDATION_LOG" ]; then
+            msg_error "" "$(t "Diagnostic log file not found or is empty.\nPlease run validation first.")"
+            return 1
+        fi
+        kei_emit preview "$(t "Diagnostic Report")"$'\t'"$(cat "$VALIDATION_LOG")"
+    }
+    # Installation stages and a failed step, for the loader and the error box.
+    tui_header() { :; }
+    tui_step() {
+        local note
+        if [ "${5:-}" = "long" ]; then
+            note="$(t "This is the longest step: it can take 10 to 20 minutes. Please keep this window open.")"
+        else
+            note="$(t "This might take a few minutes. Please keep this window open.")"
+        fi
+        kei_emit stage "[$1/$2] $4"$'\t'"$note"
+    }
+    tui_fail_card() {
+        local step="$1" file="${2:-$TUI_LOG}" text
+        text="$(t 'The step "${step}" could not be completed.')\n\n$(t "Nothing was lost. This usually comes from the internet connection, a full disk or another installation running at the same time.")\n\n$(t "If it happens again, send this file to your IT support:")\n${file}"
+        kei_emit msg "error $(t "Something needs attention")"$'\t'"$text"
+        [ -s "$file" ] && tui_log_tail "$file" 12 | sed 's/^/   /'
+    }
     pause_terminal() { :; }
     pause_terminal_continue() { :; }
     clear() { :; }
     # A dialog a routine still opens would wait where nobody can see it.
     whiptail() { kei_emit msg "error $(t "Error")"$'\t'"whiptail: $*"; return 1; }
     dialog() { whiptail "$@"; }
+}
+
+# The access credentials as "@@result cred=GROUP<TAB>LABEL<TAB>VALUE" lines,
+# in the order function_view_credentials prints them.
+kei_cred() { kei_result cred "${1}"$'\t'"$(_cred_label "$2")"$'\t'"${3}"; }
+_cred_label() { local label="${1%:}"; printf '%s' "${label%"${label##*[! ]}"}"; }
+kei_credentials() {
+    local ip cf_opac cf_staff g head
+    ip=$(get_server_ip)
+    read -r cf_opac cf_staff < <(tunnel_public_hosts 2>/dev/null)
+    [ "$cf_opac" = "-" ] && cf_opac=""
+    [ "$cf_staff" = "-" ] && cf_staff=""
+    g=$(t "ON THIS MACHINE (localhost):")
+    kei_cred "$g" "$(t "OPAC  (catalog)       :")" "http://localhost:80"
+    kei_cred "$g" "$(t "Staff (administration):")" "http://localhost:8080"
+    g=$(t "FROM OTHER COMPUTERS ON THE NETWORK:")
+    kei_cred "$g" "$(t "OPAC  (catalog)       :")" "http://${ip}:80"
+    kei_cred "$g" "$(t "Staff (administration):")" "http://${ip}:8080"
+    if [ -n "$cf_opac" ] || [ -n "$cf_staff" ]; then
+        head=$(t "\n[ INTERNET / CLOUDFLARE TUNNEL ]\n")
+        g=${head//\\n/}
+        [ -n "$cf_opac" ] && kei_cred "$g" "$(t "OPAC  (catalog)       :")" "https://${cf_opac}"
+        [ -n "$cf_staff" ] && kei_cred "$g" "$(t "Staff (administration):")" "https://${cf_staff}"
+    fi
+    g=$(t "SSH ACCESS (remote terminal):")
+    kei_cred "$g" "SSH" "ssh $(get_ssh_login "$ip")"
+    g=$(t "DATABASE CREDENTIALS (1st Access / Web Installer):")
+    kei_cred "$g" "$(t "User :")" "${DB_NAME}"
+    kei_cred "$g" "$(t "Pass :")" "$(get_database_password)"
+    kei_cred "$g" "$(t "Full file:")" "${CREDENTIALS_FILE}"
+}
+
+# What the installation screens need before anything changes: the checks
+# (report in @@preview), the ports in use, the timezone and whether an
+# instance already exists (reinstalling erases it).
+kei_task_install_check() {
+    local exists="no"
+    install_precheck >/dev/null
+    kei_emit preview "$(t "Diagnostic Report")"$'\t'"$(cat "$VALIDATION_LOG" 2>/dev/null)"
+    kei_result v_ok "$V_OK"
+    kei_result v_warn "$V_WARN"
+    kei_result v_fail "$V_FAIL"
+    kei_result busy_ports "${KEI_BUSY_PORTS[*]}"
+    kei_result port_info "$KEI_PORT_INFO"
+    kei_result tz "$(get_current_timezone)"
+    [ -d "/etc/koha/sites/${INSTANCE}" ] && exists="yes"
+    if [ "$exists" = "no" ] && command -v mysql >/dev/null 2>&1 \
+            && [ "$(run_sql "SELECT 1 FROM information_schema.schemata WHERE schema_name='${DB_NAME}';" 2>/dev/null)" = "1" ]; then
+        exists="yes"
+    fi
+    kei_result exists "$exists"
+    kei_result db_name "$DB_NAME"
+    kei_result can_reboot "$(host_can reboot && echo yes || echo no)"
+    return 0
 }
 
 # Paths and facts the panel's screens show (pickers, hints, the newest backup).
@@ -24503,6 +24620,28 @@ kei_task() {
         reports-remove)
             require_database || return 1
             tools_locked _lt_reports_remove "$REPORTS_TAG" "$(t "Essential reports pack")" REPORTS ;;
+        install-check)   kei_task_install_check ;;
+        install-free-ports)
+            install_precheck >/dev/null
+            [ ${#KEI_BUSY_PORTS[@]} -eq 0 ] || install_free_ports ;;
+        install)
+            # Answers come in KEI_TASK_TZ and KEI_TASK_REINSTALL.
+            install_precheck >/dev/null
+            if [ "$V_FAIL" -ne 0 ]; then
+                msg_error "$(t "Pre-validation Failed")" "$(awk -v tag="❌ " 'index($0, tag) == 1 { print substr($0, length(tag) + 1) }' "$VALIDATION_LOG" | head -n 4)"
+                return 1
+            fi
+            function_install_koha ;;
+        timezones)
+            local z
+            while IFS= read -r z; do
+                [ -n "$z" ] && kei_result tz "$z"
+            done < <(list_timezones)
+            return 0 ;;
+        credentials)     require_koha || return 1; kei_credentials ;;
+        validation-report)
+            show_validation_report ;;
+        reboot)          reboot_now ;;
         *)
             kei_emit msg "error $(t "Error")"$'\t'"$(t "Unknown panel action:") $name"
             return 2 ;;

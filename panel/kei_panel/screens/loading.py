@@ -48,7 +48,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         with Vertical(id="loader-box"):
             yield Label(self.title_text, id="loader-title")
             yield PacmanLoader(plain=bool(plain), colors=colors, id="pacman")
-            yield Static("", id="loader-notice")
+            yield Static("", id="loader-notice", markup=False)
             with Horizontal(id="loader-meta"):
                 yield Label("", id="loader-status")
                 yield Label("", id="loader-clock")

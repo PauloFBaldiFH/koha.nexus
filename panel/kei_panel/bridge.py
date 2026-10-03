@@ -59,6 +59,7 @@ class TaskOutcome:
     steps: list[tuple[str, int | None]] = field(default_factory=list)
     asks: list[tuple[str, str]] = field(default_factory=list)
     previews: list[tuple[str, str]] = field(default_factory=list)
+    stages: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -108,6 +109,13 @@ class TaskOutcome:
             text = unescape(rest)
             status(text.splitlines()[0] if text else "")
             log(text)
+        elif tag == "stage":
+            # A stage of a long routine ("[3/7] Database and Koha") and its note.
+            stage, _, note = rest.partition("\t")
+            self.stages.append(stage)
+            log(f"== {stage}")
+            if reporter:
+                reporter.notice(f"{stage}\n{unescape(note)}" if note else stage)
         elif tag == "msg":
             kind, _, rest = rest.partition(" ")
             title, _, text = rest.partition("\t")

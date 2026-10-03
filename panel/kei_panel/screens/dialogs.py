@@ -206,3 +206,76 @@ class MessageScreen(ModalScreen[None]):
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
         self.dismiss(None)
+
+
+class CredentialsScreen(ModalScreen[None]):
+    """Addresses and passwords, grouped, each value on its own line with a
+    Copy button (no border or label glued to what is copied)."""
+
+    BINDINGS = [Binding("escape", "close", t("OK"))]
+
+    def __init__(self, title: str, body: str, groups: list[tuple[str, list[tuple[str, str]]]],
+                 kind: str = "ok", note: str = ""):
+        super().__init__()
+        self._title, self._body, self._groups, self._kind, self._note = title, body, groups, kind, note
+        self._values: list[str] = []
+
+    def compose(self) -> ComposeResult:
+        classes = {"error": "dialog -wide -error", "info": "dialog -wide -info"}.get(self._kind, "dialog -wide -ok")
+        with Vertical(classes=classes):
+            yield Label(self._title, classes="dialog-title")
+            with VerticalScroll(classes="dialog-scroll"):
+                if self._body:
+                    yield Static(self._body, classes="dialog-body", markup=False)
+                for heading, rows in self._groups:
+                    yield Label(heading, classes="dialog-prompt")
+                    for label, value in rows:
+                        self._values.append(value)
+                        with Horizontal(classes="dialog-detail"):
+                            yield Label(label, classes="detail-label")
+                            yield Static(value, classes="detail-value", markup=False)
+                            yield Button(t("Copy"), id=f"copy-{len(self._values) - 1}", classes="detail-copy")
+                if self._note:
+                    yield Static(self._note, classes="dialog-note", markup=False)
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("OK"), id="ok", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#ok").focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid.startswith("copy-"):
+            event.stop()
+            self.app.copy_to_clipboard(self._values[int(bid[5:])])
+            self.notify(t("Copied."), timeout=3)
+
+    @on(Button.Pressed, "#ok")
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
+class TextScreen(ModalScreen[None]):
+    """A long text to read (a report), scrollable, with an OK button."""
+
+    BINDINGS = [Binding("escape", "close", t("OK"))]
+
+    def __init__(self, title: str, text: str, kind: str = "info"):
+        super().__init__()
+        self._title, self._text, self._kind = title, text, kind
+
+    def compose(self) -> ComposeResult:
+        classes = {"error": "dialog -wide -error", "ok": "dialog -wide -ok"}.get(self._kind, "dialog -wide -info")
+        with Vertical(classes=classes):
+            yield Label(self._title, classes="dialog-title")
+            with VerticalScroll(classes="dialog-scroll dialog-preview"):
+                yield Static(self._text.strip("\n"), markup=False)
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("OK"), id="ok", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#ok").focus()
+
+    @on(Button.Pressed, "#ok")
+    def action_close(self) -> None:
+        self.dismiss(None)
