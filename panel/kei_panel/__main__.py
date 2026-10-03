@@ -2,8 +2,9 @@
 
 import argparse
 import sys
+import traceback
 
-from .env import PanelEnv
+from .env import PanelEnv, log_error
 from .i18n import Translator, install
 
 
@@ -25,4 +26,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        log_error(traceback.format_exc())
+        raise

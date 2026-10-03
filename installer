@@ -4121,6 +4121,14 @@ KEI_LIB_DIR="/usr/local/lib/koha-easy-installer"
 KEI_PANEL_SRC="${KEI_LIB_DIR}/panel"
 KEI_PANEL_VENV="${KEI_LIB_DIR}/panel-venv"
 KEI_PANEL_FAILED="${KEI_LIB_DIR}/panel-setup-failed"
+# Written by the new panel once its first screen is drawn (see kei_panel_run).
+KEI_PANEL_STARTED="${KEI_LIB_DIR}/panel-started"
+KEI_PANEL_PIDFILE="${KEI_LIB_DIR}/panel.pid"
+# Its error log: a Python traceback when it crashes.
+KEI_PANEL_ERRLOG="${LOG_DIR}/new-panel.log"
+# Seconds the new panel has to draw its first screen before the classic
+# panel takes over (a first start on a slow disk takes a few seconds).
+KEI_PANEL_START_TIMEOUT="${KEI_PANEL_START_TIMEOUT:-60}"
 KEI_PANEL_TARBALL_URL="https://codeload.github.com/PauloFBaldiFH/koha.nexus/tar.gz/refs/heads/main"
 
 # 0 when $1 holds the new panel's sources.
@@ -4220,9 +4228,9 @@ kei_panel_setup_task() {
 # Why the classic panel opens instead: a box with the reason, the last
 # lines of the log and how to choose. Never a silent switch.
 kei_panel_explain_fallback() {
-    local why="$1" tail_txt
-    tail_txt=$(tui_log_tail "$APT_LOG" 4 2>/dev/null)
-    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start. KEI_UI=whiptail always opens the classic panel. Log: \${APT_LOG}")" 20 78
+    local why="$1" log_file="${2:-$APT_LOG}" tail_txt
+    tail_txt=$(tui_log_tail "$log_file" 4 2>/dev/null)
+    msg_info "$(t "Classic panel")" "$(t "The new panel could not be opened, so the classic panel opens instead.")\n\n${why}\n\n${tail_txt}\n\n$(t "It is tried again at the next start. KEI_UI=whiptail always opens the classic panel. Log:") ${log_file}" 20 78
 }
 
 # 0 when the new panel should be used, setting it up first if needed.
@@ -4261,19 +4269,61 @@ kei_panel_ready() {
 }
 
 # Runs the new panel. 0 = the librarian closed it; anything else (it could
-# not start or crashed) = the caller opens the classic panel. Exit code 3:
-# the language was chosen in the new panel's first screen; it starts again
-# in that language.
+# not start, crashed, or drew nothing in time) = the caller opens the
+# classic panel, with KEI_PANEL_WHY saying why. Exit code 3: the language
+# was chosen in the new panel's first screen; it starts again in that language.
+# Textual draws on stderr: it must stay the terminal (never 2>log); its
+# own errors go to KEI_PANEL_ERRLOG.
 kei_panel_run() {
-    local rc
+    local rc wd timed_out="${KEI_LIB_DIR}/panel-timed-out"
+    KEI_PANEL_WHY=""
+    mkdir -p "$KEI_LIB_DIR" "$LOG_DIR" 2>/dev/null
+    # Only this run's errors: the fallback box shows its last lines.
+    : > "$KEI_PANEL_ERRLOG" 2>/dev/null
     while :; do
+        rm -f "$KEI_PANEL_STARTED" "$KEI_PANEL_PIDFILE" "$timed_out"
+        # Watchdog: no first screen in time = the app is stopped, never a
+        # frozen window.
+        (
+            trap 'exit 0' TERM
+            s=0
+            while [ "$s" -lt "$KEI_PANEL_START_TIMEOUT" ]; do
+                sleep 1
+                s=$((s + 1))
+                [ -e "$KEI_PANEL_STARTED" ] && exit 0
+            done
+            pid=$(cat "$KEI_PANEL_PIDFILE" 2>/dev/null)
+            [ -n "$pid" ] || exit 0
+            : > "$timed_out"
+            kill -TERM "$pid" 2>/dev/null
+            sleep 3
+            kill -KILL "$pid" 2>/dev/null
+        ) </dev/null >/dev/null 2>&1 &
+        wd=$!
         KEI_INSTALLER="$(readlink -f "$_SCRIPT_PATH")" KEI_PANEL_LOCK_FD=9 \
+            KEI_PANEL_ERRLOG="$KEI_PANEL_ERRLOG" KEI_PANEL_READY_FILE="$KEI_PANEL_STARTED" \
             PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 \
-            "$KEI_PANEL_VENV/bin/python" -m kei_panel 2>>"$RUN_LOG"
+            sh -c 'echo $$ > "$0"; exec "$@"' "$KEI_PANEL_PIDFILE" \
+            "$KEI_PANEL_VENV/bin/python" -m kei_panel
         rc=$?
+        kill "$wd" 2>/dev/null
+        wait "$wd" 2>/dev/null
         log "new panel: exit $rc"
-        [ "$rc" = 3 ] || return "$rc"
-        set_panel_language "$(_read_lang_conf KOHA_PANEL_LANG_FULL)"
+        if [ -e "$timed_out" ]; then
+            rm -f "$timed_out"
+            # Killed mid-start: the terminal may still be in the app's mode.
+            stty sane 2>/dev/null
+            printf '\033[?1049l\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?2004l\033[?25h\033[0m'
+            KEI_PANEL_WHY="$(t "The new panel did not appear within") ${KEI_PANEL_START_TIMEOUT}s."
+            log "new panel: no first screen after ${KEI_PANEL_START_TIMEOUT}s, stopped"
+            return 124
+        fi
+        case "$rc" in
+            0) return 0 ;;
+            3) set_panel_language "$(_read_lang_conf KOHA_PANEL_LANG_FULL)" ;;
+            *) KEI_PANEL_WHY="$(t "The new panel stopped with an error") (exit $rc)."
+               return "$rc" ;;
+        esac
     done
 }
 
@@ -24351,7 +24401,7 @@ fi
 restore_apt_timers
 if kei_panel_ready; then
     kei_panel_run && { clear; exit 0; }
-    msg_info "$(t "Classic panel")" "$(t "The new panel could not start. The classic panel opens instead.\n\nDetails: \${RUN_LOG}")" 11 74
+    kei_panel_explain_fallback "${KEI_PANEL_WHY:-$(t "Unknown error.")}" "$KEI_PANEL_ERRLOG"
 fi
 kei_panel_language_set || kei_ask_panel_language
 

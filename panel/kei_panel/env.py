@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -98,6 +99,20 @@ def inherited_lock_fd() -> int | None:
     except OSError:
         return None
     return int(fd)
+
+
+def log_error(text: str) -> None:
+    """Appends to KEI_PANEL_ERRLOG (config.sh shows its last lines when it
+    opens the classic panel instead). Textual draws on stderr, so config.sh
+    cannot send stderr to a log: errors are written here."""
+    path = os.environ.get("KEI_PANEL_ERRLOG")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"===== {time.strftime('%Y-%m-%d %H:%M:%S')} | kei_panel =====\n{text.rstrip()}\n")
+    except OSError:
+        pass
 
 
 @dataclass
