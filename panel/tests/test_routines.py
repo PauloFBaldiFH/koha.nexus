@@ -129,3 +129,33 @@ def test_test_backup_offers_the_newest_file():
             return await _wait_for(pilot, MessageScreen)
     done = asyncio.run(main())
     assert ("Tables", "312") in done._details
+
+
+def test_deep_maintenance_previews_then_runs():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("db-maintenance")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            preview = confirm._question
+            confirm.query_one("#yes").press()
+            await _wait_for(pilot, LoadingScreen)
+            return preview, await _wait_for(pilot, MessageScreen, tries=100)
+    preview, done = asyncio.run(main())
+    assert "Repair and optimize" in preview and done._kind == "ok"
+
+
+def test_reports_pack_removal_is_a_danger_confirm():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("reports")
+            choice = await _wait_for(pilot, ChoiceScreen)
+            choice.dismiss("remove")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            danger = confirm._danger
+            confirm.query_one("#no").press()
+            await pilot.pause(0.3)
+            return danger, type(app.screen).__name__
+    danger, screen = asyncio.run(main())
+    assert danger and screen not in ("ConfirmScreen", "LoadingScreen")

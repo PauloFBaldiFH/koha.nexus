@@ -57,8 +57,8 @@ SECTIONS: tuple[Section, ...] = (
     ), view="backup", key="b"),
     # New screen: Koha's tables at a glance (no bash menu of its own).
     Section("database", "📑  Database tables", "📑  Database tables", entries=(
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance"),
-        Entry("📋  Essential SQL reports pack", "library-tools"),
+        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
+        Entry("📋  Essential SQL reports pack", "reports", kind="native"),
     ), view="database", key="t"),
     # New screen (Module 1): AI provider setup for the cataloguing tabs of
     # the staff web UI; its MARC Replace hook opens the routine below.
@@ -84,7 +84,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🏥  Full system health check", "health"),
         Entry("📄  View latest validation report", "validation-report"),
         Entry("📜  Real-time Apache log auditing", "apache-log"),
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance"),
+        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
         Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services"),
     )),
     Section("security", "🔒  Security center", "🔒 Security Center", "Choose a security routine:", (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..bridge import TaskOutcome, unescape
 from ..i18n import t
-from ..screens.dialogs import MessageScreen
+from ..screens.dialogs import ConfirmScreen, MessageScreen
 from ..screens.loading import LoadingScreen
 from ..tasks import TaskResult, task_job
 
@@ -48,3 +48,36 @@ async def show_failure(app, title: str, result: TaskResult) -> None:
 
 def last_message(out: TaskOutcome, default: str = "") -> tuple[str, str, str]:
     return out.last("ok", "info") or ("ok", "", default)
+
+
+async def show_done(app, title: str, result: TaskResult, default: str = "") -> None:
+    """The routine's own last box (ok or info), or its failure."""
+    if failed(result):
+        await show_failure(app, title, result)
+        return
+    kind, head, body = last_message(result.value, default or t("Done!"))
+    await app.push_screen_wait(MessageScreen(head if head and head != "OK" else title, body, kind=kind))
+
+
+async def preview_then_run(app, title: str, loader_title: str, name: str, *args: str,
+                           total_steps: int = 0, danger: bool = False) -> None:
+    """A routine that shows a preview and asks before changing anything:
+    run once with KEI_TASK_ANSWER=no (the dry run stops at its question),
+    show the preview and the question, then run again with yes."""
+    dry = await run_task(app, loader_title, name, *args, env={"KEI_TASK_ANSWER": "no"})
+    if failed(dry):
+        await show_failure(app, title, dry)
+        return
+    out = dry.value
+    if not out.asks:
+        # Nothing to ask (e.g. "not installed, nothing was changed").
+        await show_done(app, title, dry)
+        return
+    ask_title, question = out.asks[-1]
+    preview_title, preview = out.previews[-1] if out.previews else ("", "")
+    if not await app.push_screen_wait(ConfirmScreen(ask_title or title, question, danger=danger,
+                                                    preview=preview, preview_title=preview_title)):
+        return
+    result = await run_task(app, loader_title, name, *args, env={"KEI_TASK_ANSWER": "yes"},
+                            total_steps=total_steps)
+    await show_done(app, title, result)
