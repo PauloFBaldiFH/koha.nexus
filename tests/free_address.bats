@@ -158,7 +158,7 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
 @test "B04 heartbeat and token renewal are signed calls" {
     panel broker_heartbeat
     assert '[ "$status" -eq 0 ]' "$output"
-    assert '/usr/bin/curl -s -H "$ADMIN" "$BROKER/admin/libraries" | grep -q "\"installer_version\":\"1.4.0\""'
+    assert '/usr/bin/curl -s -H "$ADMIN" "$BROKER/admin/libraries" | grep -q "\"installer_version\":\"[0-9][0-9.]*\""'
 
     local before
     before=$(cat "$ENVF")

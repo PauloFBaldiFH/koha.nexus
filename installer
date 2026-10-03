@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.3"
+PANEL_VERSION=" 1.5.4"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6925,14 +6925,14 @@ EOF
 #   broker-enroll.conf request waiting for approval (0600: holds its code)
 #   koha-broker.env    TUNNEL_TOKEN for the cloudflared service (0600)
 # ----------------------------------------------------------------------
-KEI_BROKER_URL="${KEI_BROKER_URL:-https://koha-broker.bibliotecamunicipalpalotina.org}"
+KEI_BROKER_URL="${KEI_BROKER_URL:-https://broker.koha.nexus}"
 TUNNEL_CONF="${CONF_DIR}/tunnel.conf"
 BROKER_KEY="${CONF_DIR}/broker.key"
 BROKER_ENROLL="${CONF_DIR}/broker-enroll.conf"
 BROKER_ENV="${KEI_BROKER_ENV:-/etc/cloudflared/koha-broker.env}"
 CLOUDFLARED_UNIT="${KEI_CLOUDFLARED_UNIT:-/etc/systemd/system/cloudflared.service}"
 CRON_BROKER="/etc/cron.d/koha_broker"
-BROKER_STATUS="" BROKER_BODY=""
+BROKER_STATUS="" BROKER_BODY="" BROKER_CURL_RC=0
 
 # KEY=value files written by the panel. Read line by line, never sourced;
 # only known keys and plain values are accepted.
@@ -6971,6 +6971,11 @@ kv_write() {  # kv_write FILE MODE KEY VALUE [KEY VALUE ...]: merges into FILE
 tunnel_conf_get() { kv_get "$TUNNEL_CONF" "$1"; }
 tunnel_mode_is() { [ "$(tunnel_conf_get TUNNEL_MODE 2>/dev/null)" = "$1" ]; }
 broker_url() { tunnel_conf_get BROKER_URL 2>/dev/null || printf '%s' "$KEI_BROKER_URL"; }
+broker_host() { broker_url | sed -e 's#^[a-z]*://##' -e 's#[/:].*##'; }
+# 0 when the address service's name exists in DNS. It does not until the
+# service is put online (broker/README.md), and every request would then
+# fail with "could not be reached" after the questions were answered.
+broker_resolves() { getent ahosts "$(broker_host)" >/dev/null 2>&1; }
 
 # Public hostnames: "OPAC STAFF" (either may be "-"). The free address
 # publishes the staff interface only while remote staff access is on.
@@ -7120,8 +7125,9 @@ broker_request() {
         [ ${#args[@]} -eq 8 ] || { rm -f "$req"; BROKER_STATUS=000; return 1; }
     fi
     [ -n "$json" ] && args+=(-H "Content-Type: application/json" --data-binary "@$req")
+    BROKER_CURL_RC=0
     BROKER_STATUS=$(curl -sS --max-time 30 -X "$method" "${args[@]}" -o "$BROKER_BODY" -w '%{http_code}' \
-        "$(broker_url)$path" 2>/dev/null) || BROKER_STATUS=000
+        "$(broker_url)$path" 2>/dev/null) || { BROKER_CURL_RC=$?; BROKER_STATUS=000; }
     rm -f "$req"
     [[ "$BROKER_STATUS" == 2[0-9][0-9] ]]
 }
@@ -7131,11 +7137,19 @@ broker_cleanup() {
     BROKER_BODY=""
 }
 
+broker_offline_text() {
+    local host
+    host=$(broker_host)
+    t 'The free address service is not online yet: its address (${host}) does not exist on the internet, so this server cannot reach it. Your internet connection is fine.\n\nTo publish Koha now, use "Use My Own Domain (Cloudflare account)" in the Cloudflare Tunnel Manager.'
+}
+
 # Error text of the last answer, for the dialogs.
 broker_error() {
     local e=""
     [ -n "$BROKER_BODY" ] && e=$(json_field "$BROKER_BODY" error)
     [ "$BROKER_STATUS" = "000" ] && e="$(t "The address service could not be reached. Check the internet connection.")"
+    # curl 6: the name does not resolve (the service is not online), not the internet.
+    [ "$BROKER_STATUS" = "000" ] && [ "${BROKER_CURL_RC:-0}" = "6" ] && e="$(broker_offline_text)"
     printf '%s' "${e:-HTTP $BROKER_STATUS}"
 }
 
@@ -7362,6 +7376,11 @@ function_cloudflare_free_address() {
     done
 
     if [ ! -f "$BROKER_ENROLL" ]; then
+        # Before any question: a service that is not online cannot answer.
+        if ! broker_resolves; then
+            msg_error "$(t "Free address")" "$(broker_offline_text)" 13 76
+            return 0
+        fi
         if [ -f /etc/cloudflared/config.yml ]; then
             prompt_yes_no "$(t "Free address")" "$(t "This server already publishes Koha with your own domain. A free address replaces it (your domain's tunnel is switched off).\n\nContinue?")" 11 74 defaultno || return 0
         fi
