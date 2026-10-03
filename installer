@@ -837,7 +837,13 @@ KEI_CLI_MODE=""
 case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--install-data-safety|--rebuild-search-index) KEI_CLI_MODE="$1" ;; esac
 
 if [ -z "$KEI_CLI_MODE" ]; then
-    exec 9> "$PANEL_LOCK_FILE"
+    # A routine started by the new panel (config.sh --run, see
+    # kei_panel_run) gets the panel's own lock descriptor: the same lock,
+    # not a second panel. Otherwise the lock file is opened here.
+    if [ "${KEI_PANEL_LOCK_FD:-}" != "9" ] || ! { : >&9; } 2>/dev/null; then
+        exec 9> "$PANEL_LOCK_FILE"
+    fi
+    unset KEI_PANEL_LOCK_FD
     if ! flock -n 9; then
         echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
         exit 1
@@ -4094,6 +4100,146 @@ install_panel_copy() {
         mkdir -p "${CONFIG_DIR}/lang"
         cp -f "${_SCRIPT_DIR}"/lang/*.cache "${CONFIG_DIR}/lang/" 2>/dev/null || true
     fi
+    # The new panel (panel/), when it came with this script.
+    if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
+        kei_panel_install_src "${_SCRIPT_DIR}/panel" 2>/dev/null || true
+    fi
+}
+
+# ----------------------------------------------------------------------
+# The new panel (Textual, Python): panel/ in the repository.
+# ----------------------------------------------------------------------
+# "sudo config.sh" opens it instead of the whiptail menu when it can:
+# Python 3.9+, its own virtual environment with Textual, and a terminal.
+# The menus are drawn by Python; every routine still runs here, started
+# by the new panel as "config.sh --run <action>" with this panel's lock
+# descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
+#   KEI_UI=whiptail (or dialog)  always the classic panel
+#   KEI_UI=textual               the new panel, set up again if needed
+# Anything that fails (no network for the first set-up, an old Python, a
+# crash) opens the classic panel: it stays the safe way in.
+KEI_LIB_DIR="/usr/local/lib/koha-easy-installer"
+KEI_PANEL_SRC="${KEI_LIB_DIR}/panel"
+KEI_PANEL_VENV="${KEI_LIB_DIR}/panel-venv"
+KEI_PANEL_FAILED="${KEI_LIB_DIR}/panel-setup-failed"
+KEI_PANEL_TARBALL_URL="https://codeload.github.com/PauloFBaldiFH/koha.nexus/tar.gz/refs/heads/main"
+
+# 0 when $1 holds the new panel's sources.
+kei_panel_src_ok() { [ -f "$1/kei_panel/__main__.py" ] && [ -f "$1/requirements.txt" ]; }
+
+# Installs the sources from $1 under KEI_LIB_DIR (replaced whole), stamped
+# with this panel's version: config.sh then finds them from any folder.
+kei_panel_install_src() {
+    local from="$1" tmp
+    [ "$(readlink -f "$from")" = "$(readlink -f "$KEI_PANEL_SRC" 2>/dev/null)" ] && return 0
+    mkdir -p "$KEI_LIB_DIR" || return 1
+    tmp="${KEI_PANEL_SRC}.new"
+    rm -rf "$tmp"
+    cp -r "$from" "$tmp" || return 1
+    rm -rf "$tmp"/tests "$tmp"/.venv
+    find "$tmp" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
+    printf '%s\n' "${PANEL_VERSION# }" > "$tmp/.panel-version"
+    rm -rf "$KEI_PANEL_SRC" && mv "$tmp" "$KEI_PANEL_SRC"
+}
+
+# Only this script reached the server (curl, "Update this panel"): the
+# new panel's sources come from the same branch on GitHub.
+kei_panel_download_src() {
+    local tmp
+    tmp=$(mktemp -d /tmp/koha_tmp_panel.XXXXXX) || return 1
+    if curl -fsSL --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 120 "$KEI_PANEL_TARBALL_URL" \
+         | tar -xz -C "$tmp" --wildcards '*/panel/*' 2>/dev/null \
+       && kei_panel_src_ok "$(echo "$tmp"/*/panel)"; then
+        kei_panel_install_src "$(echo "$tmp"/*/panel)"
+        local rc=$?
+        rm -rf "$tmp"
+        return "$rc"
+    fi
+    rm -rf "$tmp"
+    return 1
+}
+
+# 0 when the venv has the Textual the sources ask for.
+kei_panel_venv_ok() {
+    local src="$1"
+    [ -x "$KEI_PANEL_VENV/bin/python" ] || return 1
+    cmp -s "$src/requirements.txt" "$KEI_PANEL_VENV/.requirements" || return 1
+    "$KEI_PANEL_VENV/bin/python" -c 'import textual' >/dev/null 2>&1
+}
+
+# 0 when the installed sources are this panel's version.
+kei_panel_src_current() {
+    [ "$(cat "$KEI_PANEL_SRC/.panel-version" 2>/dev/null)" = "${PANEL_VERSION# }" ]
+}
+
+# The whole set-up, run under tui_run (Pac-Man on screen, output to the log).
+kei_panel_setup_task() {
+    # Sources older than this script (only the installer was updated) or
+    # none at all: fetched from GitHub; an old copy still works if offline.
+    if ! kei_panel_src_ok "$KEI_PANEL_SRC" || ! kei_panel_src_current; then
+        if ! kei_panel_download_src; then
+            kei_panel_src_ok "$KEI_PANEL_SRC" || return 1
+            # Not asked again at every start while offline (kei_panel_ready).
+            mkdir -p "$KEI_LIB_DIR" && touch "$KEI_PANEL_FAILED"
+        fi
+    fi
+    command -v python3 >/dev/null 2>&1 || apt_install python3 || return 1
+    python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' || return 1
+    python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv || return 1
+    kei_panel_venv_ok "$KEI_PANEL_SRC" && return 0
+    # A venv is tied to its path: built in place, removed again on failure.
+    rm -rf "$KEI_PANEL_VENV"
+    if python3 -m venv "$KEI_PANEL_VENV" \
+       && "$KEI_PANEL_VENV/bin/python" -m pip install --quiet --disable-pip-version-check \
+            -r "$KEI_PANEL_SRC/requirements.txt" \
+       && cp -f "$KEI_PANEL_SRC/requirements.txt" "$KEI_PANEL_VENV/.requirements" \
+       && kei_panel_venv_ok "$KEI_PANEL_SRC"; then
+        return 0
+    fi
+    rm -rf "$KEI_PANEL_VENV"
+    return 1
+}
+
+# 0 when the new panel should be used, setting it up first if needed.
+kei_panel_ready() {
+    case "${KEI_UI:-}" in whiptail|dialog) return 1 ;; esac
+    [ -t 0 ] && [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] || return 1
+    # Sources that came with this script replace the installed copy.
+    if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
+        kei_panel_install_src "${_SCRIPT_DIR}/panel" 2>/dev/null
+    fi
+    local usable=1
+    kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_venv_ok "$KEI_PANEL_SRC" && usable=0
+    [ "$usable" = 0 ] && kei_panel_src_current && return 0
+    # A set-up that failed (offline server...) is tried again a day later,
+    # or at once with KEI_UI=textual; an older working copy is used meanwhile.
+    if [ "${KEI_UI:-}" != "textual" ] && [ -f "$KEI_PANEL_FAILED" ] \
+       && [ $(( $(date +%s) - $(stat -c %Y "$KEI_PANEL_FAILED" 2>/dev/null || echo 0) )) -lt 86400 ]; then
+        return "$usable"
+    fi
+    clear
+    printf '\n'
+    if TUI_LOG="$APT_LOG" tui_run "$(t "Preparing the new panel")" kei_panel_setup_task; then
+        kei_panel_src_current && rm -f "$KEI_PANEL_FAILED"
+        return 0
+    fi
+    mkdir -p "$KEI_LIB_DIR" && touch "$KEI_PANEL_FAILED"
+    log "new panel: set-up failed (see $APT_LOG)"
+    kei_panel_src_ok "$KEI_PANEL_SRC" && kei_panel_venv_ok "$KEI_PANEL_SRC" && return 0
+    sleep 2
+    return 1
+}
+
+# Runs the new panel. 0 = the librarian closed it; anything else (it could
+# not start or crashed) = the caller opens the classic panel.
+kei_panel_run() {
+    local rc
+    KEI_INSTALLER="$(readlink -f "$_SCRIPT_PATH")" KEI_PANEL_LOCK_FD=9 \
+        PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 \
+        "$KEI_PANEL_VENV/bin/python" -m kei_panel 2>>"$RUN_LOG"
+    rc=$?
+    log "new panel: exit $rc"
+    return "$rc"
 }
 
 # ----------------------------------------------------------------------
@@ -24157,6 +24303,15 @@ if [ "${1:-}" = "--run" ]; then
     "$_run_fn"
     clear
     exit 0
+fi
+
+# ======================================================================
+# THE NEW PANEL (Textual), when it can run; else the classic menu below
+# ======================================================================
+restore_apt_timers
+if kei_panel_ready; then
+    kei_panel_run && { clear; exit 0; }
+    msg_info "$(t "Control Dashboard")" "$(t "The new panel could not start. The classic panel opens instead.\n\nDetails: \${RUN_LOG}")" 11 74
 fi
 
 # ======================================================================

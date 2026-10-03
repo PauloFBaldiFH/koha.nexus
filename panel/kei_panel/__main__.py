@@ -18,7 +18,10 @@ def main(argv: list[str] | None = None) -> int:
     install(Translator(env.lang, env.installer, env.plain))
     from .app import KohaPanelApp
 
-    return KohaPanelApp(env).run() or 0
+    app = KohaPanelApp(env)
+    app.run()
+    # config.sh opens the classic panel when this is not 0 (a crash).
+    return app.return_code or 0
 
 
 if __name__ == "__main__":

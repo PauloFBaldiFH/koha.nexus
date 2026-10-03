@@ -87,8 +87,9 @@ class Bridge:
             app.notify(f"[demo] config.sh --run {action}", timeout=3)
             return 0
         argv = self._argv("--run", action)
+        fds = (self.env.lock_fd,) if self.env.lock_fd is not None else ()
         with app.suspend():
-            rc = subprocess.run(argv, env=self.env.child_env(), check=False).returncode
+            rc = subprocess.run(argv, env=self.env.child_env(), pass_fds=fds, check=False).returncode
         return rc
 
     # ------------------------------------------------------------------

@@ -79,6 +79,12 @@ function Install-KohaEasyBootstrap {
     Copy-Item -Path (Join-Path $src 'windows\*') -Destination $bin -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $src 'installer'), (Join-Path $src 'installer.sha256') -Destination $bin -Force
     Copy-Item -Path (Join-Path $src 'lang\*.cache') -Destination (Join-Path $bin 'lang') -Force
+    # The new panel (Python/Textual); KohaEasy.Install copies it into Debian.
+    $panelBin = Join-Path $bin 'panel'
+    if (Test-Path -LiteralPath $panelBin) { Remove-Item -LiteralPath $panelBin -Recurse -Force }
+    if (Test-Path -LiteralPath (Join-Path $src 'panel')) {
+        Copy-Item -LiteralPath (Join-Path $src 'panel') -Destination $bin -Recurse -Force
+    }
     Copy-Item -LiteralPath (Join-Path $src 'windows\Uninstall-Koha.cmd') -Destination $root -Force
     if ($tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 

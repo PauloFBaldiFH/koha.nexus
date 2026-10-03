@@ -564,7 +564,7 @@ function ConvertTo-KohaWslPath {
     return $Path
 }
 
-# Copies the installer and its dictionaries into Debian and checks the
+# Copies the installer, its dictionaries and the new panel into Debian and checks the
 # SHA-256 again on the Linux side.
 function Copy-KohaPanelIntoDistro {
     $src = ConvertTo-KohaWslPath (Get-KohaPath Bin)
@@ -574,6 +574,9 @@ function Copy-KohaPanelIntoDistro {
         'mkdir -p "$d/lang"'
         'cp "$s/installer" "$s/installer.sha256" "$d/"'
         'cp "$s"/lang/*.cache "$d/lang/" 2>/dev/null || true'
+        '# The new panel (Python/Textual), opened by the installer when it can.'
+        'rm -rf "$d/panel"'
+        'if [ -d "$s/panel" ]; then cp -r "$s/panel" "$d/panel"; fi'
         'cd "$d"'
         'sha256sum -c installer.sha256'
         '# The panel launcher the Windows tools call: the newest of the copy from'
