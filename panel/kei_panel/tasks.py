@@ -74,6 +74,10 @@ class Reporter:
     def status(self, text: str) -> None:
         self._call(self._screen.set_status, text)
 
+    def notice(self, text: str) -> None:
+        """A text the person must read while the task runs (a link to open)."""
+        self._call(self._screen.set_notice, text)
+
     def progress(self, current: float, total: float) -> None:
         """Switches Pac-Man to determinate mode (current of total)."""
         self._call(self._screen.set_progress, current / total if total else None)
@@ -107,6 +111,19 @@ def verb_job(bridge, verb: tuple[str, ...]) -> Callable[["Reporter"], Awaitable[
             tail = " / ".join(list(reporter.lines)[-3:])
             raise TaskFailed(f"exit {rc}" + (f": {tail}" if tail else ""), rc)
         return rc
+    return job
+
+
+def task_job(bridge, name: str, *args: str, env: dict[str, str] | None = None, total_steps: int = 0,
+             on_result: Callable[["Reporter", str, str], None] | None = None
+             ) -> Callable[["Reporter"], Awaitable[Any]]:
+    """A ported routine (`config.sh --task`) as a job. It returns the
+    TaskOutcome whatever happened: the routine's own boxes say what went
+    wrong, and the screen that follows shows them."""
+    async def job(reporter: Reporter):
+        cb = (lambda k, v: on_result(reporter, k, v)) if on_result else None
+        return await bridge.task(name, *args, reporter=reporter, env=env,
+                                 total_steps=total_steps, on_result=cb)
     return job
 
 

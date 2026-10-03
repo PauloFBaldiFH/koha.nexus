@@ -3,7 +3,8 @@
 Pushed by tasks.run_with_loader. It starts the job in a worker on mount,
 animates Pac-Man while the worker runs, and dismisses itself with a
 TaskResult. Esc or the Cancel button cancels the worker (an installer
-subprocess is terminated, a thread job sees reporter.cancelled).
+subprocess is terminated, a thread job sees reporter.cancelled), unless
+the task must not be stopped halfway (a restore): cancellable=False.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, RichLog
+from textual.widgets import Button, Label, RichLog, Static
 from textual.worker import Worker, WorkerState
 
 from ..i18n import t
@@ -32,10 +33,11 @@ class LoadingScreen(ModalScreen[TaskResult]):
         Binding("l", "toggle_log", "Log"),
     ]
 
-    def __init__(self, title: str, job: Job):
+    def __init__(self, title: str, job: Job, cancellable: bool = True):
         super().__init__()
         self.title_text = title
         self.job = job
+        self.cancellable = cancellable
         self.reporter = Reporter(self)
         self.started = 0.0
         self.worker: Worker | None = None
@@ -46,6 +48,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         with Vertical(id="loader-box"):
             yield Label(self.title_text, id="loader-title")
             yield PacmanLoader(plain=bool(plain), colors=colors, id="pacman")
+            yield Static("", id="loader-notice")
             with Horizontal(id="loader-meta"):
                 yield Label("", id="loader-status")
                 yield Label("", id="loader-clock")
@@ -57,6 +60,9 @@ class LoadingScreen(ModalScreen[TaskResult]):
     def on_mount(self) -> None:
         self.started = time.monotonic()
         self.query_one("#loader-log").display = False
+        self.query_one("#loader-notice").display = False
+        if not self.cancellable:
+            self.query_one("#cancel").display = False
         self.set_interval(0.5, self._update_clock)
         if is_async_job(self.job):
             self.worker = self.run_worker(self._run_async(), name="task", exit_on_error=False)
@@ -79,6 +85,11 @@ class LoadingScreen(ModalScreen[TaskResult]):
 
     def set_status(self, text: str) -> None:
         self.query_one("#loader-status", Label).update(text)
+
+    def set_notice(self, text: str) -> None:
+        notice = self.query_one("#loader-notice", Static)
+        notice.update(text)
+        notice.display = bool(text)
 
     def set_progress(self, fraction: float | None) -> None:
         self.query_one(PacmanLoader).progress = fraction
@@ -120,6 +131,9 @@ class LoadingScreen(ModalScreen[TaskResult]):
     # Actions
     # ------------------------------------------------------------------
     def action_cancel(self) -> None:
+        if not self.cancellable:
+            self.notify(t("Do not interrupt: CTRL+C is disabled until the restore finishes."), severity="warning")
+            return
         if self.worker and self.worker.is_running:
             self.reporter._request_cancel()
             self.worker.cancel()

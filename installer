@@ -834,7 +834,7 @@ PANEL_LOCK_FILE="/var/run/koha_panel.lock"
 # --install-data-safety, which only (re)writes the data-safety settings,
 # and --rebuild-search-index (the Koha window's button).
 KEI_CLI_MODE=""
-case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--install-data-safety|--rebuild-search-index) KEI_CLI_MODE="$1" ;; esac
+case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--install-data-safety|--rebuild-search-index|--task) KEI_CLI_MODE="$1" ;; esac
 
 if [ -z "$KEI_CLI_MODE" ]; then
     # A routine started by the new panel (config.sh --run, see
@@ -1448,7 +1448,7 @@ tui_task_line() {
 
 # tui_run "Label" cmd [args...]  (Mode A: unknown duration)
 tui_run() {
-    local label="$1" rc TUI_IN_RUN=1
+    local label="$1" rc TUI_IN_RUN=1 full="$1"
     shift
     tui_fit "$label" "$(tui_label_width)"; label=$REPLY
     mkdir -p "$(dirname "$TUI_LOG")" 2>/dev/null
@@ -1469,9 +1469,15 @@ tui_run() {
         ) &
         TUI_ANIM_PID=$!
     fi
+    [ -n "${KEI_TASK:-}" ] && kei_emit step "$full"
     "$@" >>"$TUI_LOG" 2>&1 </dev/null
     rc=$?
     tui_stop_anim
+    if [ -n "${KEI_TASK:-}" ]; then
+        kei_emit done "$rc $full"
+        log "task '${1}': exit $rc"
+        return "$rc"
+    fi
     tui_task_line "$rc" "$label"
     log "task '${1}': exit $rc"
     return "$rc"
@@ -5051,6 +5057,34 @@ restore_task_reindex() {
     fi
 }
 
+# restore_preflight FILE: 1) the file itself: readable, not empty, intact
+# gzip, SQL inside, ending like a complete mysqldump; 2) room for the trial
+# import and then the new catalog (InnoDB takes about 1.5 times the size of
+# the SQL text). 1 = not usable, RESTORE_PREFLIGHT_ERROR says why; the
+# DUMP_* values are left for the questions about a suspicious file.
+restore_preflight() {
+    local file="$1" datadir free_mb need_mb
+    RESTORE_PREFLIGHT_ERROR=""
+    if ! check_dump_file "$file"; then
+        RESTORE_PREFLIGHT_ERROR="$DUMP_ERROR"
+        return 1
+    fi
+    datadir=$(run_sql "SELECT @@datadir;")
+    datadir="${datadir:-/var/lib/mysql}"
+    free_mb=$(get_free_space_mb "$datadir")
+    need_mb=$(( DUMP_MB + DUMP_MB / 2 + 256 ))
+    kei_result size_mb "$DUMP_MB"
+    kei_result need_mb "$need_mb"
+    kei_result free_mb "${free_mb:-0}"
+    kei_result has_sql "$DUMP_HAS_SQL"
+    kei_result complete "$DUMP_COMPLETE"
+    if [ "${free_mb:-0}" -lt "$need_mb" ] 2>/dev/null; then
+        RESTORE_PREFLIGHT_ERROR="$(t 'Not enough free disk space for a safe restore.\n\nNeeded: ~${need_mb} MB\nFree  : ${free_mb} MB (${datadir})\n\nNothing was changed.')"
+        return 1
+    fi
+    return 0
+}
+
 function_restore_database() {
     require_koha || return 0
     require_db_admin || return 0
@@ -5062,11 +5096,11 @@ function_restore_database() {
     fi
     [ -z "$file" ] && return 0
 
-    # 1) The file itself: readable, not empty, intact gzip, SQL inside,
-    #    and ending like a complete mysqldump.
+    # 1-2) The file (readable, intact, SQL inside, complete) and the room
+    #      for the restore: see restore_preflight.
     display_explanation "Checking the backup file..."
-    if ! check_dump_file "$file"; then
-        msg_error "" "$DUMP_ERROR" 10 72
+    if ! restore_preflight "$file"; then
+        msg_error "" "$RESTORE_PREFLIGHT_ERROR" 13 76
         return 0
     fi
     if [ "$DUMP_HAS_SQL" != "yes" ]; then
@@ -5078,18 +5112,6 @@ function_restore_database() {
     fi
     if [ "$DUMP_COMPLETE" != "yes" ]; then
         prompt_yes_no "$(t "Suspicious file")" "$(t "The file does not end with the mysqldump completion line (-- Dump completed): it may be truncated.\n\nContinue anyway? It will still be tested in a temporary database first.")" 12 76 || return 0
-    fi
-
-    # 2) Room for the trial import and then the new catalog (InnoDB takes
-    #    about 1.5 times the size of the SQL text).
-    local datadir free_mb need_mb
-    datadir=$(run_sql "SELECT @@datadir;")
-    datadir="${datadir:-/var/lib/mysql}"
-    free_mb=$(get_free_space_mb "$datadir")
-    need_mb=$(( DUMP_MB + DUMP_MB / 2 + 256 ))
-    if [ "${free_mb:-0}" -lt "$need_mb" ] 2>/dev/null; then
-        msg_error "" "$(t 'Not enough free disk space for a safe restore.\n\nNeeded: ~${need_mb} MB\nFree  : ${free_mb} MB (${datadir})\n\nNothing was changed.')" 13 76
-        return 0
     fi
 
     prompt_yes_no "$(t "Confirm Restore")" \
@@ -5191,6 +5213,9 @@ function_restore_database() {
 
     tui_run "$(t "Checking that everything works")" install_task_check "$(t "database restore")"
     log "restore completed from $file (engine=$engine rebuild=$rebuild_ok)"
+    kei_result engine "$engine"
+    kei_result tables "$tables"
+    kei_result safety_backup "$rescue"
 
     if [ "$engine_ok" = "no" ]; then
         msg_error "" "$(t "Could not set the search engine after restore.")" 9 72
@@ -5198,7 +5223,7 @@ function_restore_database() {
     fi
     if [ "$rebuild_ok" = "no" ]; then
         msg_error "" "$(t "The database was restored, but index rebuilding failed.\nCheck /var/log/koha-easy-install/zebra-rebuild.log")" 11 78
-        if prompt_yes_no "$(t "View Report")" \
+        if [ -z "${KEI_TASK:-}" ] && prompt_yes_no "$(t "View Report")" \
             "$(t "Do you want to see the validation report to investigate the issues now?")" 10 72; then
             show_validation_report
         fi
@@ -5207,7 +5232,7 @@ function_restore_database() {
 
     msg_ok "$(t "Catalog restored and indexed successfully!\n\nSearch engine: \${engine}\nTables: \${tables}")" 12 74
 
-    if prompt_yes_no "$(t "View Report")" \
+    if [ -z "${KEI_TASK:-}" ] && prompt_yes_no "$(t "View Report")" \
         "$(t "Do you want to see the detailed system validation report now?")" 10 70; then
         show_validation_report
     fi
@@ -5218,20 +5243,28 @@ function_restore_database() {
 # ======================================================================
 # 4. MANUAL LOCAL BACKUP
 # ======================================================================
+# function_manual_backup [DIR]: DIR comes from the new panel's folder
+# picker; without it the operator picks the folder here.
 function_manual_backup() {
-    require_database || return 0
+    require_database || return 1
     if ! backup_lock_acquire; then
         msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
-        return 0
+        return 1
     fi
-    local srv_ip
-    srv_ip=$(get_server_ip)
-    msg_info "$(t "Backup Destination")" \
+    local target_dir="${1:-}" target_file
+    if [ -z "$target_dir" ]; then
+        local srv_ip
+        srv_ip=$(get_server_ip)
+        msg_info "$(t "Backup Destination")" \
 "$(t "Choose where to save the file.\n\n  USB drive: usually under /media or /mnt\n  To download later: scp root@\${srv_ip}:PATH Downloads/")" 12 76
-
-    local target_dir target_file
-    target_dir=$(select_directory "$REAL_HOME") || { backup_lock_release; return 0; }
-    [ -z "$target_dir" ] && { backup_lock_release; return 0; }
+        target_dir=$(select_directory "$REAL_HOME") || { backup_lock_release; return 0; }
+        [ -z "$target_dir" ] && { backup_lock_release; return 0; }
+    fi
+    if [ ! -d "$target_dir" ] || [ ! -w "$target_dir" ]; then
+        backup_lock_release
+        msg_error "" "$(t "The folder does not exist or cannot be written:") $target_dir" 9 74
+        return 1
+    fi
     target_file="${target_dir%/}/${DB_NAME}_manual_$(date +%Y-%m-%d_%Hh%M).sql.gz"
 
     clear
@@ -5246,6 +5279,13 @@ function_manual_backup() {
         local size ip_addr
         size=$(du -h "$target_file" | cut -f1)
         ip_addr=$(get_server_ip)
+        if [ -n "${KEI_TASK:-}" ]; then
+            kei_result file "$target_file"
+            kei_result size "$size"
+            kei_result scp "scp ${REAL_USER:-root}@${ip_addr}:${target_file} Downloads/"
+            kei_result user "${REAL_USER:-root}"
+            return 0
+        fi
 
         echo "======================================================================"
         echo -e "\e[1;32m$(t "BACKUP GENERATED AND VERIFIED SUCCESSFULLY!")\e[0m"
@@ -5269,17 +5309,23 @@ function_manual_backup() {
     else
         backup_lock_release
         msg_error "" "$(t "Failed to generate the backup. Check the free disk space.")" 9 70
+        return 1
     fi
 }
 
 # ======================================================================
 # 5. TEST THE LATEST BACKUP
 # ======================================================================
+newest_sql_backup() {
+    find "$DIR_SQL" -name '*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-
+}
+# function_test_backup [FILE]: the newest automatic backup unless the new
+# panel names another file.
 function_test_backup() {
-    require_koha || return 0
-    require_db_admin || return 0
-    local newest
-    newest=$(find "$DIR_SQL" -name '*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+    require_koha || return 1
+    require_db_admin || return 1
+    local newest="${1:-}"
+    [ -z "$newest" ] && newest=$(newest_sql_backup)
     if [ -z "$newest" ]; then
         msg_error "" "$(t "No automatic backup found in \${DIR_SQL}.")" 9 70
         return 0
@@ -5329,6 +5375,10 @@ function_test_backup() {
         msg_error "" "$(t "The backup DID NOT restore. Check the file urgently.")" 9 72
         return 1
     fi
+    kei_result file "$newest"
+    kei_result tables "${tab:-0}"
+    kei_result biblios "${bib:-0}"
+    kei_result patrons "${usu:-0}"
     if [ "${tab:-0}" -gt 50 ] 2>/dev/null && [ -z "$missing" ]; then
         local ok_test_msg
         ok_test_msg="$(printf "%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s" \
@@ -24273,6 +24323,180 @@ lt_aia_changes() {
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
+# ======================================================================
+# PANEL TASKS: config.sh --task NAME [ARGS]
+# ----------------------------------------------------------------------
+# The new panel (panel/) asks a routine's questions in its own screens,
+# then runs the routine here with no dialog at all: what the routine would
+# show becomes lines of a small protocol on stdout, which
+# panel/kei_panel/bridge.py reads while Pac-Man runs:
+#   @@step LABEL             a step starts (tui_run)
+#   @@done RC LABEL          that step ended
+#   @@note TEXT              a progress line (display_explanation)
+#   @@title TEXT             the routine's heading (tui_title)
+#   @@msg KIND TITLE<TAB>TEXT  the box it would show: ok, info or error
+#   @@ask TITLE<TAB>TEXT     a yes/no question: answered yes, the panel
+#                            asked it before starting
+#   @@result KEY=VALUE       a value for the panel's result screen
+# New lines inside a text travel as "\n". Only the routines listed in
+# kei_task are reachable; the panel's own lock is not taken (the routines
+# take the backup lock themselves, as in the classic panel).
+# ======================================================================
+KEI_TASK=""
+kei_emit() {
+    local tag="$1" text
+    shift
+    text="$*"
+    text=${text//$'\r'/}
+    printf '@@%s %s\n' "$tag" "${text//$'\n'/\\n}"
+}
+# A value for the panel (nothing outside a task).
+kei_result() { [ -n "${KEI_TASK:-}" ] && kei_emit result "$1=$2"; return 0; }
+
+# The dialogs of the classic panel, as protocol lines.
+kei_task_ui() {
+    msg_info() { kei_emit msg "info ${1}"$'\t'"${2}"; }
+    msg_ok() { kei_emit msg "ok $(t "OK")"$'\t'"${1}"; }
+    msg_error() { kei_emit msg "error ${1:-$(t "Error")}"$'\t'"${2}"; }
+    prompt_yes_no() { kei_emit ask "${1:-}"$'\t'"${2:-}"; return 0; }
+    display_explanation() { kei_emit note "$(t "$1")"; }
+    tui_title() { kei_emit title "$2"; }
+    pause_terminal() { :; }
+    pause_terminal_continue() { :; }
+    clear() { :; }
+    # A dialog a routine still opens would wait where nobody can see it.
+    whiptail() { kei_emit msg "error $(t "Error")"$'\t'"whiptail: $*"; return 1; }
+    dialog() { whiptail "$@"; }
+}
+
+# Paths and facts the panel's screens show (pickers, hints, the newest backup).
+kei_task_info() {
+    local newest
+    kei_result real_user "${REAL_USER:-root}"
+    kei_result real_home "${REAL_HOME:-/root}"
+    kei_result server_ip "$(get_server_ip)"
+    kei_result dir_sql "$DIR_SQL"
+    kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
+    newest=$(newest_sql_backup)
+    if [ -n "$newest" ]; then
+        kei_result newest "$newest"
+        kei_result newest_date "$(date -r "$newest" '+%Y-%m-%d %H:%M')"
+        kei_result newest_size "$(du -h "$newest" | cut -f1)"
+    fi
+    kei_result rclone "$(command -v rclone >/dev/null 2>&1 && echo yes || echo no)"
+    kei_result rclone_remote "$(grep -E '^RCLONE_REMOTE=' "$BACKUP_CONF" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"')"
+    return 0
+}
+
+# What every cloud set-up needs first: rclone and the backup scripts.
+rclone_prepare() {
+    command -v rclone >/dev/null 2>&1 || apt_install rclone >/dev/null 2>&1
+    if ! command -v rclone >/dev/null 2>&1; then
+        msg_error "" "$(t "Could not install rclone.")" 8 66
+        return 1
+    fi
+    [ -f /root/backup_sql.sh ] || write_backup_scripts
+    return 0
+}
+rclone_create_gdrive() {
+    rclone config delete gdrive >/dev/null 2>&1 || true
+    rclone config create gdrive drive config_is_local false token "$1" --non-interactive < /dev/null
+}
+
+# Cloud backup with a token made on another computer (KEI_RCLONE_TOKEN:
+# kept out of the command line).
+kei_task_cloud_token() {
+    local token="${KEI_RCLONE_TOKEN:-}"
+    unset KEI_RCLONE_TOKEN
+    require_database || return 1
+    token=$(printf '%s' "$token" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if ! is_rclone_token "$token"; then
+        msg_error "" "$(t "[ERROR] Provided JSON is corrupt or was truncated when copying. Try again:")" 9 74
+        return 1
+    fi
+    tui_run "$(t "Installing rclone")" rclone_prepare || { msg_error "" "$(t "Could not install rclone.")" 8 66; return 1; }
+    if ! tui_run "$(t "Registering 'gdrive' remote in Rclone...")" rclone_create_gdrive "$token"; then
+        msg_error "" "$(t "Failed to register connection in Rclone.")" 8 66
+        return 1
+    fi
+    validate_and_register_rclone "gdrive"
+}
+
+# Cloud backup authorized on this server: the link goes to the panel at
+# once (@@result auth_url), then this waits for Google's answer. Stopping
+# the task stops rclone too (port 53682 is freed).
+kei_task_cloud_authorize() {
+    local out token rc
+    require_database || return 1
+    tui_run "$(t "Installing rclone")" rclone_prepare || { msg_error "" "$(t "Could not install rclone.")" 8 66; return 1; }
+    out=$(mktemp /root/.kei-rclone-auth.XXXXXX) || return 1
+    if ! auth_tool_start "$out" "$RCLONE_AUTH_URL_RE" rclone authorize "drive" --auth-no-open-browser; then
+        rm -f "$out"
+        msg_error "" "$(t "rclone did not print an authorization link (is port 53682 busy?).")" 9 74
+        return 1
+    fi
+    trap 'kill "$AUTH_PID" 2>/dev/null; rm -f "$out"; exit 130' TERM INT HUP
+    kei_result auth_url "$AUTH_URL"
+    if browser_opener >/dev/null; then
+        open_in_browser "$AUTH_URL" >/dev/null 2>&1 && kei_result auth_opened yes
+    else
+        kei_result auth_tunnel "ssh -L 53682:127.0.0.1:53682 ${REAL_USER:-root}@$(get_server_ip)"
+    fi
+    kei_emit note "$(t "Waiting for the authorization...")"
+    wait "$AUTH_PID"
+    rc=$?
+    trap - TERM INT HUP
+    token=$(grep -o '{.*}' "$out" 2>/dev/null | head -n1)
+    rm -f "$out"
+    if [ "$rc" -ne 0 ] || ! is_rclone_token "$token"; then
+        msg_error "" "$(t "Could not capture token automatically. Try Option 1.")" 9 74
+        return 1
+    fi
+    if ! tui_run "$(t "Registering 'gdrive' remote in Rclone...")" rclone_create_gdrive "$token"; then
+        msg_error "" "$(t "Failed to register gdrive remote in Rclone.")" 8 66
+        return 1
+    fi
+    validate_and_register_rclone "gdrive"
+}
+
+kei_task() {
+    local name="${1:-}"
+    shift
+    KEI_TASK="$name"
+    kei_task_ui
+    log "panel task: $name"
+    case "$name" in
+        info)            kei_task_info ;;
+        backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
+        backup-test)     function_test_backup "${1:-}" ;;
+        restore-check)
+            [ -n "${1:-}" ] || return 2
+            require_koha || return 1
+            require_db_admin || return 1
+            if ! restore_preflight "$1"; then
+                msg_error "" "$RESTORE_PREFLIGHT_ERROR" 13 76
+                return 1
+            fi ;;
+        restore)         [ -n "${1:-}" ] || return 2; function_restore_database "$1" ;;
+        cloud-prepare)   require_database && tui_run "$(t "Installing rclone")" rclone_prepare ;;
+        cloud-token)     kei_task_cloud_token ;;
+        cloud-authorize) kei_task_cloud_authorize ;;
+        cloud-remotes)
+            local r
+            while IFS= read -r r; do
+                [ -n "$r" ] && kei_result remote "${r%:}"
+            done < <(rclone listremotes 2>/dev/null)
+            return 0 ;;
+        cloud-remote)
+            require_database || return 1
+            rclone_prepare || return 1
+            validate_and_register_rclone "${1:-}" ;;
+        *)
+            kei_emit msg "error $(t "Error")"$'\t'"$(t "Unknown panel action:") $name"
+            return 2 ;;
+    esac
+}
+
 # Read-only commands (section 21.5): answer and exit before anything else runs.
 # The panel's exit cleanup is not used: it removes /tmp/koha_tmp_* files that
 # belong to a panel open at the same time.
@@ -24286,6 +24510,7 @@ if [ -n "$KEI_CLI_MODE" ]; then
         # data-safety settings of an existing Koha without opening the panel.
         --install-data-safety) is_koha_installed && install_data_safety ;;
         --rebuild-search-index) kei_rebuild_search_index ;;
+        --task) kei_task "${@:2}" ;;
     esac
     exit $?
 fi

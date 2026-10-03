@@ -73,8 +73,28 @@ class KohaPanelApp(App):
     def runs_in_background(self, entry: Entry) -> bool:
         return entry.kind == "background" or bool(entry.verb and self.bridge.supports(entry.verb[0]))
 
+    def is_native(self, entry: Entry) -> bool:
+        """Ported to the panel's own screens, and the installer can run it."""
+        from . import routines
+        return entry.kind == "native" and routines.has(entry.action) and self.bridge.supports_tasks()
+
+    def run_native(self, action: str, after: Callable[[], None] | None = None) -> None:
+        from . import routines
+
+        async def flow() -> None:
+            try:
+                await routines.ROUTINES[action](self)
+            finally:
+                if after:
+                    after()
+
+        self.run_worker(flow(), group="routine", exclusive=True, exit_on_error=False)
+
     def run_entry(self, entry: Entry, after: Callable[[], None] | None = None) -> None:
         label = t(entry.label)
+        if self.is_native(entry):
+            self.run_native(entry.action, after)
+            return
         if not self.runs_in_background(entry):
             try:
                 rc = self.bridge.run_interactive(self, entry.action)

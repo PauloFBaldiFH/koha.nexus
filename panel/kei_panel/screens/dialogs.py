@@ -1,13 +1,15 @@
-"""Small modals: confirm a step, show a task's result."""
+"""Small modals: confirm a step, pick an option, type a value, show a
+task's result. Every routine screen is built from these."""
 
 from __future__ import annotations
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, RichLog
+from textual.widgets import Button, Input, Label, OptionList, RichLog, Static
+from textual.widgets.option_list import Option
 
 from ..i18n import t
 from ..tasks import TaskResult
@@ -16,16 +18,16 @@ from ..tasks import TaskResult
 class ConfirmScreen(ModalScreen[bool]):
     BINDINGS = [Binding("escape", "no", t("No")), Binding("y", "yes", t("Yes"))]
 
-    def __init__(self, title: str, question: str):
+    def __init__(self, title: str, question: str, danger: bool = False):
         super().__init__()
-        self._title, self._question = title, question
+        self._title, self._question, self._danger = title, question, danger
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
+        with Vertical(classes="dialog -error" if self._danger else "dialog"):
             yield Label(self._title, classes="dialog-title")
-            yield Label(self._question, classes="dialog-body")
+            yield Static(self._question, classes="dialog-body", markup=False)
             with Horizontal(classes="dialog-buttons"):
-                yield Button(t("Yes"), id="yes", variant="primary")
+                yield Button(t("Yes"), id="yes", variant="error" if self._danger else "primary")
                 yield Button(t("No"), id="no")
 
     def on_mount(self) -> None:
@@ -64,6 +66,134 @@ class ResultScreen(ModalScreen[None]):
         for line in self._result.log[-40:]:
             log.write(line)
         self.query_one("#ok").focus()
+
+    @on(Button.Pressed, "#ok")
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
+class ChoiceScreen(ModalScreen[str | None]):
+    """One of a few options (the whiptail --menu of a routine)."""
+
+    BINDINGS = [Binding("escape", "back", t("Back"))]
+
+    def __init__(self, title: str, prompt: str, options: list[tuple[str, str]], note: str = ""):
+        super().__init__()
+        self._title, self._prompt, self._options, self._note = title, prompt, options, note
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog -wide"):
+            yield Label(self._title, classes="dialog-title")
+            yield Static(self._prompt, classes="dialog-body", markup=False)
+            yield OptionList(*[Option(label, id=key) for key, label in self._options], classes="dialog-options")
+            if self._note:
+                yield Static(self._note, classes="dialog-note", markup=False)
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("Back"), id="back")
+
+    def on_mount(self) -> None:
+        self.query_one(OptionList).focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        self.dismiss(event.option.id)
+
+    @on(Button.Pressed, "#back")
+    def action_back(self) -> None:
+        self.dismiss(None)
+
+
+class InputScreen(ModalScreen[str | None]):
+    """Instructions and one value to type or paste (a token, a name)."""
+
+    BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
+
+    def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False):
+        super().__init__()
+        self._title, self._instructions, self._prompt = title, instructions, prompt
+        self._validate, self._password = validate, password
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog -wide"):
+            yield Label(self._title, classes="dialog-title")
+            with VerticalScroll(classes="dialog-scroll"):
+                yield Static(self._instructions, classes="dialog-body", markup=False)
+            yield Label(self._prompt, classes="dialog-prompt")
+            yield Input(password=self._password, id="value")
+            yield Label("", id="input-error", classes="dialog-error")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(t("OK"), id="ok", variant="primary")
+                yield Button(t("Cancel"), id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#value", Input).focus()
+
+    @on(Input.Submitted, "#value")
+    @on(Button.Pressed, "#ok")
+    def _accept(self) -> None:
+        value = self.query_one("#value", Input).value.strip()
+        error = self._validate(value) if self._validate else ("" if value else t("Cannot be empty."))
+        if error:
+            self.query_one("#input-error", Label).update(error)
+            return
+        self.dismiss(value)
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class MessageScreen(ModalScreen[None]):
+    """The end of a routine: what happened, its numbers, a command to copy
+    and, when it went wrong, the last lines of its output."""
+
+    BINDINGS = [Binding("escape", "close", t("OK"))]
+
+    def __init__(self, title: str, body: str, kind: str = "ok", details: list[tuple[str, str]] | None = None,
+                 command: str = "", command_help: str = "", command_notes: str = "",
+                 log: list[str] | None = None):
+        super().__init__()
+        self._title, self._body, self._kind = title, body, kind
+        self._details, self._command, self._command_help = details or [], command, command_help
+        self._command_notes = command_notes
+        self._log = log or []
+
+    def compose(self) -> ComposeResult:
+        classes = {"error": "dialog -wide -error", "info": "dialog -wide -info"}.get(self._kind, "dialog -wide -ok")
+        with Vertical(classes=classes):
+            yield Label(self._title, classes="dialog-title")
+            with VerticalScroll(classes="dialog-scroll"):
+                if self._body:
+                    yield Static(self._body, classes="dialog-body", markup=False)
+                for label, value in self._details:
+                    with Horizontal(classes="dialog-detail"):
+                        yield Label(label, classes="detail-label")
+                        yield Static(value, classes="detail-value", markup=False)
+                if self._command:
+                    if self._command_help:
+                        yield Static(self._command_help, classes="dialog-body", markup=False)
+                    yield Static(self._command, classes="dialog-command", markup=False)
+                    if self._command_notes:
+                        yield Static(self._command_notes, classes="dialog-note", markup=False)
+            if self._log:
+                log = RichLog(classes="dialog-log", wrap=True, markup=False)
+                yield log
+            with Horizontal(classes="dialog-buttons"):
+                if self._command:
+                    yield Button(t("Copy"), id="copy")
+                yield Button(t("OK"), id="ok", variant="primary")
+
+    def on_mount(self) -> None:
+        if self._log:
+            log = self.query_one(RichLog)
+            for line in self._log[-40:]:
+                log.write(line)
+        self.query_one("#ok").focus()
+
+    @on(Button.Pressed, "#copy")
+    def _copy(self) -> None:
+        self.app.copy_to_clipboard(self._command)
+        self.notify(t("Copied."), timeout=3)
 
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:

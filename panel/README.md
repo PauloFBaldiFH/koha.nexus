@@ -75,6 +75,34 @@ it (a subprocess is terminated), and `on_done` gets a `TaskResult`.
 `PacmanLoader` is a normal widget too: the dashboard uses the one-line form
 inline while it reads the status.
 
+## Ported routines (no whiptail)
+
+A ported routine asks its questions in the panel's own screens (folder and
+file pickers, choices, confirmations), then runs in the installer as
+`config.sh --task NAME ARGS` behind Pac-Man. The installer answers in a
+line protocol (`@@step`, `@@done`, `@@note`, `@@msg`, `@@result`, see
+"PANEL TASKS" in `installer`), so its own texts and translations are shown
+and its checks (locks, safety copy, rollback) stay in one place. Menu
+entries with `kind="native"` use `routines/`; an installer without `--task`
+keeps the classic routine.
+
+The classic panel stays the default until every section is ported:
+
+| Phase | Section | State |
+| --- | --- | --- |
+| 1 | Backup center (manual backup, integrity test, cloud backup) and Restore | done |
+| 2 | Database tables and maintenance (optimization, SQL reports pack) | next |
+| 3 | Install Koha server, first-access credentials | |
+| 4 | Diagnostics (status, health check, validation report, services, Apache log) | |
+| 5 | Search engine and indexing | |
+| 6 | Security center | |
+| 7 | Koha settings and parameters | |
+| 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | |
+| 9 | Schedules, languages, updates, library tools, about, reboot | |
+
+Full-screen programs of their own (rclone's wizard, htop, links, Midnight
+Commander) keep the terminal, as they would in any panel.
+
 ## Module 1: AI setup (`a`)
 
 `views/ai.py` sets up the AI the cataloguing tools use:
@@ -113,8 +141,11 @@ kei_panel/
   aiconf.py         vision.conf of the AI cataloguing tabs, ai-keys.conf, key masking
   aiclient.py       connection test and local Ollama (version, models, pull), blocking
   marcreplace.py    is the MARC Replace page installed, which --run action opens it
+  demo.py           simulated --task answers (demo mode, tests)
+  routines/         ported routines: backup, restore, cloud backup
   widgets/          PacmanLoader, StatusCard, ActionCard
-  screens/          MainScreen, LoadingScreen, ConfirmScreen, ResultScreen
+  screens/          MainScreen, LoadingScreen, dialogs (confirm, choice, input,
+                    message), PathPickerScreen
   views/            dashboard, section (generic), backup, database, ai
   panel.tcss        all styling
 tests/              pytest, headless (no Koha needed)

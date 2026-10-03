@@ -9,6 +9,8 @@ kind:
   interactive  the routine still asks its own questions (whiptail): the
                panel suspends and hands the terminal to config.sh --run.
   background   non-interactive: runs in a worker under the Pacman loader.
+  native       ported: the panel's own screens ask the questions and the
+               work runs as `config.sh --task` (routines/); no whiptail.
 verb: a read-only/idempotent installer verb (--rebuild-search-index...)
       that does the same job without questions. When the installer in use
       supports it, the entry runs in the background with it.
@@ -46,11 +48,12 @@ SECTIONS: tuple[Section, ...] = (
     Section("credentials", "🔑  View first-access credentials", entries=(
         Entry("🔑  View first-access credentials", "credentials"),)),
     Section("restore", "📥  Restore database", entries=(
-        Entry("📥  Restore database", "restore"),)),
+        Entry("📥  Restore database", "restore", kind="native"),)),
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
-        Entry("💾  Generate manual backup and download to PC", "backup-manual", verb=("--backup-now",)),
-        Entry("📤  Configure cloud backup (Google Drive)", "backup-cloud"),
-        Entry("🧾  Test integrity of latest backup", "backup-test"),
+        Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native"),
+        Entry("📤  Configure cloud backup (Google Drive)", "backup-cloud", kind="native"),
+        Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
+        Entry("📥  Restore database", "restore", kind="native"),
     ), view="backup", key="b"),
     # New screen: Koha's tables at a glance (no bash menu of its own).
     Section("database", "📑  Database tables", "📑  Database tables", entries=(
