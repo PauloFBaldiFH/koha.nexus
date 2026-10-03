@@ -115,7 +115,7 @@ def verb_job(bridge, verb: tuple[str, ...]) -> Callable[["Reporter"], Awaitable[
 
 
 def task_job(bridge, name: str, *args: str, env: dict[str, str] | None = None, total_steps: int = 0,
-             on_result: Callable[["Reporter", str, str], None] | None = None
+             on_result: Callable[["Reporter", str, str], None] | None = None, ask=None
              ) -> Callable[["Reporter"], Awaitable[Any]]:
     """A ported routine (`config.sh --task`) as a job. It returns the
     TaskOutcome whatever happened: the routine's own boxes say what went
@@ -123,7 +123,7 @@ def task_job(bridge, name: str, *args: str, env: dict[str, str] | None = None, t
     async def job(reporter: Reporter):
         cb = (lambda k, v: on_result(reporter, k, v)) if on_result else None
         return await bridge.task(name, *args, reporter=reporter, env=env,
-                                 total_steps=total_steps, on_result=cb)
+                                 total_steps=total_steps, on_result=cb, ask=ask)
     return job
 
 

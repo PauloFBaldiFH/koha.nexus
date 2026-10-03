@@ -68,9 +68,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("💬  AI assistant on the staff home page", "ai-assistant"),
     ), view="ai", key="a"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
-        Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle"),
-        Entry("🔨  Repair / rebuild indexing", "search-repair", verb=("--rebuild-search-index",),
-              confirm="Rebuild the whole search index now? Searches may be incomplete until it ends."),
+        Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
+        Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
     )),
     Section("publish", "🌐  Publish system to internet", "🌐 Publish System to Internet",
             "Choose a publishing method:", (

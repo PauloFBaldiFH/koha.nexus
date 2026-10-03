@@ -26,7 +26,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from .env import PanelEnv
 
@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from .tasks import Reporter
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
+
+# A question of an interactive routine: (outcome so far, title, text) -> yes?
+Asker = Callable[["TaskOutcome", str, str], Awaitable[bool]]
 
 
 class BridgeError(RuntimeError):
@@ -202,15 +205,17 @@ class Bridge:
     # ------------------------------------------------------------------
     async def stream(self, argv: list[str], reporter: "Reporter | None",
                      on_line: Callable[[str], None] | None = None,
-                     env: dict[str, str] | None = None) -> int:
+                     env: dict[str, str] | None = None,
+                     answer: "Callable[[str], Awaitable[str]] | None" = None) -> int:
         """Run argv, every output line to reporter.log (or on_line); returns
-        the exit code."""
+        the exit code. With answer, each "@@ask" line waits for answer(line)
+        and the reply is written to the routine's stdin."""
         child_env = self.env.child_env()
         if env:
             child_env.update(env)
         proc = await asyncio.create_subprocess_exec(
-            *argv, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT, env=child_env, limit=1 << 20)
+            *argv, stdin=asyncio.subprocess.PIPE if answer else asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=child_env, limit=1 << 20)
         assert proc.stdout is not None
         try:
             async for raw in proc.stdout:
@@ -221,6 +226,13 @@ class Bridge:
                     on_line(line)
                 elif reporter:
                     reporter.log(line)
+                if answer and proc.stdin and line.startswith("@@ask "):
+                    reply = await answer(line)
+                    try:
+                        proc.stdin.write(f"{reply}\n".encode())
+                        await proc.stdin.drain()
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
             return await proc.wait()
         except asyncio.CancelledError:
             # Worker cancelled (Esc / Cancel): the task must not outlive the screen.
@@ -233,15 +245,26 @@ class Bridge:
 
     async def task(self, name: str, *args: str, reporter: "Reporter | None" = None,
                    env: dict[str, str] | None = None, total_steps: int = 0,
-                   on_result: Callable[[str, str], None] | None = None) -> TaskOutcome:
+                   on_result: Callable[[str, str], None] | None = None,
+                   ask: "Asker | None" = None) -> TaskOutcome:
         """A ported routine: `config.sh --task name args` (see the module doc).
-        env carries what must stay off the command line (a token)."""
+        env carries what must stay off the command line (a token). With ask,
+        the routine is interactive: each question it asks is answered by
+        `await ask(outcome_so_far, title, text)` while it waits."""
         out = TaskOutcome(total_steps=total_steps)
         if self.env.demo:
             from .demo import demo_task
-            return await demo_task(out, name, args, reporter, on_result, env or {})
+            return await demo_task(out, name, args, reporter, on_result, env or {}, ask)
+        answer = None
+        if ask:
+            env = {**(env or {}), "KEI_TASK_INTERACTIVE": "1"}
+
+            async def answer(line: str) -> str:
+                title, text = out.asks[-1]
+                return "yes" if await ask(out, title, text) else "no"
         out.rc = await self.stream(self._argv("--task", name, *args), reporter,
-                                   on_line=lambda line: out.feed(line, reporter, on_result), env=env)
+                                   on_line=lambda line: out.feed(line, reporter, on_result), env=env,
+                                   answer=answer)
         return out
 
     def supports_tasks(self) -> bool:

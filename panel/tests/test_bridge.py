@@ -2,7 +2,7 @@ from conftest import INSTALLER
 
 from kei_panel.bridge import Bridge
 from kei_panel.env import PanelEnv
-from kei_panel.menus import section
+from kei_panel.menus import Entry, section
 
 
 def bridge():
@@ -20,7 +20,8 @@ def test_unsupported_verb_falls_back_to_the_routine():
     from kei_panel.app import KohaPanelApp
     app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False))
     backup = section("backup").entries[0]
-    rebuild = section("search").entries[1]
+    # No menu entry uses a verb now (search repair is a native routine).
+    rebuild = Entry("🔨  Repair / rebuild indexing", "search-repair", verb=("--rebuild-search-index",))
     assert not app.runs_in_background(backup)
     assert app.runs_in_background(rebuild)
 
