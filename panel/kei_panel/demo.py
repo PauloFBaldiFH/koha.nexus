@@ -13,6 +13,32 @@ if TYPE_CHECKING:
 _HOME = "/root"
 _NEWEST = "/var/backups/koha_sql/koha_library_2026-10-02_03h00.sql.gz"
 
+_CREDS = [
+    "@@result cred=ON THIS MACHINE (localhost):\tOPAC  (catalog)\thttp://localhost:80",
+    "@@result cred=ON THIS MACHINE (localhost):\tStaff (administration)\thttp://localhost:8080",
+    "@@result cred=FROM OTHER COMPUTERS ON THE NETWORK:\tOPAC  (catalog)\thttp://192.0.2.10:80",
+    "@@result cred=FROM OTHER COMPUTERS ON THE NETWORK:\tStaff (administration)\thttp://192.0.2.10:8080",
+    "@@result cred=SSH ACCESS (remote terminal):\tSSH\tssh root@192.0.2.10",
+    "@@result cred=DATABASE CREDENTIALS (1st Access / Web Installer):\tUser\tkoha_library",
+    "@@result cred=DATABASE CREDENTIALS (1st Access / Web Installer):\tPass\tdemo-Pa55word",
+    "@@result cred=DATABASE CREDENTIALS (1st Access / Web Installer):\tFull file\t/root/koha_credentials.txt",
+]
+_REPORT = ("@@preview Diagnostic Report\t=====\\nKOHA EASY INSTALLER & MANAGER - VALIDATION REPORT\\n"
+           "✅ Root OK.\\n✅ HTTPS: Koha repository responded.\\n✅ Disk: 41000 MB free.\\n"
+           "❗ TCP 80 already in use by 'apache2'.")
+_STAGES = [("1/7", "Preparing the system", ["Checking the package manager", "Setting up language and UTF-8",
+                                            "Updating the system"]),
+           ("2/7", "Essential tools", ["Installing essential packages", "Adding the Koha repositories"]),
+           ("3/7", "Database and Koha", ["Downloading and installing Koha", "Starting the database"]),
+           ("4/7", "Web server", ["Configuring Apache and Koha"]),
+           ("5/7", "Your library", ["Creating the Koha instance", "Starting Koha (Plack)"]),
+           ("6/7", "Search and safety", ["Turning on the search index", "Setting up backups and credentials"]),
+           ("7/7", "Services", ["Restarting Koha services", "Cleaning temporary files",
+                                "Checking that everything works"])]
+_INSTALL = [line for n, stage, steps in _STAGES
+            for line in [f"@@stage [{n}] {stage}\tThis might take a few minutes. Please keep this window open."]
+            + [x for step in steps for x in (f"@@step {step}", f"@@done 0 {step}")]]
+
 _SCRIPTS: dict[str, list[str]] = {
     "info": [
         "@@result real_user=root", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
@@ -66,6 +92,18 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@msg ok OK\tCloud enabled and tested successfully.",
     ],
     "cloud-remotes": ["@@result remote=gdrive", "@@result remote=onedrive"],
+    "install-check": [
+        _REPORT, "@@result v_ok=12", "@@result v_warn=1", "@@result v_fail=0", "@@result busy_ports=80",
+        "@@result port_info=- Port 80: apache2\\n", "@@result tz=America/Sao_Paulo", "@@result exists=yes",
+        "@@result db_name=koha_library", "@@result can_reboot=yes",
+    ],
+    "install-free-ports": ["@@note Stopping web services to free ports 80 and 8080..."],
+    "timezones": ["@@result tz=America/Sao_Paulo", "@@result tz=Europe/Lisbon", "@@result tz=UTC"],
+    "install": _INSTALL + ["@@result v_ok=40", "@@result v_warn=1", "@@result v_fail=0",
+                           "@@result can_reboot=yes"] + _CREDS,
+    "credentials": _CREDS,
+    "validation-report": [_REPORT],
+    "reboot": ["@@msg ok OK\tRebooting in 5 seconds to consolidate services..."],
     "db-maintenance": [
         "@@ask Deep Maintenance\tThis routine will:\\n\\n• Repair and optimize MariaDB tables\\n\\nContinue?",
         "@@title Deep maintenance",
@@ -98,7 +136,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2
         return out
-    pause = 0.0 if name in ("info", "cloud-remotes") else 0.15
+    pause = 0.0 if name in ("info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
     for line in lines:
         # KEI_TASK_ANSWER=no: the routine stops at its question, as in bash.
         if env.get("KEI_TASK_ANSWER") == "no" and out.asks:

@@ -11,7 +11,8 @@ from conftest import INSTALLER
 from kei_panel.app import KohaPanelApp
 from kei_panel.bridge import TaskOutcome
 from kei_panel.env import PanelEnv
-from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
+from kei_panel.screens.dialogs import (ChoiceScreen, ConfirmScreen, CredentialsScreen, InputScreen,
+                                      MessageScreen, TextScreen)
 from kei_panel.screens.files import PathPickerScreen
 from kei_panel.screens.loading import LoadingScreen
 
@@ -159,3 +160,72 @@ def test_reports_pack_removal_is_a_danger_confirm():
             return danger, type(app.screen).__name__
     danger, screen = asyncio.run(main())
     assert danger and screen not in ("ConfirmScreen", "LoadingScreen")
+
+
+def test_install_asks_everything_before_erasing():
+    async def main():
+        app = _app()
+        seen = {}
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("install")
+            ports = await _wait_for(pilot, ConfirmScreen)
+            seen["ports"] = ports._question
+            ports.query_one("#yes").press()
+            await pilot.pause(0.5)
+            welcome = await _wait_for(pilot, ConfirmScreen)
+            seen["preview"] = welcome._preview
+            welcome.query_one("#yes").press()
+            await pilot.pause(0.2)
+            tz = await _wait_for(pilot, ConfirmScreen)
+            seen["tz"] = tz._question
+            tz.query_one("#no").press()
+            region = await _wait_for(pilot, ChoiceScreen)
+            region.dismiss("Europe")
+            await pilot.pause(0.2)
+            city = await _wait_for(pilot, ChoiceScreen)
+            seen["cities"] = [key for key, _ in city._options]
+            city.dismiss("Lisbon")
+            await pilot.pause(0.2)
+            erase = await _wait_for(pilot, ConfirmScreen)
+            seen["danger"] = erase._danger and "koha_library" in erase._question
+            erase.query_one("#yes").press()
+            word = await _wait_for(pilot, InputScreen)
+            word.query_one("#value").value = "reinstall"
+            word.query_one("#ok").press()
+            await pilot.pause(0.2)
+            seen["wrong"] = isinstance(app.screen, InputScreen)
+            word.query_one("#value").value = "REINSTALL"
+            word.query_one("#ok").press()
+            loader = await _wait_for(pilot, LoadingScreen)
+            seen["cancellable"] = loader.cancellable
+            ready = await _wait_for(pilot, CredentialsScreen, tries=200)
+            seen["values"] = ready._values
+            ready.query_one("#ok").press()
+            diag = await _wait_for(pilot, ConfirmScreen)
+            diag.query_one("#yes").press()
+            report = await _wait_for(pilot, TextScreen)
+            report.query_one("#ok").press()
+            await pilot.pause(0.2)
+            reboot = await _wait_for(pilot, ConfirmScreen)
+            reboot.query_one("#no").press()
+            later = await _wait_for(pilot, MessageScreen)
+            seen["later"] = later._kind
+        return seen
+    seen = asyncio.run(main())
+    assert "apache2" in seen["ports"] and "VALIDATION REPORT" in seen["preview"]
+    assert "America/Sao_Paulo" in seen["tz"] and seen["cities"] == ["Lisbon"]
+    assert seen["danger"] and seen["wrong"] and not seen["cancellable"]
+    assert "demo-Pa55word" in seen["values"] and seen["later"] == "info"
+
+
+def test_credentials_have_one_copy_button_per_value():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("credentials")
+            screen = await _wait_for(pilot, CredentialsScreen)
+            screen.query_one("#copy-6").press()
+            await pilot.pause(0.1)
+            return screen._values, len(screen.query(".detail-copy"))
+    values, buttons = asyncio.run(main())
+    assert buttons == len(values) == 8 and values[6] == "demo-Pa55word"

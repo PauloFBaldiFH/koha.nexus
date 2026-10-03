@@ -268,6 +268,7 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 .dialog-detail { height: auto; }
 .detail-label { width: 26; color: $text-muted; }
 .detail-value { width: 1fr; text-style: bold; }
+.detail-copy { min-width: 8; width: auto; height: 1; border: none; margin-left: 1; }
 .dialog-command {
     background: $boost;
     color: $warning;
