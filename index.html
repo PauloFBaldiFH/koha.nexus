@@ -944,13 +944,10 @@ sudo bash installer</pre>
           </p>
         </div>
 
-        <div class="grid-3">
-          <!-- CARD DE EXEMPLO (Método 2) -->
-          <a href="https://castroalves.koha.nexus" target="_blank" rel="noopener" class="card" style="display:flex; flex-direction:column; justify-content:center; text-align:center; padding:32px;">
-            <h3 style="margin-bottom:4px;">Biblioteca Pública Municipal Castro Alves</h3>
-            <span style="color:var(--green); font-size:0.85rem;">castroalves.koha.nexus</span>
-          </a>
-          <!-- Novas bibliotecas podem ser adicionadas aqui -->
+        <div class="grid-3" id="libraries-grid">
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0;">
+            Fetching catalogs on the koha.nexus network...
+          </div>
         </div>
       </div>
     </section>
@@ -1062,6 +1059,51 @@ sudo bash installer</pre>
         setTimeout(() => cmdLink.classList.remove("is-downloading"), 900);
       });
     }
+
+    // Função para carregar as bibliotecas do broker dinamicamente
+    async function loadLibraries() {
+      const grid = document.getElementById("libraries-grid");
+      if (!grid) return;
+
+      try {
+        // Altere a URL abaixo para o endpoint real do seu Cloudflare Worker que entrega o JSON
+        const response = await fetch("https://broker.koha.nexus/api/public-libraries");
+        
+        if (!response.ok) throw new Error("Network response was not ok");
+        
+        const libraries = await response.json();
+        
+        grid.innerHTML = ""; // Limpa a mensagem de carregamento
+
+        if (libraries.length === 0) {
+          grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--muted);">No public libraries listed at the moment.</div>';
+          return;
+        }
+
+        // Cria os cartões dinamicamente
+        libraries.forEach(lib => {
+          const card = document.createElement("a");
+          card.href = lib.url;
+          card.target = "_blank";
+          card.rel = "noopener";
+          card.className = "card";
+          card.style.cssText = "display:flex; flex-direction:column; justify-content:center; text-align:center; padding:32px;";
+          
+          card.innerHTML = `
+            <h3 style="margin-bottom:4px;">${lib.name}</h3>
+            <span style="color:var(--green); font-size:0.85rem;">${lib.domain}</span>
+          `;
+          grid.appendChild(card);
+        });
+
+      } catch (error) {
+        console.error("Failed to fetch libraries:", error);
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--danger);">Unable to load the library network at this time.</div>';
+      }
+    }
+
+    // Executa a função assim que a página carrega
+    document.addEventListener("DOMContentLoaded", loadLibraries);
   </script>
 </body>
 </html>
