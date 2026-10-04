@@ -644,7 +644,7 @@ sudo bash installer</pre>
           </div>
         </div>
 
-        <div class="windows-card">
+<div class="windows-card">
           <div class="card">
             <div class="icon">
               <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
@@ -663,8 +663,20 @@ sudo bash installer</pre>
             </div>
             <div class="callout" style="margin-top:14px">
               <strong>How to enable Virtualization in BIOS:</strong>
-              <p style="margin:6px 0 0;font-size:0.9rem;color:var(--muted)">
-                Restart your PC and repeatedly press <kbd style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> or <kbd style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> during boot to enter BIOS/UEFI. Locate <strong>Intel Virtualization Technology (VT-x)</strong> or <strong>AMD SVM / AMD-V</strong> (usually found under <em>CPU Configuration</em>, <em>Advanced</em>, or <em>Overclocking</em>), switch it to <strong>Enabled</strong>, then press <kbd style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> to save and restart.
+              <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)">
+                Restart your PC and repeatedly press the setup key as soon as the screen turns on:
+              </p>
+              <ul style="margin:0 0 8px;padding-left:18px;font-size:0.88rem;color:var(--muted);line-height:1.6">
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> or <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> — ASUS, Gigabyte, MSI, ASRock, Acer</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> or <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Esc</kbd> — HP / Compaq</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> or <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F12</kbd> — Dell</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F1</kbd>, <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> or <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Enter</kbd> — Lenovo</li>
+              </ul>
+              <p style="margin:0 0 6px;font-size:0.88rem;color:var(--muted)">
+                Inside the BIOS, find <strong>Intel Virtualization Technology (VT-x)</strong> or <strong>AMD SVM / AMD-V</strong> (under <em>Advanced</em>, <em>CPU Configuration</em>, or <em>Overclocking</em>), switch it to <strong>Enabled</strong>, and press <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> to save.
+              </p>
+              <p style="margin:6px 0 0;font-size:0.83rem;color:var(--muted);border-top:1px solid var(--line);padding-top:6px">
+                <em>Can't access BIOS via keys?</em> In Windows, go to <strong>Settings → System → Recovery → Advanced startup (Restart now) → Troubleshoot → Advanced options → UEFI Firmware Settings</strong>.
               </p>
             </div>
             <div class="chip-row">
