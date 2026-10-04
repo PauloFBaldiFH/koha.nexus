@@ -11,7 +11,9 @@ import {
   getTunnelToken,
   heartbeat,
   joinPage,
+  newRecoveryCode,
   putStaffCredentials,
+  recover,
   rotateToken,
 } from "./api";
 import {
@@ -54,6 +56,8 @@ const routes: Route[] = [
   { method: "POST", pattern: /^\/v1\/device\/start$/, handler: (r, e, b) => deviceStart(r, e, b) },
   { method: "POST", pattern: /^\/v1\/device\/poll$/, handler: (r, e, b) => devicePoll(r, e, b) },
   { method: "POST", pattern: /^\/v1\/enroll$/, handler: (r, e, b) => enroll(r, e, b) },
+  { method: "POST", pattern: /^\/v1\/recover$/, handler: (r, e, b) => recover(r, e, b) },
+  { method: "POST", pattern: /^\/v1\/recovery-code$/, handler: (r, e, b) => newRecoveryCode(r, e, b) },
   { method: "GET", pattern: /^\/join\/?$/, handler: (r, e) => joinPage(r, e) },
   { method: "GET", pattern: new RegExp(`^/v1/jobs/(${UUID})$`), handler: (r, e, b, p) => getJob(r, e, b, p[0]!) },
   { method: "GET", pattern: /^\/v1\/library$/, handler: (r, e, b) => getLibraryInfo(r, e, b) },

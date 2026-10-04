@@ -20,13 +20,14 @@ setup_file() {
     echo $! > "$BATS_FILE_TMPDIR/broker.pid"
     local i
     for i in $(seq 1 60); do [ -s "$BROKER_STATE/ready" ] && break; sleep 0.5; done
-    rm -f /etc/koha-easy-install/tunnel.conf /etc/koha-easy-install/broker.key /etc/koha-easy-install/broker-enroll.conf
+    rm -f /etc/koha-easy-install/tunnel.conf /etc/koha-easy-install/broker.key /etc/koha-easy-install/broker-enroll.conf \
+          /etc/koha-easy-install/broker-recovery.txt
 }
 
 teardown_file() {
     [ -f "$BATS_FILE_TMPDIR/broker.pid" ] && kill "$(cat "$BATS_FILE_TMPDIR/broker.pid")" 2>/dev/null
     rm -f /etc/koha-easy-install/tunnel.conf /etc/koha-easy-install/broker.key /etc/koha-easy-install/broker-enroll.conf \
-          /root/koha-catalog-qr.png
+          /etc/koha-easy-install/broker-recovery.txt /root/koha-catalog-qr.png
     return 0
 }
 
@@ -85,7 +86,7 @@ state() { /usr/bin/curl -s "$INSPECT"; }
 pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$1';"; }
 
 @test "B01 free address: approved on the spot, tunnel installed with the token out of sight" {
-    inputs "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
+    inputs new "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
     panel function_cloudflare_free_address
     assert '[ "$status" -eq 0 ]' "$output"
 
@@ -119,6 +120,29 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     assert '[ "$output" = "t-palotina-pr.example.org -" ]' "staff stays local while remote access is off: $output"
     panel function_view_credentials
     assert 'echo "$output" | grep -qx "https://t-palotina-pr.example.org"' "value alone on its line: $output"
+}
+
+@test "B02b recovery code: saved root-only, takes the address back on a reinstalled server" {
+    assert '[ "$(stat -c %a $CONF/broker-recovery.txt)" = 600 ]'
+    local code lib
+    code=$(sed -n 's/^RECOVERY_CODE=//p' $CONF/broker-recovery.txt)
+    lib=$(sed -n 's/^LIBRARY_ID=//p' $CONF/tunnel.conf)
+    assert '[[ "$code" =~ ^[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$ ]]' "$code"
+    # Reinstalled server: no tunnel.conf, no key.
+    rm -f $CONF/tunnel.conf $CONF/broker.key
+    inputs recover "t-palotina-pr.example.org" "BBBB-BBBB-BBBB-BBBB"
+    panel function_cloudflare_free_address
+    assert '[ ! -e $CONF/tunnel.conf ]' "a wrong code recovers nothing"
+    assert 'dialogs | grep -q "not right"' "$(dialogs)"
+    inputs recover "t-palotina-pr.example.org" "$code" CANCEL
+    panel function_cloudflare_free_address
+    assert '[ "$status" -eq 0 ]' "$output"
+    assert 'grep -qx "LIBRARY_ID=$lib" $CONF/tunnel.conf' "same library: $(cat $CONF/tunnel.conf 2>/dev/null)"
+    assert 'grep -qx "OPAC_HOST=t-palotina-pr.example.org" $CONF/tunnel.conf'
+    assert '[ "$(stat -c %a $CONF/broker.key)" = 600 ]'
+    assert '! grep -qx "RECOVERY_CODE=$code" $CONF/broker-recovery.txt' "the used code is replaced"
+    assert 'grep -q "^TUNNEL_TOKEN=tunnel-token-for-" $ENVF'
+    assert 'dialogs | grep -q "OK .*Your catalog is online"' "$(dialogs)"
 }
 
 @test "B03 remote staff access: edge password on, then off; password never shown" {
@@ -216,7 +240,7 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
 
 @test "B09 a name that is taken gets a close variant, still without review" {
     # B08 gave palotina-pr up; the broker holds a released name for a while.
-    inputs "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
+    inputs new "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
     panel function_cloudflare_free_address
     assert '[ "$status" -eq 0 ]' "$output"
     assert 'grep -qx "OPAC_HOST=t-palotina-pr-2.example.org" $CONF/tunnel.conf' "$(cat $CONF/tunnel.conf 2>/dev/null)"

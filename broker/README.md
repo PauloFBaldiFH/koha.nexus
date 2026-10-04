@@ -119,7 +119,9 @@ curl -s $B/v1/enroll -H 'Content-Type: application/json' \
 |---|---|---|
 | `POST /v1/device/start` | rate limit per IP | `{institution_name, contact_email, cnpj?, requested_name?}` → `device_code`, `user_code`, `verification_uri` |
 | `POST /v1/device/poll` | device code | `pending` / `approved` / `denied` / `expired` |
-| `POST /v1/enroll` | device code (single use) | binds the Ed25519 public key, queues provisioning |
+| `POST /v1/enroll` | device code (single use) | binds the Ed25519 public key, queues provisioning; returns the `recovery_code` once |
+| `POST /v1/recover` | recovery code | `{address, recovery_code, public_key}`: binds a new server key to the address and returns a new code (see below) |
+| `POST /v1/recovery-code` | signed | new recovery code; the previous one stops working |
 | `GET /join?c=CODE` | none | status page behind the QR code (verification form comes later) |
 | `GET /v1/jobs/{id}`, `GET /v1/library` | signed | status |
 | `GET /v1/tunnel-token` | signed | current tunnel token |
@@ -128,6 +130,15 @@ curl -s $B/v1/enroll -H 'Content-Type: application/json' \
 | `PUT` / `DELETE /v1/staff-credentials` | signed | turn remote staff access on (user, password, optional CIDRs) or off |
 | `DELETE /v1/library` | signed | remove tunnel and records |
 | `/admin/...` | `Bearer ADMIN_TOKEN` | `GET /admin/enrollments?status=`, `POST /admin/enrollments/{code}/approve` (`{slug?, force?}`) or `/deny`, `GET /admin/libraries`, `POST /admin/libraries/{id}/suspend` or `/restore`, `DELETE /admin/libraries/{id}` |
+
+## Recovery codes
+
+Enrollment returns a recovery code (`XXXX-XXXX-XXXX-XXXX`, about 77 bits) once; the broker stores only its sha256. The panel shows it, saves it in `/etc/koha-easy-install/broker-recovery.txt` (root only) and asks the librarian to write it down. On a reinstalled or new server, "Recover my address" sends the address, the code and the new server's public key to `POST /v1/recover`:
+
+- **Live address:** the new key replaces the old one, the tunnel secret is rotated (an old server still running drops off), and a new code replaces the used one.
+- **Given-up address, name still on hold (180 days):** the address is provisioned again under the same name for the new key.
+
+A wrong address or code gets the same 403, and both the IP and the name are rate limited. Libraries enrolled before recovery codes existed get one from the panel (`POST /v1/recovery-code`). After updating the Worker, apply the new migration with `npm run db:migrate`.
 
 ## Signatures (Ed25519)
 
