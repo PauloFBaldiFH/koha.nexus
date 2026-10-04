@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="koha.nexus — assistente inteligente, gratuito e fácil de usar para instalação, manutenção e gestão de bibliotecas com Koha.">
+  <meta name="description" content="koha.nexus — a smart, free, and easy-to-use assistant for installing, maintaining, and managing libraries with Koha.">
   <meta name="theme-color" content="#08110d">
   <link rel="icon" type="image/x-icon" href="docs/images/koha.ico">
   <link rel="shortcut icon" href="docs/images/koha.ico">
-  <title>koha.nexus — Gestão de bibliotecas simplificada</title>
+  <title>koha.nexus — Simplified library management</title>
 
   <style>
     :root{
@@ -68,15 +68,6 @@
       filter:drop-shadow(0 6px 18px rgba(99,217,135,.08));
     }
 
-    .brand-mark{
-      width:38px;height:38px;border-radius:12px;
-      display:grid;place-items:center;
-      background:linear-gradient(135deg,var(--green),var(--green-2));
-      color:#061009;font-weight:900;box-shadow:0 10px 30px rgba(54,185,106,.24);
-    }
-
-    .brand span{font-size:1.05rem}
-
     nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
     nav a{
       color:var(--muted);
@@ -84,6 +75,13 @@
       transition:.2s ease;
     }
     nav a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+    
+    .lang-select {
+      appearance:none; background:rgba(255,255,255,.04); border:1px solid var(--line);
+      color:var(--text); font-size:0.85rem; padding:6px 12px; border-radius:10px;
+      cursor:pointer; outline:none; margin-right:12px;
+    }
+    .lang-select:hover { border-color:var(--green); }
 
     .hero{
       padding:92px 0 64px;
@@ -204,6 +202,7 @@
       background:linear-gradient(180deg,rgba(18,38,27,.88),rgba(10,23,16,.92));
       border:1px solid var(--line);border-radius:var(--radius);padding:23px;
       box-shadow:0 16px 40px rgba(0,0,0,.14);
+      transition: border-color 0.2s ease;
     }
 
     .card:hover{border-color:rgba(99,217,135,.28)}
@@ -362,176 +361,180 @@
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="brand brand-logo" href="#inicio" aria-label="koha.nexus">
+      <a class="brand brand-logo" href="#home" aria-label="koha.nexus">
         <img src="docs/images/koha-logo.png" alt="koha.nexus" width="210" height="37">
       </a>
-      <nav aria-label="Navegação principal">
-        <a href="#recursos">Recursos</a>
-        <a href="#instalacao">Instalação</a>
+      <nav aria-label="Main navigation">
+        <select class="lang-select" onchange="if (this.value) window.location.href=this.value;">
+          <option value="/" selected>🇺🇸 English</option>
+          <option value="/pt/">🇧🇷 Português</option>
+        </select>
+        <a href="#features">Features</a>
+        <a href="#installation">Installation</a>
         <a href="#windows">Windows</a>
-        <a href="#ferramentas">Ferramentas</a>
-        <a href="#catalogacao">Catalogação</a>
-        <a href="#brasil">Brasil</a>
-        <a href="#seguranca">Segurança</a>
+        <a href="#tools">Tools</a>
+        <a href="#cataloging">Cataloging</a>
+        <a href="#brazil">Brazil</a>
+        <a href="#network">Network</a>
         <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <section class="hero" id="inicio">
+    <section class="hero" id="home">
       <div class="container hero-grid">
         <div>
           <span class="eyebrow">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
           <img class="hero-logo" src="docs/images/koha-logo.png" alt="koha.nexus" width="420" height="74">
-          <h1>Koha sem a parte <span class="accent">complicada.</span></h1>
+          <h1>Koha without the <span class="accent">hassle.</span></h1>
           <p>
-            O <strong>koha.nexus</strong> é um assistente inteligente, gratuito e fácil de usar
-            para instalar, configurar, manter e ampliar o <strong>Koha Integrated Library System</strong>
-            por meio de um painel amigável e guiado.
+            <strong>koha.nexus</strong> is a smart, free, and easy-to-use assistant 
+            for installing, configuring, maintaining, and extending the <strong>Koha Integrated Library System</strong>
+            via a friendly and guided dashboard.
           </p>
 
           <div class="hero-actions">
-            <a class="btn btn-primary" href="#instalacao">Começar a instalação →</a>
-            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">Ver no GitHub</a>
-            <a class="btn btn-secondary" href="README.pt-BR.md">🇧🇷 README completo</a>
+            <a class="btn btn-primary" href="#installation">Start installation →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">View on GitHub</a>
+            <a class="btn btn-secondary" href="README.md">Full README</a>
           </div>
 
           <div class="stats">
-            <div class="stat"><strong>22 idiomas</strong><span>Painel e pacotes do Koha</span></div>
-            <div class="stat"><strong>2 sistemas</strong><span>Linux ou Windows via WSL 2</span></div>
-            <div class="stat"><strong>16+ recursos</strong><span>Gestão, manutenção e biblioteca</span></div>
-            <div class="stat"><strong>GPL-3.0+</strong><span>Software livre e modificável</span></div>
+            <div class="stat"><strong>22 languages</strong><span>Dashboard & Koha packages</span></div>
+            <div class="stat"><strong>2 systems</strong><span>Linux or Windows via WSL 2</span></div>
+            <div class="stat"><strong>16+ features</strong><span>Management, tools & tools</span></div>
+            <div class="stat"><strong>GPL-3.0+</strong><span>Free & modifiable software</span></div>
           </div>
         </div>
 
-        <div class="terminal" aria-label="Terminal de instalação">
+        <div class="terminal" aria-label="Installation terminal">
           <div class="terminal-head">
             <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-            <span class="terminal-title">instalação — terminal</span>
+            <span class="terminal-title">installation — terminal</span>
           </div>
           <pre><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
 <span class="prompt">$</span> sudo bash installer
 
 <span class="muted">KOHA.NEXUS</span>
-<span class="prompt">✓</span> Validando o servidor...
-<span class="prompt">✓</span> Instalando Koha
-<span class="prompt">✓</span> Configurando banco de dados
-<span class="prompt">✓</span> Preparando backups
-<span class="prompt">✓</span> Configurando acesso
+<span class="prompt">✓</span> Validating server...
+<span class="prompt">✓</span> Installing Koha
+<span class="prompt">✓</span> Configuring database
+<span class="prompt">✓</span> Preparing backups
+<span class="prompt">✓</span> Configuring access
 
-<span class="prompt">→</span> Painel pronto: <strong>sudo config.sh</strong></pre>
+<span class="prompt">→</span> Dashboard ready: <strong>sudo config.sh</strong></pre>
         </div>
       </div>
     </section>
 
-    <section class="section" id="recursos">
+    <section class="section" id="features">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Tudo em um só lugar</div>
-          <h2>Um painel pensado para quem precisa fazer a biblioteca funcionar.</h2>
+          <div class="kicker">All in one place</div>
+          <h2>A dashboard built for those who keep the library running.</h2>
           <p>
-            Da instalação inicial ao backup, indexação, segurança, migração, catalogação e publicação
-            na internet, os principais recursos ficam reunidos em um único ponto de controle.
+            From the initial installation to backups, indexing, security, migration, cataloging, and
+            web publishing, the core features are gathered in a single control point.
           </p>
         </div>
 
         <div class="grid-3">
           <article class="card">
             <div class="icon">⚙</div>
-            <h3>Instalação guiada</h3>
-            <p>Pré-validação de sistema, disco, rede e portas; instalação e ajuste de Koha, MariaDB, Apache, Memcached e Plack, além de SWAP, NTP e fuso horário.</p>
+            <h3>Guided installation</h3>
+            <p>System, disk, network, and port pre-validation; installation and tuning of Koha, MariaDB, Apache, Memcached, and Plack, plus SWAP, NTP, and timezone.</p>
           </article>
 
           <article class="card">
             <div class="icon">🗄</div>
-            <h3>Central de backups</h3>
-            <p>Backups SQL comprimidos, exportação MARC21, cópias manuais e integração opcional com Google Drive usando rclone.</p>
+            <h3>Backup hub</h3>
+            <p>Compressed SQL backups, MARC21 exports, manual copies, and optional integration with Google Drive via rclone.</p>
           </article>
 
           <article class="card">
             <div class="icon">🛡</div>
-            <h3>Restore seguro</h3>
-            <p>O backup é validado e testado em banco temporário antes de qualquer substituição do catálogo atual.</p>
+            <h3>Safe restore</h3>
+            <p>Backups are validated and tested in a temporary database before any replacement of the current catalog.</p>
           </article>
 
           <article class="card">
             <div class="icon">⌕</div>
-            <h3>Pesquisa e indexação</h3>
-            <p>Alternância entre Zebra e Elasticsearch 7, watchdog do indexador e ferramentas de reparo e reconstrução.</p>
+            <h3>Search & indexing</h3>
+            <p>Switch between Zebra and Elasticsearch 7, indexer watchdog, and tools for index repair and rebuild.</p>
           </article>
 
           <article class="card">
             <div class="icon">☁</div>
-            <h3>Publicação na internet</h3>
-            <p>Cloudflare Tunnel sem necessidade de abrir portas, Certbot para SSL e assistente para Google Search Console.</p>
+            <h3>Web publishing</h3>
+            <p>Cloudflare Tunnel without needing to open router ports, Certbot for SSL, and Google Search Console assistant.</p>
           </article>
 
           <article class="card">
             <div class="icon">🔐</div>
-            <h3>Segurança</h3>
-            <p>Fail2ban, firewall UFW, possibilidade de restringir o acesso ao staff em 8080 e rotação da senha do banco.</p>
+            <h3>Security</h3>
+            <p>Fail2ban, UFW firewall, options to restrict staff access on port 8080, and database password rotation.</p>
           </article>
 
           <article class="card">
             <div class="icon">📚</div>
-            <h3>Ferramentas de biblioteca</h3>
-            <p>Importação, relatórios, qualidade do catálogo, privacidade LGPD, movimentação anual de categorias e mais.</p>
+            <h3>Library tools</h3>
+            <p>Data import, SQL reports, catalog quality checks, GDPR/LGPD privacy tools, annual patron category rollover, and more.</p>
           </article>
 
           <article class="card">
             <div class="icon">🇧🇷</div>
-            <h3>Localização brasileira</h3>
-            <p>CPF, etiquetas Pimaco, ficha catalográfica, feriados, relatórios censitários e referências bibliográficas em ABNT.</p>
+            <h3>Brazil localization</h3>
+            <p>CPF validation, Pimaco labels, catalog cards, holidays, official census reports, and ABNT bibliographic references.</p>
           </article>
 
           <article class="card">
             <div class="icon">💬</div>
-            <h3>WhatsApp e Telegram</h3>
-            <p>Entrega dos avisos do Koha por gateways de WhatsApp ou bot do Telegram, de forma opcional.</p>
+            <h3>WhatsApp & Telegram</h3>
+            <p>Delivery of Koha notices through WhatsApp gateways or a Telegram bot, completely optional.</p>
           </article>
 
           <article class="card">
             <div class="icon">✂</div>
-            <h3>Catalogação assistida</h3>
-            <p>PHA ou Cutter-Sanborn, CDD, calculadora Cutter, substituição segura de registros MARC e auxílio de IA.</p>
+            <h3>Assisted cataloging</h3>
+            <p>PHA or Cutter-Sanborn, DDC, Cutter calculator, safe MARC record replacement, and AI assistance.</p>
           </article>
 
           <article class="card">
             <div class="icon">🪟</div>
             <h3>Windows + WSL 2</h3>
-            <p>Executa o Koha em um único computador Windows, com atalhos, notificações, bandeja e ferramentas de diagnóstico.</p>
+            <p>Run Koha on a single Windows PC, complete with desktop shortcuts, notifications, system tray, and diagnostic tools.</p>
           </article>
 
           <article class="card">
             <div class="icon">↻</div>
-            <h3>Autoatualização</h3>
-            <p>Atualização do painel pelo GitHub com verificação SHA-256 do instalador.</p>
+            <h3>Auto-update</h3>
+            <p>Dashboard updates straight from GitHub with SHA-256 installer verification.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section alt" id="instalacao">
+    <section class="section alt" id="installation">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Comece aqui</div>
-          <h2>Instalação no Linux em poucos comandos.</h2>
+          <div class="kicker">Start here</div>
+          <h2>Linux installation in a few commands.</h2>
           <p>
-            O projeto é voltado para Debian 11/12/13 ou Ubuntu 22.04/24.04, em amd64 ou arm64,
-            e também pode rodar no Windows por meio do WSL 2.
+            The project targets Debian 11/12/13 or Ubuntu 22.04/24.04 on amd64 or arm64 architecture,
+            and can also run on Windows via WSL 2.
           </p>
         </div>
 
         <div class="install-grid">
           <div class="card">
-            <h3>Instalador direto</h3>
-            <p>Baixe o instalador atual e execute-o com privilégios administrativos.</p>
+            <h3>Direct installer</h3>
+            <p>Download the current installer script and run it with administrative privileges.</p>
             <div class="codebox" style="margin-top:16px">
               <div class="codebox-head">
                 <span>bash</span>
                 <button class="copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
-sudo bash installer">Copiar</button>
+sudo bash installer">Copy</button>
               </div>
               <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
 sudo bash installer</pre>
@@ -539,14 +542,14 @@ sudo bash installer</pre>
           </div>
 
           <div class="card">
-            <h3>Clonar o repositório</h3>
-            <p>Também é possível manter os arquivos de tradução junto do script e trabalhar offline.</p>
+            <h3>Clone the repository</h3>
+            <p>You can also keep translation files alongside the script to work offline.</p>
             <div class="codebox" style="margin-top:16px">
               <div class="codebox-head">
                 <span>bash</span>
                 <button class="copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
 cd koha.nexus
-sudo bash installer">Copiar</button>
+sudo bash installer">Copy</button>
               </div>
               <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
 cd koha.nexus
@@ -559,25 +562,25 @@ sudo bash installer</pre>
 
         <div class="grid-2">
           <div class="card">
-            <h3>Requisitos mínimos</h3>
+            <h3>Minimum requirements</h3>
             <ul class="feature-list">
-              <li>Debian 11/12/13 ou Ubuntu 22.04/24.04, 64-bit</li>
-              <li>2 GB de RAM; 4 GB ou mais recomendado</li>
-              <li>5 GB livres; 10 GB ou mais recomendado</li>
-              <li>root ou usuário com sudo</li>
-              <li>Acesso à internet para os repositórios do Koha</li>
-              <li>Portas 80 e 8080 livres</li>
+              <li>Debian 11/12/13 or Ubuntu 22.04/24.04, 64-bit</li>
+              <li>2 GB of RAM; 4 GB or more recommended</li>
+              <li>5 GB free space; 10 GB or more recommended</li>
+              <li>root or user with sudo privileges</li>
+              <li>Internet access for Koha repositories</li>
+              <li>Ports 80 and 8080 available</li>
             </ul>
           </div>
 
           <div class="card">
-            <h3>Depois da instalação</h3>
+            <h3>After installation</h3>
             <ul class="feature-list">
-              <li>Abra o staff em <code>http://SERVER-IP:8080</code></li>
-              <li>Finalize o Web Installer do Koha</li>
-              <li>Crie seu super librarian pelo painel</li>
-              <li>O catálogo público fica em <code>http://SERVER-IP:80</code></li>
-              <li>Reabra o painel a qualquer momento com <code>sudo config.sh</code></li>
+              <li>Open the staff interface at <code>http://SERVER-IP:8080</code></li>
+              <li>Complete the Koha Web Installer</li>
+              <li>Create your super librarian via the dashboard</li>
+              <li>The public catalog is at <code>http://SERVER-IP:80</code></li>
+              <li>Reopen the dashboard anytime with <code>sudo config.sh</code></li>
             </ul>
           </div>
         </div>
@@ -588,10 +591,10 @@ sudo bash installer</pre>
       <div class="container">
         <div class="section-heading">
           <div class="kicker">Windows 10 / 11</div>
-          <h2>Um Koha completo em um único PC, usando WSL 2.</h2>
+          <h2>A full Koha environment on a single PC, using WSL 2.</h2>
           <p>
-            A edição para Windows foi pensada para bibliotecas pequenas, treinamento e avaliação,
-            mantendo os serviços do Koha dentro de Debian no WSL 2 e oferecendo ferramentas nativas no Windows.
+            The Windows edition is designed for small libraries, training, and evaluation,
+            keeping Koha services inside Debian on WSL 2 while offering native Windows tools.
           </p>
         </div>
 
@@ -599,64 +602,64 @@ sudo bash installer</pre>
           <div class="download-content">
             <div class="download-icon"><span>↓</span></div>
             <div>
-              <div class="download-kicker">INSTALADOR PARA WINDOWS</div>
-              <h3>Instale o Koha com dois cliques.</h3>
-              <p>Baixe o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute o arquivo normalmente. Ele inicia o mesmo instalador do PowerShell.</p>
+              <div class="download-kicker">WINDOWS INSTALLER</div>
+              <h3>Install Koha with two clicks.</h3>
+              <p>Download <strong>Install-Koha.cmd</strong> directly from the official repository and run it. It launches the PowerShell installer for you.</p>
             </div>
           </div>
           <div class="download-actions">
             <a id="download-cmd" class="btn btn-primary btn-download" href="windows/Install-Koha.cmd" download="Install-Koha.cmd">
-              ⬇ Baixar Install-Koha.cmd
+              ⬇ Download Install-Koha.cmd
             </a>
-            <a class="download-source" href="https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd" target="_blank" rel="noopener">Ver arquivo no GitHub ↗</a>
+            <a class="download-source" href="https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd" target="_blank" rel="noopener">View source on GitHub ↗</a>
           </div>
         </div>
 
         <div class="windows-card">
           <div class="card">
             <div class="icon">🪟</div>
-            <h3>Instalação</h3>
-            <p>Abra o PowerShell normalmente e execute:</p>
+            <h3>Installation</h3>
+            <p>Open PowerShell normally and run:</p>
             <div class="codebox" style="margin-top:15px">
               <div class="codebox-head">
                 <span>PowerShell</span>
-                <button class="copy" data-copy="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copiar</button>
+                <button class="copy" data-copy="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copy</button>
               </div>
               <pre>[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
             </div>
             <div class="callout" style="margin-top:15px">
-              <strong>Mais fácil:</strong> o botão acima baixa o <code>Install-Koha.cmd</code>. Não é necessário abrir o PowerShell manualmente.
+              <strong>Easier way:</strong> The button above downloads <code>Install-Koha.cmd</code>. No need to open PowerShell manually.
             </div>
             <div class="chip-row">
               <span class="chip">WSL 2</span>
               <span class="chip">Debian</span>
               <span class="chip">systemd</span>
               <span class="chip">Windows Terminal</span>
-              <span class="chip">Notificações</span>
-              <span class="chip">Bandeja do sistema</span>
+              <span class="chip">Notifications</span>
+              <span class="chip">System tray</span>
             </div>
           </div>
 
           <div class="timeline">
             <div class="step">
               <div class="step-num">1</div>
-              <div><h3>Verificação do computador</h3><p>Confere Windows compatível, arquitetura 64-bit, memória, espaço livre e virtualização habilitada no BIOS.</p></div>
+              <div><h3>System check</h3><p>Verifies a compatible Windows version, 64-bit architecture, memory, free space, and BIOS virtualization.</p></div>
             </div>
             <div class="step">
               <div class="step-num">2</div>
-              <div><h3>WSL 2 + Debian</h3><p>Instala o WSL 2, prepara o Debian e configura o usuário administrativo e o systemd.</p></div>
+              <div><h3>WSL 2 + Debian</h3><p>Installs WSL 2, prepares Debian, and configures the administrative user and systemd.</p></div>
             </div>
             <div class="step">
               <div class="step-num">3</div>
-              <div><h3>Ambiente Koha</h3><p>Instala o Koha dentro do Debian e cria os atalhos, tarefas agendadas e ferramentas de controle do Windows.</p></div>
+              <div><h3>Koha Environment</h3><p>Installs Koha inside Debian and creates Windows shortcuts, scheduled tasks, and control tools.</p></div>
             </div>
             <div class="step">
               <div class="step-num">4</div>
-              <div><h3>Rede da biblioteca</h3><p>Configura o acesso dos outros computadores da rede e testa as portas 80 e 8080.</p></div>
+              <div><h3>Library network</h3><p>Configures access for other computers on the local network and tests ports 80 and 8080.</p></div>
             </div>
             <div class="step">
               <div class="step-num">5</div>
-              <div><h3>Operação diária</h3><p>Start, Stop, Restart, status, diagnóstico, reconstrução do índice e desligamento seguro ficam acessíveis sem abrir um console.</p></div>
+              <div><h3>Daily operation</h3><p>Start, Stop, Restart, status, diagnostics, index rebuild, and safe shutdown are accessible without opening a console.</p></div>
             </div>
           </div>
         </div>
@@ -664,21 +667,21 @@ sudo bash installer</pre>
         <div class="separator"></div>
 
         <div class="grid-3">
-          <div class="card"><h3>Notificações</h3><p>Quedas, recuperação, backups, pouco espaço e desligamentos não limpos podem gerar alertas no Windows.</p></div>
-          <div class="card"><h3>Diagnóstico em um clique</h3><p>Exporta logs e informações úteis para suporte, removendo senhas, tokens e chaves.</p></div>
-          <div class="card"><h3>Parada segura</h3><p>O Koha é encerrado por etapas antes do WSL e do Windows serem desligados.</p></div>
+          <div class="card"><h3>Notifications</h3><p>Crashes, recoveries, backups, low disk space, and unclean shutdowns trigger native Windows alerts.</p></div>
+          <div class="card"><h3>1-Click Diagnostics</h3><p>Exports logs and useful information for support, securely removing passwords, tokens, and keys.</p></div>
+          <div class="card"><h3>Safe shutdown</h3><p>Koha is shut down in stages before WSL and Windows power off to prevent data corruption.</p></div>
         </div>
       </div>
     </section>
 
-    <section class="section" id="ferramentas">
+    <section class="section" id="tools">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Ferramentas de biblioteca</div>
-          <h2>Mais do que instalar o Koha: cuidar do acervo.</h2>
+          <div class="kicker">Library tools</div>
+          <h2>More than installing Koha: taking care of the collection.</h2>
           <p>
-            As ferramentas do painel utilizam os mecanismos do próprio Koha e seguem um fluxo de
-            proteção com bloqueio, pré-visualização, confirmação e backup verificado antes de alterações.
+            The dashboard tools utilize Koha's own mechanisms and follow a strict protection flow with
+            locking, previewing, confirmation, and verified backups before any data is altered.
           </p>
         </div>
 
@@ -686,94 +689,93 @@ sudo bash installer</pre>
           <article class="card">
             <div class="icon">🪄</div>
             <h3>Magic Import Tool</h3>
-            <p>Uma única porta de entrada para planilhas, MARC, arquivos compactados, acervo, exemplares, usuários e dados de circulação.</p>
+            <p>A single entry point for spreadsheets, MARC files, compressed archives, collections, items, patrons, and circulation data.</p>
             <span class="tag">CSV • TSV • XLSX • ODS • DBF • MARC21 • MARCXML</span>
           </article>
 
           <article class="card">
             <div class="icon">↶</div>
-            <h3>Desfazer importação MARC</h3>
-            <p>Permite reverter um lote de importação de forma controlada, preservando a segurança do catálogo.</p>
+            <h3>Undo MARC import</h3>
+            <p>Allows reverting a batch import in a controlled manner, preserving catalog integrity.</p>
           </article>
 
           <article class="card">
             <div class="icon">📊</div>
-            <h3>Pacote de relatórios SQL</h3>
-            <p>Relatórios somente leitura para empréstimos, atrasos, aquisições, itens sem código, obras nunca emprestadas e itens perdidos.</p>
+            <h3>SQL Reports Pack</h3>
+            <p>Read-only reports for loans, overdues, acquisitions, missing barcodes, items never borrowed, and lost items.</p>
           </article>
 
           <article class="card">
             <div class="icon">🔄</div>
-            <h3>Troca de categorias por ano letivo</h3>
-            <p>Move usuários entre categorias utilizando critérios definidos pela biblioteca, com dry run antes da execução.</p>
+            <h3>Category rollover</h3>
+            <p>Moves patrons between categories using criteria defined by the library, with a dry run before execution.</p>
           </article>
 
           <article class="card">
             <div class="icon">🧪</div>
-            <h3>Qualidade dos dados</h3>
-            <p>Executa a verificação de inconsistências do catálogo sem alterar os registros.</p>
+            <h3>Data quality</h3>
+            <p>Runs catalog inconsistency checks without altering the actual records.</p>
           </article>
 
           <article class="card">
             <div class="icon">🔒</div>
-            <h3>Privacidade e LGPD</h3>
-            <p>Anonimização de históricos antigos e exclusão controlada de usuários expirados que atendam aos critérios definidos.</p>
+            <h3>Privacy & GDPR/LGPD</h3>
+            <p>Anonymizes old borrowing histories and securely deletes expired patrons that meet defined criteria.</p>
           </article>
         </div>
 
         <div class="callout" style="margin-top:18px">
-          <strong>Proteção por padrão:</strong> as operações que alteram dados seguem lock compartilhado com backup,
-          prévia, confirmação e cópia <code>PRE-*</code> verificada antes da mudança.
+          <strong>Protection by default:</strong> Operations that alter data follow a shared lock with backups, previews, confirmations, and a verified <code>PRE-*</code> copy before making changes.
         </div>
       </div>
     </section>
 
-    <section class="section alt" id="catalogacao">
+    <section class="section alt" id="cataloging">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Catalogação</div>
-          <h2>PHA, Cutter-Sanborn, CDD e IA trabalhando junto do catalogador.</h2>
+          <div class="kicker">Cataloging</div>
+          <h2>PHA, Cutter-Sanborn, DDC, and AI working alongside the cataloger.</h2>
           <p>
-            O projeto reúne ferramentas auxiliares para classificação, notação de autor, cálculo de Cutter
-            e substituição segura de registros MARC, sem retirar do profissional a etapa de revisão.
+            The project brings together helper tools for classification, author notation, Cutter calculation,
+            and safe MARC record replacement, without removing the professional review step.
           </p>
         </div>
 
         <div class="grid-3">
           <article class="card">
             <div class="icon">A</div>
-            <h3>Notação de autor</h3>
-            <p>Usa a própria tabela PHA ou Cutter-Sanborn carregada pela biblioteca e mostra os números já utilizados no catálogo.</p>
+            <h3>Author notation</h3>
+            <p>Uses the library's own PHA or Cutter-Sanborn table and highlights numbers already used in the catalog.</p>
           </article>
 
           <article class="card">
             <div class="icon">▥</div>
-            <h3>Consulta CDD</h3>
-            <p>Pesquisa por número ou assunto a partir da cópia da CDD da própria biblioteca, com integração ao formulário de catalogação.</p>
+            <h3>DDC lookup</h3>
+            <p>Searches by number or subject from a local copy of the library's DDC, integrated with the cataloging form.</p>
           </article>
 
           <article class="card">
             <div class="icon">✂</div>
             <h3>Cutter Calculator</h3>
-            <p>Calcula a notação, sugere classes a partir do catálogo e pode preencher 090, 092 ou o campo de chamada do exemplar.</p>
+            <p>Calculates notation, suggests classes based on the catalog, and can auto-fill 090, 092, or the item call number field.</p>
           </article>
 
           <article class="card">
             <div class="icon">M</div>
             <h3>Replace a MARC record</h3>
-            <p>Substitui um registro por MARC ou XML através de preview, lock transacional e salvamento da versão anterior.</p>
+            <p>Replaces a record via MARC or XML through preview, transactional lock, and saving the previous version.</p>
           </article>
 
           <article class="card">
             <div class="icon">🤖</div>
-            <h3>AI cataloguing</h3>
-            <p>Recebe fotos da capa, folha de rosto e verso, gera uma proposta de registro e aplica regras catalográficas antes da revisão.</p>
+            <h3>AI cataloging</h3>
+            <p>Receives photos of the cover, title page, and verso, generating a record proposal applying cataloging rules before human review.</p>
           </article>
 
           <article class="card">
             <div class="icon">👁</div>
-            <h3>Modelos locais ou em nuvem</h3>
-            <p>Suporta serviços compatíveis com OpenAI e modelos locais via Ollama ou LM Studio, sem incluir tokens no painel.</p>
+            <h3>Local or Cloud Models</h3>
+            <p>Supports OpenAI-compatible services and local models via Ollama or LM Studio, without storing tokens in the dashboard.</p>
           </article>
         </div>
 
@@ -781,195 +783,215 @@ sudo bash installer</pre>
 
         <div class="grid-2">
           <div class="card">
-            <h3>Fluxo da catalogação com IA</h3>
+            <h3>AI Cataloging Workflow</h3>
             <ul class="feature-list">
-              <li>Fotos do livro e instruções opcionais</li>
-              <li>Resposta estruturada em JSON</li>
-              <li>Aplicação de regras AACR2/ISBD e MARC</li>
-              <li>Revisão pelo bibliotecário/operador</li>
-              <li>Preview obrigatório antes de gravar</li>
-              <li>Registro e resposta do modelo podem ser preservados para auditoria</li>
+              <li>Book photos and optional instructions</li>
+              <li>Structured JSON response</li>
+              <li>Application of AACR2/ISBD and MARC rules</li>
+              <li>Review by the librarian/operator</li>
+              <li>Mandatory preview before saving</li>
+              <li>Record and model response can be preserved for auditing</li>
             </ul>
           </div>
 
           <div class="card">
-            <h3>Princípio importante</h3>
+            <h3>Important Principle</h3>
             <div class="callout">
-              A IA funciona como <strong>assistente de catalogação</strong>. A proposta gerada é revisada
-              e só então enviada ao Koha. O projeto também prevê mecanismos para não inventar campos
-              sem suporte nas fotografias ou no contexto fornecido.
+              The AI functions as a <strong>cataloging assistant</strong>. The generated proposal is reviewed
+              and only then sent to Koha. The project also includes strict prompts to prevent hallucinating fields
+              not supported by the photographs or context.
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="section" id="brasil">
+    <section class="section" id="brazil">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Brasil: localization</div>
-          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <div class="kicker">Brazil: localization</div>
+          <h2>Features tailored for the daily routine of Brazilian libraries.</h2>
           <p>
-            Os recursos brasileiros são opt-in: nada é aplicado automaticamente durante a instalação ou por agendamento.
+            The Brazilian localization features are opt-in: nothing is applied automatically during installation or by schedule.
           </p>
         </div>
 
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+              <tr><th>Feature</th><th>What it offers</th><th>Protection</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td>CPF</td>
-                <td>Auditoria de CPF usando dígitos verificadores e identificação de números compartilhados.</td>
-                <td>Somente leitura até confirmação</td>
+                <td>CPF Validation</td>
+                <td>Audits CPF (National ID) using check digits and identifies shared numbers.</td>
+                <td>Read-only until confirmation</td>
               </tr>
               <tr>
-                <td>Etiquetas Pimaco</td>
-                <td>Modelos para folhas A4 e Letter, incluindo espinha, código de barras e título.</td>
+                <td>Pimaco Labels</td>
+                <td>Templates for A4 and Letter sheets, including spine, barcode, and title.</td>
                 <td>PRE-LABELS</td>
               </tr>
               <tr>
-                <td>Ficha catalográfica</td>
-                <td>Ficha em estilo usado por bibliotecas brasileiras, integrada à visualização do registro e com referência ABNT.</td>
+                <td>Catalog Card</td>
+                <td>Generates catalog cards in the style used by Brazilian libraries, integrated into the record view.</td>
                 <td>PRE-FICHA</td>
               </tr>
               <tr>
-                <td>Calendário brasileiro</td>
-                <td>Feriados nacionais e datas móveis, com opção de feriado municipal.</td>
+                <td>Brazilian Calendar</td>
+                <td>National holidays and floating dates, with an option for municipal holidays.</td>
                 <td>PRE-CALENDAR</td>
               </tr>
               <tr>
-                <td>Censos</td>
-                <td>Relatórios para indicadores relacionados a MEC, INEP, IBGE e SNBP, conforme os dados existentes no Koha.</td>
+                <td>Census Reports</td>
+                <td>Reports for indicators related to MEC, INEP, IBGE, and SNBP based on Koha data.</td>
                 <td>PRE-CENSO</td>
               </tr>
               <tr>
                 <td>ABNT NBR 6023:2018</td>
-                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
-                <td>Somente leitura</td>
+                <td>Generates references and bibliographies from MARC21 records in HTML and plain text.</td>
+                <td>Read-only</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div class="callout" style="margin-top:18px">
-          <strong>Observação:</strong> os dados dos censos representam o que está registrado no Koha.
-          O README recomenda conferir cada resultado contra o formulário oficial antes do envio.
+          <strong>Note:</strong> Census data represents what is registered in Koha.
+          The README recommends cross-checking every result against official forms before submission.
         </div>
       </div>
     </section>
 
-    <section class="section alt" id="seguranca">
+    <section class="section alt" id="security">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Operação e segurança</div>
-          <h2>Automação sem esconder o que está acontecendo.</h2>
+          <div class="kicker">Operation & Security</div>
+          <h2>Automation without hiding what's going on.</h2>
           <p>
-            O painel centraliza tarefas recorrentes e mostra os pontos importantes para manutenção,
-            diagnóstico e recuperação.
+            The dashboard centralizes recurring tasks and highlights important points for maintenance, diagnostics, and recovery.
           </p>
         </div>
 
         <div class="grid-2">
           <div class="card">
-            <h3>Automação padrão</h3>
+            <h3>Standard Automation</h3>
             <div class="table-wrap" style="margin-top:14px">
               <table style="min-width:580px">
-                <thead><tr><th>Quando</th><th>Tarefa</th></tr></thead>
+                <thead><tr><th>When</th><th>Task</th></tr></thead>
                 <tbody>
-                  <tr><td>Diariamente 23:00</td><td>Backup SQL comprimido e upload opcional para a nuvem</td></tr>
-                  <tr><td>Domingos 03:00</td><td>Exportação MARC21</td></tr>
-                  <tr><td>Diariamente 01:30</td><td>Limpeza de sessões e fila do Zebra</td></tr>
-                  <tr><td>Diariamente 05:00</td><td>Reinício do Plack</td></tr>
-                  <tr><td>A cada 2 min</td><td>Watchdog do indexador Zebra</td></tr>
-                  <tr><td>A cada 5 min</td><td>Watchdog do Elasticsearch, quando usado</td></tr>
+                  <tr><td>Daily 23:00</td><td>Compressed SQL backup and optional cloud upload</td></tr>
+                  <tr><td>Sundays 03:00</td><td>MARC21 export</td></tr>
+                  <tr><td>Daily 01:30</td><td>Session and Zebra queue cleanup</td></tr>
+                  <tr><td>Daily 05:00</td><td>Plack restart</td></tr>
+                  <tr><td>Every 2 min</td><td>Zebra indexer watchdog</td></tr>
+                  <tr><td>Every 5 min</td><td>Elasticsearch watchdog, when used</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
           <div class="card">
-            <h3>Arquivos importantes</h3>
+            <h3>Important Files</h3>
             <ul class="feature-list">
-              <li><code>/root/koha_credentials.txt</code> — credenciais iniciais</li>
-              <li><code>/var/backups/koha_sql</code> — backups SQL</li>
-              <li><code>/var/backups/koha_marc</code> — backups MARC</li>
-              <li><code>/etc/koha-easy-install/</code> — configurações do painel</li>
-              <li><code>/var/log/koha-easy-install/</code> — logs do painel e validações</li>
-              <li><code>~/importar</code> — pasta de entrada da Magic Import Tool</li>
+              <li><code>/root/koha_credentials.txt</code> — initial credentials</li>
+              <li><code>/var/backups/koha_sql</code> — SQL backups</li>
+              <li><code>/var/backups/koha_marc</code> — MARC backups</li>
+              <li><code>/etc/koha-easy-install/</code> — dashboard settings</li>
+              <li><code>/var/log/koha-easy-install/</code> — dashboard and validation logs</li>
+              <li><code>~/importar</code> — input folder for the Magic Import Tool</li>
             </ul>
           </div>
 
           <div class="card">
-            <h3>Diagnóstico</h3>
+            <h3>Diagnostics</h3>
             <p>
-              O painel reúne status, checagem de saúde, logs do Apache, manutenção profunda do banco
-              e relatórios prontos para suporte.
+              The dashboard gathers status, health checks, Apache logs, deep database maintenance,
+              and ready-to-use reports for support.
             </p>
             <div class="chip-row">
               <span class="chip">health check</span>
               <span class="chip">Apache logs</span>
               <span class="chip">MariaDB</span>
-              <span class="chip">Koha</span>
-              <span class="chip">logs</span>
+              <span class="chip">Koha logs</span>
             </div>
           </div>
 
           <div class="card">
-            <h3>Falha de energia</h3>
+            <h3>Power Failure</h3>
             <p>
-              O projeto prevê verificação após um reboot não limpo, criação de novo backup e atualização
-              do índice quando necessário. No Windows, a rotina de desligamento seguro tenta parar o Koha antes do sistema.
+              The project includes verification after an unclean reboot, creates a new backup, and updates
+              the index when necessary. On Windows, the safe shutdown routine attempts to stop Koha gracefully before the system shuts down.
             </p>
           </div>
         </div>
 
         <div class="callout danger" style="margin-top:18px">
-          <strong>Desinstalação é destrutiva:</strong> o <code>uninstall.sh</code> remove permanentemente o Koha,
-          bancos de dados, backups locais e configurações. Faça cópias fora do servidor antes de usar.
+          <strong>Uninstallation is destructive:</strong> The <code>uninstall.sh</code> script permanently removes Koha, databases, local backups, and configurations. Backup your data off-server before using it.
         </div>
       </div>
     </section>
 
-    <section class="section" id="contribuir">
+    <!-- INÍCIO DA SEÇÃO DO MÉTODO 2 PARA INDEXAÇÃO GOOGLE -->
+    <section class="section" id="network">
       <div class="container">
         <div class="section-heading">
-          <div class="kicker">Projeto livre</div>
-          <h2>Feito para ser usado, estudado e melhorado.</h2>
+          <div class="kicker">Public Network</div>
+          <h2>Libraries using koha.nexus</h2>
           <p>
-            O projeto inclui testes, traduções, ferramentas para colaboradores e verificação do checksum
-            do instalador para atualização automática.
+            Explore the public catalogs maintained by our partner institutions.
+            Search engines follow these links to automatically discover and index their collections.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <!-- CARD DE EXEMPLO (Método 2) -->
+          <a href="https://castroalves.koha.nexus" target="_blank" rel="noopener" class="card" style="display:flex; flex-direction:column; justify-content:center; text-align:center; padding:32px;">
+            <h3 style="margin-bottom:4px;">Biblioteca Pública Municipal Castro Alves</h3>
+            <span style="color:var(--green); font-size:0.85rem;">castroalves.koha.nexus</span>
+          </a>
+          <!-- Novas bibliotecas podem ser adicionadas aqui -->
+        </div>
+      </div>
+    </section>
+    <!-- FIM DA SEÇÃO DO MÉTODO 2 -->
+
+    <section class="section alt" id="contribute">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Open Source</div>
+          <h2>Built to be used, studied, and improved.</h2>
+          <p>
+            The project includes tests, translations, collaboration tools, and installer checksum verification for automatic updates.
           </p>
         </div>
 
         <div class="grid-3">
           <div class="card">
             <div class="icon">🧪</div>
-            <h3>Testes</h3>
-            <p>Conjunto de testes Bats para backup/restore, indexação, ferramentas de biblioteca, WSL e componentes Windows.</p>
+            <h3>Tests</h3>
+            <p>Bats test suite for backup/restore, indexing, library tools, WSL, and Windows components.</p>
           </div>
           <div class="card">
             <div class="icon">🌎</div>
-            <h3>Traduções</h3>
-            <p>Dicionários versionados por idioma, validação de cobertura e rejeição automática de traduções que perdem variáveis.</p>
+            <h3>Translations</h3>
+            <p>Versioned dictionaries by language, coverage validation, and automatic rejection of translations missing variables.</p>
           </div>
           <div class="card">
             <div class="icon">🔏</div>
-            <h3>Verificação</h3>
-            <p>O instalador usa SHA-256 para validar sua própria atualização.</p>
+            <h3>Verification</h3>
+            <p>The installer uses SHA-256 to securely validate its own updates.</p>
           </div>
         </div>
 
         <div class="separator"></div>
 
         <div class="card">
-          <h3>Licença</h3>
+          <h3>License</h3>
           <p>
-            <strong>GNU General Public License v3.0 ou posterior (GPL-3.0-or-later).</strong>
-            O projeto pode ser usado, estudado, compartilhado e modificado. Distribuições modificadas
-            devem continuar sob GPL e disponibilizar o código-fonte correspondente. O software é fornecido sem garantia.
+            <strong>GNU General Public License v3.0 or later (GPL-3.0-or-later).</strong>
+            The project can be used, studied, shared, and modified. Modified distributions
+            must remain under GPL and make the corresponding source code available. The software is provided without warranty.
           </p>
         </div>
       </div>
@@ -980,20 +1002,20 @@ sudo bash installer</pre>
     <div class="container">
       <div class="footer-grid">
         <div>
-          <a class="brand brand-logo" href="#inicio" aria-label="koha.nexus">
+          <a class="brand brand-logo" href="#home" aria-label="koha.nexus">
             <img src="docs/images/koha-logo.png" alt="koha.nexus" width="210" height="37">
           </a>
           <p style="margin-top:14px;max-width:560px">
-            Um assistente inteligente, gratuito e fácil de usar para facilitar a gestão técnica do Koha em bibliotecas.
+            A smart, free, and easy-to-use assistant to simplify Koha technical management in libraries.
           </p>
-          <p>Desenvolvido com dedicação por <strong style="color:#d6e9dc">Paulo F. Baldi FH</strong>.</p>
+          <p>Developed with dedication by <strong style="color:#d6e9dc">Paulo F. Baldi FH</strong>.</p>
         </div>
 
         <div>
-          <h4>Projeto</h4>
+          <h4>Project</h4>
           <div class="mini-links">
             <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
-            <a href="LICENSE">Licença</a>
+            <a href="LICENSE">License</a>
             <a href="README.md">README</a>
           </div>
         </div>
@@ -1001,17 +1023,17 @@ sudo bash installer</pre>
         <div>
           <h4>Links</h4>
           <div class="mini-links">
-            <a href="#recursos">Recursos</a>
-            <a href="#instalacao">Instalação</a>
+            <a href="#features">Features</a>
+            <a href="#installation">Installation</a>
             <a href="#windows">Windows</a>
-            <a href="#catalogacao">Catalogação</a>
+            <a href="#cataloging">Cataloging</a>
           </div>
         </div>
       </div>
 
       <div class="footer-bottom">
         <span>© 2026 koha.nexus • GPL-3.0-or-later</span>
-        <span>O nome e o logotipo Koha pertencem à comunidade Koha.</span>
+        <span>The Koha name and logo belong to the Koha Community.</span>
       </div>
     </div>
   </footer>
@@ -1024,17 +1046,15 @@ sudo bash installer</pre>
 
         try {
           await navigator.clipboard.writeText(value);
-          button.textContent = "Copiado ✓";
+          button.textContent = "Copied ✓";
           setTimeout(() => button.textContent = original, 1600);
         } catch {
-          button.textContent = "Selecione manualmente";
+          button.textContent = "Select manually";
           setTimeout(() => button.textContent = original, 2200);
         }
       });
     });
 
-    // O instalador fica no próprio repositório/site. O navegador faz o download
-    // pelo mesmo domínio, sem depender de CORS do raw.githubusercontent.com.
     const cmdLink = document.getElementById("download-cmd");
     if (cmdLink) {
       cmdLink.addEventListener("click", () => {
