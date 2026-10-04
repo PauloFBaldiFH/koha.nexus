@@ -39,13 +39,26 @@ class KohaPanelApp(App):
         log_error("".join(traceback.format_exception(type(error), error, error.__traceback__)))
         super()._handle_exception(error)
 
-    def copy_to_clipboard(self, text: str) -> None:
+    def copy_to_clipboard(self, text: str, quiet: bool = False) -> None:
         # Every copy ends here: Ctrl+C on text selected with the mouse, the
         # Copy buttons and the "c" key. Textual sends it as OSC 52, so the
         # terminal puts it on the clipboard of the computer the person is
         # at, also over SSH.
         super().copy_to_clipboard(text)
-        self.notify(t("Copied."), timeout=3)
+        if not quiet:
+            self.notify(t("Copied."), timeout=3)
+
+    def open_url(self, url: str, new_tab: bool = True) -> None:
+        # Textual's own open_url uses the webbrowser module, which may start
+        # a text browser over the panel on a server (opener.py). Where no
+        # browser can be opened, the address is copied instead.
+        from .opener import open_url
+        if open_url(url):
+            self.notify(t("Opening ${url} in the browser.", url=url), timeout=4)
+        else:
+            self.copy_to_clipboard(url, quiet=True)
+            self.notify(t("No browser can be opened from here. Address copied: paste it in your browser."),
+                        timeout=6)
 
     def _signal_started(self) -> None:
         """The first screen is on the terminal: config.sh's start-up watchdog

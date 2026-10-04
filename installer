@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.6"
+PANEL_VERSION=" 1.5.8"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -8326,6 +8326,25 @@ kei_overall_state() {
     fi
 }
 
+# Where people reach Koha, for the panel's dashboard and the tray:
+# "access":{...}, (trailing comma). Other computers only get the LAN address
+# when they can really use it (host_can lan_direct: not WSL in NAT mode).
+# Public hosts are the Cloudflare tunnel's, free address or own domain.
+kei_access_json() {
+    local ip="" lan=false opac staff mode=""
+    if host_can lan_direct; then
+        ip="${WIN_LAN_IP:-}"
+        [ -n "$ip" ] || ip=$(get_server_ip 2>/dev/null)
+        [ "$ip" != "127.0.0.1" ] && lan=true
+    fi
+    read -r opac staff < <(tunnel_public_hosts 2>/dev/null)
+    [ "$opac" = "-" ] && opac=""
+    [ "$staff" = "-" ] && staff=""
+    if tunnel_mode_is broker; then mode="free"; elif [ -f /etc/cloudflared/config.yml ]; then mode="own"; fi
+    printf '"access":{"opac_port":80,"staff_port":8080,"lan_ip":%s,"lan_reachable":%s,' "$(json_str "$ip")" "$lan"
+    printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")"
+}
+
 kei_status_json() {
     local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false
     local b_epoch b_size b_result b_file df_line d_total d_free mem_total mem_avail
@@ -8356,6 +8375,7 @@ kei_status_json() {
         "$(json_str "${b_file##*/}")" "$(json_num "$b_epoch")" "$(json_num "$b_size")" "$(json_str "$b_result")" "$(json_num "$(kei_backup_log_epoch)")"
     printf '"recovery":{"epoch":%s,"state":%s,"finished":%s,"db":%s,"backup":%s,"index":%s},' \
         "$(json_num "$r_epoch")" "$(json_str "$r_state")" "$(json_num "$r_finished")" "$(json_str "$r_db")" "$(json_str "$r_backup")" "$(json_str "$r_index")"
+    kei_access_json
     printf '"disk":{"total":%s,"free":%s},' "$(json_num "$d_total")" "$(json_num "$d_free")"
     printf '"memory":{"total":%s,"available":%s}}\n' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
 }
@@ -8449,6 +8469,24 @@ EOF
     chmod -R go-rwx "$out" 2>/dev/null
     log "diagnostics exported to $out"
     printf '%s\n' "$out"
+}
+
+# Panel task "export-diagnostics": the same support folder, always in
+# $KEI_DIAG_DIR (the panel's own folder, not wherever it was started),
+# keeping the newest $KEI_DIAG_KEEP. Answers @@result path=FOLDER.
+KEI_DIAG_DIR="${KEI_DIAG_DIR:-${LOG_DIR}/diagnostics}"
+KEI_DIAG_KEEP=5
+kei_task_export_diagnostics() {
+    local out old
+    mkdir -p -m 700 "$KEI_DIAG_DIR" || return 1
+    kei_emit step "$(t "Collecting logs and system status")"
+    out=$(kei_export_diagnostics "$KEI_DIAG_DIR") || return 1
+    while IFS= read -r old; do
+        rm -rf -- "$old"
+    done < <(find "$KEI_DIAG_DIR" -mindepth 1 -maxdepth 1 -type d -name 'koha-diagnostics-*' -printf '%T@ %p\n' \
+             | sort -rn | tail -n +$((KEI_DIAG_KEEP + 1)) | cut -d' ' -f2-)
+    kei_result path "$out"
+    return 0
 }
 
 # ======================================================================
@@ -25287,6 +25325,7 @@ kei_task() {
             return 0 ;;
         health)          function_validate_system ;;
         repair-services) function_repair_services ;;
+        export-diagnostics) kei_task_export_diagnostics ;;
         run)
             # Any other routine of the menu, its questions asked by the panel.
             local fn

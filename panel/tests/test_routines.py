@@ -443,3 +443,43 @@ def test_copy_addresses_codes_and_selected_text():
     values = asyncio.run(main())
     assert values == ["ABCD-EF12-GH34-JK56", "https://palotina.koha.nexus"]
     assert copied[:2] == values and copied[2].startswith("WRITE THIS")
+
+
+def test_dashboard_restart_asks_first():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("restart-koha")
+            confirm = await _wait_for(pilot, ConfirmScreen)
+            assert "Apache" in confirm._question
+            confirm.query_one("#yes").press()
+            return await _wait_for(pilot, MessageScreen)
+    done = asyncio.run(main())
+    assert "Koha services restarted" in done._body
+
+
+def test_dashboard_export_diagnostics_gives_the_folder():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("export-diagnostics")
+            return await _wait_for(pilot, MessageScreen)
+    done = asyncio.run(main())
+    assert done._command.startswith("/var/log/koha-easy-install/diagnostics/koha-diagnostics-")
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason="the installer runs as root")
+def test_installer_export_diagnostics_task_keeps_five(tmp_path):
+    env = dict(os.environ, KEI_DIAG_DIR=str(tmp_path))
+    for i in range(6):
+        (tmp_path / f"koha-diagnostics-old-{i}").mkdir()
+        os.utime(tmp_path / f"koha-diagnostics-old-{i}", (1000 + i, 1000 + i))
+    run = subprocess.run(["bash", str(INSTALLER), "--task", "export-diagnostics"], env=env,
+                         capture_output=True, text=True, timeout=180)
+    out = TaskOutcome()
+    for line in (run.stdout + run.stderr).splitlines():
+        out.feed(line)
+    path = out.get("path")
+    assert run.returncode == 0 and path.startswith(str(tmp_path))
+    kept = sorted(p.name for p in tmp_path.iterdir())
+    assert len(kept) == 5 and os.path.basename(path) in kept and "koha-diagnostics-old-0" not in kept
