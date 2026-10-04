@@ -435,10 +435,12 @@ _DEMO_STATUS = {
     "koha_installed": True,
     "services": {"apache2": "active", "mariadb": "active", "memcached": "active",
                  "rabbitmq-server": "active", "koha-common": "active", "cron": "active", "elasticsearch": "inactive",
-                 "cloudflared": "inactive"},
+                 "cloudflared": "active"},
     "plack": True, "http": {"staff": 200, "opac": 200},
     "backup": {"last_file": "koha-library-20261002-0300.sql.gz", "last_epoch": 1790910000,
                "last_size": 48_300_000, "last_result": "ok", "log_epoch": 1790910060},
+    "access": {"opac_port": 80, "staff_port": 8080, "lan_ip": "192.168.0.20", "lan_reachable": True,
+               "tunnel_mode": "free", "public_opac": "biblioteca.koha.nexus", "public_staff": ""},
     "disk": {"total": 64_000_000_000, "free": 41_500_000_000},
     "memory": {"total": 8_000_000_000, "available": 5_200_000_000},
 }
