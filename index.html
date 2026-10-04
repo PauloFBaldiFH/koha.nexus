@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="koha.nexus — assistente inteligente, gratuito e fácil de usar para instalação, manutenção e gestão de bibliotecas com Koha.">
+  <meta name="theme-color" content="#08110d">
+  <link rel="icon" type="image/x-icon" href="docs/images/koha.ico">
+  <link rel="shortcut icon" href="docs/images/koha.ico">
+  <title>koha.nexus — Gestão de bibliotecas simplificada</title>
+
+  <style>
+    :root{
+      --bg:#07100c;
+      --bg-soft:#0b1711;
+      --panel:#0f1e16;
+      --panel-2:#13251b;
+      --line:rgba(163,230,184,.14);
+      --text:#ecf8f0;
+      --muted:#a9c0b1;
+      --green:#63d987;
+      --green-2:#36b96a;
+      --green-3:#8cf0aa;
+      --gold:#ffd776;
+      --danger:#ff8e8e;
+      --shadow:0 24px 70px rgba(0,0,0,.35);
+      --radius:22px;
+      --max:1220px;
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 80% -10%, rgba(70,190,111,.15), transparent 34%),
+        radial-gradient(circle at 10% 20%, rgba(39,121,74,.11), transparent 30%),
+        var(--bg);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height:1.65;
+    }
+
+    a{color:inherit;text-decoration:none}
+    img{max-width:100%;display:block}
+    code,kbd,pre{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
+
+    .container{width:min(var(--max), calc(100% - 40px));margin:auto}
+
+    .topbar{
+      position:sticky;top:0;z-index:50;
+      backdrop-filter:blur(18px);
+      background:rgba(7,16,12,.78);
+      border-bottom:1px solid var(--line);
+    }
+
+    .topbar-inner{
+      min-height:74px;
+      display:flex;align-items:center;justify-content:space-between;gap:18px;
+    }
+
+    .brand{
+      display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:-.03em;
+    }
+
+    .brand-logo img{
+      width:210px;height:auto;object-fit:contain;
+      filter:drop-shadow(0 6px 18px rgba(99,217,135,.08));
+    }
+
+    .brand-mark{
+      width:38px;height:38px;border-radius:12px;
+      display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--green),var(--green-2));
+      color:#061009;font-weight:900;box-shadow:0 10px 30px rgba(54,185,106,.24);
+    }
+
+    .brand span{font-size:1.05rem}
+
+    nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    nav a{
+      color:var(--muted);
+      padding:9px 12px;border-radius:10px;font-size:.9rem;
+      transition:.2s ease;
+    }
+    nav a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+
+    .hero{
+      padding:92px 0 64px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .hero-grid{
+      display:grid;grid-template-columns:1.18fr .82fr;gap:46px;align-items:center;
+    }
+
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(99,217,135,.25);
+      color:var(--green-3);
+      background:rgba(99,217,135,.07);
+      padding:8px 12px;border-radius:999px;font-size:.82rem;font-weight:700;
+      letter-spacing:.02em;
+    }
+
+    .hero-logo{
+      width:min(420px, 78vw);height:auto;margin:22px 0 4px;
+      filter:drop-shadow(0 12px 26px rgba(99,217,135,.10));
+    }
+
+    .hero h1{
+      margin:8px 0 18px;
+      font-size:clamp(2.8rem,7vw,5.6rem);
+      line-height:.98;letter-spacing:-.065em;
+      max-width:850px;
+    }
+
+    .hero h1 .accent{
+      color:var(--green);
+      text-shadow:0 0 45px rgba(99,217,135,.18);
+    }
+
+    .hero p{
+      max-width:760px;color:var(--muted);font-size:1.14rem;
+      margin:0 0 28px;
+    }
+
+    .hero-actions{display:flex;flex-wrap:wrap;gap:12px}
+
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:9px;
+      padding:13px 18px;border-radius:13px;font-weight:800;font-size:.94rem;
+      border:1px solid var(--line);transition:.2s ease;
+    }
+
+    .btn-primary{
+      background:linear-gradient(135deg,var(--green),var(--green-2));
+      color:#07110b;border-color:transparent;
+      box-shadow:0 16px 34px rgba(54,185,106,.22);
+    }
+
+    .btn-primary:hover{transform:translateY(-2px);filter:brightness(1.04)}
+    .btn-secondary{background:rgba(255,255,255,.03)}
+    .btn-secondary:hover{background:rgba(255,255,255,.06);transform:translateY(-2px)}
+
+    .terminal{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg,rgba(18,39,27,.92),rgba(7,16,12,.96));
+      border-radius:24px;box-shadow:var(--shadow);overflow:hidden;
+      position:relative;
+    }
+
+    .terminal-head{
+      display:flex;align-items:center;gap:8px;
+      padding:13px 16px;border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.025);
+    }
+
+    .dot{width:10px;height:10px;border-radius:50%;background:#5f6d63}
+    .terminal-title{margin-left:6px;color:#89a392;font-size:.82rem}
+    .terminal pre{
+      margin:0;padding:26px 22px;overflow:auto;color:#cbf6d7;font-size:.86rem;line-height:1.75;
+    }
+    .terminal .prompt{color:var(--green)}
+    .terminal .muted{color:#708479}
+
+    .stats{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:30px;
+    }
+    .stat{
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--line);border-radius:17px;padding:16px;
+    }
+    .stat strong{display:block;font-size:1.2rem;color:var(--text)}
+    .stat span{display:block;color:var(--muted);font-size:.82rem;margin-top:4px}
+
+    .section{padding:88px 0}
+    .section.alt{
+      background:linear-gradient(180deg,transparent,rgba(99,217,135,.025),transparent);
+      border-top:1px solid rgba(163,230,184,.04);
+      border-bottom:1px solid rgba(163,230,184,.04);
+    }
+
+    .section-heading{max-width:820px;margin-bottom:34px}
+    .section-heading .kicker{
+      color:var(--green);font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.14em;
+    }
+    .section-heading h2{
+      font-size:clamp(2rem,4vw,3.2rem);line-height:1.08;letter-spacing:-.045em;margin:10px 0 12px;
+    }
+    .section-heading p{color:var(--muted);font-size:1.03rem;margin:0}
+
+    .separator{
+      width:100%;height:1px;
+      background:linear-gradient(90deg,transparent,rgba(99,217,135,.28),transparent);
+      margin:20px 0;
+    }
+
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+
+    .card{
+      background:linear-gradient(180deg,rgba(18,38,27,.88),rgba(10,23,16,.92));
+      border:1px solid var(--line);border-radius:var(--radius);padding:23px;
+      box-shadow:0 16px 40px rgba(0,0,0,.14);
+    }
+
+    .card:hover{border-color:rgba(99,217,135,.28)}
+    .icon{
+      width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+      background:rgba(99,217,135,.11);border:1px solid rgba(99,217,135,.18);
+      color:var(--green-3);font-size:1.15rem;margin-bottom:14px;
+    }
+    .card h3{margin:0 0 8px;font-size:1.08rem;letter-spacing:-.02em}
+    .card p{margin:0;color:var(--muted);font-size:.92rem}
+    .tag{
+      display:inline-flex;padding:5px 8px;border-radius:999px;
+      background:rgba(255,255,255,.04);border:1px solid var(--line);
+      color:#bdd0c3;font-size:.72rem;margin-top:14px;
+    }
+
+    .feature-list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+    .feature-list li{
+      display:flex;gap:10px;color:#c8dccf;font-size:.93rem;
+    }
+    .feature-list li::before{content:"✓";color:var(--green);font-weight:900}
+
+    .install-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
+
+    .codebox{
+      border-radius:18px;overflow:hidden;border:1px solid var(--line);
+      background:#060b08;
+    }
+
+    .codebox-head{
+      display:flex;justify-content:space-between;gap:12px;align-items:center;
+      padding:12px 14px;border-bottom:1px solid var(--line);color:#91aa9a;font-size:.82rem;
+    }
+
+    .copy{
+      cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.03);
+      color:#bed4c5;padding:6px 9px;border-radius:8px;font-size:.72rem;
+    }
+
+    .copy:hover{background:rgba(255,255,255,.07)}
+    .codebox pre{padding:18px;margin:0;overflow:auto;color:#d0edd7;font-size:.84rem;line-height:1.7}
+
+    .timeline{display:grid;gap:14px}
+    .step{
+      display:grid;grid-template-columns:46px 1fr;gap:14px;align-items:start;
+    }
+    .step-num{
+      width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+      background:rgba(99,217,135,.1);border:1px solid rgba(99,217,135,.2);
+      color:var(--green-3);font-weight:900;
+    }
+    .step h3{margin:2px 0 4px}
+    .step p{margin:0;color:var(--muted);font-size:.92rem}
+
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px}
+    table{width:100%;border-collapse:collapse;min-width:720px}
+    th,td{text-align:left;padding:14px 15px;border-bottom:1px solid var(--line);vertical-align:top}
+    th{color:#cbe1d1;font-size:.82rem;background:rgba(255,255,255,.025)}
+    td{color:var(--muted);font-size:.88rem}
+    tr:last-child td{border-bottom:0}
+    td:first-child{color:var(--text);font-weight:700}
+
+    .callout{
+      padding:18px 20px;border-radius:17px;
+      background:rgba(99,217,135,.07);border:1px solid rgba(99,217,135,.18);
+      color:#ccebd4;
+    }
+    .callout strong{color:var(--green-3)}
+
+    .danger{
+      background:rgba(255,142,142,.06);border-color:rgba(255,142,142,.18);
+    }
+    .danger strong{color:#ffb1b1}
+
+    .download-banner{
+      display:flex;align-items:center;justify-content:space-between;gap:24px;
+      padding:22px;border:1px solid rgba(99,217,135,.25);
+      background:linear-gradient(135deg,rgba(99,217,135,.11),rgba(255,255,255,.025));
+      border-radius:22px;margin-bottom:22px;
+      box-shadow:0 18px 50px rgba(0,0,0,.18);
+    }
+
+    .download-content{display:flex;align-items:center;gap:16px;min-width:0}
+    .download-icon{
+      flex:0 0 52px;width:52px;height:52px;border-radius:16px;
+      display:grid;place-items:center;background:linear-gradient(135deg,var(--green),var(--green-2));
+      color:#061009;font-size:1.65rem;font-weight:900;
+      box-shadow:0 12px 28px rgba(54,185,106,.18);
+    }
+    .download-kicker{font-size:.72rem;letter-spacing:.13em;font-weight:900;color:var(--green-3);margin-bottom:2px}
+    .download-banner h3{margin:0 0 3px;font-size:1.22rem}
+    .download-banner p{margin:0;color:var(--muted);font-size:.88rem;max-width:690px}
+    .download-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;flex:0 0 auto}
+    .btn-download{white-space:nowrap}
+    .download-source{text-align:center;color:#97ad9e;font-size:.78rem}
+    .download-source:hover{color:var(--text)}
+
+    .windows{
+      position:relative;
+      background:
+        radial-gradient(circle at 80% 20%, rgba(99,217,135,.10), transparent 28%),
+        linear-gradient(180deg,#0b1711,#09120d);
+    }
+
+    .windows-card{
+      display:grid;grid-template-columns:.85fr 1.15fr;gap:24px;align-items:start;
+    }
+
+    .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+    .chip{
+      padding:7px 10px;border-radius:9px;font-size:.74rem;
+      border:1px solid var(--line);background:rgba(255,255,255,.03);color:#b9d0c1;
+    }
+
+    .footer{
+      padding:54px 0 30px;border-top:1px solid var(--line);
+    }
+
+    .footer-grid{display:grid;grid-template-columns:1.4fr .6fr .6fr;gap:28px}
+    .footer h4{margin:0 0 10px}
+    .footer p,.footer a{color:var(--muted);font-size:.9rem}
+    .footer a:hover{color:var(--text)}
+
+    .footer-bottom{
+      margin-top:30px;padding-top:20px;border-top:1px solid var(--line);
+      display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+      color:#789080;font-size:.78rem;
+    }
+
+    .mini-links{display:flex;gap:14px;flex-wrap:wrap}
+
+    @media (max-width: 980px){
+      .hero-grid,.windows-card,.install-grid{grid-template-columns:1fr}
+      .download-banner{flex-direction:column;align-items:stretch}
+      .download-actions{align-items:stretch}
+      .btn-download{width:100%}
+      .grid-3{grid-template-columns:1fr 1fr}
+      .footer-grid{grid-template-columns:1fr 1fr}
+      nav a:nth-child(n+6){display:none}
+    }
+
+    @media (max-width: 680px){
+      .container{width:min(var(--max), calc(100% - 24px))}
+      .hero{padding:66px 0 40px}
+      .section{padding:64px 0}
+      .grid-2,.grid-3,.stats,.footer-grid{grid-template-columns:1fr}
+      nav{display:none}
+      .brand-logo img{width:165px}
+      .hero h1{font-size:3.05rem}
+      .stats{margin-top:20px}
+      .terminal pre{font-size:.76rem;padding:18px}
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand brand-logo" href="#inicio" aria-label="koha.nexus">
+        <img src="docs/images/koha-logo.png" alt="koha.nexus" width="210" height="37">
+      </a>
+      <nav aria-label="Navegação principal">
+        <a href="#recursos">Recursos</a>
+        <a href="#instalacao">Instalação</a>
+        <a href="#windows">Windows</a>
+        <a href="#ferramentas">Ferramentas</a>
+        <a href="#catalogacao">Catalogação</a>
+        <a href="#brasil">Brasil</a>
+        <a href="#seguranca">Segurança</a>
+        <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
+          <img class="hero-logo" src="docs/images/koha-logo.png" alt="koha.nexus" width="420" height="74">
+          <h1>Koha sem a parte <span class="accent">complicada.</span></h1>
+          <p>
+            O <strong>koha.nexus</strong> é um assistente inteligente, gratuito e fácil de usar
+            para instalar, configurar, manter e ampliar o <strong>Koha Integrated Library System</strong>
+            por meio de um painel amigável e guiado.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#instalacao">Começar a instalação →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">Ver no GitHub</a>
+            <a class="btn btn-secondary" href="README.pt-BR.md">🇧🇷 README completo</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><strong>22 idiomas</strong><span>Painel e pacotes do Koha</span></div>
+            <div class="stat"><strong>2 sistemas</strong><span>Linux ou Windows via WSL 2</span></div>
+            <div class="stat"><strong>16+ recursos</strong><span>Gestão, manutenção e biblioteca</span></div>
+            <div class="stat"><strong>GPL-3.0+</strong><span>Software livre e modificável</span></div>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Terminal de instalação">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">instalação — terminal</span>
+          </div>
+          <pre><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+<span class="prompt">$</span> sudo bash installer
+
+<span class="muted">KOHA.NEXUS</span>
+<span class="prompt">✓</span> Validando o servidor...
+<span class="prompt">✓</span> Instalando Koha
+<span class="prompt">✓</span> Configurando banco de dados
+<span class="prompt">✓</span> Preparando backups
+<span class="prompt">✓</span> Configurando acesso
+
+<span class="prompt">→</span> Painel pronto: <strong>sudo config.sh</strong></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="recursos">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Tudo em um só lugar</div>
+          <h2>Um painel pensado para quem precisa fazer a biblioteca funcionar.</h2>
+          <p>
+            Da instalação inicial ao backup, indexação, segurança, migração, catalogação e publicação
+            na internet, os principais recursos ficam reunidos em um único ponto de controle.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">⚙</div>
+            <h3>Instalação guiada</h3>
+            <p>Pré-validação de sistema, disco, rede e portas; instalação e ajuste de Koha, MariaDB, Apache, Memcached e Plack, além de SWAP, NTP e fuso horário.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🗄</div>
+            <h3>Central de backups</h3>
+            <p>Backups SQL comprimidos, exportação MARC21, cópias manuais e integração opcional com Google Drive usando rclone.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🛡</div>
+            <h3>Restore seguro</h3>
+            <p>O backup é validado e testado em banco temporário antes de qualquer substituição do catálogo atual.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">⌕</div>
+            <h3>Pesquisa e indexação</h3>
+            <p>Alternância entre Zebra e Elasticsearch 7, watchdog do indexador e ferramentas de reparo e reconstrução.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">☁</div>
+            <h3>Publicação na internet</h3>
+            <p>Cloudflare Tunnel sem necessidade de abrir portas, Certbot para SSL e assistente para Google Search Console.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🔐</div>
+            <h3>Segurança</h3>
+            <p>Fail2ban, firewall UFW, possibilidade de restringir o acesso ao staff em 8080 e rotação da senha do banco.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">📚</div>
+            <h3>Ferramentas de biblioteca</h3>
+            <p>Importação, relatórios, qualidade do catálogo, privacidade LGPD, movimentação anual de categorias e mais.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🇧🇷</div>
+            <h3>Localização brasileira</h3>
+            <p>CPF, etiquetas Pimaco, ficha catalográfica, feriados, relatórios censitários e referências bibliográficas em ABNT.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">💬</div>
+            <h3>WhatsApp e Telegram</h3>
+            <p>Entrega dos avisos do Koha por gateways de WhatsApp ou bot do Telegram, de forma opcional.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">✂</div>
+            <h3>Catalogação assistida</h3>
+            <p>PHA ou Cutter-Sanborn, CDD, calculadora Cutter, substituição segura de registros MARC e auxílio de IA.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🪟</div>
+            <h3>Windows + WSL 2</h3>
+            <p>Executa o Koha em um único computador Windows, com atalhos, notificações, bandeja e ferramentas de diagnóstico.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">↻</div>
+            <h3>Autoatualização</h3>
+            <p>Atualização do painel pelo GitHub com verificação SHA-256 do instalador.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="instalacao">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Comece aqui</div>
+          <h2>Instalação no Linux em poucos comandos.</h2>
+          <p>
+            O projeto é voltado para Debian 11/12/13 ou Ubuntu 22.04/24.04, em amd64 ou arm64,
+            e também pode rodar no Windows por meio do WSL 2.
+          </p>
+        </div>
+
+        <div class="install-grid">
+          <div class="card">
+            <h3>Instalador direto</h3>
+            <p>Baixe o instalador atual e execute-o com privilégios administrativos.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer">Copiar</button>
+              </div>
+              <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Clonar o repositório</h3>
+            <p>Também é possível manter os arquivos de tradução junto do script e trabalhar offline.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer">Copiar</button>
+              </div>
+              <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Requisitos mínimos</h3>
+            <ul class="feature-list">
+              <li>Debian 11/12/13 ou Ubuntu 22.04/24.04, 64-bit</li>
+              <li>2 GB de RAM; 4 GB ou mais recomendado</li>
+              <li>5 GB livres; 10 GB ou mais recomendado</li>
+              <li>root ou usuário com sudo</li>
+              <li>Acesso à internet para os repositórios do Koha</li>
+              <li>Portas 80 e 8080 livres</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Depois da instalação</h3>
+            <ul class="feature-list">
+              <li>Abra o staff em <code>http://SERVER-IP:8080</code></li>
+              <li>Finalize o Web Installer do Koha</li>
+              <li>Crie seu super librarian pelo painel</li>
+              <li>O catálogo público fica em <code>http://SERVER-IP:80</code></li>
+              <li>Reabra o painel a qualquer momento com <code>sudo config.sh</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section windows" id="windows">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Windows 10 / 11</div>
+          <h2>Um Koha completo em um único PC, usando WSL 2.</h2>
+          <p>
+            A edição para Windows foi pensada para bibliotecas pequenas, treinamento e avaliação,
+            mantendo os serviços do Koha dentro de Debian no WSL 2 e oferecendo ferramentas nativas no Windows.
+          </p>
+        </div>
+
+        <div class="download-banner">
+          <div class="download-content">
+            <div class="download-icon"><span>↓</span></div>
+            <div>
+              <div class="download-kicker">INSTALADOR PARA WINDOWS</div>
+              <h3>Instale o Koha com dois cliques.</h3>
+              <p>Baixe o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute o arquivo normalmente. Ele inicia o mesmo instalador do PowerShell.</p>
+            </div>
+          </div>
+          <div class="download-actions">
+            <a id="download-cmd" class="btn btn-primary btn-download" href="windows/Install-Koha.cmd" download="Install-Koha.cmd">
+              ⬇ Baixar Install-Koha.cmd
+            </a>
+            <a class="download-source" href="https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd" target="_blank" rel="noopener">Ver arquivo no GitHub ↗</a>
+          </div>
+        </div>
+
+        <div class="windows-card">
+          <div class="card">
+            <div class="icon">🪟</div>
+            <h3>Instalação</h3>
+            <p>Abra o PowerShell normalmente e execute:</p>
+            <div class="codebox" style="margin-top:15px">
+              <div class="codebox-head">
+                <span>PowerShell</span>
+                <button class="copy" data-copy="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copiar</button>
+              </div>
+              <pre>[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
+            </div>
+            <div class="callout" style="margin-top:15px">
+              <strong>Mais fácil:</strong> o botão acima baixa o <code>Install-Koha.cmd</code>. Não é necessário abrir o PowerShell manualmente.
+            </div>
+            <div class="chip-row">
+              <span class="chip">WSL 2</span>
+              <span class="chip">Debian</span>
+              <span class="chip">systemd</span>
+              <span class="chip">Windows Terminal</span>
+              <span class="chip">Notificações</span>
+              <span class="chip">Bandeja do sistema</span>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div><h3>Verificação do computador</h3><p>Confere Windows compatível, arquitetura 64-bit, memória, espaço livre e virtualização habilitada no BIOS.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div><h3>WSL 2 + Debian</h3><p>Instala o WSL 2, prepara o Debian e configura o usuário administrativo e o systemd.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div><h3>Ambiente Koha</h3><p>Instala o Koha dentro do Debian e cria os atalhos, tarefas agendadas e ferramentas de controle do Windows.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div><h3>Rede da biblioteca</h3><p>Configura o acesso dos outros computadores da rede e testa as portas 80 e 8080.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div><h3>Operação diária</h3><p>Start, Stop, Restart, status, diagnóstico, reconstrução do índice e desligamento seguro ficam acessíveis sem abrir um console.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-3">
+          <div class="card"><h3>Notificações</h3><p>Quedas, recuperação, backups, pouco espaço e desligamentos não limpos podem gerar alertas no Windows.</p></div>
+          <div class="card"><h3>Diagnóstico em um clique</h3><p>Exporta logs e informações úteis para suporte, removendo senhas, tokens e chaves.</p></div>
+          <div class="card"><h3>Parada segura</h3><p>O Koha é encerrado por etapas antes do WSL e do Windows serem desligados.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ferramentas">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Ferramentas de biblioteca</div>
+          <h2>Mais do que instalar o Koha: cuidar do acervo.</h2>
+          <p>
+            As ferramentas do painel utilizam os mecanismos do próprio Koha e seguem um fluxo de
+            proteção com bloqueio, pré-visualização, confirmação e backup verificado antes de alterações.
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="icon">🪄</div>
+            <h3>Magic Import Tool</h3>
+            <p>Uma única porta de entrada para planilhas, MARC, arquivos compactados, acervo, exemplares, usuários e dados de circulação.</p>
+            <span class="tag">CSV • TSV • XLSX • ODS • DBF • MARC21 • MARCXML</span>
+          </article>
+
+          <article class="card">
+            <div class="icon">↶</div>
+            <h3>Desfazer importação MARC</h3>
+            <p>Permite reverter um lote de importação de forma controlada, preservando a segurança do catálogo.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">📊</div>
+            <h3>Pacote de relatórios SQL</h3>
+            <p>Relatórios somente leitura para empréstimos, atrasos, aquisições, itens sem código, obras nunca emprestadas e itens perdidos.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🔄</div>
+            <h3>Troca de categorias por ano letivo</h3>
+            <p>Move usuários entre categorias utilizando critérios definidos pela biblioteca, com dry run antes da execução.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🧪</div>
+            <h3>Qualidade dos dados</h3>
+            <p>Executa a verificação de inconsistências do catálogo sem alterar os registros.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🔒</div>
+            <h3>Privacidade e LGPD</h3>
+            <p>Anonimização de históricos antigos e exclusão controlada de usuários expirados que atendam aos critérios definidos.</p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Proteção por padrão:</strong> as operações que alteram dados seguem lock compartilhado com backup,
+          prévia, confirmação e cópia <code>PRE-*</code> verificada antes da mudança.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="catalogacao">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Catalogação</div>
+          <h2>PHA, Cutter-Sanborn, CDD e IA trabalhando junto do catalogador.</h2>
+          <p>
+            O projeto reúne ferramentas auxiliares para classificação, notação de autor, cálculo de Cutter
+            e substituição segura de registros MARC, sem retirar do profissional a etapa de revisão.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">A</div>
+            <h3>Notação de autor</h3>
+            <p>Usa a própria tabela PHA ou Cutter-Sanborn carregada pela biblioteca e mostra os números já utilizados no catálogo.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">▥</div>
+            <h3>Consulta CDD</h3>
+            <p>Pesquisa por número ou assunto a partir da cópia da CDD da própria biblioteca, com integração ao formulário de catalogação.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">✂</div>
+            <h3>Cutter Calculator</h3>
+            <p>Calcula a notação, sugere classes a partir do catálogo e pode preencher 090, 092 ou o campo de chamada do exemplar.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">M</div>
+            <h3>Replace a MARC record</h3>
+            <p>Substitui um registro por MARC ou XML através de preview, lock transacional e salvamento da versão anterior.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">🤖</div>
+            <h3>AI cataloguing</h3>
+            <p>Recebe fotos da capa, folha de rosto e verso, gera uma proposta de registro e aplica regras catalográficas antes da revisão.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">👁</div>
+            <h3>Modelos locais ou em nuvem</h3>
+            <p>Suporta serviços compatíveis com OpenAI e modelos locais via Ollama ou LM Studio, sem incluir tokens no painel.</p>
+          </article>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Fluxo da catalogação com IA</h3>
+            <ul class="feature-list">
+              <li>Fotos do livro e instruções opcionais</li>
+              <li>Resposta estruturada em JSON</li>
+              <li>Aplicação de regras AACR2/ISBD e MARC</li>
+              <li>Revisão pelo bibliotecário/operador</li>
+              <li>Preview obrigatório antes de gravar</li>
+              <li>Registro e resposta do modelo podem ser preservados para auditoria</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Princípio importante</h3>
+            <div class="callout">
+              A IA funciona como <strong>assistente de catalogação</strong>. A proposta gerada é revisada
+              e só então enviada ao Koha. O projeto também prevê mecanismos para não inventar campos
+              sem suporte nas fotografias ou no contexto fornecido.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="brasil">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Brasil: localization</div>
+          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <p>
+            Os recursos brasileiros são opt-in: nada é aplicado automaticamente durante a instalação ou por agendamento.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CPF</td>
+                <td>Auditoria de CPF usando dígitos verificadores e identificação de números compartilhados.</td>
+                <td>Somente leitura até confirmação</td>
+              </tr>
+              <tr>
+                <td>Etiquetas Pimaco</td>
+                <td>Modelos para folhas A4 e Letter, incluindo espinha, código de barras e título.</td>
+                <td>PRE-LABELS</td>
+              </tr>
+              <tr>
+                <td>Ficha catalográfica</td>
+                <td>Ficha em estilo usado por bibliotecas brasileiras, integrada à visualização do registro e com referência ABNT.</td>
+                <td>PRE-FICHA</td>
+              </tr>
+              <tr>
+                <td>Calendário brasileiro</td>
+                <td>Feriados nacionais e datas móveis, com opção de feriado municipal.</td>
+                <td>PRE-CALENDAR</td>
+              </tr>
+              <tr>
+                <td>Censos</td>
+                <td>Relatórios para indicadores relacionados a MEC, INEP, IBGE e SNBP, conforme os dados existentes no Koha.</td>
+                <td>PRE-CENSO</td>
+              </tr>
+              <tr>
+                <td>ABNT NBR 6023:2018</td>
+                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
+                <td>Somente leitura</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Observação:</strong> os dados dos censos representam o que está registrado no Koha.
+          O README recomenda conferir cada resultado contra o formulário oficial antes do envio.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="seguranca">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Operação e segurança</div>
+          <h2>Automação sem esconder o que está acontecendo.</h2>
+          <p>
+            O painel centraliza tarefas recorrentes e mostra os pontos importantes para manutenção,
+            diagnóstico e recuperação.
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Automação padrão</h3>
+            <div class="table-wrap" style="margin-top:14px">
+              <table style="min-width:580px">
+                <thead><tr><th>Quando</th><th>Tarefa</th></tr></thead>
+                <tbody>
+                  <tr><td>Diariamente 23:00</td><td>Backup SQL comprimido e upload opcional para a nuvem</td></tr>
+                  <tr><td>Domingos 03:00</td><td>Exportação MARC21</td></tr>
+                  <tr><td>Diariamente 01:30</td><td>Limpeza de sessões e fila do Zebra</td></tr>
+                  <tr><td>Diariamente 05:00</td><td>Reinício do Plack</td></tr>
+                  <tr><td>A cada 2 min</td><td>Watchdog do indexador Zebra</td></tr>
+                  <tr><td>A cada 5 min</td><td>Watchdog do Elasticsearch, quando usado</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Arquivos importantes</h3>
+            <ul class="feature-list">
+              <li><code>/root/koha_credentials.txt</code> — credenciais iniciais</li>
+              <li><code>/var/backups/koha_sql</code> — backups SQL</li>
+              <li><code>/var/backups/koha_marc</code> — backups MARC</li>
+              <li><code>/etc/koha-easy-install/</code> — configurações do painel</li>
+              <li><code>/var/log/koha-easy-install/</code> — logs do painel e validações</li>
+              <li><code>~/importar</code> — pasta de entrada da Magic Import Tool</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Diagnóstico</h3>
+            <p>
+              O painel reúne status, checagem de saúde, logs do Apache, manutenção profunda do banco
+              e relatórios prontos para suporte.
+            </p>
+            <div class="chip-row">
+              <span class="chip">health check</span>
+              <span class="chip">Apache logs</span>
+              <span class="chip">MariaDB</span>
+              <span class="chip">Koha</span>
+              <span class="chip">logs</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Falha de energia</h3>
+            <p>
+              O projeto prevê verificação após um reboot não limpo, criação de novo backup e atualização
+              do índice quando necessário. No Windows, a rotina de desligamento seguro tenta parar o Koha antes do sistema.
+            </p>
+          </div>
+        </div>
+
+        <div class="callout danger" style="margin-top:18px">
+          <strong>Desinstalação é destrutiva:</strong> o <code>uninstall.sh</code> remove permanentemente o Koha,
+          bancos de dados, backups locais e configurações. Faça cópias fora do servidor antes de usar.
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contribuir">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Projeto livre</div>
+          <h2>Feito para ser usado, estudado e melhorado.</h2>
+          <p>
+            O projeto inclui testes, traduções, ferramentas para colaboradores e verificação do checksum
+            do instalador para atualização automática.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="icon">🧪</div>
+            <h3>Testes</h3>
+            <p>Conjunto de testes Bats para backup/restore, indexação, ferramentas de biblioteca, WSL e componentes Windows.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🌎</div>
+            <h3>Traduções</h3>
+            <p>Dicionários versionados por idioma, validação de cobertura e rejeição automática de traduções que perdem variáveis.</p>
+          </div>
+          <div class="card">
+            <div class="icon">🔏</div>
+            <h3>Verificação</h3>
+            <p>O instalador usa SHA-256 para validar sua própria atualização.</p>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="card">
+          <h3>Licença</h3>
+          <p>
+            <strong>GNU General Public License v3.0 ou posterior (GPL-3.0-or-later).</strong>
+            O projeto pode ser usado, estudado, compartilhado e modificado. Distribuições modificadas
+            devem continuar sob GPL e disponibilizar o código-fonte correspondente. O software é fornecido sem garantia.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a class="brand brand-logo" href="#inicio" aria-label="koha.nexus">
+            <img src="docs/images/koha-logo.png" alt="koha.nexus" width="210" height="37">
+          </a>
+          <p style="margin-top:14px;max-width:560px">
+            Um assistente inteligente, gratuito e fácil de usar para facilitar a gestão técnica do Koha em bibliotecas.
+          </p>
+          <p>Desenvolvido com dedicação por <strong style="color:#d6e9dc">Paulo F. Baldi FH</strong>.</p>
+        </div>
+
+        <div>
+          <h4>Projeto</h4>
+          <div class="mini-links">
+            <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
+            <a href="LICENSE">Licença</a>
+            <a href="README.md">README</a>
+          </div>
+        </div>
+
+        <div>
+          <h4>Links</h4>
+          <div class="mini-links">
+            <a href="#recursos">Recursos</a>
+            <a href="#instalacao">Instalação</a>
+            <a href="#windows">Windows</a>
+            <a href="#catalogacao">Catalogação</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 koha.nexus • GPL-3.0-or-later</span>
+        <span>O nome e o logotipo Koha pertencem à comunidade Koha.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll(".copy").forEach(button => {
+      button.addEventListener("click", async () => {
+        const value = button.dataset.copy || "";
+        const original = button.textContent;
+
+        try {
+          await navigator.clipboard.writeText(value);
+          button.textContent = "Copiado ✓";
+          setTimeout(() => button.textContent = original, 1600);
+        } catch {
+          button.textContent = "Selecione manualmente";
+          setTimeout(() => button.textContent = original, 2200);
+        }
+      });
+    });
+
+    // O instalador fica no próprio repositório/site. O navegador faz o download
+    // pelo mesmo domínio, sem depender de CORS do raw.githubusercontent.com.
+    const cmdLink = document.getElementById("download-cmd");
+    if (cmdLink) {
+      cmdLink.addEventListener("click", () => {
+        cmdLink.classList.add("is-downloading");
+        setTimeout(() => cmdLink.classList.remove("is-downloading"), 900);
+      });
+    }
+  </script>
+</body>
+</html>
