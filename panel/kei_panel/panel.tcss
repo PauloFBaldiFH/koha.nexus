@@ -38,6 +38,9 @@ Screen {
 .view-head {
     height: auto;
 }
+.view-head Button { margin-left: 1; }
+.quick-actions { height: auto; margin-bottom: 1; }
+.quick-actions Button { margin-right: 1; }
 .view-head .view-title {
     width: 1fr;
 }
@@ -75,6 +78,9 @@ Button.small {
 .status-card .card-note  { color: $text-muted; }
 /* Long values and notes wrap inside the card instead of being cut off. */
 .status-card Label { width: 1fr; }
+/* Address cards: Open / Copy under the address. */
+.link-card .link-buttons { height: 1; width: 1fr; }
+.link-card .link-buttons Button { margin-right: 2; min-width: 8; }
 .status-card.-ok   { border: round $success; }
 .status-card.-warn { border: round $warning; }
 .status-card.-bad  { border: round $error; }

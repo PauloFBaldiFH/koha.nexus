@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Label, Static
+from textual.widgets import Button, Label, Static
 
 from ..glyphs import split_icon
 from ..i18n import t
@@ -29,6 +29,38 @@ class StatusCard(Vertical):
         self.query_one(".card-note", Label).update(note)
         for s in ("ok", "warn", "bad"):
             self.set_class(s == state, f"-{s}")
+
+
+class LinkCard(StatusCard):
+    """A web address with Open and Copy buttons (disabled while there is
+    none; the note then says why)."""
+
+    class Pressed(Message):
+        def __init__(self, url: str, copy: bool):
+            super().__init__()
+            self.url, self.copy = url, copy
+
+    def __init__(self, title: str, *, id: str | None = None):
+        super().__init__(title, "-", id=id)
+        self.add_class("link-card")
+        self.url = ""
+
+    def compose(self) -> ComposeResult:
+        yield from super().compose()
+        with Horizontal(classes="link-buttons"):
+            yield Button(t("Open"), classes="link-open", compact=True, disabled=True)
+            yield Button(t("Copy"), classes="link-copy", compact=True, disabled=True)
+
+    def set_url(self, url: str, note: str = "", state: str = "") -> None:
+        self.url = url
+        self.set(url or "-", note, state)
+        for b in self.query(Button):
+            b.disabled = not url
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
+        if self.url:
+            self.post_message(self.Pressed(self.url, event.button.has_class("link-copy")))
 
 
 class ActionCard(Static, can_focus=True):

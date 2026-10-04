@@ -121,6 +121,8 @@ _SCRIPTS: dict[str, list[str]] = {
     "repair-services": ["@@title Restarting Koha services", "@@step Restarting Koha services",
                         "@@done 0 Restarting Koha services",
                         "@@msg ok OK\tKoha services restarted.\\n\\nMemcached: active\\nPlack: running"],
+    "export-diagnostics": ["@@step Collecting logs and system status", "@@done 0 Collecting logs and system status",
+                           "@@result path=/var/log/koha-easy-install/diagnostics/koha-diagnostics-koha-20261004-0130"],
     "search-toggle": [
         "@@ask Search Engine\tCurrent engine: ZEBRA.\\n\\nEnable ELASTICSEARCH? It brings advanced search and dynamic"
         "\\nfacets, but needs about 1.5 GB more RAM and more disk.",
