@@ -39,6 +39,14 @@ class KohaPanelApp(App):
         log_error("".join(traceback.format_exception(type(error), error, error.__traceback__)))
         super()._handle_exception(error)
 
+    def copy_to_clipboard(self, text: str) -> None:
+        # Every copy ends here: Ctrl+C on text selected with the mouse, the
+        # Copy buttons and the "c" key. Textual sends it as OSC 52, so the
+        # terminal puts it on the clipboard of the computer the person is
+        # at, also over SSH.
+        super().copy_to_clipboard(text)
+        self.notify(t("Copied."), timeout=3)
+
     def _signal_started(self) -> None:
         """The first screen is on the terminal: config.sh's start-up watchdog
         (KEI_PANEL_READY_FILE) stands down."""
