@@ -1,4 +1,4 @@
-// Bindings, configuration and the D1 row shapes (migrations/0001_init.sql).
+// Bindings, configuration and the D1 row shapes (migrations/*.sql).
 
 import type { Provisioner } from "./provisioner";
 
@@ -68,6 +68,7 @@ export interface LibraryRow {
   contact_email: string;
   cnpj: string | null;
   public_key: string;
+  recovery_hash: string | null;
   tunnel_id: string | null;
   opac_record_id: string | null;
   staff_record_id: string | null;

@@ -7,14 +7,17 @@
 // AUTO_APPROVE=false an admin approves each request (admin.ts).
 //
 // After enrollment every call is signed with the install's Ed25519 key.
+// Enrollment also hands out a recovery code, shown once: with it a
+// reinstalled server takes the same address back (POST /v1/recover).
 
-import { audit, cfApi, getLibrary, provisioner, slugAvailable } from "./db";
+import { audit, cfApi, getLibrary, getLibraryBySlug, provisioner, slugAvailable } from "./db";
 import type { Env, JobRow, LibraryRow } from "./env";
 import { now } from "./env";
-import { pbkdf2, randomBytes, randomToken, sha256Hex, toBase64 } from "./crypto";
+import { pbkdf2, randomBytes, randomToken, sha256Hex, timingSafeEqualStr, toBase64 } from "./crypto";
 import { HttpError, json, parseJson, str } from "./http";
 import { hostnamesFor, maxSlugLength, slugCandidates, slugify, validateSlug } from "./names";
 import { parseCidr } from "./netaddr";
+import { normalizeRecoveryCode, recoveryCode, recoveryHash, slugFromAddress } from "./recovery";
 import { checkSignedRequest, isValidPublicKey } from "./signature";
 
 const ENROLLMENT_TTL_SECONDS = 24 * 3600;
@@ -163,12 +166,23 @@ export async function enroll(request: Request, env: Env, body: ArrayBuffer): Pro
 
   const libraryId = crypto.randomUUID();
   const jobId = crypto.randomUUID();
+  const recovery = recoveryCode();
   try {
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO libraries (id, slug, status, institution_name, contact_email, cnpj, public_key, created_at, updated_at)
-         VALUES (?, ?, 'provisioning', ?, ?, ?, ?, ?, ?)`,
-      ).bind(libraryId, enrollment.approved_slug, enrollment.institution_name, enrollment.contact_email, enrollment.cnpj, publicKey, t, t),
+        `INSERT INTO libraries (id, slug, status, institution_name, contact_email, cnpj, public_key, recovery_hash, created_at, updated_at)
+         VALUES (?, ?, 'provisioning', ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        libraryId,
+        enrollment.approved_slug,
+        enrollment.institution_name,
+        enrollment.contact_email,
+        enrollment.cnpj,
+        publicKey,
+        await recoveryHash(normalizeRecoveryCode(recovery)!),
+        t,
+        t,
+      ),
       env.DB.prepare(
         "INSERT INTO jobs (id, library_id, kind, state, created_at, updated_at) VALUES (?, ?, 'provision', 'queued', ?, ?)",
       ).bind(jobId, libraryId, t, t),
@@ -182,7 +196,117 @@ export async function enroll(request: Request, env: Env, body: ArrayBuffer): Pro
   }
   await env.PROVISION_QUEUE.send({ jobId });
   await audit(env, `library:${libraryId}`, "library.enroll", libraryId, { slug: enrollment.approved_slug });
-  return json({ library_id: libraryId, job_id: jobId, hostnames: hostnamesFor(enrollment.approved_slug, env) }, 202);
+  return json(
+    { library_id: libraryId, job_id: jobId, hostnames: hostnamesFor(enrollment.approved_slug, env), recovery_code: recovery },
+    202,
+  );
+}
+
+// ---- Recovery ----
+
+interface RecoverBody {
+  address?: unknown;
+  recovery_code?: unknown;
+  public_key?: unknown;
+}
+
+const RECOVER_DENIED = "the address or the recovery code is not right";
+
+/**
+ * Takes an address back with its recovery code and binds a new server key.
+ * A live library keeps its tunnel and names: the old key stops working, the
+ * tunnel secret is rotated (an old server still running cloudflared drops
+ * off) and a new recovery code replaces the used one. A library that gave
+ * its address up can still take it back while the name is on hold: it is
+ * provisioned again under the same name. The answer never says which part
+ * was wrong.
+ */
+export async function recover(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
+  // The code has about 77 bits: these limits only keep the logs quiet.
+  await limit(env.RL_API, clientIp(request));
+  const b = parseJson<RecoverBody>(body);
+  const address = str(b.address, "address", { max: 300 });
+  const code = normalizeRecoveryCode(str(b.recovery_code, "recovery_code", { max: 64 }));
+  const publicKey = str(b.public_key, "public_key", { max: 64 });
+  if (!isValidPublicKey(publicKey)) throw new HttpError(400, "public_key must be a base64 raw Ed25519 key (32 bytes)");
+  const slug = slugFromAddress(address, env);
+  if (!slug) throw new HttpError(400, "address must be the library's name or its address");
+  await limit(env.RL_API, `recover:${slug}`);
+  if (!code) throw new HttpError(403, RECOVER_DENIED);
+  const hash = await recoveryHash(code);
+  const next = recoveryCode();
+  const nextHash = await recoveryHash(normalizeRecoveryCode(next)!);
+  const t = now();
+
+  const live = await getLibraryBySlug(env, slug);
+  if (live) {
+    if (!live.recovery_hash || !(await timingSafeEqualStr(live.recovery_hash, hash))) {
+      await audit(env, "public", "library.recover.denied", live.id);
+      throw new HttpError(403, RECOVER_DENIED);
+    }
+    if (live.status === "deprovisioning") throw new HttpError(409, "this address is being removed, try again in a few minutes");
+    const res = await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE libraries SET public_key = ?, recovery_hash = ?, updated_at = ? WHERE id = ? AND recovery_hash = ?",
+      ).bind(publicKey, nextHash, t, live.id, hash),
+      env.DB.prepare("DELETE FROM nonces WHERE library_id = ?").bind(live.id),
+    ]);
+    if ((res[0]?.meta.changes ?? 0) === 0) throw new HttpError(403, RECOVER_DENIED);
+    let rotated = false;
+    if (live.status === "active" || live.status === "suspended") {
+      try {
+        await provisioner(env, live.id).rotate(live.id);
+        rotated = true;
+      } catch {
+        // The key moved anyway; the new server can rotate later from the panel.
+      }
+    }
+    await audit(env, `library:${live.id}`, "library.recover", live.id, { rotated });
+    return json({
+      library_id: live.id,
+      status: live.status,
+      hostnames: hostnamesFor(live.slug, env),
+      recovery_code: next,
+      rotated,
+    });
+  }
+
+  // Given up, name still on hold: provision it again under the same name.
+  const gone = await env.DB.prepare(
+    `SELECT l.* FROM libraries l JOIN reserved_names r ON r.slug = l.slug
+     WHERE l.slug = ?1 AND l.status = 'deleted' AND r.reason = 'released' AND r.until > ?2
+     ORDER BY l.updated_at DESC LIMIT 1`,
+  )
+    .bind(slug, t)
+    .first<LibraryRow>();
+  if (!gone || !gone.recovery_hash || !(await timingSafeEqualStr(gone.recovery_hash, hash))) {
+    if (gone) await audit(env, "public", "library.recover.denied", gone.id);
+    throw new HttpError(403, RECOVER_DENIED);
+  }
+  const libraryId = crypto.randomUUID();
+  const jobId = crypto.randomUUID();
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO libraries (id, slug, status, institution_name, contact_email, cnpj, public_key, recovery_hash, created_at, updated_at)
+         VALUES (?, ?, 'provisioning', ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(libraryId, gone.slug, gone.institution_name, gone.contact_email, gone.cnpj, publicKey, nextHash, t, t),
+      // The old row's code is spent: it cannot bring the name back twice.
+      env.DB.prepare("UPDATE libraries SET recovery_hash = NULL WHERE id = ?").bind(gone.id),
+      env.DB.prepare("DELETE FROM reserved_names WHERE slug = ? AND reason = 'released'").bind(gone.slug),
+      env.DB.prepare(
+        "INSERT INTO jobs (id, library_id, kind, state, created_at, updated_at) VALUES (?, ?, 'provision', 'queued', ?, ?)",
+      ).bind(jobId, libraryId, t, t),
+    ]);
+  } catch {
+    throw new HttpError(409, "this address is no longer available");
+  }
+  await env.PROVISION_QUEUE.send({ jobId });
+  await audit(env, `library:${libraryId}`, "library.recover", libraryId, { from: gone.id, reprovision: true });
+  return json(
+    { library_id: libraryId, job_id: jobId, status: "provisioning", hostnames: hostnamesFor(gone.slug, env), recovery_code: next },
+    202,
+  );
 }
 
 // Human-facing page behind the QR code: shows the status of the request.
@@ -245,6 +369,7 @@ export async function getLibraryInfo(request: Request, env: Env, body: ArrayBuff
     status: lib.status,
     hostnames: hostnamesFor(lib.slug, env),
     staff_remote_access: Boolean(lib.staff_pass_hash),
+    has_recovery_code: Boolean(lib.recovery_hash),
     staff_allow_cidrs: lib.staff_allow_cidrs ? JSON.parse(lib.staff_allow_cidrs) : [],
   });
 }
@@ -312,6 +437,17 @@ export async function rotateToken(request: Request, env: Env, body: ArrayBuffer)
   await provisioner(env, lib.id).rotate(lib.id);
   await audit(env, `library:${lib.id}`, "tunnel_token.rotate", lib.id);
   return json({ rotated: true });
+}
+
+/** A new recovery code; the previous one stops working. Shown once. */
+export async function newRecoveryCode(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
+  const lib = await signedLibrary(request, env, body);
+  const code = recoveryCode();
+  await env.DB.prepare("UPDATE libraries SET recovery_hash = ?, updated_at = ? WHERE id = ?")
+    .bind(await recoveryHash(normalizeRecoveryCode(code)!), now(), lib.id)
+    .run();
+  await audit(env, `library:${lib.id}`, "recovery_code.new", lib.id);
+  return json({ recovery_code: code });
 }
 
 export async function requestDeletion(env: Env, libraryId: string, actor: string): Promise<Response> {

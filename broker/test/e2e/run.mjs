@@ -1,13 +1,13 @@
 // End-to-end run of the bundled Worker in local workerd (Miniflare) with a
 // fake Cloudflare API: enrollment, provisioning through the queue and the
 // Durable Object, signed calls (signed by scripts/kei-sign.sh), the staff
-// gate, suspension, rotation, reconciliation and removal.
+// gate, suspension, rotation, recovery codes, reconciliation and removal.
 //
 //   npm run test:e2e     (builds first with `npm run build:local`)
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ADMIN_TOKEN, BROKER_DIR, rawRequest, startBroker } from "./harness.mjs";
@@ -15,6 +15,7 @@ import { ADMIN_TOKEN, BROKER_DIR, rawRequest, startBroker } from "./harness.mjs"
 const SIGNER = join(BROKER_DIR, "scripts/kei-sign.sh");
 const tmp = mkdtempSync(join(tmpdir(), "kei-e2e-"));
 const KEY = join(tmp, "lib.key");
+const KEY2 = join(tmp, "new-server.key");
 
 let passed = 0;
 async function step(name, fn) {
@@ -73,7 +74,7 @@ const STAFF_HOST = "t-palotina-pr-admin.example.org";
 const gate = (headers = {}, path = "/cgi-bin/koha/mainpage.pl") => rawRequest(`${B}${path}`, { headers: { Host: STAFF_HOST, ...headers } });
 const basic = (u, p) => ({ Authorization: `Basic ${Buffer.from(`${u}:${p}`).toString("base64")}` });
 
-let start, lib, job;
+let start, lib, job, recovery;
 
 try {
   console.log(`broker e2e on ${B}`);
@@ -120,6 +121,8 @@ try {
     lib = r.json.library_id;
     job = r.json.job_id;
     assert.equal(r.json.hostnames.opac, "t-palotina-pr.example.org");
+    assert.match(r.json.recovery_code, /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/);
+    recovery = r.json.recovery_code;
     assert.equal((await call("POST", "/v1/enroll", { body: { device_code: start.device_code, public_key: pub } })).status, 409);
   });
 
@@ -211,6 +214,42 @@ try {
     assert.notEqual(t.json.tunnel_token, token);
   });
 
+  await step("recover: a wrong code is refused, the right one moves the address to a new key", async () => {
+    execFileSync("bash", [SIGNER, "keygen", KEY2]);
+    const pub2 = execFileSync("bash", [SIGNER, "pubkey", KEY2], { encoding: "utf8" }).trim();
+    const wrong = await call("POST", "/v1/recover", { body: { address: "palotina-pr", recovery_code: "BBBB-BBBB-BBBB-BBBB", public_key: pub2 } });
+    assert.equal(wrong.status, 403, wrong.text);
+    const other = await call("POST", "/v1/recover", { body: { address: "t-outra.example.org", recovery_code: recovery, public_key: pub2 } });
+    assert.equal(other.status, 403, "a code only opens its own address");
+    const r = await call("POST", "/v1/recover", {
+      body: { address: "https://t-palotina-pr-admin.example.org/", recovery_code: recovery.toLowerCase().replace(/-/g, " "), public_key: pub2 },
+    });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.json.library_id, lib);
+    assert.equal(r.json.status, "active");
+    assert.equal(r.json.rotated, true);
+    assert.equal(r.json.hostnames.opac, "t-palotina-pr.example.org");
+    assert.notEqual(r.json.recovery_code, recovery);
+    assert.deepEqual(Object.values(fake.snapshot().rotations), [2], "the old server's tunnel secret is gone");
+    assert.equal((await signed(lib, "GET", "/v1/library")).status, 401, "the old key stops working");
+    const again = await call("POST", "/v1/recover", { body: { address: "palotina-pr", recovery_code: recovery, public_key: pub2 } });
+    assert.equal(again.status, 403, "a used code does not work twice");
+    copyFileSync(KEY2, KEY);
+    const info = await signed(lib, "GET", "/v1/library");
+    assert.equal(info.status, 200, info.text);
+    assert.equal(info.json.has_recovery_code, true);
+    recovery = r.json.recovery_code;
+  });
+
+  await step("signed POST /v1/recovery-code replaces the code", async () => {
+    const r = await signed(lib, "POST", "/v1/recovery-code", {});
+    assert.equal(r.status, 200, r.text);
+    assert.notEqual(r.json.recovery_code, recovery);
+    const pub = execFileSync("bash", [SIGNER, "pubkey", KEY], { encoding: "utf8" }).trim();
+    assert.equal((await call("POST", "/v1/recover", { body: { address: "palotina-pr", recovery_code: recovery, public_key: pub } })).status, 403);
+    recovery = r.json.recovery_code;
+  });
+
   await step("admin suspend switches ingress to 503, restore brings it back", async () => {
     const s = await call("POST", `/admin/libraries/${lib}/suspend`, { headers: admin });
     assert.equal(s.status, 200, s.text);
@@ -271,6 +310,25 @@ try {
     });
     assert.equal(r.status, 200, r.text);
     assert.equal(r.json.suggested_slug, "palotina-pr-2");
+  });
+
+  await step("recover: a given-up name comes back with its code while on hold", async () => {
+    rmSync(KEY);
+    execFileSync("bash", [SIGNER, "keygen", KEY]);
+    const pub = execFileSync("bash", [SIGNER, "pubkey", KEY], { encoding: "utf8" }).trim();
+    const r = await call("POST", "/v1/recover", { body: { address: "palotina-pr", recovery_code: recovery, public_key: pub } });
+    assert.equal(r.status, 202, r.text);
+    assert.notEqual(r.json.library_id, lib);
+    assert.equal(r.json.status, "provisioning");
+    assert.ok(await settle(), "provision job did not finish");
+    const s = fake.snapshot();
+    assert.equal(s.tunnels.length, 1);
+    assert.equal(s.dns_records.length, 2);
+    const info = await signed(r.json.library_id, "GET", "/v1/library");
+    assert.equal(info.json.slug, "palotina-pr");
+    assert.equal(info.json.status, "active");
+    const twice = await call("POST", "/v1/recover", { body: { address: "palotina-pr", recovery_code: recovery, public_key: pub } });
+    assert.equal(twice.status, 403, "the spent code cannot be used again");
   });
 
   await step("device/start is rate limited (3 per minute per IP)", async () => {

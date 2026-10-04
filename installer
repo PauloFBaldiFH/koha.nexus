@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.4"
+PANEL_VERSION=" 1.5.5"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6923,12 +6923,15 @@ EOF
 #   tunnel.conf        mode, library id and public hostnames (no secrets)
 #   broker.key         Ed25519 private key (0600)
 #   broker-enroll.conf request waiting for approval (0600: holds its code)
+#   broker-recovery.txt recovery code of the address (0600; kept after giving
+#                      the address up, it brings the address back)
 #   koha-broker.env    TUNNEL_TOKEN for the cloudflared service (0600)
 # ----------------------------------------------------------------------
 KEI_BROKER_URL="${KEI_BROKER_URL:-https://broker.koha.nexus}"
 TUNNEL_CONF="${CONF_DIR}/tunnel.conf"
 BROKER_KEY="${CONF_DIR}/broker.key"
 BROKER_ENROLL="${CONF_DIR}/broker-enroll.conf"
+BROKER_RECOVERY="${CONF_DIR}/broker-recovery.txt"
 BROKER_ENV="${KEI_BROKER_ENV:-/etc/cloudflared/koha-broker.env}"
 CLOUDFLARED_UNIT="${KEI_CLOUDFLARED_UNIT:-/etc/systemd/system/cloudflared.service}"
 CRON_BROKER="/etc/cron.d/koha_broker"
@@ -7225,10 +7228,93 @@ broker_wait_request() {
     return "$rc"
 }
 
+# broker_wait_job JOB_ID: waits for a provisioning job. 0 when it is done.
+broker_wait_job() {
+    local st="" i
+    display_explanation "Creating the tunnel and the address..."
+    for i in $(seq 1 "${KEI_BROKER_WAIT:-90}"); do
+        if broker_request GET "/v1/jobs/$1" yes; then
+            st=$(json_field "$BROKER_BODY" state)
+            [ "$st" = "done" ] || [ "$st" = "failed" ] && break
+        fi
+        sleep 2
+    done
+    broker_cleanup
+    if [ "$st" != "done" ]; then
+        msg_error "" "$(t "The address is not ready yet. Try again later with the same menu option.")" 9 70
+        return 1
+    fi
+}
+
+# The recovery code takes the address back on a reinstalled or new server.
+# The address service keeps only a hash of it, so this file and the paper
+# the librarian writes it on are the only copies.
+broker_save_recovery() {    # broker_save_recovery CODE
+    [[ "$1" =~ ^[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$ ]] || return 1
+    mkdir -p "$CONF_DIR"
+    ( umask 077
+      printf '# Recovery code of the free address (koha.nexus)\n'
+      printf 'ADDRESS=%s\nRECOVERY_CODE=%s\nSAVED=%s\n' "$(tunnel_conf_get OPAC_HOST)" "$1" "$(date +%F)"
+    ) > "$BROKER_RECOVERY"
+    chmod 600 "$BROKER_RECOVERY"
+}
+
+broker_show_recovery() {    # broker_show_recovery CODE
+    local code="$1" opac
+    opac=$(tunnel_conf_get OPAC_HOST)
+    msg_info "$(t "Recovery code")" "$(t "WRITE THIS RECOVERY CODE DOWN\n\n      \$code\n\nWith it, a reinstalled or new server takes back the address https://\$opac (menu Free Address, \"Recover my address\"). Keep it on paper or in a password manager, away from this server: the address service cannot show it again.\n\nA copy is saved on this server in \$BROKER_RECOVERY (root only).")" 17 76
+}
+
+# Takes an existing address back with its recovery code: this server gets
+# a new key, and a server still using the address drops off.
+broker_recover_address() {
+    local address code pub lib job opac staff st
+    address=$(ui_input "$(t "Recover my address")" "$(t "Address or name to recover (e.g. palotina-pr.koha.nexus or palotina-pr):")") || return 1
+    address=$(printf '%s' "$address" | tr -d '[:space:]')
+    [ -n "$address" ] || return 1
+    code=$(ui_input "$(t "Recover my address")" "$(t "Recovery code (XXXX-XXXX-XXXX-XXXX):")") || return 1
+    code=$(printf '%s' "$code" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+    [ -n "$code" ] || return 1
+
+    rm -f "$BROKER_KEY"
+    broker_ensure_key || { msg_error "" "$(t "Could not create the key of this server (openssl).")" 8 66; return 1; }
+    pub=$(broker_public_key)
+    clear
+    display_explanation "Recovering the address..."
+    if ! broker_request POST /v1/recover no \
+        "{\"address\":$(json_str "$address"),\"recovery_code\":$(json_str "$code"),\"public_key\":$(json_str "$pub")}"; then
+        msg_error "" "$(t "The address was not recovered:")\n\n$(broker_error)" 10 74
+        broker_cleanup
+        return 1
+    fi
+    lib=$(json_field "$BROKER_BODY" library_id)
+    job=$(json_field "$BROKER_BODY" job_id)
+    opac=$(json_field "$BROKER_BODY" hostnames opac)
+    staff=$(json_field "$BROKER_BODY" hostnames staff)
+    code=$(json_field "$BROKER_BODY" recovery_code)
+    st=$BROKER_STATUS
+    broker_cleanup
+    [ -n "$lib" ] && [ -n "$opac" ] || { msg_error "" "$(t "The address service gave an unexpected answer. Try again later.")" 8 70; return 1; }
+    rm -f "$TUNNEL_CONF"
+    kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker BROKER_URL "$(broker_url)" LIBRARY_ID "$lib" \
+        OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" || return 1
+    log "broker: address $opac recovered (library $lib)"
+    broker_save_recovery "$code" && broker_show_recovery "$code"
+
+    # A given-up address is created again; a live one keeps its tunnel.
+    if [ "$st" = "202" ]; then
+        broker_wait_job "$job" || return 1
+    elif broker_request GET /v1/library yes && [ "$(json_field "$BROKER_BODY" staff_remote_access)" = "true" ]; then
+        kv_write "$TUNNEL_CONF" 644 STAFF_REMOTE yes
+    fi
+    broker_cleanup
+    broker_connect share
+}
+
 # After approval: registers this server's key, waits for the tunnel and
 # installs it.
 broker_complete_request() {
-    local device pub lib job opac staff st i
+    local device pub lib job opac staff code
     broker_ensure_key || { msg_error "" "$(t "Could not create the key of this server (openssl).")" 8 66; return 1; }
     pub=$(broker_public_key)
     device=$(kv_get "$BROKER_ENROLL" DEVICE_CODE)
@@ -7245,26 +7331,15 @@ broker_complete_request() {
     job=$(json_field "$BROKER_BODY" job_id)
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
+    code=$(json_field "$BROKER_BODY" recovery_code)
     broker_cleanup
     kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker BROKER_URL "$KEI_BROKER_URL" LIBRARY_ID "$lib" \
         OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" || return 1
     rm -f "$BROKER_ENROLL"
     log "broker: library $lib registered ($opac)"
+    broker_save_recovery "$code" && broker_show_recovery "$code"
 
-    display_explanation "Creating the tunnel and the address..."
-    st=""
-    for i in $(seq 1 "${KEI_BROKER_WAIT:-90}"); do
-        if broker_request GET "/v1/jobs/$job" yes; then
-            st=$(json_field "$BROKER_BODY" state)
-            [ "$st" = "done" ] || [ "$st" = "failed" ] && break
-        fi
-        sleep 2
-    done
-    broker_cleanup
-    if [ "$st" != "done" ]; then
-        msg_error "" "$(t "The address is not ready yet. Try again later with the same menu option.")" 9 70
-        return 1
-    fi
+    broker_wait_job "$job" || return 1
     broker_connect share
 }
 
@@ -7384,6 +7459,14 @@ function_cloudflare_free_address() {
         if [ -f /etc/cloudflared/config.yml ]; then
             prompt_yes_no "$(t "Free address")" "$(t "This server already publishes Koha with your own domain. A free address replaces it (your domain's tunnel is switched off).\n\nContinue?")" 11 74 defaultno || return 0
         fi
+        local how
+        how=$(ui_menu "$(t "Free address")" "$(t "Is this a new address, or one this library already had on another server (or before reinstalling)?")" \
+            "new" "$(t "Get a new free address")" \
+            "recover" "$(t "Recover my address (I have the recovery code)")") || return 0
+        if [ "$how" = "recover" ]; then
+            broker_recover_address
+            return 0
+        fi
         msg_info "$(t "Free address")" "$(t "GET A FREE ADDRESS FOR YOUR CATALOG\n\nNo domain or Cloudflare account is needed. Type the library name, a contact\ne-mail and the name you want: the address is created right away and this\nserver connects on its own. If the name is taken, a close variant is used.\n\nThe public catalog (OPAC) goes online. The staff interface stays on the\nlocal network until you turn on remote staff access, which adds a password\nchecked before anyone reaches Koha.")" 17 78
         broker_new_request || return 0
         # Approved on the spot (the usual case): no link to open, no wait.
@@ -7415,6 +7498,7 @@ function_broker_manage() {
             "1" "$(t "Remote staff access (password at the edge)")" \
             "2" "$(t "Reconnect the tunnel (fetch the token again)")" \
             "3" "$(t "Renew the tunnel token")" \
+            "5" "$(t "Recovery code (to take this address back on a new server)")" \
             "4" "$(t "Give up the free address")") || return 0
         case "$choice" in
             1) function_broker_staff_access ;;
@@ -7431,8 +7515,32 @@ function_broker_manage() {
                 fi
                 ;;
             4) function_broker_leave && return 0 ;;
+            5) function_broker_recovery_code ;;
         esac
     done
+}
+
+# Shows the saved recovery code, or makes a new one. Addresses created
+# before recovery codes existed get their first one here.
+function_broker_recovery_code() {
+    local code="" text
+    [ -f "$BROKER_RECOVERY" ] && code=$(kv_get "$BROKER_RECOVERY" RECOVERY_CODE)
+    if [ -n "$code" ]; then
+        text="$(t "Recovery code of this address:\n\n      \$code\n\nMake a new one only if this one may have been seen by someone else: the old code stops working.\n\nMake a new recovery code?")"
+        prompt_yes_no "$(t "Recovery code")" "$text" 14 74 defaultno || return 0
+    fi
+    clear
+    display_explanation "Creating a recovery code..."
+    if ! broker_request POST /v1/recovery-code yes "{}"; then
+        msg_error "" "$(t "The recovery code was not created:")\n\n$(broker_error)" 10 74
+        broker_cleanup
+        return 0
+    fi
+    code=$(json_field "$BROKER_BODY" recovery_code)
+    broker_cleanup
+    broker_save_recovery "$code" || { msg_error "" "$(t "The address service gave an unexpected answer. Try again later.")" 8 70; return 0; }
+    log "broker: new recovery code"
+    broker_show_recovery "$code"
 }
 
 # Remote staff access: the staff hostname answers only after a user and
@@ -7488,7 +7596,7 @@ function_broker_staff_access() {
 function_broker_leave() {
     local opac
     opac=$(tunnel_conf_get OPAC_HOST)
-    prompt_yes_no "$(t "Give up the free address")" "$(t "The address https://\$opac is released and the catalog goes offline to the internet (it stays on the local network).\n\nContinue?")" 11 74 defaultno || return 1
+    prompt_yes_no "$(t "Give up the free address")" "$(t "The address https://\$opac is released and the catalog goes offline to the internet (it stays on the local network).\n\nFor 180 days nobody else can take it: with the recovery code, this library can take it back (menu Free Address, \"Recover my address\").\n\nContinue?")" 14 74 defaultno || return 1
     clear
     display_explanation "Releasing the address..."
     if ! broker_request DELETE /v1/library yes && [ "$BROKER_STATUS" != "401" ]; then
