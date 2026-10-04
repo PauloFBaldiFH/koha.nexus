@@ -416,3 +416,30 @@ def test_clock_offers_the_current_zone():
             return text, done._kind
     text, kind = asyncio.run(main())
     assert "America/Sao_Paulo" in text and kind == "ok"
+
+
+def test_copy_addresses_codes_and_selected_text():
+    copied = []
+
+    async def main():
+        app = _app()
+        app.copy_to_clipboard = lambda text: copied.append(text)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.pause(0.3)
+            app.push_screen(MessageScreen("Recovery code", "WRITE THIS RECOVERY CODE DOWN\n\n      "
+                                          "ABCD-EF12-GH34-JK56\n\nIt takes back https://palotina.koha.nexus."))
+            screen = await _wait_for(pilot, MessageScreen)
+            await pilot.press("c")
+            screen.query_one("#copy-1").press()
+            await pilot.pause(0.1)
+            # Text selected with the mouse, then Ctrl+C.
+            body = screen.query_one(".dialog-body")
+            await pilot.mouse_down(body, offset=(0, 0))
+            await pilot.hover(body, offset=(10, 0))
+            await pilot.mouse_up(body, offset=(10, 0))
+            await pilot.press("ctrl+c")
+            await pilot.pause(0.1)
+            return screen._values
+    values = asyncio.run(main())
+    assert values == ["ABCD-EF12-GH34-JK56", "https://palotina.koha.nexus"]
+    assert copied[:2] == values and copied[2].startswith("WRITE THIS")
