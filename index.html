@@ -43,8 +43,8 @@
 
     /* --- CONTROLE DE EXIBIÇÃO EXCLUSIVA PARA O BRASIL --- */
     .only-pt { display: none !important; }
-    html[lang="pt"] .only-pt { display: block !important; }
-    html[lang="pt"] span.only-pt { display: inline-block !important; }
+    html[lang="pt-BR"] .only-pt { display: block !important; }
+    html[lang="pt-BR"] span.only-pt { display: inline-block !important; }
     /* ---------------------------------------------------- */
 
     a{color:inherit;text-decoration:none}
@@ -395,7 +395,7 @@
     }
   </style>
   <link rel="alternate" hreflang="en" href="https://koha.nexus/?lang=en">
-  <link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/?lang=pt">
+  <link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/?lang=br">
   <link rel="alternate" hreflang="es" href="https://koha.nexus/?lang=es">
   <link rel="alternate" hreflang="fr" href="https://koha.nexus/?lang=fr">
   <link rel="alternate" hreflang="it" href="https://koha.nexus/?lang=it">
@@ -443,7 +443,7 @@
     <div class="container">
       <div class="lang-buttons">
         <button class="lang-btn active" onclick="setLanguage('en')">English</button>
-        <button class="lang-btn" onclick="setLanguage('pt')">Português</button>
+        <button class="lang-btn" onclick="setLanguage('br')">Português</button>
         <button class="lang-btn" onclick="setLanguage('es')">Español</button>
         <button class="lang-btn" onclick="setLanguage('fr')">Français</button>
         <button class="lang-btn" onclick="setLanguage('it')">Italiano</button>
@@ -1160,7 +1160,7 @@ sudo bash installer</pre>
         c_lic_t: "License", c_lic_p: "<strong>GNU General Public License v3.0 or later (GPL-3.0-or-later).</strong> The project can be used, studied, shared, and modified. Modified distributions must remain under GPL and make the corresponding source code available. The software is provided without warranty.",
         foot_p1: "A smart, free, and easy-to-use assistant to simplify Koha technical management in libraries.", foot_p2: "Developed with dedication by <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Project", foot_links: "Links", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "The Koha name and logo belong to the Koha Community."
       },
-      pt: {
+      br: {
         nav_features: "Recursos", nav_install: "Instalação", nav_win: "Windows", nav_tools: "Ferramentas", nav_security: "Segurança", nav_net: "Rede",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "O melhor sistema gratuito de bibliotecas, <span class='accent'>agora sem complicações.</span>",
@@ -2538,7 +2538,7 @@ sudo bash installer</pre>
       });
 
       // 2. Muda o idioma base do HTML (Ativa a classe .only-pt para a palavra Brasil e os recursos do Brasil)
-      document.documentElement.lang = lang;
+      document.documentElement.lang = lang === "br" ? "pt-BR" : lang;
 
       // 3. Atualiza o estado "active" dos botõezinhos no topo
       document.querySelectorAll(".lang-btn").forEach(btn => {
@@ -2555,19 +2555,23 @@ sudo bash installer</pre>
       const url = new URL(window.location.href);
       if (url.searchParams.get("lang") !== lang) {
         url.searchParams.set("lang", lang);
-        if (translations[url.hash.slice(1)]) url.hash = "";
+        if (normalizeLang(url.hash.slice(1))) url.hash = "";
         history.replaceState(null, "", url);
       }
     }
 
-    // Idioma pedido na URL: ?lang=pt ou #pt
+    // Códigos antigos que continuam funcionando (links ?lang=pt já divulgados)
+    const LANG_ALIASES = { pt: "br" };
+    function normalizeLang(code) {
+      code = (code || "").toLowerCase();
+      code = LANG_ALIASES[code] || code;
+      return translations[code] ? code : null;
+    }
+
+    // Idioma pedido na URL: ?lang=br ou #br
     function langFromUrl() {
       const url = new URL(window.location.href);
-      const q = (url.searchParams.get("lang") || "").toLowerCase();
-      if (translations[q]) return q;
-      const h = url.hash.slice(1).toLowerCase();
-      if (translations[h]) return h;
-      return null;
+      return normalizeLang(url.searchParams.get("lang")) || normalizeLang(url.hash.slice(1));
     }
 
     // Carrega o idioma assim que a página for montada
@@ -2575,13 +2579,13 @@ sudo bash installer</pre>
       // Prioridade: idioma na URL, depois o último escolhido, depois inglês
       let savedLang = null;
       try { savedLang = localStorage.getItem("koha_lang"); } catch (e) {}
-      setLanguage(langFromUrl() || (translations[savedLang] ? savedLang : "en"));
+      setLanguage(langFromUrl() || normalizeLang(savedLang) || "en");
     });
 
     // Links como koha.nexus/#es também trocam o idioma com a página já aberta
     window.addEventListener("hashchange", () => {
-      const lang = window.location.hash.slice(1).toLowerCase();
-      if (translations[lang]) setLanguage(lang);
+      const lang = normalizeLang(window.location.hash.slice(1));
+      if (lang) setLanguage(lang);
     });
 
   </script>
