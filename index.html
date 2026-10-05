@@ -400,7 +400,7 @@
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="brand" href="#home" aria-label="koha.nexus">
-        koha.nexus <span class="only-pt" style="color: #2ecc71;">&nbsp;| Brasil</span>
+        koha.nexus
       </a>
       <nav aria-label="Main navigation">
         <a href="#features" data-i18n="nav_features">Features</a>
@@ -887,7 +887,7 @@ sudo bash installer</pre>
         </div>
 
         <div class="callout" style="margin-top:18px">
-          <strong>Nota:</strong> Os dados do censo representam o que está registado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
+          <strong>Nota:</strong> Os dados do censo representam o que está registrado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
         </div>
       </div>
     </section>
@@ -1071,8 +1071,7 @@ sudo bash installer</pre>
   <script>
     // ----------------------------------------------------------------------
     // ENGINE DE TRADUÇÃO DINÂMICA
-    // Primeira Parte: Inglês, Português, Espanhol, Francês
-    // (Responda "continua" para receber as 18 línguas adicionais!)
+    // 22 idiomas; chaves ausentes num idioma caem para o inglês.
     // ----------------------------------------------------------------------
     const translations = {
       en: {
@@ -1140,64 +1139,64 @@ sudo bash installer</pre>
       pt: {
         nav_features: "Recursos", nav_install: "Instalação", nav_win: "Windows", nav_tools: "Ferramentas", nav_security: "Segurança", nav_net: "Rede",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
-        hero_h1: "O melhor sistema de bibliotecas, <span class='accent'>agora sem complicações.</span>",
-        hero_p: "O <strong>koha.nexus</strong> é um assistente inteligente, gratuito e fácil de usar para instalar, configurar, manter e expandir o <strong>Koha Integrated Library System</strong> num painel amigável.",
-        hero_btn1: "Iniciar instalação →", hero_btn2: "Ver no GitHub", hero_btn3: "Leia-me Completo",
+        hero_h1: "O melhor sistema gratuito de bibliotecas, <span class='accent'>agora sem complicações.</span>",
+        hero_p: "O <strong>koha.nexus</strong> é um assistente inteligente, gratuito e fácil de usar para instalar, configurar, manter e expandir o <strong>Koha Integrated Library System</strong> em um painel amigável.",
+        hero_btn1: "Iniciar instalação →", hero_btn2: "Ver no GitHub", hero_btn3: "README completo",
         stat1_t: "22 idiomas", stat1_d: "Painel e pacotes do Koha", stat2_t: "2 sistemas", stat2_d: "Linux ou Windows via WSL 2", stat3_t: "16+ funções", stat3_d: "Gestão, ferramentas e ajustes", stat4_t: "GPL-3.0+", stat4_d: "Software livre e modificável",
-        term_validating: "A validar servidor...", term_installing: "A instalar Koha", term_configuring: "A configurar base de dados", term_preparing: "A preparar cópias de segurança", term_access: "A configurar acessos", term_ready: "Painel pronto:",
-        feat_kick: "Tudo num só lugar", feat_h2: "Um painel construído para quem mantém a biblioteca a funcionar.", feat_p: "Desde a instalação inicial até às cópias de segurança, indexação, segurança, migração, catalogação e publicação na web, os recursos centrais estão reunidos num único ponto de controle.",
+        term_validating: "Validando servidor...", term_installing: "Instalando o Koha", term_configuring: "Configurando o banco de dados", term_preparing: "Preparando backups", term_access: "Configurando acessos", term_ready: "Painel pronto:",
+        feat_kick: "Tudo em um só lugar", feat_h2: "Um painel construído para quem mantém a biblioteca funcionando.", feat_p: "Desde a instalação inicial até os backups, indexação, segurança, migração, catalogação e publicação na web, os recursos centrais estão reunidos em um único ponto de controle.",
         f1_t: "Instalação guiada", f1_d: "Pré-validação de sistema, disco, rede e portas; instalação e otimização do Koha, MariaDB, Apache, Memcached e Plack, além de SWAP, NTP e fuso horário.",
-        f2_t: "Central de backups", f2_d: "Cópias SQL compactadas, exportações MARC21, cópias manuais e integração opcional com o Google Drive via rclone.",
-        f3_t: "Restauração segura", f3_d: "As cópias de segurança são validadas e testadas numa base de dados temporária antes de qualquer substituição do catálogo atual.",
-        f4_t: "Busca e indexação", f4_d: "Alternância entre Zebra e Elasticsearch 7, monitorizador do indexador e ferramentas para reparação e reconstrução de índices.",
-        f5_t: "Publicação Web", f5_d: "Cloudflare Tunnel sem precisar de abrir portas no router, Certbot para SSL e assistente do Google Search Console.",
-        f6_t: "Segurança", f6_d: "Fail2ban, firewall UFW, opções para restringir o acesso administrativo na porta 8080 e rotação da palavra-passe da base de dados.",
-        f7_t: "Ferramentas da biblioteca", f7_d: "Importação de dados, relatórios SQL, verificação de qualidade do catálogo, ferramentas de privacidade RGPD/LGPD, viragem anual de categorias, entre outros.",
+        f2_t: "Central de backups", f2_d: "Backups SQL compactados, exportações MARC21, cópias manuais e integração opcional com o Google Drive via rclone.",
+        f3_t: "Restauração segura", f3_d: "Os backups são validados e testados em um banco de dados temporário antes de qualquer substituição do catálogo atual.",
+        f4_t: "Busca e indexação", f4_d: "Alternância entre Zebra e Elasticsearch 7, monitor do indexador e ferramentas para reparo e reconstrução de índices.",
+        f5_t: "Publicação Web", f5_d: "Cloudflare Tunnel sem precisar de abrir portas no roteador, Certbot para SSL e assistente do Google Search Console.",
+        f6_t: "Segurança", f6_d: "Fail2ban, firewall UFW, opções para restringir o acesso administrativo na porta 8080 e troca da senha do banco de dados.",
+        f7_t: "Ferramentas da biblioteca", f7_d: "Importação de dados, relatórios SQL, verificação de qualidade do catálogo, ferramentas de privacidade LGPD, mudança anual de categorias, entre outros.",
         f8_t: "WhatsApp e Telegram", f8_d: "Envio de notificações do Koha através de gateways do WhatsApp ou de um bot no Telegram, totalmente opcional.",
-        f9_t: "Catalogação assistida", f9_d: "PHA ou Cutter-Sanborn, CDD, calculadora Cutter, substituição segura de registos MARC e assistência com IA.",
-        f10_t: "Windows + WSL 2", f10_d: "Execute o Koha num PC Windows, completo com atalhos, notificações, ícone na área de notificação e ferramentas de diagnóstico.",
+        f9_t: "Catalogação assistida", f9_d: "PHA ou Cutter-Sanborn, CDD, calculadora Cutter, substituição segura de registros MARC e assistência com IA.",
+        f10_t: "Windows + WSL 2", f10_d: "Execute o Koha em um PC Windows, completo com atalhos, notificações, ícone na área de notificação e ferramentas de diagnóstico.",
         f11_t: "Atualização automática", f11_d: "Atualizações do painel diretamente do GitHub com verificação de segurança SHA-256 do instalador.",
-        inst_kick: "Comece aqui", inst_h2: "Instalação Linux em poucos comandos.", inst_p: "O projeto é focado em Debian 11/12/13 ou Ubuntu 22.04/24.04 na arquitetura amd64 ou arm64, podendo também correr no Windows via WSL 2.",
-        inst_b1_t: "Instalador direto", inst_b1_d: "Transfira o script de instalação atual e execute-o com privilégios administrativos.",
-        inst_b2_t: "Clonar o repositório", inst_b2_d: "Pode também manter os ficheiros de tradução junto ao script para trabalhar offline.", btn_copy: "Copiar",
-        inst_r_t: "Requisitos mínimos", inst_r1: "Debian 11/12/13 ou Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB de RAM; 4 GB ou mais recomendados", inst_r3: "5 GB de espaço livre; 10 GB ou mais recomendados", inst_r4: "root ou utilizador com privilégios sudo", inst_r5: "Acesso à Internet para os repositórios do Koha", inst_r6: "Portas 80 e 8080 disponíveis",
-        inst_a_t: "Após a instalação", inst_a1: "Abra a interface administrativa em <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Conclua o Instalador Web do Koha", inst_a3: "Crie o seu super-bibliotecário através do painel", inst_a4: "O catálogo público fica em <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra o painel a qualquer momento com <code>sudo config.sh</code>",
-        win_kick: "Windows 10 / 11", win_h2: "Um ambiente Koha completo num único PC, utilizando WSL 2.", win_p: "A edição Windows foi pensada para pequenas bibliotecas, formação e testes, mantendo os serviços Koha dentro do Debian no WSL 2 enquanto oferece ferramentas nativas do Windows.",
-        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale o Koha com dois cliques.", win_d_p: "Transfira o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute-o. Ele lança o instalador do PowerShell por si.", win_d_b: "⬇ Transferir Install-Koha.cmd", win_d_s: "Ver código-fonte no GitHub ↗",
+        inst_kick: "Comece aqui", inst_h2: "Instalação Linux em poucos comandos.", inst_p: "O projeto é focado em Debian 11/12/13 ou Ubuntu 22.04/24.04 na arquitetura amd64 ou arm64, podendo também rodar no Windows via WSL 2.",
+        inst_b1_t: "Instalador direto", inst_b1_d: "Baixe o script de instalação atual e execute-o com privilégios administrativos.",
+        inst_b2_t: "Clonar o repositório", inst_b2_d: "Você também pode manter os arquivos de tradução junto ao script para trabalhar offline.", btn_copy: "Copiar",
+        inst_r_t: "Requisitos mínimos", inst_r1: "Debian 11/12/13 ou Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB de RAM; 4 GB ou mais recomendados", inst_r3: "5 GB de espaço livre; 10 GB ou mais recomendados", inst_r4: "root ou usuário com privilégios sudo", inst_r5: "Acesso à Internet para os repositórios do Koha", inst_r6: "Portas 80 e 8080 disponíveis",
+        inst_a_t: "Após a instalação", inst_a1: "Abra a interface administrativa em <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Conclua o Instalador Web do Koha", inst_a3: "Crie seu super-bibliotecário através do painel", inst_a4: "O catálogo público fica em <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra o painel a qualquer momento com <code>sudo config.sh</code>",
+        win_kick: "Windows 10 / 11", win_h2: "Um ambiente Koha completo em um único PC, usando WSL 2.", win_p: "A edição Windows foi pensada para pequenas bibliotecas, treinamentos e testes, mantendo os serviços Koha dentro do Debian no WSL 2 enquanto oferece ferramentas nativas do Windows.",
+        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale o Koha com dois cliques.", win_d_p: "Baixe o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute-o. Ele abre o instalador do PowerShell para você.", win_d_b: "⬇ Baixar Install-Koha.cmd", win_d_s: "Ver código-fonte no GitHub ↗",
         win_b_t: "Instalação", win_b_p: "Abra o PowerShell normalmente e execute:",
-        win_c1: "<strong>Método mais fácil:</strong> O botão acima transfere o <code>Install-Koha.cmd</code>. Não precisa de abrir o PowerShell manualmente.",
-        win_c2_t: "<strong>Como ativar a Virtualização na BIOS:</strong>", win_c2_p1: "Reinicie o seu PC e prima repetidamente a tecla de acesso assim que o ecrã ligar:",
-        win_c2_p2: "Dentro da BIOS, procure por <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, altere para <strong>Enabled</strong> (Ativado) e prima <kbd>F10</kbd> para guardar.",
-        win_c2_p3: "<em>Não consegue aceder à BIOS por atalho?</em> No Windows, vá a <strong>Definições → Sistema → Recuperação → Arranque avançado (Reiniciar agora) → Resolução de problemas → Opções avançadas → Definições de Firmware UEFI</strong>.",
+        win_c1: "<strong>Método mais fácil:</strong> O botão acima baixa o <code>Install-Koha.cmd</code>. Não é preciso abrir o PowerShell manualmente.",
+        win_c2_t: "<strong>Como ativar a Virtualização na BIOS:</strong>", win_c2_p1: "Reinicie o PC e pressione repetidamente a tecla de acesso assim que a tela ligar:",
+        win_c2_p2: "Dentro da BIOS, procure por <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, altere para <strong>Enabled</strong> (Ativado) e pressione <kbd>F10</kbd> para salvar.",
+        win_c2_p3: "<em>Não consegue acessar a BIOS pelo atalho?</em> No Windows, vá em <strong>Configurações → Sistema → Recuperação → Inicialização avançada (Reiniciar agora) → Solução de problemas → Opções avançadas → Configurações de Firmware UEFI</strong>.",
         w_t1_t: "Verificação de sistema", w_t1_d: "Verifica compatibilidade do Windows, arquitetura 64-bit, memória, espaço livre e virtualização na BIOS.",
-        w_t2_t: "WSL 2 + Debian", w_t2_d: "Instala o WSL 2, prepara o Debian e configura o utilizador administrativo e o systemd.",
-        w_t3_t: "Ambiente Koha", w_t3_d: "Instala o Koha dentro do Debian e cria atalhos no Windows, tarefas agendadas e ferramentas de controlo.",
-        w_t4_t: "Rede da biblioteca", w_t4_d: "Configura o acesso para os restantes computadores da rede local e testa as portas 80 e 8080.",
-        w_t5_t: "Operação diária", w_t5_d: "Iniciar, Parar, Reiniciar, estado, diagnósticos, reconstrução de índices e encerramento seguro estão acessíveis sem abrir a consola.",
-        w_c1_t: "Notificações", w_c1_d: "Falhas, recuperações, cópias de segurança, pouco espaço em disco e encerramentos abruptos geram alertas nativos no Windows.",
-        w_c2_t: "Diagnósticos em 1-Clique", w_c2_d: "Exporta registos e informações úteis para suporte, removendo com segurança as palavras-passe, tokens e chaves.",
+        w_t2_t: "WSL 2 + Debian", w_t2_d: "Instala o WSL 2, prepara o Debian e configura o usuário administrativo e o systemd.",
+        w_t3_t: "Ambiente Koha", w_t3_d: "Instala o Koha dentro do Debian e cria atalhos no Windows, tarefas agendadas e ferramentas de controle.",
+        w_t4_t: "Rede da biblioteca", w_t4_d: "Configura o acesso para os demais computadores da rede local e testa as portas 80 e 8080.",
+        w_t5_t: "Operação diária", w_t5_d: "Iniciar, Parar, Reiniciar, estado, diagnósticos, reconstrução de índices e encerramento seguro estão acessíveis sem abrir o console.",
+        w_c1_t: "Notificações", w_c1_d: "Falhas, recuperações, backups, pouco espaço em disco e encerramentos abruptos geram alertas nativos no Windows.",
+        w_c2_t: "Diagnósticos em 1-Clique", w_c2_d: "Exporta registros e informações úteis para suporte, removendo com segurança as senhas, tokens e chaves.",
         w_c3_t: "Encerramento seguro", w_c3_d: "O Koha é encerrado por etapas antes do WSL e do Windows desligarem para evitar corrupção de dados.",
-        t_kick: "Ferramentas da biblioteca", t_h2: "Mais do que instalar o Koha: cuidar do acervo.", t_p: "As ferramentas do painel utilizam os mecanismos próprios do Koha e seguem um fluxo estrito de proteção com bloqueios, pré-visualizações, confirmações e cópias de segurança verificadas antes de alterar qualquer dado.",
-        t1_t: "Magic Import Tool", t1_d: "Um ponto de entrada único para folhas de cálculo, ficheiros MARC, arquivos compactados, coleções, exemplares, utilizadores e dados de circulação.",
+        t_kick: "Ferramentas da biblioteca", t_h2: "Mais do que instalar o Koha: cuidar do acervo.", t_p: "As ferramentas do painel usam os mecanismos próprios do Koha e seguem um fluxo estrito de proteção com bloqueios, pré-visualizações, confirmações e backups verificados antes de alterar qualquer dado.",
+        t1_t: "Magic Import Tool", t1_d: "Um ponto de entrada único para planilhas, arquivos MARC, arquivos compactados, coleções, exemplares, usuários e dados de circulação.",
         t2_t: "Desfazer importação MARC", t2_d: "Permite reverter uma importação em lote de forma controlada, preservando a integridade do catálogo.",
-        t3_t: "Pacote de Relatórios SQL", t3_d: "Relatórios de leitura para empréstimos, atrasos, aquisições, códigos de barras em falta, exemplares nunca emprestados e perdidos.",
-        t4_t: "Viragem de categorias", t4_d: "Move os utilizadores entre categorias usando critérios definidos pela biblioteca, com uma simulação antes da execução.",
-        t5_t: "Qualidade de dados", t5_d: "Executa verificações de inconsistência no catálogo sem alterar os registos em si.",
-        t6_t: "Privacidade e RGPD/LGPD", t6_d: "Anonimiza históricos de empréstimos antigos e apaga utilizadores expirados que cumprem critérios predefinidos com total segurança.",
-        t_c1: "<strong>Proteção por defeito:</strong> Operações que alteram dados seguem um bloqueio partilhado com backups, simulações, confirmações e uma cópia <code>PRE-*</code> verificada antes de efetuar alterações.",
-        s_kick: "Operação e Segurança", s_h2: "Automação sem esconder o que se passa.", s_p: "O painel centraliza tarefas recorrentes e destaca pontos vitais para manutenção, diagnóstico e recuperação.",
-        s1_t: "Automação Padrão", s1_th1: "Quando", s1_th2: "Tarefa", s1_r1_1: "Diariamente às 23:00", s1_r1_2: "Cópia SQL compactada e upload opcional na nuvem", s1_r2_1: "Domingos às 03:00", s1_r2_2: "Exportação MARC21", s1_r3_1: "Diariamente às 01:30", s1_r3_2: "Limpeza de sessões e da fila Zebra", s1_r4_1: "Diariamente às 05:00", s1_r4_2: "Reinício do Plack", s1_r5_1: "A cada 2 min", s1_r5_2: "Monitorizador do indexador Zebra", s1_r6_1: "A cada 5 min", s1_r6_2: "Monitorizador do Elasticsearch, quando usado",
-        s2_t: "Ficheiros Importantes", s2_l1: "<code>/root/koha_credentials.txt</code> — credenciais iniciais", s2_l2: "<code>/var/backups/koha_sql</code> — backups SQL", s2_l3: "<code>/var/backups/koha_marc</code> — backups MARC", s2_l4: "<code>/etc/koha-easy-install/</code> — definições do painel", s2_l5: "<code>/var/log/koha-easy-install/</code> — registos de diagnóstico e validação", s2_l6: "<code>~/importar</code> — pasta de entrada da Magic Import Tool",
-        s3_t: "Diagnósticos", s3_p: "O painel reúne o estado do servidor, exames de saúde, logs do Apache, manutenção profunda da BD e relatórios prontos a usar para suporte.", s3_c1: "exame de saúde", s3_c2: "logs Apache", s3_c3: "MariaDB", s3_c4: "logs Koha",
-        s4_t: "Falha de Energia", s4_p: "O projeto inclui uma verificação após um encerramento abrupto, cria um novo backup e atualiza o índice caso necessário. No Windows, a rotina de encerramento seguro tenta parar o Koha antes do sistema se desligar.",
-        s_c1: "<strong>A desinstalação é destrutiva:</strong> O script <code>uninstall.sh</code> remove permanentemente o Koha, bases de dados, backups locais e configurações. Guarde os seus dados fora do servidor antes de o usar.",
-        n_kick: "Rede Pública", n_h2: "Bibliotecas que utilizam o koha.nexus", n_p: "Explore os catálogos públicos mantidos pelas nossas instituições parceiras. Os motores de busca seguem estas ligações para descobrir e indexar automaticamente as suas coleções.", n_load: "A procurar catálogos na rede koha.nexus...",
+        t3_t: "Pacote de Relatórios SQL", t3_d: "Relatórios de leitura para empréstimos, atrasos, aquisições, códigos de barras ausentes, exemplares nunca emprestados e perdidos.",
+        t4_t: "Mudança de categorias", t4_d: "Move os usuários entre categorias usando critérios definidos pela biblioteca, com uma simulação antes da execução.",
+        t5_t: "Qualidade de dados", t5_d: "Executa verificações de inconsistência no catálogo sem alterar os registros em si.",
+        t6_t: "Privacidade e LGPD", t6_d: "Anonimiza históricos de empréstimos antigos e apaga usuários expirados que cumprem critérios predefinidos com total segurança.",
+        t_c1: "<strong>Proteção por padrão:</strong> Operações que alteram dados seguem um bloqueio comcompartilhado com backups, simulações, confirmações e uma cópia <code>PRE-*</code> verificada antes de efetuar alterações.",
+        s_kick: "Operação e Segurança", s_h2: "Automação sem esconder o que está acontecendo.", s_p: "O painel centraliza tarefas recorrentes e destaca pontos vitais para manutenção, diagnóstico e recuperação.",
+        s1_t: "Automação Padrão", s1_th1: "Quando", s1_th2: "Tarefa", s1_r1_1: "Diariamente às 23:00", s1_r1_2: "Backup SQL compactado e upload opcional na nuvem", s1_r2_1: "Domingos às 03:00", s1_r2_2: "Exportação MARC21", s1_r3_1: "Diariamente às 01:30", s1_r3_2: "Limpeza de sessões e da fila Zebra", s1_r4_1: "Diariamente às 05:00", s1_r4_2: "Reinício do Plack", s1_r5_1: "A cada 2 min", s1_r5_2: "Monitor do indexador Zebra", s1_r6_1: "A cada 5 min", s1_r6_2: "Monitor do Elasticsearch, quando usado",
+        s2_t: "Arquivos importantes", s2_l1: "<code>/root/koha_credentials.txt</code> — credenciais iniciais", s2_l2: "<code>/var/backups/koha_sql</code> — backups SQL", s2_l3: "<code>/var/backups/koha_marc</code> — backups MARC", s2_l4: "<code>/etc/koha-easy-install/</code> — configurações do painel", s2_l5: "<code>/var/log/koha-easy-install/</code> — logs de diagnóstico e validação", s2_l6: "<code>~/importar</code> — pasta de entrada da Magic Import Tool",
+        s3_t: "Diagnósticos", s3_p: "O painel reúne o estado do servidor, exames de saúde, logs do Apache, manutenção profunda do banco de dados e relatórios prontos para usar para suporte.", s3_c1: "exame de saúde", s3_c2: "logs Apache", s3_c3: "MariaDB", s3_c4: "logs Koha",
+        s4_t: "Falha de Energia", s4_p: "O projeto inclui uma verificação após um encerramento abrupto, cria um novo backup e atualiza o índice caso necessário. No Windows, a rotina de encerramento seguro tenta parar o Koha antes de o sistema desligar.",
+        s_c1: "<strong>A desinstalação é destrutiva:</strong> O script <code>uninstall.sh</code> remove permanentemente o Koha, bancos de dados, backups locais e configurações. Salve seus dados fora do servidor antes de usá-lo.",
+        n_kick: "Rede Pública", n_h2: "Bibliotecas que usam o koha.nexus", n_p: "Explore os catálogos públicos mantidos pelas nossas instituições parceiras. Os motores de busca seguem estes links para descobrir e indexar automaticamente suas coleções.", n_load: "Procurando catálogos na rede koha.nexus...",
         c_kick: "Código Aberto", c_h2: "Construído para ser usado, estudado e melhorado.", c_p: "O projeto inclui testes, traduções, ferramentas de colaboração e verificação do instalador via checksum para atualizações automáticas.",
         c1_t: "Testes", c1_p: "Suite de testes Bats para backup/restauração, indexação, ferramentas da biblioteca, WSL e componentes Windows.",
-        c2_t: "Traduções", c2_p: "Dicionários versionados por idioma, validação de cobertura e rejeição automática de traduções com variáveis em falta.",
-        c3_t: "Verificação", c3_p: "O instalador utiliza SHA-256 para validar com segurança as suas próprias atualizações.",
-        c_lic_t: "Licença", c_lic_p: "<strong>GNU General Public License v3.0 ou superior (GPL-3.0-or-later).</strong> O projeto pode ser utilizado, estudado, partilhado e modificado. Distribuições modificadas têm de permanecer sob a GPL e disponibilizar o código-fonte correspondente. O software é fornecido sem garantias.",
-        foot_p1: "Um assistente inteligente, gratuito e fácil de usar para simplificar a gestão técnica do Koha em bibliotecas.", foot_p2: "Desenvolvido com dedicação por <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Projeto", foot_links: "Ligações", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "O nome e logótipo Koha pertencem à Comunidade Koha."
+        c2_t: "Traduções", c2_p: "Dicionários versionados por idioma, validação de cobertura e rejeição automática de traduções com variáveis faltando.",
+        c3_t: "Verificação", c3_p: "O instalador usa SHA-256 para validar com segurança suas próprias atualizações.",
+        c_lic_t: "Licença", c_lic_p: "<strong>GNU General Public License v3.0 ou superior (GPL-3.0-or-later).</strong> O projeto pode ser utilizado, estudado, compartilhado e modificado. Distribuições modificadas precisam permanecer sob a GPL e disponibilizar o código-fonte correspondente. O software é fornecido sem garantias.",
+        foot_p1: "Um assistente inteligente, gratuito e fácil de usar para simplificar a gestão técnica do Koha em bibliotecas.", foot_p2: "Desenvolvido com dedicação por <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Projeto", foot_links: "Links", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "O nome e logotipo Koha pertencem à Comunidade Koha."
       },
       es: {
         nav_features: "Características", nav_install: "Instalación", nav_win: "Windows", nav_tools: "Herramientas", nav_security: "Seguridad", nav_net: "Red",
@@ -1322,45 +1321,8 @@ sudo bash installer</pre>
         c3_t: "Vérification", c3_p: "L'installateur utilise SHA-256 pour valider en toute sécurité ses propres mises à jour.",
         c_lic_t: "Licence", c_lic_p: "<strong>Licence Publique Générale GNU v3.0 ou ultérieure (GPL-3.0-or-later).</strong> Le projet peut être utilisé, étudié, partagé et modifié. Les distributions modifiées doivent rester sous GPL et rendre le code source disponible.",
         foot_p1: "Un assistant intelligent, gratuit et facile à utiliser pour simplifier la gestion technique de Koha dans les bibliothèques.", foot_p2: "Développé avec dévouement par <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Projet", foot_links: "Liens", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "Le nom et le logo Koha appartiennent à la Communauté Koha."
-      }
-    };
-
-    function setLanguage(lang) {
-      // 1. Altera os textos traduzíveis (usando innerHTML para suportar tags <strong>, etc.)
-      document.querySelectorAll("[data-i18n]").forEach(element => {
-        const key = element.getAttribute("data-i18n");
-        if (translations[lang] && translations[lang][key]) {
-          element.innerHTML = translations[lang][key];
-        }
-      });
-
-      // 2. Muda o idioma base do HTML (Ativa a classe .only-pt para a palavra Brasil e os recursos do Brasil)
-      document.documentElement.lang = lang;
-
-      // 3. Atualiza o estado "active" dos botõezinhos no topo
-      document.querySelectorAll(".lang-btn").forEach(btn => {
-        btn.classList.remove("active");
-        if (btn.getAttribute("onclick") === `setLanguage('${lang}')`) {
-          btn.classList.add("active");
-        }
-      });
-
-      // 4. Grava a escolha no cache do navegador
-      localStorage.setItem("koha_lang", lang);
-    }
-
-    // Carrega o idioma assim que a página for montada
-    window.addEventListener("DOMContentLoaded", () => {
-      // Se não houver linguagem guardada, vê se a URL forçou ou tenta português por padrão (caso de uso da biblioteca)
-      const savedLang = localStorage.getItem("koha_lang") || "en"; 
-      setLanguage(savedLang);
-    });
-
-  </script>
-</body>
-</html>
-
-it: {
+      },
+      it: {
         nav_features: "Funzionalità", nav_install: "Installazione", nav_win: "Windows", nav_tools: "Strumenti", nav_security: "Sicurezza", nav_net: "Rete",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "Il miglior sistema per biblioteche, <span class='accent'>ora senza complicazioni.</span>",
@@ -2539,4 +2501,40 @@ it: {
         c_lic_t: "라이선스", c_lic_p: "GNU GPLv3.",
         foot_p1: "Koha 어시스턴트.", foot_p2: "<strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>가 개발했습니다.", foot_proj: "프로젝트", foot_links: "링크", foot_c1: "© 2026 koha.nexus", foot_c2: "Koha 커뮤니티."
       }
-      
+    };
+
+    function setLanguage(lang) {
+      // 1. Altera os textos traduzíveis (usando innerHTML para suportar tags <strong>, etc.)
+      document.querySelectorAll("[data-i18n]").forEach(element => {
+        const key = element.getAttribute("data-i18n");
+        const text = (translations[lang] && translations[lang][key]) || translations.en[key];
+        if (text) {
+          element.innerHTML = text;
+        }
+      });
+
+      // 2. Muda o idioma base do HTML (Ativa a classe .only-pt para a palavra Brasil e os recursos do Brasil)
+      document.documentElement.lang = lang;
+
+      // 3. Atualiza o estado "active" dos botõezinhos no topo
+      document.querySelectorAll(".lang-btn").forEach(btn => {
+        btn.classList.remove("active");
+        if (btn.getAttribute("onclick") === `setLanguage('${lang}')`) {
+          btn.classList.add("active");
+        }
+      });
+
+      // 4. Grava a escolha no cache do navegador
+      localStorage.setItem("koha_lang", lang);
+    }
+
+    // Carrega o idioma assim que a página for montada
+    window.addEventListener("DOMContentLoaded", () => {
+      // Se não houver linguagem guardada, vê se a URL forçou ou tenta português por padrão (caso de uso da biblioteca)
+      const savedLang = localStorage.getItem("koha_lang") || "en"; 
+      setLanguage(savedLang);
+    });
+
+  </script>
+</body>
+</html>
