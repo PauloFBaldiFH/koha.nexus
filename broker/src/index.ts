@@ -11,6 +11,7 @@ import {
   getTunnelToken,
   heartbeat,
   joinPage,
+  listPublicLibraries,
   putStaffCredentials,
   rotateToken,
 } from "./api";
@@ -78,6 +79,7 @@ const routes: Route[] = [
   },
   { method: "DELETE", pattern: new RegExp(`^/admin/libraries/(${UUID})$`), handler: admin((r, e, b, p) => adminDeleteLibrary(e, p[0]!)) },
 
+  { method: "GET", pattern: /^\/api\/public-libraries$/, handler: (r, e) => listPublicLibraries(e) },
   { method: "GET", pattern: /^\/$/, handler: async () => json({ service: "kei-broker", status: "ok" }) },
 ];
 

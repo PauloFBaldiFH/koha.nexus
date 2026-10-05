@@ -337,3 +337,29 @@ export async function deleteLibrary(request: Request, env: Env, body: ArrayBuffe
   return requestDeletion(env, lib.id, `library:${lib.id}`);
 }
 
+export async function listPublicLibraries(env: Env): Promise<Response> {
+  const rows = await env.DB.prepare(
+    `SELECT institution_name, slug FROM libraries WHERE status = 'active' ORDER BY created_at DESC LIMIT 100`
+  ).all<{ institution_name: string; slug: string }>();
+
+  const baseZone = env.ZONE_NAME || "koha.nexus";
+
+  const publicList = (rows.results || []).map((lib) => {
+    const domain = `${lib.slug}.${baseZone}`;
+    return {
+      name: lib.institution_name,
+      domain: domain,
+      url: `https://${domain}`,
+    };
+  });
+
+  return new Response(JSON.stringify(publicList), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+}
