@@ -20,8 +20,8 @@ routes = [
 ]
 
 [vars]
-CF_ACCOUNT_ID = "bd7fc6052f976e218687ff8b5eb85557"
-CF_ZONE_ID = "6078cb524e8702963bfb21abe38d491c"
+CF_ACCOUNT_ID = "REPLACE_WITH_ACCOUNT_ID"
+CF_ZONE_ID = "REPLACE_WITH_ZONE_ID"
 ZONE_NAME = "koha.nexus"
 BROKER_HOST = "broker.koha.nexus"
 # Prefix for every library name. Empty in production; "t-" in a test zone.
@@ -40,7 +40,7 @@ PBKDF2_ITERATIONS = "20000"
 [[d1_databases]]
 binding = "DB"
 database_name = "kei-broker"
-database_id = "fb634324-0d6c-455b-9b70-adcb3cb1fc42"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
@@ -55,6 +55,7 @@ new_sqlite_classes = ["Provisioner"]
 [[queues.producers]]
 binding = "PROVISION_QUEUE"
 queue = "kei-provision"
+
 [[queues.consumers]]
 queue = "kei-provision"
 max_batch_size = 5

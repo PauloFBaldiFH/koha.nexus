@@ -93,11 +93,7 @@ openssl rand -base64 36 | npx wrangler secret put STAFF_SESSION_KEY
 
 Deploy before putting the secrets: `wrangler secret put` on a Worker that does not exist yet stops to ask whether to create it, and a piped value cannot answer that. Until the secrets are set, provisioning jobs retry, `/admin` answers 503 and the staff gate answers 503 once a library sets a password. Keep the admin token somewhere safe (a password manager): print it once with `openssl rand -base64 36`, store it, and pipe the same value to `wrangler secret put`.
 
-<<<<<<< Updated upstream
 Workers plan **[verify current limits]**: Durable Objects with SQLite storage, Queues, rate-limiting bindings, Cron Triggers and D1 are all offered on the Workers Free plan, within daily quotas (queue operations and Durable Object requests per day). The Free plan's CPU limit is 10 ms per request, so `PBKDF2_ITERATIONS` in `wrangler.toml` is 20,000 (about 3 ms per hash; 100,000, the most workerd accepts, takes about 15 ms and would fail staff logins on the Free plan). On the Workers Paid plan (US$5/month, 30 s CPU) it can be raised to 100,000; each password keeps the count it was saved with. The gate only hashes on login; the session cookie covers later requests.
-=======
-Workers plan **[verify current limits]**: Durable Objects with SQLite storage, Queues, rate-limiting bindings, Cron Triggers and D1 are all offered on the Workers Free plan, within daily quotas (queue operations and Durable Object requests per day). The Free plan's CPU limit is 10 ms per request. PBKDF2 at 100,000 iterations (the most workerd accepts) likely exceeds it on a staff login, so either use the Workers Paid plan (US$5/month, 30 s CPU) or lower `PBKDF2_ITERATIONS` in `wrangler.toml` (for example `10000`; each password keeps the count it was saved with). The gate only hashes on login; the session cookie covers later requests.
->>>>>>> Stashed changes
 
 ### Trying it by hand
 
