@@ -394,6 +394,30 @@
       .terminal pre { font-size: .76rem; padding: 18px; }
     }
   </style>
+  <link rel="alternate" hreflang="en" href="https://koha.nexus/?lang=en">
+  <link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/?lang=pt">
+  <link rel="alternate" hreflang="es" href="https://koha.nexus/?lang=es">
+  <link rel="alternate" hreflang="fr" href="https://koha.nexus/?lang=fr">
+  <link rel="alternate" hreflang="it" href="https://koha.nexus/?lang=it">
+  <link rel="alternate" hreflang="de" href="https://koha.nexus/?lang=de">
+  <link rel="alternate" hreflang="nl" href="https://koha.nexus/?lang=nl">
+  <link rel="alternate" hreflang="sv" href="https://koha.nexus/?lang=sv">
+  <link rel="alternate" hreflang="pl" href="https://koha.nexus/?lang=pl">
+  <link rel="alternate" hreflang="cs" href="https://koha.nexus/?lang=cs">
+  <link rel="alternate" hreflang="ru" href="https://koha.nexus/?lang=ru">
+  <link rel="alternate" hreflang="uk" href="https://koha.nexus/?lang=uk">
+  <link rel="alternate" hreflang="tr" href="https://koha.nexus/?lang=tr">
+  <link rel="alternate" hreflang="tl" href="https://koha.nexus/?lang=tl">
+  <link rel="alternate" hreflang="id" href="https://koha.nexus/?lang=id">
+  <link rel="alternate" hreflang="ar" href="https://koha.nexus/?lang=ar">
+  <link rel="alternate" hreflang="fa" href="https://koha.nexus/?lang=fa">
+  <link rel="alternate" hreflang="hi" href="https://koha.nexus/?lang=hi">
+  <link rel="alternate" hreflang="bn" href="https://koha.nexus/?lang=bn">
+  <link rel="alternate" hreflang="vi" href="https://koha.nexus/?lang=vi">
+  <link rel="alternate" hreflang="zh" href="https://koha.nexus/?lang=zh">
+  <link rel="alternate" hreflang="ja" href="https://koha.nexus/?lang=ja">
+  <link rel="alternate" hreflang="ko" href="https://koha.nexus/?lang=ko">
+  <link rel="alternate" hreflang="x-default" href="https://koha.nexus/">
 </head>
 
 <body>
@@ -2525,14 +2549,39 @@ sudo bash installer</pre>
       });
 
       // 4. Grava a escolha no cache do navegador
-      localStorage.setItem("koha_lang", lang);
+      try { localStorage.setItem("koha_lang", lang); } catch (e) {}
+
+      // 5. Coloca o idioma na URL (?lang=xx) sem recarregar e sem perder a âncora (#installation etc.)
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("lang") !== lang) {
+        url.searchParams.set("lang", lang);
+        if (translations[url.hash.slice(1)]) url.hash = "";
+        history.replaceState(null, "", url);
+      }
+    }
+
+    // Idioma pedido na URL: ?lang=pt ou #pt
+    function langFromUrl() {
+      const url = new URL(window.location.href);
+      const q = (url.searchParams.get("lang") || "").toLowerCase();
+      if (translations[q]) return q;
+      const h = url.hash.slice(1).toLowerCase();
+      if (translations[h]) return h;
+      return null;
     }
 
     // Carrega o idioma assim que a página for montada
     window.addEventListener("DOMContentLoaded", () => {
-      // Se não houver linguagem guardada, vê se a URL forçou ou tenta português por padrão (caso de uso da biblioteca)
-      const savedLang = localStorage.getItem("koha_lang") || "en"; 
-      setLanguage(savedLang);
+      // Prioridade: idioma na URL, depois o último escolhido, depois inglês
+      let savedLang = null;
+      try { savedLang = localStorage.getItem("koha_lang"); } catch (e) {}
+      setLanguage(langFromUrl() || (translations[savedLang] ? savedLang : "en"));
+    });
+
+    // Links como koha.nexus/#es também trocam o idioma com a página já aberta
+    window.addEventListener("hashchange", () => {
+      const lang = window.location.hash.slice(1).toLowerCase();
+      if (translations[lang]) setLanguage(lang);
     });
 
   </script>
