@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.9"
+PANEL_VERSION=" 1.5.10"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -13622,7 +13622,7 @@ MRPL1
     printf "our \$BACKUP_DIR = '%s';\nour \$TABLE_DIR = '%s';\nour \$VISION_CONF = \"\$BACKUP_DIR/vision.conf\";\nour \$VISION_PROMPT = \"\$BACKUP_DIR/vision-prompt.txt\";\nour \$USER = '';\nour %%T = (\n" "$MR_DIR" "$CAT_DIR"
     for k in title intro paste paste_hint file bn itype keep preview replace cancel err_csrf err_bn err_nobib \
              err_input err_parse err_many err_lines err_title err_changed err_backup err_mod current new items_kept \
-             items_dropped charset confirm ok view prev_dl undo_hint warnings not_found $MR_VISION_KEYS; do
+             items_dropped charset confirm ok view prev_dl undo_hint warnings not_found new_confirm $MR_VISION_KEYS; do
         printf '    %s => _d(q{%s}),\n' "$k" "$(mr_text "$k" | base64 -w0)"
     done
     printf ');\n'
@@ -13881,8 +13881,19 @@ sub handle_post {
         return;
     }
 
+    # A new record (no biblionumber): added, after its preview, the way the
+    # AI cataloguing adds one (ISBN check, lock, a form sent twice adds nothing).
+    if ( $op eq 'cud-add' ) {
+        do_vision_add($cgi);
+        return;
+    }
+
     my $biblionumber = $cgi->param('biblionumber');
     $biblionumber =~ s/\D//g if defined $biblionumber;
+    if ( !$biblionumber && $op ne 'cud-replace' ) {
+        do_new_preview($cgi);
+        return;
+    }
     if ( !$biblionumber ) {
         render_form( $cgi, '<div class="msg err">' . h( $T{err_bn} ) . '</div>' );
         return;
@@ -13898,6 +13909,51 @@ sub handle_post {
     } else {
         do_preview( $cgi, $biblionumber, $biblio );
     }
+    return;
+}
+
+# Without a biblionumber: the record is shown and, after confirmation, added
+# to the catalogue as a new record. Nothing is replaced.
+sub do_new_preview {
+    my ($cgi) = @_;
+    my ( $record, $charset, $warnings ) = eval { read_record($cgi) };
+    if ( !$record ) {
+        render_form( $cgi, '<div class="msg err">' . h( short_error($@) ) . '</div>' );
+        return;
+    }
+    set_itemtype( $record, scalar $cgi->param('itemtype') );
+    my $dropped = strip_items($record);
+    if ( !$record->field('245') ) {
+        render_form( $cgi, '<div class="msg err">' . h( $T{err_title} ) . '</div>' );
+        return;
+    }
+    my @dups  = find_duplicates($record);
+    my $nonce = sha1_hex( join ':', time, $$, rand(), csrf($cgi) );
+    my $xml   = encode( 'UTF-8', $record->as_xml_record('MARC21') );
+
+    my $body = '<h2>' . h( $T{title} ) . '</h2>';
+    $body .= '<div class="msg warn"><b>' . h( $T{warnings} ) . '</b><br>' . join( '<br>', map { h($_) } @$warnings ) . '</div>' if @$warnings;
+    $body .= '<p>' . h( $T{new_confirm} ) . '</p>';
+    $body .= '<p>' . h( $T{items_dropped} ) . " $dropped</p>" if $dropped;
+    $body .= '<p>' . h( $T{charset} ) . ' ' . h($charset) . '</p>';
+    if (@dups) {
+        $body .= '<div class="msg warn"><b>' . h( $T{v_dups} ) . '</b><br>'
+            . join( '<br>', map { '<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=' . h( $_->[0] ) . '" target="_blank">' . h( $_->[0] ) . '</a> ' . h( $_->[1] // '' ) } @dups )
+            . '</div>';
+    }
+    $body .= '<h3>' . h( $T{new} ) . '</h3><pre>' . h( $record->as_formatted ) . '</pre>';
+    $body .= '<form method="post">'
+        . '<input type="hidden" name="op" value="cud-add">'
+        . '<input type="hidden" name="from" value="replace">'
+        . '<input type="hidden" name="csrf_token" value="' . h( csrf($cgi) ) . '">'
+        . '<input type="hidden" name="record" value="' . encode_base64( $xml, '' ) . '">'
+        . '<input type="hidden" name="nonce" value="' . h($nonce) . '">'
+        . '<label for="frameworkcode">' . h( $T{v_framework} ) . '</label>'
+        . '<select id="frameworkcode" name="frameworkcode">' . framework_options() . '</select>'
+        . ( @dups ? '<p><input type="checkbox" id="allow_dup" name="allow_dup" value="1"> <label class="inline" for="allow_dup">' . h( $T{v_dup_ok} ) . '</label></p>' : '' )
+        . '<input type="submit" value="' . h( $T{v_add} ) . '"> '
+        . '<a href="marc_replace.pl">' . h( $T{cancel} ) . '</a></form>';
+    render_page($body);
     return;
 }
 
@@ -14058,7 +14114,7 @@ sub render_form {
             . '<p style="font-size: 0.85em; color: #666;">' . h( $T{paste_hint} ) . '</p>'
             . '<label for="marcfile">' . h( $T{file} ) . '</label>'
             . '<input type="file" id="marcfile" name="marcfile" accept=".mrc,.marc,.iso,.xml">'
-            . '<label for="biblionumber">' . h( $T{bn} ) . '</label>'
+            . '<label for="biblionumber">' . h( $T{v_bn} ) . '</label>'
             . '<input type="text" id="biblionumber" name="biblionumber" value="' . h($biblionumber) . '" placeholder="12345" inputmode="numeric">'
             . '<label for="itemtype">' . h( $T{itype} ) . ' (942$c)</label>'
             . qq{<select id="itemtype" name="itemtype">$options</select>}
@@ -14403,10 +14459,14 @@ sub save_new_copy {
 # again, the record added and its copy saved; any failure keeps nothing.
 sub do_vision_add {
     my ($cgi) = @_;
+    # From the Replace tab (a record without biblionumber) or the AI tab.
+    my $tab   = ( $cgi->param('from') // '' ) eq 'replace' ? 'replace' : 'vision';
+    my $title = $tab eq 'replace' ? $T{title} : $T{v_title};
+    my $back  = sub { $tab eq 'replace' ? render_form( $cgi, $_[0] ) : render_vision_form( $cgi, $_[0] ) };
     my $record = eval { MARC::Record->new_from_xml( decode_base64( scalar $cgi->param('record') // '' ), 'UTF-8', 'MARC21' ) };
     my $nonce  = $cgi->param('nonce') // '';
     if ( !$record || !$record->field('245') || $nonce !~ /^[0-9a-f]{40}$/ ) {
-        render_vision_form( $cgi, err_box( $T{err_parse} ) );
+        $back->( err_box( $T{err_parse} ) );
         return;
     }
     strip_items($record);
@@ -14422,9 +14482,9 @@ sub do_vision_add {
         my $done;
         if ( -e $claim && open( my $in, '<', $claim ) ) { local $/; $done = <$in> // ''; close $in }
         if ( defined $done && $done =~ /^(\d+)$/ ) {
-            render_page( '<h2>' . h( $T{v_title} ) . '</h2>' . warn_box( $T{v_twice} ) . record_links($1), 'vision' );
+            render_page( '<h2>' . h($title) . '</h2>' . warn_box( $T{v_twice} ) . record_links( $1, $tab ), $tab );
         } else {
-            render_vision_form( $cgi, err_box( defined $done ? $T{v_err_busy} : "$T{err_backup} $claim: $!" ) );
+            $back->( err_box( defined $done ? $T{v_err_busy} : "$T{err_backup} $claim: $!" ) );
         }
         return;
     }
@@ -14434,7 +14494,7 @@ sub do_vision_add {
     if ( !$locked ) {
         close $cfh;
         unlink $claim;
-        render_vision_form( $cgi, err_box( $T{v_err_busy} ) );
+        $back->( err_box( $T{v_err_busy} ) );
         return;
     }
     my ( $biblionumber, $stamp );
@@ -14456,7 +14516,7 @@ sub do_vision_add {
     if ($success) {
         print {$cfh} $biblionumber;
         close $cfh;
-        render_page( '<h2>' . h( $T{v_title} ) . '</h2><div class="msg ok">' . h( $T{v_added} ) . " ($biblionumber)</div>" . record_links($biblionumber), 'vision' );
+        render_page( '<h2>' . h($title) . '</h2><div class="msg ok">' . h( $T{v_added} ) . " ($biblionumber)</div>" . record_links( $biblionumber, $tab ), $tab );
         return;
     }
     close $cfh;
@@ -14466,17 +14526,17 @@ sub do_vision_add {
           $err =~ /^DUPLICATE/     ? $T{v_err_dup}
         : $err =~ /^BACKUP (.*)/   ? "$T{err_backup} $1"
         :                            $T{v_err_add} . ' ' . short_error( $err =~ /^ADDBIBLIO/ ? 'AddBiblio' : $err );
-    render_vision_form( $cgi, err_box($msg) );
+    $back->( err_box($msg) );
     return;
 }
 
 sub record_links {
-    my $bn = shift;
+    my ( $bn, $tab ) = @_;
     return '<p>'
         . qq{<a href="/cgi-bin/koha/catalogue/detail.pl?biblionumber=$bn" target="_blank">} . h( $T{view} ) . '</a><br>'
         . qq{<a href="/cgi-bin/koha/cataloguing/additem.pl?biblionumber=$bn" target="_blank">} . h( $T{v_add_items} ) . '</a><br>'
         . qq{<a href="/cgi-bin/koha/cataloguing/addbiblio.pl?biblionumber=$bn" target="_blank">} . h( $T{v_edit} ) . '</a></p>'
-        . '<p><a href="marc_replace.pl?op=vision">' . h( $T{v_another} ) . '</a></p>';
+        . '<p><a href="marc_replace.pl' . ( ( $tab // '' ) eq 'replace' ? '' : '?op=vision' ) . '">' . h( ( $tab // '' ) eq 'replace' ? $T{title} : $T{v_another} ) . '</a></p>';
 }
 
 # ----------------------------------------------------------------------
@@ -15714,7 +15774,8 @@ MRRULES
 mr_text() {
     case "$1" in
         title)         t "Replace a MARC record by biblionumber" ;;
-        intro)         t "Choose the .mrc (ISO 2709) or .xml (MARCXML) file, or paste the record as text, and type the biblionumber of the record to replace. A preview comes first. The items of the record are never changed: item fields in the file are left out." ;;
+        intro)         t "Choose the .mrc (ISO 2709) or .xml (MARCXML) file, or paste the record as text, and type the biblionumber of the record to replace, or leave it empty to add the record as a new one. A preview comes first. The items of a replaced record are never changed: item fields in the file are left out." ;;
+        new_confirm)   t "No biblionumber was given: the record below is added to the catalogue as a new record. Nothing is replaced." ;;
         paste)         t "Paste the record as text (optional)" ;;
         paste_hint)    t "Accepted text: lines like 245 10 |a Title (Biblioteca Nacional), MarcEdit lines (=245) or yaz-marcdump lines. When text is pasted, the file below is ignored." ;;
         file)          t "Or choose a MARC file (.mrc or .xml)" ;;
