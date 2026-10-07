@@ -129,15 +129,57 @@ Act as a Senior AI Architect. I need to fix the AI architecture of our Koha assi
 **(Status: Pending)**
 
 ```text
-Act as a Front-End Developer & UI/UX Specialist. I am building a visual customization module for the Koha OPAC. The Python panel will generate CSS/JS and inject it into Koha's MariaDB systempreferences (OpacUserCSS, OpacUserJS, OpacMainUserBlock).
+## Subject 4: OPAC Visual Customization Engine & Dynamic Cover Carousel
+**(Status: Pending)**
 
-Features to implement:
-1. Branding: Options for background images and library logos (direct URL or local file upload to Koha's Apache dir).
-2. Ghost Elements: Auto-hide RSS, cart buttons, and empty columns.
-3. Textures & Materials: Allow users to apply Frosted Glass (backdrop-filter: blur), Smooth Glass, Brushed Metal, or Solid Colors to OPAC blocks, with border-radius sliders.
-4. Smart Dark/Light Mode: Inject a JS toggle (🌓) in the OPAC footer. Save preference in localStorage so it's user-specific. Add a legibility overlay (film effect) to ensure text is readable over wallpapers.
-5. Dynamic OPAC News Buttons: Convert raw HTML in `additional-contents.pl` into modern interactive buttons.
-6. Persistence: Save all panel UI choices as a JSON string inside a CSS comment in OpacUserCSS, allowing the Python panel to restore state upon reopening.
+```text
+Act as a Principal Front-End Developer, Koha System Architect, and UI/UX Specialist. I am building a visual customization module for the Koha OPAC. The Python panel will generate clean CSS/JS and inject it directly into Koha's MariaDB system preferences (`OpacUserCSS`, `OpacUserJS`, `OpacMainUserBlock`) or Koha's Apache web directories.
+
+Feel free to leverage full creative freedom to deliver a modern, high-end visual experience.
+
+Implement the following features:
+
+1. Flexible Asset Upload & Storage (Backgrounds, Logos & Favicons):
+- Allow the user to configure custom background images, library logos, and site favicons.
+- Multi-Destination Storage Engine:
+  * Local Server / Apache Option: Copy files directly into Koha's Apache public web directory (`/usr/share/koha/opac/htdocs/images/custom/`).
+  * Cloud / Image Host Option: Integrate automated upload to external image hosting providers (e.g., Postimages API, ImgBB, or Cloudinary) and inject the returned direct HTTPS link into the CSS/JS.
+  * Direct URL Input: Let users paste an arbitrary direct image URL manually.
+
+2. Dynamic "New Arrivals" Cover Carousel (Amazon Integration):
+- Build a responsive, interactive book carousel component in the main OPAC landing area displaying the latest cataloged titles.
+- System Preference Automation:
+  * Ensure the required Koha preferences for external covers are enabled (`OPACAmazonCoverImages = 1`, `AmazonAssocTag`, and relevant ISBN cover fetchers).
+- Smart Filtering:
+  * Filter and display exclusively items that successfully resolve an active Amazon book cover image. If a newly cataloged title lacks an Amazon cover, skip it gracefully so the carousel only renders high-quality visual cards.
+- Extended Carousel Customization (Creative Freedom):
+  * Configurable autoplay toggle and slide speed interval.
+  * Card hover effects (smooth zoom, elevation shadows, tilt effect).
+  * Direct click-through from the cover card to the item's bibliographic detail page (`/cgi-bin/koha/opac-detail.pl?biblionumber=X`).
+  * Display optional metadata overlay on hover (title, author, call number, availability badge).
+
+3. Ghost Elements & UI Cleanup:
+- Automatically inject rules (`display: none !important`) for clutter: empty table columns, RSS feed icons, default cart badges, and generic community links.
+
+4. Textures, Glassmorphism & Materials:
+- Provide presets and CSS variables for structural OPAC blocks (`.navbar`, `#opac-main-search`, `.main`):
+  * Frosted Glass (glassmorphism with adjustable `backdrop-filter: blur()`).
+  * Smooth Glass (semi-transparent without blur).
+  * Brushed Metal (linear gradients with inset shadows for subtle 3D metallic feel).
+  * Flat Solid Colors and Soft Diagonal Gradients.
+- Granular sliders for border-radius (0px to 30px) across blocks, inputs, and buttons.
+
+5. Smart Independent Dark/Light Mode & Legibility Overlay:
+- Inject a theme switch button (🌓) in the bottom bar near the language selector.
+- Store preference in `localStorage` (`kei_theme = dark`) so toggling only affects the individual user's browser session.
+- Legibility Filter Overlay: Inject a subtle dynamic film layer between custom wallpaper backgrounds and content blocks (whitened in Light Mode, dimmed/tinted in Dark Mode) to guarantee WCAG-compliant text contrast.
+
+6. Interactive OPAC News Action Buttons:
+- Convert simple HTML markers placed in `additional-contents.pl` into interactive action buttons (title, description, icon, destination URL) styled to match the active material/texture.
+
+7. State Management & Persistence:
+- Store all active UI configuration options as a serialized JSON string in a top-level CSS comment inside `OpacUserCSS` (e.g., `/* KEI-THEME-DATA: {"texture": "metal", "carousel_speed": 4000, ...} */`).
+- When launching the customization panel in Python, parse this comment to hydrate the UI controls with the active live settings.
 ```
 
 ---
