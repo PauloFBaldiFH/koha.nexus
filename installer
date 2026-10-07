@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.8"
+PANEL_VERSION=" 1.5.9"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -3567,6 +3567,74 @@ ensure_search_indexing() {
     zebra_indexer_start
 }
 
+# ----------------------------------------------------------------------
+# A real catalogue search through Koha, as the staff pages make it: a plain
+# one (the search results page) and one sorted by title (the analytics of
+# the record page). The indexer can run and the index be full while the
+# search itself fails ("Unable to perform the search", "There was an error
+# searching for analytic records"): Elasticsearch down, the index missing,
+# or an index made without the sort fields of Koha's mappings.
+# Prints "OK" or "FAIL plain|sort <Koha's error>". 0 = the search works,
+# 1 = it fails, 2 = it could not be run.
+# ----------------------------------------------------------------------
+koha_search_probe() {
+    local f out
+    [ -x /usr/sbin/koha-shell ] || { printf 'FAIL plain koha-shell not found\n'; return 2; }
+    f=$(mktemp /tmp/kei-search-probe.XXXXXX) || return 2
+    cat > "$f" <<'PROBE'
+use Modern::Perl;
+use Koha::SearchEngine;
+use Koha::SearchEngine::QueryBuilder;
+use Koha::SearchEngine::Search;
+my $index   = $Koha::SearchEngine::BIBLIOS_INDEX;
+my $builder = Koha::SearchEngine::QueryBuilder->new( { index => $index } );
+my $search  = Koha::SearchEngine::Search->new( { index => $index } );
+for my $sort ( '', 'title_asc' ) {
+    my @sort = $sort ? ($sort) : ();
+    my ( $err, $query, $simple );
+    eval {
+        ( $err, $query, $simple ) = $builder->build_query_compat( undef, ['a'], undef, undef, \@sort, 0 );
+        ($err) = $search->search_compat( $query, $simple, \@sort, ['biblioserver'], 1, 0, undef, undef, 'ccl', 0 ) unless $err;
+        1;
+    } or $err = $@ || 'error';
+    if ($err) {
+        $err =~ s/\s+/ /g;
+        printf "FAIL %s %s\n", ( $sort ? 'sort' : 'plain' ), substr( $err, 0, 400 );
+        exit 1;
+    }
+}
+print "OK\n";
+PROBE
+    chmod 644 "$f"
+    out=$(cd /tmp && timeout 90 /usr/sbin/koha-shell "$INSTANCE" -c "perl $(kq "$f")" 2>&1 </dev/null 7>&- 8>&- 9>&-)
+    rm -f "$f"
+    out=$(printf '%s\n' "$out" | grep -E '^(OK|FAIL )' | tail -n1)
+    [ -n "$out" ] || { printf 'FAIL plain the search test did not run\n'; return 2; }
+    printf '%s\n' "$out"
+    [ "$out" = "OK" ]
+}
+
+# What a failed probe needs: es_down, no_index, mappings (sort fields or
+# query errors: the index is made again from Koha's mappings), config, other.
+koha_search_problem() {
+    case "$1" in
+        *[Nn]o\ [Nn]odes*|*onnection\ refused*|*[Cc]ould\ not\ connect*|*[Cc]annot\ connect*|*[Ff]ailed\ to\ connect*|*NoNodes*) printf 'es_down' ;;
+        *index_not_found*|*[Nn]o\ such\ index*) printf 'no_index' ;;
+        *[Nn]o\ mapping\ found*|*__sort*|*search_phase_execution*|*query_shard*|*illegal_argument*|*parse_exception*|*[Ff]ielddata*) printf 'mappings' ;;
+        *[Nn]o\ elasticsearch*|*elasticsearch\ configuration*|*[Ee]lasticsearch\ server*) printf 'config' ;;
+        *"did not run"*|*"koha-shell not found"*) printf 'probe' ;;
+        *) printf 'other' ;;
+    esac
+}
+
+# The index made again from scratch with Koha's default mappings (the
+# custom changes of Administration > Search engine configuration are
+# replaced): for an index whose mappings Koha's search no longer matches.
+rebuild_koha_es_reset_mappings() {
+    command -v koha-elasticsearch >/dev/null 2>&1 || return 1
+    koha_ctl koha-elasticsearch --rebuild -d -r "$INSTANCE"
+}
+
 validate_elasticsearch() {
     local e="$1" pend docs bibs
     if ! dpkg -s elasticsearch >/dev/null 2>&1 && ! dpkg -s koha-elasticsearch >/dev/null 2>&1; then
@@ -3599,6 +3667,13 @@ validate_elasticsearch() {
     curl -sS --max-time 5 "http://127.0.0.1:9200/_cat/indices/${DB_NAME}_*?format=json" 2>/dev/null | grep -q "${DB_NAME}_" \
         && v_ok "Elasticsearch: $(t "Koha indices found")." \
         || v_warn "Elasticsearch: $(t "Koha indices unconfirmed")."
+
+    local probe
+    if probe=$(koha_search_probe); then
+        v_ok "$(t "Catalogue search"): $(t "a test search through Koha worked")."
+    else
+        v_fail "$(t "Catalogue search"): $(t "FAILS: the staff pages show 'Unable to perform the search'") (${probe#FAIL })"
+    fi
 
     if is_koha_indexer_running; then
         v_ok "$(t "Indexer"): koha-es-indexer $(t "running")."
@@ -5965,10 +6040,28 @@ kei_rebuild_search_index() {
 se_task_es_repair() {
     systemctl restart elasticsearch
     prepare_koha_broker
+    set_xml_elasticsearch inserir >/dev/null 2>&1 || true
     systemctl restart memcached koha-common
     manage_koha_indexers start
     plack_restart
     return 0
+}
+
+# The index made again with Koha's default mappings, then Koha restarted
+# so its pages use them.
+se_task_es_reset() {
+    rebuild_koha_es_reset_mappings || return 1
+    systemctl restart memcached >/dev/null 2>&1 || true
+    plack_restart
+    return 0
+}
+
+# The search test of the repair, with the error in plain words. Sets
+# SEARCH_PROBE (the probe's line); 0 = the search works.
+se_search_check() {
+    SEARCH_PROBE=$(koha_search_probe) && return 0
+    log "search probe: ${SEARCH_PROBE}"
+    return 1
 }
 
 function_repair_indexing() {
@@ -5980,8 +6073,11 @@ function_repair_indexing() {
         is_koha_indexer_running && idx="$(t "running")" || idx="$(t "STOPPED")"
         ss -lnt 2>/dev/null | grep -q ":$(koha_stomp_port) " && broker="OK" || broker="$(t "absent")"
         pend=$(get_pending_es_jobs); bibs=$(get_total_biblios); docs=$(get_total_es_documents)
+        local search_now
+        if se_search_check; then search_now="OK"; else search_now="$(t "FAILS"): ${SEARCH_PROBE#FAIL }"; fi
         msg_info "$(t "Diagnostics")" \
-"Elasticsearch (9200) : ${es_up}
+"$(t "Catalogue search")     : ${search_now}
+Elasticsearch (9200) : ${es_up}
 $(t "Block in XML")         : $(is_koha_es_active_in_xml && echo OK || echo "$(t "MISSING")")
 $(t "Indexer")              : ${idx}
 RabbitMQ/STOMP       : ${broker}
@@ -5999,7 +6095,33 @@ $(t "Growing queue + smaller index = indexer is down.")" 18 76
             tui_run "$(t "Reindexing the catalog")" rebuild_koha_elasticsearch "$cut_time" || rebuild_ok="no"
         fi
 
+        # The search itself, as the staff pages make it. An index whose
+        # mappings Koha no longer matches (sort fields missing: "There was an
+        # error searching for analytic records") is made again from Koha's
+        # default mappings, after asking.
+        local search_ok="yes"
+        if ! se_search_check; then
+            search_ok="no"
+            case "$(koha_search_problem "$SEARCH_PROBE")" in
+                es_down|probe) ;;
+                *)
+                    if prompt_yes_no "$(t "Catalogue search")" "$(t "The catalogue search still fails:")"$'\n\n'"${SEARCH_PROBE#FAIL }"$'\n\n'"$(t "Make the index again with Koha's default search mappings? Changes made in Administration > Search engine configuration are replaced. On large catalogs this can take several minutes.")" 18 78; then
+                        local reset_time; reset_time=$(date '+%Y-%m-%d %H:%M:%S')
+                        if tui_run "$(t "Making the index again with Koha's mappings")" se_task_es_reset; then
+                            clear_orphan_jobs "$reset_time"
+                            se_search_check && search_ok="yes"
+                        fi
+                    fi
+                    ;;
+            esac
+        fi
+
         tui_run "$(t "Checking that everything works")" install_task_check "$(t "Elasticsearch indexing repair")"
+
+        if [ "$search_ok" = "no" ]; then
+            msg_error "" "$(t "The catalogue search still fails, so the staff pages show 'Unable to perform the search'. Koha's error:")"$'\n\n'"${SEARCH_PROBE#FAIL }"$'\n\n'"$(t "Check: systemctl status elasticsearch, and /var/log/koha/\${INSTANCE}/plack-error.log")" 16 80
+            return 1
+        fi
 
         if is_koha_indexer_running && [ "$rebuild_ok" = "yes" ]; then
             msg_ok "$(t "Indexer is running and catalog synchronized.\nAdd a test record and search for it after ~10 seconds.")" 11 76
