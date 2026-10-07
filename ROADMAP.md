@@ -102,22 +102,41 @@ Implement the following architectural modules:
 
 ---
 
-## Subject 3: Centralized AI Settings & Architecture
+## Subject 3: Centralized AI Settings & Agentic Worker Architecture (Koha API / Search Engine)
 **(Status: Pending)**
 
 ```text
-Act as a Senior AI Architect. I need to fix the AI architecture of our Koha assistant and consolidate its configuration.
+Act as a Principal AI Architect and Koha Integration Engineer. I need to redesign our AI Assistant architecture. 
+
+Direct SQL manipulation by the LLM is deprecated due to safety and state desynchronization risks. Instead, the AI Assistant must operate as a secure, tool-calling Agent/Worker that interacts exclusively with Koha's official REST API (/api/v1/), Koha's internal search engines (Elasticsearch / Zebra query builders), and CLI utility wrappers, enforced by a strict Human-in-the-Loop transaction gate for mutations.
+
+Implement the following architectural modules:
 
 1. Single Source of Truth for AI Settings:
-- Create a unified "AI Settings" tab in the panel. Do not ask for API keys inside individual tools (like Chat or MARC tool).
-- Support OpenAI, Anthropic, Gemini, and Local (Ollama/LM Studio).
-- Update the default Gemini model string in the code, as the old one is deprecated.
-- Make the UI dynamic: if "Ollama" is selected, hide the API key field and pre-fill the endpoint.
+- Create a unified "AI Settings" manager/tab in the Python panel.
+- Centralize credentials for OpenAI, Anthropic Claude, Google Gemini, and Local LLMs (Ollama / LM Studio / OpenAI-compatible).
+- Dynamic UI behavior: When "Ollama" is selected, dynamically hide the API key field and auto-populate the local endpoint ([http://127.0.0.1:11434](http://127.0.0.1:11434)).
+- Update the default Gemini model string in code to the current active release (gemini-1.5-pro / gemini-1.5-flash or current OpenAI-compatible endpoint).
 
-2. AI Architecture Fixes (Routing & Memory):
-- Implement Semantic Routing: Prevent the LLM from triggering database SQL tools for casual greetings ("hello").
-- Fix Coreference Resolution & Contextual Amnesia: Ensure the Conversation Buffer correctly passes previous subjects (e.g., "his clown book" referring to Stephen King) to the tool calls.
-- Strict Anti-Hallucination Guardrails: Stop the AI from faking tool outputs (e.g., inventing names like "João Baldi"). Force the LLM to output the exact tool call, pause execution, wait for the backend SQL/API observation, and then format the real data.
+2. Safe Agentic Worker & Tool-Calling Pipeline (No Direct Raw SQL):
+- Search & Retrieval Tool (Read-Only):
+  * Construct tools that query Koha via its native REST API (`/api/v1/biblios`, `/api/v1/patrons`) or directly generate Elasticsearch/Zebra structured queries.
+  * The tool returns real parsed JSON objects to the LLM observation window, preventing hallucinations of book titles or fake patron records.
+- Staged Mutations & Human-in-the-Loop (Write Actions):
+  * If the user asks the assistant to update a record, reserve a book, or edit patron details, the AI CANNOT execute the write operation immediately.
+  * Instead, the AI generates a structured "Action Proposal" (Payload Preview: target entity ID, proposed field diff, and action type).
+  * The UI presents this proposal with a clear review card and an explicit [Approve & Execute] / [Reject] button before any API POST/PUT or Koha Perl script is triggered.
+
+3. Intent Routing & Semantic Guardrails:
+- Implement a lightweight Router Layer (Semantic / Regex / Function gating):
+  * Casual conversation or greetings ("hello", "good morning", "who are you?") must be handled directly by the LLM conversational system prompt without triggering Koha tools or search calls.
+  * Domain queries (catalog searches, patron checks, library hours) route dynamically to the appropriate tool runner.
+
+4. Memory Management & Coreference Resolution:
+- Maintain a structured Conversation Buffer:
+  * Enable the agent to resolve contextual references across turns (e.g., User: "Do you have Stephen King books?" -> Agent: [Lists books] -> User: "Which one is his clown book?" -> Agent correctly merges context to search for "Stephen King clown" or filters the prior list for "It").
+- Strict Anti-Hallucination Enforcement:
+  * When a tool returns empty results or zero matches, the system prompt strictly forbids inventing dummy data. The assistant must truthfully state that no matching records were found in the library catalog.
 ```
 
 ---
