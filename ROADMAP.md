@@ -117,31 +117,27 @@ Implement the following architectural modules:
     - Example: "Maria de Lourdes dos Santos" -> "Santos, Maria de Lourdes dos".
   * For patron ingestion (Koha `borrowers`), map the segmented tokens cleanly into `surname` and `firstname` columns.
 
-### 8. Batch Authority Reconciliation, Linking & Synthesis Engine
-- **Dedicated Authority Management & Sync Interface:**
+8. Batch Authority Reconciliation, Linking & Synthesis Engine:
+- Dedicated Authority Management & Sync Interface:
   * Implement an explicit TUI action button: `[Sync & Link Authorities]`.
   * Support targeted execution per bibliographic range, branch, or entire catalog.
-
-- **Native Maintenance & Backend Linking Pipeline:**
+- Native Maintenance & Backend Linking Pipeline:
   * Wrap Koha's backend utility `link_bibs_to_authorities.pl`:
     - Command pattern: `koha-shell -c "/usr/share/koha/bin/cronjobs/link_bibs_to_authorities.pl -v" <instance_name>`.
     - Stream execution logs directly to a Textual modal window with real-time status and linking counters.
   * Sweep unlinked bibliographic headings (MARC fields 100, 700, 110, 710, 650 lacking subfield `$9`).
   * Match against existing authorized entries and 'See From' cross-references in `auth_header`.
-
-- **Context-Aware Fuzzy Fallback & Orphan Heading Harvesting:**
+- Context-Aware Fuzzy Fallback & Orphan Heading Harvesting:
   * Harvest unlinked personal/corporate names and subjects that standard exact-match routines fail to link.
   * Compute similarity scores (Levenshtein + soundex) to identify slight orthographic variations or missing birth/death dates without creating duplicates.
   * Disambiguation Safeguard: Never merge homonyms with conflicting temporal boundaries or divergent topical classifications (CDD/CDU/650).
-
-- **Automated Authority Synthesis & Bidirectional Binding:**
+- Automated Authority Synthesis & Bidirectional Binding:
   * For persistent orphan clusters meeting safety thresholds, synthesize standard MARC21 Authority records:
     - Tag 100 (Authorized Personal Name Heading).
     - Tag 400 (Variant / See-From Tracings).
     - Tag 670 (Source Work Citations).
   * Insert cleanly into `auth_header` and inject the generated `authid` into subfield `$9` of corresponding bibliographic records.
-
-- **Search Engine Reindexing & Post-Commit State:**
+- Search Engine Reindexing & Post-Commit State:
   * Trigger automated selective reindexing for authorities and updated biblio records via Elasticsearch (`koha-elasticsearch --rebuild -b -a <instance>`) or Zebra queue (`zebraqueue`).
   * Return a structured summary report: records evaluated, links established, new authorities created, and ambiguous cases deferred.
 ```
@@ -184,23 +180,20 @@ Implement the following architectural modules:
 - Strict Anti-Hallucination Enforcement:
   * When a tool returns empty results or zero matches, the system prompt strictly forbids inventing dummy data. The assistant must truthfully state that no matching records were found in the library catalog.
 
-### Automated Z39.50/SRU Discovery, Creative Harvesting & Live Benchmark Engine
-
-- *Multi-Source Target Acquisition & Autonomous Scraper:*
+5. Automated Z39.50/SRU Discovery, Creative Harvesting & Live Benchmark Engine:
+- Multi-Source Target Acquisition & Autonomous Scraper:
   * Be creative and resilient in how global Z39.50/SRU endpoints are discovered and maintained:
-    - *Curated Baseline:* Ship an initial categorized dictionary (targets.json) of top public endpoints (e.g., Library of Congress, British Library, BnF, BBN Brazil, Spanish REBIUN, worldwide university networks).
-    - *Dynamic Community Sync:* Implement an optional remote pull (e.g., fetching a regularly updated raw JSON/YAML registry from GitHub or community repos) to get fresh endpoints without redeploying code.
-    - *Adaptive Discovery Scrapers:* Implement lightweight parsing heuristics to ingest and extract connection endpoints (Host, Port, Database, Syntax) from open public registries, gateway pages, or standard consortium lists (such as Index Data's public target directory, National Library technical bulletin tables, or public Z39.50 directory dumps).
-    - *Export/Import Capabilities:* Allow users to import local lists (CSV, JSON, or Koha SQL dumps) and share their own custom endpoints.
-
-- *Asynchronous Health Check, Latency Benchmarking & Payloads Validation:*
+    - Curated Baseline: Ship an initial categorized dictionary (targets.json) of top public endpoints (e.g., Library of Congress, British Library, BnF, BBN Brazil, Spanish REBIUN, worldwide university networks).
+    - Dynamic Community Sync: Implement an optional remote pull (e.g., fetching a regularly updated raw JSON/YAML registry from GitHub or community repos) to get fresh endpoints without redeploying code.
+    - Adaptive Discovery Scrapers: Implement lightweight parsing heuristics to ingest and extract connection endpoints (Host, Port, Database, Syntax) from open public registries, gateway pages, or standard consortium lists (such as Index Data's public target directory, National Library technical bulletin tables, or public Z39.50 directory dumps).
+    - Export/Import Capabilities: Allow users to import local lists (CSV, JSON, or Koha SQL dumps) and share their own custom endpoints.
+- Asynchronous Health Check, Latency Benchmarking & Payloads Validation:
   * Implement an async connection scanner using Python sockets or lightweight protocol probes:
     - Concurrently ping ports (typically 210, 2100, 2210) with strict timeouts (e.g., 2–3s) to discard dead hosts without stalling the TUI.
-    - Measure round-trip query latency in milliseconds ($ms$).
+    - Measure round-trip query latency in milliseconds (ms).
     - Run an invariant dry-run probe query (e.g., querying a universal test ISBN like The Little Prince / Don Quixote) to verify if the server returns valid MARC21/USMARC binary frames rather than corrupt bytes or reset connections.
   * Rank active servers by reliability and speed, automatically discarding zombies or blacklisting broken hosts.
-
-- *Zero-Friction Ingestion into Koha (z3950servers Schema):*
+- Zero-Friction Ingestion into Koha (z3950servers Schema):
   * Provide an intuitive multi-select TUI interface grouped by Region (Brazil/Latin America, North America, Europe, Asia-Pacific, Specialized/Academia).
   * One-click injection into Koha's native z3950servers table:
     - Set host, port, db, syntax (USMARC/MARC21), encoding (utf8), checked (default active for catalog searches), and populate rank by measured latency.
@@ -278,6 +271,7 @@ Act as a Systems Architect. I need to replace walls of text instructions in our 
 2. Visual Scheduled Tasks (Cron) Manager:
 - Replace launching `nano` with a modern TUI checkbox/dropdown interface for crontab.
 - Include presets for: Nightly DB backups, Index rebuilding, and Fine calculations.
+- Add a pre-configured toggleable cron entry for automated authority reconciliation (`link_bibs_to_authorities.pl`) with daily/weekly scheduling options.
 
 3. Rclone Cloud Backup GUI:
 - Keep the automated Google Drive backup separate.
