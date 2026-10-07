@@ -4,10 +4,6 @@ This document contains the architectural "Master Prompts" to guide AI-assisted d
 
 ---
 
-## Subject 1: Core UI/UX, Themes & Panel Cleanup
-**(Status: Pending)**
-
-```text
 ## Subject 1: Core UI/UX, Themes, Panel Cleanup & Database Transfer Hub
 **(Status: Pending)**
 
@@ -102,6 +98,7 @@ Implement the following architectural modules:
   * Total items scanned, categorized entities count (books vs patrons).
   * Number of casing normalizations performed and encoding corrections made.
   * Flag critical anomalies for human review with an explicit [Confirm & Import] safety lock.
+```
 
 ---
 
@@ -125,10 +122,6 @@ Act as a Senior AI Architect. I need to fix the AI architecture of our Koha assi
 
 ---
 
-## Subject 4: OPAC Visual Customization Engine
-**(Status: Pending)**
-
-```text
 ## Subject 4: OPAC Visual Customization Engine & Dynamic Cover Carousel
 **(Status: Pending)**
 
