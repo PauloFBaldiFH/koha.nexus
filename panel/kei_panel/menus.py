@@ -107,6 +107,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
+        Entry("🔗  Sync & link authorities", "authority-sync", kind="native"),
         Entry("📋  Essential SQL reports pack", "reports", kind="native"),
         Entry("🎓  School-year turnover (patron categories)", "patron-category", kind="native"),
         Entry("🧪  Catalog data-quality check", "data-quality", kind="native"),
