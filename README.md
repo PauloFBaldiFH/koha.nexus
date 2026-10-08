@@ -6,9 +6,15 @@
   <img src="docs/images/koha-logo-green.png" alt="koha.nexus logo" width="400">
 </p>
 
+<p align="center">
+  <a href="https://koha.nexus"><img alt="Official website: koha.nexus" src="https://img.shields.io/badge/%F0%9F%8C%90_official_website-koha.nexus-63d987?style=for-the-badge&labelColor=07100c"></a>
+</p>
+
+<h3 align="center">🌐 <a href="https://koha.nexus">koha.nexus</a>: the official website, with the install guide in 23 languages and the map of libraries already running it.</h3>
+
 # koha.nexus : A smart, free and easy-to-use assistant for library management
 
-A single Bash script that installs, tunes and maintains the **[Koha](https://koha-community.org/) Integrated Library System** on Debian/Ubuntu, through a friendly menu-driven control panel (whiptail, dark theme) available in **22 languages**.
+A single Bash script that installs, tunes and maintains the **[Koha](https://koha-community.org/) Integrated Library System** on Debian/Ubuntu, through a friendly full-screen control panel available in **22 languages**: mouse and keyboard, a dark theme, a live dashboard and one screen per task (built with Textual), with the classic whiptail menus kept as the safe fallback.
 
 It was born from real-life experience facing technical barriers in collection management, and is designed for libraries without budget for expensive commercial systems or dedicated technical support.
 
@@ -124,13 +130,15 @@ Koha runs inside a Debian system in **WSL 2** (the Windows Subsystem for Linux),
 
 ### Installing on Windows
 
-Open **PowerShell** (Start menu, type *PowerShell*; no need to run it as administrator), paste this line and press Enter:
+Open **PowerShell as Administrator** (right-click the Start button > **Terminal (Admin)** or **Windows PowerShell (Admin)**, and click **Yes**), paste this line and press Enter:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
 
-If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first. Double-click it as usual, not **Run as administrator**: Windows asks for permission only for the steps that need it. If Windows blocks it with no **Run anyway** button (Smart App Control on Windows 11, or a company policy), right-click the file > **Properties**, tick **Unblock** and click **OK**, or use the PowerShell line above, which is never blocked this way.
+If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first. A plain double-click is enough: it asks Windows for administrator permission by itself at the steps that need it. If Windows blocks it with no **Run anyway** button (Smart App Control on Windows 11, or a company policy), right-click the file > **Properties**, tick **Unblock** and click **OK**, or use the PowerShell line above, which is never blocked this way.
+
+> **Use your own Windows account.** Run the installer from the account that will use Koha, and that account must be an administrator. If Windows asks for *another person's* password, cancel, sign in to an administrator account and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer, so an install approved with someone else's password ends up in their account instead.
 
 The installer does everything else and shows each step in plain language:
 
@@ -169,7 +177,9 @@ Real-Windows behaviour (the installer, notifications, the tray, Task Scheduler, 
 | 16 | Reboot server | |
 | 17 | Exit | |
 
-The dialogs use a dark theme, a fixed width and adapt to small terminals. For newt's default colours in a monochrome terminal, start the panel with `NO_COLOR=1`.
+In the new panel each of these is a card on the home screen, and the newest tools have screens and shortcut keys of their own: **d** Control Dashboard, **i** Magic Import Tool, **b** Backup center, **t** Database tables, **a** AI, **z** Z39.50 / SRU servers, **o** OPAC appearance, **m** Messaging & interoperability, **v** WireGuard VPN, **l** Library tools, **s** Schedules & cron tasks, and **ctrl+p** searches every action by name.
+
+The classic panel's dialogs use a dark theme, a fixed width and adapt to small terminals. For newt's default colours in a monochrome terminal, start the panel with `NO_COLOR=1`.
 
 ## Library tools
 
@@ -361,7 +371,7 @@ The installation shows seven numbered steps, one line per task with a small Pac-
 
 The panel's other long tasks look the same: switching the search engine, repairing the search index, setting up the Cloudflare Tunnel, updating the system, validation, service repair, deep maintenance and language updates. Their output goes to `/var/log/koha-easy-install/` (for example `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` and `apt.log`). Backup restores and the tools the panel installs on demand (Midnight Commander, htop and nethogs) look the same.
 
-The panel's dialogs are drawn with `dialog`, which the panel installs, so buttons, menu items and check boxes also take mouse clicks in terminals that report the mouse: Windows Terminal, the Linux desktop terminals (GNOME Terminal, Konsole, xterm), PuTTY and most SSH clients. The Linux text console only does so with `gpm` installed. `KEI_UI=whiptail` keeps the older keyboard-only look.
+The new panel (Textual) takes mouse clicks and the wheel everywhere. The classic panel's dialogs are drawn with `dialog`, which the panel installs, so buttons, menu items and check boxes also take mouse clicks in terminals that report the mouse: Windows Terminal, the Linux desktop terminals (GNOME Terminal, Konsole, xterm), PuTTY and most SSH clients. The Linux text console only does so with `gpm` installed. `KEI_UI=whiptail` keeps the older keyboard-only look.
 
 On a Linux PC with a graphical desktop, the panel adds a **Koha** launcher (`koha-descomplicado.desktop`) to the applications menu of the user who ran it with `sudo`, and, the first time, to that user's desktop. It opens the panel in a terminal and asks for the `sudo` password.
 
