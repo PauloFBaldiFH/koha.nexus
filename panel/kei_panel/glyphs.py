@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import unicodedata
 
+from rich.cells import cell_len
+
 GLYPH_ASCII = {
     "✔": "+", "✓": "+", "☑": "+", "✖": "x", "●": "*", "•": "*", "◆": "*",
     "⚠": "!", "→": "->", "⇄": "<->", "↔": "<->",
@@ -34,6 +36,22 @@ def plain_text(s: str) -> str:
     for g in GLYPH_ICONS:
         s = s.replace(g + "  ", "").replace(g + " ", "").replace(g, "")
     return s
+
+
+def steady(s: str) -> str:
+    """s without the emoji selector (U+FE0F) after a symbol Textual counts
+    one cell wide (⬇, 🛡, ⚠...). With the selector most terminals draw it two
+    cells wide, so everything after it on the line slides one cell and boxes,
+    highlights and scroll bars break; without it the terminal draws the plain
+    one-cell symbol Textual expects."""
+    if "\ufe0f" not in s:
+        return s
+    out: list[str] = []
+    for c in s:
+        if c == "\ufe0f" and out and cell_len(out[-1]) == 1:
+            continue
+        out.append(c)
+    return "".join(out)
 
 
 def split_icon(label: str) -> tuple[str, str]:

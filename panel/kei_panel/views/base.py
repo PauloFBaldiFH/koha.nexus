@@ -31,10 +31,11 @@ class SectionView(VerticalScroll):
             yield Label(t(self.section.prompt), classes="view-prompt")
 
     def cards(self) -> ComposeResult:
-        if not self.section.entries:
+        entries = [e for e in self.section.entries if not e.hidden]
+        if not entries:
             return
         with Grid(classes="card-grid"):
-            for entry in self.section.entries:
+            for entry in entries:
                 yield ActionCard(entry, background=self.panel.runs_in_background(entry),
                                  native=self.panel.is_native(entry))
 

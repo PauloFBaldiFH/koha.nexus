@@ -278,7 +278,12 @@ _RUN: dict[str, list[str]] = {
         "@@ask Sync & link authorities\tRecords checked: 120\\nRecords to update: 37\\nHeadings to link: 52 (by similarity: 3)"
         "\\nHeadings without a matching authority: 18\\n\\nLink them now?",
         "@@say ok OK\tHeadings linked to the authorities: 52."],
-    "about": ["@@view About\tkoha.nexus\\n\\nCreated with dedication by Paulo F. Baldi FH."],
+    "about": ["@@view About\tkoha.nexus\\n\\nBorn from real-life experience facing technical barriers in collection "
+              "management, designed for libraries without budget for expensive commercial systems or dedicated "
+              "technical support.\\n\\nSupport this open-source initiative:\\n  * Pix (Brazil)  : 076.650.449.21\\n"
+              "  * Bitcoin (BTC) : bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx\\n\\nOfficial Repository:\\n"
+              "  https://github.com/PauloFBaldiFH/koha.nexus\\nWebsite:\\n  https://koha.nexus\\n\\n"
+              "Created with dedication by Paulo F. Baldi FH."],
     "reboot": ["@@ask Reboot\tReboot the server now?", "@@say info Reboot\tRebooting in 5 seconds..."],
     "languages": [
         "@@choose Koha & Panel Languages\tChoose the language:\tpt-BR\ten\tEnglish\tpt-BR\tPortuguês (Brasil)",

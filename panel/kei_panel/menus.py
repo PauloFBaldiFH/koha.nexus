@@ -28,6 +28,9 @@ class Entry:
     kind: str = "interactive"
     verb: tuple[str, ...] = ()
     confirm: str = ""
+    # Dormant: not drawn (the routine and its code stay; Paulo, 2026-10-08:
+    # the cataloguing aids do not work yet, so their cards are hidden).
+    hidden: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,7 +46,7 @@ class Section:
 
 
 SECTIONS: tuple[Section, ...] = (
-    Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="🎛️"),
+    Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
     # Every import in one place, right under the dashboard.
     Section("import", "🪄  Magic Import Tool", entries=(
         Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
@@ -86,7 +89,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
     ), view="hub", key="m"),
     # WireGuard VPN for the staff interface and SSH (views/vpn.py).
-    Section("vpn", "🛡️  WireGuard VPN", "🛡️  WireGuard VPN", view="vpn", key="v"),
+    Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
@@ -128,10 +131,10 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🚮  Privacy (LGPD): delete old patrons", "privacy-delete", kind="native"),
         Entry("📜  View tool logs", "tool-logs", kind="native"),
         Entry("🌎  Brazil: localization", "brazil", kind="native"),
-        Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native"),
-        Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native"),
+        Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native", hidden=True),
+        Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native", hidden=True),
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
-        Entry("🧮  Cutter Calculator", "cutter", kind="native"),
+        Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
     ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
         Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),

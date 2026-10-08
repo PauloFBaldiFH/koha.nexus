@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.19"
+PANEL_VERSION=" 1.5.20"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -119,8 +119,8 @@ PANEL_LANG_ITEMS=(
     "id-ID"      "Bahasa Indonesia"
     "ar-Arab"    "العربية"
     "fa-Arab"    "فارسی"
-    "hi"         "हिन्दी"
-    "bn-IN"      "বাংলা"
+    "hi"         "Hindi"
+    "bn-IN"      "Bangla (Bengali)"
     "vi-VN"      "Tiếng Việt"
     "zh-Hans-CN" "中文 (简体)"
     "ja-Jpan-JP" "日本語"
@@ -8988,7 +8988,9 @@ function_about() {
     txt_about+="  ⭐ $(t "Star the repository on GitHub!")\n"
     txt_about+="  ⭐ $(t "Share it with colleagues and other institutions.")\n\n"
     txt_about+="$(t "Official Repository:")\n"
-    txt_about+="  https://github.com/BibliotecaPalotina/koha-easy-install\n\n"
+    txt_about+="  https://github.com/PauloFBaldiFH/koha.nexus\n"
+    txt_about+="$(t "Website:")\n"
+    txt_about+="  https://koha.nexus\n\n"
     txt_about+="----------------------------------------------------------------------\n"
     txt_about+="$(t "Created with dedication by Paulo F. Baldi FH.")\n"
     txt_about+="$(t "Library Assistant - Castro Alves Public Library")\n"
@@ -18087,7 +18089,7 @@ sys.exit(main())
 KEIPY
     cat > "$d/kei_import/__init__.py" <<'KEIPY'
 """kei_import: the engine of the Magic Import Tool (Ferramenta de Importação
-Mágica Maluca) of Koha Easy Installer. One entry point takes any file, folder
+Mágica) of Koha Easy Installer. One entry point takes any file, folder
 or archive, recognises what it holds and prepares it for Koha's own import
 tools; the panel asks the questions and commits."""
 VERSION = "1"
@@ -25470,7 +25472,7 @@ sub widget_js {
         q = $.trim(q || "");
         if (!q || busy) return;
         add({ role: "user", text: q });
-        box.find("textarea").val("").css("height", "");
+        box.find("textarea").val("").css("height", userH ? userH + "px" : "");
         loading(true, T.thinking);
         post("cud-ask", { question: q }, function (r) { if (r.entry) add(r.entry); box.find("textarea").trigger("focus"); });
     }
@@ -25496,16 +25498,22 @@ sub widget_js {
     pac.appendChild(dots); pac.appendChild(el("span", "kei-ai-status"));
     box.append(pac);
     var form = el("form", "kei-ai-form");
-    var ta = el("textarea"); ta.rows = 1; ta.placeholder = T.placeholder; ta.setAttribute("aria-label", T.placeholder);
+    var ta = el("textarea"); ta.rows = 3; ta.placeholder = T.placeholder; ta.setAttribute("aria-label", T.placeholder);
     var send = el("button", "btn btn-primary kei-ai-send", T.send); send.type = "submit";
     form.appendChild(ta); form.appendChild(send);
     box.append(form);
 
     $(form).on("submit", function (e) { e.preventDefault(); ask(ta.value); });
     $(ta).on("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(ta.value); } });
-    // One line, growing with the text (Shift+Enter) up to about six lines.
-    function fit() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 2, 150) + "px"; }
+    // Three lines to start. The grip in its corner makes it taller (kept after
+    // each question), and long text grows it up to half the window.
+    var userH = 0;
+    function fit() {
+        var h = Math.max(userH, ta.offsetHeight);
+        if (ta.scrollHeight + 2 > h) ta.style.height = Math.min(ta.scrollHeight + 2, Math.round(window.innerHeight / 2)) + "px";
+    }
     $(ta).on("input", fit);
+    $(ta).on("mouseup", function () { userH = ta.offsetHeight; });
     $(wide).on("click", function () { box.toggleClass("kei-ai-wide"); $(wide).find("i").toggleClass("fa-expand fa-compress"); });
     $(document).on("keydown", function (e) { if (e.key === "Escape" && box.hasClass("kei-ai-wide")) $(wide).trigger("click"); });
     $(reset).on("click", function () { post("cud-reset", {}, function () { box.find(".kei-ai-log").empty(); greet(); }); });
@@ -25576,7 +25584,7 @@ sub widget_css {
 #kei-ai .kei-ai-dots i:nth-child(6) { animation-delay: 1s; }
 @keyframes kei-ai-eat { 0%, 15% { opacity: 0; } 30%, 100% { opacity: 1; } }
 #kei-ai .kei-ai-form { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
-#kei-ai .kei-ai-form textarea { flex: 1; box-sizing: border-box; font: inherit; line-height: 1.4; resize: none; height: 36px; min-height: 36px; max-height: 150px; overflow-y: auto; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
+#kei-ai .kei-ai-form textarea { flex: 1; box-sizing: border-box; font: inherit; line-height: 1.4; resize: vertical; height: 76px; min-height: 76px; max-height: 50vh; overflow-y: auto; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
 #kei-ai .kei-ai-form .kei-ai-send { flex: none; box-sizing: border-box; height: 36px; padding: 0 16px; }
 #kei-ai .kei-ai-form textarea:focus { border-color: #0b62d6; outline: 2px solid #c9dcfa; }
 #kei-ai.kei-ai-wide { position: fixed; z-index: 1050; top: 70px; left: 50%; transform: translateX(-50%); width: min(820px, 96vw);

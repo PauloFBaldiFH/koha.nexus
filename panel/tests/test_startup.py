@@ -51,4 +51,4 @@ def test_dashboard_title_has_its_icon():
             await pilot.pause(0.3)
             return str(app.screen.query_one("#view-dashboard .view-title", Label).render())
 
-    assert asyncio.run(main()) == "🎛️ Control Dashboard"
+    assert asyncio.run(main()) == "📊 Control Dashboard"
