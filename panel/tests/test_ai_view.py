@@ -6,13 +6,13 @@ import time
 
 import pytest
 from conftest import INSTALLER
+from textual.widgets import ProgressBar
 
 from kei_panel import aiconf, marcreplace
 from kei_panel.bridge import Bridge, installer_actions
 from kei_panel.env import PanelEnv
 from kei_panel.screens.loading import LoadingScreen
 from kei_panel.widgets.cards import StatusCard
-from kei_panel.widgets.pacman import PacmanLoader
 
 KEY = "AIzaSyD-test-key-0123456789wxyz"
 
@@ -53,11 +53,10 @@ def test_gemini_key_test_save_and_marc_hook(demo_dir):
             q("#ai-token").value = KEY
             view.action_test()
             await pilot.pause(0.2)
-            assert isinstance(app.screen, LoadingScreen)            # Pac-Man in front
-            pac = app.screen.query_one(PacmanLoader)
-            frame = pac.frame
+            assert isinstance(app.screen, LoadingScreen)            # the loader in front
+            bar = app.screen.query_one("#loader-bar", ProgressBar)
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
-            assert pac.frame > frame                                 # it moved while the test ran
+            assert bar.percentage == 1.0                             # the demo test reports its steps
             card = q("#card-ai-connection", StatusCard)
             assert "-ok" in card.classes
 

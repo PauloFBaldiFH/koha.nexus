@@ -17,6 +17,7 @@ from .menus import Entry
 from .screens.dialogs import ConfirmScreen, ResultScreen
 from .screens.main import MainScreen
 from .tasks import TaskResult, run_with_loader, verb_job
+from .theme import load_theme, save_theme
 
 
 HIDDEN_SYSTEM_COMMANDS = {"Screenshot", "Maximize", "Minimize"}
@@ -84,7 +85,8 @@ class KohaPanelApp(App):
         self.call_after_refresh(self._signal_started)
         # Classic console / Linux console: ASCII borders (panel.tcss, App.-plain).
         self.set_class(self.env.plain, "-plain")
-        self.theme = "textual-dark"
+        self.theme = load_theme(self.available_themes)
+        self.theme_changed_signal.subscribe(self, lambda theme: save_theme(theme.name))
         if not self.env.demo and not self.env.language_chosen():
             # New installation: the language first (config.sh restarts the app in it).
             from .screens.language import LanguageScreen

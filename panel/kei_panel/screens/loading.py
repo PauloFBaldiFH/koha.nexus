@@ -2,7 +2,9 @@
 
 Pushed by tasks.run_with_loader. It starts the job in a worker on mount,
 animates Pac-Man while the worker runs, and dismisses itself with a
-TaskResult. Esc or the Cancel button cancels the worker (an installer
+TaskResult. Pac-Man is for waits of unknown length; once the job reports
+progress (reporter.progress), a plain progress bar with the percentage takes
+its place, and Pac-Man comes back if the job goes back to "unknown". Esc or the Cancel button cancels the worker (an installer
 subprocess is terminated, a thread job sees reporter.cancelled), unless
 the task must not be stopped halfway (a restore): cancellable=False.
 """
@@ -16,12 +18,13 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, RichLog, Static
+from textual.widgets import Button, Label, ProgressBar, RichLog, Static
 from textual.worker import Worker, WorkerState
 
 from ..i18n import t
 from ..tasks import Job, Reporter, TaskFailed, TaskResult, is_async_job
 from ..widgets.pacman import PacmanLoader
+from ..widgets.progress import task_progress_bar
 
 # A task shorter than this still shows the loader this long: no flash.
 MIN_SECONDS = 0.6
@@ -41,6 +44,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         self.reporter = Reporter(self)
         self.started = 0.0
         self.worker: Worker | None = None
+        self.fraction: float | None = None
 
     def compose(self) -> ComposeResult:
         plain = getattr(self.app, "env", None) and self.app.env.plain
@@ -48,6 +52,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         with Vertical(id="loader-box"):
             yield Label(self.title_text, id="loader-title")
             yield PacmanLoader(plain=bool(plain), colors=colors, id="pacman")
+            yield task_progress_bar(bool(plain), id="loader-bar")
             yield Static("", id="loader-notice", markup=False)
             with Horizontal(id="loader-meta"):
                 yield Label("", id="loader-status")
@@ -61,6 +66,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         self.started = time.monotonic()
         self.query_one("#loader-log").display = False
         self.query_one("#loader-notice").display = False
+        self.query_one("#loader-bar").display = False
         if not self.cancellable:
             self.query_one("#cancel").display = False
         self.set_interval(0.5, self._update_clock)
@@ -96,14 +102,24 @@ class LoadingScreen(ModalScreen[TaskResult]):
         self.query_one("#cancel").display = on
 
     def set_progress(self, fraction: float | None) -> None:
-        self.query_one(PacmanLoader).progress = fraction
+        if fraction is not None:
+            fraction = max(0.0, min(1.0, fraction))
+        known = fraction is not None
+        pac, bar = self.query_one(PacmanLoader), self.query_one("#loader-bar", ProgressBar)
+        if known != (self.fraction is not None):
+            pac.display, bar.display = not known, known
+            if known:
+                pac.pause()
+            else:
+                pac.resume()
+        self.fraction = fraction
+        if known:
+            bar.update(progress=fraction * 100)
         self._update_clock()
 
     def _update_clock(self) -> None:
         secs = int(time.monotonic() - self.started)
-        fraction = self.query_one(PacmanLoader).progress
-        pct = f"{round(fraction * 100):3d}%  " if fraction is not None else ""
-        self.query_one("#loader-clock", Label).update(f"{pct}{secs // 60:02d}:{secs % 60:02d}")
+        self.query_one("#loader-clock", Label).update(f"{secs // 60:02d}:{secs % 60:02d}")
 
     # ------------------------------------------------------------------
     # End of the worker
