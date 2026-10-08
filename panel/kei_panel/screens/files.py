@@ -9,15 +9,18 @@ backup to restore), with the mouse or the keyboard.
   │                                  [Choose] [Cancel]                │
   └──────────────────────────────────────────────────────────────────┘
 The path can also be typed or pasted; Enter on it opens a folder or picks
-the file.
+the file. In file mode a file can be dropped on the window: the terminal
+pastes its path (transfer.dropped_path reads it, C:\\... paths included). A file
+that is not on this server (the panel used over SSH) gets the command that
+sends it here, with its Copy button.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
-from textual import on
+from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -25,8 +28,22 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, Static
 
 from ..i18n import t
+from ..transfer import dropped_path, is_backup_name
+from .dialogs import CopyValues, MessageScreen
 
 BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz")
+
+
+class PathInput(Input):
+    """The path box: a dropped file goes to the screen, not into the text."""
+
+    def _on_paste(self, event: events.Paste) -> None:
+        screen = self.screen
+        if getattr(screen, "accepts_drops", False):
+            event.stop()
+            screen.dropped(event.text)
+            return
+        super()._on_paste(event)
 
 
 class FilteredTree(DirectoryTree):
@@ -50,14 +67,19 @@ class FilteredTree(DirectoryTree):
         return keep
 
 
-class PathPickerScreen(ModalScreen[Path | None]):
+class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
     BINDINGS = [Binding("escape", "cancel", t("Cancel")), Binding("backspace", "up", t("Up"), show=False)]
 
     def __init__(self, title: str, start: str | Path, mode: str = "dir",
                  suffixes: tuple[str, ...] | None = BACKUP_SUFFIXES,
-                 shortcuts: list[tuple[str, str]] | None = None, help_text: str = ""):
+                 shortcuts: list[tuple[str, str]] | None = None, help_text: str = "",
+                 commands: list[str] | None = None, send_command: Callable[[str], str] | None = None):
         super().__init__()
         self._title, self._mode, self._help = title, mode, help_text
+        self._commands = commands or []
+        self._send_command = send_command
+        self._values: list[str] = []
+        self.accepts_drops = mode == "file"
         self._suffixes = suffixes if mode == "file" else ()
         start_path = Path(start)
         self._start = start_path if start_path.is_dir() else Path("/")
@@ -72,7 +94,10 @@ class PathPickerScreen(ModalScreen[Path | None]):
                         for i, (label, _path) in enumerate(self._shortcuts):
                             yield Button(label, id=f"go-{i}", classes="picker-go")
                         yield Button(t("Up"), id="up", classes="picker-go")
-                    yield Input(str(self._start), id="picker-path")
+                    if self.accepts_drops:
+                        yield Static(t("⬇️ Drop a .sql or .sql.gz file here, or paste its path."),
+                                     id="picker-drop", markup=False)
+                    yield PathInput(str(self._start), id="picker-path")
                     yield FilteredTree(self._start, self._suffixes if self._mode == "file" else None,
                                        id="picker-tree")
                     yield Label("", id="picker-error", classes="dialog-error")
@@ -81,6 +106,7 @@ class PathPickerScreen(ModalScreen[Path | None]):
                     help_box = VerticalScroll(id="picker-help")
                     help_box.can_focus = False
                     with help_box:
+                        yield from self.copy_rows(self._commands, command=True)
                         yield Static(self._help, markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("Choose this folder") if self._mode == "dir" else t("Choose this file"),
@@ -152,3 +178,35 @@ class PathPickerScreen(ModalScreen[Path | None]):
     @on(Button.Pressed, "#cancel")
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    # ------------------------------------------------------------------
+    # A file dropped on the window (its path pasted by the terminal)
+    # ------------------------------------------------------------------
+    def on_paste(self, event: events.Paste) -> None:
+        if self.accepts_drops and event.text.strip():
+            event.stop()
+            self.dropped(event.text)
+
+    def dropped(self, text: str) -> None:
+        raw = text.strip().splitlines()[0].strip() if text.strip() else ""
+        if not raw:
+            return
+        path = Path(dropped_path(raw))
+        self.query_one("#picker-path", Input).value = str(path)
+        err = self.query_one("#picker-error", Label)
+        if path.is_dir():
+            self._open(path)
+            return
+        if path.is_file():
+            if not is_backup_name(path.name):
+                err.update(t("Choose a .sql or .sql.gz file."))
+                return
+            self.dismiss(path)
+            return
+        if self._send_command:
+            self.app.push_screen(MessageScreen(
+                self._title, t("That file is not on this server: it is on your computer. "
+                               "Send it with the command below, then choose it here."),
+                kind="info", command=self._send_command(raw.strip("'\""))))
+            return
+        err.update(t("The file does not exist or cannot be read.\\nNothing was changed.").split("\\n")[0])

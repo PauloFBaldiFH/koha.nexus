@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Grid
+from textual.containers import Grid, Horizontal
+from textual.widgets import Button
 
 from ..i18n import t
 from ..widgets.cards import StatusCard
@@ -14,6 +15,10 @@ from .dashboard import age, human_bytes
 class BackupView(SectionView):
     def compose(self) -> ComposeResult:
         yield from self.heading()
+        with Horizontal(classes="quick-actions"):
+            # The newest backup straight into this PC's Downloads folder
+            # (routines/backup.download_latest; over SSH: the scp command).
+            yield Button(t("⬇️ Download latest backup"), id="backup-download", variant="success")
         with Grid(classes="status-grid"):
             yield StatusCard(t("Last backup"), id="bk-age")
             yield StatusCard(t("Size"), id="bk-size")
@@ -22,6 +27,11 @@ class BackupView(SectionView):
 
     def on_mount(self) -> None:
         self.refresh_data()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "backup-download":
+            event.stop()
+            self.app.run_native("backup-download")
 
     def refresh_data(self) -> None:
         self.run_worker(self._load(), exclusive=True, group="backup-status", exit_on_error=False)

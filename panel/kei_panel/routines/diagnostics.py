@@ -104,4 +104,4 @@ async def export_diagnostics(app) -> None:
                 app.notify(t("Windows Explorer could not be opened."), severity="warning")
         return
     await app.push_screen_wait(MessageScreen(title, "", kind="ok", command=path, command_help=saved,
-                                             command_notes=note))
+                                             command_notes=note, is_command=False))

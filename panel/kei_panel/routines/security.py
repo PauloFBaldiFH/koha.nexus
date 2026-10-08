@@ -61,4 +61,4 @@ async def rotate_password(app) -> None:
     error = out.last("error")
     kind, head, body = ("error", error[1], error[2]) if error else last_message(out)
     await app.push_screen_wait(MessageScreen(head if head and head != "OK" else title, body, kind=kind,
-                                             command=password))
+                                             command=password, is_command=False))
