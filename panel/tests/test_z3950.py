@@ -439,3 +439,30 @@ def test_koha_ranks_follow_latency():
     h.record(z.ScanResult(a.key, "ok", query_ms=700))
     h.record(z.ScanResult(b.key, "ok", query_ms=90))
     assert z.koha_ranks([a, b, c], h) == {b.key: 1, a.key: 2, c.key: 3}
+
+
+def test_curated_brazil_list_and_zeus_bridge():
+    latam = [t for t in z.load_curated() if t.region == "latam"]
+    assert [t.host for t in latam] == ["127.0.0.1", "z3950.ufsc.br", "z3950.utfpr.edu.br", "z3950.unifesp.br"]
+    zeus = latam[0]
+    assert (zeus.kind, zeus.port, zeus.db, zeus.preselect) == ("sru", 5000, "sru", True)
+    assert all((t.kind, t.port, t.db, t.preselect) == ("zed", 210, "Default", False) for t in latam[1:])
+    hosts = {t.host for t in z.load_curated()}
+    assert not hosts & {"162.214.168.248", "unesp.alma.exlibrisgroup.com"}
+
+
+def test_add_file_and_sql_carry_the_sru_settings():
+    zeus = next(t for t in z.load_curated() if t.preselect)
+    ufsc = next(t for t in z.load_curated() if t.host == "z3950.ufsc.br")
+    dnb = next(t for t in z.load_curated() if t.host == "services.dnb.de")
+    rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in
+            z.add_file_text([zeus, ufsc, dnb], {}).splitlines()]
+    assert (rows[0]["kind"], rows[0]["sru_fields"], rows[0]["sru_options"]) == (
+        "sru", "title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice", "sru_version=1.1,schema=marcxml")
+    assert (rows[1]["kind"], rows[1]["sru_fields"], rows[1]["sru_options"]) == ("zed", "", "")
+    assert rows[2]["sru_fields"] == z.DEFAULT_SRU_FIELDS
+    sql = z.to_koha_sql([zeus])
+    assert "'sru_version=1.1,schema=marcxml'" in sql and "sru_options" in sql
+    # A Z39.50 target never carries SRU settings, whatever its source says.
+    t = z.make_target({"host": "z.example.org", "sru_fields": "title=x"})
+    assert t.kind == "zed" and t.sru_fields == ""
