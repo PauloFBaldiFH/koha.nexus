@@ -228,6 +228,19 @@ _SCRIPTS: dict[str, list[str]] = {
                   "@@result backup=/etc/koha/sites/library/SIPconfig.xml.kei-demo",
                   "@@msg ok OK\t✅ SIP2 is set up. The self-check machine connects to 192.0.2.10 port 6001 with "
                   "the SIP login.\n\nThe login must also be a Koha patron with the same user name and password."],
+    "vpn-status": ["@@result installed=yes", "@@result configured=yes", "@@result running=yes",
+                   "@@result supported=yes", "@@result address=10.66.0.1", "@@result port=51820",
+                   "@@result endpoint=vpn.example.org", "@@result server_ip=192.0.2.10", "@@result ssh_port=22",
+                   "@@result peer=front-desk\t10.66.0.2\t1760000000\t1048576\t5242880",
+                   "@@result peer=maria-phone\t10.66.0.3\t0\t0\t0"],
+    "vpn-setup": ["@@note Installing WireGuard...", "@@note Starting the VPN...", "@@result running=yes",
+                  "@@msg ok OK\t✅ The VPN is on: this server is 10.66.0.1 inside it, UDP port 51820.\n\n"
+                  "Add a device for each computer or phone of the staff."],
+    "vpn-peer-add": ["@@result address=10.66.0.4",
+                     "@@msg ok OK\t✅ Device added with the address 10.66.0.4. Scan its QR code with the "
+                     "WireGuard app, or copy its profile to a computer."],
+    "vpn-peer-revoke": ["@@msg ok OK\tDevice revoked: it can no longer connect."],
+    "vpn-stop": ["@@msg ok OK\tThe VPN is off. The devices and keys are kept: Set up turns it on again."],
     "cloud-provider": ["@@note Registering the connection in rclone...", "@@note Testing the real cloud upload...",
                        "@@msg ok OK\tCloud enabled and tested successfully."],
 }

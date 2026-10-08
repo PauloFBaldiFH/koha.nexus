@@ -8,6 +8,7 @@ from .dashboard import DashboardView
 from .database import DatabaseView
 from .hub import HubView
 from .opac import OpacView
+from .vpn import VpnView
 from .z3950 import Z3950View
 
 VIEWS = {
@@ -20,7 +21,8 @@ VIEWS = {
     "opac": OpacView,
     "hub": HubView,
     "crons": CronView,
+    "vpn": VpnView,
 }
 
 __all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "OpacView",
-           "HubView", "CronView"]
+           "HubView", "CronView", "VpnView"]

@@ -87,7 +87,7 @@ def test_switch_schedule_preview_and_save(tmp_path, monkeypatch):
             assert "Full search index rebuild: on" in app.screen._preview
             await pilot.pause(0.1)
             app.screen.query_one("#yes").press()
-            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen) and app.screen.query("#ok"))
             assert "Schedules updated" in app.screen._body
             assert not sent["path"].exists()               # the file handed to the task is gone
             text = sent["text"]

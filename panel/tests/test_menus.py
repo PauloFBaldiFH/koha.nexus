@@ -32,7 +32,7 @@ def test_every_entry_is_native():
 def test_existing_labels_are_installer_texts():
     # New screens (database, ai) bring new texts; everything else must be
     # the installer's own English key, or its translations are lost.
-    new = {"database", "ai", "dashboard", "z3950", "opac", "hub"}
+    new = {"database", "ai", "dashboard", "z3950", "opac", "hub", "vpn"}
     for s in SECTIONS:
         if s.id in new:
             continue
