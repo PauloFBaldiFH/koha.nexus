@@ -59,7 +59,7 @@ def test_isbn_search_returns_marcxml(results_page):
     assert root.findtext("zs:version", namespaces=NS) == "1.1"
     assert root.findtext("zs:numberOfRecords", namespaces=NS) == "1"
     rec = root.find("zs:records/zs:record", NS)
-    assert rec.findtext("zs:recordSchema", namespaces=NS) == "info:srw/schema/1/marcxml-v1.1"
+    assert rec.findtext("zs:recordSchema", namespaces=NS) == "marcxml"
     assert rec.findtext("zs:recordPosition", namespaces=NS) == "1"
     marc = rec.find("zs:recordData/marc:record", NS)
     title = marc.find("marc:datafield[@tag='245']/marc:subfield[@code='a']", NS).text
@@ -137,3 +137,87 @@ def test_health(results_page):
     client, _ = make(results_page)
     with client:
         assert client.get("/health").json()["status"] == "ok"
+
+
+SOAP_REQUEST = """<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+  <SOAP-ENV:Body>
+    <zs:searchRetrieveRequest xmlns:zs="http://www.loc.gov/zing/srw/">
+      <zs:version>1.1</zs:version>
+      <zs:query>dc.isbn=9684291426</zs:query>
+      <zs:startRecord>1</zs:startRecord>
+      <zs:maximumRecords>10</zs:maximumRecords>
+      <zs:recordSchema>info:srw/schema/1/marcxml-v1.1</zs:recordSchema>
+    </zs:searchRetrieveRequest>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>"""
+
+
+def _one_record(root):
+    assert root.findtext("zs:numberOfRecords", namespaces=NS) == "1"
+    rec = root.find("zs:records/zs:record", NS)
+    assert rec.findtext("zs:recordSchema", namespaces=NS) == "marcxml"
+    title = rec.find("zs:recordData/marc:record/marc:datafield[@tag='245']/marc:subfield[@code='a']", NS)
+    assert title.text.startswith("Tabamex")
+
+
+def test_get_search(results_page):
+    client, _ = make(results_page)
+    with client:
+        r = client.get("/sru", params={"version": "1.1", "operation": "searchRetrieve",
+                                       "query": "dc.isbn=9684291426"})
+    _one_record(ET.fromstring(r.content))
+
+
+def test_form_post_search(results_page):
+    client, fake = make(results_page)
+    with client:
+        r = client.post("/sru", data={"version": "1.1", "operation": "searchRetrieve",
+                                      "query": "dc.isbn=9684291426", "maximumRecords": "10"})
+    assert r.status_code == 200
+    _one_record(ET.fromstring(r.content))
+    assert fake.requests[0].url.params["searchType"] == "7"
+
+
+def test_form_post_without_operation_searches(results_page):
+    client, _ = make(results_page)
+    with client:
+        r = client.post("/sru", content="query=dc.title%3Dtabamex&version=1.1",
+                        headers={"content-type": "application/x-www-form-urlencoded"})
+    _one_record(ET.fromstring(r.content))
+
+
+def test_soap_post_search_answers_in_soap(results_page):
+    client, _ = make(results_page)
+    with client:
+        r = client.post("/sru", content=SOAP_REQUEST.encode(),
+                        headers={"content-type": "text/xml; charset=utf-8", "SOAPAction": ""})
+    assert r.status_code == 200
+    env = ET.fromstring(r.content)
+    assert env.tag == "{http://schemas.xmlsoap.org/soap/envelope/}Envelope"
+    root = env.find("{http://schemas.xmlsoap.org/soap/envelope/}Body/zs:searchRetrieveResponse", NS)
+    _one_record(root)
+
+
+def test_plain_xml_post_search(results_page):
+    body = SOAP_REQUEST.split("<SOAP-ENV:Body>")[1].split("</SOAP-ENV:Body>")[0].strip()
+    client, _ = make(results_page)
+    with client:
+        r = client.post("/sru/sru", content=body.encode(), headers={"content-type": "text/xml"})
+    _one_record(ET.fromstring(r.content))
+
+
+def test_empty_post_is_explain(results_page):
+    client, _ = make(results_page)
+    with client:
+        r = client.post("/sru")
+    assert ET.fromstring(r.content).tag == "{http://www.loc.gov/zing/srw/}explainResponse"
+
+
+def test_broken_xml_post_is_a_diagnostic_not_a_crash(results_page):
+    client, _ = make(results_page)
+    with client:
+        r = client.post("/sru?operation=searchRetrieve", content=b"<searchRetrieveRequest><query>",
+                        headers={"content-type": "text/xml"})
+    assert r.status_code == 200
+    assert ET.fromstring(r.content).findtext(".//diag:uri", namespaces=NS) == "info:srw/diagnostic/1/7"
