@@ -13,8 +13,12 @@
                  the newest backup copied to the Downloads folder of this
                  PC (WSL: Windows; a Linux desktop), with size, speed and
                  time left; over SSH, the scp command instead
-  cloud_backup   Google Drive with a token from another PC, authorized on
-                 this server, or any rclone remote (rclone's own wizard)
+  cloud_backup   Google Drive with a token from another PC, or authorized on
+                 this server (both untouched); or another service step by
+                 step (cloud_provider): OneDrive with a sign-in link to copy
+                 and the answer pasted back (screens/oauth.py), MEGA, or an
+                 S3 bucket (AWS, Cloudflare R2, Wasabi, MinIO...), and rclone's
+                 own wizard for the rest
 Texts are the installer's own (same translations as the classic panel).
 """
 
@@ -22,11 +26,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .. import transfer
+from .. import cloud, transfer
 from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..screens.files import PathPickerScreen
 from ..screens.loading import LoadingScreen
+from ..screens.oauth import OAuthScreen
 from .common import facts, failed, last_message, run_task, show_failure, tx
 
 DOWNLOAD_LABEL = "⬇️ Download latest backup"
@@ -323,7 +328,7 @@ async def cloud_backup(app) -> None:
         title, t("How do you want to configure auto cloud backups?"), [
             ("token", t("Express: Generate token on another PC (SSH / Headless)")),
             ("here", t("Express: Authenticate directly on this server")),
-            ("wizard", t("Manual: Standard Rclone Wizard (Other services)")),
+            ("providers", t("Other services: OneDrive, MEGA or S3 (step by step)")),
         ], note=note))
     if choice == "token":
         token = await app.push_screen_wait(InputScreen(
@@ -352,21 +357,124 @@ async def cloud_backup(app) -> None:
         result = await run_task(app, t("DIRECT SERVER AUTHENTICATION (LOCAL / WITH BROWSER OR TUNNEL)"),
                                 "cloud-authorize", on_result=on_result)
         await _cloud_result(app, title, result)
-    elif choice == "wizard":
-        prep = await run_task(app, t("Installing rclone"), "cloud-prepare")
-        if failed(prep):
-            await show_failure(app, title, prep)
-            return
-        app.bridge.run_command_interactive(app, ["rclone", "config"])
-        remotes = (await app.bridge.task("cloud-remotes")).lists.get("remote", [])
-        if not remotes:
-            await app.push_screen_wait(MessageScreen(title, tx(
-                "There is no rclone remote called '$name'.\n\nExisting remotes:\n$remotes",
-                name="", remotes="-"), kind="error"))
-            return
-        name = await app.push_screen_wait(ChoiceScreen(
-            t("Remote Name"), t("Enter the EXACT NAME configured in Rclone:"), [(r, r) for r in remotes]))
-        if name is None:
-            return
-        result = await run_task(app, t("Testing the real cloud upload..."), "cloud-remote", name)
-        await _cloud_result(app, title, result)
+    elif choice == "providers":
+        await cloud_provider(app)
+
+
+async def rclone_wizard(app, title: str) -> None:
+    """rclone's own text wizard, for the services the panel has no form for."""
+    prep = await run_task(app, t("Installing rclone"), "cloud-prepare")
+    if failed(prep):
+        await show_failure(app, title, prep)
+        return
+    app.bridge.run_command_interactive(app, ["rclone", "config"])
+    remotes = (await app.bridge.task("cloud-remotes")).lists.get("remote", [])
+    if not remotes:
+        await app.push_screen_wait(MessageScreen(title, tx(
+            "There is no rclone remote called '$name'.\n\nExisting remotes:\n$remotes",
+            name="", remotes="-"), kind="error"))
+        return
+    name = await app.push_screen_wait(ChoiceScreen(
+        t("Remote Name"), t("Enter the EXACT NAME configured in Rclone:"), [(r, r) for r in remotes]))
+    if name is None:
+        return
+    result = await run_task(app, t("Testing the real cloud upload..."), "cloud-remote", name)
+    await _cloud_result(app, title, result)
+
+
+# ----------------------------------------------------------------------
+# OneDrive, MEGA, S3: rclone remotes without the rclone command line
+# ----------------------------------------------------------------------
+async def cloud_provider(app) -> None:
+    title = t("Cloud Backup")
+    options = [(key, t(label)) for key, label in cloud.PROVIDERS.items()]
+    options.append(("wizard", t("Another service (rclone's own wizard)")))
+    provider = await app.push_screen_wait(ChoiceScreen(
+        title, t("Where should the backups go? The Google Drive options stay in the previous menu."), options))
+    if provider is None:
+        return
+    if provider == "wizard":
+        await rclone_wizard(app, title)
+        return
+    service = t(cloud.PROVIDERS[provider])
+    name = await app.push_screen_wait(InputScreen(
+        service, t("A short name for this connection in rclone (it also names it in the backup log)."),
+        t("Connection name"), value=provider, validate=lambda v: t(cloud.name_problem(v)) if cloud.name_problem(v) else ""))
+    if name is None:
+        return
+    values = await _provider_values(app, provider, service)
+    if values is None:
+        return
+    try:
+        path = cloud.settings_file(name, provider, values)
+    except ValueError:
+        await app.push_screen_wait(MessageScreen(title, t("An answer has a tab or a line break. Type it again."),
+                                                 kind="error"))
+        return
+    try:
+        result = await run_task(app, t("Testing the real cloud upload..."), "cloud-provider", str(path))
+    finally:
+        path.unlink(missing_ok=True)
+    await _cloud_result(app, title, result)
+
+
+def _need(problem_of=None):
+    def check(value: str) -> str:
+        if not value:
+            return t("Cannot be empty.")
+        problem = problem_of(value) if problem_of else ""
+        return t(problem) if problem else ""
+    return check
+
+
+async def _provider_values(app, provider: str, service: str) -> dict[str, str] | None:
+    ask = app.push_screen_wait
+    if provider == "onedrive":
+        auth = cloud.DemoAuthorizer("onedrive") if app.env.demo else cloud.Authorizer("onedrive")
+        if not app.env.demo:
+            prep = await run_task(app, t("Installing rclone"), "cloud-prepare")
+            if failed(prep):
+                await show_failure(app, service, prep)
+                return None
+        token = await ask(OAuthScreen(t("Sign in to ${service}", service=service), service, auth))
+        return {"token": token} if token else None
+    if provider == "mega":
+        user = await ask(InputScreen(service, t("The e-mail and password of the library's MEGA account. The "
+                                                "password is kept only in rclone's private file, scrambled."),
+                                     t("E-mail"), validate=_need()))
+        if user is None:
+            return None
+        password = await ask(InputScreen(service, "", t("Password"), password=True, validate=_need()))
+        return None if password is None else {"user": user, "pass": password}
+    # S3 and compatible
+    kind = await ask(ChoiceScreen(service, t("Which service?"), [(k, t(v)) for k, v in cloud.S3_PROVIDERS.items()]))
+    if kind is None:
+        return None
+    keys = t("An access key of the account, with permission to write in the bucket. It is kept only in rclone's "
+             "private file.")
+    key_id = await ask(InputScreen(service, keys, t("Access key ID"), validate=_need()))
+    if key_id is None:
+        return None
+    secret = await ask(InputScreen(service, keys, t("Secret access key"), password=True, validate=_need()))
+    if secret is None:
+        return None
+    values = {"provider": kind, "access_key_id": key_id, "secret_access_key": secret}
+    if kind == "AWS":
+        region = await ask(InputScreen(service, t("The region of the bucket, for example us-east-1 or sa-east-1."),
+                                       t("Region"), value="us-east-1", validate=_need()))
+        if region is None:
+            return None
+        values["region"] = region
+    else:
+        endpoint = await ask(InputScreen(service, t("The address of the service (for Cloudflare R2: "
+                                                    "https://ACCOUNT_ID.r2.cloudflarestorage.com)."),
+                                         t("Endpoint"), validate=_need(cloud.endpoint_problem)))
+        if endpoint is None:
+            return None
+        values["endpoint"] = endpoint
+    bucket = await ask(InputScreen(service, t("The bucket the backups go in (created if it does not exist)."),
+                                   t("Bucket"), validate=_need(cloud.bucket_problem)))
+    if bucket is None:
+        return None
+    values["bucket"] = bucket
+    return values

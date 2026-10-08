@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.16"
+PANEL_VERSION=" 1.5.17"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -522,7 +522,7 @@ declare -A KEI_GLYPH_ASCII=(
     ["🟢"]="+" ["🔴"]="x" ["⚪"]="-" ["⬜"]="-"
 )
 KEI_GLYPH_ICONS=("⚙" "ℹ" "↻" "↶" "▣" "▤" "▦" "⌁" "⌕" "☁" "◈" "◌" "◷" "⏱" "✦" "★" "⟳" "⇩" "✉" "✎" "✏" "📖" "📋" "🪄" "⬇" "🎛" "️"
-    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🌓" "🎓" "🎨" "🎭" "🏠" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
+    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🌓" "🎓" "🎨" "🎭" "🏠" "🏧" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📨" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
 KEI_GLYPH_SED=""
 for _g in "${!KEI_GLYPH_ASCII[@]}"; do KEI_GLYPH_SED+="s/${_g}/${KEI_GLYPH_ASCII[$_g]}/g;"; done
 for _g in "${KEI_GLYPH_ICONS[@]}"; do KEI_GLYPH_SED+="s/${_g} *//g;"; done
@@ -26310,6 +26310,212 @@ opac_carousel_refresh() {
     fi
 }
 
+# ======================================================================
+# 41. ADMINISTRATION HUB (panel screens)
+# ----------------------------------------------------------------------
+# Koha's side of three panel screens (ROADMAP subject 5):
+#   cron-apply FILE        Schedules & cron tasks: the panel writes the whole
+#                          koha_tasks file (panel/kei_panel/cron.py); every
+#                          line is checked before it replaces the old one
+#                          (kept as koha_tasks.bak). A full index rebuild job
+#                          brings its helper, koha-kei-reindex.
+#   hub-status             Messaging & interoperability: e-mail, SMTP servers
+#                          (no passwords), SMS driver, SIP2 and Z39.50 state,
+#                          the libraries and the staff address for the links.
+#   sip-apply FILE PORT PUBLIC
+#                          SIPconfig.xml written by the SIP2 form
+#                          (panel/kei_panel/sip.py): checked, the old one kept
+#                          as SIPconfig.xml.kei-DATE, SIP server restarted.
+#   cloud-provider FILE    cloud backup on OneDrive, MEGA or S3: the rclone
+#                          remote from the panel's answers (a private file,
+#                          deleted at once), then the usual upload test. The
+#                          Google Drive flows (section 10) are not used here.
+# ======================================================================
+CRON_REINDEX_BIN="/usr/local/bin/koha-kei-reindex"
+SIP_CONF="/etc/koha/sites/${INSTANCE}/SIPconfig.xml"
+
+# cron_file_ok FILE: a PATH line, and nothing but comments, VAR= lines and
+# cron lines with a user (what /etc/cron.d needs).
+cron_file_ok() {
+    local ln field='[0-9*/,A-Za-z-]+'
+    grep -q '^PATH=' "$1" || return 1
+    while IFS= read -r ln || [ -n "$ln" ]; do
+        ln="${ln#"${ln%%[![:space:]]*}"}"
+        [ -z "$ln" ] && continue
+        [[ "$ln" == \#* ]] && continue
+        [[ "$ln" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && continue
+        [[ "$ln" =~ ^(@[a-z]+|${field}([[:space:]]+${field}){4})[[:space:]]+[a-z_][a-z0-9_-]*[[:space:]]+[^[:space:]] ]] || return 1
+    done < "$1"
+    return 0
+}
+
+# The full rebuild of the search index, with the engine Koha uses when it
+# runs (the engine can be switched after the job is scheduled).
+cron_reindex_script() {
+    cat <<'SH'
+#!/bin/sh
+# koha.nexus: full rebuild of a Koha instance's search index (Schedules &
+# cron tasks of the panel). Usage: koha-kei-reindex INSTANCE
+inst="$1"
+case "$inst" in ''|*[!A-Za-z0-9_-]*) echo "usage: $0 INSTANCE" >&2; exit 2 ;; esac
+engine=$(/usr/sbin/koha-mysql "$inst" -N -B -e "SELECT value FROM systempreferences WHERE variable = 'SearchEngine'" 2>/dev/null)
+if [ "$engine" = "Elasticsearch" ]; then
+    exec /usr/sbin/koha-elasticsearch --rebuild -d "$inst"
+fi
+exec /usr/sbin/koha-rebuild-zebra -f -v -b -a "$inst"
+SH
+}
+
+cron_apply() {
+    local f="$1"
+    require_koha || return 1
+    if [ ! -s "$f" ] || ! cron_file_ok "$f"; then
+        rm -f -- "$f"
+        msg_error "" "$(t "The new schedule from the panel is missing or has a line cron would refuse. Nothing was changed.")"
+        return 1
+    fi
+    if grep -q 'koha-kei-reindex' "$f"; then
+        cron_reindex_script > "$CRON_REINDEX_BIN" && chmod 755 "$CRON_REINDEX_BIN"
+    fi
+    [ -f "$CRON_TASKS" ] && cp -f "$CRON_TASKS" "${CRON_TASKS}.bak"
+    if ! cat "$f" > "$CRON_TASKS"; then
+        rm -f -- "$f"
+        msg_error "" "$(t "The new schedule from the panel is missing or has a line cron would refuse. Nothing was changed.")"
+        return 1
+    fi
+    rm -f -- "$f"
+    chmod 644 "$CRON_TASKS"
+    chown root:root "$CRON_TASKS" 2>/dev/null || true
+    systemctl restart cron >/dev/null 2>&1 || true
+    log "cron: schedules saved by the panel"
+    msg_ok "$(t "Schedules updated successfully.\nPrevious copy saved at: \${CRON_TASKS}.bak")"
+}
+
+# The address of the staff interface, for the panel's links.
+hub_staff_url() {
+    local url
+    url=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = 'staffClientBaseURL';" 2>/dev/null)
+    url="${url%/}"
+    case "$url" in http://*|https://*) printf '%s' "$url" ;; *) printf 'http://%s:8080' "$(get_server_ip)" ;; esac
+}
+
+hub_status() {
+    local row
+    require_database || return 1
+    kei_result staff_url "$(hub_staff_url)"
+    kei_result email "$([ -e "$KOHA_EMAIL_FLAG" ] && echo on || echo off)"
+    kei_result admin_email "$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = 'KohaAdminEmailAddress';" 2>/dev/null)"
+    kei_result sms_driver "$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = 'SMSSendDriver';" 2>/dev/null)"
+    kei_result messaging "$(msg_installed && echo yes || echo no)"
+    while IFS= read -r row; do
+        [ -n "$row" ] && kei_result smtp "$row"
+    done < <(run_sql "SELECT name, host, port, ssl_mode, IFNULL(user_name, ''), is_default FROM ${DB_NAME}.smtp_servers ORDER BY name;" 2>/dev/null)
+    while IFS= read -r row; do
+        [ -n "$row" ] && kei_result branch "$row"
+    done < <(run_sql "SELECT branchcode, branchname FROM ${DB_NAME}.branches ORDER BY branchname;" 2>/dev/null)
+    kei_result sip_conf "$SIP_CONF"
+    kei_result sip "$(pgrep -f "SIPServer.*${INSTANCE}" >/dev/null 2>&1 && echo running || echo stopped)"
+    kei_result z3950 "$(pgrep -f "z3950_responder.*${INSTANCE}" >/dev/null 2>&1 && echo running || echo stopped)"
+    return 0
+}
+
+# sip_xml_ok FILE: well-formed XML whose root is Koha's <acsconfig>.
+sip_xml_ok() {
+    [ -s "$1" ] && grep -q '<acsconfig' "$1" || return 1
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import sys, xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])' "$1" 2>/dev/null
+    else
+        perl -MXML::LibXML -e 'XML::LibXML->load_xml(location => $ARGV[0])' "$1" 2>/dev/null
+    fi
+}
+
+sip_apply() {
+    local f="$1" port="$2" public="$3" backup="" running ip
+    require_koha || return 1
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ] || ! sip_xml_ok "$f"; then
+        rm -f -- "$f"
+        msg_error "" "$(t "The SIP2 settings from the panel are missing or damaged. Nothing was changed.")"
+        return 1
+    fi
+    if [ -f "$SIP_CONF" ]; then
+        backup="${SIP_CONF}.kei-$(date +%Y%m%d-%H%M%S)"
+        cp -p "$SIP_CONF" "$backup" || { rm -f -- "$f"; return 1; }
+        chmod 600 "$backup"
+        cat "$f" > "$SIP_CONF"
+    else
+        mkdir -p "${SIP_CONF%/*}"
+        install -m 640 "$f" "$SIP_CONF"
+        chown "root:${INSTANCE}-koha" "$SIP_CONF" 2>/dev/null || true
+    fi
+    rm -f -- "$f"
+    log "sip2: SIPconfig.xml written by the panel (port ${port}, public ${public})"
+    if [ "$public" = "yes" ] && host_can firewall 2>/dev/null; then
+        ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+    fi
+    display_explanation "Restarting Koha's SIP2 server..."
+    /usr/sbin/koha-sip --enable "$INSTANCE" >/dev/null 2>&1 || true
+    koha_ctl /usr/sbin/koha-sip --restart "$INSTANCE" >/dev/null 2>&1 \
+        || koha_ctl /usr/sbin/koha-sip --start "$INSTANCE" >/dev/null 2>&1 || true
+    sleep 2
+    running=no
+    pgrep -f "SIPServer.*${INSTANCE}" >/dev/null 2>&1 && running=yes
+    kei_result sip "$running"
+    [ -n "$backup" ] && kei_result backup "$backup"
+    if [ "$running" = "yes" ]; then
+        ip=$(get_server_ip)
+        msg_ok "$(t "✅ SIP2 is set up. The self-check machine connects to \${ip} port \${port} with the SIP login.\n\nThe login must also be a Koha patron with the same user name and password.")"
+    else
+        msg_error "" "$(t "SIPconfig.xml was saved, but Koha's SIP2 server did not start.\n\nCheck: systemctl status koha-sip-daemon@\${INSTANCE}")"
+        return 1
+    fi
+}
+
+cloud_provider_add() {
+    local f="$1" name="" type="" bucket="" key value err remote
+    local args=()
+    require_database || return 1
+    if [ ! -f "$f" ]; then
+        msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"
+        return 1
+    fi
+    while IFS=$'\t' read -r key value; do
+        case "$key" in
+            name) name="$value" ;;
+            type) type="$value" ;;
+            bucket) bucket="$value" ;;
+            token|user|pass|provider|access_key_id|secret_access_key|region|endpoint) args+=("$key" "$value") ;;
+        esac
+    done < "$f"
+    rm -f -- "$f"
+    if ! [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}$ ]] || [ "${name,,}" = "gdrive" ] \
+        || ! [[ "$type" =~ ^(onedrive|mega|s3)$ ]] \
+        || { [ "$type" = "s3" ] && ! [[ "$bucket" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; }; then
+        msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"
+        return 1
+    fi
+    rclone_prepare || return 1
+    display_explanation "Registering the connection in rclone..."
+    remote="$name"
+    [ "$type" = "s3" ] && remote="${name}-s3"
+    rclone config delete "$remote" >/dev/null 2>&1 || true
+    if ! err=$(rclone config create "$remote" "$type" "${args[@]}" --obscure --non-interactive < /dev/null 2>&1); then
+        log "rclone: the ${type} remote ${remote} was not created"
+        printf '%s\n' "$err" | grep -viE 'token|secret|pass' | tail -n 5 >> "$RUN_LOG" 2>/dev/null
+        msg_error "" "$(t "rclone could not create the connection. Check the answers (account, keys, address) and try again.")"
+        return 1
+    fi
+    if [ "$type" = "s3" ]; then
+        # Backups go in folders of the bucket: an alias keeps NAME:FOLDER.
+        rclone config delete "$name" >/dev/null 2>&1 || true
+        rclone config create "$name" alias remote "${remote}:${bucket}" --non-interactive < /dev/null >/dev/null 2>&1 || {
+            msg_error "" "$(t "rclone could not create the connection. Check the answers (account, keys, address) and try again.")"
+            return 1
+        }
+    fi
+    log "rclone: ${type} remote ${name} created by the panel"
+    validate_and_register_rclone "$name"
+}
+
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
@@ -26855,6 +27061,10 @@ kei_task() {
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;
         opac-carousel-refresh) opac_carousel_refresh ;;
+        cron-apply)      [ -n "${1:-}" ] || return 2; cron_apply "$1" ;;
+        hub-status)      hub_status ;;
+        sip-apply)       [ -n "${3:-}" ] || return 2; sip_apply "$1" "$2" "$3" ;;
+        cloud-provider)  [ -n "${1:-}" ] || return 2; cloud_provider_add "$1" ;;
         clock)           function_configure_clock ;;
         status)
             local g label value

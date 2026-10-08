@@ -216,7 +216,20 @@ _SCRIPTS: dict[str, list[str]] = {
                           "@@msg ok OK\t✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and "
                           "OpacUserJS was kept.\n\nSafety backup: /var/backups/koha_sql/PRE-OPAC-THEME_demo.sql.gz"],
     "opac-carousel-refresh": ["@@result feed=9 of 14 titles with an ISBN have an Amazon cover",
-                              "@@msg ok OK\tThe New arrivals feed was rebuilt."],
+                              "@@msg ok OK\tThe New arrivals feed was rebuilt."],    "hub-status": ["@@result staff_url=http://192.0.2.10:8080", "@@result email=on",
+                   "@@result admin_email=library@example.org", "@@result sms_driver=", "@@result messaging=no",
+                   "@@result smtp=Gmail\tsmtp.gmail.com\t587\tstarttls\tlibrary@example.org\t1",
+                   "@@result branch=CPL\tCentral Library", "@@result branch=MPL\tMidway Library",
+                   "@@result sip_conf=/etc/koha/sites/library/SIPconfig.xml", "@@result sip=stopped",
+                   "@@result z3950=running"],
+    "cron-apply": ["@@msg ok OK\tSchedules updated successfully.\nPrevious copy saved at: "
+                   "/etc/cron.d/koha_tasks.bak"],
+    "sip-apply": ["@@note Restarting Koha's SIP2 server...", "@@result sip=yes",
+                  "@@result backup=/etc/koha/sites/library/SIPconfig.xml.kei-demo",
+                  "@@msg ok OK\t✅ SIP2 is set up. The self-check machine connects to 192.0.2.10 port 6001 with "
+                  "the SIP login.\n\nThe login must also be a Koha patron with the same user name and password."],
+    "cloud-provider": ["@@note Registering the connection in rclone...", "@@note Testing the real cloud upload...",
+                       "@@msg ok OK\tCloud enabled and tested successfully."],
 }
 
 
