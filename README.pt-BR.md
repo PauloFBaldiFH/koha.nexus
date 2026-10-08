@@ -154,7 +154,7 @@ O comportamento em um Windows real (o instalador, notificações, ícone de stat
 | 8 | Central de segurança | Fail2ban, firewall, troca de senha |
 | 9 | Configurações e parâmetros do Koha | Dimensionamento, e-mail, superbibliotecário, SIP2/Z39.50, relógio |
 | 10 | Ferramentas da biblioteca | Ferramenta de Importação Mágica Maluca, desfazer uma importação MARC, relatórios SQL, virada do ano letivo, qualidade do catálogo, privacidade (LGPD), Brasil: localização, mensagens por WhatsApp / Telegram, auxílio à catalogação, substituir um registro MARC, consulta à CDD, ligar ou desligar os plugins do Koha, Calculadora Cutter |
-| 11 | Ferramentas gerais | htop/nethogs, navegador de terminal, gerenciador de arquivos |
+| 11 | Ferramentas gerais | htop/nethogs, gerenciador de arquivos |
 | 12 | Agendamentos e tarefas (cron) | Ver, entender, regenerar ou editar as tarefas automáticas |
 | 13 | Idiomas do Koha e do painel | Pacotes de idioma do Koha e idioma do painel |
 | 14 | Central de atualizações | Atualizações do sistema/Koha e do painel |
@@ -352,7 +352,7 @@ Os avisos por e-mail ficam com a agenda do próprio Koha (`koha-common`): avisos
 
 A instalação mostra sete etapas numeradas, uma linha por tarefa com uma pequena barra de progresso do Pac-Man, e uma tela final com os endereços do catálogo e da interface da equipe. A saída dos comandos nunca aparece na tela: ela fica em `/var/log/koha-easy-install/apt.log`. Se uma tarefa falhar, o painel mostra a etapa que falhou, o que verificar e as últimas linhas desse log, que é o arquivo a enviar ao suporte de TI.
 
-As outras tarefas longas do painel têm o mesmo visual: troca do motor de busca, reparo do índice de busca, configuração do Cloudflare Tunnel, atualização do sistema, validação, reparo dos serviços, manutenção profunda e atualização de idiomas. A saída delas fica em `/var/log/koha-easy-install/` (por exemplo `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` e `apt.log`). A restauração de backups e as ferramentas que o painel instala quando pedidas (Midnight Commander, links, htop e nethogs) têm o mesmo visual.
+As outras tarefas longas do painel têm o mesmo visual: troca do motor de busca, reparo do índice de busca, configuração do Cloudflare Tunnel, atualização do sistema, validação, reparo dos serviços, manutenção profunda e atualização de idiomas. A saída delas fica em `/var/log/koha-easy-install/` (por exemplo `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` e `apt.log`). A restauração de backups e as ferramentas que o painel instala quando pedidas (Midnight Commander, htop e nethogs) têm o mesmo visual.
 
 As janelas do painel são desenhadas com o `dialog`, que o painel instala, então botões, itens de menu e caixas de seleção também aceitam cliques do mouse nos terminais que informam o mouse: Windows Terminal, os terminais do desktop Linux (GNOME Terminal, Konsole, xterm), PuTTY e a maioria dos clientes SSH. O console de texto do Linux só aceita com o `gpm` instalado. `KEI_UI=whiptail` mantém o visual antigo, só com teclado.
 

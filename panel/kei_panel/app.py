@@ -19,6 +19,9 @@ from .screens.main import MainScreen
 from .tasks import TaskResult, run_with_loader, verb_job
 
 
+HIDDEN_SYSTEM_COMMANDS = {"Screenshot", "Maximize", "Minimize"}
+
+
 class KohaPanelApp(App):
     CSS_PATH = Path(__file__).with_name("panel.tcss")
     TITLE = "koha.nexus"
@@ -59,6 +62,13 @@ class KohaPanelApp(App):
             self.copy_to_clipboard(url, quiet=True)
             self.notify(t("No browser can be opened from here. Address copied: paste it in your browser."),
                         timeout=6)
+
+    def get_system_commands(self, screen):
+        # Textual's Screenshot and Maximize/Minimize do not work for the
+        # panel (ROADMAP subject 1): they are left out of the command search.
+        for command in super().get_system_commands(screen):
+            if command.title not in HIDDEN_SYSTEM_COMMANDS:
+                yield command
 
     def _signal_started(self) -> None:
         """The first screen is on the terminal: config.sh's start-up watchdog

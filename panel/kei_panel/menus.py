@@ -39,10 +39,14 @@ class Section:
     entries: tuple[Entry, ...] = field(default_factory=tuple)
     view: str = "section"  # which view draws it (views/__init__.py)
     key: str = ""         # shortcut key
+    icon: str = ""        # drawn before a label that has no icon of its own
 
 
 SECTIONS: tuple[Section, ...] = (
-    Section("dashboard", "Control Dashboard", view="dashboard", key="d"),
+    Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="🎛️"),
+    # Every import in one place, right under the dashboard.
+    Section("import", "🪄  Magic Import Tool", entries=(
+        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
     Section("install", "📦  Install Koha server", entries=(
         Entry("📦  Install Koha server", "install", kind="native"),)),
     Section("credentials", "🔑  View first-access credentials", entries=(
@@ -102,7 +106,6 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
-        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),
         Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
         Entry("📋  Essential SQL reports pack", "reports", kind="native"),
         Entry("🎓  School-year turnover (patron categories)", "patron-category", kind="native"),
@@ -119,7 +122,6 @@ SECTIONS: tuple[Section, ...] = (
     ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
         Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
-        Entry("🌐  Terminal web browser (Links)", "links", kind="native"),
         Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
     )),
     Section("crons", "⏰  Schedules & cron tasks", entries=(

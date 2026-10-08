@@ -45,3 +45,15 @@ def test_unique_ids_and_keys():
     ids = [s.id for s in SECTIONS]
     keys = [s.key for s in SECTIONS if s.key]
     assert len(ids) == len(set(ids)) and len(keys) == len(set(keys))
+
+
+def test_magic_import_is_on_the_main_menu():
+    # ROADMAP subject 1: right under the dashboard, and only there.
+    assert [s.id for s in SECTIONS][:2] == ["dashboard", "import"]
+    places = [s.id for s in SECTIONS for e in s.entries if e.action == "magic-import"]
+    assert places == ["import"]
+
+
+def test_the_terminal_web_browser_is_gone():
+    from kei_panel import routines
+    assert "links" not in all_actions() and "links" not in routines.ROUTINES

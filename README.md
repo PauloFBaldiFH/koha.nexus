@@ -154,7 +154,7 @@ Real-Windows behaviour (the installer, notifications, the tray, Task Scheduler, 
 | 8 | Security center | Fail2ban, firewall, password rotation |
 | 9 | Koha settings & parameters | Sizing, e-mail, super librarian, SIP2/Z39.50, clock |
 | 10 | Library tools | Magic Import Tool, undo of a MARC import, SQL reports pack, school-year turnover, data-quality check, privacy (LGPD), Brazil: localization, WhatsApp / Telegram messaging, cataloguing aids, replace a MARC record, CDD lookup, Koha plugins on or off, Cutter Calculator |
-| 11 | General tools | htop/nethogs, terminal browser, file manager |
+| 11 | General tools | htop/nethogs, file manager |
 | 12 | Schedules & cron tasks | View, explain, regenerate or edit automated tasks |
 | 13 | Koha languages | Koha language packs and panel language |
 | 14 | Update center | System/Koha updates and panel self-update |
@@ -352,7 +352,7 @@ E-mail notices are left to Koha's own schedule (`koha-common`): overdue and adva
 
 The installation shows seven numbered steps, one line per task with a small Pac-Man progress bar, and a final screen with the addresses of the catalog and the staff interface. The commands' own output never reaches the screen: it is kept in `/var/log/koha-easy-install/apt.log`. If a task fails, the panel shows the failed step, what to check and the last lines of that log, which is the file to send to IT support.
 
-The panel's other long tasks look the same: switching the search engine, repairing the search index, setting up the Cloudflare Tunnel, updating the system, validation, service repair, deep maintenance and language updates. Their output goes to `/var/log/koha-easy-install/` (for example `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` and `apt.log`). Backup restores and the tools the panel installs on demand (Midnight Commander, links, htop and nethogs) look the same.
+The panel's other long tasks look the same: switching the search engine, repairing the search index, setting up the Cloudflare Tunnel, updating the system, validation, service repair, deep maintenance and language updates. Their output goes to `/var/log/koha-easy-install/` (for example `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` and `apt.log`). Backup restores and the tools the panel installs on demand (Midnight Commander, htop and nethogs) look the same.
 
 The panel's dialogs are drawn with `dialog`, which the panel installs, so buttons, menu items and check boxes also take mouse clicks in terminals that report the mouse: Windows Terminal, the Linux desktop terminals (GNOME Terminal, Konsole, xterm), PuTTY and most SSH clients. The Linux text console only does so with `gpm` installed. `KEI_UI=whiptail` keeps the older keyboard-only look.
 

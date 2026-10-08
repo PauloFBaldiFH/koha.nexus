@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.10"
+PANEL_VERSION=" 1.5.11"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -4229,7 +4229,7 @@ install_panel_copy() {
 # Python 3.9+, its own virtual environment with Textual, and a terminal.
 # Every routine is a panel screen: it runs here as "config.sh --task ..."
 # (PANEL TASKS), its questions asked by the panel; only full-screen
-# programs (htop, links, mc) get the terminal, with this panel's lock
+# programs (htop, mc) get the terminal, with this panel's lock
 # descriptor handed down (KEI_PANEL_LOCK_FD, see 4.5).
 #   KEI_UI=whiptail (or dialog)  always the classic panel
 # Anything that fails (no network for the first set-up, an old Python, a
@@ -8631,27 +8631,6 @@ function_run_mc() {
         install_tool "$(t "Installing Midnight Commander")" mc || return 0
     fi
     mc
-}
-
-# ======================================================================
-# 23. TERMINAL WEB BROWSER (LINKS)
-# ======================================================================
-function_run_links() {
-    if ! command -v links >/dev/null 2>&1; then
-        install_tool "$(t "Installing the terminal web browser")" links || return 0
-    fi
-    local opc
-    opc=$(whiptail --title "$(t "Terminal Web Browser (Links)")" \
-        --menu "$(t "Which Koha interface do you want to test internally?\n\n(Use arrow keys to navigate and 'Q' to close the browser)")" 14 76 2 \
-        "1" "$(t "Public Catalog (OPAC - Port 80)")" \
-        "2" "$(t "Administrative Intranet (Staff - Port 8080)")" \
-        3>&1 1>&2 2>&3) || return 0
-
-    if [ "$opc" = "1" ]; then
-        links http://localhost:80
-    elif [ "$opc" = "2" ]; then
-        links http://localhost:8080
-    fi
 }
 
 # ======================================================================
@@ -13499,15 +13478,19 @@ lt_cat_remove() {
 
 function_cataloguing() {
     require_database || return 0
-    local opt status
+    local opt status tables=()
+    # Loading and removing tables is kept out of the menu (ROADMAP subject 1);
+    # KEI_TABLE_UPLOAD=1 shows it again (lt_cat_load / lt_cat_remove).
+    [ "${KEI_TABLE_UPLOAD:-0}" = "1" ] && tables=(
+            "4" "$(t "Load a table (PHA, Cutter-Sanborn, CDD)")"
+            "5" "$(t "Remove a table")")
     while true; do
         status="$(t "Loaded tables"): PHA $(cat_table_count pha), Cutter-Sanborn $(cat_table_count cutter), CDD $(cat_table_count cdd)"
         opt=$(ui_menu "$(t "📝  Cataloguing aids: PHA, Cutter, CDD")" "$(t "Read-only helpers: nothing in the catalogue is changed.")"$'\n'"$status" \
             "1" "$(t "Author notation (PHA or Cutter-Sanborn)")" \
             "2" "$(t "Author notation of a catalogue record")" \
             "3" "$(t "CDD: look up a number or a subject")" \
-            "4" "$(t "Load a table (PHA, Cutter-Sanborn, CDD)")" \
-            "5" "$(t "Remove a table")") || return 0
+            "${tables[@]}") || return 0
         case "$opt" in
             1) lt_cat_notation ;;
             2) lt_cat_record ;;
@@ -20521,9 +20504,11 @@ class Grouper:
 KEIPY
     cat > "$d/kei_import/patrons.py" <<'KEIPY'
 """Patrons for Koha's import_patrons.pl. A row becomes a patron only with a
-personal identifier: a valid CPF, an e-mail, a card number from a patron
-table, or a birth date with an address. CPFs are checked (modulo 11) and a
-CPF or card number used twice is refused, as the panel always did."""
+personal identifier: a CPF, an e-mail, a card number from a patron table, or
+a birth date with an address. A card number used twice is refused. CPFs are
+not a reason to refuse anyone (ROADMAP subject 1): one that fails the modulo
+11 check is only counted, and only a valid CPF, the first time it is seen,
+goes to the CPF attribute."""
 import csv
 from collections import Counter
 
@@ -20564,13 +20549,10 @@ class Patrons:
             self.card_from_cpf = True
         dob = R.iso_date(v.get("dateofbirth", ""), self.today)
         reason = ""
-        if raw_cpf and not R.cpf_ok(raw_cpf):
-            reason = "invalid CPF %s" % raw_cpf
+        cpf_valid = bool(cpf) and R.cpf_ok(raw_cpf)
+        if raw_cpf and not cpf_valid:
             self.stats["invalid_cpf"] += 1
-        elif cpf and cpf in self.seen_cpf:
-            reason = "duplicate CPF (line %d)" % self.seen_cpf[cpf]
-            self.stats["duplicates"] += 1
-        elif not sur:
+        if not sur:
             reason = "no name"
         elif not card:
             reason = "no card number"
@@ -20582,8 +20564,9 @@ class Patrons:
         if reason:
             self.rejected.append((source, line, reason))
             return
+        keep_cpf = cpf_valid and cpf not in self.seen_cpf
         if cpf:
-            self.seen_cpf[cpf] = line
+            self.seen_cpf.setdefault(cpf, line)
         self.seen_card[card] = line
         sex = (v.get("sex", "")[:1] or "").upper()
         notes = []
@@ -20600,7 +20583,7 @@ class Patrons:
             "dateenrolled": R.iso_date(v.get("dateenrolled", ""), self.today),
             "categorycode": self.categories.get(R.norm_header(v.get("category", "")), ""),
             "userid": v.get("userid", ""), "borrowernotes": "; ".join(notes),
-            "patron_attributes": ("CPF:" + cpf) if (cpf and self.cpf_attr and has_card_column) else "",
+            "patron_attributes": ("CPF:" + cpf) if (keep_cpf and self.cpf_attr and has_card_column) else "",
         }
         if v.get("category") and not out["categorycode"]:
             self.stats["category_default"] += 1
@@ -21272,7 +21255,7 @@ def build(opts):
         preview.append("== Patrons built from the spreadsheets (CSV for import_patrons.pl)")
         preview.append("Patrons ready: %d" % pats.stats["ready"])
         preview.append("Rejected: %d" % len(pats.rejected))
-        preview.append("Invalid CPF: %d" % pats.stats["invalid_cpf"])
+        preview.append("Invalid CPF (imported, not kept as CPF): %d" % pats.stats["invalid_cpf"])
         preview.append("Duplicates: %d" % pats.stats["duplicates"])
         if pats.card_from_cpf:
             preview.append("No card number column: the CPF is used as the card number.")
@@ -22777,7 +22760,12 @@ cutter_js_latest() { [ "$(mr_js_current | awk -v b="$CUTTER_JS_BEGIN" -v e="$CUT
 
 function_cutter() {
     require_database || return 0
-    local opt status table n
+    local opt status table n tables=()
+    # Loading the tables is kept out of the menu (ROADMAP subject 1);
+    # KEI_TABLE_UPLOAD=1 shows it again (lt_cat_load).
+    [ "${KEI_TABLE_UPLOAD:-0}" = "1" ] && tables=(
+            "2" "$(t "Load the Cutter-Sanborn table")"
+            "3" "$(t "Load the PHA table (text, or the PDF of the book)")")
     while true; do
         n=$(cat_table_count cutter)
         if [ "$n" -gt 0 ]; then table="$(t 'Cutter-Sanborn table: ${n} entries.')"; else table="$(t "Cutter-Sanborn table: not loaded yet.")"; fi
@@ -22786,8 +22774,7 @@ function_cutter() {
         if cutter_installed; then status="$(t "Installed"): /cgi-bin/koha/cataloguing/cutter_calculator.pl"; else status="$(t "Not installed.")"; fi
         opt=$(ui_menu "$(t "🧮  Cutter Calculator")" "$(t "The call number of a record: the class (CDD, CDU or the library's own codes, from the record or suggested from the catalogue) and the author number from the Cutter-Sanborn or the PHA table of the library, here or in Koha's cataloguing, where the Call number and Cutter buttons put it in the record (with the letter of the title, the edition and the copy as set in the gear of the page). The tables are not distributed with the panel: load the copy of your library (Cutter-Sanborn as text, e.g. 848 Assis; PHA as text or the PDF of the book, even scanned).")"$'\n\n'"$table"$'\n'"$status" \
             "1" "$(t "Calculate a Cutter number")" \
-            "2" "$(t "Load the Cutter-Sanborn table")" \
-            "3" "$(t "Load the PHA table (text, or the PDF of the book)")" \
+            "${tables[@]}" \
             "4" "$(t "Install or update the page in the staff interface")" \
             "5" "$(t "Remove the page (the tables are kept)")") || return 0
         case "$opt" in
@@ -25413,7 +25400,6 @@ panel_action_function() {
         marc-replace)       echo function_marc_replace ;;
         ai-assistant)       echo function_ai_assistant ;;
         monitor)            echo function_run_monitor ;;
-        links)              echo function_run_links ;;
         mc)                 echo function_run_mc ;;
         crons)              echo function_manage_crons ;;
         languages)          echo function_install_languages ;;
@@ -25535,11 +25521,10 @@ kei_task() {
             fi
             msg_ok "$(t "Ollama is installed and running.")" ;;
         tool-install)
-            # A terminal program the panel then opens itself (htop, links, mc).
+            # A terminal program the panel then opens itself (htop, mc).
             case "${1:-}" in
                 htop)  command -v htop >/dev/null 2>&1 && command -v nethogs >/dev/null 2>&1 \
                            || install_tool "$(t "Installing htop and nethogs")" htop nethogs ;;
-                links) command -v links >/dev/null 2>&1 || install_tool "$(t "Installing the terminal web browser")" links ;;
                 mc)    command -v mc >/dev/null 2>&1 || install_tool "$(t "Installing Midnight Commander")" mc ;;
                 *)     return 2 ;;
             esac
@@ -25805,14 +25790,12 @@ while true; do
         10) function_library_tools ;;
         11)
             SUB_OPT=$(whiptail --title "$(t '🧰 General Tools')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a tool:')" 17 76 3 \
+                --menu "$(t 'Choose a tool:')" 16 76 2 \
                 "1" "$(t '📊  Resource monitoring (Htop / Nethogs)')" \
-                "2" "$(t '🌐  Terminal web browser (Links)')" \
-                "3" "$(t '📂  File explorer (Midnight Commander)')" 3>&1 1>&2 2>&3) || continue
+                "2" "$(t '📂  File explorer (Midnight Commander)')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_run_monitor ;;
-                2) function_run_links ;;
-                3) function_run_mc ;;
+                2) function_run_mc ;;
             esac
             ;;
         12) function_manage_crons ;;
