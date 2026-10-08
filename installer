@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.15"
+PANEL_VERSION=" 1.5.16"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -522,7 +522,7 @@ declare -A KEI_GLYPH_ASCII=(
     ["🟢"]="+" ["🔴"]="x" ["⚪"]="-" ["⬜"]="-"
 )
 KEI_GLYPH_ICONS=("⚙" "ℹ" "↻" "↶" "▣" "▤" "▦" "⌁" "⌕" "☁" "◈" "◌" "◷" "⏱" "✦" "★" "⟳" "⇩" "✉" "✎" "✏" "📖" "📋" "🪄" "⬇" "🎛" "️"
-    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🎓" "🎭" "🏠" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
+    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🌓" "🎓" "🎨" "🎭" "🏠" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
 KEI_GLYPH_SED=""
 for _g in "${!KEI_GLYPH_ASCII[@]}"; do KEI_GLYPH_SED+="s/${_g}/${KEI_GLYPH_ASCII[$_g]}/g;"; done
 for _g in "${KEI_GLYPH_ICONS[@]}"; do KEI_GLYPH_SED+="s/${_g} *//g;"; done
@@ -25999,6 +25999,317 @@ z3950_add() {
     msg_ok "$(t "Z39.50/SRU servers added to Koha: \${n}\nAlready in Koha: \${existing}\n\nThey are in Administration > Z39.50/SRU servers, checked for the cataloguing searches.")"
 }
 
+# ======================================================================
+# 40. OPAC APPEARANCE (panel screen)
+# ----------------------------------------------------------------------
+# The panel's "OPAC appearance" screen (panel/kei_panel/opac_theme.py)
+# writes the stylesheet and the script of the public catalogue: textures,
+# corner radius, wallpaper with a legibility film, logo, a light/dark switch
+# saved in each reader's browser, clean-up rules, action buttons for the
+# news and a "New arrivals" cover carousel. Here only Koha's side of it:
+#   opac-theme-get       the settings now in Koha (the KEI-THEME-DATA comment
+#                        of the block in OpacUserCSS) and the state of the feed
+#   opac-theme-apply DIR the panel's folder: user.css and user.js (one marked
+#                        block each, put in OpacUserCSS / OpacUserJS with the
+#                        rest of both preferences kept), prefs (a few allowed
+#                        preferences), assets/ (pictures for
+#                        /usr/share/koha/opac/htdocs/images/custom) and
+#                        carousel ("on N" or "off")
+#   opac-theme-remove    both blocks, the pictures, the feed and its schedule
+#   opac-carousel-refresh  the feed now
+# The carousel reads kei-new-arrivals.json, written every night by
+# koha-kei-new-arrivals: the newest titles with an ISBN, a copy that is not
+# lost or withdrawn, and a real Amazon cover (Amazon answers a missing one
+# with a 1x1 picture, which is skipped). Every write takes a verified backup
+# first, under the backup/restore lock.
+# ======================================================================
+OPAC_CUSTOM_DIR="/usr/share/koha/opac/htdocs/images/custom"
+OPAC_NA_BIN="/usr/local/bin/koha-kei-new-arrivals"
+OPAC_NA_FEED="kei-new-arrivals.json"
+CRON_OPAC="/etc/cron.d/koha_kei_opac"
+OPAC_BEGIN="/* koha-easy-installer opac-theme begin */"
+OPAC_END="/* koha-easy-installer opac-theme end */"
+
+# A system preference as stored (--raw: line breaks kept).
+opac_pref_raw() {
+    mysql --default-character-set=utf8mb4 -N -B --raw -e "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = $(sql_quote "$1");" 2>/dev/null
+}
+
+# opac_pref_block_sql PREF FILE|-: SQL that rewrites PREF without our block
+# and, with FILE, with FILE's block at its end.
+opac_pref_block_sql() {
+    local cur new
+    cur=$(opac_pref_raw "$1" | awk -v b="$OPAC_BEGIN" -v e="$OPAC_END" '$0 == b { skip = 1 } !skip { print } $0 == e { skip = 0 }')
+    new="$cur"
+    [ "$2" != "-" ] && new="${cur:+${cur}$'\n'}$(cat "$2")"
+    printf "UPDATE systempreferences SET value = %s WHERE variable = %s;\n" "$(sql_quote "$new")" "$(sql_quote "$1")"
+}
+
+# opac_block_ok FILE: one marked block, nothing that ends Koha's <script> or <style>.
+opac_block_ok() {
+    [ -s "$1" ] || return 1
+    [ "$(head -n1 "$1")" = "$OPAC_BEGIN" ] && [ "$(tail -n1 "$1")" = "$OPAC_END" ] || return 1
+    [ "$(grep -cxF -e "$OPAC_BEGIN" -e "$OPAC_END" "$1")" = "2" ] || return 1
+    ! grep -qiE '</[[:space:]]*(script|style)' "$1"
+}
+
+# opac_pref_line NAME VALUE: the SQL of one allowed preference, else nothing.
+opac_pref_line() {
+    case "$1" in
+        OPACAmazonCoverImages) [[ "$2" =~ ^[01]$ ]] || return 1 ;;
+        AmazonAssocTag)        [[ "$2" =~ ^[A-Za-z0-9-]{0,40}$ ]] || return 1 ;;
+        OpacFavicon)           [[ "$2" =~ ^(https://[A-Za-z0-9.-]+(:[0-9]+)?/|/images/custom/kei-)[A-Za-z0-9._~%/?=\&+-]*$ ]] || return 1 ;;
+        *) return 1 ;;
+    esac
+    printf "UPDATE systempreferences SET value = %s WHERE variable = %s;\n" "$(sql_quote "$2")" "$(sql_quote "$1")"
+}
+
+# The nightly job of the carousel (perl, run as root: DBI on the local
+# MariaDB socket). KEI_NA_DSN / KEI_NA_OUT / KEI_NA_COVER_BASE are for the tests.
+opac_na_script() {
+    printf '#!/usr/bin/perl\n# koha.nexus: "New arrivals" feed of the OPAC carousel (config.sh, OPAC appearance).\nour ($DB, $OUT) = (%s, %s);\n' \
+        "$(sql_quote "$DB_NAME")" "$(sql_quote "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}")"
+    cat <<'PL'
+use strict;
+use warnings;
+use DBI;
+use HTTP::Tiny;
+use JSON::PP;
+
+my $count = ($ARGV[0] // '') =~ /^\d+$/ ? $ARGV[0] : 12;
+$count = 4 if $count < 4;
+$count = 24 if $count > 24;
+my $out = $ENV{KEI_NA_OUT} || $OUT;
+my $base = $ENV{KEI_NA_COVER_BASE} || 'https://images-na.ssl-images-amazon.com/images/P/';
+my $dsn = $ENV{KEI_NA_DSN} || "dbi:mysql:database=$DB;mysql_read_default_group=client";
+my $dbh = DBI->connect($dsn, $ENV{KEI_NA_DSN} ? '' : 'root', '',
+    { RaiseError => 1, PrintError => 0, mysql_enable_utf8mb4 => 1, sqlite_unicode => 1 })
+    or die "no database\n";
+
+# ISBN-10 of the first usable ISBN (Amazon's covers are named by it).
+sub isbn10 {
+    for my $tok (($_[0] // '') =~ /([0-9][0-9-]{8,16}[0-9Xx])/g) {
+        (my $d = uc $tok) =~ s/-//g;
+        if ($d =~ /^978(\d{9})\d$/) {
+            my @n = split //, $1;
+            my $s = 0;
+            $s += (10 - $_) * $n[$_] for 0 .. 8;
+            my $c = (11 - $s % 11) % 11;
+            return $1 . ($c == 10 ? 'X' : $c);
+        }
+        if ($d =~ /^\d{9}[\dX]$/) {
+            my @n = map { $_ eq 'X' ? 10 : $_ } split //, $d;
+            my $s = 0;
+            $s += (10 - $_) * $n[$_] for 0 .. 9;
+            return $d if $s % 11 == 0;
+        }
+    }
+    return;
+}
+sub clean { my $v = $_[0] // ''; $v =~ s/[\s\/:;,.=]+$//; $v =~ s/^\s+//; return $v; }
+
+# Records hidden from the OPAC, where this Koha has the column.
+my $hide = eval { $dbh->selectall_arrayref('SELECT 1 FROM biblio WHERE 1 = 0 AND opac_suppressed = 0'); 1 }
+    ? ' AND (b.opac_suppressed IS NULL OR b.opac_suppressed = 0)' : '';
+my $limit = $count * 4 > 200 ? 200 : $count * 4;
+my $rows = $dbh->selectall_arrayref(
+    "SELECT b.biblionumber, b.title, b.author, bi.isbn FROM biblio b
+     JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
+     WHERE bi.isbn IS NOT NULL AND bi.isbn <> ''$hide
+     ORDER BY b.datecreated DESC, b.biblionumber DESC LIMIT $limit");
+my $items = $dbh->prepare('SELECT itemcallnumber, onloan, notforloan, itemlost, withdrawn FROM items WHERE biblionumber = ?');
+my $http = HTTP::Tiny->new(timeout => 8, agent => 'koha.nexus-new-arrivals');
+my (@feed, %seen, $tried);
+for my $r (@$rows) {
+    last if @feed >= $count;
+    my ($id, $title, $author, $isbn) = @$r;
+    my $i10 = isbn10($isbn) or next;
+    next if $seen{$i10};
+    $items->execute($id);
+    my ($total, $avail, $call) = (0, 0, '');
+    while (my $it = $items->fetchrow_hashref) {
+        next if $it->{itemlost} || $it->{withdrawn};
+        $total++;
+        $call ||= $it->{itemcallnumber} // '';
+        $avail++ if !$it->{onloan} && !$it->{notforloan};
+    }
+    next unless $total;
+    my $cover = "$base$i10.01.LZZZZZZZ.jpg";
+    $tried++;
+    my $res = $http->get($cover);
+    next unless $res->{success} && length($res->{content} // '') > 1000;
+    $seen{$i10} = 1;
+    push @feed, { biblionumber => $id + 0, title => clean($title), author => clean($author),
+                  callnumber => $call, available => $avail, total => $total, cover => $cover };
+}
+my @t = gmtime;
+my $json = JSON::PP->new->utf8->canonical->encode({
+    generated => sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]), items => \@feed });
+open my $fh, '>', "$out.tmp" or die "$out.tmp: $!\n";
+print $fh $json;
+close $fh or die "$out.tmp: $!\n";
+chmod 0644, "$out.tmp";
+rename "$out.tmp", $out or die "$out: $!\n";
+printf "%d of %d titles with an ISBN have an Amazon cover\n", scalar @feed, $tried // 0;
+PL
+}
+
+# opac_na_install N: the job, its schedule (every night) and a first run.
+opac_na_install() {
+    local tmp
+    mkdir -p "$OPAC_CUSTOM_DIR" && chmod 755 "$OPAC_CUSTOM_DIR" || return 1
+    tmp=$(mktemp "${OPAC_NA_BIN}.XXXXXX") || return 1
+    opac_na_script > "$tmp" && chmod 755 "$tmp" && mv -f "$tmp" "$OPAC_NA_BIN" || { rm -f -- "$tmp"; return 1; }
+    printf '# koha.nexus: OPAC "New arrivals" carousel\n40 5 * * * root %s %s >/dev/null 2>&1\n' "$OPAC_NA_BIN" "$1" > "$CRON_OPAC"
+    chmod 644 "$CRON_OPAC"
+    opac_na_run "$1"
+}
+
+opac_na_run() {
+    local out
+    if out=$("$OPAC_NA_BIN" "$1" 2>&1); then
+        kei_result feed "$out"
+        log "opac-theme: carousel feed: $out"
+        return 0
+    fi
+    log "opac-theme: carousel feed failed: $out"
+    kei_result feed_error "$out"
+    return 1
+}
+
+opac_na_remove() { rm -f -- "$CRON_OPAC" "$OPAC_NA_BIN" "${OPAC_CUSTOM_DIR:?}/${OPAC_NA_FEED:?}"; }
+
+# opac_custom_drop NAME...: our pictures kei-NAME.* in Koha's images/custom.
+opac_custom_drop() {
+    local n f
+    for n in "$@"; do
+        for f in "${OPAC_CUSTOM_DIR:?}/kei-${n:?}".*; do
+            [ -f "$f" ] && rm -f -- "$f"
+        done
+    done
+    return 0
+}
+
+opac_theme_get() {
+    require_database || return 1
+    local line
+    line=$(opac_pref_raw OpacUserCSS | awk -v b="$OPAC_BEGIN" -v e="$OPAC_END" '$0 == b { on = 1; next } $0 == e { on = 0 } on' \
+        | grep -m1 -F 'KEI-THEME-DATA:')
+    [ -n "$line" ] && kei_result data "$line"
+    kei_result amazon "$(opac_pref_raw OPACAmazonCoverImages)"
+    [ -f "$CRON_OPAC" ] && kei_result carousel "on"
+    if [ -f "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" ]; then
+        kei_result feed_items "$(grep -o '"biblionumber"' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
+    fi
+    return 0
+}
+
+opac_theme_apply() {
+    local dir="$1" f
+    require_database || return 1
+    if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js"; then
+        msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
+        return 1
+    fi
+    for f in "$dir"/assets/*; do
+        [ -e "$f" ] || continue
+        if [[ ! "${f##*/}" =~ ^kei-(background|logo|favicon)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
+            msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
+            return 1
+        fi
+    done
+    tools_locked _opac_theme_apply "$dir"
+}
+
+_opac_theme_apply() {
+    local dir="$1" log sql name value mode count f
+    log=$(tools_log opac-theme)
+    tools_safety_backup OPAC-THEME || return 1
+    sql="$TOOLS_WORK/opac-theme.sql"
+    {
+        printf 'START TRANSACTION;\n'
+        opac_pref_block_sql OpacUserCSS "$dir/user.css"
+        opac_pref_block_sql OpacUserJS "$dir/user.js"
+        if [ -f "$dir/prefs" ]; then
+            while IFS=$'\t' read -r name value; do
+                [ -n "$name" ] && opac_pref_line "$name" "$value"
+            done < "$dir/prefs"
+        fi
+        printf 'COMMIT;\n'
+    } > "$sql"
+    display_explanation "Writing the OPAC preferences..."
+    if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "$log" 2>&1; then
+        msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    if compgen -G "$dir/assets/kei-*" >/dev/null; then
+        mkdir -p "$OPAC_CUSTOM_DIR" && chmod 755 "$OPAC_CUSTOM_DIR"
+        for f in "$dir"/assets/kei-*; do
+            name="${f##*/}"
+            name="${name#kei-}"
+            opac_custom_drop "${name%.*}"
+            install -m 644 "$f" "${OPAC_CUSTOM_DIR}/kei-${name}" && printf 'picture: kei-%s\n' "$name" >> "$log"
+        done
+    fi
+    read -r mode count < "$dir/carousel" 2>/dev/null
+    if [ "$mode" = "on" ] && [[ "$count" =~ ^[0-9]+$ ]]; then
+        display_explanation "Looking for the covers of the newest titles..."
+        opac_na_install "$count" || true
+    else
+        opac_na_remove
+    fi
+    memcached_flush || true
+    log "opac-theme: applied"
+    kei_result applied yes
+    msg_ok "$(t "✅ The new look is in the OPAC. Reload the catalogue page in the browser to see it.\n\nSafety backup: \${TOOLS_PRE}")"
+}
+
+opac_theme_remove() {
+    require_database || return 1
+    tools_locked _opac_theme_remove
+}
+
+_opac_theme_remove() {
+    local log sql fav
+    log=$(tools_log opac-theme)
+    tools_safety_backup OPAC-THEME || return 1
+    sql="$TOOLS_WORK/opac-theme.sql"
+    {
+        printf 'START TRANSACTION;\n'
+        opac_pref_block_sql OpacUserCSS -
+        opac_pref_block_sql OpacUserJS -
+        fav=$(opac_pref_raw OpacFavicon)
+        [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
+        printf 'COMMIT;\n'
+    } > "$sql"
+    if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "$log" 2>&1; then
+        msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    opac_na_remove
+    opac_custom_drop background logo favicon
+    memcached_flush || true
+    log "opac-theme: removed"
+    msg_ok "$(t "✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and OpacUserJS was kept.\n\nSafety backup: \${TOOLS_PRE}")"
+}
+
+opac_carousel_refresh() {
+    require_database || return 1
+    local count
+    if [ ! -x "$OPAC_NA_BIN" ]; then
+        msg_error "" "$(t "The carousel is not on: turn it on and apply the look first.")"
+        return 1
+    fi
+    count=$(awk -v b="$OPAC_NA_BIN" '{ for (i = 1; i < NF; i++) if ($i == b) { print $(i + 1); exit } }' "$CRON_OPAC" 2>/dev/null)
+    [[ "$count" =~ ^[0-9]+$ ]] || count=12
+    if opac_na_run "$count"; then
+        msg_ok "$(t "The New arrivals feed was rebuilt.")"
+    else
+        msg_error "" "$(t "The New arrivals feed could not be rebuilt. See the panel log.")"
+        return 1
+    fi
+}
+
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
@@ -26540,6 +26851,10 @@ kei_task() {
             done < <(z3950_rows)
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
+        opac-theme-get)  opac_theme_get ;;
+        opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
+        opac-theme-remove) opac_theme_remove ;;
+        opac-carousel-refresh) opac_carousel_refresh ;;
         clock)           function_configure_clock ;;
         status)
             local g label value

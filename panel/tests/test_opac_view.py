@@ -1,0 +1,155 @@
+"""The OPAC appearance screen, driven headless in demo mode."""
+
+import asyncio
+import time
+
+from conftest import INSTALLER
+from textual.widgets import Input, Select, Switch
+
+from kei_panel import opac_theme as ot
+from kei_panel.env import PanelEnv
+from kei_panel.screens.dialogs import ConfirmScreen, InputScreen, MessageScreen, TextScreen
+from kei_panel.widgets.slider import Slider
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 40
+
+
+async def _until(pilot, cond, wait=8.0):
+    deadline = time.monotonic() + wait
+    while not cond() and time.monotonic() < deadline:
+        await pilot.pause(0.05)
+    assert cond()
+
+
+def test_slider_keys_and_range():
+    from textual.app import App
+
+    class One(App):
+        def compose(self):
+            yield Slider(0, 30, 14, unit="px", id="s")
+
+    async def main():
+        app = One()
+        async with app.run_test(size=(60, 5)) as pilot:
+            s = app.query_one("#s", Slider)
+            s.focus()
+            await pilot.press("right", "right")
+            assert s.value == 16
+            await pilot.press("end")
+            assert s.value == 30 and "30px" in str(s.render())
+            await pilot.press("right", "home")
+            assert s.value == 0
+            s.value = 99
+            assert s.value == 30
+    asyncio.run(main())
+
+
+def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEI_OPAC_KEYS", str(tmp_path / "opac-theme.conf"))
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(PNG)
+    seen = {}
+    real = ot.write_apply_dir
+
+    def spy(cfg, files, text=None):
+        work = real(cfg, files, text)
+        seen["work"], seen["css"], seen["files"] = work, (work / "user.css").read_text(), sorted(
+            p.name for p in (work / "assets").iterdir())
+        return work
+    monkeypatch.setattr(ot, "write_apply_dir", spy)
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+
+            view.query_one("#o-texture", Select).value = "metal"
+            view.query_one("#o-radius_block", Slider).value = 24
+            view.query_one("#o-src-logo", Select).value = "local"
+            view.query_one("#o-val-logo", Input).value = str(logo)
+            view.query_one("#o-src-background", Select).value = "url"
+            view.query_one("#o-val-background", Input).value = "javascript:alert(1)"
+            cfg, pending, problem = view.collect()
+            assert "https://" in problem
+            view.query_one("#o-val-background", Input).value = "https://i.postimg.cc/abc/wall.jpg"
+            view.query_one("#o-src-favicon", Select).value = "imgbb"
+            view.query_one("#o-val-favicon", Input).value = str(logo)
+            view.query_one("#o-g-rss", Switch).value = False
+            cfg, pending, problem = view.collect()
+            assert problem == "" and set(pending) == {"logo", "favicon"}
+
+            view.preview()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen))
+            assert "repeating-linear-gradient" in app.screen._text and "--kei-r-block: 24px" in app.screen._text
+            await pilot.press("escape")
+
+            view.apply()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            assert "https://i.ibb.co/demo/kei-favicon.png" in app.screen._preview
+            await pilot.pause(0.1)
+            app.screen.query_one("#yes").press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert "new look is in the OPAC" in app.screen._body
+            assert not seen["work"].exists()                     # the folder handed to Koha is gone
+            assert seen["files"] == ["kei-logo.png"]             # the ImgBB one went to the host
+            sent = ot.parse_theme_data(seen["css"])
+            assert sent["texture"] == "metal" and sent["radius_block"] == 24 and not sent["ghost"]["rss"]
+            assert sent["logo"]["url"].startswith("/images/custom/kei-logo.png?v=")
+            assert sent["background"]["url"] == "https://i.postimg.cc/abc/wall.jpg"
+            await pilot.press("escape")
+
+            # Image host keys: kept privately, the key never shown again.
+            view.keys()
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen))
+            assert app.screen._password
+            app.screen.query_one("#value").value = "imgbb-S3CRET"
+            app.screen.query_one("#ok").press()
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen) and not app.screen._password)
+            app.screen.query_one("#value").value = "democloud"
+            app.screen.query_one("#ok").press()
+            await pilot.pause(0.2)
+            app.screen.query_one("#value").value = "kei_unsigned"
+            app.screen.query_one("#ok").press()
+            await _until(pilot, lambda: (tmp_path / "opac-theme.conf").exists())
+            assert ot.load_keys() == {"imgbb_key": "imgbb-S3CRET", "cloudinary_cloud": "democloud",
+                                      "cloudinary_preset": "kei_unsigned"}
+            assert (tmp_path / "opac-theme.conf").stat().st_mode & 0o777 == 0o600
+
+            view.remove_look()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            await pilot.pause(0.1)
+            app.screen.query_one("#yes").press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert "back to Koha's own look" in app.screen._body
+            await pilot.press("escape")
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "frosted")
+
+    asyncio.run(main())
+
+
+def test_settings_come_back_from_koha(monkeypatch):
+    """The screen opens with the settings of the block in OpacUserCSS."""
+    from kei_panel import demo
+    cfg = ot.normalize({"texture": "gradient", "accent": "#ff0066", "carousel": {"count": 20, "hover": "tilt"}})
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [f"@@result data={ot.data_line(cfg)}",
+                                                          "@@result carousel=on", "@@result feed_items=17"])
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "gradient")
+            assert view.query_one("#o-accent", Input).value == "#ff0066"
+            assert view.query_one("#o-count", Slider).value == 20
+            assert view.query_one("#o-car-hover", Select).value == "tilt"
+            assert "17 titles" in str(view.query_one("#o-summary").render())
+
+    asyncio.run(main())

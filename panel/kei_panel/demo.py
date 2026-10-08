@@ -206,6 +206,17 @@ _SCRIPTS: dict[str, list[str]] = {
     "z3950-add": ["@@result added=2", "@@result existing=1", "@@result invalid=0",
                   "@@msg ok OK\tZ39.50/SRU servers added to Koha: 2\\nAlready in Koha: 1\\n\\nThey are in "
                   "Administration > Z39.50/SRU servers, checked for the cataloguing searches."],
+    "opac-theme-get": ["@@result amazon=0"],
+    "opac-theme-apply": ["@@note Generating the backup...", "@@note Writing the OPAC preferences...",
+                         "@@note Looking for the covers of the newest titles...",
+                         "@@result feed=9 of 14 titles with an ISBN have an Amazon cover", "@@result applied=yes",
+                         "@@msg ok OK\t✅ The new look is in the OPAC. Reload the catalogue page in the browser to "
+                         "see it.\n\nSafety backup: /var/backups/koha_sql/PRE-OPAC-THEME_demo.sql.gz"],
+    "opac-theme-remove": ["@@note Generating the backup...",
+                          "@@msg ok OK\t✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and "
+                          "OpacUserJS was kept.\n\nSafety backup: /var/backups/koha_sql/PRE-OPAC-THEME_demo.sql.gz"],
+    "opac-carousel-refresh": ["@@result feed=9 of 14 titles with an ISBN have an Amazon cover",
+                              "@@msg ok OK\tThe New arrivals feed was rebuilt."],
 }
 
 
