@@ -80,6 +80,8 @@ XML
 
 # Windows-1252 patron spreadsheet with Portuguese headers, semicolons, quoted
 # fields, formatted CPFs, one invalid and one repeated CPF, one line without a name.
+# A CPF never refuses a patron: the invalid one is imported, the repeated one
+# is refused only because, with no card number column, it is a repeated card.
 legacy_csv() {
     printf 'Nome;CPF;E-mail;Data de Nascimento;Sexo;Cidade\r\n"Ana Maria Souza";529.982.247-25;ana@x.br;05/03/2001;Feminino;S\xe3o Paulo\r\nJo\xe3o Lima;111.444.777-35;;12/12/1999;M;"Palotina; PR"\r\nPedro Errado;123.456.789-00;;;;\r\nAna Dup;52998224725;;;;\r\n;390.533.447-05;;;;\r\n' > "$W/leitores.csv"
 }
@@ -358,24 +360,24 @@ XML
 
 # --- Spreadsheets ---------------------------------------------------------------
 
-@test "I08 legacy patrons: Windows-1252 spreadsheet, CPFs checked, the CPF as card number, then Koha's dry run" {
+@test "I08 legacy patrons: Windows-1252 spreadsheet, CPFs not refused, the CPF as card number, then Koha's dry run" {
     legacy_csv
     export KEI_SELECT_FILE="$W/leitores.csv"
     inputs CPL PT
     answer yes no yes    # go on; do not update existing; import
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
-    assert 'preview | grep -q "^Patrons ready: 2$" && preview | grep -q "^Rejected: 3$"' "$(preview)"
-    assert 'preview | grep -q "leitores.csv line 4: invalid CPF 123.456.789-00"'
-    assert 'preview | grep -q "leitores.csv line 5: duplicate CPF (line 2)" && preview | grep -q "leitores.csv line 6: no name"'
+    assert 'preview | grep -q "^Patrons ready: 3$" && preview | grep -q "^Rejected: 2$"' "$(preview)"
+    assert 'preview | grep -q "^Invalid CPF (imported, not kept as CPF): 1$" && ! preview | grep -q "invalid CPF 123"'
+    assert 'preview | grep -q "leitores.csv line 5: duplicate card number (line 2)" && preview | grep -q "leitores.csv line 6: no name"'
     assert 'preview | grep -q "the CPF is used as the card number" && preview | grep -q "(CSV, encoding Windows-1252, separator \";\")"'
     assert '! dialogs | grep -q "MENU \[Records already in the catalog\]"' "no records, no record question"
     assert 'grep -q "^import_patrons.pl .*--matchpoint cardnumber --default branchcode=CPL --default categorycode=PT -v -v \[pre=0\]" "$KEI_S/calls.log"' "$(calls)"
     assert 'grep -q "^import_patrons.pl .*--confirm \[pre=1\]" "$KEI_S/calls.log"'
     assert '[ "$(tools_sql "SELECT CONCAT(firstname, \"|\", surname) FROM borrowers WHERE cardnumber = \"52998224725\";")" = "Ana|Maria Souza" ]'
     assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"11144477735\";")" = "Lima" ]'
-    assert '[ "$(tools_sql "SELECT COUNT(*) FROM borrowers WHERE cardnumber = \"12345678900\";")" = "0" ]' "invalid CPFs are not imported"
-    assert 'dialogs | grep -q "^OK ✅ Successfully imported 0 bibliographic record(s), 0 item(s) and 2 patron(s) with zero manual mapping required"'
+    assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"12345678900\";")" = "Errado" ]' "an invalid CPF does not refuse the patron"
+    assert 'dialogs | grep -q "^OK ✅ Successfully imported 0 bibliographic record(s), 0 item(s) and 3 patron(s) with zero manual mapping required"'
 }
 
 @test "I09 patrons with a card number column: the CPF goes to the CPF attribute" {
@@ -386,10 +388,11 @@ XML
     answer yes no yes
     panel lt_magic_import
     assert 'preview | grep -qE "MATRÍCULA +-> cardnumber" && preview | grep -qE "Nº CPF +-> cpf"' "$(preview)"
-    assert 'preview | grep -q "^Patrons ready: 1$" && preview | grep -q "invalid CPF 123.456.789-00"'
+    assert 'preview | grep -q "^Patrons ready: 2$" && preview | grep -q "^Invalid CPF (imported, not kept as CPF): 1$"'
     assert 'preview | grep -q "^Columns for Koha: cardnumber, surname, firstname, address, dateexpiry, patron_attributes$" && ! preview | grep -q "not stored"' "the CPF goes to the CPF attribute"
     assert 'grep -q "^import_patrons.pl .*--confirm \[pre=1\]" "$KEI_S/calls.log"'
     assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"2024001\";")" = "Rocha" ]'
+    assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"2024002\";")" = "Reis" ]' "the invalid CPF is imported without its CPF"
 }
 
 @test "I10 Biblioteca Fácil spreadsheet: one record per work, one 952 per copy, repeated tombos renumbered, the unclear column asked" {

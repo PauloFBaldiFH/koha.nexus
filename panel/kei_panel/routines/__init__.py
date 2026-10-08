@@ -47,7 +47,6 @@ ROUTINES: dict[str, Routine] = {
     "languages": tools.languages,
     "update-panel": tools.update_panel,
     "monitor": tools.monitor,
-    "links": tools.links,
     "mc": tools.mc,
 }
 
@@ -90,6 +89,6 @@ def task_of(action: str) -> str:
     """The `--task` the routine needs from the installer ("" = its own)."""
     if action in GENERIC or action in ("languages", "update-panel"):
         return "run"
-    if action in ("monitor", "links", "mc"):
+    if action in ("monitor", "mc"):
         return "tool-install"
     return ""

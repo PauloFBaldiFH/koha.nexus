@@ -8,7 +8,7 @@
                    screens, asked over the Pac-Man loader while it waits.
   languages        the same, then the panel starts again in the new language
   update_panel     the same; a new version closes the panel (open it again)
-  monitor, links, mc
+  monitor, mc
                    full-screen programs of their own: the choice and the
                    installation are panel screens, then the program gets the
                    terminal until it is closed (q / F10).
@@ -77,18 +77,6 @@ async def monitor(app) -> None:
     rc = app.bridge.run_command_interactive(app, argv)
     if rc not in (0, None):
         app.notify(f"{title}: exit {rc}", severity="warning")
-
-
-async def links(app) -> None:
-    title = t("Terminal Web Browser (Links)")
-    choice = await app.push_screen_wait(ChoiceScreen(
-        title, tx("Which Koha interface do you want to test internally?\n\n"
-                  "(Use arrow keys to navigate and 'Q' to close the browser)"),
-        [("1", t("Public Catalog (OPAC - Port 80)")), ("2", t("Administrative Intranet (Staff - Port 8080)"))]))
-    if not choice:
-        return
-    url = "http://localhost:80" if choice == "1" else "http://localhost:8080"
-    await _terminal_tool(app, t("Installing the terminal web browser"), "links", ["links", url])
 
 
 async def mc(app) -> None:

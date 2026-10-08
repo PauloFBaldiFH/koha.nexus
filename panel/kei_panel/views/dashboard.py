@@ -125,7 +125,8 @@ def access_links(s: dict) -> dict[tuple[str, str], tuple[str, str, str]]:
 class DashboardView(SectionView):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="view-head"):
-            yield Label(t("Control Dashboard"), classes="view-title")
+            icon = "" if self.app.env.plain else f"{self.section.icon} "
+            yield Label(icon + t("Control Dashboard"), classes="view-title")
             yield Button(t("Refresh"), id="refresh", classes="small")
         with Horizontal(classes="quick-actions"):
             yield Button(t("Restart Koha"), id="restart-koha", classes="small")

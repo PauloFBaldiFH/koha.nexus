@@ -26,8 +26,9 @@ from ..menus import SECTIONS, section
 from ..views import VIEWS
 
 
-def sidebar_prompt(label: str, plain: bool) -> str:
+def sidebar_prompt(label: str, plain: bool, own_icon: str = "") -> str:
     icon, text = split_icon(t(label))
+    icon = icon or own_icon
     if plain or not icon:
         return f"  {text}"
     return f"{icon} {text}"
@@ -43,7 +44,7 @@ class MainScreen(Screen):
         yield Header(show_clock=True)
         with Horizontal(id="body"):
             yield OptionList(
-                *[Option(sidebar_prompt(s.label, self.app.env.plain), id=s.id) for s in SECTIONS],
+                *[Option(sidebar_prompt(s.label, self.app.env.plain, s.icon), id=s.id) for s in SECTIONS],
                 id="sidebar")
             yield ContentSwitcher(id="views")
         yield Footer()

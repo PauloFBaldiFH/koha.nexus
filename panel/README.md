@@ -128,7 +128,7 @@ by `tui_run` (output to its log) never waits for an answer.
 | 8 | Publishing (Cloudflare tunnel, SSL, Search Console) | done |
 | 9 | Schedules, languages, updates, library tools, general tools, about, reboot | done |
 
-Full-screen programs of their own (htop, nethogs, links, Midnight Commander)
+Full-screen programs of their own (htop, nethogs, Midnight Commander)
 get the terminal after their choice and installation are made in the
 panel, as they would in any panel.
 

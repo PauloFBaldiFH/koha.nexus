@@ -278,6 +278,8 @@ SH
     assert 'dialogs | tail -1 | grep -q "could not be read from this PDF"' "$(dialogs | tail -1)"
     local n
     for n in 1 2 3 4 5; do assert 'grep -qF "            \"$n\" \"\$(t \"" <<< "$(sed -n "/^function_cutter()/,/^}/p" "$KEI_REPO/installer")"' "menu item $n"; done
+    # Loading the tables is out of the menu unless KEI_TABLE_UPLOAD=1 (ROADMAP subject 1).
+    assert 'sed -n "/^function_cutter()/,/^}/p" "$KEI_REPO/installer" | grep -q "KEI_TABLE_UPLOAD:-0}\" = \"1\" ] && tables=("'
 }
 
 # --- the class of the call number ----------------------------------------------------
