@@ -9,6 +9,7 @@ from textual.widgets import Input, Select, Switch
 from kei_panel import opac_theme as ot
 from kei_panel.env import PanelEnv
 from kei_panel.screens.dialogs import ConfirmScreen, InputScreen, MessageScreen, TextScreen
+from kei_panel.widgets.colorpick import ColorPicker, GradientBar, hex_to_hsl, hsl_to_hex
 from kei_panel.widgets.slider import Slider
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 40
@@ -19,6 +20,43 @@ async def _until(pilot, cond, wait=8.0):
     while not cond() and time.monotonic() < deadline:
         await pilot.pause(0.05)
     assert cond()
+
+
+def test_colour_picker_bars_and_code():
+    from textual.app import App
+
+    class One(App):
+        def compose(self):
+            yield ColorPicker("Accent", "#2563eb", "acc", ("Hue", "Saturation", "Lightness"))
+
+    assert hsl_to_hex(*hex_to_hsl("#ff0066")) == "#ff0066" and hex_to_hsl("2563eb") is None
+
+    async def main():
+        app = One()
+        async with app.run_test(size=(80, 14)) as pilot:
+            field = app.query_one("#acc", Input)
+            hue, light = app.query_one(".cp-h", GradientBar), app.query_one(".cp-l", GradientBar)
+            assert (hue.value, light.value) == hex_to_hsl("#2563eb")[::2]
+            # Typing a code moves the bars and keeps the code as typed.
+            field.value = "#ff0066"
+            await _until(pilot, lambda: hue.value == 336)
+            await pilot.pause(0.1)
+            assert field.value == "#ff0066"
+            # Moving a bar writes the code.
+            light.focus()
+            await pilot.press("end")
+            await _until(pilot, lambda: field.value == "#ffffff")
+            await pilot.press("home")
+            await _until(pilot, lambda: field.value == "#000000")
+            await pilot.press("pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
+            hue.focus()
+            await pilot.press("home")
+            await _until(pilot, lambda: field.value == hsl_to_hex(0, 100, 50))
+            # A click on the hue bar picks the colour under the mouse.
+            await pilot.click(hue, offset=(hue.size.width - 1, 0))
+            await _until(pilot, lambda: hue.value == 359)
+
+    asyncio.run(main())
 
 
 def test_slider_keys_and_range():
@@ -105,11 +143,11 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
 
             # Image host keys: kept privately, the key never shown again.
             view.keys()
-            await _until(pilot, lambda: isinstance(app.screen, InputScreen))
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen) and app.screen.query("#ok"))
             assert app.screen._password
             app.screen.query_one("#value").value = "imgbb-S3CRET"
             app.screen.query_one("#ok").press()
-            await _until(pilot, lambda: isinstance(app.screen, InputScreen) and not app.screen._password)
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen) and not app.screen._password and app.screen.query("#ok"))
             app.screen.query_one("#value").value = "democloud"
             app.screen.query_one("#ok").press()
             await pilot.pause(0.2)

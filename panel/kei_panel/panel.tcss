@@ -307,6 +307,11 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen {
 .detail-label { width: 26; color: $text-muted; }
 .detail-value { width: 1fr; text-style: bold; }
 .detail-copy { min-width: 8; width: auto; height: 1; border: none; margin-left: 1; }
+/* A Copy button right after the line it copies (CopyValues.text_with_copies). */
+.inline-copies { height: auto; }
+.inline-copy { height: auto; width: 100%; }
+.inline-text { width: 100%; height: auto; }
+.inline-copy .inline-text { width: auto; max-width: 85%; }
 .dialog-command {
     background: $boost;
     color: $warning;

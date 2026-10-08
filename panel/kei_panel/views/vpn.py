@@ -151,7 +151,7 @@ class VpnView(SectionView):
 
     async def _setup(self, endpoint: str, port: str) -> None:
         from ..routines.common import run_task, show_done
-        title = t("🛡️  WireGuard VPN")
+        title = t("🔐  WireGuard VPN")
         steps = "\n".join([
             t("Installs WireGuard and writes /etc/wireguard/wg0.conf (this server: ${ip}).", ip=vpn.SERVER),
             t("Turns on IP forwarding and the NAT (iptables MASQUERADE) for 10.66.0.0/24."),
@@ -169,7 +169,7 @@ class VpnView(SectionView):
 
     async def _stop(self) -> None:
         from ..routines.common import run_task, show_done
-        title = t("🛡️  WireGuard VPN")
+        title = t("🔐  WireGuard VPN")
         if not await self.app.push_screen_wait(ConfirmScreen(
                 title, t("Turn the VPN off? Connected devices are dropped; their profiles are kept."))):
             return
@@ -188,7 +188,7 @@ class VpnView(SectionView):
 
     async def _add(self, name: str) -> None:
         from ..routines.common import failed, run_task, show_failure
-        title = t("🛡️  WireGuard VPN")
+        title = t("🔐  WireGuard VPN")
         result = await run_task(self.app, title, "vpn-peer-add", name)
         if failed(result):
             await show_failure(self.app, title, result)
@@ -229,7 +229,7 @@ class VpnView(SectionView):
 
     async def _revoke(self, name: str) -> None:
         from ..routines.common import run_task, show_done
-        title = t("🛡️  WireGuard VPN")
+        title = t("🔐  WireGuard VPN")
         if not await self.app.push_screen_wait(ConfirmScreen(
                 title, t("Revoke ${name}? It can no longer connect; a new profile is needed to come back.",
                          name=name), danger=True)):

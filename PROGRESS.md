@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.19**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.20**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -132,6 +132,13 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   via Pillow). The motion script is a second `<script>` block; it never touches
   `loadLibraries()` (the `broker.koha.nexus/api/public-libraries` fetch into `#libraries-grid`)
   nor `broker/`. New site strings are translated into pt/es/fr/it/de only.
+- **Emoji widths** (1.5.20): a symbol Textual counts one cell wide followed by U+FE0F (⬇️, 🛡️,
+  🎛️, ⚠️) is drawn two cells wide by Windows Terminal, which slides the rest of that terminal row
+  (boxes, highlights, scroll bars, even a dialog over it). `glyphs.steady()` (run by `t()`) drops
+  the selector after such symbols; menu icons use emoji that are two cells everywhere (📊, 🔐, 📥).
+  Hindi and Bengali names in the language list are written in Latin letters for the same reason.
+- **Dormant menu entries**: `Entry(hidden=True)` keeps a routine but draws no card (cataloguing
+  aids, CDD lookup, Cutter Calculator, hidden at Paulo's request on 2026-10-08).
 - **Links from the panel** open through `panel/kei_panel/opener.py` (wslview/explorer.exe on
   WSL, xdg-open as SUDO_USER on a desktop, else copy via OSC 52). Never Python `webbrowser`.
 - **Windows**: new installs go to `C:\Koha`; scheduled tasks live in the Task Scheduler root as

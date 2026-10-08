@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from .env import CONFIG_DIR
-from .glyphs import plain_text
+from .glyphs import plain_text, steady
 
 _VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}|\$([A-Za-z_][A-Za-z0-9_]*)")
 
@@ -106,6 +106,7 @@ class Translator:
                 res = self.table[src]
         if self.plain:
             res = plain_text(res)
+        res = steady(res)
         return expand(res, values) if "$" in res else res
 
 

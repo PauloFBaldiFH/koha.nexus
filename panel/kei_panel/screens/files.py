@@ -95,7 +95,7 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                             yield Button(label, id=f"go-{i}", classes="picker-go")
                         yield Button(t("Up"), id="up", classes="picker-go")
                     if self.accepts_drops:
-                        yield Static(t("⬇️ Drop a .sql or .sql.gz file here, or paste its path."),
+                        yield Static(t("📥 Drop a .sql or .sql.gz file here, or paste its path."),
                                      id="picker-drop", markup=False)
                     yield PathInput(str(self._start), id="picker-path")
                     yield FilteredTree(self._start, self._suffixes if self._mode == "file" else None,

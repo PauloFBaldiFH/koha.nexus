@@ -26,6 +26,7 @@ from .. import opac_theme as ot
 from ..i18n import t
 from ..screens.dialogs import ConfirmScreen, InputScreen, TextScreen
 from ..tasks import Reporter, TaskFailed
+from ..widgets.colorpick import ColorPicker
 from ..widgets.slider import Slider
 from .base import SectionView
 
@@ -77,8 +78,9 @@ class OpacView(SectionView):
                                                  allow_blank=False, id="o-texture"))
             for key in ("blur", "opacity", "radius_block", "radius_input", "radius_button"):
                 yield from self._slider(key)
-            yield from _row(t("Accent colour"), Input(c["accent"], id="o-accent", max_length=7))
-            yield from _row(t("Second colour"), Input(c["accent2"], id="o-accent2", max_length=7))
+            bars = (t("Hue"), t("Saturation"), t("Lightness"))
+            yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")
+            yield ColorPicker(t("Second colour"), c["accent2"], "o-accent2", bars, id="o-pick-accent2")
         with Vertical(id="o-images", classes="opac-box"):
             yield Static(t("A file on this server (PNG, JPEG, GIF, WebP or ICO; SVG is refused), a file sent to "
                            "ImgBB or Cloudinary, or a direct https address (Postimages and other hosts)."),

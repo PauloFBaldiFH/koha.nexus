@@ -18,7 +18,7 @@ class BackupView(SectionView):
         with Horizontal(classes="quick-actions"):
             # The newest backup straight into this PC's Downloads folder
             # (routines/backup.download_latest; over SSH: the scp command).
-            yield Button(t("⬇️ Download latest backup"), id="backup-download", variant="success")
+            yield Button(t("📥 Download latest backup"), id="backup-download", variant="success")
         with Grid(classes="status-grid"):
             yield StatusCard(t("Last backup"), id="bk-age")
             yield StatusCard(t("Size"), id="bk-size")

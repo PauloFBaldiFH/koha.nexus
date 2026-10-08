@@ -34,7 +34,7 @@ from ..screens.loading import LoadingScreen
 from ..screens.oauth import OAuthScreen
 from .common import facts, failed, last_message, run_task, show_failure, tx
 
-DOWNLOAD_LABEL = "⬇️ Download latest backup"
+DOWNLOAD_LABEL = "📥 Download latest backup"
 
 RESTORE_STEPS = 10   # tui_run steps of function_restore_database
 

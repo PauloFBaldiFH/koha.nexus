@@ -79,6 +79,29 @@ class CopyValues:
                 yield Static(value, classes="detail-value", markup=False)
                 yield CopyButton(command=command, id=f"copy-{len(self._values) - 1}", classes="detail-copy")
 
+    def text_with_copies(self, text: str, classes: str = "dialog-body", limit: int | None = None):
+        """The text with a Copy button right after each line that holds an
+        address, code or key (not in a list at the bottom, where nobody can
+        tell which button copies what)."""
+        values = copyable(text)[:limit]
+        with Vertical(classes=f"inline-copies {classes}".strip()):
+            block: list[str] = []
+            for line in text.split("\n"):
+                hits = [v for v in values if v in line and v not in self._values]
+                if not hits:
+                    block.append(line)
+                    continue
+                if block:
+                    yield Static("\n".join(block), classes="inline-text", markup=False)
+                    block = []
+                with Horizontal(classes="inline-copy"):
+                    yield Static(line, classes="inline-text", markup=False)
+                    for value in hits:
+                        self._values.append(value)
+                        yield CopyButton(id=f"copy-{len(self._values) - 1}", classes="detail-copy")
+            if block:
+                yield Static("\n".join(block), classes="inline-text", markup=False)
+
     def action_copy(self) -> None:
         if not self._values:
             return
@@ -116,8 +139,7 @@ class ConfirmScreen(FitsScreen, CopyValues, ModalScreen[bool]):
                     yield Label(self._preview_title, classes="dialog-prompt")
                 with VerticalScroll(classes="dialog-scroll dialog-preview"):
                     yield Static(self._preview.strip("\n"), markup=False)
-            yield Static(self._question, classes="dialog-body", markup=False)
-            yield from self.copy_rows(copyable(self._question))
+            yield from self.text_with_copies(self._question)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("Yes"), id="yes", variant="error" if self._danger else "primary")
                 yield Button(t("No"), id="no")
@@ -181,8 +203,7 @@ class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
             yield Label(self._title, classes="dialog-title")
-            yield Static(self._prompt, classes="dialog-body", markup=False)
-            yield from self.copy_rows(copyable(self._prompt))
+            yield from self.text_with_copies(self._prompt)
             yield OptionList(*[Option(label, id=key) for key, label in self._options], classes="dialog-options")
             if self._note:
                 yield Static(self._note, classes="dialog-note", markup=False)
@@ -278,10 +299,10 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
         with Vertical(classes=classes):
             yield Label(self._title, classes="dialog-title")
             with VerticalScroll(classes="dialog-scroll"):
-                if self._body:
+                if self._body and not self._command:
+                    yield from self.text_with_copies(self._body)
+                elif self._body:
                     yield Static(self._body, classes="dialog-body", markup=False)
-                if not self._command:
-                    yield from self.copy_rows(copyable(self._body))
                 for label, value in self._details:
                     with Horizontal(classes="dialog-detail"):
                         yield Label(label, classes="detail-label")
@@ -384,8 +405,7 @@ class TextScreen(FitsScreen, CopyValues, ModalScreen[None]):
             if self._body:
                 yield Static(self._body, classes="dialog-body", markup=False)
             with VerticalScroll(classes="dialog-scroll dialog-preview"):
-                yield Static(self._text.strip("\n"), markup=False)
-            yield from self.copy_rows(copyable(self._text)[:self.MAX_COPY])
+                yield from self.text_with_copies(self._text.strip("\n"), classes="", limit=self.MAX_COPY)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
 
