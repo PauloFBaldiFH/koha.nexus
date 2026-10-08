@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.21**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.22**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -67,6 +67,11 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   ticked when the screen opens via `"preselect": true`) plus UFSC, UTFPR and UNIFESP on port 210;
   Biblioteca Nacional and UNESP (Alma) were dropped as permanently dead. A target's `sru_fields`
   and `sru_options` go to Koha through the 12th and 13th columns of the z3950-add file.
+  Since 1.5.22 a server is working once it answers the protocol (Z39.50 Init accepted, or any SRU
+  response), even with 0 hits, a slow search or a refused Present; BER indefinite lengths are read.
+  `History` resets automatic hides when `HISTORY_RULES` changes. Confirmed dead and left out:
+  raw IPs (Biblioteca Nacional), `*.alma.exlibrisgroup.com` (UNESP, BNE, CSIC), Portugal's BN
+  and `z3950.loc.gov:7090` (use `lx2.loc.gov:210/LCDB`). LIBRIS is MARC-8.
 - **OPAC appearance** (1.5.16, Subject 4): panel screen `views/opac.py` over `opac_theme.py`
   (textures, radius sliders in `widgets/slider.py`, wallpaper with a legibility film, logo,
   favicon via `OpacFavicon`, a 🌓 switch saved in `localStorage` key `kei_theme`, clean-up

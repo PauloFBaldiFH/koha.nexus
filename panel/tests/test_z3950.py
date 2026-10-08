@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 
 import pytest
 
@@ -466,3 +467,133 @@ def test_add_file_and_sql_carry_the_sru_settings():
     # A Z39.50 target never carries SRU settings, whatever its source says.
     t = z.make_target({"host": "z.example.org", "sru_fields": "title=x"})
     assert t.kind == "zed" and t.sru_fields == ""
+
+
+# ----------------------------------------------------------------------
+# What counts as working (no false failures)
+# ----------------------------------------------------------------------
+class PickyZ3950(FakeZ3950):
+    """Real-world replies the older scan took for failures."""
+
+    def __init__(self, mode, **kw):
+        super().__init__(**kw)
+        self.mode = mode
+
+    async def handle(self, reader, writer):
+        try:
+            while True:
+                pdu = ber_decode(await z.read_pdu(reader))[0]
+                if pdu[1] == 20:
+                    if self.mode == "indefinite":
+                        # InitResponse with an indefinite length, its result last.
+                        writer.write(b"\xb5\x80" + tlv(3, b"\x00\xe0") + tlv(12, b"\x01") + b"\x00\x00")
+                    elif self.mode == "no_result":
+                        writer.write(tlv(21, tlv(3, b"\x00\xe0") + tlv(110, b"x"), True))
+                    elif self.mode == "nested_false":
+                        user_info = tlv(11, tlv(12, b"\x00"), True)
+                        writer.write(tlv(21, tlv(3, b"\x00\xe0") + user_info + tlv(12, b"\xff"), True))
+                    else:
+                        writer.write(tlv(21, tlv(3, b"\x00\xe0") + tlv(12, b"\xff"), True))
+                elif pdu[1] == 22:
+                    if self.mode == "slow_search":
+                        await asyncio.sleep(5)
+                    writer.write(tlv(23, tlv(23, z.ber_int(42)) + tlv(24, z.ber_int(0)) + tlv(22, b"\xff"), True))
+                elif pdu[1] == 24:
+                    # Present out of range: a nonSurrogateDiagnostic, no record.
+                    diag = tlv(130, tlv(16, tlv(6, z.ber_oid(z.OID_BIB1), cls=UNIVERSAL)
+                                        + tlv(2, z.ber_int(13), cls=UNIVERSAL), True, UNIVERSAL), True)
+                    writer.write(tlv(25, tlv(24, z.ber_int(0)) + tlv(27, z.ber_int(1)) + diag, True))
+                await writer.drain()
+        except (asyncio.IncompleteReadError, ConnectionError):
+            pass
+        finally:
+            writer.close()
+
+
+def _scan_picky(mode, **kw):
+    async def go():
+        fake = PickyZ3950(mode, **kw)
+        server, port = await _serve(fake)
+        async with server:
+            return await z.scan_one(Target("Picky", "127.0.0.1", port, "Default"))
+    return asyncio.run(go())
+
+
+def test_indefinite_length_init_is_read():
+    res = _scan_picky("indefinite")
+    assert res.alive and res.answered and res.hits == 42
+
+
+def test_init_without_or_with_a_nested_result_is_accepted():
+    assert _scan_picky("no_result").status == "empty"
+    assert _scan_picky("nested_false").status == "empty"
+
+
+def test_present_out_of_range_is_working_not_bad_marc():
+    res = _scan_picky("plain")
+    assert res.status == "empty" and res.alive and "Present" in res.detail
+
+
+def test_slow_search_after_init_is_working(monkeypatch):
+    monkeypatch.setattr(z, "QUERY_TIMEOUT", 0.3)
+
+    async def go():
+        fake = PickyZ3950("slow_search")
+        server, port = await _serve(fake)
+        async with server:
+            t = Target("Slow", "127.0.0.1", port, "LCDB")
+            return await z.probe_z3950(t, port, timeout=0.3), await z.scan([t])
+    res, [scanned] = asyncio.run(go())
+    assert res.status == "empty" and res.alive and "TimeoutError" in res.detail
+    assert scanned.alive
+
+
+def test_whole_scan_timeout_keeps_what_the_probe_learnt(monkeypatch):
+    monkeypatch.setattr(z, "QUERY_TIMEOUT", 0.1)
+    monkeypatch.setattr(z, "CONNECT_TIMEOUT", 0.1)
+
+    async def slow_probe(target, port, res=None, **kw):
+        res.status, res.answered = "tcp", True
+        await asyncio.sleep(5)
+    monkeypatch.setattr(z, "probe_z3950", slow_probe)
+
+    async def fake_port(host, port, timeout=0):
+        return port, 3
+    monkeypatch.setattr(z, "find_port", fake_port)
+    [r] = asyncio.run(z.scan([Target("T", "t.example.org", 210, "db")]))
+    assert r.status == "empty" and "took too long" in r.detail
+
+
+def test_sru_diagnostic_or_zero_hits_is_working():
+    t = Target("Zeus", "127.0.0.1", 5000, "sru", kind="sru")
+    diag = ('<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:diagnostics>'
+            '<diag:diagnostic xmlns:diag="x"><diag:uri>info:srw/diagnostic/1/1</diag:uri>'
+            '<diag:message>Catálogo Zeus did not answer</diag:message></diag:diagnostic></zs:diagnostics>'
+            '</zs:searchRetrieveResponse>')
+    res = asyncio.run(z.probe_sru(t, 5000, get=lambda u, timeout: diag))
+    assert res.status == "empty" and res.alive and "Zeus did not answer" in res.detail
+
+
+def test_history_from_the_older_scan_is_shown_again(tmp_path):
+    old = {"a.example.org:210/x": {"status": "tcp", "fails": 4, "auto": True},
+           "b.example.org:210/y": {"status": "dead", "fails": 1, "manual": True}}
+    (tmp_path / z.HISTORY_FILE).write_text(json.dumps(old))
+    h = z.History()
+    assert not h.blacklisted("a.example.org:210/x") and h.get("a.example.org:210/x")["fails"] == 0
+    assert h.blacklisted("b.example.org:210/y")          # hidden by hand: stays hidden
+    h.record(z.ScanResult("a.example.org:210/x", "dead"))
+    h.save()
+    again = z.History()
+    assert again.get("a.example.org:210/x")["fails"] == 1  # no second reset
+
+
+def test_curated_list_without_the_confirmed_dead_servers():
+    targets = z.load_curated()
+    hosts = {t.host for t in targets}
+    assert not hosts & {"z3950.bnportugal.gov.pt", "eu00.alma.exlibrisgroup.com"}
+    assert not any(t.host == "z3950.loc.gov" for t in targets)
+    assert not any(re.fullmatch(r"[\d.]+", t.host) and t.host != "127.0.0.1" for t in targets)
+    keys = {t.key for t in targets}
+    assert {"lx2.loc.gov:210/LCDB", "services.dnb.de:443/sru/dnb", "z3950.libris.kb.se:210/libr"} <= keys
+    libris = next(t for t in targets if t.host == "z3950.libris.kb.se")
+    assert libris.encoding == "MARC-8"
