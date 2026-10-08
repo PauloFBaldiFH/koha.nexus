@@ -6,7 +6,7 @@
 # tests/ai_assistant/perl5 and a scripted model); the GRANTs of the
 # read-only account; the IntranetUserJS block; and, where Playwright is
 # installed, the widget in a real browser. Needs no Koha: perl with DBI,
-# DBD::SQLite and CGI, python3 and curl.
+# DBD::SQLite, CGI and MARC::Record, python3 and curl.
 
 setup() {
     load lib/common
@@ -28,6 +28,7 @@ start_mock() {
 ask()  { curl -s -X POST --data-urlencode op=cud-ask --data-urlencode csrf_token=tok-SESS1 --data-urlencode "question=$1" "$URL"; }
 post() { curl -s -X POST --data-urlencode csrf_token=tok-SESS1 "$@" "$URL"; }
 fines() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); printf "%g", $d->selectrow_array("SELECT SUM(amountoutstanding) FROM accountlines WHERE borrowernumber = 101")' "$W/koha.db"; }
+db() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); print join("|", map { $_ // "" } $d->selectrow_array($ARGV[1])), "\n"' "$W/koha.db" "$1"; }
 
 @test "ai assistant: the module answers, links and refuses (Perl tests)" {
     run env KEI_AIA_LIB="$W/lib" perl "$KEI_REPO/tests/ai_assistant/assistant.t"
@@ -50,52 +51,154 @@ fines() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); pri
     run ask "that book about the clown that was made into a movie..."
     [[ "$output" == *'"biblio:1":{"label":"It, King, Stephen","url":"/cgi-bin/koha/catalogue/detail.pl?biblionumber=1"}'* ]]
     [[ "$output" == *'[[biblio:2|A coisa, King, Stephen]]'* ]]
+    # Searched with Koha's search engine (the Elasticsearch double), not SQL.
+    grep -q 'TOOL RESULT search_catalogue: {\\"engine\\":\\"Elasticsearch\\"' "$W/model.log"
     run ask "who is the last patron who has 4 overdue books and 144 reais in fines?"
     [[ "$output" == *'[[patron:101|Ana Souza]]'* && "$output" == *'144.00'* ]]
     [[ "$output" == *'/cgi-bin/koha/members/moremember.pl?borrowernumber=101'* ]]
     # The model got the tools and the rules, and the librarian's question.
-    grep -q 'READ-ONLY' "$W/model.log"
+    grep -q 'Approve & Execute' "$W/model.log"
     grep -q 'find_patrons' "$W/model.log"
+    ! grep -q 'run_select' "$W/model.log"
 }
 
-@test "ai assistant: nothing changes without the token or without Confirm" {
+@test "ai assistant: the search engine down, the catalogue tables answer" {
+    KEI_AIA_ENGINE=down start_mock
+    run ask "that book about the clown that was made into a movie..."
+    [[ "$output" == *'[[biblio:1|It, King, Stephen]]'* ]]
+    grep -q 'TOOL RESULT search_catalogue: {\\"engine\\":\\"database\\"' "$W/model.log"
+}
+
+@test "ai assistant: greetings get a reply without tools" {
+    start_mock
+    run ask "Hello! Who are you?"
+    [[ "$output" == *'I am the koha.nexus assistant'* ]]
+    [ "$(wc -l < "$W/model.log")" = "1" ]
+    grep -q 'This message is small talk' "$W/model.log"
+    ! grep -q 'search_catalogue' "$W/model.log"
+}
+
+@test "ai assistant: a follow-up question uses the records of the last answer" {
+    start_mock
+    run ask "Do you have Stephen King books?"
+    [[ "$output" == *'[[biblio:1|It, King, Stephen]]'* ]]
+    run ask "Which one is his clown book?"
+    [[ "$output" == *'His clown book is [['* && "$output" == *'King, Stephen]]'* ]]
+    [[ "$output" != *'Whose clown book'* ]]
+    tail -n1 "$W/model.log" | grep -q '\\"found\\":\[\\"biblio:'
+}
+
+@test "ai assistant: nothing found is said, not invented" {
+    start_mock
+    run ask "books about quantum gravity?"
+    [[ "$output" == *"Nothing in this library's catalogue matches that."* && "$output" != *'[['* ]]
+    grep -q 'NO MATCHES' "$W/model.log"
+}
+
+@test "ai assistant: statistics and opening hours" {
+    start_mock
+    run ask "how many books do we have?"
+    [[ "$output" == *'**7 records** and **10 items** (9 on loan)'* ]]
+    run ask "what are the opening hours of the library?"
+    [[ "$output" == *'Centerville Public Library: Monday 08:00-18:00'* && "$output" == *'Saturday 09:00-12:00. Closed on Sunday.'* ]]
+}
+
+@test "ai assistant: nothing changes without the token or without Approve" {
     start_mock
     run curl -s -X POST -d op=cud-ask -d csrf_token=bad -d question=hi "$URL"
     [[ "$output" == *'"error":"Invalid or expired security token'* ]]
     run ask "waive Ana's fines"
-    [[ "$output" == *'"kind":"sql"'* && "$output" == *'"rows":2'* && "$output" == *'"state":"pending"'* ]]
+    [[ "$output" == *'"action":"write_off"'* && "$output" == *'"state":"pending"'* ]]
+    [[ "$output" == *'"diff":[{"field":"outstanding fines","from":"144.00","to":"0.00"}]'* ]]
+    [[ "$output" == *'"target":{"id":"101","kind":"patron","label":"Ana Souza","url":"/cgi-bin/koha/members/moremember.pl?borrowernumber=101"}'* ]]
+    [[ "$output" != *'"args"'* && "$output" != *'"before"'* ]]
     [ "$(fines)" = "144" ]
     run curl -s -X POST -d op=cud-confirm -d proposal=1 -d csrf_token=bad "$URL"
     [[ "$output" == *'"error":"Invalid or expired security token'* ]]
     [ "$(fines)" = "144" ]
     run post -d op=cud-confirm -d proposal=1
-    [[ "$output" == *'"state":"done"'* && "$output" == *'"result":2'* ]]
+    [[ "$output" == *'"state":"done"'* && "$output" == *'"result":"144.00"'* ]]
     [ "$(fines)" = "0" ]
-    # The rows before the change and the log of who ran it.
-    grep -q '"amountoutstanding":100' "$W"/kei-ai/undo/*.json
-    grep -q $'\tlibrarian\t2\tUPDATE accountlines SET amountoutstanding = 0 WHERE borrowernumber = 101 AND amountoutstanding > 0 LIMIT 2' "$W/kei-ai/changes.log"
+    # Written off by Koha::Account (the double): a WRITEOFF credit.
+    [ "$(db "SELECT amount, description FROM accountlines WHERE borrowernumber = 101 ORDER BY accountlines_id DESC LIMIT 1")" = "-144|WRITEOFF" ]
+    # The values before the change and the log of who made it.
+    grep -q '"before":{"outstanding":"144.00"}' "$W"/kei-ai/undo/*.json
+    grep -q $'\tlibrarian\twrite_off\tpatron:101\toutstanding fines: 144.00 -> 0.00$' "$W/kei-ai/changes.log"
     run post -d op=cud-confirm -d proposal=1
     [[ "$output" == *'"error":"This proposal was already decided."'* ]]
 }
 
-@test "ai assistant: a change runs only on the rows of the preview" {
+@test "ai assistant: Reject changes nothing" {
+    start_mock
+    ask "waive Ana's fines" > /dev/null
+    run post -d op=cud-cancel -d proposal=1
+    [[ "$output" == *'"state":"cancelled"'* ]]
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"error":"This proposal was already decided."'* ]]
+    [ "$(fines)" = "144" ]
+}
+
+@test "ai assistant: a change runs only on the values of the proposal" {
     start_mock
     ask "waive Ana's fines" > /dev/null
     perl -MDBI -e 'DBI->connect("dbi:SQLite:dbname=$ARGV[0]")->do("INSERT INTO accountlines VALUES (9, 101, 3, 3, \"OVERDUE\", \"\")")' "$W/koha.db"
     run post -d op=cud-confirm -d proposal=1
-    [[ "$output" == *'"error":"The data changed after the preview'* ]]
+    [[ "$output" == *'"error":"The record changed after the proposal'* ]]
     [ "$(fines)" = "147" ]
+    [ ! -e "$W/kei-ai/changes.log" ]
 }
 
-@test "ai assistant: SQL changes only for a superlibrarian; Koha pages for everyone" {
-    KEI_AIA_PERMS="patrons reports prefs sql" start_mock
+@test "ai assistant: a hold, a patron's e-mail and a record's title, made by Koha" {
+    start_mock
+    run ask "reserve Dom Casmurro for Bruno"
+    [[ "$output" == *'"action":"place_hold"'* && "$output" == *'"to":"Bruno Lima"'* && "$output" == *'"to":"Centerville Public Library"'* ]]
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"state":"done"'* ]]
+    [ "$(db "SELECT borrowernumber, biblionumber, branchcode, priority FROM reserves WHERE biblionumber = 3")" = "102|3|CPL|1" ]
+    run ask "change Carla's email to carla@example.org"
+    [[ "$output" == *'"diff":[{"field":"email","from":"","to":"carla@example.org"}]'* ]]
+    run post -d op=cud-confirm -d proposal=2
+    [[ "$output" == *'"state":"done"'* ]]
+    [ "$(db "SELECT email FROM borrowers WHERE borrowernumber = 103")" = "carla@example.org" ]
+    run ask "fix the title of record 5 to Drop Dead Gorgeous"
+    [[ "$output" == *'"diff":[{"field":"title","from":"Drop dead gorgeous","to":"Drop Dead Gorgeous"}]'* ]]
+    run post -d op=cud-confirm -d proposal=3
+    [[ "$output" == *'"state":"done"'* ]]
+    [ "$(db "SELECT title, author FROM biblio WHERE biblionumber = 5")" = "Drop Dead Gorgeous|Smith, Jane" ]
+    # The MARC record changed where the framework maps the title, its ISBD kept.
+    grep -q '^245 10 _aDrop Dead Gorgeous /' "$W/koha.db.marc"
+    [ "$(grep -c $'\tlibrarian\t' "$W/kei-ai/changes.log")" = "3" ]
+}
+
+@test "ai assistant: Koha's refusal is shown and nothing is marked done" {
+    KEI_AIA_HOLD=tooManyReserves start_mock
+    ask "reserve Dom Casmurro for Bruno" > /dev/null
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"error":"Koha did not make the change: Koha does not allow this hold (tooManyReserves)'* ]]
+    [ "$(db "SELECT COUNT(*) FROM reserves WHERE biblionumber = 3")" = "0" ]
+    run curl -s "$URL?op=state"
+    [[ "$output" == *'"state":"failed"'* ]]
+    grep -q $'\tplace_hold FAILED\t' "$W/kei-ai/changes.log"
+}
+
+@test "ai assistant: changes follow the librarian's Koha permissions; Koha pages for everyone" {
+    KEI_AIA_PERMS="patrons reports prefs" start_mock
     run ask "waive Ana's fines"
-    [[ "$output" == *'not allowed to change data through the assistant'* && "$output" == *'"proposals":[]'* ]]
-    ask "who is the last patron who has 4 overdue books and 144 reais in fines?" > /dev/null
+    [[ "$output" == *'permissions do not allow write_off'* && "$output" == *'"proposals":[]'* ]]
     run ask "write off Ana's fines"
-    [[ "$output" == *'"kind":"koha_page"'* && "$output" == *'"url":"/cgi-bin/koha/members/boraccount.pl?borrowernumber=101"'* ]]
+    [[ "$output" == *'"action":"open_page"'* && "$output" == *'"url":"/cgi-bin/koha/members/boraccount.pl?borrowernumber=101"'* ]]
     run post -d op=cud-confirm -d proposal=1
     [[ "$output" == *'"go":"/cgi-bin/koha/members/boraccount.pl?borrowernumber=101"'* ]]
+    [ "$(fines)" = "144" ]
+}
+
+@test "ai assistant: approving needs the permission at that moment too" {
+    start_mock
+    ask "waive Ana's fines" > /dev/null
+    kill "$MOCK_PID"; wait "$MOCK_PID" 2>/dev/null || true
+    KEI_AIA_PERMS="patrons" start_mock
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"error":"Your Koha permissions do not allow this change."'* ]]
     [ "$(fines)" = "144" ]
 }
 
@@ -106,11 +209,12 @@ fines() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); pri
     ! grep -q '"find_patrons' <(head -n1 "$W/model.log" | grep -o '"content": "You are[^"]*')
 }
 
-@test "ai assistant: passwords and secrets are never read" {
+@test "ai assistant: passwords and secrets are never read or changed" {
     start_mock
     run ask "show me the password of Ana"
-    [[ "$output" == *'refused: the column password is not available to the assistant'* ]]
+    [[ "$output" == *'password is not a field the assistant can change'* && "$output" == *'"proposals":[]'* ]]
     [[ "$output" != *'$2a$'* ]]
+    ! grep -q '2a\$08' "$W/model.log"
 }
 
 @test "ai assistant: the setup problems are told on the page" {

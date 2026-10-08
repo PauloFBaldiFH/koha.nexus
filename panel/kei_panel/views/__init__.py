@@ -5,6 +5,7 @@ from .backup import BackupView
 from .base import SectionView
 from .dashboard import DashboardView
 from .database import DatabaseView
+from .z3950 import Z3950View
 
 VIEWS = {
     "section": SectionView,
@@ -12,6 +13,7 @@ VIEWS = {
     "backup": BackupView,
     "database": DatabaseView,
     "ai": AIView,
+    "z3950": Z3950View,
 }
 
-__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView"]
+__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View"]

@@ -119,9 +119,12 @@ class AIView(SectionView):
 
     def compose_assistant(self) -> ComposeResult:
         yield Label(t("A chat on the home page of the Koha staff interface, in the place of the news block. "
-                      "Librarians ask in plain language about books, patrons, reports and settings; the answers "
-                      "link to the records. It only reads (a SELECT-only database account): a change it suggests "
-                      "is shown first, with the exact SQL or the Koha page, and only runs after a click on Confirm."),
+                      "Librarians ask in plain language about books, patrons, loans, reports, settings and opening "
+                      "hours; the answers link to the records. It searches with Koha's own search engine and reads "
+                      "through a read-only database account, never with SQL written by the AI. A change it suggests "
+                      "(a hold, a patron's or a record's fields, a write-off) is an action proposal showing each "
+                      "field before and after: Koha makes it only after a click on Approve & Execute, with the "
+                      "librarian's own permissions."),
                     classes="view-prompt")
         yield Label(t("It answers with the AI provider set up in AI cataloguing."), classes="view-prompt")
         with Grid(classes="status-grid", id="ai-assistant-cards"):

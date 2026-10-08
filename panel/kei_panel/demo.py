@@ -202,6 +202,10 @@ _SCRIPTS: dict[str, list[str]] = {
     ],
     "cloud-remote": ["@@note Testing the real cloud upload...",
                      "@@msg ok OK\tCloud enabled and tested successfully."],
+    "z3950-list": ["@@result row=lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS"],
+    "z3950-add": ["@@result added=2", "@@result existing=1", "@@result invalid=0",
+                  "@@msg ok OK\tZ39.50/SRU servers added to Koha: 2\\nAlready in Koha: 1\\n\\nThey are in "
+                  "Administration > Z39.50/SRU servers, checked for the cataloguing searches."],
 }
 
 
