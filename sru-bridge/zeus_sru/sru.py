@@ -9,12 +9,18 @@ ZS = "http://www.loc.gov/zing/srw/"
 DIAG = "http://www.loc.gov/zing/srw/diagnostic/"
 EXPLAIN = "http://explain.z3950.org/dtd/2.0/"
 MARC = "http://www.loc.gov/MARC21/slim"
-MARCXML_SCHEMA = "info:srw/schema/1/marcxml-v1.1"
+# The schema name put in each record. YAZ (Koha's ZOOM client) drops records
+# whose recordSchema is the full URI, so the short name goes out; the URI is
+# still accepted on the way in and listed in explain.
+MARCXML_SCHEMA = "marcxml"
+MARCXML_URI = "info:srw/schema/1/marcxml-v1.1"
+SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
 
 ET.register_namespace("zs", ZS)
 ET.register_namespace("diag", DIAG)
 ET.register_namespace("marc", MARC)
 ET.register_namespace("ex", EXPLAIN)
+ET.register_namespace("SOAP-ENV", SOAP)
 
 # Names Koha and other clients send for MARCXML. An empty schema means the
 # server default, which is MARCXML too.
@@ -146,9 +152,16 @@ def explain_response(host: str, port: int, database: str, max_records: int) -> b
         m = x(idx, "map")
         x(m, "name", name, set=set_name)
     schema_info = x(explain, "schemaInfo")
-    s = x(schema_info, "schema", identifier=MARCXML_SCHEMA, name="marcxml")
+    s = x(schema_info, "schema", identifier=MARCXML_URI, name=MARCXML_SCHEMA)
     x(s, "title", "MARCXML")
     cfg = x(explain, "configInfo")
     x(cfg, "default", 10, type="numberOfRecords")
     x(cfg, "setting", max_records, type="maximumRecords")
     return serialize(root)
+
+
+def soap_wrap(body: bytes) -> bytes:
+    """An SRU response inside a SOAP 1.1 envelope (SRW), for SOAP requests."""
+    env = ET.Element(f"{{{SOAP}}}Envelope")
+    ET.SubElement(env, f"{{{SOAP}}}Body").append(ET.fromstring(body))
+    return serialize(env)

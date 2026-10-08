@@ -15,6 +15,11 @@ Koha ──SRU 1.1 GET──▶ 127.0.0.1:5000/sru ──HTTPS, 15 targets a req
 ## What a search does
 
 1. Koha sends `GET /sru?version=1.1&operation=searchRetrieve&query=dc.isbn=…`.
+   YAZ, Koha's ZOOM client, may send the same as a POST instead: a form
+   (`application/x-www-form-urlencoded`) or an SRW SOAP envelope holding a
+   `searchRetrieveRequest`. All three are read, and a SOAP request gets its
+   answer back inside a SOAP envelope. Without a `query` or an `operation`
+   the request is an `explain`.
 2. The CQL query becomes one Zeus search: an ISBN clause (`isbn`,
    `dc.isbn`, `bath.isbn`, `dc.identifier`) is searched with `searchType=7`;
    anything else with `searchType=4` (title). A bare term that looks like an
@@ -28,8 +33,10 @@ Koha ──SRU 1.1 GET──▶ 127.0.0.1:5000/sru ──HTTPS, 15 targets a req
    directory offsets don't match its bytes is rebuilt from its fields rather
    than dropped. The same record coming back twice is kept once.
 5. The records are wrapped in an SRU 1.1 `searchRetrieveResponse`
-   (`recordSchema` `info:srw/schema/1/marcxml-v1.1`, `recordPacking` xml or
-   string), paged with `startRecord` / `maximumRecords`.
+   (`recordSchema` `marcxml`, `recordPacking` xml or string), paged with
+   `startRecord` / `maximumRecords`. The short name matters: YAZ drops
+   records whose `recordSchema` is the full `info:srw/schema/1/marcxml-v1.1`
+   URI. Requests may still ask for either.
 
 Results are cached in memory for 10 minutes, so Koha paging through a result
 set does not search Zeus again. `GET /sru` with no query answers an SRU

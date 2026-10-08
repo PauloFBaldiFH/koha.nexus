@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import parse_qsl
+from xml.etree import ElementTree as ET
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -19,6 +21,41 @@ from .zeus import ZeusClient, ZeusUnavailable
 
 log = logging.getLogger("zeus_sru")
 XML = "text/xml; charset=utf-8"
+SRU_PARAMS = ("operation", "version", "query", "startRecord", "maximumRecords", "recordPacking",
+              "recordSchema", "sortKeys", "stylesheet", "resultSetTTL")
+
+
+async def read_params(request: Request) -> tuple[dict[str, str], bool]:
+    """The SRU parameters of a GET, a form POST or a SOAP (SRW) POST, and
+    whether the request came as SOAP (the answer then goes back as SOAP).
+
+    YAZ, which Koha uses through ZOOM, may send any of the three. Body
+    values win over the query string."""
+    p: dict[str, str] = dict(request.query_params)
+    if request.method != "POST":
+        return p, False
+    body = (await request.body()).decode("utf-8", "replace").strip()
+    if not body:
+        return p, False
+    if not body.startswith("<"):
+        p.update(parse_qsl(body, keep_blank_values=True))
+        return p, False
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as exc:
+        log.warning("unreadable XML body: %s", exc)
+        return p, False
+    soap = root.tag.endswith("}Envelope") or root.tag == "Envelope"
+    for node in root.iter():
+        name = node.tag.rsplit("}", 1)[-1]
+        if name in ("searchRetrieveRequest", "explainRequest", "scanRequest"):
+            p["operation"] = name[:-len("Request")]
+            for child in node:
+                key = child.tag.rsplit("}", 1)[-1]
+                if key in SRU_PARAMS and child.text and child.text.strip():
+                    p[key] = child.text.strip()
+            break
+    return p, soap
 
 
 def create_app(settings: Settings | None = None, client: ZeusClient | None = None) -> FastAPI:
@@ -47,12 +84,19 @@ def create_app(settings: Settings | None = None, client: ZeusClient | None = Non
         return JSONResponse({"status": "ok", "version": __version__,
                              "targets": list(settings.targets), "chunk_size": settings.chunk_size})
 
-    @app.get("/sru")
-    @app.get("/sru/{database:path}")
+    @app.api_route("/sru", methods=["GET", "POST"])
+    @app.api_route("/sru/{database:path}", methods=["GET", "POST"])
     async def sru_endpoint(request: Request, database: str = "") -> Response:
+        p, soap = await read_params(request)
+        resp = await handle(request, p)
+        if soap:
+            resp = xml(sru.soap_wrap(resp.body))
+        return resp
+
+    async def handle(request: Request, p: dict[str, str]) -> Response:
         # SRU parameter names are case-sensitive; Koha sends them as spelled here.
-        p = request.query_params
-        operation = p.get("operation", "explain" if "query" not in p else "searchRetrieve")
+        operation = p.get("operation", "").strip() or ("searchRetrieve" if p.get("query", "").strip()
+                                                       else "explain")
         version = p.get("version", "1.1")
 
         if version not in ("1.1", "1.2"):
