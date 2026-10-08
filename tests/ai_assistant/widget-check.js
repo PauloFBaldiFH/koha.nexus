@@ -43,17 +43,20 @@ function check(cond, what) {
         await page.press("#kei-ai textarea", "Enter");
         const card = page.locator("#kei-ai .kei-ai-proposal").last();
         await card.waitFor();
-        check(/UPDATE accountlines/.test(await card.locator("pre.kei-ai-sql").innerText()), "the exact SQL is previewed");
-        await card.locator("button.btn-warning").click();
-        check((await card.locator("button.btn-danger").innerText()).trim() === "Yes, run it", "Confirm asks a second time");
+        check(/outstanding fines/.test(await card.locator("table.kei-ai-diff").innerText()), "the proposal shows the field");
+        check((await card.locator("td.kei-ai-from").innerText()).trim() === "144.00"
+              && (await card.locator("td.kei-ai-to").innerText()).trim() === "0.00", "with its value now and after");
+        check(/Ana Souza/.test(await card.locator("a.kei-ai-link").innerText()), "and the patron it changes");
+        check((await card.locator("button.kei-ai-approve").innerText()).trim() === "Approve & Execute", "an Approve & Execute button");
+        check(await card.locator("button.kei-ai-reject").count() === 1, "and a Reject button");
         if (shot) {
             await page.locator("#kei-ai .kei-ai-log").evaluate((l) => { l.scrollTop = l.scrollHeight; });
             await page.screenshot({ path: shot });
             console.log("ok screenshot " + shot);
         }
-        await card.locator("button.btn-danger").click();
+        await card.locator("button.kei-ai-approve").click();
         await page.waitForSelector("#kei-ai .kei-ai-proposal.kei-ai-done");
-        check(/2 rows changed/.test(await page.locator("#kei-ai .kei-ai-proposal.kei-ai-done").innerText()), "the change ran after the second click");
+        check(/Koha made the change/.test(await page.locator("#kei-ai .kei-ai-proposal.kei-ai-done").innerText()), "the change ran after Approve");
 
         // A text from the model is never HTML.
         await page.reload();

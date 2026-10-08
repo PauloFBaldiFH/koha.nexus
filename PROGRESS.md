@@ -27,7 +27,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
 | Free-address broker | `broker/` | Cloudflare Worker (TypeScript), D1, Queues | Gives each library `<name>.koha.nexus` and `<name>-admin.koha.nexus` through Cloudflare Tunnels. Live at `https://broker.koha.nexus`. |
 | AI assistant (Module 2) | installed by installer section 38 | Perl (`tools/ai_assistant.pl`, `KohaEasy::Assistant`) + JS/CSS via `IntranetUserJS` | Chat on the Koha **web** staff home page, replacing the news block. |
 | AI cataloguing / MARC replace | installer + `marc_replace.pl` + `panel/kei_panel/marcreplace.py` | Perl + JS | AI-generated MARC record preview, add as new or replace an existing biblio. |
-| Tests | `tests/*.bats`, `panel/tests` | bats, pytest | Most bats suites need a real Koha; `tests/ai_assistant.bats` runs in the cloud. Panel: `cd panel && python3 -m pytest -q tests`. |
+| Tests | `tests/*.bats`, `panel/tests` | bats, pytest | Most bats suites need a real Koha; `tests/ai_assistant.bats` and `tests/z3950.bats` (MariaDB only) run in the cloud. Panel: `cd panel && python3 -m pytest -q tests`. |
 
 ### Key decisions (with dates)
 
@@ -52,8 +52,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   regenerates the hash.
 - **AI assistant lives in the Koha web staff UI, not the TUI** (2026-10-02). Injected through a
   marked `IntranetUserJS` block (survives koha-common upgrades). Read-only MariaDB user
-  `kei_ai_ro_<instance>` (sensitive tables/columns excluded). Writes are only proposals with a
-  Confirm card; SQL writes are superlibrarian-only, single table, with undo JSON and a log.
+  `kei_ai_ro_<instance>` (sensitive tables/columns excluded). Since 1.5.15 (Subject 3) the model
+  never writes SQL: catalogue search goes through Koha's search engine (database fallback), the
+  other reads are fixed queries, small talk skips the tools, and each answer keeps the records
+  it found for follow-up questions. Changes are action proposals (hold, patron fields, record
+  fields, write-off) with a field diff and Approve & Execute / Reject; on approval the values
+  are re-read and Koha's own Perl objects make the change with the librarian's permissions
+  (not /api/v1, which needs OAuth), with undo JSON and a log.
+- **Z39.50 / SRU servers** (1.5.15): panel screen `views/z3950.py` over `z3950.py` (curated
+  `data/z3950_targets.json`, community sync from that file on `main`, imports, BER Z39.50 and
+  SRU probes that must return valid MARC, blacklist history in `/etc/koha-easy-install`).
+  Koha's side is `--task z3950-list` / `z3950-add FILE` (installer section 39).
 - **AI providers**: Ollama (default `http://127.0.0.1:11434`, always send `num_ctx`, 16384),
   OpenAI, Anthropic, Google Gemini. Active key in `vision.conf` (owned by the Koha instance
   user, else the web says "provider not configured"); all keys in `ai-keys.conf` (0600).

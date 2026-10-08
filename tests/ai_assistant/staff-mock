@@ -71,24 +71,72 @@ NEWS = """<div id="area-news" class="page-section"><h3><span class="news_title">
 <div class="newsitem"><h4>Welcome to Koha</h4><p>Welcome to Koha. Koha is a full-featured open-source ILS.</p></div></div>"""
 
 
-def model_reply(messages):
-    """The example questions, answered the way a real model should."""
-    last = messages[-1]["content"]
-    if last.startswith("TOOL RESULT"):
-        return {"answer": answer_from(last)}
-    q = last.lower()
+def turn(messages):
+    """The librarian's question, the turns before it and this turn's tool results."""
+    i = max(n for n, m in enumerate(messages) if m["role"] == "user" and not m["content"].startswith("TOOL RESULT")
+            and not m["content"].startswith("You answered without calling a tool"))
+    results = []
+    for m in messages[i + 1:]:
+        if m["role"] == "user" and m["content"].startswith("TOOL RESULT "):
+            name, _, body = m["content"].removeprefix("TOOL RESULT ").partition(": ")
+            results.append((name, json.loads(body) if body.startswith("{") else {}))
+    return messages[i]["content"], messages[1:i], results
+
+
+def first_id(results, tool, key, field):
+    for name, data in results:
+        if name == tool and data.get(key):
+            return data[key][0][field]
+    return None
+
+
+def plan(q, history):
+    """The tool calls a real model would make for the example questions, in
+    order; each takes the results so far and gives the arguments."""
+    def patron(name):
+        return ("find_patrons", lambda r: {"name": name, "limit": 1})
+
+    def propose(**args):
+        return ("propose_action", lambda r: args)
+    if re.search(r"\bhis\b.*\bclown\b", q):
+        # A follow-up: only with the earlier search in the conversation buffer.
+        if not any("King, Stephen" in m["content"] for m in history if m["role"] == "assistant"):
+            return None
+        return [("search_catalogue", lambda r: {"terms": ["Stephen King", "clown", "It", "Pennywise"]})]
     if any(w in q for w in ("clown", "palhaço", "palhaco")):
-        return {"tool": "search_catalogue", "args": {"terms": ["It", "A coisa", "Stephen King", "Pennywise"]}}
+        return [("search_catalogue", lambda r: {"terms": ["It", "A coisa", "Stephen King", "Pennywise"]})]
+    if "stephen king" in q:
+        return [("search_catalogue", lambda r: {"terms": ["Stephen King"]})]
+    if "quantum" in q:
+        return [("search_catalogue", lambda r: {"terms": ["quantum gravity", "gravidade quântica"]})]
     if any(w in q for w in ("waive", "perdo", "zerar")):
-        return {"tool": "propose_change", "args": {
-            "kind": "sql", "summary": "Waive the outstanding fines of Ana Souza (patron 101).",
-            "sql": "UPDATE accountlines SET amountoutstanding = 0 WHERE borrowernumber = 101 AND amountoutstanding > 0"}}
-    if any(w in q for w in ("write off", "pay")):
-        return {"tool": "propose_change", "args": {
-            "kind": "koha_page", "page": "patron_account", "id": "101",
-            "summary": "Write off the fines of Ana Souza on her accounting page."}}
-    if any(w in q for w in ("drop", "truncate")):
-        return {"answer": "I can't do that: structural commands are never allowed, not even as a proposal."}
+        return [patron("Ana"), propose(action="write_off", patron=101, summary="Write off the outstanding fines of Ana Souza.")]
+    if "write off" in q:
+        return [patron("Ana"), propose(action="open_page", page="patron_account", id="101",
+                                       summary="Write off the fines of Ana Souza on her accounting page.")]
+    if any(w in q for w in ("reserve", "hold")):
+        return [("search_catalogue", lambda r: {"terms": ["Dom Casmurro"]}), patron("Bruno"),
+                ("propose_action", lambda r: {"action": "place_hold", "summary": "Place a hold on Dom Casmurro for Bruno Lima.",
+                                              "patron": first_id(r, "find_patrons", "patrons", "borrowernumber"),
+                                              "biblio": first_id(r, "search_catalogue", "matches", "biblionumber")})]
+    if "email" in q:
+        return [patron("Carla"), propose(action="update_patron", patron=103, changes={"email": "carla@example.org"},
+                                         summary="Change the e-mail of Carla Mendes.")]
+    if "title of" in q:
+        return [("get_record", lambda r: {"kind": "biblio", "id": 5}),
+                propose(action="update_record", biblio=5, changes={"title": "Drop Dead Gorgeous"},
+                        summary="Capitalise the title of record 5.")]
+    if "password" in q:
+        return [patron("Ana"), propose(action="update_patron", patron=101, changes={"password": "x"},
+                                       summary="Show the password.")]
+    if "drop" in q or "truncate" in q:
+        return []
+    if "how many" in q:
+        return [("library_stats", lambda r: {"metric": "catalogue"})]
+    if "most borrowed" in q:
+        return [("library_stats", lambda r: {"metric": "most_borrowed", "since": "2026-01-01"})]
+    if any(w in q for w in ("open", "hours")):
+        return [("library_info", lambda r: {"library": "Centerville"})]
     if any(w in q for w in ("overdue", "atras", "fine", "multa")):
         nums = [float(n.replace(",", ".")) for n in re.findall(r"\d+(?:[.,]\d+)?", q)]
         args = {"order": "recent_activity", "limit": 1 if re.search(r"\b(last|último|ultimo)\b", q) else 5}
@@ -96,19 +144,43 @@ def model_reply(messages):
             args |= {"overdues_min": nums[0], "overdues_max": nums[0]}
         if len(nums) > 1:
             args |= {"fines_min": nums[1], "fines_max": nums[1]}
-        return {"tool": "find_patrons", "args": args}
-    if "password" in q:
-        return {"tool": "run_select", "args": {"sql": "SELECT password FROM borrowers"}}
-    return {"tool": "find_page", "args": {"query": last}}
+        return [("find_patrons", lambda r: args)]
+    return [("find_page", lambda r: {"query": q})]
 
 
-def answer_from(result):
-    name, _, body = result.removeprefix("TOOL RESULT ").partition(": ")
-    data = json.loads(body) if body.startswith("{") else {}
-    if "error" in data:
-        return f"That did not work: {data['error']}"
-    if name == "propose_change":
-        return "I prepared the change below. It runs only after you press **Confirm**."
+def model_reply(messages):
+    """The example questions, answered the way a real model should."""
+    if "This message is small talk" in messages[0]["content"]:
+        return {"answer": "Hello! I am the koha.nexus assistant: ask me about books, patrons, loans or opening hours."}
+    question, history, results = turn(messages)
+    q = question.lower()
+    steps = plan(q, history)
+    if steps is None:
+        return {"answer": "Whose clown book do you mean?"}
+    if not steps:
+        return {"answer": "I can't do that: structural commands are never allowed, not even as a proposal."}
+    for name, data in results:
+        if "error" in data:
+            return {"answer": f"That did not work: {data['error']}"}
+    if len(results) < len(steps):
+        name, args = steps[len(results)]
+        return {"tool": name, "args": args(results)}
+    return {"answer": answer_from(*results[-1])}
+
+
+def answer_from(name, data):
+    if name == "propose_action":
+        return "I prepared the change below. Koha makes it only after you press **Approve & Execute**."
+    if "NO MATCHES" in data.get("note", ""):
+        return "Nothing in this library's catalogue matches that."
+    if name == "library_stats":
+        if data.get("metric") == "most_borrowed":
+            return "Most borrowed:\n" + "\n".join(f"- {r['link']} ({r['loans']} loans)" for r in data["titles"])
+        return f"The catalogue has **{data['records']} records** and **{data['items']} items** ({data['items_on_loan']} on loan)."
+    if name == "library_info":
+        lib = data["libraries"][0]
+        hours = "; ".join(f"{h['day']} {h['open']}-{h['close']}" for h in lib.get("opening_hours", []))
+        return f"{lib['branchname']}: {hours}. Closed on {', '.join(lib.get('closed_every', []))}."
     rows = next((v for v in data.values() if isinstance(v, list) and v and isinstance(v[0], dict)), [])
     if not rows:
         return "I found nothing matching that."
@@ -118,7 +190,9 @@ def answer_from(result):
                 f"**{r['fines']}** in fines; last seen {(r.get('lastseen') or '-')[:10]}.\n"
                 "I read \"last\" as the most recent activity.")
     if name == "search_catalogue":
-        top = [r for r in rows if r.get("score", 0) >= rows[0].get("score", 0) - 2][:3]
+        if len(rows) > 1 and any(t == "clown" for t in data.get("terms", [])):
+            return f"His clown book is {rows[0]['link']}."
+        top = rows[:3]
         return ("It is **It** by Stephen King, the novel about Pennywise the clown (filmed in 1990 and 2017):\n"
                 + "\n".join(f"- {r['link']}" for r in top))
     return "Here is what I found:\n" + "\n".join(f"- {r['link']}" for r in rows[:5])
