@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.16**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.17**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -77,6 +77,33 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `/usr/local/bin/koha-kei-new-arrivals` (cron `/etc/cron.d/koha_kei_opac`): newest titles
   with a copy that is not lost or withdrawn and a real Amazon cover (the 43-byte "no cover"
   GIF is skipped). Not yet tried on a live OPAC.
+- **Administration hub** (1.5.17, Subject 5), installer section 41:
+  - *Messaging & interoperability* (`views/hub.py`, key `m`): tabs E-mail, WhatsApp &
+    Telegram, SMS, SIP2, Z39.50 over `--task hub-status` (no SMTP passwords). Buttons run the
+    `email`, `messaging` and `interoperability` routines (their entries moved into this
+    section); links open the exact staff page (`smtp_servers.pl`, `?op=add_form`,
+    `KohaAdminEmailAddress`, `letter.pl`, `overduerules.pl`, `SMSSendDriver`,
+    `memberentry.pl`, `z3950servers.pl`) from `staffClientBaseURL`, else `http://IP:8080`.
+    Gmail cheat sheet (smtp.gmail.com, 587, STARTTLS, app password).
+  - *SIP2 wizard*: `sip.py` reads and writes `SIPconfig.xml` (RAW listener 127.0.0.1 or
+    0.0.0.0, the login, its institution policy; Koha's example logins with public passwords
+    removed by default; comments and other listeners kept). `--task sip-apply FILE PORT
+    PUBLIC` checks the XML, keeps `SIPconfig.xml.kei-DATE` (0600), opens the port when public
+    and restarts `koha-sip`.
+  - *Schedules & cron tasks* (`views/crons.py` over `cron.py`, key `s`): switches, frequency,
+    day and time per job of `/etc/cron.d/koha_tasks`; presets for backups, a full index
+    rebuild (`/usr/local/bin/koha-kei-reindex`, Zebra or Elasticsearch at run time), fines,
+    authority linking (daily/weekly), sessions, Plack, journal, mysqlcheck. A job switched
+    off stays in the file as `#off# ...`; hand-written lines and `# BEGIN/# END` blocks are
+    kept. `--task cron-apply FILE` validates every line and keeps `koha_tasks.bak`. No nano.
+  - *Cloud backup, other services* (`cloud.py`, `screens/oauth.py`): OneDrive, MEGA, S3
+    (AWS, R2, Wasabi, MinIO) without the rclone CLI. OneDrive runs `rclone authorize
+    onedrive --auth-no-open-browser` on the server, follows its first redirect to get
+    Microsoft's own sign-in URL (📋 Copy link works from any computer), and the person pastes
+    back the `http://localhost:53682/?code=...` address, which the panel replays to rclone on
+    127.0.0.1 (or pastes a token). `--task cloud-provider FILE` (0600 TSV, deleted at once)
+    runs `rclone config create ... --obscure`; S3 gets `NAME-s3` plus an alias `NAME` →
+    `NAME-s3:bucket`. Google Drive flows untouched. None of this tried on a live Koha yet.
 - **AI providers**: Ollama (default `http://127.0.0.1:11434`, always send `num_ctx`, 16384),
   OpenAI, Anthropic, Google Gemini. Active key in `vision.conf` (owned by the Koha instance
   user, else the web says "provider not configured"); all keys in `ai-keys.conf` (0600).

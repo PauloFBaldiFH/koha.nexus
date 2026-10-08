@@ -3,8 +3,10 @@
 from .ai import AIView
 from .backup import BackupView
 from .base import SectionView
+from .crons import CronView
 from .dashboard import DashboardView
 from .database import DatabaseView
+from .hub import HubView
 from .opac import OpacView
 from .z3950 import Z3950View
 
@@ -16,6 +18,9 @@ VIEWS = {
     "ai": AIView,
     "z3950": Z3950View,
     "opac": OpacView,
+    "hub": HubView,
+    "crons": CronView,
 }
 
-__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "OpacView"]
+__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "OpacView",
+           "HubView", "CronView"]

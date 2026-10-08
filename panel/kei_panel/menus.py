@@ -78,6 +78,13 @@ SECTIONS: tuple[Section, ...] = (
     # New screen: the public catalogue's look (textures, wallpaper, dark mode,
     # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
     Section("opac", "🎨  OPAC appearance", "🎨  OPAC appearance", view="opac", key="o"),
+    # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
+    # Z39.50 on one screen (views/hub.py); its buttons run these routines.
+    Section("hub", "📨  Messaging & interoperability", "📨  Messaging & interoperability", entries=(
+        Entry("📧  Configure email and circulation notices", "email", kind="native"),
+        Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
+        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
+    ), view="hub", key="m"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
@@ -105,9 +112,7 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
         Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
-        Entry("📧  Configure email and circulation notices", "email", kind="native"),
         Entry("👑  Create super librarian", "superlibrarian", kind="native"),
-        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
         Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
     )),
     Section("library", "📚  Library tools", "📚  Library tools",
@@ -121,7 +126,6 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🚮  Privacy (LGPD): delete old patrons", "privacy-delete", kind="native"),
         Entry("📜  View tool logs", "tool-logs", kind="native"),
         Entry("🌎  Brazil: localization", "brazil", kind="native"),
-        Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native"),
         Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native"),
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
@@ -131,8 +135,9 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
         Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
     )),
+    # The visual cron manager (views/crons.py); the entry is the classic routine.
     Section("crons", "⏰  Schedules & cron tasks", entries=(
-        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),)),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s"),
     Section("languages", "🌍  Koha languages", entries=(
         Entry("🌍  Koha languages", "languages", kind="native"),)),
     Section("update", "🔄  Update center", "🔄 Update Center", "Choose what to update:", (
