@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.20"
+PANEL_VERSION=" 1.5.21"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -25926,7 +25926,8 @@ lt_aia_changes() {
 # the insert of the ones the librarian chose (z3950-add FILE). FILE is a
 # private (0600) tab-separated file written by the panel, one target per
 # line: host, port, db, syntax, encoding, name, rank, timeout, servertype,
-# user, password, sru_fields. It may hold logins: it is deleted as soon as
+# user, password, sru_fields, sru_options (the last two only for SRU
+# targets, e.g. the local Zeus bridge). It may hold logins: it is deleted as soon as
 # it is read, and no password goes to a log or to the screen.
 # ======================================================================
 Z3950_SYNTAXES=" USMARC MARC21 UNIMARC NORMARC DANMARC "
@@ -25950,7 +25951,7 @@ z3950_valid() {
 }
 
 z3950_add() {
-    local file="$1" log sql before after err host port db syntax enc name rank timeout kind user pass sru
+    local file="$1" log sql before after err host port db syntax enc name rank timeout kind user pass sru sruopt
     local -a secrets=()
     local valid=0 invalid=0 n
     require_database || { rm -f -- "$file"; return 1; }
@@ -25965,7 +25966,7 @@ z3950_add() {
     local line
     while IFS= read -r line || [ -n "$line" ]; do
         # Tabs are IFS white space (empty fields would merge): split on US.
-        IFS=$'\x1f' read -r host port db syntax enc name rank timeout kind user pass sru <<< "${line//$'\t'/$'\x1f'}"
+        IFS=$'\x1f' read -r host port db syntax enc name rank timeout kind user pass sru sruopt <<< "${line//$'\t'/$'\x1f'}"
         [ -n "$host" ] || continue
         if ! z3950_valid "$host" "$port" "$db" "$syntax" "$enc" "$kind" "${rank:-0}" "${timeout:-0}"; then
             invalid=$((invalid + 1))
@@ -25973,12 +25974,14 @@ z3950_add() {
             continue
         fi
         [ -n "$pass" ] && secrets+=("$pass")
+        # SRU settings belong to SRU targets only.
+        [ "$kind" = sru ] || { sru=""; sruopt=""; }
         valid=$((valid + 1))
         printf '%s:%s/%s %s (rank %s)\n' "$host" "$port" "$db" "$syntax" "${rank:-0}" >> "$log"
-        printf "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, \`rank\`, syntax, timeout, servertype, encoding, recordtype, sru_fields) SELECT %s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, 'biblio', %s FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM z3950servers WHERE host = %s AND port = %s AND IFNULL(db,'') = %s AND recordtype = 'biblio');\n" \
+        printf "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, \`rank\`, syntax, timeout, servertype, encoding, recordtype, sru_fields, sru_options) SELECT %s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, 'biblio', %s, %s FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM z3950servers WHERE host = %s AND port = %s AND IFNULL(db,'') = %s AND recordtype = 'biblio');\n" \
             "$(sql_quote "$host")" "$port" "$(sql_quote "$db")" "$(sql_quote "$user")" "$(sql_quote "$pass")" \
             "$(sql_quote "${name:-$host}")" "${rank:-0}" "$(sql_quote "$syntax")" "${timeout:-0}" \
-            "$(sql_quote "$kind")" "$(sql_quote "$enc")" "$(sql_quote "$sru")" \
+            "$(sql_quote "$kind")" "$(sql_quote "$enc")" "$(sql_quote "$sru")" "$(sql_quote "$sruopt")" \
             "$(sql_quote "$host")" "$port" "$(sql_quote "$db")" >> "$sql"
     done < "$file"
     rm -f -- "$file"

@@ -98,6 +98,9 @@ class Target:
     user: str = ""
     password: str = field(default="", repr=False)
     schema: str = ""             # SRU recordSchema (marcxml...)
+    sru_fields: str = ""         # Koha's SRU search field mapping (title=dc.title,...)
+    sru_options: str = ""        # Koha's extra SRU options (sru_version=1.1,...)
+    preselect: bool = False      # ticked when the screen opens
     source: str = ""
     notes: str = ""
     verified: bool = False       # taken from the library's own published page
@@ -138,6 +141,9 @@ _ALIASES = {
     "user": ("user", "userid", "username", "login_user", "usuario"),
     "password": ("password", "pass", "senha"),
     "schema": ("schema", "recordschema"),
+    "sru_fields": ("sru_fields", "srufields"),
+    "sru_options": ("sru_options", "sruoptions"),
+    "preselect": ("preselect",),
     "source": ("source", "fonte"),
     "notes": ("notes", "note", "comment", "obs"),
     "login": ("login", "needs_login", "auth"),
@@ -219,6 +225,9 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
         encoding=str(d.get("encoding") or "utf8"), region=region, country=country,
         login=_truthy(d.get("login")) or bool(d.get("user")), user=str(d.get("user", "")),
         password=str(d.get("password", "")), schema=str(d.get("schema", "")),
+        sru_fields=str(d.get("sru_fields", "")) if kind == "sru" else "",
+        sru_options=str(d.get("sru_options", "")) if kind == "sru" else "",
+        preselect=_truthy(d.get("preselect")),
         source=str(d.get("source", "")), notes=str(d.get("notes", "")),
         verified=_truthy(d.get("verified")), origin=origin)
 
@@ -496,9 +505,10 @@ def to_koha_sql(targets: list[Target], ranks: dict[str, int] | None = None, pass
         pw = t.password if passwords else ""
         lines.append(
             "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, `rank`, syntax, "
-            "timeout, servertype, encoding, recordtype) SELECT "
+            "timeout, servertype, encoding, recordtype, sru_fields, sru_options) SELECT "
             f"{_q(t.host)}, {int(t.port)}, {_q(t.db)}, {_q(t.user)}, {_q(pw)}, {_q(t.name)}, 1, {int(rank)}, "
-            f"{_q(t.syntax)}, 0, {_q(t.kind)}, {_q(t.encoding)}, 'biblio' FROM DUAL WHERE NOT EXISTS "
+            f"{_q(t.syntax)}, 0, {_q(t.kind)}, {_q(t.encoding)}, 'biblio', {_q(sru_fields(t))}, "
+            f"{_q(t.sru_options if t.kind == 'sru' else '')} FROM DUAL WHERE NOT EXISTS "
             f"(SELECT 1 FROM z3950servers WHERE host = {_q(t.host)} AND port = {int(t.port)} "
             f"AND db = {_q(t.db)} AND recordtype = 'biblio');")
     return "\n".join(lines) + "\n"
@@ -513,7 +523,15 @@ def write_export(path: Path, targets: list[Target], passwords: bool = False) -> 
 
 # The file config.sh --task z3950-add reads: one line per target.
 ADD_FIELDS = ("host", "port", "db", "syntax", "encoding", "name", "rank", "timeout", "kind", "user", "password",
-              "sru_fields")
+              "sru_fields", "sru_options")
+DEFAULT_SRU_FIELDS = "title=dc.title,isbn=bath.isbn,author=dc.creator"
+
+
+def sru_fields(t: Target) -> str:
+    """Koha's SRU search field mapping: the target's own, else the usual one."""
+    if t.kind != "sru":
+        return ""
+    return t.sru_fields or DEFAULT_SRU_FIELDS
 
 
 def _cell(v) -> str:
@@ -523,10 +541,10 @@ def _cell(v) -> str:
 def add_file_text(targets: list[Target], ranks: dict[str, int]) -> str:
     lines = []
     for t in targets:
-        sru = "title=dc.title,isbn=bath.isbn,author=dc.creator" if t.kind == "sru" else ""
         row = {"host": t.host, "port": t.port, "db": t.db, "syntax": t.syntax, "encoding": t.encoding,
                "name": t.name, "rank": ranks.get(t.key, 0), "timeout": 0, "kind": t.kind, "user": t.user,
-               "password": t.password, "sru_fields": sru}
+               "password": t.password, "sru_fields": sru_fields(t),
+               "sru_options": t.sru_options if t.kind == "sru" else ""}
         lines.append("\t".join(_cell(row[f]) for f in ADD_FIELDS))
     return "\n".join(lines) + "\n"
 

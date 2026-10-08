@@ -39,6 +39,12 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             loc = next(t for t in curated if t.host == "lx2.loc.gov")
             await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
 
+            # The Zeus bridge comes ticked; untick it before the regions.
+            zeus = next(t for t in curated if t.preselect)
+            assert view.selected == {zeus.key}
+            view.toggle(zeus.key)
+            assert view.selected == set()
+
             # A region ticks all of it; space on a server unticks one.
             view.toggle("region:europe")
             europe = [t for t in curated if t.region == "europe"]

@@ -37,6 +37,9 @@ SH
       printf '%s\t' lx2.loc.gov 210 LCDB USMARC utf8 'Library of Congress' 3 0 zed '' '' ''; printf '\n'
       printf '%s\t' z3950.bnf.fr 2211 TOUT-ANA1-UTF8 UNIMARC utf8 "BnF l'officielle" 1 0 zed Z3950 'Pa\ss'"'"'w0rd' ''; printf '\n'
       printf '%s\t' services.dnb.de 443 sru/dnb USMARC utf8 'DNB (SRU)' 2 0 sru '' '' 'title=dc.title'; printf '\n'
+      printf '%s\t' 127.0.0.1 5000 sru USMARC utf8 'Catálogo Zeus' 0 0 sru '' '' \
+          'title=dc.title,isbn=dc.isbn' 'sru_version=1.1,schema=marcxml'; printf '\n'
+      printf '%s\t' z3950.ufsc.br 210 Default USMARC utf8 'UFSC' 4 0 zed '' '' 'title=x' 'sru_version=1.1'; printf '\n'
       printf '%s\t' 'bad host;drop' 210 x USMARC utf8 'Bad' 4 0 zed '' '' ''; printf '\n'
       printf '%s\t' ok.example.org 210 x WEIRDMARC utf8 'Bad syntax' 5 0 zed '' '' ''; printf '\n'
     ) > "$W/add.tsv"
@@ -50,15 +53,18 @@ zsql() { mysql -N "$DB" -e "$1"; }
     [ "$status" -eq 0 ]
     [ ! -e "$W/add.tsv" ]
     # LoC was already there (same host, port and database): not added twice.
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio'")" = "3" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio'")" = "5" ]
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov' AND db = 'LCDB'")" = "1" ]
     [ "$(mysql -N --raw "$DB" -e "SELECT password FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = 'Pa\ss'"'"'w0rd' ]
     [ "$(zsql "SELECT servername, checked, \`rank\` FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = "$(printf "BnF l'officielle\t1\t1")" ]
     [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = 'services.dnb.de'")" = "$(printf 'sru\t443\tsru/dnb\ttitle=dc.title')" ]
+    # The Zeus bridge gets its SRU fields and options; a Z39.50 server gets none.
+    [ "$(zsql "SELECT servertype, port, db, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\ttitle=dc.title,isbn=dc.isbn\tsru_version=1.1,schema=marcxml')" ]
+    [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-') FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t')" ]
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
-    grep -q "OK .*added to Koha: 2" "$KEI_S/dialogs.log"
-    [ "$(cat "$W/results")" = "$(printf 'RESULT added=2\nRESULT existing=1\nRESULT invalid=2')" ]
+    grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
+    [ "$(cat "$W/results")" = "$(printf 'RESULT added=4\nRESULT existing=1\nRESULT invalid=2')" ]
     grep -q "Already in Koha: 1" "$KEI_S/dialogs.log"
     # The password is in no log, and no SQL file is left behind.
     ! grep -rq "w0rd" "$W/logs" /var/log/koha-easy-install 2>/dev/null

@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.20**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.21**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -63,6 +63,10 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `data/z3950_targets.json`, community sync from that file on `main`, imports, BER Z39.50 and
   SRU probes that must return valid MARC, blacklist history in `/etc/koha-easy-install`).
   Koha's side is `--task z3950-list` / `z3950-add FILE` (installer section 39).
+  Since 1.5.21 the Brazil list is the local Zeus SRU bridge (`sru-bridge/`, 127.0.0.1:5000/sru,
+  ticked when the screen opens via `"preselect": true`) plus UFSC, UTFPR and UNIFESP on port 210;
+  Biblioteca Nacional and UNESP (Alma) were dropped as permanently dead. A target's `sru_fields`
+  and `sru_options` go to Koha through the 12th and 13th columns of the z3950-add file.
 - **OPAC appearance** (1.5.16, Subject 4): panel screen `views/opac.py` over `opac_theme.py`
   (textures, radius sliders in `widgets/slider.py`, wallpaper with a legibility film, logo,
   favicon via `OpacFavicon`, a 🌓 switch saved in `localStorage` key `kei_theme`, clean-up

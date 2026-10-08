@@ -77,6 +77,8 @@ class Z3950View(SectionView):
             if self.app.env.demo:
                 z3950.use_dir(demo_dir())
             self.reload()
+            self.selected.update(tg.key for tg in self.visible() if tg.preselect)
+            self.draw()
             self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
 
     # ------------------------------------------------------------------
