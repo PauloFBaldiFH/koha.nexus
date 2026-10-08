@@ -246,6 +246,13 @@ LoadingScreen {
     height: 1;
     margin-bottom: 1;
 }
+#loader-bar {
+    height: 1;
+    margin-bottom: 1;
+}
+#loader-bar Bar {
+    width: 1fr;
+}
 #loader-meta {
     height: 1;
 }
@@ -378,3 +385,21 @@ LanguageScreen {
 #language-title { text-style: bold; padding-bottom: 1; }
 #language-list { height: 22; }
 App.-plain #language-box { border: ascii $primary; }
+
+/* ---- command search (ctrl+p) ------------------------------------------
+   Textual draws the chosen line with the faint "blurred" cursor colour
+   (the typing box keeps the focus) and the line under the mouse with a
+   faint tint, both close to the background: here they get the theme's
+   primary colour, and "auto" text that stays readable on it. */
+CommandList > .option-list--option-highlighted {
+    background: $primary;
+    color: auto 90%;
+    text-style: bold;
+}
+CommandList > .option-list--option-hover {
+    background: $primary 45%;
+    color: auto 90%;
+}
+CommandList:nocolor > .option-list--option-highlighted {
+    text-style: reverse;
+}
