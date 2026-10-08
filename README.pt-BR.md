@@ -6,9 +6,15 @@
   <img src="docs/images/koha-logo-green.png" alt="Logotipo do koha.nexus" width="400">
 </p>
 
+<p align="center">
+  <a href="https://koha.nexus/?lang=br"><img alt="Site oficial: koha.nexus" src="https://img.shields.io/badge/%F0%9F%8C%90_site_oficial-koha.nexus-63d987?style=for-the-badge&labelColor=07100c"></a>
+</p>
+
+<h3 align="center">🌐 <a href="https://koha.nexus/?lang=br">koha.nexus</a>: o site oficial, com o guia de instalação em 23 idiomas e o mapa das bibliotecas que já o usam.</h3>
+
 # koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas
 
-Um único script Bash que instala, ajusta e mantém o **[Koha](https://koha-community.org/), sistema integrado de gestão de bibliotecas**, no Debian/Ubuntu, por meio de um painel de controle com menus (whiptail, tema escuro) disponível em **22 idiomas**.
+Um único script Bash que instala, ajusta e mantém o **[Koha](https://koha-community.org/), sistema integrado de gestão de bibliotecas**, no Debian/Ubuntu, por meio de um painel de controle em tela cheia disponível em **22 idiomas**: mouse e teclado, tema escuro, um painel de controle ao vivo e uma tela para cada tarefa (feito com Textual), com os menus clássicos do whiptail mantidos como alternativa segura.
 
 Nasceu da experiência real com as barreiras técnicas da gestão de acervos e foi pensado para bibliotecas sem orçamento para sistemas comerciais caros ou suporte técnico dedicado.
 
@@ -124,13 +130,15 @@ O Koha roda dentro de um sistema Debian no **WSL 2** (Subsistema do Windows para
 
 ### Como instalar no Windows
 
-Abra o **PowerShell** (menu Iniciar, digite *PowerShell*; não precisa ser como administrador), cole esta linha e tecle Enter:
+Abra o **PowerShell como Administrador** (clique com o botão direito no botão Iniciar > **Terminal (Admin)** ou **Windows PowerShell (Admin)**, e clique em **Sim**), cole esta linha e tecle Enter:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
 
-Se preferir dois cliques, baixe o [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, a seta no canto superior direito da página) e dê dois cliques nele. Ele roda exatamente a mesma linha, então a instalação é idêntica. O arquivo não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo**. É texto puro, então você pode abri-lo no Bloco de Notas e lê-lo antes. Dê dois cliques normalmente, sem **Executar como administrador**: o Windows pede permissão só nas etapas que precisam. Se o Windows bloquear o arquivo sem o botão **Executar assim mesmo** (Controle Inteligente de Aplicativos do Windows 11, ou uma política da empresa), clique com o botão direito no arquivo > **Propriedades**, marque **Desbloquear** e clique em **OK**, ou use a linha do PowerShell acima, que não é bloqueada dessa forma.
+Se preferir dois cliques, baixe o [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, a seta no canto superior direito da página) e dê dois cliques nele. Ele roda exatamente a mesma linha, então a instalação é idêntica. O arquivo não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo**. É texto puro, então você pode abri-lo no Bloco de Notas e lê-lo antes. Dois cliques normais bastam: ele mesmo pede ao Windows permissão de administrador nas etapas que precisam. Se o Windows bloquear o arquivo sem o botão **Executar assim mesmo** (Controle Inteligente de Aplicativos do Windows 11, ou uma política da empresa), clique com o botão direito no arquivo > **Propriedades**, marque **Desbloquear** e clique em **OK**, ou use a linha do PowerShell acima, que não é bloqueada dessa forma.
+
+> **Use a sua própria conta do Windows.** Rode o instalador na conta que vai usar o Koha, e essa conta precisa ser administradora. Se o Windows pedir a senha de *outra pessoa*, cancele, entre em uma conta de administrador e rode lá: o Debian, os atalhos e a etapa de reinício são criados para a conta que roda o instalador, então uma instalação aprovada com a senha de outra pessoa vai parar na conta dela.
 
 O instalador faz todo o resto e mostra cada etapa em linguagem simples:
 
@@ -169,7 +177,9 @@ O comportamento em um Windows real (o instalador, notificações, ícone de stat
 | 16 | Reiniciar servidor | |
 | 17 | Sair | |
 
-As janelas usam um tema escuro, largura fixa e se adaptam a terminais pequenos. Para as cores padrão do newt em um terminal monocromático, abra o painel com `NO_COLOR=1`.
+No painel novo cada item é um cartão na tela inicial, e as ferramentas mais novas têm telas e teclas de atalho próprias: **d** Painel de controle, **i** Ferramenta de Importação Mágica, **b** Central de backup, **t** Tabelas do banco, **a** IA, **z** Servidores Z39.50 / SRU, **o** Aparência do OPAC, **m** Mensagens e interoperabilidade, **v** VPN WireGuard, **l** Ferramentas da biblioteca, **s** Agendamentos e tarefas cron, e **ctrl+p** procura qualquer ação pelo nome.
+
+As janelas do painel clássico usam um tema escuro, largura fixa e se adaptam a terminais pequenos. Para as cores padrão do newt em um terminal monocromático, abra o painel com `NO_COLOR=1`.
 
 ## Ferramentas da biblioteca
 
@@ -361,7 +371,7 @@ A instalação mostra sete etapas numeradas, uma linha por tarefa com uma pequen
 
 As outras tarefas longas do painel têm o mesmo visual: troca do motor de busca, reparo do índice de busca, configuração do Cloudflare Tunnel, atualização do sistema, validação, reparo dos serviços, manutenção profunda e atualização de idiomas. A saída delas fica em `/var/log/koha-easy-install/` (por exemplo `search-engine.log`, `zebra-rebuild.log`, `cloudflare.log`, `restore.log` e `apt.log`). A restauração de backups e as ferramentas que o painel instala quando pedidas (Midnight Commander, htop e nethogs) têm o mesmo visual.
 
-As janelas do painel são desenhadas com o `dialog`, que o painel instala, então botões, itens de menu e caixas de seleção também aceitam cliques do mouse nos terminais que informam o mouse: Windows Terminal, os terminais do desktop Linux (GNOME Terminal, Konsole, xterm), PuTTY e a maioria dos clientes SSH. O console de texto do Linux só aceita com o `gpm` instalado. `KEI_UI=whiptail` mantém o visual antigo, só com teclado.
+O painel novo (Textual) aceita cliques e a rodinha do mouse em tudo. As janelas do painel clássico são desenhadas com o `dialog`, que o painel instala, então botões, itens de menu e caixas de seleção também aceitam cliques do mouse nos terminais que informam o mouse: Windows Terminal, os terminais do desktop Linux (GNOME Terminal, Konsole, xterm), PuTTY e a maioria dos clientes SSH. O console de texto do Linux só aceita com o `gpm` instalado. `KEI_UI=whiptail` mantém o visual antigo, só com teclado.
 
 Num PC Linux com desktop gráfico, o painel adiciona um atalho **Koha** (`koha-descomplicado.desktop`) ao menu de aplicativos do usuário que o executou com `sudo` e, na primeira vez, à área de trabalho desse usuário. Ele abre o painel num terminal e pede a senha do `sudo`. Em português, o painel se chama **koha.nexus : Assistente inteligente e gratuito para facilitar a gestão de bibliotecas**.
 

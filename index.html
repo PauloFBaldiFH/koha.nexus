@@ -61,6 +61,7 @@
     }
 
     .topbar-inner{
+      position:relative;
       min-height:74px;
       display:flex;align-items:center;justify-content:space-between;gap:18px;
     }
@@ -375,6 +376,190 @@
 
     .mini-links{display:flex;gap:14px;flex-wrap:wrap}
 
+
+    /* ---------------- Motion, showcase and navigation (1.5.19) ---------------- */
+    :focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:6px}
+    ::selection{background:rgba(99,217,135,.28);color:#fff}
+    section[id]{scroll-margin-top:84px}
+    .section-heading p code,.card p code,.callout code,.pane code{
+      padding:1px 6px;border-radius:6px;font-size:.88em;
+      background:rgba(99,217,135,.09);border:1px solid rgba(99,217,135,.16);color:var(--green-3);
+    }
+    .section-heading p kbd,.pane kbd{
+      padding:1px 6px;border-radius:6px;font-size:.85em;
+      background:rgba(255,255,255,.07);border:1px solid var(--line);border-bottom-width:2px;color:var(--text);
+    }
+
+    .scroll-progress{
+      position:fixed;top:0;left:0;height:3px;width:100%;z-index:80;
+      transform-origin:0 50%;transform:scaleX(0);
+      background:linear-gradient(90deg,var(--green-2),var(--green-3),var(--gold));
+      box-shadow:0 0 12px rgba(99,217,135,.55);pointer-events:none;
+    }
+
+    nav a.active{color:var(--green-3);background:rgba(99,217,135,.09)}
+    .menu-toggle{
+      display:none;cursor:pointer;width:42px;height:42px;border-radius:12px;
+      border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);
+      align-items:center;justify-content:center;font-size:1.2rem;
+    }
+
+    /* Hero: slow aurora and a faint grid behind the content */
+    .hero-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+    .hero > .container{position:relative;z-index:1}
+    .blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.42;will-change:transform}
+    .blob.b1{width:520px;height:520px;left:-140px;top:-160px;background:#1f8a4c;animation:drift1 22s ease-in-out infinite alternate}
+    .blob.b2{width:440px;height:440px;right:-120px;top:40px;background:#2bbf73;opacity:.25;animation:drift2 26s ease-in-out infinite alternate}
+    .blob.b3{width:360px;height:360px;left:40%;bottom:-220px;background:#c9a945;opacity:.13;animation:drift3 30s ease-in-out infinite alternate}
+    .grid-bg{
+      position:absolute;inset:0;
+      background-image:linear-gradient(rgba(163,230,184,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(163,230,184,.05) 1px,transparent 1px);
+      background-size:46px 46px;
+      -webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 20%,transparent 72%);
+              mask-image:radial-gradient(ellipse at 50% 30%,#000 20%,transparent 72%);
+    }
+    @keyframes drift1{to{transform:translate(120px,90px) scale(1.12)}}
+    @keyframes drift2{to{transform:translate(-110px,120px) scale(.9)}}
+    @keyframes drift3{to{transform:translate(-160px,-60px) scale(1.15)}}
+
+    .hero h1 .accent{
+      background:linear-gradient(90deg,var(--green),var(--green-3),var(--gold),var(--green));
+      background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+      animation:shine 9s linear infinite;
+    }
+    @keyframes shine{to{background-position:300% 0}}
+
+    .terminal{transform:perspective(1200px) rotateY(-4deg) rotateX(2deg);transition:transform .6s ease}
+    .terminal:hover{transform:none}
+    .terminal::after{
+      content:"";position:absolute;inset:-1px;border-radius:24px;pointer-events:none;
+      background:linear-gradient(130deg,rgba(99,217,135,.35),transparent 35%,transparent 70%,rgba(255,215,118,.18));
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor;mask-composite:exclude;padding:1px;
+    }
+    .terminal .dot:nth-child(1){background:#ff6b6b}
+    .terminal .dot:nth-child(2){background:#ffd166}
+    .terminal .dot:nth-child(3){background:#63d987}
+    .terminal pre .tl{display:block;opacity:0;transform:translateY(4px);animation:tline .45s ease forwards;animation-delay:calc(var(--d) * .32s + .3s)}
+    @keyframes tline{to{opacity:1;transform:none}}
+    .caret{display:inline-block;width:.6em;height:1.05em;vertical-align:-2px;background:var(--green);margin-left:4px;animation:blink 1s steps(1) infinite}
+    @keyframes blink{50%{opacity:0}}
+
+    .stat{transition:transform .25s ease,border-color .25s ease}
+    .stat:hover{transform:translateY(-3px);border-color:rgba(99,217,135,.3)}
+
+    /* Cards: a soft light follows the pointer */
+    .card{position:relative;overflow:hidden;transition:border-color .25s ease,transform .25s ease,box-shadow .25s ease}
+    .card::before{
+      content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s ease;
+      background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(99,217,135,.10),transparent 42%);
+    }
+    .card:hover::before{opacity:1}
+    .card:hover{transform:translateY(-3px);box-shadow:0 22px 50px rgba(0,0,0,.28)}
+    .card > *{position:relative}
+    .card .icon{transition:transform .3s ease,background .3s ease}
+    .card:hover .icon{transform:rotate(-6deg) scale(1.08);background:rgba(99,217,135,.18)}
+    .badge-new{
+      display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;vertical-align:2px;
+      font-size:.62rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+      color:#07110b;background:linear-gradient(135deg,var(--gold),#ffc14d);
+    }
+
+    .callout-warn{background:rgba(255,215,118,.07);border-color:rgba(255,215,118,.25);color:#f3e6c2}
+    .callout-warn strong{color:var(--gold)}
+
+    /* Scroll reveal (only added by the script, so the page reads fine without it) */
+    .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+    .reveal.in{opacity:1;transform:none}
+    .card.reveal.in:hover{transform:translateY(-3px)}
+    .reveal.in.card{transition:border-color .25s ease,transform .25s ease,box-shadow .25s ease,opacity .7s ease}
+
+    /* Panel showcase */
+    .showcase{display:grid;grid-template-columns:270px 1fr;gap:22px;align-items:start}
+    .tabs{display:flex;flex-direction:column;gap:6px}
+    .tab{
+      display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+      padding:11px 13px;border-radius:13px;border:1px solid transparent;background:transparent;
+      color:var(--muted);font:inherit;font-size:.93rem;font-weight:700;transition:.2s ease;
+    }
+    .tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
+    .tab[aria-selected="true"]{color:var(--text);background:rgba(99,217,135,.10);border-color:rgba(99,217,135,.3)}
+    .tab .k{
+      margin-left:auto;min-width:24px;text-align:center;padding:1px 6px;border-radius:6px;
+      border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--green-3);
+      font:700 .74rem "SFMono-Regular",Consolas,monospace;
+    }
+    .tab .ti{font-size:1.05rem;width:22px;text-align:center}
+    .stage{
+      border:1px solid var(--line);border-radius:22px;padding:16px;
+      background:linear-gradient(180deg,rgba(18,38,27,.7),rgba(8,18,13,.9));box-shadow:var(--shadow);
+    }
+    .shot{
+      display:block;width:100%;padding:0;border:0;background:#0b0f0d;cursor:zoom-in;
+      border-radius:14px;overflow:hidden;aspect-ratio:1400/924;position:relative;
+    }
+    .shot img{width:100%;height:100%;object-fit:cover;transition:opacity .35s ease,transform .6s ease}
+    .shot:hover img{transform:scale(1.015)}
+    .shot.loading img{opacity:.25}
+    .stage-text{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;margin-top:14px}
+    .stage-text h3{margin:0 0 4px;font-size:1.15rem}
+    .stage-text p{margin:0;color:var(--muted);font-size:.93rem}
+    .stage-hint{color:#7f978a;font-size:.78rem;white-space:nowrap}
+    .stage-dots{display:flex;gap:6px;justify-content:center;margin-top:14px}
+    .stage-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.14);transition:.3s}
+    .stage-dots i.on{background:var(--green);width:20px;border-radius:6px}
+
+    .lightbox{
+      position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:28px;
+      background:rgba(3,8,6,.88);backdrop-filter:blur(6px);cursor:zoom-out;
+    }
+    .lightbox.open{display:flex;animation:fadein .25s ease}
+    .lightbox img{max-width:min(1400px,100%);max-height:100%;border-radius:12px;box-shadow:0 30px 90px rgba(0,0,0,.6)}
+    .lightbox button{
+      position:absolute;top:16px;right:18px;width:42px;height:42px;border-radius:50%;cursor:pointer;
+      border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);font-size:1.2rem;
+    }
+    @keyframes fadein{from{opacity:0}}
+
+    .live-pill{
+      display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:6px 11px;border-radius:999px;
+      border:1px solid rgba(99,217,135,.25);background:rgba(99,217,135,.06);color:var(--green-3);font-size:.78rem;font-weight:700;
+    }
+    .live-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(99,217,135,.6);animation:ping 1.8s infinite}
+    @keyframes ping{70%{box-shadow:0 0 0 9px rgba(99,217,135,0)}100%{box-shadow:0 0 0 0 rgba(99,217,135,0)}}
+
+    .to-top{
+      position:fixed;right:20px;bottom:20px;z-index:60;width:46px;height:46px;border-radius:14px;cursor:pointer;
+      border:1px solid rgba(99,217,135,.3);background:rgba(11,23,17,.9);color:var(--green-3);font-size:1.15rem;
+      opacity:0;transform:translateY(12px);pointer-events:none;transition:.3s ease;box-shadow:0 12px 30px rgba(0,0,0,.35);
+    }
+    .to-top.show{opacity:1;transform:none;pointer-events:auto}
+    .to-top:hover{background:rgba(99,217,135,.15)}
+
+    @media (max-width: 980px){
+      .showcase{grid-template-columns:1fr}
+      .tabs{flex-direction:row;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+      .tab{width:auto;white-space:nowrap}
+      .tab .k{display:none}
+      .terminal{transform:none}
+    }
+    @media (max-width: 680px){
+      .menu-toggle{display:inline-flex}
+      nav.open{
+        display:flex;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:2px;
+        padding:10px 12px 14px;background:#07100c;border-bottom:1px solid var(--line);box-shadow:0 24px 40px rgba(0,0,0,.55);
+      }
+      nav.open a{display:block !important;padding:12px}
+      .stage-text{flex-direction:column}
+      .blob{filter:blur(50px)}
+    }
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+      html{scroll-behavior:auto}
+      .reveal{opacity:1;transform:none}
+      .terminal{transform:none}
+    }
+
     @media (max-width: 980px){
       .hero-grid, .install-grid { grid-template-columns: 1fr; }
       .download-banner { flex-direction: column; align-items: stretch; }
@@ -421,13 +606,16 @@
 </head>
 
 <body>
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="brand" href="#home" aria-label="koha.nexus">
         koha.nexus
       </a>
-      <nav aria-label="Main navigation">
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menu" aria-controls="main-nav" aria-expanded="false">☰</button>
+      <nav id="main-nav" aria-label="Main navigation">
         <a href="#features" data-i18n="nav_features">Features</a>
+        <a href="#panel" data-i18n="nav_panel">Panel</a>
         <a href="#installation" data-i18n="nav_install">Installation</a>
         <a href="#windows" data-i18n="nav_win">Windows</a>
         <a href="#tools" data-i18n="nav_tools">Tools</a>
@@ -471,6 +659,7 @@
 
   <main>
     <section class="hero" id="home">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-bg"></div><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
       <div class="container hero-grid">
         <div>
           <span class="eyebrow" data-i18n="hero_eye">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
@@ -491,7 +680,7 @@
           <div class="stats">
             <div class="stat"><strong data-i18n="stat1_t">22 languages</strong><span data-i18n="stat1_d">Dashboard & Koha packages</span></div>
             <div class="stat"><strong data-i18n="stat2_t">2 systems</strong><span data-i18n="stat2_d">Linux or Windows via WSL 2</span></div>
-            <div class="stat"><strong data-i18n="stat3_t">16+ features</strong><span data-i18n="stat3_d">Management, tools & tweaks</span></div>
+            <div class="stat"><strong data-i18n="stat3_t">25+ features</strong><span data-i18n="stat3_d">Management, tools & tweaks</span></div>
             <div class="stat"><strong data-i18n="stat4_t">GPL-3.0+</strong><span data-i18n="stat4_d">Free & modifiable software</span></div>
           </div>
         </div>
@@ -501,17 +690,7 @@
             <span class="dot"></span><span class="dot"></span><span class="dot"></span>
             <span class="terminal-title">installation — terminal</span>
           </div>
-          <pre><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
-<span class="prompt">$</span> sudo bash installer
-
-<span class="muted">KOHA.NEXUS</span>
-<span class="prompt">✓</span> <span data-i18n="term_validating">Validating server...</span>
-<span class="prompt">✓</span> <span data-i18n="term_installing">Installing Koha</span>
-<span class="prompt">✓</span> <span data-i18n="term_configuring">Configuring database</span>
-<span class="prompt">✓</span> <span data-i18n="term_preparing">Preparing backups</span>
-<span class="prompt">✓</span> <span data-i18n="term_access">Configuring access</span>
-
-<span class="prompt">→</span> <span data-i18n="term_ready">Dashboard ready:</span> <strong>sudo config.sh</strong></pre>
+          <pre><span class="tl" style="--d:0"><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer</span><span class="tl" style="--d:1"><span class="prompt">$</span> sudo bash installer</span><span class="tl" style="--d:2">&nbsp;</span><span class="tl" style="--d:3"><span class="muted">KOHA.NEXUS</span></span><span class="tl" style="--d:4"><span class="prompt">✓</span> <span data-i18n="term_validating">Validating server...</span></span><span class="tl" style="--d:5"><span class="prompt">✓</span> <span data-i18n="term_installing">Installing Koha</span></span><span class="tl" style="--d:6"><span class="prompt">✓</span> <span data-i18n="term_configuring">Configuring database</span></span><span class="tl" style="--d:7"><span class="prompt">✓</span> <span data-i18n="term_preparing">Preparing backups</span></span><span class="tl" style="--d:8"><span class="prompt">✓</span> <span data-i18n="term_access">Configuring access</span></span><span class="tl" style="--d:9">&nbsp;</span><span class="tl" style="--d:10"><span class="prompt">→</span> <span data-i18n="term_ready">Dashboard ready:</span> <strong>sudo config.sh</strong><span class="caret"></span></span></pre>
         </div>
       </div>
     </section>
@@ -541,7 +720,7 @@
               <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
             </div>
             <h3 data-i18n="f2_t">Backup hub</h3>
-            <p data-i18n="f2_d">Compressed SQL backups, MARC21 exports, manual copies, and optional integration with Google Drive via rclone.</p>
+            <p data-i18n="f2_d">Compressed SQL backups, MARC21 exports, a restore test, and cloud copies on Google Drive, OneDrive, MEGA or S3, set up step by step.</p>
           </article>
 
           <article class="card">
@@ -615,11 +794,109 @@
             <h3 data-i18n="f11_t">Auto-update</h3>
             <p data-i18n="f11_d">Dashboard updates straight from GitHub with SHA-256 installer verification.</p>
           </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+            </div>
+            <h3><span data-i18n="f12_t">Z39.50 / SRU servers</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f12_d">Curated public catalogues tested with a real search: only servers that return valid MARC records go into Koha, fastest first.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"/></svg>
+            </div>
+            <h3><span data-i18n="f13_t">OPAC appearance</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f13_d">Textures, rounded corners, wallpaper, logo, a light/dark switch and a New arrivals carousel, written into Koha with a backup first.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </div>
+            <h3><span data-i18n="f14_t">Messaging & interoperability</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f14_d">E-mail, SMS, SIP2 self-check and Z39.50 on one screen, with links to the exact Koha page and a SIP2 form that writes the configuration.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <h3><span data-i18n="f15_t">Schedules & cron tasks</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f15_d">Switch each automated job on or off and choose how often and when. Hand-written lines are kept.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5"/></svg>
+            </div>
+            <h3><span data-i18n="f16_t">WireGuard VPN</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f16_d">Staff reach the staff interface and SSH from anywhere with a QR code for their phone. Only the library's addresses go through the VPN.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <h3><span data-i18n="f17_t">Free address</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f17_d">A public catalog address on koha.nexus without buying a domain or opening a Cloudflare account, shared as a QR code or a link. Still in testing.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewBox="0 0 24 24"><rect width="18" height="10" x="3" y="11" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" x2="8" y1="16" y2="16"/><line x1="16" x2="16" y1="16" y2="16"/></svg>
+            </div>
+            <h3><span data-i18n="f18_t">AI assistant</span><span class="badge-new" data-i18n="badge_new">New</span></h3>
+            <p data-i18n="f18_d">Librarians ask in plain language about books, patrons and loans. Any change is a proposal that runs only after Approve &amp; Execute.</p>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="section alt" id="installation">
+    <section class="section alt" id="panel">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="p_kick">The new control panel</div>
+          <h2 data-i18n="p_h2">One screen for every task, with mouse and keyboard.</h2>
+          <p data-i18n="p_p">Run <code>sudo config.sh</code> and the panel opens full screen: a live dashboard, cards you click, shortcut keys and a command palette (<kbd>ctrl+p</kbd>). These are real screenshots of the panel.</p>
+        </div>
+
+        <div class="showcase">
+          <div class="tabs" role="tablist" aria-label="Panel screens">
+            <button class="tab" type="button" role="tab" id="tab-dashboard" aria-controls="panel-stage" aria-selected="true" tabindex="0" data-shot="dashboard"><span class="ti" aria-hidden="true">🎛️</span><span data-i18n="pt_dashboard">Control Dashboard</span><span class="k" aria-hidden="true">d</span></button>
+            <button class="tab" type="button" role="tab" id="tab-hub" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="hub"><span class="ti" aria-hidden="true">📨</span><span data-i18n="pt_hub">Messaging & interoperability</span><span class="k" aria-hidden="true">m</span></button>
+            <button class="tab" type="button" role="tab" id="tab-z3950" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="z3950"><span class="ti" aria-hidden="true">📡</span><span data-i18n="pt_z3950">Z39.50 / SRU servers</span><span class="k" aria-hidden="true">z</span></button>
+            <button class="tab" type="button" role="tab" id="tab-opac" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="opac"><span class="ti" aria-hidden="true">🎨</span><span data-i18n="pt_opac">OPAC appearance</span><span class="k" aria-hidden="true">o</span></button>
+            <button class="tab" type="button" role="tab" id="tab-vpn" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="vpn"><span class="ti" aria-hidden="true">🛡️</span><span data-i18n="pt_vpn">WireGuard VPN</span><span class="k" aria-hidden="true">v</span></button>
+            <button class="tab" type="button" role="tab" id="tab-crons" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="crons"><span class="ti" aria-hidden="true">⏰</span><span data-i18n="pt_crons">Schedules & cron tasks</span><span class="k" aria-hidden="true">s</span></button>
+            <button class="tab" type="button" role="tab" id="tab-ai" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="ai"><span class="ti" aria-hidden="true">🤖</span><span data-i18n="pt_ai">AI</span><span class="k" aria-hidden="true">a</span></button>
+            <button class="tab" type="button" role="tab" id="tab-backup" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="backup"><span class="ti" aria-hidden="true">💾</span><span data-i18n="pt_backup">Backup center</span><span class="k" aria-hidden="true">b</span></button>
+          </div>
+          <div class="stage" id="panel-stage" role="tabpanel">
+            <button class="shot" id="shot" type="button" aria-label="Enlarge">
+              <img id="shot-img" src="docs/images/panel/dashboard.webp" alt="Control Dashboard" width="1400" height="924" loading="lazy" decoding="async">
+            </button>
+            <div class="stage-text">
+              <div>
+                <div class="pane" data-pane="dashboard"><h3 data-i18n="pt_dashboard">Control Dashboard</h3><p data-i18n="pd_dashboard">Koha's state, the last backup, free disk and every address of the catalog and the staff interface (this computer, the local network and the internet), each with Open and Copy buttons.</p></div>
+                <div class="pane" data-pane="hub" hidden><h3 data-i18n="pt_hub">Messaging & interoperability</h3><p data-i18n="pd_hub">E-mail, WhatsApp & Telegram, SMS, SIP2 and Z39.50 on one screen. Links open the exact Koha staff page, a Gmail cheat sheet fills the SMTP form, and a SIP2 form writes <code>SIPconfig.xml</code> for the self-check machine.</p></div>
+                <div class="pane" data-pane="z3950" hidden><h3 data-i18n="pt_z3950">Z39.50 / SRU servers</h3><p data-i18n="pd_z3950">Public catalogues by region plus a community list. The scan runs a real search on each server and keeps only those that return a valid MARC record, ranked by speed.</p></div>
+                <div class="pane" data-pane="opac" hidden><h3 data-i18n="pt_opac">OPAC appearance</h3><p data-i18n="pd_opac">The public catalogue's look in one click: frosted glass or brushed metal, rounded corners, a wallpaper, logo, a light/dark switch and a New arrivals carousel with real covers. A backup is taken first.</p></div>
+                <div class="pane" data-pane="vpn" hidden><h3 data-i18n="pt_vpn">WireGuard VPN</h3><p data-i18n="pd_vpn">A private WireGuard network for the staff: add a phone or laptop, scan its QR code, and the staff interface and SSH work from anywhere. Split tunnel only: the device's own internet is untouched.</p></div>
+                <div class="pane" data-pane="crons" hidden><h3 data-i18n="pt_crons">Schedules & cron tasks</h3><p data-i18n="pd_crons">Every scheduled job with a switch, how often and the time, instead of a text editor. Lines written by hand are kept and the old file is saved first.</p></div>
+                <div class="pane" data-pane="ai" hidden><h3 data-i18n="pt_ai">AI</h3><p data-i18n="pd_ai">AI cataloguing from photos of the cover and title page, and an assistant on Koha's staff home page that answers in plain language and changes data only after <strong>Approve &amp; Execute</strong>.</p></div>
+                <div class="pane" data-pane="backup" hidden><h3 data-i18n="pt_backup">Backup center</h3><p data-i18n="pd_backup">Download the latest backup to this PC, test it in a temporary database and copy it to Google Drive, OneDrive, MEGA or S3, step by step.</p></div>
+              </div>
+              <span class="stage-hint" data-i18n="p_hint">Click to enlarge</span>
+            </div>
+            <div class="stage-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="installation">
       <div class="container">
         <div class="section-heading">
           <div class="kicker" data-i18n="inst_kick">Start here</div>
@@ -727,7 +1004,7 @@ sudo bash installer</pre>
               <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
             </div>
             <h3 data-i18n="win_b_t">Installation</h3>
-            <p data-i18n="win_b_p">Open PowerShell normally and run:</p>
+            <p data-i18n="win_b_p">Open PowerShell <strong>as Administrator</strong> (right-click the Start button → <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>) and run:</p>
             <div class="codebox" style="margin-top:15px">
               <div class="codebox-head">
                 <span>PowerShell</span>
@@ -735,6 +1012,7 @@ sudo bash installer</pre>
               </div>
               <pre>[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
             </div>
+            <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.</div>
             <div class="callout" style="margin-top:15px" data-i18n="win_c1">
               <strong>Easier way:</strong> The button above downloads <code>Install-Koha.cmd</code>. No need to open PowerShell manually.
             </div>
@@ -994,6 +1272,7 @@ sudo bash installer</pre>
             Explore the public catalogs maintained by our partner institutions.
             Search engines follow these links to automatically discover and index their collections.
           </p>
+          <span class="live-pill" data-i18n="n_live">Live list from the koha.nexus network</span>
         </div>
 
         <div class="grid-3" id="libraries-grid">
@@ -1078,6 +1357,7 @@ sudo bash installer</pre>
           <h4 data-i18n="foot_links">Links</h4>
           <div class="mini-links">
             <a href="#features" data-i18n="nav_features">Features</a>
+            <a href="#panel" data-i18n="nav_panel">Panel</a>
             <a href="#installation" data-i18n="nav_install">Installation</a>
             <a href="#windows" data-i18n="nav_win">Windows</a>
             <a href="#tools" data-i18n="nav_tools">Tools</a>
@@ -1099,16 +1379,17 @@ sudo bash installer</pre>
     // ----------------------------------------------------------------------
     const translations = {
       en: {
+        nav_panel: "Panel", badge_new: "New", p_kick: "The new control panel", p_h2: "One screen for every task, with mouse and keyboard.", p_p: "Run <code>sudo config.sh</code> and the panel opens full screen: a live dashboard, cards you click, shortcut keys and a command palette (<kbd>ctrl+p</kbd>). These are real screenshots of the panel.", p_hint: "Click to enlarge", pt_dashboard: "Control Dashboard", pt_hub: "Messaging & interoperability", pt_z3950: "Z39.50 / SRU servers", pt_opac: "OPAC appearance", pt_vpn: "WireGuard VPN", pt_crons: "Schedules & cron tasks", pt_ai: "AI", pt_backup: "Backup center", pd_dashboard: "Koha's state, the last backup, free disk and every address of the catalog and the staff interface (this computer, the local network and the internet), each with Open and Copy buttons.", pd_hub: "E-mail, WhatsApp & Telegram, SMS, SIP2 and Z39.50 on one screen. Links open the exact Koha staff page, a Gmail cheat sheet fills the SMTP form, and a SIP2 form writes <code>SIPconfig.xml</code> for the self-check machine.", pd_z3950: "Public catalogues by region plus a community list. The scan runs a real search on each server and keeps only those that return a valid MARC record, ranked by speed.", pd_opac: "The public catalogue's look in one click: frosted glass or brushed metal, rounded corners, a wallpaper, logo, a light/dark switch and a New arrivals carousel with real covers. A backup is taken first.", pd_vpn: "A private WireGuard network for the staff: add a phone or laptop, scan its QR code, and the staff interface and SSH work from anywhere. Split tunnel only: the device's own internet is untouched.", pd_crons: "Every scheduled job with a switch, how often and the time, instead of a text editor. Lines written by hand are kept and the old file is saved first.", pd_ai: "AI cataloguing from photos of the cover and title page, and an assistant on Koha's staff home page that answers in plain language and changes data only after <strong>Approve &amp; Execute</strong>.", pd_backup: "Download the latest backup to this PC, test it in a temporary database and copy it to Google Drive, OneDrive, MEGA or S3, step by step.", f12_t: "Z39.50 / SRU servers", f12_d: "Curated public catalogues tested with a real search: only servers that return valid MARC records go into Koha, fastest first.", f13_t: "OPAC appearance", f13_d: "Textures, rounded corners, wallpaper, logo, a light/dark switch and a New arrivals carousel, written into Koha with a backup first.", f14_t: "Messaging & interoperability", f14_d: "E-mail, SMS, SIP2 self-check and Z39.50 on one screen, with links to the exact Koha page and a SIP2 form that writes the configuration.", f15_t: "Schedules & cron tasks", f15_d: "Switch each automated job on or off and choose how often and when. Hand-written lines are kept.", f16_t: "WireGuard VPN", f16_d: "Staff reach the staff interface and SSH from anywhere with a QR code for their phone. Only the library's addresses go through the VPN.", f17_t: "Free address", f17_d: "A public catalog address on koha.nexus without buying a domain or opening a Cloudflare account, shared as a QR code or a link. Still in testing.", f18_t: "AI assistant", f18_d: "Librarians ask in plain language about books, patrons and loans. Any change is a proposal that runs only after Approve &amp; Execute.", n_live: "Live list from the koha.nexus network",
         nav_features: "Features", nav_install: "Installation", nav_win: "Windows", nav_tools: "Tools", nav_security: "Security", nav_net: "Network",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "The best free library system, <span class='accent'>now without the hassle.</span>",
         hero_p: "<strong>koha.nexus</strong> is a smart, free, and easy-to-use assistant for installing, configuring, maintaining, and extending the <strong>Koha Integrated Library System</strong> via a friendly and guided dashboard.",
         hero_btn1: "Start installation →", hero_btn2: "View on GitHub", hero_btn3: "Full README",
-        stat1_t: "22 languages", stat1_d: "Dashboard & Koha packages", stat2_t: "2 systems", stat2_d: "Linux or Windows via WSL 2", stat3_t: "16+ features", stat3_d: "Management, tools & tweaks", stat4_t: "GPL-3.0+", stat4_d: "Free & modifiable software",
+        stat1_t: "22 languages", stat1_d: "Dashboard & Koha packages", stat2_t: "2 systems", stat2_d: "Linux or Windows via WSL 2", stat3_t: "25+ features", stat3_d: "Management, tools & tweaks", stat4_t: "GPL-3.0+", stat4_d: "Free & modifiable software",
         term_validating: "Validating server...", term_installing: "Installing Koha", term_configuring: "Configuring database", term_preparing: "Preparing backups", term_access: "Configuring access", term_ready: "Dashboard ready:",
         feat_kick: "All in one place", feat_h2: "A dashboard built for those who keep the library running.", feat_p: "From the initial installation to backups, indexing, security, migration, cataloging, and web publishing, the core features are gathered in a single control point.",
         f1_t: "Guided installation", f1_d: "System, disk, network, and port pre-validation; installation and tuning of Koha, MariaDB, Apache, Memcached, and Plack, plus SWAP, NTP, and timezone.",
-        f2_t: "Backup hub", f2_d: "Compressed SQL backups, MARC21 exports, manual copies, and optional integration with Google Drive via rclone.",
+        f2_t: "Backup hub", f2_d: "Compressed SQL backups, MARC21 exports, a restore test, and cloud copies on Google Drive, OneDrive, MEGA or S3, set up step by step.",
         f3_t: "Safe restore", f3_d: "Backups are validated and tested in a temporary database before any replacement of the current catalog.",
         f4_t: "Search & indexing", f4_d: "Switch between Zebra and Elasticsearch 7, indexer watchdog, and tools for index repair and rebuild.",
         f5_t: "Web publishing", f5_d: "Cloudflare Tunnel without needing to open router ports, Certbot for SSL, and Google Search Console assistant.",
@@ -1125,7 +1406,7 @@ sudo bash installer</pre>
         inst_a_t: "After installation", inst_a1: "Open the staff interface at <code>http://SERVER-IP:8080</code>", inst_a2: "Complete the Koha Web Installer", inst_a3: "Create your super librarian via the dashboard", inst_a4: "The public catalog is at <code>http://SERVER-IP:80</code>", inst_a5: "Reopen the dashboard anytime with <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "A full Koha environment on a single PC, using WSL 2.", win_p: "The Windows edition is designed for small libraries, training, and evaluation, keeping Koha services inside Debian on WSL 2 while offering native Windows tools.",
         win_d_k: "WINDOWS INSTALLER", win_d_t: "Install Koha with two clicks.", win_d_p: "Download <strong>Install-Koha.cmd</strong> directly from the official repository and run it. It launches the PowerShell installer for you.", win_d_b: "⬇ Download Install-Koha.cmd", win_d_s: "View source on GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Open PowerShell normally and run:",
+        win_b_t: "Installation", win_b_p: "Open PowerShell <strong>as Administrator</strong> (right-click the Start button → <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>) and run:", win_admin: "<strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.",
         win_c1: "<strong>Easier way:</strong> The button above downloads <code>Install-Koha.cmd</code>. No need to open PowerShell manually.",
         win_c2_t: "<strong>How to enable Virtualization in BIOS:</strong>", win_c2_p1: "Restart your PC and repeatedly press the setup key as soon as the screen turns on:",
         win_c2_p2: "Inside the BIOS, find <strong>Intel Virtualization Technology (VT-x)</strong> or <strong>AMD SVM / AMD-V</strong>, switch it to <strong>Enabled</strong>, and press <kbd>F10</kbd> to save.",
@@ -1161,16 +1442,17 @@ sudo bash installer</pre>
         foot_p1: "A smart, free, and easy-to-use assistant to simplify Koha technical management in libraries.", foot_p2: "Developed with dedication by <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Project", foot_links: "Links", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "The Koha name and logo belong to the Koha Community."
       },
       br: {
+        nav_panel: "Painel", badge_new: "Novo", p_kick: "O novo painel de controle", p_h2: "Uma tela para cada tarefa, com mouse e teclado.", p_p: "Rode <code>sudo config.sh</code> e o painel abre em tela cheia: um painel ao vivo, cartões clicáveis, teclas de atalho e uma paleta de comandos (<kbd>ctrl+p</kbd>). Estas são capturas reais do painel.", p_hint: "Clique para ampliar", pt_dashboard: "Painel de controle", pt_hub: "Mensagens e interoperabilidade", pt_z3950: "Servidores Z39.50 / SRU", pt_opac: "Aparência do OPAC", pt_vpn: "VPN WireGuard", pt_crons: "Agendamentos e tarefas cron", pt_ai: "IA", pt_backup: "Central de backup", pd_dashboard: "O estado do Koha, o último backup, o disco livre e todos os endereços do catálogo e da interface da equipe (este computador, a rede local e a internet), cada um com os botões Abrir e Copiar.", pd_hub: "E-mail, WhatsApp e Telegram, SMS, SIP2 e Z39.50 em uma só tela. Os links abrem a página exata da equipe no Koha, uma cola do Gmail preenche o formulário SMTP e um formulário SIP2 grava o <code>SIPconfig.xml</code> da máquina de autoatendimento.", pd_z3950: "Catálogos públicos por região e uma lista da comunidade. A varredura faz uma busca real em cada servidor e só fica com os que devolvem um registro MARC válido, do mais rápido ao mais lento.", pd_opac: "O visual do catálogo público com um clique: vidro fosco ou metal escovado, cantos arredondados, papel de parede, logotipo, um botão claro/escuro e um carrossel de Novidades com capas reais. Um backup é feito antes.", pd_vpn: "Uma rede privada WireGuard para a equipe: adicione um celular ou notebook, leia o QR code e a interface da equipe e o SSH funcionam de qualquer lugar. Só túnel dividido: a internet do aparelho não muda.", pd_crons: "Cada tarefa agendada com um botão, a frequência e o horário, em vez de um editor de texto. As linhas escritas à mão são mantidas e o arquivo antigo é salvo antes.", pd_ai: "Catalogação com IA a partir de fotos da capa e da folha de rosto, e um assistente na página inicial da equipe do Koha que responde em linguagem simples e só altera dados depois de <strong>Aprovar e executar</strong>.", pd_backup: "Baixe o último backup para este computador, teste-o em um banco temporário e copie-o para o Google Drive, OneDrive, MEGA ou S3, passo a passo.", f12_t: "Servidores Z39.50 / SRU", f12_d: "Catálogos públicos selecionados e testados com uma busca real: só entram no Koha os servidores que devolvem registros MARC válidos, os mais rápidos primeiro.", f13_t: "Aparência do OPAC", f13_d: "Texturas, cantos arredondados, papel de parede, logotipo, botão claro/escuro e um carrossel de Novidades, gravados no Koha com backup antes.", f14_t: "Mensagens e interoperabilidade", f14_d: "E-mail, SMS, autoatendimento SIP2 e Z39.50 em uma só tela, com links para a página exata do Koha e um formulário SIP2 que grava a configuração.", f15_t: "Agendamentos e tarefas cron", f15_d: "Ligue ou desligue cada tarefa automática e escolha a frequência e o horário. As linhas escritas à mão são mantidas.", f16_t: "VPN WireGuard", f16_d: "A equipe acessa a interface da equipe e o SSH de qualquer lugar com um QR code no celular. Só os endereços da biblioteca passam pela VPN.", f17_t: "Endereço gratuito", f17_d: "Um endereço público do catálogo no koha.nexus sem comprar domínio nem abrir conta na Cloudflare, compartilhado por QR code ou link. Ainda em testes.", f18_t: "Assistente de IA", f18_d: "Bibliotecários perguntam em linguagem simples sobre livros, leitores e empréstimos. Qualquer alteração é uma proposta que só roda depois de Aprovar e executar.", n_live: "Lista ao vivo da rede koha.nexus",
         nav_features: "Recursos", nav_install: "Instalação", nav_win: "Windows", nav_tools: "Ferramentas", nav_security: "Segurança", nav_net: "Rede",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "O melhor sistema gratuito de bibliotecas, <span class='accent'>agora sem complicações.</span>",
         hero_p: "O <strong>koha.nexus</strong> é um assistente inteligente, gratuito e fácil de usar para instalar, configurar, manter e expandir o <strong>Koha Integrated Library System</strong> em um painel amigável.",
         hero_btn1: "Iniciar instalação →", hero_btn2: "Ver no GitHub", hero_btn3: "README completo",
-        stat1_t: "22 idiomas", stat1_d: "Painel e pacotes do Koha", stat2_t: "2 sistemas", stat2_d: "Linux ou Windows via WSL 2", stat3_t: "16+ funções", stat3_d: "Gestão, ferramentas e ajustes", stat4_t: "GPL-3.0+", stat4_d: "Software livre e modificável",
+        stat1_t: "22 idiomas", stat1_d: "Painel e pacotes do Koha", stat2_t: "2 sistemas", stat2_d: "Linux ou Windows via WSL 2", stat3_t: "25+ funções", stat3_d: "Gestão, ferramentas e ajustes", stat4_t: "GPL-3.0+", stat4_d: "Software livre e modificável",
         term_validating: "Validando servidor...", term_installing: "Instalando o Koha", term_configuring: "Configurando o banco de dados", term_preparing: "Preparando backups", term_access: "Configurando acessos", term_ready: "Painel pronto:",
         feat_kick: "Tudo em um só lugar", feat_h2: "Um painel construído para quem mantém a biblioteca funcionando.", feat_p: "Desde a instalação inicial até os backups, indexação, segurança, migração, catalogação e publicação na web, os recursos centrais estão reunidos em um único ponto de controle.",
         f1_t: "Instalação guiada", f1_d: "Pré-validação de sistema, disco, rede e portas; instalação e otimização do Koha, MariaDB, Apache, Memcached e Plack, além de SWAP, NTP e fuso horário.",
-        f2_t: "Central de backups", f2_d: "Backups SQL compactados, exportações MARC21, cópias manuais e integração opcional com o Google Drive via rclone.",
+        f2_t: "Central de backups", f2_d: "Backups SQL compactados, exportações MARC21, teste de restauração e cópias na nuvem no Google Drive, OneDrive, MEGA ou S3, configuradas passo a passo.",
         f3_t: "Restauração segura", f3_d: "Os backups são validados e testados em um banco de dados temporário antes de qualquer substituição do catálogo atual.",
         f4_t: "Busca e indexação", f4_d: "Alternância entre Zebra e Elasticsearch 7, monitor do indexador e ferramentas para reparo e reconstrução de índices.",
         f5_t: "Publicação Web", f5_d: "Cloudflare Tunnel sem precisar de abrir portas no roteador, Certbot para SSL e assistente do Google Search Console.",
@@ -1187,7 +1469,7 @@ sudo bash installer</pre>
         inst_a_t: "Após a instalação", inst_a1: "Abra a interface administrativa em <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Conclua o Instalador Web do Koha", inst_a3: "Crie seu super-bibliotecário através do painel", inst_a4: "O catálogo público fica em <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra o painel a qualquer momento com <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Um ambiente Koha completo em um único PC, usando WSL 2.", win_p: "A edição Windows foi pensada para pequenas bibliotecas, treinamentos e testes, mantendo os serviços Koha dentro do Debian no WSL 2 enquanto oferece ferramentas nativas do Windows.",
         win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale o Koha com dois cliques.", win_d_p: "Baixe o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute-o. Ele abre o instalador do PowerShell para você.", win_d_b: "⬇ Baixar Install-Koha.cmd", win_d_s: "Ver código-fonte no GitHub ↗",
-        win_b_t: "Instalação", win_b_p: "Abra o PowerShell normalmente e execute:",
+        win_b_t: "Instalação", win_b_p: "Abra o PowerShell <strong>como Administrador</strong> (clique com o botão direito no botão Iniciar → <em>Terminal (Admin)</em> ou <em>Windows PowerShell (Admin)</em>) e execute:", win_admin: "<strong>Use a sua própria conta do Windows.</strong> Se o Windows pedir a senha de <em>outra pessoa</em>, entre primeiro em uma conta de administrador e execute lá: o Debian, os atalhos e a etapa de reinício são criados para a conta que executa o instalador.",
         win_c1: "<strong>Método mais fácil:</strong> O botão acima baixa o <code>Install-Koha.cmd</code>. Não é preciso abrir o PowerShell manualmente.",
         win_c2_t: "<strong>Como ativar a Virtualização na BIOS:</strong>", win_c2_p1: "Reinicie o PC e pressione repetidamente a tecla de acesso assim que a tela ligar:",
         win_c2_p2: "Dentro da BIOS, procure por <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, altere para <strong>Enabled</strong> (Ativado) e pressione <kbd>F10</kbd> para salvar.",
@@ -1223,16 +1505,17 @@ sudo bash installer</pre>
         foot_p1: "Um assistente inteligente, gratuito e fácil de usar para simplificar a gestão técnica do Koha em bibliotecas.", foot_p2: "Desenvolvido com dedicação por <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Projeto", foot_links: "Links", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "O nome e logotipo Koha pertencem à Comunidade Koha."
       },
       es: {
+        nav_panel: "Panel", badge_new: "Nuevo", p_kick: "El nuevo panel de control", p_h2: "Una pantalla para cada tarea, con ratón y teclado.", p_p: "Ejecute <code>sudo config.sh</code> y el panel se abre a pantalla completa: un tablero en vivo, tarjetas en las que hacer clic, atajos de teclado y una paleta de comandos (<kbd>ctrl+p</kbd>). Son capturas reales del panel.", p_hint: "Clic para ampliar", pt_dashboard: "Tablero de control", pt_hub: "Mensajería e interoperabilidad", pt_z3950: "Servidores Z39.50 / SRU", pt_opac: "Apariencia del OPAC", pt_vpn: "VPN WireGuard", pt_crons: "Programaciones y tareas cron", pt_ai: "IA", pt_backup: "Centro de copias", pd_dashboard: "El estado de Koha, la última copia, el disco libre y todas las direcciones del catálogo y de la interfaz del personal (este equipo, la red local e internet), cada una con botones Abrir y Copiar.", pd_hub: "Correo, WhatsApp y Telegram, SMS, SIP2 y Z39.50 en una sola pantalla. Los enlaces abren la página exacta de Koha, una guía de Gmail rellena el formulario SMTP y un formulario SIP2 escribe el <code>SIPconfig.xml</code> de la máquina de autopréstamo.", pd_z3950: "Catálogos públicos por región y una lista de la comunidad. El escaneo hace una búsqueda real en cada servidor y solo conserva los que devuelven un registro MARC válido, ordenados por velocidad.", pd_opac: "El aspecto del catálogo público en un clic: vidrio esmerilado o metal cepillado, esquinas redondeadas, fondo, logotipo, un interruptor claro/oscuro y un carrusel de Novedades con portadas reales. Antes se hace una copia.", pd_vpn: "Una red privada WireGuard para el personal: añada un teléfono o portátil, escanee su código QR y la interfaz del personal y SSH funcionan desde cualquier lugar. Solo túnel dividido: el internet del dispositivo no cambia.", pd_crons: "Cada tarea programada con un interruptor, la frecuencia y la hora, en lugar de un editor de texto. Las líneas escritas a mano se conservan y el archivo anterior se guarda primero.", pd_ai: "Catalogación con IA a partir de fotos de la cubierta y la portada, y un asistente en la página de inicio del personal de Koha que responde en lenguaje sencillo y solo cambia datos tras <strong>Aprobar y ejecutar</strong>.", pd_backup: "Descargue la última copia a este equipo, pruébela en una base temporal y cópiela a Google Drive, OneDrive, MEGA o S3, paso a paso.", f12_t: "Servidores Z39.50 / SRU", f12_d: "Catálogos públicos seleccionados y probados con una búsqueda real: solo entran en Koha los que devuelven registros MARC válidos, los más rápidos primero.", f13_t: "Apariencia del OPAC", f13_d: "Texturas, esquinas redondeadas, fondo, logotipo, interruptor claro/oscuro y un carrusel de Novedades, escritos en Koha con una copia previa.", f14_t: "Mensajería e interoperabilidad", f14_d: "Correo, SMS, autopréstamo SIP2 y Z39.50 en una sola pantalla, con enlaces a la página exacta de Koha y un formulario SIP2 que escribe la configuración.", f15_t: "Programaciones y tareas cron", f15_d: "Active o desactive cada tarea automática y elija la frecuencia y la hora. Las líneas escritas a mano se conservan.", f16_t: "VPN WireGuard", f16_d: "El personal accede a su interfaz y a SSH desde cualquier lugar con un código QR en el teléfono. Solo las direcciones de la biblioteca pasan por la VPN.", f17_t: "Dirección gratuita", f17_d: "Una dirección pública del catálogo en koha.nexus sin comprar un dominio ni abrir una cuenta de Cloudflare, compartida por QR o enlace. Aún en pruebas.", f18_t: "Asistente de IA", f18_d: "Los bibliotecarios preguntan en lenguaje sencillo sobre libros, lectores y préstamos. Todo cambio es una propuesta que solo se ejecuta tras Aprobar y ejecutar.", n_live: "Lista en vivo de la red koha.nexus",
         nav_features: "Características", nav_install: "Instalación", nav_win: "Windows", nav_tools: "Herramientas", nav_security: "Seguridad", nav_net: "Red",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "El mejor sistema de bibliotecas, <span class='accent'>ahora sin complicaciones.</span>",
         hero_p: "<strong>koha.nexus</strong> es un asistente inteligente, gratuito y fácil de usar para instalar, configurar, mantener y ampliar el <strong>Koha Integrated Library System</strong> mediante un panel amigable.",
         hero_btn1: "Iniciar instalación →", hero_btn2: "Ver en GitHub", hero_btn3: "Léame Completo",
-        stat1_t: "22 idiomas", stat1_d: "Panel y paquetes de Koha", stat2_t: "2 sistemas", stat2_d: "Linux o Windows vía WSL 2", stat3_t: "16+ funciones", stat3_d: "Gestión, herramientas y ajustes", stat4_t: "GPL-3.0+", stat4_d: "Software libre y modificable",
+        stat1_t: "22 idiomas", stat1_d: "Panel y paquetes de Koha", stat2_t: "2 sistemas", stat2_d: "Linux o Windows vía WSL 2", stat3_t: "25+ funciones", stat3_d: "Gestión, herramientas y ajustes", stat4_t: "GPL-3.0+", stat4_d: "Software libre y modificable",
         term_validating: "Validando servidor...", term_installing: "Instalando Koha", term_configuring: "Configurando base de datos", term_preparing: "Preparando copias de seguridad", term_access: "Configurando accesos", term_ready: "Panel listo:",
         feat_kick: "Todo en un solo lugar", feat_h2: "Un panel construido para quienes mantienen la biblioteca funcionando.", feat_p: "Desde la instalación inicial hasta las copias de seguridad, indexación, seguridad, migración, catalogación y publicación web, las funciones principales están reunidas en un solo punto de control.",
         f1_t: "Instalación guiada", f1_d: "Pre-validación de sistema, disco, red y puertos; instalación y ajuste de Koha, MariaDB, Apache, Memcached y Plack, más SWAP, NTP y zona horaria.",
-        f2_t: "Centro de backups", f2_d: "Copias SQL comprimidas, exportaciones MARC21, copias manuales e integración opcional con Google Drive vía rclone.",
+        f2_t: "Centro de backups", f2_d: "Copias SQL comprimidas, exportaciones MARC21, prueba de restauración y copias en la nube en Google Drive, OneDrive, MEGA o S3, configuradas paso a paso.",
         f3_t: "Restauración segura", f3_d: "Las copias se validan y prueban en una base de datos temporal antes de reemplazar el catálogo actual.",
         f4_t: "Búsqueda e indexación", f4_d: "Alternancia entre Zebra y Elasticsearch 7, monitor del indexador y herramientas para reparar y reconstruir índices.",
         f5_t: "Publicación web", f5_d: "Cloudflare Tunnel sin abrir puertos en el router, Certbot para SSL y asistente de Google Search Console.",
@@ -1249,7 +1532,7 @@ sudo bash installer</pre>
         inst_a_t: "Después de la instalación", inst_a1: "Abra la interfaz del personal en <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Complete el Instalador Web de Koha", inst_a3: "Cree su súper bibliotecario desde el panel", inst_a4: "El catálogo público está en <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra el panel cuando quiera con <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un entorno Koha completo en un solo PC, usando WSL 2.", win_p: "La edición Windows está pensada para pequeñas bibliotecas, formación y evaluación, manteniendo los servicios Koha dentro de Debian en WSL 2 mientras ofrece herramientas nativas de Windows.",
         win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale Koha con dos clics.", win_d_p: "Descargue <strong>Install-Koha.cmd</strong> directamente del repositorio oficial y ejecútelo. Lanzará el instalador de PowerShell por usted.", win_d_b: "⬇ Descargar Install-Koha.cmd", win_d_s: "Ver código fuente en GitHub ↗",
-        win_b_t: "Instalación", win_b_p: "Abra PowerShell normalmente y ejecute:",
+        win_b_t: "Instalación", win_b_p: "Abra PowerShell <strong>como Administrador</strong> (clic derecho en el botón Inicio → <em>Terminal (Administrador)</em> o <em>Windows PowerShell (Administrador)</em>) y ejecute:", win_admin: "<strong>Use su propia cuenta de Windows.</strong> Si Windows pide la contraseña de <em>otra persona</em>, inicie sesión primero en una cuenta de administrador y ejecútelo allí: Debian, los accesos directos y el paso de reinicio se crean para la cuenta que ejecuta el instalador.",
         win_c1: "<strong>Forma más fácil:</strong> El botón de arriba descarga <code>Install-Koha.cmd</code>. No necesita abrir PowerShell manualmente.",
         win_c2_t: "<strong>Cómo habilitar la Virtualización en BIOS:</strong>", win_c2_p1: "Reinicie su PC y presione repetidamente la tecla de configuración tan pronto se encienda la pantalla:",
         win_c2_p2: "Dentro de la BIOS, busque <strong>Intel Virtualization Technology (VT-x)</strong> o <strong>AMD SVM / AMD-V</strong>, cámbielo a <strong>Enabled</strong> y presione <kbd>F10</kbd> para guardar.",
@@ -1285,16 +1568,17 @@ sudo bash installer</pre>
         foot_p1: "Un asistente inteligente, gratuito y fácil de usar para simplificar la gestión técnica de Koha en las bibliotecas.", foot_p2: "Desarrollado con dedicación por <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Proyecto", foot_links: "Enlaces", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "El nombre y logotipo de Koha pertenecen a la Comunidad Koha."
       },
       fr: {
+        nav_panel: "Panneau", badge_new: "Nouveau", p_kick: "Le nouveau panneau de contrôle", p_h2: "Un écran pour chaque tâche, à la souris et au clavier.", p_p: "Lancez <code>sudo config.sh</code> et le panneau s'ouvre en plein écran : un tableau de bord en direct, des cartes cliquables, des raccourcis clavier et une palette de commandes (<kbd>ctrl+p</kbd>). Ce sont de vraies captures du panneau.", p_hint: "Cliquez pour agrandir", pt_dashboard: "Tableau de bord", pt_hub: "Messagerie et interopérabilité", pt_z3950: "Serveurs Z39.50 / SRU", pt_opac: "Apparence de l'OPAC", pt_vpn: "VPN WireGuard", pt_crons: "Planifications et tâches cron", pt_ai: "IA", pt_backup: "Centre de sauvegarde", pd_dashboard: "L'état de Koha, la dernière sauvegarde, l'espace disque libre et toutes les adresses du catalogue et de l'interface professionnelle (cet ordinateur, le réseau local et Internet), chacune avec les boutons Ouvrir et Copier.", pd_hub: "E-mail, WhatsApp et Telegram, SMS, SIP2 et Z39.50 sur un seul écran. Les liens ouvrent la page exacte de Koha, un aide-mémoire Gmail remplit le formulaire SMTP et un formulaire SIP2 écrit le <code>SIPconfig.xml</code> de l'automate de prêt.", pd_z3950: "Des catalogues publics par région et une liste communautaire. L'analyse lance une vraie recherche sur chaque serveur et ne garde que ceux qui renvoient une notice MARC valide, classés par rapidité.", pd_opac: "L'apparence du catalogue public en un clic : verre dépoli ou métal brossé, coins arrondis, fond d'écran, logo, bascule clair/sombre et un carrousel de Nouveautés avec de vraies couvertures. Une sauvegarde est faite d'abord.", pd_vpn: "Un réseau privé WireGuard pour le personnel : ajoutez un téléphone ou un portable, scannez son QR code, et l'interface professionnelle et SSH fonctionnent de partout. Tunnel partagé uniquement : l'Internet de l'appareil ne change pas.", pd_crons: "Chaque tâche planifiée avec un interrupteur, sa fréquence et son heure, au lieu d'un éditeur de texte. Les lignes écrites à la main sont conservées et l'ancien fichier est sauvegardé d'abord.", pd_ai: "Le catalogage par IA à partir de photos de la couverture et de la page de titre, et un assistant sur l'accueil professionnel de Koha qui répond en langage simple et ne modifie les données qu'après <strong>Approuver et exécuter</strong>.", pd_backup: "Téléchargez la dernière sauvegarde sur ce PC, testez-la dans une base temporaire et copiez-la sur Google Drive, OneDrive, MEGA ou S3, pas à pas.", f12_t: "Serveurs Z39.50 / SRU", f12_d: "Des catalogues publics choisis et testés par une vraie recherche : seuls les serveurs qui renvoient des notices MARC valides entrent dans Koha, les plus rapides d'abord.", f13_t: "Apparence de l'OPAC", f13_d: "Textures, coins arrondis, fond d'écran, logo, bascule clair/sombre et carrousel de Nouveautés, écrits dans Koha après une sauvegarde.", f14_t: "Messagerie et interopérabilité", f14_d: "E-mail, SMS, automate SIP2 et Z39.50 sur un seul écran, avec des liens vers la page exacte de Koha et un formulaire SIP2 qui écrit la configuration.", f15_t: "Planifications et tâches cron", f15_d: "Activez ou désactivez chaque tâche automatique et choisissez sa fréquence et son heure. Les lignes écrites à la main sont conservées.", f16_t: "VPN WireGuard", f16_d: "Le personnel accède à l'interface professionnelle et à SSH de partout avec un QR code sur son téléphone. Seules les adresses de la bibliothèque passent par le VPN.", f17_t: "Adresse gratuite", f17_d: "Une adresse publique du catalogue sur koha.nexus sans acheter de domaine ni ouvrir de compte Cloudflare, partagée par QR code ou lien. Encore en test.", f18_t: "Assistant IA", f18_d: "Les bibliothécaires posent leurs questions en langage simple sur les livres, les lecteurs et les prêts. Toute modification est une proposition exécutée seulement après Approuver et exécuter.", n_live: "Liste en direct du réseau koha.nexus",
         nav_features: "Fonctionnalités", nav_install: "Installation", nav_win: "Windows", nav_tools: "Outils", nav_security: "Sécurité", nav_net: "Réseau",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "Le meilleur système de bibliothèque, <span class='accent'>maintenant sans tracas.</span>",
         hero_p: "<strong>koha.nexus</strong> est un assistant intelligent, gratuit et facile à utiliser pour installer, configurer, maintenir et étendre le <strong>Koha Integrated Library System</strong> via un tableau de bord convivial.",
         hero_btn1: "Démarrer l'installation →", hero_btn2: "Voir sur GitHub", hero_btn3: "README Complet",
-        stat1_t: "22 langues", stat1_d: "Tableau de bord et paquets Koha", stat2_t: "2 systèmes", stat2_d: "Linux ou Windows via WSL 2", stat3_t: "16+ fonctions", stat3_d: "Gestion, outils et ajustements", stat4_t: "GPL-3.0+", stat4_d: "Logiciel libre et modifiable",
+        stat1_t: "22 langues", stat1_d: "Tableau de bord et paquets Koha", stat2_t: "2 systèmes", stat2_d: "Linux ou Windows via WSL 2", stat3_t: "25+ fonctions", stat3_d: "Gestion, outils et ajustements", stat4_t: "GPL-3.0+", stat4_d: "Logiciel libre et modifiable",
         term_validating: "Validation du serveur...", term_installing: "Installation de Koha", term_configuring: "Configuration de la base de données", term_preparing: "Préparation des sauvegardes", term_access: "Configuration des accès", term_ready: "Tableau de bord prêt:",
         feat_kick: "Tout en un seul endroit", feat_h2: "Un tableau de bord conçu pour ceux qui font fonctionner la bibliothèque.", feat_p: "De l'installation initiale aux sauvegardes, indexation, sécurité, migration, catalogage et publication web, les fonctionnalités clés sont rassemblées dans un point de contrôle unique.",
         f1_t: "Installation guidée", f1_d: "Pré-validation du système, du disque, du réseau et des ports; installation et optimisation de Koha, MariaDB, Apache, Memcached et Plack, plus SWAP, NTP et fuseau horaire.",
-        f2_t: "Centre de sauvegardes", f2_d: "Sauvegardes SQL compressées, exports MARC21, copies manuelles et intégration optionnelle avec Google Drive via rclone.",
+        f2_t: "Centre de sauvegardes", f2_d: "Sauvegardes SQL compressées, exports MARC21, test de restauration et copies dans le cloud sur Google Drive, OneDrive, MEGA ou S3, configurées pas à pas.",
         f3_t: "Restauration sécurisée", f3_d: "Les sauvegardes sont validées et testées dans une base de données temporaire avant de remplacer le catalogue actuel.",
         f4_t: "Recherche et indexation", f4_d: "Basculement entre Zebra et Elasticsearch 7, chien de garde de l'indexeur, et outils pour la réparation et la reconstruction de l'index.",
         f5_t: "Publication Web", f5_d: "Cloudflare Tunnel sans besoin d'ouvrir des ports, Certbot pour SSL, et assistant Google Search Console.",
@@ -1311,7 +1595,7 @@ sudo bash installer</pre>
         inst_a_t: "Après l'installation", inst_a1: "Ouvrez l'interface professionnelle à <code>http://IP-SERVEUR:8080</code>", inst_a2: "Terminez l'installation Web de Koha", inst_a3: "Créez votre super bibliothécaire via le tableau de bord", inst_a4: "Le catalogue public est à <code>http://IP-SERVEUR:80</code>", inst_a5: "Rouvrez le tableau de bord avec <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un environnement Koha complet sur un seul PC, utilisant WSL 2.", win_p: "L'édition Windows est conçue pour les petites bibliothèques et la formation, gardant les services Koha à l'intérieur de Debian sur WSL 2 tout en offrant des outils Windows natifs.",
         win_d_k: "INSTALLATEUR WINDOWS", win_d_t: "Installez Koha en deux clics.", win_d_p: "Téléchargez <strong>Install-Koha.cmd</strong> directement depuis le dépôt officiel et exécutez-le. Il lance l'installateur PowerShell pour vous.", win_d_b: "⬇ Télécharger Install-Koha.cmd", win_d_s: "Voir la source sur GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Ouvrez PowerShell normalement et exécutez:",
+        win_b_t: "Installation", win_b_p: "Ouvrez PowerShell <strong>en tant qu'administrateur</strong> (clic droit sur le bouton Démarrer → <em>Terminal (administrateur)</em> ou <em>Windows PowerShell (admin)</em>) et exécutez :", win_admin: "<strong>Utilisez votre propre compte Windows.</strong> Si Windows demande le mot de passe d'<em>une autre personne</em>, connectez-vous d'abord à un compte administrateur et lancez-le là : Debian, les raccourcis et l'étape de redémarrage sont créés pour le compte qui lance l'installateur.",
         win_c1: "<strong>Plus facile:</strong> Le bouton ci-dessus télécharge <code>Install-Koha.cmd</code>. Pas besoin d'ouvrir PowerShell manuellement.",
         win_c2_t: "<strong>Comment activer la virtualisation dans le BIOS:</strong>", win_c2_p1: "Redémarrez votre PC et appuyez sur la touche de configuration dès que l'écran s'allume:",
         win_c2_p2: "Dans le BIOS, trouvez <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, changez-le en <strong>Enabled</strong>, et appuyez sur <kbd>F10</kbd> pour enregistrer.",
@@ -1347,16 +1631,17 @@ sudo bash installer</pre>
         foot_p1: "Un assistant intelligent, gratuit et facile à utiliser pour simplifier la gestion technique de Koha dans les bibliothèques.", foot_p2: "Développé avec dévouement par <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Projet", foot_links: "Liens", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "Le nom et le logo Koha appartiennent à la Communauté Koha."
       },
       it: {
+        nav_panel: "Pannello", badge_new: "Nuovo", p_kick: "Il nuovo pannello di controllo", p_h2: "Una schermata per ogni attività, con mouse e tastiera.", p_p: "Esegui <code>sudo config.sh</code> e il pannello si apre a schermo intero: una dashboard in tempo reale, schede cliccabili, scorciatoie da tastiera e una tavolozza dei comandi (<kbd>ctrl+p</kbd>). Sono schermate reali del pannello.", p_hint: "Clicca per ingrandire", pt_dashboard: "Dashboard di controllo", pt_hub: "Messaggi e interoperabilità", pt_z3950: "Server Z39.50 / SRU", pt_opac: "Aspetto dell'OPAC", pt_vpn: "VPN WireGuard", pt_crons: "Pianificazioni e attività cron", pt_ai: "IA", pt_backup: "Centro backup", pd_dashboard: "Lo stato di Koha, l'ultimo backup, lo spazio libero e tutti gli indirizzi del catalogo e dell'interfaccia dello staff (questo computer, la rete locale e internet), ognuno con i pulsanti Apri e Copia.", pd_hub: "E-mail, WhatsApp e Telegram, SMS, SIP2 e Z39.50 in una sola schermata. I link aprono la pagina esatta di Koha, un promemoria Gmail compila il modulo SMTP e un modulo SIP2 scrive il <code>SIPconfig.xml</code> della postazione di autoprestito.", pd_z3950: "Cataloghi pubblici per regione e un elenco della comunità. La scansione esegue una ricerca reale su ogni server e tiene solo quelli che restituiscono un record MARC valido, in ordine di velocità.", pd_opac: "L'aspetto del catalogo pubblico in un clic: vetro smerigliato o metallo spazzolato, angoli arrotondati, sfondo, logo, un interruttore chiaro/scuro e un carosello di Novità con copertine reali. Prima viene fatto un backup.", pd_vpn: "Una rete privata WireGuard per lo staff: aggiungi un telefono o un portatile, scansiona il suo codice QR e l'interfaccia dello staff e SSH funzionano ovunque. Solo split tunnel: la connessione del dispositivo non cambia.", pd_crons: "Ogni attività pianificata con un interruttore, la frequenza e l'orario, invece di un editor di testo. Le righe scritte a mano restano e il file precedente viene salvato prima.", pd_ai: "Catalogazione con IA da foto della copertina e del frontespizio, e un assistente nella home dello staff di Koha che risponde in linguaggio semplice e modifica i dati solo dopo <strong>Approva ed esegui</strong>.", pd_backup: "Scarica l'ultimo backup su questo PC, provalo in un database temporaneo e copialo su Google Drive, OneDrive, MEGA o S3, passo dopo passo.", f12_t: "Server Z39.50 / SRU", f12_d: "Cataloghi pubblici selezionati e provati con una ricerca reale: entrano in Koha solo i server che restituiscono record MARC validi, i più veloci per primi.", f13_t: "Aspetto dell'OPAC", f13_d: "Texture, angoli arrotondati, sfondo, logo, interruttore chiaro/scuro e un carosello di Novità, scritti in Koha dopo un backup.", f14_t: "Messaggi e interoperabilità", f14_d: "E-mail, SMS, autoprestito SIP2 e Z39.50 in una schermata, con link alla pagina esatta di Koha e un modulo SIP2 che scrive la configurazione.", f15_t: "Pianificazioni e attività cron", f15_d: "Attiva o disattiva ogni attività automatica e scegli frequenza e orario. Le righe scritte a mano restano.", f16_t: "VPN WireGuard", f16_d: "Lo staff raggiunge la sua interfaccia e SSH da ovunque con un codice QR sul telefono. Solo gli indirizzi della biblioteca passano per la VPN.", f17_t: "Indirizzo gratuito", f17_d: "Un indirizzo pubblico del catalogo su koha.nexus senza comprare un dominio né aprire un account Cloudflare, condiviso con QR o link. Ancora in prova.", f18_t: "Assistente IA", f18_d: "I bibliotecari chiedono in linguaggio semplice di libri, utenti e prestiti. Ogni modifica è una proposta che parte solo dopo Approva ed esegui.", n_live: "Elenco in tempo reale della rete koha.nexus",
         nav_features: "Funzionalità", nav_install: "Installazione", nav_win: "Windows", nav_tools: "Strumenti", nav_security: "Sicurezza", nav_net: "Rete",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "Il miglior sistema per biblioteche, <span class='accent'>ora senza complicazioni.</span>",
         hero_p: "<strong>koha.nexus</strong> è un assistente intelligente, gratuito e facile da usare per installare, configurare, mantenere ed espandere il <strong>Koha Integrated Library System</strong> tramite un pannello intuitivo.",
         hero_btn1: "Inizia l'installazione →", hero_btn2: "Vedi su GitHub", hero_btn3: "README Completo",
-        stat1_t: "22 lingue", stat1_d: "Pannello e pacchetti Koha", stat2_t: "2 sistemi", stat2_d: "Linux o Windows tramite WSL 2", stat3_t: "16+ funzioni", stat3_d: "Gestione, strumenti e ottimizzazioni", stat4_t: "GPL-3.0+", stat4_d: "Software libero e modificabile",
+        stat1_t: "22 lingue", stat1_d: "Pannello e pacchetti Koha", stat2_t: "2 sistemi", stat2_d: "Linux o Windows tramite WSL 2", stat3_t: "25+ funzioni", stat3_d: "Gestione, strumenti e ottimizzazioni", stat4_t: "GPL-3.0+", stat4_d: "Software libero e modificabile",
         term_validating: "Validazione del server...", term_installing: "Installazione di Koha", term_configuring: "Configurazione del database", term_preparing: "Preparazione dei backup", term_access: "Configurazione degli accessi", term_ready: "Pannello pronto:",
         feat_kick: "Tutto in un unico posto", feat_h2: "Un pannello costruito per chi mantiene in funzione la biblioteca.", feat_p: "Dall'installazione iniziale ai backup, indicizzazione, sicurezza, migrazione, catalogazione e pubblicazione web, le funzionalità principali sono raggruppate in un unico punto di controllo.",
         f1_t: "Installazione guidata", f1_d: "Pre-validazione di sistema, disco, rete e porte; installazione e ottimizzazione di Koha, MariaDB, Apache, Memcached e Plack, oltre a SWAP, NTP e fuso orario.",
-        f2_t: "Hub di backup", f2_d: "Backup SQL compressi, esportazioni MARC21, copie manuali e integrazione opzionale con Google Drive tramite rclone.",
+        f2_t: "Hub di backup", f2_d: "Backup SQL compressi, esportazioni MARC21, test di ripristino e copie nel cloud su Google Drive, OneDrive, MEGA o S3, configurate passo dopo passo.",
         f3_t: "Ripristino sicuro", f3_d: "I backup vengono convalidati e testati in un database temporaneo prima di qualsiasi sostituzione del catalogo attuale.",
         f4_t: "Ricerca e indicizzazione", f4_d: "Passaggio tra Zebra ed Elasticsearch 7, watchdog dell'indicizzatore e strumenti per la riparazione e ricostruzione degli indici.",
         f5_t: "Pubblicazione web", f5_d: "Cloudflare Tunnel senza necessità di aprire le porte del router, Certbot per SSL e assistente Google Search Console.",
@@ -1373,7 +1658,7 @@ sudo bash installer</pre>
         inst_a_t: "Dopo l'installazione", inst_a1: "Apri l'interfaccia dello staff su <code>http://IP-SERVER:8080</code>", inst_a2: "Completa l'Installatore Web di Koha", inst_a3: "Crea il tuo super bibliotecario tramite il pannello", inst_a4: "Il catalogo pubblico è su <code>http://IP-SERVER:80</code>", inst_a5: "Riapri il pannello in qualsiasi momento con <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un ambiente Koha completo su un singolo PC, utilizzando WSL 2.", win_p: "L'edizione per Windows è progettata per piccole biblioteche, formazione e valutazione, mantenendo i servizi Koha all'interno di Debian su WSL 2 pur offrendo strumenti nativi di Windows.",
         win_d_k: "INSTALLATORE WINDOWS", win_d_t: "Installa Koha con due clic.", win_d_p: "Scarica <strong>Install-Koha.cmd</strong> direttamente dal repository ufficiale ed eseguilo. Avvierà l'installatore PowerShell per te.", win_d_b: "⬇ Scarica Install-Koha.cmd", win_d_s: "Vedi il codice sorgente su GitHub ↗",
-        win_b_t: "Installazione", win_b_p: "Apri PowerShell normalmente ed esegui:",
+        win_b_t: "Installazione", win_b_p: "Apri PowerShell <strong>come amministratore</strong> (clic destro sul pulsante Start → <em>Terminale (amministratore)</em> o <em>Windows PowerShell (amministratore)</em>) ed esegui:", win_admin: "<strong>Usa il tuo account Windows.</strong> Se Windows chiede la password di <em>un'altra persona</em>, accedi prima a un account amministratore ed eseguilo lì: Debian, i collegamenti e il passaggio di riavvio vengono creati per l'account che esegue l'installatore.",
         win_c1: "<strong>Modo più semplice:</strong> Il pulsante qui sopra scarica <code>Install-Koha.cmd</code>. Non è necessario aprire PowerShell.",
         win_c2_t: "<strong>Come abilitare la virtualizzazione nel BIOS:</strong>", win_c2_p1: "Riavvia il PC e premi ripetutamente il tasto di configurazione non appena lo schermo si accende:",
         win_c2_p2: "All'interno del BIOS, trova <strong>Intel Virtualization Technology (VT-x)</strong> o <strong>AMD SVM / AMD-V</strong>, impostalo su <strong>Enabled</strong> e premi <kbd>F10</kbd> per salvare.",
@@ -1409,16 +1694,17 @@ sudo bash installer</pre>
         foot_p1: "Un assistente intelligente, gratuito e facile da usare per semplificare la gestione tecnica di Koha nelle biblioteche.", foot_p2: "Sviluppato con dedizione da <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.", foot_proj: "Progetto", foot_links: "Link", foot_c1: "© 2026 koha.nexus • GPL-3.0-or-later", foot_c2: "Il nome e il logo Koha appartengono alla Koha Community."
       },
       de: {
+        nav_panel: "Panel", badge_new: "Neu", p_kick: "Das neue Kontrollpanel", p_h2: "Ein Bildschirm für jede Aufgabe, mit Maus und Tastatur.", p_p: "Starten Sie <code>sudo config.sh</code> und das Panel öffnet sich im Vollbild: ein Live-Dashboard, anklickbare Karten, Tastenkürzel und eine Befehlspalette (<kbd>Strg+P</kbd>). Das sind echte Bildschirmfotos des Panels.", p_hint: "Zum Vergrößern klicken", pt_dashboard: "Kontroll-Dashboard", pt_hub: "Nachrichten & Interoperabilität", pt_z3950: "Z39.50- / SRU-Server", pt_opac: "OPAC-Aussehen", pt_vpn: "WireGuard-VPN", pt_crons: "Zeitpläne & Cron-Aufgaben", pt_ai: "KI", pt_backup: "Backup-Center", pd_dashboard: "Der Zustand von Koha, das letzte Backup, freier Speicher und alle Adressen von Katalog und Dienstoberfläche (dieser Computer, das lokale Netz und das Internet), jeweils mit den Schaltflächen Öffnen und Kopieren.", pd_hub: "E-Mail, WhatsApp & Telegram, SMS, SIP2 und Z39.50 auf einem Bildschirm. Links öffnen genau die richtige Koha-Seite, ein Gmail-Spickzettel füllt das SMTP-Formular, und ein SIP2-Formular schreibt die <code>SIPconfig.xml</code> für den Selbstverbuchungsautomaten.", pd_z3950: "Öffentliche Kataloge nach Region und eine Community-Liste. Der Scan führt auf jedem Server eine echte Suche aus und behält nur die, die einen gültigen MARC-Datensatz liefern, nach Geschwindigkeit sortiert.", pd_opac: "Das Aussehen des öffentlichen Katalogs mit einem Klick: Milchglas oder gebürstetes Metall, abgerundete Ecken, Hintergrundbild, Logo, ein Hell/Dunkel-Schalter und ein Neuerwerbungen-Karussell mit echten Covern. Vorher wird ein Backup angelegt.", pd_vpn: "Ein privates WireGuard-Netz für das Personal: Telefon oder Laptop hinzufügen, QR-Code scannen, und Dienstoberfläche und SSH funktionieren von überall. Nur Split-Tunnel: das Internet des Geräts bleibt unverändert.", pd_crons: "Jede geplante Aufgabe mit Schalter, Häufigkeit und Uhrzeit statt eines Texteditors. Von Hand geschriebene Zeilen bleiben erhalten, die alte Datei wird vorher gesichert.", pd_ai: "KI-Katalogisierung aus Fotos von Umschlag und Titelseite und ein Assistent auf der Dienst-Startseite von Koha, der in einfacher Sprache antwortet und Daten erst nach <strong>Genehmigen &amp; Ausführen</strong> ändert.", pd_backup: "Das neueste Backup auf diesen PC laden, in einer temporären Datenbank testen und Schritt für Schritt nach Google Drive, OneDrive, MEGA oder S3 kopieren.", f12_t: "Z39.50- / SRU-Server", f12_d: "Ausgewählte öffentliche Kataloge, mit einer echten Suche getestet: nur Server mit gültigen MARC-Datensätzen kommen in Koha, die schnellsten zuerst.", f13_t: "OPAC-Aussehen", f13_d: "Texturen, abgerundete Ecken, Hintergrundbild, Logo, Hell/Dunkel-Schalter und ein Neuerwerbungen-Karussell, nach einem Backup in Koha geschrieben.", f14_t: "Nachrichten & Interoperabilität", f14_d: "E-Mail, SMS, SIP2-Selbstverbuchung und Z39.50 auf einem Bildschirm, mit Links zur genauen Koha-Seite und einem SIP2-Formular, das die Konfiguration schreibt.", f15_t: "Zeitpläne & Cron-Aufgaben", f15_d: "Jede automatische Aufgabe ein- oder ausschalten und Häufigkeit und Uhrzeit wählen. Von Hand geschriebene Zeilen bleiben erhalten.", f16_t: "WireGuard-VPN", f16_d: "Das Personal erreicht Dienstoberfläche und SSH von überall mit einem QR-Code auf dem Telefon. Nur die Adressen der Bibliothek laufen über das VPN.", f17_t: "Kostenlose Adresse", f17_d: "Eine öffentliche Katalogadresse auf koha.nexus ohne Domainkauf und ohne Cloudflare-Konto, geteilt als QR-Code oder Link. Noch im Test.", f18_t: "KI-Assistent", f18_d: "Bibliothekare fragen in einfacher Sprache nach Büchern, Lesern und Ausleihen. Jede Änderung ist ein Vorschlag, der erst nach Genehmigen &amp; Ausführen läuft.", n_live: "Live-Liste aus dem koha.nexus-Netz",
         nav_features: "Funktionen", nav_install: "Installation", nav_win: "Windows", nav_tools: "Werkzeuge", nav_security: "Sicherheit", nav_net: "Netzwerk",
         hero_eye: "✦ Koha • Debian • Ubuntu • Windows 10/11",
         hero_h1: "Das beste freie Bibliothekssystem, <span class='accent'>jetzt ohne Aufwand.</span>",
         hero_p: "<strong>koha.nexus</strong> ist ein intelligenter, kostenloser und einfach zu bedienender Assistent zur Installation, Konfiguration, Wartung und Erweiterung des <strong>Koha Integrated Library System</strong> über ein benutzerfreundliches Dashboard.",
         hero_btn1: "Installation starten →", hero_btn2: "Auf GitHub ansehen", hero_btn3: "Vollständige README",
-        stat1_t: "22 Sprachen", stat1_d: "Dashboard & Koha Pakete", stat2_t: "2 Systeme", stat2_d: "Linux oder Windows über WSL 2", stat3_t: "16+ Funktionen", stat3_d: "Verwaltung, Werkzeuge & Optimierungen", stat4_t: "GPL-3.0+", stat4_d: "Freie & modifizierbare Software",
+        stat1_t: "22 Sprachen", stat1_d: "Dashboard & Koha Pakete", stat2_t: "2 Systeme", stat2_d: "Linux oder Windows über WSL 2", stat3_t: "25+ Funktionen", stat3_d: "Verwaltung, Werkzeuge & Optimierungen", stat4_t: "GPL-3.0+", stat4_d: "Freie & modifizierbare Software",
         term_validating: "Server validieren...", term_installing: "Koha installieren", term_configuring: "Datenbank konfigurieren", term_preparing: "Backups vorbereiten", term_access: "Zugriff konfigurieren", term_ready: "Dashboard bereit:",
         feat_kick: "Alles an einem Ort", feat_h2: "Ein Dashboard für diejenigen, die die Bibliothek am Laufen halten.", feat_p: "Von der Erstinstallation über Backups, Indexierung, Sicherheit, Migration, Katalogisierung bis hin zur Web-Veröffentlichung sind die Kernfunktionen in einem einzigen Kontrollpunkt zusammengefasst.",
         f1_t: "Geführte Installation", f1_d: "Vorvalidierung von System, Festplatte, Netzwerk und Ports; Installation und Tuning von Koha, MariaDB, Apache, Memcached und Plack sowie SWAP, NTP und Zeitzone.",
-        f2_t: "Backup Hub", f2_d: "Komprimierte SQL-Backups, MARC21-Exporte, manuelle Kopien und optionale Integration mit Google Drive über rclone.",
+        f2_t: "Backup Hub", f2_d: "Komprimierte SQL-Backups, MARC21-Exporte, ein Wiederherstellungstest und Cloud-Kopien auf Google Drive, OneDrive, MEGA oder S3, Schritt für Schritt eingerichtet.",
         f3_t: "Sichere Wiederherstellung", f3_d: "Backups werden in einer temporären Datenbank validiert und getestet, bevor der aktuelle Katalog ersetzt wird.",
         f4_t: "Suche & Indexierung", f4_d: "Wechsel zwischen Zebra und Elasticsearch 7, Watchdog für Indexierer und Werkzeuge für Indexreparatur und Neuaufbau.",
         f5_t: "Web-Veröffentlichung", f5_d: "Cloudflare Tunnel ohne Router-Ports öffnen zu müssen, Certbot für SSL und Google Search Console Assistent.",
@@ -1435,7 +1721,7 @@ sudo bash installer</pre>
         inst_a_t: "Nach der Installation", inst_a1: "Öffnen Sie die Mitarbeiteroberfläche unter <code>http://SERVER-IP:8080</code>", inst_a2: "Schließen Sie den Koha Web Installer ab", inst_a3: "Erstellen Sie Ihren Superbibliothekar über das Dashboard", inst_a4: "Der öffentliche Katalog befindet sich unter <code>http://SERVER-IP:80</code>", inst_a5: "Öffnen Sie das Dashboard jederzeit wieder mit <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Eine vollständige Koha-Umgebung auf einem einzigen PC mit WSL 2.", win_p: "Die Windows-Edition wurde für kleine Bibliotheken, Schulungen und Evaluierungen entwickelt und behält die Koha-Dienste in Debian unter WSL 2 bei, während sie native Windows-Tools bietet.",
         win_d_k: "WINDOWS INSTALLER", win_d_t: "Installieren Sie Koha mit zwei Klicks.", win_d_p: "Laden Sie <strong>Install-Koha.cmd</strong> direkt aus dem offiziellen Repository herunter und führen Sie es aus. Es startet den PowerShell-Installer für Sie.", win_d_b: "⬇ Install-Koha.cmd herunterladen", win_d_s: "Quellcode auf GitHub ansehen ↗",
-        win_b_t: "Installation", win_b_p: "Öffnen Sie PowerShell normal und führen Sie Folgendes aus:",
+        win_b_t: "Installation", win_b_p: "Öffnen Sie PowerShell <strong>als Administrator</strong> (Rechtsklick auf die Start-Schaltfläche → <em>Terminal (Administrator)</em> oder <em>Windows PowerShell (Administrator)</em>) und führen Sie Folgendes aus:", win_admin: "<strong>Verwenden Sie Ihr eigenes Windows-Konto.</strong> Fragt Windows nach dem Kennwort <em>einer anderen Person</em>, melden Sie sich zuerst an einem Administratorkonto an und starten Sie es dort: Debian, die Verknüpfungen und der Neustartschritt werden für das Konto angelegt, das den Installer ausführt.",
         win_c1: "<strong>Einfacherer Weg:</strong> Die Schaltfläche oben lädt <code>Install-Koha.cmd</code> herunter. Sie müssen PowerShell nicht manuell öffnen.",
         win_c2_t: "<strong>So aktivieren Sie die Virtualisierung im BIOS:</strong>", win_c2_p1: "Starten Sie Ihren PC neu und drücken Sie wiederholt die Setup-Taste, sobald sich der Bildschirm einschaltet:",
         win_c2_p2: "Suchen Sie im BIOS nach <strong>Intel Virtualization Technology (VT-x)</strong> oder <strong>AMD SVM / AMD-V</strong>, stellen Sie es auf <strong>Enabled</strong> und drücken Sie <kbd>F10</kbd>, um zu speichern.",
@@ -1476,7 +1762,7 @@ sudo bash installer</pre>
         hero_h1: "Het beste gratis bibliotheeksysteem, <span class='accent'>nu zonder gedoe.</span>",
         hero_p: "<strong>koha.nexus</strong> is een slimme, gratis en eenvoudig te gebruiken assistent voor het installeren, configureren en onderhouden van het <strong>Koha Integrated Library System</strong> via een gebruiksvriendelijk dashboard.",
         hero_btn1: "Start installatie →", hero_btn2: "Bekijk op GitHub", hero_btn3: "Volledige README",
-        stat1_t: "22 talen", stat1_d: "Dashboard & Koha-pakketten", stat2_t: "2 systemen", stat2_d: "Linux of Windows via WSL 2", stat3_t: "16+ functies", stat3_d: "Beheer, tools & tweaks", stat4_t: "GPL-3.0+", stat4_d: "Vrije en aanpasbare software",
+        stat1_t: "22 talen", stat1_d: "Dashboard & Koha-pakketten", stat2_t: "2 systemen", stat2_d: "Linux of Windows via WSL 2", stat3_t: "25+ functies", stat3_d: "Beheer, tools & tweaks", stat4_t: "GPL-3.0+", stat4_d: "Vrije en aanpasbare software",
         term_validating: "Server valideren...", term_installing: "Koha installeren", term_configuring: "Database configureren", term_preparing: "Back-ups voorbereiden", term_access: "Toegang configureren", term_ready: "Dashboard klaar:",
         feat_kick: "Alles op één plek", feat_h2: "Een dashboard gebouwd voor degenen die de bibliotheek draaiende houden.", feat_p: "Van de eerste installatie tot back-ups, indexering, beveiliging, migratie en webpublicatie, de kernfuncties zijn verzameld in één controlepunt.",
         f1_t: "Begeleide installatie", f1_d: "Pre-validatie van systeem en poorten; installatie en afstemming van Koha, MariaDB, Apache, Memcached en Plack, plus SWAP, NTP en tijdzone.",
@@ -1497,7 +1783,7 @@ sudo bash installer</pre>
         inst_a_t: "Na installatie", inst_a1: "Open de personeelsinterface op <code>http://SERVER-IP:8080</code>", inst_a2: "Voltooi de Koha Web Installer", inst_a3: "Maak uw superbibliothecaris aan via het dashboard", inst_a4: "De publieke catalogus is op <code>http://SERVER-IP:80</code>", inst_a5: "Heropen het dashboard op elk gewenst moment met <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Een volledige Koha-omgeving op één pc, via WSL 2.", win_p: "De Windows-editie is ontworpen voor kleine bibliotheken en training, waarbij Koha-services in Debian op WSL 2 behouden blijven en native Windows-tools worden geboden.",
         win_d_k: "WINDOWS INSTALLATEUR", win_d_t: "Installeer Koha met twee klikken.", win_d_p: "Download <strong>Install-Koha.cmd</strong> rechtstreeks van de officiële repository. Het start het PowerShell-installatieprogramma voor u.", win_d_b: "⬇ Download Install-Koha.cmd", win_d_s: "Bekijk bron op GitHub ↗",
-        win_b_t: "Installatie", win_b_p: "Open PowerShell normaal en voer uit:",
+        win_b_t: "Installatie", win_b_p: "Open PowerShell <strong>als administrator</strong> (rechtsklik op de Startknop → <em>Terminal (Beheerder)</em>) en voer uit:",
         win_c1: "<strong>Makkelijkere manier:</strong> De knop hierboven downloadt <code>Install-Koha.cmd</code>. U hoeft PowerShell niet te openen.",
         win_c2_t: "<strong>Virtualisatie inschakelen in BIOS:</strong>", win_c2_p1: "Start uw pc opnieuw op en druk herhaaldelijk op de instellingsknop zodra het scherm aangaat:",
         win_c2_p2: "Zoek in de BIOS naar <strong>Intel Virtualization Technology (VT-x)</strong> of <strong>AMD SVM / AMD-V</strong>, zet het op <strong>Enabled</strong> en druk op <kbd>F10</kbd> om op te slaan.",
@@ -1538,7 +1824,7 @@ sudo bash installer</pre>
         hero_h1: "Det bästa gratis bibliotekssystemet, <span class='accent'>nu utan krångel.</span>",
         hero_p: "<strong>koha.nexus</strong> är en smart, gratis och lättanvänd assistent för att installera, konfigurera och underhålla <strong>Koha Integrated Library System</strong>.",
         hero_btn1: "Starta installationen →", hero_btn2: "Visa på GitHub", hero_btn3: "Fullständig README",
-        stat1_t: "22 språk", stat1_d: "Instrumentpanel och paket", stat2_t: "2 system", stat2_d: "Linux eller Windows (WSL 2)", stat3_t: "16+ funktioner", stat3_d: "Hantering och verktyg", stat4_t: "GPL-3.0+", stat4_d: "Fri & modifierbar mjukvara",
+        stat1_t: "22 språk", stat1_d: "Instrumentpanel och paket", stat2_t: "2 system", stat2_d: "Linux eller Windows (WSL 2)", stat3_t: "25+ funktioner", stat3_d: "Hantering och verktyg", stat4_t: "GPL-3.0+", stat4_d: "Fri & modifierbar mjukvara",
         term_validating: "Validerar server...", term_installing: "Installerar Koha", term_configuring: "Konfigurerar databas", term_preparing: "Förbereder säkerhetskopior", term_access: "Konfigurerar åtkomst", term_ready: "Panelen är klar:",
         feat_kick: "Allt på ett ställe", feat_h2: "En instrumentpanel byggd för de som håller biblioteket igång.", feat_p: "Från första installationen till säkerhetskopior, säkerhet, katalogisering och webbpublicering är kärnfunktionerna samlade i en kontrollpunkt.",
         f1_t: "Guidad installation", f1_d: "Pre-validering av systemet; installation och justering av Koha, MariaDB, Apache och Memcached.",
@@ -1559,7 +1845,7 @@ sudo bash installer</pre>
         inst_a_t: "Efter installation", inst_a1: "Öppna personalgränssnittet på <code>http://SERVER-IP:8080</code>", inst_a2: "Slutför Koha Web Installer", inst_a3: "Skapa en superbibliotekarie i panelen", inst_a4: "Den offentliga katalogen finns på <code>http://SERVER-IP:80</code>", inst_a5: "Panelen kan öppnas med <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "En komplett Koha-miljö på en enda PC.", win_p: "Windows-versionen är utformad för små bibliotek och utbildning.",
         win_d_k: "WINDOWS INSTALLATION", win_d_t: "Installera Koha med två klick.", win_d_p: "Ladda ner <strong>Install-Koha.cmd</strong> direkt och kör det.", win_d_b: "⬇ Ladda ner Install-Koha.cmd", win_d_s: "Visa källkod på GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Öppna PowerShell och kör:",
+        win_b_t: "Installation", win_b_p: "Öppna PowerShell <strong>som administratör</strong> (högerklicka på Start → <em>Terminal (administratör)</em>) och kör:",
         win_c1: "<strong>Enklare sätt:</strong> Knappen ovan laddar ner installationsfilen direkt.",
         win_c2_t: "<strong>Så här aktiverar du virtualisering i BIOS:</strong>", win_c2_p1: "Starta om datorn och tryck på inställningsknappen (t.ex. F2 eller Del):",
         win_c2_p2: "Hitta <strong>Intel Virtualization Technology</strong> eller <strong>AMD SVM</strong>, ställ in på <strong>Enabled</strong> och spara.",
@@ -1600,7 +1886,7 @@ sudo bash installer</pre>
         hero_h1: "Najlepszy darmowy system biblioteczny, <span class='accent'>teraz bez problemów.</span>",
         hero_p: "<strong>koha.nexus</strong> to inteligentny, darmowy i łatwy w obsłudze asystent do instalacji, konfiguracji i utrzymania <strong>Koha Integrated Library System</strong>.",
         hero_btn1: "Rozpocznij instalację →", hero_btn2: "Zobacz na GitHub", hero_btn3: "Pełny plik README",
-        stat1_t: "22 języki", stat1_d: "Panel i pakiety Koha", stat2_t: "2 systemy", stat2_d: "Linux lub Windows (WSL 2)", stat3_t: "16+ funkcji", stat3_d: "Zarządzanie i narzędzia", stat4_t: "GPL-3.0+", stat4_d: "Wolne oprogramowanie",
+        stat1_t: "22 języki", stat1_d: "Panel i pakiety Koha", stat2_t: "2 systemy", stat2_d: "Linux lub Windows (WSL 2)", stat3_t: "25+ funkcji", stat3_d: "Zarządzanie i narzędzia", stat4_t: "GPL-3.0+", stat4_d: "Wolne oprogramowanie",
         term_validating: "Sprawdzanie serwera...", term_installing: "Instalowanie Koha", term_configuring: "Konfigurowanie bazy danych", term_preparing: "Przygotowywanie kopii zapasowych", term_access: "Konfigurowanie dostępu", term_ready: "Panel gotowy:",
         feat_kick: "Wszystko w jednym miejscu", feat_h2: "Panel stworzony dla tych, którzy dbają o działanie biblioteki.", feat_p: "Od wstępnej instalacji do kopii zapasowych, indeksowania, bezpieczeństwa i publikacji w Internecie – kluczowe funkcje zebrane w jednym punkcie kontrolnym.",
         f1_t: "Instalacja z przewodnikiem", f1_d: "Wstępna weryfikacja systemu; instalacja Koha, MariaDB, Apache i Memcached.",
@@ -1621,7 +1907,7 @@ sudo bash installer</pre>
         inst_a_t: "Po instalacji", inst_a1: "Otwórz interfejs na <code>http://IP-SERWERA:8080</code>", inst_a2: "Zakończ instalator sieciowy Koha", inst_a3: "Utwórz superbibliotekarza w panelu", inst_a4: "Katalog publiczny: <code>http://IP-SERWERA:80</code>", inst_a5: "Zawsze możesz otworzyć panel używając <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Pełne środowisko Koha na komputerze z systemem Windows.", win_p: "Wersja dla systemu Windows jest przeznaczona dla małych bibliotek i do celów szkoleniowych.",
         win_d_k: "INSTALATOR WINDOWS", win_d_t: "Zainstaluj Koha za pomocą dwóch kliknięć.", win_d_p: "Pobierz <strong>Install-Koha.cmd</strong> i uruchom go. Uruchomi instalator dla Ciebie.", win_d_b: "⬇ Pobierz Install-Koha.cmd", win_d_s: "Zobacz kod na GitHub ↗",
-        win_b_t: "Instalacja", win_b_p: "Otwórz program PowerShell i uruchom:",
+        win_b_t: "Instalacja", win_b_p: "Otwórz PowerShell <strong>jako administrator</strong> (prawy przycisk na Start → <em>Terminal (Administrator)</em>) i uruchom:",
         win_c1: "<strong>Łatwiejszy sposób:</strong> Przycisk powyżej pobiera instalator automatycznie.",
         win_c2_t: "<strong>Jak włączyć wirtualizację w BIOS-ie:</strong>", win_c2_p1: "Uruchom ponownie komputer i wejdź do ustawień BIOS:",
         win_c2_p2: "Znajdź <strong>Intel Virtualization Technology</strong> lub <strong>AMD SVM</strong>, ustaw na <strong>Enabled</strong> i zapisz.",
@@ -1662,7 +1948,7 @@ sudo bash installer</pre>
         hero_h1: "Nejlepší bezplatný knihovní systém, <span class='accent'>nyní bez potíží.</span>",
         hero_p: "<strong>koha.nexus</strong> je inteligentní, bezplatný a snadno použitelný asistent pro instalaci, údržbu a správu <strong>Koha Integrated Library System</strong>.",
         hero_btn1: "Zahájit instalaci →", hero_btn2: "Zobrazit na GitHubu", hero_btn3: "Přečíst README",
-        stat1_t: "22 jazyků", stat1_d: "Panel a balíčky", stat2_t: "2 systémy", stat2_d: "Linux nebo Windows (WSL 2)", stat3_t: "16+ funkcí", stat3_d: "Správa a nástroje", stat4_t: "GPL-3.0+", stat4_d: "Svobodný software",
+        stat1_t: "22 jazyků", stat1_d: "Panel a balíčky", stat2_t: "2 systémy", stat2_d: "Linux nebo Windows (WSL 2)", stat3_t: "25+ funkcí", stat3_d: "Správa a nástroje", stat4_t: "GPL-3.0+", stat4_d: "Svobodný software",
         term_validating: "Ověřování serveru...", term_installing: "Instalace Koha", term_configuring: "Konfigurace databáze", term_preparing: "Příprava záloh", term_access: "Konfigurace přístupu", term_ready: "Panel připraven:",
         feat_kick: "Vše na jednom místě", feat_h2: "Řídicí panel pro knihovníky i IT.", feat_p: "Od instalace přes zálohy a aktualizace až po bezpečnost – klíčové funkce máte po ruce.",
         f1_t: "Řízená instalace", f1_d: "Automatická kontrola, instalace Koha, Apache, MariaDB.",
@@ -1683,7 +1969,7 @@ sudo bash installer</pre>
         inst_a_t: "Co dál?", inst_a1: "Otevřete: <code>http://IP:8080</code>", inst_a2: "Dokončete Web Installer", inst_a3: "Vytvořte superknihovníka v panelu", inst_a4: "Katalog na portu 80", inst_a5: "Panel otevřete: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Plné prostředí Koha na PC.", win_p: "Udržuje Koha služby v Debianu pod WSL 2, ale nabízí ikony pro Windows.",
         win_d_k: "WINDOWS INSTALÁTOR", win_d_t: "Instalace přes PowerShell.", win_d_p: "Stáhněte si Install-Koha.cmd.", win_d_b: "⬇ Stáhnout Install-Koha.cmd", win_d_s: "Zdrojový kód (GitHub) ↗",
-        win_b_t: "Příkazový řádek", win_b_p: "Vložte do PowerShell:",
+        win_b_t: "Příkazový řádek", win_b_p: "Otevřete PowerShell <strong>jako správce</strong> (pravým tlačítkem na Start → <em>Terminál (správce)</em>) a spusťte:",
         win_c1: "<strong>Alternativa:</strong> Stačí dvojklik na stažený soubor.",
         win_c2_t: "<strong>Jak zapnout Virtualizaci:</strong>", win_c2_p1: "Vstupte do BIOS/UEFI během startu.",
         win_c2_p2: "Zapněte (Enabled) Intel Virtualization nebo AMD SVM.",
@@ -1724,7 +2010,7 @@ sudo bash installer</pre>
         hero_h1: "Лучшая бесплатная библиотечная система, <span class='accent'>теперь без хлопот.</span>",
         hero_p: "<strong>koha.nexus</strong> — это умный, бесплатный и простой в использовании помощник для установки и обслуживания <strong>Koha Integrated Library System</strong>.",
         hero_btn1: "Начать установку →", hero_btn2: "Смотреть на GitHub", hero_btn3: "Полный README",
-        stat1_t: "22 языка", stat1_d: "Панель управления и пакеты Koha", stat2_t: "2 системы", stat2_d: "Linux или Windows через WSL 2", stat3_t: "16+ функций", stat3_d: "Управление и инструменты", stat4_t: "GPL-3.0+", stat4_d: "Свободное ПО",
+        stat1_t: "22 языка", stat1_d: "Панель управления и пакеты Koha", stat2_t: "2 системы", stat2_d: "Linux или Windows через WSL 2", stat3_t: "25+ функций", stat3_d: "Управление и инструменты", stat4_t: "GPL-3.0+", stat4_d: "Свободное ПО",
         term_validating: "Проверка сервера...", term_installing: "Установка Koha...", term_configuring: "Настройка базы данных...", term_preparing: "Подготовка резервных копий...", term_access: "Настройка доступа...", term_ready: "Панель готова:",
         feat_kick: "Всё в одном месте", feat_h2: "Панель для тех, кто поддерживает работу библиотеки.", feat_p: "От первичной установки до резервного копирования, безопасности и публикации в интернете — все ключевые функции собраны здесь.",
         f1_t: "Управляемая установка", f1_d: "Установка и настройка Koha, MariaDB, Apache, Memcached.",
@@ -1745,7 +2031,7 @@ sudo bash installer</pre>
         inst_a_t: "После установки", inst_a1: "Откройте <code>http://IP:8080</code>", inst_a2: "Завершите Web Installer", inst_a3: "Создайте супербиблиотекаря", inst_a4: "Каталог: <code>http://IP:80</code>", inst_a5: "Открытие панели: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Полная среда Koha на одном ПК.", win_p: "Версия для Windows идеально подходит для небольших библиотек и обучения.",
         win_d_k: "УСТАНОВЩИК WINDOWS", win_d_t: "Установка в два клика.", win_d_p: "Скачайте <strong>Install-Koha.cmd</strong> и запустите его.", win_d_b: "⬇ Скачать Install-Koha.cmd", win_d_s: "Смотреть исходный код ↗",
-        win_b_t: "Установка", win_b_p: "Откройте PowerShell и выполните:",
+        win_b_t: "Установка", win_b_p: "Откройте PowerShell <strong>от имени администратора</strong> (правый клик по «Пуск» → <em>Терминал (администратор)</em>) и выполните:",
         win_c1: "<strong>Проще:</strong> Кнопка выше скачивает файл автоматически.",
         win_c2_t: "<strong>Как включить виртуализацию в BIOS:</strong>", win_c2_p1: "Перезагрузите ПК и войдите в BIOS:",
         win_c2_p2: "Найдите <strong>Intel Virtualization Technology</strong> или <strong>AMD SVM</strong>, выберите <strong>Enabled</strong> и сохраните.",
@@ -1786,7 +2072,7 @@ sudo bash installer</pre>
         hero_h1: "Найкраща безкоштовна бібліотечна система, <span class='accent'>тепер без зайвих проблем.</span>",
         hero_p: "<strong>koha.nexus</strong> — це розумний, безкоштовний і простий у використанні помічник для встановлення та управління <strong>Koha</strong>.",
         hero_btn1: "Почати встановлення →", hero_btn2: "Дивитись на GitHub", hero_btn3: "Повний README",
-        stat1_t: "22 мови", stat1_d: "Панель та пакети Koha", stat2_t: "2 системи", stat2_d: "Linux або Windows через WSL 2", stat3_t: "16+ функцій", stat3_d: "Управління та інструменти", stat4_t: "GPL-3.0+", stat4_d: "Вільне ПЗ",
+        stat1_t: "22 мови", stat1_d: "Панель та пакети Koha", stat2_t: "2 системи", stat2_d: "Linux або Windows через WSL 2", stat3_t: "25+ функцій", stat3_d: "Управління та інструменти", stat4_t: "GPL-3.0+", stat4_d: "Вільне ПЗ",
         term_validating: "Перевірка сервера...", term_installing: "Встановлення Koha...", term_configuring: "Налаштування бази даних...", term_preparing: "Підготовка резервних копій...", term_access: "Налаштування доступу...", term_ready: "Панель готова:",
         feat_kick: "Все в одному місці", feat_h2: "Панель для тих, хто підтримує роботу бібліотеки.", feat_p: "Від початкового встановлення до резервного копіювання, безпеки та веб-публікації — усі ключові функції зібрані тут.",
         f1_t: "Кероване встановлення", f1_d: "Встановлення та налаштування Koha, MariaDB, Apache, Memcached.",
@@ -1807,7 +2093,7 @@ sudo bash installer</pre>
         inst_a_t: "Після встановлення", inst_a1: "Відкрийте <code>http://IP:8080</code>", inst_a2: "Завершіть Web Installer", inst_a3: "Створіть супербібліотекаря", inst_a4: "Каталог: <code>http://IP:80</code>", inst_a5: "Відкриття панелі: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Повне середовище Koha на одному ПК.", win_p: "Версія для Windows ідеально підходить для невеликих бібліотек.",
         win_d_k: "ІНСТАЛЯТОР WINDOWS", win_d_t: "Встановлення у два кліки.", win_d_p: "Завантажте <strong>Install-Koha.cmd</strong> та запустіть його.", win_d_b: "⬇ Завантажити Install-Koha.cmd", win_d_s: "Дивитись код ↗",
-        win_b_t: "Встановлення", win_b_p: "Відкрийте PowerShell і виконайте:",
+        win_b_t: "Встановлення", win_b_p: "Відкрийте PowerShell <strong>від імені адміністратора</strong> (правий клік на «Пуск» → <em>Термінал (адміністратор)</em>) і виконайте:",
         win_c1: "<strong>Простіше:</strong> Кнопка вище завантажує файл автоматично.",
         win_c2_t: "<strong>Як увімкнути віртуалізацію:</strong>", win_c2_p1: "Перезавантажте ПК і увійдіть у BIOS:",
         win_c2_p2: "Знайдіть <strong>Intel Virtualization Technology</strong> або <strong>AMD SVM</strong>, увімкніть (Enabled) і збережіть.",
@@ -1848,7 +2134,7 @@ sudo bash installer</pre>
         hero_h1: "En iyi ücretsiz kütüphane sistemi, <span class='accent'>artık zahmetsiz.</span>",
         hero_p: "<strong>koha.nexus</strong>, <strong>Koha Integrated Library System</strong>'i yönetmek ve genişletmek için akıllı, ücretsiz ve kullanımı kolay bir asistandır.",
         hero_btn1: "Kuruluma başla →", hero_btn2: "GitHub'da görüntüle", hero_btn3: "Tam README",
-        stat1_t: "22 dil", stat1_d: "Pano ve Koha paketleri", stat2_t: "2 sistem", stat2_d: "Linux veya Windows (WSL 2)", stat3_t: "16+ özellik", stat3_d: "Yönetim, araçlar ve ayarlar", stat4_t: "GPL-3.0+", stat4_d: "Özgür Yazılım",
+        stat1_t: "22 dil", stat1_d: "Pano ve Koha paketleri", stat2_t: "2 sistem", stat2_d: "Linux veya Windows (WSL 2)", stat3_t: "25+ özellik", stat3_d: "Yönetim, araçlar ve ayarlar", stat4_t: "GPL-3.0+", stat4_d: "Özgür Yazılım",
         term_validating: "Sunucu doğrulanıyor...", term_installing: "Koha kuruluyor...", term_configuring: "Veritabanı yapılandırılıyor...", term_preparing: "Yedeklemeler hazırlanıyor...", term_access: "Erişim yapılandırılıyor...", term_ready: "Pano hazır:",
         feat_kick: "Hepsi bir arada", feat_h2: "Kütüphaneyi ayakta tutanlar için tasarlandı.", feat_p: "Kurulumdan yedeklemelere, indekslemeye, güvenliğe ve web yayınına kadar temel işlevler tek bir yerde.",
         f1_t: "Rehberli kurulum", f1_d: "Sistem ve port ön doğrulaması; Koha, MariaDB, Apache, Memcached kurulumu.",
@@ -1869,7 +2155,7 @@ sudo bash installer</pre>
         inst_a_t: "Kurulumdan sonra", inst_a1: "Personel arayüzünü açın: <code>http://IP:8080</code>", inst_a2: "Koha Web Yükleyicisini tamamlayın", inst_a3: "Panel aracılığıyla süper kütüphaneci oluşturun", inst_a4: "Katalog: <code>http://IP:80</code>", inst_a5: "Paneli istediğiniz zaman açın: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "WSL 2 kullanarak tek bir bilgisayarda Koha.", win_p: "Küçük kütüphaneler ve eğitim için mükemmel.",
         win_d_k: "WINDOWS KURULUM", win_d_t: "İki tıklama ile Koha kurun.", win_d_p: "<strong>Install-Koha.cmd</strong> dosyasını indirin ve çalıştırın.", win_d_b: "⬇ Install-Koha.cmd İndir", win_d_s: "Kaynak kodu GitHub'da görüntüle ↗",
-        win_b_t: "Kurulum", win_b_p: "PowerShell'de çalıştırın:",
+        win_b_t: "Kurulum", win_b_p: "PowerShell'i <strong>yönetici olarak</strong> açın (Başlat'a sağ tıklayın → <em>Terminal (Yönetici)</em>) ve çalıştırın:",
         win_c1: "<strong>Daha kolay yol:</strong> Yukarıdaki düğme dosyayı doğrudan indirir.",
         win_c2_t: "<strong>BIOS'ta Sanallaştırma nasıl etkinleştirilir:</strong>", win_c2_p1: "Bilgisayarı yeniden başlatın ve BIOS'a girin:",
         win_c2_p2: "<strong>Intel Virtualization Technology</strong> veya <strong>AMD SVM</strong> öğesini bulun, <strong>Enabled</strong> yapın ve kaydedin.",
@@ -1910,7 +2196,7 @@ sudo bash installer</pre>
         hero_h1: "Ang pinakamahusay na libreng sistema ng aklatan, <span class='accent'>ngayon nang walang abala.</span>",
         hero_p: "Ang <strong>koha.nexus</strong> ay isang matalino, libre, at madaling gamitin na katulong para sa <strong>Koha Integrated Library System</strong>.",
         hero_btn1: "Simulan ang pag-install →", hero_btn2: "Tingnan sa GitHub", hero_btn3: "Buong README",
-        stat1_t: "22 na wika", stat1_d: "Dashboard at mga pakete", stat2_t: "2 sistema", stat2_d: "Linux o Windows (WSL 2)", stat3_t: "16+ tampok", stat3_d: "Pamamahala at mga kasangkapan", stat4_t: "GPL-3.0+", stat4_d: "Libreng Software",
+        stat1_t: "22 na wika", stat1_d: "Dashboard at mga pakete", stat2_t: "2 sistema", stat2_d: "Linux o Windows (WSL 2)", stat3_t: "25+ tampok", stat3_d: "Pamamahala at mga kasangkapan", stat4_t: "GPL-3.0+", stat4_d: "Libreng Software",
         term_validating: "Bine-verify ang server...", term_installing: "Ini-install ang Koha", term_configuring: "Inaayos ang database", term_preparing: "Naghahanda ng backups", term_access: "Inaayos ang access", term_ready: "Handa na ang Dashboard:",
         feat_kick: "Lahat sa isang lugar", feat_h2: "Isang dashboard para sa pamamahala ng aklatan.", feat_p: "Mula pag-install hanggang sa seguridad at pagpa-publish sa web.",
         f1_t: "Ginabayang pag-install", f1_d: "Pag-install ng Koha, Apache, MariaDB.",
@@ -1931,7 +2217,7 @@ sudo bash installer</pre>
         inst_a_t: "Pagkatapos ng install", inst_a1: "Buksan ang: <code>http://IP:8080</code>", inst_a2: "Tapusin ang Web Installer", inst_a3: "Gumawa ng librarian", inst_a4: "Katalogo: <code>http://IP:80</code>", inst_a5: "Panel: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Koha sa Windows.", win_p: "WSL 2 environment.",
         win_d_k: "WINDOWS INSTALLER", win_d_t: "2 Clicks Install.", win_d_p: "I-download ang Install-Koha.cmd.", win_d_b: "⬇ I-download", win_d_s: "GitHub ↗",
-        win_b_t: "Pag-install", win_b_p: "Buksan sa PowerShell:",
+        win_b_t: "Pag-install", win_b_p: "Buksan ang PowerShell <strong>bilang Administrator</strong> (right-click sa Start → <em>Terminal (Admin)</em>) at patakbuhin:",
         win_c1: "<strong>Mas madali:</strong> I-click ang download button sa itaas.",
         win_c2_t: "<strong>Paano i-enable ang Virtualization:</strong>", win_c2_p1: "I-restart at pumunta sa BIOS:",
         win_c2_p2: "I-enable ang Intel VT-x o AMD SVM.",
@@ -1973,7 +2259,7 @@ sudo bash installer</pre>
         hero_h1: "Sistem perpustakaan gratis terbaik, <span class='accent'>kini tanpa ribet.</span>",
         hero_p: "<strong>koha.nexus</strong> adalah asisten cerdas, gratis, dan mudah digunakan untuk mengelola <strong>Koha</strong>.",
         hero_btn1: "Mulai instalasi →", hero_btn2: "Lihat di GitHub", hero_btn3: "Baca README",
-        stat1_t: "22 bahasa", stat1_d: "Dasbor & Paket Koha", stat2_t: "2 sistem", stat2_d: "Linux atau Windows (WSL)", stat3_t: "16+ fitur", stat3_d: "Manajemen & alat", stat4_t: "GPL-3.0+", stat4_d: "Perangkat Lunak Bebas",
+        stat1_t: "22 bahasa", stat1_d: "Dasbor & Paket Koha", stat2_t: "2 sistem", stat2_d: "Linux atau Windows (WSL)", stat3_t: "25+ fitur", stat3_d: "Manajemen & alat", stat4_t: "GPL-3.0+", stat4_d: "Perangkat Lunak Bebas",
         term_validating: "Memvalidasi server...", term_installing: "Menginstal Koha...", term_configuring: "Mengonfigurasi database...", term_preparing: "Menyiapkan cadangan...", term_access: "Mengonfigurasi akses...", term_ready: "Dasbor siap:",
         feat_kick: "Semua di satu tempat", feat_h2: "Dasbor untuk mengelola perpustakaan Anda.", feat_p: "Dari instalasi hingga cadangan, keamanan, dan publikasi web.",
         f1_t: "Instalasi Terpandu", f1_d: "Instalasi otomatis Koha, Apache, MariaDB.",
@@ -1994,7 +2280,7 @@ sudo bash installer</pre>
         inst_a_t: "Setelah instalasi", inst_a1: "Buka <code>http://IP:8080</code>", inst_a2: "Selesaikan Web Installer", inst_a3: "Buat Pustakawan Super", inst_a4: "Katalog: <code>http://IP:80</code>", inst_a5: "Panel: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Lingkungan Koha penuh di PC.", win_p: "Menjalankan Koha via WSL 2 di Windows.",
         win_d_k: "PENGINSTAL WINDOWS", win_d_t: "Instal Koha dengan dua klik.", win_d_p: "Unduh Install-Koha.cmd.", win_d_b: "⬇ Unduh", win_d_s: "Lihat di GitHub ↗",
-        win_b_t: "Instalasi", win_b_p: "Buka PowerShell dan jalankan:",
+        win_b_t: "Instalasi", win_b_p: "Buka PowerShell <strong>sebagai Administrator</strong> (klik kanan tombol Start → <em>Terminal (Admin)</em>) lalu jalankan:",
         win_c1: "<strong>Lebih mudah:</strong> Klik tombol unduh di atas.",
         win_c2_t: "<strong>Cara mengaktifkan Virtualisasi:</strong>", win_c2_p1: "Masuk ke pengaturan BIOS saat booting.",
         win_c2_p2: "Aktifkan Intel VT-x atau AMD SVM.",
@@ -2035,7 +2321,7 @@ sudo bash installer</pre>
         hero_h1: "أفضل نظام مكتبة مجاني، <span class='accent'>الآن بدون عناء.</span>",
         hero_p: "<strong>koha.nexus</strong> هو مساعد ذكي ومجاني وسهل الاستخدام لإدارة <strong>Koha</strong>.",
         hero_btn1: "بدء التثبيت ←", hero_btn2: "عرض على GitHub", hero_btn3: "اقرأ المزيد",
-        stat1_t: "22 لغة", stat1_d: "لوحة التحكم والحزم", stat2_t: "نظامان", stat2_d: "لينكس أو ويندوز", stat3_t: "+16 ميزة", stat3_d: "الإدارة والأدوات", stat4_t: "GPL-3.0+", stat4_d: "برمجيات حرة",
+        stat1_t: "22 لغة", stat1_d: "لوحة التحكم والحزم", stat2_t: "نظامان", stat2_d: "لينكس أو ويندوز", stat3_t: "+25 ميزة", stat3_d: "الإدارة والأدوات", stat4_t: "GPL-3.0+", stat4_d: "برمجيات حرة",
         term_validating: "جاري التحقق من الخادم...", term_installing: "جاري تثبيت Koha...", term_configuring: "تكوين قاعدة البيانات...", term_preparing: "تجهيز النسخ الاحتياطية...", term_access: "تكوين الوصول...", term_ready: "اللوحة جاهزة:",
         feat_kick: "كل شيء في مكان واحد", feat_h2: "لوحة تحكم لإدارة مكتبتك.", feat_p: "من التثبيت إلى النسخ الاحتياطي والأمان ونشر الويب.",
         f1_t: "تثبيت موجه", f1_d: "تثبيت تلقائي لـ Koha و Apache و MariaDB.",
@@ -2056,7 +2342,7 @@ sudo bash installer</pre>
         inst_a_t: "بعد التثبيت", inst_a1: "افتح <code>http://IP:8080</code>", inst_a2: "أكمل مثبت الويب", inst_a3: "إنشاء أمين مكتبة متميز", inst_a4: "الفهرس: <code>http://IP:80</code>", inst_a5: "اللوحة: <code>sudo config.sh</code>",
         win_kick: "ويندوز 10 / 11", win_h2: "بيئة Koha كاملة على جهاز الكمبيوتر.", win_p: "تشغيل Koha عبر WSL 2.",
         win_d_k: "مثبت ويندوز", win_d_t: "تثبيت بنقرتين.", win_d_p: "تنزيل Install-Koha.cmd.", win_d_b: "⬇ تنزيل", win_d_s: "عرض المصدر ↗",
-        win_b_t: "التثبيت", win_b_p: "افتح PowerShell وقم بتشغيل:",
+        win_b_t: "التثبيت", win_b_p: "افتح PowerShell <strong>كمسؤول</strong> (انقر بزر الماوس الأيمن على ابدأ ← <em>Terminal (Admin)</em>) ثم شغّل:",
         win_c1: "<strong>أسهل:</strong> انقر فوق زر التنزيل أعلاه.",
         win_c2_t: "<strong>كيفية تمكين المحاكاة الافتراضية:</strong>", win_c2_p1: "أدخل إعدادات BIOS.",
         win_c2_p2: "قم بتمكين Intel VT-x أو AMD SVM.",
@@ -2097,7 +2383,7 @@ sudo bash installer</pre>
         hero_h1: "بهترین سیستم کتابخانه رایگان، <span class='accent'>اکنون بدون دردسر.</span>",
         hero_p: "<strong>koha.nexus</strong> یک دستیار هوشمند و رایگان برای مدیریت <strong>Koha</strong> است.",
         hero_btn1: "شروع نصب ←", hero_btn2: "مشاهده در GitHub", hero_btn3: "خواندن README",
-        stat1_t: "22 زبان", stat1_d: "داشبورد و بسته‌ها", stat2_t: "2 سیستم", stat2_d: "لینوکس یا ویندوز", stat3_t: "+16 ویژگی", stat3_d: "مدیریت و ابزارها", stat4_t: "GPL-3.0+", stat4_d: "نرم افزار آزاد",
+        stat1_t: "22 زبان", stat1_d: "داشبورد و بسته‌ها", stat2_t: "2 سیستم", stat2_d: "لینوکس یا ویندوز", stat3_t: "+25 ویژگی", stat3_d: "مدیریت و ابزارها", stat4_t: "GPL-3.0+", stat4_d: "نرم افزار آزاد",
         term_validating: "در حال اعتبارسنجی...", term_installing: "در حال نصب Koha...", term_configuring: "پیکربندی پایگاه داده...", term_preparing: "آماده سازی بکاپ...", term_access: "تنظیم دسترسی...", term_ready: "داشبورد آماده است:",
         feat_kick: "همه در یک مکان", feat_h2: "داشبوردی برای مدیریت کتابخانه شما.", feat_p: "از نصب تا پشتیبان‌گیری، امنیت و انتشار در وب.",
         f1_t: "نصب هدایت شده", f1_d: "نصب خودکار Koha, Apache, MariaDB.",
@@ -2118,7 +2404,7 @@ sudo bash installer</pre>
         inst_a_t: "پس از نصب", inst_a1: "باز کردن <code>http://IP:8080</code>", inst_a2: "تکمیل Web Installer", inst_a3: "ایجاد کتابدار ارشد", inst_a4: "کاتالوگ: <code>http://IP:80</code>", inst_a5: "داشبورد: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "محیط کامل Koha در رایانه شخصی.", win_p: "اجرای Koha در ویندوز.",
         win_d_k: "نصاب ویندوز", win_d_t: "نصب با دو کلیک.", win_d_p: "دانلود Install-Koha.cmd.", win_d_b: "⬇ دانلود", win_d_s: "منبع ↗",
-        win_b_t: "نصب", win_b_p: "در PowerShell اجرا کنید:",
+        win_b_t: "نصب", win_b_p: "PowerShell را <strong>با دسترسی مدیر (Administrator)</strong> باز کنید (کلیک راست روی Start ← <em>Terminal (Admin)</em>) و اجرا کنید:",
         win_c1: "<strong>آسان تر:</strong> دکمه دانلود بالا.",
         win_c2_t: "<strong>فعال کردن مجازی سازی:</strong>", win_c2_p1: "وارد تنظیمات BIOS شوید.",
         win_c2_p2: "Intel VT-x یا AMD SVM را فعال کنید.",
@@ -2159,7 +2445,7 @@ sudo bash installer</pre>
         hero_h1: "सर्वश्रेष्ठ मुफ्त लाइब्रेरी सिस्टम, <span class='accent'>अब बिना परेशानी के।</span>",
         hero_p: "<strong>koha.nexus</strong> Koha के लिए एक स्मार्ट और मुफ्त सहायक है।",
         hero_btn1: "स्थापना शुरू करें →", hero_btn2: "GitHub पर देखें", hero_btn3: "README पढ़ें",
-        stat1_t: "22 भाषाएं", stat1_d: "डैशबोर्ड और पैकेज", stat2_t: "2 सिस्टम", stat2_d: "Linux या Windows", stat3_t: "16+ सुविधाएँ", stat3_d: "प्रबंधन और उपकरण", stat4_t: "GPL-3.0+", stat4_d: "मुफ्त सॉफ्टवेयर",
+        stat1_t: "22 भाषाएं", stat1_d: "डैशबोर्ड और पैकेज", stat2_t: "2 सिस्टम", stat2_d: "Linux या Windows", stat3_t: "25+ सुविधाएँ", stat3_d: "प्रबंधन और उपकरण", stat4_t: "GPL-3.0+", stat4_d: "मुफ्त सॉफ्टवेयर",
         term_validating: "सर्वर सत्यापित कर रहा है...", term_installing: "Koha स्थापित हो रहा है...", term_configuring: "डेटाबेस कॉन्फ़िगर कर रहा है...", term_preparing: "बैकअप तैयार कर रहा है...", term_access: "एक्सेस कॉन्फ़िगर कर रहा है...", term_ready: "डैशबोर्ड तैयार:",
         feat_kick: "सब कुछ एक जगह", feat_h2: "लाइब्रेरी प्रबंधन के लिए डैशबोर्ड।", feat_p: "स्थापना से लेकर बैकअप और सुरक्षा तक।",
         f1_t: "निर्देशित स्थापना", f1_d: "Koha, Apache, MariaDB का स्वचालित सेटअप।",
@@ -2180,7 +2466,7 @@ sudo bash installer</pre>
         inst_a_t: "स्थापना के बाद", inst_a1: "खोलें <code>http://IP:8080</code>", inst_a2: "Web Installer पूरा करें", inst_a3: "सुपर लाइब्रेरियन बनाएं", inst_a4: "कैटलॉग: <code>http://IP:80</code>", inst_a5: "डैशबोर्ड: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC पर पूर्ण Koha वातावरण।", win_p: "Windows में Koha चलाएं।",
         win_d_k: "विंडोज़ इंस्टॉलर", win_d_t: "दो क्लिक में स्थापित करें।", win_d_p: "Install-Koha.cmd डाउनलोड करें।", win_d_b: "⬇ डाउनलोड", win_d_s: "स्रोत देखें ↗",
-        win_b_t: "स्थापना", win_b_p: "PowerShell में चलाएं:",
+        win_b_t: "स्थापना", win_b_p: "PowerShell को <strong>व्यवस्थापक (Administrator) के रूप में</strong> खोलें (Start पर राइट-क्लिक → <em>Terminal (Admin)</em>) और चलाएं:",
         win_c1: "<strong>आसान तरीका:</strong> ऊपर डाउनलोड बटन पर क्लिक करें।",
         win_c2_t: "<strong>वर्चुअलाइजेशन कैसे सक्षम करें:</strong>", win_c2_p1: "BIOS सेटिंग्स दर्ज करें।",
         win_c2_p2: "Intel VT-x या AMD SVM सक्षम करें।",
@@ -2221,7 +2507,7 @@ sudo bash installer</pre>
         hero_h1: "সেরা বিনামূল্যের লাইব্রেরি সিস্টেম, <span class='accent'>এখন কোনো ঝামেলা ছাড়াই।</span>",
         hero_p: "<strong>koha.nexus</strong> হলো Koha পরিচালনার জন্য একটি স্মার্ট এবং বিনামূল্যের সহকারী।",
         hero_btn1: "ইনস্টলেশন শুরু করুন →", hero_btn2: "GitHub এ দেখুন", hero_btn3: "README পড়ুন",
-        stat1_t: "২২টি ভাষা", stat1_d: "ড্যাশবোর্ড এবং প্যাকেজ", stat2_t: "২টি সিস্টেম", stat2_d: "Linux বা Windows", stat3_t: "১৬+ বৈশিষ্ট্য", stat3_d: "পরিচালনা এবং সরঞ্জাম", stat4_t: "GPL-3.0+", stat4_d: "ফ্রি সফটওয়্যার",
+        stat1_t: "২২টি ভাষা", stat1_d: "ড্যাশবোর্ড এবং প্যাকেজ", stat2_t: "২টি সিস্টেম", stat2_d: "Linux বা Windows", stat3_t: "২৫+ বৈশিষ্ট্য", stat3_d: "পরিচালনা এবং সরঞ্জাম", stat4_t: "GPL-3.0+", stat4_d: "ফ্রি সফটওয়্যার",
         term_validating: "সার্ভার যাচাই করা হচ্ছে...", term_installing: "Koha ইনস্টল করা হচ্ছে...", term_configuring: "ডেটাবেস কনফিগার করা হচ্ছে...", term_preparing: "ব্যাকআপ প্রস্তুত করা হচ্ছে...", term_access: "অ্যাক্সেস কনফিগার করা হচ্ছে...", term_ready: "ড্যাশবোর্ড প্রস্তুত:",
         feat_kick: "সবকিছু এক জায়গায়", feat_h2: "লাইব্রেরি পরিচালনার ড্যাশবোর্ড।", feat_p: "ইনস্টলেশন থেকে ব্যাকআপ এবং নিরাপত্তা পর্যন্ত।",
         f1_t: "নির্দেশিত ইনস্টলেশন", f1_d: "Koha, Apache, MariaDB এর স্বয়ংক্রিয় সেটআপ।",
@@ -2242,7 +2528,7 @@ sudo bash installer</pre>
         inst_a_t: "ইনস্টলেশনের পরে", inst_a1: "খুলুন <code>http://IP:8080</code>", inst_a2: "Web Installer সম্পূর্ণ করুন", inst_a3: "সুপার লাইব্রেরিয়ান তৈরি করুন", inst_a4: "ক্যাটালগ: <code>http://IP:80</code>", inst_a5: "ড্যাশবোর্ড: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC-তে সম্পূর্ণ Koha পরিবেশ।", win_p: "Windows-এ Koha চালান।",
         win_d_k: "উইন্ডোজ ইনস্টলার", win_d_t: "দুই ক্লিকে ইনস্টল করুন।", win_d_p: "Install-Koha.cmd ডাউনলোড করুন।", win_d_b: "⬇ ডাউনলোড", win_d_s: "উৎস দেখুন ↗",
-        win_b_t: "ইনস্টলেশন", win_b_p: "PowerShell-এ চালান:",
+        win_b_t: "ইনস্টলেশন", win_b_p: "PowerShell <strong>অ্যাডমিনিস্ট্রেটর হিসেবে</strong> খুলুন (Start-এ রাইট-ক্লিক → <em>Terminal (Admin)</em>) এবং চালান:",
         win_c1: "<strong>সহজ উপায়:</strong> উপরের ডাউনলোড বোতামে ক্লিক করুন।",
         win_c2_t: "<strong>কীভাবে ভার্চুয়ালাইজেশন সক্ষম করবেন:</strong>", win_c2_p1: "BIOS সেটিংসে প্রবেশ করুন।",
         win_c2_p2: "Intel VT-x বা AMD SVM সক্ষম করুন।",
@@ -2283,7 +2569,7 @@ sudo bash installer</pre>
         hero_h1: "Hệ thống thư viện miễn phí tốt nhất, <span class='accent'>nay không còn rắc rối.</span>",
         hero_p: "<strong>koha.nexus</strong> là một trợ lý thông minh, miễn phí và dễ sử dụng cho <strong>Koha</strong>.",
         hero_btn1: "Bắt đầu cài đặt →", hero_btn2: "Xem trên GitHub", hero_btn3: "Đọc README",
-        stat1_t: "22 ngôn ngữ", stat1_d: "Bảng điều khiển & Gói", stat2_t: "2 hệ thống", stat2_d: "Linux hoặc Windows", stat3_t: "16+ tính năng", stat3_d: "Quản lý và công cụ", stat4_t: "GPL-3.0+", stat4_d: "Phần mềm tự do",
+        stat1_t: "22 ngôn ngữ", stat1_d: "Bảng điều khiển & Gói", stat2_t: "2 hệ thống", stat2_d: "Linux hoặc Windows", stat3_t: "25+ tính năng", stat3_d: "Quản lý và công cụ", stat4_t: "GPL-3.0+", stat4_d: "Phần mềm tự do",
         term_validating: "Đang xác thực máy chủ...", term_installing: "Đang cài đặt Koha...", term_configuring: "Cấu hình cơ sở dữ liệu...", term_preparing: "Chuẩn bị sao lưu...", term_access: "Cấu hình truy cập...", term_ready: "Bảng điều khiển đã sẵn sàng:",
         feat_kick: "Tất cả ở một nơi", feat_h2: "Bảng điều khiển để quản lý thư viện của bạn.", feat_p: "Từ cài đặt đến sao lưu, bảo mật và xuất bản web.",
         f1_t: "Cài đặt có hướng dẫn", f1_d: "Cài đặt tự động Koha, Apache, MariaDB.",
@@ -2304,7 +2590,7 @@ sudo bash installer</pre>
         inst_a_t: "Sau khi cài đặt", inst_a1: "Mở <code>http://IP:8080</code>", inst_a2: "Hoàn tất Web Installer", inst_a3: "Tạo thủ thư cấp cao", inst_a4: "Danh mục: <code>http://IP:80</code>", inst_a5: "Bảng điều khiển: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Môi trường Koha đầy đủ trên PC.", win_p: "Chạy Koha trên Windows.",
         win_d_k: "TRÌNH CÀI ĐẶT WINDOWS", win_d_t: "Cài đặt với hai cú nhấp chuột.", win_d_p: "Tải xuống Install-Koha.cmd.", win_d_b: "⬇ Tải xuống", win_d_s: "Xem nguồn ↗",
-        win_b_t: "Cài đặt", win_b_p: "Chạy trong PowerShell:",
+        win_b_t: "Cài đặt", win_b_p: "Mở PowerShell <strong>với quyền Quản trị viên</strong> (nhấp chuột phải vào Start → <em>Terminal (Admin)</em>) rồi chạy:",
         win_c1: "<strong>Cách dễ hơn:</strong> Nhấp vào nút tải xuống ở trên.",
         win_c2_t: "<strong>Cách bật Ảo hóa:</strong>", win_c2_p1: "Vào cài đặt BIOS.",
         win_c2_p2: "Bật Intel VT-x hoặc AMD SVM.",
@@ -2345,7 +2631,7 @@ sudo bash installer</pre>
         hero_h1: "最好的免费图书馆系统，<span class='accent'>现在不再繁琐。</span>",
         hero_p: "<strong>koha.nexus</strong> 是一个智能、免费且易于使用的助手，用于安装和管理 <strong>Koha</strong>。",
         hero_btn1: "开始安装 →", hero_btn2: "在 GitHub 上查看", hero_btn3: "阅读 README",
-        stat1_t: "22 种语言", stat1_d: "控制面板和包", stat2_t: "2 个系统", stat2_d: "Linux 或 Windows", stat3_t: "16+ 功能", stat3_d: "管理和工具", stat4_t: "GPL-3.0+", stat4_d: "自由软件",
+        stat1_t: "22 种语言", stat1_d: "控制面板和包", stat2_t: "2 个系统", stat2_d: "Linux 或 Windows", stat3_t: "25+ 功能", stat3_d: "管理和工具", stat4_t: "GPL-3.0+", stat4_d: "自由软件",
         term_validating: "正在验证服务器...", term_installing: "正在安装 Koha...", term_configuring: "配置数据库...", term_preparing: "准备备份...", term_access: "配置访问...", term_ready: "控制面板已准备就绪:",
         feat_kick: "一切尽在一个地方", feat_h2: "管理您的图书馆的控制面板。", feat_p: "从安装到备份、安全和 Web 发布。",
         f1_t: "引导安装", f1_d: "自动安装 Koha、Apache、MariaDB。",
@@ -2366,7 +2652,7 @@ sudo bash installer</pre>
         inst_a_t: "安装后", inst_a1: "打开 <code>http://IP:8080</code>", inst_a2: "完成 Web Installer", inst_a3: "创建超级管理员", inst_a4: "目录: <code>http://IP:80</code>", inst_a5: "控制面板: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC 上的完整 Koha 环境。", win_p: "在 Windows 上运行 Koha。",
         win_d_k: "WINDOWS 安装程序", win_d_t: "两步安装。", win_d_p: "下载 Install-Koha.cmd。", win_d_b: "⬇ 下载", win_d_s: "查看源码 ↗",
-        win_b_t: "安装", win_b_p: "在 PowerShell 中运行:",
+        win_b_t: "安装", win_b_p: "<strong>以管理员身份</strong>打开 PowerShell(右键单击“开始”→ <em>终端(管理员)</em>)并运行:",
         win_c1: "<strong>更简单:</strong> 点击上面的下载按钮。",
         win_c2_t: "<strong>如何启用虚拟化:</strong>", win_c2_p1: "进入 BIOS 设置。",
         win_c2_p2: "启用 Intel VT-x 或 AMD SVM。",
@@ -2407,7 +2693,7 @@ sudo bash installer</pre>
         hero_h1: "最高の無料図書館システム、<span class='accent'>もう手間はかかりません。</span>",
         hero_p: "<strong>koha.nexus</strong>は、<strong>Koha</strong>を管理するためのスマートで無料の使いやすいアシスタントです。",
         hero_btn1: "インストールを開始 →", hero_btn2: "GitHubで見る", hero_btn3: "READMEを読む",
-        stat1_t: "22言語", stat1_d: "ダッシュボードとパッケージ", stat2_t: "2システム", stat2_d: "LinuxまたはWindows", stat3_t: "16+機能", stat3_d: "管理とツール", stat4_t: "GPL-3.0+", stat4_d: "フリーソフトウェア",
+        stat1_t: "22言語", stat1_d: "ダッシュボードとパッケージ", stat2_t: "2システム", stat2_d: "LinuxまたはWindows", stat3_t: "25+機能", stat3_d: "管理とツール", stat4_t: "GPL-3.0+", stat4_d: "フリーソフトウェア",
         term_validating: "サーバーを検証中...", term_installing: "Kohaをインストール中...", term_configuring: "データベースを設定中...", term_preparing: "バックアップを準備中...", term_access: "アクセスを設定中...", term_ready: "ダッシュボードの準備完了:",
         feat_kick: "すべてを1か所で", feat_h2: "図書館を管理するためのダッシュボード。", feat_p: "インストールからバックアップ、セキュリティ、Web公開まで。",
         f1_t: "ガイド付きインストール", f1_d: "Koha、Apache、MariaDBの自動セットアップ。",
@@ -2428,7 +2714,7 @@ sudo bash installer</pre>
         inst_a_t: "インストール後", inst_a1: "開く: <code>http://IP:8080</code>", inst_a2: "Web Installerを完了する", inst_a3: "スーパーライブラリアンを作成", inst_a4: "カタログ: <code>http://IP:80</code>", inst_a5: "ダッシュボード: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC上の完全なKoha環境。", win_p: "WindowsでKohaを実行します。",
         win_d_k: "WINDOWS インストーラー", win_d_t: "2クリックでインストール。", win_d_p: "Install-Koha.cmdをダウンロード。", win_d_b: "⬇ ダウンロード", win_d_s: "ソースを見る ↗",
-        win_b_t: "インストール", win_b_p: "PowerShellで実行:",
+        win_b_t: "インストール", win_b_p: "PowerShell を<strong>管理者として</strong>開き(スタートを右クリック → <em>ターミナル (管理者)</em>)、次を実行:",
         win_c1: "<strong>より簡単:</strong> 上のダウンロードボタンをクリックします。",
         win_c2_t: "<strong>仮想化を有効にする方法:</strong>", win_c2_p1: "BIOS設定に入ります。",
         win_c2_p2: "Intel VT-xまたはAMD SVMを有効にします。",
@@ -2469,7 +2755,7 @@ sudo bash installer</pre>
         hero_h1: "최고의 무료 도서관 시스템, <span class='accent'>이제 번거로움 없이.</span>",
         hero_p: "<strong>koha.nexus</strong>는 <strong>Koha</strong>를 관리하기 위한 스마트하고 무료이며 사용하기 쉬운 어시스턴트입니다.",
         hero_btn1: "설치 시작 →", hero_btn2: "GitHub에서 보기", hero_btn3: "README 읽기",
-        stat1_t: "22개 언어", stat1_d: "대시보드 및 패키지", stat2_t: "2개 시스템", stat2_d: "Linux 또는 Windows", stat3_t: "16개 이상 기능", stat3_d: "관리 및 도구", stat4_t: "GPL-3.0+", stat4_d: "자유 소프트웨어",
+        stat1_t: "22개 언어", stat1_d: "대시보드 및 패키지", stat2_t: "2개 시스템", stat2_d: "Linux 또는 Windows", stat3_t: "25개 이상 기능", stat3_d: "관리 및 도구", stat4_t: "GPL-3.0+", stat4_d: "자유 소프트웨어",
         term_validating: "서버 확인 중...", term_installing: "Koha 설치 중...", term_configuring: "데이터베이스 구성 중...", term_preparing: "백업 준비 중...", term_access: "액세스 구성 중...", term_ready: "대시보드 준비 완료:",
         feat_kick: "모두 한 곳에", feat_h2: "도서관 관리를 위한 대시보드.", feat_p: "설치부터 백업, 보안 및 웹 게시까지.",
         f1_t: "안내에 따른 설치", f1_d: "Koha, Apache, MariaDB 자동 설정.",
@@ -2490,7 +2776,7 @@ sudo bash installer</pre>
         inst_a_t: "설치 후", inst_a1: "열기: <code>http://IP:8080</code>", inst_a2: "Web Installer 완료", inst_a3: "최고 사서 만들기", inst_a4: "카탈로그: <code>http://IP:80</code>", inst_a5: "대시보드: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC의 전체 Koha 환경.", win_p: "Windows에서 Koha 실행.",
         win_d_k: "WINDOWS 설치 프로그램", win_d_t: "두 번의 클릭으로 설치.", win_d_p: "Install-Koha.cmd 다운로드.", win_d_b: "⬇ 다운로드", win_d_s: "소스 보기 ↗",
-        win_b_t: "설치", win_b_p: "PowerShell에서 실행:",
+        win_b_t: "설치", win_b_p: "PowerShell을 <strong>관리자 권한으로</strong> 열고(시작 단추 우클릭 → <em>터미널(관리자)</em>) 실행:",
         win_c1: "<strong>더 쉬운 방법:</strong> 위 다운로드 버튼 클릭.",
         win_c2_t: "<strong>가상화 활성화 방법:</strong>", win_c2_p1: "BIOS 설정으로 들어갑니다.",
         win_c2_p2: "Intel VT-x 또는 AMD SVM 활성화.",
@@ -2682,6 +2968,210 @@ sudo bash installer</pre>
 
     loadLibraries();
 
+  </script>
+
+  <button class="to-top" id="to-top" type="button" aria-label="Back to top">↑</button>
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot">
+    <button type="button" aria-label="Close">✕</button>
+    <img alt="">
+  </div>
+
+  <script>
+    // ----------------------------------------------------------------------
+    // Movimento e navegação: barra de progresso, menu ativo, menu no celular,
+    // revelar ao rolar, contadores, vitrine do painel e voltar ao topo.
+    // Nada aqui mexe na rede pública (loadLibraries) nem nas traduções.
+    // ----------------------------------------------------------------------
+    (function () {
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const $ = (sel, root) => (root || document).querySelector(sel);
+      const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+      // Barra de progresso e botão "voltar ao topo"
+      const bar = $("#scroll-progress");
+      const toTop = $("#to-top");
+      let ticking = false;
+      function onScroll() {
+        ticking = false;
+        const doc = document.documentElement;
+        const max = doc.scrollHeight - window.innerHeight;
+        const ratio = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+        if (bar) bar.style.transform = "scaleX(" + ratio + ")";
+        if (toTop) toTop.classList.toggle("show", window.scrollY > 700);
+      }
+      window.addEventListener("scroll", () => {
+        if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+      }, { passive: true });
+      onScroll();
+      if (toTop) toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" }));
+
+      // Menu no celular
+      const nav = $("#main-nav");
+      const toggle = $("#menu-toggle");
+      if (nav && toggle) {
+        toggle.addEventListener("click", () => {
+          const open = nav.classList.toggle("open");
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          toggle.textContent = open ? "✕" : "☰";
+        });
+        nav.addEventListener("click", e => {
+          if (e.target.closest("a") && nav.classList.contains("open")) toggle.click();
+        });
+      }
+
+      // Link do menu da seção visível
+      const links = nav ? $$("a[href^='#']", nav) : [];
+      const sections = links.map(a => document.getElementById(a.getAttribute("href").slice(1))).filter(Boolean);
+      if ("IntersectionObserver" in window && sections.length) {
+        const seen = new Map();
+        const spy = new IntersectionObserver(entries => {
+          entries.forEach(en => seen.set(en.target.id, en.isIntersecting ? en.intersectionRatio : 0));
+          let best = null, bestRatio = 0;
+          seen.forEach((r, id) => { if (r > bestRatio) { bestRatio = r; best = id; } });
+          links.forEach(a => a.classList.toggle("active", best !== null && a.getAttribute("href") === "#" + best));
+        }, { rootMargin: "-35% 0px -55% 0px", threshold: [0, 0.01, 0.25, 0.5, 1] });
+        sections.forEach(sec => spy.observe(sec));
+      }
+
+      // Revelar ao rolar (os cartões da rede pública chegam depois e não entram aqui)
+      if (!reduce && "IntersectionObserver" in window) {
+        const items = $$(".section-heading, .card, .step, .download-banner, .table-wrap, .showcase, .stat")
+          .filter(el => !el.closest("#libraries-grid") && !el.closest(".hero"));
+        const groups = new Map();
+        items.forEach(el => {
+          const parent = el.parentElement;
+          const i = groups.get(parent) || 0;
+          groups.set(parent, i + 1);
+          el.dataset.rd = String(Math.min(i, 6) * 70);
+          el.classList.add("reveal");
+        });
+        const io = new IntersectionObserver(entries => {
+          entries.forEach(en => {
+            if (en.isIntersecting) {
+              const el = en.target;
+              io.unobserve(el);
+              setTimeout(() => el.classList.add("in"), parseInt(el.dataset.rd || "0", 10));
+            }
+          });
+        }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+        items.forEach(el => io.observe(el));
+      }
+
+      // Contadores dos números do topo ("22 idiomas" conta de 0 a 22)
+      function countUp(el) {
+        const m = (el.textContent || "").match(/\d+/);
+        if (!m) return;
+        const target = parseInt(m[0], 10);
+        const start = performance.now();
+        const dur = 1100;
+        function frame(now) {
+          const t = Math.min(1, (now - start) / dur);
+          const value = Math.round(target * (1 - Math.pow(1 - t, 3)));
+          // Relê o texto a cada quadro: se o idioma mudar no meio, vale o novo.
+          el.innerHTML = el.innerHTML.replace(/\d+/, String(value));
+          if (t < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+      if (!reduce) {
+        window.addEventListener("load", () => $$(".stat strong").forEach(countUp));
+      }
+
+      // Luz que segue o ponteiro nos cartões
+      document.addEventListener("pointermove", e => {
+        const card = e.target.closest && e.target.closest(".card");
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        card.style.setProperty("--mx", (e.clientX - r.left) + "px");
+        card.style.setProperty("--my", (e.clientY - r.top) + "px");
+      }, { passive: true });
+
+      // Vitrine do painel: abas, setas do teclado, troca automática e ampliação
+      const tabs = $$(".tab[data-shot]");
+      const img = $("#shot-img");
+      const shot = $("#shot");
+      const dots = $$(".stage-dots i");
+      const stage = $("#panel-stage");
+      let current = 0, timer = null, userPicked = false;
+      const preload = {};
+      function select(i, focus) {
+        if (!tabs.length || !img) return;
+        current = (i + tabs.length) % tabs.length;
+        const name = tabs[current].dataset.shot;
+        tabs.forEach((t, n) => {
+          t.setAttribute("aria-selected", n === current ? "true" : "false");
+          t.tabIndex = n === current ? 0 : -1;
+        });
+        $$(".pane[data-pane]").forEach(p => { p.hidden = p.dataset.pane !== name; });
+        dots.forEach((d, n) => d.classList.toggle("on", n === current));
+        if (stage) stage.setAttribute("aria-labelledby", tabs[current].id);
+        const src = "docs/images/panel/" + name + ".webp";
+        if (!img.src.endsWith(src)) {
+          shot.classList.add("loading");
+          const next = new Image();
+          next.onload = next.onerror = () => {
+            img.src = src;
+            img.alt = tabs[current].textContent.trim();
+            shot.classList.remove("loading");
+          };
+          next.src = src;
+        }
+        if (focus) tabs[current].focus();
+      }
+      tabs.forEach((t, n) => {
+        t.addEventListener("click", () => { userPicked = true; stop(); select(n); });
+        t.addEventListener("keydown", e => {
+          const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+          if (step) { e.preventDefault(); userPicked = true; stop(); select(current + step, true); }
+          else if (e.key === "Home") { e.preventDefault(); select(0, true); }
+          else if (e.key === "End") { e.preventDefault(); select(tabs.length - 1, true); }
+        });
+      });
+      function stop() { if (timer) { clearInterval(timer); timer = null; } }
+      function play() {
+        if (reduce || userPicked || timer) return;
+        timer = setInterval(() => select(current + 1), 6500);
+      }
+      if (stage && "IntersectionObserver" in window) {
+        new IntersectionObserver(entries => {
+          entries.forEach(en => {
+            if (en.isIntersecting) {
+              // As outras telas só são baixadas quando a vitrine aparece.
+              tabs.forEach(t => {
+                const n = t.dataset.shot;
+                if (!preload[n]) { preload[n] = new Image(); preload[n].src = "docs/images/panel/" + n + ".webp"; }
+              });
+              play();
+            } else stop();
+          });
+        }, { threshold: 0.3 }).observe(stage);
+        stage.addEventListener("mouseenter", stop);
+        stage.addEventListener("mouseleave", play);
+      }
+
+      const box = $("#lightbox");
+      if (box && shot && img) {
+        const big = $("img", box);
+        const close = () => { box.classList.remove("open"); document.body.style.overflow = ""; shot.focus(); };
+        shot.addEventListener("click", () => {
+          stop();
+          big.src = img.src; big.alt = img.alt;
+          box.classList.add("open");
+          document.body.style.overflow = "hidden";
+          $("button", box).focus();
+        });
+        box.addEventListener("click", close);
+        document.addEventListener("keydown", e => {
+          if (!box.classList.contains("open")) return;
+          if (e.key === "Escape") close();
+          else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            select(current + (e.key === "ArrowRight" ? 1 : -1));
+            big.src = "docs/images/panel/" + tabs[current].dataset.shot + ".webp";
+          }
+        });
+      }
+    })();
   </script>
 </body>
 </html>

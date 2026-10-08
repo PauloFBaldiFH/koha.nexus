@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.18**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.19**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -125,10 +125,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   account. His local `wrangler.toml` holds real IDs; the repo keeps placeholders. The Worker
   he deploys is `kei-broker`; a stray Cloudflare auto-deploy for a Worker named `koha-nexus`
   shows a red check on PRs and can be disconnected in Cloudflare.
+- **Website** (`index.html`, served at https://koha.nexus by GitHub Pages; 1.5.19, Subject 7):
+  23 languages in one `translations` object, missing keys fall back to English. A "Panel"
+  showcase (`#panel`) shows real screenshots of the panel's demo mode in
+  `docs/images/panel/*.webp` (Textual `save_screenshot` SVG, rasterised with Playwright, WebP
+  via Pillow). The motion script is a second `<script>` block; it never touches
+  `loadLibraries()` (the `broker.koha.nexus/api/public-libraries` fetch into `#libraries-grid`)
+  nor `broker/`. New site strings are translated into pt/es/fr/it/de only.
 - **Links from the panel** open through `panel/kei_panel/opener.py` (wslview/explorer.exe on
   WSL, xdg-open as SUDO_USER on a desktop, else copy via OSC 52). Never Python `webbrowser`.
 - **Windows**: new installs go to `C:\Koha`; scheduled tasks live in the Task Scheduler root as
-  "Koha - <task> (<USERNAME>)"; the `.cmd` no longer runs as admin. Use `Get-KohaPath`, not
+  "Koha - <task> (<USERNAME>)"; the `.cmd` no longer runs as admin.
+  The manual PowerShell line is documented as "open PowerShell **as Administrator**" from the
+  person's own administrator account (Paulo, 2026-10-08); the `.cmd` itself still runs as the
+  signed-in user (5c1fa82), and the docs warn not to approve with another person's password. Use `Get-KohaPath`, not
   literal paths.
 - **Naming**: product name koha.nexus everywhere visible; internal ids/paths such as
   `koha-easy-installer` and `/etc/koha-easy-install` are intentionally kept.
