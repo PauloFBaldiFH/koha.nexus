@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.13"
+PANEL_VERSION=" 1.5.14"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9283,6 +9283,110 @@ _lt_marc_undo_run() {
 }
 
 # ----------------------------------------------------------------------
+# Authorities: the catalogue's headings (100, 110, 600, 650, 700...) linked
+# to the authority records ($9) by Koha's own link_bibs_to_authorities.pl
+# (ROADMAP subject 2): first its dry run (--test --link-report), with the
+# counts and the headings no authority matches, then, after confirmation
+# and a verified backup, the real run and the search index brought up to
+# date. Koha's linker settings (LinkerModule, CatalogModuleRelink,
+# AutoCreateAuthorities) decide how headings are matched.
+# ----------------------------------------------------------------------
+lt_authority_sync() {
+    require_database || return 0
+    local scope limit="" from to last branch title
+    title=$(t "🔗  Sync & link authorities")
+    if ! koha_script link_bibs_to_authorities.pl >/dev/null; then
+        msg_error "" "$(t "Koha's link_bibs_to_authorities.pl was not found. Nothing was changed.")" 9 72
+        return 1
+    fi
+    if [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.auth_header;")" = "0" ]; then
+        msg_info "$title" "$(t "The catalog has no authority records yet: there is nothing to link the headings to. Import the authorities first (Magic Import Tool or Koha's staged import).")" 11 74
+        return 0
+    fi
+    scope=$(ui_menu "$title" "$(t "Which records should be linked to the authorities?")" \
+        "all"    "$(t "The whole catalog")" \
+        "range"  "$(t "A range of record numbers (biblionumber)")" \
+        "branch" "$(t "The records with copies in one library")") || return 0
+    case "$scope" in
+        range)
+            last=$(run_sql "SELECT COALESCE(MAX(biblionumber), 1) FROM ${DB_NAME}.biblio;")
+            from=$(ui_input "$title" "$(t "First record number (biblionumber):")" "1") || return 0
+            to=$(ui_input "$title" "$(t "Last record number (biblionumber):")" "$last") || return 0
+            if ! [[ "$from" =~ ^[0-9]+$ && "$to" =~ ^[0-9]+$ ]] || [ "$from" -gt "$to" ]; then
+                msg_error "" "$(t "Type two record numbers, the first not larger than the last. Nothing was changed.")" 9 72
+                return 1
+            fi
+            limit="biblionumber BETWEEN ${from} AND ${to}" ;;
+        branch)
+            branch=$(tools_pick "$title" "$(t "Library:")" "SELECT branchcode, branchname FROM ${DB_NAME}.branches ORDER BY branchname;") || return 0
+            [[ "$branch" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+            limit="biblionumber IN (SELECT biblionumber FROM items WHERE homebranch = \"${branch}\")" ;;
+    esac
+    tools_locked _lt_authority_sync_run "$limit"
+}
+
+_lt_authority_sync_run() {
+    local limit="$1" log title preview checked modified linked unlinked fuzzy indexed
+    local args=()
+    title=$(t "🔗  Sync & link authorities")
+    log=$(tools_log authority-sync)
+    [ -n "$limit" ] && args+=(--bib-limit "$limit")
+    display_explanation "Preview (dry run): nothing is changed yet..."
+    if ! koha_tool "$log" link_bibs_to_authorities.pl --test --link-report "${args[@]}"; then
+        ui_textbox "$title" "$log"
+        msg_error "" "$(t 'Koha could not complete the request. Nothing was changed.\n\nLog: ${log}')" 10 74
+        return 1
+    fi
+    checked=$(tools_num "$log" "Number of bibs checked:")
+    modified=$(tools_num "$log" "Number of bibs modified:")
+    linked=$(tools_num "$log" "Number of headings linked:")
+    unlinked=$(tools_num "$log" "Number of headings unlinked:")
+    fuzzy=$(tools_num "$log" "Number of headings fuzzily linked:")
+    # The report of the dry run: the counts, then the headings found and not found.
+    preview="${TOOLS_WORK}/authorities-preview.txt"
+    tools_output "$log" | sed -n '/heading linking report/,$p' | head -n 400 > "$preview"
+    [ -s "$preview" ] || tools_output "$log" | tail -n 200 > "$preview"
+    ui_textbox "$(t "Preview (dry run)")" "$preview"
+    if [ "${modified:-0}" -eq 0 ]; then
+        msg_info "$title" "$(t 'Records checked: ${checked}\nNo heading can be linked to an authority: nothing to change.\n\nHeadings without a matching authority: ${unlinked} (listed in the preview).\n\nLog: ${log}')" 14 76
+        return 0
+    fi
+    prompt_yes_no "$title" "$(t 'Records checked: ${checked}\nRecords to update: ${modified}\nHeadings to link: ${linked} (by similarity: ${fuzzy})\nHeadings without a matching authority: ${unlinked}\n\nLink them now? A verified backup is made first, and the search index is updated afterwards.')" 16 76 defaultno || return 0
+    tools_safety_backup AUTHORITIES || return 1
+    display_explanation "Linking the headings to the authorities..."
+    if ! koha_tool "$log" link_bibs_to_authorities.pl -v "${args[@]}"; then
+        ui_textbox "$title" "$log"
+        msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    modified=$(tools_num "$log" "Number of bibs modified:")
+    linked=$(tools_num "$log" "Number of headings linked:")
+    unlinked=$(tools_num "$log" "Number of headings unlinked:")
+    display_explanation "Updating the search index..."
+    if tools_reindex "$log"; then
+        indexed=$(t "The search index was updated.")
+    else
+        indexed=$(t "The search index could not be updated now: run Repair / rebuild indexing.")
+    fi
+    log "tools: authorities linked (checked=$checked modified=$modified linked=$linked unlinked=$unlinked)"
+    msg_ok "$(t '✅ Headings linked to the authorities.\n\nRecords checked: ${checked}\nRecords updated: ${modified}\nHeadings linked: ${linked}\nHeadings without a matching authority (left for review): ${unlinked}')\n\n${indexed}\n\n$(t 'Safety backup: ${TOOLS_PRE}\nLog: ${log}')" 18 78
+}
+
+# The search index after many records changed at once: Elasticsearch
+# updates the records and authorities in place (no -d: searching keeps
+# working), Zebra works through its queue.
+tools_reindex() {
+    local log="$1"
+    if [ "$(get_search_engine)" = "Elasticsearch" ]; then
+        printf '$ koha-elasticsearch --rebuild -b -a %s\n' "$INSTANCE" >> "$log"
+        koha_ctl /usr/sbin/koha-elasticsearch --rebuild -b -a "$INSTANCE" >> "$log" 2>&1 </dev/null
+    else
+        printf '$ koha-rebuild-zebra -v -b -a %s\n' "$INSTANCE" >> "$log"
+        koha_ctl /usr/sbin/koha-rebuild-zebra -v -b -a "$INSTANCE" >> "$log" 2>&1 </dev/null
+    fi
+}
+
+# ----------------------------------------------------------------------
 # 2. Essential SQL reports pack (read-only SELECTs in Koha's saved reports)
 # ----------------------------------------------------------------------
 # Each report carries "[koha-easy-installer:<key>]" in its notes: installing
@@ -9646,7 +9750,8 @@ function_library_tools() {
             "13" "$(t "🔎  CDD lookup in the cataloguing (staff tool)")" \
             "14" "$(t "🧩  Koha plugins (turn on or off)")" \
             "15" "$(t "🧮  Cutter Calculator")" \
-            "16" "$(t "💬  AI assistant on the staff home page")") || return 0
+            "16" "$(t "💬  AI assistant on the staff home page")" \
+            "17" "$(t "🔗  Sync & link authorities")") || return 0
         case "$opt" in
             1) lt_magic_import ;;
             2) lt_marc_undo ;;
@@ -9664,6 +9769,7 @@ function_library_tools() {
             14) function_koha_plugins ;;
             15) function_cutter ;;
             16) function_ai_assistant ;;
+            17) lt_authority_sync ;;
         esac
         clear
     done
@@ -13605,7 +13711,7 @@ MRPL1
     printf "our \$BACKUP_DIR = '%s';\nour \$TABLE_DIR = '%s';\nour \$VISION_CONF = \"\$BACKUP_DIR/vision.conf\";\nour \$VISION_PROMPT = \"\$BACKUP_DIR/vision-prompt.txt\";\nour \$USER = '';\nour %%T = (\n" "$MR_DIR" "$CAT_DIR"
     for k in title intro paste paste_hint file bn itype keep preview replace cancel err_csrf err_bn err_nobib \
              err_input err_parse err_many err_lines err_title err_changed err_backup err_mod current new items_kept \
-             items_dropped charset confirm ok view prev_dl undo_hint warnings not_found new_confirm $MR_VISION_KEYS; do
+             items_dropped charset confirm ok view prev_dl undo_hint warnings not_found new_confirm nobib_new $MR_VISION_KEYS; do
         printf '    %s => _d(q{%s}),\n' "$k" "$(mr_text "$k" | base64 -w0)"
     done
     printf ');\n'
@@ -13883,7 +13989,18 @@ sub handle_post {
     }
     my $biblio = Koha::Biblios->find($biblionumber);
     if ( !$biblio ) {
-        render_form( $cgi, '<div class="msg err">' . h( $T{err_nobib} ) . " ($biblionumber)</div>" );
+        # A biblionumber that cannot be verified never stops the work: the
+        # record is offered as a new one, after its preview (nothing is
+        # replaced). After a preview the record comes back in the form.
+        my $given;
+        if ( $op eq 'cud-replace' ) {
+            $given = eval { MARC::Record->new_from_xml( decode_base64( scalar $cgi->param('record') // '' ), 'UTF-8', 'MARC21' ) };
+            if ( !$given ) {
+                render_form( $cgi, '<div class="msg err">' . h( $T{err_parse} ) . '</div>' );
+                return;
+            }
+        }
+        do_new_preview( $cgi, "$T{nobib_new} ($biblionumber)", $given );
         return;
     }
 
@@ -13895,11 +14012,12 @@ sub handle_post {
     return;
 }
 
-# Without a biblionumber: the record is shown and, after confirmation, added
-# to the catalogue as a new record. Nothing is replaced.
+# Without a biblionumber, or with one that is not in the catalogue (NOTE
+# says so; RECORD is the one already read): the record is shown and, after
+# confirmation, added to the catalogue as a new record. Nothing is replaced.
 sub do_new_preview {
-    my ($cgi) = @_;
-    my ( $record, $charset, $warnings ) = eval { read_record($cgi) };
+    my ( $cgi, $note, $given ) = @_;
+    my ( $record, $charset, $warnings ) = $given ? ( $given, 'UTF-8', [] ) : eval { read_record($cgi) };
     if ( !$record ) {
         render_form( $cgi, '<div class="msg err">' . h( short_error($@) ) . '</div>' );
         return;
@@ -13916,7 +14034,7 @@ sub do_new_preview {
 
     my $body = '<h2>' . h( $T{title} ) . '</h2>';
     $body .= '<div class="msg warn"><b>' . h( $T{warnings} ) . '</b><br>' . join( '<br>', map { h($_) } @$warnings ) . '</div>' if @$warnings;
-    $body .= '<p>' . h( $T{new_confirm} ) . '</p>';
+    $body .= $note ? '<div class="msg warn">' . h($note) . '</div>' : '<p>' . h( $T{new_confirm} ) . '</p>';
     $body .= '<p>' . h( $T{items_dropped} ) . " $dropped</p>" if $dropped;
     $body .= '<p>' . h( $T{charset} ) . ' ' . h($charset) . '</p>';
     if (@dups) {
@@ -15771,6 +15889,7 @@ mr_text() {
         err_csrf)      t "Invalid or expired security token. Reload the page and try again." ;;
         err_bn)        t "No biblionumber given: no record was replaced." ;;
         err_nobib)     t "There is no record with this biblionumber: nothing was replaced." ;;
+        nobib_new)     t "There is no record with this biblionumber in the catalogue: the record below is added as a new record instead. Nothing is replaced." ;;
         err_input)     t "Paste the text of the record or choose a .mrc or .xml file." ;;
         err_parse)     t "The MARC record could not be read." ;;
         err_many)      t "The file has more than one record. Send a file with only the record to replace." ;;
@@ -18058,9 +18177,25 @@ def repair_mojibake(s):
     return fixed if len(_MOJIBAKE.findall(fixed)) < len(_MOJIBAKE.findall(s)) else s
 
 
+def _reads_well(text):
+    """How well the non-ASCII characters of a decoded text read as letters:
+    an accented letter with the case of the letters next to it counts one,
+    a symbol in the middle of a word ("a‡Æo") takes one away."""
+    score = 0
+    for m in re.finditer(r"(?<=[A-Za-z])[^\x00-\x7f]|[^\x00-\x7f](?=[A-Za-z])", text[:1 << 20]):
+        c, i = m.group(0), m.start()
+        near = [x for x in (text[i - 1:i], text[i + 1:i + 2]) if x.isascii() and x.isalpha()]
+        if c.isalpha():
+            score += any(x.isupper() == c.isupper() for x in near)
+        elif len(near) == 2:
+            score -= 1
+    return score
+
+
 def decode_text(data):
     """Bytes of a text file -> (text, encoding name). UTF-8 when valid,
-    otherwise Windows-1252 (a superset of ISO-8859-1)."""
+    otherwise Windows-1252 (a superset of ISO-8859-1) or, when it reads
+    better, IBM850 (MS-DOS: dBase, ISIS and Clipper exports)."""
     if data.startswith(b"\xef\xbb\xbf"):
         data = data[3:]
     elif data.startswith((b"\xff\xfe", b"\xfe\xff")):
@@ -18069,6 +18204,9 @@ def decode_text(data):
         text, enc = data.decode("utf-8"), "UTF-8"
     except UnicodeDecodeError:
         text, enc = data.decode("cp1252", errors="replace"), "Windows-1252"
+        dos = data.decode("cp850")
+        if _reads_well(dos) > _reads_well(text):
+            text, enc = dos, "IBM850 (MS-DOS)"
     fixed = repair_mojibake(text)
     if fixed != text:
         enc += " (double-encoded text repaired)"
@@ -18279,14 +18417,37 @@ def invert_name(s):
     words = name_words(s)
     if len(words) < 2:
         return s
-    cut = len(words) - 1
-    if norm_header(words[-1]) in _SUFFIXES and len(words) > 2:
-        cut -= 1
+    cut = _surname_cut(words)
     return " ".join(words[cut:]) + ", " + " ".join(words[:cut])
 
 
+def _surname_cut(words):
+    """Index of the first word of the surname: the last word, with the
+    agnomen (Filho, Neto, Júnior...) bound to the surname before it. The
+    particles stay with the forenames ('Maria de Lourdes dos | Santos')."""
+    cut = len(words) - 1
+    if norm_header(words[-1]) in _SUFFIXES and len(words) > 2:
+        cut -= 1
+    return cut
+
+
+def natural_name(s):
+    """Direct order of an entry: 'Assis, Machado de' -> 'Machado de Assis',
+    'Silva Filho, Carlos Eduardo da' -> 'Carlos Eduardo da Silva Filho'
+    (dates of the heading left out)."""
+    s = clean(s)
+    if "," not in s or is_corporate(s):
+        return s
+    sur, rest = [p.strip() for p in s.split(",", 1)]
+    rest = re.sub(r",?\s*[\d?]+\s*-\s*[\d?]*\.?$", "", rest).strip(" ,")
+    return (rest + " " + sur).strip() if rest else sur
+
+
 def split_patron_name(full):
-    """'Ana Maria Souza' -> ('Ana', 'Maria Souza'); 'Souza, Ana' -> ('Ana', 'Souza')."""
+    """(firstname, surname) for Koha's borrowers, by the same rule as the
+    authors: 'João Pedro Santos' -> ('João Pedro', 'Santos'),
+    'Carlos Eduardo da Silva Filho' -> ('Carlos Eduardo da', 'Silva Filho'),
+    'Souza, Ana' -> ('Ana', 'Souza')."""
     full = clean(full)
     if "," in full:
         sur, first = [p.strip() for p in full.split(",", 1)]
@@ -18294,7 +18455,158 @@ def split_patron_name(full):
     words = full.split(" ")
     if len(words) == 1:
         return "", full
-    return words[0], " ".join(words[1:])
+    cut = _surname_cut(words)
+    return " ".join(words[:cut]), " ".join(words[cut:])
+
+
+# ---------------------------------------------------------------- casing
+
+ACRONYMS = {"abnt", "unesco", "eua", "ufpr", "usp", "ufrj", "ufmg", "ufrgs", "ufsc", "ufpe", "ufba", "ufc", "unb",
+            "uerj", "uel", "unicamp", "unesp", "utfpr", "ifpr", "ibge", "onu", "mec", "inep", "cnpq", "capes",
+            "sesc", "senac", "senai", "sebrae", "embrapa", "fgv", "puc", "ibict", "fiocruz", "oms", "oea", "fao",
+            "unicef", "otan", "nato", "usa", "urss", "isbn", "issn", "marc", "cdd", "cdu", "aacr", "ldb", "clt",
+            "eca", "sus", "stf", "stj", "oab", "aids", "hiv", "dna", "rna", "dvd", "tv", "ti"}
+# Words without vowels that are words, not acronyms.
+_ABBREVIATIONS = {"dr", "dra", "sr", "sra", "srta", "st", "sta", "sto", "mr", "mrs", "ms", "jr", "pr"}
+# Lowercase inside a title or a name (particles, articles, prepositions).
+_SMALL = {"de", "da", "do", "das", "dos", "e", "em", "por", "von", "van", "del", "della", "di", "du", "y",
+          "a", "o", "os", "as", "um", "uma", "ao", "aos", "à", "às", "na", "no", "nas", "nos", "num", "numa",
+          "pela", "pelo", "pelas", "pelos", "com", "sem", "para", "sob", "sobre", "entre", "the", "of", "and",
+          "in", "on", "at", "to", "for", "an", "or", "el", "la", "los", "las", "le", "les", "des", "et", "en",
+          "und", "der", "die", "zu", "dem", "den", "dei", "degli", "ten", "ter"}
+# Proper nouns kept capitalised in sentence case (subtitles, subjects, notes).
+_PROPER = {"brasil", "portugal", "angola", "mocambique", "america", "europa", "africa", "asia", "oceania",
+           "franca", "espanha", "inglaterra", "alemanha", "italia", "japao", "china", "russia", "argentina",
+           "mexico", "chile", "peru", "uruguai", "paraguai", "bolivia", "venezuela", "colombia", "cuba",
+           "canada", "deus", "jesus", "cristo", "parana", "bahia", "amazonia", "amazonas", "pernambuco",
+           "londres", "roma"} | {c for c in CITIES if " " not in c and c != "porto"}
+_ROMAN_RE = re.compile(r"m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})")
+_WORD_RE = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)*")
+_SENTENCE_END = re.compile(r"(?:[.!?;|]|\s-{1,2}|\s–)\s*$")
+
+
+def is_roman(w):
+    """A Roman numeral of two or more letters ('iii', 'xiv')."""
+    return len(w) > 1 and bool(_ROMAN_RE.fullmatch(w.lower()))
+
+
+def is_shouting(s):
+    """Text typed in capitals (DOS and ISIS catalogues): 90% or more of its
+    letters, and at least four of them, upper case."""
+    letters = [c for c in str(s or "") if c.isalpha()]
+    return len(letters) >= 4 and sum(1 for c in letters if c.isupper()) >= 0.9 * len(letters)
+
+
+def _capitalise(low, start):
+    parts = re.split(r"(['’])", low)
+    if len(parts) == 3 and parts[0] in ("d", "l") and not start:      # d'Água, l'Enfant
+        return parts[0] + parts[1] + parts[2][:1].upper() + parts[2][1:]
+    out = parts[0][:1].upper() + parts[0][1:]
+    for i in range(2, len(parts), 2):                                  # Sant'Anna, but Didn't
+        p = parts[i]
+        out += parts[i - 1] + (p[:1].upper() + p[1:] if len(p) > 1 else p)
+    return out
+
+
+def _case_word(word, start, mode, gap):
+    low = word.lower()
+    key = strip_accents(low)
+    if key in ACRONYMS or is_roman(key):
+        return word.upper()
+    if 2 <= len(key) <= 6 and not re.search(r"[aeiouy]", key) and key not in _ABBREVIATIONS:
+        return word.upper()                                            # SP, CNPQ, BNDS
+    if len(key) == 1:
+        return low if not start and key in ("e", "a", "o", "y") else word.upper()
+    if key in UF and re.search(r"[-/,(]\s*$", gap):                    # Salvador, BA
+        return word.upper()
+    if not start and low in _SMALL:
+        return low
+    if mode == "sentence" and not start and key not in _PROPER:
+        return low
+    return _capitalise(low, start)
+
+
+def smart_case(s, mode="title"):
+    """Text typed in capitals, written the way a catalogue writes it. mode
+    "title" (titles, names, publishers, places): every word capitalised but
+    the particles and articles; "sentence" (subtitles, subjects, notes):
+    only the first word of each sentence or subject, and proper nouns.
+    Acronyms (ABNT, UFPR), Roman numerals (XIV) and initials stay in capitals.
+    Text that is not in capitals is returned as it is."""
+    s = str(s or "")
+    if not is_shouting(s):
+        return s
+    out, pos = [], 0
+    for m in _WORD_RE.finditer(s):
+        gap = s[pos:m.start()]
+        start = pos == 0 or (mode == "sentence" and bool(_SENTENCE_END.search(s[:m.start()])))
+        out.append(gap)
+        out.append(_case_word(m.group(0), start, mode, gap))
+        pos = m.end()
+    out.append(s[pos:])
+    return "".join(out)
+
+
+# ---------------------------------------------------------------- 008
+
+_LANG_WORDS = {
+    "por": {"o", "os", "do", "dos", "da", "das", "no", "na", "nos", "nas", "um", "uma", "ao", "aos", "com",
+            "para", "pelo", "pela", "nao", "seu", "sua", "como"},
+    "spa": {"el", "los", "las", "del", "y", "al", "su", "sus", "con", "historia"},
+    "eng": {"the", "of", "and", "to", "in", "for", "with", "on", "an", "from", "by", "is", "its"},
+    "fre": {"le", "les", "des", "du", "et", "une", "pour", "dans", "sur", "au", "aux", "est", "qui"},
+    "ita": {"il", "gli", "della", "delle", "dei", "degli", "di", "per", "nella", "nel", "che"},
+    "ger": {"der", "und", "von", "zu", "mit", "ein", "eine", "im", "fur", "den", "dem", "ist"},
+}
+
+
+def guess_language(text):
+    """MARC language code of a title from its small words ('' when unsure)."""
+    words = norm_header(text).split()
+    scores = {code: sum(1 for w in words if w in ws) for code, ws in _LANG_WORDS.items()}
+    best = max(scores, key=scores.get)
+    if scores[best] == 0 or list(scores.values()).count(scores[best]) > 1:
+        return ""
+    return best
+
+
+_FOREIGN_PLACES = {"lisboa": "po ", "porto": "po ", "coimbra": "po ", "braga": "po ", "madrid": "sp ",
+                   "barcelona": "sp ", "buenos aires": "ag ", "mexico": "mx ", "santiago": "cl ",
+                   "montevideo": "uy ", "paris": "fr ", "london": "enk", "londres": "enk", "oxford": "enk",
+                   "new york": "nyu", "nova york": "nyu", "nova iorque": "nyu", "chicago": "ilu",
+                   "boston": "mau", "roma": "it ", "milano": "it ", "milao": "it ", "berlin": "gw ",
+                   "berlim": "gw ", "tokyo": "ja ", "toquio": "ja "}
+
+
+def place_code(place):
+    """008/15-17: Brazil unless the place is a known foreign city; 'xx '
+    for 's.l.' (no place)."""
+    p = norm_header(place)
+    if p in ("s l", "sl", "sine loco", "sem local"):
+        return "xx "
+    return _FOREIGN_PLACES.get(p, "bl ")
+
+
+# ---------------------------------------------------------------- similarity
+
+def edit_distance(a, b):
+    """Levenshtein distance (insertions, deletions, substitutions)."""
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def similar(a, b):
+    """0..1: how close two normalised texts are (1 = the same)."""
+    if not a or not b:
+        return 1.0 if a == b else 0.0
+    return 1.0 - edit_distance(a, b) / max(len(a), len(b))
 KEIPY
     cat > "$d/kei_import/marc.py" <<'KEIPY'
 """MARC 21: the record model, the MARCXML writer Koha's stage_file.pl reads,
@@ -18471,15 +18783,18 @@ def marcxml_records(fh, limit=None):
 KEIPY
     cat > "$d/kei_import/tables.py" <<'KEIPY'
 """Spreadsheet readers: CSV/TSV, XLSX and ODS (standard Python), XLS
-(python3-xlrd, installed by the panel when such a file shows up) and dBase
-DBF with its memo file. Every reader returns Table objects of plain text
-cells, so the classifier never sees the file format."""
+(python3-xlrd, installed by the panel when such a file shows up), dBase
+DBF with its memo file, and JSON and XML exports (each list of records a
+table). Every reader returns Table objects of plain text cells, so the
+classifier never sees the file format."""
 import csv
 import io
+import json
 import os
 import re
 import struct
 import zipfile
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
 
@@ -18893,6 +19208,139 @@ def read_dbf(path, name):
     t.headers = rows[0]
     t.header_row = True
     return [t]
+
+
+# ---------------------------------------------------------------- JSON / XML exports
+
+MAX_STRUCTURED = 512 << 20
+
+
+def _flat_value(v):
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "1" if v else "0"
+    if isinstance(v, (list, tuple)):
+        return "; ".join(x for x in (_flat_value(i) for i in v) if x)
+    if isinstance(v, dict):
+        return "; ".join(x for x in (_flat_value(i) for i in v.values()) if x)
+    return str(v)
+
+
+def _flat_object(obj, prefix="", depth=0):
+    """{"autor": {"nome": "X"}} -> {"autor.nome": "X"}; lists of values
+    joined with '; '."""
+    out = {}
+    for k, v in obj.items():
+        key = prefix + str(k)
+        if isinstance(v, dict) and depth < 2:
+            out.update(_flat_object(v, key + ".", depth + 1))
+        else:
+            out[key] = _flat_value(v)
+    return out
+
+
+def _keyed_table(name, objects, enc, fmt):
+    """A table from records with named fields: the names are the header."""
+    flat = [_flat_object(o) for o in objects[:MAX_ROWS]]
+    headers = list(OrderedDict((k, None) for f in flat for k in f))
+    t = Table(name, [headers] + [[f.get(h, "") for h in headers] for f in flat], enc, fmt)
+    t.headers = t.rows[0] if t.rows else []
+    t.header_row = True
+    return t
+
+
+def _record_lists(data, where="", depth=0):
+    """(where, [objects]) for every list of objects in a JSON document."""
+    if isinstance(data, list):
+        objs = [x for x in data if isinstance(x, dict)]
+        if objs and len(objs) >= 0.8 * len(data):
+            yield where, objs
+    elif isinstance(data, dict) and depth < 4:
+        for k, v in data.items():
+            yield from _record_lists(v, (where + "." if where else "") + str(k), depth + 1)
+
+
+def read_json(path, name):
+    """A JSON export: every list of objects is a table, its keys the
+    columns. JSON Lines (one object per line) too."""
+    if os.path.getsize(path) > MAX_STRUCTURED:
+        raise ValueError("JSON larger than 512 MB")
+    with open(path, "rb") as fh:
+        text, enc = R.decode_text(fh.read())
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = [json.loads(line) for line in text.splitlines() if line.strip()]
+    if isinstance(data, dict) and not any(isinstance(v, (list, dict)) for v in data.values()):
+        data = [data]
+    return [_keyed_table("%s: %s" % (name, where) if where else name, objs, enc, "JSON")
+            for where, objs in _record_lists(data)]
+
+
+def _local(tag):
+    return tag.split("}")[-1] if isinstance(tag, str) else ""
+
+
+def _xml_text(el):
+    return R.clean("".join(el.itertext()))
+
+
+def _xml_record(el):
+    """One element as a row: its attributes, its child elements and, one
+    level down, their children ("autor.nome"); repeated ones joined."""
+    row = OrderedDict()
+
+    def put(key, value):
+        if value:
+            row[key] = row[key] + "; " + value if row.get(key) else value
+    for k, v in el.attrib.items():
+        put(_local(k), R.clean(v))
+    for child in el:
+        key = _local(child.tag)
+        for k, v in child.attrib.items():
+            put(key + "." + _local(k), R.clean(v))
+        if len(child):
+            for g in child:
+                put(key + "." + _local(g.tag), _xml_text(g))
+        else:
+            put(key, _xml_text(child))
+    return row
+
+
+def read_xml(path, name):
+    """An XML export (not MARCXML): each group of repeated elements with
+    fields of their own (<livro>...</livro> <livro>...</livro>) is a table."""
+    if os.path.getsize(path) > MAX_STRUCTURED:
+        raise ValueError("XML larger than 512 MB")
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if re.search(rb"<!(DOCTYPE[^>]*\[|ENTITY)", data[:65536]):
+        raise ValueError("XML with entity declarations is not read")
+    enc = (re.match(rb'\s*<\?xml[^>]*encoding=["\']([\w.-]+)', data) or [None, b"UTF-8"])[1].decode("ascii").upper()
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        # No or wrong declaration: the bytes are read like a text file.
+        text, enc = R.decode_text(data)
+        root = ET.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", text).encode("utf-8"))
+    found = []
+
+    def walk(el, where, depth):
+        groups = OrderedDict()
+        for child in el:
+            groups.setdefault(_local(child.tag), []).append(child)
+        for tag, kids in groups.items():
+            fields = [k for k in kids if len(k) or k.attrib]
+            if len(kids) >= 2 and len(fields) >= 0.8 * len(kids):
+                found.append((tag, kids))
+            elif depth < 6:
+                for k in kids:
+                    walk(k, where + "/" + tag, depth + 1)
+    walk(root, "", 0)
+    if not found and len(root):
+        found.append((_local(root.tag), [root]))
+    return [_keyed_table("%s: %s" % (name, tag), [_xml_record(k) for k in kids], enc, "XML") for tag, kids in found]
 KEIPY
     cat > "$d/kei_import/classify.py" <<'KEIPY'
 """Column roles and table entities.
@@ -19771,6 +20219,13 @@ def _by_content(member, fh, head, work):
         if "acervo" in found:
             return Detection(member, "isis", 0.95, "PostgreSQL dump with the acervo table")
         return Detection(member, "pg_other", 0.8, "PostgreSQL dump of another system")
+    start = head.lstrip(b"\xef\xbb\xbf \t\r\n")
+    if re.match(rb'\[\s*[\[{"\d\]-]|\{\s*["}]', start):
+        return Detection(member, "table", 0.85, "JSON export", fmt="json")
+    if re.match(rb"(?i)<!doctype html|<html", start):
+        return Detection(member, "unknown", 0.0, "web page (HTML)")
+    if start[:1] == b"<":
+        return Detection(member, "table", 0.85, "XML export", fmt="xml")
     if b"\0" in head[:4096]:
         return Detection(member, "unknown", 0.0, "binary file of an unknown format")
     decoded, _ = R.decode_text(head)
@@ -20257,6 +20712,31 @@ def _union(lists):
     return list(seen.values())
 
 
+# Fields recased when typed in capitals, and how (rules.smart_case).
+CASING = {"title": "title", "author": "title", "coauthors": "title", "publisher": "title", "place": "title",
+          "series": "title", "subtitle": "sentence", "subjects": "sentence",
+          "notes": "sentence"}
+FUZZY = 0.9         # title similarity that makes two rows without ISBN one work
+
+
+def recase(values, stats, examples):
+    """Values typed in capitals recased in place; counts each change."""
+    for k, mode in CASING.items():
+        v = values.get(k)
+        if not v:
+            continue
+        new = [R.smart_case(x, mode) for x in v] if isinstance(v, list) else R.smart_case(v, mode)
+        if new != v:
+            stats["casing"] += 1
+            if len(examples) < 6 and not isinstance(v, list):
+                examples.append("%s -> %s" % (R.clean(v)[:50], R.clean(new)[:50]))
+            values[k] = new
+
+
+def _numbers(text):
+    return [w for w in text.split() if w.isdigit() or R.is_roman(w)]
+
+
 class Grouper:
     def __init__(self, branch, itype, itypes, today=None, merge_shared_isbn=False):
         self.branch = branch
@@ -20267,8 +20747,10 @@ class Grouper:
         self.rows = []
         self.stats = Counter()
         self.flags = []                 # lines for the preview
+        self.case_examples = []
 
     def add(self, values, line, source, notes):
+        recase(values, self.stats, self.case_examples)
         title = values.get("title", "")
         if not title:
             self.stats["no_title_tombo" if values.get("tombo") or values.get("barcode") else "no_title"] += 1
@@ -20337,9 +20819,35 @@ class Grouper:
             if len(owners) == 1:
                 isbn_groups[owners.pop()].extend(groups.pop(key))
                 self.stats["joined_by_description"] += 1
+        self._fuzzy(groups)
         self.groups = list(isbn_groups.values()) + list(groups.values())
         self.stats["isbn_shared"] = shared
         return shared
+
+    def _fuzzy(self, groups):
+        """Works without ISBN whose titles differ only by a typo ("Dom
+        Casmurro" / "Dom Casmuro") become one record when the first author's
+        surname, the publisher, the edition, the volume and the year are the
+        same and the numbers in the titles (5, XIV) agree."""
+        buckets = OrderedDict()
+        for key, rows in groups.items():
+            title, sub, surname, pub, ed, vol = key[5:].split("|")
+            if not surname or not title:
+                continue
+            year = R.year_of(_most(r.v.get("year", "") for r in rows)[0])
+            buckets.setdefault((surname, pub, ed, vol, year), []).append((key, (title + " " + sub).strip()))
+        for members in buckets.values():
+            kept = []
+            for key, text in members:
+                for k2, t2 in kept:
+                    if _numbers(text) == _numbers(t2) and R.similar(text, t2) >= FUZZY:
+                        self.flags.append('Joined as one title (the spelling differs): "%s" / "%s"'
+                                          % (groups[k2][0].v["title"][:50], groups[key][0].v["title"][:50]))
+                        groups[k2].extend(groups.pop(key))
+                        self.stats["fuzzy_joined"] += 1
+                        break
+                else:
+                    kept.append((key, text))
 
     # ------------------------------------------------------------ records
     def records(self):
@@ -20381,9 +20889,15 @@ class Grouper:
             if other:
                 self.stats["differing"] += 1
                 self.flags.append("Different %s in one record (%s): %s; kept %s" % (k, title[:40], ", ".join(other[:3]), best))
-        lang = R.LANGUAGES.get(R.norm_header(pick("language")[0]), "por")
+        given = R.LANGUAGES.get(R.norm_header(pick("language")[0]), "")
+        lang = given or R.guess_language(title + " " + subtitle) or "por"
+        if lang != "por" and not given:
+            self.stats["language_guessed"] += 1
         year = R.year_of(year_txt)
-        rec.control("008", self.today.strftime("%y%m%d") + ("s" + year if year else "nuuuu") + "    bl " + "|" * 17 + lang + " d")
+        place, _ = pick("place")
+        # 008: date entered, s + Date 1 (n + uuuu without a year), place, language, source d.
+        rec.control("008", self.today.strftime("%y%m%d") + ("s" + year if year else "nuuuu") + "    "
+                    + R.place_code(place) + "|" * 17 + lang + " d")
         isbns = _union([[s for s, _ in self._isbns(r)] for r in rows])
         for s in isbns:
             if R.isbn13(s):
@@ -20394,7 +20908,7 @@ class Grouper:
         issn, _ = pick("issn")
         if issn:
             rec.add("022", " ", " ", ("a", issn))
-        if lang != "por":
+        if given and given != "por":
             rec.add("041", "0", " ", ("a", lang))
         cdd, _ = pick("cdd")
         cdu, _ = pick("cdu")
@@ -20422,11 +20936,17 @@ class Grouper:
             t.append(("b", subtitle))
         if vol and not title_volume(title):
             t.append(("n", vol if not re.fullmatch(r"\d{1,3}", vol) else "v. " + vol))
+        # 245 $c, the statement of responsibility, from the 100/110 and 700/710 names.
+        names = [R.natural_name(n) for n in ([main] if main else []) + others]
+        if names:
+            c, last = t[-1]
+            t[-1] = (c, last.rstrip(" .") + " /")
+            t.append(("c", ", ".join(names[:3]) + (" [et al.]" if len(names) > 3 else "")))
+            self.stats["responsibility"] += 1
         rec.add("245", "1" if main else "0", str(R.nonfiling(title)), *t)
         ed, _ = pick("edition")
         if ed:
             rec.add("250", " ", " ", ("a", R.edition_text(ed)))
-        place, _ = pick("place")
         pub, _ = pick("publisher")
         imp = []
         if place:
@@ -20533,6 +21053,13 @@ class Patrons:
 
     def add(self, v, line, source, from_patron_table, has_card_column):
         self.stats["read"] += 1
+        # Names and places typed in capitals, written as names ("SILVA, ANA" -> "Silva, Ana").
+        for k in ("fullname", "firstname", "surname", "city", "address", "address2"):
+            if v.get(k) and R.is_shouting(v[k]):
+                fixed = R.smart_case(v[k], "title")
+                if fixed != v[k]:
+                    v[k] = fixed
+                    self.stats["casing"] += 1
         full = v.get("fullname", "")
         first, sur = v.get("firstname", ""), v.get("surname", "")
         if full and not sur:
@@ -20827,7 +21354,7 @@ its own preview, confirmation and verified backup."""
 import hashlib
 import os
 import sys
-from collections import Counter
+from collections import Counter, OrderedDict
 from datetime import date
 
 from . import bridge, classify, detect, group, holdings, intake, marc, patrons, tables
@@ -20995,7 +21522,8 @@ def analyse(opts):
             a.readers.append(d)
         elif d.kind == "table":
             reader = {"csv": tables.read_csv, "xlsx": tables.read_xlsx, "ods": tables.read_ods,
-                      "xls": tables.read_xls, "dbf": tables.read_dbf}[d.info.get("fmt", "csv")]
+                      "xls": tables.read_xls, "dbf": tables.read_dbf, "json": tables.read_json,
+                      "xml": tables.read_xml}[d.info.get("fmt", "csv")]
             try:
                 found = reader(m.plain(opts.work), m.display)
             except tables.NeedPackage as e:
@@ -21231,6 +21759,13 @@ def build(opts):
         preview.append("Items without barcode: %d" % st["no_barcode"])
         preview.append("Repeated tombos or barcodes renumbered (<code>-<n>, noted in 952 $x): %d" % st["renumbered"])
         preview.append("Rows joined to an ISBN record by their description: %d" % st["joined_by_description"])
+        preview.append("Rows without ISBN joined by a similar title (same author, publisher and year): %d" % st["fuzzy_joined"])
+        preview.append("Values typed in capitals, recased: %d" % st["casing"])
+        for e in grouper.case_examples:
+            preview.append("  " + e)
+        preview.append("Statements of responsibility (245 $c) written from the authors: %d" % st["responsibility"])
+        if st["language_guessed"]:
+            preview.append("Languages other than Portuguese read from the title (008): %d" % st["language_guessed"])
         preview.append("ISBNs with a wrong check digit (kept in 020 $z): %d" % st["invalid_isbn"])
         preview.append("ISBNs shared by different titles (%s): %d" % ("merged, your answer" if a.isbn_answer == "merge" else "kept apart", st["isbn_shared"]))
         if st["itemtype_default"]:
@@ -21254,6 +21789,7 @@ def build(opts):
     if pats.stats["read"]:
         preview.append("== Patrons built from the spreadsheets (CSV for import_patrons.pl)")
         preview.append("Patrons ready: %d" % pats.stats["ready"])
+        preview.append("Names and places typed in capitals, recased: %d" % pats.stats["casing"])
         preview.append("Rejected: %d" % len(pats.rejected))
         preview.append("Invalid CPF (imported, not kept as CPF): %d" % pats.stats["invalid_cpf"])
         preview.append("Duplicates: %d" % pats.stats["duplicates"])
@@ -21365,6 +21901,35 @@ def build(opts):
             totals["failed"] += 1
         preview.append("")
 
+    # The summary the operator reads first (ROADMAP subject 2: the review gate).
+    gs, ps = grouper.stats, pats.stats
+    rows_read = sum(len(p.table.data()) for p in a.tables if p.entity in ("biblio", "patrons", "mixed", "koha_patrons"))
+    codepage = {"cp850": "IBM850", "cp437": "IBM437", "cp1252": "Windows-1252"}
+    legacy = Counter(codepage.get(p.table.encoding.split(" (")[0], p.table.encoding.split(" (")[0]) for p in a.tables
+                     if p.table.encoding and not p.table.encoding.startswith(("UTF-", "Excel")))
+    repaired = sum(1 for p in a.tables if "double-encoded" in (p.table.encoding or ""))
+    casing = gs["casing"] + ps["casing"]
+    anomalies = OrderedDict((
+        ("ISBNs with a wrong check digit", gs["invalid_isbn"]),
+        ("ISBNs shared by different titles", gs["isbn_shared"]),
+        ("rows with a tombo or barcode but no title", gs["no_title_tombo"]),
+        ("repeated tombos or barcodes", gs["renumbered"]),
+        ("records whose rows disagree (year, publisher...)", gs["differing"]),
+        ("patrons rejected", len(pats.rejected)),
+        ("invalid CPFs", ps["invalid_cpf"]),
+        ("files not imported", len(a.unsupported)),
+    ))
+    summary = ["== Summary",
+               "Rows read from tables: %d" % rows_read,
+               "Books: %d record(s), %d item(s)" % (totals["records"], totals["items"]),
+               "Patrons: %d" % totals["patrons"],
+               "Casing fixed (text typed in capitals): %d" % casing,
+               "Encoding fixed: %d file(s) converted to UTF-8%s, %d with double-encoded text repaired"
+               % (sum(legacy.values()), " (%s)" % ", ".join("%s: %d" % kv for kv in legacy.items()) if legacy else "", repaired),
+               "Anomalies to check: %d" % sum(anomalies.values())]
+    summary += ["  %s: %d" % (k, v) for k, v in anomalies.items() if v]
+    preview[2:2] = summary + [""]
+
     with open(os.path.join(out_dir, "manifest.tsv"), "w", encoding="utf-8") as fh:
         for row in manifest:
             fh.write("\t".join(str(x).replace("\t", " ") for x in row) + "\n")
@@ -21377,6 +21942,10 @@ def build(opts):
     print("Total loans: %d" % totals["loans"], file=log)
     print("Total holds: %d" % totals["holds"], file=log)
     print("Readers failed: %d" % totals["failed"], file=log)
+    print("Rows read: %d" % rows_read, file=log)
+    print("Casing fixes: %d" % casing, file=log)
+    print("Encoding fixes: %d" % (sum(legacy.values()) + repaired), file=log)
+    print("Anomalies: %d" % sum(anomalies.values()), file=log)
     return 0 if manifest else 3
 KEIPY
     cat > "$d/kei_import/__main__.py" <<'KEIPY'
@@ -21805,7 +22374,7 @@ lt_magic_import() {
 # holding the backup/restore lock. The work copies go when it ends.
 _lt_magic_run() {
     local src="$1" log rc round=0 needs tried="" n settings backups=() args=() title
-    local recs items pats loans holds mode="keep" cat="" over="no" match="cardnumber" failed=0
+    local recs items pats loans holds casing encfix anom gate mode="keep" cat="" over="no" match="cardnumber" failed=0
     local lines=() line kind fmt enc path nrec nitem extra shown
     title=$(t "🪄  Magic Import Tool")
     MAGIC_ENGINE="$TOOLS_WORK/kei"; MAGIC_WORK="$TOOLS_WORK/magic"
@@ -21893,13 +22462,17 @@ _lt_magic_run() {
     fi
     recs=$(tools_num "$log" "Total records:"); items=$(tools_num "$log" "Total items:"); pats=$(tools_num "$log" "Total patrons:")
     loans=$(tools_num "$log" "Total loans:"); holds=$(tools_num "$log" "Total holds:")
+    casing=$(tools_num "$log" "Casing fixes:"); encfix=$(tools_num "$log" "Encoding fixes:"); anom=$(tools_num "$log" "Anomalies:")
     [ -f "$MAGIC_WORK/out/preview.txt" ] && cat "$MAGIC_WORK/out/preview.txt" >> "$log"
     [ -f "$MAGIC_WORK/out/preview.txt" ] && ui_textbox "$(t "Preview (dry run)")" "$MAGIC_WORK/out/preview.txt"
     if [ "$rc" = 3 ] || [ $((recs + pats + loans + holds)) -eq 0 ]; then
         msg_info "$title" "$(t 'Nothing could be built from it: the preview just shown says why.\nNothing was changed.\n\nLog: ${log}')" 11 76
         return 0
     fi
-    if ! prompt_yes_no "$title" "$(t 'Ready to import:\n  Records: ${recs}\n  Items: ${items}\n  Patrons: ${pats}\n  Loans: ${loans}\n  Holds: ${holds}\n\nGo on? Koha checks each part first (its own dry run) and asks again before it writes, after a verified backup.')" 17 76 defaultno; then
+    # The review gate: what was corrected and what to check, above the counts.
+    gate=$(t 'Casing fixed: ${casing}  ·  Encoding fixed: ${encfix}  ·  Anomalies to check: ${anom}')
+    [ "${anom:-0}" -gt 0 ] && gate+="\n$(t "The anomalies are listed in the summary at the top of the preview.")"
+    if ! prompt_yes_no "$title" "${gate}\n\n$(t 'Ready to import:\n  Records: ${recs}\n  Items: ${items}\n  Patrons: ${pats}\n  Loans: ${loans}\n  Holds: ${holds}\n\nGo on? Koha checks each part first (its own dry run) and asks again before it writes, after a verified backup.')" 20 78 defaultno; then
         msg_info "$title" "$(t 'Nothing was imported.\n\nLog: ${log}')" 9 72
         return 0
     fi
@@ -25386,6 +25959,7 @@ panel_action_function() {
         reports)            echo lt_reports ;;
         magic-import)       echo lt_magic_import ;;
         marc-undo)          echo lt_marc_undo ;;
+        authority-sync)     echo lt_authority_sync ;;
         patron-category)    echo lt_patron_category ;;
         data-quality)       echo lt_data_quality ;;
         privacy-anonymise)  echo lt_privacy_anonymise ;;

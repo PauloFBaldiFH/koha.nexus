@@ -225,7 +225,18 @@ _RUN: dict[str, list[str]] = {
     "magic-import": [
         "@@file file\tFile Explorer\tPick the file to import:\t{0}\t*",
         "@@step Reading the file", "@@done 0 Reading the file",
+        "@@preview Preview (dry run)\t== Summary\\nRows read from tables: 124\\nBooks: 120 record(s), 131 item(s)"
+        "\\nPatrons: 0\\nCasing fixed (text typed in capitals): 37\\nAnomalies to check: 2",
+        "@@ask 🪄  Magic Import Tool\tCasing fixed: 37  ·  Encoding fixed: 1  ·  Anomalies to check: 2"
+        "\\n\\nReady to import:\\n  Records: 120\\n  Items: 131\\n\\nGo on?",
         "@@say ok OK\t120 records imported."],
+    "authority-sync": [
+        "@@choose Sync & link authorities\tWhich records should be linked to the authorities?\t"
+        "\tall\tThe whole catalog\trange\tA range of record numbers (biblionumber)",
+        "@@step Preview (dry run): nothing is changed yet...", "@@done 0 Preview (dry run): nothing is changed yet...",
+        "@@ask Sync & link authorities\tRecords checked: 120\\nRecords to update: 37\\nHeadings to link: 52 (by similarity: 3)"
+        "\\nHeadings without a matching authority: 18\\n\\nLink them now?",
+        "@@say ok OK\tHeadings linked to the authorities: 52."],
     "about": ["@@view About\tkoha.nexus\\n\\nCreated with dedication by Paulo F. Baldi FH."],
     "reboot": ["@@ask Reboot\tReboot the server now?", "@@say info Reboot\tRebooting in 5 seconds..."],
     "languages": [

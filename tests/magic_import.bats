@@ -374,7 +374,7 @@ XML
     assert '! dialogs | grep -q "MENU \[Records already in the catalog\]"' "no records, no record question"
     assert 'grep -q "^import_patrons.pl .*--matchpoint cardnumber --default branchcode=CPL --default categorycode=PT -v -v \[pre=0\]" "$KEI_S/calls.log"' "$(calls)"
     assert 'grep -q "^import_patrons.pl .*--confirm \[pre=1\]" "$KEI_S/calls.log"'
-    assert '[ "$(tools_sql "SELECT CONCAT(firstname, \"|\", surname) FROM borrowers WHERE cardnumber = \"52998224725\";")" = "Ana|Maria Souza" ]'
+    assert '[ "$(tools_sql "SELECT CONCAT(firstname, \"|\", surname) FROM borrowers WHERE cardnumber = \"52998224725\";")" = "Ana Maria|Souza" ]' "the surname is the last name (ROADMAP subject 2)"
     assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"11144477735\";")" = "Lima" ]'
     assert '[ "$(tools_sql "SELECT surname FROM borrowers WHERE cardnumber = \"12345678900\";")" = "Errado" ]' "an invalid CPF does not refuse the patron"
     assert 'dialogs | grep -q "^OK ✅ Successfully imported 0 bibliographic record(s), 0 item(s) and 3 patron(s) with zero manual mapping required"'
@@ -409,7 +409,7 @@ XML
     assert 'preview | grep -q "^Repeated tombos or barcodes renumbered (<code>-<n>, noted in 952 \$x): 1$" && preview | grep -q "^ISBNs with a wrong check digit (kept in 020 \$z): 1$"'
     assert 'grep -q "^stage_file.pl .*records.xml --format MARCXML --encoding UTF-8 .*acervo.csv" "$KEI_S/calls.log"' "MARCXML for the staged import: $(calls)"
     assert '[ "$(xml_dump "$f" | grep -c "^245")" = "3" ]' "$(xml_dump "$f")"
-    assert 'xml_dump "$f" | grep -qx "245 12 \$a O cortiço" && xml_dump "$f" | grep -qx "100 1  \$a Azevedo, Aluísio"' "nonfiling article"
+    assert 'xml_dump "$f" | grep -qx "245 12 \$a O cortiço / \$c Aluísio Azevedo" && xml_dump "$f" | grep -qx "100 1  \$a Azevedo, Aluísio"' "nonfiling article"
     assert 'xml_dump "$f" | grep -qx "260    \$a São Paulo : \$b Ática, \$c 1997" && xml_dump "$f" | grep -qx "250    \$a 2. ed."'
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$o 869.3 A994c \$p 0001 \$i 0001 \$t 1 \$d 2020-03-05 \$g 25.90"' "$(xml_dump "$f" | grep ^952)"
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$o 869.3 A994c \$p 0002 \$i 0002 \$t 2 \$d 2020-03-05"'
@@ -475,7 +475,7 @@ XML
     local f="$KEI_S/last-staged.mrc"
     assert 'preview | grep -q "^== ACERVO.DBF  (DBF, encoding cp850 (dBase))" && preview | grep -q "^Deleted rows in the table (left out): 1$"' "$(preview)"
     assert 'preview | grep -q "^Records: 2$" && preview | grep -q "^Items created: 3$"' "the two copies of one work make one record: $(preview)"
-    assert 'xml_dump "$f" | grep -qx "245 10 \$a Memórias póstumas de Brás Cubas" && xml_dump "$f" | grep -q "Exemplar com dedicatória do autor"' "accents from cp850 and the memo text: $(xml_dump "$f")"
+    assert 'xml_dump "$f" | grep -qx "245 10 \$a Memórias póstumas de Brás Cubas / \$c Machado de Assis" && xml_dump "$f" | grep -q "Exemplar com dedicatória do autor"' "accents from cp850 and the memo text: $(xml_dump "$f")"
     assert '! xml_dump "$f" | grep -q "Apagado"'
 }
 
@@ -488,7 +488,7 @@ XML
     assert 'dialogs | grep -q "^MENU \[🪄  Magic Import Tool\] => biblio$"' "$(dialogs)"
     local f="$KEI_S/last-staged.mrc"
     assert 'preview | grep -q "^Holds: books and copies \[your answer\]" && preview | grep -q "^Records: 2$" && preview | grep -q "^Items created: 3$"' "$(preview)"
-    assert 'xml_dump "$f" | grep -qx "245 12 \$a A hora da estrela" && xml_dump "$f" | grep -qx "100 1  \$a Lispector, Clarice"' "$(xml_dump "$f")"
+    assert 'xml_dump "$f" | grep -qx "245 12 \$a A hora da estrela / \$c Clarice Lispector" && xml_dump "$f" | grep -qx "100 1  \$a Lispector, Clarice"' "$(xml_dump "$f")"
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p 8002 \$i 8002"'
 }
 
