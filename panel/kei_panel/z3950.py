@@ -61,6 +61,8 @@ ALT_PORTS = (210, 2100, 2210)
 CONNECT_TIMEOUT = 3.0
 QUERY_TIMEOUT = 8.0
 FAILS_TO_BLACKLIST = 3
+HISTORY_RULES = 2                     # bumped when the scan's idea of "working" changes
+RULES_KEY = "_rules"
 # Words of titles every catalogue has: Don Quixote and The Little Prince.
 PROBE_TERMS = ("quixote", "quijote", "prince", "principe")
 
@@ -628,6 +630,15 @@ class History:
             self.data: dict = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self.data = {}
+        if self.data.get(RULES_KEY) != HISTORY_RULES:
+            # Hidden by the older, stricter scan (a slow search, 0 hits or an
+            # indefinite-length reply counted as a failure): shown again, and
+            # the next scans decide. A hide by hand stays.
+            for h in self.data.values():
+                if isinstance(h, dict):
+                    h.pop("auto", None)
+                    h["fails"] = 0
+            self.data[RULES_KEY] = HISTORY_RULES
 
     def get(self, key: str) -> dict:
         return self.data.get(key, {})
@@ -711,36 +722,57 @@ def ber_oid(dotted: str) -> bytes:
     return bytes(out)
 
 
+def _ber_node(data: bytes, pos: int, end: int) -> tuple[tuple, int]:
+    """One TLV at pos: ((class, number, constructed, value), next pos).
+    Definite and indefinite (constructed, ended by 00 00) lengths."""
+    first = data[pos]
+    pos += 1
+    cls, constructed, number = first & 0xC0, bool(first & 0x20), first & 0x1F
+    if number == 0x1F:
+        number = 0
+        while True:
+            b = data[pos]
+            pos += 1
+            number = (number << 7) | (b & 0x7F)
+            if not b & 0x80:
+                break
+    length = data[pos]
+    pos += 1
+    if length == 0x80:
+        # Indefinite length (some Z39.50 servers send it): children up to 00 00.
+        if not constructed:
+            raise ValueError("indefinite length on a primitive BER value")
+        kids = []
+        while True:
+            if pos + 2 > end:
+                raise ValueError("truncated BER")
+            if data[pos] == 0 and data[pos + 1] == 0:
+                return (cls, number, True, kids), pos + 2
+            node, pos = _ber_node(data, pos, end)
+            kids.append(node)
+    if length & 0x80:
+        k = length & 0x7F
+        length = int.from_bytes(data[pos:pos + k], "big")
+        pos += k
+    if pos + length > end:
+        raise ValueError("truncated BER")
+    value = data[pos:pos + length]
+    return (cls, number, constructed, ber_decode(data, pos, pos + length) if constructed else value), pos + length
+
+
 def ber_decode(data: bytes, pos: int = 0, end: int | None = None) -> list[tuple[int, int, bool, bytes | list]]:
     """[(class, number, constructed, value)], constructed values decoded too."""
     end = len(data) if end is None else end
     out = []
     while pos < end:
-        first = data[pos]
-        pos += 1
-        cls, constructed, number = first & 0xC0, bool(first & 0x20), first & 0x1F
-        if number == 0x1F:
-            number = 0
-            while True:
-                b = data[pos]
-                pos += 1
-                number = (number << 7) | (b & 0x7F)
-                if not b & 0x80:
-                    break
-        length = data[pos]
-        pos += 1
-        if length == 0x80:
-            raise ValueError("indefinite BER length")
-        if length & 0x80:
-            k = length & 0x7F
-            length = int.from_bytes(data[pos:pos + k], "big")
-            pos += k
-        if pos + length > end:
-            raise ValueError("truncated BER")
-        value = data[pos:pos + length]
-        out.append((cls, number, constructed, ber_decode(data, pos, pos + length) if constructed else value))
-        pos += length
+        node, pos = _ber_node(data, pos, end)
+        out.append(node)
     return out
+
+
+def ber_top(nodes, number: int, cls: int = CTX):
+    """The value of a direct child with this tag (not one nested deeper)."""
+    return next((v for c, n, _k, v in nodes if c == cls and n == number), None)
 
 
 def ber_find(nodes, number: int, cls: int = CTX):
@@ -767,9 +799,8 @@ def ber_octets(nodes) -> list[bytes]:
     return sorted(out, key=len, reverse=True)
 
 
-async def read_pdu(reader: asyncio.StreamReader) -> bytes:
-    """One whole APDU from the socket."""
-    head = await reader.readexactly(1)
+async def _read_tlv(reader: asyncio.StreamReader, budget: list[int], head: bytes = b"") -> bytes:
+    head = head or await reader.readexactly(1)
     if head[0] & 0x1F == 0x1F:
         while True:
             b = await reader.readexactly(1)
@@ -780,14 +811,28 @@ async def read_pdu(reader: asyncio.StreamReader) -> bytes:
     head += lb
     length = lb[0]
     if length == 0x80:
-        raise ValueError("indefinite BER length")
+        # Indefinite length: read the children up to the 00 00 end mark.
+        while True:
+            tag = await reader.readexactly(1)
+            if tag == b"\x00":
+                end = await reader.readexactly(1)
+                if end != b"\x00":
+                    raise ValueError("bad BER end-of-contents")
+                return head + tag + end
+            head += await _read_tlv(reader, budget, tag)
     if length & 0x80:
         extra = await reader.readexactly(length & 0x7F)
         head += extra
         length = int.from_bytes(extra, "big")
-    if length > 8_000_000:
+    budget[0] -= length
+    if length > 8_000_000 or budget[0] < 0:
         raise ValueError("APDU too large")
     return head + await reader.readexactly(length)
+
+
+async def read_pdu(reader: asyncio.StreamReader) -> bytes:
+    """One whole APDU from the socket (definite or indefinite length)."""
+    return await _read_tlv(reader, [8_000_000])
 
 
 OID_BIB1 = "1.2.840.10003.3.1"
@@ -902,10 +947,21 @@ class ScanResult:
     hits: int = 0
     title: str = ""
     detail: str = ""
+    answered: bool = False       # the server spoke the protocol (Init or an SRU response)
 
     @property
     def alive(self) -> bool:
         return self.status in ("ok", "empty", "no_marc", "login")
+
+    def settle(self, why: str) -> "ScanResult":
+        """A probe cut short: a server that already answered the protocol is
+        working (it may just be slow, or have nothing for the test words);
+        one that never did is not."""
+        if self.answered and not self.alive:
+            self.status = "empty"
+        if why:
+            self.detail = (self.detail + "; " if self.detail else "") + why
+        return self
 
 
 async def _connect(host: str, port: int, timeout: float):
@@ -933,10 +989,16 @@ async def find_port(host: str, port: int, timeout: float = CONNECT_TIMEOUT) -> t
     return None
 
 
-async def probe_z3950(target: Target, port: int, timeout: float = QUERY_TIMEOUT) -> ScanResult:
+async def probe_z3950(target: Target, port: int, timeout: float = QUERY_TIMEOUT,
+                      res: ScanResult | None = None) -> ScanResult:
     """Init, then a title search for each probe word until one has hits, then
-    Present of the first record in the target's syntax."""
-    res = ScanResult(target.key, status="tcp", port=port)
+    Present of the first record in the target's syntax.
+
+    A server that accepts the Init is working, whatever comes after: 0 hits,
+    a slow or failed search, or a Present refused (record out of range...)
+    only change what the scan reports, never hide it."""
+    res = res or ScanResult(target.key)
+    res.status, res.port = "tcp", port
     try:
         reader, writer, res.connect_ms = await _connect(target.host, port, CONNECT_TIMEOUT)
     except (OSError, asyncio.TimeoutError):
@@ -950,39 +1012,47 @@ async def probe_z3950(target: Target, port: int, timeout: float = QUERY_TIMEOUT)
         return ber_decode(await asyncio.wait_for(read_pdu(reader), timeout))
     try:
         resp = await ask(init_request(target.user, target.password))
-        if not resp or resp[0][1] != 21:
+        if not resp or resp[0][1] != 21 or not resp[0][2]:
             res.detail = "no Init response"
             return res
-        if ber_find(resp[0][3], 12) in (None, b"\x00"):
+        res.answered = True
+        # result [12] is a direct child of the InitResponse; only an explicit
+        # false refuses (a nested [12] or a missing one is not a refusal).
+        if ber_top(resp[0][3], 12) == b"\x00":
             res.status, res.detail = "login", "Init refused"
             return res
+        res.status = "empty"
         for term in PROBE_TERMS:
             resp = await ask(search_request(target.db, term))
-            if not resp or resp[0][1] != 23:
+            if not resp or resp[0][1] != 23 or not resp[0][2]:
                 res.detail = "no Search response"
                 return res
-            res.hits = _int(ber_find(resp[0][3], 23))
+            res.hits = _int(ber_top(resp[0][3], 23))
             if res.hits:
                 break
+        res.query_ms = int((time.monotonic() - t0) * 1000)
         if not res.hits:
-            res.status, res.query_ms = "empty", int((time.monotonic() - t0) * 1000)
             return res
         resp = await ask(present_request(target.syntax))
         res.query_ms = int((time.monotonic() - t0) * 1000)
-        if not resp or resp[0][1] != 25:
-            res.status, res.detail = "no_marc", "no Present response"
+        if not resp or resp[0][1] != 25 or not resp[0][2]:
+            res.detail = "no Present response"
             return res
         for blob in ber_octets(resp[0][3]):
             if marc_frame_ok(blob):
                 res.status = "ok"
                 res.title = marc_title(blob, target.syntax.upper() == "UNIMARC")
                 return res
+        if ber_top(resp[0][3], 28) is None or ber_find(resp[0][3], 130) is not None:
+            # No records, or a diagnostic (present out of range...): the
+            # server answered, it just did not hand over the test record.
+            res.detail = "Present returned no record"
+            return res
         res.status, res.detail = "no_marc", "the record is not an ISO 2709 frame"
         return res
     except (asyncio.TimeoutError, asyncio.IncompleteReadError, ConnectionError, OSError, ValueError,
             IndexError) as e:
-        res.detail = type(e).__name__
-        return res
+        return res.settle(type(e).__name__)
     finally:
         writer.close()
 
@@ -1001,8 +1071,12 @@ def _sru_get(url: str, timeout: float) -> str:
         return resp.read(2_000_000).decode("utf-8", "replace")
 
 
-async def probe_sru(target: Target, port: int, timeout: float = QUERY_TIMEOUT, get=_sru_get) -> ScanResult:
-    res = ScanResult(target.key, status="tcp", port=port)
+async def probe_sru(target: Target, port: int, timeout: float = QUERY_TIMEOUT, get=_sru_get,
+                    res: ScanResult | None = None) -> ScanResult:
+    """A searchRetrieve for each probe word until one has hits. Any SRU
+    response counts as working, a diagnostic or 0 hits included."""
+    res = res or ScanResult(target.key)
+    res.status, res.port = "tcp", port
     t0 = time.monotonic()
     probe = replace(target, port=port)
     for term in PROBE_TERMS:
@@ -1010,13 +1084,21 @@ async def probe_sru(target: Target, port: int, timeout: float = QUERY_TIMEOUT, g
             text = await asyncio.wait_for(asyncio.to_thread(get, sru_url(probe, term), timeout), timeout + 1)
         except (OSError, asyncio.TimeoutError, ValueError) as e:
             code = getattr(e, "code", 0)
-            res.status = "login" if code in (401, 403) else "tcp"
+            if code in (401, 403):
+                res.status = "login"
             res.detail = f"HTTP {code}" if code else type(e).__name__
-            return res
+            return res.settle("") if res.answered and not code else res
         m = re.search(r"<(?:\w+:)?numberOfRecords>\s*(\d+)", text)
         if not m:
-            res.detail = "not an SRU response"
+            if re.search(r"<(?:\w+:)?(searchRetrieveResponse|explainResponse|diagnostic)\b", text):
+                res.answered, res.status = True, "empty"
+                res.query_ms = int((time.monotonic() - t0) * 1000)
+                d = re.search(r"<(?:\w+:)?message>([^<]+)<", text)
+                res.detail = f"SRU diagnostic: {d.group(1).strip()}" if d else "SRU diagnostic"
+            else:
+                res.detail = "not an SRU response"
             return res
+        res.answered = True
         res.hits = int(m.group(1))
         if res.hits:
             break
@@ -1032,13 +1114,17 @@ async def probe_sru(target: Target, port: int, timeout: float = QUERY_TIMEOUT, g
     return res
 
 
-async def scan_one(target: Target) -> ScanResult:
+async def scan_one(target: Target, res: ScanResult | None = None) -> ScanResult:
+    """res, when given, is filled in as the probe goes, so a caller that
+    times the probe out still knows how far it got."""
+    res = res or ScanResult(target.key)
     found = await find_port(target.host, target.port)
     if not found:
-        return ScanResult(target.key, status="dead", detail="no port answered")
+        res.status, res.detail = "dead", "no port answered"
+        return res
     port, ms = found
     probe = probe_sru if target.kind == "sru" else probe_z3950
-    res = await probe(target, port)
+    res = await probe(target, port, res=res)
     res.connect_ms = res.connect_ms or ms
     if port != target.port:
         res.detail = (res.detail + "; " if res.detail else "") + f"answers on port {port}"
@@ -1052,10 +1138,13 @@ async def scan(targets: list[Target], on_result=None, concurrency: int = 16) -> 
 
     async def one(t: Target) -> ScanResult:
         async with sem:
+            r = ScanResult(t.key)
             try:
-                r = await asyncio.wait_for(scan_one(t), CONNECT_TIMEOUT + 3 * QUERY_TIMEOUT)
+                r = await asyncio.wait_for(scan_one(t, r), CONNECT_TIMEOUT + 3 * QUERY_TIMEOUT)
             except asyncio.TimeoutError:
-                r = ScanResult(t.key, status="tcp", detail="the probe took too long")
+                if r.status == "dead" and not r.answered:
+                    r.status = "tcp"
+                r.settle("the probe took too long")
         if on_result:
             on_result(t, r)
         return r

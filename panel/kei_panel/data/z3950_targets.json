@@ -75,19 +75,6 @@
    "notes": "Koha's own default target."
   },
   {
-   "name": "Library of Congress (Voyager)",
-   "host": "z3950.loc.gov",
-   "port": 7090,
-   "db": "Voyager",
-   "kind": "zed",
-   "syntax": "USMARC",
-   "encoding": "utf8",
-   "region": "north_america",
-   "country": "US",
-   "verified": true,
-   "source": "https://www.loc.gov/z3950/lcserver.html"
-  },
-  {
    "name": "Yale University Library",
    "host": "z3950.library.yale.edu",
    "port": 7090,
@@ -131,46 +118,6 @@
    "user": "Z3950",
    "password": "Z3950_BNF",
    "notes": "Public login published by the BnF."
-  },
-  {
-   "name": "Biblioteca Nacional de Portugal",
-   "host": "z3950.bnportugal.gov.pt",
-   "port": 210,
-   "db": "BN",
-   "kind": "zed",
-   "syntax": "UNIMARC",
-   "encoding": "utf8",
-   "region": "europe",
-   "country": "PT",
-   "verified": true,
-   "source": "https://wiki.ifac.org.br"
-  },
-  {
-   "name": "Biblioteca Nacional de España",
-   "host": "eu00.alma.exlibrisgroup.com",
-   "port": 210,
-   "db": "34BNE_INST",
-   "kind": "zed",
-   "syntax": "USMARC",
-   "encoding": "utf8",
-   "region": "europe",
-   "country": "ES",
-   "verified": false,
-   "source": "https://bne.es/en/profiles/librarians/record-supply/download-with-z3950",
-   "notes": "The BNE publishes port 210 and base 34BNE_INST but not the host: the Alma EU host is a guess."
-  },
-  {
-   "name": "CSIC Libraries (Spain)",
-   "host": "eu00.alma.exlibrisgroup.com",
-   "port": 1921,
-   "db": "34CSIC_INST",
-   "kind": "zed",
-   "syntax": "USMARC",
-   "encoding": "utf8",
-   "region": "europe",
-   "country": "ES",
-   "verified": true,
-   "source": "https://bibliotecas.csic.es/en/node/274"
   },
   {
    "name": "Deutsche Nationalbibliothek (SRU)",
@@ -220,11 +167,12 @@
    "db": "libr",
    "kind": "zed",
    "syntax": "USMARC",
-   "encoding": "utf8",
+   "encoding": "MARC-8",
    "region": "europe",
    "country": "SE",
-   "verified": false,
-   "source": "https://libris.kb.se"
+   "verified": true,
+   "source": "https://libris.kb.se",
+   "notes": "Records come in MARC-8, not UTF-8."
   },
   {
    "name": "British Library",

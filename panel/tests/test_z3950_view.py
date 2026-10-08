@@ -59,8 +59,8 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             assert isinstance(app.screen, LoadingScreen)
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
             history = json.loads((tmp_path / z3950.HISTORY_FILE).read_text())
-            assert set(history) == {t.key for t in europe}
-            bnp = next(t for t in europe if t.host == "z3950.bnportugal.gov.pt")
+            assert set(history) - {z3950.RULES_KEY} == {t.key for t in europe}
+            bnp = next(t for t in europe if t.host == "z3950.libris.kb.se")
             assert history[bnp.key]["status"] == "ok"
             assert "Working" in table.get_row(bnp.key)[2] and table.get_row(bnp.key)[3]
 
