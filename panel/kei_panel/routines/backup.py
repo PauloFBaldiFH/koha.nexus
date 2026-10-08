@@ -4,9 +4,15 @@
                  scp command to copy it to a PC
   test_backup    which backup (newest, or another file) -> trial import ->
                  tables, records, patrons
-  restore        how to send a file + file picker -> file check -> the
-                 questions about a suspicious file -> REPLACE confirmation
-                 -> the restore (cannot be cancelled halfway) -> result
+  restore        how to send a file + file picker (a file can be dropped on
+                 it) -> a file on the Windows disk is copied in first ->
+                 file check -> the questions about a suspicious file ->
+                 REPLACE confirmation -> the restore (cannot be cancelled
+                 halfway) -> result
+  download_latest
+                 the newest backup copied to the Downloads folder of this
+                 PC (WSL: Windows; a Linux desktop), with size, speed and
+                 time left; over SSH, the scp command instead
   cloud_backup   Google Drive with a token from another PC, authorized on
                  this server, or any rclone remote (rclone's own wizard)
 Texts are the installer's own (same translations as the classic panel).
@@ -16,10 +22,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .. import transfer
 from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..screens.files import PathPickerScreen
+from ..screens.loading import LoadingScreen
 from .common import facts, failed, last_message, run_task, show_failure, tx
+
+DOWNLOAD_LABEL = "⬇️ Download latest backup"
 
 RESTORE_STEPS = 10   # tui_run steps of function_restore_database
 
@@ -58,12 +68,15 @@ async def manual_backup(app) -> None:
         t("2. Make sure to include 'Downloads/' at the end of the command."),
         tx("3. You will be asked for the password of user '${REAL_USER:-root}'.", REAL_USER=user),
     ])
-    await app.push_screen_wait(MessageScreen(
+    here = transfer.where() in ("wsl", "desktop")
+    choice = await app.push_screen_wait(MessageScreen(
         t("BACKUP GENERATED AND VERIFIED SUCCESSFULLY!"), "",
         details=[(t("File:"), out.get("file")), (t("Size:"), out.get("size"))],
         command=out.get("scp"),
         command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
-        command_notes=after))
+        command_notes=after, extra=t(DOWNLOAD_LABEL) if here else ""))
+    if choice == "extra":
+        await download_latest(app, file=out.get("file"))
 
 
 # ----------------------------------------------------------------------
@@ -105,6 +118,12 @@ async def test_backup(app) -> None:
 # ----------------------------------------------------------------------
 # Restore
 # ----------------------------------------------------------------------
+def send_command(info, local_path: str) -> str:
+    """The command, run on the person's computer, that sends a file here."""
+    user, ip, home = info.get("real_user", "root"), info.get("server_ip"), info.get("real_home", "/root")
+    return f'scp "{local_path}" {user}@{ip}:{home}/'
+
+
 def transfer_help(info) -> str:
     user, ip, home = info.get("real_user", "root"), info.get("server_ip"), info.get("real_home", "/root")
     return "\n".join([
@@ -125,11 +144,49 @@ async def restore(app, file: str | None = None) -> None:
     if not file:
         picked = await app.push_screen_wait(PathPickerScreen(
             title, info.get("real_home", "/root"), mode="file", shortcuts=_places(info),
-            help_text=transfer_help(info)))
+            help_text=transfer_help(info), commands=[send_command(info, "backup_file.sql")],
+            send_command=lambda path: send_command(info, path)))
         if picked is None:
             return
         file = str(picked)
 
+    staged = None
+    if transfer.on_windows_disk(file):
+        # A file of the Windows disk (dropped on the panel under WSL) is
+        # copied in first: the restore then reads a local, stable copy.
+        staged = await _copy_in(app, title, Path(file), Path(info.get("dir_sql", "/var/backups/koha_sql")))
+        if staged is None:
+            return
+        file = str(staged)
+    try:
+        await _restore_file(app, title, file)
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
+async def _copy_in(app, title: str, src: Path, backups: Path) -> Path | None:
+    folder = backups / "incoming"
+
+    def job(reporter):
+        folder.mkdir(parents=True, exist_ok=True)
+        return transfer.copy_file(src, transfer.free_target(folder, src.name), reporter)
+
+    result = await app.push_screen_wait(LoadingScreen(t("Copying the backup file"), job))
+    if result.ok:
+        return result.value
+    await _copy_failed(app, title, result)
+    return None
+
+
+async def _copy_failed(app, title: str, result) -> None:
+    if result.cancelled:
+        app.notify(f"{title}: {t('Cancelled')}", severity="warning")
+        return
+    await app.push_screen_wait(MessageScreen(title, result.error or t("Unknown error."), kind="error"))
+
+
+async def _restore_file(app, title: str, file: str) -> None:
     check = await run_task(app, tx("Checking the backup file..."), "restore-check", file)
     if failed(check):
         await show_failure(app, title, check)
@@ -166,6 +223,48 @@ async def restore(app, file: str | None = None) -> None:
 
 
 # ----------------------------------------------------------------------
+# Download the latest backup to this PC
+# ----------------------------------------------------------------------
+async def download_latest(app, file: str | None = None) -> None:
+    title = t(DOWNLOAD_LABEL)
+    info = await facts(app)
+    src = Path(file or info.get("newest") or "")
+    if not str(src) or str(src) == "." or not src.is_file():
+        await app.push_screen_wait(MessageScreen(title, tx("No backup found in ${dir}.", dir=info.get("dir_sql")),
+                                                 kind="error"))
+        return
+    place = transfer.where()
+
+    def job(reporter):
+        reporter.status(t("Looking for the Downloads folder..."))
+        folder = transfer.downloads_folder(place)
+        if folder is None:
+            return None
+        return transfer.copy_file(src, transfer.free_target(folder, src.name), reporter,
+                                  owner=transfer.desktop_owner(place))
+
+    result = await app.push_screen_wait(LoadingScreen(t("Downloading the latest backup"), job))
+    if not result.ok:
+        await _copy_failed(app, title, result)
+        return
+    saved = result.value
+    if saved is None:
+        # SSH or a server without a desktop: the Downloads folder is on
+        # another computer, which fetches the file itself.
+        user, ip = info.get("real_user", "root"), info.get("server_ip")
+        await app.push_screen_wait(MessageScreen(
+            title, t("This panel runs on another computer (SSH): download the backup with the command below, "
+                     "on your computer."),
+            kind="info", command=f"scp {user}@{ip}:{src} Downloads/",
+            command_help=t("Open Terminal or PowerShell on your personal computer and paste the exact command:")))
+        return
+    app.notify(tx("Backup saved in your Downloads folder: ${file}", file=saved.name), timeout=8)
+    await app.push_screen_wait(MessageScreen(title, "", details=[
+        (t("File:"), saved.name), (t("Size:"), transfer.human_size(saved.stat().st_size)),
+        (t("Folder"), str(saved.parent))]))
+
+
+# ----------------------------------------------------------------------
 # Cloud backup (rclone)
 # ----------------------------------------------------------------------
 def token_problem(token: str) -> str:
@@ -177,6 +276,17 @@ def token_problem(token: str) -> str:
     if not all(k in token for k in ('"access_token"', '"refresh_token"', '"expiry"')):
         return t("[ERROR] Provided JSON is corrupt or was truncated when copying. Try again:")
     return ""
+
+
+# The commands of token_instructions, each with its Copy button.
+TOKEN_COMMANDS = [
+    'rclone authorize "drive"',
+    "winget install Rclone.Rclone",
+    "wsl --shutdown\nnet stop winnat\nnet stop hns\n"
+    "netsh int ipv4 set dynamic tcp start=49152 num=16384\n"
+    "netsh int ipv6 set dynamic tcp start=49152 num=16384\n"
+    'rclone authorize "drive"',
+]
 
 
 def token_instructions() -> str:
@@ -218,7 +328,8 @@ async def cloud_backup(app) -> None:
     if choice == "token":
         token = await app.push_screen_wait(InputScreen(
             t("EXPRESS GOOGLE DRIVE CONFIGURATION (VIA PERSONAL PC)"), token_instructions(),
-            t("Paste the complete token JSON string below and press [ENTER]:"), validate=token_problem))
+            t("Paste the complete token JSON string below and press [ENTER]:"), validate=token_problem,
+            commands=TOKEN_COMMANDS))
         if token is None:
             return
         result = await run_task(app, t("Registering 'gdrive' remote in Rclone..."), "cloud-token",

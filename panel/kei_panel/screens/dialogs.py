@@ -15,6 +15,7 @@ from textual.widgets.option_list import Option
 
 from ..i18n import t
 from ..tasks import TaskResult
+from ..widgets.copy import CopyButton
 
 
 class FitsScreen:
@@ -42,15 +43,22 @@ class FitsScreen:
         part.styles.max_height = max(3, min(cap, room)) + part.styles.gutter.height
 
 
-# What a person may want to paste elsewhere: addresses and recovery codes.
-_COPYABLE = re.compile(r"https?://[^\s\"'<>]+|\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}\b")
+# What a person may want to paste elsewhere: addresses, recovery codes, a
+# Bitcoin address, and the key on a "Pix" line (only there: a CPF in a
+# report is not something to copy).
+_PIX = re.compile(r"\bPix\b[^:\n]*:\s*(\S+)", re.I)
+_OTHER = re.compile(r"https?://[^\s\"'<>]+|\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}\b|\bbc1[02-9ac-hj-np-z]{11,71}\b")
 
 
 def copyable(text: str) -> list[str]:
-    """The addresses and codes in a dialog's text, in order, once each."""
+    """The addresses, codes and Pix/Bitcoin keys in a dialog's text, in
+    order, once each."""
+    text = text or ""
+    hits = [(m.start(1), m.group(1)) for m in _PIX.finditer(text)]
+    hits += [(m.start(), m.group(0)) for m in _OTHER.finditer(text)]
     found: list[str] = []
-    for m in _COPYABLE.finditer(text or ""):
-        value = m.group(0).rstrip(".,;:)!?")
+    for _, value in sorted(hits):
+        value = value.rstrip(".,;:)!?") if value.startswith("http") else value
         if value not in found:
             found.append(value)
     return found
@@ -64,18 +72,22 @@ class CopyValues:
 
     _values: list[str]
 
-    def copy_rows(self, values: list[str]):
+    def copy_rows(self, values: list[str], command: bool = False):
         for value in values:
             self._values.append(value)
             with Horizontal(classes="dialog-detail"):
                 yield Static(value, classes="detail-value", markup=False)
-                yield Button(t("Copy"), id=f"copy-{len(self._values) - 1}", classes="detail-copy")
+                yield CopyButton(command=command, id=f"copy-{len(self._values) - 1}", classes="detail-copy")
 
     def action_copy(self) -> None:
         if not self._values:
             return
         bid = getattr(self.focused, "id", None) or ""
-        self.app.copy_to_clipboard(self._values[int(bid[5:]) if bid.startswith("copy-") else 0])
+        index = int(bid[5:]) if bid.startswith("copy-") else 0
+        self.app.copy_to_clipboard(self._values[index])
+        for button in self.query(f"#copy-{index}, #copy").results(CopyButton):
+            button.flash()
+            break
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
@@ -193,16 +205,18 @@ class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class InputScreen(FitsScreen, ModalScreen[str | None]):
+class InputScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
     """Instructions and one value to type or paste (a token, a name)."""
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
 
     def __init__(self, title: str, instructions: str, prompt: str, validate=None, password: bool = False,
-                 value: str = ""):
+                 value: str = "", commands: list[str] | None = None):
         super().__init__()
         self._title, self._instructions, self._prompt = title, instructions, prompt
         self._validate, self._password, self._value = validate, password, value
+        self._commands = commands or []
+        self._values: list[str] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
@@ -210,6 +224,7 @@ class InputScreen(FitsScreen, ModalScreen[str | None]):
             if self._instructions:
                 with VerticalScroll(classes="dialog-scroll"):
                     yield Static(self._instructions, classes="dialog-body", markup=False)
+                    yield from self.copy_rows(self._commands, command=True)
             yield Label(self._prompt, classes="dialog-prompt")
             yield Input(self._value, password=self._password, id="value")
             yield Label("", id="input-error", classes="dialog-error")
@@ -235,7 +250,7 @@ class InputScreen(FitsScreen, ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class MessageScreen(FitsScreen, CopyValues, ModalScreen[None]):
+class MessageScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
     """The end of a routine: what happened, its numbers, a command to copy
     (else the addresses and codes in its text) and, when it went wrong, the
     last lines of its output."""
@@ -244,8 +259,14 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[None]):
 
     def __init__(self, title: str, body: str, kind: str = "ok", details: list[tuple[str, str]] | None = None,
                  command: str = "", command_help: str = "", command_notes: str = "",
-                 log: list[str] | None = None):
+                 log: list[str] | None = None, is_command: bool = True, extra: str = ""):
         super().__init__()
+        # extra: the label of one more button; pressing it closes the
+        # dialog with "extra" (else None).
+        self._extra = extra
+        # "command" is shown to copy: a command (📋 Copy command), or a path
+        # or a password (is_command=False: 📋 Copy).
+        self._command_is_command = is_command
         self._title, self._body, self._kind = title, body, kind
         self._details, self._command, self._command_help = details or [], command, command_help
         self._command_notes = command_notes
@@ -276,7 +297,9 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[None]):
                 yield log
             with Horizontal(classes="dialog-buttons"):
                 if self._command:
-                    yield Button(t("Copy"), id="copy")
+                    yield CopyButton(command=self._command_is_command, id="copy")
+                if self._extra:
+                    yield Button(self._extra, id="extra", variant="success")
                 yield Button(t("OK"), id="ok", variant="primary")
 
     def on_mount(self) -> None:
@@ -289,6 +312,10 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[None]):
     @on(Button.Pressed, "#copy")
     def _copy(self) -> None:
         self.app.copy_to_clipboard(self._command)
+
+    @on(Button.Pressed, "#extra")
+    def _extra_pressed(self) -> None:
+        self.dismiss("extra")
 
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
@@ -323,7 +350,7 @@ class CredentialsScreen(FitsScreen, CopyValues, ModalScreen[None]):
                             yield Static(value, classes="detail-value", markup=False)
                             if self._copy:
                                 self._values.append(value)
-                                yield Button(t("Copy"), id=f"copy-{len(self._values) - 1}", classes="detail-copy")
+                                yield CopyButton(id=f"copy-{len(self._values) - 1}", classes="detail-copy")
                 if self._note:
                     yield Static(self._note, classes="dialog-note", markup=False)
             with Horizontal(classes="dialog-buttons"):
@@ -337,14 +364,18 @@ class CredentialsScreen(FitsScreen, CopyValues, ModalScreen[None]):
         self.dismiss(None)
 
 
-class TextScreen(FitsScreen, ModalScreen[None]):
-    """A long text to read (a report), scrollable, with an OK button."""
+class TextScreen(FitsScreen, CopyValues, ModalScreen[None]):
+    """A long text to read (a report), scrollable, with an OK button, and
+    Copy buttons for the first addresses and keys in it (About: the Pix
+    key, the Bitcoin address, the repository)."""
 
-    BINDINGS = [Binding("escape", "close", t("OK"))]
+    BINDINGS = [Binding("escape", "close", t("OK")), Binding("c", "copy", t("Copy"), show=False)]
+    MAX_COPY = 6
 
     def __init__(self, title: str, text: str, kind: str = "info", body: str = ""):
         super().__init__()
         self._title, self._text, self._kind, self._body = title, text, kind, body
+        self._values: list[str] = []
 
     def compose(self) -> ComposeResult:
         classes = {"error": "dialog -wide -error", "ok": "dialog -wide -ok"}.get(self._kind, "dialog -wide -info")
@@ -354,6 +385,7 @@ class TextScreen(FitsScreen, ModalScreen[None]):
                 yield Static(self._body, classes="dialog-body", markup=False)
             with VerticalScroll(classes="dialog-scroll dialog-preview"):
                 yield Static(self._text.strip("\n"), markup=False)
+            yield from self.copy_rows(copyable(self._text)[:self.MAX_COPY])
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
 

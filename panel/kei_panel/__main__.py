@@ -1,11 +1,34 @@
 """python3 -m kei_panel [--demo]"""
 
 import argparse
+import os
 import sys
 import traceback
 
 from .env import PanelEnv, log_error
 from .i18n import Translator, install
+
+
+MAXIMIZE = "\x1b[9;1t"   # xterm window op: maximize (ignored where unsupported)
+
+
+def maximize_window() -> None:
+    """Asks the terminal for a maximized window before the panel draws.
+    xterm-like terminals (GNOME Terminal, Konsole, xterm, PuTTY...) act on
+    it; Windows Terminal is opened maximized by its launcher (wt.exe -M);
+    the Linux console has no window. KEI_NO_MAXIMIZE=1 leaves it alone."""
+    if os.environ.get("KEI_NO_MAXIMIZE") == "1" or os.environ.get("TERM", "") in ("", "linux", "dumb"):
+        return
+    try:
+        fd = os.open("/dev/tty", os.O_WRONLY | os.O_NOCTTY)
+    except OSError:
+        return
+    try:
+        os.write(fd, MAXIMIZE.encode())
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -20,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     from .app import KohaPanelApp
 
     app = KohaPanelApp(env)
+    maximize_window()
     app.run()
     # config.sh opens the classic panel when this is not 0 (a crash).
     return app.return_code or 0

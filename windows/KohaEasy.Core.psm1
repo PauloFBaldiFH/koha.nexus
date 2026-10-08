@@ -1934,7 +1934,7 @@ function Open-KohaPanel {
     Confirm-KohaWindowScript | Out-Null
     $wsl = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'wsl.exe')
     $launch = Get-KohaPanelLaunch -Wsl $wsl -Terminal (Get-KohaTerminalPath) -Pause (T 'The control panel ended with an error. Press Enter to close this window.') -Action $Action
-    Start-Process -FilePath $launch.File -ArgumentList $launch.Arguments | Out-Null
+    Start-Process -FilePath $launch.File -ArgumentList $launch.Arguments -WindowStyle $launch.WindowStyle | Out-Null
     if ($Action) { Write-KohaLog ('control panel opened on ' + $Action) } else { Write-KohaLog 'control panel opened' }
 }
 
@@ -1953,8 +1953,10 @@ function Get-KohaPanelLaunch {
     # One routine only (the Koha window's Painel de Gestão): the panel runs it
     # and ends, with no main menu. Only plain action names get through.
     if ($Action -cmatch '^[a-z][a-z0-9-]*$') { $cmd += ' --run ' + $Action }
-    if ($Terminal) { return [pscustomobject]@{ File = $Terminal; Arguments = ('-w new --title Koha "{0}" {1}' -f $Wsl, $cmd) } }
-    return [pscustomobject]@{ File = $Wsl; Arguments = $cmd }
+    # Maximized: Windows Terminal with -M, the classic console with the
+    # window style (Open-KohaPanel passes WindowStyle to Start-Process).
+    if ($Terminal) { return [pscustomobject]@{ File = $Terminal; Arguments = ('-w new -M --title Koha "{0}" {1}' -f $Wsl, $cmd); WindowStyle = 'Maximized' } }
+    return [pscustomobject]@{ File = $Wsl; Arguments = $cmd; WindowStyle = 'Maximized' }
 }
 
 # The Koha window's "Debian terminal (advanced)": a shell in Debian as the

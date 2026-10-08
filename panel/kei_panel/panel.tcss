@@ -403,3 +403,23 @@ CommandList > .option-list--option-hover {
 CommandList:nocolor > .option-list--option-highlighted {
     text-style: reverse;
 }
+
+/* ---- Copy buttons: "✓ Copied!" for a moment after a press --------- */
+.copy-button.-copied {
+    background: $success;
+    color: auto 90%;
+    text-style: bold;
+}
+
+/* ---- restore: where a backup file can be dropped ------------------- */
+#picker-drop {
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+    border: dashed $accent;
+    color: $text-accent;
+    text-align: center;
+}
+App.-plain #picker-drop {
+    border: ascii $accent;
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import traceback
 from pathlib import Path
 from typing import Callable
@@ -21,6 +22,13 @@ from .theme import load_theme, save_theme
 
 
 HIDDEN_SYSTEM_COMMANDS = {"Screenshot", "Maximize", "Minimize"}
+# Colours and other terminal escapes (ANSI CSI and OSC) never go to the
+# clipboard with a copied command.
+_ESCAPES = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
+
+
+def clean_copy(text: str) -> str:
+    return _ESCAPES.sub("", text or "").strip("\n")
 
 
 class KohaPanelApp(App):
@@ -48,7 +56,7 @@ class KohaPanelApp(App):
         # Copy buttons and the "c" key. Textual sends it as OSC 52, so the
         # terminal puts it on the clipboard of the computer the person is
         # at, also over SSH.
-        super().copy_to_clipboard(text)
+        super().copy_to_clipboard(clean_copy(text))
         if not quiet:
             self.notify(t("Copied."), timeout=3)
 

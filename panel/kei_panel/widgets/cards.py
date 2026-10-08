@@ -10,6 +10,7 @@ from textual.widgets import Button, Label, Static
 from ..glyphs import split_icon
 from ..i18n import t
 from ..menus import Entry
+from .copy import CopyButton
 
 
 class StatusCard(Vertical):
@@ -49,7 +50,7 @@ class LinkCard(StatusCard):
         yield from super().compose()
         with Horizontal(classes="link-buttons"):
             yield Button(t("Open"), classes="link-open", compact=True, disabled=True)
-            yield Button(t("Copy"), classes="link-copy", compact=True, disabled=True)
+            yield CopyButton(classes="link-copy", compact=True, disabled=True)
 
     def set_url(self, url: str, note: str = "", state: str = "") -> None:
         self.url = url
