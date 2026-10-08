@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.10**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.16**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -27,7 +27,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
 | Free-address broker | `broker/` | Cloudflare Worker (TypeScript), D1, Queues | Gives each library `<name>.koha.nexus` and `<name>-admin.koha.nexus` through Cloudflare Tunnels. Live at `https://broker.koha.nexus`. |
 | AI assistant (Module 2) | installed by installer section 38 | Perl (`tools/ai_assistant.pl`, `KohaEasy::Assistant`) + JS/CSS via `IntranetUserJS` | Chat on the Koha **web** staff home page, replacing the news block. |
 | AI cataloguing / MARC replace | installer + `marc_replace.pl` + `panel/kei_panel/marcreplace.py` | Perl + JS | AI-generated MARC record preview, add as new or replace an existing biblio. |
-| Tests | `tests/*.bats`, `panel/tests` | bats, pytest | Most bats suites need a real Koha; `tests/ai_assistant.bats` and `tests/z3950.bats` (MariaDB only) run in the cloud. Panel: `cd panel && python3 -m pytest -q tests`. |
+| Tests | `tests/*.bats`, `panel/tests` | bats, pytest | Most bats suites need a real Koha; `tests/ai_assistant.bats`, `tests/z3950.bats` and `tests/opac_theme.bats` (MariaDB only) run in the cloud. Panel: `cd panel && python3 -m pytest -q tests`. |
 
 ### Key decisions (with dates)
 
@@ -63,6 +63,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `data/z3950_targets.json`, community sync from that file on `main`, imports, BER Z39.50 and
   SRU probes that must return valid MARC, blacklist history in `/etc/koha-easy-install`).
   Koha's side is `--task z3950-list` / `z3950-add FILE` (installer section 39).
+- **OPAC appearance** (1.5.16, Subject 4): panel screen `views/opac.py` over `opac_theme.py`
+  (textures, radius sliders in `widgets/slider.py`, wallpaper with a legibility film, logo,
+  favicon via `OpacFavicon`, a 🌓 switch saved in `localStorage` key `kei_theme`, clean-up
+  rules, `[kei-button ...]` markers in news, the New arrivals carousel). It writes one marked
+  block into `OpacUserCSS` (first line `/* KEI-THEME-DATA: {...} */`, read back to fill the
+  screen) and one into `OpacUserJS`; the rest of both preferences is kept. Koha's side is
+  installer section 40: `--task opac-theme-get | opac-theme-apply DIR | opac-theme-remove |
+  opac-carousel-refresh`, backup first, under the backup lock. Pictures go to
+  `/usr/share/koha/opac/htdocs/images/custom/kei-*`, ImgBB (API key) or Cloudinary (unsigned
+  preset); the keys stay in `/etc/koha-easy-install/opac-theme.conf` (0600), never in the
+  public CSS. The carousel reads `images/custom/kei-new-arrivals.json`, written nightly by
+  `/usr/local/bin/koha-kei-new-arrivals` (cron `/etc/cron.d/koha_kei_opac`): newest titles
+  with a copy that is not lost or withdrawn and a real Amazon cover (the 43-byte "no cover"
+  GIF is skipped). Not yet tried on a live OPAC.
 - **AI providers**: Ollama (default `http://127.0.0.1:11434`, always send `num_ctx`, 16384),
   OpenAI, Anthropic, Google Gemini. Active key in `vision.conf` (owned by the Koha instance
   user, else the web says "provider not configured"); all keys in `ai-keys.conf` (0600).

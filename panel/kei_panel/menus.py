@@ -75,6 +75,9 @@ SECTIONS: tuple[Section, ...] = (
     # New screen: public catalogues for copy cataloguing (Z39.50 and SRU),
     # scanned and ranked, added to Koha's z3950servers (no bash menu).
     Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z"),
+    # New screen: the public catalogue's look (textures, wallpaper, dark mode,
+    # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
+    Section("opac", "🎨  OPAC appearance", "🎨  OPAC appearance", view="opac", key="o"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),

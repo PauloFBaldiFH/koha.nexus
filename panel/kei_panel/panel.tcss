@@ -423,3 +423,28 @@ CommandList:nocolor > .option-list--option-highlighted {
 App.-plain #picker-drop {
     border: ascii $accent;
 }
+
+/* ---- OPAC appearance (views/opac.py) ------------------------------- */
+.opac-box {
+    height: auto;
+    max-width: 110;
+    border: round $panel-lighten-2;
+    border-title-color: $text;
+    border-title-style: bold;
+    background: $surface;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+.opac-box:focus-within {
+    border: round $primary;
+}
+.opac-box .form-label {
+    width: 20;
+}
+.opac-box Select {
+    width: 1fr;
+}
+.opac-box Select.opac-source {
+    width: 28;
+    margin-right: 1;
+}
