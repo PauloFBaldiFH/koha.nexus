@@ -121,7 +121,7 @@ def test_sip_wizard_writes_the_xml(tmp_path, monkeypatch):
             assert "S3lf-Check-99" not in preview
             await pilot.pause(0.1)
             app.screen.query_one("#yes").press()
-            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen) and app.screen.query("#ok"))
             assert "SIP2 is set up" in app.screen._body
             assert not sent["path"].exists() and sent["mode"] == 0o600
             text = sent["text"]

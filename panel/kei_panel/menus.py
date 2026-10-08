@@ -85,6 +85,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
     ), view="hub", key="m"),
+    # WireGuard VPN for the staff interface and SSH (views/vpn.py).
+    Section("vpn", "🛡️  WireGuard VPN", "🛡️  WireGuard VPN", view="vpn", key="v"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),

@@ -529,3 +529,14 @@ App.-plain #picker-drop {
 .cron-raw {
     width: 24;
 }
+
+/* ---- WireGuard VPN (views/vpn.py, screens/vpn.py) ------------------ */
+#vpn-qr-box {
+    height: auto;
+    align-horizontal: center;
+}
+#vpn-qr {
+    width: auto;
+    background: white;
+    color: black;
+}

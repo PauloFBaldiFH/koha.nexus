@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.17**._
+_Last updated: 2026-10-08. Panel version on `main`: **1.5.18**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -104,6 +104,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
     127.0.0.1 (or pastes a token). `--task cloud-provider FILE` (0600 TSV, deleted at once)
     runs `rclone config create ... --obscure`; S3 gets `NAME-s3` plus an alias `NAME` →
     `NAME-s3:bucket`. Google Drive flows untouched. None of this tried on a live Koha yet.
+- **WireGuard VPN** (1.5.18, Subject 6): panel screen `views/vpn.py` (key `v`) over `vpn.py`
+  and `screens/vpn.py`; installer section 42, `--task vpn-status | vpn-setup ENDPOINT PORT |
+  vpn-peer-add NAME | vpn-peer-revoke NAME | vpn-stop`. Server 10.66.0.1/24 on wg0, UDP port
+  51820 by default, `wg-quick@wg0`, `net.ipv4.ip_forward` in `/etc/sysctl.d/99-kei-wireguard.conf`,
+  iptables FORWARD + MASQUERADE in PostUp/PostDown, UFW: the UDP port plus 8080 and the SSH port
+  on wg0. Keys: `/etc/wireguard/kei-server.key`; each device is `kei-peers/NAME.peer` (server
+  block, PSK) + `NAME.conf` (its profile, 0600); wg0.conf is rebuilt from them and applied with
+  `wg syncconf`. Profiles are split tunnel only (`AllowedIPs = 10.66.0.0/24`, MTU 1360,
+  PersistentKeepalive 25, no DNS line); the panel refuses to show one that is not
+  (`vpn.profile_problem`). QR via `qrencode -t ansiutf8` (comments stripped to keep it small),
+  Copy profile via OSC 52. WSL needs mirrored networking (`host_can lan_direct`). Not yet tried
+  on a live server.
 - **AI providers**: Ollama (default `http://127.0.0.1:11434`, always send `num_ctx`, 16384),
   OpenAI, Anthropic, Google Gemini. Active key in `vision.conf` (owned by the Koha instance
   user, else the web says "provider not configured"); all keys in `ai-keys.conf` (0600).

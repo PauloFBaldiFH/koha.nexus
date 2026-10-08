@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.17"
+PANEL_VERSION=" 1.5.18"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -522,7 +522,7 @@ declare -A KEI_GLYPH_ASCII=(
     ["🟢"]="+" ["🔴"]="x" ["⚪"]="-" ["⬜"]="-"
 )
 KEI_GLYPH_ICONS=("⚙" "ℹ" "↻" "↶" "▣" "▤" "▦" "⌁" "⌕" "☁" "◈" "◌" "◷" "⏱" "✦" "★" "⟳" "⇩" "✉" "✎" "✏" "📖" "📋" "🪄" "⬇" "🎛" "️"
-    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🌓" "🎓" "🎨" "🎭" "🏠" "🏧" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📨" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
+    "⏰" "🆓" "🆔" "🆕" "🆙" "🌉" "🌍" "🌎" "🌐" "🌓" "🎓" "🎨" "🎭" "🏠" "🏧" "🏥" "👑" "💡" "💬" "💾" "📂" "📄" "📅" "📇" "📈" "📊" "📏" "📑" "📚" "📜" "📝" "📡" "📤" "📥" "📦" "📧" "📨" "📱" "🔀" "🔁" "🔃" "🔄" "🔌" "🔍" "🔎" "🔏" "🔐" "🔑" "🔒" "🔖" "🔗" "🔙" "🔧" "🔨" "🕒" "🚧" "🚨" "🚪" "🚮" "🛑" "🛡" "🧩" "🧪" "🧮" "🧰" "🧱" "🧹" "🧾" "🩺")
 KEI_GLYPH_SED=""
 for _g in "${!KEI_GLYPH_ASCII[@]}"; do KEI_GLYPH_SED+="s/${_g}/${KEI_GLYPH_ASCII[$_g]}/g;"; done
 for _g in "${KEI_GLYPH_ICONS[@]}"; do KEI_GLYPH_SED+="s/${_g} *//g;"; done
@@ -26516,6 +26516,253 @@ cloud_provider_add() {
     validate_and_register_rclone "$name"
 }
 
+# ======================================================================
+# 42. WIREGUARD VPN (panel screen)
+# ----------------------------------------------------------------------
+# Optional VPN for the staff interface (:8080) and SSH (ROADMAP subject 6).
+# The server is 10.66.0.1 on wg0; each device gets 10.66.0.N. Split tunnel
+# only: a device's profile routes 10.66.0.0/24 and nothing else (never
+# 0.0.0.0/0) and has no DNS line, so the covers and other services Koha's
+# pages call (Amazon, Syndetics...) still go through the reader's own
+# network. MTU 1360 and PersistentKeepalive 25 keep it stable behind NAT.
+#
+#   vpn-status               state, endpoint, devices and their traffic
+#   vpn-setup ENDPOINT PORT  wireguard-tools, server key, wg0.conf,
+#                            net.ipv4.ip_forward, iptables NAT/MASQUERADE,
+#                            the UDP port in UFW, wg-quick@wg0 started
+#   vpn-peer-add NAME        a device: keys, address, its profile (0600)
+#   vpn-peer-revoke NAME     the device removed from wg0 at once
+#   vpn-stop                 wg-quick@wg0 stopped and disabled
+#
+# Files: /etc/wireguard/kei-server.key, /etc/wireguard/kei-peers/NAME.peer
+# (the server's block) and NAME.conf (the device's profile, read by the
+# panel for its QR code and Copy button). wg0.conf is written from them.
+# ======================================================================
+WG_IF="wg0"
+WG_DIR="/etc/wireguard"
+WG_CONF="${WG_DIR}/${WG_IF}.conf"
+WG_KEY="${WG_DIR}/kei-server.key"
+WG_PEERS="${WG_DIR}/kei-peers"
+WG_STATE="${CONFIG_DIR}/wireguard.conf"
+WG_SYSCTL="/etc/sysctl.d/99-kei-wireguard.conf"
+WG_NET="10.66.0"
+WG_MTU=1360
+WG_KEEPALIVE=25
+
+wg_state_get() { sed -n "s/^$1=//p" "$WG_STATE" 2>/dev/null | head -n 1; }
+wg_running() { wg show "$WG_IF" >/dev/null 2>&1; }
+wg_configured() { [ -s "$WG_KEY" ] && [ -f "$WG_CONF" ]; }
+wg_name_ok() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$ ]]; }
+
+# The interface of the default route (the NAT goes out through it).
+wg_wan_if() {
+    local dev
+    dev=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+    printf '%s' "${dev:-eth0}"
+}
+
+wg_ssh_port() {
+    local p
+    p=$(sshd -T 2>/dev/null | awk '/^port /{ print $2; exit }')
+    printf '%s' "${p:-22}"
+}
+
+# wg0.conf from the server key and the devices' blocks.
+wg_write_conf() {
+    local port="$1" wan tmp f
+    wan=$(wg_wan_if)
+    tmp=$(mktemp "${WG_DIR}/.wg0.XXXXXX") || return 1
+    {
+        echo "# koha.nexus VPN (panel > WireGuard VPN). Written by config.sh: changes here are replaced."
+        echo "[Interface]"
+        echo "Address = ${WG_NET}.1/24"
+        echo "ListenPort = ${port}"
+        echo "PrivateKey = $(cat "$WG_KEY")"
+        echo "MTU = ${WG_MTU}"
+        echo "PostUp = sysctl -q -w net.ipv4.ip_forward=1; iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -s ${WG_NET}.0/24 -o ${wan} -j MASQUERADE"
+        echo "PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -s ${WG_NET}.0/24 -o ${wan} -j MASQUERADE"
+        for f in "$WG_PEERS"/*.peer; do
+            [ -f "$f" ] || continue
+            echo
+            cat "$f"
+        done
+    } > "$tmp"
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$WG_CONF"
+}
+
+# Devices added or revoked take effect without dropping the others.
+wg_reload() {
+    wg_running || return 0
+    wg syncconf "$WG_IF" <(wg-quick strip "$WG_IF") >/dev/null 2>&1
+}
+
+vpn_status() {
+    local f name ip pub dump hs rx tx endpoint
+    kei_result installed "$(command -v wg >/dev/null 2>&1 && echo yes || echo no)"
+    kei_result configured "$(wg_configured && echo yes || echo no)"
+    kei_result running "$(wg_running && echo yes || echo no)"
+    kei_result supported "$(host_can lan_direct && echo yes || echo no)"
+    kei_result address "${WG_NET}.1"
+    kei_result port "$(wg_state_get PORT)"
+    endpoint=$(wg_state_get ENDPOINT)
+    kei_result endpoint "$endpoint"
+    if [ -z "$endpoint" ]; then
+        kei_result public_ip "$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null | tr -cd '0-9.')"
+    fi
+    kei_result server_ip "$(get_server_ip)"
+    kei_result ssh_port "$(wg_ssh_port)"
+    dump=$(wg show "$WG_IF" dump 2>/dev/null)
+    for f in "$WG_PEERS"/*.peer; do
+        [ -f "$f" ] || continue
+        name=$(basename "$f" .peer)
+        ip=$(sed -n 's/^AllowedIPs = \([0-9.]*\)\/32$/\1/p' "$f")
+        pub=$(sed -n 's/^PublicKey = //p' "$f")
+        hs=0 rx=0 tx=0
+        if [ -n "$dump" ] && [ -n "$pub" ]; then
+            read -r hs rx tx < <(printf '%s\n' "$dump" | awk -F'\t' -v k="$pub" '$1 == k { print $5, $6, $7; exit }')
+        fi
+        kei_result peer "${name}"$'\t'"${ip}"$'\t'"${hs:-0}"$'\t'"${rx:-0}"$'\t'"${tx:-0}"
+    done
+    return 0
+}
+
+vpn_setup() {
+    local endpoint="$1" port="$2" f had_peers=no
+    if ! [[ "$endpoint" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$ ]] \
+        || ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then
+        msg_error "" "$(t "Type the address devices reach this server at (a public IP or a name) and a UDP port between 1024 and 65535.")"
+        return 1
+    fi
+    if ! host_can lan_direct; then
+        msg_error "" "$(t "The VPN needs a server that devices reach directly. On Windows (WSL) turn on mirrored networking first, or run the VPN on a Linux server.")"
+        return 1
+    fi
+    if ! command -v wg >/dev/null 2>&1 || ! command -v qrencode >/dev/null 2>&1; then
+        display_explanation "Installing WireGuard..."
+        apt_install wireguard-tools qrencode iptables >/dev/null 2>&1
+    fi
+    if ! command -v wg >/dev/null 2>&1; then
+        msg_error "" "$(t "WireGuard could not be installed. Check the internet connection and the APT log.")"
+        return 1
+    fi
+    mkdir -p "$WG_DIR" "$WG_PEERS" "$CONFIG_DIR"
+    chmod 700 "$WG_DIR" "$WG_PEERS"
+    if [ ! -s "$WG_KEY" ]; then
+        ( umask 077; wg genkey > "$WG_KEY" )
+    fi
+    chmod 600 "$WG_KEY"
+    printf 'ENDPOINT=%s\nPORT=%s\n' "$endpoint" "$port" > "$WG_STATE"
+    chmod 600 "$WG_STATE"
+    # Devices already made follow a new address or port.
+    for f in "$WG_PEERS"/*.conf; do
+        [ -f "$f" ] || continue
+        had_peers=yes
+        sed -i "s/^Endpoint = .*/Endpoint = ${endpoint}:${port}/" "$f"
+    done
+    printf 'net.ipv4.ip_forward = 1\n' > "$WG_SYSCTL"
+    sysctl -q -p "$WG_SYSCTL" >/dev/null 2>&1 || true
+    wg_write_conf "$port" || return 1
+    if host_can firewall && command -v ufw >/dev/null 2>&1; then
+        ufw allow "${port}/udp" >/dev/null 2>&1 || true
+        ufw allow in on "$WG_IF" to any port 8080 proto tcp >/dev/null 2>&1 || true
+        ufw allow in on "$WG_IF" to any port "$(wg_ssh_port)" proto tcp >/dev/null 2>&1 || true
+    fi
+    display_explanation "Starting the VPN..."
+    systemctl enable "wg-quick@${WG_IF}" >/dev/null 2>&1 || true
+    systemctl restart "wg-quick@${WG_IF}" >/dev/null 2>&1 || true
+    log "vpn: wg0 set up (endpoint ${endpoint}, port ${port})"
+    kei_result running "$(wg_running && echo yes || echo no)"
+    if ! wg_running; then
+        msg_error "" "$(t "wg0.conf was written, but the VPN did not start (the kernel may lack WireGuard).\n\nCheck: systemctl status wg-quick@wg0")"
+        return 1
+    fi
+    if [ "$had_peers" = "yes" ]; then
+        msg_ok "$(t "✅ The VPN is on: this server is \${WG_NET}.1 inside it, UDP port \${port}.\n\nThe devices already added now point to \${endpoint}:\${port}: import their profiles again.")"
+    else
+        msg_ok "$(t "✅ The VPN is on: this server is \${WG_NET}.1 inside it, UDP port \${port}.\n\nAdd a device for each computer or phone of the staff.")"
+    fi
+}
+
+vpn_peer_add() {
+    local name="$1" n ip="" priv pub psk server_pub endpoint port peer conf
+    if ! wg_configured; then
+        msg_error "" "$(t "Set up the VPN first.")"
+        return 1
+    fi
+    if ! wg_name_ok "$name"; then
+        msg_error "" "$(t "A device name has letters, digits, _ and - only (up to 32).")"
+        return 1
+    fi
+    peer="${WG_PEERS}/${name}.peer"
+    conf="${WG_PEERS}/${name}.conf"
+    if [ -e "$peer" ]; then
+        msg_error "" "$(t "There is already a device called \${name}.")"
+        return 1
+    fi
+    for n in $(seq 2 254); do
+        if ! grep -qsx "AllowedIPs = ${WG_NET}.${n}/32" "$WG_PEERS"/*.peer; then
+            ip="${WG_NET}.${n}"
+            break
+        fi
+    done
+    if [ -z "$ip" ]; then
+        msg_error "" "$(t "The VPN is full: revoke a device first.")"
+        return 1
+    fi
+    endpoint=$(wg_state_get ENDPOINT)
+    port=$(wg_state_get PORT)
+    server_pub=$(wg pubkey < "$WG_KEY")
+    priv=$(wg genkey)
+    pub=$(printf '%s\n' "$priv" | wg pubkey)
+    psk=$(wg genpsk)
+    (
+        umask 077
+        printf '# kei-peer: %s\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s/32\n' \
+            "$name" "$pub" "$psk" "$ip" > "$peer"
+        {
+            echo "# koha.nexus VPN: ${name}. Only ${WG_NET}.0/24 goes through the VPN; the device's"
+            echo "# internet and DNS stay with its own network."
+            echo "[Interface]"
+            echo "PrivateKey = ${priv}"
+            echo "Address = ${ip}/32"
+            echo "MTU = ${WG_MTU}"
+            echo
+            echo "[Peer]"
+            echo "PublicKey = ${server_pub}"
+            echo "PresharedKey = ${psk}"
+            echo "Endpoint = ${endpoint}:${port}"
+            echo "AllowedIPs = ${WG_NET}.0/24"
+            echo "PersistentKeepalive = ${WG_KEEPALIVE}"
+        } > "$conf"
+    )
+    wg_write_conf "$port" && wg_reload
+    log "vpn: device ${name} added (${ip})"
+    kei_result peer "$name"
+    kei_result address "$ip"
+    kei_result conf "$conf"
+    msg_ok "$(t "✅ Device \${name} added with the address \${ip}. Scan its QR code with the WireGuard app, or copy its profile to a computer.")"
+}
+
+vpn_peer_revoke() {
+    local name="$1" port
+    if ! wg_name_ok "$name" || [ ! -e "${WG_PEERS}/${name}.peer" ]; then
+        msg_error "" "$(t "There is no device called \${name}.")"
+        return 1
+    fi
+    rm -f -- "${WG_PEERS:?}/${name}.peer" "${WG_PEERS:?}/${name}.conf"
+    port=$(wg_state_get PORT)
+    wg_write_conf "${port:-51820}" && wg_reload
+    log "vpn: device ${name} revoked"
+    msg_ok "$(t "Device \${name} revoked: it can no longer connect.")"
+}
+
+vpn_stop() {
+    systemctl disable --now "wg-quick@${WG_IF}" >/dev/null 2>&1 || true
+    log "vpn: wg0 stopped"
+    msg_ok "$(t "The VPN is off. The devices and keys are kept: Set up turns it on again.")"
+}
+
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
@@ -27065,6 +27312,11 @@ kei_task() {
         hub-status)      hub_status ;;
         sip-apply)       [ -n "${3:-}" ] || return 2; sip_apply "$1" "$2" "$3" ;;
         cloud-provider)  [ -n "${1:-}" ] || return 2; cloud_provider_add "$1" ;;
+        vpn-status)      vpn_status ;;
+        vpn-setup)       [ -n "${2:-}" ] || return 2; vpn_setup "$1" "$2" ;;
+        vpn-peer-add)    [ -n "${1:-}" ] || return 2; vpn_peer_add "$1" ;;
+        vpn-peer-revoke) [ -n "${1:-}" ] || return 2; vpn_peer_revoke "$1" ;;
+        vpn-stop)        vpn_stop ;;
         clock)           function_configure_clock ;;
         status)
             local g label value
