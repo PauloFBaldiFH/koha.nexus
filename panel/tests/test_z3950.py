@@ -5,6 +5,8 @@ import re
 import pytest
 
 from kei_panel import z3950 as z
+from dataclasses import replace
+
 from kei_panel.z3950 import CTX, UNIVERSAL, Target, ber_decode, tlv
 
 
@@ -39,8 +41,32 @@ def test_curated_list_loads_and_covers_every_region():
     loc = next(t for t in targets if t.host == "lx2.loc.gov")
     assert (loc.port, loc.db, loc.syntax, loc.verified) == (210, "LCDB", "USMARC", True)
     bnf = next(t for t in targets if t.host == "z3950.bnf.fr")
-    assert bnf.syntax == "UNIMARC" and bnf.login and bnf.user == "Z3950"
+    assert bnf.syntax == "UNIMARC" and bnf.login and bnf.login_env == "KEI_Z3950_BNF"
     assert all(t.kind in ("zed", "sru") for t in targets)
+
+
+def test_curated_file_carries_no_login():
+    data = json.loads(z.DATA_FILE.read_text(encoding="utf-8"))
+    assert not [t["name"] for t in data["targets"] if t.get("user") or t.get("password")]
+
+
+def test_login_comes_from_the_environment_or_the_env_file(tmp_path, monkeypatch):
+    raw = {"host": "z.example.org", "db": "X", "login": True, "login_env": "KEI_Z3950_DEMO"}
+    assert (z.make_target(raw).user, z.make_target(raw).password) == ("", "")
+    (tmp_path / "kei.env").write_text("# logins\nexport KEI_Z3950_DEMO_USER=reader\n"
+                                      "KEI_Z3950_DEMO_PASSWORD='from file'\n")
+    t = z.make_target(raw)
+    assert (t.user, t.password, t.login) == ("reader", "from file", True)
+    monkeypatch.setenv("KEI_Z3950_DEMO_PASSWORD", "from env")
+    assert z.make_target(raw).password == "from env"
+    # A login typed in the list wins; one from .env is not copied into it.
+    assert z.make_target(dict(raw, user="typed", password="pw")).password == "pw"
+    z.save_local([replace(t, origin="curated")])
+    assert z.load_local() == []
+    # Only KEI_Z3950_* names: an imported list cannot read anything else.
+    monkeypatch.setenv("HOME_PASSWORD", "nope")
+    t = z.make_target(dict(raw, login_env="HOME"))
+    assert (t.login_env, t.password) == ("", "")
 
 
 def test_curated_file_is_plain_json_with_sources():
@@ -89,10 +115,10 @@ def test_koha_sql_dump_with_and_without_columns():
             "'USMARC',0,'zed','utf8','biblio',NULL,NULL,NULL,NULL),(2,'lx2.loc.gov',210,'NAF','','',"
             "'LOC AUTH',0,0,'USMARC',0,'zed','utf8','authority',NULL,NULL,NULL,NULL);\n"
             "INSERT INTO z3950servers (host, port, db, userid, password, servername, syntax) VALUES "
-            "('z3950.bnf.fr', 2211, 'TOUT-ANA1-UTF8', 'Z3950', 'Z3950_BNF', 'BnF l\\'officielle', 'UNIMARC');")
+            "('z3950.bnf.fr', 2211, 'TOUT-ANA1-UTF8', 'reader', 'example', 'BnF l\\'officielle', 'UNIMARC');")
     loc, bnf = z.parse_koha_sql(dump)
     assert (loc.name, loc.db) == ("LIBRARY OF CONGRESS", "LCDB")
-    assert (bnf.name, bnf.user, bnf.password, bnf.syntax) == ("BnF l'officielle", "Z3950", "Z3950_BNF", "UNIMARC")
+    assert (bnf.name, bnf.user, bnf.password, bnf.syntax) == ("BnF l'officielle", "reader", "example", "UNIMARC")
 
 
 def test_scraper_reads_pages_tables_and_labels():

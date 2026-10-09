@@ -115,9 +115,8 @@
    "verified": true,
    "source": "https://wiki.koha-community.org/wiki/Koha_Z39.50_targets",
    "login": true,
-   "user": "Z3950",
-   "password": "Z3950_BNF",
-   "notes": "Public login published by the BnF."
+   "login_env": "KEI_Z3950_BNF",
+   "notes": "Public login published by the BnF (see the source): type it with Login, or set KEI_Z3950_BNF_USER and KEI_Z3950_BNF_PASSWORD in /etc/koha-easy-install/.env."
   },
   {
    "name": "Deutsche Nationalbibliothek (SRU)",

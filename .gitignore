@@ -1,0 +1,4 @@
+# Local logins (see .env.example): never committed.
+.env
+.env.*
+!.env.example

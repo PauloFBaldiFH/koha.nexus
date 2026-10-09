@@ -40,6 +40,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
+from . import credentials
 from .env import CONFIG_DIR
 
 DATA_FILE = Path(__file__).with_name("data") / "z3950_targets.json"
@@ -99,6 +100,7 @@ class Target:
     login: bool = False          # the server needs a user and password
     user: str = ""
     password: str = field(default="", repr=False)
+    login_env: str = ""          # KEI_Z3950_...: its _USER and _PASSWORD come from the environment or .env
     schema: str = ""             # SRU recordSchema (marcxml...)
     sru_fields: str = ""         # Koha's SRU search field mapping (title=dc.title,...)
     sru_options: str = ""        # Koha's extra SRU options (sru_version=1.1,...)
@@ -149,6 +151,7 @@ _ALIASES = {
     "source": ("source", "fonte"),
     "notes": ("notes", "note", "comment", "obs"),
     "login": ("login", "needs_login", "auth"),
+    "login_env": ("login_env",),
     "verified": ("verified",),
 }
 _FIELD_OF = {alias: f for f, aliases in _ALIASES.items() for alias in aliases}
@@ -221,17 +224,26 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
     region = str(d.get("region", "")).strip().lower()
     if region not in REGIONS:
         region = next((k for k, v in REGIONS.items() if v.lower() == region), "") or guess_region(country, host)
+    user, password = str(d.get("user", "")), str(d.get("password", ""))
+    login_env = str(d.get("login_env", "")).strip().upper()
+    if not _LOGIN_ENV.match(login_env):
+        login_env = ""               # a list from elsewhere must not read any other variable
+    elif not user:
+        user, password = credentials.get(login_env + "_USER"), credentials.get(login_env + "_PASSWORD")
     return Target(
         name=str(d.get("name") or host)[:100], host=host, port=port, db=db, kind=kind,
         syntax=normalize_syntax(str(d.get("syntax", ""))),
         encoding=str(d.get("encoding") or "utf8"), region=region, country=country,
-        login=_truthy(d.get("login")) or bool(d.get("user")), user=str(d.get("user", "")),
-        password=str(d.get("password", "")), schema=str(d.get("schema", "")),
+        login=_truthy(d.get("login")) or bool(user), user=user, password=password, login_env=login_env,
+        schema=str(d.get("schema", "")),
         sru_fields=str(d.get("sru_fields", "")) if kind == "sru" else "",
         sru_options=str(d.get("sru_options", "")) if kind == "sru" else "",
         preselect=_truthy(d.get("preselect")),
         source=str(d.get("source", "")), notes=str(d.get("notes", "")),
         verified=_truthy(d.get("verified")), origin=origin)
+
+
+_LOGIN_ENV = re.compile(r"^KEI_Z3950_[A-Z0-9_]{1,40}$")
 
 
 def _truthy(v) -> bool:
@@ -593,10 +605,15 @@ def load_local() -> list[Target]:
     return out
 
 
+def _login_from_env(t: Target) -> bool:
+    return bool(t.login_env) and credentials.get(t.login_env + "_USER") == t.user
+
+
 def save_local(targets: list[Target]) -> None:
     """The person's own targets and logins (root only, 0600): the curated
-    ones are saved only when they carry a login."""
-    keep = [t for t in targets if t.origin != "curated" or t.user]
+    ones are saved only when they carry a login the person typed (one from
+    the environment or .env stays there)."""
+    keep = [t for t in targets if t.origin != "curated" or (t.user and not _login_from_env(t))]
     items = [dict(t.to_dict(passwords=True), origin=t.origin) for t in keep]
     _write_private(config_dir() / LOCAL_FILE, json.dumps({"schema": 1, "targets": items}, ensure_ascii=False,
                                                          indent=1) + "\n")
