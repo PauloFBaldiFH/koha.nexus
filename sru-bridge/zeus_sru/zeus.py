@@ -41,6 +41,22 @@ def extract_raw_records(page: str) -> list[str]:
     return out
 
 
+# Zeus /zeus/ embeds each result as MARCXML: <record>...</record> blocks
+# holding a leader (prefixed or not, with or without the slim namespace).
+_MARCXML_RE = re.compile(r"<(?:marc:)?record\b[^>]*>.*?</(?:marc:)?record>", re.S | re.I)
+
+
+def extract_marcxml_records(page: str) -> list[str]:
+    """Every MARCXML record block in a Zeus page, deduplicated, in order."""
+    seen, out = set(), []
+    for m in _MARCXML_RE.finditer(page):
+        block = m.group(0)
+        if "leader>" in block and block not in seen:
+            seen.add(block)
+            out.append(block)
+    return out
+
+
 def chunks(items: tuple[int, ...], size: int) -> list[tuple[int, ...]]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
@@ -63,7 +79,8 @@ class ZeusClient:
         self._client = client or httpx.AsyncClient(
             timeout=settings.timeout,
             follow_redirects=True,
-            headers={"User-Agent": settings.user_agent},
+            headers={"User-Agent": settings.user_agent,
+                     "Referer": settings.base_url.split("/zeus")[0].split("/zbib")[0] + "/"},
         )
         self._cache: OrderedDict[ZeusQuery, tuple[float, list[pymarc.Record]]] = OrderedDict()
 
@@ -96,8 +113,9 @@ class ZeusClient:
         for page in pages:
             if isinstance(page, BaseException):
                 continue
-            for raw in extract_raw_records(page):
-                record = marc.parse_record(marc.decode_raw(raw))
+            found = [marc.parse_marcxml(b) for b in extract_marcxml_records(page)]
+            found += [marc.parse_record(marc.decode_raw(r)) for r in extract_raw_records(page)]
+            for record in found:
                 if record is None:
                     continue
                 key = marc.record_key(record)

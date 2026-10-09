@@ -232,7 +232,10 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
         user, password = credentials.get(login_env + "_USER"), credentials.get(login_env + "_PASSWORD")
     return Target(
         name=str(d.get("name") or host)[:100], host=host, port=port, db=db, kind=kind,
-        syntax=normalize_syntax(str(d.get("syntax", ""))),
+        # An SRU server answering MARCXML is MARC21 for Koha (USMARC would make
+        # it expect ISO 2709 and show nothing).
+        syntax=("MARC21" if kind == "sru" and str(d.get("syntax", "")).strip().upper() == "MARC21"
+                else normalize_syntax(str(d.get("syntax", "")))),
         encoding=str(d.get("encoding") or "utf8"), region=region, country=country,
         login=_truthy(d.get("login")) or bool(user), user=user, password=password, login_env=login_env,
         schema=str(d.get("schema", "")),

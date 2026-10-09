@@ -16,3 +16,8 @@ def raw_record() -> str:
 @pytest.fixture
 def results_page() -> str:
     return (FIXTURES / "zeus_results.html").read_text()
+
+
+@pytest.fixture
+def marcxml_page() -> str:
+    return (FIXTURES / "zeus_marcxml.html").read_text()

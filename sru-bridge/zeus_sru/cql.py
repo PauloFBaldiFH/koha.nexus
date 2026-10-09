@@ -8,9 +8,9 @@ arrives looks like:
     bath.isbn = "978-85-..."
     tabamex                      (a bare term: cql.serverChoice)
 
-Zeus takes a single searchString plus a searchType (7 = ISBN, 4 = Title),
-so an ISBN clause wins when there is one, then a title clause, and
-otherwise every term is joined and searched as a title. A bare term that
+Zeus takes a single searchString plus a searchType (7 = ISBN, 4 = Title,
+1003 = Author, 1016 = any field), so an ISBN clause wins when there is one,
+then a title, then an author clause; anything else is searched in any field. A bare term that
 looks like an ISBN is searched as one.
 """
 
@@ -21,9 +21,13 @@ from dataclasses import dataclass
 
 ISBN = 7
 TITLE = 4
+AUTHOR = 1003
+ANY = 1016
 
 ISBN_INDEXES = {"isbn", "identifier", "issn", "number", "standardidentifier"}
-TITLE_INDEXES = {"title", "titles", "anywhere", "serverchoice", "keyword", "any", "all", "text"}
+TITLE_INDEXES = {"title", "titles", "ti"}
+AUTHOR_INDEXES = {"author", "creator", "au", "name"}
+ANY_INDEXES = {"anywhere", "serverchoice", "keyword", "any", "all", "text"}
 
 _RELATIONS = r"==|<>|<=|>=|=|<|>|\b(?:exact|any|all|adj|within|encloses)\b"
 _CLAUSE = re.compile(
@@ -45,7 +49,7 @@ class ZeusQuery:
 
     @property
     def kind(self) -> str:
-        return "isbn" if self.search_type == ISBN else "title"
+        return {ISBN: "isbn", TITLE: "title", AUTHOR: "author"}.get(self.search_type, "any")
 
 
 def looks_like_isbn(term: str) -> bool:
@@ -77,6 +81,7 @@ def parse(query: str) -> ZeusQuery:
 
     isbn: list[str] = []
     title: list[str] = []
+    author: list[str] = []
     other: list[str] = []
     for m in _CLAUSE.finditer(query):
         index, term = m.group("index"), _unquote(m.group("term"))
@@ -89,15 +94,20 @@ def parse(query: str) -> ZeusQuery:
             isbn.append(term)
         elif short in TITLE_INDEXES:
             title.append(term)
+        elif short in AUTHOR_INDEXES:
+            author.append(term)
         else:
             other.append(term)
 
     if isbn:
         return ZeusQuery(clean_isbn(isbn[0]), ISBN)
-    words = title or other
-    if not words:
+    if title:
+        return ZeusQuery(" ".join(title), TITLE)
+    if author:
+        return ZeusQuery(" ".join(author), AUTHOR)
+    if not other:
         raise CQLError(f"no search term in {query!r}")
-    joined = " ".join(words)
-    if len(words) == 1 and looks_like_isbn(joined):
+    joined = " ".join(other)
+    if len(other) == 1 and looks_like_isbn(joined):
         return ZeusQuery(clean_isbn(joined), ISBN)
-    return ZeusQuery(joined, TITLE)
+    return ZeusQuery(joined, ANY)
