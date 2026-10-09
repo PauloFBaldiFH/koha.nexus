@@ -555,3 +555,24 @@ App.-plain #picker-drop {
     background: white;
     color: black;
 }
+
+/* ---- OPAC appearance: quick access buttons ------------------------- */
+#o-links-rows {
+    height: auto;
+}
+.link-row Input.link-icon {
+    width: 10;
+}
+.link-row Input.link-text {
+    width: 1fr;
+}
+.link-row Input.link-url {
+    width: 2fr;
+}
+.opac-box .link-row Select.link-target {
+    width: 18;
+}
+.link-row Button.link-del {
+    min-width: 5;
+    width: 5;
+}

@@ -191,3 +191,84 @@ def test_settings_come_back_from_koha(monkeypatch):
             assert "17 titles" in str(view.query_one("#o-summary").render())
 
     asyncio.run(main())
+
+
+def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
+    """Quick access buttons (rows of fields), the 3D carousel, the block and
+    page colours and the staff interface travel to Koha and come back."""
+    seen = {}
+    real = ot.write_apply_dir
+
+    def spy(cfg, files, text=None):
+        work = real(cfg, files, text)
+        seen["css"] = (work / "user.css").read_text()
+        seen["js"] = (work / "user.js").read_text()
+        seen["staff"] = (work / "staff.css").read_text() if (work / "staff.css").exists() else ""
+        return work
+    monkeypatch.setattr(ot, "write_apply_dir", spy)
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+            view.query_one("#o-car-mode", Select).value = "coverflow"
+            view.query_one("#o-surface", Input).value = "#1e293b"
+            view.query_one("#o-page-on", Switch).value = True
+            view.query_one("#o-page", Input).value = "#0f172a"
+            view.query_one("#o-links-enabled", Switch).value = True
+            view.query_one("#o-links-style", Select).value = "gradient"
+            for _ in range(2):
+                view.query_one("#o-link-add").press()
+                await pilot.pause(0.1)
+            rows = list(view.query(".link-row"))
+            assert len(rows) == 2
+            fields = lambda row: (row.query(Input).results(), row.query_one(Select))   # noqa: E731
+            (icon, text, url), target = list(fields(rows[0])[0]), fields(rows[0])[1]
+            icon.value, text.value, url.value, target.value = "📖", "Catálogo", "javascript:alert(1)", "_blank"
+            _cfg, _p, problem = view.collect()
+            assert "https://" in problem
+            url.value = "https://biblioteca.example.org/acervo"
+            (icon2, text2, url2) = list(rows[1].query(Input).results())
+            icon2.value, text2.value, url2.value = "📧", "Contato", "mailto:biblioteca@example.org"
+            view.query_one("#o-staff-enabled", Switch).value = True
+            view.query_one("#o-staff-density", Select).value = "compact"
+            view.query_one("#o-staff-contrast", Select).value = "high"
+            cfg, _p, problem = view.collect()
+            assert problem == ""
+            # Removing a row drops its button.
+            view.query_one(f"#{rows[1].id.replace('o-link-', 'o-link-del-')}").press()
+            await pilot.pause(0.1)
+            assert len(view.query(".link-row")) == 1
+            rows[1] = None
+            view.add_link({"icon": "📧", "text": "Contato", "url": "mailto:biblioteca@example.org", "target": "_self"})
+            await pilot.pause(0.1)
+
+            view.apply()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            assert "3D coverflow" in app.screen._preview and "Quick access buttons: 2" in app.screen._preview
+            app.screen.query_one("#yes").press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            await pilot.press("escape")
+            sent = ot.parse_theme_data(seen["css"])
+            assert sent["carousel"]["mode"] == "coverflow"
+            assert sent["surface"] == "#1e293b" and sent["page"] == "#0f172a"
+            assert [i["text"] for i in sent["links"]["items"]] == ["Catálogo", "Contato"]
+            assert sent["links"]["items"][0]["target"] == "_blank"
+            assert '"mode": "coverflow"' in seen["js"] and "kei-links" in seen["js"]
+            assert "--kei-text: #f1f5f9" in seen["css"]           # light text on the dark blocks
+            assert "padding: .2rem .45rem" in seen["staff"] and "kei-carousel" not in seen["staff"]
+
+            # The same settings fill the screen again.
+            view.fill({})
+            await pilot.pause(0.1)
+            assert len(view.query(".link-row")) == 0
+            view.fill(sent)
+            await pilot.pause(0.2)
+            assert len(view.query(".link-row")) == 2
+            assert view.query_one("#o-staff-density", Select).value == "compact"
+
+    asyncio.run(main())

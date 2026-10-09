@@ -7,10 +7,14 @@ here, with no Textual:
     end up in a public stylesheet);
   * css_block() / js_block(): the marked blocks `config.sh --task
     opac-theme-apply` puts in OpacUserCSS and OpacUserJS, the rest of both
-    preferences kept as the library wrote it. The first line inside the CSS
+    preferences kept as the library wrote it; staff_css_block(): the
+    staff interface's block (IntranetUserCSS: colours, type, contrast and
+    table density only, none of the OPAC's widgets). The first line inside the CSS
     block is /* KEI-THEME-DATA: {...} */, the settings as JSON, read back by
     parse_theme_data() when the screen opens (state lives in Koha, so a
-    second server or a restored backup shows the settings it has);
+    second server or a restored backup shows the settings it has; the
+    installer also keeps a copy in theme-settings.json and puts it back
+    after a database restore);
   * images: a file on the server (copied to Koha's public images folder),
     an upload to an image host (ImgBB with an API key, Cloudinary with an
     unsigned upload preset) or a direct URL. Keys stay in a private file of
@@ -54,6 +58,12 @@ TEXTURES = {
     "gradient": "Soft diagonal gradient",
 }
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
+CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
+LINK_STYLES = {"solid": "Solid colour", "gradient": "Gradient", "glass": "Glass (blur)"}
+LINK_TARGETS = {"_self": "Same tab", "_blank": "New tab"}
+STAFF_DENSITY = {"comfortable": "Comfortable", "normal": "Normal", "compact": "Compact"}
+STAFF_CONTRAST = {"normal": "Normal", "high": "High"}
+MAX_LINKS = 12
 THEMES = {"light": "Light", "dark": "Dark", "auto": "Follow the device"}
 SOURCES = {"none": "None", "local": "File on this server", "url": "Direct URL", "imgbb": "Upload to ImgBB",
            "cloudinary": "Upload to Cloudinary"}
@@ -72,21 +82,30 @@ DEFAULTS: dict = {
     "radius_button": 10,
     "accent": "#2563eb",
     "accent2": "#7c3aed",     # second colour of the gradient
+    "surface": "#ffffff",     # background of the blocks (header, search, content, news)
+    "page": "",               # background of the page ("" = Koha's own)
     "background": {"source": "none", "url": ""},
     "logo": {"source": "none", "url": ""},
     "favicon": {"source": "none", "url": ""},
     "film": 55,               # % of the legibility film over a wallpaper
     "dark_switch": True,
     "default_theme": "light",
-    "carousel": {"enabled": True, "autoplay": True, "speed": 4000, "count": 12, "hover": "lift",
-                 "overlay": True, "title": "New arrivals", "amazon_tag": ""},
+    "carousel": {"enabled": True, "autoplay": True, "speed": 3500, "count": 12, "hover": "lift",
+                 "overlay": True, "title": "New arrivals", "amazon_tag": "", "mode": "flat"},
     "ghost": {"rss": True, "cart_badge": True, "community": True, "empty_columns": True},
     "news_buttons": True,
+    # Quick access buttons at the top of the home page (link-tree style):
+    # [{"icon": "📖", "text": "...", "url": "https://...", "target": "_blank"}]
+    "links": {"enabled": False, "style": "glass", "items": []},
+    # The staff interface (IntranetUserCSS): the same colours, its own type,
+    # contrast and table density.
+    "staff": {"enabled": False, "density": "normal", "contrast": "normal", "font": 100},
 }
 
 RANGES = {"blur": (0, 30), "opacity": (30, 100), "radius_block": (0, 30), "radius_input": (0, 30),
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
+STAFF_FONT = (90, 120)
 
 
 # ----------------------------------------------------------------------
@@ -123,6 +142,34 @@ def _text(value, default: str, limit: int = 60) -> str:
     return value[:limit]
 
 
+def safe_link(value: str) -> str:
+    """A button's destination: http(s), a path of this OPAC, mailto:, tel:
+    or #anchor. Anything else (javascript:, data:, quotes) becomes ""."""
+    value = str(value or "").strip()
+    if len(value) > 500 or re.search(r"[\s\"'<>\\`]", value):
+        return ""
+    if re.fullmatch(r"https?://[A-Za-z0-9.-]+(:\d+)?(/\S*)?", value) or re.fullmatch(r"/(?!/)\S*", value) \
+            or re.fullmatch(r"mailto:[^@\s]+@[A-Za-z0-9.-]+(\?\S*)?", value) or re.fullmatch(r"tel:\+?[0-9().-]{3,20}", value) \
+            or re.fullmatch(r"#[\w-]*", value):
+        return value
+    return ""
+
+
+def _link(raw) -> dict | None:
+    raw = raw if isinstance(raw, dict) else {}
+    url = safe_link(raw.get("url", ""))
+    text = _text(raw.get("text"), "", 60)
+    if not url or not text:
+        return None
+    icon = _text(raw.get("icon"), "", 24)
+    if icon.startswith("fa-"):
+        icon = icon if re.fullmatch(r"fa-[a-z0-9-]{1,30}", icon) else ""
+    else:
+        icon = icon[:4]
+    target = raw.get("target") if raw.get("target") in LINK_TARGETS else "_self"
+    return {"icon": icon, "text": text, "url": url, "target": target}
+
+
 def normalize(raw: dict | None) -> dict:
     """Every setting checked: unknown keys dropped, numbers clamped, colours
     and URLs validated, defaults where missing."""
@@ -133,6 +180,8 @@ def normalize(raw: dict | None) -> dict:
         cfg[key] = _clamp(raw.get(key, DEFAULTS[key]), lo, hi, DEFAULTS[key])
     cfg["accent"] = _hex(raw.get("accent"), DEFAULTS["accent"])
     cfg["accent2"] = _hex(raw.get("accent2"), DEFAULTS["accent2"])
+    cfg["surface"] = _hex(raw.get("surface"), DEFAULTS["surface"])
+    cfg["page"] = _hex(raw.get("page"), "") if raw.get("page") else ""
     for name in ASSETS:
         a = raw.get(name) if isinstance(raw.get(name), dict) else {}
         source = a.get("source") if a.get("source") in SOURCES else "none"
@@ -151,10 +200,21 @@ def normalize(raw: dict | None) -> dict:
     car["title"] = _text(c.get("title"), car["title"])
     tag = str(c.get("amazon_tag", "")).strip()
     car["amazon_tag"] = tag if re.fullmatch(r"[A-Za-z0-9-]{0,40}", tag) else ""
+    car["mode"] = c.get("mode") if c.get("mode") in CAROUSEL_MODES else car["mode"]
     g = raw.get("ghost") if isinstance(raw.get("ghost"), dict) else {}
     for key in cfg["ghost"]:
         cfg["ghost"][key] = bool(g.get(key, cfg["ghost"][key]))
     cfg["news_buttons"] = bool(raw.get("news_buttons", DEFAULTS["news_buttons"]))
+    lk = raw.get("links") if isinstance(raw.get("links"), dict) else {}
+    items = lk.get("items") if isinstance(lk.get("items"), list) else []
+    cfg["links"] = {"enabled": bool(lk.get("enabled", False)),
+                    "style": lk.get("style") if lk.get("style") in LINK_STYLES else DEFAULTS["links"]["style"],
+                    "items": [x for x in (_link(i) for i in items) if x][:MAX_LINKS]}
+    st = raw.get("staff") if isinstance(raw.get("staff"), dict) else {}
+    cfg["staff"] = {"enabled": bool(st.get("enabled", False)),
+                    "density": st.get("density") if st.get("density") in STAFF_DENSITY else "normal",
+                    "contrast": st.get("contrast") if st.get("contrast") in STAFF_CONTRAST else "normal",
+                    "font": _clamp(st.get("font", 100), *STAFF_FONT, 100)}
     return cfg
 
 
@@ -182,16 +242,39 @@ def _rgb(hex_color: str) -> str:
     return ",".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
 
 
+def luminance(hex_color: str) -> float:
+    """Relative luminance (WCAG) of #rrggbb, 0 (black) to 1 (white)."""
+    h = hex_color.lstrip("#")
+    out = []
+    for i in (0, 2, 4):
+        c = int(h[i:i + 2], 16) / 255
+        out.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]
+
+
+def text_on(hex_color: str) -> str:
+    """Dark or light text, whichever reads better on hex_color."""
+    return "#111827" if luminance(hex_color) > 0.40 else "#ffffff"
+
+
 # ----------------------------------------------------------------------
 # The stylesheet
 # ----------------------------------------------------------------------
-_BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .main"
+# The big blocks (the texture) and the content blocks inside them (a
+# solid card with the accent on its edge). "html body" before each one, and
+# !important, so Koha's Bootstrap rules never win over the chosen colours.
+_BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .mastheadsearch, .main"
+_CONTENT = "#opacmainuserblock, #opacmainblock, #news .newsitem, .newsitem, .news-item"
+
+
+def _strong(selectors: str) -> str:
+    return ", ".join("html body " + x.strip() for x in selectors.split(","))
 
 
 def _texture_css(cfg: dict) -> str:
     t = cfg["texture"]
     surface = "rgba(var(--kei-surface-rgb), var(--kei-surface-a))"
-    base = [f"{_BLOCKS} {{", f"    background: {surface} !important;",
+    base = [f"{_strong(_BLOCKS)} {{", f"    background: {surface} !important;", "    color: var(--kei-text);",
             "    border-radius: var(--kei-r-block) !important;", "    border: 1px solid var(--kei-edge) !important;"]
     if t == "frosted":
         base += ["    -webkit-backdrop-filter: blur(var(--kei-blur)) saturate(140%);",
@@ -211,21 +294,41 @@ def _texture_css(cfg: dict) -> str:
         base[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
                    "rgba(var(--kei-accent-rgb), .10) 55%, rgba(var(--kei-accent2-rgb), .14) 100%) !important;")
     base.append("}")
+    base.append(f"""{_strong(_CONTENT)} {{
+    background: rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
+    color: var(--kei-text) !important;
+    border: 1px solid var(--kei-edge) !important;
+    border-left: 4px solid var(--nexus-primary) !important;
+    border-radius: calc(var(--kei-r-block) * .7) !important;
+    padding: .9rem 1.1rem;
+    margin-bottom: 1rem;
+}}
+html body .main h1, html body .main h2, html body .main h3, html body .main h4, html body .main legend,
+html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-text); }}
+html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei-muted) !important; }}""")
     return "\n".join(base)
 
 
 def css_body(cfg: dict) -> str:
     cfg = normalize(cfg)
     car, ghost = cfg["carousel"], cfg["ghost"]
+    dark_surface = luminance(cfg["surface"]) < 0.30
+    text, muted, edge = (("#f1f5f9", "#cbd5e1", "rgba(255, 255, 255, .14)") if dark_surface
+                         else ("#1f2933", "#52606d", "rgba(15, 23, 42, .10)"))
     out = [f""":root {{
+    --nexus-primary: {cfg['accent']};
+    --nexus-secondary: {cfg['accent2']};
+    --nexus-surface: {cfg['surface']};
+    --nexus-text: {text};
+    --nexus-on-primary: {text_on(cfg['accent'])};
     --kei-accent: {cfg['accent']};
     --kei-accent-rgb: {_rgb(cfg['accent'])};
     --kei-accent2-rgb: {_rgb(cfg['accent2'])};
-    --kei-surface-rgb: 255, 255, 255;
+    --kei-surface-rgb: {_rgb(cfg['surface'])};
     --kei-surface-a: {cfg['opacity'] / 100:.2f};
-    --kei-text: #1f2933;
-    --kei-muted: #52606d;
-    --kei-edge: rgba(15, 23, 42, .10);
+    --kei-text: {text};
+    --kei-muted: {muted};
+    --kei-edge: {edge};
     --kei-blur: {cfg['blur']}px;
     --kei-r-block: {cfg['radius_block']}px;
     --kei-r-input: {cfg['radius_input']}px;
@@ -250,13 +353,16 @@ html[data-kei-theme="dark"] textarea {{ background-color: #161b22; color: var(--
 html[data-kei-theme="dark"] a:not(.btn) {{ color: #79b8ff; }}
 html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb-item {{ color: var(--kei-muted) !important; }}
 {_texture_css(cfg)}
-.main {{ padding: 1.25rem; margin-top: 1rem; }}
+html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
 .btn, button.btn, input[type="submit"] {{ border-radius: var(--kei-r-btn) !important; }}
-.btn-primary {{ background-color: var(--kei-accent) !important; border-color: var(--kei-accent) !important; }}
+html body .btn-primary {{ background-color: var(--nexus-primary) !important; border-color: var(--nexus-primary) !important;
+    color: var(--nexus-on-primary) !important; }}
 .btn-primary:hover, .btn-primary:focus {{ filter: brightness(1.08); }}
 a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}"""]
+    if cfg["page"]:
+        out.append(f"html body {{ background-color: {cfg['page']} !important; }}")
     bg = cfg["background"]["url"]
     if bg:
         out.append(f"""body.kei-wallpaper {{
@@ -328,7 +434,43 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
 .kei-action-text { display: block; color: var(--kei-muted); font-size: .92em; }""")
     if car["enabled"]:
         out.append(_carousel_css(car))
+    if cfg["links"]["enabled"] and cfg["links"]["items"]:
+        out.append(_links_css())
     return "\n".join(out) + "\n"
+
+
+def _links_css() -> str:
+    return """#kei-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: .75rem;
+    margin: 0 0 1.25rem;
+}
+html body a.kei-link {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .85rem 1.1rem;
+    border-radius: var(--kei-r-btn);
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+html body a.kei-link:hover, html body a.kei-link:focus-visible { transform: translateY(-2px); filter: brightness(1.05); }
+.kei-link-icon { font-size: 1.35rem; line-height: 1; min-width: 1.6rem; text-align: center; }
+html body .kei-links-solid a.kei-link { background: var(--nexus-primary); color: var(--nexus-on-primary) !important;
+    box-shadow: 0 4px 14px rgba(var(--kei-accent-rgb), .30); }
+html body .kei-links-gradient a.kei-link { color: #fff !important;
+    background: linear-gradient(135deg, var(--nexus-primary), var(--nexus-secondary));
+    box-shadow: 0 6px 18px rgba(var(--kei-accent2-rgb), .28); }
+html body .kei-links-glass a.kei-link { color: var(--kei-text) !important;
+    background: rgba(var(--kei-surface-rgb), .55);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    backdrop-filter: blur(10px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, .45);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .35); }
+html body .kei-links-glass a.kei-link:hover { border-color: var(--nexus-primary); }
+@media (prefers-reduced-motion: reduce) { html body a.kei-link { transition: none; } }"""
 
 
 def _carousel_css(car: dict) -> str:
@@ -399,13 +541,104 @@ def _carousel_css(car: dict) -> str:
 .kei-nav:hover {{ border-color: var(--kei-accent); }}
 .kei-prev {{ left: -.6rem; }}
 .kei-next {{ right: -.6rem; }}
+/* 3D coverflow: the cards stand on a stage and turn around the centre one. */
+.kei-mode-coverflow .kei-stage {{
+    position: relative;
+    height: 290px;
+    perspective: 1100px;
+    overflow: hidden;
+    touch-action: pan-y;
+    user-select: none;
+}}
+.kei-mode-coverflow .kei-card {{
+    position: absolute;
+    left: 50%;
+    top: 12px;
+    width: 170px;
+    margin-left: -85px;
+    transition: transform .6s cubic-bezier(.22, .61, .36, 1), opacity .6s ease, box-shadow .6s ease;
+    box-shadow: 0 18px 30px rgba(0, 0, 0, .35);
+}}
+.kei-mode-coverflow .kei-card::after {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(0, 0, 0, var(--kei-shade-l, 0)), rgba(0, 0, 0, var(--kei-shade-r, 0)));
+    transition: background .6s ease;
+}}
+.kei-mode-coverflow .kei-card.kei-center {{ box-shadow: 0 24px 40px rgba(0, 0, 0, .45); }}
+.kei-mode-coverflow .kei-card.kei-center .kei-card-info {{ opacity: 1; transform: none; }}
+.kei-mode-coverflow .kei-nav {{ top: 42%; }}
+.kei-mode-coverflow .kei-prev {{ left: .4rem; }}
+.kei-mode-coverflow .kei-next {{ right: .4rem; }}
 @media (prefers-reduced-motion: reduce) {{
     .kei-card, .kei-card img, .kei-card-info, .kei-track {{ transition: none; scroll-behavior: auto; }}
+    .kei-mode-coverflow .kei-card {{ transition: none; }}
 }}"""
 
 
 def css_block(cfg: dict) -> str:
     return "\n".join([CSS_BEGIN, data_line(cfg), css_body(cfg).rstrip("\n"), CSS_END]) + "\n"
+
+
+# ----------------------------------------------------------------------
+# The staff interface (IntranetUserCSS)
+# ----------------------------------------------------------------------
+_STAFF_PAD = {"compact": ".2rem .45rem", "comfortable": ".65rem .85rem"}
+
+
+def staff_css_body(cfg: dict) -> str:
+    """The OPAC's colours on the staff interface, with its own type size,
+    contrast and table density. Only CSS: no carousel, buttons or other
+    OPAC widget ever reaches the staff pages."""
+    cfg = normalize(cfg)
+    st = cfg["staff"]
+    on = text_on(cfg["accent"])
+    out = [f""":root {{
+    --nexus-primary: {cfg['accent']};
+    --nexus-secondary: {cfg['accent2']};
+    --nexus-on-primary: {on};
+    --nexus-primary-rgb: {_rgb(cfg['accent'])};
+}}
+html {{ font-size: {st['font']}%; }}
+html body #header.navbar, html body #header, html body .navbar.navbar-expand#header {{
+    background: linear-gradient(90deg, var(--nexus-primary), var(--nexus-secondary)) !important;
+    border-color: transparent !important;
+}}
+html body #header a, html body #header .navbar-nav > li > a, html body #header .nav-link,
+html body #header .navbar-text {{ color: var(--nexus-on-primary) !important; }}
+html body .btn-primary, html body .btn-primary:hover, html body .btn-primary:focus {{
+    background-color: var(--nexus-primary) !important;
+    border-color: var(--nexus-primary) !important;
+    color: var(--nexus-on-primary) !important;
+}}
+html body .nav-tabs .nav-link.active, html body .ui-tabs .ui-tabs-nav li.ui-tabs-active {{
+    border-top: 3px solid var(--nexus-primary) !important;
+}}
+html body a:focus-visible, html body .btn:focus-visible, html body input:focus, html body select:focus,
+html body textarea:focus {{
+    outline: 3px solid rgba(var(--nexus-primary-rgb), .45) !important;
+    outline-offset: 1px;
+}}"""]
+    pad = _STAFF_PAD.get(st["density"])
+    if pad:
+        out.append(f"""html body table td, html body table th, html body .table > :not(caption) > * > * {{
+    padding: {pad} !important;
+}}""")
+        if st["density"] == "compact":
+            out.append("html body table { line-height: 1.25; }")
+    if st["contrast"] == "high":
+        out.append("""html body { color: #000 !important; }
+html body .text-muted, html body .hint, html body .help-block, html body .form-text { color: #1f1f1f !important; }
+html body table, html body table td, html body table th { border-color: #4b5563 !important; }
+html body a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
+html body .btn { border-width: 2px; }""")
+    return "\n".join(out) + "\n"
+
+
+def staff_css_block(cfg: dict) -> str:
+    return "\n".join([CSS_BEGIN, staff_css_body(cfg).rstrip("\n"), CSS_END]) + "\n"
 
 
 # ----------------------------------------------------------------------
@@ -531,9 +764,13 @@ _JS = r"""(function () {
             });
         }
 
-        // New arrivals, on the OPAC home page only.
         var home = document.getElementById("opac-main") || /opac-main\.pl$/.test(location.pathname)
             || location.pathname === "/";
+
+        // Quick access buttons (link-tree style), at the top of the home page.
+        if (C.links && home && !document.getElementById("kei-links")) { links(C.links); }
+
+        // New arrivals, on the OPAC home page only.
         if (C.carousel && home && !document.getElementById("kei-carousel") && window.fetch) {
             fetch(C.carousel.feed, { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : { items: [] }; })
                 .then(function (feed) { carousel(feed.items || []); })
@@ -541,33 +778,86 @@ _JS = r"""(function () {
         }
     });
 
+    function homeTarget() {
+        return document.getElementById("opacmainuserblock") || document.getElementById("opacmainblock")
+            || document.querySelector(".maincontent") || document.querySelector(".main");
+    }
+
+    function links(L) {
+        var place = homeTarget();
+        if (!place || !L.items || !L.items.length) { return; }
+        var nav = document.createElement("nav");
+        nav.id = "kei-links";
+        nav.className = "kei-links-" + L.style;
+        nav.setAttribute("aria-label", C.text.links);
+        L.items.forEach(function (it) {
+            var url = /^(https?:\/\/|\/(?!\/)|mailto:|tel:|#)/.test(it.url || "") ? it.url : "";
+            if (!url) { return; }
+            var a = document.createElement("a");
+            a.className = "kei-link";
+            a.href = url;
+            if (it.target === "_blank") { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+            var icon = document.createElement("span");
+            icon.className = "kei-link-icon";
+            icon.setAttribute("aria-hidden", "true");
+            if (/^fa-[a-z0-9-]+$/.test(it.icon || "")) {
+                var i = document.createElement("i");
+                i.className = "fa " + it.icon;
+                icon.appendChild(i);
+            } else {
+                icon.textContent = it.icon || "➜";
+            }
+            var label = document.createElement("span");
+            label.textContent = it.text;
+            a.appendChild(icon);
+            a.appendChild(label);
+            nav.appendChild(a);
+        });
+        if (!nav.children.length) { return; }
+        if (place.id === "opacmainuserblock" || place.id === "opacmainblock") {
+            place.insertBefore(nav, place.firstChild);
+        } else {
+            place.parentNode.insertBefore(nav, place);
+        }
+    }
+
+    // New arrivals: 2D flat (a strip that loops for ever) or 3D coverflow
+    // (the cards turn around the centre one, like a real carousel). Both
+    // keep turning after a click or a swipe; only a hidden tab, keyboard
+    // focus inside or "reduce motion" stop them.
     function carousel(items) {
         var K = C.carousel;
-        items = items.slice(0, K.count);
+        items = items.filter(function (it) {
+            return parseInt(it.biblionumber, 10) && /^https:\/\//.test(it.cover || "");
+        }).slice(0, K.count);
         if (!items.length) { return; }
+        var flow = K.mode === "coverflow";
         var box = document.createElement("section");
         box.id = "kei-carousel";
+        box.className = flow ? "kei-mode-coverflow" : "kei-mode-flat";
         box.setAttribute("aria-label", K.title);
+        box.setAttribute("aria-roledescription", "carousel");
         var h = document.createElement("h2");
         h.textContent = K.title;
         var track = document.createElement("div");
-        track.className = "kei-track";
+        track.className = flow ? "kei-stage" : "kei-track";
         box.appendChild(h);
         box.appendChild(track);
         var pending = items.length;
         function settled() {
             pending -= 1;
-            if (pending === 0 && !track.children.length && box.parentNode) { box.parentNode.removeChild(box); }
+            if (pending > 0) { return; }
+            if (!track.children.length) { if (box.parentNode) { box.parentNode.removeChild(box); } return; }
+            (flow ? coverflow : flat)(box, track);
         }
         items.forEach(function (it) {
-            var id = parseInt(it.biblionumber, 10);
-            if (!id || !/^https:\/\//.test(it.cover || "")) { settled(); return; }
             var card = document.createElement("a");
             card.className = "kei-card";
-            card.href = "/cgi-bin/koha/opac-detail.pl?biblionumber=" + id;
+            card.href = "/cgi-bin/koha/opac-detail.pl?biblionumber=" + parseInt(it.biblionumber, 10);
             var img = document.createElement("img");
-            img.loading = "lazy";
+            img.loading = flow ? "eager" : "lazy";
             img.alt = it.title || "";
+            img.draggable = false;
             // Amazon answers a missing cover with a 1x1 image: no card then.
             img.addEventListener("load", function () {
                 if (img.naturalWidth <= 1 && card.parentNode) { card.parentNode.removeChild(card); }
@@ -591,7 +881,7 @@ _JS = r"""(function () {
                 info.appendChild(badge);
                 card.appendChild(info);
             }
-            if (K.hover === "tilt") {
+            if (K.hover === "tilt" && !flow) {
                 card.addEventListener("mousemove", function (e) {
                     var r = card.getBoundingClientRect();
                     var x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
@@ -601,38 +891,142 @@ _JS = r"""(function () {
             }
             track.appendChild(card);
         });
-        [["kei-prev", "\u2039", -1], ["kei-next", "\u203A", 1]].forEach(function (n) {
+        var target = homeTarget();
+        if (!target) { return; }
+        var after = document.getElementById("kei-links");
+        if (after && after.parentNode === target) {
+            target.insertBefore(box, after.nextSibling);
+        } else {
+            target.parentNode.insertBefore(box, target);
+        }
+    }
+
+    function navButtons(box, step) {
+        [["kei-prev", "‹", -1], ["kei-next", "›", 1]].forEach(function (n) {
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "kei-nav " + n[0];
             btn.textContent = n[1];
             btn.setAttribute("aria-label", n[2] < 0 ? C.text.prev : C.text.next);
-            btn.addEventListener("click", function () { step(n[2]); });
+            btn.addEventListener("click", function () { step(n[2], true); });
             box.appendChild(btn);
         });
-        function step(dir) {
-            var w = track.firstElementChild ? track.firstElementChild.getBoundingClientRect().width + 16 : 160;
-            if (dir > 0 && track.scrollLeft + track.clientWidth >= track.scrollWidth - 4) { track.scrollLeft = 0; return; }
-            track.scrollBy({ left: dir * w, behavior: "smooth" });
-        }
-        var target = document.getElementById("opacmainuserblock") || document.querySelector(".maincontent")
-            || document.querySelector(".main");
-        if (!target) { return; }
-        target.parentNode.insertBefore(box, target);
+    }
+
+    // autoplay(box, step): every K.speed ms, for ever (a click restarts the count).
+    function autoplay(box, step) {
+        var K = C.carousel;
         var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (K.autoplay && !still) {
-            var paused = false;
-            box.addEventListener("mouseenter", function () { paused = true; });
-            box.addEventListener("mouseleave", function () { paused = false; });
-            box.addEventListener("focusin", function () { paused = true; });
-            box.addEventListener("focusout", function () { paused = false; });
-            setInterval(function () { if (!paused && !document.hidden) { step(1); } }, K.speed);
+        if (!K.autoplay || still) { return function () {}; }
+        var focused = false, timer = null;
+        box.addEventListener("focusin", function () { focused = true; });
+        box.addEventListener("focusout", function () { focused = false; });
+        function arm() {
+            if (timer) { clearInterval(timer); }
+            timer = setInterval(function () { if (!focused && !document.hidden) { step(1, false); } }, K.speed);
         }
+        arm();
+        return arm;
+    }
+
+    function flat(box, track) {
+        // The cards twice in a row: past the first set the strip jumps back
+        // by its width, so it loops with no visible end.
+        var originals = Array.prototype.slice.call(track.children);
+        var looping = track.scrollWidth > track.clientWidth + 8;
+        if (looping) {
+            originals.forEach(function (c) {
+                var copy = c.cloneNode(true);
+                copy.setAttribute("aria-hidden", "true");
+                copy.tabIndex = -1;
+                track.appendChild(copy);
+            });
+        }
+        function period() { return originals.length ? (track.scrollWidth / (looping ? 2 : 1)) : 0; }
+        function width() {
+            var c = track.firstElementChild;
+            return c ? c.getBoundingClientRect().width + 16 : 160;
+        }
+        var restart = function () {};
+        function step(dir, byHand) {
+            if (looping) {
+                if (dir < 0 && track.scrollLeft < width()) { track.scrollLeft += period(); }
+                if (dir > 0 && track.scrollLeft >= period()) { track.scrollLeft -= period(); }
+            } else if (dir > 0 && track.scrollLeft + track.clientWidth >= track.scrollWidth - 4) {
+                track.scrollLeft = 0;
+                return;
+            }
+            track.scrollBy({ left: dir * width(), behavior: "smooth" });
+            if (byHand) { restart(); }
+        }
+        if (looping) {
+            track.addEventListener("scroll", function () {
+                if (track.scrollLeft >= period()) { track.scrollLeft -= period(); }
+            });
+        }
+        navButtons(box, step);
+        restart = autoplay(box, step);
+    }
+
+    function coverflow(box, track) {
+        var cards = Array.prototype.slice.call(track.children);
+        var n = cards.length, current = 0;
+        function layout() {
+            cards.forEach(function (card, i) {
+                var d = i - current;
+                if (d > n / 2) { d -= n; }
+                if (d < -n / 2) { d += n; }
+                var a = Math.abs(d), side = d < 0 ? -1 : 1;
+                var x = d === 0 ? 0 : side * (110 + (a - 1) * 70);
+                card.style.transform = "translateX(" + x + "px) translateZ(" + (-a * 140) + "px) rotateY(" +
+                    (d === 0 ? 0 : -side * 48) + "deg)";
+                card.style.zIndex = String(100 - a);
+                card.style.opacity = a > 3 ? "0" : "1";
+                card.style.pointerEvents = a > 3 ? "none" : "";
+                card.style.setProperty("--kei-shade-l", d > 0 ? String(Math.min(.15 * a + .15, .6)) : "0");
+                card.style.setProperty("--kei-shade-r", d < 0 ? String(Math.min(.15 * a + .15, .6)) : "0");
+                card.classList.toggle("kei-center", d === 0);
+                card.tabIndex = d === 0 ? 0 : -1;
+                card.setAttribute("aria-hidden", d === 0 ? "false" : "true");
+            });
+        }
+        var restart = function () {};
+        function step(dir, byHand) {
+            current = (current + dir + n) % n;
+            layout();
+            if (byHand) { restart(); }
+        }
+        cards.forEach(function (card, i) {
+            card.addEventListener("click", function (e) {
+                if (!card.classList.contains("kei-center")) {
+                    e.preventDefault();
+                    current = i;
+                    layout();
+                    restart();
+                }
+            });
+        });
+        // Swipe (touch or mouse drag).
+        var x0 = null;
+        track.addEventListener("pointerdown", function (e) { x0 = e.clientX; });
+        track.addEventListener("pointerup", function (e) {
+            if (x0 === null) { return; }
+            var dx = e.clientX - x0;
+            x0 = null;
+            if (Math.abs(dx) > 40) { step(dx < 0 ? 1 : -1, true); }
+        });
+        box.addEventListener("keydown", function (e) {
+            if (e.key === "ArrowRight") { step(1, true); e.preventDefault(); }
+            if (e.key === "ArrowLeft") { step(-1, true); e.preventDefault(); }
+        });
+        layout();
+        navButtons(box, step);
+        restart = autoplay(box, step);
     }
 })();"""
 
 JS_TEXT = {"switch_title": "Light / dark mode", "available": "Available", "out": "On loan", "prev": "Previous",
-           "next": "Next"}
+           "next": "Next", "links": "Quick access"}
 
 
 def js_config(cfg: dict, text: dict | None = None) -> dict:
@@ -645,8 +1039,10 @@ def js_config(cfg: dict, text: dict | None = None) -> dict:
         "empty_columns": cfg["ghost"]["empty_columns"],
         "news_buttons": cfg["news_buttons"],
         "carousel": ({"feed": FEED_URL, "count": car["count"], "autoplay": car["autoplay"], "speed": car["speed"],
-                      "hover": car["hover"], "overlay": car["overlay"], "title": car["title"]}
+                      "hover": car["hover"], "overlay": car["overlay"], "title": car["title"], "mode": car["mode"]}
                      if car["enabled"] else None),
+        "links": ({"style": cfg["links"]["style"], "items": cfg["links"]["items"]}
+                  if cfg["links"]["enabled"] and cfg["links"]["items"] else None),
         "text": {**JS_TEXT, **(text or {})},
     }
 
@@ -768,13 +1164,17 @@ def upload_cloudinary(path: Path, cloud: str, preset: str, post=_post) -> str:
 # The folder handed to `config.sh --task opac-theme-apply DIR`
 # ----------------------------------------------------------------------
 def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None) -> Path:
-    """user.css, user.js, prefs (NAME<TAB>VALUE), carousel (on N|off) and
-    assets/ (the server files to publish). Private (0700)."""
+    """user.css, user.js, staff.css (when the staff interface takes the
+    colours), prefs (NAME<TAB>VALUE), carousel (on N|off) and assets/ (the
+    server files to publish). Private (0700)."""
     cfg = normalize(cfg)
     work = Path(tempfile.mkdtemp(prefix="kei-opac-"))
     os.chmod(work, 0o700)
     (work / "user.css").write_text(css_block(cfg), encoding="utf-8")
     (work / "user.js").write_text(js_block(cfg, text), encoding="utf-8")
+    # No staff.css: the task takes the staff interface's block out again.
+    if cfg["staff"]["enabled"]:
+        (work / "staff.css").write_text(staff_css_block(cfg), encoding="utf-8")
     prefs = []
     car = cfg["carousel"]
     if car["enabled"]:

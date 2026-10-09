@@ -39,7 +39,8 @@ CREATE TABLE systempreferences (variable varchar(50) NOT NULL PRIMARY KEY, value
   explanation mediumtext, type varchar(20)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 INSERT INTO systempreferences (variable, value) VALUES
   ('OpacUserCSS', '#mine { color: red; }'), ('OpacUserJS', 'console.log(\"mine\");'),
-  ('OPACAmazonCoverImages', '0'), ('AmazonAssocTag', ''), ('OpacFavicon', ''), ('OpacNav', 'keep');"
+  ('OPACAmazonCoverImages', '0'), ('AmazonAssocTag', ''), ('OpacFavicon', ''), ('OpacNav', 'keep'),
+  ('IntranetUserCSS', '#staff { color: navy; }');"
     mkdir -p "$W/custom" "$W/work"
     cat > "$W/extra.sh" <<SH
 SYS_LANG=en
@@ -53,6 +54,8 @@ TOOLS_LOG_DIR="$W/logs"
 OPAC_CUSTOM_DIR="$W/custom"
 OPAC_NA_BIN="$W/koha-kei-new-arrivals"
 CRON_OPAC="$W/cron"
+THEME_STATE="$W/etc/theme-settings.json"
+LOG_DIR="$W/logs"
 SH
     apply_dir "$W/apply" "a { color: blue; }" "off"
 }
@@ -166,6 +169,72 @@ task() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat
     task opac_theme_remove
     [ "$status" -eq 0 ]
     [ "$(pref OpacFavicon)" = "https://example.org/f.ico" ]
+}
+
+@test "opac-theme-apply: staff.css goes in IntranetUserCSS, and out again without it" {
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" ".navbar { background: #123456; }" \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.css"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ "$(pref IntranetUserCSS | head -n1)" = "#staff { color: navy; }" ]
+    pref IntranetUserCSS | grep -qF ".navbar { background: #123456; }"
+    rm "$W/apply/staff.css"
+    task opac_theme_apply "$W/apply"
+    [ "$(pref IntranetUserCSS)" = "#staff { color: navy; }" ]
+}
+
+@test "theme-settings.json: saved by apply, written back after a restore, gone with remove" {
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" ".navbar { background: #123456; }" \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.css"
+    task opac_theme_apply "$W/apply"
+    [ -s "$W/etc/theme-settings.json" ]
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert s["settings"] == {"texture": "frosted", "version": 1}, s
+assert set(s["blocks"]) == {"OpacUserCSS", "OpacUserJS", "IntranetUserCSS"}, s
+assert ["AmazonAssocTag", "mytag-20"] in s["prefs"] and s["carousel"] == "off", s
+PY
+    # A restore brings back the backup's preferences: the look is gone.
+    mysql "$DB" -e "UPDATE systempreferences SET value = '#old { }' WHERE variable = 'OpacUserCSS';
+UPDATE systempreferences SET value = '' WHERE variable IN ('OpacUserJS', 'IntranetUserCSS', 'AmazonAssocTag');"
+    rm -f "$W/results"
+    task theme_state_reapply
+    [ "$status" -eq 0 ]
+    [ "$(pref OpacUserCSS | head -n1)" = "#old { }" ]
+    pref OpacUserCSS | grep -qxF "a { color: blue; }"
+    [ "$(pref OpacUserCSS | grep -c 'opac-theme begin')" = "1" ]
+    pref OpacUserJS | grep -qF "(function () { var x = 1; })();"
+    pref IntranetUserCSS | grep -qF ".navbar { background: #123456; }"
+    [ "$(pref AmazonAssocTag)" = "mytag-20" ]
+    grep -q "RESULT theme_reapplied=yes" "$W/results"
+    # Twice is the same as once.
+    task theme_state_reapply
+    [ "$(pref OpacUserCSS | grep -c 'opac-theme begin')" = "1" ]
+    task opac_theme_remove
+    [ ! -e "$W/etc/theme-settings.json" ]
+    [ "$(pref IntranetUserCSS)" = "" ]
+}
+
+@test "theme-settings.json: nothing saved or a damaged file changes nothing" {
+    task theme_state_reapply
+    [ "$status" -eq 0 ]
+    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
+    mkdir -p "$W/etc"
+    printf '{"blocks": {"OpacUserCSS": "</style><script>alert(1)</script>", "OpacUserJS": "x"}}' > "$W/etc/theme-settings.json"
+    task theme_state_reapply
+    [ "$status" -eq 1 ]
+    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
+    printf 'not json' > "$W/etc/theme-settings.json"
+    task theme_state_reapply
+    [ "$status" -eq 1 ]
+    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
+}
+
+@test "restore database: the saved look goes back in before Koha restarts" {
+    reapply=$(grep -n 'tui_run .*theme_state_reapply' "$KEI_REPO/installer" | head -n1 | cut -d: -f1)
+    resume=$(awk -v n="$reapply" 'NR > n && /tui_run .*resume_koha_services/ { print NR; exit }' "$KEI_REPO/installer")
+    [ -n "$reapply" ] && [ -n "$resume" ] && [ $((resume - reapply)) -lt 5 ]
 }
 
 # --- the "New arrivals" job -------------------------------------------

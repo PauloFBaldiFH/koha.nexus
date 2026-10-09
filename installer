@@ -5582,6 +5582,12 @@ function_restore_database() {
     cut_time=$(date '+%Y-%m-%d %H:%M:%S')
     tui_run "$(t "Reindexing the catalog")" restore_task_reindex "$engine" "$cut_time" || rebuild_ok="no"
 
+    # The backup's systempreferences replaced the look made in the panel
+    # (OpacUserCSS, OpacUserJS, IntranetUserCSS): it goes back in.
+    if [ -s "$THEME_STATE" ]; then
+        tui_run "$(t "Re-applying the saved OPAC and staff look")" theme_state_reapply || true
+    fi
+
     tui_run "$(t "Restarting Koha services")" resume_koha_services
     unshield_signals
     maintenance_end
@@ -26641,8 +26647,15 @@ z3950_add() {
 #                        preferences), assets/ (pictures for
 #                        /usr/share/koha/opac/htdocs/images/custom) and
 #                        carousel ("on N" or "off")
-#   opac-theme-remove    both blocks, the pictures, the feed and its schedule
+#                        and staff.css when the staff interface takes the
+#                        colours (IntranetUserCSS; without it our block there
+#                        is taken out)
+#   opac-theme-remove    the blocks, the pictures, the feed and its schedule
 #   opac-carousel-refresh  the feed now
+# Each apply also saves what it wrote in theme-settings.json (CONF_DIR,
+# also reached as /etc/koha-nexus/theme-settings.json): a database restore
+# brings back the backup's systempreferences, which would wipe the look, so
+# Restore database writes the saved blocks back (theme_state_reapply).
 # The carousel reads kei-new-arrivals.json, written every night by
 # koha-kei-new-arrivals: the newest titles with an ISBN, a copy that is not
 # lost or withdrawn, and a real Amazon cover (Amazon answers a missing one
@@ -26655,6 +26668,7 @@ OPAC_NA_FEED="kei-new-arrivals.json"
 CRON_OPAC="/etc/cron.d/koha_kei_opac"
 OPAC_BEGIN="/* koha-easy-installer opac-theme begin */"
 OPAC_END="/* koha-easy-installer opac-theme end */"
+THEME_STATE="${KEI_THEME_STATE:-${CONF_DIR}/theme-settings.json}"
 
 # A system preference as stored (--raw: line breaks kept).
 opac_pref_raw() {
@@ -26833,7 +26847,8 @@ opac_theme_get() {
 opac_theme_apply() {
     local dir="$1" f
     require_database || return 1
-    if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js"; then
+    if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js" \
+       || { [ -e "$dir/staff.css" ] && ! opac_block_ok "$dir/staff.css"; }; then
         msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
         return 1
     fi
@@ -26856,6 +26871,11 @@ _opac_theme_apply() {
         printf 'START TRANSACTION;\n'
         opac_pref_block_sql OpacUserCSS "$dir/user.css"
         opac_pref_block_sql OpacUserJS "$dir/user.js"
+        if [ -f "$dir/staff.css" ]; then
+            opac_pref_block_sql IntranetUserCSS "$dir/staff.css"
+        else
+            opac_pref_block_sql IntranetUserCSS -
+        fi
         if [ -f "$dir/prefs" ]; then
             while IFS=$'\t' read -r name value; do
                 [ -n "$name" ] && opac_pref_line "$name" "$value"
@@ -26885,9 +26905,112 @@ _opac_theme_apply() {
         opac_na_remove
     fi
     memcached_flush || true
+    if theme_state_save "$dir"; then
+        printf 'saved: %s\n' "$THEME_STATE" >> "$log"
+    else
+        log "opac-theme: theme-settings.json could not be written"
+    fi
     log "opac-theme: applied"
     kei_result applied yes
     msg_ok "$(t "✅ The new look is in the OPAC. Reload the catalogue page in the browser to see it.\n\nSafety backup: \${TOOLS_PRE}")"
+}
+
+# theme_state_save DIR: what the apply wrote (the blocks, the allowed
+# preferences, the carousel switch and the settings) as one JSON file.
+theme_state_save() {
+    local dir="$1" tmp
+    mkdir -p "${THEME_STATE%/*}" || return 1
+    tmp=$(mktemp "${THEME_STATE}.XXXXXX") || return 1
+    if python3 -I - "$dir" "${PANEL_VERSION# }" > "$tmp" <<'PY'
+import json, os, re, sys, time
+d, version = sys.argv[1], sys.argv[2]
+def read(name):
+    p = os.path.join(d, name)
+    return open(p, encoding="utf-8").read() if os.path.isfile(p) else None
+css = read("user.css") or ""
+m = re.search(r"/\*\s*KEI-THEME-DATA:\s*(\{.*?\})\s*\*/", css, re.S)
+try:
+    settings = json.loads(m.group(1)) if m else {}
+except ValueError:
+    settings = {}
+prefs = [l.split("\t", 1) for l in (read("prefs") or "").splitlines() if "\t" in l]
+blocks = {"OpacUserCSS": css, "OpacUserJS": read("user.js") or ""}
+if read("staff.css") is not None:
+    blocks["IntranetUserCSS"] = read("staff.css")
+json.dump({"format": 1, "saved": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "panel": version, "settings": settings,
+           "blocks": blocks, "prefs": prefs, "carousel": (read("carousel") or "off").strip()},
+          sys.stdout, ensure_ascii=False, indent=1)
+PY
+    then
+        chmod 644 "$tmp" && mv -f "$tmp" "$THEME_STATE" && return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+# theme_state_reapply: after a database restore, the look saved by the last
+# apply (theme-settings.json) goes back into systempreferences: the blocks of
+# OpacUserCSS, OpacUserJS and IntranetUserCSS (the rest of each preference is
+# the restored one) and the allowed preferences. Nothing saved: nothing done.
+theme_state_reapply() {
+    [ -s "$THEME_STATE" ] || return 0
+    local dir sql f mode count name value
+    dir=$(mktemp -d /tmp/koha_tmp_theme.XXXXXX) || return 1
+    if ! python3 -I - "$THEME_STATE" "$dir" <<'PY'
+import json, os, sys
+state, d = json.load(open(sys.argv[1], encoding="utf-8")), sys.argv[2]
+blocks = state.get("blocks") or {}
+for pref, name in (("OpacUserCSS", "user.css"), ("OpacUserJS", "user.js"), ("IntranetUserCSS", "staff.css")):
+    if isinstance(blocks.get(pref), str) and blocks[pref]:
+        open(os.path.join(d, name), "w", encoding="utf-8").write(blocks[pref])
+with open(os.path.join(d, "prefs"), "w", encoding="utf-8") as fh:
+    for p in state.get("prefs") or []:
+        if isinstance(p, list) and len(p) == 2:
+            fh.write("%s\t%s\n" % (p[0], str(p[1]).replace("\n", " ")))
+open(os.path.join(d, "carousel"), "w").write(str(state.get("carousel") or "off") + "\n")
+PY
+    then
+        rm -rf -- "$dir"
+        log "theme: $THEME_STATE could not be read; the look was not re-applied"
+        return 1
+    fi
+    for f in user.css user.js staff.css; do
+        if [ -e "$dir/$f" ] && ! opac_block_ok "$dir/$f"; then
+            rm -rf -- "$dir"
+            log "theme: $THEME_STATE holds a damaged block ($f); the look was not re-applied"
+            return 1
+        fi
+    done
+    if [ ! -e "$dir/user.css" ] || [ ! -e "$dir/user.js" ]; then
+        rm -rf -- "$dir"
+        return 0
+    fi
+    sql="$dir/theme.sql"
+    {
+        printf 'START TRANSACTION;\n'
+        opac_pref_block_sql OpacUserCSS "$dir/user.css"
+        opac_pref_block_sql OpacUserJS "$dir/user.js"
+        if [ -e "$dir/staff.css" ]; then opac_pref_block_sql IntranetUserCSS "$dir/staff.css"; else opac_pref_block_sql IntranetUserCSS -; fi
+        while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] && opac_pref_line "$name" "$value"
+        done < "$dir/prefs"
+        printf 'COMMIT;\n'
+    } > "$sql"
+    if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "${LOG_DIR}/mysql.log" 2>&1; then
+        rm -rf -- "$dir"
+        log "theme: the saved look could not be written back after the restore"
+        return 1
+    fi
+    read -r mode count < "$dir/carousel" 2>/dev/null
+    rm -rf -- "$dir"
+    memcached_flush >/dev/null 2>&1 || true
+    # The covers of the restored catalogue: the feed again, in the background.
+    if [ "$mode" = "on" ] && [[ "$count" =~ ^[0-9]+$ ]] && [ -x "$OPAC_NA_BIN" ]; then
+        ( "$OPAC_NA_BIN" "$count" ) </dev/null >/dev/null 2>&1 7>&- 8>&- 9>&- &
+    fi
+    log "theme: the saved look was written back after the restore ($THEME_STATE)"
+    kei_result theme_reapplied yes
+    return 0
 }
 
 opac_theme_remove() {
@@ -26904,6 +27027,7 @@ _opac_theme_remove() {
         printf 'START TRANSACTION;\n'
         opac_pref_block_sql OpacUserCSS -
         opac_pref_block_sql OpacUserJS -
+        opac_pref_block_sql IntranetUserCSS -
         fav=$(opac_pref_raw OpacFavicon)
         [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
         printf 'COMMIT;\n'
@@ -26914,6 +27038,7 @@ _opac_theme_remove() {
     fi
     opac_na_remove
     opac_custom_drop background logo favicon
+    rm -f -- "$THEME_STATE"
     memcached_flush || true
     log "opac-theme: removed"
     msg_ok "$(t "✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and OpacUserJS was kept.\n\nSafety backup: \${TOOLS_PRE}")"
