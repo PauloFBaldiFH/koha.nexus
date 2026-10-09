@@ -1208,7 +1208,7 @@ esac
 [ -z "$KEI_CLI_MODE" ] && host_can ntp && { timedatectl set-ntp true >/dev/null 2>&1 || true; }
 
 MISSING_DEPS=()
-for dep in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux; do
+for dep in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux zstd:zstd; do
     if ! command -v "${dep%%:*}" >/dev/null 2>&1; then
         MISSING_DEPS+=("${dep#*:}")
     fi
@@ -2414,7 +2414,44 @@ resume_koha_services() {
     ensure_koha_services >/dev/null 2>&1
 }
 
-# Streams a .sql/.sql.gz backup into a database. Statements that would
+# dump_codec FILE: gz | bz2 | xz | zst | plain, read from the first bytes
+# of the file, never from its name (a .sql.gz that is plain text, or a
+# dump.sql.zst renamed to .sql, still restores).
+dump_codec() {
+    local sig
+    sig=$(head -c 6 -- "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+    case "$sig" in
+        1f8b*)        echo gz ;;
+        425a68*)      echo bz2 ;;
+        fd377a585a00) echo xz ;;
+        28b52ffd*)    echo zst ;;
+        *)            echo plain ;;
+    esac
+}
+
+# dump_cat FILE: the dump as plain SQL on stdout, whatever its compression.
+dump_cat() {
+    case "$(dump_codec "$1")" in
+        gz)  zcat -- "$1" ;;
+        bz2) bzip2 -dc -- "$1" ;;
+        xz)  xz -dc -- "$1" ;;
+        zst) zstd -dcq -- "$1" ;;
+        *)   cat -- "$1" ;;
+    esac
+}
+
+# dump_test FILE: 0 when the compressed stream is intact (plain: always).
+dump_test() {
+    case "$(dump_codec "$1")" in
+        gz)  gzip -t -- "$1" ;;
+        bz2) bzip2 -t -- "$1" ;;
+        xz)  xz -t -- "$1" ;;
+        zst) command -v zstd >/dev/null 2>&1 && zstd -tq -- "$1" ;;
+        *)   return 0 ;;
+    esac
+} 2>/dev/null
+
+# Streams a .sql backup (plain, .gz, .bz2, .xz or .zst) into a database. Statements that would
 # redirect the import to another database (CREATE DATABASE/USE, present in
 # dumps made with --databases), DEFINERs of users that do not exist here and
 # MySQL 8 collations unknown to MariaDB are neutralised.
@@ -2425,7 +2462,7 @@ import_sql_file() {
     [ "$SIGNALS_SHIELDED" = "1" ] && sig_opt=(--sigint-ignore)
     {
         echo "SET FOREIGN_KEY_CHECKS=0; SET UNIQUE_CHECKS=0;"
-        if [[ "$file" == *.gz ]]; then zcat -- "$file"; else cat -- "$file"; fi
+        dump_cat "$file"
         echo ""
         echo "SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1;"
     } | sed -E -e '/^[[:space:]]*(CREATE DATABASE|USE[[:space:]])/Id' \
@@ -2441,8 +2478,8 @@ import_sql_file() {
 # cut short (or made with --skip-comments / by another tool).
 dump_is_complete() {
     local n
-    if [[ "$1" == *.gz ]]; then
-        n=$(zcat -- "$1" 2>/dev/null | tail -c 512 | grep -c '^-- Dump completed')
+    if [ "$(dump_codec "$1")" != "plain" ]; then
+        n=$(dump_cat "$1" 2>/dev/null | tail -c 512 | grep -c '^-- Dump completed')
     else
         n=$(tail -c 512 -- "$1" 2>/dev/null | grep -c '^-- Dump completed')
     fi
@@ -2454,7 +2491,7 @@ dump_is_complete() {
 # uncompressed size, DUMP_HAS_SQL says whether SQL statements were found at
 # the start and DUMP_COMPLETE whether the file ends like a full mysqldump.
 check_dump_file() {
-    local file="$1" n
+    local file="$1" n codec
     DUMP_ERROR=""; DUMP_MB=0; DUMP_HAS_SQL="no"; DUMP_COMPLETE="no"
     if [ ! -f "$file" ] || [ ! -r "$file" ]; then
         DUMP_ERROR="$(t "The file does not exist or cannot be read.\nNothing was changed.")"
@@ -2464,15 +2501,24 @@ check_dump_file() {
         DUMP_ERROR="$(t "The file is empty (0 bytes).\nNothing was changed.")"
         return 1
     fi
-    if [[ "$file" == *.gz ]]; then
-        if ! gzip -t -- "$file" 2>/dev/null; then
-            DUMP_ERROR="$(t "The file is corrupt (failed the gzip test).\nNothing was changed.")"
+    codec=$(dump_codec "$file")
+    if [ "$codec" = "zst" ] && ! command -v zstd >/dev/null 2>&1; then
+        DUMP_ERROR="$(t "This backup is compressed with zstd, which is not installed. Install it (sudo apt install zstd) and try again.\nNothing was changed.")"
+        return 1
+    fi
+    if [ "$codec" != "plain" ]; then
+        if ! dump_test "$file"; then
+            if [ "$codec" = "gz" ]; then
+                DUMP_ERROR="$(t "The file is corrupt (failed the gzip test).\nNothing was changed.")"
+            else
+                DUMP_ERROR="$(t 'The file is corrupt (failed the ${codec} test).\nNothing was changed.')"
+            fi
             return 1
         fi
-        n=$(zcat -- "$file" 2>/dev/null | wc -c)
+        n=$(dump_cat "$file" 2>/dev/null | wc -c)
         # grep -c reads everything: "grep -q" would exit early, head would
         # get SIGPIPE and pipefail would report a valid file as suspicious.
-        [ "$(zcat -- "$file" 2>/dev/null | head -c 200000 | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
+        [ "$(dump_cat "$file" 2>/dev/null | head -c 200000 | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
     else
         n=$(stat -c %s -- "$file" 2>/dev/null)
         [ "$(head -c 200000 -- "$file" | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
@@ -2531,7 +2577,7 @@ picker_start_dir() {
 
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -5357,7 +5403,7 @@ function_restore_database() {
         return 0
     fi
     if [ "$DUMP_HAS_SQL" != "yes" ]; then
-        if [[ "$file" == *.gz ]]; then
+        if [ "$(dump_codec "$file")" != "plain" ]; then
             prompt_yes_no "$(t "Suspicious file")" "$(t "No SQL statements found at the start of the file.\nIt may not be a Koha backup.\n\nContinue anyway?")" 11 72 || return 0
         else
             prompt_yes_no "$(t "Suspicious file")" "$(t "No SQL statements found at the start of the file.\n\nContinue anyway?")" 10 72 || return 0
@@ -20122,8 +20168,9 @@ KEIPY
 """Intake: the dropped file (or folder) becomes a list of members. Archives
 are unpacked inside the work folder with limits (no path outside it, no
 links or devices, size and count caps, zip bombs refused); compressed
-single files (.gz, .bz2, .xz) are read through their decompressor and only
-written out when a reader needs a real file."""
+single files (.gz, .bz2, .xz, .zst) are read through their decompressor and
+only written out when a reader needs a real file. Zstandard has no module in
+Python's standard library before 3.14: it is read through the zstd program."""
 import bz2
 import gzip
 import lzma
@@ -20131,6 +20178,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tarfile
 import zipfile
 
@@ -20141,13 +20189,42 @@ MAX_DEPTH = 3              # archives inside archives
 JUNK = re.compile(r"(^|/)(__MACOSX|\.DS_Store|Thumbs\.db|desktop\.ini|~\$[^/]*|\.~lock\.[^/]*)(/|$)", re.I)
 
 
+class ZstdReader:
+    """The output of zstd -dc as a read-only binary stream."""
+
+    def __init__(self, path):
+        exe = shutil.which("zstd")
+        if not exe:
+            raise OSError("zstd is not installed (sudo apt install zstd)")
+        self._p = subprocess.Popen([exe, "-dcq", "--", path], stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL)
+
+    def read(self, n=-1):
+        return self._p.stdout.read(n)
+
+    def readable(self):
+        return True
+
+    def close(self):
+        self._p.stdout.close()
+        if self._p.poll() is None:
+            self._p.kill()
+        self._p.wait()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
 class Member:
     n_plain = 0
 
     def __init__(self, path, display, codec=None, in_archive=False):
         self.path = path            # file on disk
         self.display = display      # name shown to the operator
-        self.codec = codec          # 'gz' | 'bz2' | 'xz' when read through a decompressor
+        self.codec = codec          # 'gz' | 'bz2' | 'xz' | 'zst' when read through a decompressor
         self.in_archive = in_archive
         self._plain = None
 
@@ -20158,6 +20235,8 @@ class Member:
             return bz2.open(self.path, "rb")
         if self.codec == "xz":
             return lzma.open(self.path, "rb")
+        if self.codec == "zst":
+            return ZstdReader(self.path)
         return open(self.path, "rb")
 
     def plain(self, work):
@@ -20167,7 +20246,7 @@ class Member:
         if not self._plain:
             os.makedirs(os.path.join(work, "plain"), exist_ok=True)
             base = os.path.basename(self.path)
-            base = re.sub(r"\.(gz|bz2|xz)$", "", base, flags=re.I)
+            base = re.sub(r"\.(gz|bz2|xz|zst)$", "", base, flags=re.I)
             Member.n_plain += 1
             self._plain = os.path.join(work, "plain", "%d-%s" % (Member.n_plain, safe_name(base)))
             with self.open() as src, open(self._plain, "wb") as dst:
@@ -20199,6 +20278,8 @@ def codec_of(head):
         return "bz2"
     if head.startswith(b"\xfd7zXZ\x00"):
         return "xz"
+    if head.startswith(b"\x28\xb5\x2f\xfd"):
+        return "zst"
     return None
 
 
@@ -20246,14 +20327,17 @@ class Intake:
         if codec:
             # A compressed tar is an archive; anything else is read as it streams.
             m = Member(path, display, codec, in_archive)
-            with m.open() as fh:
-                try:
+            try:
+                with m.open() as fh:
                     inner = fh.read(512)
-                except (OSError, EOFError, lzma.LZMAError):
-                    self.skipped.append((display, "damaged %s file" % codec))
-                    return
+            except (OSError, EOFError, lzma.LZMAError) as e:
+                self.skipped.append((display, "damaged %s file (%s)" % (codec, e)))
+                return
+            if not inner:
+                self.skipped.append((display, "damaged or empty %s file" % codec))
+                return
             if _is_tar(inner) and depth < MAX_DEPTH:
-                self._untar(path, display, depth)
+                self._untar(path, display, depth, codec)
             else:
                 self.members.append(m)
             return
@@ -20326,12 +20410,23 @@ class Intake:
                     continue
                 self.add(target, display + "/" + name, depth + 1, True)
 
-    def _untar(self, path, display, depth):
+    def _untar(self, path, display, depth, codec=None):
+        if codec == "zst":
+            # tarfile cannot read zstd itself: the stream, member by member.
+            try:
+                with ZstdReader(path) as stream:
+                    self._untar_open(tarfile.open(fileobj=stream, mode="r|"), display, depth)
+            except (tarfile.TarError, OSError, EOFError) as e:
+                self.skipped.append((display, "damaged tar file (%s)" % e))
+            return
         try:
             tf = tarfile.open(path, "r:*")
         except (tarfile.TarError, OSError, EOFError) as e:
             self.skipped.append((display, "damaged tar file (%s)" % e))
             return
+        self._untar_open(tf, display, depth)
+
+    def _untar_open(self, tf, display, depth):
         dest = self._dest()
         with tf:
             for info in tf:
@@ -20361,6 +20456,8 @@ then structure and content), never from the name alone. The Koha backup
 check runs before anything else and wins when it matches."""
 import os
 import re
+import shutil
+import subprocess
 from collections import Counter
 
 from . import holdings, intake, marc
@@ -20490,6 +20587,51 @@ def _by_content(member, fh, head, work):
         if max(widths) >= 2 and Counter(widths).most_common(1)[0][1] >= 0.6 * len(widths):
             return Detection(member, "table", 0.9, "text with columns separated by %r" % {"\t": "TAB"}.get(sep, sep), fmt="csv")
     return Detection(member, "unknown", 0.0, "text without columns")
+
+
+# What to do with a file that is not data the tool reads, by its MIME type
+# (file -b --mime-type): the operator gets a next step, not just "no".
+MIME_HINTS = (
+    ("application/pdf", "a PDF document: export the records from the old system as MARC (.mrc), MARCXML (.xml) or a spreadsheet (.csv, .xlsx) instead"),
+    ("application/msword", "a Word document: save its table as a spreadsheet (.xlsx or .csv) and drop that"),
+    ("application/vnd.openxmlformats-officedocument.wordprocessingml", "a Word document: save its table as a spreadsheet (.xlsx or .csv) and drop that"),
+    ("application/vnd.oasis.opendocument.text", "a text document: save its table as a spreadsheet (.ods, .xlsx or .csv) and drop that"),
+    ("application/x-rar", "a RAR archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/vnd.rar", "a RAR archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/x-7z-compressed", "a 7-Zip archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/x-msaccess", "an Access database: export each table as a spreadsheet (.xlsx or .csv) and drop those"),
+    ("application/x-sqlite3", "an SQLite database: export the tables as .csv and drop those"),
+    ("application/x-executable", "a program, not data"),
+    ("application/x-dosexec", "a Windows program, not data"),
+    ("application/x-sharedlib", "a program library, not data"),
+    ("image/", "a picture: the records cannot be read from it; export them from the old system as MARC or a spreadsheet"),
+    ("audio/", "a sound file, not data"),
+    ("video/", "a video, not data"),
+)
+
+
+def mime_type(member):
+    """file -b --mime-type of the member ('' when file is missing)."""
+    exe = shutil.which("file")
+    if not exe:
+        return ""
+    args = [exe, "-b", "--mime-type"] + (["-z"] if member.codec else []) + ["--", member.path]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=15).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out if re.fullmatch(r"[\w.+-]+/[\w.+-]+", out) else ""
+
+
+def mime_hint(member):
+    """'; <type>: what to do' for a file that was not recognised, or ''."""
+    mime = mime_type(member)
+    if not mime:
+        return ""
+    for prefix, hint in MIME_HINTS:
+        if mime.startswith(prefix):
+            return "; %s: %s" % (mime, hint)
+    return "; %s" % mime
 
 
 # ---------------------------------------------------------------- MARC inspection
@@ -21789,7 +21931,10 @@ def analyse(opts):
             for t in found:
                 plan_table(a, m, t)
         elif d.kind != "part":
-            a.unsupported.append((m.display, UNSUPPORTED.get(d.kind, d.evidence)))
+            why = UNSUPPORTED.get(d.kind, d.evidence)
+            if d.kind == "unknown":
+                why = "%s (%s)%s" % (why, d.evidence, detect.mime_hint(m))
+            a.unsupported.append((m.display, why))
     if not a.questions.open:
         isbn_question(a, opts)
     return a
@@ -22328,9 +22473,9 @@ magic_pick() {
 # applies the same rule inside archives.
 magic_is_koha_dump() {
     local head
-    head=$(gzip -dcf -- "$1" 2>/dev/null | head -c 4096 | tr -d '\0')
+    head=$(dump_cat "$1" 2>/dev/null | head -c 4096 | tr -d '\0')
     [[ "$head" == *"-- MySQL dump"* || "$head" == *"-- MariaDB dump"* ]] || return 1
-    gzip -dcf -- "$1" 2>/dev/null | LC_ALL=C awk '
+    dump_cat "$1" 2>/dev/null | LC_ALL=C awk '
         /^CREATE TABLE `(biblio|biblio_metadata|items|borrowers|systempreferences|marc_subfield_structure)`/ {
             if (!($3 in seen)) { seen[$3] = 1; n++ }
             if (n >= 4) { found = 1; exit }
@@ -22349,13 +22494,14 @@ magic_to_restore() {
 # once the import tool has let go of its work folder and its lock.
 magic_keep_backup() {
     local path="$1" codec="$2" name="${3##*/}" dir
-    name="${name//[^A-Za-z0-9._-]/_}"; name="${name%.gz}"; name="${name%.bz2}"; name="${name%.xz}"
+    name="${name//[^A-Za-z0-9._-]/_}"; name="${name%.gz}"; name="${name%.bz2}"; name="${name%.xz}"; name="${name%.zst}"
     [[ "${name,,}" == *.sql ]] || name="${name}.sql"
     dir=$(mktemp -d /var/tmp/kei-restore.XXXXXX) || return 1
     case "$codec" in
         gz)  cp -f -- "$path" "$dir/${name}.gz" && name="${name}.gz" ;;
         bz2) bzip2 -dc -- "$path" > "$dir/$name" ;;
         xz)  xz -dc -- "$path" > "$dir/$name" ;;
+        zst) zstd -dcq -- "$path" > "$dir/$name" ;;
         *)   cp -f -- "$path" "$dir/$name" ;;
     esac || { rm -rf "$dir"; return 1; }
     chmod 600 "$dir/$name"
@@ -27308,7 +27454,7 @@ kei_task_ui() {
         printf '%s' "$REPLY"
     }
     select_file() {
-        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz}"
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst}"
     }
     select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
     # A file to change by hand (the classic panel opens nano):

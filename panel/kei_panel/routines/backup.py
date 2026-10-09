@@ -201,7 +201,7 @@ async def _restore_file(app, title: str, file: str) -> None:
     out = check.value
     if out.get("has_sql") != "yes":
         question = ("No SQL statements found at the start of the file.\nIt may not be a Koha backup.\n\n"
-                    "Continue anyway?") if file.endswith(".gz") else \
+                    "Continue anyway?") if file.endswith((".gz", ".bz2", ".xz", ".zst")) else \
             "No SQL statements found at the start of the file.\n\nContinue anyway?"
         if not await app.push_screen_wait(ConfirmScreen(t("Suspicious file"), tx(question))):
             return

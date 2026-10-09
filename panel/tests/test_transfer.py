@@ -43,6 +43,11 @@ class FakeReporter:
     ("\\\\wsl.localhost\\Debian\\root\\k.sql", "/root/k.sql"),
     ("file:///home/ana/k%20b.sql", "/home/ana/k b.sql"),
     ("file:///C:/Users/Ana/k.sql", "/mnt/c/Users/Ana/k.sql"),
+    # Escaped or doubled quotes and a Windows line break (drag and drop).
+    ('\\"/home/ana/acervo.mrc\\"', "/home/ana/acervo.mrc"),
+    ("\\'/home/ana/my file.xml\\'\r\n", "/home/ana/my file.xml"),
+    ("\"'/mnt/c/Users/Ana/livros.xlsx'\"", "/mnt/c/Users/Ana/livros.xlsx"),
+    ("'C:\\Koha\\Importar\\dump.sql.zst'\r\n", "/mnt/c/Koha/Importar/dump.sql.zst"),
 ])
 def test_dropped_paths(text, path):
     assert transfer.dropped_path(text) == path
@@ -216,3 +221,10 @@ def test_download_over_ssh_shows_the_scp_command(tmp_path, monkeypatch):
                     break
             return a.screen._command
     assert asyncio.run(main()) == f"scp ana@192.0.2.10:{src} Downloads/"
+
+
+def test_compressed_backups_are_backup_names(tmp_path):
+    for name in ("k.sql", "k.sql.gz", "k.sql.bz2", "k.sql.xz", "k.sql.zst"):
+        assert transfer.is_backup_name(name)
+    (tmp_path / "k.sql.zst").write_text("x")
+    assert transfer.free_target(tmp_path, "k.sql.zst").name == "k (2).sql.zst"

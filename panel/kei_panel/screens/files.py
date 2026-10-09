@@ -31,7 +31,7 @@ from ..i18n import t
 from ..transfer import dropped_path, is_backup_name
 from .dialogs import CopyValues, MessageScreen
 
-BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz")
+BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst")
 
 
 class PathInput(Input):
