@@ -337,10 +337,8 @@
     .download-kicker{font-size:.72rem;letter-spacing:.13em;font-weight:900;color:var(--green-3);margin-bottom:2px}
     .download-banner h3{margin:0 0 3px;font-size:1.22rem}
     .download-banner p{margin:0;color:var(--muted);font-size:.88rem;max-width:690px}
-    .download-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;flex:0 0 auto}
-    .btn-download{white-space:nowrap}
-    .download-source{text-align:center;color:#97ad9e;font-size:.78rem}
-    .download-source:hover{color:var(--text)}
+    .download-banner{flex-wrap:wrap}
+    .download-banner .codebox{flex:1 1 100%;min-width:0;width:100%}
 
     .windows{
       position:relative;
@@ -587,8 +585,6 @@
     @media (max-width: 980px){
       .hero-grid, .install-grid { grid-template-columns: 1fr; }
       .download-banner { flex-direction: column; align-items: stretch; }
-      .download-actions { align-items: stretch; }
-      .btn-download { width: 100%; }
       .grid-3, .footer-grid { grid-template-columns: 1fr 1fr; }
       nav a:nth-child(n+6) { display: none; }
     }
@@ -1007,19 +1003,20 @@ sudo bash installer</pre>
         <div class="download-banner">
           <div class="download-content">
             <div class="download-icon">
-              <svg viewBox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+              <svg viewBox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
             </div>
             <div>
               <div class="download-kicker" data-i18n="win_d_k">WINDOWS INSTALLER</div>
-              <h3 data-i18n="win_d_t">Install Koha with two clicks.</h3>
-              <p data-i18n="win_d_p">Download <strong>Install-Koha.cmd</strong> directly from the official repository and run it. It launches the PowerShell installer for you.</p>
+              <h3 data-i18n="win_d_t">Install Koha with one command.</h3>
+              <p data-i18n="win_d_p">Open PowerShell <strong>as Administrator</strong>, paste this command and press Enter.</p>
             </div>
           </div>
-          <div class="download-actions">
-            <a id="download-cmd" class="btn btn-primary btn-download" href="windows/Install-Koha.cmd" download="Install-Koha.cmd" data-i18n="win_d_b">
-              ⬇ Download Install-Koha.cmd
-            </a>
-            <a class="download-source" href="https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd" target="_blank" rel="noopener" data-i18n="win_d_s">View source on GitHub ↗</a>
+          <div class="codebox">
+            <div class="codebox-head">
+              <span>PowerShell</span>
+              <button class="copy" data-i18n="btn_copy" data-copy="irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copy</button>
+            </div>
+            <pre>irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
           </div>
         </div>
 
@@ -1029,18 +1026,8 @@ sudo bash installer</pre>
               <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
             </div>
             <h3 data-i18n="win_b_t">Installation</h3>
-            <p data-i18n="win_b_p">Open PowerShell <strong>as Administrator</strong> (right-click the Start button → <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>) and run:</p>
-            <div class="codebox" style="margin-top:15px">
-              <div class="codebox-head">
-                <span>PowerShell</span>
-                <button class="copy" data-i18n="btn_copy" data-copy="[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copy</button>
-              </div>
-              <pre>[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
-            </div>
+            <p data-i18n="win_b_p">Right-click the Start button and choose <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>, then click <strong>Yes</strong>. Paste the command above and press Enter.</p>
             <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.</div>
-            <div class="callout" style="margin-top:15px" data-i18n="win_c1">
-              <strong>Easier way:</strong> The button above downloads <code>Install-Koha.cmd</code>. No need to open PowerShell manually.
-            </div>
             <div class="callout" style="margin-top:14px">
               <strong data-i18n="win_c2_t">How to enable Virtualization in BIOS:</strong>
               <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)" data-i18n="win_c2_p1">
@@ -1463,9 +1450,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimum requirements", inst_r1: "Debian 11/12/13 or Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB of RAM; 4 GB or more recommended", inst_r3: "5 GB free space; 10 GB or more recommended", inst_r4: "root or user with sudo privileges", inst_r5: "Internet access for Koha repositories", inst_r6: "Ports 80 and 8080 available",
         inst_a_t: "After installation", inst_a1: "Open the staff interface at <code>http://SERVER-IP:8080</code>", inst_a2: "Complete the Koha Web Installer", inst_a3: "Create your super librarian via the dashboard", inst_a4: "The public catalog is at <code>http://SERVER-IP:80</code>", inst_a5: "Reopen the dashboard anytime with <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "A full Koha environment on a single PC, using WSL 2.", win_p: "The Windows edition is designed for small libraries, training, and evaluation, keeping Koha services inside Debian on WSL 2 while offering native Windows tools.",
-        win_d_k: "WINDOWS INSTALLER", win_d_t: "Install Koha with two clicks.", win_d_p: "Download <strong>Install-Koha.cmd</strong> directly from the official repository and run it. It launches the PowerShell installer for you.", win_d_b: "⬇ Download Install-Koha.cmd", win_d_s: "View source on GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Open PowerShell <strong>as Administrator</strong> (right-click the Start button → <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>) and run:", win_admin: "<strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.",
-        win_c1: "<strong>Easier way:</strong> The button above downloads <code>Install-Koha.cmd</code>. No need to open PowerShell manually.",
+        win_d_k: "WINDOWS INSTALLER", win_d_t: "Install Koha with one command.", win_d_p: "Open PowerShell <strong>as Administrator</strong>, paste this command and press Enter.",
+        win_b_t: "Installation", win_b_p: "Right-click the Start button and choose <em>Terminal (Admin)</em> or <em>Windows PowerShell (Admin)</em>, then click <strong>Yes</strong>. Paste the command above and press Enter.", win_admin: "<strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.",
         win_c2_t: "<strong>How to enable Virtualization in BIOS:</strong>", win_c2_p1: "Restart your PC and repeatedly press the setup key as soon as the screen turns on:",
         win_c2_p2: "Inside the BIOS, find <strong>Intel Virtualization Technology (VT-x)</strong> or <strong>AMD SVM / AMD-V</strong>, switch it to <strong>Enabled</strong>, and press <kbd>F10</kbd> to save.",
         win_c2_p3: "<em>Can't access BIOS via keys?</em> In Windows, go to <strong>Settings → System → Recovery → Advanced startup (Restart now) → Troubleshoot → Advanced options → UEFI Firmware Settings</strong>.",
@@ -1527,9 +1513,8 @@ sudo bash installer</pre>
         inst_r_t: "Requisitos mínimos", inst_r1: "Debian 11/12/13 ou Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB de RAM; 4 GB ou mais recomendados", inst_r3: "5 GB de espaço livre; 10 GB ou mais recomendados", inst_r4: "root ou usuário com privilégios sudo", inst_r5: "Acesso à Internet para os repositórios do Koha", inst_r6: "Portas 80 e 8080 disponíveis",
         inst_a_t: "Após a instalação", inst_a1: "Abra a interface administrativa em <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Conclua o Instalador Web do Koha", inst_a3: "Crie seu super-bibliotecário através do painel", inst_a4: "O catálogo público fica em <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra o painel a qualquer momento com <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Um ambiente Koha completo em um único PC, usando WSL 2.", win_p: "A edição Windows foi pensada para pequenas bibliotecas, treinamentos e testes, mantendo os serviços Koha dentro do Debian no WSL 2 enquanto oferece ferramentas nativas do Windows.",
-        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale o Koha com dois cliques.", win_d_p: "Baixe o <strong>Install-Koha.cmd</strong> diretamente do repositório oficial e execute-o. Ele abre o instalador do PowerShell para você.", win_d_b: "⬇ Baixar Install-Koha.cmd", win_d_s: "Ver código-fonte no GitHub ↗",
-        win_b_t: "Instalação", win_b_p: "Abra o PowerShell <strong>como Administrador</strong> (clique com o botão direito no botão Iniciar → <em>Terminal (Admin)</em> ou <em>Windows PowerShell (Admin)</em>) e execute:", win_admin: "<strong>Use a sua própria conta do Windows.</strong> Se o Windows pedir a senha de <em>outra pessoa</em>, entre primeiro em uma conta de administrador e execute lá: o Debian, os atalhos e a etapa de reinício são criados para a conta que executa o instalador.",
-        win_c1: "<strong>Método mais fácil:</strong> O botão acima baixa o <code>Install-Koha.cmd</code>. Não é preciso abrir o PowerShell manualmente.",
+        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale o Koha com um único comando.", win_d_p: "Abra o PowerShell <strong>como Administrador</strong>, cole este comando e pressione Enter.",
+        win_b_t: "Instalação", win_b_p: "Clique com o botão direito no botão Iniciar e escolha <em>Terminal (Admin)</em> ou <em>Windows PowerShell (Admin)</em>, depois clique em <strong>Sim</strong>. Cole o comando acima e pressione Enter.", win_admin: "<strong>Use a sua própria conta do Windows.</strong> Se o Windows pedir a senha de <em>outra pessoa</em>, entre primeiro em uma conta de administrador e execute lá: o Debian, os atalhos e a etapa de reinício são criados para a conta que executa o instalador.",
         win_c2_t: "<strong>Como ativar a Virtualização na BIOS:</strong>", win_c2_p1: "Reinicie o PC e pressione repetidamente a tecla de acesso assim que a tela ligar:",
         win_c2_p2: "Dentro da BIOS, procure por <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, altere para <strong>Enabled</strong> (Ativado) e pressione <kbd>F10</kbd> para salvar.",
         win_c2_p3: "<em>Não consegue acessar a BIOS pelo atalho?</em> No Windows, vá em <strong>Configurações → Sistema → Recuperação → Inicialização avançada (Reiniciar agora) → Solução de problemas → Opções avançadas → Configurações de Firmware UEFI</strong>.",
@@ -1591,9 +1576,8 @@ sudo bash installer</pre>
         inst_r_t: "Requisitos mínimos", inst_r1: "Debian 11/12/13 o Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB de RAM; 4 GB o más recomendados", inst_r3: "5 GB de espacio libre; 10 GB o más recomendados", inst_r4: "root o usuario con privilegios sudo", inst_r5: "Acceso a Internet para los repositorios de Koha", inst_r6: "Puertos 80 y 8080 disponibles",
         inst_a_t: "Después de la instalación", inst_a1: "Abra la interfaz del personal en <code>http://IP-SERVIDOR:8080</code>", inst_a2: "Complete el Instalador Web de Koha", inst_a3: "Cree su súper bibliotecario desde el panel", inst_a4: "El catálogo público está en <code>http://IP-SERVIDOR:80</code>", inst_a5: "Reabra el panel cuando quiera con <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un entorno Koha completo en un solo PC, usando WSL 2.", win_p: "La edición Windows está pensada para pequeñas bibliotecas, formación y evaluación, manteniendo los servicios Koha dentro de Debian en WSL 2 mientras ofrece herramientas nativas de Windows.",
-        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale Koha con dos clics.", win_d_p: "Descargue <strong>Install-Koha.cmd</strong> directamente del repositorio oficial y ejecútelo. Lanzará el instalador de PowerShell por usted.", win_d_b: "⬇ Descargar Install-Koha.cmd", win_d_s: "Ver código fuente en GitHub ↗",
-        win_b_t: "Instalación", win_b_p: "Abra PowerShell <strong>como Administrador</strong> (clic derecho en el botón Inicio → <em>Terminal (Administrador)</em> o <em>Windows PowerShell (Administrador)</em>) y ejecute:", win_admin: "<strong>Use su propia cuenta de Windows.</strong> Si Windows pide la contraseña de <em>otra persona</em>, inicie sesión primero en una cuenta de administrador y ejecútelo allí: Debian, los accesos directos y el paso de reinicio se crean para la cuenta que ejecuta el instalador.",
-        win_c1: "<strong>Forma más fácil:</strong> El botón de arriba descarga <code>Install-Koha.cmd</code>. No necesita abrir PowerShell manualmente.",
+        win_d_k: "INSTALADOR WINDOWS", win_d_t: "Instale Koha con un solo comando.", win_d_p: "Abra PowerShell <strong>como Administrador</strong>, pegue este comando y pulse Enter.",
+        win_b_t: "Instalación", win_b_p: "Haga clic derecho en el botón Inicio y elija <em>Terminal (Administrador)</em> o <em>Windows PowerShell (Administrador)</em>, y luego haga clic en <strong>Sí</strong>. Pegue el comando de arriba y pulse Enter.", win_admin: "<strong>Use su propia cuenta de Windows.</strong> Si Windows pide la contraseña de <em>otra persona</em>, inicie sesión primero en una cuenta de administrador y ejecútelo allí: Debian, los accesos directos y el paso de reinicio se crean para la cuenta que ejecuta el instalador.",
         win_c2_t: "<strong>Cómo habilitar la Virtualización en BIOS:</strong>", win_c2_p1: "Reinicie su PC y presione repetidamente la tecla de configuración tan pronto se encienda la pantalla:",
         win_c2_p2: "Dentro de la BIOS, busque <strong>Intel Virtualization Technology (VT-x)</strong> o <strong>AMD SVM / AMD-V</strong>, cámbielo a <strong>Enabled</strong> y presione <kbd>F10</kbd> para guardar.",
         win_c2_p3: "<em>¿No puede acceder a la BIOS por teclas?</em> En Windows, vaya a <strong>Configuración → Sistema → Recuperación → Inicio avanzado (Reiniciar ahora) → Solucionar problemas → Opciones avanzadas → Configuración de firmware UEFI</strong>.",
@@ -1655,9 +1639,8 @@ sudo bash installer</pre>
         inst_r_t: "Exigences minimales", inst_r1: "Debian 11/12/13 ou Ubuntu 22.04/24.04, 64 bits", inst_r2: "2 Go de RAM; 4 Go ou plus recommandés", inst_r3: "5 Go d'espace libre; 10 Go ou plus recommandés", inst_r4: "root ou utilisateur avec privilèges sudo", inst_r5: "Accès Internet pour les dépôts Koha", inst_r6: "Ports 80 et 8080 disponibles",
         inst_a_t: "Après l'installation", inst_a1: "Ouvrez l'interface professionnelle à <code>http://IP-SERVEUR:8080</code>", inst_a2: "Terminez l'installation Web de Koha", inst_a3: "Créez votre super bibliothécaire via le tableau de bord", inst_a4: "Le catalogue public est à <code>http://IP-SERVEUR:80</code>", inst_a5: "Rouvrez le tableau de bord avec <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un environnement Koha complet sur un seul PC, utilisant WSL 2.", win_p: "L'édition Windows est conçue pour les petites bibliothèques et la formation, gardant les services Koha à l'intérieur de Debian sur WSL 2 tout en offrant des outils Windows natifs.",
-        win_d_k: "INSTALLATEUR WINDOWS", win_d_t: "Installez Koha en deux clics.", win_d_p: "Téléchargez <strong>Install-Koha.cmd</strong> directement depuis le dépôt officiel et exécutez-le. Il lance l'installateur PowerShell pour vous.", win_d_b: "⬇ Télécharger Install-Koha.cmd", win_d_s: "Voir la source sur GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Ouvrez PowerShell <strong>en tant qu'administrateur</strong> (clic droit sur le bouton Démarrer → <em>Terminal (administrateur)</em> ou <em>Windows PowerShell (admin)</em>) et exécutez :", win_admin: "<strong>Utilisez votre propre compte Windows.</strong> Si Windows demande le mot de passe d'<em>une autre personne</em>, connectez-vous d'abord à un compte administrateur et lancez-le là : Debian, les raccourcis et l'étape de redémarrage sont créés pour le compte qui lance l'installateur.",
-        win_c1: "<strong>Plus facile:</strong> Le bouton ci-dessus télécharge <code>Install-Koha.cmd</code>. Pas besoin d'ouvrir PowerShell manuellement.",
+        win_d_k: "INSTALLATEUR WINDOWS", win_d_t: "Installez Koha en une seule commande.", win_d_p: "Ouvrez PowerShell <strong>en tant qu'administrateur</strong>, collez cette commande et appuyez sur Entrée.",
+        win_b_t: "Installation", win_b_p: "Faites un clic droit sur le bouton Démarrer et choisissez <em>Terminal (administrateur)</em> ou <em>Windows PowerShell (admin)</em>, puis cliquez sur <strong>Oui</strong>. Collez la commande ci-dessus et appuyez sur Entrée.", win_admin: "<strong>Utilisez votre propre compte Windows.</strong> Si Windows demande le mot de passe d'<em>une autre personne</em>, connectez-vous d'abord à un compte administrateur et lancez-le là : Debian, les raccourcis et l'étape de redémarrage sont créés pour le compte qui lance l'installateur.",
         win_c2_t: "<strong>Comment activer la virtualisation dans le BIOS:</strong>", win_c2_p1: "Redémarrez votre PC et appuyez sur la touche de configuration dès que l'écran s'allume:",
         win_c2_p2: "Dans le BIOS, trouvez <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, changez-le en <strong>Enabled</strong>, et appuyez sur <kbd>F10</kbd> pour enregistrer.",
         win_c2_p3: "<em>Impossible d'accéder au BIOS via les touches ?</em> Sous Windows, allez dans <strong>Paramètres → Système → Récupération → Démarrage avancé (Redémarrer maintenant) → Dépannage → Options avancées → Paramètres du microprogramme UEFI</strong>.",
@@ -1719,9 +1702,8 @@ sudo bash installer</pre>
         inst_r_t: "Requisiti minimi", inst_r1: "Debian 11/12/13 o Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB di RAM; 4 GB o più consigliati", inst_r3: "5 GB di spazio libero; 10 GB o più consigliati", inst_r4: "root o utente con privilegi sudo", inst_r5: "Accesso a Internet per i repository Koha", inst_r6: "Porte 80 e 8080 disponibili",
         inst_a_t: "Dopo l'installazione", inst_a1: "Apri l'interfaccia dello staff su <code>http://IP-SERVER:8080</code>", inst_a2: "Completa l'Installatore Web di Koha", inst_a3: "Crea il tuo super bibliotecario tramite il pannello", inst_a4: "Il catalogo pubblico è su <code>http://IP-SERVER:80</code>", inst_a5: "Riapri il pannello in qualsiasi momento con <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Un ambiente Koha completo su un singolo PC, utilizzando WSL 2.", win_p: "L'edizione per Windows è progettata per piccole biblioteche, formazione e valutazione, mantenendo i servizi Koha all'interno di Debian su WSL 2 pur offrendo strumenti nativi di Windows.",
-        win_d_k: "INSTALLATORE WINDOWS", win_d_t: "Installa Koha con due clic.", win_d_p: "Scarica <strong>Install-Koha.cmd</strong> direttamente dal repository ufficiale ed eseguilo. Avvierà l'installatore PowerShell per te.", win_d_b: "⬇ Scarica Install-Koha.cmd", win_d_s: "Vedi il codice sorgente su GitHub ↗",
-        win_b_t: "Installazione", win_b_p: "Apri PowerShell <strong>come amministratore</strong> (clic destro sul pulsante Start → <em>Terminale (amministratore)</em> o <em>Windows PowerShell (amministratore)</em>) ed esegui:", win_admin: "<strong>Usa il tuo account Windows.</strong> Se Windows chiede la password di <em>un'altra persona</em>, accedi prima a un account amministratore ed eseguilo lì: Debian, i collegamenti e il passaggio di riavvio vengono creati per l'account che esegue l'installatore.",
-        win_c1: "<strong>Modo più semplice:</strong> Il pulsante qui sopra scarica <code>Install-Koha.cmd</code>. Non è necessario aprire PowerShell.",
+        win_d_k: "INSTALLATORE WINDOWS", win_d_t: "Installa Koha con un solo comando.", win_d_p: "Apri PowerShell <strong>come amministratore</strong>, incolla questo comando e premi Invio.",
+        win_b_t: "Installazione", win_b_p: "Fai clic destro sul pulsante Start e scegli <em>Terminale (amministratore)</em> o <em>Windows PowerShell (amministratore)</em>, poi fai clic su <strong>Sì</strong>. Incolla il comando qui sopra e premi Invio.", win_admin: "<strong>Usa il tuo account Windows.</strong> Se Windows chiede la password di <em>un'altra persona</em>, accedi prima a un account amministratore ed eseguilo lì: Debian, i collegamenti e il passaggio di riavvio vengono creati per l'account che esegue l'installatore.",
         win_c2_t: "<strong>Come abilitare la virtualizzazione nel BIOS:</strong>", win_c2_p1: "Riavvia il PC e premi ripetutamente il tasto di configurazione non appena lo schermo si accende:",
         win_c2_p2: "All'interno del BIOS, trova <strong>Intel Virtualization Technology (VT-x)</strong> o <strong>AMD SVM / AMD-V</strong>, impostalo su <strong>Enabled</strong> e premi <kbd>F10</kbd> per salvare.",
         win_c2_p3: "<em>Non riesci ad accedere al BIOS con i tasti?</em> In Windows, vai su <strong>Impostazioni → Sistema → Ripristino → Avvio avanzato (Riavvia ora) → Risoluzione dei problemi → Opzioni avanzate → Impostazioni firmware UEFI</strong>.",
@@ -1783,9 +1765,8 @@ sudo bash installer</pre>
         inst_r_t: "Mindestanforderungen", inst_r1: "Debian 11/12/13 oder Ubuntu 22.04/24.04, 64-Bit", inst_r2: "2 GB RAM; 4 GB oder mehr empfohlen", inst_r3: "5 GB freier Speicherplatz; 10 GB oder mehr empfohlen", inst_r4: "root oder Benutzer mit sudo-Rechten", inst_r5: "Internetzugang für Koha-Repositories", inst_r6: "Ports 80 und 8080 verfügbar",
         inst_a_t: "Nach der Installation", inst_a1: "Öffnen Sie die Mitarbeiteroberfläche unter <code>http://SERVER-IP:8080</code>", inst_a2: "Schließen Sie den Koha Web Installer ab", inst_a3: "Erstellen Sie Ihren Superbibliothekar über das Dashboard", inst_a4: "Der öffentliche Katalog befindet sich unter <code>http://SERVER-IP:80</code>", inst_a5: "Öffnen Sie das Dashboard jederzeit wieder mit <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Eine vollständige Koha-Umgebung auf einem einzigen PC mit WSL 2.", win_p: "Die Windows-Edition wurde für kleine Bibliotheken, Schulungen und Evaluierungen entwickelt und behält die Koha-Dienste in Debian unter WSL 2 bei, während sie native Windows-Tools bietet.",
-        win_d_k: "WINDOWS INSTALLER", win_d_t: "Installieren Sie Koha mit zwei Klicks.", win_d_p: "Laden Sie <strong>Install-Koha.cmd</strong> direkt aus dem offiziellen Repository herunter und führen Sie es aus. Es startet den PowerShell-Installer für Sie.", win_d_b: "⬇ Install-Koha.cmd herunterladen", win_d_s: "Quellcode auf GitHub ansehen ↗",
-        win_b_t: "Installation", win_b_p: "Öffnen Sie PowerShell <strong>als Administrator</strong> (Rechtsklick auf die Start-Schaltfläche → <em>Terminal (Administrator)</em> oder <em>Windows PowerShell (Administrator)</em>) und führen Sie Folgendes aus:", win_admin: "<strong>Verwenden Sie Ihr eigenes Windows-Konto.</strong> Fragt Windows nach dem Kennwort <em>einer anderen Person</em>, melden Sie sich zuerst an einem Administratorkonto an und starten Sie es dort: Debian, die Verknüpfungen und der Neustartschritt werden für das Konto angelegt, das den Installer ausführt.",
-        win_c1: "<strong>Einfacherer Weg:</strong> Die Schaltfläche oben lädt <code>Install-Koha.cmd</code> herunter. Sie müssen PowerShell nicht manuell öffnen.",
+        win_d_k: "WINDOWS INSTALLER", win_d_t: "Installieren Sie Koha mit einem einzigen Befehl.", win_d_p: "Öffnen Sie PowerShell <strong>als Administrator</strong>, fügen Sie diesen Befehl ein und drücken Sie die Eingabetaste.",
+        win_b_t: "Installation", win_b_p: "Klicken Sie mit der rechten Maustaste auf die Start-Schaltfläche, wählen Sie <em>Terminal (Administrator)</em> oder <em>Windows PowerShell (Administrator)</em> und klicken Sie auf <strong>Ja</strong>. Fügen Sie den Befehl oben ein und drücken Sie die Eingabetaste.", win_admin: "<strong>Verwenden Sie Ihr eigenes Windows-Konto.</strong> Fragt Windows nach dem Kennwort <em>einer anderen Person</em>, melden Sie sich zuerst an einem Administratorkonto an und starten Sie es dort: Debian, die Verknüpfungen und der Neustartschritt werden für das Konto angelegt, das den Installer ausführt.",
         win_c2_t: "<strong>So aktivieren Sie die Virtualisierung im BIOS:</strong>", win_c2_p1: "Starten Sie Ihren PC neu und drücken Sie wiederholt die Setup-Taste, sobald sich der Bildschirm einschaltet:",
         win_c2_p2: "Suchen Sie im BIOS nach <strong>Intel Virtualization Technology (VT-x)</strong> oder <strong>AMD SVM / AMD-V</strong>, stellen Sie es auf <strong>Enabled</strong> und drücken Sie <kbd>F10</kbd>, um zu speichern.",
         win_c2_p3: "<em>Können Sie nicht über Tasten auf das BIOS zugreifen?</em> Gehen Sie in Windows zu <strong>Einstellungen → System → Wiederherstellung → Erweiterter Start (Jetzt neu starten) → Problembehandlung → Erweiterte Optionen → UEFI-Firmwareeinstellungen</strong>.",
@@ -1845,9 +1826,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimale vereisten", inst_r1: "Debian 11/12/13 of Ubuntu 22.04/24.04, 64-bit", inst_r2: "2 GB RAM; 4 GB of meer aanbevolen", inst_r3: "5 GB vrije ruimte; 10 GB of meer aanbevolen", inst_r4: "root of gebruiker met sudo-rechten", inst_r5: "Internettoegang voor Koha repositories", inst_r6: "Poorten 80 en 8080 beschikbaar",
         inst_a_t: "Na installatie", inst_a1: "Open de personeelsinterface op <code>http://SERVER-IP:8080</code>", inst_a2: "Voltooi de Koha Web Installer", inst_a3: "Maak uw superbibliothecaris aan via het dashboard", inst_a4: "De publieke catalogus is op <code>http://SERVER-IP:80</code>", inst_a5: "Heropen het dashboard op elk gewenst moment met <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Een volledige Koha-omgeving op één pc, via WSL 2.", win_p: "De Windows-editie is ontworpen voor kleine bibliotheken en training, waarbij Koha-services in Debian op WSL 2 behouden blijven en native Windows-tools worden geboden.",
-        win_d_k: "WINDOWS INSTALLATEUR", win_d_t: "Installeer Koha met twee klikken.", win_d_p: "Download <strong>Install-Koha.cmd</strong> rechtstreeks van de officiële repository. Het start het PowerShell-installatieprogramma voor u.", win_d_b: "⬇ Download Install-Koha.cmd", win_d_s: "Bekijk bron op GitHub ↗",
-        win_b_t: "Installatie", win_b_p: "Open PowerShell <strong>als administrator</strong> (rechtsklik op de Startknop → <em>Terminal (Beheerder)</em>) en voer uit:",
-        win_c1: "<strong>Makkelijkere manier:</strong> De knop hierboven downloadt <code>Install-Koha.cmd</code>. U hoeft PowerShell niet te openen.",
+        win_d_k: "WINDOWS INSTALLATEUR", win_d_t: "Installeer Koha met één opdracht.", win_d_p: "Open PowerShell <strong>als administrator</strong>, plak deze opdracht en druk op Enter.",
+        win_b_t: "Installatie", win_b_p: "Klik met de rechtermuisknop op de Startknop, kies <em>Terminal (Beheerder)</em> en klik op <strong>Ja</strong>. Plak de opdracht hierboven en druk op Enter.",
         win_c2_t: "<strong>Virtualisatie inschakelen in BIOS:</strong>", win_c2_p1: "Start uw pc opnieuw op en druk herhaaldelijk op de instellingsknop zodra het scherm aangaat:",
         win_c2_p2: "Zoek in de BIOS naar <strong>Intel Virtualization Technology (VT-x)</strong> of <strong>AMD SVM / AMD-V</strong>, zet het op <strong>Enabled</strong> en druk op <kbd>F10</kbd> om op te slaan.",
         win_c2_p3: "<em>Kunt u de BIOS niet openen via toetsen?</em> Ga in Windows naar <strong>Instellingen → Systeem → Systeemherstel → Geavanceerde opstartopties (Nu opnieuw opstarten) → Problemen oplossen → Geavanceerde opties → UEFI Firmware-instellingen</strong>.",
@@ -1907,9 +1887,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimikrav", inst_r1: "Debian eller Ubuntu 64-bit", inst_r2: "2 GB RAM (4 GB rekommenderas)", inst_r3: "5 GB ledigt utrymme", inst_r4: "root eller sudo-användare", inst_r5: "Internetåtkomst", inst_r6: "Port 80 och 8080",
         inst_a_t: "Efter installation", inst_a1: "Öppna personalgränssnittet på <code>http://SERVER-IP:8080</code>", inst_a2: "Slutför Koha Web Installer", inst_a3: "Skapa en superbibliotekarie i panelen", inst_a4: "Den offentliga katalogen finns på <code>http://SERVER-IP:80</code>", inst_a5: "Panelen kan öppnas med <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "En komplett Koha-miljö på en enda PC.", win_p: "Windows-versionen är utformad för små bibliotek och utbildning.",
-        win_d_k: "WINDOWS INSTALLATION", win_d_t: "Installera Koha med två klick.", win_d_p: "Ladda ner <strong>Install-Koha.cmd</strong> direkt och kör det.", win_d_b: "⬇ Ladda ner Install-Koha.cmd", win_d_s: "Visa källkod på GitHub ↗",
-        win_b_t: "Installation", win_b_p: "Öppna PowerShell <strong>som administratör</strong> (högerklicka på Start → <em>Terminal (administratör)</em>) och kör:",
-        win_c1: "<strong>Enklare sätt:</strong> Knappen ovan laddar ner installationsfilen direkt.",
+        win_d_k: "WINDOWS INSTALLATION", win_d_t: "Installera Koha med ett enda kommando.", win_d_p: "Öppna PowerShell <strong>som administratör</strong>, klistra in kommandot och tryck på Enter.",
+        win_b_t: "Installation", win_b_p: "Högerklicka på Start, välj <em>Terminal (administratör)</em> och klicka på <strong>Ja</strong>. Klistra in kommandot ovan och tryck på Enter.",
         win_c2_t: "<strong>Så här aktiverar du virtualisering i BIOS:</strong>", win_c2_p1: "Starta om datorn och tryck på inställningsknappen (t.ex. F2 eller Del):",
         win_c2_p2: "Hitta <strong>Intel Virtualization Technology</strong> eller <strong>AMD SVM</strong>, ställ in på <strong>Enabled</strong> och spara.",
         win_c2_p3: "<em>Problem med BIOS?</em> Gå till Avancerad start i Windows.",
@@ -1969,9 +1948,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimalne wymagania", inst_r1: "Debian lub Ubuntu 64-bit", inst_r2: "2 GB RAM (zalecane 4 GB)", inst_r3: "5 GB wolnego miejsca", inst_r4: "Użytkownik root lub sudo", inst_r5: "Dostęp do Internetu", inst_r6: "Wolne porty 80 i 8080",
         inst_a_t: "Po instalacji", inst_a1: "Otwórz interfejs na <code>http://IP-SERWERA:8080</code>", inst_a2: "Zakończ instalator sieciowy Koha", inst_a3: "Utwórz superbibliotekarza w panelu", inst_a4: "Katalog publiczny: <code>http://IP-SERWERA:80</code>", inst_a5: "Zawsze możesz otworzyć panel używając <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Pełne środowisko Koha na komputerze z systemem Windows.", win_p: "Wersja dla systemu Windows jest przeznaczona dla małych bibliotek i do celów szkoleniowych.",
-        win_d_k: "INSTALATOR WINDOWS", win_d_t: "Zainstaluj Koha za pomocą dwóch kliknięć.", win_d_p: "Pobierz <strong>Install-Koha.cmd</strong> i uruchom go. Uruchomi instalator dla Ciebie.", win_d_b: "⬇ Pobierz Install-Koha.cmd", win_d_s: "Zobacz kod na GitHub ↗",
-        win_b_t: "Instalacja", win_b_p: "Otwórz PowerShell <strong>jako administrator</strong> (prawy przycisk na Start → <em>Terminal (Administrator)</em>) i uruchom:",
-        win_c1: "<strong>Łatwiejszy sposób:</strong> Przycisk powyżej pobiera instalator automatycznie.",
+        win_d_k: "INSTALATOR WINDOWS", win_d_t: "Zainstaluj Koha jednym poleceniem.", win_d_p: "Otwórz PowerShell <strong>jako administrator</strong>, wklej to polecenie i naciśnij Enter.",
+        win_b_t: "Instalacja", win_b_p: "Kliknij prawym przyciskiem Start, wybierz <em>Terminal (Administrator)</em> i kliknij <strong>Tak</strong>. Wklej polecenie powyżej i naciśnij Enter.",
         win_c2_t: "<strong>Jak włączyć wirtualizację w BIOS-ie:</strong>", win_c2_p1: "Uruchom ponownie komputer i wejdź do ustawień BIOS:",
         win_c2_p2: "Znajdź <strong>Intel Virtualization Technology</strong> lub <strong>AMD SVM</strong>, ustaw na <strong>Enabled</strong> i zapisz.",
         win_c2_p3: "<em>Problem z BIOS-em?</em> Wejdź w Ustawienia zaawansowane w systemie Windows.",
@@ -2031,9 +2009,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimální požadavky", inst_r1: "Debian nebo Ubuntu 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB místa na disku", inst_r4: "Uživatel sudo", inst_r5: "Internetové připojení", inst_r6: "Porty 80 a 8080",
         inst_a_t: "Co dál?", inst_a1: "Otevřete: <code>http://IP:8080</code>", inst_a2: "Dokončete Web Installer", inst_a3: "Vytvořte superknihovníka v panelu", inst_a4: "Katalog na portu 80", inst_a5: "Panel otevřete: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Plné prostředí Koha na PC.", win_p: "Udržuje Koha služby v Debianu pod WSL 2, ale nabízí ikony pro Windows.",
-        win_d_k: "WINDOWS INSTALÁTOR", win_d_t: "Instalace přes PowerShell.", win_d_p: "Stáhněte si Install-Koha.cmd.", win_d_b: "⬇ Stáhnout Install-Koha.cmd", win_d_s: "Zdrojový kód (GitHub) ↗",
-        win_b_t: "Příkazový řádek", win_b_p: "Otevřete PowerShell <strong>jako správce</strong> (pravým tlačítkem na Start → <em>Terminál (správce)</em>) a spusťte:",
-        win_c1: "<strong>Alternativa:</strong> Stačí dvojklik na stažený soubor.",
+        win_d_k: "WINDOWS INSTALÁTOR", win_d_t: "Instalace jedním příkazem.", win_d_p: "Otevřete PowerShell <strong>jako správce</strong>, vložte tento příkaz a stiskněte Enter.",
+        win_b_t: "Příkazový řádek", win_b_p: "Klikněte pravým tlačítkem na Start, zvolte <em>Terminál (správce)</em> a klikněte na <strong>Ano</strong>. Vložte příkaz výše a stiskněte Enter.",
         win_c2_t: "<strong>Jak zapnout Virtualizaci:</strong>", win_c2_p1: "Vstupte do BIOS/UEFI během startu.",
         win_c2_p2: "Zapněte (Enabled) Intel Virtualization nebo AMD SVM.",
         win_c2_p3: "Lze najít přes Obnovení systému ve Windows.",
@@ -2093,9 +2070,8 @@ sudo bash installer</pre>
         inst_r_t: "Минимальные требования", inst_r1: "Debian или Ubuntu 64-bit", inst_r2: "2 ГБ ОЗУ", inst_r3: "5 ГБ свободного места", inst_r4: "Права sudo", inst_r5: "Доступ в интернет", inst_r6: "Порты 80 и 8080",
         inst_a_t: "После установки", inst_a1: "Откройте <code>http://IP:8080</code>", inst_a2: "Завершите Web Installer", inst_a3: "Создайте супербиблиотекаря", inst_a4: "Каталог: <code>http://IP:80</code>", inst_a5: "Открытие панели: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Полная среда Koha на одном ПК.", win_p: "Версия для Windows идеально подходит для небольших библиотек и обучения.",
-        win_d_k: "УСТАНОВЩИК WINDOWS", win_d_t: "Установка в два клика.", win_d_p: "Скачайте <strong>Install-Koha.cmd</strong> и запустите его.", win_d_b: "⬇ Скачать Install-Koha.cmd", win_d_s: "Смотреть исходный код ↗",
-        win_b_t: "Установка", win_b_p: "Откройте PowerShell <strong>от имени администратора</strong> (правый клик по «Пуск» → <em>Терминал (администратор)</em>) и выполните:",
-        win_c1: "<strong>Проще:</strong> Кнопка выше скачивает файл автоматически.",
+        win_d_k: "УСТАНОВЩИК WINDOWS", win_d_t: "Установка одной командой.", win_d_p: "Откройте PowerShell <strong>от имени администратора</strong>, вставьте эту команду и нажмите Enter.",
+        win_b_t: "Установка", win_b_p: "Щёлкните правой кнопкой по «Пуск», выберите <em>Терминал (администратор)</em> и нажмите <strong>Да</strong>. Вставьте команду выше и нажмите Enter.",
         win_c2_t: "<strong>Как включить виртуализацию в BIOS:</strong>", win_c2_p1: "Перезагрузите ПК и войдите в BIOS:",
         win_c2_p2: "Найдите <strong>Intel Virtualization Technology</strong> или <strong>AMD SVM</strong>, выберите <strong>Enabled</strong> и сохраните.",
         win_c2_p3: "Или используйте параметры загрузки Windows.",
@@ -2155,9 +2131,8 @@ sudo bash installer</pre>
         inst_r_t: "Мінімальні вимоги", inst_r1: "Debian або Ubuntu 64-bit", inst_r2: "2 ГБ ОЗП", inst_r3: "5 ГБ вільного місця", inst_r4: "Права sudo", inst_r5: "Доступ до інтернету", inst_r6: "Порти 80 та 8080",
         inst_a_t: "Після встановлення", inst_a1: "Відкрийте <code>http://IP:8080</code>", inst_a2: "Завершіть Web Installer", inst_a3: "Створіть супербібліотекаря", inst_a4: "Каталог: <code>http://IP:80</code>", inst_a5: "Відкриття панелі: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Повне середовище Koha на одному ПК.", win_p: "Версія для Windows ідеально підходить для невеликих бібліотек.",
-        win_d_k: "ІНСТАЛЯТОР WINDOWS", win_d_t: "Встановлення у два кліки.", win_d_p: "Завантажте <strong>Install-Koha.cmd</strong> та запустіть його.", win_d_b: "⬇ Завантажити Install-Koha.cmd", win_d_s: "Дивитись код ↗",
-        win_b_t: "Встановлення", win_b_p: "Відкрийте PowerShell <strong>від імені адміністратора</strong> (правий клік на «Пуск» → <em>Термінал (адміністратор)</em>) і виконайте:",
-        win_c1: "<strong>Простіше:</strong> Кнопка вище завантажує файл автоматично.",
+        win_d_k: "ІНСТАЛЯТОР WINDOWS", win_d_t: "Встановлення однією командою.", win_d_p: "Відкрийте PowerShell <strong>від імені адміністратора</strong>, вставте цю команду й натисніть Enter.",
+        win_b_t: "Встановлення", win_b_p: "Клацніть правою кнопкою на «Пуск», виберіть <em>Термінал (адміністратор)</em> і натисніть <strong>Так</strong>. Вставте команду вище й натисніть Enter.",
         win_c2_t: "<strong>Як увімкнути віртуалізацію:</strong>", win_c2_p1: "Перезавантажте ПК і увійдіть у BIOS:",
         win_c2_p2: "Знайдіть <strong>Intel Virtualization Technology</strong> або <strong>AMD SVM</strong>, увімкніть (Enabled) і збережіть.",
         win_c2_p3: "Або використайте параметри завантаження Windows.",
@@ -2217,9 +2192,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimum gereksinimler", inst_r1: "Debian veya Ubuntu 64-bit", inst_r2: "2 GB RAM; 4 GB önerilir", inst_r3: "5 GB boş alan", inst_r4: "Root veya sudo ayrıcalıkları", inst_r5: "İnternet erişimi", inst_r6: "Port 80 ve 8080 açık olmalı",
         inst_a_t: "Kurulumdan sonra", inst_a1: "Personel arayüzünü açın: <code>http://IP:8080</code>", inst_a2: "Koha Web Yükleyicisini tamamlayın", inst_a3: "Panel aracılığıyla süper kütüphaneci oluşturun", inst_a4: "Katalog: <code>http://IP:80</code>", inst_a5: "Paneli istediğiniz zaman açın: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "WSL 2 kullanarak tek bir bilgisayarda Koha.", win_p: "Küçük kütüphaneler ve eğitim için mükemmel.",
-        win_d_k: "WINDOWS KURULUM", win_d_t: "İki tıklama ile Koha kurun.", win_d_p: "<strong>Install-Koha.cmd</strong> dosyasını indirin ve çalıştırın.", win_d_b: "⬇ Install-Koha.cmd İndir", win_d_s: "Kaynak kodu GitHub'da görüntüle ↗",
-        win_b_t: "Kurulum", win_b_p: "PowerShell'i <strong>yönetici olarak</strong> açın (Başlat'a sağ tıklayın → <em>Terminal (Yönetici)</em>) ve çalıştırın:",
-        win_c1: "<strong>Daha kolay yol:</strong> Yukarıdaki düğme dosyayı doğrudan indirir.",
+        win_d_k: "WINDOWS KURULUM", win_d_t: "Koha'yı tek bir komutla kurun.", win_d_p: "PowerShell'i <strong>yönetici olarak</strong> açın, bu komutu yapıştırın ve Enter'a basın.",
+        win_b_t: "Kurulum", win_b_p: "Başlat'a sağ tıklayın, <em>Terminal (Yönetici)</em> seçin ve <strong>Evet</strong>'e tıklayın. Yukarıdaki komutu yapıştırın ve Enter'a basın.",
         win_c2_t: "<strong>BIOS'ta Sanallaştırma nasıl etkinleştirilir:</strong>", win_c2_p1: "Bilgisayarı yeniden başlatın ve BIOS'a girin:",
         win_c2_p2: "<strong>Intel Virtualization Technology</strong> veya <strong>AMD SVM</strong> öğesini bulun, <strong>Enabled</strong> yapın ve kaydedin.",
         win_c2_p3: "<em>Veya Windows gelişmiş başlangıç seçeneklerini kullanın.</em>",
@@ -2279,9 +2253,8 @@ sudo bash installer</pre>
         inst_r_t: "Minimum Requirements", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB Storage", inst_r4: "Sudo user", inst_r5: "Internet", inst_r6: "Port 80 at 8080",
         inst_a_t: "Pagkatapos ng install", inst_a1: "Buksan ang: <code>http://IP:8080</code>", inst_a2: "Tapusin ang Web Installer", inst_a3: "Gumawa ng librarian", inst_a4: "Katalogo: <code>http://IP:80</code>", inst_a5: "Panel: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Koha sa Windows.", win_p: "WSL 2 environment.",
-        win_d_k: "WINDOWS INSTALLER", win_d_t: "2 Clicks Install.", win_d_p: "I-download ang Install-Koha.cmd.", win_d_b: "⬇ I-download", win_d_s: "GitHub ↗",
-        win_b_t: "Pag-install", win_b_p: "Buksan ang PowerShell <strong>bilang Administrator</strong> (right-click sa Start → <em>Terminal (Admin)</em>) at patakbuhin:",
-        win_c1: "<strong>Mas madali:</strong> I-click ang download button sa itaas.",
+        win_d_k: "WINDOWS INSTALLER", win_d_t: "I-install ang Koha sa isang command.", win_d_p: "Buksan ang PowerShell <strong>bilang Administrator</strong>, i-paste ang command na ito at pindutin ang Enter.",
+        win_b_t: "Pag-install", win_b_p: "I-right-click ang Start, piliin ang <em>Terminal (Admin)</em> at i-click ang <strong>Yes</strong>. I-paste ang command sa itaas at pindutin ang Enter.",
         win_c2_t: "<strong>Paano i-enable ang Virtualization:</strong>", win_c2_p1: "I-restart at pumunta sa BIOS:",
         win_c2_p2: "I-enable ang Intel VT-x o AMD SVM.",
         win_c2_p3: "Gamitin ang Windows Advanced Startup.",
@@ -2342,9 +2315,8 @@ sudo bash installer</pre>
         inst_r_t: "Persyaratan Minimum", inst_r1: "Linux 64-bit", inst_r2: "RAM 2 GB", inst_r3: "Ruang kosong 5 GB", inst_r4: "Pengguna sudo", inst_r5: "Akses Internet", inst_r6: "Port 80 dan 8080",
         inst_a_t: "Setelah instalasi", inst_a1: "Buka <code>http://IP:8080</code>", inst_a2: "Selesaikan Web Installer", inst_a3: "Buat Pustakawan Super", inst_a4: "Katalog: <code>http://IP:80</code>", inst_a5: "Panel: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Lingkungan Koha penuh di PC.", win_p: "Menjalankan Koha via WSL 2 di Windows.",
-        win_d_k: "PENGINSTAL WINDOWS", win_d_t: "Instal Koha dengan dua klik.", win_d_p: "Unduh Install-Koha.cmd.", win_d_b: "⬇ Unduh", win_d_s: "Lihat di GitHub ↗",
-        win_b_t: "Instalasi", win_b_p: "Buka PowerShell <strong>sebagai Administrator</strong> (klik kanan tombol Start → <em>Terminal (Admin)</em>) lalu jalankan:",
-        win_c1: "<strong>Lebih mudah:</strong> Klik tombol unduh di atas.",
+        win_d_k: "PENGINSTAL WINDOWS", win_d_t: "Instal Koha dengan satu perintah.", win_d_p: "Buka PowerShell <strong>sebagai Administrator</strong>, tempel perintah ini lalu tekan Enter.",
+        win_b_t: "Instalasi", win_b_p: "Klik kanan tombol Start, pilih <em>Terminal (Admin)</em> lalu klik <strong>Ya</strong>. Tempel perintah di atas dan tekan Enter.",
         win_c2_t: "<strong>Cara mengaktifkan Virtualisasi:</strong>", win_c2_p1: "Masuk ke pengaturan BIOS saat booting.",
         win_c2_p2: "Aktifkan Intel VT-x atau AMD SVM.",
         win_c2_p3: "Atau gunakan Windows Advanced Startup.",
@@ -2404,9 +2376,8 @@ sudo bash installer</pre>
         inst_r_t: "الحد الأدنى من المتطلبات", inst_r1: "لينكس 64 بت", inst_r2: "2 جيجابايت رام", inst_r3: "5 جيجابايت مساحة", inst_r4: "مستخدم sudo", inst_r5: "إنترنت", inst_r6: "منافذ 80 و 8080",
         inst_a_t: "بعد التثبيت", inst_a1: "افتح <code>http://IP:8080</code>", inst_a2: "أكمل مثبت الويب", inst_a3: "إنشاء أمين مكتبة متميز", inst_a4: "الفهرس: <code>http://IP:80</code>", inst_a5: "اللوحة: <code>sudo config.sh</code>",
         win_kick: "ويندوز 10 / 11", win_h2: "بيئة Koha كاملة على جهاز الكمبيوتر.", win_p: "تشغيل Koha عبر WSL 2.",
-        win_d_k: "مثبت ويندوز", win_d_t: "تثبيت بنقرتين.", win_d_p: "تنزيل Install-Koha.cmd.", win_d_b: "⬇ تنزيل", win_d_s: "عرض المصدر ↗",
-        win_b_t: "التثبيت", win_b_p: "افتح PowerShell <strong>كمسؤول</strong> (انقر بزر الماوس الأيمن على ابدأ ← <em>Terminal (Admin)</em>) ثم شغّل:",
-        win_c1: "<strong>أسهل:</strong> انقر فوق زر التنزيل أعلاه.",
+        win_d_k: "مثبت ويندوز", win_d_t: "ثبّت Koha بأمر واحد.", win_d_p: "افتح PowerShell <strong>كمسؤول</strong>، والصق هذا الأمر واضغط Enter.",
+        win_b_t: "التثبيت", win_b_p: "انقر بزر الماوس الأيمن على ابدأ واختر <em>Terminal (Admin)</em> ثم انقر <strong>نعم</strong>. الصق الأمر أعلاه واضغط Enter.",
         win_c2_t: "<strong>كيفية تمكين المحاكاة الافتراضية:</strong>", win_c2_p1: "أدخل إعدادات BIOS.",
         win_c2_p2: "قم بتمكين Intel VT-x أو AMD SVM.",
         win_c2_p3: "أو استخدم إعدادات بدء تشغيل ويندوز المتقدمة.",
@@ -2466,9 +2437,8 @@ sudo bash installer</pre>
         inst_r_t: "حداقل نیازمندی ها", inst_r1: "لینوکس 64 بیتی", inst_r2: "2 گیگابایت رم", inst_r3: "5 گیگابایت فضا", inst_r4: "کاربر sudo", inst_r5: "اینترنت", inst_r6: "پورت 80 و 8080",
         inst_a_t: "پس از نصب", inst_a1: "باز کردن <code>http://IP:8080</code>", inst_a2: "تکمیل Web Installer", inst_a3: "ایجاد کتابدار ارشد", inst_a4: "کاتالوگ: <code>http://IP:80</code>", inst_a5: "داشبورد: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "محیط کامل Koha در رایانه شخصی.", win_p: "اجرای Koha در ویندوز.",
-        win_d_k: "نصاب ویندوز", win_d_t: "نصب با دو کلیک.", win_d_p: "دانلود Install-Koha.cmd.", win_d_b: "⬇ دانلود", win_d_s: "منبع ↗",
-        win_b_t: "نصب", win_b_p: "PowerShell را <strong>با دسترسی مدیر (Administrator)</strong> باز کنید (کلیک راست روی Start ← <em>Terminal (Admin)</em>) و اجرا کنید:",
-        win_c1: "<strong>آسان تر:</strong> دکمه دانلود بالا.",
+        win_d_k: "نصاب ویندوز", win_d_t: "نصب Koha با یک فرمان.", win_d_p: "PowerShell را <strong>با دسترسی مدیر (Administrator)</strong> باز کنید، این فرمان را بچسبانید و Enter را بزنید.",
+        win_b_t: "نصب", win_b_p: "روی Start کلیک راست کنید، <em>Terminal (Admin)</em> را انتخاب کنید و <strong>Yes</strong> را بزنید. فرمان بالا را بچسبانید و Enter را بزنید.",
         win_c2_t: "<strong>فعال کردن مجازی سازی:</strong>", win_c2_p1: "وارد تنظیمات BIOS شوید.",
         win_c2_p2: "Intel VT-x یا AMD SVM را فعال کنید.",
         win_c2_p3: "یا از استارتاپ پیشرفته ویندوز استفاده کنید.",
@@ -2528,9 +2498,8 @@ sudo bash installer</pre>
         inst_r_t: "न्यूनतम आवश्यकताएं", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB स्पेस", inst_r4: "Sudo उपयोगकर्ता", inst_r5: "इंटरनेट", inst_r6: "पोर्ट 80 और 8080",
         inst_a_t: "स्थापना के बाद", inst_a1: "खोलें <code>http://IP:8080</code>", inst_a2: "Web Installer पूरा करें", inst_a3: "सुपर लाइब्रेरियन बनाएं", inst_a4: "कैटलॉग: <code>http://IP:80</code>", inst_a5: "डैशबोर्ड: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC पर पूर्ण Koha वातावरण।", win_p: "Windows में Koha चलाएं।",
-        win_d_k: "विंडोज़ इंस्टॉलर", win_d_t: "दो क्लिक में स्थापित करें।", win_d_p: "Install-Koha.cmd डाउनलोड करें।", win_d_b: "⬇ डाउनलोड", win_d_s: "स्रोत देखें ↗",
-        win_b_t: "स्थापना", win_b_p: "PowerShell को <strong>व्यवस्थापक (Administrator) के रूप में</strong> खोलें (Start पर राइट-क्लिक → <em>Terminal (Admin)</em>) और चलाएं:",
-        win_c1: "<strong>आसान तरीका:</strong> ऊपर डाउनलोड बटन पर क्लिक करें।",
+        win_d_k: "विंडोज़ इंस्टॉलर", win_d_t: "एक कमांड से Koha स्थापित करें।", win_d_p: "PowerShell को <strong>व्यवस्थापक (Administrator) के रूप में</strong> खोलें, यह कमांड पेस्ट करें और Enter दबाएँ।",
+        win_b_t: "स्थापना", win_b_p: "Start पर राइट-क्लिक करें, <em>Terminal (Admin)</em> चुनें और <strong>Yes</strong> पर क्लिक करें। ऊपर की कमांड पेस्ट करें और Enter दबाएँ।",
         win_c2_t: "<strong>वर्चुअलाइजेशन कैसे सक्षम करें:</strong>", win_c2_p1: "BIOS सेटिंग्स दर्ज करें।",
         win_c2_p2: "Intel VT-x या AMD SVM सक्षम करें।",
         win_c2_p3: "या Windows उन्नत स्टार्टअप का उपयोग करें।",
@@ -2590,9 +2559,8 @@ sudo bash installer</pre>
         inst_r_t: "ন্যূনতম প্রয়োজনীয়তা", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB স্পেস", inst_r4: "Sudo ব্যবহারকারী", inst_r5: "ইন্টারনেট", inst_r6: "পোর্ট 80 এবং 8080",
         inst_a_t: "ইনস্টলেশনের পরে", inst_a1: "খুলুন <code>http://IP:8080</code>", inst_a2: "Web Installer সম্পূর্ণ করুন", inst_a3: "সুপার লাইব্রেরিয়ান তৈরি করুন", inst_a4: "ক্যাটালগ: <code>http://IP:80</code>", inst_a5: "ড্যাশবোর্ড: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC-তে সম্পূর্ণ Koha পরিবেশ।", win_p: "Windows-এ Koha চালান।",
-        win_d_k: "উইন্ডোজ ইনস্টলার", win_d_t: "দুই ক্লিকে ইনস্টল করুন।", win_d_p: "Install-Koha.cmd ডাউনলোড করুন।", win_d_b: "⬇ ডাউনলোড", win_d_s: "উৎস দেখুন ↗",
-        win_b_t: "ইনস্টলেশন", win_b_p: "PowerShell <strong>অ্যাডমিনিস্ট্রেটর হিসেবে</strong> খুলুন (Start-এ রাইট-ক্লিক → <em>Terminal (Admin)</em>) এবং চালান:",
-        win_c1: "<strong>সহজ উপায়:</strong> উপরের ডাউনলোড বোতামে ক্লিক করুন।",
+        win_d_k: "উইন্ডোজ ইনস্টলার", win_d_t: "একটি কমান্ডে Koha ইনস্টল করুন।", win_d_p: "PowerShell <strong>অ্যাডমিনিস্ট্রেটর হিসেবে</strong> খুলুন, এই কমান্ডটি পেস্ট করে Enter চাপুন।",
+        win_b_t: "ইনস্টলেশন", win_b_p: "Start-এ রাইট-ক্লিক করে <em>Terminal (Admin)</em> বেছে নিন এবং <strong>Yes</strong> ক্লিক করুন। উপরের কমান্ডটি পেস্ট করে Enter চাপুন।",
         win_c2_t: "<strong>কীভাবে ভার্চুয়ালাইজেশন সক্ষম করবেন:</strong>", win_c2_p1: "BIOS সেটিংসে প্রবেশ করুন।",
         win_c2_p2: "Intel VT-x বা AMD SVM সক্ষম করুন।",
         win_c2_p3: "অথবা Windows Advanced Startup ব্যবহার করুন।",
@@ -2652,9 +2620,8 @@ sudo bash installer</pre>
         inst_r_t: "Yêu cầu tối thiểu", inst_r1: "Linux 64-bit", inst_r2: "RAM 2 GB", inst_r3: "Không gian 5 GB", inst_r4: "Người dùng Sudo", inst_r5: "Internet", inst_r6: "Cổng 80 và 8080",
         inst_a_t: "Sau khi cài đặt", inst_a1: "Mở <code>http://IP:8080</code>", inst_a2: "Hoàn tất Web Installer", inst_a3: "Tạo thủ thư cấp cao", inst_a4: "Danh mục: <code>http://IP:80</code>", inst_a5: "Bảng điều khiển: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "Môi trường Koha đầy đủ trên PC.", win_p: "Chạy Koha trên Windows.",
-        win_d_k: "TRÌNH CÀI ĐẶT WINDOWS", win_d_t: "Cài đặt với hai cú nhấp chuột.", win_d_p: "Tải xuống Install-Koha.cmd.", win_d_b: "⬇ Tải xuống", win_d_s: "Xem nguồn ↗",
-        win_b_t: "Cài đặt", win_b_p: "Mở PowerShell <strong>với quyền Quản trị viên</strong> (nhấp chuột phải vào Start → <em>Terminal (Admin)</em>) rồi chạy:",
-        win_c1: "<strong>Cách dễ hơn:</strong> Nhấp vào nút tải xuống ở trên.",
+        win_d_k: "TRÌNH CÀI ĐẶT WINDOWS", win_d_t: "Cài đặt Koha bằng một lệnh.", win_d_p: "Mở PowerShell <strong>với quyền Quản trị viên</strong>, dán lệnh này và nhấn Enter.",
+        win_b_t: "Cài đặt", win_b_p: "Nhấp chuột phải vào Start, chọn <em>Terminal (Admin)</em> rồi nhấp <strong>Có</strong>. Dán lệnh ở trên và nhấn Enter.",
         win_c2_t: "<strong>Cách bật Ảo hóa:</strong>", win_c2_p1: "Vào cài đặt BIOS.",
         win_c2_p2: "Bật Intel VT-x hoặc AMD SVM.",
         win_c2_p3: "Hoặc sử dụng Khởi động Nâng cao của Windows.",
@@ -2714,9 +2681,8 @@ sudo bash installer</pre>
         inst_r_t: "最低要求", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB 空间", inst_r4: "Sudo 用户", inst_r5: "互联网", inst_r6: "端口 80 和 8080",
         inst_a_t: "安装后", inst_a1: "打开 <code>http://IP:8080</code>", inst_a2: "完成 Web Installer", inst_a3: "创建超级管理员", inst_a4: "目录: <code>http://IP:80</code>", inst_a5: "控制面板: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC 上的完整 Koha 环境。", win_p: "在 Windows 上运行 Koha。",
-        win_d_k: "WINDOWS 安装程序", win_d_t: "两步安装。", win_d_p: "下载 Install-Koha.cmd。", win_d_b: "⬇ 下载", win_d_s: "查看源码 ↗",
-        win_b_t: "安装", win_b_p: "<strong>以管理员身份</strong>打开 PowerShell(右键单击“开始”→ <em>终端(管理员)</em>)并运行:",
-        win_c1: "<strong>更简单:</strong> 点击上面的下载按钮。",
+        win_d_k: "WINDOWS 安装程序", win_d_t: "一条命令安装 Koha。", win_d_p: "<strong>以管理员身份</strong>打开 PowerShell,粘贴此命令并按 Enter。",
+        win_b_t: "安装", win_b_p: "右键单击“开始”,选择 <em>终端(管理员)</em>,然后点击<strong>是</strong>。粘贴上面的命令并按 Enter。",
         win_c2_t: "<strong>如何启用虚拟化:</strong>", win_c2_p1: "进入 BIOS 设置。",
         win_c2_p2: "启用 Intel VT-x 或 AMD SVM。",
         win_c2_p3: "或使用 Windows 高级启动。",
@@ -2776,9 +2742,8 @@ sudo bash installer</pre>
         inst_r_t: "最小要件", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GBのスペース", inst_r4: "Sudoユーザー", inst_r5: "インターネット", inst_r6: "ポート80と8080",
         inst_a_t: "インストール後", inst_a1: "開く: <code>http://IP:8080</code>", inst_a2: "Web Installerを完了する", inst_a3: "スーパーライブラリアンを作成", inst_a4: "カタログ: <code>http://IP:80</code>", inst_a5: "ダッシュボード: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC上の完全なKoha環境。", win_p: "WindowsでKohaを実行します。",
-        win_d_k: "WINDOWS インストーラー", win_d_t: "2クリックでインストール。", win_d_p: "Install-Koha.cmdをダウンロード。", win_d_b: "⬇ ダウンロード", win_d_s: "ソースを見る ↗",
-        win_b_t: "インストール", win_b_p: "PowerShell を<strong>管理者として</strong>開き(スタートを右クリック → <em>ターミナル (管理者)</em>)、次を実行:",
-        win_c1: "<strong>より簡単:</strong> 上のダウンロードボタンをクリックします。",
+        win_d_k: "WINDOWS インストーラー", win_d_t: "コマンド1つでKohaをインストール。", win_d_p: "PowerShell を<strong>管理者として</strong>開き、このコマンドを貼り付けて Enter を押します。",
+        win_b_t: "インストール", win_b_p: "スタートを右クリックして <em>ターミナル (管理者)</em> を選び、<strong>はい</strong>をクリックします。上のコマンドを貼り付けて Enter を押します。",
         win_c2_t: "<strong>仮想化を有効にする方法:</strong>", win_c2_p1: "BIOS設定に入ります。",
         win_c2_p2: "Intel VT-xまたはAMD SVMを有効にします。",
         win_c2_p3: "またはWindowsの高度なスタートアップを使用します。",
@@ -2838,9 +2803,8 @@ sudo bash installer</pre>
         inst_r_t: "최소 요구 사항", inst_r1: "Linux 64-bit", inst_r2: "2 GB RAM", inst_r3: "5 GB 공간", inst_r4: "Sudo 사용자", inst_r5: "인터넷", inst_r6: "포트 80 및 8080",
         inst_a_t: "설치 후", inst_a1: "열기: <code>http://IP:8080</code>", inst_a2: "Web Installer 완료", inst_a3: "최고 사서 만들기", inst_a4: "카탈로그: <code>http://IP:80</code>", inst_a5: "대시보드: <code>sudo config.sh</code>",
         win_kick: "Windows 10 / 11", win_h2: "PC의 전체 Koha 환경.", win_p: "Windows에서 Koha 실행.",
-        win_d_k: "WINDOWS 설치 프로그램", win_d_t: "두 번의 클릭으로 설치.", win_d_p: "Install-Koha.cmd 다운로드.", win_d_b: "⬇ 다운로드", win_d_s: "소스 보기 ↗",
-        win_b_t: "설치", win_b_p: "PowerShell을 <strong>관리자 권한으로</strong> 열고(시작 단추 우클릭 → <em>터미널(관리자)</em>) 실행:",
-        win_c1: "<strong>더 쉬운 방법:</strong> 위 다운로드 버튼 클릭.",
+        win_d_k: "WINDOWS 설치 프로그램", win_d_t: "명령 하나로 Koha 설치.", win_d_p: "PowerShell을 <strong>관리자 권한으로</strong> 열고 이 명령을 붙여넣은 뒤 Enter를 누르세요.",
+        win_b_t: "설치", win_b_p: "시작 단추를 우클릭해 <em>터미널(관리자)</em>을 선택하고 <strong>예</strong>를 클릭하세요. 위 명령을 붙여넣고 Enter를 누르세요.",
         win_c2_t: "<strong>가상화 활성화 방법:</strong>", win_c2_p1: "BIOS 설정으로 들어갑니다.",
         win_c2_p2: "Intel VT-x 또는 AMD SVM 활성화.",
         win_c2_p3: "또는 Windows 고급 시작 사용.",
@@ -2968,14 +2932,6 @@ sudo bash installer</pre>
         setTimeout(() => button.innerHTML = original, ok ? 1600 : 2200);
       });
     });
-
-    const cmdLink = document.getElementById("download-cmd");
-    if (cmdLink) {
-      cmdLink.addEventListener("click", () => {
-        cmdLink.classList.add("is-downloading");
-        setTimeout(() => cmdLink.classList.remove("is-downloading"), 900);
-      });
-    }
 
     // ----------------------------------------------------------------------
     // Rede pública: lista de bibliotecas vinda do broker (Cloudflare Worker)
