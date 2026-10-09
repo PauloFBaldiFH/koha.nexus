@@ -103,7 +103,8 @@ Button.small {
     height: auto;
     min-height: 7;
 }
-/* Long labels wrap on two or three lines instead of being cut off. */
+/* Long labels wrap on two or three lines instead of being cut off; the
+   hint under them is one line that scrolls (widgets/marquee.py). */
 .action-card Label { width: 1fr; }
 .action-card:hover {
     border: round $primary-lighten-2;
