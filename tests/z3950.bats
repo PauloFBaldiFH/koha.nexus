@@ -32,6 +32,9 @@ kei_result() { printf 'RESULT %s=%s\n' "\$1" "\$2" >> "$W/results"; }
 require_database() { return 0; }
 is_koha_installed() { return 0; }
 TOOLS_LOG_DIR="$W/logs"
+# The Zeus bridge: not running, and its install only noted.
+sru_bridge_listening() { return 1; }
+sru_bridge_install() { echo called >> "$W/bridge"; }
 SH
     ( umask 077
       printf '%s\t' lx2.loc.gov 210 LCDB USMARC utf8 'Library of Congress' 3 0 zed '' '' ''; printf '\n'
@@ -61,6 +64,8 @@ zsql() { mysql -N "$DB" -e "$1"; }
     # The Zeus bridge gets its SRU fields and options; a Z39.50 server gets none.
     [ "$(zsql "SELECT servertype, port, db, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\ttitle=dc.title,isbn=dc.isbn\tsru_version=1.1,schema=marcxml')" ]
     [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-') FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t')" ]
+    # The Zeus row asked for its bridge to be installed and started.
+    [ "$(cat "$W/bridge")" = called ]
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
     grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
@@ -111,4 +116,17 @@ zsql() { mysql -N "$DB" -e "$1"; }
 @test "z3950: the panel knows the tasks" {
     grep -q '^        z3950-list)' "$KEI_REPO/installer"
     grep -q '^        z3950-add) ' "$KEI_REPO/installer"
+}
+
+@test "z3950-add: no bridge install without a Zeus row" {
+    ( printf '%s\t' z3950.ufsc.br 210 Default USMARC utf8 UFSC 1 0 zed '' '' '' ''; printf '\n' ) > "$W/u.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/u.tsv"
+    [ "$status" -eq 0 ]
+    [ ! -e "$W/bridge" ]
+}
+
+@test "sru-bridge: the panel task exists and the unit starts the bridge on boot" {
+    grep -q '^        sru-bridge)' "$KEI_REPO/installer"
+    grep -q 'WantedBy=multi-user.target' "$KEI_REPO/installer"
+    grep -q 'ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m zeus_sru' "$KEI_REPO/installer"
 }

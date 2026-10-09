@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.25"
+PANEL_VERSION=" 1.5.26"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -26081,10 +26081,107 @@ z3950_valid() {
     [[ "$7" =~ ^[0-9]{1,4}$ && "$8" =~ ^[0-9]{1,4}$ ]]
 }
 
+# ----------------------------------------------------------------------
+# The Zeus SRU bridge (sru-bridge/ in the repository): Koha's "Catálogo
+# Zeus" target is 127.0.0.1:5000/sru, answered by this small service. It is
+# installed under KEI_LIB_DIR with its own venv and runs as the systemd unit
+# koha-zeus-sru (enabled at boot, restarted on failure).
+# ----------------------------------------------------------------------
+SRU_BRIDGE_DIR="/usr/local/lib/koha-easy-installer/sru-bridge"
+SRU_BRIDGE_UNIT="koha-zeus-sru"
+SRU_BRIDGE_PORT=5000
+
+# 0 when $1 holds the bridge's sources.
+sru_bridge_src_ok() { [ -f "$1/zeus_sru/app.py" ] && [ -f "$1/requirements.txt" ]; }
+
+# 0 when something answers on 127.0.0.1:SRU_BRIDGE_PORT.
+sru_bridge_listening() {
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn "sport = :${SRU_BRIDGE_PORT}" 2>/dev/null | grep -q LISTEN
+    else
+        (exec 3<>"/dev/tcp/127.0.0.1/${SRU_BRIDGE_PORT}") 2>/dev/null
+    fi
+}
+
+# Sources (next to this script, else from GitHub), venv, unit, start, check.
+sru_bridge_install() {
+    local src="" tmp="" log cert=""
+    log=$(tools_log sru-bridge 2>/dev/null || echo "${LOG_DIR:-/tmp}/sru-bridge.log")
+    if [ -n "${_SCRIPT_DIR:-}" ] && sru_bridge_src_ok "${_SCRIPT_DIR}/sru-bridge"; then
+        src="${_SCRIPT_DIR}/sru-bridge"
+    else
+        tmp=$(mktemp -d /tmp/koha_tmp_sru.XXXXXX) || return 1
+        if curl -fsSL --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 120 "$KEI_PANEL_TARBALL_URL" \
+             | tar -xz -C "$tmp" --wildcards '*/sru-bridge/*' 2>>"$log" \
+           && sru_bridge_src_ok "$(echo "$tmp"/*/sru-bridge)"; then
+            src="$(echo "$tmp"/*/sru-bridge)"
+        fi
+    fi
+    if [ -z "$src" ]; then
+        [ -n "$tmp" ] && rm -rf "$tmp"
+        printf 'sru-bridge: sources not found (no internet?)\n' >> "$log"
+        kei_result bridge "no-sources"
+        return 1
+    fi
+    command -v python3 >/dev/null 2>&1 || apt_install python3 >>"$log" 2>&1
+    python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv >>"$log" 2>&1
+    mkdir -p "$SRU_BRIDGE_DIR"
+    rm -rf "$SRU_BRIDGE_DIR/zeus_sru"
+    cp -r "$src/zeus_sru" "$src/requirements.txt" "$SRU_BRIDGE_DIR/" || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
+    [ -n "$tmp" ] && rm -rf "$tmp"
+    find "$SRU_BRIDGE_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
+    [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
+    if ! cmp -s "$SRU_BRIDGE_DIR/requirements.txt" "$SRU_BRIDGE_DIR/.venv/.requirements" 2>/dev/null; then
+        rm -rf "$SRU_BRIDGE_DIR/.venv"
+        if ! python3 -m venv "$SRU_BRIDGE_DIR/.venv" >>"$log" 2>&1 \
+           || ! PIP_CERT="${PIP_CERT:-$cert}" "$SRU_BRIDGE_DIR/.venv/bin/python" -m pip install --quiet \
+                  --disable-pip-version-check --retries 2 --timeout 20 -r "$SRU_BRIDGE_DIR/requirements.txt" >>"$log" 2>&1; then
+            rm -rf "$SRU_BRIDGE_DIR/.venv"
+            kei_result bridge "no-venv"
+            return 1
+        fi
+        cp -f "$SRU_BRIDGE_DIR/requirements.txt" "$SRU_BRIDGE_DIR/.venv/.requirements"
+    fi
+    cat > "/etc/systemd/system/${SRU_BRIDGE_UNIT}.service" <<UNIT
+[Unit]
+Description=Zeus SRU bridge for Koha (127.0.0.1:${SRU_BRIDGE_PORT}/sru -> Catálogo Zeus, UFSC)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=${SRU_BRIDGE_DIR}
+Environment=ZEUS_SRU_HOST=127.0.0.1
+Environment=ZEUS_SRU_PORT=${SRU_BRIDGE_PORT}
+ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m zeus_sru
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload >>"$log" 2>&1
+    systemctl enable "$SRU_BRIDGE_UNIT" >>"$log" 2>&1
+    systemctl restart "$SRU_BRIDGE_UNIT" >>"$log" 2>&1
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sru_bridge_listening && { log "sru-bridge: ${SRU_BRIDGE_UNIT} listening on 127.0.0.1:${SRU_BRIDGE_PORT}"; kei_result bridge running; return 0; }
+        sleep 1
+    done
+    systemctl status "$SRU_BRIDGE_UNIT" --no-pager >>"$log" 2>&1
+    kei_result bridge "not-listening"
+    return 1
+}
+
 z3950_add() {
     local file="$1" log sql before after err host port db syntax enc name rank timeout kind user pass sru sruopt
     local -a secrets=()
-    local valid=0 invalid=0 n
+    local valid=0 invalid=0 n wants_bridge=0
     require_database || { rm -f -- "$file"; return 1; }
     if [ ! -f "$file" ]; then
         msg_error "" "$(t "The list of servers to add was not found.")"
@@ -26105,6 +26202,7 @@ z3950_add() {
             continue
         fi
         [ -n "$pass" ] && secrets+=("$pass")
+        [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$SRU_BRIDGE_PORT" ] && wants_bridge=1
         # SRU settings belong to SRU targets only.
         [ "$kind" = sru ] || { sru=""; sruopt=""; }
         valid=$((valid + 1))
@@ -26133,6 +26231,10 @@ z3950_add() {
     rm -f -- "$sql"
     after=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio';")
     n=$(( ${after:-0} - ${before:-0} ))
+    # The Zeus target needs its bridge running on this server.
+    if [ "${wants_bridge:-0}" = 1 ] && ! sru_bridge_listening; then
+        sru_bridge_install || log "z3950: the Zeus SRU bridge could not be started (see logs)"
+    fi
     kei_result added "$n"
     kei_result existing "$((valid - n))"
     kei_result invalid "$invalid"
@@ -27442,6 +27544,7 @@ kei_task() {
             done < <(z3950_rows)
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
+        sru-bridge)      sru_bridge_install ;;
         opac-theme-get)  opac_theme_get ;;
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;
