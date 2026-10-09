@@ -1,21 +1,27 @@
-"""AIView (Module 1): AI provider setup for the cataloguing tools.
+"""AIView: both AI tools on one screen, MARC Replace (Module 1, AI
+cataloguing) and the AI assistant of the staff home page (Module 2). They
+share one provider; each may have its own model.
 
-  [ AI cataloguing ][ AI assistant on the staff home page ]   tabs
-
-  ┌ AI provider ─┐ ┌ Google Gemini ───────────────────────────┐
-  │ ( ) Ollama   │ │ Server URL  [..........................] │
-  │ (•) Gemini   │ │ Model       [gemini-2.5-flash..........] │
-  │ ( ) OpenAI   │ │ API key     [••••••••••••••••••••••••••] │
-  │ ( ) Claude   │ │ saved key ••••a1b2 · get one at ...      │
-  │ ( ) Other    │ └──────────────────────────────────────────┘
-  └──────────────┘  [Test connection] [Save]
-  [Provider]  [Connection]  [MARC Replace]       status cards
-  ┌ Next: MARC Replace ─────────────────────────────────────┐
-  │ ready: photos become a MARC draft  [Open MARC Replace]   │
+  ┌ AI provider ─┐ ┌ Local Ollama ────────────────────────────┐
+  │ (•) Ollama   │ │ Server URL      [http://127.0.0.1:11434] │
+  │ ( ) Gemini   │ │ Vision model    [qwen2.5vl:7b..........] │
+  │ ( ) OpenAI   │ │ Chat model      [qwen2.5:3b............] │
+  │ ( ) Claude   │ └──────────────────────────────────────────┘
+  │ ( ) Other    │  [Test connection] [Save]
+  └──────────────┘ ┌ Ollama on this server ───────────────────┐
+                   │ Ollama 0.12 · 3 models · ...             │
+                   │ Model [qwen2.5:3b · Balanced (CPU)    v] │
+                   │ [Check] [Install] [Download] [Use for…]  │
+                   └──────────────────────────────────────────┘
+  [Provider]  [Connection]  [MARC Replace]  [AI assistant]   status cards
+  ┌ The AI tools ───────────────────────────────────────────┐
+  │ MARC Replace: ready ...               [Open MARC Replace]│
+  │ AI assistant: installed ...  [Install, update or remove] │
   └──────────────────────────────────────────────────────────┘
 
-Local Ollama gets its own box: is it running, is the model there,
-download it. Everything that touches the network (connection test, Ollama
+The Ollama box is always there and needs only Ollama itself: a model can be
+downloaded whatever the provider and whether or not the assistant is
+installed. Everything that touches the network (connection test, Ollama
 check, model download) is a thread job behind the Pac-Man loader
 (run_with_loader), so the screen never freezes.
 
@@ -33,13 +39,16 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
-from textual.widgets import Button, Input, Label, RadioButton, RadioSet, TabbedContent, TabPane
+from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Select
 
 from .. import aiclient, aiconf, marcreplace
 from ..i18n import t
 from ..tasks import Reporter, TaskFailed, TaskResult, run_with_loader
 from ..widgets.cards import StatusCard
 from .base import SectionView
+
+# The preset list's first choice: the models typed in the fields.
+FIELDS = "@fields"
 
 
 class AIView(SectionView):
@@ -53,6 +62,7 @@ class AIView(SectionView):
         self.provider = "openai"
         self.check: aiclient.Check | None = None
         self.check_error = ""
+        self.ollama_models: list[str] = []
 
     # ------------------------------------------------------------------
     # Files
@@ -72,15 +82,10 @@ class AIView(SectionView):
         c = self.saved()
         self.provider = c["provider"]
         yield from self.heading()
-        with TabbedContent(id="ai-tabs"):
-            with TabPane(t("🪄  AI cataloguing"), id="ai-tab-cat"):
-                yield from self.compose_cataloguing(c)
-            with TabPane(t("💬  AI assistant"), id="ai-tab-assistant"):
-                yield from self.compose_assistant()
-
-    def compose_cataloguing(self, c: dict[str, str]) -> ComposeResult:
-        yield Label(t("Choose the AI that reads the photos of a book's cover and title page and drafts "
-                      "its MARC record in the staff interface."), classes="view-prompt")
+        yield Label(t("Both AI tools in one place: MARC Replace reads the photos of a book's cover and title "
+                      "page and drafts its MARC record, and the AI assistant answers librarians on the home page "
+                      "of the staff interface. They use the AI provider below; each can have its own model."),
+                    classes="view-prompt")
         with Horizontal(id="ai-body"):
             with RadioSet(id="ai-providers"):
                 for p in aiconf.SELECTOR_ORDER:
@@ -91,52 +96,61 @@ class AIView(SectionView):
                         yield Label(t("Server URL"), classes="form-label")
                         yield Input(c["url"], id="ai-url")
                     with Horizontal(classes="form-row"):
-                        yield Label(t("Model"), classes="form-label")
+                        yield Label(t("Vision model"), classes="form-label")
                         yield Input(c["model"], id="ai-model")
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Chat model"), classes="form-label")
+                        yield Input(c["chat_model"], id="ai-chat-model",
+                                    placeholder=t("empty: the same as the vision model"))
                     with Horizontal(classes="form-row", id="ai-token-row"):
                         yield Label(t("API key"), classes="form-label", id="ai-token-label")
                         yield Input("", password=True, id="ai-token")
                     yield Label("", id="ai-key-note", classes="ai-note")
+                with Horizontal(classes="form-buttons"):
+                    yield Button(t("Test connection"), id="ai-test", variant="primary")
+                    yield Button(t("Save"), id="ai-save", variant="success")
                 with Vertical(id="ai-ollama", classes="ai-box"):
                     yield Label(t("Not checked yet."), id="ai-ollama-state")
                     yield Label(t("Not installed? On this server run:") + f"\n  {aiclient.OLLAMA_INSTALL}\n"
-                                + t("then choose a vision model (qwen2.5vl, llama3.2-vision, gemma3) and download it."),
+                                + t("Without a GPU, prefer the light models: a 7B vision model can take "
+                                    "minutes per answer on a CPU."),
                                 id="ai-ollama-hint", classes="ai-note")
                     with Horizontal(classes="form-buttons"):
                         yield Button(t("Check Ollama"), id="ai-ollama-check")
                         yield Button(t("Install Ollama"), id="ai-ollama-install")
-                        yield Button(t("Download the model"), id="ai-ollama-pull")
-                with Horizontal(classes="form-buttons"):
-                    yield Button(t("Test connection"), id="ai-test", variant="primary")
-                    yield Button(t("Save"), id="ai-save", variant="success")
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Model"), classes="form-label")
+                        yield Select(self.preset_options(), value=FIELDS, allow_blank=False, id="ai-ollama-preset")
+                    with Horizontal(classes="form-buttons"):
+                        yield Button(t("Download"), id="ai-ollama-pull", variant="primary")
+                        yield Button(t("Use for chat"), id="ai-use-chat")
+                        yield Button(t("Use for cataloguing"), id="ai-use-vision")
         with Grid(classes="status-grid", id="ai-cards"):
             yield StatusCard(t("Provider"), id="card-ai-provider")
             yield StatusCard(t("Connection"), id="card-ai-connection")
             yield StatusCard(t("MARC Replace"), id="card-ai-marc")
-        with Horizontal(id="ai-hook", classes="ai-box"):
-            yield Label("", id="ai-hook-text")
-            yield Button(t("Open MARC Replace"), id="ai-marc", variant="primary")
+            yield StatusCard(t("💬  AI assistant"), id="card-aia-page")
+        with Vertical(id="ai-hook", classes="ai-box"):
+            with Horizontal(classes="ai-tool-row"):
+                yield Label("", id="ai-hook-text", classes="ai-tool-text")
+                yield Button(t("Open MARC Replace"), id="ai-marc", variant="primary")
+            with Horizontal(classes="ai-tool-row"):
+                yield Label("", id="ai-aia-text", classes="ai-tool-text")
+                yield Button(t("Install, update or remove the assistant"), id="ai-assistant", variant="primary")
 
-    def compose_assistant(self) -> ComposeResult:
-        yield Label(t("A chat on the home page of the Koha staff interface, in the place of the news block. "
-                      "Librarians ask in plain language about books, patrons, loans, reports, settings and opening "
-                      "hours; the answers link to the records. It searches with Koha's own search engine and reads "
-                      "through a read-only database account, never with SQL written by the AI. A change it suggests "
-                      "(a hold, a patron's or a record's fields, a write-off) is an action proposal showing each "
-                      "field before and after: Koha makes it only after a click on Approve & Execute, with the "
-                      "librarian's own permissions."),
-                    classes="view-prompt")
-        yield Label(t("It answers with the AI provider set up in AI cataloguing."), classes="view-prompt")
-        with Grid(classes="status-grid", id="ai-assistant-cards"):
-            yield StatusCard(t("Provider"), id="card-aia-provider")
-            yield StatusCard(t("💬  AI assistant on the staff home page"), id="card-aia-page")
-        with Horizontal(classes="form-buttons"):
-            yield Button(t("Install, update or remove the assistant"), id="ai-assistant", variant="primary")
+    def preset_options(self) -> list[tuple[str, str]]:
+        """The download list: the typed models, then the presets, light first;
+        ✓ on the ones the last check found in Ollama."""
+        options = [(t("The models in the fields above"), FIELDS)]
+        for model, label, _use in aiconf.OLLAMA_PRESETS:
+            mark = "✓ " if aiclient.model_found("ollama", model, self.ollama_models) else ""
+            options.append((f"{mark}{model} · {t(label)}", model))
+        return options
 
     def on_mount(self) -> None:
         self.query_one("#ai-form").border_title = t(aiconf.LABELS[self.provider])
         self.query_one("#ai-ollama").border_title = t("Ollama on this server")
-        self.query_one("#ai-hook").border_title = t("Next step: MARC Replace")
+        self.query_one("#ai-hook").border_title = t("The AI tools")
         self.apply_provider(self.provider, keep_fields=True)
         self.refresh_cards()
 
@@ -160,16 +174,15 @@ class AIView(SectionView):
         saved = self.saved()
         if not keep_fields:
             if saved["provider"] == provider:
-                url, model = saved["url"], saved["model"]
+                url, model, chat = saved["url"], saved["model"], saved["chat_model"]
             else:
-                url, model = aiconf.DEFAULTS[provider]
+                (url, model), chat = aiconf.DEFAULTS[provider], ""
             self.query_one("#ai-url", Input).value = url
             self.query_one("#ai-model", Input).value = model
+            self.query_one("#ai-chat-model", Input).value = chat
             self.query_one("#ai-token", Input).value = ""
         self.query_one("#ai-form").border_title = t(aiconf.LABELS[provider])
-        local = provider == "ollama"
-        self.query_one("#ai-ollama").display = local
-        self.query_one("#ai-token-row").display = not local
+        self.query_one("#ai-token-row").display = provider != "ollama"
         self.show_key_note()
         self.refresh_cards()
 
@@ -197,6 +210,8 @@ class AIView(SectionView):
         c["provider"] = self.provider
         c["url"] = self.query_one("#ai-url", Input).value.strip()
         c["model"] = self.query_one("#ai-model", Input).value.strip()
+        chat = self.query_one("#ai-chat-model", Input).value.strip()
+        c["chat_model"] = "" if chat == c["model"] else chat
         typed = self.query_one("#ai-token", Input).value.strip()
         c["token"] = "" if self.provider == "ollama" else (typed or self.saved_key())
         return aiconf.with_defaults(c)
@@ -212,6 +227,8 @@ class AIView(SectionView):
             "ai-ollama-install": self.install_ollama,
             "ai-assistant": self.open_assistant,
             "ai-ollama-pull": self.pull_model,
+            "ai-use-chat": lambda: self.use_preset("chat"),
+            "ai-use-vision": lambda: self.use_preset("vision"),
             "ai-marc": self.open_marc_replace,
         }
         if event.button.id in actions:
@@ -261,27 +278,41 @@ class AIView(SectionView):
         if result.ok:
             self.check, self.check_error = result.value, ""
             msg = f"{t('Connected.')} {len(self.check.models)} {t('models')}"
-            if not self.check.found:
-                msg += " · " + t("the model ${model} is not among them", model=self.values()["model"])
-            self.app.notify(msg, severity="information" if self.check.found else "warning", timeout=6)
+            missing = self.missing(self.check.models)
+            for model in missing:
+                msg += " · " + t("the model ${model} is not among them", model=model)
+            self.app.notify(msg, severity="warning" if missing else "information", timeout=6)
         elif not result.cancelled:
             self.check, self.check_error = None, result.error
             self.app.task_failed(t("Testing the AI provider"), result)
         self.refresh_cards()
 
-    def check_ollama(self) -> None:
-        conf = self.values()
-        demo = self.app.env.demo
+    def missing(self, ids: list[str]) -> list[str]:
+        """The vision and chat models of the fields that ids do not have."""
+        c = self.values()
+        wanted = dict.fromkeys(m for m in (c["model"], aiconf.chat_model(c)) if m)
+        return [m for m in wanted if not aiclient.model_found(c["provider"], m, ids)]
 
-        def job(reporter: Reporter) -> tuple[str, aiclient.Check]:
-            reporter.status(conf["url"])
+    def ollama_url(self) -> str:
+        """Ollama's address: the field's when it is the provider, else the
+        saved one, else the local default. The assistant plays no part."""
+        if self.provider == "ollama":
+            return self.query_one("#ai-url", Input).value.strip() or aiconf.OLLAMA_URL
+        saved = self.saved()
+        return saved["url"] if saved["provider"] == "ollama" else aiconf.OLLAMA_URL
+
+    def check_ollama(self) -> None:
+        url, demo = self.ollama_url(), self.app.env.demo
+
+        def job(reporter: Reporter) -> tuple[str, list[str]]:
+            reporter.status(url)
             if demo:
                 _demo_wait(reporter, 1.2)
-                return "0.12-demo", aiclient.Check(conf["url"], ["llama3.2:latest"], False)
+                return "0.12-demo", ["llama3.2:latest"]
             try:
-                version = aiclient.ollama_version(conf["url"])
+                version = aiclient.ollama_version(url)
                 reporter.progress(1, 2)
-                return version, aiclient.check_connection(conf)
+                return version, aiclient.check_connection({"provider": "ollama", "url": url, "model": ""}).models
             except RuntimeError as e:
                 raise TaskFailed(str(e)) from None
 
@@ -291,17 +322,34 @@ class AIView(SectionView):
         state = self.query_one("#ai-ollama-state", Label)
         if result.cancelled:
             return
+        local = self.provider == "ollama"
         if not result.ok:
-            state.update(t("Ollama is not answering at ${url}.", url=self.values()["url"]))
-            self.check, self.check_error = None, result.error
+            state.update(t("Ollama is not answering at ${url}.", url=self.ollama_url()))
+            self.ollama_models = []
+            if local:
+                self.check, self.check_error = None, result.error
+            self._refresh_presets()
             self.refresh_cards()
             return
-        version, check = result.value
-        self.check, self.check_error = check, ""
-        model = self.values()["model"]
-        have = t("installed") if check.found else t("not downloaded yet")
-        state.update(f"Ollama {version} · {len(check.models)} {t('models')} · {model}: {have}")
+        version, models = result.value
+        self.ollama_models = models
+        parts = [f"Ollama {version}", f"{len(models)} {t('models')}"]
+        if local:
+            c, missing = self.values(), self.missing(models)
+            self.check = aiclient.Check(aiclient.models_endpoint(c)[0], models, not missing)
+            self.check_error = ""
+            for model in dict.fromkeys(m for m in (c["model"], aiconf.chat_model(c)) if m):
+                have = t("not downloaded yet") if model in missing else t("installed")
+                parts.append(f"{model}: {have}")
+        state.update(" · ".join(parts))
+        self._refresh_presets()
         self.refresh_cards()
+
+    def _refresh_presets(self) -> None:
+        select = self.query_one("#ai-ollama-preset", Select)
+        value = select.value
+        select.set_options(self.preset_options())
+        select.value = value
 
     def install_ollama(self) -> None:
         """Ollama's own install script, run by the installer behind Pac-Man."""
@@ -321,29 +369,76 @@ class AIView(SectionView):
         self.app.run_entry(Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
                            after=self.refresh_cards)
 
+    def selected_preset(self) -> str:
+        value = self.query_one("#ai-ollama-preset", Select).value
+        return value if isinstance(value, str) else FIELDS
+
+    def models_to_pull(self) -> list[str]:
+        """The chosen preset, or the models of the fields (Ollama only)."""
+        preset = self.selected_preset()
+        if preset != FIELDS:
+            return [preset]
+        if self.provider != "ollama":
+            return []
+        c = self.values()
+        return list(dict.fromkeys(m for m in (c["model"], aiconf.chat_model(c)) if m))
+
+    def use_preset(self, use: str) -> None:
+        """Puts the chosen preset in the chat or the vision field (switching
+        the provider to Ollama); Save keeps it."""
+        model = self.selected_preset()
+        if model == FIELDS:
+            self.app.notify(t("Choose a model in the list first."), severity="warning")
+            return
+        kind = next((u for m, _label, u in aiconf.OLLAMA_PRESETS if m == model), "")
+        if use == "vision" and kind == "chat":
+            self.app.notify(t("${model} reads text only: MARC Replace needs a vision model.", model=model),
+                            severity="warning", timeout=6)
+            return
+        if self.provider != "ollama":
+            self.apply_provider("ollama")
+            self.query_one("#ai-p-ollama", RadioButton).value = True
+        field = "#ai-chat-model" if use == "chat" else "#ai-model"
+        self.query_one(field, Input).value = model
+        self.app.notify(t("${model} set. Save to keep it.", model=model))
+
     def pull_model(self) -> None:
-        conf = self.values()
-        demo = self.app.env.demo
+        """Downloads into Ollama: needs Ollama answering, nothing else."""
+        models = self.models_to_pull()
+        if not models:
+            self.app.notify(t("Choose a model in the list first."), severity="warning")
+            return
+        url, demo = self.ollama_url(), self.app.env.demo
 
         def job(reporter: Reporter) -> str:
-            reporter.status(t("Downloading ${model}", model=conf["model"]))
             if demo:
+                reporter.status(t("Downloading ${model}", model=", ".join(models)))
                 _demo_wait(reporter, 3.0)
-                return conf["model"]
-            last = [""]
-
-            def progress(status: str, done: int, total: int) -> None:
-                if status != last[0]:
-                    reporter.log(status)
-                    reporter.status(status[:60])
-                    last[0] = status
-                if total:
-                    reporter.progress(done, total)
+                return ", ".join(models)
             try:
-                aiclient.ollama_pull(conf["url"], conf["model"], progress, lambda: reporter.cancelled)
-            except RuntimeError as e:
-                raise TaskFailed(str(e)) from None
-            return conf["model"]
+                aiclient.ollama_version(url)
+            except RuntimeError:
+                raise TaskFailed(t("Ollama is not answering at ${url}. Install or start it first (Install Ollama).",
+                                   url=url)) from None
+            for model in models:
+                if reporter.cancelled:
+                    break
+                reporter.log(t("Downloading ${model}", model=model))
+                reporter.status(t("Downloading ${model}", model=model))
+                last = [""]
+
+                def progress(status: str, done: int, total: int) -> None:
+                    if status != last[0]:
+                        reporter.log(status)
+                        reporter.status(f"{model}: {status}"[:60])
+                        last[0] = status
+                    if total:
+                        reporter.progress(done, total)
+                try:
+                    aiclient.ollama_pull(url, model, progress, lambda: reporter.cancelled)
+                except RuntimeError as e:
+                    raise TaskFailed(f"{model}: {e}") from None
+            return ", ".join(models)
 
         run_with_loader(self.app, t("Downloading the model into Ollama"), job, on_done=self._pulled)
 
@@ -351,7 +446,7 @@ class AIView(SectionView):
         if result.ok:
             self.app.notify(f"{result.value}: {t('Done!')}", timeout=5)
             self.check_ollama()
-        else:
+        elif not result.cancelled:
             self.app.task_failed(t("Downloading the model into Ollama"), result)
 
     # ------------------------------------------------------------------
@@ -371,8 +466,10 @@ class AIView(SectionView):
         saved = self.saved()
         ready = self.ready()
         name = t(aiconf.LABELS[saved["provider"]])
+        chat = aiconf.chat_model(saved)
+        models = saved["model"] if chat == saved["model"] else f"{saved['model']} · {t('chat')}: {chat}"
         self.query_one("#card-ai-provider", StatusCard).set(
-            name if ready else t("Not set up"), saved["model"] if ready else t("Save a provider below"),
+            name if ready else t("Not set up"), models if ready else t("Save a provider below"),
             "ok" if ready else "warn")
 
         conn = self.query_one("#card-ai-connection", StatusCard)
@@ -390,12 +487,17 @@ class AIView(SectionView):
             t("Installed") if installed else t("Not installed."), "marc_replace.pl",
             "ok" if installed else "warn")
 
-        self.query_one("#card-aia-provider", StatusCard).set(
-            name if ready else t("Not set up"),
-            saved["model"] if ready else t("Set up and save an AI provider first."), "ok" if ready else "warn")
         on_page = marcreplace.assistant_installed(self.app.env.demo)
         self.query_one("#card-aia-page", StatusCard).set(
             t("Installed") if on_page else t("Not installed."), "ai_assistant.pl", "ok" if on_page else "warn")
+        aia = self.query_one("#ai-aia-text", Label)
+        if not ready:
+            aia.update(t("AI assistant: set up and save an AI provider first."))
+        elif on_page:
+            aia.update(t("AI assistant: on the staff home page, answering with ${name} (${model}).",
+                         name=name, model=chat))
+        else:
+            aia.update(t("AI assistant: ready to install on the staff home page (${model}).", model=chat))
 
         text = self.query_one("#ai-hook-text", Label)
         button = self.query_one("#ai-marc", Button)

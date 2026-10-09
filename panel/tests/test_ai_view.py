@@ -6,7 +6,7 @@ import time
 
 import pytest
 from conftest import INSTALLER
-from textual.widgets import ProgressBar
+from textual.widgets import Input, ProgressBar, Select
 
 from kei_panel import aiconf, marcreplace
 from kei_panel.bridge import Bridge, installer_actions
@@ -41,7 +41,8 @@ def test_gemini_key_test_save_and_marc_hook(demo_dir):
             await pilot.pause(0.3)
             view = app.screen.query_one("#view-ai")
             q = view.query_one
-            assert not q("#ai-ollama").display                      # openai by default
+            assert q("#ai-ollama").display                          # always there: needs only Ollama
+            assert q("#ai-assistant") and q("#ai-marc")              # both tools on one screen
             assert q("#ai-marc").disabled                           # nothing set up yet
 
             await pilot.click("#ai-p-gemini")
@@ -71,7 +72,7 @@ def test_gemini_key_test_save_and_marc_hook(demo_dir):
 
             await pilot.click("#ai-p-ollama")
             await pilot.pause(0.1)
-            assert q("#ai-ollama").display and not q("#ai-token-row").display
+            assert not q("#ai-token-row").display
             assert q("#ai-url").value == "http://127.0.0.1:11434"
             await pilot.click("#ai-p-gemini")                       # back: saved settings return
             await pilot.pause(0.1)
@@ -110,3 +111,57 @@ def test_marc_replace_action_falls_back_on_older_installers(tmp_path):
     assert marcreplace.action(bridge) == marcreplace.FALLBACK_ACTION
     bridge = Bridge(PanelEnv(installer=INSTALLER, lang="en", plain=False))
     assert marcreplace.action(bridge) == marcreplace.ACTION
+
+
+def test_models_download_without_the_assistant_and_presets_fill_the_fields(demo_dir, monkeypatch):
+    from kei_panel.app import KohaPanelApp
+
+    monkeypatch.setattr(marcreplace, "assistant_installed", lambda demo=False: False)
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(140, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("a")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-ai")
+            q = view.query_one
+            assert view.provider == "openai" and not marcreplace.assistant_installed()
+            assert view.ollama_url() == aiconf.OLLAMA_URL           # Ollama's own address, any provider
+
+            options = dict((v, label) for label, v in view.preset_options())
+            for model in ("llama3.2:1b", "llama3.2:3b", "qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5vl:7b"):
+                assert model in options
+            assert "[High CPU / Slow on ARM]" in options["qwen2.5vl:7b"]
+
+            # The fields' models need Ollama as the provider; a preset does not.
+            assert view.models_to_pull() == []
+            q("#ai-ollama-preset", Select).value = "qwen2.5:3b"
+            assert view.models_to_pull() == ["qwen2.5:3b"]
+            view.pull_model()
+            await pilot.pause(0.2)
+            assert isinstance(app.screen, LoadingScreen)             # downloading, no assistant needed
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen), 6)   # the check after it
+
+            # A text model is refused for cataloguing, taken for the chat.
+            q("#ai-ollama-preset", Select).value = "llama3.2:1b"
+            view.use_preset("vision")
+            assert q("#ai-model", Input).value != "llama3.2:1b"
+            view.use_preset("chat")
+            await pilot.pause(0.1)
+            assert view.provider == "ollama"
+            assert q("#ai-model", Input).value == "qwen2.5vl:7b"
+            assert q("#ai-chat-model", Input).value == "llama3.2:1b"
+            assert view.models_to_pull() == ["llama3.2:1b"]
+            q("#ai-ollama-preset", Select).value = "@fields"
+            assert view.models_to_pull() == ["qwen2.5vl:7b", "llama3.2:1b"]
+
+            view.action_save()
+            await pilot.pause(0.1)
+            saved = aiconf.load(demo_dir / "vision.conf")
+            assert saved["model"] == "qwen2.5vl:7b" and saved["chat_model"] == "llama3.2:1b"
+            assert aiconf.chat_model(saved) == "llama3.2:1b"
+            assert "llama3.2:1b" in str(q("#ai-aia-text").render())
+
+    asyncio.run(main())

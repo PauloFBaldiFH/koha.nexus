@@ -145,13 +145,6 @@ Button.small {
 .form-row Input {
     width: 1fr;
 }
-#ai-tabs {
-    height: auto;
-}
-#ai-tabs TabPane {
-    height: auto;
-    padding: 1 0 0 0;
-}
 .form-buttons {
     height: auto;
     padding-top: 1;
@@ -205,17 +198,30 @@ Button.small {
 #ai-ollama .form-buttons {
     padding-top: 1;
 }
+#ai-cards {
+    grid-size: 4;
+}
+.-narrow #ai-cards, .-stacked #ai-cards {
+    grid-size: 2;
+}
 #ai-cards .status-card {
     min-height: 5;
 }
 #ai-hook {
     border: round $success;
-    padding: 1;
+    padding: 0 1;
 }
-#ai-hook-text {
+.ai-tool-row {
+    height: auto;
+    padding: 1 0 0 0;
+}
+.ai-tool-text {
     width: 1fr;
     padding-top: 1;
     padding-right: 2;
+}
+#ai-ollama-preset {
+    width: 1fr;
 }
 .-narrow #ai-body, .-stacked #ai-body {
     layout: vertical;

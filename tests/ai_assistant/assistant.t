@@ -221,4 +221,17 @@ $hist = [];
 $res = KohaEasy::Assistant::ask( fresh(), sub { shift @script // '{"answer":"I do not have access."}' }, $hist, 'ok?', 'en' );
 is( scalar @$hist, 0, 'a refusal is not kept in the history' );
 is_deeply( KohaEasy::Assistant::question_terms('Temos livros do Machado de Assis sobre o Rio de Janeiro?'), [ 'Machado de Assis', 'Rio de Janeiro' ] );
+# The chat can have its own (lighter) model; empty: the vision model.
+{
+    my $conf = "$ENV{KEI_AIA_LIB}/../chat-model.conf";
+    open my $cf, '>', $conf or die;
+    print {$cf} "provider=ollama\nmodel=qwen2.5vl:7b\nchat_model=qwen2.5:3b\n";
+    close $cf;
+    is( KohaEasy::Assistant::load_conf($conf)->{model}, 'qwen2.5:3b', 'chat_model answers the chat' );
+    open $cf, '>', $conf or die;
+    print {$cf} "provider=ollama\nmodel=qwen2.5vl:7b\nchat_model=\n";
+    close $cf;
+    is( KohaEasy::Assistant::load_conf($conf)->{model}, 'qwen2.5vl:7b', 'no chat_model: the vision model' );
+    unlink $conf;
+}
 done_testing;

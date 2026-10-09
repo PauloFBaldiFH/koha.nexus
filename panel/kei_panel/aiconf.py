@@ -25,7 +25,7 @@ DEFAULTS = {
     "openai": ("https://api.openai.com/v1", "gpt-4.1-mini"),
     "anthropic": ("https://api.anthropic.com", "claude-sonnet-5"),
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
-    "ollama": ("http://127.0.0.1:11434", "qwen2.5vl:7b"),
+    "ollama": ("http://127.0.0.1:11434", "qwen2.5vl:7b"),     # vision: MARC Replace reads photos
     "compatible": ("http://localhost:1234/v1", ""),
 }
 PROVIDERS = tuple(DEFAULTS)
@@ -46,8 +46,22 @@ KEY_HELP = {
     "compatible": "LM Studio (http://localhost:1234/v1), vLLM, llama.cpp, OpenRouter...",
     "ollama": "",
 }
+# model: the vision model of MARC Replace; chat_model: the AI assistant's,
+# when it is another one (empty: the same model).
 CONF_KEYS = ("provider", "url", "model", "token", "timeout", "max_px", "lang", "org_code",
-             "table", "ddc_edition", "country")
+             "table", "ddc_edition", "country", "chat_model")
+
+# Ollama models offered for download, light first: on a server without a GPU
+# a 7B vision model answers in minutes, a 1-3B text model in seconds.
+# (model, label, what it is for: "chat" or "vision")
+OLLAMA_PRESETS = (
+    ("llama3.2:1b", "Fast chat (CPU)", "chat"),
+    ("qwen2.5:1.5b", "Fast chat (CPU)", "chat"),
+    ("llama3.2:3b", "Fast chat (CPU)", "chat"),
+    ("qwen2.5:3b", "Balanced, multipurpose (CPU)", "chat"),
+    ("qwen2.5vl:7b", "Vision / cataloguing [High CPU / Slow on ARM]", "vision"),
+)
+OLLAMA_URL = "http://127.0.0.1:11434"
 
 
 def conf_path(instance: str) -> Path:
@@ -68,6 +82,11 @@ def with_defaults(c: dict[str, str]) -> dict[str, str]:
     for k in CONF_KEYS:
         c.setdefault(k, "")
     return c
+
+
+def chat_model(c: dict[str, str]) -> str:
+    """The model the AI assistant answers with (KohaEasy::Assistant::load_conf)."""
+    return c.get("chat_model") or c.get("model", "")
 
 
 def load(path: Path) -> dict[str, str]:
