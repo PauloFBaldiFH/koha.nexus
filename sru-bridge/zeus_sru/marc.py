@@ -82,6 +82,22 @@ def parse_record(data: bytes) -> pymarc.Record | None:
     return record
 
 
+_SLIM = "http://www.loc.gov/MARC21/slim"
+
+
+def parse_marcxml(block: str) -> pymarc.Record | None:
+    """One <record>...</record> block as Zeus embeds it in its page (with or
+    without the MARC21/slim namespace)."""
+    if "xmlns" not in block[:200]:
+        block = block.replace("<record", f'<record xmlns="{_SLIM}"', 1)
+    try:
+        records = pymarc.parse_xml_to_array(io.BytesIO(block.encode("utf-8")))
+    except Exception as exc:
+        log.warning("unreadable MARCXML record skipped: %s", exc)
+        return None
+    return records[0] if records else None
+
+
 def to_marcxml(record: pymarc.Record) -> ET.Element:
     # Round-trip through bytes so the tags carry the MARC21/slim namespace
     # (record_to_xml_node only writes an xmlns attribute).

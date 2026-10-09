@@ -15,7 +15,7 @@ EMPTY = "<html><body>Nenhum registro encontrado</body></html>"
 
 
 class FakeZeus:
-    """Answers like Zeus: the Tabamex record only from the chunk holding target 6."""
+    """Answers like Zeus: the Tabamex record only from the chunk holding target 0."""
 
     def __init__(self, page, fail_all=False, delay=0.05):
         self.page, self.fail_all, self.delay = page, fail_all, delay
@@ -31,13 +31,16 @@ class FakeZeus:
         if self.fail_all:
             return httpx.Response(503, text="down")
         targets = [k for k in request.url.params if k.startswith("targets[")]
-        body = self.page if "targets[6]" in targets else EMPTY
+        body = self.page if "targets[0]" in targets else EMPTY
         return httpx.Response(200, text=body)
 
 
-def make(page, **kw):
+ALL_TARGETS = (0, 1, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18)
+
+
+def make(page, targets=(0,), **kw):
     fake = FakeZeus(page, **kw)
-    settings = Settings(cache_ttl=600)
+    settings = Settings(cache_ttl=600, targets=targets)
     zeus = ZeusClient(settings, httpx.AsyncClient(transport=httpx.MockTransport(fake)))
     return TestClient(create_app(settings, zeus)), fake
 
@@ -52,7 +55,7 @@ def sru(client, **params):
 
 
 def test_isbn_search_returns_marcxml(results_page):
-    client, fake = make(results_page)
+    client, fake = make(results_page, targets=ALL_TARGETS)
     with client:
         root = sru(client, query="dc.isbn=9684291426", maximumRecords="10")
     assert root.tag == "{http://www.loc.gov/zing/srw/}searchRetrieveResponse"
@@ -82,7 +85,7 @@ def test_title_search_and_cache(results_page):
         sru(client, query='dc.title="tabamex"')
         root = sru(client, query='dc.title="tabamex"', startRecord="1")
     assert fake.requests[0].url.params["searchType"] == "4"
-    assert len(fake.requests) == 2   # second SRU call came from the cache
+    assert len(fake.requests) == 1   # second SRU call came from the cache
     assert root.findtext("zs:numberOfRecords", namespaces=NS) == "1"
 
 
@@ -221,3 +224,19 @@ def test_broken_xml_post_is_a_diagnostic_not_a_crash(results_page):
                         headers={"content-type": "text/xml"})
     assert r.status_code == 200
     assert ET.fromstring(r.content).findtext(".//diag:uri", namespaces=NS) == "info:srw/diagnostic/1/7"
+
+
+def test_default_is_target_0_only_and_embedded_marcxml(marcxml_page):
+    client, fake = make(marcxml_page)
+    with client:
+        root = sru(client, query='dc.author="jauregui"')
+    [req] = fake.requests
+    assert [k for k in req.url.params if k.startswith("targets[")] == ["targets[0]"]
+    assert req.url.params["searchType"] == "1003"
+    assert str(req.url).startswith("https://catalogo.bu.ufsc.br/zeus/")
+    assert root.findtext("zs:numberOfRecords", namespaces=NS) == "2"
+    titles = [e.text for e in root.iterfind(
+        ".//marc:record/marc:datafield[@tag='245']/marc:subfield[@code='a']", NS)]
+    assert titles[0].startswith("Tabamex") and titles[1] == "Dom Casmurro"
+    schemas = {e.text for e in root.iterfind(".//zs:recordSchema", NS)}
+    assert schemas == {"marcxml"}

@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.26"
+PANEL_VERSION=" 1.5.27"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -26103,6 +26103,35 @@ sru_bridge_listening() {
     fi
 }
 
+# Koha's row for the bridge, as tested on a live server: SRU, syntax MARC21
+# (the bridge answers MARCXML; USMARC makes Koha expect ISO 2709 and show
+# nothing), GET requests, 15 s timeout. Replaces any older Zeus row (same
+# name, or 127.0.0.1:5000) and unticks the UFSC Z39.50 server, which does not
+# answer. Only once Koha's database exists; quiet otherwise.
+SRU_BRIDGE_NAME="Catálogo Zeus (UFSC bridge, SRU)"
+sru_bridge_register() {
+    is_koha_installed 2>/dev/null || return 0
+    mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
+    local name
+    name=$(sql_quote "$SRU_BRIDGE_NAME")
+    if mysql --default-character-set=utf8mb4 "$DB_NAME" <<SQL
+DELETE FROM z3950servers WHERE recordtype = 'biblio'
+  AND (servername = ${name} OR (host = '127.0.0.1' AND port = ${SRU_BRIDGE_PORT}));
+INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout,
+  servertype, recordtype, sru_fields, sru_options, add_xslt)
+VALUES ('127.0.0.1', ${SRU_BRIDGE_PORT}, 'sru', ${name}, 1, 1, 'MARC21', 'utf8', 15, 'sru', 'biblio',
+  'title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice', 'sru=get,sru_version=1.1', '');
+UPDATE z3950servers SET checked = 0 WHERE host LIKE '%z3950.ufsc.br%';
+SQL
+    then
+        log "sru-bridge: Koha's Zeus target set (SRU, MARC21); z3950.ufsc.br unticked"
+        kei_result koha-target set
+    else
+        kei_result koha-target failed
+        return 1
+    fi
+}
+
 # Sources (next to this script, else from GitHub), venv, unit, start, check.
 sru_bridge_install() {
     local src="" tmp="" log cert=""
@@ -26232,8 +26261,11 @@ z3950_add() {
     after=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio';")
     n=$(( ${after:-0} - ${before:-0} ))
     # The Zeus target needs its bridge running on this server.
-    if [ "${wants_bridge:-0}" = 1 ] && ! sru_bridge_listening; then
-        sru_bridge_install || log "z3950: the Zeus SRU bridge could not be started (see logs)"
+    if [ "${wants_bridge:-0}" = 1 ]; then
+        if ! sru_bridge_listening; then
+            sru_bridge_install || log "z3950: the Zeus SRU bridge could not be started (see logs)"
+        fi
+        sru_bridge_register
     fi
     kei_result added "$n"
     kei_result existing "$((valid - n))"
@@ -27544,7 +27576,7 @@ kei_task() {
             done < <(z3950_rows)
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
-        sru-bridge)      sru_bridge_install ;;
+        sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
         opac-theme-get)  opac_theme_get ;;
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;

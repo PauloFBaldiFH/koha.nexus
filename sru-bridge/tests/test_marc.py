@@ -44,9 +44,11 @@ def test_extract_dedupes_form_and_link(results_page, raw_record):
 
 
 def test_chunks_respect_zeus_limit():
-    groups = chunks(DEFAULT_TARGETS, 15)
+    assert DEFAULT_TARGETS == (0,)
+    many = (0, 1, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18)
+    groups = chunks(many, 15)
     assert [len(g) for g in groups] == [15, 1]
-    assert sum(groups, ()) == DEFAULT_TARGETS
+    assert sum(groups, ()) == many
 
 
 def test_build_params():

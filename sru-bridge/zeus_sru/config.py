@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-# The Zeus targets[N] ids Paulo listed (Biblioteca Nacional, UNICAMP, UNESP,
-# USP, UFRGS, UFSC...). Ids 2, 4 and 15 are left out on purpose.
-DEFAULT_TARGETS = (0, 1, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18)
+# Only targets[0], BU/UFSC's own catalogue: tested on a live server, it answers
+# in under a second with full MARCXML, while the other federated targets often
+# hang until the request times out. ZEUS_SRU_TARGETS=0,1,3,... adds them back.
+DEFAULT_TARGETS = (0,)
 
 
 def _int(name: str, default: int) -> int:
@@ -29,10 +30,10 @@ def _targets(name: str) -> tuple[int, ...]:
 
 @dataclass(frozen=True)
 class Settings:
-    base_url: str = "https://catalogo.bu.ufsc.br/zbib/"
+    base_url: str = "https://catalogo.bu.ufsc.br/zeus/"
     targets: tuple[int, ...] = DEFAULT_TARGETS
     chunk_size: int = 15          # Zeus refuses more than 15 targets a request
-    timeout: float = 30.0         # seconds, per Zeus request
+    timeout: float = 15.0         # seconds, per Zeus request (Koha waits 15)
     cache_ttl: int = 600          # seconds a search result is reused (paging)
     cache_size: int = 256         # searches kept in memory
     max_records: int = 50         # SRU maximumRecords ceiling

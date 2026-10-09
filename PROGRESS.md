@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.26**._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.27**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -70,6 +70,10 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   Since 1.5.26 the bridge is installed by the installer (`--task sru-bridge`, and automatically when
   z3950-add gets the Zeus row): `/usr/local/lib/koha-easy-installer/sru-bridge` with its own venv,
   systemd unit `koha-zeus-sru` (enabled at boot, Restart=always, DynamicUser).
+  Since 1.5.27 (from Paulo's live tests): the bridge queries `catalogo.bu.ufsc.br/zeus/` with only
+  `targets[0]` (BU/UFSC; the other targets hang) and reads the MARCXML Zeus embeds; Koha's row is
+  syntax MARC21 (USMARC shows 0 results), `sru=get,sru_version=1.1`, timeout 15, written by
+  `sru_bridge_register`, which also unticks `z3950.ufsc.br` (dropped from the curated list).
   Since 1.5.22 a server is working once it answers the protocol (Z39.50 Init accepted, or any SRU
   response), even with 0 hits, a slow search or a refused Present; BER indefinite lengths are read.
   `History` resets automatic hides when `HISTORY_RULES` changes. Confirmed dead and left out:

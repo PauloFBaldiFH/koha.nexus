@@ -62,14 +62,17 @@ zsql() { mysql -N "$DB" -e "$1"; }
     [ "$(zsql "SELECT servername, checked, \`rank\` FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = "$(printf "BnF l'officielle\t1\t1")" ]
     [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = 'services.dnb.de'")" = "$(printf 'sru\t443\tsru/dnb\ttitle=dc.title')" ]
     # The Zeus bridge gets its SRU fields and options; a Z39.50 server gets none.
-    [ "$(zsql "SELECT servertype, port, db, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\ttitle=dc.title,isbn=dc.isbn\tsru_version=1.1,schema=marcxml')" ]
-    [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-') FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t')" ]
+    # ...and then the bridge's own row replaced it: MARC21, GET, 15 s.
+    [ "$(zsql "SELECT servertype, port, db, syntax, timeout, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\tMARC21\t15\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = '127.0.0.1'")" = "1" ]
+    # The UFSC Z39.50 server does not answer: kept, but unticked.
+    [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-'), checked FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t\t0')" ]
     # The Zeus row asked for its bridge to be installed and started.
     [ "$(cat "$W/bridge")" = called ]
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
     grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
-    [ "$(cat "$W/results")" = "$(printf 'RESULT added=4\nRESULT existing=1\nRESULT invalid=2')" ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT koha-target=set\nRESULT added=4\nRESULT existing=1\nRESULT invalid=2')" ]
     grep -q "Already in Koha: 1" "$KEI_S/dialogs.log"
     # The password is in no log, and no SQL file is left behind.
     ! grep -rq "w0rd" "$W/logs" /var/log/koha-easy-install 2>/dev/null

@@ -9,30 +9,17 @@
    "port": 5000,
    "db": "sru",
    "kind": "sru",
-   "syntax": "USMARC",
+   "syntax": "MARC21",
    "encoding": "utf8",
    "schema": "marcxml",
    "sru_fields": "title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice",
-   "sru_options": "sru_version=1.1,schema=marcxml",
+   "sru_options": "sru=get,sru_version=1.1",
    "region": "latam",
    "country": "BR",
    "preselect": true,
    "verified": true,
    "source": "https://github.com/PauloFBaldiFH/koha.nexus/tree/main/sru-bridge",
-   "notes": "The local sru-bridge service: searches the Brazilian university catalogues federated by Catálogo Zeus (BU/UFSC). Answers only while the service runs on this server."
-  },
-  {
-   "name": "UFSC (Universidade Federal de Santa Catarina)",
-   "host": "z3950.ufsc.br",
-   "port": 210,
-   "db": "Default",
-   "kind": "zed",
-   "syntax": "USMARC",
-   "encoding": "utf8",
-   "region": "latam",
-   "country": "BR",
-   "verified": true,
-   "source": "Tested on port 210 by the koha.nexus maintainer (2026-10-08)"
+   "notes": "The local sru-bridge service (unit koha-zeus-sru): searches BU/UFSC's catalogue through Catálogo Zeus and answers MARCXML, so Koha's syntax is MARC21. Answers only while the service runs on this server."
   },
   {
    "name": "UTFPR (Universidade Tecnológica Federal do Paraná)",
