@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.27** (1.5.28 in the koha.nexus rebrand PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.28** (1.5.29: panel lock fix PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -194,6 +194,11 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   OPAC look has a 2D/3D carousel, block colours (`--nexus-*`), quick access buttons and an
   optional staff theme (IntranetUserCSS); each apply saves `theme-settings.json` in CONF_DIR
   and Restore database writes it back (`theme_state_reapply`).
+- **1.5.29 (panel lock fix)**: a panel's bash runs its TERM trap only after the Textual panel
+  it waits for ends, so `kill PID` left it running and the lock loop went on (Paulo,
+  2026-10-09). `panel_lock_end` ends the whole tree (TERM, 3 s, KILL); `sudo config.sh --unlock`
+  and the "close it and open here? [s/N]" question use it. A running backup is named instead of
+  a dead PID. The lock file is removed on exit; `panel_lock_open` re-opens it if the path changed.
 
 ---
 

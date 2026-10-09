@@ -72,9 +72,69 @@ take() { bash -c "source '$W/lock.sh'; $1; panel_lock_take; rc=\$?; echo \"rc=\$
     kill -0 "$HOLDER"
 }
 
-@test "panel_lock_release clears the PID only for the panel that took the lock" {
-    run bash -c "source '$W/lock.sh'; panel_lock_take; panel_lock_release; wc -c < \"\$PANEL_LOCK_FILE\""
-    [ "$output" = "0" ]
+@test "panel_lock_release removes the lock file only for the panel that took the lock" {
+    run bash -c "source '$W/lock.sh'; panel_lock_take; panel_lock_release; [ -e \"\$PANEL_LOCK_FILE\" ] && echo kept || echo gone"
+    [ "$output" = "gone" ]
+    printf '4242\n' > "$KEI_PANEL_LOCK_FILE"
+    run bash -c "source '$W/lock.sh'; panel_lock_release; cat \"\$PANEL_LOCK_FILE\""
+    [ "$output" = "4242" ]
+}
+
+# hold_panel: a panel as on Paulo's server: bash named config.sh that
+# traps TERM and waits for a child (the Textual panel), lock on fd 9.
+hold_panel() {
+    ( exec 9>>"$KEI_PANEL_LOCK_FILE"; flock -n 9 || exit 1
+      exec -a config.sh bash -c 'trap "exit 143" TERM; sleep 300; :' ) </dev/null >/dev/null 2>&1 3>&- &
+    HOLDER=$!
+    for _ in $(seq 50); do
+        [ -n "$(pgrep -P "$HOLDER" sleep)" ] && break
+        sleep 0.1
+    done
+    printf '%s\n' "$HOLDER" > "$KEI_PANEL_LOCK_FILE"
+}
+
+@test "a plain kill leaves such a panel running; --unlock (takeover) ends it and its child" {
+    hold_panel
+    local child
+    child=$(pgrep -P "$HOLDER" sleep)
+    [ -n "$child" ]
+    kill "$HOLDER"
+    sleep 0.5
+    kill -0 "$HOLDER"            # bash waits for its child before running the trap
+    run take :
+    [[ "$output" == *"rc=1 holder=$HOLDER"* ]]
+    run bash -c "source '$W/lock.sh'; panel_lock_take; PANEL_LOCK_HOLDER=$HOLDER; panel_lock_takeover; echo \"rc=\$? closed=\$PANEL_LOCK_CLOSED\"; cat \"\$PANEL_LOCK_FILE\" | sed 's/^/pid=/'"
+    [[ "$output" == *"rc=0 closed=$HOLDER"* ]]
+    [[ "$output" == *"pid="[0-9]* ]] && [[ "$output" != *"pid=$HOLDER"* ]]
+    ! kill -0 "$HOLDER" 2>/dev/null
+    ! kill -0 "$child" 2>/dev/null
+}
+
+@test "a recycled PID (alive, not this panel) in the file does not block" {
+    sleep 300 </dev/null >/dev/null 2>&1 3>&- &
+    HOLDER=$!
+    printf '%s\n' "$HOLDER" > "$KEI_PANEL_LOCK_FILE"
+    run take :
+    [[ "$output" == *"rc=0"* ]]
+    kill -0 "$HOLDER"
+}
+
+@test "a running backup is named instead of a dead PID" {
+    printf '999999\n' > "$KEI_PANEL_LOCK_FILE"
+    ( exec 9>>"$KEI_PANEL_LOCK_FILE"; flock -n 9; exec 8>>"$BACKUP_LOCK_FILE"; flock -n 8; exec -a backup_sql.sh sleep 300 ) </dev/null >/dev/null 2>&1 3>&- &
+    HOLDER=$!
+    sleep 0.4
+    run bash -c "source '$W/lock.sh'; panel_lock_take; echo \"rc=\$? holder=\$PANEL_LOCK_HOLDER busy=\$PANEL_LOCK_BUSY\""
+    [[ "$output" == *"rc=1 holder= busy=$HOLDER backup_sql.sh"* ]]
+}
+
+@test "a lock file removed by a closing panel is opened again, never two panels" {
+    run bash -c "source '$W/lock.sh'
+        exec 9>> \"\$PANEL_LOCK_FILE\"; rm -f \"\$PANEL_LOCK_FILE\"; exec 9>&-
+        exec 7>> \"\$PANEL_LOCK_FILE\"; rm -f \"\$PANEL_LOCK_FILE\"   # the old file, then gone
+        panel_lock_open; echo rc=\$?
+        [ \"\$(stat -L -c %i /proc/\$\$/fd/9)\" = \"\$(stat -c %i \"\$PANEL_LOCK_FILE\")\" ] && echo same"
+    [[ "$output" == *"rc=0"* ]] && [[ "$output" == *"same"* ]]
 }
 
 @test "a closed terminal (dropped SSH session) is seen as gone" {
