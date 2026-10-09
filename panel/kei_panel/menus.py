@@ -178,3 +178,66 @@ def section(section_id: str) -> Section:
 def all_actions() -> set[str]:
     """Installer actions (a view entry opens a screen, not a routine)."""
     return {e.action for s in SECTIONS for e in s.entries if e.kind != "view"}
+
+
+# The line under each card (widgets/cards.py): what the routine does, in a
+# few words. English keys like the labels; pt.cache holds the PT-BR texts.
+# tests/test_menus.py checks every entry has one.
+DESCRIPTIONS: dict[str, str] = {
+    "install": "Installs Koha with MariaDB and Apache on this server",
+    "credentials": "Shows the logins and passwords of the first access",
+    "restore": "Replaces Koha's database with a backup, tested first",
+    "backup-manual": "Makes a full backup and shows how to copy it to a PC",
+    "backup-cloud": "Connects Google Drive to keep the backups in the cloud",
+    "backup-test": "Imports a backup into a test database to check it",
+    "magic-import": "Imports catalogs in any format: MARC, ISIS, CSV, backups",
+    "db-maintenance": "Optimizes the tables and clears old logs, with a preview",
+    "reports": "Adds ready-made SQL reports to Koha's Reports module",
+    "marc-replace": "Installs a staff page that replaces a record's MARC",
+    "ai-assistant": "Puts an AI chat on the staff interface home page",
+    "email": "Sets up the SMTP server and the circulation e-mails",
+    "messaging": "Sends Koha's notices through WhatsApp and Telegram",
+    "interoperability": "Turns on Koha's SIP2 and Z39.50 servers",
+    "vpn": "Creates the WireGuard VPN and the devices' profiles",
+    "cloudflare": "Publishes the OPAC and the staff site through Cloudflare",
+    "ufw": "Lists the firewall rules active on this server",
+    "staff-firewall": "Blocks or opens the staff port 8080 to the internet",
+    "ssl": "Gets a free HTTPS certificate from Let's Encrypt",
+    "fail2ban": "Shows the banned IPs and the intrusion attempts",
+    "rotate-db-password": "Makes a new MariaDB password for Koha",
+    "search-console": "Checks the OPAC and helps Google index it",
+    "search-toggle": "Switches the catalog search between Zebra and Elasticsearch",
+    "search-repair": "Repairs the search engine and reindexes the catalog",
+    "status": "Shows services, search, disk and the last backup",
+    "health": "Runs every check and writes a validation report",
+    "validation-report": "Opens the latest validation report",
+    "apache-log": "Follows the staff or OPAC error log live",
+    "repair-services": "Restarts Memcached, Plack and Koha's services",
+    "sizing": "Tunes memory and workers to this server's RAM",
+    "superlibrarian": "Creates a staff account with every permission",
+    "clock": "Sets the timezone and syncs the clock with NTP",
+    "marc-undo": "Removes the records of an imported MARC batch",
+    "authority-sync": "Links the catalog headings to their authorities",
+    "patron-category": "Moves patrons from one category to another",
+    "data-quality": "Finds records with missing or broken data",
+    "privacy-anonymise": "Anonymises loans and holds that ended long ago",
+    "privacy-delete": "Deletes expired patrons with no loans, after a backup",
+    "tool-logs": "Shows what the library tools did and when",
+    "brazil": "CPF check, Pimaco labels, holidays, ABNT and census",
+    "cataloguing": "PHA, Cutter and CDD helpers for cataloguers",
+    "cdd": "Adds a CDD lookup to the cataloguing editor",
+    "plugins": "Turns Koha plugins on or off and sets their sources",
+    "cutter": "Finds the Cutter number of an author",
+    "monitor": "Watches CPU, memory and network live",
+    "mc": "Browses the server's files in Midnight Commander",
+    "crons": "Turns Koha's scheduled jobs on or off",
+    "languages": "Installs or removes Koha's interface languages",
+    "update-system": "Updates the system packages and Koha's database",
+    "update-panel": "Downloads the newest version of this panel",
+    "about": "Version, license and where to get help",
+    "reboot": "Restarts the whole server",
+}
+
+
+def description(entry: Entry) -> str:
+    return DESCRIPTIONS.get(entry.action, "")

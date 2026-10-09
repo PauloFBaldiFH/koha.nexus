@@ -9,7 +9,7 @@ from textual.widgets import Button, Label, Static
 
 from ..glyphs import split_icon
 from ..i18n import t
-from ..menus import Entry
+from ..menus import Entry, description
 from .copy import CopyButton
 from .marquee import Marquee
 
@@ -75,23 +75,15 @@ class ActionCard(Static, can_focus=True):
 
     BINDINGS = [("enter", "choose", "Open"), ("space", "choose", "Open")]
 
-    def __init__(self, entry: Entry, background: bool = False, native: bool = False):
+    def __init__(self, entry: Entry):
         super().__init__(classes="action-card")
         self.entry = entry
-        self.background = background
-        self.native = native
 
     def compose(self) -> ComposeResult:
         icon, text = split_icon(t(self.entry.label))
         yield Label(icon or ">", classes="action-icon")
         yield Label(text, classes="action-text")
-        if self.native:
-            hint = t("Step by step, in this panel")
-        elif self.background:
-            hint = t("Runs in the background")
-        else:
-            hint = t("Opens the classic screens")
-        yield Marquee(hint, classes="action-hint")
+        yield Marquee(t(description(self.entry)), classes="action-hint")
 
     # The hint scrolls while the card has the mouse or the focus (Enter and
     # Leave also come up from the labels inside, hence the re-check).

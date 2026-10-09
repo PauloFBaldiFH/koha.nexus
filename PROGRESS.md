@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.33** (1.5.34: updater downloads from one commit)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.34** (1.5.35: a real description under every card)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -242,12 +242,19 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   readable line (exit 4), with the traceback in the log.
 
 - **1.5.33 (card hint ticker)**: the grey hint line under each action card ("Runs in the
-  background", "Passo a passo, neste painel"...) is one line now (`widgets/marquee.py`). Text that
+  background"...) is one line now (`widgets/marquee.py`). Text that
   fits is drawn as it is; text that does not is cut with "…", and while the card is hovered or
   focused it slides one cell every 0.15 s, resting about 1.5 s at the start and at the end. Only a
   running ticker has a timer, the window is always exactly the box width (wide characters cut by
   an edge become a space), so nothing bleeds past the border. Gotcha: a Textual widget must not
   use `self._running` (MessagePump's own flag), like `remove()` and `_task()`.
+
+- **1.5.35 (card descriptions)**: Paulo asked for a real one-line description under every menu
+  card instead of the generic hint ("Step by step, in this panel" / "Runs in the background" /
+  "Opens the classic screens", now removed from the panel and pt.cache). `menus.DESCRIPTIONS`
+  maps each action to an English key (like the labels), with the PT-BR text added by hand to
+  `lang/pt.cache`; the other languages show the English text until gen_lang.py runs where Google
+  Translate can be reached. tests/test_menus.py checks every entry has one with a PT-BR text.
 
 ---
 
