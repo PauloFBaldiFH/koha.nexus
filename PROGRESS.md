@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.24**._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.25**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -72,6 +72,10 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `History` resets automatic hides when `HISTORY_RULES` changes. Confirmed dead and left out:
   raw IPs (Biblioteca Nacional), `*.alma.exlibrisgroup.com` (UNESP, BNE, CSIC), Portugal's BN
   and `z3950.loc.gov:7090` (use `lx2.loc.gov:210/LCDB`). LIBRIS is MARC-8.
+  Since 1.5.25 no login is in the repository (GitGuardian flagged BnF's public one): a curated
+  target names `"login_env": "KEI_Z3950_X"` and `credentials.py` reads `KEI_Z3950_X_USER` /
+  `_PASSWORD` from the environment or `/etc/koha-easy-install/.env` (`KEI_ENV_FILE`; see
+  `.env.example`; `.env` is git-ignored). Such a login is not copied into `z3950-targets.json`.
 - **OPAC appearance** (1.5.16, Subject 4): panel screen `views/opac.py` over `opac_theme.py`
   (textures, radius sliders in `widgets/slider.py`, wallpaper with a legibility film, logo,
   favicon via `OpacFavicon`, a 🌓 switch saved in `localStorage` key `kei_theme`, clean-up
