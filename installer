@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.33"
+PANEL_VERSION=" 1.5.34"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9231,57 +9231,102 @@ function_view_logs() {
 # ======================================================================
 # 26. UPDATE THE PANEL
 # ======================================================================
+# The update is downloaded from one commit, not from the branch:
+# raw.githubusercontent.com caches every file for up to 5 minutes on its own,
+# so right after a merge the branch URLs can serve the new installer with the
+# old installer.sha256 (or the reverse) and the check fails for nothing.
+# update_resolve sets UPDATE_BASE to the folder of the commit the branch points
+# to now (UPDATE_COMMIT); when GitHub's API can't be reached it falls back to
+# the branch folder and leaves UPDATE_COMMIT empty.
+update_resolve() {
+    UPDATE_COMMIT=""
+    UPDATE_BASE="${UPDATE_URL%/*}/"
+    local re='^https://raw\.githubusercontent\.com/([^/]+/[^/]+)/(refs/heads/)?([^/]+)/installer$'
+    [[ "$UPDATE_URL" =~ $re ]] || return 0
+    local repo="${BASH_REMATCH[1]}" ref="${BASH_REMATCH[3]}" sha
+    sha=$(curl -fsSL --retry 2 --connect-timeout 5 --max-time 15 \
+        -H 'Accept: application/vnd.github.sha' \
+        "https://api.github.com/repos/${repo}/commits/${ref}" 2>/dev/null)
+    if [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+        UPDATE_COMMIT="$sha"
+        UPDATE_BASE="https://raw.githubusercontent.com/${repo}/${sha}/"
+    fi
+    return 0
+}
+
+# update_fetch SCRIPT SUM: downloads the installer and its checksum from
+# UPDATE_BASE and checks one against the other. A mismatch is downloaded once
+# more (a transfer cut short also gives a wrong hash) before it counts.
+# Returns 0 verified, 1 download failed, 2 the hash does not match.
+update_fetch() {
+    local script="$1" sum="$2" try expected actual
+    for try in 1 2; do
+        if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
+                -H 'Cache-Control: no-cache' "${UPDATE_BASE}installer" -o "$script" || \
+           ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+                -H 'Cache-Control: no-cache' "${UPDATE_BASE}installer.sha256" -o "$sum"; then
+            return 1
+        fi
+        expected=$(awk 'NR==1 {print tolower($1)}' "$sum" 2>/dev/null)
+        actual=$(sha256sum "$script" | awk '{print $1}')
+        [[ "$expected" =~ ^[0-9a-f]{64}$ ]] && [ "$expected" = "$actual" ] && return 0
+        log "update: SHA-256 mismatch from ${UPDATE_BASE} (attempt $try): expected '${expected}', got '${actual}'"
+    done
+    return 2
+}
+
 function_autoupdate() {
     clear
     display_explanation "Looking for updates in the repository..."
 
+    local target="/usr/local/bin/config.sh"
+    local target_dir; target_dir=$(dirname "$target")
+    local tmp; tmp="$(mktemp "${target_dir}/.config.sh.update.XXXXXX")"
+    local tmp_sha; tmp_sha="$(mktemp "${target_dir}/.config.sh.sha256.XXXXXX")"
+
+    if [ -z "$tmp" ] || [ -z "$tmp_sha" ]; then
+        rm -f "$tmp" "$tmp_sha"
+        msg_error "" "$(t "Could not create temporary files in the panel directory.")" 9 76
+        return 1
+    fi
+
+    update_resolve
+    local fetched=0
+    update_fetch "$tmp" "$tmp_sha" || fetched=$?
+    if [ "$fetched" = 1 ]; then
+        rm -f "$tmp" "$tmp_sha"
+        msg_error "" "$(t "Could not check the version on GitHub. Check your internet connection or the update URL.")" 10 76
+        return 1
+    fi
+    if [ "$fetched" = 2 ]; then
+        rm -f "$tmp" "$tmp_sha"
+        if [ -n "$UPDATE_COMMIT" ]; then
+            msg_error "" "$(t "SECURITY ALERT: The downloaded file does NOT match the expected SHA-256 signature.\nUpdate aborted to protect the server.")" 11 78
+        else
+            msg_error "" "$(t "The update files on GitHub do not match each other yet (GitHub keeps copies for up to 5 minutes after a new version is published). Nothing was changed.\n\nTry again in a few minutes. If this keeps happening, do not update and report it.")" 13 78
+        fi
+        return 1
+    fi
+
     local remote_version
-    remote_version=$(curl -fsSL --retry 2 --connect-timeout 5 --max-time 10 "$UPDATE_URL" | grep -m1 '^PANEL_VERSION=' | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    remote_version=$(grep -m1 '^PANEL_VERSION=' "$tmp" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 
     if [ -z "$remote_version" ]; then
+        rm -f "$tmp" "$tmp_sha"
         msg_error "" "$(t "Could not check the version on GitHub. Check your internet connection or the update URL.")" 10 76
         return 1
     fi
 
     if [ "$remote_version" = "$PANEL_VERSION" ]; then
+        rm -f "$tmp" "$tmp_sha"
         msg_ok "$(t "The panel is already at the latest version!\n\nNo update required.\nInstalled version: \${PANEL_VERSION}")" 10 70
         return 0
     fi
 
     if ! prompt_yes_no "$(t "Update Available")" \
 "$(t "A new version of the panel was found on GitHub.\n\nCurrent installed version: \${PANEL_VERSION}\nNew available version    : \${remote_version}\n\nThe system will download it, validate the SHA-256 signature, and create a backup before replacing.\n\nDownload and update now?")" 16 80; then
+        rm -f "$tmp" "$tmp_sha"
         return 0
-    fi
-
-    clear
-    display_explanation "Downloading version \${remote_version} and SHA-256 signature..."
-    local target="/usr/local/bin/config.sh"
-    local target_dir; target_dir=$(dirname "$target")
-    
-    local tmp; tmp="$(mktemp "${target_dir}/.config.sh.update.XXXXXX")"
-    local tmp_sha; tmp_sha="$(mktemp "${target_dir}/.config.sh.sha256.XXXXXX")"
-    
-    if [ -z "$tmp" ] || [ -z "$tmp_sha" ]; then
-        msg_error "" "$(t "Could not create temporary files in the panel directory.")" 9 76
-        return 1
-    fi
-
-    if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 "$UPDATE_URL" -o "$tmp" || \
-       ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 "${UPDATE_URL}.sha256" -o "$tmp_sha"; then
-        rm -f "$tmp" "$tmp_sha"
-        msg_error "" "$(t "Update download failed (script or signature missing). The current panel keeps working.")" 10 78
-        return 1
-    fi
-
-    display_explanation "Verifying cryptographic signature (SHA-256)..."
-    local expected_hash actual_hash
-    expected_hash=$(awk '{print $1}' "$tmp_sha" 2>/dev/null)
-    actual_hash=$(sha256sum "$tmp" | awk '{print $1}')
-
-    if [ -z "$expected_hash" ] || [ "$expected_hash" != "$actual_hash" ]; then
-        rm -f "$tmp" "$tmp_sha"
-        msg_error "" "$(t "SECURITY ALERT: The downloaded file does NOT match the expected SHA-256 signature.\nUpdate aborted to protect the server.")" 11 78
-        return 1
     fi
 
     if ! bash -n "$tmp" 2>/dev/null; then
@@ -9302,7 +9347,7 @@ function_autoupdate() {
     fi
 
     if mv -f "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target"; then
-        log "panel updated from version $PANEL_VERSION to $remote_version (SHA-256 verified)"
+        log "panel updated from version $PANEL_VERSION to $remote_version (SHA-256 verified, ${UPDATE_COMMIT:-branch})"
         # Dictionaries are downloaded again on the next start (they are now
         # older than the panel); the bundled copy is dropped to force it.
         rm -f "${CONFIG_DIR}/lang/${SYS_LANG}.cache" 2>/dev/null || true
