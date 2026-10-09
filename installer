@@ -52,6 +52,7 @@ MAINT_MARKER_OWNED=""
 TOOLS_WORK=""
 on_exit() {
     restore_apt_timers
+    declare -F panel_lock_release >/dev/null && panel_lock_release
     [ -n "$RESTORE_TRIAL_DB" ] && mysql -e "DROP DATABASE IF EXISTS \`${RESTORE_TRIAL_DB}\`;" >/dev/null 2>&1
     [ -n "$CLEANUP_FILE" ] && rm -f "$CLEANUP_FILE"
     [ -n "$MAINT_MARKER_OWNED" ] && rm -f "$MAINT_MARKER_OWNED"
@@ -827,7 +828,97 @@ REAL_HOME="$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6)"
 # ======================================================================
 # 4.5. PANEL LOCK (ROOT ONLY)
 # ======================================================================
-PANEL_LOCK_FILE="/var/run/koha_panel.lock"
+PANEL_LOCK_FILE="${KEI_PANEL_LOCK_FILE:-/var/run/koha_panel.lock}"
+PANEL_LOCK_OWNED=""
+PANEL_LOCK_CLEARED=""
+
+# The lock is a flock on PANEL_LOCK_FILE, which the kernel drops when its
+# holder dies, so a file left behind never blocks by itself. What does
+# block: a panel whose SSH session or window went away while it kept
+# running (bash waits for the Textual panel, which hangs on a terminal
+# that no longer exists), or another program that inherited the lock
+# descriptor. The file holds the PID of the panel that took it.
+
+# panel_lock_pid_is_panel PID: 0 when PID is alive (kill -0) and its
+# /proc/PID/cmdline is this panel (config.sh, the installer, koha-nexus or
+# the Textual panel kei_panel).
+panel_lock_pid_is_panel() {
+    local pid="$1" cmd
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    cmd=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null) || return 1
+    case "$cmd" in
+        *config.sh*|*installer*|*koha-nexus*|*kei_panel*) return 0 ;;
+    esac
+    return 1
+}
+
+# panel_lock_pid_orphaned PID: 0 when the terminal of PID is gone (its
+# stdin, stdout or stderr is a terminal that was closed: an SSH session
+# that dropped, a closed window). A panel with no terminal at all is not
+# taken for an orphan.
+panel_lock_pid_orphaned() {
+    local fd tgt
+    for fd in 0 1 2; do
+        tgt=$(readlink "/proc/${1}/fd/${fd}" 2>/dev/null) || continue
+        case "$tgt" in
+            /dev/pts/*|/dev/tty*)
+                [[ "$tgt" == *" (deleted)" ]] && return 0
+                [ -e "$tgt" ] || return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# panel_lock_take: takes the panel lock (descriptor 9), clearing a stale
+# one. 0 = taken; 1 = a live panel has it (PANEL_LOCK_HOLDER = its PID) or
+# a dropped session is still restoring or backing up.
+panel_lock_take() {
+    local holder pid
+    PANEL_LOCK_HOLDER=""
+    exec 9>> "$PANEL_LOCK_FILE" || return 1
+    if ! flock -n 9; then
+        holder=$(head -c 32 "$PANEL_LOCK_FILE" 2>/dev/null | tr -cd '0-9')
+        if panel_lock_pid_is_panel "$holder" && ! panel_lock_pid_orphaned "$holder"; then
+            PANEL_LOCK_HOLDER="$holder"
+            return 1
+        fi
+        # A dropped session still writing the catalog keeps it to the end.
+        if { exec 8>>"${BACKUP_LOCK_FILE:-/var/lock/koha_backup.lock}"; } 2>/dev/null && ! flock -n 8; then
+            exec 8>&-
+            PANEL_LOCK_HOLDER="${holder:-?}"
+            return 1
+        fi
+        exec 8>&- 2>/dev/null
+        # Panels left behind by a dropped session end; other programs that
+        # merely inherited the descriptor are left alone. Then the file is
+        # replaced: the lock is on the file, so a new file is a free lock.
+        if panel_lock_pid_is_panel "$holder"; then
+            kill -TERM "$holder" 2>/dev/null
+        fi
+        for pid in $(fuser "$PANEL_LOCK_FILE" 2>/dev/null); do
+            [ "$pid" = "$$" ] && continue
+            panel_lock_pid_is_panel "$pid" && panel_lock_pid_orphaned "$pid" && kill -TERM "$pid" 2>/dev/null
+        done
+        exec 9>&-
+        rm -f -- "$PANEL_LOCK_FILE"
+        exec 9>> "$PANEL_LOCK_FILE" || return 1
+        flock -n 9 || return 1
+        PANEL_LOCK_CLEARED="${holder:-?}"
+    fi
+    printf '%s\n' "$$" > "$PANEL_LOCK_FILE"
+    PANEL_LOCK_OWNED=1
+    return 0
+}
+
+# On exit (EXIT, and INT/TERM/HUP through unshield_signals) the PID is
+# cleared; the kernel drops the flock itself.
+panel_lock_release() {
+    [ "$PANEL_LOCK_OWNED" = "1" ] || return 0
+    : > "$PANEL_LOCK_FILE" 2>/dev/null
+    PANEL_LOCK_OWNED=""
+}
+# end of panel lock helpers
 
 # Commands for the Windows tools (section 21.5) run next to an open panel:
 # no lock, no dependency install, no menu. All are read-only except
@@ -840,13 +931,20 @@ if [ -z "$KEI_CLI_MODE" ]; then
     # A routine started by the new panel (config.sh --run, see
     # kei_panel_run) gets the panel's own lock descriptor: the same lock,
     # not a second panel. Otherwise the lock file is opened here.
-    if [ "${KEI_PANEL_LOCK_FD:-}" != "9" ] || ! { : >&9; } 2>/dev/null; then
-        exec 9> "$PANEL_LOCK_FILE"
-    fi
-    unset KEI_PANEL_LOCK_FD
-    if ! flock -n 9; then
-        echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
-        exit 1
+    if [ "${KEI_PANEL_LOCK_FD:-}" = "9" ] && { : >&9; } 2>/dev/null; then
+        unset KEI_PANEL_LOCK_FD
+        if ! flock -n 9; then
+            echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
+            exit 1
+        fi
+    else
+        unset KEI_PANEL_LOCK_FD
+        if ! panel_lock_take; then
+            echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
+            [ -n "$PANEL_LOCK_HOLDER" ] && [ "$PANEL_LOCK_HOLDER" != "?" ] \
+                && echo "$(t 'Process: ${PANEL_LOCK_HOLDER}. To end it: sudo kill ${PANEL_LOCK_HOLDER}')"
+            exit 1
+        fi
     fi
 fi
 
@@ -27710,6 +27808,7 @@ is_koha_installed && ficha_refresh
 is_koha_installed && aia_refresh
 # Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
 is_koha_installed && mr_refresh
+[ -n "$PANEL_LOCK_CLEARED" ] && log "panel lock: stale lock of PID ${PANEL_LOCK_CLEARED} cleared (dropped session)"
 # The koha.nexus names of the panel's folders and command (see kei_brand_links).
 kei_brand_links
 
