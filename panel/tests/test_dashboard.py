@@ -50,3 +50,14 @@ def test_browser_is_never_opened_over_ssh_or_without_a_desktop():
     assert opener_command(url, wsl=False, ssh=False, which=which, environ={}) is None
     cmd = opener_command(url, wsl=False, ssh=False, which=which, environ={"DISPLAY": ":0", "SUDO_USER": "ana"})
     assert cmd[-2:] == ["xdg-open", url]
+
+
+def test_cloud_server_on_a_private_address_shows_its_public_ip():
+    s = dict(_BASE, services={"cloudflared": "inactive"},
+             access=dict(_BASE["access"], lan_ip="10.0.0.60", tunnel_mode="", public_opac="", public_staff="",
+                         public_ip="203.0.113.7"))
+    links = access_links(s)
+    assert links["lan", "opac"][0] == "http://10.0.0.60"
+    assert links["public", "opac"][0] == "http://203.0.113.7"
+    assert links["public", "staff"][0] == "http://203.0.113.7:8080"
+    assert "Cloudflare Tunnel" in links["public", "staff"][1]

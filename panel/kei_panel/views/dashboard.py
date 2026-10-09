@@ -117,6 +117,13 @@ def access_links(s: dict) -> dict[tuple[str, str], tuple[str, str, str]]:
                                        "ok" if online else "bad")
         elif mode == "free" and page == "staff":
             links[("public", page)] = ("", t("Remote staff access is off"), "")
+        elif a.get("public_ip"):
+            # A cloud server on a private address (10.0.0.60): the address
+            # the Internet sees, which works once the cloud firewall lets
+            # ports 80 and 8080 in.
+            links[("public", page)] = (http_url(a["public_ip"], ports[page]),
+                                       t("Public IP: open ports 80 and 8080 in the cloud firewall, or use a "
+                                         "Cloudflare Tunnel"), "")
         else:
             links[("public", page)] = ("", t("Not published on the Internet"), "")
     return links

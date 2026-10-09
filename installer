@@ -1720,7 +1720,7 @@ tui_wrap() {
 # tui_celebrate IP [FAILURES]: the addresses come from this machine's own
 # configuration (network address, WSL network mode, Cloudflare Tunnel).
 tui_celebrate() {
-    local ip="${1:-$(get_server_ip)}" fails="${2:-0}" cf_opac="" cf_staff="" rule i w=0 n lab
+    local ip="${1:-$(get_server_ip)}" fails="${2:-0}" cf_opac="" cf_staff="" rule i w=0 n lab pub
     local -a labels=() urls=() icons=()
     read -r cf_opac cf_staff < <(tunnel_public_hosts 2>/dev/null)
     [ "$cf_opac" = "-" ] && cf_opac=""
@@ -1731,6 +1731,12 @@ tui_celebrate() {
     if host_can lan_direct && [ "$ip" != "127.0.0.1" ]; then
         icons+=("📖"); labels+=("$(t "Public catalog (library network)")"); urls+=("http://${ip}")
         icons+=("🔑"); labels+=("$(t "Staff interface (library network)")"); urls+=("http://${ip}:8080")
+    fi
+    # A cloud server on a private address: the address the internet sees.
+    pub=$(server_public_ip "$ip")
+    if [ -n "$pub" ]; then
+        icons+=("🌍"); labels+=("$(t "Public catalog (public IP)")"); urls+=("http://${pub}")
+        icons+=("🌍"); labels+=("$(t "Staff interface (public IP)")"); urls+=("http://${pub}:8080")
     fi
     icons+=("💻"); labels+=("$(t "Public catalog (this computer)")"); urls+=("http://localhost")
     icons+=("💻"); labels+=("$(t "Staff interface (this computer)")"); urls+=("http://localhost:8080")
@@ -1760,6 +1766,10 @@ tui_celebrate() {
     echo ""
     tui_icon "🔐"
     printf '   %s%s %s%s%s\n' "$REPLY" "$(t "Username and password:")" "$TUI_CYN" "sudo cat $CREDENTIALS_FILE" "$TUI_RST"
+    if [ -n "$pub" ] && [ -z "$cf_opac" ]; then
+        tui_icon "💡"
+        printf '   %s%s\n' "$REPLY" "$(t 'This server has a private address (${ip}). If the public IP does not open, the cloud firewall blocks ports 80 and 8080: open them there, or use Security & access hub > Cloudflare Tunnel (no open ports needed).')"
+    fi
     tui_icon "👉"
     printf '   %s%s\n' "$REPLY" "$(t "Next step: open the staff interface to finish Koha's web installer.")"
     printf '   %s%s%s\n\n' "$TUI_DIM" "$rule" "$TUI_RST"
@@ -1773,6 +1783,50 @@ get_server_ip() {
     [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     [ -z "$ip" ] && ip="127.0.0.1"
     printf '%s' "$ip"
+}
+
+# ip_is_private IP: 0 for an address the internet cannot reach: RFC 1918
+# (10/8, 172.16/12, 192.168/16), carrier-grade NAT (100.64/10), link-local
+# and loopback. Cloud servers (Oracle Cloud, AWS, DigitalOcean's VPC...)
+# sit on such an address behind a public one.
+ip_is_private() {
+    case "$1" in
+        10.*|192.168.*|127.*|169.254.*) return 0 ;;
+        172.1[6-9].*|172.2[0-9].*|172.3[01].*) return 0 ;;
+        100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*) return 0 ;;
+    esac
+    return 1
+}
+
+# get_public_ip: the address the internet sees for this server (ipify, then
+# ifconfig.me; a few seconds at most), or nothing. Remembered for an hour
+# in KEI_PUBLIC_IP_CACHE, so banners and the dashboard do not ask each time.
+KEI_PUBLIC_IP_CACHE="${KEI_PUBLIC_IP_CACHE:-/run/koha-easy-install/public-ip}"
+KEI_PUBLIC_IP_URLS="${KEI_PUBLIC_IP_URLS:-https://api.ipify.org https://ifconfig.me/ip}"
+get_public_ip() {
+    local ip="" u
+    if [ -n "$(find "$KEI_PUBLIC_IP_CACHE" -mmin -60 2>/dev/null)" ]; then
+        ip=$(head -c 64 "$KEI_PUBLIC_IP_CACHE" 2>/dev/null | tr -cd '0-9.')
+        printf '%s' "$ip"
+        return 0
+    fi
+    for u in $KEI_PUBLIC_IP_URLS; do
+        ip=$(curl -fsS --connect-timeout 3 --max-time 4 "$u" 2>/dev/null | head -c 64 | tr -cd '0-9.')
+        if [[ "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && ! ip_is_private "$ip"; then break; fi
+        ip=""
+    done
+    mkdir -p "${KEI_PUBLIC_IP_CACHE%/*}" 2>/dev/null && printf '%s\n' "$ip" > "$KEI_PUBLIC_IP_CACHE" 2>/dev/null
+    printf '%s' "$ip"
+}
+
+# server_public_ip [IP]: the public address when this server's own address
+# (IP, default get_server_ip) is private and other machines reach it
+# directly (not WSL); nothing otherwise.
+server_public_ip() {
+    local ip="${1:-$(get_server_ip)}"
+    host_can lan_direct || return 0
+    ip_is_private "$ip" || return 0
+    get_public_ip
 }
 
 get_database_password() {
@@ -4213,13 +4267,24 @@ write_banner() {
     l_opac_loc="$(t "- OPAC  (Local)   : http://localhost:80")"
     l_staff_cf="$(t "- Staff (Cloud)   : \${staff_cf_text}")"
     l_opac_cf="$(t "- OPAC  (Cloud)   : \${opac_cf_text}")"
+    # Cloud server (Oracle Cloud, AWS, DigitalOcean...): its own address is
+    # private (10.0.0.60), so the banner also shows the public one.
+    local pub l_pub=() hint
+    pub=$(server_public_ip "$ip")
+    if [ -n "$pub" ]; then
+        l_pub+=("$(t "- Staff (Public)  : http://\${pub}:8080")" "$(t "- OPAC  (Public)  : http://\${pub}:80")")
+        if [ -z "$cf_opac" ]; then
+            hint="$(t "- No access? Cloudflare Tunnel: config.sh > Security")"
+            l_pub+=("$hint")
+        fi
+    fi
     l_user="$(t "- User (Admin)    : \${user}")"
     l_pass="$(t "- Password (Root) : cat /root/koha_credentials.txt")"
 
     # The art is plain ASCII with no backslash: agetty reads "\x" in
     # /etc/issue as an escape and would eat the character after it.
     local art
-    art=$(banner_art "$l_ctrl" "$l_ssh" - "$l_urls" "$l_staff" "$l_opac" "$l_staff_loc" "$l_opac_loc" \
+    art=$(banner_art "$l_ctrl" "$l_ssh" - "$l_urls" "$l_staff" "$l_opac" "${l_pub[@]}" "$l_staff_loc" "$l_opac_loc" \
         "$l_staff_cf" "$l_opac_cf" - "$l_user" "$l_pass")
     printf '\\S\n\n%s\n\n' "$art" > /etc/issue
     printf '\n%s\n\n' "$art" > /etc/issue.net 2>/dev/null
@@ -4364,6 +4429,19 @@ kei_brand_links() {
         [ -e "$link" ] || [ -L "$link" ] && continue
         ln -s "$target" "$link" 2>/dev/null && log "koha.nexus: $link -> $target"
     done
+    return 0
+}
+
+# The login banner (/etc/issue, /etc/motd) written at install time shows the
+# addresses of that day; a cloud server's public address can change. Once a
+# day it is written again, in the background, with the panel's lock
+# descriptors closed (a background job holding them would keep the next
+# "sudo config.sh" out).
+kei_banner_refresh() {
+    is_koha_installed || return 0
+    grep -qF "__..--''" /etc/motd 2>/dev/null || return 0
+    [ -n "$(find /etc/motd -mmin +1440 2>/dev/null)" ] || return 0
+    ( write_banner "" "$DB_NAME" ) </dev/null >/dev/null 2>&1 7>&- 8>&- 9>&- &
     return 0
 }
 
@@ -8606,7 +8684,7 @@ st_mark() {
 # The server status as "GROUP<TAB>LABEL<TAB>VALUE" lines (the classic box
 # and the panel's status screen both read them).
 detailed_status_rows() {
-    local engine idx pend docs bibs plack email g
+    local engine idx pend docs bibs plack email g pub
     engine=$(get_search_engine)
     if is_koha_indexer_running; then idx="🟢 $(t "running")"; else idx="⚪ $(t "stopped")"; fi
     if plack_running; then plack="🟢 $(t "running")"; else plack="🔴 $(t "stopped")"; fi
@@ -8639,6 +8717,8 @@ detailed_status_rows() {
         "$g" "$(t "Uptime")" "$(uptime -p 2>/dev/null)" \
         "$g" "$(t "Timezone")" "$(get_current_timezone)" \
         "$g" "IP" "$(get_server_ip)"
+    pub=$(server_public_ip)
+    [ -n "$pub" ] && printf '%s\t%s\t%s\n' "$g" "$(t "Public IP")" "$pub"
     g=$(t "BACKUP")
     printf '%s\t%s\t%s\n' \
         "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" -name '*.sql.gz' -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
@@ -8741,18 +8821,19 @@ kei_overall_state() {
 # when they can really use it (host_can lan_direct: not WSL in NAT mode).
 # Public hosts are the Cloudflare tunnel's, free address or own domain.
 kei_access_json() {
-    local ip="" lan=false opac staff mode=""
+    local ip="" lan=false opac staff mode="" pub=""
     if host_can lan_direct; then
         ip="${WIN_LAN_IP:-}"
         [ -n "$ip" ] || ip=$(get_server_ip 2>/dev/null)
         [ "$ip" != "127.0.0.1" ] && lan=true
+        [ -z "${WIN_LAN_IP:-}" ] && pub=$(server_public_ip "$ip")
     fi
     read -r opac staff < <(tunnel_public_hosts 2>/dev/null)
     [ "$opac" = "-" ] && opac=""
     [ "$staff" = "-" ] && staff=""
     if tunnel_mode_is broker; then mode="free"; elif [ -f /etc/cloudflared/config.yml ]; then mode="own"; fi
     printf '"access":{"opac_port":80,"staff_port":8080,"lan_ip":%s,"lan_reachable":%s,' "$(json_str "$ip")" "$lan"
-    printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")"
+    printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s,"public_ip":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")" "$(json_str "$pub")"
 }
 
 kei_status_json() {
@@ -27965,6 +28046,8 @@ is_koha_installed && mr_refresh
 [ -n "$PANEL_LOCK_CLEARED" ] && log "panel lock: stale lock of PID ${PANEL_LOCK_CLEARED} cleared (dropped session)"
 # The koha.nexus names of the panel's folders and command (see kei_brand_links).
 kei_brand_links
+# The login banner of a cloud server shows its public address: refreshed daily.
+kei_banner_refresh
 
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO
