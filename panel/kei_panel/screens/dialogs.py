@@ -8,6 +8,7 @@ import re
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.content import Content
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, OptionList, RichLog, SelectionList, Static, TextArea
@@ -133,10 +134,10 @@ class ConfirmScreen(FitsScreen, CopyValues, ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         classes = "dialog -error" if self._danger else "dialog"
         with Vertical(classes=classes + (" -wide" if self._preview else "")):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             if self._preview:
                 if self._preview_title:
-                    yield Label(self._preview_title, classes="dialog-prompt")
+                    yield Label(self._preview_title, classes="dialog-prompt", markup=False)
                 with VerticalScroll(classes="dialog-scroll dialog-preview"):
                     yield Static(self._preview.strip("\n"), markup=False)
             yield from self.text_with_copies(self._question)
@@ -168,11 +169,11 @@ class ResultScreen(FitsScreen, ModalScreen[None]):
     def compose(self) -> ComposeResult:
         r = self._result
         with Vertical(classes="dialog -error"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             # Text and log scroll together: on a short terminal they give
             # way, never the OK button below them.
             with VerticalScroll(classes="dialog-scroll"):
-                yield Label(r.error or t("Cancelled"), classes="dialog-body")
+                yield Label(r.error or t("Cancelled"), classes="dialog-body", markup=False)
                 yield RichLog(classes="dialog-log -inner", wrap=True, markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
@@ -202,9 +203,9 @@ class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             yield from self.text_with_copies(self._prompt)
-            yield OptionList(*[Option(label, id=key) for key, label in self._options], classes="dialog-options")
+            yield OptionList(*[Option(Content(label), id=key) for key, label in self._options], classes="dialog-options")
             if self._note:
                 yield Static(self._note, classes="dialog-note", markup=False)
             with Horizontal(classes="dialog-buttons"):
@@ -241,14 +242,14 @@ class InputScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             if self._instructions:
                 with VerticalScroll(classes="dialog-scroll"):
                     yield Static(self._instructions, classes="dialog-body", markup=False)
                     yield from self.copy_rows(self._commands, command=True)
-            yield Label(self._prompt, classes="dialog-prompt")
+            yield Label(self._prompt, classes="dialog-prompt", markup=False)
             yield Input(self._value, password=self._password, id="value")
-            yield Label("", id="input-error", classes="dialog-error")
+            yield Label("", id="input-error", classes="dialog-error", markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
                 yield Button(t("Cancel"), id="cancel")
@@ -297,7 +298,7 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         classes = {"error": "dialog -wide -error", "info": "dialog -wide -info"}.get(self._kind, "dialog -wide -ok")
         with Vertical(classes=classes):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             with VerticalScroll(classes="dialog-scroll"):
                 if self._body and not self._command:
                     yield from self.text_with_copies(self._body)
@@ -305,7 +306,7 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
                     yield Static(self._body, classes="dialog-body", markup=False)
                 for label, value in self._details:
                     with Horizontal(classes="dialog-detail"):
-                        yield Label(label, classes="detail-label")
+                        yield Label(label, classes="detail-label", markup=False)
                         yield Static(value, classes="detail-value", markup=False)
                 if self._command:
                     if self._command_help:
@@ -359,15 +360,15 @@ class CredentialsScreen(FitsScreen, CopyValues, ModalScreen[None]):
     def compose(self) -> ComposeResult:
         classes = {"error": "dialog -wide -error", "info": "dialog -wide -info"}.get(self._kind, "dialog -wide -ok")
         with Vertical(classes=classes):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             with VerticalScroll(classes="dialog-scroll"):
                 if self._body:
                     yield Static(self._body, classes="dialog-body", markup=False)
                 for heading, rows in self._groups:
-                    yield Label(heading, classes="dialog-prompt")
+                    yield Label(heading, classes="dialog-prompt", markup=False)
                     for label, value in rows:
                         with Horizontal(classes="dialog-detail"):
-                            yield Label(label, classes="detail-label")
+                            yield Label(label, classes="detail-label", markup=False)
                             yield Static(value, classes="detail-value", markup=False)
                             if self._copy:
                                 self._values.append(value)
@@ -401,7 +402,7 @@ class TextScreen(FitsScreen, CopyValues, ModalScreen[None]):
     def compose(self) -> ComposeResult:
         classes = {"error": "dialog -wide -error", "ok": "dialog -wide -ok"}.get(self._kind, "dialog -wide -info")
         with Vertical(classes=classes):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             if self._body:
                 yield Static(self._body, classes="dialog-body", markup=False)
             with VerticalScroll(classes="dialog-scroll dialog-preview"):
@@ -428,10 +429,10 @@ class ChecklistScreen(FitsScreen, ModalScreen[list[str] | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             if self._prompt:
                 yield Static(self._prompt, classes="dialog-body", markup=False)
-            yield SelectionList[str](*[(label, key, on) for key, label, on in self._options],
+            yield SelectionList[str](*[(Content(label), key, on) for key, label, on in self._options],
                                      classes="dialog-options")
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("OK"), id="ok", variant="primary")
@@ -466,11 +467,11 @@ class EditScreen(ModalScreen[bool]):
         except OSError:
             text = ""
         with Vertical(classes="dialog -wide -log"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             if self._note:
                 yield Static(self._note, classes="dialog-note", markup=False)
             yield TextArea(text, id="editor", classes="dialog-editor", show_line_numbers=True)
-            yield Label("", id="edit-error", classes="dialog-error")
+            yield Label("", id="edit-error", classes="dialog-error", markup=False)
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("Save"), id="save", variant="primary")
                 yield Button(t("Cancel"), id="cancel")

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.31"
+PANEL_VERSION=" 1.5.32"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2587,6 +2587,77 @@ dump_test() {
     esac
 } 2>/dev/null
 
+# dump_kind FILE: what the file holds, read from its content (after the
+# compression, if any), never from its name, so "BKP_BIBLIOTECA (2).backup",
+# .bkp, .dump or .tar files are told apart like any other:
+#   mysql       a MariaDB/MySQL dump (mysqldump, mariadb-dump, phpMyAdmin...)
+#   pg_custom   a PostgreSQL backup in pg_dump's custom format (PGDMP)
+#   pg_tar      a PostgreSQL backup in pg_dump's tar format (toc.dat inside)
+#   pg_plain    a PostgreSQL backup as plain SQL (pg_dump -Fp)
+#   tar | zip   an archive of other files
+#   sqlite      an SQLite database
+#   sql         SQL statements of an unknown origin
+#   empty | other
+# file -b --mime-type, when installed, is the fallback for the rest.
+dump_kind() {
+    local head mime
+    head=$(dump_cat "$1" 2>/dev/null | head -c 65536 | tr -d '\0')
+    if [ -z "$head" ]; then
+        echo empty
+        return 0
+    fi
+    case "$head" in
+        PGDMP*)          echo pg_custom; return 0 ;;
+        "SQLite format 3"*) echo sqlite; return 0 ;;
+        PK*)             [ "$(head -c 4 -- "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')" = "504b0304" ] && { echo zip; return 0; } ;;
+    esac
+    # A tar archive: "ustar" at byte 257 of the (decompressed) stream.
+    # Before the text checks: the files in it may be SQL too. grep -c, not
+    # -q: with pipefail, tar stopped by SIGPIPE would fail the test.
+    if [ "$(dump_cat "$1" 2>/dev/null | head -c 262 | tail -c 5)" = "ustar" ]; then
+        if [ "$(dump_cat "$1" 2>/dev/null | tar -tf - 2>/dev/null | grep -cx 'toc.dat')" -gt 0 ]; then
+            echo pg_tar
+        else
+            echo tar
+        fi
+        return 0
+    fi
+    if [[ "$head" == *"-- MySQL dump"* || "$head" == *"-- MariaDB dump"* || "$head" == *"phpMyAdmin SQL Dump"* \
+          || "$head" == *'CREATE TABLE `'* || "$head" == *'INSERT INTO `'* ]]; then
+        echo mysql
+        return 0
+    fi
+    if [[ "$head" == *"PostgreSQL database dump"* || "$head" == *"SET client_encoding"* || "$head" == *"pg_catalog."* ]] \
+        || grep -aqE '^COPY [^ ]+ .*FROM stdin;' <<< "$head"; then
+        echo pg_plain
+        return 0
+    fi
+    if grep -aqiE '^[[:space:]]*(CREATE TABLE|INSERT INTO|DROP TABLE)' <<< "$head"; then
+        echo sql
+        return 0
+    fi
+    mime=$(command -v file >/dev/null 2>&1 && file -b --mime-type -- "$1" 2>/dev/null)
+    case "$mime" in
+        application/x-tar)   echo tar ;;
+        application/zip)     echo zip ;;
+        application/vnd.sqlite3|application/x-sqlite3) echo sqlite ;;
+        *)                   echo other ;;
+    esac
+}
+
+# dump_kind_error KIND: the reason a backup of KIND cannot be restored into
+# Koha's MariaDB (nothing printed for a MariaDB/MySQL dump).
+dump_kind_error() {
+    case "$1" in
+        pg_custom|pg_tar|pg_plain)
+            t "This is a PostgreSQL backup, not a MariaDB/MySQL one. Koha keeps its catalog in MariaDB, so a PostgreSQL backup cannot be restored into it.\n\nIf it comes from another library system, open it with the Magic Import Tool (Library tools): it reads the systems it knows and says what it cannot.\nNothing was changed." ;;
+        tar|zip)
+            t "This is an archive (tar or zip), not a database backup. Extract the .sql file from it first, or open it with the Magic Import Tool (Library tools), which reads archives.\nNothing was changed." ;;
+        sqlite)
+            t "This is an SQLite database, not a MariaDB/MySQL backup: it cannot be restored into Koha.\nNothing was changed." ;;
+    esac
+}
+
 # Streams a .sql backup (plain, .gz, .bz2, .xz or .zst) into a database. Statements that would
 # redirect the import to another database (CREATE DATABASE/USE, present in
 # dumps made with --databases), DEFINERs of users that do not exist here and
@@ -2660,6 +2731,9 @@ check_dump_file() {
         [ "$(head -c 200000 -- "$file" | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
     fi
     DUMP_MB=$(( ${n:-0} / 1048576 ))
+    # Read from the content: a PostgreSQL backup also has CREATE TABLE lines.
+    DUMP_ERROR=$(dump_kind_error "$(dump_kind "$file")")
+    [ -z "$DUMP_ERROR" ] || return 1
     dump_is_complete "$file" && DUMP_COMPLETE="yes"
     return 0
 }
@@ -2713,7 +2787,7 @@ picker_start_dir() {
 
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -18537,6 +18611,7 @@ MAGIC_RESTORE=""
 MAGIC_RESTORE_DIR=""
 MAGIC_SKIP_BACKUP=""
 MAGIC_ASKED=0
+MAGIC_KIND=""
 
 # kei_import_write DIR: the engine (DIR/kei_import_run.py and the package
 # DIR/kei_import) and the Perl readers it calls (DIR/readers).
@@ -21930,8 +22005,8 @@ MARC_ENCODINGS = ["UTF-8", "ISO_8859-1", "MARC-8"]
 UNSUPPORTED = {
     "mrk": "MARC text from MarcEdit: save it as MARC 21 (.mrc) in MarcEdit and drop that file",
     "sql_other": "an SQL dump of another system: send a sample so a reader can be added",
-    "pg_other": "a PostgreSQL export of another system (Biblivre?): send a sample so a reader can be added",
-    "pg_custom": "a PostgreSQL custom-format export: export it again as plain SQL (pg_dump -Fp)",
+    "pg_other": "a PostgreSQL backup of another system (Biblivre?). Koha's database is MariaDB, so it cannot be loaded as it is: export the catalogue as MARC or spreadsheets, or send a sample so a reader can be added",
+    "pg_custom": "a PostgreSQL backup (pg_dump custom format). Koha's database is MariaDB, so it cannot be loaded as it is: export the catalogue as MARC or spreadsheets (for ISIS, export it again as plain SQL with pg_dump -Fp)",
     "cds_isis": "a CDS/ISIS master file: export the base from WinISIS as ISO 2709 and drop that file",
     "unknown": "format not recognised",
 }
@@ -22525,6 +22600,7 @@ read, 6 questions still open, 7 a Debian package is needed first."""
 import argparse
 import os
 import sys
+import traceback
 
 from . import engine, intake
 
@@ -22565,6 +22641,11 @@ def main(argv=None):
         return engine.build(opts)
     except intake.IntakeError as e:
         print("The file cannot be unpacked safely: %s" % e)
+        return 4
+    except Exception as e:  # noqa: BLE001 - a file the readers choke on
+        # Said in one line for the person; the details stay in the log.
+        traceback.print_exc(file=sys.stderr)
+        print("The file could not be read: %s: %s" % (type(e).__name__, e))
         return 4
 
 
@@ -22634,6 +22715,90 @@ magic_pick() {
     fi
     [ -n "${paths[choice]:-}" ] || return 1
     printf '%s' "${paths[choice]}"
+}
+
+# clean_path TEXT: a path as typed, pasted or dropped on a terminal, as a
+# path of this machine: blanks and quotes around it removed (also "& '...'"
+# from PowerShell), file:// read, C:\\... and \\\\wsl.localhost\\Distro\\...
+# turned into /mnt/c/... and /..., backslashes into slashes. A path with
+# blanks or parentheses ("BKP_BIBLIOTECA (2).backup") stays as it is: every
+# command quotes it.
+clean_path() {
+    local p="$1" q
+    p=${p%%$'\n'*}; p=${p//$'\r'/}
+    p="${p#"${p%%[![:space:]]*}"}"; p="${p%"${p##*[![:space:]]}"}"
+    [[ "$p" == "& "[\'\"]* ]] && p=${p#& }
+    for q in 1 2 3; do
+        if [[ "$p" == \"*\" || "$p" == \'*\' ]] && [ ${#p} -ge 2 ]; then
+            p=${p:1:${#p}-2}
+            p="${p#"${p%%[![:space:]]*}"}"; p="${p%"${p##*[![:space:]]}"}"
+        fi
+    done
+    if [[ "${p,,}" == file://* ]]; then
+        p=${p#*://}; p=${p#localhost}
+        [[ "$p" == /* ]] || p="//$p"
+        p=$(printf '%b' "${p//%/\\x}")
+        [[ "$p" =~ ^/[A-Za-z]:/ ]] && p=${p:1}
+    fi
+    if [[ "$p" =~ ^[\\/]{2}wsl(\.localhost|\$)[\\/][^\\/]+[\\/](.*)$ ]]; then
+        p="/${BASH_REMATCH[2]//\\//}"
+    elif [[ "$p" =~ ^([A-Za-z]):[\\/](.*)$ ]]; then
+        p="/mnt/${BASH_REMATCH[1],,}/${BASH_REMATCH[2]//\\//}"
+    fi
+    printf '%s' "$p"
+}
+
+# magic_preflight PATH: before anything is copied, the file is checked and
+# each step is said (the panel shows it under Pac-Man): it exists and can be
+# read, its compression is intact, and its format, read from the content
+# (dump_kind), is one the tool can take. A PostgreSQL backup in pg_dump's
+# custom or tar format stops here, said plainly: Koha's database is MariaDB.
+# Sets MAGIC_KIND.
+magic_preflight() {
+    local src="$1" shown="${1##*/}" size codec
+    MAGIC_KIND=""
+    if [ ! -e "$src" ]; then
+        msg_error "" "$(t 'The file was not found on this server:\n${src}\n\nA file on another computer must be copied to this server first.\nNothing was changed.')" 13 76
+        return 1
+    fi
+    if [ ! -r "$src" ] || { [ -f "$src" ] && [ ! -s "$src" ]; } || { [ ! -f "$src" ] && [ ! -d "$src" ]; } \
+        || { [ -f "$src" ] && ! head -c 1 -- "$src" >/dev/null 2>&1; }; then
+        msg_error "" "$(t "The file is empty or cannot be read.\nNothing was changed.")" 10 70
+        return 1
+    fi
+    [ -f "$src" ] || return 0
+    size=$(du -h -- "$src" 2>/dev/null | cut -f1)
+    display_explanation 'Checking "${shown}" (${size})...'
+    codec=$(dump_codec "$src")
+    if [ "$codec" != "plain" ]; then
+        display_explanation 'Testing the compressed file (${codec})...'
+        if [ "$codec" = "zst" ] && ! command -v zstd >/dev/null 2>&1; then
+            msg_error "" "$(t "This backup is compressed with zstd, which is not installed. Install it (sudo apt install zstd) and try again.\nNothing was changed.")" 11 76
+            return 1
+        fi
+        if ! dump_test "$src"; then
+            if [ "$codec" = "gz" ]; then
+                msg_error "" "$(t "The file is corrupt (failed the gzip test).\nNothing was changed.")" 10 70
+            else
+                msg_error "" "$(t 'The file is corrupt (failed the ${codec} test).\nNothing was changed.')" 10 70
+            fi
+            return 1
+        fi
+    fi
+    display_explanation "Reading the format of the file..."
+    MAGIC_KIND=$(dump_kind "$src")
+    log "tools: magic import pre-check of ${src}: ${codec}, ${MAGIC_KIND}"
+    case "$MAGIC_KIND" in
+        pg_custom|pg_tar)
+            msg_error "$(t "PostgreSQL backup")" "$(t '"${shown}" is a PostgreSQL backup (pg_dump). Koha keeps its data in MariaDB, so a PostgreSQL backup cannot be loaded into it as it is.\n\nWhat works: export the catalogue of the old system as MARC (.mrc, .xml) or as spreadsheets (.csv, .xlsx) and drop those files here. For an ISIS backup, export it again as plain SQL (pg_dump -Fp).\nNothing was changed.')" 16 78
+            return 1 ;;
+        tar)
+            if [ "$(dump_cat "$src" 2>/dev/null | tar -tf - 2>/dev/null | wc -l)" -eq 0 ]; then
+                msg_error "" "$(t "The archive is damaged or incomplete: its list of files cannot be read.\nNothing was changed.")" 10 74
+                return 1
+            fi ;;
+    esac
+    return 0
 }
 
 # magic_is_koha_dump FILE: 0 when FILE (plain or gzip) is a mysqldump of a
@@ -22909,17 +23074,12 @@ lt_magic_import() {
     require_database || return 0
     local src rc=0
     src=$(magic_pick) || return 0
-    if [ ! -r "$src" ] || { [ -f "$src" ] && [ ! -s "$src" ]; } || { [ ! -f "$src" ] && [ ! -d "$src" ]; }; then
-        msg_error "" "$(t "The file is empty or cannot be read.\nNothing was changed.")" 10 70
-        return 1
-    fi
+    src=$(clean_path "$src")
+    magic_preflight "$src" || return 1
     # A Koha backup replaces the catalog: Restore database, never an import.
-    if [ -f "$src" ]; then
-        display_explanation "Checking the file..."
-        if magic_is_koha_dump "$src"; then
-            magic_to_restore "${src##*/}" && function_restore_database "$src"
-            return 0
-        fi
+    if [ "$MAGIC_KIND" = "mysql" ] && magic_is_koha_dump "$src"; then
+        magic_to_restore "${src##*/}" && function_restore_database "$src"
+        return 0
     fi
     if [ ! -x "$MAGIC_PY" ]; then
         local p="python3"
@@ -27892,7 +28052,7 @@ kei_task_ui() {
         printf '%s' "$REPLY"
     }
     select_file() {
-        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst}"
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump}"
     }
     select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
     # A file to change by hand (the classic panel opens nano):

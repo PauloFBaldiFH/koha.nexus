@@ -99,6 +99,18 @@ def asker(app, danger: tuple[str, ...] = ()):
     shown: set[int] = set()
 
     async def ask(out: TaskOutcome, kind: str, title: str, text: str, extra):
+        # A screen that fails (a file it cannot read...) cancels this one
+        # question with a message: the routine says "nothing was changed"
+        # and ends, and the panel stays open.
+        try:
+            return await _ask(out, kind, title, text, extra)
+        except Exception as e:  # noqa: BLE001 - any error of a screen
+            await app.push_screen_wait(MessageScreen(
+                title or t("Error"), tx("This step could not be shown: ${error}\nNothing was changed.",
+                                        error=f"{type(e).__name__}: {e}"), kind="error"))
+            return None
+
+    async def _ask(out: TaskOutcome, kind: str, title: str, text: str, extra):
         if kind == "choose":
             default, options = extra
             return await app.push_screen_wait(ChoiceScreen(title, text, options, default=default))

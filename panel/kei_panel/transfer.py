@@ -52,10 +52,14 @@ def where() -> str:
 
 
 def dropped_path(text: str) -> str:
-    """The path a terminal pastes when a file is dropped on it, as a path of
-    this machine: quotes and backslash escapes removed, file:// URIs read,
-    C:\\... and \\\\wsl.localhost\\Distro\\... turned into /mnt/c/... and /...."""
+    """The path a terminal pastes when a file is dropped on it (or the one
+    typed in the path box), as a path of this machine: blanks around it,
+    quotes and backslash escapes removed, PowerShell's "& '...'" read,
+    file:// URIs read, C:\\... and \\\\wsl.localhost\\Distro\\... turned
+    into /mnt/c/... and /..., ~ expanded and doubled slashes made single."""
     line = (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
+    # PowerShell pastes a dropped file as a command: & 'C:\...'
+    line = re.sub(r"^&\s+(?=[\\]?[\"'])", "", line)
     # Quotes around the path, also escaped (\"...\" or \'...\') or doubled
     # by a terminal that quotes what it pastes ("'...'").
     for _ in range(3):
@@ -63,18 +67,37 @@ def dropped_path(text: str) -> str:
         if not m:
             break
         line = m.group(2).strip()
-    if line.lower().startswith("file://"):
-        line = unquote(urlparse(line).path)
+    # A quote left on one side only (a path cut while pasting).
+    quotes = ("'", '"')
+    if line.startswith(quotes) and not line.endswith(quotes):
+        line = line[1:].strip()
+    elif line.endswith(quotes) and not line.startswith(quotes) and not line.endswith(("\\'", '\\"')):
+        line = line[:-1].strip()
+    if line.lower().startswith("file:"):
+        uri = urlparse(line)
+        line = unquote(uri.path)
+        if uri.netloc and uri.netloc.lower() not in ("", "localhost"):
+            # file://wsl.localhost/Debian/home/... (a WSL file from Windows)
+            line = "//" + uri.netloc + line
         if re.match(r"^/[A-Za-z]:/", line):
             line = line[1:]
     m = _WSL_SHARE.match(line)
     if m:
-        return "/" + m.group(1).replace("\\", "/")
+        return _tidy("/" + m.group(1).replace("\\", "/"))
     m = _WINDOWS_PATH.match(line)
     if m:
-        return f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/")
-    # Linux terminals escape spaces and quotes with a backslash.
-    return re.sub(r"\\(.)", r"\1", line)
+        return _tidy(f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/"))
+    # Linux terminals escape spaces, parentheses and quotes with a backslash.
+    line = re.sub(r"\\(.)", r"\1", line)
+    if line.startswith("~"):
+        line = os.path.expanduser(line)
+    return _tidy(line)
+
+
+def _tidy(path: str) -> str:
+    """Doubled slashes made single, and no slash left at the end."""
+    path = re.sub(r"/{2,}", "/", path)
+    return path.rstrip("/") or path
 
 
 def on_windows_disk(path: str | Path) -> bool:

@@ -145,20 +145,26 @@ bf_circ_schema() {
     assert 'dialogs | grep -q "Nothing was added to the catalog"'
 }
 
-@test "I03 empty, unknown and custom-format files: refused or explained, never sent to Koha" {
+@test "I03 empty, unknown and PostgreSQL files: refused or explained, never sent to Koha" {
     local f
     : > "$W/empty.mrc"
     echo "hello" > "$W/text.mrc"
     head -c 4000 /dev/urandom > "$W/estragado.bkp"
-    printf 'PGDMP\001\016\000' > "$W/custom.backup"
-    for f in empty.mrc text.mrc estragado.bkp custom.backup; do
+    # pg_dump's custom and tar formats, names with blanks and parentheses.
+    printf 'PGDMP\001\016\000' > "$W/BKP_BIBLIOTECA (2).backup"
+    mkdir "$W/pgtar" && echo x > "$W/pgtar/toc.dat" && tar cf "$W/pg (3).tar" -C "$W/pgtar" toc.dat
+    printf 'garbage' | gzip -c | head -c 12 > "$W/cut (2).sql.gz"
+    for f in empty.mrc text.mrc estragado.bkp "BKP_BIBLIOTECA (2).backup" "pg (3).tar" "cut (2).sql.gz"; do
         export KEI_SELECT_FILE="$W/$f"
         panel lt_magic_import
     done
     assert '! grep -q "stage_file.pl\|import_patrons.pl" "$KEI_S/calls.log" 2>/dev/null' "$(calls)"
     assert '[ "$(dialogs | grep -c "^ERROR.*empty or cannot be read")" = "1" ]' "$(dialogs)"
-    assert '[ "$(dialogs | grep -c "^INFO .*Nothing in it can be imported")" = "3" ]' "$(dialogs)"
-    assert 'preview | grep -q "estragado.bkp: format not recognised" && preview | grep -q "export it again as plain SQL (pg_dump -Fp)"' "$(preview)"
+    assert '[ "$(dialogs | grep -c "^INFO .*Nothing in it can be imported")" = "2" ]' "$(dialogs)"
+    assert '[ "$(dialogs | grep -c "^ERROR \[PostgreSQL backup\] .*cannot be loaded into it")" = "2" ]' "$(dialogs)"
+    assert 'dialogs | grep -q "^ERROR .*corrupt (failed the gzip test)"' "$(dialogs)"
+    assert '! grep -q "kei_import.*\(BKP_BIBLIOTECA\|pg (3)\|cut (2)\)" "$KEI_S/calls.log" 2>/dev/null' "checked before the engine: $(calls)"
+    assert 'preview | grep -q "estragado.bkp: format not recognised"' "$(preview)"
     assert '! preview | grep -q "^Settings:\|^Importable:"' "the operator sees the files, not the engine's bookkeeping"
     assert '[ "$(bibs)" = "200" ] && [ "$(pre_backups)" = "0" ]'
 }

@@ -10,13 +10,18 @@ backup to restore), with the mouse or the keyboard.
   └──────────────────────────────────────────────────────────────────┘
 The path can also be typed or pasted; Enter on it opens a folder or picks
 the file. In file mode a file can be dropped on the window: the terminal
-pastes its path (transfer.dropped_path reads it, C:\\... paths included). A file
-that is not on this server (the panel used over SSH) gets the command that
-sends it here, with its Copy button.
+pastes its path. Typed, pasted or dropped, the path is cleaned the same way
+(transfer.dropped_path: quotes, C:\\..., file://, backslash escapes), and a
+name with blanks or parentheses ("BKP_BIBLIOTECA (2).backup") is a path like
+any other. A file that is not on this server (the panel used over SSH) gets
+the command that sends it here, with its Copy button. A path that cannot be
+read (no permission, too long) is said under the box, never raised: an
+error in a screen's handler would close the whole panel.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -28,10 +33,30 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, Static
 
 from ..i18n import t
-from ..transfer import dropped_path, is_backup_name
+from ..transfer import dropped_path
 from .dialogs import CopyValues, MessageScreen
 
-BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst")
+BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst", ".backup", ".bkp", ".dump")
+
+
+def path_kind(path: Path) -> str:
+    """"dir", "file", "missing" or "denied", without raising (a path with a
+    NUL, too long, or in a folder this user cannot read)."""
+    try:
+        if path.is_dir():
+            return "dir"
+        if path.is_file():
+            return "file" if os.access(path, os.R_OK) else "denied"
+        return "missing"
+    except PermissionError:
+        return "denied"
+    except (OSError, ValueError):
+        return "missing"
+
+
+def typed_path(text: str) -> Path:
+    """The path in the box, cleaned as a dropped one ("/" when empty)."""
+    return Path(dropped_path(text) or "/")
 
 
 class PathInput(Input):
@@ -60,7 +85,7 @@ class FilteredTree(DirectoryTree):
                 continue
             try:
                 is_dir = p.is_dir()
-            except OSError:
+            except (OSError, ValueError):
                 continue
             if is_dir or self.suffixes is None or p.name.lower().endswith(self.suffixes):
                 keep.append(p)
@@ -82,12 +107,12 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
         self.accepts_drops = mode == "file"
         self._suffixes = suffixes if mode == "file" else ()
         start_path = Path(start)
-        self._start = start_path if start_path.is_dir() else Path("/")
-        self._shortcuts = [(label, path) for label, path in (shortcuts or []) if Path(path).is_dir()]
+        self._start = start_path if path_kind(start_path) == "dir" else Path("/")
+        self._shortcuts = [(label, path) for label, path in (shortcuts or []) if path_kind(Path(path)) == "dir"]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="picker-box"):
-            yield Label(self._title, classes="dialog-title")
+            yield Label(self._title, classes="dialog-title", markup=False)
             with Horizontal(id="picker-body"):
                 with Vertical(id="picker-main"):
                     with Horizontal(id="picker-shortcuts"):
@@ -95,12 +120,13 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                             yield Button(label, id=f"go-{i}", classes="picker-go")
                         yield Button(t("Up"), id="up", classes="picker-go")
                     if self.accepts_drops:
-                        yield Static(t("📥 Drop a .sql or .sql.gz file here, or paste its path."),
+                        yield Static(t("📥 Drop the file here, or paste its path.") if self._suffixes is None
+                                     else t("📥 Drop a .sql or .sql.gz file here, or paste its path."),
                                      id="picker-drop", markup=False)
                     yield PathInput(str(self._start), id="picker-path")
                     yield FilteredTree(self._start, self._suffixes if self._mode == "file" else None,
                                        id="picker-tree")
-                    yield Label("", id="picker-error", classes="dialog-error")
+                    yield Label("", id="picker-error", classes="dialog-error", markup=False)
                 if self._help:
                     # Read-only: Tab goes from the tree straight to the buttons.
                     help_box = VerticalScroll(id="picker-help")
@@ -123,17 +149,29 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
         self.query_one("#picker-path", Input).value = str(folder)
         self.query_one("#picker-error", Label).update("")
 
+    def _wanted(self, path: Path) -> bool:
+        """The kind of file this picker is for (any file when no suffixes)."""
+        return not self._suffixes or path.name.lower().endswith(self._suffixes)
+
+    def _unreadable(self, kind: str) -> None:
+        err = self.query_one("#picker-error", Label)
+        if kind == "denied":
+            err.update(t("This file cannot be read: no permission to open it."))
+        else:
+            err.update(t("The file does not exist or cannot be read.\\nNothing was changed.").split("\\n")[0])
+
     def _choose(self, path: Path) -> None:
         err = self.query_one("#picker-error", Label)
+        kind = path_kind(path)
         if self._mode == "dir":
-            if not path.is_dir():
+            if kind != "dir":
                 err.update(t("Choose a folder."))
                 return
-        elif path.is_dir():
+        elif kind == "dir":
             self._open(path)
             return
-        elif not path.is_file():
-            err.update(t("The file does not exist or cannot be read.\\nNothing was changed.").split("\\n")[0])
+        elif kind != "file":
+            self._unreadable(kind)
             return
         self.dismiss(path)
 
@@ -149,10 +187,10 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
 
     @on(Input.Submitted, "#picker-path")
     def _typed(self, event: Input.Submitted) -> None:
-        path = Path(event.value.strip() or "/").expanduser()
-        if path.is_dir() and self._mode == "file":
-            self._open(path)
-        elif path.is_dir():
+        path = typed_path(event.value)
+        if str(path) != event.value:
+            event.input.value = str(path)
+        if path_kind(path) == "dir":
             self._open(path)
         else:
             self._choose(path)
@@ -173,7 +211,7 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
 
     @on(Button.Pressed, "#choose")
     def _choose_pressed(self) -> None:
-        self._choose(Path(self.query_one("#picker-path", Input).value.strip() or "/").expanduser())
+        self._choose(typed_path(self.query_one("#picker-path", Input).value))
 
     @on(Button.Pressed, "#cancel")
     def action_cancel(self) -> None:
@@ -191,17 +229,22 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
         raw = text.strip().splitlines()[0].strip() if text.strip() else ""
         if not raw:
             return
-        path = Path(dropped_path(raw))
+        path = Path(dropped_path(raw) or "/")
         self.query_one("#picker-path", Input).value = str(path)
         err = self.query_one("#picker-error", Label)
-        if path.is_dir():
+        kind = path_kind(path)
+        if kind == "dir":
             self._open(path)
             return
-        if path.is_file():
-            if not is_backup_name(path.name):
-                err.update(t("Choose a .sql or .sql.gz file."))
+        if kind == "file":
+            if not self._wanted(path):
+                err.update(t("Choose a .sql or .sql.gz file.") if self._suffixes == BACKUP_SUFFIXES
+                           else t('Choose a file of this kind: ${kinds}', kinds=", ".join(self._suffixes)))
                 return
             self.dismiss(path)
+            return
+        if kind == "denied":
+            self._unreadable(kind)
             return
         if self._send_command:
             self.app.push_screen(MessageScreen(
