@@ -115,3 +115,21 @@ def test_the_vpn_card_opens_the_vpn_screen():
     in_sidebar, shown, highlighted = asyncio.run(main())
     assert "vpn" not in in_sidebar and "security" in in_sidebar and "publish" not in in_sidebar
     assert shown == "view-vpn" and highlighted == "security"
+
+
+def test_every_card_says_what_it_does():
+    # Paulo, 2026-10-09: a real one-line description under every card, no
+    # generic "Step by step, in this panel" line.
+    from kei_panel.i18n import load_cache
+    from kei_panel.menus import DESCRIPTIONS, description
+
+    from conftest import REPO
+
+    pt = load_cache(REPO / "lang" / "pt.cache")
+    for section in SECTIONS:
+        for entry in section.entries:
+            text = description(entry)
+            assert text, entry.action
+            assert pt.get(text), f"no PT-BR text for {text!r}"
+    assert set(DESCRIPTIONS) == {e.action for s in SECTIONS for e in s.entries}
+    assert "Step by step, in this panel" not in pt
