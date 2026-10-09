@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.23**._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.24**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -138,6 +138,11 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   OpenAI, Anthropic, Google Gemini. Active key in `vision.conf` (owned by the Koha instance
   user, else the web says "provider not configured"); all keys in `ai-keys.conf` (0600).
   Saved keys are never shown back, only the last 4 characters.
+  Since 1.5.24 the panel's 🤖 AI screen has both tools on one page (no tabs), an Ollama box
+  that downloads models with only Ollama answering, CPU-friendly presets (`llama3.2:1b/3b`,
+  `qwen2.5:1.5b/3b`, `qwen2.5vl:7b` marked High CPU / Slow on ARM) and a separate
+  `chat_model` in `vision.conf` for the assistant (empty = `model`, the vision one;
+  `KohaEasy::Assistant::load_conf` uses it, the web AI settings form keeps it).
 - **Free addresses**: Paulo bought the `koha.nexus` domain; broker deployed by Paulo on the
   **Cloudflare Workers Free plan** (so `PBKDF2_ITERATIONS=20000`). One broker per Cloudflare
   account. His local `wrangler.toml` holds real IDs; the repo keeps placeholders. The Worker

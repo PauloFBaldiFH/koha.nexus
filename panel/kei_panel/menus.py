@@ -67,10 +67,10 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
         Entry("📋  Essential SQL reports pack", "reports", kind="native"),
     ), view="database", key="t"),
-    # New screen: everything AI in one place, two tabs. AI cataloguing
-    # (Module 1: provider setup for the cataloguing tabs of the staff web UI;
-    # its MARC Replace hook opens the routine below) and the AI assistant
-    # (Module 2: the chat on the Koha staff home page, same provider).
+    # New screen: both AI tools on one page (views/ai.py). AI cataloguing
+    # (Module 1: MARC Replace, which opens the routine below) and the AI
+    # assistant (Module 2: the chat on the Koha staff home page) share the
+    # provider, each with its own model; Ollama models download from there.
     Section("ai", "🤖  AI", "🤖  AI", entries=(
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),

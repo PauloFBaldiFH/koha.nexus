@@ -88,7 +88,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.23"
+PANEL_VERSION=" 1.5.24"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -14841,7 +14841,7 @@ sub do_settings {
     my $old = KohaEasy::Cataloguing::Vision::load_conf($VISION_CONF);
     my %c;
     for my $k (@KohaEasy::Cataloguing::Vision::CONF_KEYS) {
-        next if $k eq 'token';
+        next if $k eq 'token' || $k eq 'chat_model';    # not on this form
         my $v = $cgi->param($k) // '';
         $v =~ s/[\x00-\x1F\x7F]+//g;
         $v =~ s/^\s+|\s+$//g;
@@ -14849,6 +14849,8 @@ sub do_settings {
     }
     # Switching the service: the address and model of the old one would be wrong.
     @c{qw( url model )} = ( '', '' ) if $c{provider} ne $old->{provider} && $c{url} eq $old->{url} && $c{model} eq $old->{model};
+    # The assistant's own model (set in the panel) belongs to the same service.
+    $c{chat_model} = $c{provider} eq $old->{provider} ? $old->{chat_model} // '' : '';
     my $token = $cgi->param('token') // '';
     $token =~ s/\s+//g;
     $c{token} = $token ne '' ? $token : $cgi->param('token_clear') ? '' : $old->{token};
@@ -14928,7 +14930,9 @@ our %DEFAULTS = (
 our @PROVIDERS = qw( openai anthropic gemini ollama compatible );
 
 # Settings the page and the panel may write (key=value lines, see load_conf).
-our @CONF_KEYS = qw( provider url model token timeout max_px lang org_code table ddc_edition country );
+# chat_model: the model of the AI assistant when it is not the vision model
+# (empty: the same one); the panel sets it, this page keeps it.
+our @CONF_KEYS = qw( provider url model token timeout max_px lang org_code table ddc_edition country chat_model );
 
 # Image roles, in the order they are shown to the model.
 our @ROLES = qw( cover title verso );
@@ -14968,7 +14972,7 @@ sub with_defaults {
     $c{ddc_edition} = '23'  unless ( $c{ddc_edition} // '' ) =~ /^\d{1,2}$/;
     $c{country}     = 'bl'  unless ( $c{country} // '' ) =~ /^[a-z]{2,3}$/;
     $c{table}       = 'auto' unless ( $c{table}  // '' ) =~ /^(auto|pha|cutter|none)$/;
-    $c{$_} //= '' for qw( token org_code );
+    $c{$_} //= '' for qw( token org_code chat_model );
     return \%c;
 }
 
@@ -23946,6 +23950,8 @@ sub load_conf {
     }
     $c{provider} = 'openai' unless $c{provider} && $DEFAULTS{ $c{provider} };
     $c{url}   ||= $DEFAULTS{ $c{provider} }{url};
+    # The chat may have a lighter model than the vision one (panel: AI tools).
+    $c{model} = $c{chat_model} if defined $c{chat_model} && $c{chat_model} ne '';
     $c{model} ||= $DEFAULTS{ $c{provider} }{model};
     $c{token} //= '';
     $c{timeout} = 120 unless ( $c{timeout} // '' ) =~ /^\d+$/ && $c{timeout} > 0;

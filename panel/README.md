@@ -132,27 +132,37 @@ Full-screen programs of their own (htop, nethogs, Midnight Commander)
 get the terminal after their choice and installation are made in the
 panel, as they would in any panel.
 
-## Module 1: AI setup (`a`)
+## AI tools (`a`)
 
-`views/ai.py` sets up the AI the cataloguing tools use:
+`views/ai.py` puts both AI tools on one screen: MARC Replace (Module 1, AI
+cataloguing) and the AI assistant of the staff home page (Module 2). They
+share one provider; each can have its own model.
 
 * **Provider selector** (radio list, mouse or arrows): Local Ollama, Google
   Gemini, OpenAI, Anthropic Claude, or any OpenAI-compatible server.
+* **Vision model** (`model` in `vision.conf`, read by MARC Replace) and
+  **Chat model** (`chat_model`, read by the assistant; empty = the vision
+  model). A light text model for the chat keeps it fast on a CPU-only server.
 * **API key** in a password field. Saved to `vision.conf` (the file the
   staff interface reads) and, per provider, to `ai-keys.conf` next to it,
   both mode 0600; switching provider brings the saved key back. A saved key
   is never put back in a widget: the field stays empty (empty = keep it) and
   shows `••••` plus the last four characters.
-* **Local Ollama box**: checks that Ollama answers and whether the model is
-  downloaded, downloads it (`/api/pull`, with a real progress bar), and shows
-  the install command when nothing answers.
+* **Ollama box**, always shown and needing only Ollama itself (not the
+  assistant, not Ollama as the provider): checks that Ollama answers and which
+  models it has, installs it, and downloads (`/api/pull`, with a real progress
+  bar) either the models of the fields or a preset, light ones first:
+  `llama3.2:1b`, `qwen2.5:1.5b`, `llama3.2:3b` (fast chat), `qwen2.5:3b`
+  (balanced) and `qwen2.5vl:7b` (vision, marked *High CPU / Slow on ARM*).
+  **Use for chat** / **Use for cataloguing** put the preset in a field
+  (a text-only model is refused for cataloguing).
 * **Test connection** (F5) lists the provider's models with the same
   endpoints as the staff interface's own test; **Save** (ctrl+s) refuses the
   same problems the Perl side does (bad URL, key over plain http, missing key).
-* **Next step: MARC Replace**: once a provider is saved, opens the
-  installer's MARC Replace routine (`config.sh --task run marc-replace`, its
-  menus as panel screens; `library-tools` with an older installer) to install or manage the page
-  whose "AI cataloguing" tab uses this provider.
+* **The AI tools** box: once a provider is saved, opens the installer's
+  MARC Replace routine (`config.sh --task run marc-replace`; `library-tools`
+  with an older installer) and the assistant's install / update / remove
+  routine (`ai-assistant`).
 
 Every network call above is a thread job behind the Pac-Man loader.
 
