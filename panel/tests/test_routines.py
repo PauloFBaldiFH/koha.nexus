@@ -483,3 +483,51 @@ def test_installer_export_diagnostics_task_keeps_five(tmp_path):
     assert run.returncode == 0 and path.startswith(str(tmp_path))
     kept = sorted(p.name for p in tmp_path.iterdir())
     assert len(kept) == 5 and os.path.basename(path) in kept and "koha-diagnostics-old-0" not in kept
+
+
+def test_clean_token_matches_the_installer():
+    from kei_panel.routines.backup import clean_token, token_problem
+    token = '{"access_token":"a","refresh_token":"b","expiry":"c"}'
+    for messy in (token + "\r\n", "  " + token[:20] + "\n" + token[20:], "﻿" + token, f"'{token}'",
+                  token.replace('"', '\\"'), token.replace('"access_token"', "“access_token”")):
+        assert clean_token(messy) == token and token_problem(messy) == ""
+    assert token_problem(token[:30] + "}")
+
+
+def test_cloud_failure_offers_retry_and_edit(monkeypatch):
+    from kei_panel import demo
+    failing = ["@@step Registering 'gdrive' remote in Rclone...",
+               "@@done 0 Registering 'gdrive' remote in Rclone...",
+               "@@note Testing the real cloud upload...",
+               "@@msg error Error\tThe test upload to gdrive:Backup_SQL_Koha failed.\\n\\nDetail:\\n"
+               "The cloud did not answer within 30 seconds, so the test was stopped."]
+    monkeypatch.setitem(demo._SCRIPTS, "cloud-token", failing)
+    token = '{"access_token":"a","refresh_token":"b","expiry":"c"}'
+
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("backup-cloud")
+            (await _wait_for(pilot, ChoiceScreen)).dismiss("token")
+            form = await _wait_for(pilot, InputScreen)
+            form.query_one("#value").value = "  " + token + "\n"
+            form.query_one("#ok").press()
+            error = await _wait_for(pilot, MessageScreen)
+            shown = (error._kind, error._body)
+            error.dismiss(None)
+            choice = await _wait_for(pilot, ChoiceScreen)
+            options = [key for key, _ in choice._options]
+            choice.dismiss("edit")
+            again = await _wait_for(pilot, InputScreen)
+            kept = again._value
+            again.query_one("#value").value = token
+            again.query_one("#ok").press()
+            (await _wait_for(pilot, MessageScreen)).dismiss(None)
+            (await _wait_for(pilot, ChoiceScreen)).dismiss("retry")
+            done = await _wait_for(pilot, MessageScreen)
+            return shown, options, kept, done._kind
+    shown, options, kept, kind = asyncio.run(main())
+    assert shown[0] == "error" and "did not answer within 30 seconds" in shown[1]
+    assert options == ["retry", "edit"]
+    assert kept == token
+    assert kind == "ok"   # the retry runs the cloud-remote test, which passes in the demo

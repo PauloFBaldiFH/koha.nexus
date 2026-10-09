@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-08. Panel version on `main`: **1.5.22**._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.23**._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -113,6 +113,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
     127.0.0.1 (or pastes a token). `--task cloud-provider FILE` (0600 TSV, deleted at once)
     runs `rclone config create ... --obscure`; S3 gets `NAME-s3` plus an alias `NAME` →
     `NAME-s3:bucket`. Google Drive flows untouched. None of this tried on a live Koha yet.
+  - *Cloud set-up test* (1.5.23, every service): `validate_and_register_rclone` no longer runs the
+    full backup in the foreground. Each rclone call goes through `rclone_probe` (`timeout 30s` plus
+    `--contimeout 15s --timeout 20s --retries 1 --low-level-retries 1`): mkdir, then a small
+    `kei-upload-test.txt` sent, listed back and deleted. Only then is `RCLONE_REMOTE` saved and the
+    first full backup started in the background. A failure or timeout shows rclone's own output;
+    the panel and the classic menu offer *Try the test again* / *Edit the token* / *Back*. The
+    pasted Google Drive token goes through `rclone_token_clean` (control characters, BOM, outer
+    quotes, typographic quotes and PowerShell `\"` removed, JSON re-written compact) and is read
+    back from rclone.conf. Tests: `tests/cloud_test.bats` (stand-in rclone; the real one when present).
 - **WireGuard VPN** (1.5.18, Subject 6): panel screen `views/vpn.py` (key `v`) over `vpn.py`
   and `screens/vpn.py`; installer section 42, `--task vpn-status | vpn-setup ENDPOINT PORT |
   vpn-peer-add NAME | vpn-peer-revoke NAME | vpn-stop`. Server 10.66.0.1/24 on wg0, UDP port

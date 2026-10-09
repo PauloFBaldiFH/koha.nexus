@@ -24,6 +24,8 @@ Texts are the installer's own (same translations as the classic panel).
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from .. import cloud, transfer
@@ -272,8 +274,28 @@ async def download_latest(app, file: str | None = None) -> None:
 # ----------------------------------------------------------------------
 # Cloud backup (rclone)
 # ----------------------------------------------------------------------
+def clean_token(raw: str) -> str:
+    """The pasted token as the installer writes it to rclone.conf
+    (rclone_token_clean): line breaks, tabs and other control characters, a
+    byte-order mark, quotes around the whole token, typographic quotes and
+    the \\" escaping of a PowerShell copy removed; valid JSON comes back
+    compact, on one line."""
+    s = re.sub(r"[\x00-\x1f\x7f]", "", raw or "").lstrip("\ufeff")
+    s = s.replace("\u201c", '"').replace("\u201d", '"').strip()
+    if len(s) > 1 and s[0] in "'\"" and s[-1] == s[0] and s[1:2] == "{" and s[-2:-1] == "}":
+        s = s[1:-1]
+    if '\\"' in s:
+        s = s.replace('\\"', '"')
+    try:
+        data = json.loads(s)
+    except ValueError:
+        return s
+    return json.dumps(data, separators=(",", ":")) if isinstance(data, dict) else s
+
+
 def token_problem(token: str) -> str:
     """The checks of the classic routine, with its messages."""
+    token = clean_token(token)
     if not token:
         return tx("[ERROR] Token cannot be empty. Try again or press Ctrl+C to cancel.").split(" Try")[0]
     if not (token.startswith("{") and token.endswith("}")):
@@ -311,12 +333,27 @@ def token_instructions() -> str:
     ])
 
 
-async def _cloud_result(app, title: str, result) -> None:
-    if failed(result):
+async def _cloud_result(app, title: str, result, remote: str = "", edit: bool = False) -> str:
+    """The set-up's last box. On a failure: rclone's own error, then Try the
+    test again (the cloud-remote test of REMOTE), Edit the token (EDIT) or
+    Back. Returns "edit" when the person wants to paste the token again."""
+    while failed(result):
         await show_failure(app, title, result)
-        return
+        if result.cancelled:
+            return ""
+        options = [("retry", t("Try the test again"))] if remote else []
+        if edit:
+            options.append(("edit", t("Edit the token")))
+        if not options:
+            return ""
+        again = await app.push_screen_wait(ChoiceScreen(
+            title, t("The cloud test failed. What do you want to do?"), options))
+        if again != "retry":
+            return again or ""
+        result = await run_task(app, t("Testing the real cloud upload..."), "cloud-remote", remote)
     kind, head, body = last_message(result.value, t("Cloud configured"))
     await app.push_screen_wait(MessageScreen(head or t("Cloud configured"), body, kind=kind))
+    return ""
 
 
 async def cloud_backup(app) -> None:
@@ -331,15 +368,19 @@ async def cloud_backup(app) -> None:
             ("providers", t("Other services: OneDrive, MEGA or S3 (step by step)")),
         ], note=note))
     if choice == "token":
-        token = await app.push_screen_wait(InputScreen(
-            t("EXPRESS GOOGLE DRIVE CONFIGURATION (VIA PERSONAL PC)"), token_instructions(),
-            t("Paste the complete token JSON string below and press [ENTER]:"), validate=token_problem,
-            commands=TOKEN_COMMANDS))
-        if token is None:
-            return
-        result = await run_task(app, t("Registering 'gdrive' remote in Rclone..."), "cloud-token",
-                                env={"KEI_RCLONE_TOKEN": token})
-        await _cloud_result(app, title, result)
+        token = ""
+        while True:
+            token = await app.push_screen_wait(InputScreen(
+                t("EXPRESS GOOGLE DRIVE CONFIGURATION (VIA PERSONAL PC)"), token_instructions(),
+                t("Paste the complete token JSON string below and press [ENTER]:"), validate=token_problem,
+                commands=TOKEN_COMMANDS, value=token))
+            if token is None:
+                return
+            token = clean_token(token)
+            result = await run_task(app, t("Registering 'gdrive' remote in Rclone..."), "cloud-token",
+                                    env={"KEI_RCLONE_TOKEN": token})
+            if await _cloud_result(app, title, result, "gdrive", edit=True) != "edit":
+                return
     elif choice == "here":
         def on_result(reporter, key: str, value: str) -> None:
             if key == "auth_url":
@@ -356,7 +397,7 @@ async def cloud_backup(app) -> None:
         state = {"text": ""}
         result = await run_task(app, t("DIRECT SERVER AUTHENTICATION (LOCAL / WITH BROWSER OR TUNNEL)"),
                                 "cloud-authorize", on_result=on_result)
-        await _cloud_result(app, title, result)
+        await _cloud_result(app, title, result, "gdrive")
     elif choice == "providers":
         await cloud_provider(app)
 
@@ -379,7 +420,7 @@ async def rclone_wizard(app, title: str) -> None:
     if name is None:
         return
     result = await run_task(app, t("Testing the real cloud upload..."), "cloud-remote", name)
-    await _cloud_result(app, title, result)
+    await _cloud_result(app, title, result, name)
 
 
 # ----------------------------------------------------------------------
@@ -415,7 +456,7 @@ async def cloud_provider(app) -> None:
         result = await run_task(app, t("Testing the real cloud upload..."), "cloud-provider", str(path))
     finally:
         path.unlink(missing_ok=True)
-    await _cloud_result(app, title, result)
+    await _cloud_result(app, title, result, name)
 
 
 def _need(problem_of=None):
