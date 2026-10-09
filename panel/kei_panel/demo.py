@@ -23,7 +23,7 @@ _CREDS = [
     "@@result cred=DATABASE CREDENTIALS (1st Access / Web Installer):\tPass\tdemo-Pa55word",
     "@@result cred=DATABASE CREDENTIALS (1st Access / Web Installer):\tFull file\t/root/koha_credentials.txt",
 ]
-_REPORT = ("@@preview Diagnostic Report\t=====\\nKOHA EASY INSTALLER & MANAGER - VALIDATION REPORT\\n"
+_REPORT = ("@@preview Diagnostic Report\t=====\\nKOHA.NEXUS - VALIDATION REPORT\\n"
            "✅ Root OK.\\n✅ HTTPS: Koha repository responded.\\n✅ Disk: 41000 MB free.\\n"
            "❗ TCP 80 already in use by 'apache2'.")
 _STAGES = [("1/7", "Preparing the system", ["Checking the package manager", "Setting up language and UTF-8",

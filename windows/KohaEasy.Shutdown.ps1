@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: Shut down the PC safely (KohaEasy.ps1
+﻿# koha.nexus for Windows: Shut down the PC safely (KohaEasy.ps1
 # SafeShutdown, from the Start menu, the tray and the Koha window).
 # The librarian's one click at the end of the day: Koha's services stop in
 # order, everything is written to disk and WSL closes Debian's virtual
@@ -90,7 +90,7 @@ $form.AutoSize = $true
 $form.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $form.TopMost = $true
 $form.KeyPreview = $true
-$ico = Get-KohaIcon -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'KohaEasy.exe')
+$ico = Get-KohaIcon -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'koha.nexus.exe')
 if ($ico) { $form.Icon = $ico }
 
 $root = New-Object System.Windows.Forms.TableLayoutPanel

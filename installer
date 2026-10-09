@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ======================================================================
-# KOHA EASY INSTALLER & MANAGER - ADVANCED MANAGEMENT SUITE
+# KOHA.NEXUS (Koha Nexus) - INSTALLER & MANAGEMENT SUITE
 # Deployment, maintenance, tuning and backup suite for Koha ILS.
 # ----------------------------------------------------------------------
 # Single, self-sufficient file. Updates via "Update this panel" option.
@@ -1765,7 +1765,7 @@ KOHA_WAIT_SCRIPT="/usr/local/bin/koha-wait-services.sh"
 install_boot_ordering() {
     cat > "$KOHA_WAIT_SCRIPT" << 'EOF'
 #!/bin/bash
-# Koha Easy Installer: waits until MariaDB and Memcached answer (default 60 s)
+# koha.nexus: waits until MariaDB and Memcached answer (default 60 s)
 # so that Plack never starts before them. ExecStartPre of koha-common.
 set -euo pipefail
 max="${1:-60}"
@@ -1786,7 +1786,7 @@ EOF
     chown root:root "$KOHA_WAIT_SCRIPT" 2>/dev/null
     mkdir -p /etc/systemd/system/koha-common.service.d /etc/systemd/system/apache2.service.d
     cat > /etc/systemd/system/koha-common.service.d/koha-easy-install.conf << EOF
-# Koha Easy Installer: Plack must start after Memcached and MariaDB, and
+# koha.nexus: Plack must start after Memcached and MariaDB, and
 # Koha's background workers after RabbitMQ (their message queue).
 [Unit]
 Wants=memcached.service mariadb.service
@@ -1798,7 +1798,7 @@ After=memcached.service mariadb.service rabbitmq-server.service network-online.t
 ExecStartPre=-${KOHA_WAIT_SCRIPT}
 EOF
     cat > /etc/systemd/system/apache2.service.d/koha-easy-install.conf << 'EOF'
-# Koha Easy Installer: Apache proxies to Plack, so it starts after koha-common.
+# koha.nexus: Apache proxies to Plack, so it starts after koha-common.
 [Unit]
 After=koha-common.service
 EOF
@@ -1849,7 +1849,7 @@ write_if_changed() {
 stop_guard_script() {
     cat << EOF
 #!/bin/bash
-# Koha Easy Installer: remembers whether Koha was stopped cleanly and
+# koha.nexus: remembers whether Koha was stopped cleanly and
 # repairs it after a power cut, a forced shutdown or a crash.
 #   koha-stop-guard boot      at boot, before MariaDB (koha-stop-guard.service)
 #   koha-stop-guard stop      at a clean stop, once MariaDB and Zebra are down
@@ -2009,10 +2009,10 @@ install_stop_guard() {
     mkdir -p "${STOP_GUARD_SCRIPT%/*}" "$STOP_GUARD_STATE_DIR" /etc/systemd/system 2>/dev/null
     stop_guard_script | write_if_changed "$STOP_GUARD_SCRIPT" 755 && changed=1
     write_if_changed "$STOP_GUARD_UNIT" 644 << EOF && changed=1
-# Koha Easy Installer: remembers whether Koha was stopped cleanly.
+# koha.nexus: remembers whether Koha was stopped cleanly.
 # Ordered before MariaDB and Koha, so that at shutdown it stops after them.
 [Unit]
-Description=Koha Easy: clean-stop guard
+Description=koha.nexus: clean-stop guard
 DefaultDependencies=no
 After=local-fs.target
 Before=mariadb.service koha-common.service apache2.service memcached.service rabbitmq-server.service elasticsearch.service
@@ -2030,10 +2030,10 @@ TimeoutStopSec=30
 WantedBy=multi-user.target
 EOF
     write_if_changed "$STOP_GUARD_RECOVER_UNIT" 644 << EOF && changed=1
-# Koha Easy Installer: checks and repairs Koha after an unclean stop.
+# koha.nexus: checks and repairs Koha after an unclean stop.
 # Type=exec: the boot does not wait for it (a full reindex can take long).
 [Unit]
-Description=Koha Easy: repair after an unclean stop
+Description=koha.nexus: repair after an unclean stop
 After=koha-stop-guard.service mariadb.service koha-common.service apache2.service
 ConditionPathExists=${MARKER_DIR}/unclean-stop
 
@@ -2080,7 +2080,7 @@ install_mariadb_durability() {
     [ -d "${KEI_MARIADB_CONF_DIR%/*}" ] || return 0
     mkdir -p "$KEI_MARIADB_CONF_DIR"
     write_if_changed "${KEI_MARIADB_CONF_DIR}/98-koha-durability.cnf" 644 << 'EOF' && log "MariaDB durability settings written"
-# Koha Easy Installer: MariaDB's crash-safety settings (a power cut loses no
+# koha.nexus: MariaDB's crash-safety settings (a power cut loses no
 # committed transaction and tears no page). Do not change them.
 [mysqld]
 innodb_doublewrite = 1
@@ -2102,7 +2102,7 @@ install_log_limits() {
     if [ -d "${KEI_JOURNALD_DIR%/*}" ]; then
         mkdir -p "$KEI_JOURNALD_DIR"
         if write_if_changed "${KEI_JOURNALD_DIR}/00-koha-limits.conf" 644 << 'EOF'
-# Koha Easy Installer: the system journal keeps at most 100 MB on disk,
+# koha.nexus: the system journal keeps at most 100 MB on disk,
 # 30 MB in memory, and one month.
 [Journal]
 SystemMaxUse=100M
@@ -2116,7 +2116,7 @@ EOF
     fi
     if [ -d "$KEI_LOGROTATE_DIR" ]; then
         write_if_changed "${KEI_LOGROTATE_DIR}/koha-easy-install" 644 << EOF && log "logrotate rule for ${LOG_DIR} written"
-# Koha Easy Installer: the panel's logs, rotated once they pass 5 MB (the
+# koha.nexus: the panel's logs, rotated once they pass 5 MB (the
 # last line of backup_sql.log is what the Windows tray reads).
 ${LOG_DIR}/*.log {
     size 5M
@@ -2507,7 +2507,7 @@ v_reset() {
     VALIDATION_LOG="${LOG_DIR}/validacao-$(date '+%Y%m%d-%H%M%S').log"
     {
         echo "======================================================================"
-        echo "KOHA EASY INSTALLER & MANAGER - VALIDATION REPORT"
+        echo "KOHA.NEXUS - VALIDATION REPORT"
         echo "$(t "Context"): ${1:-general}"
         echo "$(t "Date"): $(date '+%Y-%m-%d %H:%M:%S %Z')"
         echo "Host: $(hostname)    Panel: v${PANEL_VERSION}"
@@ -3015,7 +3015,7 @@ validate_pre_installation() {
     welcome_body+="$(t "Estimated time: 10 to 30 minutes.")\n"
     welcome_body+="$(t "Please do not close the terminal during installation.")"
 
-    msg_info "$(t "Welcome to Koha Easy Installer!")" "$welcome_body" 16 78
+    msg_info "$(t "Welcome to koha.nexus!")" "$welcome_body" 16 78
     
     clear
     install_precheck
@@ -3484,7 +3484,7 @@ zebra_stuck_records() {
 write_cron_zebra() {
     cat > "$ZEBRA_WATCHDOG" << EOF
 #!/bin/bash
-# Koha Easy Installer: keeps Zebra incremental indexing alive (run from
+# koha.nexus: keeps Zebra incremental indexing alive (run from
 # ${CRON_ZEBRA}). New records are queued in zebraqueue and indexed by the
 # koha-indexer daemon; if it is down, they never reach the OPAC search.
 set -euo pipefail
@@ -3730,7 +3730,7 @@ write_backup_scripts() {
 
     cat > /root/backup_sql.sh << EOF
 #!/bin/bash
-# Koha database backup. Generated by Koha Easy Install & Tools.
+# Koha database backup. Generated by koha.nexus.
 set -euo pipefail
 umask 077
 CONF="${BACKUP_CONF}"
@@ -3928,7 +3928,7 @@ write_cron_tasks() {
 
     cat > "$CRON_TASKS" << EOF
 # ======================================================================
-# KOHA EASY INSTALL & TOOLS - SCHEDULED AUTOMATED TASKS
+# KOHA.NEXUS - SCHEDULED AUTOMATED TASKS
 # ======================================================================
 # This file controls Koha's periodic automated maintenance routines.
 #
@@ -4000,7 +4000,7 @@ banner_art() {
     [ "$F" -lt 64 ] && F=64
     [ "$F" -gt 76 ] && F=76
     # Pediment: four rows, each 16 columns wider than the one above.
-    local -a text=("" "KOHA LIBRARY" "Koha Easy Installer & Tools" "")
+    local -a text=("" "KOHA.NEXUS" "Koha Nexus library suite" "")
     for k in 0 1 2 3; do
         inner=$((F - 16 * (3 - k) - 16))
         if [ "$k" -eq 3 ]; then fill="_"; else fill=" "; fi
@@ -4174,7 +4174,7 @@ configure_fail2ban() {
     if [ ! -f /var/log/auth.log ] && [ -d /etc/fail2ban/jail.d ]; then
         apt_install python3-systemd >/dev/null 2>&1 || true
         cat > /etc/fail2ban/jail.d/koha-easy-install.local << 'EOF'
-# Generated by Koha Easy Installer: this system logs to journald.
+# Generated by koha.nexus: this system logs to journald.
 [sshd]
 enabled = true
 backend = systemd
@@ -4202,6 +4202,23 @@ ensure_koha_conffiles() {
         -o Dpkg::Options::=--force-confmiss -o Dpkg::Options::=--force-confold \
         -o Acquire::ForceIPv4=true koha-common >>"$APT_LOG" 2>&1
     [ -f /etc/koha/apache-site.conf.in ] && [ -f /etc/koha/koha-conf-site.xml.in ]
+}
+
+# koha.nexus names next to the old ones. The folders keep their first
+# names (koha-easy-install*): running panels, cron jobs, Koha's settings and
+# older copies of config.sh all point there. Only links are added, never
+# moved: /etc/koha-nexus, /usr/local/lib/koha-nexus and the koha-nexus
+# command (= config.sh). A path that already exists is left alone.
+KEI_BRAND_LINKS="/etc/koha-nexus:${CONFIG_DIR} /usr/local/lib/koha-nexus:/usr/local/lib/koha-easy-installer /usr/local/bin/koha-nexus:/usr/local/bin/config.sh"
+kei_brand_links() {
+    local pair link target
+    for pair in $KEI_BRAND_LINKS; do
+        link="${pair%%:*}"; target="${pair#*:}"
+        [ -e "$target" ] || continue
+        [ -e "$link" ] || [ -L "$link" ] && continue
+        ln -s "$target" "$link" 2>/dev/null && log "koha.nexus: $link -> $target"
+    done
+    return 0
 }
 
 # Copies the panel (and its dictionaries) to /usr/local/bin/config.sh.
@@ -8671,7 +8688,7 @@ kei_export_diagnostics() {
     mkdir -m 700 "$out" "$out/logs" || return 1
     kei_status_json > "$out/status.json" 2>/dev/null
     {
-        printf 'Koha Easy Install %s  |  %s\n' "${PANEL_VERSION# }" "$(date '+%F %T %z')"
+        printf 'koha.nexus %s  |  %s\n' "${PANEL_VERSION# }" "$(date '+%F %T %z')"
         printf 'platform=%s  wsl_net=%s  autostart=%s  windows_build=%s\n\n' "$KEI_PLATFORM" "${KEI_WSL_NET:--}" "${WIN_AUTOSTART:--}" "${WIN_BUILD:--}"
     } > "$out/system.txt"
     kei_diag_cmd "$out/system.txt" uname -a
@@ -9585,7 +9602,7 @@ _lt_reports_install() {
         fi
         printf '● %s — %s\n' "${RP_NAME[i]}" "$state" >> "$log"
         ok=$((ok + 1))
-        notes="$(t "Read-only report installed by Koha Easy Installer.") ${mark}"
+        notes="$(t "Read-only report installed by koha.nexus.") ${mark}"
         {
             printf 'UPDATE saved_sql SET report_name = %s, savedsql = %s, notes = %s, report_group = %s, last_modified = NOW() WHERE LOCATE(%s, notes) > 0;\n' \
                 "$(sql_quote "${RP_NAME[i]}")" "$(sql_quote "${RP_SQL[i]}")" "$(sql_quote "$notes")" "$(sql_quote "${RP_GROUP[i]}")" "$(sql_quote "$mark")"
@@ -11416,7 +11433,7 @@ _lt_br_labels_remove() {
 # cataloguer opens it with SHOW_LABEL.
 ficha_xsl() {   # ficha_xsl DEFAULT_XSL TITLE PRINT_LABEL ABNT_LABEL SHOW_LABEL
     printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-    printf '<!-- Koha Easy Installer: Koha'"'"'s default detail view plus the Brazilian catalogue card (ficha catalografica, AACR2). Generated file. -->\n'
+    printf '<!-- koha.nexus: Koha'"'"'s default detail view plus the Brazilian catalogue card (ficha catalografica, AACR2). Generated file. -->\n'
     printf '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:marc="http://www.loc.gov/MARC21/slim" exclude-result-prefixes="marc">\n'
     printf '  <xsl:import href="%s"/>\n' "$(xml_escape "$1")"
     printf '  <xsl:variable name="kei-title">%s</xsl:variable>\n' "$(xml_escape "$2")"
@@ -12250,7 +12267,7 @@ print {$h} <<"HTML";
 <head>
 <meta charset="utf-8">
 <title>${\( $cap ne '' ? $cap : 'Referências' )}</title>
-<!-- Koha Easy Installer: references by ABNT NBR 6023:2018, presented as NBR 14724 (A4, margins 3 cm top/left and 2 cm bottom/right, Times 12, single spacing, a blank line between references). -->
+<!-- koha.nexus: references by ABNT NBR 6023:2018, presented as NBR 14724 (A4, margins 3 cm top/left and 2 cm bottom/right, Times 12, single spacing, a blank line between references). -->
 <style>
 \@page { size: A4; margin: 3cm 2cm 2cm 3cm; }
 body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1; color: #000; background: #fff; max-width: 16cm; margin: 1cm auto; }
@@ -18218,7 +18235,7 @@ sys.exit(main())
 KEIPY
     cat > "$d/kei_import/__init__.py" <<'KEIPY'
 """kei_import: the engine of the Magic Import Tool (Ferramenta de Importação
-Mágica) of Koha Easy Installer. One entry point takes any file, folder
+Mágica) of koha.nexus. One entry point takes any file, folder
 or archive, recognises what it holds and prepares it for Koha's own import
 tools; the panel asks the questions and commits."""
 VERSION = "1"
@@ -27693,6 +27710,8 @@ is_koha_installed && ficha_refresh
 is_koha_installed && aia_refresh
 # Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
 is_koha_installed && mr_refresh
+# The koha.nexus names of the panel's folders and command (see kei_brand_links).
+kei_brand_links
 
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO

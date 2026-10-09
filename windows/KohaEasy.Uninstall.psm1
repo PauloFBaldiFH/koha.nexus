@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: removes Koha from this PC.
+﻿# koha.nexus for Windows: removes Koha from this PC.
 # Started by Uninstall-Koha.cmd (in the Koha folder) or by Settings > Apps
 # (the "Koha" entry) as "KohaEasy.ps1 Uninstall". It asks before anything is
 # removed, then takes away what the installer made, in this order:
@@ -37,14 +37,14 @@ function Test-KohaYesAnswer {
 }
 
 # Every process of the Windows side but this one and the one that started
-# it: the tray, the Koha window, the keep-alive task, KohaEasy.exe.
+# it: the tray, the Koha window, the keep-alive task, koha.nexus.exe.
 function Stop-KohaWindowsSide {
     Stop-KohaKeepAlive
     $keep = @($PID)
     try { $keep += [int](Get-CimInstance Win32_Process -Filter ('ProcessId = {0}' -f $PID) -ErrorAction Stop).ParentProcessId } catch { }
     try {
         Get-CimInstance Win32_Process -ErrorAction Stop |
-            Where-Object { $keep -notcontains [int]$_.ProcessId -and ($_.Name -eq 'KohaEasy.exe' -or ([string]$_.CommandLine) -match 'KohaEasy\.(ps1|Tray\.ps1|Window\.ps1|Hidden\.js)') } |
+            Where-Object { $keep -notcontains [int]$_.ProcessId -and ($_.Name -eq 'koha.nexus.exe' -or ([string]$_.CommandLine) -match 'KohaEasy\.(ps1|Tray\.ps1|Window\.ps1|Hidden\.js)') } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch { }
 }

@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: notification-area icon.
+﻿# koha.nexus for Windows: notification-area icon.
 # Started at sign-in (HKCU Run, KohaEasy.ps1 Tray) whatever the automatic
 # start mode, so a stopped Koha still has its Start button. It never starts
 # the distro by itself: the status is read only while Koha is already running.
@@ -37,9 +37,9 @@ $DISK_EVERY_S = 1800
 # drawn from koha.ico's largest frame, a little smaller, and the dot sits
 # beside it with a white ring: at 16 pixels the green leaf and a green dot
 # on top of it looked like one plain green dot. Get-KohaIcon tries the file
-# again while it is busy (at sign-in), then KohaEasy.exe's own icon, and
+# again while it is busy (at sign-in), then koha.nexus.exe's own icon, and
 # logs why; a plain dot only when neither can be read.
-$kohaIcon = Get-KohaIcon -Size 48 -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'KohaEasy.exe')
+$kohaIcon = Get-KohaIcon -Size 48 -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'koha.nexus.exe')
 $kohaLeaf = $null
 if ($kohaIcon) { try { $kohaLeaf = $kohaIcon.ToBitmap() } catch { Write-KohaLog ('tray icon: ' + $_.Exception.Message) } }
 $traySize = [Math]::Max(16, [System.Windows.Forms.SystemInformation]::SmallIconSize.Width)

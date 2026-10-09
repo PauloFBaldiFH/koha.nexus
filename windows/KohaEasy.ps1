@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Koha Easy Installer for Windows: shortcuts, scheduled tasks and tray.
+    koha.nexus for Windows: shortcuts, scheduled tasks and tray.
 .DESCRIPTION
     KohaEasy.ps1 Start [-Trigger user|logon]   Koha - Start shortcut, tray, sign-in task
     KohaEasy.ps1 Stop [-Force]                 Koha - Stop shortcut, tray
@@ -22,7 +22,7 @@
     KohaEasy.ps1 CheckDisk                     free space around the virtual disk
     KohaEasy.ps1 CompactDisk                   give unused space back to Windows (admin)
     KohaEasy.ps1 SetAutostart -Mode logon|manual
-    KohaEasy.ps1 RegisterTasks [-Mode logon|manual]   KohaEasy.exe, tasks, tray at sign-in and shortcuts
+    KohaEasy.ps1 RegisterTasks [-Mode logon|manual]   koha.nexus.exe, tasks, tray at sign-in and shortcuts
     KohaEasy.ps1 Install                       the whole installation (windows\install.ps1 starts it)
     KohaEasy.ps1 CreateShortcuts               Start menu "Koha" and desktop, with koha.ico
     KohaEasy.ps1 SetupNetwork                  firewall and port forwarding for the library network (admin)

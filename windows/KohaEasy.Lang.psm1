@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: translations.
+﻿# koha.nexus for Windows: translations.
 # Reads the panel's own dictionaries (lang\<code>.cache, one
 # "base64(English)|base64(translation)" entry per line), so the Windows texts
 # are translated once, in the same files, and checked by the same test (P13).

@@ -1,15 +1,15 @@
-﻿// Koha Easy Installer for Windows: KohaEasy.exe.
+﻿// koha.nexus for Windows: koha.nexus.exe.
 //
 // Built on this PC by the installer (KohaEasy.Core.psm1, Install-KohaLauncher)
 // with the C# compiler that ships with Windows (.NET Framework 4), so it is
 // never downloaded: no SmartScreen question, and this source is what runs.
 // C# 5 only (the compiler of .NET Framework 4.x).
 //
-//   KohaEasy.exe <command> [options]   runs "KohaEasy.ps1 <command> [options]"
+//   koha.nexus.exe <command> [options]   runs "KohaEasy.ps1 <command> [options]"
 //                                       in Windows PowerShell 5.1 with no
 //                                       console window at all, waits for it
 //                                       and returns its exit code
-//   KohaEasy.exe --self-test            exit 0 (the installer checks that
+//   koha.nexus.exe --self-test            exit 0 (the installer checks that
 //                                       Windows lets it run)
 //
 // It is a Windows (GUI) program, so Windows never opens a console or a
@@ -30,8 +30,8 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 
 [assembly: AssemblyTitle("Koha")]
-[assembly: AssemblyDescription("Koha Easy Installer for Windows")]
-[assembly: AssemblyProduct("Koha Easy Installer")]
+[assembly: AssemblyDescription("koha.nexus for Windows")]
+[assembly: AssemblyProduct("koha.nexus")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 
@@ -67,7 +67,7 @@ namespace KohaEasy
             }
             catch (Exception e)
             {
-                Log(dir, "KohaEasy.exe could not start PowerShell: " + e.Message);
+                Log(dir, "koha.nexus.exe could not start PowerShell: " + e.Message);
                 return 1;
             }
         }

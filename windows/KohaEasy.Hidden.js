@@ -1,8 +1,8 @@
-// Koha Easy Installer for Windows: KohaEasy.ps1 with no window at all,
+// koha.nexus for Windows: KohaEasy.ps1 with no window at all,
 // through Windows Script Host. wscript.exe is a Windows program (no console
 // of its own), and WScript.Shell.Run with window style 0 starts PowerShell
 // hidden from the start, so Windows Terminal never takes over its console.
-// Used when KohaEasy.exe and conhost --headless do not work on this PC.
+// Used when koha.nexus.exe and conhost --headless do not work on this PC.
 //   wscript.exe //B //Nologo KohaEasy.Hidden.js <command> [arguments]
 // Waits for PowerShell and returns its exit code (the scheduled tasks
 // read it). JScript: VBScript is being removed from Windows.

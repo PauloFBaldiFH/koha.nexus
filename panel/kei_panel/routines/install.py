@@ -100,7 +100,7 @@ async def install_koha(app) -> None:
         f"{t('No critical errors.')}  {t('OK')}: {_num(out, 'v_ok')}   {t('Warnings')}: {_num(out, 'v_warn')}",
         t("Start the installation now?"),
     ])
-    if not await app.push_screen_wait(ConfirmScreen(t("Welcome to Koha Easy Installer!"), welcome,
+    if not await app.push_screen_wait(ConfirmScreen(t("Welcome to koha.nexus!"), welcome,
                                                     preview=report, preview_title=t("Diagnostic Report"))):
         return
 

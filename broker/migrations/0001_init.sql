@@ -1,4 +1,4 @@
--- Koha Easy Installer broker: initial schema (Cloudflare D1 / SQLite).
+-- koha.nexus broker: initial schema (Cloudflare D1 / SQLite).
 -- Times are unix seconds.
 
 CREATE TABLE enrollments (

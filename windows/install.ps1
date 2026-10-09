@@ -1,4 +1,4 @@
-# Koha Easy Installer for Windows - bootstrapper.
+# koha.nexus for Windows - bootstrapper.
 #
 #   How to install Koha on Windows: this line, in PowerShell opened as
 #   Administrator from your own (administrator) Windows account:
@@ -47,7 +47,7 @@ function Install-KohaEasyBootstrap {
     $tmp = $null
 
     Write-Host ''
-    Write-Host 'Koha Easy Installer for Windows' -ForegroundColor Green
+    Write-Host 'koha.nexus for Windows' -ForegroundColor Green
     if ([Environment]::OSVersion.Platform -ne 'Win32NT') { throw 'This installer runs on Windows 10 or 11.' }
     # Emoji only where they can be drawn: Windows Terminal. Code points keep
     # this file ASCII.
@@ -56,7 +56,7 @@ function Install-KohaEasyBootstrap {
 
     $src = $env:KOHAEASY_SOURCE
     if (-not $src) {
-        Write-Host ('{0} Downloading Koha Easy Installer ({1})...' -f $mark, $branch) -ForegroundColor Cyan
+        Write-Host ('{0} Downloading koha.nexus ({1})...' -f $mark, $branch) -ForegroundColor Cyan
         $tmp = Join-Path $env:TEMP ('KohaEasy-' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         $zip = Join-Path $tmp 'source.zip'

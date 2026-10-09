@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ======================================================================
-# KOHA EASY INSTALLER & MANAGER - DEEP CLEANUP & UNINSTALL
+# KOHA.NEXUS - DEEP CLEANUP & UNINSTALL
 # Remove o Koha e tudo o que o painel criou, deixando a máquina pronta
 # para uma nova instalação limpa (ideal para repetir testes).
 #
@@ -190,6 +190,7 @@ rm -f /etc/cron.d/koha_* /etc/cron.d/koha-common
 rm -f /root/backup_sql.sh /root/backup_marc.sh /usr/local/bin/koha-es-watchdog.sh
 rm -f /usr/local/bin/koha-zebra-watchdog.sh /usr/local/bin/koha-wait-services.sh
 rm -f /usr/local/bin/config.sh /usr/local/bin/config.sh.bak-* /usr/local/bin/.config.sh.*
+rm -f /usr/local/bin/koha-nexus /etc/koha-nexus /usr/local/lib/koha-nexus
 rm -f /usr/local/bin/koha-foreach /tmp/koha-foreach
 systemctl disable --now koha-stop-guard-recover.service koha-stop-guard.service >/dev/null 2>&1 || true
 rm -f /usr/local/sbin/koha-stop-guard /etc/systemd/system/koha-stop-guard.service /etc/systemd/system/koha-stop-guard-recover.service
