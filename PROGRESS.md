@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.32** (1.5.33: card hint ticker PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.33** (1.5.34: updater downloads from one commit)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -51,6 +51,13 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   keep stale copies. Parallel PRs touching `installer` always conflict on `installer.sha256`
   and the version: whichever merges second merges `main`, takes the next version, and
   regenerates the hash.
+- **Self-update reads one commit** (1.5.34): "Update this panel via GitHub" asks
+  `api.github.com/repos/<repo>/commits/main` for the commit and downloads `installer` and
+  `installer.sha256` from `raw.githubusercontent.com/<repo>/<sha>/`. The branch URLs are cached
+  up to 5 minutes per file, so right after a merge they paired a new installer with the old hash
+  and the panel showed the SHA-256 security alert. A mismatch at a pinned commit is still the
+  security alert; only when the API is unreachable (branch fallback) does the panel say to try
+  again in a few minutes. `tests/updater.bats` runs in the cloud (fake curl).
 - **AI assistant lives in the Koha web staff UI, not the TUI** (2026-10-02). Injected through a
   marked `IntranetUserJS` block (survives koha-common upgrades). Read-only MariaDB user
   `kei_ai_ro_<instance>` (sensitive tables/columns excluded). Since 1.5.15 (Subject 3) the model
