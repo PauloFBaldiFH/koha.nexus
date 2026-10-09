@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.28** (1.5.29: panel lock fix PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.29** (1.5.30: Z39.50 screen + Catalog Network PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -24,6 +24,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
 | Integrity hash | `installer.sha256` | sha256 | Windows installer verifies it. **Regenerate after every change to `installer`.** |
 | Textual panel (default UI) | `panel/kei_panel/` | Python 3, Textual 8.2 (own venv `panel-venv`) | Full-screen TUI. All 9 sections are native screens; no whiptail boxes. |
 | Windows installer | `windows/` | PowerShell + C# launcher + .cmd | Installs Debian on WSL2 and Koha inside it. Install root `C:\Koha` (old `C:\KohaEasy` kept). |
+| Catalog Network | `catalog-network/` | Python (FastAPI + SQLite FTS5) | The shared catalogue on the project's Oracle VPS: SRU 1.1/1.2 for Koha, `POST /api/records/sync` (bearer tokens), systemd unit `koha-nexus-catalog` on 127.0.0.1:8088 behind the Cloudflare Tunnel. |
 | Free-address broker | `broker/` | Cloudflare Worker (TypeScript), D1, Queues | Gives each library `<name>.koha.nexus` and `<name>-admin.koha.nexus` through Cloudflare Tunnels. Live at `https://broker.koha.nexus`. |
 | AI assistant (Module 2) | installed by installer section 38 | Perl (`tools/ai_assistant.pl`, `KohaEasy::Assistant`) + JS/CSS via `IntranetUserJS` | Chat on the Koha **web** staff home page, replacing the news block. |
 | AI cataloguing / MARC replace | installer + `marc_replace.pl` + `panel/kei_panel/marcreplace.py` | Perl + JS | AI-generated MARC record preview, add as new or replace an existing biblio. |
@@ -199,6 +200,19 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   2026-10-09). `panel_lock_end` ends the whole tree (TERM, 3 s, KILL); `sudo config.sh --unlock`
   and the "close it and open here? [s/N]" question use it. A running backup is named instead of
   a dead PID. The lock file is removed on exit; `panel_lock_open` re-opens it if the path changed.
+
+- **1.5.30 (Z39.50 screen + Catalog Network)**: the Z39.50 / SRU servers screen has three
+  boxes. Top: this Koha's Z39.50/SRU server (`koha-z3950-responder`) with an on/off switch
+  (`--task z3950-daemon on|off`: firewall port opened/closed, off also at boot; its
+  `/etc/koha/sites/<instance>/z3950` settings are kept aside as `z3950.kei-off` in case
+  `--disable` drops them). Middle: the "Rede koha.nexus (Catalogação Compartilhada)" switch
+  (`--task catalog-network on URL|off`: an SRU row, host `https://HOST`, port 443, db `sru`,
+  MARC21, utf8). Both read `--task z3950-server-status`. Bottom: the outbound list as before.
+  The hub's Z39.50 tab only shows the state and links here (its "Enable SIP2 and Z39.50"
+  buttons are gone; the classic routine stays as a hidden entry). The network's address is
+  `KEI_CATALOG_NETWORK_URL` (environment or `.env`), default `https://catalog.koha.nexus/sru`:
+  **a placeholder until the tunnel hostname is chosen**. The service itself is
+  `catalog-network/` (see its README for the VPS install, the cloudflared rule and the SQL).
 
 ---
 

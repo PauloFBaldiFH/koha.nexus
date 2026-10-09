@@ -1,5 +1,12 @@
-"""Z3950View: public catalogues for copy cataloguing, scanned and ranked.
+"""Z3950View: everything Z39.50 / SRU on one screen, in three parts.
 
+Top, this catalogue's own server: the switch turns koha-z3950-responder
+on or off (`config.sh --task z3950-daemon on|off`), with its state and port.
+Middle, the koha.nexus Catalog Network: the switch puts the shared
+catalogue's SRU address in Koha's z3950servers or takes it out
+(`--task catalog-network on URL|off`). Both read `--task z3950-server-status`.
+
+Bottom, public catalogues for copy cataloguing, scanned and ranked.
 The list (z3950.py) is grouped by region; the librarian ticks servers
 (space, or a click on a region to tick all of it), scans them behind the
 Pac-Man loader (a real search that must return a MARC record, latency in
@@ -20,8 +27,8 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
-from textual.widgets import Button, DataTable, Label, Static
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, DataTable, Label, Static, Switch
 
 from .. import z3950
 from ..i18n import t
@@ -44,10 +51,32 @@ class Z3950View(SectionView):
         self.selected: set[str] = set()
         self.in_koha: set[str] = set()
         self.show_hidden = False
+        # This Koha's server and the network, as the last status said: the
+        # switches are set from them, and a change that matches is no request.
+        self.server: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="view-head"):
             yield from self.heading()
+            yield Button(t("Reload"), id="z-reload", classes="small")
+        with Vertical(id="z-inbound", classes="hub-box"):
+            with Horizontal(classes="z-switch-row"):
+                yield Switch(False, id="z-daemon", disabled=True)
+                yield Label(t("Z39.50/SRU server (koha-z3950-daemon)"), classes="z-switch-name")
+                yield Label(t("Not checked yet."), id="z-daemon-state", classes="z-switch-state")
+            yield Static(t("Lets other libraries search this catalogue by Z39.50 and SRU (koha-z3950-daemon). "
+                           "Turning it on opens its port in the firewall; off closes it, also after a restart."),
+                         classes="ai-note", markup=False)
+        with Vertical(id="z-network", classes="hub-box"):
+            with Horizontal(classes="z-switch-row"):
+                yield Switch(False, id="z-net", disabled=True)
+                yield Label(z3950.NETWORK_NAME, classes="z-switch-name")
+                yield Label(t("Not checked yet."), id="z-net-state", classes="z-switch-state")
+            yield Static("", id="z-net-note", classes="ai-note", markup=False)
+        with Vertical(id="z-outbound", classes="hub-box z-wide"):
+            yield from self.compose_outbound()
+
+    def compose_outbound(self) -> ComposeResult:
         yield Static(t("Public catalogues to copy records from. Tick servers with the space bar (or a region "
                       "to tick it all), scan them, then add the working ones to Koha. * an address from an "
                       "older list: the scan tells if it still works."), classes="view-prompt", markup=False)
@@ -71,6 +100,15 @@ class Z3950View(SectionView):
         table.add_column(t("Address"), key="address")
         yield table
 
+    def on_mount(self) -> None:
+        self.query_one("#z-inbound").border_title = t("This catalogue's Z39.50 / SRU server (inbound)")
+        self.query_one("#z-network").border_title = t("Community network")
+        self.query_one("#z-outbound").border_title = t("Catalogues to copy records from (outbound)")
+        self.query_one("#z-net-note", Static).update(
+            t("The shared catalogue of the koha.nexus libraries. Turning it on adds it to Koha's Z39.50/SRU "
+              "servers, checked for the cataloguing searches; off takes it out.")
+            + "\n" + t("Address: ${url}", url=z3950.network_url()))
+
     def on_show(self) -> None:
         if not self.loaded:
             self.loaded = True
@@ -80,6 +118,100 @@ class Z3950View(SectionView):
             self.selected.update(tg.key for tg in self.visible() if tg.preselect)
             self.draw()
             self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
+            self.load_server()
+
+    def refresh_data(self) -> None:
+        self.load_server()
+        self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
+
+    # ------------------------------------------------------------------
+    # Inbound server and community network
+    # ------------------------------------------------------------------
+    def load_server(self) -> None:
+        self.run_worker(self._load_server(), exclusive=True, group="z3950-server", exit_on_error=False)
+
+    async def _load_server(self) -> None:
+        try:
+            out = await self.app.bridge.task("z3950-server-status")
+        except Exception:     # noqa: BLE001 (no installer: the switches stay off and say so)
+            self.show_server()
+            return
+        if out.ok:
+            self.server = dict(out.results)
+        self.show_server()
+
+    def show_server(self) -> None:
+        s = self.server
+        daemon = self.query_one("#z-daemon", Switch)
+        net = self.query_one("#z-net", Switch)
+        daemon.disabled = "daemon" not in s
+        net.disabled = "network" not in s
+        daemon.value = s.get("daemon") == "running"
+        net.value = s.get("network") == "on"
+        if "daemon" not in s:
+            state = t("Not checked")
+        elif s["daemon"] == "running":
+            state = t("● Running · port ${port}", port=s.get("port", "2100"))
+        else:
+            state = t("○ Stopped · port ${port}", port=s.get("port", "2100"))
+        self.query_one("#z-daemon-state", Label).update(state)
+        if "network" not in s:
+            state = t("Not checked")
+        elif s["network"] == "on":
+            state = t("● In Koha: ${url}", url=s.get("network_url", ""))
+        else:
+            state = t("○ Not in Koha")
+        self.query_one("#z-net-state", Label).update(state)
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        event.stop()
+        if event.switch.id == "z-daemon" and event.value != (self.server.get("daemon") == "running"):
+            self.app.run_worker(self._toggle_daemon(event.value), group="routine", exclusive=True,
+                                exit_on_error=False)
+        elif event.switch.id == "z-net" and event.value != (self.server.get("network") == "on"):
+            self.app.run_worker(self._toggle_network(event.value), group="routine", exclusive=True,
+                                exit_on_error=False)
+
+    async def _toggle_daemon(self, on: bool) -> None:
+        from ..routines.common import failed, run_task, show_done
+        title = t("This catalogue's Z39.50 / SRU server")
+        port = self.server.get("port", "2100")
+        question = (t("Turn on this catalogue's Z39.50/SRU server? Other libraries will be able to search it on "
+                      "port ${port}, and the port is opened in the firewall.", port=port) if on else
+                    t("Turn off this catalogue's Z39.50/SRU server? Other libraries will no longer search it, and "
+                      "port ${port} is closed in the firewall.", port=port))
+        if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
+            self.show_server()
+            return
+        result = await run_task(self.app, title, "z3950-daemon", "on" if on else "off")
+        if not failed(result):
+            out = result.value
+            self.server["daemon"] = out.get("daemon") or ("running" if on else "stopped")
+            self.server["port"] = out.get("port") or port
+        self.show_server()
+        await show_done(self.app, title, result)
+        self.load_server()
+
+    async def _toggle_network(self, on: bool) -> None:
+        from ..routines.common import failed, run_task, show_done
+        title = z3950.NETWORK_NAME
+        url = z3950.network_url()
+        question = (t("Add the koha.nexus network (${url}) to Koha's Z39.50/SRU servers, checked for the "
+                      "cataloguing searches?", url=url) if on else
+                    t("Take the koha.nexus network out of Koha's Z39.50/SRU servers?"))
+        if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
+            self.show_server()
+            return
+        args = ("on", url) if on else ("off",)
+        result = await run_task(self.app, title, "catalog-network", *args)
+        if not failed(result):
+            out = result.value
+            self.server["network"] = out.get("network") or ("on" if on else "off")
+            self.server["network_url"] = out.get("network_url") or url
+        self.show_server()
+        await show_done(self.app, title, result)
+        self.load_server()
+        await self._load_koha()
 
     # ------------------------------------------------------------------
     # The list
@@ -192,7 +324,7 @@ class Z3950View(SectionView):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {"z-scan": self.scan, "z-add": self.add, "z-login": self.login, "z-hide": self.hide,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
-                   "z-hidden": self.toggle_hidden}
+                   "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data}
         if event.button.id in actions:
             event.stop()
             actions[event.button.id]()

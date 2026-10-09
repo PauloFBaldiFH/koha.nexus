@@ -1,0 +1,10 @@
+# The rule to add to an existing Cloudflare Tunnel's config.yml
+# (/etc/cloudflared/config.yml), above the final catch-all rule, then:
+#   sudo systemctl restart cloudflared
+# A tunnel managed from the Cloudflare dashboard: Zero Trust > Networks >
+# Tunnels > the tunnel > Public Hostname > Add: catalog.koha.nexus,
+# type HTTP, URL 127.0.0.1:8088.
+ingress:
+  - hostname: catalog.koha.nexus
+    service: http://127.0.0.1:8088
+  - service: http_status:404

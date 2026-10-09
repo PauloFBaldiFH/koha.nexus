@@ -1,0 +1,40 @@
+# systemd unit for the koha.nexus Catalog Network (the shared catalogue).
+# Install: see ../README.md. In short:
+#   cp koha-nexus-catalog.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now koha-nexus-catalog
+# It listens on 127.0.0.1:8088 only: the Cloudflare Tunnel publishes it.
+[Unit]
+Description=koha.nexus Catalog Network (shared catalogue: SRU + sync API on 127.0.0.1:8088)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus-catalog
+Group=nexus-catalog
+WorkingDirectory=/opt/koha-nexus-catalog
+# NEXUS_CATALOG_* settings; the sync tokens live in their own file.
+EnvironmentFile=-/etc/koha-nexus-catalog/catalog.env
+Environment=NEXUS_CATALOG_HOST=127.0.0.1
+Environment=NEXUS_CATALOG_PORT=8088
+Environment=NEXUS_CATALOG_DB=/var/lib/koha-nexus-catalog/catalog.db
+Environment=NEXUS_CATALOG_TOKENS_FILE=/etc/koha-nexus-catalog/tokens
+ExecStart=/opt/koha-nexus-catalog/.venv/bin/python -m nexus_catalog serve
+Restart=always
+RestartSec=5
+# /var/lib/koha-nexus-catalog, owned by the service user: the only place it writes.
+StateDirectory=koha-nexus-catalog
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

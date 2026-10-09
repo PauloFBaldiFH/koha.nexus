@@ -66,6 +66,20 @@ HISTORY_RULES = 2                     # bumped when the scan's idea of "working"
 RULES_KEY = "_rules"
 # Words of titles every catalogue has: Don Quixote and The Little Prince.
 PROBE_TERMS = ("quixote", "quijote", "prince", "principe")
+# The koha.nexus Catalog Network (catalog-network/ in the repository): the
+# shared catalogue's SRU address, put in Koha's z3950servers by
+# `config.sh --task catalog-network on URL`. KEI_CATALOG_NETWORK_URL (the
+# environment or /etc/koha-easy-install/.env) points it somewhere else.
+NETWORK_NAME = "Rede koha.nexus (Catalogação Compartilhada)"
+NETWORK_ENV = "KEI_CATALOG_NETWORK_URL"
+NETWORK_URL = "https://catalog.koha.nexus/sru"
+
+
+def network_url() -> str:
+    """The shared catalogue's SRU address (https://HOST[:PORT]/DATABASE)."""
+    url = credentials.get(NETWORK_ENV).strip()
+    return url if re.fullmatch(r"https?://[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?(/[A-Za-z0-9._~/-]*)?", url) \
+        else NETWORK_URL
 
 
 _DIR: Path | None = None
