@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.29** (1.5.30: Z39.50 screen + Catalog Network PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.30** (1.5.31: PowerShell-only Windows install PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -23,7 +23,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
 | Translations | `lang/*.cache` (22 languages) | key=value dictionaries | English keys byte-for-byte; `pt.cache` must get every new string. Headers carry the panel version. |
 | Integrity hash | `installer.sha256` | sha256 | Windows installer verifies it. **Regenerate after every change to `installer`.** |
 | Textual panel (default UI) | `panel/kei_panel/` | Python 3, Textual 8.2 (own venv `panel-venv`) | Full-screen TUI. All 9 sections are native screens; no whiptail boxes. |
-| Windows installer | `windows/` | PowerShell + C# launcher + .cmd | Installs Debian on WSL2 and Koha inside it. Install root `C:\Koha` (old `C:\KohaEasy` kept). |
+| Windows installer | `windows/` | PowerShell + C# launcher | Installs Debian on WSL2 and Koha inside it. Install root `C:\Koha` (old `C:\KohaEasy` kept). |
 | Catalog Network | `catalog-network/` | Python (FastAPI + SQLite FTS5) | The shared catalogue on the project's Oracle VPS: SRU 1.1/1.2 for Koha, `POST /api/records/sync` (bearer tokens), systemd unit `koha-nexus-catalog` on 127.0.0.1:8088 behind the Cloudflare Tunnel. |
 | Free-address broker | `broker/` | Cloudflare Worker (TypeScript), D1, Queues | Gives each library `<name>.koha.nexus` and `<name>-admin.koha.nexus` through Cloudflare Tunnels. Live at `https://broker.koha.nexus`. |
 | AI assistant (Module 2) | installed by installer section 38 | Perl (`tools/ai_assistant.pl`, `KohaEasy::Assistant`) + JS/CSS via `IntranetUserJS` | Chat on the Koha **web** staff home page, replacing the news block. |
@@ -177,10 +177,11 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
 - **Links from the panel** open through `panel/kei_panel/opener.py` (wslview/explorer.exe on
   WSL, xdg-open as SUDO_USER on a desktop, else copy via OSC 52). Never Python `webbrowser`.
 - **Windows**: new installs go to `C:\Koha`; scheduled tasks live in the Task Scheduler root as
-  "Koha - <task> (<USERNAME>)"; the `.cmd` no longer runs as admin.
-  The manual PowerShell line is documented as "open PowerShell **as Administrator**" from the
-  person's own administrator account (Paulo, 2026-10-08); the `.cmd` itself still runs as the
-  signed-in user (5c1fa82), and the docs warn not to approve with another person's password. Use `Get-KohaPath`, not
+  "Koha - <task> (<USERNAME>)". The only install path is the PowerShell one-liner
+  `irm .../windows/install.ps1 | iex`, documented as "open PowerShell **as Administrator**" from
+  the person's own administrator account (Paulo, 2026-10-08); the docs warn not to approve with
+  another person's password. `Install-Koha.cmd` was removed in 1.5.31 (Paulo, 2026-10-09): do not
+  bring back a .cmd or batch installer. `Uninstall-Koha.cmd` (the uninstaller in `C:\Koha`) stays. Use `Get-KohaPath`, not
   literal paths.
 - **Naming**: product name koha.nexus everywhere visible; internal ids/paths such as
   `koha-easy-installer` and `/etc/koha-easy-install` are intentionally kept.
@@ -213,6 +214,11 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `KEI_CATALOG_NETWORK_URL` (environment or `.env`), default `https://catalog.koha.nexus/sru`:
   **a placeholder until the tunnel hostname is chosen**. The service itself is
   `catalog-network/` (see its README for the VPS install, the cloudflared rule and the SQL).
+
+- **1.5.31 (PowerShell-only Windows install)**: `windows/Install-Koha.cmd` is gone. The READMEs
+  and `index.html` show only `irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex`
+  (without the old `Tls12` prefix, as Paulo wrote it), and the site's download button is now a
+  code box with a Copy button, translated into all 22 languages.
 
 ---
 

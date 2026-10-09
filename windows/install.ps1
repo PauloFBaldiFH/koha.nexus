@@ -2,8 +2,7 @@
 #
 #   How to install Koha on Windows: this line, in PowerShell opened as
 #   Administrator from your own (administrator) Windows account:
-#   [Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
-#   or a double-click on windows\Install-Koha.cmd, which runs the same line.
+#   irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 #
 # It copies the Windows tools, the panel and its dictionaries to
 # C:\Koha\bin (downloaded from GitHub with the

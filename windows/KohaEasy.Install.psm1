@@ -1,6 +1,6 @@
 ﻿# koha.nexus for Windows: the install flow (blueprint 2.3).
-# Started by windows\install.ps1 (the irm | iex one-liner, which
-# Install-Koha.cmd also runs) as "KohaEasy.ps1 Install". Every phase is
+# Started by windows\install.ps1 (the irm | iex one-liner) as
+# "KohaEasy.ps1 Install". Every phase is
 # idempotent and recorded in state.json, so running Install again (or the
 # RunOnce entry after a restart) continues where it stopped:
 #   checks    Windows version, 64-bit, memory, disk, virtualization; then the

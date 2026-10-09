@@ -133,10 +133,8 @@ O Koha roda dentro de um sistema Debian no **WSL 2** (Subsistema do Windows para
 Abra o **PowerShell como Administrador** (clique com o botão direito no botão Iniciar > **Terminal (Admin)** ou **Windows PowerShell (Admin)**, e clique em **Sim**), cole esta linha e tecle Enter:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
+irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
-
-Se preferir dois cliques, baixe o [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, a seta no canto superior direito da página) e dê dois cliques nele. Ele roda exatamente a mesma linha, então a instalação é idêntica. O arquivo não é assinado: se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo**. É texto puro, então você pode abri-lo no Bloco de Notas e lê-lo antes. Dois cliques normais bastam: ele mesmo pede ao Windows permissão de administrador nas etapas que precisam. Se o Windows bloquear o arquivo sem o botão **Executar assim mesmo** (Controle Inteligente de Aplicativos do Windows 11, ou uma política da empresa), clique com o botão direito no arquivo > **Propriedades**, marque **Desbloquear** e clique em **OK**, ou use a linha do PowerShell acima, que não é bloqueada dessa forma.
 
 > **Use a sua própria conta do Windows.** Rode o instalador na conta que vai usar o Koha, e essa conta precisa ser administradora. Se o Windows pedir a senha de *outra pessoa*, cancele, entre em uma conta de administrador e rode lá: o Debian, os atalhos e a etapa de reinício são criados para a conta que roda o instalador, então uma instalação aprovada com a senha de outra pessoa vai parar na conta dela.
 

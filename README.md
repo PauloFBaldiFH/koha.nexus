@@ -133,10 +133,8 @@ Koha runs inside a Debian system in **WSL 2** (the Windows Subsystem for Linux),
 Open **PowerShell as Administrator** (right-click the Start button > **Terminal (Admin)** or **Windows PowerShell (Admin)**, and click **Yes**), paste this line and press Enter:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
+irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex
 ```
-
-If you prefer double-clicking, download [**Install-Koha.cmd**](https://github.com/PauloFBaldiFH/koha.nexus/blob/main/windows/Install-Koha.cmd) (**Download raw file**, the arrow at the top right of that page) and double-click it. It runs exactly the same line, so the install is identical. The file is not signed: if Windows shows "Windows protected your PC", click **More info > Run anyway**. It is plain text, so you can open it in Notepad and read it first. A plain double-click is enough: it asks Windows for administrator permission by itself at the steps that need it. If Windows blocks it with no **Run anyway** button (Smart App Control on Windows 11, or a company policy), right-click the file > **Properties**, tick **Unblock** and click **OK**, or use the PowerShell line above, which is never blocked this way.
 
 > **Use your own Windows account.** Run the installer from the account that will use Koha, and that account must be an administrator. If Windows asks for *another person's* password, cancel, sign in to an administrator account and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer, so an install approved with someone else's password ends up in their account instead.
 
