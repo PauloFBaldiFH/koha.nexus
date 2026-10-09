@@ -210,6 +210,8 @@ declare -A _MENU_PT=(
     ["🌐  Publish system to internet"]="🌐  Publicar sistema na Internet"
     ["🩺  Diagnostics & maintenance center"]="🩺  Diagnóstico e manutenção"
     ["🔒  Security center"]="🔒  Central de segurança"
+    ["🔒  Security & access hub"]="🔒  Central de Segurança & Acesso"
+    ["🪄  Magic Import Tool"]="🪄  Ferramenta Mágica de Importação"
     ["🔧  Koha settings & parameters"]="🔧  Configurações e parâmetros do Koha"
     ["📚  Library tools"]="📚  Ferramentas da biblioteca"
     ["🧰  General tools"]="🧰  Ferramentas gerais"
@@ -9056,6 +9058,12 @@ function_fail2ban_status() {
         return 0
     fi
     whiptail --title "$(t '🚨 Fail2ban')" --scrolltext --msgbox "$(printf '%b' "$info")" 24 78 || true
+}
+
+# Security & access hub > WireGuard VPN in the classic menu: the VPN has
+# its own screen in the new panel only (QR codes, devices).
+function_vpn_classic() {
+    msg_info "$(t '🔐  WireGuard VPN')" "$(t "WireGuard VPN is managed on its own screen of the new panel: Security & access hub > WireGuard VPN (key V). Open the panel with: sudo config.sh")" 12 76
 }
 
 function_staff_firewall() {
@@ -27882,10 +27890,10 @@ while true; do
     m2=$(t '🔑  View first-access credentials')
     m3=$(t '📥  Restore database')
     m4=$(t '💾  Backup center')
-    m5=$(t '🔍  Search engine & indexing')
-    m6=$(t '🌐  Publish system to internet')
-    m7=$(t '🩺  Diagnostics & maintenance center')
-    m8=$(t '🔒  Security center')
+    m5=$(t '🪄  Magic Import Tool')
+    m6=$(t '🔍  Search engine & indexing')
+    m7=$(t '🔒  Security & access hub')
+    m8=$(t '🩺  Diagnostics & maintenance center')
     m9=$(t '🔧  Koha settings & parameters')
     m10=$(t '📚  Library tools')
     m11=$(t '🧰  General tools')
@@ -27940,7 +27948,8 @@ while true; do
                 3) function_test_backup ;;
             esac
             ;;
-        5)
+        5) lt_magic_import ;;
+        6)
             SUB_OPT=$(whiptail --title "$(t '🔍 Search Engine & Indexing')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose an action:')" 16 76 2 \
                 "1" "$(t '🔃  Toggle search engine (Zebra ⇄ Elasticsearch)')" \
@@ -27950,19 +27959,29 @@ while true; do
                 2) function_repair_indexing ;;
             esac
             ;;
-        6)
-            SUB_OPT=$(whiptail --title "$(t '🌐 Publish System to Internet')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a publishing method:')" 17 76 3 \
-                "1" "$(t '🌉  Cloudflare Tunnel Manager (Recommended)')" \
-                "2" "$(t '🔏  Free SSL certificate (Certbot / Apache)')" \
-                "3" "$(t '🔎  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
+        7)
+            SUB_OPT=$(whiptail --title "$(t '🔒 Security & Access Hub')" --cancel-button "$(t 'Back')" \
+                --menu "$(t 'Choose a security or remote-access tool:')" 22 78 8 \
+                "1" "$(t '🔐  WireGuard VPN')" \
+                "2" "$(t '🌉  Cloudflare Tunnel Manager (Recommended)')" \
+                "3" "$(t '🧱  Show active UFW rules')" \
+                "4" "$(t '🚧  Staff firewall (restrict port 8080)')" \
+                "5" "$(t '🔏  Free SSL certificate (Certbot / Apache)')" \
+                "6" "$(t '🚨  Fail2ban status (intrusion attempts)')" \
+                "7" "$(t '🔐  Rotate database password')" \
+                "8" "$(t '🔎  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
-                1) function_configure_cloudflare ;;
-                2) function_configure_ssl ;;
-                3) function_google_search_console ;;
+                1) function_vpn_classic ;;
+                2) function_configure_cloudflare ;;
+                3) function_ufw_rules ;;
+                4) function_staff_firewall ;;
+                5) function_configure_ssl ;;
+                6) function_fail2ban_status ;;
+                7) function_rotate_db_password ;;
+                8) function_google_search_console ;;
             esac
             ;;
-        7)
+        8)
             SUB_OPT=$(whiptail --title "$(t '🩺 Diagnostics & Maintenance Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 20 76 6 \
                 "1" "$(t '📡  Detailed server & Koha status')" \
@@ -27978,20 +27997,6 @@ while true; do
                 4) function_view_logs ;;
                 5) function_deep_maintenance ;;
                 6) function_repair_services ;;
-            esac
-            ;;
-        8)
-            SUB_OPT=$(whiptail --title "$(t '🔒 Security Center')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a security routine:')" 18 76 4 \
-                "1" "$(t '🚨  Fail2ban status (intrusion attempts)')" \
-                "2" "$(t '🚧  Staff firewall (restrict port 8080)')" \
-                "3" "$(t '🔐  Rotate database password')" \
-                "4" "$(t '🧱  Show active UFW rules')" 3>&1 1>&2 2>&3) || continue
-            case "$SUB_OPT" in
-                1) function_fail2ban_status ;;
-                2) function_staff_firewall ;;
-                3) function_rotate_db_password ;;
-                4) function_ufw_rules ;;
             esac
             ;;
         9)
