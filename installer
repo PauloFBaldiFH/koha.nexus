@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.29"
+PANEL_VERSION=" 1.5.30"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -26713,6 +26713,156 @@ z3950_add() {
     msg_ok "$(t "Z39.50/SRU servers added to Koha: \${n}\nAlready in Koha: \${existing}\n\nThey are in Administration > Z39.50/SRU servers, checked for the cataloguing searches.")"
 }
 
+# ----------------------------------------------------------------------
+# The rest of the panel's Z39.50 / SRU screen: this Koha's own Z39.50/SRU
+# server (koha-z3950-responder: other libraries search this catalogue) and
+# the koha.nexus Catalog Network (catalog-network/ in the repository: the
+# shared catalogue, an SRU target in z3950servers).
+#   z3950-server-status          daemon (running|stopped), port, network
+#                                (on|off) and network_url (Koha's row)
+#   z3950-daemon on|off          start it (and at boot, firewall port open)
+#                                or stop it (off at boot, port closed)
+#   catalog-network on URL|off   add (or replace) the shared catalogue's row,
+#                                or take it out
+# ----------------------------------------------------------------------
+CATALOG_NETWORK_NAME="Rede koha.nexus (Catalogação Compartilhada)"
+CATALOG_NETWORK_FIELDS="title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice"
+
+z3950_daemon_dir() { echo "${KEI_Z3950_DIR:-/etc/koha/sites/${INSTANCE}/z3950}"; }
+
+# The port in the responder's config.xml (<listen>tcp:@:2100</listen>), else 2100.
+z3950_daemon_port() {
+    local f p
+    f="$(z3950_daemon_dir)/config.xml"
+    [ -f "$f" ] || f=/etc/koha/z3950/config.xml
+    p=$(grep -o 'tcp:[^<]*' "$f" 2>/dev/null | head -n 1 | grep -oE '[0-9]+$')
+    echo "${p:-2100}"
+}
+
+z3950_daemon_running() { pgrep -f "z3950_responder.*${INSTANCE}" >/dev/null 2>&1; }
+
+# z3950_daemon_wait on|off: up to 10 s for the responder to reach that state.
+z3950_daemon_wait() {
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        if [ "$1" = on ]; then z3950_daemon_running && return 0; else z3950_daemon_running || return 0; fi
+        sleep 1
+    done
+    return 1
+}
+
+z3950_daemon() {
+    local want="$1" dir port
+    require_koha || return 1
+    dir=$(z3950_daemon_dir)
+    if [ "$want" = on ]; then
+        # The settings kept when it was turned off come back first.
+        [ ! -d "$dir" ] && [ -d "${dir}.kei-off" ] && mv "${dir}.kei-off" "$dir"
+        koha_ctl /usr/sbin/koha-z3950-responder --enable "$INSTANCE" >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        port=$(z3950_daemon_port)
+        ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+        z3950_daemon_running \
+          || koha_ctl /usr/sbin/koha-z3950-responder --start "$INSTANCE" >/dev/null 2>&1 \
+          || systemctl enable --now "koha-z3950-responder@${INSTANCE}" >/dev/null 2>&1 || true
+        if z3950_daemon_wait on; then
+            log "z3950: this Koha's Z39.50/SRU server is on (port ${port})"
+            kei_result daemon running
+            kei_result port "$port"
+            msg_ok "$(t "This catalogue's Z39.50/SRU server is on, port \${port}: other libraries can search it.")"
+            return 0
+        fi
+        kei_result daemon stopped
+        msg_error "" "$(t "The Z39.50/SRU server did not start. Check: systemctl status koha-z3950-responder@\${INSTANCE}")"
+        return 1
+    fi
+    port=$(z3950_daemon_port)
+    koha_ctl /usr/sbin/koha-z3950-responder --stop "$INSTANCE" >/dev/null 2>&1 || true
+    systemctl disable --now "koha-z3950-responder@${INSTANCE}" >/dev/null 2>&1 || true
+    # --disable keeps it off at boot; its settings are kept aside for "on".
+    [ -d "$dir" ] && { rm -rf "${dir}.kei-off"; cp -a "$dir" "${dir}.kei-off"; }
+    koha_ctl /usr/sbin/koha-z3950-responder --disable "$INSTANCE" >/dev/null 2>&1 || true
+    [ -d "$dir" ] && rm -rf "${dir}.kei-off"
+    ufw delete allow "${port}/tcp" >/dev/null 2>&1 || true
+    if z3950_daemon_wait off; then
+        log "z3950: this Koha's Z39.50/SRU server is off"
+        kei_result daemon stopped
+        kei_result port "$port"
+        msg_ok "$(t "This catalogue's Z39.50/SRU server is off (also after a restart), and its firewall port is closed.")"
+        return 0
+    fi
+    kei_result daemon running
+    msg_error "" "$(t "The Z39.50/SRU server did not stop. Check: systemctl status koha-z3950-responder@\${INSTANCE}")"
+    return 1
+}
+
+# catalog_network_parse URL: CN_HOST (with its http:// or https://, as Koha
+# wants it for HTTPS), CN_PORT and CN_DB; 1 when it is no http(s) address.
+catalog_network_parse() {
+    local re='^(https?)://([A-Za-z0-9][A-Za-z0-9.-]{0,252})(:([0-9]{1,5}))?(/([A-Za-z0-9._~/-]{0,200}))?$'
+    [[ "$1" =~ $re ]] || return 1
+    CN_HOST="${BASH_REMATCH[1]}://${BASH_REMATCH[2]}"
+    CN_PORT="${BASH_REMATCH[4]}"
+    CN_DB="${BASH_REMATCH[6]%/}"
+    [ -n "$CN_PORT" ] || { [ "${BASH_REMATCH[1]}" = https ] && CN_PORT=443 || CN_PORT=80; }
+    [ "$CN_PORT" -ge 1 ] && [ "$CN_PORT" -le 65535 ] || return 1
+    [ -n "$CN_DB" ] || CN_DB=sru
+}
+
+catalog_network() {
+    local want="$1" url="${2:-}" name
+    require_database || return 1
+    name=$(sql_quote "$CATALOG_NETWORK_NAME")
+    if [ "$want" = on ]; then
+        if ! catalog_network_parse "$url"; then
+            msg_error "" "$(t "The address of the koha.nexus network is not valid: \${url}")"
+            return 1
+        fi
+        if ! mysql --default-character-set=utf8mb4 "$DB_NAME" <<SQL
+DELETE FROM z3950servers WHERE recordtype = 'biblio'
+  AND (servername = ${name} OR (host = $(sql_quote "$CN_HOST") AND port = ${CN_PORT} AND IFNULL(db,'') = $(sql_quote "$CN_DB")));
+INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout,
+  servertype, recordtype, sru_fields, sru_options, add_xslt)
+VALUES ($(sql_quote "$CN_HOST"), ${CN_PORT}, $(sql_quote "$CN_DB"), ${name}, 1, 1, 'MARC21', 'utf8', 15, 'sru',
+  'biblio', $(sql_quote "$CATALOG_NETWORK_FIELDS"), 'sru=get,sru_version=1.1', '');
+SQL
+        then
+            msg_error "" "$(t "Koha's database did not take the koha.nexus network.")"
+            return 1
+        fi
+        log "z3950: koha.nexus network on (${CN_HOST}:${CN_PORT}/${CN_DB})"
+        kei_result network on
+        kei_result network_url "${CN_HOST}:${CN_PORT}/${CN_DB}"
+        msg_ok "$(t "The koha.nexus network is in Koha's Z39.50/SRU servers, checked for the cataloguing searches.")"
+        return 0
+    fi
+    if ! run_sql "DELETE FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio' AND servername = ${name};" >/dev/null; then
+        msg_error "" "$(t "Koha's database did not take the koha.nexus network.")"
+        return 1
+    fi
+    log "z3950: koha.nexus network off"
+    kei_result network off
+    msg_ok "$(t "The koha.nexus network is no longer searched by Koha's cataloguing.")"
+}
+
+z3950_server_status() {
+    local row host port db
+    kei_result daemon "$(z3950_daemon_running && echo running || echo stopped)"
+    kei_result port "$(z3950_daemon_port)"
+    if mysql -e "USE ${DB_NAME};" >/dev/null 2>&1; then
+        row=$(run_sql "SELECT host, port, IFNULL(db,'') FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio'
+                       AND servername = $(sql_quote "$CATALOG_NETWORK_NAME") LIMIT 1;" 2>/dev/null)
+        if [ -n "$row" ]; then
+            IFS=$'\t' read -r host port db <<< "$row"
+            kei_result network on
+            kei_result network_url "${host}:${port}/${db}"
+        else
+            kei_result network off
+        fi
+    fi
+    return 0
+}
+
 # ======================================================================
 # 40. OPAC APPEARANCE (panel screen)
 # ----------------------------------------------------------------------
@@ -28134,6 +28284,14 @@ kei_task() {
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
         sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
+        z3950-server-status) z3950_server_status ;;
+        z3950-daemon)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; z3950_daemon "$1" ;;
+        catalog-network)
+            case "${1:-}" in
+                on)  [ -n "${2:-}" ] || return 2; catalog_network on "$2" ;;
+                off) catalog_network off ;;
+                *)   return 2 ;;
+            esac ;;
         opac-theme-get)  opac_theme_get ;;
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;

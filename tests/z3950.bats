@@ -48,7 +48,7 @@ SH
     ) > "$W/add.tsv"
 }
 
-zsql() { mysql -N "$DB" -e "$1"; }
+zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
 
 @test "z3950-add: valid targets go in once, checked, ranked; the list file is deleted" {
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/add.tsv"
@@ -132,4 +132,107 @@ zsql() { mysql -N "$DB" -e "$1"; }
     grep -q '^        sru-bridge)' "$KEI_REPO/installer"
     grep -q 'WantedBy=multi-user.target' "$KEI_REPO/installer"
     grep -q 'ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m zeus_sru' "$KEI_REPO/installer"
+}
+
+# ---------------------------------------------------------------------
+# The screen's top and middle: this Koha's own Z39.50/SRU server and the
+# koha.nexus Catalog Network row.
+# ---------------------------------------------------------------------
+daemon_extra() {
+    mkdir -p "$W/z3950"
+    printf '<yazgfs>\n  <listen id="public">tcp:@:2111</listen>\n</yazgfs>\n' > "$W/z3950/config.xml"
+    cat >> "$W/extra.sh" <<SH
+require_koha() { return 0; }
+KEI_Z3950_DIR="$W/z3950"
+z3950_daemon_running() { [ -e "$W/running" ]; }
+koha_ctl() {
+    echo "\$*" >> "$W/calls"
+    case "\$*" in
+        *--start*) touch "$W/running" ;;
+        *--stop*) rm -f "$W/running" ;;
+        *--disable*) rm -rf "$W/z3950" ;;    # as if Koha took the settings away
+    esac
+}
+ufw() { echo "ufw \$*" >> "$W/calls"; }
+systemctl() { echo "systemctl \$*" >> "$W/calls"; return 1; }
+SH
+}
+
+@test "z3950-daemon: on starts the responder and opens its port; off stops it, closes it, keeps its settings" {
+    daemon_extra
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-daemon bash "$PANEL" z3950_daemon on
+    echo "$output"; cat "$W/calls"
+    [ "$status" -eq 0 ]
+    grep -q -- "--enable" "$W/calls"
+    grep -q -- "--start" "$W/calls"
+    grep -q "ufw allow 2111/tcp" "$W/calls"
+    grep -q "RESULT daemon=running" "$W/results"
+    grep -q "RESULT port=2111" "$W/results"
+    grep -q "OK .*port 2111" "$KEI_S/dialogs.log"
+
+    : > "$W/results"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-daemon bash "$PANEL" z3950_daemon off
+    [ "$status" -eq 0 ]
+    grep -q -- "--stop" "$W/calls"
+    grep -q -- "--disable" "$W/calls"
+    grep -q "ufw delete allow 2111/tcp" "$W/calls"
+    grep -q "RESULT daemon=stopped" "$W/results"
+    # Koha's --disable removed the settings: a copy waits for "on".
+    [ ! -e "$W/z3950" ] && [ -f "$W/z3950.kei-off/config.xml" ]
+
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-daemon bash "$PANEL" z3950_daemon on
+    [ "$status" -eq 0 ]
+    [ -f "$W/z3950/config.xml" ] && [ ! -e "$W/z3950.kei-off" ]
+    [ "$(grep -c "ufw allow 2111/tcp" "$W/calls")" = 2 ]
+}
+
+@test "catalog-network: on adds the shared catalogue as SRU (HTTPS, MARC21, utf8), again replaces it, off removes it" {
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "https://catalog.koha.nexus/sru"
+    echo "$output"; cat "$KEI_S/dialogs.log"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT host, port, db, syntax, encoding, servertype, checked, timeout, sru_options FROM z3950servers WHERE servername = 'Rede koha.nexus (Catalogação Compartilhada)'")" = \
+      "$(printf 'https://catalog.koha.nexus\t443\tsru\tMARC21\tutf8\tsru\t1\t15\tsru=get,sru_version=1.1')" ]
+    [ "$(zsql "SELECT sru_fields FROM z3950servers WHERE host = 'https://catalog.koha.nexus'")" = \
+      "title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice" ]
+    grep -q "RESULT network=on" "$W/results"
+    grep -q "RESULT network_url=https://catalog.koha.nexus:443/sru" "$W/results"
+
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "http://10.0.0.5:8088/"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "1" ]
+    [ "$(zsql "SELECT host, port, db FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "$(printf 'http://10.0.0.5\t8088\tsru')" ]
+
+    : > "$W/results"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-server-status bash "$PANEL" z3950_server_status
+    grep -q "RESULT network=on" "$W/results"
+    grep -q "RESULT network_url=http://10.0.0.5:8088/sru" "$W/results"
+
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network off
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "0" ]
+    # The other targets are untouched.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers")" = "2" ]
+}
+
+@test "catalog-network: an address that is not http(s) changes nothing" {
+    for bad in "catalog.koha.nexus" "https://x.org/sru'; DROP TABLE z3950servers; --" "ftp://x.org/sru" "https://x.org:99999/sru"; do
+        run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "$bad"
+        [ "$status" -eq 1 ]
+    done
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers")" = "2" ]
+    grep -q "ERROR .*not valid" "$KEI_S/dialogs.log"
+}
+
+@test "z3950-server-status: the responder's state, port and no network row" {
+    daemon_extra
+    touch "$W/running"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-server-status bash "$PANEL" z3950_server_status
+    [ "$status" -eq 0 ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT daemon=running\nRESULT port=2111\nRESULT network=off')" ]
+}
+
+@test "z3950: the panel knows the server and network tasks" {
+    grep -q '^        z3950-server-status)' "$KEI_REPO/installer"
+    grep -q '^        z3950-daemon) ' "$KEI_REPO/installer"
+    grep -q '^        catalog-network)' "$KEI_REPO/installer"
 }

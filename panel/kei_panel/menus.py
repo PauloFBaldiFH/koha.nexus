@@ -80,18 +80,21 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
     ), view="ai", key="a"),
-    # New screen: public catalogues for copy cataloguing (Z39.50 and SRU),
-    # scanned and ranked, added to Koha's z3950servers (no bash menu).
+    # New screen: this Koha's Z39.50/SRU server (on/off), the koha.nexus
+    # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
+    # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
     Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z"),
     # New screen: the public catalogue's look (textures, wallpaper, dark mode,
     # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
     Section("opac", "🎨  OPAC appearance", "🎨  OPAC appearance", view="opac", key="o"),
     # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
     # Z39.50 on one screen (views/hub.py); its buttons run these routines.
+    # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:
+    # the classic "SIP2 and Z39.50" routine stays reachable, but no button runs it.
     Section("hub", "📨  Messaging & interoperability", "📨  Messaging & interoperability", entries=(
         Entry("📧  Configure email and circulation notices", "email", kind="native"),
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
-        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
+        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native", hidden=True),
     ), view="hub", key="m"),
     # WireGuard VPN for the staff interface and SSH (views/vpn.py), opened
     # from the Security & access hub (or its key).

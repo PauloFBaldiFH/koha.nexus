@@ -460,6 +460,25 @@ App.-plain #picker-drop {
     margin-right: 1;
 }
 
+/* ---- Z39.50 / SRU servers (views/z3950.py) ------------------------ */
+.z-switch-row {
+    height: auto;
+    margin-top: 1;
+}
+.z-switch-row Switch {
+    margin-right: 1;
+}
+.z-switch-name {
+    text-style: bold;
+    padding: 1 2 0 0;
+}
+.z-switch-state {
+    padding: 1 0 0 0;
+}
+.hub-box.z-wide {
+    max-width: 100%;
+}
+
 /* ---- Messaging & interoperability (views/hub.py) ------------------- */
 #hub-tabs {
     height: auto;

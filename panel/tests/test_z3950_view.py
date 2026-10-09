@@ -147,3 +147,77 @@ def test_import_and_export(tmp_path, monkeypatch):
             assert key in [k.value for k in table.rows]           # the community list keeps mine
 
     asyncio.run(main())
+
+
+async def _press(pilot, app, button_id):
+    """Press a dialog button once the dialog has drawn it."""
+    await _until(pilot, lambda: bool(app.screen.query(f"#{button_id}")))
+    app.screen.query_one(f"#{button_id}").press()
+    await pilot.pause(0.05)
+
+
+def test_inbound_server_and_community_network(tmp_path, monkeypatch):
+    """Top and middle of the screen: the switches show the state the status
+    task reads, ask before acting, and run the task with the network's address."""
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    (tmp_path / "kei.env").write_text("KEI_CATALOG_NETWORK_URL=https://catalogo.example.org/sru\n")
+    monkeypatch.setenv("KEI_ENV_FILE", str(tmp_path / "kei.env"))
+    from kei_panel.app import KohaPanelApp
+    from textual.widgets import Switch
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        calls = []
+        real_task = app.bridge.task
+
+        async def spy(name, *args, **kwargs):
+            calls.append((name, *args))
+            return await real_task(name, *args, **kwargs)
+        monkeypatch.setattr(app.bridge, "task", spy)
+        async with app.run_test(size=(150, 60)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("z")
+            view = app.screen.query_one("#view-z3950")
+            daemon = view.query_one("#z-daemon", Switch)
+            net = view.query_one("#z-net", Switch)
+            await _until(pilot, lambda: not daemon.disabled, wait=20)
+            assert daemon.value is True and net.value is False
+            assert "Running · port 2100" in str(view.query_one("#z-daemon-state").render())
+            assert "Not in Koha" in str(view.query_one("#z-net-state").render())
+            assert "https://catalogo.example.org/sru" in str(view.query_one("#z-net-note").render())
+            assert view.query_one("#z-inbound").border_title.startswith("This catalogue")
+
+            # The network: asked first, then the task gets the address.
+            net.value = True
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            assert "https://catalogo.example.org/sru" in app.screen._question
+            await _press(pilot, app, "yes")
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert ("catalog-network", "on", "https://catalogo.example.org/sru") in calls
+            await _press(pilot, app, "ok")
+
+            # The daemon: "no" puts the switch back and runs nothing.
+            await _until(pilot, lambda: not isinstance(app.screen, MessageScreen))
+            await _until(pilot, lambda: not [w for w in app.workers if w.group in ("routine", "z3950-server")
+                                             and w.is_running], wait=20)
+            daemon.value = False
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            await _press(pilot, app, "no")
+            await _until(pilot, lambda: daemon.value is True)
+            assert not [c for c in calls if c[0] == "z3950-daemon"]
+            daemon.value = False
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            await _press(pilot, app, "yes")
+            await _until(pilot, lambda: ("z3950-daemon", "off") in calls)
+
+    asyncio.run(main())
+
+
+def test_network_address_falls_back_to_the_default(monkeypatch, tmp_path):
+    monkeypatch.setenv("KEI_ENV_FILE", str(tmp_path / "none.env"))
+    monkeypatch.delenv("KEI_CATALOG_NETWORK_URL", raising=False)
+    assert z3950.network_url() == z3950.NETWORK_URL
+    monkeypatch.setenv("KEI_CATALOG_NETWORK_URL", "https://x.example.org:8443/sru")
+    assert z3950.network_url() == "https://x.example.org:8443/sru"
+    monkeypatch.setenv("KEI_CATALOG_NETWORK_URL", "javascript:alert(1)")
+    assert z3950.network_url() == z3950.NETWORK_URL

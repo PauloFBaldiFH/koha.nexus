@@ -1,0 +1,5 @@
+# koha.nexus Catalog Network: runtime dependencies. Install into its own
+# venv (see README.md), never into the system Python. SQLite (with FTS5)
+# and the MARCXML handling come from Python's standard library.
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1

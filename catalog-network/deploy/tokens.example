@@ -1,0 +1,5 @@
+# /etc/koha-nexus-catalog/tokens (root:nexus-catalog, 0640): one library per
+# line, "name token". Read again whenever this file changes: adding or
+# removing a library needs no restart. Tokens shorter than 24 characters
+# are ignored. Make one with: openssl rand -hex 32
+biblioteca-exemplo  replace-with-the-output-of-openssl-rand-hex-32

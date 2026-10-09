@@ -1,6 +1,8 @@
 """HubView: messaging & interoperability on one screen.
 
-Five tabs: E-mail (SMTP), WhatsApp & Telegram, SMS, SIP2 and Z39.50. Each
+Five tabs: E-mail (SMTP), WhatsApp & Telegram, SMS, SIP2 and Z39.50 (its
+state, and the way to the Z39.50 / SRU servers screen, where it is turned
+on or off). Each
 shows what Koha has now (`config.sh --task hub-status`: no passwords), the
 buttons that set it up from the panel, and links that open the exact Koha
 staff page (through opener.py) instead of a wall of instructions.
@@ -51,8 +53,7 @@ GMAIL = (   # the cheat sheet: field of Koha's SMTP server form, value
 POLICY = {"checkout": "Check out", "checkin": "Check in", "renewal": "Renew",
           "status_update": "Change patron data"}
 # Buttons that run a panel routine (menus.py entries of this section).
-ROUTINE_BUTTONS = {"h-email-setup": "email", "h-msg-setup": "messaging",
-                   "h-interop": "interoperability", "h-z-interop": "interoperability"}
+ROUTINE_BUTTONS = {"h-email-setup": "email", "h-msg-setup": "messaging"}
 
 
 class HubView(SectionView):
@@ -149,18 +150,17 @@ class HubView(SectionView):
         with Horizontal(classes="form-buttons"):
             yield Button(t("Save"), id="h-sip-save", variant="success")
             yield Button(t("Create the SIP patron in Koha"), id="h-l-sip-patron")
-            yield Button(t("Enable SIP2 and Z39.50"), id="h-interop")
         yield Static(t("The SIP login must also be a Koha patron with the same user name and password, and the "
                        "circulate permission."), classes="ai-note", markup=False)
 
     def compose_z3950(self) -> ComposeResult:
         yield Label(t("Not checked yet."), id="h-z-state", classes="hub-state")
-        yield Static(t("Z39.50 (port 2100) lets other libraries search this catalogue. The servers this Koha "
-                       "copies records from are managed on their own screen."), classes="ai-note", markup=False)
+        yield Static(t("This catalogue's Z39.50/SRU server (on or off), the koha.nexus network and the catalogues "
+                       "Koha copies records from are all on the Z39.50 / SRU servers screen."),
+                     classes="ai-note", markup=False)
         with Horizontal(classes="form-buttons"):
             yield Button(t("📡  Z39.50 / SRU servers"), id="h-z-servers", variant="primary")
             yield Button(t("Z39.50/SRU servers in Koha"), id="h-l-z3950")
-            yield Button(t("Enable SIP2 and Z39.50"), id="h-z-interop")
 
     def on_mount(self) -> None:
         self.query_one("#h-sip-form").border_title = t("SIP2 server")
