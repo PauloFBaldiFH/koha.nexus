@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.27**._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.27** (1.5.28 in the koha.nexus rebrand PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -183,6 +183,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   literal paths.
 - **Naming**: product name koha.nexus everywhere visible; internal ids/paths such as
   `koha-easy-installer` and `/etc/koha-easy-install` are intentionally kept.
+  Since 1.5.28 the Windows launcher is `koha.nexus.exe`, banners say KOHA.NEXUS, and the
+  installer adds `/etc/koha-nexus`, `/usr/local/lib/koha-nexus` and `/usr/local/bin/koha-nexus`
+  as links to the old paths (uninstall removes them).
+- **1.5.28 (koha.nexus rebrand PR)**: the panel lock (`/var/run/koha_panel.lock`) is taken
+  over when its holder is gone or lost its terminal (SSH drop); 🔒 Security & access hub
+  (WireGuard, Cloudflare Tunnel, UFW, staff firewall, SSL, Fail2ban...) replaces the sidebar
+  VPN/publish items; Magic Import sits right under Backups; dumps may be `.sql.bz2/.xz/.zst`
+  (zstd added to the dependencies); cloud servers show the public IP next to the private one;
+  OPAC look has a 2D/3D carousel, block colours (`--nexus-*`), quick access buttons and an
+  optional staff theme (IntranetUserCSS); each apply saves `theme-settings.json` in CONF_DIR
+  and Restore database writes it back (`theme_state_reapply`).
 
 ---
 
