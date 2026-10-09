@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.31** (1.5.32: Magic Import file checks PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.32** (1.5.33: card hint ticker PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -233,6 +233,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   PostgreSQL backups, tar/zip archives and SQLite files in `check_dump_file`, and its pickers
   also list `.backup`, `.bkp` and `.dump` (the content decides). An engine exception is one
   readable line (exit 4), with the traceback in the log.
+
+- **1.5.33 (card hint ticker)**: the grey hint line under each action card ("Runs in the
+  background", "Passo a passo, neste painel"...) is one line now (`widgets/marquee.py`). Text that
+  fits is drawn as it is; text that does not is cut with "…", and while the card is hovered or
+  focused it slides one cell every 0.15 s, resting about 1.5 s at the start and at the end. Only a
+  running ticker has a timer, the window is always exactly the box width (wide characters cut by
+  an edge become a space), so nothing bleeds past the border. Gotcha: a Textual widget must not
+  use `self._running` (MessagePump's own flag), like `remove()` and `_task()`.
 
 ---
 

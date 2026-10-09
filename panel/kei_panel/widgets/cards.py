@@ -11,6 +11,7 @@ from ..glyphs import split_icon
 from ..i18n import t
 from ..menus import Entry
 from .copy import CopyButton
+from .marquee import Marquee
 
 
 class StatusCard(Vertical):
@@ -90,7 +91,26 @@ class ActionCard(Static, can_focus=True):
             hint = t("Runs in the background")
         else:
             hint = t("Opens the classic screens")
-        yield Label(hint, classes="action-hint")
+        yield Marquee(hint, classes="action-hint")
+
+    # The hint scrolls while the card has the mouse or the focus (Enter and
+    # Leave also come up from the labels inside, hence the re-check).
+    def _tickers(self) -> None:
+        on = self.has_focus or self.is_mouse_over
+        for m in self.query(Marquee):
+            m.run(on)
+
+    def on_enter(self) -> None:
+        self._tickers()
+
+    def on_leave(self) -> None:
+        self._tickers()
+
+    def on_focus(self) -> None:
+        self._tickers()
+
+    def on_blur(self) -> None:
+        self._tickers()
 
     def on_click(self) -> None:
         self.action_choose()
