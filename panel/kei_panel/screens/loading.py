@@ -50,13 +50,13 @@ class LoadingScreen(ModalScreen[TaskResult]):
         plain = getattr(self.app, "env", None) and self.app.env.plain
         colors = not (getattr(self.app, "env", None) and self.app.env.no_color)
         with Vertical(id="loader-box"):
-            yield Label(self.title_text, id="loader-title")
+            yield Label(self.title_text, id="loader-title", markup=False)
             yield PacmanLoader(plain=bool(plain), colors=colors, id="pacman")
             yield task_progress_bar(bool(plain), id="loader-bar")
             yield Static("", id="loader-notice", markup=False)
             with Horizontal(id="loader-meta"):
-                yield Label("", id="loader-status")
-                yield Label("", id="loader-clock")
+                yield Label("", id="loader-status", markup=False)
+                yield Label("", id="loader-clock", markup=False)
             yield RichLog(id="loader-log", max_lines=500, wrap=False, markup=False)
             with Horizontal(id="loader-buttons"):
                 yield Button("Log", id="toggle-log", variant="default")

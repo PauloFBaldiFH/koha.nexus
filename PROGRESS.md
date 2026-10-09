@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.30** (1.5.31: PowerShell-only Windows install PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.31** (1.5.32: Magic Import file checks PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -219,6 +219,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   and `index.html` show only `irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex`
   (without the old `Tls12` prefix, as Paulo wrote it), and the site's download button is now a
   code box with a Copy button, translated into all 22 languages.
+
+- **1.5.32 (Magic Import file checks)**: Paulo's "BKP_BIBLIOTECA (2).backup" report. The file
+  picker takes any file when the routine asks for any (`.backup`, `.bkp`, `.dump`, `.tar`...),
+  and a typed, pasted or dropped path is cleaned the same way (`transfer.dropped_path`: quotes,
+  `& '...'` from PowerShell, `C:\...`, `C:/...`, `file://`, `\\wsl.localhost\...`, backslash
+  escapes, `~`). Dialog titles, options and the loader status are plain text now (`markup=False`,
+  `Content(...)`): a `[/path]` in a text used to raise Rich's MarkupError and close the panel.
+  Before copying anything, `magic_preflight` says each step under Pac-Man (checking, testing the
+  compression, reading the format), and `dump_kind` reads the kind from the content: a pg_dump
+  custom or tar backup stops with a plain "Koha's database is MariaDB" message; a plain-SQL
+  PostgreSQL dump still goes to the engine (the ISIS reader). Restore database refuses
+  PostgreSQL backups, tar/zip archives and SQLite files in `check_dump_file`, and its pickers
+  also list `.backup`, `.bkp` and `.dump` (the content decides). An engine exception is one
+  readable line (exit 4), with the traceback in the log.
 
 ---
 

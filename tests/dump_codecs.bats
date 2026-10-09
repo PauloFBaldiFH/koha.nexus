@@ -35,3 +35,28 @@ setup() {
     run bash -c "source '$W/dump.sh'; dump_test '$W/cut.sql.bz2'"
     [ "$status" -ne 0 ]
 }
+
+@test "the kind of a backup is read from its content, whatever its name" {
+    mkdir "$W/pg" && echo x > "$W/pg/toc.dat" && tar cf "$W/pg (3).bkp" -C "$W/pg" toc.dat
+    printf 'PGDMP\001\016\000' > "$W/BKP_BIBLIOTECA (2).backup"
+    printf -- '--\n-- PostgreSQL database dump\n--\nCOPY public.livros (id) FROM stdin;\n1\n\\.\n' > "$W/pg (2).dump"
+    gzip -c "$W/k.sql" > "$W/koha (2).backup"
+    tar czf "$W/arch (2).tar" -C "$W" k.sql
+    printf 'SQLite format 3\000x' > "$W/s.bkp"
+    : > "$W/empty.dump"
+    run bash -c "source '$W/dump.sh'; for f in 'koha (2).backup' 'BKP_BIBLIOTECA (2).backup' 'pg (3).bkp' 'pg (2).dump' 'arch (2).tar' s.bkp empty.dump; do dump_kind \"$W/\$f\"; done | tr '\n' ' '"
+    [ "$output" = "mysql pg_custom pg_tar pg_plain tar sqlite empty " ]
+}
+
+@test "Restore database refuses a PostgreSQL backup and an archive, and says why" {
+    printf -- '--\n-- PostgreSQL database dump\n--\nCREATE TABLE public.livros (id integer);\n' > "$W/pg (2).backup"
+    tar cf "$W/k.tar" -C "$W" k.sql
+    for f in "pg (2).backup" k.tar k.sql; do
+        run bash -c "t() { printf '%s' \"\$1\"; }; source '$W/dump.sh'; sed -n '/^check_dump_file() {/,/^}/p' '$REPO/installer' > '$W/check.sh'; source '$W/check.sh'; dump_is_complete() { return 0; }; check_dump_file \"$W/$f\"; echo \"rc=\$? \$DUMP_ERROR\""
+        case "$f" in
+            pg*)   [[ "$output" == "rc=1 This is a PostgreSQL backup, not a MariaDB/MySQL one."* ]] ;;
+            k.tar) [[ "$output" == "rc=1 This is an archive (tar or zip)"* ]] ;;
+            *)     [ "$output" = "rc=0 " ] ;;
+        esac
+    done
+}

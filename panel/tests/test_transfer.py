@@ -48,6 +48,15 @@ class FakeReporter:
     ("\\'/home/ana/my file.xml\\'\r\n", "/home/ana/my file.xml"),
     ("\"'/mnt/c/Users/Ana/livros.xlsx'\"", "/mnt/c/Users/Ana/livros.xlsx"),
     ("'C:\\Koha\\Importar\\dump.sql.zst'\r\n", "/mnt/c/Koha/Importar/dump.sql.zst"),
+    # Names with blanks and parentheses; PowerShell's "& '...'"; forward
+    # slashes; a WSL file dropped from Windows Explorer; one quote left.
+    ("& 'C:\\Users\\Ana\\BKP_BIBLIOTECA (2).backup'", "/mnt/c/Users/Ana/BKP_BIBLIOTECA (2).backup"),
+    ("/root/BKP_BIBLIOTECA\\ \\(2\\).backup", "/root/BKP_BIBLIOTECA (2).backup"),
+    ("  \"/root/BKP_BIBLIOTECA (2).backup\"  ", "/root/BKP_BIBLIOTECA (2).backup"),
+    ("C:/Users/Ana/acervo.dump", "/mnt/c/Users/Ana/acervo.dump"),
+    ("file://wsl.localhost/Debian/root/a%20(2).bkp", "/root/a (2).bkp"),
+    ("'/root/importar/x.tar", "/root/importar/x.tar"),
+    ("/root//importar/", "/root/importar"),
 ])
 def test_dropped_paths(text, path):
     assert transfer.dropped_path(text) == path
@@ -161,6 +170,71 @@ def test_a_dropped_backup_is_chosen(tmp_path):
     f.write_bytes(b"x")
     result, _ = pick(tmp_path, f"'{f}'")
     assert result == [f]
+
+
+def test_a_dropped_backup_with_parentheses_is_chosen(tmp_path):
+    f = tmp_path / "BKP_BIBLIOTECA (2).backup"
+    f.write_bytes(b"x")
+    result, _ = pick(tmp_path, f'"{f}"')
+    assert result == [f]
+
+
+def test_any_file_is_taken_when_the_picker_is_for_any_file(tmp_path):
+    """The Magic Import Tool asks for any file (no suffixes): a dropped
+    .tar or .dump is chosen, and a typed path in quotes is cleaned first."""
+    f = tmp_path / "acervo antigo (2).tar"
+    f.write_bytes(b"x")
+
+    async def main(how):
+        a = app()
+        result = []
+        async with a.run_test(size=(120, 40)) as pilot:
+            a.push_screen(PathPickerScreen("Import", tmp_path, mode="file", suffixes=None), callback=result.append)
+            await pilot.pause(0.2)
+            if how == "drop":
+                a.screen.query_one("#picker-tree").post_message(events.Paste(f"'{f}'"))
+            else:
+                box = a.screen.query_one("#picker-path")
+                box.value = f'  "{f}"  '
+                box.focus()
+                await pilot.press("enter")
+            await pilot.pause(0.3)
+            return result
+    assert asyncio.run(main("drop")) == [f]
+    assert asyncio.run(main("type")) == [f]
+
+
+def test_an_unreadable_path_is_said_not_raised(tmp_path):
+    async def main():
+        a = app()
+        async with a.run_test(size=(120, 40)) as pilot:
+            a.push_screen(PathPickerScreen("Import", tmp_path, mode="file", suffixes=None))
+            await pilot.pause(0.2)
+            box = a.screen.query_one("#picker-path")
+            box.value = "/root/" + "x" * 5000
+            box.focus()
+            await pilot.press("enter")
+            await pilot.pause(0.2)
+            return type(a.screen).__name__, str(a.screen.query_one("#picker-error").render())
+    name, error = asyncio.run(main())
+    assert name == "PathPickerScreen" and "does not exist" in error
+
+
+def test_texts_with_brackets_never_close_the_panel():
+    """A title, option or status with "[/...]" (a path) is shown as it is,
+    not read as Rich markup (a MarkupError would end the whole panel)."""
+    from kei_panel.screens.dialogs import ChoiceScreen
+    text = "Saved in [/root/importar] (2)"
+
+    async def main():
+        a = app()
+        async with a.run_test(size=(120, 40)) as pilot:
+            a.push_screen(ChoiceScreen(text, text, [("1", text)]))
+            await pilot.pause(0.3)
+            a.push_screen(MessageScreen(text, text, kind="error"))
+            await pilot.pause(0.3)
+            return type(a.screen).__name__
+    assert asyncio.run(main()) == "MessageScreen"
 
 
 def test_a_dropped_file_from_another_computer_gets_the_scp_command(tmp_path):
