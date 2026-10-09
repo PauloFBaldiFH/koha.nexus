@@ -200,3 +200,33 @@ def test_write_apply_dir(tmp_path):
         assert json.loads(json.dumps(ot.js_config({}))) is not None
     finally:
         shutil.rmtree(off)
+
+
+def test_block_colours_links_coverflow_and_staff(tmp_path):
+    cfg = ot.normalize({
+        "accent": "#123456", "surface": "#1a1a1a",
+        "carousel": {"enabled": True, "mode": "coverflow", "speed": 99999},
+        "links": {"enabled": True, "style": "neon", "items": [
+            {"icon": "📚", "text": "Catalogue", "url": "https://example.org", "target": "_blank"},
+            {"icon": "x", "text": "Bad", "url": "javascript:alert(1)"}]},
+        "staff": {"enabled": True, "density": "compact", "contrast": "high", "font": 300}})
+    assert cfg["carousel"]["mode"] == "coverflow" and cfg["links"]["style"] == "glass"
+    assert [i["text"] for i in cfg["links"]["items"]] == ["Catalogue"]
+    assert cfg["staff"]["font"] == ot.STAFF_FONT[1]
+    css = ot.css_body(cfg)
+    assert "--nexus-primary: #123456" in css and "#opacmainblock" in css and ".mastheadsearch" in css
+    assert "html body" in css and "kei-mode-coverflow" in css and "#kei-links" in css
+    conf = ot.js_config(cfg)
+    assert conf["carousel"]["mode"] == "coverflow" and conf["links"]["items"][0]["target"] == "_blank"
+    assert ot.normalize({"carousel": {"mode": "spiral"}})["carousel"]["mode"] == "flat"
+    assert ot.normalize({})["carousel"]["speed"] == 3500
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        staff = (work / "staff.css").read_text()
+        assert ot.check_block(staff, ot.CSS_BEGIN, ot.CSS_END) == "" and "#123456" in staff
+        cfg["staff"]["enabled"] = False
+        again = ot.write_apply_dir(cfg, {})
+        assert not (again / "staff.css").exists()
+        shutil.rmtree(again)
+    finally:
+        shutil.rmtree(work)

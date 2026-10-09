@@ -198,3 +198,50 @@ def test_dos_csv_and_patron_names(engine, tmp_path):
     assert "encoding IBM850 (MS-DOS)" in preview
     assert "Encoding fixed: 1 file(s) converted to UTF-8 (IBM850: 1)" in preview
     assert re.search(r"^Casing fixes: 1$", log, re.M)
+
+
+# ---------------------------------------------------------------- zstd and unknown files
+needs_zstd = pytest.mark.skipif(not __import__("shutil").which("zstd"), reason="zstd not installed")
+
+
+@needs_zstd
+def test_zstd_spreadsheet_and_tar(engine, tmp_path):
+    import tarfile
+
+    d, _ = engine
+    intake = importlib.import_module("kei_import.intake")
+    csv = tmp_path / "livros.csv"
+    csv.write_bytes(BOOKS.encode("utf-8"))
+    subprocess.run(["zstd", "-q", "-f", str(csv), "-o", str(tmp_path / "livros.csv.zst")], check=True)
+    with tarfile.open(tmp_path / "pack.tar", "w") as tf:
+        tf.add(csv, "dados/livros.csv")
+    subprocess.run(["zstd", "-q", "-f", str(tmp_path / "pack.tar"), "-o", str(tmp_path / "pack.tar.zst")], check=True)
+    (tmp_path / "work").mkdir()
+    one = intake.Intake(str(tmp_path / "work"))
+    one.add(str(tmp_path / "livros.csv.zst"))
+    assert [m.codec for m in one.members] == ["zst"]
+    with one.members[0].open() as fh:
+        assert fh.read().decode("utf-8") == BOOKS
+    packed = intake.Intake(str(tmp_path / "work"))
+    packed.add(str(tmp_path / "pack.tar.zst"))
+    assert [m.display for m in packed.members] == ["pack.tar.zst/dados/livros.csv"]
+    # Damaged zstd: skipped with the reason, nothing raised.
+    (tmp_path / "bad.zst").write_bytes(b"\x28\xb5\x2f\xfd" + b"garbage" * 10)
+    bad = intake.Intake(str(tmp_path / "work"))
+    bad.add(str(tmp_path / "bad.zst"))
+    assert not bad.members and "zst" in bad.skipped[0][1]
+
+
+def test_unknown_files_say_what_they_are(engine, tmp_path):
+    d, _ = engine
+    pdf = tmp_path / "acervo.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n" + b"\0" * 64)
+    work = tmp_path / "work"
+    work.mkdir()
+    p = subprocess.run([sys.executable, str(d / "kei_import_run.py"), "analyse", "--in", str(pdf), "--work", str(work)],
+                       capture_output=True, text=True, cwd=d)
+    out = p.stdout + p.stderr + "".join(f.read_text(encoding="utf-8", errors="replace")
+                                        for f in work.rglob("*.txt"))
+    assert "format not recognised" in out
+    if __import__("shutil").which("file"):
+        assert "application/pdf" in out and "export the records" in out

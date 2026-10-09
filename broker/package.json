@@ -2,7 +2,7 @@
   "name": "kei-broker",
   "version": "0.1.0",
   "private": true,
-  "description": "Koha Easy Installer subdomain broker (Cloudflare Worker): provisions library subdomains and Cloudflare Tunnels without exposing the account API token.",
+  "description": "koha.nexus subdomain broker (Cloudflare Worker): provisions library subdomains and Cloudflare Tunnels without exposing the account API token.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

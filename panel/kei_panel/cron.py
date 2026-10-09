@@ -30,7 +30,7 @@ FREQS = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "custom": "
 WEEKDAYS = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
 HEADER = """# ======================================================================
-# KOHA EASY INSTALL & TOOLS - SCHEDULED AUTOMATED TASKS
+# KOHA.NEXUS - SCHEDULED AUTOMATED TASKS
 # ======================================================================
 # This file controls Koha's periodic automated maintenance routines.
 # It is written by the panel (Schedules & cron tasks): a job that is off

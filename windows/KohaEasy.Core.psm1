@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: shared logic for the shortcuts, the
+﻿# koha.nexus for Windows: shared logic for the shortcuts, the
 # scheduled tasks and the tray (blueprint, part 2).
 #   * state.json: what the librarian asked for (desired running/stopped,
 #     automatic start) and what was already notified.
@@ -744,7 +744,7 @@ function Invoke-KohaDiskpart {
 # Start, Stop and automatic start (blueprint 2.5.1)
 # ----------------------------------------------------------------------
 # Pure: how a Koha command starts with no window at all, best first:
-#   1. KohaEasy.exe, built on this PC (KohaEasy.Launcher.cs): a Windows
+#   1. koha.nexus.exe, built on this PC (KohaEasy.Launcher.cs): a Windows
 #      program, so Windows opens no console for it, and it starts PowerShell
 #      with CREATE_NO_WINDOW;
 #   2. wscript.exe KohaEasy.Hidden.js: Windows Script Host is a Windows
@@ -828,15 +828,15 @@ function Get-KohaRelaunchArguments {
     return ($a -join ' ')
 }
 
-# KohaEasy.exe, once the installer built it and Windows let it run
+# koha.nexus.exe, once the installer built it and Windows let it run
 # (state.json launcher = ok); '' otherwise.
 function Get-KohaLauncherPath {
     if ((Get-KohaState).launcher -ne 'ok') { return '' }
-    return [System.IO.Path]::Combine((Get-KohaPath Bin), 'KohaEasy.exe')
+    return [System.IO.Path]::Combine((Get-KohaPath Bin), 'koha.nexus.exe')
 }
 
 # ----------------------------------------------------------------------
-# KohaEasy.exe (windows\KohaEasy.Launcher.cs)
+# koha.nexus.exe (windows\KohaEasy.Launcher.cs)
 # ----------------------------------------------------------------------
 # Built here, on this PC, by the C# compiler of the .NET Framework that
 # Windows 10 and 11 ship: nothing is downloaded, so SmartScreen does not ask,
@@ -864,10 +864,10 @@ function Invoke-KohaCsc {
     [void]$p.ReferencedAssemblies.Add('System.dll')
     $res = $provider.CompileAssemblyFromSource($p, [System.IO.File]::ReadAllText($Source))
     $errors = @($res.Errors | Where-Object { -not $_.IsWarning } | ForEach-Object { $_.ToString() })
-    if ($errors.Count -gt 0) { throw ('KohaEasy.exe did not compile: ' + ($errors -join '; ')) }
+    if ($errors.Count -gt 0) { throw ('koha.nexus.exe did not compile: ' + ($errors -join '; ')) }
 }
 
-# Whether Windows lets KohaEasy.exe run ("KohaEasy.exe --self-test" exits 0).
+# Whether Windows lets koha.nexus.exe run ("koha.nexus.exe --self-test" exits 0).
 function Test-KohaLauncher {
     param([string]$Path)
     try {
@@ -877,18 +877,18 @@ function Test-KohaLauncher {
         $p = [System.Diagnostics.Process]::Start($psi)
         if (-not $p.WaitForExit(20000)) {
             try { $p.Kill() } catch { }
-            Write-KohaLog 'KohaEasy.exe: the self-test did not end in 20 s'
+            Write-KohaLog 'koha.nexus.exe: the self-test did not end in 20 s'
             return $false
         }
-        if ($p.ExitCode -ne 0) { Write-KohaLog ('KohaEasy.exe: self-test exit {0}' -f $p.ExitCode) }
+        if ($p.ExitCode -ne 0) { Write-KohaLog ('koha.nexus.exe: self-test exit {0}' -f $p.ExitCode) }
         return ($p.ExitCode -eq 0)
     } catch {
-        Write-KohaLog ('KohaEasy.exe does not run on this PC: ' + $_.Exception.Message)
+        Write-KohaLog ('koha.nexus.exe does not run on this PC: ' + $_.Exception.Message)
         return $false
     }
 }
 
-# Puts a new file in place of $Path. A KohaEasy.exe that is running (the
+# Puts a new file in place of $Path. A koha.nexus.exe that is running (the
 # tray, a window) cannot be replaced or deleted, but it can be renamed: the
 # old copy is set aside and removed on a later run.
 function Set-KohaFileInPlace {
@@ -907,7 +907,7 @@ function Set-KohaFileInPlace {
     Move-Item -LiteralPath $NewFile -Destination $Path -Force
 }
 
-# Builds KohaEasy.exe when its source changed (or it is missing) and checks
+# Builds koha.nexus.exe when its source changed (or it is missing) and checks
 # that Windows lets it run. Returns current | built | failed | refused |
 # no-source; state.json launcher (ok | failed | refused) says whether the
 # Koha tools use it.
@@ -918,7 +918,7 @@ function Install-KohaLauncher {
         [scriptblock]$SelfTest = { param($Path) Test-KohaLauncher -Path $Path }
     )
     $src = [System.IO.Path]::Combine($Bin, 'KohaEasy.Launcher.cs')
-    $exe = [System.IO.Path]::Combine($Bin, 'KohaEasy.exe')
+    $exe = [System.IO.Path]::Combine($Bin, 'koha.nexus.exe')
     if (-not (Test-Path -LiteralPath $src)) {
         Set-KohaState @{ launcher = 'failed' } | Out-Null
         return 'no-source'
@@ -926,30 +926,30 @@ function Install-KohaLauncher {
     $hash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
     $state = Get-KohaState
     if ($state.launcher -eq 'ok' -and $state.launcherHash -eq $hash -and (Test-Path -LiteralPath $exe)) { return 'current' }
-    # The tray did not come up through this KohaEasy.exe (the installer's
+    # The tray did not come up through this koha.nexus.exe (the installer's
     # check): not tried again until its source changes.
     if ($state.launcher -eq 'refused' -and $state.launcherHash -eq $hash) { return 'refused' }
-    $tmp = [System.IO.Path]::Combine($Bin, ('KohaEasy.{0}.new.exe' -f [guid]::NewGuid().ToString('N')))
+    $tmp = [System.IO.Path]::Combine($Bin, ('koha.nexus.{0}.new.exe' -f [guid]::NewGuid().ToString('N')))
     try {
         $icon = [System.IO.Path]::Combine($Bin, 'koha.ico')
         if (-not (Test-Path -LiteralPath $icon)) { $icon = '' }
         & $Compile $src $tmp (Get-KohaLauncherCompilerOptions -Icon $icon)
-        if (-not (Test-Path -LiteralPath $tmp)) { throw 'the compiler wrote no KohaEasy.exe' }
-        if (-not (& $SelfTest $tmp)) { throw 'Windows did not let KohaEasy.exe run (Smart App Control or an antivirus)' }
+        if (-not (Test-Path -LiteralPath $tmp)) { throw 'the compiler wrote no koha.nexus.exe' }
+        if (-not (& $SelfTest $tmp)) { throw 'Windows did not let koha.nexus.exe run (Smart App Control or an antivirus)' }
         Set-KohaFileInPlace -NewFile $tmp -Path $exe
         Set-KohaState @{ launcher = 'ok'; launcherHash = $hash } | Out-Null
-        Write-KohaLog 'KohaEasy.exe built and checked'
+        Write-KohaLog 'koha.nexus.exe built and checked'
         return 'built'
     } catch {
         Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         Set-KohaState @{ launcher = 'failed'; launcherHash = $hash } | Out-Null
-        Write-KohaLog ('KohaEasy.exe not used: ' + $_.Exception.Message)
+        Write-KohaLog ('koha.nexus.exe not used: ' + $_.Exception.Message)
         return 'failed'
     }
 }
 
-# KohaEasy.Native (in KohaEasy.exe) for this PowerShell: the Koha identity
-# on the taskbar and on the shortcuts. $false when KohaEasy.exe is not used.
+# KohaEasy.Native (in koha.nexus.exe) for this PowerShell: the Koha identity
+# on the taskbar and on the shortcuts. $false when koha.nexus.exe is not used.
 function Import-KohaNative {
     if ('KohaEasy.Native' -as [type]) { return $true }
     $exe = Get-KohaLauncherPath
@@ -958,7 +958,7 @@ function Import-KohaNative {
         [void][System.Reflection.Assembly]::LoadFrom($exe)
         return [bool]('KohaEasy.Native' -as [type])
     } catch {
-        Write-KohaLog ('KohaEasy.exe could not be loaded: ' + $_.Exception.Message)
+        Write-KohaLog ('koha.nexus.exe could not be loaded: ' + $_.Exception.Message)
         return $false
     }
 }
@@ -972,7 +972,7 @@ function Set-KohaProcessAppId {
 }
 
 # An open Koha window, restored and brought to the front (the Koha icon
-# clicked again): KohaEasy.Native when KohaEasy.exe is in use, else the
+# clicked again): KohaEasy.Native when koha.nexus.exe is in use, else the
 # Windows shell.
 function Show-KohaOpenWindow {
     param([string]$Title)
@@ -1175,7 +1175,7 @@ function Set-KohaSignInTask {
 function Start-KohaKeepAlive { Start-ScheduledTask -TaskPath $script:Cfg.TaskPath -TaskName $script:Cfg.KeepTask }
 function Stop-KohaKeepAlive {
     Stop-ScheduledTask -TaskPath $script:Cfg.TaskPath -TaskName $script:Cfg.KeepTask -ErrorAction SilentlyContinue
-    # Started through KohaEasy.exe, the task's PowerShell is a child process,
+    # Started through koha.nexus.exe, the task's PowerShell is a child process,
     # which Task Scheduler leaves running when it ends the task.
     try {
         Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
@@ -1641,7 +1641,7 @@ function Set-KohaLanAccess {
         -Principal $principal -Settings $settings -Force | Out-Null
     # As administrator, the old tasks in \KohaEasy\ can always go.
     Remove-KohaOldTasks | Out-Null
-    # The task keeps this start (KohaEasy.exe, conhost...) until the next
+    # The task keeps this start (koha.nexus.exe, conhost...) until the next
     # SetupNetwork: Get-KohaLanSetupNeed compares it with the current one.
     Set-KohaState @{ netLaunch = (Get-KohaHiddenLaunch -Arguments 'UpdatePortProxy').Target } | Out-Null
     $now = Update-KohaPortProxy -Mode $Mode
@@ -1851,7 +1851,7 @@ function Get-KohaLanReport {
 # instead of the panel.
 $script:WindowScript = @'
 #!/bin/sh
-# Written by Koha Easy Installer for Windows (KohaEasy.Core.psm1).
+# Written by koha.nexus for Windows (KohaEasy.Core.psm1).
 # koha-window [--shell | command...]: see Install-KohaWindowScript.
 shell=0
 if [ "${1:-}" = "--shell" ]; then shell=1; shift; fi
@@ -2259,7 +2259,7 @@ function Export-KohaDiagnosticsText {
     param([string]$Destination = [Environment]::GetFolderPath('Desktop'), [string]$FileName = 'diagnostico_koha.txt')
     $out = New-Object System.Collections.Generic.List[string]
     $out.Add(('Koha on Windows - diagnostics - {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')))
-    $out.Add(('Computer: {0}   Koha Easy Installer for Windows {1}' -f $env:COMPUTERNAME, $script:KohaEasyVersion))
+    $out.Add(('Computer: {0}   koha.nexus for Windows {1}' -f $env:COMPUTERNAME, $script:KohaEasyVersion))
     try {
         $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
         $out.Add(('Windows: {0} {1} (build {2})' -f $os.Caption, $os.Version, $os.BuildNumber))
@@ -2386,8 +2386,8 @@ function Get-KohaIconPath { return [System.IO.Path]::Combine((Get-KohaPath Bin),
 # inteligente e gratuito para facilitar a gestão de bibliotecas").
 function Get-KohaAppTitle { return (T 'koha.nexus : A smart, free and easy-to-use assistant for library management') }
 
-# The icon of the program shortcuts: KohaEasy.exe's own icon (koha.ico,
-# built into the program the shortcuts start) while KohaEasy.exe is in use,
+# The icon of the program shortcuts: koha.nexus.exe's own icon (koha.ico,
+# built into the program the shortcuts start) while koha.nexus.exe is in use,
 # else koha.ico. Explorer and the taskbar read an icon inside the program
 # they start as reliably as the program itself; a loose .ico next to it
 # came back as a blank page on the desktop and the taskbar after a
@@ -2400,14 +2400,14 @@ function Get-KohaShortcutIcon {
 
 # koha.ico as an icon for a window or the tray ($Size 0: the file's own
 # sizes). Read into memory, and tried again while a program still holds
-# the file (an antivirus scan at sign-in); then KohaEasy.exe's own icon,
+# the file (an antivirus scan at sign-in); then koha.nexus.exe's own icon,
 # the same koha.ico built in; then $null, and the window keeps Windows'
 # default icon. Every failure is logged with Windows' reason.
 function Get-KohaIcon {
     param(
         [int]$Size = 0,
         [string]$Path = (Get-KohaIconPath),
-        [string]$Exe = ([System.IO.Path]::Combine((Get-KohaPath Bin), 'KohaEasy.exe')),
+        [string]$Exe = ([System.IO.Path]::Combine((Get-KohaPath Bin), 'koha.nexus.exe')),
         [int]$Tries = 3,
         [int]$WaitMs = 700
     )
@@ -2430,11 +2430,11 @@ function Get-KohaIcon {
         try {
             $ico = [System.Drawing.Icon]::ExtractAssociatedIcon($Exe)
             if ($ico) {
-                Write-KohaLog ($msg + '; using the icon inside KohaEasy.exe')
+                Write-KohaLog ($msg + '; using the icon inside koha.nexus.exe')
                 if ($Size -gt 0) { return (New-Object System.Drawing.Icon($ico, $Size, $Size)) }
                 return $ico
             }
-        } catch { $msg += '; KohaEasy.exe: ' + $_.Exception.Message }
+        } catch { $msg += '; koha.nexus.exe: ' + $_.Exception.Message }
     }
     Write-KohaLog $msg
     return $null
@@ -2483,7 +2483,7 @@ function Save-KohaUrlShortcut {
 }
 
 # Two independent ways: WScript.Shell, then the shell's own IShellLink in
-# KohaEasy.exe (KohaEasy.Native). Throws with both reasons when neither
+# koha.nexus.exe (KohaEasy.Native). Throws with both reasons when neither
 # could write it.
 function Save-KohaLnkShortcut {
     param([string]$Path, [string]$Target, [string]$Arguments, [string]$Icon, [string]$Description = '')
@@ -2774,7 +2774,7 @@ function Set-KohaTrayAtSignIn {
 }
 
 # The tray is the PowerShell running "KohaEasy.ps1 Tray" (whatever started it:
-# KohaEasy.exe, conhost or PowerShell itself).
+# koha.nexus.exe, conhost or PowerShell itself).
 # The "Koha" entry of Settings > Apps (this user only, no administrator
 # rights): its Uninstall button runs "KohaEasy.ps1 Uninstall", like
 # Uninstall-Koha.cmd in the Koha folder.

@@ -44,7 +44,8 @@ class MainScreen(Screen):
         yield Header(show_clock=True)
         with Horizontal(id="body"):
             yield OptionList(
-                *[Option(sidebar_prompt(s.label, self.app.env.plain, s.icon), id=s.id) for s in SECTIONS],
+                *[Option(sidebar_prompt(s.label, self.app.env.plain, s.icon), id=s.id) for s in SECTIONS
+                  if s.sidebar],
                 id="sidebar")
             yield ContentSwitcher(id="views")
         yield Footer()
@@ -73,7 +74,7 @@ class MainScreen(Screen):
         self.sub_title = split_icon(t(sec.label))[1]
         if not from_sidebar:
             sidebar = self.query_one("#sidebar", OptionList)
-            sidebar.highlighted = sidebar.get_option_index(section_id)
+            sidebar.highlighted = sidebar.get_option_index(sec.parent or section_id)
 
     def action_toggle_sidebar(self) -> None:
         sidebar = self.query_one("#sidebar")

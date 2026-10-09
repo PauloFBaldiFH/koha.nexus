@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ======================================================================
-# KOHA EASY INSTALLER & MANAGER - ADVANCED MANAGEMENT SUITE
+# KOHA.NEXUS (Koha Nexus) - INSTALLER & MANAGEMENT SUITE
 # Deployment, maintenance, tuning and backup suite for Koha ILS.
 # ----------------------------------------------------------------------
 # Single, self-sufficient file. Updates via "Update this panel" option.
@@ -52,6 +52,7 @@ MAINT_MARKER_OWNED=""
 TOOLS_WORK=""
 on_exit() {
     restore_apt_timers
+    declare -F panel_lock_release >/dev/null && panel_lock_release
     [ -n "$RESTORE_TRIAL_DB" ] && mysql -e "DROP DATABASE IF EXISTS \`${RESTORE_TRIAL_DB}\`;" >/dev/null 2>&1
     [ -n "$CLEANUP_FILE" ] && rm -f "$CLEANUP_FILE"
     [ -n "$MAINT_MARKER_OWNED" ] && rm -f "$MAINT_MARKER_OWNED"
@@ -88,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.27"
+PANEL_VERSION=" 1.5.28"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -209,6 +210,8 @@ declare -A _MENU_PT=(
     ["🌐  Publish system to internet"]="🌐  Publicar sistema na Internet"
     ["🩺  Diagnostics & maintenance center"]="🩺  Diagnóstico e manutenção"
     ["🔒  Security center"]="🔒  Central de segurança"
+    ["🔒  Security & access hub"]="🔒  Central de Segurança & Acesso"
+    ["🪄  Magic Import Tool"]="🪄  Ferramenta Mágica de Importação"
     ["🔧  Koha settings & parameters"]="🔧  Configurações e parâmetros do Koha"
     ["📚  Library tools"]="📚  Ferramentas da biblioteca"
     ["🧰  General tools"]="🧰  Ferramentas gerais"
@@ -827,7 +830,97 @@ REAL_HOME="$(getent passwd "$REAL_USER" 2>/dev/null | cut -d: -f6)"
 # ======================================================================
 # 4.5. PANEL LOCK (ROOT ONLY)
 # ======================================================================
-PANEL_LOCK_FILE="/var/run/koha_panel.lock"
+PANEL_LOCK_FILE="${KEI_PANEL_LOCK_FILE:-/var/run/koha_panel.lock}"
+PANEL_LOCK_OWNED=""
+PANEL_LOCK_CLEARED=""
+
+# The lock is a flock on PANEL_LOCK_FILE, which the kernel drops when its
+# holder dies, so a file left behind never blocks by itself. What does
+# block: a panel whose SSH session or window went away while it kept
+# running (bash waits for the Textual panel, which hangs on a terminal
+# that no longer exists), or another program that inherited the lock
+# descriptor. The file holds the PID of the panel that took it.
+
+# panel_lock_pid_is_panel PID: 0 when PID is alive (kill -0) and its
+# /proc/PID/cmdline is this panel (config.sh, the installer, koha-nexus or
+# the Textual panel kei_panel).
+panel_lock_pid_is_panel() {
+    local pid="$1" cmd
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    cmd=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null) || return 1
+    case "$cmd" in
+        *config.sh*|*installer*|*koha-nexus*|*kei_panel*) return 0 ;;
+    esac
+    return 1
+}
+
+# panel_lock_pid_orphaned PID: 0 when the terminal of PID is gone (its
+# stdin, stdout or stderr is a terminal that was closed: an SSH session
+# that dropped, a closed window). A panel with no terminal at all is not
+# taken for an orphan.
+panel_lock_pid_orphaned() {
+    local fd tgt
+    for fd in 0 1 2; do
+        tgt=$(readlink "/proc/${1}/fd/${fd}" 2>/dev/null) || continue
+        case "$tgt" in
+            /dev/pts/*|/dev/tty*)
+                [[ "$tgt" == *" (deleted)" ]] && return 0
+                [ -e "$tgt" ] || return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# panel_lock_take: takes the panel lock (descriptor 9), clearing a stale
+# one. 0 = taken; 1 = a live panel has it (PANEL_LOCK_HOLDER = its PID) or
+# a dropped session is still restoring or backing up.
+panel_lock_take() {
+    local holder pid
+    PANEL_LOCK_HOLDER=""
+    exec 9>> "$PANEL_LOCK_FILE" || return 1
+    if ! flock -n 9; then
+        holder=$(head -c 32 "$PANEL_LOCK_FILE" 2>/dev/null | tr -cd '0-9')
+        if panel_lock_pid_is_panel "$holder" && ! panel_lock_pid_orphaned "$holder"; then
+            PANEL_LOCK_HOLDER="$holder"
+            return 1
+        fi
+        # A dropped session still writing the catalog keeps it to the end.
+        if { exec 8>>"${BACKUP_LOCK_FILE:-/var/lock/koha_backup.lock}"; } 2>/dev/null && ! flock -n 8; then
+            exec 8>&-
+            PANEL_LOCK_HOLDER="${holder:-?}"
+            return 1
+        fi
+        exec 8>&- 2>/dev/null
+        # Panels left behind by a dropped session end; other programs that
+        # merely inherited the descriptor are left alone. Then the file is
+        # replaced: the lock is on the file, so a new file is a free lock.
+        if panel_lock_pid_is_panel "$holder"; then
+            kill -TERM "$holder" 2>/dev/null
+        fi
+        for pid in $(fuser "$PANEL_LOCK_FILE" 2>/dev/null); do
+            [ "$pid" = "$$" ] && continue
+            panel_lock_pid_is_panel "$pid" && panel_lock_pid_orphaned "$pid" && kill -TERM "$pid" 2>/dev/null
+        done
+        exec 9>&-
+        rm -f -- "$PANEL_LOCK_FILE"
+        exec 9>> "$PANEL_LOCK_FILE" || return 1
+        flock -n 9 || return 1
+        PANEL_LOCK_CLEARED="${holder:-?}"
+    fi
+    printf '%s\n' "$$" > "$PANEL_LOCK_FILE"
+    PANEL_LOCK_OWNED=1
+    return 0
+}
+
+# On exit (EXIT, and INT/TERM/HUP through unshield_signals) the PID is
+# cleared; the kernel drops the flock itself.
+panel_lock_release() {
+    [ "$PANEL_LOCK_OWNED" = "1" ] || return 0
+    : > "$PANEL_LOCK_FILE" 2>/dev/null
+    PANEL_LOCK_OWNED=""
+}
+# end of panel lock helpers
 
 # Commands for the Windows tools (section 21.5) run next to an open panel:
 # no lock, no dependency install, no menu. All are read-only except
@@ -840,13 +933,20 @@ if [ -z "$KEI_CLI_MODE" ]; then
     # A routine started by the new panel (config.sh --run, see
     # kei_panel_run) gets the panel's own lock descriptor: the same lock,
     # not a second panel. Otherwise the lock file is opened here.
-    if [ "${KEI_PANEL_LOCK_FD:-}" != "9" ] || ! { : >&9; } 2>/dev/null; then
-        exec 9> "$PANEL_LOCK_FILE"
-    fi
-    unset KEI_PANEL_LOCK_FD
-    if ! flock -n 9; then
-        echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
-        exit 1
+    if [ "${KEI_PANEL_LOCK_FD:-}" = "9" ] && { : >&9; } 2>/dev/null; then
+        unset KEI_PANEL_LOCK_FD
+        if ! flock -n 9; then
+            echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
+            exit 1
+        fi
+    else
+        unset KEI_PANEL_LOCK_FD
+        if ! panel_lock_take; then
+            echo "$(t "The panel is already running in another session. Aborting to prevent conflicts.")"
+            [ -n "$PANEL_LOCK_HOLDER" ] && [ "$PANEL_LOCK_HOLDER" != "?" ] \
+                && echo "$(t 'Process: ${PANEL_LOCK_HOLDER}. To end it: sudo kill ${PANEL_LOCK_HOLDER}')"
+            exit 1
+        fi
     fi
 fi
 
@@ -1108,7 +1208,7 @@ esac
 [ -z "$KEI_CLI_MODE" ] && host_can ntp && { timedatectl set-ntp true >/dev/null 2>&1 || true; }
 
 MISSING_DEPS=()
-for dep in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux; do
+for dep in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux zstd:zstd; do
     if ! command -v "${dep%%:*}" >/dev/null 2>&1; then
         MISSING_DEPS+=("${dep#*:}")
     fi
@@ -1620,7 +1720,7 @@ tui_wrap() {
 # tui_celebrate IP [FAILURES]: the addresses come from this machine's own
 # configuration (network address, WSL network mode, Cloudflare Tunnel).
 tui_celebrate() {
-    local ip="${1:-$(get_server_ip)}" fails="${2:-0}" cf_opac="" cf_staff="" rule i w=0 n lab
+    local ip="${1:-$(get_server_ip)}" fails="${2:-0}" cf_opac="" cf_staff="" rule i w=0 n lab pub
     local -a labels=() urls=() icons=()
     read -r cf_opac cf_staff < <(tunnel_public_hosts 2>/dev/null)
     [ "$cf_opac" = "-" ] && cf_opac=""
@@ -1631,6 +1731,12 @@ tui_celebrate() {
     if host_can lan_direct && [ "$ip" != "127.0.0.1" ]; then
         icons+=("📖"); labels+=("$(t "Public catalog (library network)")"); urls+=("http://${ip}")
         icons+=("🔑"); labels+=("$(t "Staff interface (library network)")"); urls+=("http://${ip}:8080")
+    fi
+    # A cloud server on a private address: the address the internet sees.
+    pub=$(server_public_ip "$ip")
+    if [ -n "$pub" ]; then
+        icons+=("🌍"); labels+=("$(t "Public catalog (public IP)")"); urls+=("http://${pub}")
+        icons+=("🌍"); labels+=("$(t "Staff interface (public IP)")"); urls+=("http://${pub}:8080")
     fi
     icons+=("💻"); labels+=("$(t "Public catalog (this computer)")"); urls+=("http://localhost")
     icons+=("💻"); labels+=("$(t "Staff interface (this computer)")"); urls+=("http://localhost:8080")
@@ -1660,6 +1766,10 @@ tui_celebrate() {
     echo ""
     tui_icon "🔐"
     printf '   %s%s %s%s%s\n' "$REPLY" "$(t "Username and password:")" "$TUI_CYN" "sudo cat $CREDENTIALS_FILE" "$TUI_RST"
+    if [ -n "$pub" ] && [ -z "$cf_opac" ]; then
+        tui_icon "💡"
+        printf '   %s%s\n' "$REPLY" "$(t 'This server has a private address (${ip}). If the public IP does not open, the cloud firewall blocks ports 80 and 8080: open them there, or use Security & access hub > Cloudflare Tunnel (no open ports needed).')"
+    fi
     tui_icon "👉"
     printf '   %s%s\n' "$REPLY" "$(t "Next step: open the staff interface to finish Koha's web installer.")"
     printf '   %s%s%s\n\n' "$TUI_DIM" "$rule" "$TUI_RST"
@@ -1673,6 +1783,50 @@ get_server_ip() {
     [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     [ -z "$ip" ] && ip="127.0.0.1"
     printf '%s' "$ip"
+}
+
+# ip_is_private IP: 0 for an address the internet cannot reach: RFC 1918
+# (10/8, 172.16/12, 192.168/16), carrier-grade NAT (100.64/10), link-local
+# and loopback. Cloud servers (Oracle Cloud, AWS, DigitalOcean's VPC...)
+# sit on such an address behind a public one.
+ip_is_private() {
+    case "$1" in
+        10.*|192.168.*|127.*|169.254.*) return 0 ;;
+        172.1[6-9].*|172.2[0-9].*|172.3[01].*) return 0 ;;
+        100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*) return 0 ;;
+    esac
+    return 1
+}
+
+# get_public_ip: the address the internet sees for this server (ipify, then
+# ifconfig.me; a few seconds at most), or nothing. Remembered for an hour
+# in KEI_PUBLIC_IP_CACHE, so banners and the dashboard do not ask each time.
+KEI_PUBLIC_IP_CACHE="${KEI_PUBLIC_IP_CACHE:-/run/koha-easy-install/public-ip}"
+KEI_PUBLIC_IP_URLS="${KEI_PUBLIC_IP_URLS:-https://api.ipify.org https://ifconfig.me/ip}"
+get_public_ip() {
+    local ip="" u
+    if [ -n "$(find "$KEI_PUBLIC_IP_CACHE" -mmin -60 2>/dev/null)" ]; then
+        ip=$(head -c 64 "$KEI_PUBLIC_IP_CACHE" 2>/dev/null | tr -cd '0-9.')
+        printf '%s' "$ip"
+        return 0
+    fi
+    for u in $KEI_PUBLIC_IP_URLS; do
+        ip=$(curl -fsS --connect-timeout 3 --max-time 4 "$u" 2>/dev/null | head -c 64 | tr -cd '0-9.')
+        if [[ "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && ! ip_is_private "$ip"; then break; fi
+        ip=""
+    done
+    mkdir -p "${KEI_PUBLIC_IP_CACHE%/*}" 2>/dev/null && printf '%s\n' "$ip" > "$KEI_PUBLIC_IP_CACHE" 2>/dev/null
+    printf '%s' "$ip"
+}
+
+# server_public_ip [IP]: the public address when this server's own address
+# (IP, default get_server_ip) is private and other machines reach it
+# directly (not WSL); nothing otherwise.
+server_public_ip() {
+    local ip="${1:-$(get_server_ip)}"
+    host_can lan_direct || return 0
+    ip_is_private "$ip" || return 0
+    get_public_ip
 }
 
 get_database_password() {
@@ -1765,7 +1919,7 @@ KOHA_WAIT_SCRIPT="/usr/local/bin/koha-wait-services.sh"
 install_boot_ordering() {
     cat > "$KOHA_WAIT_SCRIPT" << 'EOF'
 #!/bin/bash
-# Koha Easy Installer: waits until MariaDB and Memcached answer (default 60 s)
+# koha.nexus: waits until MariaDB and Memcached answer (default 60 s)
 # so that Plack never starts before them. ExecStartPre of koha-common.
 set -euo pipefail
 max="${1:-60}"
@@ -1786,7 +1940,7 @@ EOF
     chown root:root "$KOHA_WAIT_SCRIPT" 2>/dev/null
     mkdir -p /etc/systemd/system/koha-common.service.d /etc/systemd/system/apache2.service.d
     cat > /etc/systemd/system/koha-common.service.d/koha-easy-install.conf << EOF
-# Koha Easy Installer: Plack must start after Memcached and MariaDB, and
+# koha.nexus: Plack must start after Memcached and MariaDB, and
 # Koha's background workers after RabbitMQ (their message queue).
 [Unit]
 Wants=memcached.service mariadb.service
@@ -1798,7 +1952,7 @@ After=memcached.service mariadb.service rabbitmq-server.service network-online.t
 ExecStartPre=-${KOHA_WAIT_SCRIPT}
 EOF
     cat > /etc/systemd/system/apache2.service.d/koha-easy-install.conf << 'EOF'
-# Koha Easy Installer: Apache proxies to Plack, so it starts after koha-common.
+# koha.nexus: Apache proxies to Plack, so it starts after koha-common.
 [Unit]
 After=koha-common.service
 EOF
@@ -1849,7 +2003,7 @@ write_if_changed() {
 stop_guard_script() {
     cat << EOF
 #!/bin/bash
-# Koha Easy Installer: remembers whether Koha was stopped cleanly and
+# koha.nexus: remembers whether Koha was stopped cleanly and
 # repairs it after a power cut, a forced shutdown or a crash.
 #   koha-stop-guard boot      at boot, before MariaDB (koha-stop-guard.service)
 #   koha-stop-guard stop      at a clean stop, once MariaDB and Zebra are down
@@ -2009,10 +2163,10 @@ install_stop_guard() {
     mkdir -p "${STOP_GUARD_SCRIPT%/*}" "$STOP_GUARD_STATE_DIR" /etc/systemd/system 2>/dev/null
     stop_guard_script | write_if_changed "$STOP_GUARD_SCRIPT" 755 && changed=1
     write_if_changed "$STOP_GUARD_UNIT" 644 << EOF && changed=1
-# Koha Easy Installer: remembers whether Koha was stopped cleanly.
+# koha.nexus: remembers whether Koha was stopped cleanly.
 # Ordered before MariaDB and Koha, so that at shutdown it stops after them.
 [Unit]
-Description=Koha Easy: clean-stop guard
+Description=koha.nexus: clean-stop guard
 DefaultDependencies=no
 After=local-fs.target
 Before=mariadb.service koha-common.service apache2.service memcached.service rabbitmq-server.service elasticsearch.service
@@ -2030,10 +2184,10 @@ TimeoutStopSec=30
 WantedBy=multi-user.target
 EOF
     write_if_changed "$STOP_GUARD_RECOVER_UNIT" 644 << EOF && changed=1
-# Koha Easy Installer: checks and repairs Koha after an unclean stop.
+# koha.nexus: checks and repairs Koha after an unclean stop.
 # Type=exec: the boot does not wait for it (a full reindex can take long).
 [Unit]
-Description=Koha Easy: repair after an unclean stop
+Description=koha.nexus: repair after an unclean stop
 After=koha-stop-guard.service mariadb.service koha-common.service apache2.service
 ConditionPathExists=${MARKER_DIR}/unclean-stop
 
@@ -2080,7 +2234,7 @@ install_mariadb_durability() {
     [ -d "${KEI_MARIADB_CONF_DIR%/*}" ] || return 0
     mkdir -p "$KEI_MARIADB_CONF_DIR"
     write_if_changed "${KEI_MARIADB_CONF_DIR}/98-koha-durability.cnf" 644 << 'EOF' && log "MariaDB durability settings written"
-# Koha Easy Installer: MariaDB's crash-safety settings (a power cut loses no
+# koha.nexus: MariaDB's crash-safety settings (a power cut loses no
 # committed transaction and tears no page). Do not change them.
 [mysqld]
 innodb_doublewrite = 1
@@ -2102,7 +2256,7 @@ install_log_limits() {
     if [ -d "${KEI_JOURNALD_DIR%/*}" ]; then
         mkdir -p "$KEI_JOURNALD_DIR"
         if write_if_changed "${KEI_JOURNALD_DIR}/00-koha-limits.conf" 644 << 'EOF'
-# Koha Easy Installer: the system journal keeps at most 100 MB on disk,
+# koha.nexus: the system journal keeps at most 100 MB on disk,
 # 30 MB in memory, and one month.
 [Journal]
 SystemMaxUse=100M
@@ -2116,7 +2270,7 @@ EOF
     fi
     if [ -d "$KEI_LOGROTATE_DIR" ]; then
         write_if_changed "${KEI_LOGROTATE_DIR}/koha-easy-install" 644 << EOF && log "logrotate rule for ${LOG_DIR} written"
-# Koha Easy Installer: the panel's logs, rotated once they pass 5 MB (the
+# koha.nexus: the panel's logs, rotated once they pass 5 MB (the
 # last line of backup_sql.log is what the Windows tray reads).
 ${LOG_DIR}/*.log {
     size 5M
@@ -2314,7 +2468,44 @@ resume_koha_services() {
     ensure_koha_services >/dev/null 2>&1
 }
 
-# Streams a .sql/.sql.gz backup into a database. Statements that would
+# dump_codec FILE: gz | bz2 | xz | zst | plain, read from the first bytes
+# of the file, never from its name (a .sql.gz that is plain text, or a
+# dump.sql.zst renamed to .sql, still restores).
+dump_codec() {
+    local sig
+    sig=$(head -c 6 -- "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+    case "$sig" in
+        1f8b*)        echo gz ;;
+        425a68*)      echo bz2 ;;
+        fd377a585a00) echo xz ;;
+        28b52ffd*)    echo zst ;;
+        *)            echo plain ;;
+    esac
+}
+
+# dump_cat FILE: the dump as plain SQL on stdout, whatever its compression.
+dump_cat() {
+    case "$(dump_codec "$1")" in
+        gz)  zcat -- "$1" ;;
+        bz2) bzip2 -dc -- "$1" ;;
+        xz)  xz -dc -- "$1" ;;
+        zst) zstd -dcq -- "$1" ;;
+        *)   cat -- "$1" ;;
+    esac
+}
+
+# dump_test FILE: 0 when the compressed stream is intact (plain: always).
+dump_test() {
+    case "$(dump_codec "$1")" in
+        gz)  gzip -t -- "$1" ;;
+        bz2) bzip2 -t -- "$1" ;;
+        xz)  xz -t -- "$1" ;;
+        zst) command -v zstd >/dev/null 2>&1 && zstd -tq -- "$1" ;;
+        *)   return 0 ;;
+    esac
+} 2>/dev/null
+
+# Streams a .sql backup (plain, .gz, .bz2, .xz or .zst) into a database. Statements that would
 # redirect the import to another database (CREATE DATABASE/USE, present in
 # dumps made with --databases), DEFINERs of users that do not exist here and
 # MySQL 8 collations unknown to MariaDB are neutralised.
@@ -2325,7 +2516,7 @@ import_sql_file() {
     [ "$SIGNALS_SHIELDED" = "1" ] && sig_opt=(--sigint-ignore)
     {
         echo "SET FOREIGN_KEY_CHECKS=0; SET UNIQUE_CHECKS=0;"
-        if [[ "$file" == *.gz ]]; then zcat -- "$file"; else cat -- "$file"; fi
+        dump_cat "$file"
         echo ""
         echo "SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1;"
     } | sed -E -e '/^[[:space:]]*(CREATE DATABASE|USE[[:space:]])/Id' \
@@ -2341,8 +2532,8 @@ import_sql_file() {
 # cut short (or made with --skip-comments / by another tool).
 dump_is_complete() {
     local n
-    if [[ "$1" == *.gz ]]; then
-        n=$(zcat -- "$1" 2>/dev/null | tail -c 512 | grep -c '^-- Dump completed')
+    if [ "$(dump_codec "$1")" != "plain" ]; then
+        n=$(dump_cat "$1" 2>/dev/null | tail -c 512 | grep -c '^-- Dump completed')
     else
         n=$(tail -c 512 -- "$1" 2>/dev/null | grep -c '^-- Dump completed')
     fi
@@ -2354,7 +2545,7 @@ dump_is_complete() {
 # uncompressed size, DUMP_HAS_SQL says whether SQL statements were found at
 # the start and DUMP_COMPLETE whether the file ends like a full mysqldump.
 check_dump_file() {
-    local file="$1" n
+    local file="$1" n codec
     DUMP_ERROR=""; DUMP_MB=0; DUMP_HAS_SQL="no"; DUMP_COMPLETE="no"
     if [ ! -f "$file" ] || [ ! -r "$file" ]; then
         DUMP_ERROR="$(t "The file does not exist or cannot be read.\nNothing was changed.")"
@@ -2364,15 +2555,24 @@ check_dump_file() {
         DUMP_ERROR="$(t "The file is empty (0 bytes).\nNothing was changed.")"
         return 1
     fi
-    if [[ "$file" == *.gz ]]; then
-        if ! gzip -t -- "$file" 2>/dev/null; then
-            DUMP_ERROR="$(t "The file is corrupt (failed the gzip test).\nNothing was changed.")"
+    codec=$(dump_codec "$file")
+    if [ "$codec" = "zst" ] && ! command -v zstd >/dev/null 2>&1; then
+        DUMP_ERROR="$(t "This backup is compressed with zstd, which is not installed. Install it (sudo apt install zstd) and try again.\nNothing was changed.")"
+        return 1
+    fi
+    if [ "$codec" != "plain" ]; then
+        if ! dump_test "$file"; then
+            if [ "$codec" = "gz" ]; then
+                DUMP_ERROR="$(t "The file is corrupt (failed the gzip test).\nNothing was changed.")"
+            else
+                DUMP_ERROR="$(t 'The file is corrupt (failed the ${codec} test).\nNothing was changed.')"
+            fi
             return 1
         fi
-        n=$(zcat -- "$file" 2>/dev/null | wc -c)
+        n=$(dump_cat "$file" 2>/dev/null | wc -c)
         # grep -c reads everything: "grep -q" would exit early, head would
         # get SIGPIPE and pipefail would report a valid file as suspicious.
-        [ "$(zcat -- "$file" 2>/dev/null | head -c 200000 | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
+        [ "$(dump_cat "$file" 2>/dev/null | head -c 200000 | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
     else
         n=$(stat -c %s -- "$file" 2>/dev/null)
         [ "$(head -c 200000 -- "$file" | grep -aic 'CREATE TABLE')" -gt 0 ] && DUMP_HAS_SQL="yes"
@@ -2431,7 +2631,7 @@ picker_start_dir() {
 
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current exts="${2:-sql sql.gz}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -2507,7 +2707,7 @@ v_reset() {
     VALIDATION_LOG="${LOG_DIR}/validacao-$(date '+%Y%m%d-%H%M%S').log"
     {
         echo "======================================================================"
-        echo "KOHA EASY INSTALLER & MANAGER - VALIDATION REPORT"
+        echo "KOHA.NEXUS - VALIDATION REPORT"
         echo "$(t "Context"): ${1:-general}"
         echo "$(t "Date"): $(date '+%Y-%m-%d %H:%M:%S %Z')"
         echo "Host: $(hostname)    Panel: v${PANEL_VERSION}"
@@ -3015,7 +3215,7 @@ validate_pre_installation() {
     welcome_body+="$(t "Estimated time: 10 to 30 minutes.")\n"
     welcome_body+="$(t "Please do not close the terminal during installation.")"
 
-    msg_info "$(t "Welcome to Koha Easy Installer!")" "$welcome_body" 16 78
+    msg_info "$(t "Welcome to koha.nexus!")" "$welcome_body" 16 78
     
     clear
     install_precheck
@@ -3484,7 +3684,7 @@ zebra_stuck_records() {
 write_cron_zebra() {
     cat > "$ZEBRA_WATCHDOG" << EOF
 #!/bin/bash
-# Koha Easy Installer: keeps Zebra incremental indexing alive (run from
+# koha.nexus: keeps Zebra incremental indexing alive (run from
 # ${CRON_ZEBRA}). New records are queued in zebraqueue and indexed by the
 # koha-indexer daemon; if it is down, they never reach the OPAC search.
 set -euo pipefail
@@ -3730,7 +3930,7 @@ write_backup_scripts() {
 
     cat > /root/backup_sql.sh << EOF
 #!/bin/bash
-# Koha database backup. Generated by Koha Easy Install & Tools.
+# Koha database backup. Generated by koha.nexus.
 set -euo pipefail
 umask 077
 CONF="${BACKUP_CONF}"
@@ -3928,7 +4128,7 @@ write_cron_tasks() {
 
     cat > "$CRON_TASKS" << EOF
 # ======================================================================
-# KOHA EASY INSTALL & TOOLS - SCHEDULED AUTOMATED TASKS
+# KOHA.NEXUS - SCHEDULED AUTOMATED TASKS
 # ======================================================================
 # This file controls Koha's periodic automated maintenance routines.
 #
@@ -4000,7 +4200,7 @@ banner_art() {
     [ "$F" -lt 64 ] && F=64
     [ "$F" -gt 76 ] && F=76
     # Pediment: four rows, each 16 columns wider than the one above.
-    local -a text=("" "KOHA LIBRARY" "Koha Easy Installer & Tools" "")
+    local -a text=("" "KOHA.NEXUS" "Koha Nexus library suite" "")
     for k in 0 1 2 3; do
         inner=$((F - 16 * (3 - k) - 16))
         if [ "$k" -eq 3 ]; then fill="_"; else fill=" "; fi
@@ -4067,13 +4267,24 @@ write_banner() {
     l_opac_loc="$(t "- OPAC  (Local)   : http://localhost:80")"
     l_staff_cf="$(t "- Staff (Cloud)   : \${staff_cf_text}")"
     l_opac_cf="$(t "- OPAC  (Cloud)   : \${opac_cf_text}")"
+    # Cloud server (Oracle Cloud, AWS, DigitalOcean...): its own address is
+    # private (10.0.0.60), so the banner also shows the public one.
+    local pub l_pub=() hint
+    pub=$(server_public_ip "$ip")
+    if [ -n "$pub" ]; then
+        l_pub+=("$(t "- Staff (Public)  : http://\${pub}:8080")" "$(t "- OPAC  (Public)  : http://\${pub}:80")")
+        if [ -z "$cf_opac" ]; then
+            hint="$(t "- No access? Cloudflare Tunnel: config.sh > Security")"
+            l_pub+=("$hint")
+        fi
+    fi
     l_user="$(t "- User (Admin)    : \${user}")"
     l_pass="$(t "- Password (Root) : cat /root/koha_credentials.txt")"
 
     # The art is plain ASCII with no backslash: agetty reads "\x" in
     # /etc/issue as an escape and would eat the character after it.
     local art
-    art=$(banner_art "$l_ctrl" "$l_ssh" - "$l_urls" "$l_staff" "$l_opac" "$l_staff_loc" "$l_opac_loc" \
+    art=$(banner_art "$l_ctrl" "$l_ssh" - "$l_urls" "$l_staff" "$l_opac" "${l_pub[@]}" "$l_staff_loc" "$l_opac_loc" \
         "$l_staff_cf" "$l_opac_cf" - "$l_user" "$l_pass")
     printf '\\S\n\n%s\n\n' "$art" > /etc/issue
     printf '\n%s\n\n' "$art" > /etc/issue.net 2>/dev/null
@@ -4174,7 +4385,7 @@ configure_fail2ban() {
     if [ ! -f /var/log/auth.log ] && [ -d /etc/fail2ban/jail.d ]; then
         apt_install python3-systemd >/dev/null 2>&1 || true
         cat > /etc/fail2ban/jail.d/koha-easy-install.local << 'EOF'
-# Generated by Koha Easy Installer: this system logs to journald.
+# Generated by koha.nexus: this system logs to journald.
 [sshd]
 enabled = true
 backend = systemd
@@ -4202,6 +4413,36 @@ ensure_koha_conffiles() {
         -o Dpkg::Options::=--force-confmiss -o Dpkg::Options::=--force-confold \
         -o Acquire::ForceIPv4=true koha-common >>"$APT_LOG" 2>&1
     [ -f /etc/koha/apache-site.conf.in ] && [ -f /etc/koha/koha-conf-site.xml.in ]
+}
+
+# koha.nexus names next to the old ones. The folders keep their first
+# names (koha-easy-install*): running panels, cron jobs, Koha's settings and
+# older copies of config.sh all point there. Only links are added, never
+# moved: /etc/koha-nexus, /usr/local/lib/koha-nexus and the koha-nexus
+# command (= config.sh). A path that already exists is left alone.
+KEI_BRAND_LINKS="/etc/koha-nexus:${CONFIG_DIR} /usr/local/lib/koha-nexus:/usr/local/lib/koha-easy-installer /usr/local/bin/koha-nexus:/usr/local/bin/config.sh"
+kei_brand_links() {
+    local pair link target
+    for pair in $KEI_BRAND_LINKS; do
+        link="${pair%%:*}"; target="${pair#*:}"
+        [ -e "$target" ] || continue
+        [ -e "$link" ] || [ -L "$link" ] && continue
+        ln -s "$target" "$link" 2>/dev/null && log "koha.nexus: $link -> $target"
+    done
+    return 0
+}
+
+# The login banner (/etc/issue, /etc/motd) written at install time shows the
+# addresses of that day; a cloud server's public address can change. Once a
+# day it is written again, in the background, with the panel's lock
+# descriptors closed (a background job holding them would keep the next
+# "sudo config.sh" out).
+kei_banner_refresh() {
+    is_koha_installed || return 0
+    grep -qF "__..--''" /etc/motd 2>/dev/null || return 0
+    [ -n "$(find /etc/motd -mmin +1440 2>/dev/null)" ] || return 0
+    ( write_banner "" "$DB_NAME" ) </dev/null >/dev/null 2>&1 7>&- 8>&- 9>&- &
+    return 0
 }
 
 # Copies the panel (and its dictionaries) to /usr/local/bin/config.sh.
@@ -5240,7 +5481,7 @@ function_restore_database() {
         return 0
     fi
     if [ "$DUMP_HAS_SQL" != "yes" ]; then
-        if [[ "$file" == *.gz ]]; then
+        if [ "$(dump_codec "$file")" != "plain" ]; then
             prompt_yes_no "$(t "Suspicious file")" "$(t "No SQL statements found at the start of the file.\nIt may not be a Koha backup.\n\nContinue anyway?")" 11 72 || return 0
         else
             prompt_yes_no "$(t "Suspicious file")" "$(t "No SQL statements found at the start of the file.\n\nContinue anyway?")" 10 72 || return 0
@@ -5340,6 +5581,12 @@ function_restore_database() {
     tui_run "$(t "Synchronizing the search engine")" restore_task_engine "$engine" || engine_ok="no"
     cut_time=$(date '+%Y-%m-%d %H:%M:%S')
     tui_run "$(t "Reindexing the catalog")" restore_task_reindex "$engine" "$cut_time" || rebuild_ok="no"
+
+    # The backup's systempreferences replaced the look made in the panel
+    # (OpacUserCSS, OpacUserJS, IntranetUserCSS): it goes back in.
+    if [ -s "$THEME_STATE" ]; then
+        tui_run "$(t "Re-applying the saved OPAC and staff look")" theme_state_reapply || true
+    fi
 
     tui_run "$(t "Restarting Koha services")" resume_koha_services
     unshield_signals
@@ -8443,7 +8690,7 @@ st_mark() {
 # The server status as "GROUP<TAB>LABEL<TAB>VALUE" lines (the classic box
 # and the panel's status screen both read them).
 detailed_status_rows() {
-    local engine idx pend docs bibs plack email g
+    local engine idx pend docs bibs plack email g pub
     engine=$(get_search_engine)
     if is_koha_indexer_running; then idx="🟢 $(t "running")"; else idx="⚪ $(t "stopped")"; fi
     if plack_running; then plack="🟢 $(t "running")"; else plack="🔴 $(t "stopped")"; fi
@@ -8476,6 +8723,8 @@ detailed_status_rows() {
         "$g" "$(t "Uptime")" "$(uptime -p 2>/dev/null)" \
         "$g" "$(t "Timezone")" "$(get_current_timezone)" \
         "$g" "IP" "$(get_server_ip)"
+    pub=$(server_public_ip)
+    [ -n "$pub" ] && printf '%s\t%s\t%s\n' "$g" "$(t "Public IP")" "$pub"
     g=$(t "BACKUP")
     printf '%s\t%s\t%s\n' \
         "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" -name '*.sql.gz' -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
@@ -8578,18 +8827,19 @@ kei_overall_state() {
 # when they can really use it (host_can lan_direct: not WSL in NAT mode).
 # Public hosts are the Cloudflare tunnel's, free address or own domain.
 kei_access_json() {
-    local ip="" lan=false opac staff mode=""
+    local ip="" lan=false opac staff mode="" pub=""
     if host_can lan_direct; then
         ip="${WIN_LAN_IP:-}"
         [ -n "$ip" ] || ip=$(get_server_ip 2>/dev/null)
         [ "$ip" != "127.0.0.1" ] && lan=true
+        [ -z "${WIN_LAN_IP:-}" ] && pub=$(server_public_ip "$ip")
     fi
     read -r opac staff < <(tunnel_public_hosts 2>/dev/null)
     [ "$opac" = "-" ] && opac=""
     [ "$staff" = "-" ] && staff=""
     if tunnel_mode_is broker; then mode="free"; elif [ -f /etc/cloudflared/config.yml ]; then mode="own"; fi
     printf '"access":{"opac_port":80,"staff_port":8080,"lan_ip":%s,"lan_reachable":%s,' "$(json_str "$ip")" "$lan"
-    printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")"
+    printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s,"public_ip":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")" "$(json_str "$pub")"
 }
 
 kei_status_json() {
@@ -8671,7 +8921,7 @@ kei_export_diagnostics() {
     mkdir -m 700 "$out" "$out/logs" || return 1
     kei_status_json > "$out/status.json" 2>/dev/null
     {
-        printf 'Koha Easy Install %s  |  %s\n' "${PANEL_VERSION# }" "$(date '+%F %T %z')"
+        printf 'koha.nexus %s  |  %s\n' "${PANEL_VERSION# }" "$(date '+%F %T %z')"
         printf 'platform=%s  wsl_net=%s  autostart=%s  windows_build=%s\n\n' "$KEI_PLATFORM" "${KEI_WSL_NET:--}" "${WIN_AUTOSTART:--}" "${WIN_BUILD:--}"
     } > "$out/system.txt"
     kei_diag_cmd "$out/system.txt" uname -a
@@ -8941,6 +9191,12 @@ function_fail2ban_status() {
         return 0
     fi
     whiptail --title "$(t '🚨 Fail2ban')" --scrolltext --msgbox "$(printf '%b' "$info")" 24 78 || true
+}
+
+# Security & access hub > WireGuard VPN in the classic menu: the VPN has
+# its own screen in the new panel only (QR codes, devices).
+function_vpn_classic() {
+    msg_info "$(t '🔐  WireGuard VPN')" "$(t "WireGuard VPN is managed on its own screen of the new panel: Security & access hub > WireGuard VPN (key V). Open the panel with: sudo config.sh")" 12 76
 }
 
 function_staff_firewall() {
@@ -9585,7 +9841,7 @@ _lt_reports_install() {
         fi
         printf '● %s — %s\n' "${RP_NAME[i]}" "$state" >> "$log"
         ok=$((ok + 1))
-        notes="$(t "Read-only report installed by Koha Easy Installer.") ${mark}"
+        notes="$(t "Read-only report installed by koha.nexus.") ${mark}"
         {
             printf 'UPDATE saved_sql SET report_name = %s, savedsql = %s, notes = %s, report_group = %s, last_modified = NOW() WHERE LOCATE(%s, notes) > 0;\n' \
                 "$(sql_quote "${RP_NAME[i]}")" "$(sql_quote "${RP_SQL[i]}")" "$(sql_quote "$notes")" "$(sql_quote "${RP_GROUP[i]}")" "$(sql_quote "$mark")"
@@ -11416,7 +11672,7 @@ _lt_br_labels_remove() {
 # cataloguer opens it with SHOW_LABEL.
 ficha_xsl() {   # ficha_xsl DEFAULT_XSL TITLE PRINT_LABEL ABNT_LABEL SHOW_LABEL
     printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-    printf '<!-- Koha Easy Installer: Koha'"'"'s default detail view plus the Brazilian catalogue card (ficha catalografica, AACR2). Generated file. -->\n'
+    printf '<!-- koha.nexus: Koha'"'"'s default detail view plus the Brazilian catalogue card (ficha catalografica, AACR2). Generated file. -->\n'
     printf '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:marc="http://www.loc.gov/MARC21/slim" exclude-result-prefixes="marc">\n'
     printf '  <xsl:import href="%s"/>\n' "$(xml_escape "$1")"
     printf '  <xsl:variable name="kei-title">%s</xsl:variable>\n' "$(xml_escape "$2")"
@@ -12250,7 +12506,7 @@ print {$h} <<"HTML";
 <head>
 <meta charset="utf-8">
 <title>${\( $cap ne '' ? $cap : 'Referências' )}</title>
-<!-- Koha Easy Installer: references by ABNT NBR 6023:2018, presented as NBR 14724 (A4, margins 3 cm top/left and 2 cm bottom/right, Times 12, single spacing, a blank line between references). -->
+<!-- koha.nexus: references by ABNT NBR 6023:2018, presented as NBR 14724 (A4, margins 3 cm top/left and 2 cm bottom/right, Times 12, single spacing, a blank line between references). -->
 <style>
 \@page { size: A4; margin: 3cm 2cm 2cm 3cm; }
 body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1; color: #000; background: #fff; max-width: 16cm; margin: 1cm auto; }
@@ -18218,7 +18474,7 @@ sys.exit(main())
 KEIPY
     cat > "$d/kei_import/__init__.py" <<'KEIPY'
 """kei_import: the engine of the Magic Import Tool (Ferramenta de Importação
-Mágica) of Koha Easy Installer. One entry point takes any file, folder
+Mágica) of koha.nexus. One entry point takes any file, folder
 or archive, recognises what it holds and prepares it for Koha's own import
 tools; the panel asks the questions and commits."""
 VERSION = "1"
@@ -19999,8 +20255,9 @@ KEIPY
 """Intake: the dropped file (or folder) becomes a list of members. Archives
 are unpacked inside the work folder with limits (no path outside it, no
 links or devices, size and count caps, zip bombs refused); compressed
-single files (.gz, .bz2, .xz) are read through their decompressor and only
-written out when a reader needs a real file."""
+single files (.gz, .bz2, .xz, .zst) are read through their decompressor and
+only written out when a reader needs a real file. Zstandard has no module in
+Python's standard library before 3.14: it is read through the zstd program."""
 import bz2
 import gzip
 import lzma
@@ -20008,6 +20265,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tarfile
 import zipfile
 
@@ -20018,13 +20276,42 @@ MAX_DEPTH = 3              # archives inside archives
 JUNK = re.compile(r"(^|/)(__MACOSX|\.DS_Store|Thumbs\.db|desktop\.ini|~\$[^/]*|\.~lock\.[^/]*)(/|$)", re.I)
 
 
+class ZstdReader:
+    """The output of zstd -dc as a read-only binary stream."""
+
+    def __init__(self, path):
+        exe = shutil.which("zstd")
+        if not exe:
+            raise OSError("zstd is not installed (sudo apt install zstd)")
+        self._p = subprocess.Popen([exe, "-dcq", "--", path], stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL)
+
+    def read(self, n=-1):
+        return self._p.stdout.read(n)
+
+    def readable(self):
+        return True
+
+    def close(self):
+        self._p.stdout.close()
+        if self._p.poll() is None:
+            self._p.kill()
+        self._p.wait()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
 class Member:
     n_plain = 0
 
     def __init__(self, path, display, codec=None, in_archive=False):
         self.path = path            # file on disk
         self.display = display      # name shown to the operator
-        self.codec = codec          # 'gz' | 'bz2' | 'xz' when read through a decompressor
+        self.codec = codec          # 'gz' | 'bz2' | 'xz' | 'zst' when read through a decompressor
         self.in_archive = in_archive
         self._plain = None
 
@@ -20035,6 +20322,8 @@ class Member:
             return bz2.open(self.path, "rb")
         if self.codec == "xz":
             return lzma.open(self.path, "rb")
+        if self.codec == "zst":
+            return ZstdReader(self.path)
         return open(self.path, "rb")
 
     def plain(self, work):
@@ -20044,7 +20333,7 @@ class Member:
         if not self._plain:
             os.makedirs(os.path.join(work, "plain"), exist_ok=True)
             base = os.path.basename(self.path)
-            base = re.sub(r"\.(gz|bz2|xz)$", "", base, flags=re.I)
+            base = re.sub(r"\.(gz|bz2|xz|zst)$", "", base, flags=re.I)
             Member.n_plain += 1
             self._plain = os.path.join(work, "plain", "%d-%s" % (Member.n_plain, safe_name(base)))
             with self.open() as src, open(self._plain, "wb") as dst:
@@ -20076,6 +20365,8 @@ def codec_of(head):
         return "bz2"
     if head.startswith(b"\xfd7zXZ\x00"):
         return "xz"
+    if head.startswith(b"\x28\xb5\x2f\xfd"):
+        return "zst"
     return None
 
 
@@ -20123,14 +20414,17 @@ class Intake:
         if codec:
             # A compressed tar is an archive; anything else is read as it streams.
             m = Member(path, display, codec, in_archive)
-            with m.open() as fh:
-                try:
+            try:
+                with m.open() as fh:
                     inner = fh.read(512)
-                except (OSError, EOFError, lzma.LZMAError):
-                    self.skipped.append((display, "damaged %s file" % codec))
-                    return
+            except (OSError, EOFError, lzma.LZMAError) as e:
+                self.skipped.append((display, "damaged %s file (%s)" % (codec, e)))
+                return
+            if not inner:
+                self.skipped.append((display, "damaged or empty %s file" % codec))
+                return
             if _is_tar(inner) and depth < MAX_DEPTH:
-                self._untar(path, display, depth)
+                self._untar(path, display, depth, codec)
             else:
                 self.members.append(m)
             return
@@ -20203,12 +20497,23 @@ class Intake:
                     continue
                 self.add(target, display + "/" + name, depth + 1, True)
 
-    def _untar(self, path, display, depth):
+    def _untar(self, path, display, depth, codec=None):
+        if codec == "zst":
+            # tarfile cannot read zstd itself: the stream, member by member.
+            try:
+                with ZstdReader(path) as stream:
+                    self._untar_open(tarfile.open(fileobj=stream, mode="r|"), display, depth)
+            except (tarfile.TarError, OSError, EOFError) as e:
+                self.skipped.append((display, "damaged tar file (%s)" % e))
+            return
         try:
             tf = tarfile.open(path, "r:*")
         except (tarfile.TarError, OSError, EOFError) as e:
             self.skipped.append((display, "damaged tar file (%s)" % e))
             return
+        self._untar_open(tf, display, depth)
+
+    def _untar_open(self, tf, display, depth):
         dest = self._dest()
         with tf:
             for info in tf:
@@ -20238,6 +20543,8 @@ then structure and content), never from the name alone. The Koha backup
 check runs before anything else and wins when it matches."""
 import os
 import re
+import shutil
+import subprocess
 from collections import Counter
 
 from . import holdings, intake, marc
@@ -20367,6 +20674,51 @@ def _by_content(member, fh, head, work):
         if max(widths) >= 2 and Counter(widths).most_common(1)[0][1] >= 0.6 * len(widths):
             return Detection(member, "table", 0.9, "text with columns separated by %r" % {"\t": "TAB"}.get(sep, sep), fmt="csv")
     return Detection(member, "unknown", 0.0, "text without columns")
+
+
+# What to do with a file that is not data the tool reads, by its MIME type
+# (file -b --mime-type): the operator gets a next step, not just "no".
+MIME_HINTS = (
+    ("application/pdf", "a PDF document: export the records from the old system as MARC (.mrc), MARCXML (.xml) or a spreadsheet (.csv, .xlsx) instead"),
+    ("application/msword", "a Word document: save its table as a spreadsheet (.xlsx or .csv) and drop that"),
+    ("application/vnd.openxmlformats-officedocument.wordprocessingml", "a Word document: save its table as a spreadsheet (.xlsx or .csv) and drop that"),
+    ("application/vnd.oasis.opendocument.text", "a text document: save its table as a spreadsheet (.ods, .xlsx or .csv) and drop that"),
+    ("application/x-rar", "a RAR archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/vnd.rar", "a RAR archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/x-7z-compressed", "a 7-Zip archive: unpack it on your computer and drop the files (or pack them again as .zip or .tar.gz)"),
+    ("application/x-msaccess", "an Access database: export each table as a spreadsheet (.xlsx or .csv) and drop those"),
+    ("application/x-sqlite3", "an SQLite database: export the tables as .csv and drop those"),
+    ("application/x-executable", "a program, not data"),
+    ("application/x-dosexec", "a Windows program, not data"),
+    ("application/x-sharedlib", "a program library, not data"),
+    ("image/", "a picture: the records cannot be read from it; export them from the old system as MARC or a spreadsheet"),
+    ("audio/", "a sound file, not data"),
+    ("video/", "a video, not data"),
+)
+
+
+def mime_type(member):
+    """file -b --mime-type of the member ('' when file is missing)."""
+    exe = shutil.which("file")
+    if not exe:
+        return ""
+    args = [exe, "-b", "--mime-type"] + (["-z"] if member.codec else []) + ["--", member.path]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=15).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out if re.fullmatch(r"[\w.+-]+/[\w.+-]+", out) else ""
+
+
+def mime_hint(member):
+    """'; <type>: what to do' for a file that was not recognised, or ''."""
+    mime = mime_type(member)
+    if not mime:
+        return ""
+    for prefix, hint in MIME_HINTS:
+        if mime.startswith(prefix):
+            return "; %s: %s" % (mime, hint)
+    return "; %s" % mime
 
 
 # ---------------------------------------------------------------- MARC inspection
@@ -21666,7 +22018,10 @@ def analyse(opts):
             for t in found:
                 plan_table(a, m, t)
         elif d.kind != "part":
-            a.unsupported.append((m.display, UNSUPPORTED.get(d.kind, d.evidence)))
+            why = UNSUPPORTED.get(d.kind, d.evidence)
+            if d.kind == "unknown":
+                why = "%s (%s)%s" % (why, d.evidence, detect.mime_hint(m))
+            a.unsupported.append((m.display, why))
     if not a.questions.open:
         isbn_question(a, opts)
     return a
@@ -22205,9 +22560,9 @@ magic_pick() {
 # applies the same rule inside archives.
 magic_is_koha_dump() {
     local head
-    head=$(gzip -dcf -- "$1" 2>/dev/null | head -c 4096 | tr -d '\0')
+    head=$(dump_cat "$1" 2>/dev/null | head -c 4096 | tr -d '\0')
     [[ "$head" == *"-- MySQL dump"* || "$head" == *"-- MariaDB dump"* ]] || return 1
-    gzip -dcf -- "$1" 2>/dev/null | LC_ALL=C awk '
+    dump_cat "$1" 2>/dev/null | LC_ALL=C awk '
         /^CREATE TABLE `(biblio|biblio_metadata|items|borrowers|systempreferences|marc_subfield_structure)`/ {
             if (!($3 in seen)) { seen[$3] = 1; n++ }
             if (n >= 4) { found = 1; exit }
@@ -22226,13 +22581,14 @@ magic_to_restore() {
 # once the import tool has let go of its work folder and its lock.
 magic_keep_backup() {
     local path="$1" codec="$2" name="${3##*/}" dir
-    name="${name//[^A-Za-z0-9._-]/_}"; name="${name%.gz}"; name="${name%.bz2}"; name="${name%.xz}"
+    name="${name//[^A-Za-z0-9._-]/_}"; name="${name%.gz}"; name="${name%.bz2}"; name="${name%.xz}"; name="${name%.zst}"
     [[ "${name,,}" == *.sql ]] || name="${name}.sql"
     dir=$(mktemp -d /var/tmp/kei-restore.XXXXXX) || return 1
     case "$codec" in
         gz)  cp -f -- "$path" "$dir/${name}.gz" && name="${name}.gz" ;;
         bz2) bzip2 -dc -- "$path" > "$dir/$name" ;;
         xz)  xz -dc -- "$path" > "$dir/$name" ;;
+        zst) zstd -dcq -- "$path" > "$dir/$name" ;;
         *)   cp -f -- "$path" "$dir/$name" ;;
     esac || { rm -rf "$dir"; return 1; }
     chmod 600 "$dir/$name"
@@ -26291,8 +26647,15 @@ z3950_add() {
 #                        preferences), assets/ (pictures for
 #                        /usr/share/koha/opac/htdocs/images/custom) and
 #                        carousel ("on N" or "off")
-#   opac-theme-remove    both blocks, the pictures, the feed and its schedule
+#                        and staff.css when the staff interface takes the
+#                        colours (IntranetUserCSS; without it our block there
+#                        is taken out)
+#   opac-theme-remove    the blocks, the pictures, the feed and its schedule
 #   opac-carousel-refresh  the feed now
+# Each apply also saves what it wrote in theme-settings.json (CONF_DIR,
+# also reached as /etc/koha-nexus/theme-settings.json): a database restore
+# brings back the backup's systempreferences, which would wipe the look, so
+# Restore database writes the saved blocks back (theme_state_reapply).
 # The carousel reads kei-new-arrivals.json, written every night by
 # koha-kei-new-arrivals: the newest titles with an ISBN, a copy that is not
 # lost or withdrawn, and a real Amazon cover (Amazon answers a missing one
@@ -26305,6 +26668,7 @@ OPAC_NA_FEED="kei-new-arrivals.json"
 CRON_OPAC="/etc/cron.d/koha_kei_opac"
 OPAC_BEGIN="/* koha-easy-installer opac-theme begin */"
 OPAC_END="/* koha-easy-installer opac-theme end */"
+THEME_STATE="${KEI_THEME_STATE:-${CONF_DIR}/theme-settings.json}"
 
 # A system preference as stored (--raw: line breaks kept).
 opac_pref_raw() {
@@ -26483,7 +26847,8 @@ opac_theme_get() {
 opac_theme_apply() {
     local dir="$1" f
     require_database || return 1
-    if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js"; then
+    if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js" \
+       || { [ -e "$dir/staff.css" ] && ! opac_block_ok "$dir/staff.css"; }; then
         msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
         return 1
     fi
@@ -26506,6 +26871,11 @@ _opac_theme_apply() {
         printf 'START TRANSACTION;\n'
         opac_pref_block_sql OpacUserCSS "$dir/user.css"
         opac_pref_block_sql OpacUserJS "$dir/user.js"
+        if [ -f "$dir/staff.css" ]; then
+            opac_pref_block_sql IntranetUserCSS "$dir/staff.css"
+        else
+            opac_pref_block_sql IntranetUserCSS -
+        fi
         if [ -f "$dir/prefs" ]; then
             while IFS=$'\t' read -r name value; do
                 [ -n "$name" ] && opac_pref_line "$name" "$value"
@@ -26535,9 +26905,112 @@ _opac_theme_apply() {
         opac_na_remove
     fi
     memcached_flush || true
+    if theme_state_save "$dir"; then
+        printf 'saved: %s\n' "$THEME_STATE" >> "$log"
+    else
+        log "opac-theme: theme-settings.json could not be written"
+    fi
     log "opac-theme: applied"
     kei_result applied yes
     msg_ok "$(t "✅ The new look is in the OPAC. Reload the catalogue page in the browser to see it.\n\nSafety backup: \${TOOLS_PRE}")"
+}
+
+# theme_state_save DIR: what the apply wrote (the blocks, the allowed
+# preferences, the carousel switch and the settings) as one JSON file.
+theme_state_save() {
+    local dir="$1" tmp
+    mkdir -p "${THEME_STATE%/*}" || return 1
+    tmp=$(mktemp "${THEME_STATE}.XXXXXX") || return 1
+    if python3 -I - "$dir" "${PANEL_VERSION# }" > "$tmp" <<'PY'
+import json, os, re, sys, time
+d, version = sys.argv[1], sys.argv[2]
+def read(name):
+    p = os.path.join(d, name)
+    return open(p, encoding="utf-8").read() if os.path.isfile(p) else None
+css = read("user.css") or ""
+m = re.search(r"/\*\s*KEI-THEME-DATA:\s*(\{.*?\})\s*\*/", css, re.S)
+try:
+    settings = json.loads(m.group(1)) if m else {}
+except ValueError:
+    settings = {}
+prefs = [l.split("\t", 1) for l in (read("prefs") or "").splitlines() if "\t" in l]
+blocks = {"OpacUserCSS": css, "OpacUserJS": read("user.js") or ""}
+if read("staff.css") is not None:
+    blocks["IntranetUserCSS"] = read("staff.css")
+json.dump({"format": 1, "saved": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "panel": version, "settings": settings,
+           "blocks": blocks, "prefs": prefs, "carousel": (read("carousel") or "off").strip()},
+          sys.stdout, ensure_ascii=False, indent=1)
+PY
+    then
+        chmod 644 "$tmp" && mv -f "$tmp" "$THEME_STATE" && return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+# theme_state_reapply: after a database restore, the look saved by the last
+# apply (theme-settings.json) goes back into systempreferences: the blocks of
+# OpacUserCSS, OpacUserJS and IntranetUserCSS (the rest of each preference is
+# the restored one) and the allowed preferences. Nothing saved: nothing done.
+theme_state_reapply() {
+    [ -s "$THEME_STATE" ] || return 0
+    local dir sql f mode count name value
+    dir=$(mktemp -d /tmp/koha_tmp_theme.XXXXXX) || return 1
+    if ! python3 -I - "$THEME_STATE" "$dir" <<'PY'
+import json, os, sys
+state, d = json.load(open(sys.argv[1], encoding="utf-8")), sys.argv[2]
+blocks = state.get("blocks") or {}
+for pref, name in (("OpacUserCSS", "user.css"), ("OpacUserJS", "user.js"), ("IntranetUserCSS", "staff.css")):
+    if isinstance(blocks.get(pref), str) and blocks[pref]:
+        open(os.path.join(d, name), "w", encoding="utf-8").write(blocks[pref])
+with open(os.path.join(d, "prefs"), "w", encoding="utf-8") as fh:
+    for p in state.get("prefs") or []:
+        if isinstance(p, list) and len(p) == 2:
+            fh.write("%s\t%s\n" % (p[0], str(p[1]).replace("\n", " ")))
+open(os.path.join(d, "carousel"), "w").write(str(state.get("carousel") or "off") + "\n")
+PY
+    then
+        rm -rf -- "$dir"
+        log "theme: $THEME_STATE could not be read; the look was not re-applied"
+        return 1
+    fi
+    for f in user.css user.js staff.css; do
+        if [ -e "$dir/$f" ] && ! opac_block_ok "$dir/$f"; then
+            rm -rf -- "$dir"
+            log "theme: $THEME_STATE holds a damaged block ($f); the look was not re-applied"
+            return 1
+        fi
+    done
+    if [ ! -e "$dir/user.css" ] || [ ! -e "$dir/user.js" ]; then
+        rm -rf -- "$dir"
+        return 0
+    fi
+    sql="$dir/theme.sql"
+    {
+        printf 'START TRANSACTION;\n'
+        opac_pref_block_sql OpacUserCSS "$dir/user.css"
+        opac_pref_block_sql OpacUserJS "$dir/user.js"
+        if [ -e "$dir/staff.css" ]; then opac_pref_block_sql IntranetUserCSS "$dir/staff.css"; else opac_pref_block_sql IntranetUserCSS -; fi
+        while IFS=$'\t' read -r name value; do
+            [ -n "$name" ] && opac_pref_line "$name" "$value"
+        done < "$dir/prefs"
+        printf 'COMMIT;\n'
+    } > "$sql"
+    if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "${LOG_DIR}/mysql.log" 2>&1; then
+        rm -rf -- "$dir"
+        log "theme: the saved look could not be written back after the restore"
+        return 1
+    fi
+    read -r mode count < "$dir/carousel" 2>/dev/null
+    rm -rf -- "$dir"
+    memcached_flush >/dev/null 2>&1 || true
+    # The covers of the restored catalogue: the feed again, in the background.
+    if [ "$mode" = "on" ] && [[ "$count" =~ ^[0-9]+$ ]] && [ -x "$OPAC_NA_BIN" ]; then
+        ( "$OPAC_NA_BIN" "$count" ) </dev/null >/dev/null 2>&1 7>&- 8>&- 9>&- &
+    fi
+    log "theme: the saved look was written back after the restore ($THEME_STATE)"
+    kei_result theme_reapplied yes
+    return 0
 }
 
 opac_theme_remove() {
@@ -26554,6 +27027,7 @@ _opac_theme_remove() {
         printf 'START TRANSACTION;\n'
         opac_pref_block_sql OpacUserCSS -
         opac_pref_block_sql OpacUserJS -
+        opac_pref_block_sql IntranetUserCSS -
         fav=$(opac_pref_raw OpacFavicon)
         [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
         printf 'COMMIT;\n'
@@ -26564,6 +27038,7 @@ _opac_theme_remove() {
     fi
     opac_na_remove
     opac_custom_drop background logo favicon
+    rm -f -- "$THEME_STATE"
     memcached_flush || true
     log "opac-theme: removed"
     msg_ok "$(t "✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and OpacUserJS was kept.\n\nSafety backup: \${TOOLS_PRE}")"
@@ -27185,7 +27660,7 @@ kei_task_ui() {
         printf '%s' "$REPLY"
     }
     select_file() {
-        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz}"
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst}"
     }
     select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
     # A file to change by hand (the classic panel opens nano):
@@ -27693,6 +28168,11 @@ is_koha_installed && ficha_refresh
 is_koha_installed && aia_refresh
 # Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
 is_koha_installed && mr_refresh
+[ -n "$PANEL_LOCK_CLEARED" ] && log "panel lock: stale lock of PID ${PANEL_LOCK_CLEARED} cleared (dropped session)"
+# The koha.nexus names of the panel's folders and command (see kei_brand_links).
+kei_brand_links
+# The login banner of a cloud server shows its public address: refreshed daily.
+kei_banner_refresh
 
 # ======================================================================
 # PRIMEIRA EXECUÇÃO: IDIOMA OBRIGATÓRIO SE NÃO ESTIVER CONFIGURADO
@@ -27764,10 +28244,10 @@ while true; do
     m2=$(t '🔑  View first-access credentials')
     m3=$(t '📥  Restore database')
     m4=$(t '💾  Backup center')
-    m5=$(t '🔍  Search engine & indexing')
-    m6=$(t '🌐  Publish system to internet')
-    m7=$(t '🩺  Diagnostics & maintenance center')
-    m8=$(t '🔒  Security center')
+    m5=$(t '🪄  Magic Import Tool')
+    m6=$(t '🔍  Search engine & indexing')
+    m7=$(t '🔒  Security & access hub')
+    m8=$(t '🩺  Diagnostics & maintenance center')
     m9=$(t '🔧  Koha settings & parameters')
     m10=$(t '📚  Library tools')
     m11=$(t '🧰  General tools')
@@ -27822,7 +28302,8 @@ while true; do
                 3) function_test_backup ;;
             esac
             ;;
-        5)
+        5) lt_magic_import ;;
+        6)
             SUB_OPT=$(whiptail --title "$(t '🔍 Search Engine & Indexing')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose an action:')" 16 76 2 \
                 "1" "$(t '🔃  Toggle search engine (Zebra ⇄ Elasticsearch)')" \
@@ -27832,19 +28313,29 @@ while true; do
                 2) function_repair_indexing ;;
             esac
             ;;
-        6)
-            SUB_OPT=$(whiptail --title "$(t '🌐 Publish System to Internet')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a publishing method:')" 17 76 3 \
-                "1" "$(t '🌉  Cloudflare Tunnel Manager (Recommended)')" \
-                "2" "$(t '🔏  Free SSL certificate (Certbot / Apache)')" \
-                "3" "$(t '🔎  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
+        7)
+            SUB_OPT=$(whiptail --title "$(t '🔒 Security & Access Hub')" --cancel-button "$(t 'Back')" \
+                --menu "$(t 'Choose a security or remote-access tool:')" 22 78 8 \
+                "1" "$(t '🔐  WireGuard VPN')" \
+                "2" "$(t '🌉  Cloudflare Tunnel Manager (Recommended)')" \
+                "3" "$(t '🧱  Show active UFW rules')" \
+                "4" "$(t '🚧  Staff firewall (restrict port 8080)')" \
+                "5" "$(t '🔏  Free SSL certificate (Certbot / Apache)')" \
+                "6" "$(t '🚨  Fail2ban status (intrusion attempts)')" \
+                "7" "$(t '🔐  Rotate database password')" \
+                "8" "$(t '🔎  Google Search Console Assistant')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
-                1) function_configure_cloudflare ;;
-                2) function_configure_ssl ;;
-                3) function_google_search_console ;;
+                1) function_vpn_classic ;;
+                2) function_configure_cloudflare ;;
+                3) function_ufw_rules ;;
+                4) function_staff_firewall ;;
+                5) function_configure_ssl ;;
+                6) function_fail2ban_status ;;
+                7) function_rotate_db_password ;;
+                8) function_google_search_console ;;
             esac
             ;;
-        7)
+        8)
             SUB_OPT=$(whiptail --title "$(t '🩺 Diagnostics & Maintenance Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 20 76 6 \
                 "1" "$(t '📡  Detailed server & Koha status')" \
@@ -27860,20 +28351,6 @@ while true; do
                 4) function_view_logs ;;
                 5) function_deep_maintenance ;;
                 6) function_repair_services ;;
-            esac
-            ;;
-        8)
-            SUB_OPT=$(whiptail --title "$(t '🔒 Security Center')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a security routine:')" 18 76 4 \
-                "1" "$(t '🚨  Fail2ban status (intrusion attempts)')" \
-                "2" "$(t '🚧  Staff firewall (restrict port 8080)')" \
-                "3" "$(t '🔐  Rotate database password')" \
-                "4" "$(t '🧱  Show active UFW rules')" 3>&1 1>&2 2>&3) || continue
-            case "$SUB_OPT" in
-                1) function_fail2ban_status ;;
-                2) function_staff_firewall ;;
-                3) function_rotate_db_password ;;
-                4) function_ufw_rules ;;
             esac
             ;;
         9)

@@ -534,8 +534,12 @@ App.-plain #picker-drop {
 .cron-day {
     width: 18;
 }
+/* "00:30" whole, with room for the cursor: the box's border and padding
+   took 6 of its 10 columns, so it showed "00:3". */
 .cron-time {
-    width: 10;
+    width: 11;
+    min-width: 11;
+    padding: 0 1;
 }
 .cron-raw {
     width: 24;
@@ -550,4 +554,25 @@ App.-plain #picker-drop {
     width: auto;
     background: white;
     color: black;
+}
+
+/* ---- OPAC appearance: quick access buttons ------------------------- */
+#o-links-rows {
+    height: auto;
+}
+.link-row Input.link-icon {
+    width: 10;
+}
+.link-row Input.link-text {
+    width: 1fr;
+}
+.link-row Input.link-url {
+    width: 2fr;
+}
+.opac-box .link-row Select.link-target {
+    width: 18;
+}
+.link-row Button.link-del {
+    min-width: 5;
+    width: 5;
 }

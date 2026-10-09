@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: the Koha window (KohaEasy.ps1 Window).
+﻿# koha.nexus for Windows: the Koha window (KohaEasy.ps1 Window).
 # A native Windows window, so it keeps working when Koha does not: it reads
 # Debian's services through wsl.exe and never needs Koha's web server.
 # Dark, in cards, from top to bottom:
@@ -20,11 +20,11 @@
 # inside this window (ConPTY and a VT renderer), far more than a status
 # window should carry. Closing it or typing exit ends everything it ran.
 # No console window ever appears: the desktop icon, the tray and the Start
-# menu open it through KohaEasy.exe (a Windows program that starts
+# menu open it through koha.nexus.exe (a Windows program that starts
 # PowerShell with CreateNoWindow; conhost --headless where Windows refuses
 # it), and wsl.exe runs inside that hidden console. Only the management
 # panel and the Debian terminal open a terminal window, on purpose.
-# On the taskbar it is Koha (Koha's AppUserModelID, KohaEasy.exe), not
+# On the taskbar it is Koha (Koha's AppUserModelID, koha.nexus.exe), not
 # Windows PowerShell. Like the tray, it never starts Debian by itself: only
 # its Start buttons do. Every check and action runs in a background
 # runspace, so the window never freezes. Windows PowerShell 5.1. Loaded by
@@ -226,10 +226,10 @@ $form.AutoSize = $true
 $form.AutoSizeMode = [System.Windows.Forms.AutoSizeMode]::GrowAndShrink
 $form.KeyPreview = $true
 # koha.ico on the title bar and the taskbar button (Get-KohaIcon: tried
-# again while the file is busy, then KohaEasy.exe's own icon, logged).
-$kohaIco = Get-KohaIcon -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'KohaEasy.exe')
+# again while the file is busy, then koha.nexus.exe's own icon, logged).
+$kohaIco = Get-KohaIcon -Path (Join-Path $here 'koha.ico') -Exe (Join-Path $here 'koha.nexus.exe')
 if ($kohaIco) { $form.Icon = $kohaIco }
-# A dark title bar to match (KohaEasy.exe; Windows 10 1809 and later).
+# A dark title bar to match (koha.nexus.exe; Windows 10 1809 and later).
 $form.add_HandleCreated({
         if (Import-KohaNative) { try { [void][KohaEasy.Native]::SetDarkTitleBar($form.Handle) } catch { } }
     })

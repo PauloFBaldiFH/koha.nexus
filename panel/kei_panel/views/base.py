@@ -37,7 +37,7 @@ class SectionView(VerticalScroll):
         with Grid(classes="card-grid"):
             for entry in entries:
                 yield ActionCard(entry, background=self.panel.runs_in_background(entry),
-                                 native=self.panel.is_native(entry))
+                                 native=entry.kind == "view" or self.panel.is_native(entry))
 
     def compose(self) -> ComposeResult:
         yield from self.heading()
@@ -46,6 +46,9 @@ class SectionView(VerticalScroll):
     @on(ActionCard.Chosen)
     def _chosen(self, event: ActionCard.Chosen) -> None:
         event.stop()
+        if event.entry.kind == "view":
+            self.screen.action_show(event.entry.action)
+            return
         self.panel.run_entry(event.entry, after=self.refresh_data)
 
     def refresh_data(self) -> None:

@@ -1,4 +1,4 @@
-# Koha Easy Installer for Windows - shortcut and tray check.
+# koha.nexus for Windows - shortcut and tray check.
 #
 #   Checks, step by step, what the Koha icon and the Koha tray need, creates
 #   the shortcuts and starts the tray again, and prints every error in full
@@ -49,7 +49,7 @@ function Invoke-KohaEasyDiagnose {
     try { Say ('  execution policy: ' + ((Get-ExecutionPolicy -List | ForEach-Object { '{0}={1}' -f $_.Scope, $_.ExecutionPolicy }) -join ', ')) } catch { Show-Err $_ }
 
     Head ('Files in ' + $bin)
-    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Window.ps1', 'KohaEasy.Hidden.js', 'KohaEasy.exe', 'koha.ico', 'koha-logo.png') {
+    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Window.ps1', 'KohaEasy.Hidden.js', 'koha.nexus.exe', 'koha.ico', 'koha-logo.png') {
         $p = Join-Path $bin $f
         if (Test-Path -LiteralPath $p) { Say ('  ok      {0} ({1:yyyy-MM-dd HH:mm})' -f $f, (Get-Item -LiteralPath $p).LastWriteTime) } else { Say ('  missing {0}' -f $f) 'Yellow' }
     }
@@ -74,7 +74,7 @@ function Invoke-KohaEasyDiagnose {
         $install = Get-ChildItem -LiteralPath $logs -Filter 'install-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if ($install) {
             Say ('  Important lines of {0}:' -f $install.Name)
-            Select-String -LiteralPath $install.FullName -Pattern 'step failed|shortcut|Koha icon|tray|hidden launch|launcher|KohaEasy.exe|desktop|error|failed|phase' |
+            Select-String -LiteralPath $install.FullName -Pattern 'step failed|shortcut|Koha icon|tray|hidden launch|launcher|koha.nexus.exe|desktop|error|failed|phase' |
                 Select-Object -Last 40 | ForEach-Object { Say ('    ' + $_.Line) }
         } else { Say '  no install-*.log: the installer never wrote its log here' 'Yellow' }
         $koha = Get-ChildItem -LiteralPath $logs -Filter 'koha-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 1

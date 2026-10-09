@@ -11,6 +11,9 @@ kind:
   background   non-interactive: runs in a worker under the Pacman loader.
   native       ported: the panel's own screens ask the questions and the
                work runs as `config.sh --task` (routines/); no whiptail.
+  view         opens another section's screen (action = its section id),
+               for a screen that lives inside a hub (the VPN in the
+               Security & access hub).
 verb: a read-only/idempotent installer verb (--rebuild-search-index...)
       that does the same job without questions. When the installer in use
       supports it, the entry runs in the background with it.
@@ -43,13 +46,12 @@ class Section:
     view: str = "section"  # which view draws it (views/__init__.py)
     key: str = ""         # shortcut key
     icon: str = ""        # drawn before a label that has no icon of its own
+    sidebar: bool = True  # False: reached from a hub entry (and its key) only
+    parent: str = ""      # the hub highlighted in the sidebar while it is shown
 
 
 SECTIONS: tuple[Section, ...] = (
     Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
-    # Every import in one place, right under the dashboard.
-    Section("import", "🪄  Magic Import Tool", entries=(
-        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
     Section("install", "📦  Install Koha server", entries=(
         Entry("📦  Install Koha server", "install", kind="native"),)),
     Section("credentials", "🔑  View first-access credentials", entries=(
@@ -62,6 +64,9 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
         Entry("📥  Restore database", "restore", kind="native"),
     ), view="backup", key="b"),
+    # Every import in one place, right under the backups (Paulo, 2026-10-09).
+    Section("import", "🪄  Magic Import Tool", entries=(
+        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
     # New screen: Koha's tables at a glance (no bash menu of its own).
     Section("database", "📑  Database tables", "📑  Database tables", entries=(
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
@@ -88,17 +93,27 @@ SECTIONS: tuple[Section, ...] = (
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native"),
     ), view="hub", key="m"),
-    # WireGuard VPN for the staff interface and SSH (views/vpn.py).
-    Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v"),
+    # WireGuard VPN for the staff interface and SSH (views/vpn.py), opened
+    # from the Security & access hub (or its key).
+    Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v", sidebar=False,
+            parent="security"),
+    # Security, remote access and the firewall in one hub: VPN, Cloudflare
+    # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
+    # internet" and "Security center").
+    Section("security", "🔒  Security & access hub", "🔒 Security & Access Hub",
+            "Choose a security or remote-access tool:", (
+        Entry("🔐  WireGuard VPN", "vpn", kind="view"),
+        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
+        Entry("🧱  Show active UFW rules", "ufw", kind="native"),
+        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
+        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
+        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
+        Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
+        Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
+    ), key="x"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
-    )),
-    Section("publish", "🌐  Publish system to internet", "🌐 Publish System to Internet",
-            "Choose a publishing method:", (
-        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
-        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
-        Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
     )),
     Section("diagnostics", "🩺  Diagnostics & maintenance center", "🩺 Diagnostics & Maintenance Center",
             "Choose a tool:", (
@@ -108,12 +123,6 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
         Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
-    )),
-    Section("security", "🔒  Security center", "🔒 Security Center", "Choose a security routine:", (
-        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
-        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
-        Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
-        Entry("🧱  Show active UFW rules", "ufw", kind="native"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
         Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
@@ -164,4 +173,5 @@ def section(section_id: str) -> Section:
 
 
 def all_actions() -> set[str]:
-    return {e.action for s in SECTIONS for e in s.entries}
+    """Installer actions (a view entry opens a screen, not a routine)."""
+    return {e.action for s in SECTIONS for e in s.entries if e.kind != "view"}

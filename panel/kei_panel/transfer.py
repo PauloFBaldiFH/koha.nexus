@@ -30,7 +30,7 @@ from .i18n import t
 from .opener import over_ssh
 from .tasks import TaskFailed
 
-BACKUP_SUFFIXES = (".sql", ".sql.gz")
+BACKUP_SUFFIXES = (".sql", ".sql.gz", ".sql.bz2", ".sql.xz", ".sql.zst")
 CHUNK = 1024 * 1024
 _WINDOWS_PATH = re.compile(r"^([A-Za-z]):[\\/](.*)$")
 _WSL_SHARE = re.compile(r"^[\\/]{2}wsl(?:\.localhost|\$)[\\/][^\\/]+[\\/](.*)$", re.I)
@@ -56,8 +56,13 @@ def dropped_path(text: str) -> str:
     this machine: quotes and backslash escapes removed, file:// URIs read,
     C:\\... and \\\\wsl.localhost\\Distro\\... turned into /mnt/c/... and /...."""
     line = (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
-    if len(line) >= 2 and line[0] == line[-1] and line[0] in "'\"":
-        line = line[1:-1]
+    # Quotes around the path, also escaped (\"...\" or \'...\') or doubled
+    # by a terminal that quotes what it pastes ("'...'").
+    for _ in range(3):
+        m = re.fullmatch(r"""\\?(["'])(.*?)\\?\1""", line, re.S)
+        if not m:
+            break
+        line = m.group(2).strip()
     if line.lower().startswith("file://"):
         line = unquote(urlparse(line).path)
         if re.match(r"^/[A-Za-z]:/", line):
@@ -138,7 +143,8 @@ def downloads_folder(place: str | None = None) -> Path | None:
 def free_target(folder: Path, name: str) -> Path:
     """name in folder, or name (2), name (3)... when it is taken."""
     target = folder / name
-    stem, suffix = (name[:-7], ".sql.gz") if name.lower().endswith(".sql.gz") else (Path(name).stem, Path(name).suffix)
+    double = next((s for s in BACKUP_SUFFIXES[1:] if name.lower().endswith(s)), "")
+    stem, suffix = (name[:-len(double)], name[-len(double):]) if double else (Path(name).stem, Path(name).suffix)
     n = 2
     while target.exists():
         target = folder / f"{stem} ({n}){suffix}"

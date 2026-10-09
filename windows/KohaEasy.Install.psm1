@@ -1,4 +1,4 @@
-﻿# Koha Easy Installer for Windows: the install flow (blueprint 2.3).
+﻿# koha.nexus for Windows: the install flow (blueprint 2.3).
 # Started by windows\install.ps1 (the irm | iex one-liner, which
 # Install-Koha.cmd also runs) as "KohaEasy.ps1 Install". Every phase is
 # idempotent and recorded in state.json, so running Install again (or the
@@ -267,7 +267,7 @@ function Set-KohaIniValue {
 function Get-KohaWslConf {
     param([AllowEmptyString()][string]$Existing = '', [string]$User = 'root')
     $t = $Existing
-    if (-not $t -or -not $t.Trim()) { $t = '# Written by Koha Easy Installer for Windows.' }
+    if (-not $t -or -not $t.Trim()) { $t = '# Written by koha.nexus for Windows.' }
     $t = Set-KohaIniValue $t 'boot' 'systemd' 'true'
     $t = Set-KohaIniValue $t 'user' 'default' $User
     $t = Set-KohaIniValue $t 'interop' 'appendWindowsPath' 'false'
@@ -584,7 +584,7 @@ function Copy-KohaPanelIntoDistro {
         ('l=''{0}''' -f $script:LauncherPath)
         'cat > "$l.tmp" <<EOF'
         '#!/bin/sh'
-        '# Written by Koha Easy Installer for Windows.'
+        '# Written by koha.nexus for Windows.'
         'p=''$d/installer''; c=/usr/local/bin/config.sh'
         'if [ -x "\$c" ] && [ "\$c" -nt "\$p" ]; then exec "\$c" "\$@"; fi'
         'cd ''$d'' && exec bash ./installer "\$@"'
@@ -635,7 +635,7 @@ function Show-KohaInstalledCheck {
     Write-KohaStep $what 'warn'
 }
 
-# The ways into Koha on Windows: KohaEasy.exe, the tasks, the Koha icon
+# The ways into Koha on Windows: koha.nexus.exe, the tasks, the Koha icon
 # (desktop and Start menu), the tray at sign-in and the tray itself. Made as
 # soon as Debian is ready, before Koha is installed.
 function Install-KohaEntryPoints {
@@ -749,7 +749,7 @@ function Install-Koha {
     $phase = [string]$state['phase']
     if (-not $phase -or $script:Phases -notcontains $phase) { $phase = 'checks' }
     Write-Host ''
-    Write-Host (T 'Koha Easy Installer for Windows') -ForegroundColor Green
+    Write-Host (T 'koha.nexus for Windows') -ForegroundColor Green
     Write-Host ''
 
     if (-not (Test-KohaPhaseDone 'checks' $phase)) {
@@ -904,7 +904,7 @@ function Install-Koha {
         $mode = 'manual'
         if ($auto) { $mode = 'logon' }
         Set-KohaState @{ autostart = $mode; desired = 'running' } | Out-Null
-        # One step that fails must not skip the others. KohaEasy.exe first:
+        # One step that fails must not skip the others. koha.nexus.exe first:
         # the tasks and shortcuts start through it. Made already in this run
         # when Koha was installed in the panel just now (above).
         if (-not $entryDone) { Invoke-KohaSafeStep { Install-KohaLauncherStep } }
@@ -912,7 +912,7 @@ function Install-Koha {
         if (-not $entryDone) {
             Invoke-KohaSafeStep { Install-KohaShortcuts }
             Invoke-KohaSafeStep { Register-KohaUninstallEntry }
-            # The tray settles how Koha's tools start on this PC (KohaEasy.exe,
+            # The tray settles how Koha's tools start on this PC (koha.nexus.exe,
             # conhost, PowerShell) before the Koha network task and the
             # keep-alive task are started with it.
             Invoke-KohaSafeStep { Start-KohaTrayChecked }
@@ -940,7 +940,7 @@ function Install-Koha {
     # started, and when it does not answer, the same help as above.
     $ready = $false
     if ($wasDone -and $phase -eq 'done' -and -not $NonInteractive) {
-        # KohaEasy.exe, the tasks, the shortcuts, the tray at sign-in and the
+        # koha.nexus.exe, the tasks, the shortcuts, the tray at sign-in and the
         # tray itself of this version (older tasks started PowerShell with a
         # window of its own).
         Invoke-KohaSafeStep { Install-KohaLauncherStep }
@@ -1004,7 +1004,7 @@ function Install-Koha {
 
 function Start-KohaTray { Start-KohaHidden 'Tray' }
 
-# KohaEasy.exe for this PC, with what it means for the librarian.
+# koha.nexus.exe for this PC, with what it means for the librarian.
 function Install-KohaLauncherStep {
     # Every run of the installer tries each hidden launch again, best first:
     # the tray check below falls back again where one still fails, so a PC
@@ -1017,8 +1017,8 @@ function Install-KohaLauncherStep {
         Set-KohaState $reset | Out-Null
     }
     $r = Install-KohaLauncher
-    if ($r -eq 'built') { Write-KohaStep (T 'KohaEasy.exe is ready: Koha starts in the background with no windows.') 'ok' }
-    if ($r -eq 'failed') { Write-KohaStep (T 'KohaEasy.exe could not be used on this PC; Koha starts through a hidden console instead.') 'warn' }
+    if ($r -eq 'built') { Write-KohaStep (T 'koha.nexus.exe is ready: Koha starts in the background with no windows.') 'ok' }
+    if ($r -eq 'failed') { Write-KohaStep (T 'koha.nexus.exe could not be used on this PC; Koha starts through a hidden console instead.') 'warn' }
 }
 
 # The library network test, printed: what works, what to fix, and the
@@ -1083,7 +1083,7 @@ function Test-KohaLanguageMode {
     return $false
 }
 
-# Starts the tray and checks it is there. When KohaEasy.exe does not bring
+# Starts the tray and checks it is there. When koha.nexus.exe does not bring
 # it up, the Koha tools go back to conhost --headless; when that does not
 # either, to a plain hidden PowerShell for good. The tray at sign-in, the
 # shortcuts and the tasks follow.
@@ -1092,7 +1092,7 @@ function Start-KohaTrayChecked {
     Restart-KohaTray
     Start-Sleep -Seconds $WaitSeconds
     if ((Get-KohaState).launcher -eq 'ok' -and -not (Test-KohaTrayRunning)) {
-        Write-KohaLog 'the tray did not start through KohaEasy.exe; using the next hidden launch' 'install'
+        Write-KohaLog 'the tray did not start through koha.nexus.exe; using the next hidden launch' 'install'
         Set-KohaState @{ launcher = 'refused' } | Out-Null
         Set-KohaTrayAtSignIn -Enabled $true
         New-KohaShortcuts | Out-Null
