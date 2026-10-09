@@ -51,7 +51,13 @@ python3 -m venv .venv
 .venv/bin/python -m zeus_sru          # listens on 127.0.0.1:5000
 ```
 
-To run it as a service, see [`deploy/zeus-sru.service`](deploy/zeus-sru.service).
+On a koha.nexus server the installer does all of this: adding the Zeus
+target to Koha from the panel (or `config.sh --task sru-bridge`) installs the
+bridge under `/usr/local/lib/koha-easy-installer/sru-bridge` and runs it as
+the systemd unit `koha-zeus-sru`, enabled at boot. Check it with
+`systemctl status koha-zeus-sru` and `ss -ltnp 'sport = :5000'`.
+
+To run it as a service by hand, see [`deploy/zeus-sru.service`](deploy/zeus-sru.service).
 Keep it on 127.0.0.1: it is meant for the Koha server only.
 
 ## Register it in Koha
