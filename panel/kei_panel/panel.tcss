@@ -534,8 +534,12 @@ App.-plain #picker-drop {
 .cron-day {
     width: 18;
 }
+/* "00:30" whole, with room for the cursor: the box's border and padding
+   took 6 of its 10 columns, so it showed "00:3". */
 .cron-time {
-    width: 10;
+    width: 11;
+    min-width: 11;
+    padding: 0 1;
 }
 .cron-raw {
     width: 24;

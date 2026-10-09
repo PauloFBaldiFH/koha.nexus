@@ -135,3 +135,27 @@ def test_custom_schedule_is_checked_and_nothing_changed(tmp_path, monkeypatch):
             assert view.query_one(f"#cr-freq-{_index(view, 'backup_sql')}", Select).value == "daily"
 
     asyncio.run(main())
+
+
+def test_the_time_box_shows_the_whole_time(tmp_path, monkeypatch):
+    # The border and padding used to leave 4 columns: "00:30" showed as "00:3".
+    path = tmp_path / "koha_tasks"
+    path.write_text(FILE)
+    monkeypatch.setenv("KEI_CRON_FILE", str(path))
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause(0.3)
+            app.screen.action_show("crons")
+            view = app.screen.query_one("#view-crons")
+            await _until(pilot, lambda: view.drawn)
+            boxes = [w for w in app.screen.query(".cron-time") if w.display]
+            box = boxes[0]
+            box.value = "00:30"
+            await pilot.pause(0.1)
+            return box.content_region.width, "".join(seg.text for seg in box.render_line(0))
+
+    width, shown = asyncio.run(main())
+    assert width >= 6 and shown.strip() == "00:30"
