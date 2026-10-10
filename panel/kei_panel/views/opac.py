@@ -6,10 +6,16 @@ marked blocks of OpacUserCSS and OpacUserJS, and
 rest of both preferences kept). The settings travel inside the CSS block
 (/* KEI-THEME-DATA */): opening the screen reads them back from Koha.
 
-Two more boxes: the quick access buttons of the home page (icon, text,
-address, tab; solid, gradient or glass) and the staff interface's colours
-("Apply color theme to Staff Client": IntranetUserCSS, with its own type
-size, contrast and table density, never the OPAC's widgets).
+More boxes: the quick access buttons of the home page (icon, text,
+address, tab and order; solid, gradient, glass or brushed metal; one per
+line or two columns), the same buttons for the staff interface's home page
+(IntranetUserJS) and the staff interface's colours ("Apply color theme to
+Staff Client": IntranetUserCSS, with its own type size, contrast and table
+density, never the OPAC's widgets).
+
+"Sync current OPAC settings" reads what is live in Koha (OpacUserCSS,
+OpacUserJS, the staff preferences, OpacMainUserBlock) into the fields and
+shows what it found; nothing is written until Apply.
 
 Pictures: a file on this server (copied to Koha's public images folder), a
 file sent to an image host (ImgBB with an API key, Cloudinary with an
@@ -53,6 +59,8 @@ SLIDERS = {   # id: (label, unit, step)
 GHOST = {"rss": "RSS icons", "cart_badge": "Cart badge", "community": "Community links",
          "empty_columns": "Empty table columns"}
 ICON_EXAMPLES = "📖 📜 💬 📧 📷 🔐 📅 ❓ fa-book"
+# The two sets of quick access buttons: settings key -> id prefix of their fields.
+LINK_SETS = {"links": "o-link", "staff_links": "o-slink"}
 
 
 class OpacView(SectionView):
@@ -79,7 +87,7 @@ class OpacView(SectionView):
         with Horizontal(classes="quick-actions"):
             yield Button(t("Apply"), id="o-apply", classes="small", variant="success")
             yield Button(t("Preview"), id="o-preview", classes="small")
-            yield Button(t("Reload"), id="o-reload", classes="small")
+            yield Button(t("Sync current OPAC settings"), id="o-sync", classes="small")
             yield Button(t("Refresh carousel"), id="o-refresh", classes="small")
             yield Button(t("Image host keys"), id="o-keys", classes="small")
             yield Button(t("Remove"), id="o-remove", classes="small", variant="error")
@@ -126,17 +134,16 @@ class OpacView(SectionView):
             yield from _row(t("Details"), Switch(car["overlay"], id="o-car-overlay"))
             yield from _row(t("Amazon tag"), Input(car["amazon_tag"], id="o-car-tag", max_length=40,
                                                    placeholder=t("optional")))
-        lk = c["links"]
         with Vertical(id="o-links", classes="opac-box"):
             yield Static(t("Buttons at the top of the home page, like a link tree: an icon or emoji, the text, "
-                           "the address and where it opens.") + "  " + ICON_EXAMPLES,
+                           "the address, where it opens and its place in the list (1 comes first).") + "  "
+                         + ICON_EXAMPLES, classes="ai-note", markup=False)
+            yield from self._link_set("links")
+        with Vertical(id="o-slinks", classes="opac-box"):
+            yield Static(t("The same buttons on the staff interface's home page, above the module tiles: "
+                           "shortcuts to the library's own workflows (IntranetUserJS), in the staff colours."),
                          classes="ai-note", markup=False)
-            yield from _row(t("Show"), Switch(lk["enabled"], id="o-links-enabled"))
-            yield from _row(t("Style"), Select([(t(v), k) for k, v in ot.LINK_STYLES.items()], value=lk["style"],
-                                               allow_blank=False, id="o-links-style"))
-            yield Vertical(id="o-links-rows")
-            with Horizontal(classes="quick-actions"):
-                yield Button(t("Add a button"), id="o-link-add", classes="small")
+            yield from self._link_set("staff_links")
         st = c["staff"]
         with Vertical(id="o-staff", classes="opac-box"):
             yield Static(t("The staff interface's own look (IntranetUserCSS), set apart from the public "
@@ -175,6 +182,17 @@ class OpacView(SectionView):
                          allow_blank=False, id=f"o-src-{name}", classes="opac-source")
             yield Input(current["url"], id=f"o-val-{name}", placeholder=t("File or address"))
 
+    def _link_set(self, key: str) -> ComposeResult:
+        lk, p = self.cfg[key], LINK_SETS[key]
+        yield from _row(t("Show"), Switch(lk["enabled"], id=f"{p}s-enabled"))
+        yield from _row(t("Style"), Select([(t(v), k) for k, v in ot.LINK_STYLES.items()], value=lk["style"],
+                                           allow_blank=False, id=f"{p}s-style"))
+        yield from _row(t("Layout"), Select([(t(v), k) for k, v in ot.LINK_LAYOUTS.items()], value=lk["layout"],
+                                            allow_blank=False, id=f"{p}s-layout"))
+        yield Vertical(id=f"{p}s-rows", classes="link-rows")
+        with Horizontal(classes="quick-actions"):
+            yield Button(t("Add a button"), id=f"{p}-add", classes="small")
+
     def _slider(self, key: str) -> ComposeResult:
         label, unit, step = SLIDERS[key]
         lo, hi = ot.RANGES[key]
@@ -183,45 +201,56 @@ class OpacView(SectionView):
     def on_mount(self) -> None:
         titles = {"o-material": "Material", "o-images": "Pictures", "o-dark": "Legibility and dark mode",
                   "o-carousel": "New arrivals carousel", "o-links": "Quick access buttons",
+                  "o-slinks": "Staff home page buttons",
                   "o-staff": "Staff interface", "o-ghost": "Hide", "o-news": "News action buttons"}
         for wid, title in titles.items():
             self.query_one(f"#{wid}").border_title = t(title)
-        self.set_links(self.cfg["links"]["items"])
+        for key in LINK_SETS:
+            self.set_links(self.cfg[key]["items"], key)
 
     # ------------------------------------------------------------------
-    # Quick access buttons: one row of fields per button
+    # Quick access buttons (OPAC: o-link-*, staff: o-slink-*): one row of
+    # fields per button
     # ------------------------------------------------------------------
-    def set_links(self, items: list[dict]) -> None:
-        box = self.query_one("#o-links-rows", Vertical)
+    def set_links(self, items: list[dict], key: str = "links") -> None:
+        box = self.query_one(f"#{LINK_SETS[key]}s-rows", Vertical)
         box.remove_children()
         for item in items:
-            self.add_link(item)
+            self.add_link(item, key)
 
-    def add_link(self, item: dict | None = None) -> None:
-        box = self.query_one("#o-links-rows", Vertical)
+    def add_link(self, item: dict | None = None, key: str = "links") -> None:
+        p = LINK_SETS[key]
+        box = self.query_one(f"#{p}s-rows", Vertical)
         if len(box.children) >= ot.MAX_LINKS:
             self.app.notify(t("At most ${n} buttons.", n=str(ot.MAX_LINKS)), severity="warning")
             return
-        item = item or {"icon": "", "text": "", "url": "", "target": "_self"}
+        if item is None:     # a new button goes last
+            orders = [_order(i.value) for i in box.query(".link-order").results(Input)]
+            item = {"icon": "", "text": "", "url": "", "target": "_self",
+                    "sort_order": min(max([o for o in orders if o] + [len(orders)]) + 1, ot.MAX_ORDER)}
         self.link_rows += 1
         n = self.link_rows
         box.mount(Horizontal(
-            Input(item["icon"], placeholder="📖", max_length=24, id=f"o-link-icon-{n}", classes="link-icon"),
-            Input(item["text"], placeholder=t("Text"), max_length=60, id=f"o-link-text-{n}", classes="link-text"),
-            Input(item["url"], placeholder="https://...", id=f"o-link-url-{n}", classes="link-url"),
+            Input(str(item.get("sort_order") or len(box.children) + 1), placeholder="#", max_length=3, restrict=r"[0-9]*",
+                  id=f"{p}-order-{n}", classes="link-order", tooltip=t("Order (1 comes first)")),
+            Input(item["icon"], placeholder="📖", max_length=24, id=f"{p}-icon-{n}", classes="link-icon"),
+            Input(item["text"], placeholder=t("Text"), max_length=60, id=f"{p}-text-{n}", classes="link-text"),
+            Input(item["url"], placeholder="https://...", id=f"{p}-url-{n}", classes="link-url"),
             Select([(t(v), k) for k, v in ot.LINK_TARGETS.items()], value=item["target"], allow_blank=False,
-                   id=f"o-link-target-{n}", classes="link-target"),
-            Button("✕", id=f"o-link-del-{n}", classes="small link-del", tooltip=t("Remove")),
-            classes="form-row link-row", id=f"o-link-{n}"))
+                   id=f"{p}-target-{n}", classes="link-target"),
+            Button("✕", id=f"{p}-del-{n}", classes="small link-del", tooltip=t("Remove")),
+            classes="form-row " + ("link-row" if key == "links" else "slink-row"), id=f"{p}-{n}"))
 
-    def collect_links(self) -> tuple[list[dict], str]:
+    def collect_links(self, key: str = "links") -> tuple[list[dict], str]:
+        p = LINK_SETS[key]
         items = []
-        for row in self.query(".link-row"):
+        for pos, row in enumerate(self.query_one(f"#{p}s-rows", Vertical).children, 1):
             n = (row.id or "").rsplit("-", 1)[-1]
-            raw = {"icon": row.query_one(f"#o-link-icon-{n}", Input).value.strip(),
-                   "text": row.query_one(f"#o-link-text-{n}", Input).value.strip(),
-                   "url": row.query_one(f"#o-link-url-{n}", Input).value.strip(),
-                   "target": row.query_one(f"#o-link-target-{n}", Select).value}
+            raw = {"icon": row.query_one(f"#{p}-icon-{n}", Input).value.strip(),
+                   "text": row.query_one(f"#{p}-text-{n}", Input).value.strip(),
+                   "url": row.query_one(f"#{p}-url-{n}", Input).value.strip(),
+                   "target": row.query_one(f"#{p}-target-{n}", Select).value,
+                   "sort_order": _order(row.query_one(f"#{p}-order-{n}", Input).value) or pos}
             if not raw["text"] and not raw["url"]:
                 continue
             if not raw["text"]:
@@ -270,9 +299,11 @@ class OpacView(SectionView):
         for key in GHOST:
             q(f"#o-g-{key}", Switch).value = cfg["ghost"][key]
         q("#o-news_buttons", Switch).value = cfg["news_buttons"]
-        q("#o-links-enabled", Switch).value = cfg["links"]["enabled"]
-        q("#o-links-style", Select).value = cfg["links"]["style"]
-        self.set_links(cfg["links"]["items"])
+        for key, p in LINK_SETS.items():
+            q(f"#{p}s-enabled", Switch).value = cfg[key]["enabled"]
+            q(f"#{p}s-style", Select).value = cfg[key]["style"]
+            q(f"#{p}s-layout", Select).value = cfg[key]["layout"]
+            self.set_links(cfg[key]["items"], key)
         st = cfg["staff"]
         q("#o-staff-enabled", Switch).value = st["enabled"]
         for key in ("accent", "accent2", "surface"):
@@ -308,11 +339,13 @@ class OpacView(SectionView):
                          "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
-        items, problem = self.collect_links()
-        raw["links"] = {"enabled": q("#o-links-enabled", Switch).value, "style": q("#o-links-style", Select).value,
-                        "items": items}
-        if problem:
-            return raw, {}, problem
+        for key, p in LINK_SETS.items():
+            items, problem = self.collect_links(key)
+            raw[key] = {"enabled": q(f"#{p}s-enabled", Switch).value, "style": q(f"#{p}s-style", Select).value,
+                        "layout": q(f"#{p}s-layout", Select).value, "items": items}
+            if problem:
+                where = t("Staff home page buttons") if key == "staff_links" else t("Quick access buttons")
+                return raw, {}, f"{where}: {problem}"
         if raw["carousel"]["amazon_tag"] and not ot.normalize(raw)["carousel"]["amazon_tag"]:
             return raw, {}, t("The Amazon tag has only letters, digits and hyphens.")
         pending: dict[str, tuple[str, Path]] = {}
@@ -349,13 +382,15 @@ class OpacView(SectionView):
     # Buttons
     # ------------------------------------------------------------------
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {"o-apply": self.apply, "o-preview": self.preview, "o-reload": self.reload,
+        actions = {"o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
                    "o-refresh": self.refresh_carousel, "o-keys": self.keys, "o-remove": self.remove_look,
-                   "o-link-add": self.add_link}
+                   "o-link-add": lambda: self.add_link(None, "links"),
+                   "o-slink-add": lambda: self.add_link(None, "staff_links")}
         bid = event.button.id or ""
-        if bid.startswith("o-link-del-"):
+        gone = re.fullmatch(r"(o-s?link)-del-(\d+)", bid)
+        if gone:
             event.stop()
-            self.query_one(f"#o-link-{bid.rsplit('-', 1)[1]}").remove()
+            self.query_one(f"#{gone.group(1)}-{gone.group(2)}").remove()
             return
         if event.button.id in actions:
             event.stop()
@@ -378,6 +413,30 @@ class OpacView(SectionView):
             self.fill(cfg)
         self.summary(applied=bool(cfg))
 
+    def sync(self) -> None:
+        self.run_worker(self._sync(), exclusive=True, group="opac-load", exit_on_error=False)
+
+    async def _sync(self) -> None:
+        """Sync current OPAC settings: what is live in Koha into the fields,
+        and a report of what was found. Nothing is written to Koha."""
+        title = t("Sync current OPAC settings")
+        try:
+            out = await self.app.bridge.task("opac-theme-sync")
+        except Exception as e:   # noqa: BLE001 (no installer, no database)
+            self.app.notify(f"{title}: {e}", severity="error")
+            return
+        cfg, notes = ot.sync_settings(out.results)
+        self.carousel_on = out.results.get("carousel") == "on"
+        self.feed_items = out.results.get("feed_items", "")
+        if cfg:
+            self.fill(cfg)
+        self.summary(applied=cfg is not None)
+        report = "\n".join("• " + t(text, **values) for text, values in notes)
+        if cfg:
+            report += "\n\n" + t("The fields now show these settings. Nothing was written to Koha: Apply "
+                                   "writes them.")
+        self.app.push_screen(TextScreen(title, report))
+
     def summary(self, applied: bool = False) -> None:
         text = t("Applied in Koha.") if applied else t("Not applied yet: Koha shows its own look.")
         if self.carousel_on:
@@ -390,8 +449,11 @@ class OpacView(SectionView):
             self.app.notify(problem, severity="warning")
             return
         text = ("OpacUserCSS\n\n" + ot.css_block(raw) + "\n\nOpacUserJS\n\n" + ot.js_block(raw, self.js_text()))
-        if ot.normalize(raw)["staff"]["enabled"]:
-            text += "\n\nIntranetUserCSS\n\n" + ot.staff_css_block(raw)
+        cfg = ot.normalize(raw)
+        if ot.staff_active(cfg):
+            text += "\n\nIntranetUserCSS\n\n" + ot.staff_css_block(cfg)
+        if ot.links_on(cfg["staff_links"]):
+            text += "\n\nIntranetUserJS\n\n" + ot.staff_js_block(cfg, self.js_text())
         self.app.push_screen(TextScreen(t("What goes into Koha"), text))
 
     def apply(self) -> None:
@@ -421,6 +483,8 @@ class OpacView(SectionView):
                  f"{t('New arrivals carousel')}: "
                  + (f"{t('on')} ({t(ot.CAROUSEL_MODES[car['mode']])})" if car["enabled"] else t("off")),
                  f"{t('Quick access buttons')}: {len(cfg['links']['items']) if cfg['links']['enabled'] else t('off')}",
+                 f"{t('Staff home page buttons')}: "
+                 f"{len(cfg['staff_links']['items']) if cfg['staff_links']['enabled'] else t('off')}",
                  f"{t('Staff interface')}: {t('on') if cfg['staff']['enabled'] else t('off')}"]
         lines += [f"{t(ASSET_LABELS[n])}: {cfg[n]['url']}" for n in ot.ASSETS if cfg[n]["url"]]
         if cfg["staff"]["enabled"]:
@@ -521,6 +585,11 @@ def _row(label: str, widget) -> ComposeResult:
     with Horizontal(classes="form-row"):
         yield Label(label, classes="form-label")
         yield widget
+
+
+def _order(value: str) -> int:
+    """A button's place in the list as typed (0: none)."""
+    return int(value) if value.isdigit() else 0
 
 
 def _name_problem(value: str) -> str:

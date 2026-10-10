@@ -227,12 +227,14 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
             rows = list(view.query(".link-row"))
             assert len(rows) == 2
             fields = lambda row: (row.query(Input).results(), row.query_one(Select))   # noqa: E731
-            (icon, text, url), target = list(fields(rows[0])[0]), fields(rows[0])[1]
+            (order, icon, text, url), target = list(fields(rows[0])[0]), fields(rows[0])[1]
+            assert order.value == "1"
             icon.value, text.value, url.value, target.value = "📖", "Catálogo", "javascript:alert(1)", "_blank"
             _cfg, _p, problem = view.collect()
             assert "https://" in problem
             url.value = "https://biblioteca.example.org/acervo"
-            (icon2, text2, url2) = list(rows[1].query(Input).results())
+            (order2, icon2, text2, url2) = list(rows[1].query(Input).results())
+            assert order2.value == "2"
             icon2.value, text2.value, url2.value = "📧", "Contato", "mailto:biblioteca@example.org"
             view.query_one("#o-staff-enabled", Switch).value = True
             view.query_one("#o-staff-density", Select).value = "compact"
@@ -270,5 +272,112 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
             await pilot.pause(0.2)
             assert len(view.query(".link-row")) == 2
             assert view.query_one("#o-staff-density", Select).value == "compact"
+
+    asyncio.run(main())
+
+
+def test_order_layout_metal_and_staff_buttons(monkeypatch):
+    """Each button has its place in the list; two columns, brushed metal and
+    the staff home page's own buttons travel to Koha (IntranetUserJS)."""
+    seen = {}
+    real = ot.write_apply_dir
+
+    def spy(cfg, files, text=None):
+        work = real(cfg, files, text)
+        seen["css"] = (work / "user.css").read_text()
+        seen["staff_css"] = (work / "staff.css").read_text() if (work / "staff.css").exists() else ""
+        seen["staff_js"] = (work / "staff.js").read_text() if (work / "staff.js").exists() else ""
+        return work
+    monkeypatch.setattr(ot, "write_apply_dir", spy)
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+            view.query_one("#o-links-enabled", Switch).value = True
+            view.query_one("#o-links-style", Select).value = "metal"
+            view.query_one("#o-links-layout", Select).value = "grid2"
+            view.add_link({"icon": "📖", "text": "Catálogo", "url": "/cgi-bin/koha/opac-search.pl",
+                           "target": "_self", "sort_order": 1})
+            view.add_link({"icon": "📧", "text": "Contato", "url": "mailto:b@example.org", "target": "_self",
+                           "sort_order": 2})
+            await pilot.pause(0.1)
+            # Contato first: its number goes below Catálogo's.
+            first, second = list(view.query(".link-row"))
+            first.query_one(".link-order", Input).value = "5"
+            # A new button is numbered after the last one.
+            view.query_one("#o-link-add").press()
+            await pilot.pause(0.1)
+            assert list(view.query(".link-row"))[-1].query_one(".link-order", Input).value == "6"
+
+            view.query_one("#o-slinks-enabled", Switch).value = True
+            view.query_one("#o-slinks-layout", Select).value = "grid2"
+            view.query_one("#o-slink-add").press()
+            await pilot.pause(0.1)
+            srow = view.query_one(".slink-row")
+            assert srow.query_one(".link-order", Input).value == "1"
+            order, icon, text, url = list(srow.query(Input).results())
+            icon.value, text.value, url.value = "fa-exchange", "Circulação", "javascript:alert(1)"
+            _cfg, _p, problem = view.collect()
+            assert problem.startswith("Staff home page buttons:")
+            url.value = "/cgi-bin/koha/circ/circulation-home.pl"
+            cfg, _p, problem = view.collect()
+            assert problem == ""
+
+            view.apply()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            assert "Staff home page buttons: 1" in app.screen._preview
+            app.screen.query_one("#yes").press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            await pilot.press("escape")
+            sent = ot.parse_theme_data(seen["css"])
+            assert [(i["text"], i["sort_order"]) for i in sent["links"]["items"]] == [("Contato", 2), ("Catálogo", 5)]
+            assert sent["links"]["style"] == "metal" and sent["links"]["layout"] == "grid2"
+            assert "kei-links-metal" in seen["css"] and "kei-layout-grid2" in seen["css"]
+            assert sent["staff_links"]["items"][0]["url"] == "/cgi-bin/koha/circ/circulation-home.pl"
+            assert "kei-staff-links" in seen["staff_js"] and "Circula" in seen["staff_js"]
+            assert "#kei-staff-links" in seen["staff_css"] and "nexus-staff-page" not in seen["staff_css"]
+
+            # Back on the screen in the order they are shown.
+            view.fill(sent)
+            await pilot.pause(0.2)
+            assert [r.query_one(".link-text", Input).value for r in view.query(".link-row")] == ["Contato", "Catálogo"]
+            assert len(view.query(".slink-row")) == 1
+
+    asyncio.run(main())
+
+
+def test_sync_reads_what_is_live_in_koha(monkeypatch):
+    """Sync current OPAC settings: the fields take what Koha has, and a report
+    says what was found; [kei-button] markers turn the news buttons on."""
+    from kei_panel import demo
+    cfg = ot.normalize({"texture": "smooth", "news_buttons": False,
+                        "links": {"enabled": True, "items": [{"text": "A", "url": "/a"}, {"text": "B", "url": "/b"}]}})
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
+        f"@@result data={ot.data_line(cfg)}", "@@result block_OpacUserCSS=yes", "@@result block_OpacUserJS=no",
+        "@@result own_OpacUserCSS=4", "@@result mainblock=yes", "@@result mainblock_buttons=3"])
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+            view.query_one("#o-sync").press()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen))
+            report = app.screen._text
+            assert "read from OpacUserCSS" in report and "missing from OpacUserJS" in report
+            assert "3 [kei-button] markers" in report and "News action buttons turned on" in report
+            assert "OpacUserCSS: 4 lines" in report and "Nothing was written to Koha" in report
+            await pilot.press("escape")
+            assert view.query_one("#o-texture", Select).value == "smooth"
+            assert view.query_one("#o-news_buttons", Switch).value is True
+            assert len(view.query(".link-row")) == 2
 
     asyncio.run(main())

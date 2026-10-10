@@ -60,11 +60,13 @@ TEXTURES = {
 }
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
 CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
-LINK_STYLES = {"solid": "Solid colour", "gradient": "Gradient", "glass": "Glass (blur)"}
+LINK_STYLES = {"solid": "Solid colour", "gradient": "Gradient", "glass": "Glass (blur)", "metal": "Brushed metal"}
+LINK_LAYOUTS = {"list": "One per line", "grid2": "Two columns"}
 LINK_TARGETS = {"_self": "Same tab", "_blank": "New tab"}
 STAFF_DENSITY = {"comfortable": "Comfortable", "normal": "Normal", "compact": "Compact"}
 STAFF_CONTRAST = {"normal": "Normal", "high": "High"}
 MAX_LINKS = 12
+MAX_ORDER = 999
 THEMES = {"light": "Light", "dark": "Dark", "auto": "Follow the device"}
 SOURCES = {"none": "None", "local": "File on this server", "url": "Direct URL", "imgbb": "Upload to ImgBB",
            "cloudinary": "Upload to Cloudinary"}
@@ -99,8 +101,12 @@ DEFAULTS: dict = {
     "ghost": {"rss": True, "cart_badge": True, "community": True, "empty_columns": True},
     "news_buttons": True,
     # Quick access buttons at the top of the home page (link-tree style):
-    # [{"icon": "📖", "text": "...", "url": "https://...", "target": "_blank"}]
-    "links": {"enabled": False, "style": "glass", "items": []},
+    # [{"icon": "📖", "text": "...", "url": "https://...", "target": "_blank", "sort_order": 1}],
+    # shown by sort_order (settings saved before it had one: 1..n, as listed).
+    "links": {"enabled": False, "style": "glass", "layout": "list", "items": []},
+    # The same buttons on the staff interface's home page (IntranetUserJS),
+    # above the module tiles: shortcuts to the library's internal workflows.
+    "staff_links": {"enabled": False, "style": "glass", "layout": "list", "items": []},
     # The staff interface (IntranetUserCSS): its own palette, type, contrast
     # and table density, nothing shared with the OPAC. Settings saved before
     # it had colours start from the OPAC's (normalize()).
@@ -164,7 +170,7 @@ def safe_link(value: str) -> str:
     return ""
 
 
-def _link(raw) -> dict | None:
+def _link(raw, position: int = 1) -> dict | None:
     raw = raw if isinstance(raw, dict) else {}
     url = safe_link(raw.get("url", ""))
     text = _text(raw.get("text"), "", 60)
@@ -176,7 +182,25 @@ def _link(raw) -> dict | None:
     else:
         icon = icon[:4]
     target = raw.get("target") if raw.get("target") in LINK_TARGETS else "_self"
-    return {"icon": icon, "text": text, "url": url, "target": target}
+    order = _clamp(raw.get("sort_order", position), 1, MAX_ORDER, min(position, MAX_ORDER))
+    return {"icon": icon, "text": text, "url": url, "target": target, "sort_order": order}
+
+
+def _links(raw) -> dict:
+    """A set of quick access buttons: the valid ones, by sort_order (a tie
+    keeps the order they were listed in), at most MAX_LINKS."""
+    lk = raw if isinstance(raw, dict) else {}
+    items = lk.get("items") if isinstance(lk.get("items"), list) else []
+    kept = [x for x in (_link(i, n) for n, i in enumerate(items, 1)) if x]
+    kept.sort(key=lambda x: x["sort_order"])
+    return {"enabled": bool(lk.get("enabled", False)),
+            "style": lk.get("style") if lk.get("style") in LINK_STYLES else DEFAULTS["links"]["style"],
+            "layout": lk.get("layout") if lk.get("layout") in LINK_LAYOUTS else "list",
+            "items": kept[:MAX_LINKS]}
+
+
+def links_on(lk: dict) -> bool:
+    return bool(lk["enabled"] and lk["items"])
 
 
 def _asset(raw) -> dict:
@@ -218,11 +242,8 @@ def normalize(raw: dict | None) -> dict:
     for key in cfg["ghost"]:
         cfg["ghost"][key] = bool(g.get(key, cfg["ghost"][key]))
     cfg["news_buttons"] = bool(raw.get("news_buttons", DEFAULTS["news_buttons"]))
-    lk = raw.get("links") if isinstance(raw.get("links"), dict) else {}
-    items = lk.get("items") if isinstance(lk.get("items"), list) else []
-    cfg["links"] = {"enabled": bool(lk.get("enabled", False)),
-                    "style": lk.get("style") if lk.get("style") in LINK_STYLES else DEFAULTS["links"]["style"],
-                    "items": [x for x in (_link(i) for i in items) if x][:MAX_LINKS]}
+    cfg["links"] = _links(raw.get("links"))
+    cfg["staff_links"] = _links(raw.get("staff_links"))
     st = raw.get("staff") if isinstance(raw.get("staff"), dict) else {}
     cfg["staff"] = {"enabled": bool(st.get("enabled", False)),
                     "accent": _hex(st.get("accent"), cfg["accent"]),
@@ -254,6 +275,89 @@ def parse_theme_data(text: str) -> dict | None:
         return normalize(json.loads(m.group(1)))
     except ValueError:
         return None
+
+
+def _json(text: str) -> dict | None:
+    try:
+        data = json.loads(text or "")
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _from_script(conf: dict) -> dict:
+    """The settings that the config of our OpacUserJS script still tells
+    (when the settings line itself is gone)."""
+    car = conf.get("carousel") if isinstance(conf.get("carousel"), dict) else None
+    lk = conf.get("links") if isinstance(conf.get("links"), dict) else None
+    return {"default_theme": conf.get("default_theme"), "dark_switch": conf.get("dark_switch", True),
+            "news_buttons": conf.get("news_buttons", True),
+            "ghost": {"empty_columns": conf.get("empty_columns", True)},
+            "carousel": {**(car or {}), "enabled": car is not None},
+            "links": {**(lk or {}), "enabled": lk is not None}}
+
+
+def sync_settings(found: dict[str, str]) -> tuple[dict | None, list[tuple[str, dict]]]:
+    """What `--task opac-theme-sync` read in Koha, as the screen's settings
+    (None: nothing of ours there) and a report: (message, values) pairs, in
+    English, for the screen to translate.
+
+    The settings line of OpacUserCSS wins; without it, the copy saved by the
+    last apply (theme-settings.json); without that, what the config of our
+    scripts in OpacUserJS and IntranetUserJS still tells. [kei-button]
+    markers in OpacMainUserBlock turn the news action buttons on."""
+    notes: list[tuple[str, dict]] = []
+    cfg = parse_theme_data(found.get("data", ""))
+    if cfg:
+        notes.append(("Settings: read from OpacUserCSS.", {}))
+    else:
+        state = _json(found.get("state", ""))
+        if state:
+            cfg = normalize(state)
+            notes.append(("Settings: not in OpacUserCSS; taken from the copy saved by the last Apply "
+                          "(theme-settings.json).", {}))
+        else:
+            opac_js = _json(found.get("config_OpacUserJS", ""))
+            staff_js = _json(found.get("config_IntranetUserJS", ""))
+            if opac_js or staff_js:
+                raw = _from_script(opac_js) if opac_js else {}
+                if staff_js and isinstance(staff_js.get("links"), dict):
+                    raw["staff_links"] = {**staff_js["links"], "enabled": True}
+                cfg = normalize(raw)
+                notes.append(("Settings: rebuilt from the panel's scripts in Koha (buttons, carousel, "
+                              "light/dark); colours and pictures stay as on this screen.", {}))
+    if cfg is None:
+        notes.append(("Nothing of the panel's look is in Koha: the screen keeps its settings.", {}))
+    yes = {k: found.get(f"block_{k}") == "yes" for k in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS",
+                                                          "IntranetUserJS")}
+    if cfg:
+        if not yes["OpacUserCSS"] or not yes["OpacUserJS"]:
+            missing = [k for k in ("OpacUserCSS", "OpacUserJS") if not yes[k]]
+            notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
+                          {"prefs": ", ".join(missing)}))
+        if staff_active(cfg) and not yes["IntranetUserCSS"]:
+            notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
+                          {"prefs": "IntranetUserCSS"}))
+        if links_on(cfg["staff_links"]) and not yes["IntranetUserJS"]:
+            notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
+                          {"prefs": "IntranetUserJS"}))
+        notes.append(("Quick access buttons: OPAC ${opac}, staff ${staff}.",
+                      {"opac": str(len(cfg["links"]["items"]) if cfg["links"]["enabled"] else 0),
+                       "staff": str(len(cfg["staff_links"]["items"]) if cfg["staff_links"]["enabled"] else 0)}))
+    for pref in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS", "IntranetUserJS"):
+        own = found.get(f"own_{pref}", "0")
+        if own.isdigit() and int(own):
+            notes.append(("${pref}: ${n} lines of the library's own, kept as they are.", {"pref": pref, "n": own}))
+    markers = found.get("mainblock_buttons", "0")
+    markers = int(markers) if markers.isdigit() else 0
+    if markers:
+        notes.append(("OpacMainUserBlock: ${n} [kei-button] markers.", {"n": str(markers)}))
+        if cfg and not cfg["news_buttons"]:
+            cfg["news_buttons"] = True
+            notes.append(("News action buttons turned on, so those markers become buttons.", {}))
+    elif found.get("mainblock") == "yes":
+        notes.append(("OpacMainUserBlock: no [kei-button] markers.", {}))
+    return cfg, notes
 
 
 def _rgb(hex_color: str) -> str:
@@ -472,8 +576,8 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
 .kei-action-text { display: block; color: var(--kei-muted); font-size: .92em; }""")
     if car["enabled"]:
         out.append(_carousel_css(car))
-    if cfg["links"]["enabled"] and cfg["links"]["items"]:
-        out.append(_links_css())
+    if links_on(cfg["links"]):
+        out.append(_links_css("#kei-links"))
     return "\n".join(out) + "\n"
 
 
@@ -576,16 +680,29 @@ html[data-kei-theme="dark"] body {{
     return "\n".join(lines)
 
 
-def _links_css() -> str:
-    # One full-width button per line, like the buttons of the home page block.
-    return """#kei-links {
+def _links_css(nav: str) -> str:
+    """The quick access buttons of the nav with id nav: one full-width
+    button per line, like the buttons of the home page block, or two
+    columns (kei-layout-grid2) that stack the icon over the text on a phone
+    and fall back to one column on the narrowest screens. The look is the
+    nav's class: kei-links-solid, -gradient, -glass or -metal."""
+    n = f"html body {nav}"
+    dark = f'html[data-kei-theme="dark"] body {nav}'
+    return f"""{nav} {{
     display: flex;
     flex-direction: column;
     gap: .6rem;
     width: 100%;
     margin: 0 0 1.25rem;
-}
-html body a.kei-link {
+}}
+{n}.kei-layout-grid2 {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .6rem;
+}}
+{n} a.kei-link {{
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -599,23 +716,88 @@ html body a.kei-link {
     border-radius: var(--kei-r-btn);
     font-weight: 600;
     text-decoration: none !important;
-    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
-}
-html body a.kei-link:hover, html body a.kei-link:focus-visible { transform: translateY(-2px); filter: brightness(1.05); }
-.kei-link-icon { font-size: 1.35rem; line-height: 1; min-width: 1.6rem; text-align: center; }
-html body .kei-links-solid a.kei-link { background: var(--nexus-primary); color: var(--nexus-on-primary) !important;
-    box-shadow: 0 4px 14px rgba(var(--kei-accent-rgb), .30); }
-html body .kei-links-gradient a.kei-link { color: #fff !important;
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease, border-color .18s ease;
+}}
+{n} a.kei-link:hover, {n} a.kei-link:focus-visible {{ transform: translateY(-2px); filter: brightness(1.05); }}
+{n} .kei-link-icon {{ font-size: 1.35rem; line-height: 1; min-width: 1.6rem; text-align: center; }}
+{n}.kei-links-solid a.kei-link {{ background: var(--nexus-primary); color: var(--nexus-on-primary) !important;
+    box-shadow: 0 4px 14px rgba(var(--kei-accent-rgb), .30); }}
+{n}.kei-links-gradient a.kei-link {{ color: #fff !important;
     background: linear-gradient(135deg, var(--nexus-primary), var(--nexus-secondary));
-    box-shadow: 0 6px 18px rgba(var(--kei-accent2-rgb), .28); }
-html body .kei-links-glass a.kei-link { color: var(--kei-text) !important;
+    box-shadow: 0 6px 18px rgba(var(--kei-accent2-rgb), .28); }}
+{n}.kei-links-glass a.kei-link {{ color: var(--kei-text) !important;
     background: rgba(var(--kei-surface-rgb), .55);
     -webkit-backdrop-filter: blur(10px) saturate(150%);
     backdrop-filter: blur(10px) saturate(150%);
     border: 1px solid rgba(255, 255, 255, .45);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .35); }
-html body .kei-links-glass a.kei-link:hover { border-color: var(--nexus-primary); }
-@media (prefers-reduced-motion: reduce) { html body a.kei-link { transition: none; } }"""
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .35); }}
+{n}.kei-links-glass a.kei-link:hover {{ border-color: var(--nexus-primary); }}
+/* Brushed metal: fine horizontal grain over a satin silver gradient, a
+   bevel of light and shade, and a specular band that sweeps across on hover. */
+{n}.kei-links-metal a.kei-link {{ color: #1f2933 !important;
+    background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .10) 0 1px, rgba(0, 0, 0, .03) 1px 2px,
+            transparent 2px 3px),
+        linear-gradient(180deg, #f6f7f9 0%, #e1e5ea 42%, #cbd0d7 58%, #e7eaee 100%);
+    border: 1px solid #a9afb7;
+    border-top-color: #d8dce1;
+    border-bottom-color: #8e949c;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, .75);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(0, 0, 0, .14),
+        0 3px 8px rgba(15, 23, 42, .18); }}
+{n}.kei-links-metal a.kei-link::after {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .7) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform .6s ease;
+}}
+{n}.kei-links-metal a.kei-link:hover::after, {n}.kei-links-metal a.kei-link:focus-visible::after {{
+    transform: translateX(120%); }}
+{n}.kei-links-metal a.kei-link:hover, {n}.kei-links-metal a.kei-link:focus-visible {{
+    border-color: var(--nexus-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(0, 0, 0, .14),
+        0 8px 18px rgba(var(--kei-accent-rgb), .28); }}
+{n}.kei-links-metal .kei-link-icon {{ color: var(--nexus-primary); text-shadow: none; }}
+{dark}.kei-links-metal a.kei-link {{ color: #eef1f4 !important;
+    background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .05) 0 1px, rgba(0, 0, 0, .06) 1px 2px,
+            transparent 2px 3px),
+        linear-gradient(180deg, #5b626b 0%, #434951 45%, #33383f 58%, #4a5058 100%);
+    border-color: #2a2e34;
+    border-top-color: #6c737c;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, .5); }}
+{dark}.kei-links-metal a.kei-link::after {{
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .22) 50%, transparent 65%); }}
+@media (max-width: 576px) {{
+    {n}.kei-layout-grid2 a.kei-link {{ flex-direction: column; gap: .35rem; min-height: 64px;
+        padding: .7rem .5rem; font-size: .92rem; }}
+}}
+@media (max-width: 340px) {{ {n}.kei-layout-grid2 {{ grid-template-columns: 1fr; }} }}
+@media (prefers-reduced-motion: reduce) {{
+    {n} a.kei-link, {n}.kei-links-metal a.kei-link::after {{ transition: none; }}
+}}"""
+
+
+def staff_links_css(cfg: dict) -> str:
+    """The staff home page's quick access buttons: the same rules, with the
+    staff interface's colours set on the nav itself, so they work with or
+    without the staff colour theme."""
+    st = normalize(cfg)["staff"]
+    accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
+    return f"""html body #kei-staff-links {{
+    --nexus-primary: {accent};
+    --nexus-secondary: {accent2};
+    --nexus-on-primary: {text_on(accent)};
+    --kei-accent-rgb: {_rgb(accent)};
+    --kei-accent2-rgb: {_rgb(accent2)};
+    --kei-surface-rgb: {_rgb(mix(surface, accent, .08))};
+    --kei-text: {text_on(surface)};
+    --kei-r-btn: 10px;
+    margin-top: .5rem;
+}}
+{_links_css("#kei-staff-links")}
+"""
 
 
 def _carousel_css(car: dict) -> str:
@@ -1042,13 +1224,62 @@ html body .dataTables_wrapper, html body fieldset.rows, html body form .action {
     return out
 
 
+def staff_active(cfg: dict) -> bool:
+    """Something of ours goes into the staff interface: its colours or its
+    home page buttons."""
+    cfg = normalize(cfg)
+    return cfg["staff"]["enabled"] or links_on(cfg["staff_links"])
+
+
 def staff_css_block(cfg: dict) -> str:
-    return "\n".join([CSS_BEGIN, staff_css_body(cfg).rstrip("\n"), CSS_END]) + "\n"
+    """IntranetUserCSS: the staff colours when they are on, the home page
+    buttons when there are some."""
+    cfg = normalize(cfg)
+    parts = []
+    if cfg["staff"]["enabled"]:
+        parts.append(staff_css_body(cfg).rstrip("\n"))
+    if links_on(cfg["staff_links"]):
+        parts.append(staff_links_css(cfg).rstrip("\n"))
+    return "\n".join([CSS_BEGIN, *parts, CSS_END]) + "\n"
 
 
 # ----------------------------------------------------------------------
 # The script
 # ----------------------------------------------------------------------
+# The nav of quick access buttons (OPAC and staff home page): id, the
+# settings ({style, layout, items}, already in sort_order) and its label.
+_LINK_NAV = r"""    function linkNav(id, L, label) {
+        if (!L || !L.items || !L.items.length) { return null; }
+        var nav = document.createElement("nav");
+        nav.id = id;
+        nav.className = "kei-links-" + L.style + " kei-layout-" + (L.layout || "list");
+        nav.setAttribute("aria-label", label);
+        L.items.slice().sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); }).forEach(function (it) {
+            var url = /^(https?:\/\/|\/(?!\/)|mailto:|tel:|#)/.test(it.url || "") ? it.url : "";
+            if (!url) { return; }
+            var a = document.createElement("a");
+            a.className = "kei-link";
+            a.href = url;
+            if (it.target === "_blank") { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+            var icon = document.createElement("span");
+            icon.className = "kei-link-icon";
+            icon.setAttribute("aria-hidden", "true");
+            if (/^fa-[a-z0-9-]+$/.test(it.icon || "")) {
+                var i = document.createElement("i");
+                i.className = "fa " + it.icon;
+                icon.appendChild(i);
+            } else {
+                icon.textContent = it.icon || "\u279C";
+            }
+            var text = document.createElement("span");
+            text.textContent = it.text;
+            a.appendChild(icon);
+            a.appendChild(text);
+            nav.appendChild(a);
+        });
+        return nav.children.length ? nav : null;
+    }"""
+
 _JS = r"""(function () {
     "use strict";
     var C = __CONFIG__;
@@ -1188,37 +1419,12 @@ _JS = r"""(function () {
             || document.querySelector(".maincontent") || document.querySelector(".main");
     }
 
+__LINK_NAV__
+
     function links(L) {
         var place = homeTarget();
-        if (!place || !L.items || !L.items.length) { return; }
-        var nav = document.createElement("nav");
-        nav.id = "kei-links";
-        nav.className = "kei-links-" + L.style;
-        nav.setAttribute("aria-label", C.text.links);
-        L.items.forEach(function (it) {
-            var url = /^(https?:\/\/|\/(?!\/)|mailto:|tel:|#)/.test(it.url || "") ? it.url : "";
-            if (!url) { return; }
-            var a = document.createElement("a");
-            a.className = "kei-link";
-            a.href = url;
-            if (it.target === "_blank") { a.target = "_blank"; a.rel = "noopener noreferrer"; }
-            var icon = document.createElement("span");
-            icon.className = "kei-link-icon";
-            icon.setAttribute("aria-hidden", "true");
-            if (/^fa-[a-z0-9-]+$/.test(it.icon || "")) {
-                var i = document.createElement("i");
-                i.className = "fa " + it.icon;
-                icon.appendChild(i);
-            } else {
-                icon.textContent = it.icon || "➜";
-            }
-            var label = document.createElement("span");
-            label.textContent = it.text;
-            a.appendChild(icon);
-            a.appendChild(label);
-            nav.appendChild(a);
-        });
-        if (!nav.children.length) { return; }
+        var nav = place && linkNav("kei-links", L, C.text.links);
+        if (!nav) { return; }
         if (place.id === "opacmainuserblock" || place.id === "opacmainblock") {
             place.insertBefore(nav, place.firstChild);
         } else {
@@ -1430,6 +1636,32 @@ _JS = r"""(function () {
     }
 })();"""
 
+# The staff home page (mainpage.pl): the buttons above the module tiles.
+_STAFF_JS = r"""(function () {
+    "use strict";
+    var C = __CONFIG__;
+__LINK_NAV__
+
+    function ready(fn) {
+        if (document.readyState !== "loading") { fn(); } else { document.addEventListener("DOMContentLoaded", fn); }
+    }
+
+    ready(function () {
+        var home = (document.body && document.body.id === "main_intranet-main") || /\/mainpage\.pl$/.test(location.pathname);
+        if (!home || document.getElementById("kei-staff-links")) { return; }
+        var nav = linkNav("kei-staff-links", C.links, C.label);
+        if (!nav) { return; }
+        var tiles = document.querySelector("#container-main .biglinks-list");
+        var row = tiles && tiles.closest ? tiles.closest(".row") : null;
+        var main = document.getElementById("container-main") || document.querySelector(".main");
+        if (row && row.parentNode) {
+            row.parentNode.insertBefore(nav, row);
+        } else if (main) {
+            main.insertBefore(nav, main.firstChild);
+        }
+    });
+})();"""
+
 JS_TEXT = {"switch_title": "Light / dark mode", "available": "Available", "out": "On loan", "prev": "Previous",
            "next": "Next", "links": "Quick access"}
 
@@ -1446,15 +1678,32 @@ def js_config(cfg: dict, text: dict | None = None) -> dict:
         "carousel": ({"feed": FEED_URL, "count": car["count"], "autoplay": car["autoplay"], "speed": car["speed"],
                       "hover": car["hover"], "overlay": car["overlay"], "title": car["title"], "mode": car["mode"]}
                      if car["enabled"] else None),
-        "links": ({"style": cfg["links"]["style"], "items": cfg["links"]["items"]}
-                  if cfg["links"]["enabled"] and cfg["links"]["items"] else None),
+        "links": _links_conf(cfg["links"]) if links_on(cfg["links"]) else None,
         "text": {**JS_TEXT, **(text or {})},
     }
 
 
+def _links_conf(lk: dict) -> dict:
+    return {"style": lk["style"], "layout": lk["layout"], "items": lk["items"]}
+
+
+def _script(template: str, conf: dict) -> str:
+    conf = json.dumps(conf, ensure_ascii=True, sort_keys=True).replace("</", "<\\/")
+    return template.replace("__LINK_NAV__", _LINK_NAV).replace("__CONFIG__", conf)
+
+
 def js_block(cfg: dict, text: dict | None = None) -> str:
-    conf = json.dumps(js_config(cfg, text), ensure_ascii=True, sort_keys=True).replace("</", "<\\/")
-    return "\n".join([JS_BEGIN, _JS.replace("__CONFIG__", conf), JS_END]) + "\n"
+    return "\n".join([JS_BEGIN, _script(_JS, js_config(cfg, text)), JS_END]) + "\n"
+
+
+def staff_js_config(cfg: dict, text: dict | None = None) -> dict:
+    cfg = normalize(cfg)
+    return {"links": _links_conf(cfg["staff_links"]), "label": {**JS_TEXT, **(text or {})}["links"]}
+
+
+def staff_js_block(cfg: dict, text: dict | None = None) -> str:
+    """IntranetUserJS: the staff home page buttons."""
+    return "\n".join([JS_BEGIN, _script(_STAFF_JS, staff_js_config(cfg, text)), JS_END]) + "\n"
 
 
 def check_block(text: str, begin: str, end: str) -> str:
@@ -1573,16 +1822,19 @@ def upload_cloudinary(path: Path, cloud: str, preset: str, post=_post) -> str:
 # ----------------------------------------------------------------------
 def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None) -> Path:
     """user.css, user.js, staff.css (when the staff interface takes the
-    colours), prefs (NAME<TAB>VALUE), carousel (on N|off) and assets/ (the
+    colours or has home page buttons), staff.js (the buttons), prefs (NAME<TAB>VALUE), carousel (on N|off) and assets/ (the
     server files to publish). Private (0700)."""
     cfg = normalize(cfg)
     work = Path(tempfile.mkdtemp(prefix="kei-opac-"))
     os.chmod(work, 0o700)
     (work / "user.css").write_text(css_block(cfg), encoding="utf-8")
     (work / "user.js").write_text(js_block(cfg, text), encoding="utf-8")
-    # No staff.css: the task takes the staff interface's block out again.
-    if cfg["staff"]["enabled"]:
+    # No staff.css / staff.js: the task takes our blocks out of the staff
+    # interface's preferences again.
+    if staff_active(cfg):
         (work / "staff.css").write_text(staff_css_block(cfg), encoding="utf-8")
+    if links_on(cfg["staff_links"]):
+        (work / "staff.js").write_text(staff_js_block(cfg, text), encoding="utf-8")
     prefs = []
     car = cfg["carousel"]
     if car["enabled"]:

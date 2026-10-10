@@ -40,7 +40,8 @@ CREATE TABLE systempreferences (variable varchar(50) NOT NULL PRIMARY KEY, value
 INSERT INTO systempreferences (variable, value) VALUES
   ('OpacUserCSS', '#mine { color: red; }'), ('OpacUserJS', 'console.log(\"mine\");'),
   ('OPACAmazonCoverImages', '0'), ('AmazonAssocTag', ''), ('OpacFavicon', ''), ('OpacNav', 'keep'),
-  ('IntranetUserCSS', '#staff { color: navy; }'), ('IntranetFavicon', '');"
+  ('IntranetUserCSS', '#staff { color: navy; }'), ('IntranetFavicon', ''),
+  ('IntranetUserJS', '/* koha-easy-installer cdd begin */\nvar cdd = 1;\n/* koha-easy-installer cdd end */');"
     mkdir -p "$W/custom" "$W/work"
     cat > "$W/extra.sh" <<SH
 SYS_LANG=en
@@ -334,4 +335,77 @@ SH
     grep -q '^        opac-theme-apply) ' "$KEI_REPO/installer"
     grep -q '^        opac-theme-remove) ' "$KEI_REPO/installer"
     grep -q '^        opac-carousel-refresh) ' "$KEI_REPO/installer"
+    grep -q '^        opac-theme-sync) ' "$KEI_REPO/installer"
+}
+
+@test "opac-theme-apply: staff.js goes in IntranetUserJS next to the other tools' blocks, and out again" {
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" "(function () { var staff = 1; })();" \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.js"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    pref IntranetUserJS | grep -qxF "var cdd = 1;"
+    pref IntranetUserJS | grep -qF "var staff = 1;"
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert "var staff = 1;" in s["blocks"]["IntranetUserJS"], s
+PY
+    # A restore wipes it; the saved look puts it back.
+    mysql "$DB" -e "UPDATE systempreferences SET value = 'var old = 1;' WHERE variable = 'IntranetUserJS';"
+    task theme_state_reapply
+    [ "$(pref IntranetUserJS | head -n1)" = "var old = 1;" ]
+    pref IntranetUserJS | grep -qF "var staff = 1;"
+    # Without staff.js our block goes, the other one stays.
+    mysql "$DB" -e "UPDATE systempreferences SET value = CONCAT('var cdd = 1;', CHAR(10), value) WHERE variable = 'IntranetUserJS';"
+    rm "$W/apply/staff.js"
+    task opac_theme_apply "$W/apply"
+    [ -z "$(pref IntranetUserJS | grep -F "var staff = 1;")" ]
+    pref IntranetUserJS | grep -qxF "var cdd = 1;"
+    # A damaged staff.js changes nothing.
+    printf 'var staff = 2;\n' > "$W/apply/staff.js"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    [ -z "$(pref IntranetUserJS | grep -F "var staff = 2;")" ]
+    rm "$W/apply/staff.js"
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" "var staff = 3;" \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.js"
+    task opac_theme_apply "$W/apply"
+    task opac_theme_remove
+    [ -z "$(pref IntranetUserJS | grep -F "var staff = 3;")" ]
+    pref IntranetUserJS | grep -qxF "var cdd = 1;"
+}
+
+@test "opac-theme-sync: what is live in Koha, for the panel's Sync button" {
+    mysql "$DB" -e "DROP TABLE IF EXISTS additional_contents_localizations; DROP TABLE IF EXISTS additional_contents;
+CREATE TABLE additional_contents (id int PRIMARY KEY, location varchar(255));
+CREATE TABLE additional_contents_localizations (id int PRIMARY KEY, additional_content_id int, content mediumtext);
+INSERT INTO additional_contents VALUES (1, 'OpacMainUserBlock'), (2, 'opac_news');
+INSERT INTO additional_contents_localizations VALUES
+  (1, 1, '<p>Hi</p>[kei-button url=\\\"/a\\\"]A[/kei-button] [kei-button url=\\\"/b\\\"]B[/kei-button]'),
+  (2, 2, '[kei-button url=\\\"/c\\\"]C[/kei-button]');"
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" '    var C = {"links": {"items": []}};' \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/user.js"
+    task opac_theme_apply "$W/apply"
+    rm -f "$W/results"
+    task opac_theme_sync
+    [ "$status" -eq 0 ]
+    grep -qF 'RESULT data=/* KEI-THEME-DATA: {"texture": "frosted", "version": 1} */' "$W/results"
+    grep -qxF 'RESULT block_OpacUserCSS=yes' "$W/results"
+    grep -qxF 'RESULT block_IntranetUserJS=no' "$W/results"
+    grep -qxF 'RESULT own_OpacUserCSS=1' "$W/results"
+    grep -qxF 'RESULT own_IntranetUserJS=3' "$W/results"
+    grep -qxF 'RESULT config_OpacUserJS={"links": {"items": []}}' "$W/results"
+    grep -qxF 'RESULT state={"texture": "frosted", "version": 1}' "$W/results"
+    grep -qxF 'RESULT mainblock=yes' "$W/results"
+    grep -qxF 'RESULT mainblock_buttons=2' "$W/results"
+    # The settings line moved out of our block by hand: still found.
+    mysql "$DB" -e "UPDATE systempreferences SET value = '/* KEI-THEME-DATA: {\\\"texture\\\": \\\"metal\\\"} */' WHERE variable = 'OpacUserCSS';
+DROP TABLE additional_contents_localizations; DROP TABLE additional_contents;"
+    rm -f "$W/results" "$W/etc/theme-settings.json"
+    task opac_theme_sync
+    [ "$status" -eq 0 ]
+    grep -qF 'RESULT data=/* KEI-THEME-DATA: {"texture": "metal"} */' "$W/results"
+    grep -qxF 'RESULT block_OpacUserCSS=no' "$W/results"
+    [ -z "$(grep 'RESULT state=' "$W/results")" ]
+    grep -qxF 'RESULT mainblock=no' "$W/results"
 }
