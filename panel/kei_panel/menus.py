@@ -84,9 +84,9 @@ SECTIONS: tuple[Section, ...] = (
     # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
     # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
     Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z"),
-    # New screen: the public catalogue's look (textures, wallpaper, dark mode,
+    # New screen: the look of the public catalogue and the staff interface (textures, wallpaper, dark mode,
     # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
-    Section("opac", "🎨  OPAC appearance", "🎨  OPAC appearance", view="opac", key="o"),
+    Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o"),
     # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
     # Z39.50 on one screen (views/hub.py); its buttons run these routines.
     # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:

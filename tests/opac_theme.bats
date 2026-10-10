@@ -34,6 +34,7 @@ setup() {
     load lib/common
     W="$BATS_TEST_TMPDIR"
     rm -f "$KEI_S/dialogs.log"
+    mysql "$DB" -e "DROP TABLE IF EXISTS additional_contents_localizations; DROP TABLE IF EXISTS additional_contents;"
     mysql "$DB" -e "DROP TABLE IF EXISTS systempreferences;
 CREATE TABLE systempreferences (variable varchar(50) NOT NULL PRIMARY KEY, value mediumtext, options longtext,
   explanation mediumtext, type varchar(20)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -51,6 +52,8 @@ is_koha_installed() { return 0; }
 tools_locked() { TOOLS_WORK="$W/work"; "\$@"; }
 tools_safety_backup() { TOOLS_PRE="$W/PRE-\$1.sql.gz"; echo "\$1" >> "$W/backups"; }
 memcached_flush() { return 0; }
+opac_theme_restart() { echo restart >> "$W/restarts"; }
+OPAC_RETIRED="$W/etc/theme-retired.tsv"
 TOOLS_LOG_DIR="$W/logs"
 OPAC_CUSTOM_DIR="$W/custom"
 STAFF_CUSTOM_DIR="$W/staff-custom"
@@ -409,3 +412,140 @@ DROP TABLE additional_contents_localizations; DROP TABLE additional_contents;"
     [ -z "$(grep 'RESULT state=' "$W/results")" ]
     grep -qxF 'RESULT mainblock=no' "$W/results"
 }
+
+# --- login instructions and footer credits (HTML customizations) --------
+
+# Koha 23.11+ tables, and the library's own entries: credits (id 1, shown),
+# login instructions (id 2, shown until a date) and an old expired one (id 3).
+contents_tables() {
+    mysql "$DB" -e "CREATE TABLE additional_contents (id int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  category varchar(20) NOT NULL, code varchar(100) NOT NULL, location varchar(255) NOT NULL,
+  branchcode varchar(10) DEFAULT NULL, published_on date DEFAULT NULL,
+  updated_on timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  expirationdate date DEFAULT NULL, number int DEFAULT NULL, borrowernumber int DEFAULT NULL,
+  UNIQUE KEY additional_contents_uniq (category, code, branchcode)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE additional_contents_localizations (id int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  additional_content_id int unsigned NOT NULL, title varchar(250) NOT NULL DEFAULT '', content mediumtext NOT NULL,
+  lang varchar(50) NOT NULL DEFAULT '', UNIQUE KEY (additional_content_id, lang),
+  CONSTRAINT fk_ac FOREIGN KEY (additional_content_id) REFERENCES additional_contents (id) ON DELETE CASCADE)
+  ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO additional_contents (id, category, code, location, published_on, expirationdate) VALUES
+  (1, 'html_customizations', 'opaccredits_1', 'opaccredits', '2025-01-01', NULL),
+  (2, 'html_customizations', 'OpacLoginInstructions_2', 'OpacLoginInstructions', '2025-01-01', '2099-12-31'),
+  (3, 'html_customizations', 'opaccredits_3', 'opaccredits', '2020-01-01', '2021-01-01');
+INSERT INTO additional_contents_localizations (additional_content_id, content, lang) VALUES
+  (1, '<p>Old credits</p>', 'default'), (2, '<p>Old login</p>', 'default'), (3, '<p>Older</p>', 'default');"
+}
+
+# contents DIR LOC=on|off...: the panel's contents.list and files.
+contents() {
+    local dir="$1" a loc
+    shift
+    mkdir -p "$dir/contents"
+    : > "$dir/contents.list"
+    for a in "$@"; do
+        loc="${a%%=*}"
+        printf '%s\t%s\n' "$loc" "${a#*=}" >> "$dir/contents.list"
+        [ "${a#*=}" = "on" ] && printf '<div class="kei-credits">\n<p>%s – ours</p>\n</div>\n' "$loc" > "$dir/contents/$loc.html"
+    done
+    printf '{"credits": {"enabled": true, "name": "Biblioteca"}}' > "$dir/contents.json"
+}
+
+ac() { mysql --default-character-set=utf8mb4 -N --raw "$DB" -e "$1"; }
+
+@test "contents: ours goes in, the library's own entry expires and comes back with off and remove" {
+    contents_tables
+    contents "$W/apply" opaccredits=on OpacLoginInstructions=on StaffLoginInstructions=off
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ "$(ac "SELECT l.content FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
+             WHERE c.code = 'kei-opaccredits' AND c.location = 'opaccredits' AND c.branchcode IS NULL AND l.lang = 'default'
+             AND c.published_on <= CURDATE() AND c.expirationdate IS NULL")" = $'<div class="kei-credits">\n<p>opaccredits – ours</p>\n</div>' ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-%'")" = "2" ]
+    # Koha would show both: the library's own shown entries are expired, the old one untouched.
+    [ "$(ac "SELECT id FROM additional_contents WHERE code NOT LIKE 'kei-%' AND expirationdate < CURDATE() ORDER BY id" | tr '\n' ' ')" = "1 2 3 " ]
+    [ "$(ac "SELECT expirationdate FROM additional_contents WHERE id = 3")" = "2021-01-01" ]
+    [ "$(cat "$W/etc/theme-retired.tsv")" = $'opaccredits\t1\t\nOpacLoginInstructions\t2\t2099-12-31' ]
+    grep -qx restart "$W/restarts"
+    # A second apply: still one entry of ours per place, nothing listed twice.
+    task opac_theme_apply "$W/apply"
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-opaccredits'")" = "1" ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents_localizations")" = "5" ]
+    [ "$(wc -l < "$W/etc/theme-retired.tsv")" = "2" ]
+    # The credits turned off: ours goes, the library's credits come back.
+    contents "$W/apply" opaccredits=off OpacLoginInstructions=on StaffLoginInstructions=off
+    task opac_theme_apply "$W/apply"
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-opaccredits'")" = "0" ]
+    [ "$(ac "SELECT IFNULL(expirationdate, 'none') FROM additional_contents WHERE id = 1")" = "none" ]
+    [ "$(cat "$W/etc/theme-retired.tsv")" = $'OpacLoginInstructions\t2\t2099-12-31' ]
+    # Remove: none of ours left, the login instructions get their own date back.
+    task opac_theme_remove
+    [ "$status" -eq 0 ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-%'")" = "0" ]
+    [ "$(ac "SELECT expirationdate FROM additional_contents WHERE id = 2")" = "2099-12-31" ]
+    [ ! -e "$W/etc/theme-retired.tsv" ]
+}
+
+@test "contents: scripts, handlers, unknown places or a missing file change nothing" {
+    contents_tables
+    contents "$W/apply" opaccredits=on
+    printf '<p onclick="alert(1)">x</p>\n' > "$W/apply/contents/opaccredits.html"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    grep -q "ERROR .*missing or damaged" "$KEI_S/dialogs.log"
+    printf '<p>x</p><SCRIPT>alert(1)</SCRIPT>\n' > "$W/apply/contents/opaccredits.html"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    printf '<a href="javascript:alert(1)">x</a>\n' > "$W/apply/contents/opaccredits.html"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    contents "$W/apply" OpacNav=on
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    contents "$W/apply" opaccredits=on
+    rm -f "$W/apply/contents/opaccredits.html"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 1 ]
+    [ ! -e "$W/backups" ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-%'")" = "0" ]
+}
+
+@test "contents: the login banners go to each side's folder" {
+    printf '\x89PNG\r\n\x1a\nfake' > "$W/apply/assets/kei-login.png"
+    printf '\x89PNG\r\n\x1a\nfake' > "$W/apply/assets/kei-staff-login.png"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ -f "$W/custom/kei-login.png" ] && [ -f "$W/staff-custom/kei-staff-login.png" ]
+    task opac_theme_remove
+    [ ! -e "$W/custom/kei-login.png" ] && [ ! -e "$W/staff-custom/kei-staff-login.png" ]
+}
+
+@test "contents: a Koha without the localizations table skips them, the look still goes in" {
+    contents "$W/apply" opaccredits=on
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    grep -q "RESULT contents=unsupported" "$W/results"
+    pref OpacUserCSS | grep -qxF "a { color: blue; }"
+}
+
+@test "contents: saved in theme-settings.json, written back after a restore, read by opac-theme-get" {
+    contents_tables
+    contents "$W/apply" opaccredits=on OpacLoginInstructions=off StaffLoginInstructions=off
+    task opac_theme_apply "$W/apply"
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert "ours" in s["contents"]["opaccredits"] and s["contents"]["OpacLoginInstructions"] == "", s
+assert s["contents_settings"]["credits"]["name"] == "Biblioteca", s
+PY
+    # The restored database has the library's own credits back and none of ours.
+    ac "DELETE FROM additional_contents WHERE code LIKE 'kei-%'; UPDATE additional_contents SET expirationdate = NULL WHERE id = 1;"
+    task theme_state_reapply
+    [ "$status" -eq 0 ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-opaccredits'")" = "1" ]
+    [ "$(ac "SELECT expirationdate < CURDATE() FROM additional_contents WHERE id = 1")" = "1" ]
+    rm -f "$W/results"
+    task opac_theme_get
+    grep -qF 'RESULT contents_settings={"credits": {"enabled": true, "name": "Biblioteca"}}' "$W/results"
+}
+

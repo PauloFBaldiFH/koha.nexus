@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.48** (1.5.49: staff authority links PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.49** (1.5.50: OPAC and Staff Appearance PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,23 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.50 (OPAC and Staff Appearance)**: the "OPAC appearance" screen is now **OPAC and Staff
+  Appearance** (pt: *Aparência do OPAC e STAFF*). Readability fixes from Paulo's screenshots: `.main`
+  and `#opaccredits` are content panels (new slider `panel_opacity`, 80-100, default 94, blur on a
+  `::before` layer), Koha's inner panels (breadcrumbs, tab panes, `#menu`/`#usermenu`, facets,
+  toolbars, `#action`, `.nav_results`, tables, pagination) share one solid inner colour, edge and
+  radius; text/labels/links/headings get colours checked to WCAG AA (`panel_colors`, `readable`)
+  in light (#1a1a1a on near-white) and dark (#e6edf3 on #161b22/#0d1117) mode, dark alerts and
+  status colours. `.main` left `_BLOCKS` (the header/search keep the glass). Staff: breadcrumb
+  card, `.page-section` on the card colour, and with a dark staff surface Koha's white tables,
+  forms and dialogs follow it. New boxes: OPAC login page / Staff login page (allow-listed HTML via
+  `sanitize_html`, banner picture `kei-login.*` / `kei-staff-login.*`) and Footer credits (a form ->
+  fixed markup). They are Koha 23.11+ HTML customizations (`additional_contents` +
+  `_localizations`, code `kei-<location>`, lang `default`), not sysprefs; the library's own entries
+  at the same location are set to expired and listed in `theme-retired.tsv`, given back when ours is
+  turned off or on Remove. Their settings are kept out of the public CSS data line and live in
+  theme-settings.json (`contents_settings`, `contents`), re-applied after a restore. Apply and
+  Remove restart memcached and Plack. Not checked on a live Koha.
 - **1.5.49 (staff authority links)**: the magnifying glass next to a heading on the staff record
   page opened `opac-authoritiesdetail.pl` (404 on the staff port). Koha's staff stylesheet
   (25.05 to 26.05) links to `authorities/detail.pl`; only the OPAC one makes that link, so the staff

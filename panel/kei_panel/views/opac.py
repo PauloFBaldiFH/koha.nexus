@@ -33,7 +33,7 @@ from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Input, Label, Select, Static, Switch
+from textual.widgets import Button, Input, Label, Select, Static, Switch, TextArea
 
 from .. import opac_theme as ot
 from ..i18n import t
@@ -43,16 +43,34 @@ from ..widgets.colorpick import ColorPicker
 from ..widgets.slider import Slider
 from .base import SectionView
 
-ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon"}
+ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon", "login": "Login banner"}
 FILE_SOURCES = ("local", "imgbb", "cloudinary")
+# The login pages: settings side -> (box id, title, picture name).
+LOGIN_BOXES = {"opac": ("o-login-opac", "OPAC login page"), "staff": ("o-login-staff", "Staff login page")}
+# The credits form: field -> (label, placeholder, max length).
+CREDIT_FIELDS = {
+    "name": ("Library name", "", 120), "address": ("Address", "", 200), "phone": ("Phone", "+55 (44) 3649-1214", 40),
+    "whatsapp": ("WhatsApp", "+55 44 3649-1214", 30), "email": ("E-mail", "biblioteca@...", 120),
+    "website": ("Website", "https://...", 300), "hours": ("Opening hours", "", 120),
+    "instagram": ("Instagram", "@biblioteca", 300), "facebook": ("Facebook", "https://facebook.com/...", 300),
+    "youtube": ("YouTube", "https://youtube.com/@...", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
+    "note": ("Note", "", 300),
+}
+
+
 def _picture(raw: dict, name: str) -> dict:
-    """The settings entry of a picture: raw[name], or raw["staff"][...] for staff-*."""
+    """The settings entry of a picture: raw[name], raw["staff"][...] for
+    staff-*, the login banners' raw["login"][side]["image"]."""
+    for side, role in ot.LOGIN_ASSETS.items():
+        if name == role:
+            return raw["login"][side]["image"]
     return raw["staff"][name.removeprefix("staff-")] if name.startswith("staff-") else raw[name]
 
 
 SLIDERS = {   # id: (label, unit, step)
     "blur": ("Blur", "px", 1),
     "opacity": ("Opacity", "%", 1),
+    "panel_opacity": ("Content panels", "%", 1),
     "radius_block": ("Blocks", "px", 1),
     "radius_input": ("Inputs", "px", 1),
     "radius_button": ("Buttons", "px", 1),
@@ -98,7 +116,7 @@ class OpacView(SectionView):
         with Vertical(id="o-material", classes="opac-box"):
             yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=c["texture"],
                                                  allow_blank=False, id="o-texture"))
-            for key in ("blur", "opacity", "radius_block", "radius_input", "radius_button"):
+            for key in ("blur", "opacity", "panel_opacity", "radius_block", "radius_input", "radius_button"):
                 yield from self._slider(key)
             bars = (t("Hue"), t("Saturation"), t("Lightness"))
             yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")
@@ -180,6 +198,31 @@ class OpacView(SectionView):
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
                                                   value=st["contrast"], allow_blank=False, id="o-staff-contrast"))
             yield from _row(t("Text size"), Slider(*ot.STAFF_FONT, st["font"], unit="%", id="o-staff-font"))
+        for side, (box, _title) in LOGIN_BOXES.items():
+            lg = c["login"][side]
+            with Vertical(id=box, classes="opac-box"):
+                yield Static(t("Shown on the login page (${where}), next to the login form: a banner picture "
+                               "(it shrinks with the screen) and your text. HTML is allowed: paragraphs, bold, "
+                               "italics, lists, headings, links and pictures; scripts, styles and event handlers "
+                               "are taken out.", where=ot.LOGIN_SIDES[side]),
+                             classes="ai-note", markup=False)
+                yield from _row(t("Show"), Switch(lg["enabled"], id=f"{box}-enabled"))
+                yield from self._asset_row(ot.LOGIN_ASSETS[side], lg["image"])
+                yield from _row(t("Picture description"), Input(lg["alt"], id=f"{box}-alt", max_length=120,
+                                                                 placeholder=t("for screen readers")))
+                yield from _row(t("Text (HTML)"), TextArea(lg["html"], id=f"{box}-html", classes="o-html"))
+        cr = c["credits"]
+        with Vertical(id="o-credits", classes="opac-box"):
+            yield Static(t("The footer of every OPAC page (opaccredits), built from these fields: no HTML to "
+                           "type. While it is on, the library's own footer entries are set to expired, and come "
+                           "back when it is turned off or the look is removed."), classes="ai-note", markup=False)
+            yield from _row(t("Show"), Switch(cr["enabled"], id="o-cr-enabled"))
+            for key, (label, hint, size) in CREDIT_FIELDS.items():
+                yield from _row(t(label), Input(cr[key], id=f"o-cr-{key}", max_length=size, placeholder=hint))
+            yield from _row(t("Other links"), TextArea(_credit_links_text(cr["links"]), id="o-cr-links",
+                                                       classes="o-html o-links-text"))
+            yield Static(t("One per line: text | address (at most ${n}).", n=str(ot.MAX_CREDIT_LINKS)),
+                         classes="ai-note", markup=False)
         with Vertical(id="o-ghost", classes="opac-box"):
             for key, label in GHOST.items():
                 yield from _row(t(label), Switch(c["ghost"][key], id=f"o-g-{key}"))
@@ -218,7 +261,9 @@ class OpacView(SectionView):
         titles = {"o-material": "Material", "o-images": "Pictures", "o-dark": "Legibility and dark mode",
                   "o-carousel": "New arrivals carousel", "o-links": "Quick access buttons",
                   "o-slinks": "Staff home page buttons",
-                  "o-staff": "Staff interface", "o-ghost": "Hide", "o-news": "News action buttons"}
+                  "o-staff": "Staff interface", "o-ghost": "Hide", "o-news": "News action buttons",
+                  "o-credits": "Footer credits",
+                  **{box: title for box, title in LOGIN_BOXES.values()}}
         for wid, title in titles.items():
             self.query_one(f"#{wid}").border_title = t(title)
         for key in LINK_SETS:
@@ -321,6 +366,23 @@ class OpacView(SectionView):
             q(f"#{p}s-layout", Select).value = cfg[key]["layout"]
             self.set_links(cfg[key]["items"], key)
         self.fill_staff(cfg["staff"])
+        self.fill_contents(cfg)
+
+    def fill_contents(self, cfg: dict) -> None:
+        q = self.query_one
+        for side, (box, _title) in LOGIN_BOXES.items():
+            lg = cfg["login"][side]
+            q(f"#{box}-enabled", Switch).value = lg["enabled"]
+            q(f"#{box}-alt", Input).value = lg["alt"]
+            q(f"#{box}-html", TextArea).text = lg["html"]
+            name = ot.LOGIN_ASSETS[side]
+            q(f"#o-src-{name}", Select).value = lg["image"]["source"]
+            q(f"#o-val-{name}", Input).value = lg["image"]["url"]
+        cr = cfg["credits"]
+        q("#o-cr-enabled", Switch).value = cr["enabled"]
+        for key in CREDIT_FIELDS:
+            q(f"#o-cr-{key}", Input).value = cr[key]
+        q("#o-cr-links", TextArea).text = _credit_links_text(cr["links"])
 
     def fill_staff(self, st: dict) -> None:
         q = self.query_one
@@ -367,6 +429,18 @@ class OpacView(SectionView):
                          **{key: q(f"#o-staff-{key}", Slider).value for key in ot.STAFF_MATERIAL}}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
+        raw["login"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value, "alt": q(f"#{box}-alt", Input).value,
+                               "html": q(f"#{box}-html", TextArea).text, "image": {"source": "none", "url": ""}}
+                        for side, (box, _title) in LOGIN_BOXES.items()}
+        raw["credits"] = {"enabled": q("#o-cr-enabled", Switch).value,
+                          **{key: q(f"#o-cr-{key}", Input).value.strip() for key in CREDIT_FIELDS}}
+        links, problem = _credit_links(q("#o-cr-links", TextArea).text)
+        raw["credits"]["links"] = links
+        if problem:
+            return raw, {}, f"{t('Footer credits')}: {problem}"
+        problem = _credits_problem(raw["credits"])
+        if problem:
+            return raw, {}, f"{t('Footer credits')}: {problem}"
         for key, p in LINK_SETS.items():
             items, problem = self.collect_links(key)
             raw[key] = {"enabled": q(f"#{p}s-enabled", Switch).value, "style": q(f"#{p}s-style", Select).value,
@@ -377,24 +451,32 @@ class OpacView(SectionView):
         if raw["carousel"]["amazon_tag"] and not ot.normalize(raw)["carousel"]["amazon_tag"]:
             return raw, {}, t("The Amazon tag has only letters, digits and hyphens.")
         pending: dict[str, tuple[str, Path]] = {}
-        pictures = [(name, raw, self.cfg[name], t(ASSET_LABELS[name])) for name in ot.ASSETS]
-        pictures += [(f"staff-{name}", raw["staff"], self.cfg["staff"][name],
+        pictures = [(name, self.cfg[name], t(ASSET_LABELS[name])) for name in ot.ASSETS]
+        pictures += [(f"staff-{name}", self.cfg["staff"][name],
                       f"{t('Staff interface')}: {t(ASSET_LABELS[name])}") for name in ot.STAFF_ASSETS]
-        for name, holder, current, label in pictures:
-            key = name.removeprefix("staff-")
+        pictures += [(ot.LOGIN_ASSETS[side], self.cfg["login"][side]["image"],
+                      f"{t(LOGIN_BOXES[side][1])}: {t(ASSET_LABELS['login'])}") for side in ot.LOGIN_SIDES]
+        for name, current, label in pictures:
             source = q(f"#o-src-{name}", Select).value
             value = q(f"#o-val-{name}", Input).value.strip()
-            holder[key] = {"source": source, "url": ""}
+            pic = {"source": source, "url": ""}
+            if name.startswith("staff-") and name not in ot.LOGIN_ASSETS.values():
+                raw["staff"][name.removeprefix("staff-")] = pic
+            elif name in ot.LOGIN_ASSETS.values():
+                _picture(raw, name).update(pic)
+                pic = _picture(raw, name)
+            else:
+                raw[name] = pic
             if source == "none":
                 continue
             if not value:
                 return raw, {}, t("${name}: choose a file or type an address.", name=label)
             if value == current["url"] and source == current["source"]:
-                holder[key]["url"] = value                      # already published
+                pic["url"] = value                              # already published
             elif source == "url":
                 if not ot.safe_url(value):
                     return raw, {}, t("${name}: the address must start with https://.", name=label)
-                holder[key]["url"] = value
+                pic["url"] = value
             else:
                 path = Path(value).expanduser()
                 problem = ot.image_problem(path)
@@ -404,7 +486,9 @@ class OpacView(SectionView):
         return raw, pending, ""
 
     def js_text(self) -> dict:
-        return {k: t(v) for k, v in ot.JS_TEXT.items()}
+        """The words written into Koha, in the panel's language: the
+        script's labels and the credits' ones."""
+        return {k: t(v) for k, v in {**ot.JS_TEXT, **ot.CREDITS_TEXT}.items()}
 
     # ------------------------------------------------------------------
     # Buttons
@@ -436,10 +520,11 @@ class OpacView(SectionView):
             self.summary()
             return
         cfg = ot.parse_theme_data(out.results.get("data", ""))
+        extra = ot.parse_contents(out.results.get("contents_settings", ""))
         self.carousel_on = out.results.get("carousel") == "on"
         self.feed_items = out.results.get("feed_items", "")
-        if cfg:
-            self.fill(cfg)
+        if cfg or extra:
+            self.fill({**(cfg or self.cfg), **extra})
         self.summary(applied=bool(cfg))
 
     def sync(self) -> None:
@@ -495,6 +580,9 @@ class OpacView(SectionView):
             return
         text = ("OpacUserCSS\n\n" + ot.css_block(raw) + "\n\nOpacUserJS\n\n" + ot.js_block(raw, self.js_text()))
         cfg = ot.normalize(raw)
+        for location, markup in ot.contents(cfg, self.js_text()).items():
+            if markup:
+                text += f"\n\n{location} ({t('HTML customizations')})\n\n" + markup
         if ot.staff_active(cfg):
             text += "\n\nIntranetUserCSS\n\n" + ot.staff_css_block(cfg)
         if ot.links_on(cfg["staff_links"]):
@@ -510,7 +598,7 @@ class OpacView(SectionView):
 
     async def _apply(self, raw: dict, pending: dict[str, tuple[str, Path]]) -> None:
         from ..routines.common import run_task, show_done
-        title = t("OPAC appearance")
+        title = t("OPAC and Staff Appearance")
         uploads = {n: p for n, p in pending.items() if p[0] != "local"}
         if uploads:
             result = await self.app.push_screen_wait(_loader(t("Sending the pictures"), self._upload_job(uploads)))
@@ -530,7 +618,10 @@ class OpacView(SectionView):
                  f"{t('Quick access buttons')}: {len(cfg['links']['items']) if cfg['links']['enabled'] else t('off')}",
                  f"{t('Staff home page buttons')}: "
                  f"{len(cfg['staff_links']['items']) if cfg['staff_links']['enabled'] else t('off')}",
-                 f"{t('Staff interface')}: {t('on') if cfg['staff']['enabled'] else t('off')}"]
+                 f"{t('Staff interface')}: {t('on') if cfg['staff']['enabled'] else t('off')}",
+                 f"{t('OPAC login page')}: {t('on') if ot.login_on(cfg['login']['opac']) else t('off')}",
+                 f"{t('Staff login page')}: {t('on') if ot.login_on(cfg['login']['staff']) else t('off')}",
+                 f"{t('Footer credits')}: {t('on') if ot.credits_on(cfg['credits']) else t('off')}"]
         lines += [f"{t(ASSET_LABELS[n])}: {cfg[n]['url']}" for n in ot.ASSETS if cfg[n]["url"]]
         if cfg["staff"]["enabled"]:
             lines += [f"{t('Staff interface')}: {t(ASSET_LABELS[n])}: {cfg['staff'][n]['url']}"
@@ -579,7 +670,7 @@ class OpacView(SectionView):
         self.app.run_worker(self._remove(), group="routine", exclusive=True, exit_on_error=False)
 
     async def _remove(self) -> None:
-        title = t("OPAC appearance")
+        title = t("OPAC and Staff Appearance")
         if await self.app.push_screen_wait(ConfirmScreen(
                 title, t("Remove this look from the OPAC and go back to Koha's own? A backup of the database is "
                          "taken first; your own OpacUserCSS and OpacUserJS are kept."))):
@@ -624,6 +715,43 @@ class OpacView(SectionView):
             self.app.notify(str(e), severity="error")
             return
         self.app.notify(t("Image host keys saved."))
+
+
+def _credit_links_text(links: list[dict]) -> str:
+    return "\n".join(f"{x['text']} | {x['url']}" for x in links)
+
+
+def _credit_links(text: str) -> tuple[list[dict], str]:
+    """The credits' other links, one "text | address" per line."""
+    links = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        label, sep, url = line.rpartition("|")
+        label, url = label.strip(), url.strip()
+        if not sep or not label:
+            return links, t("${line}: write the text, a | and the address.", line=line.strip())
+        if not ot.safe_link(url):
+            return links, t("${name}: the address must start with https://, http://, / , mailto: or tel:.", name=label)
+        links.append({"text": label, "url": url})
+    if len(links) > ot.MAX_CREDIT_LINKS:
+        return links, t("At most ${n} links.", n=str(ot.MAX_CREDIT_LINKS))
+    return links, ""
+
+
+def _credits_problem(raw: dict) -> str:
+    """The first credits field that would be dropped, said plainly."""
+    clean = ot.normalize({"credits": raw})["credits"]
+    checks = (("email", "E-mail", t("an address like name@library.org")),
+              ("whatsapp", "WhatsApp", t("the number with country and area code, digits only")),
+              ("website", "Website", t("an address starting with https://")),
+              ("facebook", "Facebook", t("an address starting with https://")),
+              ("youtube", "YouTube", t("an address starting with https://")),
+              ("instagram", "Instagram", t("@name or an address starting with https://")))
+    for key, label, hint in checks:
+        if str(raw.get(key) or "").strip() and not clean[key]:
+            return f"{t(label)}: {hint}"
+    return ""
 
 
 def _row(label: str, widget) -> ComposeResult:
