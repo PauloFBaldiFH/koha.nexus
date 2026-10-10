@@ -49,11 +49,12 @@ FILE_SOURCES = ("local", "imgbb", "cloudinary")
 LOGIN_BOXES = {"opac": ("o-login-opac", "OPAC login page"), "staff": ("o-login-staff", "Staff login page")}
 # The credits form: field -> (label, placeholder, max length).
 CREDIT_FIELDS = {
-    "name": ("Library name", "", 120), "address": ("Address", "", 200), "phone": ("Phone", "+55 (44) 3649-1214", 40),
-    "whatsapp": ("WhatsApp", "+55 44 3649-1214", 30), "email": ("E-mail", "biblioteca@...", 120),
-    "website": ("Website", "https://...", 300), "hours": ("Opening hours", "", 120),
-    "instagram": ("Instagram", "@biblioteca", 300), "facebook": ("Facebook", "https://facebook.com/...", 300),
-    "youtube": ("YouTube", "https://youtube.com/@...", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
+    "name": ("Library name", "Biblioteca Municipal", 120), "address": ("Address", "Rua Exemplo, 123", 200),
+    "phone": ("Phone", "(00) 0000-0000", 40), "whatsapp": ("WhatsApp", "(00) 00000-0000", 30),
+    "email": ("E-mail", "contato@biblioteca.gov.br", 120), "website": ("Website", "https://biblioteca.gov.br", 300),
+    "hours": ("Opening hours", "", 120), "instagram": ("Instagram", "https://instagram.com/biblioteca", 300),
+    "facebook": ("Facebook", "https://facebook.com/biblioteca", 300),
+    "youtube": ("YouTube", "https://youtube.com/@biblioteca", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
     "note": ("Note", "", 300),
 }
 

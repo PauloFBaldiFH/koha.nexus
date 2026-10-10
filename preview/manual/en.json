@@ -998,7 +998,7 @@
     },
     {
      "name": "Content panels",
-     "text": "How solid the page's content is (80% to 100%, 94% by default): the main area, tabs, menus, facets, breadcrumbs and the footer, so text never sits on the bare wallpaper. Text, labels and links on these panels are checked for WCAG AA contrast in light and dark mode."
+     "text": "How see-through the page's content is (50% to 100%, 76% by default): the main area, tabs, menus, facets and breadcrumbs are frosted glass with a 12px blur behind, so the wallpaper shows through. Text, labels and links on the glass are checked for WCAG AA contrast against the darkest and the lightest wallpaper, in light and dark mode, with a soft shadow and bolder labels: 7:1 from 76% up, at least 4.5:1 from 60% up. The footer credits have no box: a halo around the letters keeps them readable."
     },
     {
      "name": "Blocks, Inputs, Buttons",

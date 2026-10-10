@@ -241,7 +241,7 @@ FEATURES: tuple[Feature, ...] = (
     # OPAC and Staff Appearance
     Feature("opac-material", "opac", "views/opac.py", "Material", [
         select("Texture", "opac_theme.TEXTURES"), slider("Blur", 12, "px"), slider("Opacity", 82),
-        slider("Content panels", 94),
+        slider("Content panels", 76),
         slider("Blocks", 14, "px"), slider("Inputs", 10, "px"), slider("Buttons", 10, "px"),
         color("Accent colour", "#2f7d5b"), color("Second colour", "#1e4f86"), color("Block background", "#ffffff"),
         switch("Page colour", False),
@@ -281,8 +281,9 @@ FEATURES: tuple[Feature, ...] = (
         field_("Text (HTML)", "<p>Staff only. Forgot your password? Call the coordinator.</p>"),
     ]),
     Feature("opac-credits", "opac", "views/opac.py", "Footer credits", [
-        switch("Show"), field_("Library name", "Biblioteca Pública Municipal"), field_("Address", "Rua ..., Centro"),
-        field_("Phone", "+55 (44) 3649-1214"), field_("E-mail", "biblioteca@..."), field_("Instagram", "@biblioteca"),
+        switch("Show"), field_("Library name", "Biblioteca Municipal"), field_("Address", "Rua Exemplo, 123"),
+        field_("Phone", "(00) 0000-0000"), field_("E-mail", "contato@biblioteca.gov.br"),
+        field_("Instagram", "https://instagram.com/biblioteca"),
         field_("CNPJ", "00.000.000/0000-00"),
     ]),
     Feature("opac-hide", "opac", "views/opac.py", "Hide", [

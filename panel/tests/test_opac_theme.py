@@ -462,22 +462,28 @@ def test_panels_reach_wcag_aa_in_light_and_dark():
     for accent in ("#2563eb", "#facc15", "#ffffff", "#000000", "#7c3aed", "#10b981"):
         for surface in ("#ffffff", "#333844", "#0b0b0b", "#fde68a"):
             cfg = ot.normalize({"accent": accent, "surface": surface})
-            for dark in (False, True):
-                c = ot.panel_colors(cfg, dark)
-                for bg in (c["panel"], c["inner"]):
+            for dark, opacity in ((False, 76), (True, 76), (False, 100), (True, 100)):
+                c = ot.panel_colors({**cfg, "panel_opacity": opacity}, dark)
+                assert len(c["grounds"]) == 4
+                for bg in c["grounds"]:
                     assert ot.contrast(c["text"], bg) >= 7, (accent, surface, dark)
                     for key in ("muted", "link", "ink"):
                         assert ot.contrast(c[key], bg) >= 4.5, (accent, surface, dark, key)
+            # More see-through than the default: the text still reaches AA (4.5:1) on any wallpaper.
+            for dark in (False, True):
+                c = ot.panel_colors({**cfg, "panel_opacity": 60}, dark)
+                assert min(ot.contrast(c["text"], bg) for bg in c["grounds"]) >= 4.5, (accent, surface, dark)
     # Light mode reads dark on light even when the block background is dark (the screenshots' case).
     light = ot.panel_colors(ot.normalize({"surface": "#333844"}), False)
     assert ot.luminance(light["panel"]) > .8 and light["text"] == "#1a1a1a"
     dark = ot.panel_colors(ot.normalize({}), True)
-    assert (dark["panel"], dark["inner"], dark["text"]) == ("#161b22", "#0d1117", "#e6edf3")
+    assert (dark["panel"], dark["inner"]) == ("#161b22", "#0d1117") and dark["text"].startswith("#e")
 
 
 def test_panels_css_covers_koha_panels():
-    css = ot.css_body(ot.normalize({"panel_opacity": 97, "surface": "#333844"}))
-    assert "--kei-panel-a: 0.97;" in css and "--kei-panel-rgb: 22, 27, 34;" in css
+    assert ot.normalize({})["panel_opacity"] == 76
+    css = ot.css_body(ot.normalize({"panel_opacity": 72, "surface": "#333844"}))
+    assert "--kei-panel-a: 0.72;" in css and "--kei-panel-rgb: 22, 27, 34;" in css
     for sel in ("html body .breadcrumb", "html body .main .tab-content", "html body .main #search-facets",
                 "html body .main #menu li a", "html body .main #usermenu li a", "html body .main #action",
                 "html body .main .nav_results", "html body .main .selections-toolbar", "html body #opaccredits",
@@ -485,10 +491,16 @@ def test_panels_css_covers_koha_panels():
         assert sel in css, sel
     # The main area left the glass blocks: header and search keep the texture, .main is a panel.
     texture = css[:css.index("Content panels")]
-    assert "html body .main," not in texture and "html body .main, html body #opaccredits {" in css
-    assert "html body .main::before" in css and "backdrop-filter: blur(6px)" in css
+    assert "html body .main," not in texture and "html body .main {" in css
+    # Frosted glass: translucent panels with a 12px blur (WebKit too), inner panels translucent as well.
+    assert "html body .main::before {" in css and "-webkit-backdrop-filter: blur(12px);" in css
+    assert "    backdrop-filter: blur(12px);" in css and "--kei-panel-2: rgba(" in css
+    assert "text-shadow: var(--kei-p-shadow);" in css and "font-weight: 600;" in css
+    # The footer credits: no box behind them, only a halo around the letters.
+    assert "#opaccredits::before" not in css and "html body .main, html body #opaccredits" not in css
+    assert "background: transparent !important; }" in css and 'html[data-kei-theme="dark"] body #opaccredits {' in css
     assert 'html[data-kei-theme="dark"] body .main .alert {' in css
-    assert ot.normalize({"panel_opacity": 10})["panel_opacity"] == 80
+    assert ot.normalize({"panel_opacity": 10})["panel_opacity"] == 50
     assert ot.check_block(ot.css_block(ot.normalize({})), ot.CSS_BEGIN, ot.CSS_END) == ""
 
 
@@ -532,18 +544,18 @@ def test_login_instructions_markup():
 
 
 def test_credits_form_to_markup():
-    raw = {"enabled": True, "name": "Biblioteca <Castro Alves>", "address": "R. Ipiranga, 720",
-           "phone": "+55 (44) 3649-1214", "whatsapp": "+55 44 3649-1214", "email": "a@b.gov.br",
-           "website": "https://biblioteca.org/", "instagram": "@bibliotecamunicipal", "facebook": "javascript:x",
-           "cnpj": "76208487000164", "links": [{"text": "Portal", "url": "https://palotina.pr.gov.br"},
+    raw = {"enabled": True, "name": "Biblioteca <Municipal>", "address": "Rua Exemplo, 123",
+           "phone": "(00) 0000-0000", "whatsapp": "+55 00 00000-0000", "email": "contato@biblioteca.gov.br",
+           "website": "https://biblioteca.gov.br/", "instagram": "@biblioteca", "facebook": "javascript:x",
+           "cnpj": "00000000000000", "links": [{"text": "Portal", "url": "https://biblioteca.gov.br/portal"},
                                                {"text": "bad", "url": "javascript:alert(1)"}]}
     cr = ot.normalize({"credits": raw})["credits"]
-    assert cr["cnpj"] == "76.208.487/0001-64" and cr["facebook"] == "" and len(cr["links"]) == 1
+    assert cr["cnpj"] == "00.000.000/0000-00" and cr["facebook"] == "" and len(cr["links"]) == 1
     html = ot.credits_html(cr, {"phone": "Telefone"})
-    assert "<strong>Biblioteca Castro Alves</strong>" in html                # <> taken out
-    assert 'Telefone: <a href="tel:554436491214">+55 (44) 3649-1214</a>' in html
-    assert 'href="https://wa.me/554436491214"' in html and 'href="mailto:a@b.gov.br"' in html
-    assert 'href="https://www.instagram.com/bibliotecamunicipal/"' in html and "CNPJ: 76.208.487/0001-64" in html
+    assert "<strong>Biblioteca Municipal</strong>" in html                # <> taken out
+    assert 'Telefone: <a href="tel:0000000000">(00) 0000-0000</a>' in html
+    assert 'href="https://wa.me/5500000000000"' in html and 'href="mailto:contato@biblioteca.gov.br"' in html
+    assert 'href="https://www.instagram.com/biblioteca/"' in html and "CNPJ: 00.000.000/0000-00" in html
     assert "javascript" not in html and ot.credits_on(cr)
     assert not ot.credits_on(ot.normalize({"credits": {"enabled": True}})["credits"])
 
