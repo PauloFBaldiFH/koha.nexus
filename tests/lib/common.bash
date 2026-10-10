@@ -165,7 +165,7 @@ kei_reset_env() {
     touch "$KEI_S/svc/mariadb" "$KEI_S/svc/memcached" "$KEI_S/svc/apache2" "$KEI_S/svc/cron"
     touch "$KEI_S/run/zebra" "$KEI_S/run/indexer" "$KEI_S/run/plack" "$KEI_S/run/worker"
     rm -f /root/.my.cnf
-    rm -rf /var/backups/koha_sql /var/backups/koha_marc /run/koha-easy-install
+    rm -rf /var/backups/koha_sql /var/backups/koha_marc /run/koha-easy-install /var/lib/koha-easy-install/last-manual-backup
     rm -f /etc/cron.d/koha_* /var/lock/koha_backup.lock /var/run/koha_backup.pid
     rm -f /usr/local/bin/koha-zebra-watchdog.sh /usr/local/bin/koha-es-watchdog.sh /usr/local/bin/koha-wait-services.sh
     # Modules of Library tools 11-13 (messaging, cataloguing tables, marc_replace.pl).
