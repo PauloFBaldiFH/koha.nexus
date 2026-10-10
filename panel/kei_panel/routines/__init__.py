@@ -62,6 +62,7 @@ GENERIC: dict[str, str] = {
     "magic-import": "🪄  Magic Import Tool (drop anything here)",
     "marc-undo": "🔙  Undo a MARC import",
     "authority-sync": "🔗  Sync & link authorities",
+    "authority-match": "👥  Find duplicate authors (authorities)",
     "patron-category": "🎓  School-year turnover (patron categories)",
     "data-quality": "🧪  Catalog data-quality check",
     "privacy-anonymise": "🎭  Privacy (LGPD): anonymise old history",

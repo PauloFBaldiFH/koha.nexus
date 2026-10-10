@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.44"
+PANEL_VERSION=" 1.5.45"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10363,6 +10363,211 @@ _lt_authority_sync_run() {
     msg_ok "$(t '✅ Headings linked to the authorities.\n\nRecords checked: ${checked}\nRecords updated: ${modified}\nHeadings linked: ${linked}\nHeadings without a matching authority (left for review): ${unlinked}')\n\n${indexed}\n\n$(t 'Safety backup: ${TOOLS_PRE}\nLog: ${log}')" 18 78
 }
 
+# ----------------------------------------------------------------------
+# Authorities: one person, many forms. The personal names of the authority
+# file (100) are compared by the Magic Import engine (kei_import
+# authorities: Jaro-Winkler and Levenshtein per word, the sound of the
+# word in Portuguese and Spanish, initials, the direct and the inverted
+# order, dates and agnomen that must agree) and the variant forms are
+# grouped with a score. Nothing is merged on a guess: every group is shown
+# to the operator, who picks the form to keep or leaves the group alone.
+# The confirmed merges go through Koha's own merge (the staff interface's
+# "Merge" of two authorities: C4::AuthoritiesMarc::merge, then
+# DelAuthority): the records that used a variant point to the form kept,
+# the variant stays in it as a 400 "see from" reference, and a verified
+# PRE-AUTHORITIES backup is made first.
+# ----------------------------------------------------------------------
+AUTH_MATCH_THRESHOLD="${AUTH_MATCH_THRESHOLD:-0.85}"
+
+lt_authority_match() {
+    require_database || return 0
+    local title
+    title=$(t "👥  Find duplicate authors (authorities)")
+    if [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.auth_header;")" = "0" ]; then
+        msg_info "$title" "$(t "The catalog has no authority records yet: there is nothing to compare. Import the authorities first (Magic Import Tool or Koha's staged import).")" 11 74
+        return 0
+    fi
+    tools_locked _lt_authority_match_run
+}
+
+_lt_authority_match_run() {
+    local title log heads uses groups report rc plan total n merged errors
+    title=$(t "👥  Find duplicate authors (authorities)")
+    log=$(tools_log authority-match)
+    heads="${TOOLS_WORK}/headings.tsv"
+    uses="${TOOLS_WORK}/uses.txt"
+    groups="${TOOLS_WORK}/authority-groups.tsv"
+    report="${TOOLS_WORK}/authority-report.txt"
+    plan="${TOOLS_WORK}/merge-plan.tsv"
+    if ! kei_import_write "${TOOLS_WORK}/kei"; then
+        msg_error "" "$(t "The work folder could not be prepared. Nothing was changed.")" 9 70
+        return 1
+    fi
+    display_explanation "Reading the personal names of the authority file..."
+    # 100 $a, $q (fuller form) and $d (dates) of each authority; then the
+    # $9 of the catalogue's headings (not the items' 952), to know how many
+    # records use each form.
+    run_sql "SELECT authid, authtypecode,
+        ExtractValue(marcxml, '//datafield[@tag=\"100\"]/subfield[@code=\"a\"]'),
+        ExtractValue(marcxml, '//datafield[@tag=\"100\"]/subfield[@code=\"q\"]'),
+        ExtractValue(marcxml, '//datafield[@tag=\"100\"]/subfield[@code=\"d\"]')
+        FROM ${DB_NAME}.auth_header WHERE marcxml LIKE '%tag=\"100\"%';" > "$heads"
+    run_sql "SELECT ExtractValue(metadata, '//datafield[@tag<900]/subfield[@code=\"9\"]')
+        FROM ${DB_NAME}.biblio_metadata WHERE metadata LIKE '%code=\"9\"%';" > "$uses"
+    chown "${INSTANCE}-koha:" "$heads" "$uses" 2>/dev/null || true
+    chmod 600 "$heads" "$uses"
+    display_explanation "Comparing the names..."
+    koha_exec "$log" kei_import "$MAGIC_PY" -I -B "${TOOLS_WORK}/kei/kei_import_run.py" authorities \
+        --in "$heads" --uses "$uses" --work "$TOOLS_WORK" --threshold "$AUTH_MATCH_THRESHOLD"
+    rc=$?
+    tools_output "$log" > "$report"
+    if [ "$rc" -eq 3 ]; then
+        total=$(tools_num "$log" "Personal names checked:")
+        msg_info "$title" "$(t 'Personal names checked: ${total}\nNo variant forms of one name were found: nothing to merge.\n\nLog: ${log}')" 12 74
+        return 0
+    fi
+    if [ "$rc" -ne 0 ] || [ ! -s "$groups" ]; then
+        ui_textbox "$title" "$log"
+        msg_error "" "$(t 'The names could not be compared. Nothing was changed.\n\nLog: ${log}')" 10 74
+        return 1
+    fi
+    ui_textbox "$(t "Preview (nothing is changed yet)")" "$report"
+    auth_match_review "$title" "$groups" "$plan" || return 0
+    n=$(grep -c . "$plan" 2>/dev/null)
+    if [ "${n:-0}" -eq 0 ]; then
+        msg_info "$title" "$(t "No group was confirmed: nothing was changed.")" 9 70
+        return 0
+    fi
+    prompt_yes_no "$title" "$(t 'Authorities to merge into the form kept: ${n}\n\nThe records that use them will point to the form kept, and each variant stays in it as a "see from" reference (400). A verified backup is made first.\n\nMerge them now?')" 16 76 defaultno || return 0
+    tools_safety_backup AUTHORITIES || return 1
+    auth_merge_write "${TOOLS_WORK}/kei/authority_merge.pl"
+    chown "${INSTANCE}-koha:" "$plan" 2>/dev/null || true
+    display_explanation "Merging the authorities..."
+    koha_exec "$log" authority_merge perl "${TOOLS_WORK}/kei/authority_merge.pl" "$plan"
+    rc=$?
+    merged=$(tools_num "$log" "Number of authorities merged:")
+    errors=$(tools_num "$log" "Number of errors:")
+    log "tools: authorities merged (merged=$merged errors=$errors rc=$rc)"
+    if [ "$rc" -ne 0 ] && [ "${merged:-0}" -eq 0 ]; then
+        ui_textbox "$title" "$log"
+        msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    msg_ok "$(t '✅ Authorities merged: ${merged}\nNot merged (see the log): ${errors}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+}
+
+# auth_match_review TITLE GROUPS PLAN: asks about every group of the engine
+# (GROUPS: group, authid, keep|variant, score, reasons, uses, heading,
+# 100$a) and writes the confirmed merges to PLAN (authid kept, authid
+# merged, form of the variant). 1 when the operator cancels: nothing at all
+# is merged then.
+auth_match_review() {
+    local title="$1" groups="$2" plan="$3" g gg id role score why used head form
+    local total i=0 all=0 keep choice text v
+    local -a items ids
+    local -A forms
+    : > "$plan"
+    total=$(cut -f1 "$groups" | sort -un | grep -c .)
+    for g in $(cut -f1 "$groups" | sort -un); do
+        i=$((i + 1))
+        items=(); ids=(); text=""; keep=""
+        while IFS=$'\t' read -r gg id role score why used head form; do
+            [ "$gg" = "$g" ] || continue
+            ids+=("$id"); forms[$id]="$form"
+            if [ "$role" = "keep" ]; then
+                keep="$id"
+                items=("$id" "${head} · $(t 'suggested') · $(t 'records:') ${used}" "${items[@]}")
+            else
+                items+=("$id" "${head} · $(t 'records:') ${used}")
+                text+="\n  ${score}  ${head} (${why})"
+            fi
+        done < "$groups"
+        [ -n "$keep" ] && [ ${#ids[@]} -ge 2 ] || continue
+        if [ "$all" -eq 0 ]; then
+            choice=$(ui_menu "$(t 'Group ${i} of ${total}')" \
+                "$(t 'These forms look like the same person (score and why):')${text}\n\n$(t "Which form should stay? The others are merged into it.")" \
+                "${items[@]}" \
+                "skip" "$(t "Not the same person: leave this group as it is")" \
+                "all" "$(t "Keep the suggested form here and in every group left")") || return 1
+            case "$choice" in
+                skip) continue ;;
+                all) all=1 ;;
+                *) keep="$choice" ;;
+            esac
+        fi
+        for v in "${ids[@]}"; do
+            [ "$v" = "$keep" ] || printf '%s\t%s\t%s\n' "$keep" "$v" "${forms[$v]}" >> "$plan"
+        done
+    done
+    return 0
+}
+
+# auth_merge_write FILE: the merge of the confirmed pairs, done by Koha the
+# way the staff interface merges two authorities (authorities/merge.pl):
+# the variant's form added to the record kept as a 400, then
+# C4::AuthoritiesMarc::merge (the records that used the variant now use
+# the record kept) and DelAuthority. Reads the plan (kept<TAB>variant<TAB>
+# form); one failed pair does not stop the others.
+auth_merge_write() {
+    cat > "$1" <<'KEIPL'
+use strict;
+use warnings;
+use utf8;
+use Encode qw( decode );
+use MARC::Field;
+use C4::AuthoritiesMarc qw( GetAuthority ModAuthority merge DelAuthority );
+use Koha::Authorities;
+
+binmode STDOUT, ':encoding(UTF-8)';
+my ( $merged, $errors ) = ( 0, 0 );
+my %gone;
+open( my $fh, '<:encoding(UTF-8)', $ARGV[0] ) or die "Cannot read $ARGV[0]: $!\n";
+while ( my $line = <$fh> ) {
+    chomp $line;
+    my ( $keep, $from, $form ) = split /\t/, $line, 3;
+    next unless defined $from && $keep =~ /^\d+$/ && $from =~ /^\d+$/ && $keep != $from;
+    my $ok = eval {
+        die "authority $keep was merged into another one\n" if $gone{$keep};
+        my $to  = GetAuthority($keep) or die "authority $keep not found\n";
+        my $old = GetAuthority($from) or die "authority $from not found\n";
+        my $type = Koha::Authorities->find($keep)->authtypecode;
+        if ( defined $form && $form ne '' && $form ne '-' && !has_form( $to, $form ) ) {
+            $to->insert_fields_ordered( MARC::Field->new( '400', ( $form =~ /,/ ? '1' : '0' ), ' ', a => $form ) );
+            ModAuthority( $keep, $to, $type );
+            $to = GetAuthority($keep);
+        }
+        merge( { mergefrom => $from, MARCfrom => $old, mergeto => $keep, MARCto => $to, override_limit => 1 } );
+        DelAuthority( { authid => $from, skip_merge => 1 } );
+        1;
+    };
+    if ($ok) {
+        $merged++;
+        $gone{$from} = 1;
+        print "Authority $from merged into $keep\n";
+    } else {
+        $errors++;
+        ( my $e = $@ || 'unknown error' ) =~ s/\s+$//;
+        print "Authority $from not merged into $keep: $e\n";
+    }
+}
+close $fh;
+print "Number of authorities merged: $merged\nNumber of errors: $errors\n";
+exit( $errors && !$merged ? 1 : 0 );
+
+# The form is already the heading (100) or a "see from" (400) of the record.
+sub has_form {
+    my ( $record, $form ) = @_;
+    my $want = norm($form);
+    for my $f ( $record->field( '100', '400' ) ) {
+        return 1 if norm( $f->subfield('a') // '' ) eq $want;
+    }
+    return 0;
+}
+sub norm { my $s = lc shift; $s =~ s/[\s[:punct:]]+/ /g; $s =~ s/^ | $//g; return $s }
+KEIPL
+    chmod 644 "$1"
+}
+
 # The search index after many records changed at once: Elasticsearch
 # updates the records and authorities in place (no -d: searching keeps
 # working), Zebra works through its queue.
@@ -10771,7 +10976,8 @@ function_library_tools() {
             "14" "$(t "🧩  Koha plugins (turn on or off)")" \
             "15" "$(t "🧮  Cutter Calculator")" \
             "16" "$(t "💬  AI assistant on the staff home page")" \
-            "17" "$(t "🔗  Sync & link authorities")") || return 0
+            "17" "$(t "🔗  Sync & link authorities")" \
+            "18" "$(t "👥  Find duplicate authors (authorities)")") || return 0
         case "$opt" in
             1) lt_magic_import ;;
             2) lt_marc_undo ;;
@@ -10790,6 +10996,7 @@ function_library_tools() {
             15) function_cutter ;;
             16) function_ai_assistant ;;
             17) lt_authority_sync ;;
+            18) lt_authority_match ;;
         esac
         clear
     done
@@ -23072,23 +23279,493 @@ def build(opts):
     print("Anomalies: %d" % sum(anomalies.values()), file=log)
     return 0 if manifest else 3
 KEIPY
+    cat > "$d/kei_import/authorities.py" <<'KEIPY'
+"""Smart authority matching: the variant forms of one person's name in the
+authority file (100 of MARC 21 authorities): abbreviations ('Assis, M. de'),
+typos ('Asis'), the direct and the inverted order ('Machado de Assis'),
+accents and case, and the spellings that sound alike in Portuguese and
+Spanish ('Souza' / 'Sousa', 'Luiz' / 'Luís', 'Thereza' / 'Teresa').
+
+The names are compared word by word in their direct order, so an inverted
+and a direct form line up; a word is matched by Jaro-Winkler, by its sound
+or by its initial. Different dates, or a different agnomen (Filho, Neto,
+Júnior), never match. Nothing is merged here: the groups, each with the
+form suggested to keep and a score per variant, go to the panel, which asks
+the operator about every group.
+"""
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+from functools import lru_cache
+
+from . import rules as R
+
+THRESHOLD = 0.85
+# Two forms that score below this can never end up in one group, even
+# through a third one ('Silva, J.' fits both 'Silva, José' and 'Silva, João').
+_FLOOR = 0.75
+_INITIAL = 0.85      # 'M.' for 'Machado'
+_SOUND = 0.95        # 'Souza' / 'Sousa'
+_WORD_OK = 0.82      # a word below this is a different word
+_GAP_MIDDLE = 0.94   # a middle name left out
+_GAP_EDGE = 0.88     # a first name or a last surname left out
+_AGNOMEN = {"filho": "filho", "neto": "neto", "junior": "junior", "jr": "junior", "jor": "junior",
+            "sobrinho": "sobrinho", "segundo": "segundo", "bisneto": "bisneto", "hijo": "hijo"}
+_TITLES = {"dr", "dra", "prof", "profa", "pe", "padre", "frei", "dom", "sir", "dona", "d", "sr", "sra", "irma", "mons"}
+_DATES = re.compile(r"(?:^|[\s,(])(\d{3,4})?\s*-\s*(\d{3,4})?\s*\)?\.?\s*$")
+_YEAR = re.compile(r"\b(\d{3,4})\b")
+
+
+# ---------------------------------------------------------------- similarity
+
+@lru_cache(maxsize=1 << 16)
+def jaro_winkler(a, b):
+    """0..1 (1 = the same): Jaro similarity with Winkler's bonus for a
+    common beginning (up to 4 letters)."""
+    if a == b:
+        return 1.0
+    la, lb = len(a), len(b)
+    if not la or not lb:
+        return 0.0
+    reach = max(max(la, lb) // 2 - 1, 0)
+    used = [False] * lb
+    match_a = []
+    for i, c in enumerate(a):
+        for j in range(max(0, i - reach), min(lb, i + reach + 1)):
+            if not used[j] and b[j] == c:
+                used[j] = True
+                match_a.append(c)
+                break
+    m = len(match_a)
+    if not m:
+        return 0.0
+    match_b = [b[j] for j in range(lb) if used[j]]
+    half = sum(x != y for x, y in zip(match_a, match_b)) / 2
+    jaro = (m / la + m / lb + (m - half) / m) / 3
+    prefix = 0
+    for x, y in zip(a[:4], b[:4]):
+        if x != y:
+            break
+        prefix += 1
+    return jaro + prefix * 0.1 * (1 - jaro)
+
+
+_SOUNDS = [
+    (r"ph", "f"), (r"th", "t"), (r"sh", "x"), (r"ch", "x"), (r"lh", "l"), (r"nh", "n"),
+    (r"ll", "l"), (r"y", "i"), (r"w", "v"), (r"k", "c"),
+    (r"qu(?=[ei])", "k"), (r"gu(?=[ei])", "g"),
+    (r"sc(?=[ei])", "s"), (r"xc(?=[ei])", "s"), (r"c(?=[ei])", "s"), (r"g(?=[ei])", "j"),
+    (r"z", "s"), (r"v", "b"), (r"h", ""), (r"q", "c"), (r"c", "k"),
+    (r"m$", "n"), (r"(.)\1+", r"\1"),
+]
+_SOUNDS = [(re.compile(p), r) for p, r in _SOUNDS]
+
+
+@lru_cache(maxsize=1 << 16)
+def sound(word):
+    """How a name word sounds in Portuguese or Spanish, as a key: 'souza' and
+    'sousa' -> 'sousa', 'thereza' and 'teresa' -> 'teresa', 'philippe' and
+    'filipe' -> 'filipe', 'mattos' -> 'matos', 'vasquez' and 'vazquez' alike."""
+    for pattern, repl in _SOUNDS:
+        word = pattern.sub(repl, word)
+    return word
+
+
+@lru_cache(maxsize=1 << 16)
+def word_score(a, b):
+    """0..1 for two name words (lower case, no accents); an initial is one
+    letter long. The mean of Jaro-Winkler (kind to typos at the end) and of
+    the Levenshtein distance (strict with short given names: 'Marcos' is not
+    'Márcio'); two words that sound the same score at least 0.95, and the
+    masculine and the feminine of one name ('Mário' / 'Maria') nothing."""
+    if a == b:
+        return 1.0
+    if len(a) == 1 or len(b) == 1:
+        return _INITIAL if a[0] == b[0] else 0.0
+    if len(a) == len(b) and a[:-1] == b[:-1] and {a[-1], b[-1]} == {"a", "o"}:
+        return 0.0
+    s = (jaro_winkler(a, b) + R.similar(a, b)) / 2
+    if sound(a) == sound(b):
+        s = max(s, _SOUND)
+    return s if s >= _WORD_OK else 0.0
+
+
+# ---------------------------------------------------------------- names
+
+class Name:
+    """One heading: its words in direct order (particles and titles left
+    out), the agnomen, the dates, and how complete the form is."""
+    __slots__ = ("authid", "kind", "heading", "form", "fuller", "words", "agnomen", "born", "died", "uses", "quality", "key")
+
+    def __init__(self, authid, heading, fuller="", dates="", kind="", uses=0):
+        self.authid = str(authid)
+        self.kind = kind
+        self.uses = uses
+        a = _trim(heading)
+        dates = R.clean(dates)
+        if not dates:
+            m = _DATES.search(a)
+            if m and (m.group(1) or m.group(2)):
+                dates, a = m.group(0), _trim(a[:m.start()])
+        self.form = a
+        self.heading = a + (" (%s)" % R.clean(fuller).strip("() ,.") if fuller and fuller.strip("() ,.") else "")
+        if dates:
+            self.heading += ", " + dates.strip(" ,.")
+        years = _YEAR.findall(dates)
+        span = dates.split("-", 1)
+        self.born = _YEAR.search(span[0]).group(1) if _YEAR.search(span[0]) else ""
+        self.died = _YEAR.search(span[1]).group(1) if len(span) > 1 and _YEAR.search(span[1]) else ""
+        if len(span) == 1 and years:
+            self.born = years[0]
+        # 'Silva, J. C. (João Carlos)': the fuller form stands for the initials.
+        fuller = R.clean(fuller).strip("() ,.")
+        self.fuller = False
+        if "," in a:
+            surname, forenames = [p.strip() for p in a.split(",", 1)]
+            if fuller and _initials_only(forenames):
+                forenames = fuller
+                self.fuller = True
+            order = forenames + " " + surname
+        else:
+            order = a
+        self.agnomen = ""
+        words = []
+        for w in re.split(r"[\s.]+", order):
+            w = R.norm_header(w).replace(" ", "")
+            if not w or w in R._PARTICLES:
+                continue
+            if w in _AGNOMEN:
+                self.agnomen = _AGNOMEN[w]
+                continue
+            if w in _TITLES and not words:
+                continue
+            words.append(w)
+        self.words = tuple(words)
+        letters = "".join(c for c in self.heading if c.isalpha())
+        self.quality = (sum(len(w) > 1 for w in self.words),                    # whole words
+                        int(bool(self.born or self.died)),                      # dates
+                        int("," in self.heading),                               # inverted, as in authorities
+                        int(any(ord(c) > 127 for c in letters)),                # accents
+                        int(not letters.isupper()))                             # not in capitals
+        self.key = " ".join(self.words) + "|" + self.agnomen + "|" + self.born + "|" + self.died
+
+    def blocks(self):
+        """Keys that put two names that could match in the same bucket: the
+        sound of the last surname and its first letters (a typo seldom
+        changes both)."""
+        if not self.words:
+            return set()
+        last = self.words[-1]
+        return {"<" + last[:4], ">" + sound(last)}
+
+
+def _trim(s):
+    """Heading without the closing punctuation of MARC ('Assis, Machado de,'),
+    keeping the period of an initial ('Silva, J.')."""
+    s = R.clean(s).strip(" ,;:/")
+    if s.endswith(".") and not re.search(r"(?:^|[\s.])[^\W\d_]\.$", s):
+        s = s.rstrip(". ")
+    return s
+
+
+def _initials_only(s):
+    return all(len(w) <= 2 for w in re.split(r"[\s.]+", s) if w)
+
+
+def _align(short, long_):
+    """Best word-by-word alignment that keeps the order: (sum of the word
+    scores, indices of `long_` matched, matched pairs)."""
+    n, m = len(short), len(long_)
+    best = [[(0.0, ())] * (m + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        for j in range(0, m + 1):
+            cands = []
+            if j:
+                cands.append(best[i][j - 1])
+                s = word_score(short[i - 1], long_[j - 1])
+                if s:
+                    v, path = best[i - 1][j - 1]
+                    cands.append((v + s, path + ((i - 1, j - 1, s),)))
+            cands.append(best[i - 1][j])
+            best[i][j] = max(cands, key=lambda c: c[0])
+    return best[n][m]
+
+
+def compare(a, b):
+    """(score 0..1, reasons) for two names."""
+    if a.key == b.key:
+        return 1.0, _reasons(a, b, [])
+    if a.born and b.born and a.born != b.born or a.died and b.died and a.died != b.died:
+        return 0.0, ["different dates"]
+    if a.agnomen != b.agnomen:
+        return 0.0, ["different agnomen"]
+    short, long_ = (a, b) if len(a.words) <= len(b.words) else (b, a)
+    if len(short.words) < 2:
+        return 0.0, []
+    total, pairs = _align(short.words, long_.words)
+    if len(pairs) < len(short.words):
+        return 0.0, []
+    # The last word (the surname the heading is filed under) must be there,
+    # and spelled out, not an initial.
+    li, lj, ls = pairs[-1]
+    if len(short.words[li]) == 1 or len(long_.words[lj]) == 1 or lj < 1:
+        return 0.0, []
+    score = total / len(short.words)
+    matched = {j for _, j, _ in pairs}
+    first, last = pairs[0][1], pairs[-1][1]
+    for j in range(len(long_.words)):
+        if j not in matched:
+            score *= _GAP_MIDDLE if first < j < last else _GAP_EDGE
+    gaps = len(long_.words) - len(matched)
+    return round(score, 3), _reasons(a, b, pairs, gaps)
+
+
+def _reasons(a, b, pairs, gaps=0):
+    why = []
+    ha, hb = a.form, b.form
+    if ("," in ha) != ("," in hb):
+        why.append("inverted")
+    elif "," in ha:
+        fa, fb = (R.norm_header(h.split(",")[0]).split() or [""] for h in (ha, hb))
+        if fa[0] and fb[0] and not word_score(fa[0], fb[0]):
+            why.append("filed under another surname")
+    if R.strip_accents(ha).lower() == R.strip_accents(hb).lower() and ha != hb:
+        why.append("accents or case")
+    if a.fuller != b.fuller:
+        why.append("abbreviated")
+    sa, sb = (a, b) if len(a.words) <= len(b.words) else (b, a)
+    for i, j, s in pairs:
+        x, y = sa.words[i], sb.words[j]
+        if x == y:
+            continue
+        if len(x) == 1 or len(y) == 1:
+            if "abbreviated" not in why:
+                why.append("abbreviated")
+        elif sound(x) == sound(y):
+            if "sounds alike" not in why:
+                why.append("sounds alike")
+        elif "spelling" not in why:
+            why.append("spelling")
+    if gaps:
+        why.append("name left out")
+    if bool(a.born or a.died) != bool(b.born or b.died):
+        why.append("dates missing")
+    if not why:
+        why.append("punctuation" if a.heading != b.heading else "same name")
+    return why
+
+
+# ---------------------------------------------------------------- groups
+
+class Group:
+    def __init__(self, names):
+        self.names = names
+        # The most complete form (whole words, dates, inverted, accents, not
+        # in capitals); then the one most records use; then the oldest.
+        self.keep = max(names, key=lambda n: n.quality + (n.uses, -_num(n.authid)))
+        self.scores = {}
+        self.ambiguous = {}
+
+    def variants(self):
+        return sorted((n for n in self.names if n is not self.keep),
+                      key=lambda n: (-self.scores.get(n.authid, (0,))[0], _num(n.authid)))
+
+
+def _num(authid):
+    return int(authid) if authid.isdigit() else 0
+
+
+def find_groups(names, threshold=THRESHOLD):
+    """Groups of the names that are one person's: every pair at or above the
+    threshold joins, the strongest first, unless it would put two names that
+    clearly differ in one group."""
+    names = [n for n in names if n.words and not R.is_corporate(n.heading)]
+    buckets = {}
+    for n in names:
+        for k in n.blocks():
+            buckets.setdefault(k, []).append(n)
+    scores = {}
+    for bucket in buckets.values():
+        for i, a in enumerate(bucket):
+            for b in bucket[i + 1:]:
+                pair = (a.authid, b.authid) if a.authid < b.authid else (b.authid, a.authid)
+                if pair[0] != pair[1] and pair not in scores:
+                    scores[pair] = compare(a, b)
+    by_id = {n.authid: n for n in names}
+    cluster = {n.authid: {n.authid} for n in names}
+
+    def score_of(x, y):
+        pair = (x, y) if x < y else (y, x)
+        if pair not in scores:
+            scores[pair] = compare(by_id[x], by_id[y])
+        return scores[pair][0]
+
+    # The strongest pairs first; on a tie, the older records (lower authid).
+    strong = sorted((p for p, s in scores.items() if s[0] >= threshold),
+                    key=lambda p: (-scores[p][0], min(_num(p[0]), _num(p[1])), max(_num(p[0]), _num(p[1]))))
+    near = {}
+    for x, y in strong:
+        cx, cy = cluster[x], cluster[y]
+        if cx is cy:
+            continue
+        if all(score_of(u, v) >= _FLOOR for u in cx for v in cy):
+            cx |= cy
+            for z in cy:
+                cluster[z] = cx
+        else:
+            near.setdefault(x, set()).add(y)
+            near.setdefault(y, set()).add(x)
+    groups, seen = [], set()
+    for n in names:
+        c = cluster[n.authid]
+        if len(c) < 2 or id(c) in seen:
+            continue
+        seen.add(id(c))
+        g = Group(sorted((by_id[x] for x in c), key=lambda m: _num(m.authid)))
+        for v in g.names:
+            if v is not g.keep:
+                pair = (v.authid, g.keep.authid) if v.authid < g.keep.authid else (g.keep.authid, v.authid)
+                score_of(*pair)
+                g.scores[v.authid] = scores[pair]
+            others = [by_id[o].heading for o in near.get(v.authid, ()) if o not in c]
+            if others:
+                g.ambiguous[v.authid] = others
+        groups.append(g)
+    groups.sort(key=lambda g: (-len(g.names), R.strip_accents(g.keep.heading).lower()))
+    return groups
+
+
+# ---------------------------------------------------------------- input / output
+
+_NS = "{http://www.loc.gov/MARC21/slim}"
+
+
+def read_headings(path, uses=None):
+    """The personal-name headings of a file: the panel's TSV (authid, type,
+    100$a, 100$q, 100$d) or MARCXML authority records (001 and 100)."""
+    uses = uses or {}
+    with open(path, "rb") as f:
+        data = f.read()
+    text = R.decode_text(data)[0]
+    if text.lstrip().startswith("<"):
+        return _read_marcxml(text, uses)
+    names = []
+    for line in text.splitlines():
+        cols = line.split("\t")
+        if len(cols) < 3 or not cols[0].strip().isdigit() or not cols[2].strip():
+            continue
+        cols += [""] * (5 - len(cols))
+        names.append(Name(cols[0].strip(), cols[2], cols[3], cols[4], cols[1].strip(), uses.get(cols[0].strip(), 0)))
+    return names
+
+
+def _read_marcxml(text, uses):
+    root = ET.fromstring(text.encode("utf-8"))
+    names = []
+    for rec in root.iter():
+        if rec.tag not in (_NS + "record", "record"):
+            continue
+        ns = _NS if rec.tag.startswith(_NS) else ""
+        authid, kind, sub = "", "", {}
+        for cf in rec.findall(ns + "controlfield"):
+            if cf.get("tag") == "001":
+                authid = (cf.text or "").strip()
+        for df in rec.findall(ns + "datafield"):
+            if df.get("tag") == "100" and not sub:
+                for sf in df.findall(ns + "subfield"):
+                    sub.setdefault(sf.get("code"), sf.text or "")
+            elif df.get("tag") == "942":
+                for sf in df.findall(ns + "subfield"):
+                    if sf.get("code") == "a":
+                        kind = sf.text or ""
+        if authid and sub.get("a"):
+            names.append(Name(authid, sub["a"], sub.get("q", ""), sub.get("d", ""), kind or "PERSO_NAME",
+                              uses.get(authid, 0)))
+    return names
+
+
+def read_uses(path):
+    """How many records point to each authority: lines of the $9 values of
+    one record (separated by spaces), or 'authid<TAB>count'."""
+    uses = {}
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "\t" in line:
+                a, n = line.split("\t", 1)
+                if a.strip().isdigit() and n.strip().isdigit():
+                    uses[a.strip()] = uses.get(a.strip(), 0) + int(n)
+                continue
+            for a in set(line.split()):
+                if a.isdigit():
+                    uses[a] = uses.get(a, 0) + 1
+    return uses
+
+
+def write_groups(groups, path):
+    """group<TAB>authid<TAB>role (keep|variant)<TAB>score<TAB>reasons ("-" for
+    the form to keep)<TAB>uses<TAB>heading<TAB>100$a: no field is ever empty."""
+    with open(path, "w", encoding="utf-8") as f:
+        for i, g in enumerate(groups, 1):
+            f.write("%d\t%s\tkeep\t1.00\t-\t%d\t%s\t%s\n" % (i, g.keep.authid, g.keep.uses, _tsv(g.keep.heading),
+                                                          _tsv(g.keep.form)))
+            for v in g.variants():
+                s, why = g.scores[v.authid]
+                if v.authid in g.ambiguous:
+                    why = why + ["also like: " + "; ".join(g.ambiguous[v.authid])]
+                f.write("%d\t%s\tvariant\t%.2f\t%s\t%d\t%s\t%s\n" % (i, v.authid, s, _tsv(", ".join(why)), v.uses,
+                                                                    _tsv(v.heading), _tsv(v.form)))
+
+
+def _tsv(s):
+    return re.sub(r"[\t\r\n]+", " ", s).strip() or "-"
+
+
+def print_report(groups, total, threshold, out):
+    variants = sum(len(g.names) - 1 for g in groups)
+    out.write("== Smart authority matching\n")
+    out.write("Personal names checked: %d\n" % total)
+    out.write("Groups of variant forms: %d\n" % len(groups))
+    out.write("Variant forms to merge: %d\n" % variants)
+    out.write("Similarity threshold: %.2f\n" % threshold)
+    for i, g in enumerate(groups, 1):
+        out.write("\n%d. Keep: %s  [authid %s, used in %d records]\n" % (i, g.keep.heading, g.keep.authid, g.keep.uses))
+        for v in g.variants():
+            s, why = g.scores[v.authid]
+            note = ", ".join(why)
+            if v.authid in g.ambiguous:
+                note += "; also like: " + "; ".join(g.ambiguous[v.authid])
+            out.write("   %.2f  %s  [authid %s, used in %d records] (%s)\n" % (s, v.heading, v.authid, v.uses, note))
+
+
+def run(src, work, uses_file=None, threshold=THRESHOLD, out=None):
+    """The command: 0 groups found, 3 none."""
+    out = out or sys.stdout
+    uses = read_uses(uses_file) if uses_file and os.path.exists(uses_file) else {}
+    names = read_headings(src, uses)
+    groups = find_groups(names, threshold)
+    write_groups(groups, os.path.join(work, "authority-groups.tsv"))
+    print_report(groups, len(names), threshold, out)
+    return 0 if groups else 3
+KEIPY
     cat > "$d/kei_import/__main__.py" <<'KEIPY'
 """Command line (the panel runs it as the Koha instance user, through
-koha-shell): kei_import_run.py analyse|build [options]
+koha-shell): kei_import_run.py analyse|build|authorities [options]
 
-Exit codes: 0 done, 2 usage, 3 nothing importable, 4 the file cannot be
-read, 6 questions still open, 7 a Debian package is needed first."""
+Exit codes: 0 done, 2 usage, 3 nothing importable (authorities: no variant
+forms found), 4 the file cannot be read, 6 questions still open, 7 a Debian
+package is needed first."""
 import argparse
 import os
 import sys
 import traceback
 
-from . import engine, intake
+from . import authorities, engine, intake
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="kei_import")
-    p.add_argument("command", choices=("analyse", "build"))
+    p.add_argument("command", choices=("analyse", "build", "authorities"))
     p.add_argument("--in", dest="src", required=True)
     p.add_argument("--work", required=True)
     p.add_argument("--answers")
@@ -23103,6 +23780,8 @@ def main(argv=None):
     p.add_argument("--cpf-attr", action="store_true")
     p.add_argument("--today")
     p.add_argument("--yaz", default="yaz-marcdump")
+    p.add_argument("--uses")
+    p.add_argument("--threshold", type=float, default=authorities.THRESHOLD)
     opts = p.parse_args(argv)
     if not os.path.exists(opts.src):
         print("Cannot read %s" % opts.src)
@@ -23112,6 +23791,8 @@ def main(argv=None):
     except AttributeError:
         pass
     try:
+        if opts.command == "authorities":
+            return authorities.run(opts.src, opts.work, opts.uses, opts.threshold)
         if opts.command == "analyse":
             a = engine.analyse(opts)
             a.questions.write(os.path.join(opts.work, "questions.tsv"))
@@ -28981,6 +29662,7 @@ panel_action_function() {
         magic-import)       echo lt_magic_import ;;
         marc-undo)          echo lt_marc_undo ;;
         authority-sync)     echo lt_authority_sync ;;
+        authority-match)    echo lt_authority_match ;;
         patron-category)    echo lt_patron_category ;;
         data-quality)       echo lt_data_quality ;;
         privacy-anonymise)  echo lt_privacy_anonymise ;;

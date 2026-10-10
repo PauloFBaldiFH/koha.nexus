@@ -2057,6 +2057,23 @@
     "Todos que estiverem usando o catálogo são desconectados. Prefira Reiniciar Koha quando só o Koha precisar."
    ],
    "_en": "59f7b89246"
+  },
+  "authority-match": {
+   "summary": "Encontra as formas variantes de um mesmo autor no arquivo de autoridades (invertidas, abreviadas, com erro de digitação, sem acento, escritas como soam) e une as que você confirmar, grupo a grupo.",
+   "overview": [
+    "Catálogos construídos ao longo de anos acabam com um autor em vários cabeçalhos: 'Assis, Machado de', 'Machado de Assis', 'Assis, M. de', 'Asis, Machado de'. A ferramenta compara os nomes pessoais (100) palavra por palavra na ordem direta, com distância entre textos (Jaro-Winkler e Levenshtein), o som da palavra em português e espanhol (Souza e Sousa, Luiz e Luís) e as iniciais. Nada é unido sem a sua confirmação, e a união é a mesma que a interface da equipe do Koha faz."
+   ],
+   "steps": [
+    "Leia a prévia: cada grupo mostra a forma sugerida para ficar e cada variante com sua pontuação (0 a 1) e o motivo.",
+    "Em cada grupo, escolha a forma que fica, ou diga que não é a mesma pessoa. 'Manter a forma sugerida neste e em todos os grupos restantes' responde o resto de uma vez.",
+    "Confirme: um backup verificado é feito, o Koha une cada variante à forma mantida, os registros que a usavam acompanham, e a variante fica como remissiva 'ver de' (400)."
+   ],
+   "tips": [
+    "Só grupos com pontuação 0,85 ou mais são sugeridos. Datas diferentes, Filho e Neto, ou Mário e Maria nunca são agrupados.",
+    "Uma variante marcada 'also like' combina com mais de uma pessoa (por exemplo 'Silva, J.'): confira antes de unir.",
+    "Rode Sincronizar e ligar autoridades depois, para vincular os cabeçalhos que ainda não têm autoridade."
+   ],
+   "_en": "91c24f6979"
   }
  }
 }

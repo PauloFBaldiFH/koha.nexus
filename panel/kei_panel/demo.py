@@ -288,6 +288,18 @@ _RUN: dict[str, list[str]] = {
         "@@ask Sync & link authorities\tRecords checked: 120\\nRecords to update: 37\\nHeadings to link: 52 (by similarity: 3)"
         "\\nHeadings without a matching authority: 18\\n\\nLink them now?",
         "@@say ok OK\tHeadings linked to the authorities: 52."],
+    "authority-match": [
+        "@@step Comparing the names...", "@@done 0 Comparing the names...",
+        "@@view Preview (nothing is changed yet)\t== Smart authority matching\nPersonal names checked: 412"
+        "\nGroups of variant forms: 2\nVariant forms to merge: 3\n\n1. Keep: Assis, Machado de, 1839-1908"
+        "\n   1.00  Machado de Assis (inverted, dates missing)\n   0.93  Assis, M. de (abbreviated, dates missing)"
+        "\n\n2. Keep: Sousa, Ana Maria de\n   0.98  Souza, Ana Maria de (sounds alike)",
+        "@@choose Group 1 of 2\tThese forms look like the same person (score and why):"
+        "\n  1.00  Machado de Assis (inverted, dates missing)\n  0.93  Assis, M. de (abbreviated, dates missing)"
+        "\n\nWhich form should stay? The others are merged into it.\t1\t1\tAssis, Machado de, 1839-1908 · suggested"
+        "\tskip\tNot the same person: leave this group as it is",
+        "@@ask Find duplicate authors\tAuthorities to merge into the form kept: 3\n\nMerge them now?",
+        "@@say ok OK\tAuthorities merged: 3"],
     "about": ["@@view About\tkoha.nexus\\n\\nBorn from real-life experience facing technical barriers in collection "
               "management, designed for libraries without budget for expensive commercial systems or dedicated "
               "technical support.\\n\\nSupport this open-source initiative:\\n  * Pix (Brazil)  : 076.650.449.21\\n"
