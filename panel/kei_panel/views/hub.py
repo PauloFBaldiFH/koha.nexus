@@ -1,8 +1,8 @@
 """HubView: messaging & interoperability on one screen.
 
-Five tabs: E-mail (SMTP), WhatsApp & Telegram, SMS, SIP2 and Z39.50 (its
-state, and the way to the Z39.50 / SRU servers screen, where it is turned
-on or off). Each
+Six tabs: E-mail (SMTP), WhatsApp & Telegram, SMS, Alerts, SIP2 and Z39.50
+(its state, and the way to the Z39.50 / SRU servers screen, where it is
+turned on or off). Each
 shows what Koha has now (`config.sh --task hub-status`: no passwords), the
 buttons that set it up from the panel, and links that open the exact Koha
 staff page (through opener.py) instead of a wall of instructions.
@@ -12,19 +12,27 @@ The SIP2 tab is a form: it reads SIPconfig.xml, sip.py writes the new one
 do; Koha's example logins with published passwords are taken out) and
 `config.sh --task sip-apply` puts it in place after a backup and restarts
 the SIP2 server. No XML to edit by hand.
+
+The Alerts tab chooses what notify.py sends (due-date reminders, overdue
+alerts, the daily digest) and by which of the channels above; it saves
+notifications.conf and switches on the "Reader alerts & daily digest" job
+of Schedules & cron tasks when an alert is on. Its dry run shows what
+would go out today and sends nothing.
 """
 
 from __future__ import annotations
 
+import asyncio
+import datetime as dt
 from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Select, Static, Switch, TabbedContent, TabPane
 
-from .. import sip
+from .. import cron, notify, sip
 from ..i18n import t
-from ..screens.dialogs import ConfirmScreen
+from ..screens.dialogs import ConfirmScreen, TextScreen
 from .base import SectionView
 
 # Koha staff pages the links open (staff address + path).
@@ -84,6 +92,8 @@ class HubView(SectionView):
                 yield from self.compose_messaging()
             with TabPane(t("📱  SMS"), id="hub-sms"):
                 yield from self.compose_sms()
+            with TabPane(t("🔔  Alerts"), id="hub-alerts"):
+                yield from self.compose_alerts()
             with TabPane(t("🏧  SIP2"), id="hub-sip"):
                 yield from self.compose_sip()
             with TabPane(t("📡  Z39.50"), id="hub-z3950"):
@@ -128,6 +138,31 @@ class HubView(SectionView):
             yield Button(t("SMS driver (SMSSendDriver)"), id="h-l-sms", variant="primary")
             yield Button(t("Readers' messaging preferences"), id="h-l-msgprefs-sms")
 
+    def compose_alerts(self) -> ComposeResult:
+        yield Label(t("Not checked yet."), id="h-al-state", classes="hub-state")
+        yield Static(t("Messages the server sends by itself every morning: reminders before the due date and "
+                       "overdue alerts to readers, and a daily summary of the loans and of the server to the "
+                       "library. Everything is off until you switch it on. Nothing is sent twice on the same day."),
+                     classes="ai-note", markup=False)
+        with Vertical(id="h-al-form", classes="hub-box"):
+            yield from _row(t("Due-date reminders"), Switch(False, id="h-al-due"))
+            yield from _row(t("Days before"), Input("2", id="h-al-days", max_length=2, type="integer"))
+            yield from _row(t("Overdue alerts"), Switch(False, id="h-al-overdue"))
+            yield from _row(t("Repeat every (days)"), Input("7", id="h-al-every", max_length=2, type="integer",
+                                                            tooltip=t("0: once")))
+            yield from _row(t("Readers get them by e-mail"), Switch(True, id="h-al-email"))
+            yield from _row(t("and by WhatsApp or Telegram"), Switch(False, id="h-al-chat"))
+            yield from _row(t("Daily summary"), Switch(False, id="h-al-digest"))
+            yield from _row(t("Send it to"), Input("", id="h-al-to", placeholder=t("the library's e-mail address")))
+        with Horizontal(classes="form-buttons"):
+            yield Button(t("Save"), id="h-al-save", variant="success")
+            yield Button(t("Dry run (sends nothing)"), id="h-al-dry")
+            yield Button(t("⏰  Schedules & cron tasks"), id="h-al-cron")
+        yield Static(t("Koha's own notices (Overdue notice triggers, readers' messaging preferences) can send "
+                       "reminders too: use one or the other, or readers get two messages. Loans overdue for more "
+                       "than ${n} days are only listed in the summary.", n=notify.OVERDUE_LIMIT),
+                     classes="ai-note", markup=False)
+
     def compose_sip(self) -> ComposeResult:
         yield Label(t("Not checked yet."), id="h-sip-state", classes="hub-state")
         yield Static(t("The self-check machine (or RFID gate) signs in to Koha's SIP2 server with a login of its "
@@ -164,6 +199,7 @@ class HubView(SectionView):
 
     def on_mount(self) -> None:
         self.query_one("#h-sip-form").border_title = t("SIP2 server")
+        self.query_one("#h-al-form").border_title = t("Alerts")
         self.query_one("#h-gmail").border_title = "Gmail"
         table = self.query_one("#h-gmail-table", DataTable)
         table.add_columns(t("Field"), t("Value"))
@@ -198,6 +234,7 @@ class HubView(SectionView):
                 self.branches.append((code, name or code))
         self.show_status()
         self.load_sip()
+        self.load_alerts()
 
     def show_status(self) -> None:
         s = self.status
@@ -311,6 +348,100 @@ class HubView(SectionView):
         self.reload()
 
     # ------------------------------------------------------------------
+    # Alerts (notify.py)
+    # ------------------------------------------------------------------
+    def load_alerts(self) -> None:
+        s = notify.load_settings()
+        q = self.query_one
+        q("#h-al-due", Switch).value = s.due_soon
+        q("#h-al-days", Input).value = str(s.due_days)
+        q("#h-al-overdue", Switch).value = s.overdue
+        q("#h-al-every", Input).value = str(s.overdue_every)
+        q("#h-al-email", Switch).value = s.email
+        q("#h-al-chat", Switch).value = s.chat
+        q("#h-al-digest", Switch).value = s.digest
+        q("#h-al-to", Input).value = s.digest_to
+        self.show_alerts(s)
+
+    def show_alerts(self, s: notify.Settings) -> None:
+        on = [t(label) for flag, label in ((s.due_soon, "Due-date reminders"), (s.overdue, "Overdue alerts"),
+                                           (s.digest, "Daily summary")) if flag]
+        if not on:
+            text = t("Alerts: all off")
+        else:
+            job = cron.parse(cron.read(), self.app.env.instance).job("notify")
+            when = cron.describe(job) if job and job.enabled else t("the schedule is off: Save switches it on")
+            text = t("Alerts on: ${list}", list=", ".join(on)) + "  ·  " + when
+        self.query_one("#h-al-state", Label).update(text)
+
+    def alert_settings(self) -> tuple[notify.Settings, str]:
+        q = self.query_one
+        days, every = q("#h-al-days", Input).value.strip(), q("#h-al-every", Input).value.strip()
+        if not days.isdigit() or not every.isdigit():
+            return notify.Settings(), t("Type the days as a number.")
+        s = notify.Settings(
+            due_soon=q("#h-al-due", Switch).value, due_days=int(days),
+            overdue=q("#h-al-overdue", Switch).value, overdue_every=int(every),
+            digest=q("#h-al-digest", Switch).value, digest_to=q("#h-al-to", Input).value.strip(),
+            email=q("#h-al-email", Switch).value, chat=q("#h-al-chat", Switch).value)
+        problem = notify.settings_problem(s)
+        return s, t(problem) if problem else ""
+
+    def alerts_save(self) -> None:
+        s, problem = self.alert_settings()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        self.app.run_worker(self._alerts_save(s), group="routine", exclusive=True, exit_on_error=False)
+
+    async def _alerts_save(self, s: notify.Settings) -> None:
+        from ..routines.common import run_task, show_done
+        try:
+            if not self.app.env.demo:
+                notify.save_settings(s)
+        except OSError as e:
+            self.app.notify(str(e), severity="error")
+            return
+        new = cron.with_job_on(cron.read(), "notify", self.app.env.instance) if s.any_on() else ""
+        if not new:
+            self.app.notify(t("Saved."))
+            self.show_alerts(s)
+            return
+        title = t("⏰  Schedules & cron tasks")
+        path = cron.write_temp(new)
+        try:
+            result = await run_task(self.app, title, "cron-apply", str(path))
+        finally:
+            path.unlink(missing_ok=True)
+        await show_done(self.app, title, result)
+        self.show_alerts(s)
+
+    def alerts_dry_run(self) -> None:
+        s, problem = self.alert_settings()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        self.app.run_worker(self._alerts_dry_run(s), group="hub-dry", exclusive=True, exit_on_error=False)
+
+    async def _alerts_dry_run(self, s: notify.Settings) -> None:
+        demo = self.app.env.demo
+        try:
+            status = await self.app.bridge.status()
+        except Exception:     # noqa: BLE001 (the summary says the state could not be read)
+            status = {}
+        instance = self.app.env.instance
+        try:
+            rep = await asyncio.to_thread(
+                notify.run, instance, s, dry_run=True, status=lambda: status, t=t,
+                runner=notify.demo_runner() if demo else None,
+                channels=notify.DemoChannels() if demo else None,
+                today=notify.DEMO_TODAY if demo else dt.date.today())
+        except (RuntimeError, OSError) as e:
+            self.app.notify(str(e), severity="error")
+            return
+        await self.app.push_screen_wait(TextScreen(t("Dry run: what would be sent today"), "\n".join(rep.lines)))
+
+    # ------------------------------------------------------------------
     # Buttons
     # ------------------------------------------------------------------
     def staff_link(self, path: str) -> str:
@@ -337,6 +468,15 @@ class HubView(SectionView):
         elif bid == "h-sip-save":
             event.stop()
             self.sip_save()
+        elif bid == "h-al-save":
+            event.stop()
+            self.alerts_save()
+        elif bid == "h-al-dry":
+            event.stop()
+            self.alerts_dry_run()
+        elif bid == "h-al-cron":
+            event.stop()
+            self.app.screen.action_show("crons")
         elif bid == "h-reload":
             event.stop()
             self.reload()

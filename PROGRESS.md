@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.43** (1.5.44: last-backup indicator and pre-restore safety backup PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.44** (1.5.45: reader alerts and daily digest PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.45 (reader alerts and daily digest)**: `panel/kei_panel/notify.py` (standard library only)
+  sends due-date reminders and overdue alerts to readers (one message per reader, by e-mail and/or
+  WhatsApp/Telegram through `KohaEasy::Messaging`) and a daily summary to the library (loans plus
+  `config.sh --status-json`). Each alert is off until switched on in Messaging > Alerts (new hub
+  tab, `/etc/koha-easy-install/notifications.conf`); its dry run shows what would go out today.
+  Runs from Schedules & cron tasks: preset `notify`, daily at 07:00, off; the Alerts tab's Save
+  switches it on; `cron-apply` writes `/usr/local/bin/koha-kei-notify` (panel venv Python, else
+  python3). Koha is only read (koha-mysql); e-mail goes through Koha's default SMTP server
+  (`smtp_servers`, else localhost:25, as Koha does) from KohaAdminEmailAddress and only when
+  Koha's e-mail is on. What was sent: `/var/lib/koha/<instance>/kei-notify/sent.tsv` (written after
+  each message, under a lock), so repeated runs never send twice on the same day; due keys carry the
+  due date (a renewal brings a new reminder); overdue repeats every N days (0: once), loans overdue
+  over 90 days only in the summary. Log: `/var/log/koha-easy-install/notify.log`. Not tried live.
+
 - **1.5.44 (last-backup indicator, pre-restore safety backup)**: one source of truth for "the
   newest backup", `latest_sql_backup` (EPOCH MTIME SIZE PATH): top-level, non-empty `*.sql.{gz,zst,xz}`
   in $DIR_SQL, dated by the timestamp in the name (`backup_name_epoch`: `_23h00`, `_14h0733`,

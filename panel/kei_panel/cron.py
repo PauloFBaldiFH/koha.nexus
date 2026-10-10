@@ -6,7 +6,8 @@ Jobs and writes it back; `config.sh --task cron-apply FILE` checks the new
 file, keeps a copy of the old one and puts it in place.
 
   * presets: the jobs the panel knows (the backups, the clean-ups, a full
-    index rebuild, fines, authority linking), found by their command;
+    index rebuild, fines, authority linking, the reader alerts of
+    notify.py), found by their command;
   * a job that is off stays in the file as "#off# <cron line>", so turning
     it on again keeps its time;
   * lines the library wrote by hand are kept as they are, with the comment
@@ -25,6 +26,7 @@ CRON_FILE = "/etc/cron.d/koha_tasks"
 CRON_PATH = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 OFF = "#off# "
 REINDEX_BIN = "/usr/local/bin/koha-kei-reindex"
+NOTIFY_BIN = "/usr/local/bin/koha-kei-notify"
 
 FREQS = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "custom": "Custom"}
 WEEKDAYS = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
@@ -87,6 +89,9 @@ PRESETS: tuple[Preset, ...] = (
            "koha-plack --restart", hour=5),
     Preset("journal", "System log cleanup (keeps 14 days)", "/usr/bin/journalctl --vacuum-time=14d >/dev/null 2>&1",
            "journalctl --vacuum", minute=30),
+    Preset("notify", "Reader alerts & daily digest", NOTIFY_BIN + " {instance} >/dev/null 2>&1",
+           "koha-kei-notify", hour=7, enabled=False, freqs=("daily", "custom"),
+           help="Due-date reminders, overdue alerts and the status digest chosen in Messaging > Alerts."),
     Preset("mysqlcheck", "Database table check",
            "/usr/bin/mysqlcheck --check --databases koha_{instance} >/dev/null 2>&1", "mysqlcheck",
            freq="monthly", day=5, hour=1),
@@ -322,3 +327,14 @@ def with_freq(job: Job, freq: str) -> Job:
         day = min(max(day, 1), 28)
     raw = job.raw or job.schedule()
     return replace(job, freq=freq, day=day, raw=raw)
+
+
+def with_job_on(text: str, key: str, instance: str) -> str:
+    """The file with the preset `key` switched on (its time kept), or "" when
+    it is on already. Used by screens that need their job to run (Alerts)."""
+    cf = parse(text, instance)
+    job = cf.job(key)
+    if job is None or job.enabled:
+        return ""
+    job.enabled = True
+    return render(cf)

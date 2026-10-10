@@ -131,3 +131,64 @@ def test_sip_wizard_writes_the_xml(tmp_path, monkeypatch):
             assert 'renewal="false"' in text
 
     asyncio.run(main())
+
+
+def test_alerts_tab_dry_run_and_schedule(tmp_path, monkeypatch):
+    from kei_panel import cron, notify
+    from kei_panel.screens.dialogs import TextScreen
+    monkeypatch.setenv("KEI_NOTIFY_CONF", str(tmp_path / "notifications.conf"))
+    monkeypatch.setenv("KEI_CRON_FILE", str(tmp_path / "koha_tasks"))
+    (tmp_path / "koha_tasks").write_text("PATH=/usr/bin\n15 22 * * * root /bin/bash /root/backup_sql.sh\n")
+    sent = {}
+    real = cron.write_temp
+
+    def spy(text):
+        sent["text"] = text
+        return real(text)
+    monkeypatch.setattr(cron, "write_temp", spy)
+
+    async def main():
+        app = _app(monkeypatch, [])
+        async with app.run_test(size=(160, 60)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("m")
+            view = app.screen.query_one("#view-hub")
+            await _until(pilot, lambda: view.staff_url)
+            view.query_one("#hub-tabs", TabbedContent).active = "hub-alerts"
+            await pilot.pause(0.1)
+            assert "all off" in str(view.query_one("#h-al-state").render())
+            assert view.query_one("#h-al-due", Switch).value is False
+
+            view.query_one("#h-al-due", Switch).value = True
+            view.query_one("#h-al-days", Input).value = "40"
+            assert "0 to 14" in view.alert_settings()[1]
+            view.query_one("#h-al-days", Input).value = "2"
+            view.query_one("#h-al-email", Switch).value = False
+            assert "Choose how readers" in view.alert_settings()[1]
+            view.query_one("#h-al-chat", Switch).value = True
+            view.query_one("#h-al-digest", Switch).value = True
+            assert view.alert_settings()[1] == ""
+
+            view.query_one("#h-al-dry").press()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen) and app.screen.query("#ok"))
+            assert "dry run" in app.screen._text and "+5511987654321" not in app.screen._text   # not overdue on
+            assert "Biblioteca Central - daily summary" in app.screen._text
+            app.screen.query_one("#ok").press()
+            await pilot.pause(0.2)
+
+            # Save switches the schedule's job on (it was off).
+            view.query_one("#h-al-save").press()
+            await _until(pilot, lambda: "text" in sent and isinstance(app.screen, MessageScreen))
+            assert "\n0 7 * * * root /usr/local/bin/koha-kei-notify library" in sent["text"]
+            assert "\n15 22 * * * root /bin/bash /root/backup_sql.sh" in sent["text"]
+            app.screen.query_one("#ok").press()
+            await pilot.pause(0.1)
+
+            view.query_one("#h-al-cron").press()
+            await _until(pilot, lambda: app.screen.query_one("#views").current == "view-crons")
+            crons = app.screen.query_one("#view-crons")
+            await _until(pilot, lambda: crons.drawn)
+            await pilot.pause(0.3)
+            assert notify.Settings().any_on() is False
+
+    asyncio.run(main())
