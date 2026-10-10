@@ -230,3 +230,33 @@ def test_block_colours_links_coverflow_and_staff(tmp_path):
         shutil.rmtree(again)
     finally:
         shutil.rmtree(work)
+
+
+def test_depth_and_buttons():
+    # No wallpaper: a canvas with depth under the blocks, the library's page colour kept as its base.
+    plain = ot.css_body(ot.normalize({"surface": "#ffffff", "opacity": 100}))
+    assert "radial-gradient" in plain and "#e8ecf2" in plain and "0 12px 32px -10px" in plain
+    page = ot.css_body(ot.normalize({"page": "#f5f0e6"}))
+    assert "#f5f0e6 !important" in page and "#e8ecf2" not in page
+    wall = ot.css_body(ot.normalize({"page": "#f5f0e6",
+                                     "background": {"source": "url", "url": "https://i.ibb.co/x/w.jpg"}}))
+    assert "radial-gradient" not in wall and "background-color: #f5f0e6 !important" in wall
+    # Every kind of button, and full-width touch targets in the news and the home page block.
+    for sel in ("html body #searchsubmit", "html body .btn-default", 'html body input[type="submit"]:not(.btn)',
+                "html body #backtotop", "html body .newsitem .btn", "html body #opacmainuserblock .btn",
+                'html body #opacmainuserblock input[type="submit"]'):
+        assert sel in plain, sel
+    assert "width: 100% !important" in plain and "min-height: 44px" in plain
+    assert "#c9c9c9" in ot.css_body(ot.normalize({"texture": "metal"})) and "#c9c9c9" not in plain
+    # The settings line is untouched by the new rules.
+    assert ot.parse_theme_data(ot.css_block(ot.normalize({"texture": "metal"})))["texture"] == "metal"
+
+
+def test_blocks_take_the_chosen_colours():
+    css = ot.css_body(ot.normalize({"accent": "#7c3aed", "accent2": "#db2777", "surface": "#ffffff"}))
+    tint = ot.mix("#ffffff", "#7c3aed", .12)
+    assert tint != "#ffffff" and f"--kei-surface-rgb: {ot._rgb(tint)};" in css
+    assert "--kei-surface-rgb: 255,255,255;" not in css
+    assert "rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%" in css
+    assert f"--kei-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css
+    assert ot.mix("#000000", "#ffffff", .5) == "#808080"

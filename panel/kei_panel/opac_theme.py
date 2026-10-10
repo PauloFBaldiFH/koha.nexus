@@ -242,6 +242,12 @@ def _rgb(hex_color: str) -> str:
     return ",".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
 
 
+def mix(a: str, b: str, amount: float) -> str:
+    """#rrggbb: a with amount (0-1) of b mixed in."""
+    ca, cb = (tuple(int(h.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)) for h in (a, b))
+    return "#" + "".join(f"{round(x + (y - x) * amount):02x}" for x, y in zip(ca, cb))
+
+
 def luminance(hex_color: str) -> float:
     """Relative luminance (WCAG) of #rrggbb, 0 (black) to 1 (white)."""
     h = hex_color.lstrip("#")
@@ -274,7 +280,8 @@ def _strong(selectors: str) -> str:
 def _texture_css(cfg: dict) -> str:
     t = cfg["texture"]
     surface = "rgba(var(--kei-surface-rgb), var(--kei-surface-a))"
-    base = [f"{_strong(_BLOCKS)} {{", f"    background: {surface} !important;", "    color: var(--kei-text);",
+    wash = "linear-gradient(135deg, rgba(var(--kei-accent-rgb), .10), rgba(var(--kei-accent2-rgb), .10))"
+    base = [f"{_strong(_BLOCKS)} {{", f"    background: {wash}, {surface} !important;", "    color: var(--kei-text);",
             "    border-radius: var(--kei-r-block) !important;", "    border: 1px solid var(--kei-edge) !important;"]
     if t == "frosted":
         base += ["    -webkit-backdrop-filter: blur(var(--kei-blur)) saturate(140%);",
@@ -285,26 +292,27 @@ def _texture_css(cfg: dict) -> str:
     elif t == "metal":
         base[1] = (f"    background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
                    "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px), "
-                   f"{surface} !important;")
+                   f"{wash}, {surface} !important;")
         base += ["    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
                  "0 2px 8px rgba(0, 0, 0, .14);"]
     elif t == "flat":
-        base[1] = "    background: rgb(var(--kei-surface-rgb)) !important;"
+        base[1] = f"    background: {wash}, rgb(var(--kei-surface-rgb)) !important;"
     elif t == "gradient":
         base[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
                    "rgba(var(--kei-accent-rgb), .10) 55%, rgba(var(--kei-accent2-rgb), .14) 100%) !important;")
     base.append("}")
     base.append(f"""{_strong(_CONTENT)} {{
-    background: rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
+    background: linear-gradient(135deg, rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%),
+        rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
     color: var(--kei-text) !important;
-    border: 1px solid var(--kei-edge) !important;
+    border: 1px solid rgba(var(--kei-accent-rgb), .35) !important;
     border-left: 4px solid var(--nexus-primary) !important;
     border-radius: calc(var(--kei-r-block) * .7) !important;
     padding: .9rem 1.1rem;
     margin-bottom: 1rem;
 }}
 html body .main h1, html body .main h2, html body .main h3, html body .main h4, html body .main legend,
-html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-text); }}
+html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-ink); }}
 html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei-muted) !important; }}""")
     return "\n".join(base)
 
@@ -312,9 +320,13 @@ html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei
 def css_body(cfg: dict) -> str:
     cfg = normalize(cfg)
     car, ghost = cfg["carousel"], cfg["ghost"]
-    dark_surface = luminance(cfg["surface"]) < 0.30
+    # The blocks take the chosen colours: the surface tinted with the accent
+    # (the blocks then add a wash of both accents), headings in the accent.
+    tint = mix(cfg["surface"], cfg["accent"], .12)
+    dark_surface = luminance(tint) < 0.30
     text, muted, edge = (("#f1f5f9", "#cbd5e1", "rgba(255, 255, 255, .14)") if dark_surface
-                         else ("#1f2933", "#52606d", "rgba(15, 23, 42, .10)"))
+                         else ("#1f2933", "#52606d", f"rgba({_rgb(cfg['accent'])}, .22)"))
+    ink = mix(cfg["accent"], "#ffffff", .45) if dark_surface else mix(cfg["accent"], "#000000", .30)
     out = [f""":root {{
     --nexus-primary: {cfg['accent']};
     --nexus-secondary: {cfg['accent2']};
@@ -324,10 +336,11 @@ def css_body(cfg: dict) -> str:
     --kei-accent: {cfg['accent']};
     --kei-accent-rgb: {_rgb(cfg['accent'])};
     --kei-accent2-rgb: {_rgb(cfg['accent2'])};
-    --kei-surface-rgb: {_rgb(cfg['surface'])};
+    --kei-surface-rgb: {_rgb(tint)};
     --kei-surface-a: {cfg['opacity'] / 100:.2f};
     --kei-text: {text};
     --kei-muted: {muted};
+    --kei-ink: {ink};
     --kei-edge: {edge};
     --kei-blur: {cfg['blur']}px;
     --kei-r-block: {cfg['radius_block']}px;
@@ -336,7 +349,8 @@ def css_body(cfg: dict) -> str:
     --kei-film: {cfg['film'] / 100:.2f};
 }}
 html[data-kei-theme="dark"] {{
-    --kei-surface-rgb: 22, 27, 34;
+    --kei-surface-rgb: {_rgb(mix("#161b22", cfg["accent"], .14))};
+    --kei-ink: {mix(cfg["accent"], "#ffffff", .45)};
     --kei-text: #e6edf3;
     --kei-muted: #9da7b3;
     --kei-edge: rgba(255, 255, 255, .10);
@@ -356,14 +370,13 @@ html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb
 html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
-.btn, button.btn, input[type="submit"] {{ border-radius: var(--kei-r-btn) !important; }}
-html body .btn-primary {{ background-color: var(--nexus-primary) !important; border-color: var(--nexus-primary) !important;
-    color: var(--nexus-on-primary) !important; }}
-.btn-primary:hover, .btn-primary:focus {{ filter: brightness(1.08); }}
+{_buttons_css(cfg)}
 a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}"""]
-    if cfg["page"]:
-        out.append(f"html body {{ background-color: {cfg['page']} !important; }}")
     bg = cfg["background"]["url"]
+    if not bg:
+        out.append(_canvas_css(cfg))
+    elif cfg["page"]:
+        out.append(f"html body {{ background-color: {cfg['page']} !important; }}")
     if bg:
         out.append(f"""body.kei-wallpaper {{
     background: url("{bg}") center / cover no-repeat fixed !important;
@@ -437,6 +450,105 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     if cfg["links"]["enabled"] and cfg["links"]["items"]:
         out.append(_links_css())
     return "\n".join(out) + "\n"
+
+
+# Every kind of button Koha draws: Bootstrap's, the masthead search button
+# and the bare submit inputs of older templates and news. The carousel
+# arrows, the theme switch and the quick-access links keep their own look.
+_BTN_MAIN = ('.btn-primary, #searchsubmit, .btn-acesso, input[type="submit"]:not(.btn), '
+             'button[type="submit"]:not(.btn):not(.kei-nav)')
+_BTN_SOFT = ('.btn-default, .btn-secondary, .btn-light, .btn-outline-primary, .btn-outline-secondary, '
+             'input[type="button"]:not(.btn), input[type="reset"]:not(.btn), #backtotop')
+# Buttons inside the news and the library's own home page block: action
+# cards, full width, big enough to tap.
+_CARD_AREAS = ("#news .newsitem", ".newsitem", ".news-item", "#opacmainuserblock", "#OpacMainUserBlock")
+_CARD_BUTTONS = (".btn", 'input[type="submit"]', 'input[type="button"]', 'button[type="submit"]')
+
+
+def _buttons_css(cfg: dict) -> str:
+    """The OPAC's buttons: the main ones in the accent colour (a brushed
+    sheen with the metal texture), the secondary ones on the block surface,
+    and full-width touch targets inside the news and the home page block."""
+    main, soft = _strong(_BTN_MAIN), _strong(_BTN_SOFT)
+
+    def hover(sel: str) -> str:
+        return ", ".join(f"{x}:hover, {x}:focus" for x in sel.split(", "))
+
+    if cfg["texture"] == "metal":
+        main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .08) 50%, "
+                   "rgba(0, 0, 0, .14) 100%), var(--nexus-primary)")
+        soft_bg = "linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 50%, #c9c9c9 100%)"
+        soft_fg, soft_edge = "#333", "#b3b3b3"
+        shadow = ("inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), "
+                  "0 4px 6px rgba(0, 0, 0, .12)")
+    else:
+        main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), "
+                   "var(--nexus-primary)")
+        soft_bg = "rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5))"
+        soft_fg, soft_edge = "var(--kei-text)", "var(--kei-edge)"
+        shadow = "inset 0 1px 0 rgba(255, 255, 255, .25), 0 2px 6px rgba(15, 23, 42, .14)"
+    areas = ", ".join(f"html body {a} {b}" for a in _CARD_AREAS for b in _CARD_BUTTONS)
+    return f""".btn, button.btn, input[type="submit"], input[type="button"], input[type="reset"] {{
+    border-radius: var(--kei-r-btn) !important; }}
+{main} {{
+    background: {main_bg} !important;
+    border: 1px solid var(--nexus-primary) !important;
+    color: var(--nexus-on-primary) !important;
+    font-weight: 600 !important;
+    box-shadow: {shadow} !important;
+    transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
+    cursor: pointer;
+}}
+{soft} {{
+    background: {soft_bg} !important;
+    border: 1px solid {soft_edge} !important;
+    color: {soft_fg} !important;
+    font-weight: 600 !important;
+    box-shadow: {shadow} !important;
+    transition: filter .18s ease, transform .18s ease, border-color .18s ease;
+    cursor: pointer;
+}}
+{hover(main)}, {hover(soft)} {{ filter: brightness(1.06); transform: translateY(-1px); }}
+{hover(soft)} {{ border-color: var(--nexus-primary) !important; }}
+{areas} {{
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 44px;
+    padding: .75rem 1.1rem !important;
+    line-height: 1.4;
+    text-decoration: none !important;
+    margin: .5rem 0 !important;
+    font-size: 1.02rem;
+    text-align: center;
+    white-space: normal;
+}}
+@media (prefers-reduced-motion: reduce) {{ {main}, {soft} {{ transition: none; }} }}"""
+
+
+def _canvas_css(cfg: dict) -> str:
+    """No wallpaper: a page with some depth instead of a flat white sheet,
+    so the blocks (white ones above all) stand out and glass has something
+    to blur. The library's page colour, or a soft grey, under two faint
+    glows of the accent colours; the blocks get a layered shadow."""
+    light = luminance(cfg["surface"]) >= 0.30
+    base = cfg["page"] or ("#e8ecf2" if light else "#1b2230")
+    shadow = ("0 1px 2px rgba(15, 23, 42, .06), 0 12px 32px -10px rgba(15, 23, 42, .22)" if light
+              else "0 1px 2px rgba(0, 0, 0, .25), 0 12px 32px -10px rgba(0, 0, 0, .55)")
+    glows = ("radial-gradient(1200px 600px at 0% 0%, rgba(var(--kei-accent-rgb), .16), transparent 60%), "
+             "radial-gradient(1000px 600px at 100% 100%, rgba(var(--kei-accent2-rgb), .14), transparent 60%)")
+    lines = [f"""html body {{
+    background: {glows}, {base} !important;
+    background-attachment: fixed !important;
+}}
+html[data-kei-theme="dark"] body {{
+    background: {glows.replace(".16", ".10").replace(".14", ".08")}, #0d1117 !important;
+}}"""]
+    if cfg["texture"] != "metal":
+        lines.append(f"""{_strong(_BLOCKS + ", " + _CONTENT)} {{
+    box-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"});
+}}""")
+    return "\n".join(lines)
 
 
 def _links_css() -> str:
