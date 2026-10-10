@@ -11,9 +11,10 @@ share one provider; each may have its own model.
   └──────────────┘ └──────────────────────────────────────────┘
                     [Test connection] [Save]
                    ┌ Ollama on this server ───────────────────┐
-                   │ Ollama 0.12 · 3 models · ...             │
+                   │ Ollama 0.12 · 3 installed · in memory: … │
+                   │ [Check] [Install] [Free memory]          │
                    │ Model [qwen2.5:3b · Balanced (CPU)    v] │
-                   │ [Check] [Install] [Download] [Use for…]  │
+                   │ [Download] [Use for chat] [Use for…]     │
                    └──────────────────────────────────────────┘
   [Provider]  [Connection]  [MARC Replace]  [AI assistant]   status cards
   ┌ The AI tools ───────────────────────────────────────────┐
@@ -25,6 +26,12 @@ Models: the list under the fields comes from the provider itself (Load
 models, or a passed connection test) with the key typed or saved, in two
 groups, Free / Accessible and Advanced (💳, needs a paid key or billing);
 until it can be read, a built-in list is shown and says so (aimodels).
+
+Memory: "installed" counts the downloaded models (/api/tags); only the
+ones "in memory" (/api/ps) take RAM. The assistant and MARC Replace unload
+every other model before each request, Save unloads the models that are
+not in the fields, and Free memory unloads them all (Ollama loads one
+again on demand).
 
 The Ollama box is always there and needs only Ollama itself: a model can be
 downloaded whatever the provider and whether or not the assistant is
@@ -39,6 +46,7 @@ stays empty and shows the saved key masked; empty means "keep it".
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import time
 from pathlib import Path
@@ -136,6 +144,9 @@ class AIView(SectionView):
                     with Horizontal(classes="form-buttons"):
                         yield Button(t("Check Ollama"), id="ai-ollama-check")
                         yield Button(t("Install Ollama"), id="ai-ollama-install")
+                        yield Button(t("Free memory"), id="ai-ollama-free",
+                                     tooltip=t("Unloads every model from memory; Ollama loads one again "
+                                               "when it is asked."))
                     with Horizontal(classes="form-row"):
                         yield Label(t("Model"), classes="form-label")
                         yield Select(self.preset_options(), value=FIELDS, allow_blank=False, id="ai-ollama-preset")
@@ -244,6 +255,7 @@ class AIView(SectionView):
             "ai-test": self.action_test,
             "ai-ollama-check": self.check_ollama,
             "ai-ollama-install": self.install_ollama,
+            "ai-ollama-free": lambda: self.free_ollama([]),
             "ai-assistant": self.open_assistant,
             "ai-ollama-pull": self.pull_model,
             "ai-use-chat": lambda: self.use_preset("chat"),
@@ -273,6 +285,9 @@ class AIView(SectionView):
         tested = self.check is not None
         self.app.notify(t("Saved.") + ("" if tested else " " + t("Test the connection to be sure it works.")))
         self.refresh_cards()
+        if c["provider"] == "ollama":
+            # A model chosen before stays in RAM for minutes: only the saved ones may.
+            self.free_ollama([c["model"], aiconf.chat_model(c)], quiet=True)
 
     # ------------------------------------------------------------------
     # Heavy work: always a thread job behind the Pac-Man loader
@@ -301,7 +316,7 @@ class AIView(SectionView):
             self.check, self.check_error = result.value, ""
             if not self.app.env.demo:
                 self.show_models(aimodels.from_ids(self.provider, self.check.models))
-            msg = f"{t('Connected.')} {len(self.check.models)} {t('models')}"
+            msg = f"{t('Connected.')} {t('${n} installed', n=len(self.check.models))}"
             missing = self.missing(self.check.models)
             for model in missing:
                 msg += " · " + t("the model ${model} is not among them", model=model)
@@ -421,15 +436,17 @@ class AIView(SectionView):
     def check_ollama(self) -> None:
         url, demo = self.ollama_url(), self.app.env.demo
 
-        def job(reporter: Reporter) -> tuple[str, list[str]]:
+        def job(reporter: Reporter) -> tuple[str, list[str], list[str]]:
             reporter.status(url)
             if demo:
                 _demo_wait(reporter, 1.2)
-                return "0.12-demo", ["llama3.2:latest"]
+                return "0.12-demo", ["llama3.2:latest"], ["llama3.2:latest"]
             try:
                 version = aiclient.ollama_version(url)
-                reporter.progress(1, 2)
-                return version, aiclient.check_connection({"provider": "ollama", "url": url, "model": ""}).models
+                reporter.progress(1, 3)
+                models = aiclient.check_connection({"provider": "ollama", "url": url, "model": ""}).models
+                reporter.progress(2, 3)
+                return version, models, aiclient.ollama_loaded(url)
             except RuntimeError as e:
                 raise TaskFailed(str(e)) from None
 
@@ -448,9 +465,11 @@ class AIView(SectionView):
             self._refresh_presets()
             self.refresh_cards()
             return
-        version, models = result.value
+        version, models, loaded = result.value
         self.ollama_models = models
-        parts = [f"Ollama {version}", f"{len(models)} {t('models')}"]
+        # Installed is what /api/tags lists; only the loaded ones take RAM.
+        parts = [f"Ollama {version}", t("${n} installed", n=len(models)),
+                 t("in memory: ${models}", models=", ".join(loaded)) if loaded else t("nothing in memory")]
         if local:
             c, missing = self.values(), self.missing(models)
             self.check = aiclient.Check(aiclient.models_endpoint(c)[0], models, not missing)
@@ -461,6 +480,46 @@ class AIView(SectionView):
         state.update(" · ".join(parts))
         self._refresh_presets()
         self.refresh_cards()
+
+    def free_ollama(self, keep: list[str], quiet: bool = False) -> None:
+        """Unloads from Ollama's memory every model not in keep (all with
+        keep empty). Quiet: a thread worker with no loader, after Save."""
+        url, demo = self.ollama_url(), self.app.env.demo
+
+        def unload() -> list[str]:
+            return [] if demo else aiclient.ollama_keep_only(url, keep)
+
+        def done(gone: list[str]) -> None:
+            if gone:
+                self.app.notify(t("Unloaded from memory: ${models}", models=", ".join(gone)), timeout=5)
+            elif not quiet:
+                self.app.notify(t("Nothing else was in memory."), timeout=4)
+
+        if quiet:
+            async def worker() -> None:
+                try:
+                    gone = await asyncio.to_thread(unload)
+                except RuntimeError:
+                    return                   # Ollama not answering: nothing is loaded either
+                done(gone)
+            self.run_worker(worker(), group="ollama-free", exclusive=True, exit_on_error=False)
+            return
+
+        def job(reporter: Reporter) -> list[str]:     # thread worker
+            reporter.status(url)
+            try:
+                return unload()
+            except RuntimeError as e:
+                raise TaskFailed(str(e)) from None
+
+        def finished(result: TaskResult) -> None:
+            if result.ok:
+                done(result.value)
+                self.check_ollama()
+            elif not result.cancelled:
+                self.app.task_failed(t("Freeing Ollama's memory"), result)
+
+        run_with_loader(self.app, t("Freeing Ollama's memory"), job, on_done=finished)
 
     def _refresh_presets(self) -> None:
         select = self.query_one("#ai-ollama-preset", Select)
@@ -591,7 +650,7 @@ class AIView(SectionView):
 
         conn = self.query_one("#card-ai-connection", StatusCard)
         if self.check and self.check.found:
-            conn.set(t("Connected"), f"{len(self.check.models)} {t('models')}", "ok")
+            conn.set(t("Connected"), t("${n} installed", n=len(self.check.models)), "ok")
         elif self.check:
             conn.set(t("Connected"), t("model not found"), "warn")
         elif self.check_error:

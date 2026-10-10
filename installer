@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.45"
+PANEL_VERSION=" 1.5.46"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -16156,6 +16156,27 @@ sub _http {
     return HTTP::Tiny->new( timeout => $c->{timeout}, verify_SSL => 1, agent => "koha-easy-installer-vision/$VERSION" );
 }
 
+# Only the vision model in Ollama's memory while it reads the photos: the
+# chat model of the AI assistant (and any other) is unloaded first
+# (keep_alive 0); Ollama loads the vision one on demand.
+sub ollama_unload_others {
+    my ( $c, $http ) = @_;
+    $http ||= HTTP::Tiny->new( timeout => 5, agent => "koha-easy-installer-vision/$VERSION" );
+    my $b   = _base($c);
+    my $res = $http->get("$b/api/ps");
+    my $d   = $res->{success} ? eval { JSON::PP->new->utf8->decode( $res->{content} ) } : undef;
+    ( my $keep = $c->{model} ) =~ s/:latest$//;
+    my @gone;
+    for my $m ( ref $d eq 'HASH' && ref $d->{models} eq 'ARRAY' ? @{ $d->{models} } : () ) {
+        ( my $name = ref $m eq 'HASH' ? $m->{name} // $m->{model} // '' : '' ) =~ s/:latest$//;
+        next if $name eq '' || $name eq $keep;
+        $http->post( "$b/api/generate", { headers => { 'Content-Type' => 'application/json' },
+            content => JSON::PP->new->utf8->encode( { model => $name, keep_alive => 0 } ) } );
+        push @gone, $name;
+    }
+    return \@gone;
+}
+
 # (response, decoded JSON or undef)
 sub _call {
     my ( $c, $method, $url, $headers, $body ) = @_;
@@ -16379,6 +16400,7 @@ sub extract {
     if ( my $p = endpoint_problem($c) ) { @r{qw( error_code error )} = ( 'CONFIG', $p ); return \%r }
     if ( !$images || !@$images )         { @r{qw( error_code error )} = ( 'CONFIG', 'NO_IMAGES' ); return \%r }
 
+    eval { ollama_unload_others($c) } if $c->{provider} eq 'ollama';
     my $t0     = time;
     my $prompt = prompt_text( lang => $c->{lang}, roles => [ map { $_->{role} } @$images ], instructions => $opts->{instructions}, note => $opts->{note} );
     my ( $res, $data ) = eval { _call( $c, 'POST', _endpoint($c), _auth_headers($c), _request_body( $c, $prompt, $images ) ) };
@@ -25124,12 +25146,40 @@ sub reply_text {
     return join '', map { ref $_ eq 'HASH' ? $_->{text} // '' : '' } @{ ref $m->{content} eq 'ARRAY' ? $m->{content} : [] };
 }
 
+# Local models: only the one answering stays in memory. Ollama keeps every
+# model it ran for 5 minutes (up to three at once on a CPU server), so the
+# vision model of MARC Replace and the chat model would hold the RAM
+# together. Before each request the others are unloaded (keep_alive 0) and
+# Ollama loads this one on demand (one /api/ps on this machine: cheap).
+# Ollama not answering is not an error here (the request itself says it).
+
+sub same_model { my ( $x, $y ) = map { ( my $m = $_ // '' ) =~ s/:latest$//; $m } @_; return $x eq $y }
+
+sub ollama_unload_others {
+    my ( $c, $http ) = @_;
+    return [] if $c->{provider} ne 'ollama';
+    $http ||= HTTP::Tiny->new( timeout => 5, agent => "koha-easy-installer-assistant/$VERSION" );
+    my $b   = _base($c);
+    my $res = $http->get("$b/api/ps");
+    my $d   = $res->{success} ? eval { JSON::PP->new->utf8->decode( $res->{content} ) } : undef;
+    my @gone;
+    for my $m ( ref $d eq 'HASH' && ref $d->{models} eq 'ARRAY' ? @{ $d->{models} } : () ) {
+        my $name = ref $m eq 'HASH' ? $m->{name} // $m->{model} // '' : '';
+        next if $name eq '' || same_model( $name, $c->{model} );
+        $http->post( "$b/api/generate", { headers => { 'Content-Type' => 'application/json' },
+            content => JSON::PP->new->utf8->encode( { model => $name, keep_alive => 0 } ) } );
+        push @gone, $name;
+    }
+    return \@gone;
+}
+
 # One round trip; dies with a short message (the address and the HTTP
 # status, never the key).
 sub chat {
     my ( $c, $messages ) = @_;
     my $problem = endpoint_problem($c);
     die "$problem\n" if $problem;
+    eval { ollama_unload_others($c) } if $c->{provider} eq 'ollama';
     my %h = ( 'Content-Type' => 'application/json' );
     if    ( $c->{provider} eq 'anthropic' ) { %h = ( %h, 'x-api-key' => $c->{token}, 'anthropic-version' => '2023-06-01' ) }
     elsif ( $c->{token} && $c->{provider} ne 'ollama' ) { $h{Authorization} = "Bearer $c->{token}" }
@@ -25875,6 +25925,11 @@ Every reply you send is ONE JSON object and nothing else. Exactly one of:
   {"tool": "<tool name>", "args": {...}}       to call a tool; you get its result next
   {"answer": "<text for the librarian>"}       to finish the turn
 Call one tool at a time. At most {STEPS} tool calls per question; then answer with what you have.
+Never announce a call ("I will search for...", "Vou usar o termo..."): send the call itself. The librarian only sees "answer", so a reply that says what you are going to do leaves them with nothing.
+Example. The librarian asks "Temos livros do Manuel Bandeira?". You send:
+  {"tool": "search_catalogue", "args": {"terms": ["Manuel Bandeira", "Bandeira, Manuel"]}}
+You get TOOL RESULT search_catalogue with the matches, and only then you send:
+  {"answer": "Sim, temos 2: - [[biblio:<id>|<title>]] ..."}
 
 # Searching well
 - Vague or abstract descriptions ("that book about the clown that became a movie"): first work out from your own knowledge which works it could be, then call search_catalogue ONCE with every candidate: original title, the Brazilian/Portuguese title, author name, character names, series (e.g. ["It", "A Coisa", "Stephen King", "Pennywise"]). If nothing matches, try one more round with broader terms before saying it is not in the catalogue.
@@ -26004,6 +26059,74 @@ sub parse_envelope {
     return {};
 }
 
+# A tool call in the shapes local models were trained on, read as
+# {"tool": name, "args": {...}}: Llama 3 ({"name", "parameters"}), Qwen
+# (<tool_call>{"name", "arguments": "<json>"}</tool_call>), OpenAI
+# ({"tool_calls": [{"function": {...}}]}, {"function": ...}), ReAct
+# ({"action", "action_input"}), a nested {"tool": {"name", "args"}} and
+# arguments next to the name ({"tool": "search_catalogue", "terms": [...]}).
+# A name other than "tool" counts only when it is one of the tools, so a
+# patron's "name" or a proposal's "action" is never taken for one.
+our @CALL_NAME = qw( tool name tool_name function action );
+our @CALL_ARGS = qw( args arguments parameters input tool_input action_input );
+
+sub tool_name {
+    my ($n) = @_;
+    return undef unless defined $n && !ref $n;
+    ( my $t = lc $n ) =~ s/^\s+|\s+$//g;
+    $t =~ s/^(?:functions?|tools?)[.:]//;
+    $t =~ s/_catalog$/_catalogue/;
+    return $TOOLS{$t} ? $t : undef;
+}
+
+sub normalize_envelope {
+    my ($env) = @_;
+    return {} unless ref $env eq 'HASH';
+    my $call = $env;
+    $call = $call->{tool_calls}[0] if ref $call->{tool_calls} eq 'ARRAY' && ref $call->{tool_calls}[0] eq 'HASH';
+    for my $k (qw( function function_call tool )) { $call = $call->{$k} if ref $call->{$k} eq 'HASH' }
+    my ( $name, $key );
+    for my $k (@CALL_NAME) {
+        next unless defined $call->{$k} && !ref $call->{$k};
+        if ( my $known = tool_name( $call->{$k} ) ) { ( $name, $key ) = ( $known, $k ); last }
+        ( $name, $key ) = ( $call->{$k}, $k ) if $k eq 'tool' && $call->{$k} =~ /\S/;    # unknown: call_tool lists the real ones
+        last if $name;
+    }
+    return $env unless defined $name;
+    my ($args) = grep { defined } map { $call->{$_} } @CALL_ARGS;
+    $args = eval { JSON::PP->new->relaxed->decode($args) } if defined $args && !ref $args;
+    if ( ref $args ne 'HASH' ) {
+        my %skip = map { $_ => 1 } $key, @CALL_ARGS, qw( type id answer );
+        $args = { map { $_ => $call->{$_} } grep { !$skip{$_} } keys %$call };
+    }
+    return { tool => $name, args => $args };
+}
+
+# "I will search the catalogue for 'Bandeira'": a turn that only says what
+# it is going to do (small local models do, instead of sending the call).
+our $ANNOUNCE = qr/
+      \b(?:I'?ll|I\ will|I\ am\ going\ to|I'?m\ going\ to|let\ me|let'?s|we\ need\ to|I\ need\ to)\b[^.\n]{0,40}?\b(?:search|look|query|check|use|call|find|run)
+    | \b(?:vou|vamos|irei|iremos|preciso|precisamos|devo|devemos|farei|faremos)\b[^.\n]{0,40}?\b(?:usar|utilizar|busca|buscar|pesquis|procur|consult|verific|chamar|fazer\ uma\ busca|realizar)
+    | \b(?:voy\ a|vamos\ a|necesito|necesitamos)\b[^.\n]{0,40}?\b(?:usar|buscar|consultar|realizar)
+    | \bje\ vais\b[^.\n]{0,40}?\b(?:chercher|utiliser|consulter)
+    | \b(?:search_catalogue|find_patrons|get_record|library_stats|library_info|search_reports|get_syspref|find_page)\b
+/xi;
+
+sub announces { my ($answer) = @_; return defined $answer && !ref $answer && $answer =~ $ANNOUNCE && $answer !~ /\[\[/ ? 1 : 0 }
+
+# Records named before any tool ran: links with ids nobody returned.
+sub invents { my ($answer) = @_; return defined $answer && !ref $answer && $answer =~ /\[\[(?:biblio|patron|report):/ ? 1 : 0 }
+
+# The words an announcement put in quotes ("Vou usar o termo 'Bandeira'").
+sub announced_terms {
+    my ($text) = @_;
+    my ( @t, %seen );
+    push @t, $1 while ( $text // '' ) =~ /["'\x{201C}\x{2018}\x{AB}]([^"'\x{201D}\x{2019}\x{BB}\n]{2,60})["'\x{201D}\x{2019}\x{BB}]/g;
+    @t = grep { /\p{L}/ && !$seen{ lc $_ }++ } map { s/^\s+|\s+$//gr } @t;
+    splice @t, 6 if @t > 6;
+    return \@t;
+}
+
 # "I have no access to the database": what a model says when it answers
 # without trying a tool (small local models do, and so does any model whose
 # instructions were cut off). English, Portuguese, Spanish and French.
@@ -26022,6 +26145,11 @@ our $NUDGE = 'You answered without calling a tool. You DO have live read access 
     . 'nothing else is needed. Call the tool that fits the librarian\'s question now, as {"tool": "<name>", "args": {...}}.';
 
 sub refuses { my ($answer) = @_; return defined $answer && !ref $answer && $answer =~ $REFUSAL ? 1 : 0 }
+
+our $NUDGE_ANNOUNCE = 'Do not say what you are going to do: do it. The librarian sees only "answer", never your plans. '
+    . 'Send the tool call now, as ONE JSON object and nothing else: {"tool": "<name>", "args": {...}}.';
+our $NUDGE_INVENTED = 'You named records before any tool ran, so their ids are not from this library. '
+    . 'Call the tool that finds them now, as {"tool": "<name>", "args": {...}}; never answer with records no tool returned.';
 
 # Search terms of a question, for when the model will not search itself:
 # names in capitals ("Machado de Assis") whole, then the other long words.
@@ -26065,7 +26193,7 @@ sub ask {
     $ctx->{seen} = [];
     my $first = @{ $ctx->{proposals} };
     my $route = route($question);
-    my ( @steps, @calls, $answer, $nudged );
+    my ( @steps, @calls, $answer, $nudged, $announced );
     if ( $route eq 'chat' ) {
         my $raw = $model->( [ { role => 'system', content => system_prompt( $ctx, $lang, 'chat' ) }, @$history, { role => 'user', content => $question } ] );
         my $env = parse_envelope($raw);
@@ -26077,21 +26205,28 @@ sub ask {
         my @msgs = ( { role => 'system', content => system_prompt( $ctx, $lang ) }, @$history, { role => 'user', content => $question } );
         for my $step ( 0 .. $MAX_STEPS ) {
             my $raw  = $model->( \@msgs );
-            my $env  = parse_envelope($raw);
+            my $env  = normalize_envelope( parse_envelope($raw) );
             my $name = $env->{tool};
             if ( !$name || ref $name || $step == $MAX_STEPS ) {
                 $answer = $env->{answer};
                 if ( !defined $answer || ref $answer || $answer !~ /\S/ ) {
-                    $answer = %$env ? 'I could not finish this answer. Please rephrase the question.' : $raw;
+                    $answer = %$env || ( $raw // '' ) !~ /\S/ ? 'I could not finish this answer. Please rephrase the question.' : $raw;
                 }
-                # "No access" before trying anything: reminded once; then the
-                # catalogue is searched for it with the words of the question.
-                if ( !@steps && $step < $MAX_STEPS && refuses($answer) ) {
+                # Before any tool ran: "no access", "I will search for X" or
+                # records out of nowhere. Reminded once; then the catalogue is
+                # searched with the announced words, or those of the question.
+                # Anything else is a plain answer ("how do I renew a loan?").
+                my $why = $step < $MAX_STEPS && !@steps
+                    ? ( refuses($answer) ? $NUDGE : announces($answer) ? $NUDGE_ANNOUNCE : invents($answer) ? $NUDGE_INVENTED : '' ) : '';
+                if ($why) {
                     if ( !$nudged++ ) {
-                        push @msgs, { role => 'assistant', content => $raw // '' }, { role => 'user', content => $NUDGE };
+                        push @msgs, { role => 'assistant', content => $raw // '' }, { role => 'user', content => $why };
+                        $announced = $answer if $why eq $NUDGE_ANNOUNCE;
                         next;
                     }
-                    my $terms = question_terms($question);
+                    my $terms = announced_terms( announces($answer) ? $answer : $announced );
+                    $terms = question_terms($question) unless @$terms;
+                    $answer = 'I could not finish this answer. Please rephrase the question.' if !@$terms && $why ne $NUDGE;
                     if (@$terms) {
                         my $args = { terms => $terms };
                         push @steps, 'search_catalogue';
@@ -26687,7 +26822,8 @@ sub widget_js {
         q = $.trim(q || "");
         if (!q || busy) return;
         add({ role: "user", text: q });
-        box.find("textarea").val("").css("height", userH ? userH + "px" : "");
+        box.find("textarea").val("");
+        fit();
         loading(true, T.thinking);
         post("cud-ask", { question: q }, function (r) { if (r.entry) add(r.entry); box.find("textarea").trigger("focus"); });
     }
@@ -26720,16 +26856,32 @@ sub widget_js {
 
     $(form).on("submit", function (e) { e.preventDefault(); ask(ta.value); });
     $(ta).on("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(ta.value); } });
-    // Three lines to start. The grip in its corner makes it taller (kept after
-    // each question), and long text grows it up to half the window.
-    var userH = 0;
+    // Three lines to start; long text grows it up to its CSS max-height
+    // (about eight lines, never more than a third of the window) and then it
+    // scrolls inside. Deleting text shrinks it back, and so does sending.
+    // The grip in its corner sets a taller start (userH), within the same
+    // limits. The height is measured from scratch each time ("auto" first),
+    // whatever box-sizing and padding a theme gives textareas: adding to the
+    // last height made it grow a little more on every key.
+    var userH = 0, fitH = 0;
     function fit() {
-        var h = Math.max(userH, ta.offsetHeight);
-        if (ta.scrollHeight + 2 > h) ta.style.height = Math.min(ta.scrollHeight + 2, Math.round(window.innerHeight / 2)) + "px";
+        var cs = window.getComputedStyle(ta);
+        var num = function (v) { return parseFloat(v) || 0; };
+        var edge = cs.boxSizing === "border-box" ? num(cs.borderTopWidth) + num(cs.borderBottomWidth)
+            : -(num(cs.paddingTop) + num(cs.paddingBottom));
+        var max = num(cs.maxHeight) || Math.round(window.innerHeight / 3);
+        var min = Math.max(num(cs.minHeight), userH);
+        ta.style.height = "auto";
+        var want = ta.scrollHeight + edge;
+        ta.style.height = Math.round(Math.min(Math.max(want, min), max)) + "px";
+        ta.style.overflowY = want > max + 1 ? "auto" : "hidden";
+        fitH = ta.offsetHeight;
     }
     $(ta).on("input", fit);
-    $(ta).on("mouseup", function () { userH = ta.offsetHeight; });
-    $(wide).on("click", function () { box.toggleClass("kei-ai-wide"); $(wide).find("i").toggleClass("fa-expand fa-compress"); });
+    // Only a drag of the grip changes the start height, not a click.
+    $(ta).on("mouseup", function () { if (Math.abs(ta.offsetHeight - fitH) > 2) { userH = ta.offsetHeight; fit(); } });
+    $(window).on("resize", fit);
+    $(wide).on("click", function () { box.toggleClass("kei-ai-wide"); $(wide).find("i").toggleClass("fa-expand fa-compress"); fit(); });
     $(document).on("keydown", function (e) { if (e.key === "Escape" && box.hasClass("kei-ai-wide")) $(wide).trigger("click"); });
     $(reset).on("click", function () { post("cud-reset", {}, function () { box.find(".kei-ai-log").empty(); greet(); }); });
 
@@ -26799,12 +26951,14 @@ sub widget_css {
 #kei-ai .kei-ai-dots i:nth-child(6) { animation-delay: 1s; }
 @keyframes kei-ai-eat { 0%, 15% { opacity: 0; } 30%, 100% { opacity: 1; } }
 #kei-ai .kei-ai-form { display: flex; gap: 6px; align-items: flex-end; margin-top: 6px; }
-#kei-ai .kei-ai-form textarea { flex: 1; box-sizing: border-box; font: inherit; line-height: 1.4; resize: vertical; height: 76px; min-height: 76px; max-height: 50vh; overflow-y: auto; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; }
+#kei-ai .kei-ai-form textarea { flex: 1; box-sizing: border-box; font: inherit; line-height: 1.4; resize: vertical; height: 76px; min-height: 76px; max-height: min(176px, 33vh); overflow-y: hidden; border: 1px solid #c5cbd2; border-radius: 4px; padding: 6px 8px; margin: 0; }
 #kei-ai .kei-ai-form .kei-ai-send { flex: none; box-sizing: border-box; height: 36px; padding: 0 16px; }
 #kei-ai .kei-ai-form textarea:focus { border-color: #0b62d6; outline: 2px solid #c9dcfa; }
 #kei-ai.kei-ai-wide { position: fixed; z-index: 1050; top: 70px; left: 50%; transform: translateX(-50%); width: min(820px, 96vw);
     height: calc(100vh - 90px); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); }
 #kei-ai.kei-ai-wide .kei-ai-log { min-height: 0; max-height: none; }
+#kei-ai.kei-ai-wide .kei-ai-form { flex: none; }
+#kei-ai.kei-ai-wide .kei-ai-form textarea { max-height: min(240px, 30vh); }
 KEICSS
 }
 AIAPL2

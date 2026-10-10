@@ -98,6 +98,7 @@ def test_ollama_check_runs_behind_the_loader(demo_dir):
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
             state = str(view.query_one("#ai-ollama-state").render())
             assert "Ollama 0.12-demo" in state and "not downloaded yet" in state
+            assert "1 installed" in state and "in memory: llama3.2:latest" in state
 
     asyncio.run(main())
 

@@ -24,10 +24,32 @@ function check(cond, what) {
         check(await page.locator(".col-md-3 > #kei-ai + #area-quote").count() === 1, "in the place of the news, above the quote");
         check(await page.locator("#kei-ai .kei-ai-chip").count() === 0, "no example questions under the chat");
 
+        // The input: three lines to start, grows with the text up to its
+        // limit and then scrolls inside; shrinks back when the text goes.
+        const box = () => page.$eval("#kei-ai textarea", (t) => ({ h: t.offsetHeight, max: parseFloat(getComputedStyle(t).maxHeight),
+            min: parseFloat(getComputedStyle(t).minHeight), oy: getComputedStyle(t).overflowY, sh: t.scrollHeight, ch: t.clientHeight }));
+        const start = await box();
+        check(start.h >= start.min && start.h <= start.min + 2, "the input starts at three lines (" + start.h + "px)");
+        await page.click("#kei-ai textarea");
+        await page.keyboard.type("short question");
+        check((await box()).h === start.h, "a short question keeps that height");
+        await page.keyboard.type(" and a very long prompt that goes on".repeat(30));
+        const long = await box();
+        check(long.h <= long.max + 1 && long.h <= 900 / 3 + 1, "a long prompt stops growing at " + long.max + "px (" + long.h + "px)");
+        check(long.oy === "auto" && long.sh > long.ch, "and scrolls inside");
+        await page.keyboard.type(" more".repeat(40));
+        check((await box()).h === long.h, "typing on does not grow it any more");
+        await page.click("#kei-ai textarea");
+        await page.fill("#kei-ai textarea", "back to one line");
+        await page.dispatchEvent("#kei-ai textarea", "input");
+        check((await box()).h === start.h, "deleting the text shrinks it back (a click does not pin the height)");
+        await page.fill("#kei-ai textarea", "x ".repeat(400));
+        await page.dispatchEvent("#kei-ai textarea", "input");
         await page.fill("#kei-ai textarea", "that book about the clown that was made into a movie...");
         await page.press("#kei-ai textarea", "Enter");
         check(await page.locator("#kei-ai .kei-ai-pac").isVisible(), "the Pac-Man loader runs while it thinks");
         await page.waitForSelector("#kei-ai a.kei-ai-link[href*='biblionumber=1']");
+        check((await box()).h === start.h, "after sending, the input is back to three lines");
         check(await page.locator("#kei-ai .kei-ai-pac").isHidden(), "the loader is hidden after the answer");
         const color = await page.locator("#kei-ai a.kei-ai-link").first().evaluate((a) => getComputedStyle(a).color);
         check(color === "rgb(11, 98, 214)", "record links are blue (" + color + ")");

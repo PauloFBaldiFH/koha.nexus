@@ -221,6 +221,57 @@ $hist = [];
 $res = KohaEasy::Assistant::ask( fresh(), sub { shift @script // '{"answer":"I do not have access."}' }, $hist, 'ok?', 'en' );
 is( scalar @$hist, 0, 'a refusal is not kept in the history' );
 is_deeply( KohaEasy::Assistant::question_terms('Temos livros do Machado de Assis sobre o Rio de Janeiro?'), [ 'Machado de Assis', 'Rio de Janeiro' ] );
+# Local models: tool calls in the shapes they were trained on, and a turn
+# that only says what it is going to do.
+for my $call ( '{"name":"search_catalogue","parameters":{"terms":["Machado de Assis"]}}',
+               '<tool_call>{"name": "search_catalogue", "arguments": "{\"terms\": [\"Machado de Assis\"]}"}</tool_call>',
+               '{"tool_calls":[{"type":"function","function":{"name":"functions.search_catalogue","arguments":{"terms":["Machado de Assis"]}}}]}',
+               '{"tool":"search_catalog","terms":["Machado de Assis"]}',
+               '{"tool":{"name":"search_catalogue","args":{"terms":["Machado de Assis"]}}}' ) {
+    @script = ( $call, '{"answer":"[[biblio:3|Dom Casmurro]]"}' );
+    @seen = ();
+    $res = KohaEasy::Assistant::ask( fresh(), sub { push @seen, [ @{ $_[0] } ]; shift @script }, [], 'Temos livros do Machado de Assis?', 'pt' );
+    is_deeply( $res->{steps}, ['search_catalogue'], "tool call read: $call" );
+    like( $seen[1][-1]{content}, qr/^TOOL RESULT search_catalogue: .*Dom Casmurro/s, '  and run' );
+}
+@script = ( '{"answer":"Para encontrar livros do autor, precisamos fazer uma busca no catálogo. Vou usar o termo \'Machado de Assis\'."}',
+            '{"tool":"search_catalogue","args":{"terms":["Machado de Assis"]}}',
+            '{"answer":"[[biblio:3|Dom Casmurro]]"}' );
+@seen = ();
+$res = KohaEasy::Assistant::ask( fresh(), sub { push @seen, [ @{ $_[0] } ]; shift @script }, [], 'Livros do Machado?', 'pt' );
+is( $res->{answer}, '[[biblio:3|Dom Casmurro]]', 'announcing a search: reminded to make the call' );
+like( $seen[1][-1]{content}, qr/Do not say what you are going to do/ );
+@script = ( '{"answer":"Vou usar o termo \'Machado de Assis\' para buscar no catálogo."}',
+            'Vou buscar por "Machado de Assis" agora.', '{"answer":"[[biblio:3|Dom Casmurro]]"}' );
+@seen = ();
+$res = KohaEasy::Assistant::ask( fresh(), sub { push @seen, [ @{ $_[0] } ]; shift @script }, [], 'Livros do bruxo?', 'pt' );
+is_deeply( $res->{steps}, ['search_catalogue'], 'announcing twice: the announced term is searched' );
+like( $seen[2][-2]{content}, qr/"terms":\["Machado de Assis"\]/ );
+@script = ( '{"answer":"Temos [[biblio:99|Libertinagem]] e [[biblio:98|Estrela da vida inteira]]."}',
+            '{"tool":"search_catalogue","args":{"terms":["Manuel Bandeira"]}}', '{"answer":"Nada encontrado."}' );
+@seen = ();
+$res = KohaEasy::Assistant::ask( fresh(), sub { push @seen, [ @{ $_[0] } ]; shift @script }, [], 'Livros do Manuel Bandeira?', 'pt' );
+is_deeply( $res->{steps}, ['search_catalogue'], 'records named before any tool ran: reminded to search' );
+@script = ( '{"answer":"Para renovar, abra a página de Circulação."}' );
+$res = KohaEasy::Assistant::ask( fresh(), sub { shift @script }, [], 'Como renovo um empréstimo?', 'pt' );
+is( $res->{answer}, 'Para renovar, abra a página de Circulação.', 'a plain answer with no tool is kept' );
+$res = KohaEasy::Assistant::ask( fresh(), sub { '' }, [], 'Livros do Machado?', 'pt' );
+like( $res->{answer}, qr/\S/, 'an empty reply is never an empty answer' );
+like( KohaEasy::Assistant::system_prompt( fresh(), 'pt' ), qr/never announce/i, 'the prompt forbids announcing' );
+# Ollama: only the model answering stays in memory.
+{
+    package FakeHTTP;
+    sub new { my ( $class, @loaded ) = @_; return bless { loaded => [@loaded], posts => [] }, $class }
+    sub get { my ($s) = @_; return { success => 1, content => JSON::PP->new->encode( { models => [ map { { name => $_ } } @{ $s->{loaded} } ] } ) } }
+    sub post { my ( $s, $url, $o ) = @_; push @{ $s->{posts} }, [ $url, JSON::PP->new->decode( $o->{content} ) ]; return { success => 1 } }
+    package main;
+    my $http = FakeHTTP->new( 'qwen2.5vl:7b', 'qwen2.5:3b', 'llama3.2:latest' );
+    my $gone = KohaEasy::Assistant::ollama_unload_others( { provider => 'ollama', url => 'http://localhost:11434', model => 'llama3.2' }, $http );
+    is_deeply( $gone, [ 'qwen2.5vl:7b', 'qwen2.5:3b' ], 'ollama: the idle models are unloaded, the chat one kept' );
+    is_deeply( [ map { $_->[1]{keep_alive} } @{ $http->{posts} } ], [ 0, 0 ], '  with keep_alive 0' );
+    is( $http->{posts}[0][0], 'http://127.0.0.1:11434/api/generate' );
+    is_deeply( KohaEasy::Assistant::ollama_unload_others( { provider => 'openai', model => 'x' }, FakeHTTP->new('a') ), [], 'other providers: nothing' );
+}
 # The chat can have its own (lighter) model; empty: the vision model.
 {
     my $conf = "$ENV{KEI_AIA_LIB}/../chat-model.conf";

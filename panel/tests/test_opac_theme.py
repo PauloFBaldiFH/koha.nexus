@@ -406,3 +406,49 @@ def test_sync_settings():
     # Nothing at all: None, the screen keeps its fields.
     got, notes = ot.sync_settings({"data": "/* KEI-THEME-DATA: {broken */", "state": "[]"})
     assert got is None and "Nothing of the panel" in notes[0][0]
+
+
+def test_staff_material_like_the_opac():
+    # Saved before the staff had a material: flat, its old corners, no new blocks.
+    old = ot.normalize({"staff": {"enabled": True, "accent": "#0f766e"}})["staff"]
+    assert (old["texture"], old["radius_block"], old["opacity"]) == ("flat", 12, 100)
+    flat = ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
+    assert "backdrop-filter" not in flat and "--nexus-staff-radius: 12px" in flat
+    st = {"enabled": True, "texture": "frosted", "blur": 99, "opacity": 10, "radius_block": 4,
+          "radius_input": 2, "radius_button": 30, "page": "#0b1220"}
+    cfg = ot.normalize({"staff": st})
+    assert cfg["staff"]["blur"] == ot.RANGES["blur"][1] and cfg["staff"]["opacity"] == ot.RANGES["opacity"][0]
+    css = ot.staff_css_body(cfg)
+    for part in ("--nexus-staff-blur: 30px", "--nexus-staff-surface-a: 0.30", "--nexus-staff-radius: 4px",
+                 "--nexus-staff-r-input: 2px", "--nexus-staff-r-btn: 30px", "--nexus-staff-page: #0b1220",
+                 "html body .page-section::before", "backdrop-filter: blur(var(--nexus-staff-blur))",
+                 "border-radius: var(--nexus-staff-r-input) 0 0 var(--nexus-staff-r-input)"):
+        assert part in css, part
+    # The blur is on a layer behind the content, never on a block itself
+    # (it would trap Koha's position: fixed modals).
+    block_rule = css.split("html body .page-section, html body #area-news, html body fieldset.rows {", 1)[1].split("}", 1)[0]
+    assert "backdrop-filter" not in block_rule and "isolation: isolate" in block_rule
+    metal = ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "texture": "metal"}}))
+    assert "#f0f0f0 0%, #dcdcdc 50%" in metal and "nav.navbar.bg-dark" in metal
+    for tex in ot.TEXTURES:     # every texture is accepted and builds
+        assert ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "texture": tex}}))
+    assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["texture"] == "frosted"
+
+
+def test_copy_opac_preset():
+    raw = {"texture": "smooth", "blur": 7, "opacity": 64, "radius_block": 20, "radius_input": 5, "radius_button": 9,
+           "accent": "#aa0000", "accent2": "#00aa00", "surface": "#fafafa", "page": "#e0e0e0", "film": 10,
+           "background": {"source": "local", "url": "/images/custom/kei-background.png?v=1"},
+           "logo": {"source": "imgbb", "url": "https://i.ibb.co/x/logo.png"},
+           "staff": {"font": 115, "density": "compact", "favicon": {"source": "url", "url": "https://e.org/s.ico"}}}
+    cfg, skipped = ot.copy_opac_to_staff(raw)
+    st = cfg["staff"]
+    assert st["enabled"] and (st["texture"], st["blur"], st["opacity"]) == ("smooth", 7, 64)
+    assert (st["radius_block"], st["radius_input"], st["radius_button"]) == (20, 5, 9)
+    assert (st["accent"], st["accent2"], st["surface"], st["page"]) == ("#aa0000", "#00aa00", "#fafafa", "#e0e0e0")
+    assert st["film"] == ot.STAFF_FILM[0]                          # the staff film keeps tables readable
+    assert st["logo"] == {"source": "url", "url": "https://i.ibb.co/x/logo.png"}
+    assert skipped == ["background"] and st["background"]["source"] == "none"   # an OPAC file: not served on staff
+    assert st["favicon"]["url"] == "https://e.org/s.ico"          # nothing to copy: the staff's own kept
+    assert (st["font"], st["density"]) == (115, "compact")
+    assert cfg["texture"] == "smooth" and cfg["accent"] == "#aa0000"   # the OPAC untouched
