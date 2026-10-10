@@ -157,7 +157,7 @@ kei_reset_env() {
     kei_kill_daemons
     rm -rf "$KEI_S/calls.log" "$KEI_S/dialogs.log" "$KEI_S/answers" "$KEI_S/syslog" \
            "$KEI_S/run" "$KEI_S/svc" "$KEI_S/svc-fail" "$KEI_S/fail" "$KEI_S/pkgs" \
-           "$KEI_S/inputs" "$KEI_S/cache-module-broken" "$KEI_S/textbox.last" "$KEI_S/textboxes.log" "$KEI_S/last-staged.mrc" "$KEI_S"/batch-*.biblios
+           "$KEI_S/inputs" "$KEI_S/cache-module-broken" "$KEI_S/textbox.last" "$KEI_S/textboxes.log" "$KEI_S/menus.log" "$KEI_S/last-linker" "$KEI_S/last-staged.mrc" "$KEI_S"/batch-*.biblios
     rm -rf /var/log/koha-easy-install/tools /var/lib/koha/library/email.enabled /root/koha_patrons_template.csv
     # Magic Import Tool: drop folder, remembered column answers, backups on their way to Restore database.
     rm -rf /root/importar /etc/koha-easy-install/import-profiles /var/tmp/kei-restore.*

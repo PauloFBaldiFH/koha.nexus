@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.47** (1.5.48: staff authority links PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.48** (1.5.49: staff authority links PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,7 +337,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
-- **1.5.48 (staff authority links)**: the magnifying glass next to a heading on the staff record
+- **1.5.49 (staff authority links)**: the magnifying glass next to a heading on the staff record
   page opened `opac-authoritiesdetail.pl` (404 on the staff port). Koha's staff stylesheet
   (25.05 to 26.05) links to `authorities/detail.pl`; only the OPAC one makes that link, so the staff
   page was being drawn by an OPAC stylesheet. `staff_authlinks_fix` (after install, Koha update,
@@ -348,6 +348,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   mention `opac-authoritiesdetail.pl` yet, written through `C4::Context->set_preference` by
   `koha-shell -c "perl -"` (script from a quoted heredoc), then memcached and Plack restart, only
   when something changed. Log: `tools/staff-authority-links-*.log`. Not run on a live Koha.
+- **1.5.48 (Sync & link authorities: simulation or apply, linker choice)**: the old flow always
+  ran `link_bibs_to_authorities.pl --test` first and decided on its "Number of bibs modified",
+  which Koha only counts outside `--test`, so it always said "nothing to change". Now the menu
+  asks for the linker (Default, FirstMatch, LastMatch) and the mode: **Simulation**
+  (`--test -v --link-report`; records that would change counted from the `-v` lines
+  "Bib N (...): K headings changed"; can go straight on to apply) or **Apply permanently**
+  (PRE-AUTHORITIES backup, run without `--test`, then `koha-rebuild-zebra -v -b` or
+  `koha-elasticsearch --rebuild -b` in the background, log `authority-sync-*-reindex.log`).
+  Koha's script has no `--linker` option (GetOptions would refuse it) and no Fuzzy module, so the
+  linker goes to that run only as `OVERRIDE_SYSPREF_LinkerModule=<X>` (read by
+  `C4::Context->preference` before the database); the saved preference is untouched.
+  `koha_exec` takes `KOHA_EXEC_OUT`: stdout to that file (`authority-sync-*-simulation.txt` /
+  `-applied.txt`, parsed), stderr (per-record warnings) to the tool log. Tests:
+  `tests/authority_sync.bats` (double in `tests/mocks/koha-script`), not run on a live Koha.
 - **1.5.47 (Find duplicate authors, Library tools > 18, panel action `authority-match`)**: the
   personal names of the authority file (100 $a/$q/$d) are compared by the Magic Import engine,
   new module `kei_import/authorities.py` (`kei_import_run.py authorities --in TSV|MARCXML --work DIR

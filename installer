@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.48"
+PANEL_VERSION=" 1.5.49"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10041,7 +10041,9 @@ koha_tool() {
 
 # koha_exec LOG LABEL PROGRAM [ARGS...]: runs PROGRAM as the instance user
 # through koha-shell (Koha's environment and Perl libraries), every argument
-# quoted with kq. The command line (under LABEL) and its output go to LOG.
+# quoted with kq. The command line (under LABEL) and its output go to LOG;
+# with KOHA_EXEC_OUT set, the standard output goes to that file instead and
+# only the warnings (standard error) to LOG.
 koha_exec() {
     local log="$1" label="$2" cmd="" a q
     shift 2
@@ -10052,7 +10054,7 @@ koha_exec() {
     printf '$ %s %s\n' "$label" "${*:2}" >> "$log"
     log "tools: $label ${*:2}"
     ( cd "${TOOLS_WORK:-/tmp}" 2>/dev/null || cd /tmp || exit 1
-      koha_ctl /usr/sbin/koha-shell "$INSTANCE" -c "$cmd" ) >> "$log" 2>&1 </dev/null
+      koha_ctl /usr/sbin/koha-shell "$INSTANCE" -c "$cmd" ) >> "${KOHA_EXEC_OUT:-$log}" 2>> "$log" </dev/null
 }
 
 # koha_sql_run LOG FILE: runs an SQL file with Koha's own database account
@@ -10279,15 +10281,27 @@ _lt_marc_undo_run() {
 # ----------------------------------------------------------------------
 # Authorities: the catalogue's headings (100, 110, 600, 650, 700...) linked
 # to the authority records ($9) by Koha's own link_bibs_to_authorities.pl
-# (ROADMAP subject 2): first its dry run (--test --link-report), with the
-# counts and the headings no authority matches, then, after confirmation
-# and a verified backup, the real run and the search index brought up to
-# date. Koha's linker settings (LinkerModule, CatalogModuleRelink,
-# AutoCreateAuthorities) decide how headings are matched.
+# (ROADMAP subject 2), in one of two modes picked in the menu:
+#  - simulation (--test -v --link-report): nothing is written. In test mode
+#    the script never counts "bibs modified" (that counter moves only when a
+#    record is saved), so the records that would change are counted from its
+#    -v lines ("Bib N (title): K headings changed");
+#  - apply (no --test): a verified PRE-AUTHORITIES backup, the real run,
+#    then the biblio index rebuilt in the background.
+# The script has no option for the matching algorithm: it loads the linker
+# named by Koha's LinkerModule preference (Default: a heading is linked only
+# when exactly one authority matches; FirstMatch / LastMatch: when several
+# match, the first / last is taken and the heading is counted as "fuzzily
+# linked"). The one picked here is handed to that run alone through
+# OVERRIDE_SYSPREF_LinkerModule, which C4::Context->preference reads before
+# the database: the saved preference is never touched. The script's
+# standard output (summary and report) goes to its own file to be read; its
+# warnings ("Error while searching for authorities for biblionumber N", on
+# standard error) go to the tool's log in ${TOOLS_LOG_DIR}.
 # ----------------------------------------------------------------------
 lt_authority_sync() {
     require_database || return 0
-    local scope limit="" from to last branch title
+    local scope limit="" from to last branch title linker mode note=""
     title=$(t "🔗  Sync & link authorities")
     if ! koha_script link_bibs_to_authorities.pl >/dev/null; then
         msg_error "" "$(t "Koha's link_bibs_to_authorities.pl was not found. Nothing was changed.")" 9 72
@@ -10318,54 +10332,88 @@ lt_authority_sync() {
             [[ "$branch" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
             limit="biblionumber IN (SELECT biblionumber FROM items WHERE homebranch = \"${branch}\")" ;;
     esac
-    tools_locked _lt_authority_sync_run "$limit"
+    linker=$(ui_menu "$title" "$(t "How should a heading be matched to an authority?")" \
+        "Default"    "$(t "Default (exact, safe): only when a single authority matches")" \
+        "FirstMatch" "$(t "Fuzzy: when several authorities match, take the first")" \
+        "LastMatch"  "$(t "Fuzzy: when several authorities match, take the last")") || return 0
+    [ "$linker" = "Default" ] || note="\n\n$(t "Fuzzy matching can link a heading to the wrong authority. Recommended: run the simulation first and check the headings it lists as fuzzily linked.")"
+    mode=$(ui_menu "$title" "$(t "What should be done?")${note}" \
+        "preview" "$(t "Simulation / preview (dry run): nothing is written")" \
+        "apply"   "$(t "Apply the changes permanently")") || return 0
+    tools_locked _lt_authority_sync_run "$mode" "$linker" "$limit"
+}
+
+# _auth_link LOG OUT LINKER [ARGS...]: link_bibs_to_authorities.pl through
+# koha-shell with the LINKER module for this run only; standard output in
+# OUT, warnings in LOG.
+_auth_link() {
+    local log="$1" out="$2" linker="$3" path
+    shift 3
+    path=$(koha_script link_bibs_to_authorities.pl) || return 127
+    : > "$out" && chmod 600 "$out"
+    KOHA_EXEC_OUT="$out" koha_exec "$log" link_bibs_to_authorities.pl env "OVERRIDE_SYSPREF_LinkerModule=${linker}" "$path" "$@"
 }
 
 _lt_authority_sync_run() {
-    local limit="$1" log title preview checked modified linked unlinked fuzzy indexed
+    local mode="$1" linker="$2" limit="$3" log out view rlog title checked changed modified linked unlinked fuzzy bad indexed
     local args=()
     title=$(t "🔗  Sync & link authorities")
     log=$(tools_log authority-sync)
     [ -n "$limit" ] && args+=(--bib-limit "$limit")
-    display_explanation "Preview (dry run): nothing is changed yet..."
-    if ! koha_tool "$log" link_bibs_to_authorities.pl --test --link-report "${args[@]}"; then
-        ui_textbox "$title" "$log"
-        msg_error "" "$(t 'Koha could not complete the request. Nothing was changed.\n\nLog: ${log}')" 10 74
-        return 1
+    if [ "$mode" = "preview" ]; then
+        out="${log%.log}-simulation.txt"
+        display_explanation "Simulation (dry run): nothing is written..."
+        if ! _auth_link "$log" "$out" "$linker" --test -v --link-report "${args[@]}"; then
+            ui_textbox "$title" "$log"
+            msg_error "" "$(t 'Koha could not complete the request. Nothing was changed.\n\nLog: ${log}')" 10 74
+            return 1
+        fi
+        checked=$(tools_num "$out" "Number of bibs checked:")
+        linked=$(tools_num "$out" "Number of headings linked:")
+        unlinked=$(tools_num "$out" "Number of headings unlinked:")
+        fuzzy=$(tools_num "$out" "Number of headings fuzzily linked:")
+        bad=$(tools_num "$out" "Number of bibs with errors:")
+        changed=$(grep -cE '^Bib +[0-9]+ .*headings changed' "$out")
+        # The report without the per-record lines: counts, then the headings found and not found.
+        view="${TOOLS_WORK}/authorities-simulation.txt"
+        grep -vE '^Bib +[0-9]+ ' "$out" | sed -n '/heading linking report/,$p' | head -n 400 > "$view"
+        [ -s "$view" ] || tail -n 200 "$out" > "$view"
+        ui_textbox "$(t "Simulation (dry run)")" "$view"
+        if [ "${changed:-0}" -eq 0 ]; then
+            if [ "${linked:-0}" -eq 0 ]; then
+                msg_info "$(t "Simulation (dry run)")" "$(t 'Nothing was written (simulation).\n\nLinker: ${linker}\nRecords checked: ${checked}\nNo heading matches an authority: nothing to change.\nHeadings without a matching authority: ${unlinked}\nRecords with errors: ${bad}\n\nReport: ${out}\nLog: ${log}')" 18 78
+            else
+                msg_info "$(t "Simulation (dry run)")" "$(t 'Nothing was written (simulation).\n\nLinker: ${linker}\nRecords checked: ${checked}\nHeadings that match an authority: ${linked}, all already linked: nothing to change.\nHeadings without a matching authority: ${unlinked}\nRecords with errors: ${bad}\n\nReport: ${out}\nLog: ${log}')" 18 78
+            fi
+            return 0
+        fi
+        prompt_yes_no "$(t "Simulation (dry run)")" "$(t 'Nothing was written (simulation).\n\nLinker: ${linker}\nRecords checked: ${checked}\nRecords that would be updated: ${changed}\nHeadings that would be linked: ${linked} (fuzzily: ${fuzzy})\nHeadings without a matching authority: ${unlinked}\nRecords with errors: ${bad}\n\nApply these changes permanently now? A verified backup is made first.')" 20 78 defaultno || return 0
+    else
+        prompt_yes_no "$title" "$(t 'Apply the authority links permanently with the ${linker} linker?\n\nKoha writes the links into the catalog records. A verified backup is made first, and the search index is rebuilt in the background afterwards.')" 13 76 defaultno || return 0
     fi
-    checked=$(tools_num "$log" "Number of bibs checked:")
-    modified=$(tools_num "$log" "Number of bibs modified:")
-    linked=$(tools_num "$log" "Number of headings linked:")
-    unlinked=$(tools_num "$log" "Number of headings unlinked:")
-    fuzzy=$(tools_num "$log" "Number of headings fuzzily linked:")
-    # The report of the dry run: the counts, then the headings found and not found.
-    preview="${TOOLS_WORK}/authorities-preview.txt"
-    tools_output "$log" | sed -n '/heading linking report/,$p' | head -n 400 > "$preview"
-    [ -s "$preview" ] || tools_output "$log" | tail -n 200 > "$preview"
-    ui_textbox "$(t "Preview (dry run)")" "$preview"
-    if [ "${modified:-0}" -eq 0 ]; then
-        msg_info "$title" "$(t 'Records checked: ${checked}\nNo heading can be linked to an authority: nothing to change.\n\nHeadings without a matching authority: ${unlinked} (listed in the preview).\n\nLog: ${log}')" 14 76
-        return 0
-    fi
-    prompt_yes_no "$title" "$(t 'Records checked: ${checked}\nRecords to update: ${modified}\nHeadings to link: ${linked} (by similarity: ${fuzzy})\nHeadings without a matching authority: ${unlinked}\n\nLink them now? A verified backup is made first, and the search index is updated afterwards.')" 16 76 defaultno || return 0
     tools_safety_backup AUTHORITIES || return 1
+    out="${log%.log}-applied.txt"
     display_explanation "Linking the headings to the authorities..."
-    if ! koha_tool "$log" link_bibs_to_authorities.pl -v "${args[@]}"; then
+    if ! _auth_link "$log" "$out" "$linker" -v --link-report "${args[@]}"; then
         ui_textbox "$title" "$log"
         msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
         return 1
     fi
-    modified=$(tools_num "$log" "Number of bibs modified:")
-    linked=$(tools_num "$log" "Number of headings linked:")
-    unlinked=$(tools_num "$log" "Number of headings unlinked:")
-    display_explanation "Updating the search index..."
-    if tools_reindex "$log"; then
-        indexed=$(t "The search index was updated.")
+    checked=$(tools_num "$out" "Number of bibs checked:")
+    modified=$(tools_num "$out" "Number of bibs modified:")
+    linked=$(tools_num "$out" "Number of headings linked:")
+    unlinked=$(tools_num "$out" "Number of headings unlinked:")
+    fuzzy=$(tools_num "$out" "Number of headings fuzzily linked:")
+    bad=$(tools_num "$out" "Number of bibs with errors:")
+    if [ "${modified:-0}" -gt 0 ]; then
+        rlog="${log%.log}-reindex.log"
+        tools_reindex_bg "$rlog"
+        indexed=$(t 'The biblio search index is being rebuilt in the background; searches show the new links when it finishes.\nIndex log: ${rlog}')
     else
-        indexed=$(t "The search index could not be updated now: run Repair / rebuild indexing.")
+        indexed=$(t "No record changed: the search index was left as it was.")
     fi
-    log "tools: authorities linked (checked=$checked modified=$modified linked=$linked unlinked=$unlinked)"
-    msg_ok "$(t '✅ Headings linked to the authorities.\n\nRecords checked: ${checked}\nRecords updated: ${modified}\nHeadings linked: ${linked}\nHeadings without a matching authority (left for review): ${unlinked}')\n\n${indexed}\n\n$(t 'Safety backup: ${TOOLS_PRE}\nLog: ${log}')" 18 78
+    log "tools: authorities linked (linker=$linker checked=$checked modified=$modified linked=$linked unlinked=$unlinked)"
+    msg_ok "$(t '✅ Changes saved permanently.\n\nLinker: ${linker}\nRecords checked: ${checked}\nRecords updated: ${modified}\nHeadings linked: ${linked} (fuzzily: ${fuzzy})\nHeadings without a matching authority (left for review): ${unlinked}\nRecords with errors: ${bad}')\n\n${indexed}\n\n$(t 'Safety backup: ${TOOLS_PRE}\nReport: ${out}\nLog: ${log}')" 22 80
 }
 
 # ----------------------------------------------------------------------
@@ -10585,6 +10633,22 @@ tools_reindex() {
         printf '$ koha-rebuild-zebra -v -b -a %s\n' "$INSTANCE" >> "$log"
         koha_ctl /usr/sbin/koha-rebuild-zebra -v -b -a "$INSTANCE" >> "$log" 2>&1 </dev/null
     fi
+}
+
+# The biblio index rebuilt in the background after a tool changed many
+# records (koha_ctl: the rebuild never holds the panel's locks); its output
+# goes to LOG.
+tools_reindex_bg() {
+    local log="$1"
+    : >> "$log" && chmod 600 "$log"
+    if [ "$(get_search_engine)" = "Elasticsearch" ]; then
+        set -- /usr/sbin/koha-elasticsearch --rebuild -b "$INSTANCE"
+    else
+        set -- /usr/sbin/koha-rebuild-zebra -v -b "$INSTANCE"
+    fi
+    printf '$ %s\n' "${*#/usr/sbin/}" >> "$log"
+    log "tools: background reindex: ${*#/usr/sbin/}"
+    koha_ctl nohup setsid "$@" >> "$log" 2>&1 </dev/null &
 }
 
 # ----------------------------------------------------------------------
