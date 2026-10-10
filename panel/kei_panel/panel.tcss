@@ -599,3 +599,12 @@ App.-plain #picker-drop {
     min-width: 5;
     width: 5;
 }
+
+/* ---- OPAC and Staff Appearance: login instructions and credits ------ */
+.opac-box TextArea.o-html {
+    width: 1fr;
+    height: 8;
+}
+.opac-box TextArea.o-links-text {
+    height: 5;
+}

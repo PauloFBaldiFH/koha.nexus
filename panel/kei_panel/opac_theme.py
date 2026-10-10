@@ -1,4 +1,6 @@
-"""The OPAC's look: settings, the CSS and JS written into Koha, images.
+"""The OPAC's and the staff interface's look ("OPAC and Staff Appearance"):
+settings, the CSS and JS written into Koha, images, and the login
+instructions and footer credits (Koha's HTML customizations).
 
 The screen (views/opac.py) edits a settings dict; everything else lives
 here, with no Textual:
@@ -29,6 +31,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import html
 import json
 import os
 import re
@@ -37,6 +40,7 @@ import shutil
 import tempfile
 import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
 
 from .env import CONFIG_DIR
@@ -83,6 +87,7 @@ DEFAULTS: dict = {
     "texture": "frosted",
     "blur": 12,               # px, frosted glass
     "opacity": 78,            # % of the block surface
+    "panel_opacity": 94,      # % of the content panels (.main, tabs, menus): text never sits on the bare wallpaper
     "radius_block": 14,       # px, 0-30
     "radius_input": 10,
     "radius_button": 10,
@@ -119,9 +124,19 @@ DEFAULTS: dict = {
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
               "favicon": {"source": "none", "url": ""}, "film": 75},
+    # Koha's HTML customizations (Tools > HTML customizations) the panel
+    # writes: the login instructions of the OPAC and of the staff interface
+    # (allow-listed HTML, a banner picture above it) and the OPAC footer
+    # credits, built from a form. Not in the public stylesheet's settings
+    # line (data_line): they travel in theme-settings.json.
+    "login": {"opac": {"enabled": False, "html": "", "image": {"source": "none", "url": ""}, "alt": ""},
+              "staff": {"enabled": False, "html": "", "image": {"source": "none", "url": ""}, "alt": ""}},
+    "credits": {"enabled": False, "name": "", "address": "", "phone": "", "whatsapp": "", "email": "",
+                "website": "", "hours": "", "instagram": "", "facebook": "", "youtube": "", "cnpj": "",
+                "note": "", "links": []},
 }
 
-RANGES = {"blur": (0, 30), "opacity": (30, 100), "radius_block": (0, 30), "radius_input": (0, 30),
+RANGES = {"blur": (0, 30), "opacity": (30, 100), "panel_opacity": (80, 100), "radius_block": (0, 30), "radius_input": (0, 30),
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
@@ -217,6 +232,271 @@ def _asset(raw) -> dict:
     return {"source": source, "url": url if source != "none" else ""}
 
 
+# ----------------------------------------------------------------------
+# HTML customizations: login instructions and footer credits
+# ----------------------------------------------------------------------
+# Koha's places for them (additional_contents.location, Koha 23.11 and later):
+# the OPAC login page, the staff login page and the OPAC footer.
+CONTENT_LOCATIONS = ("OpacLoginInstructions", "StaffLoginInstructions", "opaccredits")
+LOGIN_SIDES = {"opac": "OpacLoginInstructions", "staff": "StaffLoginInstructions"}
+# The login banners: kei-login.* in the OPAC's folder, kei-staff-login.* in the staff one.
+LOGIN_ASSETS = {"opac": "login", "staff": "staff-login"}
+MAX_HTML = 20_000
+MAX_CREDIT_LINKS = 6
+# What the login instructions keep of the HTML typed or pasted in the panel:
+# these tags, and per tag only the attributes below (links and pictures
+# through safe_link / safe_url). Script, style, iframes, forms, event
+# handlers (onclick=...), style="" and javascript: addresses never reach Koha.
+_ALLOWED_TAGS = {"p", "br", "hr", "strong", "b", "em", "i", "u", "small", "span", "div", "a", "img", "ul", "ol",
+                 "li", "h2", "h3", "h4", "h5", "blockquote"}
+_VOID_TAGS = {"br", "hr", "img"}
+_BLOCK_TAGS = {"p", "div", "ul", "ol", "h2", "h3", "h4", "h5", "blockquote", "hr"}
+# Dropped with everything inside them.
+_DROP_WITH_TEXT = {"script", "style", "iframe", "object", "embed", "template", "noscript", "svg", "math",
+                   "textarea", "select", "title", "head", "frameset", "frame", "applet"}
+_CLASS = re.compile(r"[A-Za-z0-9_ -]{1,80}")
+
+
+class _Sanitizer(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.out: list[str] = []
+        self.stack: list[str] = []
+        self.skip: list[str] = []
+
+    def _attrs(self, tag: str, attrs: list[tuple[str, str | None]]) -> str | None:
+        kept: list[tuple[str, str]] = []
+        for name, value in attrs:
+            value = (value or "").strip()
+            if name == "class" and _CLASS.fullmatch(value):
+                kept.append((name, value))
+            elif tag == "a" and name == "href" and safe_link(value):
+                kept.append((name, value))
+            elif tag == "a" and name == "target" and value == "_blank":
+                kept += [(name, value), ("rel", "noopener noreferrer")]
+            elif tag in ("a", "img") and name in ("title", "alt"):
+                kept.append((name, value[:200]))
+            elif tag == "img" and name == "src" and safe_url(value):
+                kept.append((name, value))
+            elif tag == "img" and name in ("width", "height") and re.fullmatch(r"\d{1,4}", value):
+                kept.append((name, value))
+        if tag == "img" and not any(n == "src" for n, _ in kept):
+            return None
+        if tag == "img":
+            kept += [("loading", "lazy"), ("style", "max-width:100%;height:auto")]
+        return "".join(f' {n}="{html.escape(v, quote=True)}"' for n, v in kept)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in _DROP_WITH_TEXT:
+            self.skip.append(tag)
+            return
+        if self.skip or tag not in _ALLOWED_TAGS:
+            return
+        attr = self._attrs(tag, attrs)
+        if attr is None:
+            return
+        # What the browser would close by itself: a list item before the
+        # next one, a paragraph before a block.
+        if tag == "li" and self.stack and self.stack[-1] == "li":
+            self.handle_endtag("li")
+        if tag in _BLOCK_TAGS and "p" in self.stack:
+            self.handle_endtag("p")
+        self.out.append(f"<{tag}{attr}>")
+        if tag not in _VOID_TAGS:
+            self.stack.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in _DROP_WITH_TEXT:
+            return
+        self.handle_starttag(tag, attrs)
+        if tag not in _VOID_TAGS and self.stack and self.stack[-1] == tag and not self.skip:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _DROP_WITH_TEXT:
+            if tag in self.skip:
+                while self.skip and self.skip.pop() != tag:
+                    pass
+            return
+        if self.skip or tag not in self.stack:
+            return
+        while self.stack:
+            top = self.stack.pop()
+            self.out.append(f"</{top}>")
+            if top == tag:
+                break
+
+    def handle_data(self, data: str) -> None:
+        if not self.skip:
+            self.out.append(html.escape(data, quote=False))
+
+    def result(self) -> str:
+        self.close()
+        while self.stack:
+            self.out.append(f"</{self.stack.pop()}>")
+        return "".join(self.out).strip()
+
+
+def sanitize_html(value) -> str:
+    """The HTML of a login instruction, kept to an allow-list (see
+    _ALLOWED_TAGS): what is left is safe to print raw in Koha's page."""
+    text = str(value or "")[:MAX_HTML]
+    if not text.strip():
+        return ""
+    parser = _Sanitizer()
+    parser.feed(text)
+    return parser.result()
+
+
+def _login(raw) -> dict:
+    r = raw if isinstance(raw, dict) else {}
+    return {"enabled": bool(r.get("enabled", False)), "html": sanitize_html(r.get("html", "")),
+            "image": _asset(r.get("image")), "alt": _text(r.get("alt"), "", 120)}
+
+
+def _digits(value) -> str:
+    return re.sub(r"\D", "", str(value or ""))
+
+
+def _credits(raw) -> dict:
+    """The footer credits form: each field checked (links through safe_link,
+    e-mail and WhatsApp by their shape); a field that fails is left empty."""
+    r = raw if isinstance(raw, dict) else {}
+    out = {"enabled": bool(r.get("enabled", False))}
+    for key, limit in (("name", 120), ("address", 200), ("phone", 40), ("hours", 120), ("note", 300)):
+        out[key] = _text(r.get(key), "", limit)
+    wa = _digits(r.get("whatsapp"))
+    out["whatsapp"] = wa if 8 <= len(wa) <= 15 else ""
+    email = _text(r.get("email"), "", 120)
+    out["email"] = email if re.fullmatch(r"[^@\s\"'<>]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", email) else ""
+    for key in ("website", "facebook", "youtube"):
+        url = safe_link(r.get(key, ""))
+        out[key] = url if url.startswith(("https://", "http://")) else ""
+    ig = str(r.get("instagram") or "").strip()
+    if ig.startswith(("https://", "http://")):
+        out["instagram"] = safe_link(ig)
+    else:
+        handle = ig.lstrip("@")
+        out["instagram"] = "@" + handle if re.fullmatch(r"[A-Za-z0-9._]{1,30}", handle) else ""
+    cnpj = _text(r.get("cnpj"), "", 30)
+    d = _digits(cnpj)
+    out["cnpj"] = f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}" if len(d) == 14 else cnpj
+    links = []
+    for item in r.get("links") if isinstance(r.get("links"), list) else []:
+        item = item if isinstance(item, dict) else {}
+        text, url = _text(item.get("text"), "", 60), safe_link(item.get("url", ""))
+        if text and url:
+            links.append({"text": text, "url": url})
+    out["links"] = links[:MAX_CREDIT_LINKS]
+    return out
+
+
+def credits_on(cr: dict) -> bool:
+    return bool(cr["enabled"] and any(v for k, v in cr.items() if k != "enabled"))
+
+
+def login_on(lg: dict) -> bool:
+    return bool(lg["enabled"] and (lg["html"] or lg["image"]["url"]))
+
+
+def login_html(lg: dict) -> str:
+    """The login instructions as Koha prints them: the banner (responsive:
+    never wider than the box, height kept in proportion) and the HTML."""
+    parts = []
+    if lg["image"]["url"]:
+        parts.append(f'<p class="kei-login-banner-wrap"><img class="kei-login-banner img-fluid" '
+                     f'src="{html.escape(lg["image"]["url"], quote=True)}" alt="{html.escape(lg["alt"], quote=True)}" '
+                     'style="display:block;max-width:100%;height:auto;margin:0 auto;border-radius:8px"></p>')
+    if lg["html"]:
+        parts.append(lg["html"])
+    return '<div class="kei-login">\n' + "\n".join(parts) + "\n</div>" if parts else ""
+
+
+CREDITS_TEXT = {"phone": "Phone", "whatsapp": "WhatsApp", "email": "E-mail", "website": "Website",
+                "hours": "Opening hours", "cnpj": "CNPJ", "social": "Follow us"}
+
+
+def credits_html(cr: dict, text: dict | None = None) -> str:
+    """The footer credits: one fixed block of markup from the form's
+    fields (every value escaped), for Koha's opaccredits."""
+    lab = {**CREDITS_TEXT, **(text or {})}
+    e = html.escape
+
+    def link(url: str, label: str, new_tab: bool = True) -> str:
+        extra = ' target="_blank" rel="noopener noreferrer"' if new_tab else ""
+        return f'<a href="{e(url, quote=True)}"{extra}>{e(label)}</a>'
+
+    lines = []
+    if cr["name"]:
+        lines.append(f'<p class="kei-credits-name"><strong>{e(cr["name"])}</strong></p>')
+    if cr["address"]:
+        lines.append(f'<p class="kei-credits-address">{e(cr["address"])}</p>')
+    contact = []
+    if cr["phone"]:
+        contact.append(f'{e(lab["phone"])}: {link("tel:" + _digits(cr["phone"]), cr["phone"], False)}'
+                       if len(_digits(cr["phone"])) >= 3 else f'{e(lab["phone"])}: {e(cr["phone"])}')
+    if cr["whatsapp"]:
+        contact.append(f'{e(lab["whatsapp"])}: {link("https://wa.me/" + cr["whatsapp"], "+" + cr["whatsapp"])}')
+    if cr["email"]:
+        contact.append(f'{e(lab["email"])}: {link("mailto:" + cr["email"], cr["email"], False)}')
+    if cr["website"]:
+        shown = re.sub(r"^https?://", "", cr["website"]).rstrip("/")
+        contact.append(f'{e(lab["website"])}: {link(cr["website"], shown)}')
+    if contact:
+        lines.append('<p class="kei-credits-contact">' + " · ".join(contact) + "</p>")
+    if cr["hours"]:
+        lines.append(f'<p class="kei-credits-hours">{e(lab["hours"])}: {e(cr["hours"])}</p>')
+    social = []
+    if cr["instagram"]:
+        url = (cr["instagram"] if cr["instagram"].startswith("http")
+               else f"https://www.instagram.com/{cr['instagram'][1:]}/")
+        social.append(link(url, "Instagram" + (f" {cr['instagram']}" if cr["instagram"].startswith("@") else "")))
+    if cr["facebook"]:
+        social.append(link(cr["facebook"], "Facebook"))
+    if cr["youtube"]:
+        social.append(link(cr["youtube"], "YouTube"))
+    if social:
+        lines.append(f'<p class="kei-credits-social">{e(lab["social"])}: ' + " · ".join(social) + "</p>")
+    if cr["links"]:
+        lines.append('<p class="kei-credits-links">'
+                     + " · ".join(link(x["url"], x["text"], x["url"].startswith("http")) for x in cr["links"]) + "</p>")
+    if cr["note"]:
+        lines.append(f'<p class="kei-credits-note">{e(cr["note"])}</p>')
+    if cr["cnpj"]:
+        lines.append(f'<p class="kei-credits-cnpj">{e(lab["cnpj"])}: {e(cr["cnpj"])}</p>')
+    return '<div class="kei-credits">\n' + "\n".join(lines) + "\n</div>" if lines else ""
+
+
+def contents(cfg: dict, text: dict | None = None) -> dict[str, str]:
+    """{location: HTML} of the three places the panel manages; "" turns the
+    panel's entry there off (the library's own entries come back)."""
+    cfg = normalize(cfg)
+    out = {loc: (login_html(cfg["login"][side]) if login_on(cfg["login"][side]) else "")
+           for side, loc in LOGIN_SIDES.items()}
+    out["opaccredits"] = credits_html(cfg["credits"], text) if credits_on(cfg["credits"]) else ""
+    return out
+
+
+def parse_contents(text: str) -> dict:
+    """The login and credits settings that opac-theme-get read from
+    theme-settings.json ({} when there are none)."""
+    try:
+        data = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    cfg = normalize({k: data.get(k) for k in ("login", "credits")})
+    return {k: cfg[k] for k in ("login", "credits") if k in data}
+
+
+def contents_settings(cfg: dict) -> dict:
+    """The settings of the HTML customizations, kept out of the public
+    stylesheet (theme-settings.json holds them)."""
+    cfg = normalize(cfg)
+    return {"login": cfg["login"], "credits": cfg["credits"]}
+
+
 def normalize(raw: dict | None) -> dict:
     """Every setting checked: unknown keys dropped, numbers clamped, colours
     and URLs validated, defaults where missing."""
@@ -267,6 +547,9 @@ def normalize(raw: dict | None) -> dict:
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
     for name in STAFF_ASSETS:
         cfg["staff"][name] = _asset(st.get(name))
+    lg = raw.get("login") if isinstance(raw.get("login"), dict) else {}
+    cfg["login"] = {side: _login(lg.get(side)) for side in LOGIN_SIDES}
+    cfg["credits"] = _credits(raw.get("credits"))
     return cfg
 
 
@@ -295,8 +578,12 @@ def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
 
 
 def data_line(cfg: dict) -> str:
-    """The settings as a CSS comment (one line; "*/" cannot end it early)."""
-    text = json.dumps(normalize(cfg), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    """The settings as a CSS comment (one line; "*/" cannot end it early).
+    The login instructions and credits stay out (contents_settings())."""
+    data = normalize(cfg)
+    for key in ("login", "credits"):
+        data.pop(key)
+    text = json.dumps(data, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
     text = text.replace("*/", "*\\/").replace("</", "<\\/")
     return "/* " + DATA_TAG + " " + text + " */"
 
@@ -362,6 +649,10 @@ def sync_settings(found: dict[str, str]) -> tuple[dict | None, list[tuple[str, d
                 cfg = normalize(raw)
                 notes.append(("Settings: rebuilt from the panel's scripts in Koha (buttons, carousel, "
                               "light/dark); colours and pictures stay as on this screen.", {}))
+    extra = parse_contents(found.get("contents_settings", ""))
+    if cfg is not None and extra:
+        cfg = normalize({**cfg, **extra})
+        notes.append(("Login instructions and footer credits: read from theme-settings.json.", {}))
     if cfg is None:
         notes.append(("Nothing of the panel's look is in Koha: the screen keeps its settings.", {}))
     yes = {k: found.get(f"block_{k}") == "yes" for k in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS",
@@ -422,13 +713,55 @@ def text_on(hex_color: str) -> str:
     return "#111827" if luminance(hex_color) > 0.40 else "#ffffff"
 
 
+def contrast(a: str, b: str) -> float:
+    """WCAG contrast ratio of two #rrggbb colours (1 to 21)."""
+    la, lb = luminance(a) + .05, luminance(b) + .05
+    return max(la, lb) / min(la, lb)
+
+
+def readable(color: str, bg: str, minimum: float = 4.5) -> str:
+    """color, darkened (on a light bg) or lightened (on a dark one) just
+    enough to reach the minimum contrast on bg (WCAG AA: 4.5)."""
+    target = "#000000" if luminance(bg) > .18 else "#ffffff"
+    for step in range(21):
+        out = mix(color, target, step / 20)
+        if contrast(out, bg) >= minimum:
+            return out
+    return target
+
+
+def panel_colors(cfg: dict, dark: bool) -> dict:
+    """The content panels' colours: in light mode a light surface (the
+    block background when it is light, else white) with #1a1a1a text; in
+    dark mode #161b22 / #0d1117 with #e6edf3 text. Muted text, links and
+    headings are checked for 4.5:1 on both panel layers."""
+    accent = cfg["accent"]
+    if dark:
+        panel, inner, text = "#161b22", "#0d1117", "#e6edf3"
+        muted, link, ink = "#9da7b3", "#79b8ff", mix(accent, "#ffffff", .45)
+        edge = "rgba(240, 246, 252, .12)"
+    else:
+        base = cfg["surface"] if luminance(cfg["surface"]) >= .30 else "#ffffff"
+        panel, inner, text = mix(base, accent, .03), mix(base, accent, .07), "#1a1a1a"
+        muted, link, ink = "#4b5563", mix(accent, "#000000", .15), mix(accent, "#000000", .30)
+        edge = "rgba(15, 23, 42, .12)"
+    worst = panel if contrast(text, panel) < contrast(text, inner) else inner
+
+    def both(c: str) -> str:
+        return readable(readable(c, panel), inner)
+    return {"panel": panel, "inner": inner, "text": readable(text, worst, 7), "muted": both(muted),
+            "link": both(link), "ink": both(ink), "edge": edge}
+
+
 # ----------------------------------------------------------------------
 # The stylesheet
 # ----------------------------------------------------------------------
 # The big blocks (the texture) and the content blocks inside them (a
 # solid card with the accent on its edge). "html body" before each one, and
 # !important, so Koha's Bootstrap rules never win over the chosen colours.
-_BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .mastheadsearch, .main"
+# The page's content (.main) is not one of them: it is a content panel
+# (_panels_css), near-solid so text never sits on the bare wallpaper.
+_BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .mastheadsearch"
 _CONTENT = "#opacmainuserblock, #opacmainblock, #news .newsitem, .newsitem, .news-item"
 
 
@@ -461,9 +794,9 @@ def _texture_css(cfg: dict) -> str:
                    "rgba(var(--kei-accent-rgb), .10) 55%, rgba(var(--kei-accent2-rgb), .14) 100%) !important;")
     base.append("}")
     base.append(f"""{_strong(_CONTENT)} {{
-    background: linear-gradient(135deg, rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%),
-        rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
-    color: var(--kei-text) !important;
+    background: linear-gradient(135deg, rgba(var(--kei-accent-rgb), .14) 0%, rgba(var(--kei-accent2-rgb), .10) 100%),
+        var(--kei-panel-2) !important;
+    color: var(--kei-p-text) !important;
     border: 1px solid rgba(var(--kei-accent-rgb), .35) !important;
     border-left: 4px solid var(--nexus-primary) !important;
     border-radius: calc(var(--kei-r-block) * .7) !important;
@@ -524,6 +857,7 @@ html[data-kei-theme="dark"] .form-control, html[data-kei-theme="dark"] .form-sel
 html[data-kei-theme="dark"] input[type="text"], html[data-kei-theme="dark"] select,
 html[data-kei-theme="dark"] textarea {{ background-color: #161b22; color: var(--kei-text); border-color: #30363d; }}
 html[data-kei-theme="dark"] a:not(.btn) {{ color: #79b8ff; }}
+html[data-kei-theme="dark"] ::placeholder {{ color: #9da7b3; opacity: 1; }}
 html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb-item {{ color: var(--kei-muted) !important; }}
 {_texture_css(cfg)}
 /* The header and its menus above the search bar: the glass of each block
@@ -534,7 +868,8 @@ html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
 {_buttons_css(cfg)}
-a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}"""]
+a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}
+{_panels_css(cfg)}"""]
     bg = cfg["background"]["url"]
     if not bg:
         out.append(_canvas_css(cfg))
@@ -615,6 +950,159 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     if links_on(cfg["links"]):
         out.append(_links_css("#kei-links"))
     return "\n".join(out) + "\n"
+
+
+# The panels inside the page's content: Koha paints them white or grey
+# (breadcrumbs, the user menu, facets, tabs, toolbars, the record's side
+# box); here they all take the inner panel colour, one edge, one radius.
+_INNER = (".breadcrumb", ".main .tab-content", ".main #search-facets", ".main #toolbar", ".main .toolbar",
+          ".main .selections-toolbar", ".main #action", ".main .nav_results", ".main .card", ".main .well",
+          ".main #views .view a", ".main #views .view span", ".main .current-view")
+_TEXT = ("p", "li", "dd", "dt", "td", "th", "label", "legend", "caption", "blockquote", ".results_summary",
+         ".note", ".content_set", ".authstanza", ".authstanzaheading", ".usedin", ".maincontent", ".tab-pane",
+         ".heading", ".authorized")
+_MUTED = (".text-muted", ".hint", "small", ".form-text", "p.details", ".label", ".results_summary .label",
+          ".newsfooter", ".breadcrumb-item")
+_HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6", "legend")
+_LINK_SKIP = (".btn", ".nav-link", ".dropdown-item", ".kei-link", ".kei-action", ".page-link", ".btn-acesso")
+
+
+def _panels_css(cfg: dict) -> str:
+    """Readability first (WCAG AA): the page's content (.main) and the
+    footer credits are near-solid panels (panel_opacity, a light blur
+    behind), Koha's own panels inside them share one solid inner colour,
+    edge and radius, and text, labels, headings and links take colours
+    checked against both (panel_colors), in light and in dark mode. Fixes
+    white tab panes with light text in dark mode, a stark white breadcrumb
+    bar, and light text on bare wallpaper in light mode."""
+    light, dark = panel_colors(cfg, False), panel_colors(cfg, True)
+
+    def tokens(c: dict) -> str:
+        return (f"    --kei-panel-rgb: {_rgb(c['panel']).replace(',', ', ')};\n    --kei-panel-2: {c['inner']};\n"
+                f"    --kei-p-text: {c['text']};\n    --kei-p-muted: {c['muted']};\n    --kei-p-link: {c['link']};\n"
+                f"    --kei-p-ink: {c['ink']};\n    --kei-p-edge: {c['edge']};")
+
+    def sel(items, prefix: str = "html body .main ") -> str:
+        return ", ".join(prefix + x for x in items)
+    inner = ", ".join("html body " + x for x in _INNER)
+    links = "html body .main a" + "".join(f":not({x})" for x in _LINK_SKIP)
+    return f"""/* Content panels: readable on any wallpaper, in light and dark mode. */
+:root {{
+{tokens(light)}
+    --kei-panel-a: {cfg['panel_opacity'] / 100:.2f};
+}}
+html[data-kei-theme="dark"] {{
+{tokens(dark)}
+}}
+html body .main, html body #opaccredits {{
+    position: relative;
+    isolation: isolate;
+    background: rgba(var(--kei-panel-rgb), var(--kei-panel-a)) !important;
+    color: var(--kei-p-text) !important;
+    border: 1px solid var(--kei-p-edge) !important;
+    border-radius: var(--kei-r-block) !important;
+}}
+/* The blur on a layer behind the content: on the panel itself it would
+   become the frame of every position: fixed thing inside (Koha's modals). */
+html body .main::before, html body #opaccredits::before {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
+}}
+html body #opaccredits {{ margin: 1rem 0; padding: 1rem 1.25rem; text-align: center; }}
+html body #opaccredits, html body #opaccredits p, html body #opaccredits li {{ color: var(--kei-p-text) !important; }}
+html body #opaccredits a {{ color: var(--kei-p-link) !important; }}
+html body .kei-credits p {{ margin: .2rem 0; }}
+html body .kei-credits-name {{ font-size: 1.05rem; }}
+html body .kei-login-banner-wrap {{ margin: 0 0 1rem; }}
+{inner} {{
+    background: var(--kei-panel-2) !important;
+    color: var(--kei-p-text) !important;
+    border: 1px solid var(--kei-p-edge) !important;
+    border-radius: calc(var(--kei-r-block) * .6) !important;
+    box-shadow: none !important;
+}}
+html body .breadcrumb {{ padding: .5rem .9rem !important; margin: 0 0 1rem !important; }}
+html body .breadcrumb a {{ color: var(--kei-p-link) !important; }}
+html body .breadcrumb-item, html body .breadcrumb-item.active {{ color: var(--kei-p-muted) !important; }}
+html[data-kei-theme="dark"] body .breadcrumb-item + .breadcrumb-item::before {{ filter: invert(1); opacity: .7; }}
+html body .main .tab-content {{ border-top-left-radius: 0 !important; padding: .9rem 1rem; }}
+html body .main .nav-tabs {{ border-bottom-color: var(--kei-p-edge); }}
+html body .main .nav-tabs .nav-link {{ color: var(--kei-p-link) !important; background: transparent; }}
+html body .main .nav-tabs .nav-link.active, html body .main .nav-tabs .nav-item.show .nav-link,
+html body .main .nav-tabs .active > a {{
+    background: var(--kei-panel-2) !important;
+    color: var(--kei-p-text) !important;
+    border-color: var(--kei-p-edge) var(--kei-p-edge) var(--kei-panel-2) !important;
+}}
+/* The user menu (account pages) and the facets: one list, one radius. */
+html body .main #menu ul, html body .main #usermenu ul {{
+    border: 1px solid var(--kei-p-edge);
+    border-radius: calc(var(--kei-r-block) * .6);
+    overflow: hidden;
+}}
+html body .main #menu li a, html body .main #usermenu li a {{
+    background: var(--kei-panel-2) !important;
+    color: var(--kei-p-link) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--kei-p-edge) !important;
+}}
+html body .main #menu li:last-child a, html body .main #usermenu li:last-child a {{ border-bottom: 0 !important; }}
+html body .main #menu li.active a, html body .main #usermenu li.active a,
+html body .main #menu li a:hover, html body .main #usermenu li a:hover {{
+    background: rgba(var(--kei-accent-rgb), .14) !important;
+    color: var(--kei-p-ink) !important;
+    box-shadow: inset 3px 0 0 var(--nexus-primary);
+}}
+html body .main #search-facets ul, html body .main #search-facets li {{ background: transparent !important; }}
+/* Tables and search results: rows on the panel, stripes in the inner colour. */
+html body .main table, html body .main .table {{
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--kei-p-text);
+    --bs-table-striped-bg: var(--kei-panel-2);
+    --bs-table-striped-color: var(--kei-p-text);
+    --bs-table-hover-bg: rgba(var(--kei-accent-rgb), .08);
+    --bs-table-hover-color: var(--kei-p-text);
+    --bs-table-border-color: var(--kei-p-edge);
+    background-color: transparent !important;
+    color: var(--kei-p-text);
+}}
+html body .main table > * > tr > td, html body .main table > * > tr > th {{
+    background-color: transparent !important;
+    border-color: var(--kei-p-edge) !important;
+}}
+html body .main table > thead > tr > th, html body .main .table-striped > tbody > tr:nth-of-type(odd) > *,
+html body .main .searchresults table > tbody > tr:nth-of-type(odd) > * {{ background-color: var(--kei-panel-2) !important; }}
+html body .main .pagination .page-link {{ background: var(--kei-panel-2); border-color: var(--kei-p-edge); color: var(--kei-p-link); }}
+html body .main .pagination .active .page-link, html body .main .pagination .page-item.active .page-link {{
+    background: var(--nexus-primary); border-color: var(--nexus-primary); color: var(--nexus-on-primary);
+}}
+/* Text: crisp on the panels, never the faint grey of Koha's defaults. */
+html body .main, {sel(_TEXT)} {{ color: var(--kei-p-text) !important; }}
+{sel(_MUTED)} {{ color: var(--kei-p-muted) !important; }}
+{sel(_HEADINGS)} {{ color: var(--kei-p-ink) !important; }}
+html body .main .alert h1, html body .main .alert h2, html body .main .alert h3, html body .main .alert h4,
+html body .main .alert h5, html body .main .alert p, html body .main .alert li {{ color: inherit !important; }}
+{links} {{ color: var(--kei-p-link); }}
+/* Dark mode: Koha's light alerts and status colours on the dark panels. */
+html[data-kei-theme="dark"] body .main .alert {{
+    background: rgba(var(--kei-accent-rgb), .16) !important;
+    border-color: rgba(var(--kei-accent-rgb), .40) !important;
+    color: var(--kei-p-text) !important;
+}}
+html[data-kei-theme="dark"] body .main .alert-warning {{ background: rgba(227, 179, 65, .14) !important; border-color: rgba(227, 179, 65, .45) !important; }}
+html[data-kei-theme="dark"] body .main .alert-danger, html[data-kei-theme="dark"] body .main .alert-error {{
+    background: rgba(248, 81, 73, .14) !important; border-color: rgba(248, 81, 73, .45) !important; }}
+html[data-kei-theme="dark"] body .main .alert-success {{ background: rgba(63, 185, 80, .14) !important; border-color: rgba(63, 185, 80, .45) !important; }}
+html[data-kei-theme="dark"] body .main .available, html[data-kei-theme="dark"] body .main .text-success {{ color: #56d364 !important; }}
+html[data-kei-theme="dark"] body .main .unavailable, html[data-kei-theme="dark"] body .main .text-danger {{ color: #ff7b72 !important; }}
+html[data-kei-theme="dark"] body .main .text-warning {{ color: #e3b341 !important; }}
+html[data-kei-theme="dark"] body .main .term {{ color: #1a1a1a !important; }}"""
 
 
 # Every kind of button Koha draws: Bootstrap's, the masthead search button
@@ -710,7 +1198,7 @@ html[data-kei-theme="dark"] body {{
     background: {glows.replace(".16", ".10").replace(".14", ".08")}, #0d1117 !important;
 }}"""]
     if cfg["texture"] != "metal":
-        lines.append(f"""{_strong(_BLOCKS + ", " + _CONTENT)} {{
+        lines.append(f"""{_strong(_BLOCKS + ", .main, " + _CONTENT)} {{
     box-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"});
 }}""")
     return "\n".join(lines)
@@ -1220,6 +1708,7 @@ html body textarea:focus {{
 }}""")
         if st["density"] == "compact":
             out.append("html body table { line-height: 1.25; }")
+    out.append(_staff_panels_css(st))
     out += _staff_material_css(st)
     out += _staff_pictures_css(st)
     if st["contrast"] == "high":
@@ -1229,6 +1718,71 @@ html body table, html body table td, html body table th { border-color: #4b5563 
 html body a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
 html body .btn { border-width: 2px; }""")
     return "\n".join(out) + "\n"
+
+
+def _staff_panels_css(st: dict) -> str:
+    """The staff pages' panels in the staff palette: the breadcrumb bar a
+    card instead of Koha's flat strip, the content sections on the card
+    colour, the login page's instructions box; with a dark block background
+    Koha's white tables, forms and dialogs follow it, so light text never
+    lands on white."""
+    light = luminance(st["surface"]) >= 0.30
+    out = ["""html body #breadcrumbs { background: transparent; border: 0; box-shadow: none; }
+html body #breadcrumbs .breadcrumb {
+    background-color: var(--nexus-staff-card);
+    border: 1px solid var(--nexus-staff-edge);
+    border-radius: calc(var(--nexus-staff-radius) * .6);
+    box-shadow: var(--nexus-staff-shadow);
+    padding: .45rem .9rem;
+    margin: .5rem 0;
+}
+html body #breadcrumbs .breadcrumb-item, html body #breadcrumbs .breadcrumb-item.active { color: var(--nexus-staff-muted); }
+html body .page-section {
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-text);
+    border-radius: var(--nexus-staff-radius);
+}
+html body #login #StaffLoginInstructions {
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-text);
+    border: 1px solid var(--nexus-staff-edge);
+    border-radius: var(--nexus-staff-radius);
+    box-shadow: var(--nexus-staff-shadow);
+}
+html body #login .kei-login-banner-wrap { margin: 0 0 .75rem; }"""]
+    if not light:
+        field = mix(st["surface"], "#000000", .25)
+        out.append(f"""/* A dark block background: Koha's white surfaces follow it. */
+html body h1, html body h2, html body h3, html body h4, html body h5, html body legend {{ color: var(--nexus-staff-ink); }}
+html body .text-muted, html body .hint, html body .form-text, html body .breadcrumb-item {{ color: var(--nexus-staff-muted) !important; }}
+html body table, html body .table {{
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--nexus-staff-text);
+    --bs-table-striped-bg: rgba(255, 255, 255, .04);
+    --bs-table-striped-color: var(--nexus-staff-text);
+    --bs-table-border-color: rgba(255, 255, 255, .12);
+    color: var(--nexus-staff-text);
+}}
+html body table td, html body table th, html body table.dataTable tbody tr, html body .dataTables_wrapper {{
+    background-color: transparent !important;
+    color: var(--nexus-staff-text);
+    border-color: rgba(255, 255, 255, .12) !important;
+}}
+html body table thead th, html body table tbody tr:nth-child(odd) td {{ background-color: rgba(255, 255, 255, .04) !important; }}
+html body .main input[type="text"], html body .main input[type="search"], html body .main input[type="password"],
+html body .main input[type="email"], html body .main input[type="number"], html body .main input[type="tel"],
+html body .main select, html body .main textarea, html body .main .form-control, html body .main .form-select {{
+    background-color: {field};
+    color: var(--nexus-staff-text);
+    border-color: rgba(255, 255, 255, .18);
+}}
+html body .modal-content, html body .dropdown-menu:not(.dropdown-menu-dark), html body fieldset.rows,
+html body .toptabs .tab-content, html body .tab-content {{
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-text);
+}}
+html body fieldset.rows label, html body fieldset.rows legend {{ color: var(--nexus-staff-text); }}""")
+    return "\n".join(out)
 
 
 def staff_page(st: dict) -> str:
@@ -1823,7 +2377,7 @@ def js_config(cfg: dict, text: dict | None = None) -> dict:
                       "hover": car["hover"], "overlay": car["overlay"], "title": car["title"], "mode": car["mode"]}
                      if car["enabled"] else None),
         "links": _links_conf(cfg["links"]) if links_on(cfg["links"]) else None,
-        "text": {**JS_TEXT, **(text or {})},
+        "text": {**JS_TEXT, **{k: v for k, v in (text or {}).items() if k in JS_TEXT}},
     }
 
 
@@ -1966,8 +2520,9 @@ def upload_cloudinary(path: Path, cloud: str, preset: str, post=_post) -> str:
 # ----------------------------------------------------------------------
 def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None) -> Path:
     """user.css, user.js, staff.css (when the staff interface takes the
-    colours or has home page buttons), staff.js (the buttons), prefs (NAME<TAB>VALUE), carousel (on N|off) and assets/ (the
-    server files to publish). Private (0700)."""
+    colours or has home page buttons), staff.js (the buttons), prefs (NAME<TAB>VALUE), carousel (on N|off), assets/ (the
+    server files to publish) and the HTML customizations (contents.list,
+    contents/, contents.json). Private (0700)."""
     cfg = normalize(cfg)
     work = Path(tempfile.mkdtemp(prefix="kei-opac-"))
     os.chmod(work, 0o700)
@@ -1995,4 +2550,18 @@ def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None)
     assets.mkdir()
     for role, src in files.items():
         shutil.copyfile(src, assets / local_name(role, src))
+    # Koha's HTML customizations: contents.list says which of the three
+    # places the panel fills (on) or gives back to the library (off);
+    # contents/<location>.html is what goes there; contents.json the form's
+    # settings, for theme-settings.json.
+    folder = work / "contents"
+    folder.mkdir()
+    listing = []
+    for location, markup in contents(cfg, text).items():
+        listing.append(f"{location}\t{'on' if markup else 'off'}\n")
+        if markup:
+            (folder / f"{location}.html").write_text(markup + "\n", encoding="utf-8")
+    (work / "contents.list").write_text("".join(listing), encoding="utf-8")
+    (work / "contents.json").write_text(json.dumps(contents_settings(cfg), ensure_ascii=False, sort_keys=True),
+                                        encoding="utf-8")
     return work

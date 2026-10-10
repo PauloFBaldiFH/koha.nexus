@@ -437,3 +437,58 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             assert "html { font-size: 110%; }" in seen["staff"]
 
     asyncio.run(main())
+
+
+def test_login_instructions_and_credits(tmp_path, monkeypatch):
+    """The login pages and footer credits boxes: checked fields, a banner file
+    for each side's folder, and the forms come back from theme-settings.json."""
+    from kei_panel import demo
+    banner = tmp_path / "banner.png"
+    banner.write_bytes(PNG)
+    saved = ot.normalize({"credits": {"enabled": True, "name": "Biblioteca Castro Alves", "cnpj": "76208487000164"}})
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [
+        f"@@result data={ot.data_line(saved)}",
+        "@@result contents_settings=" + __import__("json").dumps(ot.contents_settings(saved))])
+    from textual.widgets import TextArea
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: view.query_one("#o-cr-name", Input).value == "Biblioteca Castro Alves")
+            assert view.query_one("#o-cr-cnpj", Input).value == "76.208.487/0001-64"
+            assert view.query_one("#o-credits").border_title == "Footer credits"
+            view.query_one("#o-cr-email", Input).value = "not-an-email"
+            _cfg, _pending, problem = view.collect()
+            assert problem.startswith("Footer credits: E-mail")
+            view.query_one("#o-cr-email", Input).value = "biblioteca@palotina.pr.gov.br"
+            view.query_one("#o-cr-links", TextArea).text = "Portal | https://palotina.pr.gov.br\nno bar here"
+            _cfg, _pending, problem = view.collect()
+            assert "write the text, a | and the address" in problem
+            view.query_one("#o-cr-links", TextArea).text = "Portal | https://palotina.pr.gov.br"
+            view.query_one("#o-login-opac-enabled", Switch).value = True
+            view.query_one("#o-login-opac-html", TextArea).text = "<h2>Ask at the desk</h2><script>x()</script>"
+            view.query_one("#o-src-login", Select).value = "local"
+            view.query_one("#o-val-login", Input).value = str(banner)
+            view.query_one("#o-login-staff-enabled", Switch).value = True
+            view.query_one("#o-src-staff-login", Select).value = "url"
+            view.query_one("#o-val-staff-login", Input).value = "https://i.ibb.co/x/staff.png"
+            raw, pending, problem = view.collect()
+            assert problem == "" and set(pending) == {"login"}
+            cfg = ot.normalize(raw)
+            assert cfg["credits"]["links"] == [{"text": "Portal", "url": "https://palotina.pr.gov.br"}]
+            assert cfg["login"]["opac"]["html"] == "<h2>Ask at the desk</h2>"
+            assert cfg["login"]["staff"]["image"]["url"] == "https://i.ibb.co/x/staff.png"
+            assert ot.local_url("login", banner).startswith("/images/custom/kei-login.png?v=")
+            assert ot.local_url("staff-login", banner).startswith("/intranet-tmpl/kei-custom/kei-staff-login.png")
+            view.preview()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen))
+            assert "opaccredits (HTML customizations)" in app.screen._text
+            assert "StaffLoginInstructions (HTML customizations)" in app.screen._text
+            await pilot.pause(0.2)
+            await pilot.press("escape")
+
+    asyncio.run(main())

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.49"
+PANEL_VERSION=" 1.5.50"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9946,7 +9946,7 @@ function_reboot_server() {
     if ! host_can reboot; then
         prompt_yes_no "$(t "Restart Koha services")" "$(t "Restart Koha services now?\nEveryone using the catalog will be disconnected for a minute.")" 10 74 || return 0
         clear
-        display_explanation "Restarting Koha services (Memcached, Plack, Apache)..."
+        display_explanation "Restarting Memcached and Plack..."
         if restart_koha_stack; then
             msg_ok "$(t "Koha services restarted.")"
         else
@@ -28675,6 +28675,10 @@ CRON_OPAC="/etc/cron.d/koha_kei_opac"
 OPAC_BEGIN="/* koha-easy-installer opac-theme begin */"
 OPAC_END="/* koha-easy-installer opac-theme end */"
 THEME_STATE="${KEI_THEME_STATE:-${CONF_DIR}/theme-settings.json}"
+# The library's own HTML customizations the panel set to expired when it
+# wrote its login instructions or credits in their place (location, id, the
+# expiration date they had): turning ours off or Remove gives it back.
+OPAC_RETIRED="${KEI_OPAC_RETIRED:-${CONF_DIR}/theme-retired.tsv}"
 
 # A system preference as stored (--raw: line breaks kept).
 opac_pref_raw() {
@@ -28848,6 +28852,129 @@ staff_custom_drop() {
     return 0
 }
 
+# ----------------------------------------------------------------------
+# HTML customizations (Tools > HTML customizations, Koha 23.11 and later):
+# the panel's login instructions (OPAC and staff) and OPAC footer credits,
+# one entry each (code kei-<location>, every library, lang "default").
+# The panel's folder: contents.list (LOCATION<TAB>on|off) and
+# contents/LOCATION.html. While ours is on, the library's own entries at the
+# same place are set to expired (Koha would show both); OPAC_RETIRED keeps
+# what they had, for when ours goes off or the look is removed.
+# ----------------------------------------------------------------------
+OPAC_CONTENT_LOCATIONS="OpacLoginInstructions|StaffLoginInstructions|opaccredits"
+
+# opac_contents_ok DIR: only the three places, each "on" one with its file,
+# and no script, style, frame, event handler or javascript: address (the
+# panel keeps the HTML to an allow-list; this is the second lock).
+opac_contents_ok() {
+    local dir="$1" loc state f
+    [ -e "$dir/contents.list" ] || return 0
+    [ -f "$dir/contents.list" ] && [ ! -L "$dir/contents.list" ] || return 1
+    while IFS=$'\t' read -r loc state; do
+        [ -n "$loc" ] || continue
+        [[ "$loc" =~ ^(${OPAC_CONTENT_LOCATIONS})$ ]] || return 1
+        case "$state" in
+            off) ;;
+            on)
+                f="$dir/contents/$loc.html"
+                [ -f "$f" ] && [ ! -L "$f" ] && [ -s "$f" ] || return 1
+                [ "$(wc -c < "$f")" -le 65536 ] || return 1
+                ! grep -qiE '<[[:space:]]*/?[[:space:]]*(script|style|iframe|object|embed|form)|javascript:|<[^>]*[[:space:]]on[a-z]+[[:space:]]*=' "$f" || return 1 ;;
+            *) return 1 ;;
+        esac
+    done < "$dir/contents.list"
+    return 0
+}
+
+opac_contents_supported() {
+    [ "$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = $(sql_quote "$DB_NAME") AND table_name = 'additional_contents_localizations';" 2>/dev/null)" = "1" ]
+}
+
+# opac_contents_live LOCATION: id and expiration date of the library's own
+# entries shown there now.
+opac_contents_live() {
+    mysql --default-character-set=utf8mb4 -N -B -e "SELECT id, IFNULL(expirationdate, '') FROM ${DB_NAME}.additional_contents
+        WHERE category = 'html_customizations' AND location = $(sql_quote "$1") AND code NOT LIKE 'kei-%'
+        AND (expirationdate IS NULL OR expirationdate >= CURDATE()) ORDER BY id;" 2>/dev/null
+}
+
+# opac_retired_restore_sql LOCATION|"" FILE: SQL giving the library's
+# entries of LOCATION (of every place with "") the expiration date they had;
+# their lines leave FILE.
+opac_retired_restore_sql() {
+    local loc="$1" file="$2" l id orig value keep
+    [ -f "$file" ] || return 0
+    keep=$(mktemp "${file}.XXXXXX") || return 1
+    while IFS=$'\t' read -r l id orig; do
+        [[ "$id" =~ ^[0-9]+$ ]] || continue
+        if [ -z "$loc" ] || [ "$l" = "$loc" ]; then
+            value=NULL
+            [[ "$orig" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && value="'$orig'"
+            printf "UPDATE additional_contents SET expirationdate = %s WHERE id = %s AND code NOT LIKE 'kei-%%';\n" "$value" "$id"
+        else
+            printf '%s\t%s\t%s\n' "$l" "$id" "$orig" >> "$keep"
+        fi
+    done < "$file"
+    mv -f "$keep" "$file"
+}
+
+# opac_contents_sql DIR LOG: the SQL of contents.list (inside the caller's
+# transaction). The list of retired entries is written to OPAC_RETIRED.new;
+# opac_retired_commit makes it the real one once the SQL went in.
+opac_contents_sql() {
+    local dir="$1" log="$2" loc state id orig ids
+    [ -e "$dir/contents.list" ] || return 0
+    if ! opac_contents_supported; then
+        printf 'html customizations: no additional_contents_localizations table (Koha 23.11 or later needed); skipped\n' >> "$log"
+        kei_result contents unsupported
+        return 0
+    fi
+    mkdir -p "${OPAC_RETIRED%/*}"
+    if [ -f "$OPAC_RETIRED" ]; then cp -f "$OPAC_RETIRED" "$OPAC_RETIRED.new"; else : > "$OPAC_RETIRED.new"; fi
+    while IFS=$'\t' read -r loc state; do
+        [ -n "$loc" ] || continue
+        printf "DELETE FROM additional_contents WHERE category = 'html_customizations' AND code = %s;\n" "$(sql_quote "kei-$loc")"
+        if [ "$state" != "on" ]; then
+            opac_retired_restore_sql "$loc" "$OPAC_RETIRED.new"
+            continue
+        fi
+        printf "INSERT INTO additional_contents (category, code, location, branchcode, published_on, number) VALUES ('html_customizations', %s, %s, NULL, CURDATE(), 0);\n" \
+            "$(sql_quote "kei-$loc")" "$(sql_quote "$loc")"
+        printf "INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (LAST_INSERT_ID(), '', %s, 'default');\n" \
+            "$(sql_quote "$(cat "$dir/contents/$loc.html")")"
+        ids=""
+        while IFS=$'\t' read -r id orig; do
+            [[ "$id" =~ ^[0-9]+$ ]] || continue
+            ids="${ids:+${ids}, }$id"
+            grep -q "^${loc}"$'\t'"${id}"$'\t' "$OPAC_RETIRED.new" || printf '%s\t%s\t%s\n' "$loc" "$id" "$orig" >> "$OPAC_RETIRED.new"
+        done < <(opac_contents_live "$loc")
+        if [ -n "$ids" ]; then
+            printf "UPDATE additional_contents SET expirationdate = DATE_SUB(CURDATE(), INTERVAL 1 DAY) WHERE id IN (%s);\n" "$ids"
+            printf "html customizations: %s: the library's own entries %s set to expired\n" "$loc" "$ids" >> "$log"
+        fi
+        printf 'html customizations: %s written\n' "$loc" >> "$log"
+    done < "$dir/contents.list"
+    kei_result contents yes
+}
+
+opac_retired_commit() {
+    [ -f "$OPAC_RETIRED.new" ] || return 0
+    if [ -s "$OPAC_RETIRED.new" ]; then
+        mv -f "$OPAC_RETIRED.new" "$OPAC_RETIRED"
+    else
+        rm -f -- "$OPAC_RETIRED.new" "$OPAC_RETIRED"
+    fi
+}
+
+# opac_theme_restart LOG: Koha keeps the preferences and the HTML
+# customizations in Memcached and in Plack's workers: both start fresh.
+opac_theme_restart() {
+    printf '$ systemctl restart memcached; koha-plack --restart %s\n' "$INSTANCE" >> "$1"
+    systemctl restart memcached >/dev/null 2>&1 || koha_ctl service memcached restart >/dev/null 2>&1 \
+        || memcached_flush || true
+    plack_restart || true
+}
+
 opac_theme_get() {
     require_database || return 1
     local line
@@ -28858,6 +28985,12 @@ opac_theme_get() {
     [ -f "$CRON_OPAC" ] && kei_result carousel "on"
     if [ -f "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" ]; then
         kei_result feed_items "$(grep -o '"biblionumber"' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
+    fi
+    # The login instructions and credits forms: not in the public
+    # stylesheet, only in theme-settings.json.
+    if [ -s "$THEME_STATE" ]; then
+        line=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8")).get("contents_settings") or {}))' \
+            "$THEME_STATE" 2>/dev/null) && [ -n "$line" ] && [ "$line" != "{}" ] && kei_result contents_settings "$line"
     fi
     return 0
 }
@@ -28923,11 +29056,15 @@ opac_theme_apply() {
     fi
     for f in "$dir"/assets/*; do
         [ -e "$f" ] || continue
-        if [[ ! "${f##*/}" =~ ^kei-(staff-)?(background|logo|favicon)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
+        if [[ ! "${f##*/}" =~ ^kei-(staff-)?(background|logo|favicon|login)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
             msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
             return 1
         fi
     done
+    if ! opac_contents_ok "$dir"; then
+        msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
+        return 1
+    fi
     tools_locked _opac_theme_apply "$dir"
 }
 
@@ -28955,13 +29092,16 @@ _opac_theme_apply() {
                 [ -n "$name" ] && opac_pref_line "$name" "$value"
             done < "$dir/prefs"
         fi
+        opac_contents_sql "$dir" "$log"
         printf 'COMMIT;\n'
     } > "$sql"
     display_explanation "Writing the OPAC preferences..."
     if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "$log" 2>&1; then
+        rm -f -- "$OPAC_RETIRED.new"
         msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
         return 1
     fi
+    opac_retired_commit
     if compgen -G "$dir/assets/kei-*" >/dev/null; then
         for f in "$dir"/assets/kei-*; do
             name="${f##*/}"
@@ -28984,12 +29124,13 @@ _opac_theme_apply() {
     else
         opac_na_remove
     fi
-    memcached_flush || true
     if theme_state_save "$dir"; then
         printf 'saved: %s\n' "$THEME_STATE" >> "$log"
     else
         log "opac-theme: theme-settings.json could not be written"
     fi
+    display_explanation "Restarting Memcached and Plack..."
+    opac_theme_restart "$log"
     log "opac-theme: applied"
     kei_result applied yes
     msg_ok "$(t "✅ The new look is in the OPAC. Reload the catalogue page in the browser to see it.\n\nSafety backup: \${TOOLS_PRE}")"
@@ -29019,8 +29160,18 @@ if read("staff.css") is not None:
     blocks["IntranetUserCSS"] = read("staff.css")
 if read("staff.js") is not None:
     blocks["IntranetUserJS"] = read("staff.js")
+contents = {}
+for line in (read("contents.list") or "").splitlines():
+    loc, _, state = line.partition("\t")
+    if loc:
+        contents[loc] = (read(os.path.join("contents", loc + ".html")) or "") if state == "on" else ""
+try:
+    contents_settings = json.loads(read("contents.json") or "{}")
+except ValueError:
+    contents_settings = {}
 json.dump({"format": 1, "saved": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "panel": version, "settings": settings,
-           "blocks": blocks, "prefs": prefs, "carousel": (read("carousel") or "off").strip()},
+           "blocks": blocks, "prefs": prefs, "carousel": (read("carousel") or "off").strip(),
+           "contents": contents, "contents_settings": contents_settings},
           sys.stdout, ensure_ascii=False, indent=1)
 PY
     then
@@ -29051,6 +29202,15 @@ with open(os.path.join(d, "prefs"), "w", encoding="utf-8") as fh:
         if isinstance(p, list) and len(p) == 2:
             fh.write("%s\t%s\n" % (p[0], str(p[1]).replace("\n", " ")))
 open(os.path.join(d, "carousel"), "w").write(str(state.get("carousel") or "off") + "\n")
+contents = state.get("contents")
+if isinstance(contents, dict) and contents:
+    os.mkdir(os.path.join(d, "contents"))
+    with open(os.path.join(d, "contents.list"), "w", encoding="utf-8") as fh:
+        for loc, markup in contents.items():
+            on = isinstance(markup, str) and markup.strip() != ""
+            fh.write("%s\t%s\n" % (loc, "on" if on else "off"))
+            if on:
+                open(os.path.join(d, "contents", loc + ".html"), "w", encoding="utf-8").write(markup)
 PY
     then
         rm -rf -- "$dir"
@@ -29064,6 +29224,11 @@ PY
             return 1
         fi
     done
+    if ! opac_contents_ok "$dir"; then
+        rm -rf -- "$dir"
+        log "theme: $THEME_STATE holds damaged login instructions or credits; the look was not re-applied"
+        return 1
+    fi
     if [ ! -e "$dir/user.css" ] || [ ! -e "$dir/user.js" ]; then
         rm -rf -- "$dir"
         return 0
@@ -29078,13 +29243,16 @@ PY
         while IFS=$'\t' read -r name value; do
             [ -n "$name" ] && opac_pref_line "$name" "$value"
         done < "$dir/prefs"
+        opac_contents_sql "$dir" "${LOG_DIR}/mysql.log"
         printf 'COMMIT;\n'
     } > "$sql"
     if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "${LOG_DIR}/mysql.log" 2>&1; then
         rm -rf -- "$dir"
+        rm -f -- "$OPAC_RETIRED.new"
         log "theme: the saved look could not be written back after the restore"
         return 1
     fi
+    opac_retired_commit
     read -r mode count < "$dir/carousel" 2>/dev/null
     rm -rf -- "$dir"
     memcached_flush >/dev/null 2>&1 || true
@@ -29117,17 +29285,26 @@ _opac_theme_remove() {
         [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
         fav=$(opac_pref_raw IntranetFavicon)
         [[ "$fav" == /intranet-tmpl/kei-custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'IntranetFavicon';\n"
+        if opac_contents_supported; then
+            printf "DELETE FROM additional_contents WHERE category = 'html_customizations' AND code IN ('kei-OpacLoginInstructions', 'kei-StaffLoginInstructions', 'kei-opaccredits');\n"
+            if [ -f "$OPAC_RETIRED" ]; then
+                cp -f "$OPAC_RETIRED" "$OPAC_RETIRED.new"
+                opac_retired_restore_sql "" "$OPAC_RETIRED.new"
+            fi
+        fi
         printf 'COMMIT;\n'
     } > "$sql"
     if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "$log" 2>&1; then
+        rm -f -- "$OPAC_RETIRED.new"
         msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
         return 1
     fi
+    opac_retired_commit
     opac_na_remove
-    opac_custom_drop background logo favicon
-    staff_custom_drop staff-background staff-logo staff-favicon
+    opac_custom_drop background logo favicon login
+    staff_custom_drop staff-background staff-logo staff-favicon staff-login
     rm -f -- "$THEME_STATE"
-    memcached_flush || true
+    opac_theme_restart "$log"
     log "opac-theme: removed"
     msg_ok "$(t "✅ The OPAC is back to Koha's own look. The rest of OpacUserCSS and OpacUserJS was kept.\n\nSafety backup: \${TOOLS_PRE}")"
 }

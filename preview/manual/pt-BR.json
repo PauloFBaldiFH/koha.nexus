@@ -805,12 +805,13 @@
   "sec-opac": {
    "summary": "A aparência do catálogo público (OPAC) e da intranet, desenhada numa só tela e gravada no Koha com um clique, depois de um backup, preservando o CSS e o JavaScript da própria biblioteca.",
    "overview": [
-    "A tela Aparência do OPAC (tecla **o**) grava as suas escolhas nas preferências `OpacUserCSS` e `OpacUserJS` do Koha (e em `IntranetUserCSS`/`IntranetUserJS` para a intranet) entre marcadores, para que o seu próprio código fique intacto.",
-    "Ela cobre o material dos blocos (texturas, cantos, cores), as imagens (papel de parede, logotipo, favicon), legibilidade e modo escuro, um Carrossel de Novidades, botões de acesso rápido para o OPAC e para a página inicial da equipe, as cores próprias da intranet, a limpeza de partes que você não usa e botões dentro das notícias.",
-    "Cada aplicação fica salva em `/etc/koha-nexus/theme-settings.json` e é regravada depois de uma restauração do banco."
+    "A tela Aparência do OPAC e STAFF (tecla **o**) grava as suas escolhas nas preferências `OpacUserCSS` e `OpacUserJS` do Koha (e em `IntranetUserCSS`/`IntranetUserJS` para a intranet) entre marcadores, para que o seu próprio código fique intacto.",
+    "Ela cobre o material dos blocos (texturas, cantos, cores), painéis de conteúdo legíveis no modo claro e no escuro, as imagens (papel de parede, logotipo, favicon), legibilidade e modo escuro, um Carrossel de Novidades, botões de acesso rápido para o OPAC e para a página inicial da equipe, as cores próprias da intranet, as instruções de login do OPAC e da intranet, os créditos do rodapé do OPAC, a limpeza de partes que você não usa e botões dentro das notícias.",
+    "Cada aplicação fica salva em `/etc/koha-nexus/theme-settings.json` e é regravada depois de uma restauração do banco.",
+    "Cada aplicação reinicia o Memcached e o Plack, para o Koha mostrar a nova aparência e os textos na hora."
    ],
    "steps": [
-    "Abra **Aparência do OPAC** (tecla **o**). Pressione **Sincronizar configurações atuais do OPAC** para começar pelo que está no ar.",
+    "Abra **Aparência do OPAC e STAFF** (tecla **o**). Pressione **Sincronizar configurações atuais do OPAC** para começar pelo que está no ar.",
     "Ajuste cada caixa: material, imagens, modo escuro, carrossel, botões, interface da equipe.",
     "Pressione **Prévia** para ver o que vai para o Koha.",
     "Pressione **Aplicar**: um backup do banco é feito e a aparência é gravada.",
@@ -820,7 +821,7 @@
     "Mude uma coisa de cada vez e confira o OPAC no celular, além do computador.",
     "Escolha cores com bom contraste: leitores com baixa visão dependem disso."
    ],
-   "_en": "3b8f321e82"
+   "_en": "d2422c6434"
   },
   "opac-material": {
    "title": "Material",
@@ -833,6 +834,10 @@
     {
      "name": "Desfoque e Opacidade",
      "text": "Quanto as texturas de vidro desfocam o que está atrás e quão sólidos são os blocos."
+    },
+    {
+     "name": "Painéis de conteúdo",
+     "text": "Quão sólido é o conteúdo da página (de 80% a 100%, 94% por padrão): a área principal, abas, menus, facetas, trilha de navegação e rodapé, para o texto nunca ficar sobre o papel de parede puro. Textos, rótulos e links desses painéis são conferidos para contraste WCAG AA no modo claro e no escuro."
     },
     {
      "name": "Blocos, Campos, Botões",
@@ -851,7 +856,7 @@
     "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
     "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente."
    ],
-   "_en": "710ff8ebb0"
+   "_en": "47b9b64b30"
   },
   "opac-pictures": {
    "title": "Imagens",
@@ -2077,6 +2082,76 @@
     "Rode Sincronizar e ligar autoridades depois, para vincular os cabeçalhos que ainda não têm autoridade."
    ],
    "_en": "91c24f6979"
+  },
+  "opac-login": {
+   "title": "Página de login do OPAC",
+   "summary": "O seu texto e uma imagem de destaque na página de login do OPAC (`OpacLoginInstructions` do Koha).",
+   "options": [
+    {
+     "name": "Mostrar",
+     "text": "Grava as instruções no Koha (Ferramentas > Personalizações HTML). Desligado, a entrada da própria biblioteca volta."
+    },
+    {
+     "name": "Imagem de login",
+     "text": "Uma imagem acima do texto: um arquivo deste servidor, um serviço de imagens ou um endereço https direto. Ela nunca fica mais larga que a caixa e mantém as proporções no celular."
+    },
+    {
+     "name": "Descrição da imagem",
+     "text": "O que os leitores de tela dizem sobre a imagem."
+    },
+    {
+     "name": "Texto (HTML)",
+     "text": "Parágrafos, negrito, itálico, listas, títulos, links e imagens. Scripts, estilos, frames e manipuladores de eventos (onclick e afins) são retirados antes de salvar."
+    }
+   ],
+   "tips": [
+    "Enquanto as instruções do painel estão ligadas, a entrada da própria biblioteca no mesmo lugar fica expirada, para o Koha não mostrar as duas; Remover a traz de volta."
+   ],
+   "_en": "d0b57b824e"
+  },
+  "opac-staff-login": {
+   "title": "Página de login da equipe",
+   "summary": "O seu texto e um logotipo ou imagem de destaque na página de login da intranet (`StaffLoginInstructions` do Koha).",
+   "options": [
+    {
+     "name": "Mostrar, Imagem de login e Texto (HTML)",
+     "text": "Os mesmos campos da página de login do OPAC. A imagem fica na pasta própria da intranet (`/intranet-tmpl/kei-custom`)."
+    }
+   ],
+   "tips": [
+    "A página de login da equipe muitas vezes é acessível de fora da biblioteca: não escreva ali nada que um visitante não possa ler."
+   ],
+   "_en": "1d2fc1a734"
+  },
+  "opac-credits": {
+   "title": "Créditos do rodapé",
+   "summary": "O rodapé de todas as páginas do OPAC (`opaccredits` do Koha), montado por um formulário: sem HTML para digitar.",
+   "options": [
+    {
+     "name": "Nome da biblioteca, Endereço, Horário de funcionamento, Observação",
+     "text": "Texto simples, uma linha cada."
+    },
+    {
+     "name": "Telefone, WhatsApp, E-mail, Site",
+     "text": "Viram links: o telefone liga, o WhatsApp abre uma conversa (`wa.me`), o e-mail abre uma mensagem."
+    },
+    {
+     "name": "Instagram, Facebook, YouTube",
+     "text": "`@nome` ou o endereço da página no Instagram; o endereço da página nos outros."
+    },
+    {
+     "name": "CNPJ",
+     "text": "Catorze dígitos aparecem como 00.000.000/0000-00."
+    },
+    {
+     "name": "Outros links",
+     "text": "Um por linha: o texto, uma `|` e o endereço (no máximo 6)."
+    }
+   ],
+   "tips": [
+    "Enquanto os créditos estão ligados, as entradas de rodapé da própria biblioteca ficam expiradas, e voltam quando eles são desligados ou a aparência é removida."
+   ],
+   "_en": "bfb3a41f09"
   }
  }
 }

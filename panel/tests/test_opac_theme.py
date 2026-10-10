@@ -257,7 +257,8 @@ def test_blocks_take_the_chosen_colours():
     tint = ot.mix("#ffffff", "#7c3aed", .12)
     assert tint != "#ffffff" and f"--kei-surface-rgb: {ot._rgb(tint)};" in css
     assert "--kei-surface-rgb: 255,255,255;" not in css
-    assert "rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%" in css
+    # The news and home page blocks: the accent wash over the readable inner panel.
+    assert "rgba(var(--kei-accent-rgb), .14) 0%, rgba(var(--kei-accent2-rgb), .10) 100%),\n        var(--kei-panel-2)" in css
     assert f"--kei-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css
     assert ot.mix("#000000", "#ffffff", .5) == "#808080"
 
@@ -452,3 +453,120 @@ def test_copy_opac_preset():
     assert st["favicon"]["url"] == "https://e.org/s.ico"          # nothing to copy: the staff's own kept
     assert (st["font"], st["density"]) == (115, "compact")
     assert cfg["texture"] == "smooth" and cfg["accent"] == "#aa0000"   # the OPAC untouched
+
+
+# ----------------------------------------------------------------------
+# OPAC and Staff Appearance: readable panels, login instructions, credits
+# ----------------------------------------------------------------------
+def test_panels_reach_wcag_aa_in_light_and_dark():
+    for accent in ("#2563eb", "#facc15", "#ffffff", "#000000", "#7c3aed", "#10b981"):
+        for surface in ("#ffffff", "#333844", "#0b0b0b", "#fde68a"):
+            cfg = ot.normalize({"accent": accent, "surface": surface})
+            for dark in (False, True):
+                c = ot.panel_colors(cfg, dark)
+                for bg in (c["panel"], c["inner"]):
+                    assert ot.contrast(c["text"], bg) >= 7, (accent, surface, dark)
+                    for key in ("muted", "link", "ink"):
+                        assert ot.contrast(c[key], bg) >= 4.5, (accent, surface, dark, key)
+    # Light mode reads dark on light even when the block background is dark (the screenshots' case).
+    light = ot.panel_colors(ot.normalize({"surface": "#333844"}), False)
+    assert ot.luminance(light["panel"]) > .8 and light["text"] == "#1a1a1a"
+    dark = ot.panel_colors(ot.normalize({}), True)
+    assert (dark["panel"], dark["inner"], dark["text"]) == ("#161b22", "#0d1117", "#e6edf3")
+
+
+def test_panels_css_covers_koha_panels():
+    css = ot.css_body(ot.normalize({"panel_opacity": 97, "surface": "#333844"}))
+    assert "--kei-panel-a: 0.97;" in css and "--kei-panel-rgb: 22, 27, 34;" in css
+    for sel in ("html body .breadcrumb", "html body .main .tab-content", "html body .main #search-facets",
+                "html body .main #menu li a", "html body .main #usermenu li a", "html body .main #action",
+                "html body .main .nav_results", "html body .main .selections-toolbar", "html body #opaccredits",
+                "html body .main .results_summary", "html body .main .note", "html body .main p.details"):
+        assert sel in css, sel
+    # The main area left the glass blocks: header and search keep the texture, .main is a panel.
+    texture = css[:css.index("Content panels")]
+    assert "html body .main," not in texture and "html body .main, html body #opaccredits {" in css
+    assert "html body .main::before" in css and "backdrop-filter: blur(6px)" in css
+    assert 'html[data-kei-theme="dark"] body .main .alert {' in css
+    assert ot.normalize({"panel_opacity": 10})["panel_opacity"] == 80
+    assert ot.check_block(ot.css_block(ot.normalize({})), ot.CSS_BEGIN, ot.CSS_END) == ""
+
+
+def test_staff_panels_and_dark_surface():
+    light = ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
+    assert "html body #breadcrumbs .breadcrumb {" in light and "html body #login #StaffLoginInstructions" in light
+    assert "A dark block background" not in light
+    dark = ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "surface": "#1e222a"}}))
+    assert "html body table.dataTable tbody tr" in dark and "--nexus-staff-text: #e6edf3" in dark
+
+
+def test_sanitize_html_keeps_an_allow_list():
+    dirty = ('<p onclick="x()">Hi <b>there</b><script>alert(1)</script><a href="javascript:alert(1)">x</a>'
+             '<img src="https://a.b/c.png" onerror="y" width="300"><iframe src=x>t</iframe><style>p{}</style>'
+             '<form><input name=a></form><p style="background:url(x)">s</p><ul><li>a<li>b</ul>'
+             '<a href="https://koha.nexus" target="_blank">k</a><SCRIPT SRC=//x></SCRIPT><!-- c -->&lt;b&gt;')
+    out = ot.sanitize_html(dirty)
+    for bad in ("script", "onclick", "onerror", "javascript", "iframe", "<style", "<form", "<input",
+                "background:url", "<!--"):
+        assert bad not in out.lower(), bad
+    assert '<img src="https://a.b/c.png" width="300" loading="lazy" style="max-width:100%;height:auto">' in out
+    assert '<a href="https://koha.nexus" target="_blank" rel="noopener noreferrer">k</a>' in out
+    assert "<ul><li>a</li><li>b</li></ul>" in out and "&lt;b&gt;" in out
+    assert ot.sanitize_html(out) == out
+    assert ot.sanitize_html("<b>open") == "<b>open</b>" and ot.sanitize_html("  ") == ""
+
+
+def test_login_instructions_markup():
+    cfg = ot.normalize({"login": {"opac": {"enabled": True, "html": "<h2>Welcome</h2><script>x</script>",
+                                           "image": {"source": "url", "url": "https://i.ibb.co/a/b.png"},
+                                           "alt": 'Front "door"'},
+                                  "staff": {"enabled": True, "html": ""}}})
+    html = ot.login_html(cfg["login"]["opac"])
+    assert html.startswith('<div class="kei-login">') and "<h2>Welcome</h2>" in html and "script" not in html
+    assert 'src="https://i.ibb.co/a/b.png" alt="Front &quot;door&quot;"' in html and "max-width:100%" in html
+    assert not ot.login_on(cfg["login"]["staff"])
+    c = ot.contents(cfg)
+    assert c["OpacLoginInstructions"] == html and c["StaffLoginInstructions"] == "" and c["opaccredits"] == ""
+    assert ot.normalize({"login": {"opac": {"image": {"source": "url", "url": "javascript:x"}}}})[
+        "login"]["opac"]["image"]["url"] == ""
+
+
+def test_credits_form_to_markup():
+    raw = {"enabled": True, "name": "Biblioteca <Castro Alves>", "address": "R. Ipiranga, 720",
+           "phone": "+55 (44) 3649-1214", "whatsapp": "+55 44 3649-1214", "email": "a@b.gov.br",
+           "website": "https://biblioteca.org/", "instagram": "@bibliotecamunicipal", "facebook": "javascript:x",
+           "cnpj": "76208487000164", "links": [{"text": "Portal", "url": "https://palotina.pr.gov.br"},
+                                               {"text": "bad", "url": "javascript:alert(1)"}]}
+    cr = ot.normalize({"credits": raw})["credits"]
+    assert cr["cnpj"] == "76.208.487/0001-64" and cr["facebook"] == "" and len(cr["links"]) == 1
+    html = ot.credits_html(cr, {"phone": "Telefone"})
+    assert "<strong>Biblioteca Castro Alves</strong>" in html                # <> taken out
+    assert 'Telefone: <a href="tel:554436491214">+55 (44) 3649-1214</a>' in html
+    assert 'href="https://wa.me/554436491214"' in html and 'href="mailto:a@b.gov.br"' in html
+    assert 'href="https://www.instagram.com/bibliotecamunicipal/"' in html and "CNPJ: 76.208.487/0001-64" in html
+    assert "javascript" not in html and ot.credits_on(cr)
+    assert not ot.credits_on(ot.normalize({"credits": {"enabled": True}})["credits"])
+
+
+def test_contents_stay_out_of_the_public_stylesheet(tmp_path):
+    cfg = ot.normalize({"login": {"staff": {"enabled": True, "html": "<p>Internal extension 123</p>"}},
+                        "credits": {"enabled": True, "name": "Biblioteca"}})
+    line = ot.data_line(cfg)
+    assert "Internal extension" not in line and "credits" not in line
+    back = ot.parse_theme_data(ot.css_block(cfg))
+    assert back["credits"]["name"] == "" and not back["login"]["staff"]["enabled"]
+    extra = ot.parse_contents(json.dumps(ot.contents_settings(cfg)))
+    assert extra["credits"]["name"] == "Biblioteca" and ot.parse_contents("nope") == {}
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        assert (work / "contents.list").read_text() == ("OpacLoginInstructions\toff\nStaffLoginInstructions\ton\n"
+                                                        "opaccredits\ton\n")
+        assert "Internal extension 123" in (work / "contents" / "StaffLoginInstructions.html").read_text()
+        assert not (work / "contents" / "OpacLoginInstructions.html").exists()
+        assert json.loads((work / "contents.json").read_text())["credits"]["name"] == "Biblioteca"
+    finally:
+        shutil.rmtree(work)
+    # sync: the contents settings join the settings read from Koha.
+    found = {"data": ot.data_line(ot.normalize({})), "contents_settings": json.dumps(ot.contents_settings(cfg))}
+    synced, notes = ot.sync_settings(found)
+    assert synced["credits"]["name"] == "Biblioteca" and any("theme-settings.json" in n for n, _ in notes)

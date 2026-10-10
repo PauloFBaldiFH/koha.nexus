@@ -957,12 +957,13 @@
   "sec-opac": {
    "summary": "The look of the public catalogue (OPAC) and of the staff interface, designed on one screen and written into Koha in one click, after a backup, keeping the library's own CSS and JavaScript.",
    "overview": [
-    "The OPAC appearance screen (key **o**) writes your choices into Koha's `OpacUserCSS` and `OpacUserJS` preferences (and `IntranetUserCSS`/`IntranetUserJS` for the staff interface) between markers, so your own code stays untouched.",
-    "It covers the material of the blocks (textures, corners, colours), the pictures (wallpaper, logo, favicon), legibility and dark mode, a New arrivals carousel, quick access buttons for the OPAC and the staff home page, the staff interface's own colours, the clean-up of parts you do not use and buttons inside news items.",
-    "Each apply is saved in `/etc/koha-nexus/theme-settings.json` and written back after a database restore."
+    "The OPAC and Staff Appearance screen (key **o**) writes your choices into Koha's `OpacUserCSS` and `OpacUserJS` preferences (and `IntranetUserCSS`/`IntranetUserJS` for the staff interface) between markers, so your own code stays untouched.",
+    "It covers the material of the blocks (textures, corners, colours), readable content panels in light and dark mode, the pictures (wallpaper, logo, favicon), legibility and dark mode, a New arrivals carousel, quick access buttons for the OPAC and the staff home page, the staff interface's own colours, the login instructions of the OPAC and of the staff interface, the OPAC footer credits, the clean-up of parts you do not use and buttons inside news items.",
+    "Each apply is saved in `/etc/koha-nexus/theme-settings.json` and written back after a database restore.",
+    "Each apply restarts Memcached and Plack, so Koha shows the new look and texts at once."
    ],
    "steps": [
-    "Open **OPAC appearance** (key **o**). Press **Sync current OPAC settings** to start from what is live.",
+    "Open **OPAC and Staff Appearance** (key **o**). Press **Sync current OPAC settings** to start from what is live.",
     "Adjust each box: material, pictures, dark mode, carousel, buttons, staff interface.",
     "Press **Preview** to see what goes into Koha.",
     "Press **Apply**: a database backup is taken and the look is written.",
@@ -978,6 +979,8 @@
     "opac-carousel",
     "opac-links",
     "opac-staff",
+    "opac-login",
+    "opac-credits",
     "opac-actions"
    ]
   },
@@ -992,6 +995,10 @@
     {
      "name": "Blur and Opacity",
      "text": "How much the glass textures blur what is behind them and how solid the blocks are."
+    },
+    {
+     "name": "Content panels",
+     "text": "How solid the page's content is (80% to 100%, 94% by default): the main area, tabs, menus, facets, breadcrumbs and the footer, so text never sits on the bare wallpaper. Text, labels and links on these panels are checked for WCAG AA contrast in light and dark mode."
     },
     {
      "name": "Blocks, Inputs, Buttons",
@@ -2452,6 +2459,87 @@
    ],
    "overview": [
     "Catalogues built over years end up with one author under several headings: 'Assis, Machado de', 'Machado de Assis', 'Assis, M. de', 'Asis, Machado de'. The tool compares the personal names (100) word by word in their direct order, with string distance (Jaro-Winkler and Levenshtein), how the word sounds in Portuguese and Spanish (Souza and Sousa, Luiz and Luís) and initials. Nothing is merged without your confirmation, and the merge is the one Koha's staff interface does."
+   ]
+  },
+  "opac-login": {
+   "title": "OPAC login page",
+   "summary": "Your own text and a banner picture on the OPAC's login page (Koha's `OpacLoginInstructions`).",
+   "options": [
+    {
+     "name": "Show",
+     "text": "Writes the instructions into Koha (Tools > HTML customizations). Turned off, the library's own entry comes back."
+    },
+    {
+     "name": "Login banner",
+     "text": "A picture above the text: a file on this server, an image host or a direct https address. It never gets wider than the box and keeps its proportions on a phone."
+    },
+    {
+     "name": "Picture description",
+     "text": "What screen readers say for the banner."
+    },
+    {
+     "name": "Text (HTML)",
+     "text": "Paragraphs, bold, italics, lists, headings, links and pictures. Scripts, styles, frames and event handlers (onclick and the like) are taken out before anything is saved."
+    }
+   ],
+   "tips": [
+    "While the panel's instructions are on, the library's own entry at the same place is set to expired, so Koha does not show both; Remove brings it back."
+   ],
+   "related": [
+    "opac-staff-login",
+    "opac-credits",
+    "sec-opac"
+   ]
+  },
+  "opac-staff-login": {
+   "title": "Staff login page",
+   "summary": "Your own text and a logo or banner on the staff interface's login page (Koha's `StaffLoginInstructions`).",
+   "options": [
+    {
+     "name": "Show, Login banner and Text (HTML)",
+     "text": "The same fields as the OPAC login page. The banner is kept in the staff interface's own folder (`/intranet-tmpl/kei-custom`)."
+    }
+   ],
+   "tips": [
+    "The staff login page is often reachable from outside the library: write nothing there you would not want a visitor to read."
+   ],
+   "related": [
+    "opac-login",
+    "opac-staff",
+    "sec-opac"
+   ]
+  },
+  "opac-credits": {
+   "title": "Footer credits",
+   "summary": "The footer of every OPAC page (Koha's `opaccredits`), built from a form: no HTML to type.",
+   "options": [
+    {
+     "name": "Library name, Address, Opening hours, Note",
+     "text": "Plain text, one line each."
+    },
+    {
+     "name": "Phone, WhatsApp, E-mail, Website",
+     "text": "Become links: the phone dials, WhatsApp opens a chat (`wa.me`), the e-mail opens a message."
+    },
+    {
+     "name": "Instagram, Facebook, YouTube",
+     "text": "`@name` or the page's address for Instagram; the page's address for the others."
+    },
+    {
+     "name": "CNPJ",
+     "text": "Fourteen digits are shown as 00.000.000/0000-00."
+    },
+    {
+     "name": "Other links",
+     "text": "One per line: the text, a `|` and the address (at most 6)."
+    }
+   ],
+   "tips": [
+    "While the credits are on, the library's own footer entries are set to expired, and come back when they are turned off or the look is removed."
+   ],
+   "related": [
+    "opac-login",
+    "sec-opac"
    ]
   }
  }

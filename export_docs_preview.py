@@ -238,9 +238,10 @@ FEATURES: tuple[Feature, ...] = (
     Feature("z3950-pergamum", "z3950", "data/z3950_targets.json", "Catálogo Rede Pergamum (CRP bridge, SRU)", [
         table(["Server", "Status", "Format", "Address"], "targets:Pergamum"),
     ]),
-    # OPAC appearance
+    # OPAC and Staff Appearance
     Feature("opac-material", "opac", "views/opac.py", "Material", [
         select("Texture", "opac_theme.TEXTURES"), slider("Blur", 12, "px"), slider("Opacity", 82),
+        slider("Content panels", 94),
         slider("Blocks", 14, "px"), slider("Inputs", 10, "px"), slider("Buttons", 10, "px"),
         color("Accent colour", "#2f7d5b"), color("Second colour", "#1e4f86"), color("Block background", "#ffffff"),
         switch("Page colour", False),
@@ -270,6 +271,19 @@ FEATURES: tuple[Feature, ...] = (
         color("Second colour", "#2f7d5b"), slider("Legibility film", 80),
         select("Table density", "opac_theme.STAFF_DENSITY", 1), select("Contrast", "opac_theme.STAFF_CONTRAST"),
         slider("Text size", 100),
+    ]),
+    Feature("opac-login", "opac", "views/opac.py", "OPAC login page", [
+        switch("Show"), select("Login banner", "opac_theme.SOURCES", 1), field_("Picture description", "Library front"),
+        field_("Text (HTML)", "<h2>Don't have a password yet?</h2>"),
+    ]),
+    Feature("opac-staff-login", "opac", "views/opac.py", "Staff login page", [
+        switch("Show"), select("Login banner", "opac_theme.SOURCES", 1),
+        field_("Text (HTML)", "<p>Staff only. Forgot your password? Call the coordinator.</p>"),
+    ]),
+    Feature("opac-credits", "opac", "views/opac.py", "Footer credits", [
+        switch("Show"), field_("Library name", "Biblioteca Pública Municipal"), field_("Address", "Rua ..., Centro"),
+        field_("Phone", "+55 (44) 3649-1214"), field_("E-mail", "biblioteca@..."), field_("Instagram", "@biblioteca"),
+        field_("CNPJ", "00.000.000/0000-00"),
     ]),
     Feature("opac-hide", "opac", "views/opac.py", "Hide", [
         switch("RSS icons"), switch("Cart badge", False), switch("Community links"), switch("Empty table columns"),
