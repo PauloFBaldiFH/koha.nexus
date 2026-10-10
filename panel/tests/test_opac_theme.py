@@ -250,3 +250,13 @@ def test_depth_and_buttons():
     assert "#c9c9c9" in ot.css_body(ot.normalize({"texture": "metal"})) and "#c9c9c9" not in plain
     # The settings line is untouched by the new rules.
     assert ot.parse_theme_data(ot.css_block(ot.normalize({"texture": "metal"})))["texture"] == "metal"
+
+
+def test_blocks_take_the_chosen_colours():
+    css = ot.css_body(ot.normalize({"accent": "#7c3aed", "accent2": "#db2777", "surface": "#ffffff"}))
+    tint = ot.mix("#ffffff", "#7c3aed", .12)
+    assert tint != "#ffffff" and f"--kei-surface-rgb: {ot._rgb(tint)};" in css
+    assert "--kei-surface-rgb: 255,255,255;" not in css
+    assert "rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%" in css
+    assert f"--kei-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css
+    assert ot.mix("#000000", "#ffffff", .5) == "#808080"

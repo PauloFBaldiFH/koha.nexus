@@ -242,6 +242,12 @@ def _rgb(hex_color: str) -> str:
     return ",".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
 
 
+def mix(a: str, b: str, amount: float) -> str:
+    """#rrggbb: a with amount (0-1) of b mixed in."""
+    ca, cb = (tuple(int(h.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)) for h in (a, b))
+    return "#" + "".join(f"{round(x + (y - x) * amount):02x}" for x, y in zip(ca, cb))
+
+
 def luminance(hex_color: str) -> float:
     """Relative luminance (WCAG) of #rrggbb, 0 (black) to 1 (white)."""
     h = hex_color.lstrip("#")
@@ -274,7 +280,8 @@ def _strong(selectors: str) -> str:
 def _texture_css(cfg: dict) -> str:
     t = cfg["texture"]
     surface = "rgba(var(--kei-surface-rgb), var(--kei-surface-a))"
-    base = [f"{_strong(_BLOCKS)} {{", f"    background: {surface} !important;", "    color: var(--kei-text);",
+    wash = "linear-gradient(135deg, rgba(var(--kei-accent-rgb), .10), rgba(var(--kei-accent2-rgb), .10))"
+    base = [f"{_strong(_BLOCKS)} {{", f"    background: {wash}, {surface} !important;", "    color: var(--kei-text);",
             "    border-radius: var(--kei-r-block) !important;", "    border: 1px solid var(--kei-edge) !important;"]
     if t == "frosted":
         base += ["    -webkit-backdrop-filter: blur(var(--kei-blur)) saturate(140%);",
@@ -285,26 +292,27 @@ def _texture_css(cfg: dict) -> str:
     elif t == "metal":
         base[1] = (f"    background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
                    "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px), "
-                   f"{surface} !important;")
+                   f"{wash}, {surface} !important;")
         base += ["    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
                  "0 2px 8px rgba(0, 0, 0, .14);"]
     elif t == "flat":
-        base[1] = "    background: rgb(var(--kei-surface-rgb)) !important;"
+        base[1] = f"    background: {wash}, rgb(var(--kei-surface-rgb)) !important;"
     elif t == "gradient":
         base[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
                    "rgba(var(--kei-accent-rgb), .10) 55%, rgba(var(--kei-accent2-rgb), .14) 100%) !important;")
     base.append("}")
     base.append(f"""{_strong(_CONTENT)} {{
-    background: rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
+    background: linear-gradient(135deg, rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%),
+        rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5)) !important;
     color: var(--kei-text) !important;
-    border: 1px solid var(--kei-edge) !important;
+    border: 1px solid rgba(var(--kei-accent-rgb), .35) !important;
     border-left: 4px solid var(--nexus-primary) !important;
     border-radius: calc(var(--kei-r-block) * .7) !important;
     padding: .9rem 1.1rem;
     margin-bottom: 1rem;
 }}
 html body .main h1, html body .main h2, html body .main h3, html body .main h4, html body .main legend,
-html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-text); }}
+html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-ink); }}
 html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei-muted) !important; }}""")
     return "\n".join(base)
 
@@ -312,9 +320,13 @@ html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei
 def css_body(cfg: dict) -> str:
     cfg = normalize(cfg)
     car, ghost = cfg["carousel"], cfg["ghost"]
-    dark_surface = luminance(cfg["surface"]) < 0.30
+    # The blocks take the chosen colours: the surface tinted with the accent
+    # (the blocks then add a wash of both accents), headings in the accent.
+    tint = mix(cfg["surface"], cfg["accent"], .12)
+    dark_surface = luminance(tint) < 0.30
     text, muted, edge = (("#f1f5f9", "#cbd5e1", "rgba(255, 255, 255, .14)") if dark_surface
-                         else ("#1f2933", "#52606d", "rgba(15, 23, 42, .10)"))
+                         else ("#1f2933", "#52606d", f"rgba({_rgb(cfg['accent'])}, .22)"))
+    ink = mix(cfg["accent"], "#ffffff", .45) if dark_surface else mix(cfg["accent"], "#000000", .30)
     out = [f""":root {{
     --nexus-primary: {cfg['accent']};
     --nexus-secondary: {cfg['accent2']};
@@ -324,10 +336,11 @@ def css_body(cfg: dict) -> str:
     --kei-accent: {cfg['accent']};
     --kei-accent-rgb: {_rgb(cfg['accent'])};
     --kei-accent2-rgb: {_rgb(cfg['accent2'])};
-    --kei-surface-rgb: {_rgb(cfg['surface'])};
+    --kei-surface-rgb: {_rgb(tint)};
     --kei-surface-a: {cfg['opacity'] / 100:.2f};
     --kei-text: {text};
     --kei-muted: {muted};
+    --kei-ink: {ink};
     --kei-edge: {edge};
     --kei-blur: {cfg['blur']}px;
     --kei-r-block: {cfg['radius_block']}px;
@@ -336,7 +349,8 @@ def css_body(cfg: dict) -> str:
     --kei-film: {cfg['film'] / 100:.2f};
 }}
 html[data-kei-theme="dark"] {{
-    --kei-surface-rgb: 22, 27, 34;
+    --kei-surface-rgb: {_rgb(mix("#161b22", cfg["accent"], .14))};
+    --kei-ink: {mix(cfg["accent"], "#ffffff", .45)};
     --kei-text: #e6edf3;
     --kei-muted: #9da7b3;
     --kei-edge: rgba(255, 255, 255, .10);

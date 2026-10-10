@@ -275,7 +275,10 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   button kind: main ones (.btn-primary, #searchsubmit, bare submit inputs) in the accent,
   secondary ones (.btn-default/.btn-secondary/#backtotop...) on the surface; with the metal
   texture they take his brushed/silver gradients. Buttons inside news and #opacmainuserblock
-  are full-width, 44px+ touch targets. No new settings: KEI-THEME-DATA unchanged. His
+  are full-width, 44px+ touch targets. Paulo then reported the blocks stayed white whatever
+  accent he chose: the surface is now tinted 12% with the accent (`mix`), every block gets a
+  wash of both accents (content blocks .22/.16, with an accent border) and headings use
+  `--kei-ink` (the accent, darkened or lightened). No new settings: KEI-THEME-DATA unchanged. His
   site-specific bits (image URLs, link hiding, mobile results layout) were not made defaults.
 
 ---
