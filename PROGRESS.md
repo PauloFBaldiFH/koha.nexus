@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.46** (1.5.47: Find duplicate authors PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.47** (1.5.48: staff authority links PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.48 (staff authority links)**: the magnifying glass next to a heading on the staff record
+  page opened `opac-authoritiesdetail.pl` (404 on the staff port). Koha's staff stylesheet
+  (25.05 to 26.05) links to `authorities/detail.pl`; only the OPAC one makes that link, so the staff
+  page was being drawn by an OPAC stylesheet. `staff_authlinks_fix` (after install, Koha update,
+  restore, and at the start of Sync & link authorities): any of `XSLTDetailsDisplay`,
+  `XSLTResultsDisplay`, `XSLTListsDisplay` whose file (or a file it imports) links to the OPAC page
+  goes back to `default` (the catalogue card files are written again instead when the preference is
+  the card's), then a jQuery rewrite is appended to `IntranetUserJS` when the text there does not
+  mention `opac-authoritiesdetail.pl` yet, written through `C4::Context->set_preference` by
+  `koha-shell -c "perl -"` (script from a quoted heredoc), then memcached and Plack restart, only
+  when something changed. Log: `tools/staff-authority-links-*.log`. Not run on a live Koha.
 - **1.5.47 (Find duplicate authors, Library tools > 18, panel action `authority-match`)**: the
   personal names of the authority file (100 $a/$q/$d) are compared by the Magic Import engine,
   new module `kei_import/authorities.py` (`kei_import_run.py authorities --in TSV|MARCXML --work DIR

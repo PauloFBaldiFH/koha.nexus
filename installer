@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.47"
+PANEL_VERSION=" 1.5.48"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -5484,6 +5484,7 @@ function_install_koha() {
 
     tui_step 7 "$steps" "🌐" "$(t "Services")"
     tui_run "$(t "Restarting Koha services")" ensure_koha_services
+    tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
     tui_run "$(t "Cleaning temporary files")" install_task_cleanup
     restore_apt_timers
     tui_run "$(t "Checking that everything works")" install_task_check
@@ -6016,6 +6017,7 @@ _function_restore_database() {
     fi
 
     tui_run "$(t "Restarting Koha services")" resume_koha_services
+    tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
     unshield_signals
     maintenance_end
     backup_lock_release
@@ -9134,6 +9136,7 @@ function_update_system() {
             esac
             return 1
         fi
+        tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
     fi
     tui_run "$(t "Cleaning temporary files")" install_task_cleanup 14
     restore_apt_timers
@@ -10294,6 +10297,8 @@ lt_authority_sync() {
         msg_info "$title" "$(t "The catalog has no authority records yet: there is nothing to link the headings to. Import the authorities first (Magic Import Tool or Koha's staged import).")" 11 74
         return 0
     fi
+    # The staff record page must open the linked authorities (staff_authlinks_fix).
+    staff_authlinks_fix
     scope=$(ui_menu "$title" "$(t "Which records should be linked to the authorities?")" \
         "all"    "$(t "The whole catalog")" \
         "range"  "$(t "A range of record numbers (biblionumber)")" \
@@ -12824,6 +12829,160 @@ _lt_br_ficha_off() {
     case "$FICHA_DIR" in /var/lib/koha/*/kei-xslt) rm -rf "$FICHA_DIR" ;; esac
     log "tools: catalogue card disabled"
     msg_ok "$(t "✅ Koha's default detail view is back.")" 8 64
+}
+
+# ----------------------------------------------------------------------
+# Staff authority links: the magnifying glass next to a heading on the
+# staff record page (catalogue/detail.pl) must open authorities/detail.pl.
+# Koha's staff stylesheet (MARC21slim2intranetDetail.xsl, 25.05 to 26.05)
+# already links there; only the OPAC stylesheet links to
+# opac-authoritiesdetail.pl, a page the staff site does not serve (404 on
+# the staff port). So the staff interface shows that link only when one of
+# its XSLT preferences points to an OPAC stylesheet. staff_authlinks_fix:
+#   1. a staff XSLT preference whose stylesheet (or a file it imports)
+#      links to opac-authoritiesdetail.pl goes back to Koha's staff view
+#      ("default"); when it is the panel's catalogue card, the card files
+#      are written again from the staff stylesheet instead;
+#   2. a safety net is appended to IntranetUserJS, only when no text there
+#      mentions opac-authoritiesdetail.pl yet, the rest kept as it is;
+#      written by Koha itself (C4::Context->set_preference via koha-shell,
+#      the script read from a quoted heredoc), never through SQL;
+#   3. memcached and Plack are restarted when anything changed.
+# Run after an install or a Koha update, after a restore and before Sync &
+# link authorities. Running it again changes nothing.
+# ----------------------------------------------------------------------
+STAFF_AUTHLINK_PREFS="XSLTDetailsDisplay XSLTResultsDisplay XSLTListsDisplay"
+
+# staff_xsl_files VALUE: the stylesheet files a preference value names
+# ({langcode} matched against every language folder); none for Koha's own.
+staff_xsl_files() {
+    local v="$1" t pre suf f
+    t=$(printf '%s' "$v" | tr -d ' "' | tr '[:upper:]' '[:lower:]')
+    [ -z "$t" ] || [ "$t" = "default" ] && return 0
+    if [[ "$v" == *"{langcode}"* ]]; then
+        pre="${v%%\{langcode\}*}"; suf="${v#*\{langcode\}}"
+        for f in "$pre"*"$suf"; do [ -f "$f" ] && printf '%s\n' "$f"; done
+    elif [ -f "$v" ]; then
+        printf '%s\n' "$v"
+    fi
+}
+
+# staff_xsl_links_opac FILE: true when FILE, or a stylesheet it imports or
+# includes, links to the OPAC authority page.
+staff_xsl_links_opac() {
+    local f="$1" h
+    grep -q 'opac-authoritiesdetail\.pl' "$f" 2>/dev/null && return 0
+    while IFS= read -r h; do
+        [ -n "$h" ] || continue
+        [[ "$h" == /* ]] || h="$(dirname "$f")/$h"
+        grep -q 'opac-authoritiesdetail\.pl' "$h" 2>/dev/null && return 0
+    done < <(grep -oE '<xsl:(import|include)[^>]*href="[^"]+"' "$f" 2>/dev/null | sed -E 's/.*href="([^"]+)".*/\1/')
+    return 1
+}
+
+# staff_xsl_pref_bad VALUE: true when a file VALUE names links to the OPAC.
+staff_xsl_pref_bad() {
+    local f
+    while IFS= read -r f; do
+        [ -n "$f" ] && staff_xsl_links_opac "$f" && return 0
+    done < <(staff_xsl_files "$1")
+    return 1
+}
+
+# staff_xslt_repair LOG: step 1. Returns 0 when a preference or file changed.
+staff_xslt_repair() {
+    local log="$1" pref v changed=1
+    for pref in $STAFF_AUTHLINK_PREFS; do
+        v=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = '${pref}';")
+        staff_xsl_pref_bad "$v" || continue
+        printf '%s = %s: its stylesheet links to opac-authoritiesdetail.pl (the OPAC page)\n' "$pref" "$v" >> "$log"
+        if [ "$pref" = "XSLTDetailsDisplay" ] && [ "$v" = "$FICHA_DIR/{langcode}/staff-detail.xsl" ] \
+            && ficha_write >/dev/null && ! staff_xsl_pref_bad "$v"; then
+            printf '%s: the catalogue card files were written again from the staff stylesheet\n' "$pref" >> "$log"
+            log "staff authority links: catalogue card stylesheets written again"
+            changed=0
+            continue
+        fi
+        koha_tool "$log" koha-preferences set "$pref" default
+        if [ "$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = '${pref}';")" = "default" ]; then
+            log "staff authority links: $pref was '$v', set back to default"
+            changed=0
+        else
+            log "staff authority links: $pref could not be set back to default"
+        fi
+    done
+    return "$changed"
+}
+
+# The Perl run by koha-shell for step 2: reads IntranetUserJS through Koha,
+# appends the rewrite only when opac-authoritiesdetail.pl is not there yet,
+# and saves it with set_preference (no SQL, nothing passed through a shell).
+staff_authlinks_perl() {
+    cat <<'PERL'
+use Modern::Perl;
+use Koha::Script;
+use C4::Context;
+
+my $current = C4::Context->preference('IntranetUserJS') // q{};
+if ( index( $current, 'opac-authoritiesdetail.pl' ) >= 0 ) {
+    print "IntranetUserJS already mentions opac-authoritiesdetail.pl: nothing added\n";
+    exit 0;
+}
+my $js = <<'JS';
+/* koha.nexus: staff authority links (opac-authoritiesdetail.pl -> authorities/detail.pl) */
+$(document).ready(function() {
+    $("a[href*='opac-authoritiesdetail.pl']").each(function() {
+        var h = $(this).attr("href");
+        if (h) {
+            $(this).attr("href", h.replace("opac-authoritiesdetail.pl", "authorities/detail.pl"));
+        }
+    });
+});
+/* koha.nexus: end of staff authority links */
+JS
+my $new = $current eq q{} ? $js : $current =~ /\n\z/ ? "$current\n$js" : "$current\n\n$js";
+C4::Context->set_preference( 'IntranetUserJS', $new );
+print "IntranetUserJS: staff authority link rewrite appended\n";
+PERL
+}
+
+# staff_authlinks_has_js: true when IntranetUserJS mentions the OPAC page.
+staff_authlinks_has_js() {
+    [ "$(run_sql "SELECT INSTR(value, 'opac-authoritiesdetail.pl') > 0 FROM ${DB_NAME}.systempreferences WHERE variable = 'IntranetUserJS';")" = "1" ]
+}
+
+# staff_authlinks_js LOG: step 2. Returns 0 when the script was appended.
+staff_authlinks_js() {
+    local log="$1"
+    staff_authlinks_has_js && return 1
+    printf '$ koha-shell %s -c "perl -" (IntranetUserJS: staff authority links)\n' "$INSTANCE" >> "$log"
+    ( cd /tmp || exit 1
+      staff_authlinks_perl | koha_ctl /usr/sbin/koha-shell "$INSTANCE" -c "perl -" ) >> "$log" 2>&1
+    if staff_authlinks_has_js; then
+        log "staff authority links: rewrite appended to IntranetUserJS"
+        return 0
+    fi
+    log "staff authority links: the rewrite could not be added to IntranetUserJS (log: $log)"
+    return 1
+}
+
+# staff_authlinks_fix: steps 1 to 3. Quiet and best effort: it never stops
+# the install, update, restore or tool that runs it.
+staff_authlinks_fix() {
+    is_database_ready || return 0
+    [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.systempreferences WHERE variable = 'IntranetUserJS';")" = "1" ] || return 0
+    local log changed=1
+    log=$(tools_log staff-authority-links) || return 0
+    staff_xslt_repair "$log" && changed=0
+    staff_authlinks_js "$log" && changed=0
+    if [ "$changed" -eq 0 ]; then
+        printf '$ systemctl restart memcached; koha-plack --restart %s\n' "$INSTANCE" >> "$log"
+        systemctl restart memcached >/dev/null 2>&1 || koha_ctl service memcached restart >/dev/null 2>&1 || true
+        plack_restart || true
+    else
+        rm -f "$log"
+    fi
+    return 0
 }
 
 # ----------------------------------------------------------------------
