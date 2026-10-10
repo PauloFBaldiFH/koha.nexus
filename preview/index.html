@@ -7,6 +7,11 @@
   <meta name="description" content="koha.nexus interactive preview and manual: every screen, option and button of the control panel, explained step by step.">
   <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
   <title>koha.nexus Panel Manual</title>
+  <script>
+    // Every path below is relative to this folder: a host that serves
+    // /preview without the trailing slash would look for them at the site root.
+    (function (l) { if (!/(\/|\.html?)$/.test(l.pathname)) l.replace(l.pathname + "/" + l.search + l.hash); })(location);
+  </script>
   <link rel="stylesheet" href="assets/preview.css">
 </head>
 <body>
@@ -14,8 +19,9 @@
     Interactive preview and manual of the koha.nexus panel.
     Data: data/preview.json, written by export_docs_preview.py from the panel's
     code and preview/manual/<language>.json. No build step: serve this folder
-    as it is. data-src and data-asset-base can point elsewhere when the page is
-    copied into another site.
+    as it is. data-src and data-asset-base are resolved from this folder (the
+    one holding assets/), whatever the page's own URL; they can be absolute
+    URLs when the page is copied into another site.
   -->
   <div id="kp-app" class="kp" data-src="data/preview.json" data-asset-base="../">
     <header class="kp-top">

@@ -17,8 +17,11 @@
   "use strict";
 
   var root = document.getElementById("kp-app");
-  var SRC = root.getAttribute("data-src") || "data/preview.json";
-  var ASSET_BASE = root.getAttribute("data-asset-base") || "";
+  // Paths are taken from the preview folder (the parent of assets/), not from
+  // the page's URL, so /preview, /preview/ and /preview/index.html all work.
+  var HERE = new URL("../", (document.currentScript && document.currentScript.src) || location.href);
+  var SRC = new URL(root.getAttribute("data-src") || "data/preview.json", HERE).href;
+  var ASSET_BASE = new URL(root.getAttribute("data-asset-base") || "../", HERE).href;
   var STORE_KEY = "koha_lang";
 
   // English defaults of the page's own texts; preview/manual/<lang>.json "ui" overrides them.
