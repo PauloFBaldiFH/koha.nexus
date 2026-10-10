@@ -49,7 +49,50 @@ class KohaPanelApp(App):
         # Textual shows the traceback on the terminal after it exits; config.sh
         # then covers it with the classic panel, so it is kept in the log too.
         log_error("".join(traceback.format_exception(type(error), error, error.__traceback__)))
+        if self._recover(error):
+            return
         super()._handle_exception(error)
+
+    _recovered = 0
+
+    def _recover(self, error: Exception) -> bool:
+        """An error in a dialog (a file picker, a question, the loader) closes
+        that dialog with an error box instead of the whole panel: the
+        routine waiting on it gets "cancelled" and says nothing was changed.
+        Errors on the main screen, at start-up or over and over still end
+        the app (a broken main screen cannot be left running)."""
+        from textual._context import active_message_pump
+        from textual.screen import ModalScreen
+
+        if self._recovered >= 5 or not self.is_running:
+            return False
+        try:
+            pump = active_message_pump.get()
+        except LookupError:
+            return False
+        screen = pump if isinstance(pump, ModalScreen) else None
+        if screen is None:
+            try:
+                screen = pump.screen  # a widget of a dialog
+            except Exception:  # noqa: BLE001 - not on a screen
+                return False
+        if not isinstance(screen, ModalScreen) or screen is not self.screen:
+            return False
+        self._recovered += 1
+
+        def close() -> None:
+            from .screens.dialogs import MessageScreen
+            try:
+                if self.screen is screen:
+                    screen.dismiss(None)
+            except Exception:  # noqa: BLE001 - already gone
+                pass
+            self.push_screen(MessageScreen(
+                t("Error"), t("Something went wrong on this screen, so it was closed. Nothing was changed.\\n\\n"
+                              "${error}\\n\\nDetails: /var/log/koha-easy-install/new-panel.log",
+                              error=f"{type(error).__name__}: {error}").replace("\\n", "\n"), kind="error"))
+        self.call_later(close)
+        return True
 
     def copy_to_clipboard(self, text: str, quiet: bool = False) -> None:
         # Every copy ends here: Ctrl+C on text selected with the mouse, the

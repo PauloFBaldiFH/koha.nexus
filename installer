@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.35"
+PANEL_VERSION=" 1.5.36"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2787,7 +2787,7 @@ picker_start_dir() {
 
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
-    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
+    local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump tar tar.gz tgz zip}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
     [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
@@ -5527,11 +5527,11 @@ restore_failed() {
     maintenance_end
     backup_lock_release
     case "$outcome" in
-        intact)      msg_error "" "$(t 'Could not recreate the database.\n\n${details}')" 14 80 ;;
-        kept)        msg_error "" "$(t "Schema migration failed. The imported database was preserved for diagnosis.")" 11 78 ;;
-        empty)       msg_error "" "$(t 'The backup could not be imported. Nothing was changed in the current catalog.\n\nLast error lines:\n${details}')" 18 80 ;;
-        rolled-back) msg_error "" "$(t 'The import failed. The previous catalog was restored from the safety backup.\n\nLast error lines:\n${details}')" 18 80 ;;
-        *)           msg_error "" "$(t 'The import failed and the safety backup could not be restored automatically.\nRestore it with option 3: ${rescue}\n\nLast error lines:\n${details}')" 18 80 ;;
+        intact)      msg_error "$(t "SQL restore error")" "$(t 'Could not recreate the database.\n\n${details}')" 14 80 ;;
+        kept)        msg_error "$(t "SQL restore error")" "$(t "Schema migration failed. The imported database was preserved for diagnosis.")" 11 78 ;;
+        empty)       msg_error "$(t "SQL restore error")" "$(t 'The backup could not be imported. Nothing was changed in the current catalog.\n\nLast error lines:\n${details}')" 18 80 ;;
+        rolled-back) msg_error "$(t "SQL restore error")" "$(t 'The import failed. The previous catalog was restored from the safety backup.\n\nLast error lines:\n${details}')" 18 80 ;;
+        *)           msg_error "$(t "SQL restore error")" "$(t 'The import failed and the safety backup could not be restored automatically.\nRestore it with option 3: ${rescue}\n\nLast error lines:\n${details}')" 18 80 ;;
     esac
 }
 
@@ -5618,7 +5618,70 @@ restore_preflight() {
     return 0
 }
 
+# restore_unpack FILE: a tar (.tar, .tar.gz, .tgz...) or zip holding a
+# backup is unpacked in a folder of its own under /var/tmp (paths kept
+# inside it: GNU tar drops a leading / and refuses ".."), and the MariaDB/
+# MySQL dump in it goes to RESTORE_UNPACK_FILE (the largest, when there
+# are several). RESTORE_UNPACK_DIR is that folder, removed by
+# function_restore_database. Not called in $(...): both are globals.
+# 1 with RESTORE_UNPACK_ERROR set when there is no usable dump inside.
+RESTORE_UNPACK_DIR=""
+RESTORE_UNPACK_FILE=""
+RESTORE_UNPACK_ERROR=""
+restore_unpack() {
+    local file="$1" kind="$2" dir need free f k best="" best_size=0 size pg=""
+    RESTORE_UNPACK_ERROR=""; RESTORE_UNPACK_FILE=""
+    need=$(( $(stat -c %s -- "$file" 2>/dev/null || echo 0) * 6 / 1048576 + 64 ))
+    free=$(get_free_space_mb /var/tmp)
+    if [ "${free:-0}" -lt "$need" ] 2>/dev/null; then
+        RESTORE_UNPACK_ERROR="$(t 'Not enough free space in /var/tmp to unpack the archive: about ${need} MB are needed and ${free} MB are free.\nNothing was changed.')"
+        return 1
+    fi
+    dir=$(mktemp -d /var/tmp/kei-unpack.XXXXXX) || return 1
+    chmod 700 "$dir"
+    RESTORE_UNPACK_DIR="$dir"
+    if [ "$kind" = "zip" ]; then
+        command -v unzip >/dev/null 2>&1 && unzip -qq -o -- "$file" -d "$dir" >/dev/null 2>&1
+    else
+        dump_cat "$file" 2>/dev/null | tar -x -f - -C "$dir" --no-same-owner --no-same-permissions 2>/dev/null
+    fi
+    if [ -z "$(find "$dir" -type f -print -quit 2>/dev/null)" ]; then
+        RESTORE_UNPACK_ERROR="$(t "The archive is damaged or incomplete: its list of files cannot be read.\nNothing was changed.")"
+        return 1
+    fi
+    while IFS= read -r -d '' f; do
+        k=$(dump_kind "$f")
+        case "$k" in
+            mysql)
+                size=$(stat -c %s -- "$f" 2>/dev/null || echo 0)
+                if [ "$size" -gt "$best_size" ]; then best="$f"; best_size=$size; fi ;;
+            pg_*) pg=1 ;;
+        esac
+    done < <(find "$dir" -type f ! -name 'toc.dat' -print0 2>/dev/null)
+    if [ -z "$best" ]; then
+        if [ -n "$pg" ] || [ -n "$(find "$dir" -type f -name 'toc.dat' -print -quit)" ]; then
+            RESTORE_UNPACK_ERROR=$(dump_kind_error pg_tar)
+        else
+            RESTORE_UNPACK_ERROR="$(t "The archive has no MariaDB/MySQL backup (.sql) inside.\nNothing was changed.")"
+        fi
+        return 1
+    fi
+    log "restore: ${file} unpacked, using ${best#"$dir"/}"
+    RESTORE_UNPACK_FILE="$best"
+}
+
+# function_restore_database [FILE]: the restore, then the folder an archive
+# was unpacked into goes, however it ended.
 function_restore_database() {
+    local rc=0
+    RESTORE_UNPACK_DIR=""
+    _function_restore_database "$@" || rc=$?
+    [ -n "$RESTORE_UNPACK_DIR" ] && rm -rf -- "$RESTORE_UNPACK_DIR"
+    RESTORE_UNPACK_DIR=""
+    return "$rc"
+}
+
+_function_restore_database() {
     require_koha || return 0
     require_db_admin || return 0
 
@@ -5628,12 +5691,24 @@ function_restore_database() {
         file=$(select_file "$REAL_HOME") || return 0
     fi
     [ -z "$file" ] && return 0
+    file=$(clean_path "$file")
 
     # 1-2) The file (readable, intact, SQL inside, complete) and the room
-    #      for the restore: see restore_preflight.
+    #      for the restore: see restore_preflight. Its kind is read from
+    #      the content: an archive is unpacked first.
     display_explanation "Checking the backup file..."
+    local kind
+    kind=$(dump_kind "$file" 2>/dev/null)
+    if [ "$kind" = "tar" ] || [ "$kind" = "zip" ]; then
+        display_explanation "Unpacking the archive..."
+        if ! restore_unpack "$file" "$kind"; then
+            msg_error "$(t "Incompatible file format")" "$RESTORE_UNPACK_ERROR" 12 78
+            return 1
+        fi
+        file="$RESTORE_UNPACK_FILE"
+    fi
     if ! restore_preflight "$file"; then
-        msg_error "" "$RESTORE_PREFLIGHT_ERROR" 13 76
+        msg_error "$(t "Incompatible file format")" "$RESTORE_PREFLIGHT_ERROR" 13 76
         return 0
     fi
     if [ "$DUMP_HAS_SQL" != "yes" ]; then
@@ -5668,7 +5743,7 @@ function_restore_database() {
     if ! tui_run "$(t "Testing the backup in a temporary database")" restore_task_trial "$file" "$import_log"; then
         restore_release
         details=$(grep -v "^=====" "$import_log" | tail -n 6 | cut -c1-76)
-        msg_error "" "$(t 'The backup could not be imported. Nothing was changed in the current catalog.\n\nLast error lines:\n${details}')" 18 80
+        msg_error "$(t "SQL restore error")" "$(t 'The backup could not be imported. Nothing was changed in the current catalog.\n\nLast error lines:\n${details}')" 18 80
         return 1
     fi
     tables=$(run_sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${RESTORE_TRIAL_DB}';")
@@ -22854,12 +22929,17 @@ magic_is_koha_dump() {
     local head
     head=$(dump_cat "$1" 2>/dev/null | head -c 4096 | tr -d '\0')
     [[ "$head" == *"-- MySQL dump"* || "$head" == *"-- MariaDB dump"* ]] || return 1
+    # awk stops at the fourth table: zcat then dies of SIGPIPE, and with
+    # pipefail that made every compressed Koha backup "not a Koha backup"
+    # (it then went through the import engine, copied twice). Only awk's
+    # answer counts.
+    ( set +o pipefail
     dump_cat "$1" 2>/dev/null | LC_ALL=C awk '
         /^CREATE TABLE `(biblio|biblio_metadata|items|borrowers|systempreferences|marc_subfield_structure)`/ {
             if (!($3 in seen)) { seen[$3] = 1; n++ }
             if (n >= 4) { found = 1; exit }
         }
-        END { exit !found }'
+        END { exit !found }' )
 }
 
 # magic_to_restore SHOWN: asks before a Koha backup goes to Restore database.
@@ -28097,7 +28177,7 @@ kei_task_ui() {
         printf '%s' "$REPLY"
     }
     select_file() {
-        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump}"
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump tar tar.gz tgz zip}"
     }
     select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
     # A file to change by hand (the classic panel opens nano):

@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.34** (1.5.35: a real description under every card)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.35** (1.5.36: Magic Import restore fixes PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -255,6 +255,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   maps each action to an English key (like the labels), with the PT-BR text added by hand to
   `lang/pt.cache`; the other languages show the English text until gen_lang.py runs where Google
   Translate can be reached. tests/test_menus.py checks every entry has one with a PT-BR text.
+
+- **1.5.36 (Magic Import restore)**: Paulo still saw the panel close before the restore of
+  "BKP_BIBLIOTECA (2).backup". Found: `magic_is_koha_dump` always failed on a compressed backup
+  (awk exits early, zcat dies of SIGPIPE, pipefail), so every real Koha backup went through the
+  import engine and was copied twice before Restore database; it now runs without pipefail.
+  The panel no longer exits on an error in a dialog: `KohaPanelApp._recover` closes that dialog
+  (the routine gets "cancelled") and shows the error, with the traceback in
+  `/var/log/koha-easy-install/new-panel.log`; errors on the main screen still end the app.
+  Restore database unpacks a .tar/.tar.gz/.tgz/.zip in /var/tmp/kei-unpack.* (`restore_unpack`,
+  the largest MariaDB dump inside; a pg_dump tar is refused) and its errors are titled
+  "Incompatible file format" / "SQL restore error". Tested end to end here: the real panel and
+  installer, mock Koha, a gzip and a tar.gz named "BKP_BIBLIOTECA (2).backup".
 
 ---
 
