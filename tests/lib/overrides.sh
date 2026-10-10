@@ -34,7 +34,8 @@ select_file()      { printf '%s' "${KEI_SELECT_FILE:-}"; [ -n "${KEI_SELECT_FILE
 
 # Menus and input boxes of the library tools: answers from $KEI_S/inputs,
 # one per line. With an empty queue a menu takes its first tag and an input
-# box its default value; "CANCEL" cancels the dialog. Text boxes are
+# box its default value; "CANCEL" cancels the dialog. Menu texts go to
+# $KEI_S/menus.log. Text boxes are
 # recorded (the last one shown is kept in $KEI_S/textbox.last).
 _kei_next_input() {
     local ans=""
@@ -46,6 +47,7 @@ _kei_next_input() {
 }
 ui_menu() {
     local title="$1" ans
+    printf '[%s] %s\n' "$1" "$2" >> "$KEI_S/menus.log"
     shift 2
     ans=$(_kei_next_input); [ -n "$ans" ] || ans="${1:-}"
     _kei_dialog "MENU [$title] => $ans"

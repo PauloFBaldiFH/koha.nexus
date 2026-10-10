@@ -2012,14 +2012,17 @@
    ]
   },
   "authority-sync": {
-   "summary": "Links the catalogue's headings (authors, subjects, series) to their authority records with Koha's link_bibs_to_authorities.pl, after a dry run that shows the counts and unmatched headings.",
+   "summary": "Links the catalogue's headings (authors, subjects, series) to their authority records with Koha's link_bibs_to_authorities.pl, as a simulation that writes nothing or as a permanent run, with the matching algorithm of your choice.",
    "steps": [
     "Choose the scope: the whole catalogue, a range of record numbers or the records of one library.",
-    "Read the dry run: headings linked and headings no authority matches.",
-    "Confirm: a verified backup, the real run and the index update follow."
+    "Choose the matching: Default (exact, safe: a heading is linked only when a single authority matches) or Fuzzy (when several authorities match, the first or the last is taken).",
+    "Choose Simulation / preview to see what would change without writing anything, or Apply the changes permanently.",
+    "After a simulation you can apply the same run at once. Applying makes a verified backup first and rebuilds the search index in the background afterwards."
    ],
    "tips": [
-    "Import the authorities first (Magic Import Tool). Koha's LinkerModule and AutoCreateAuthorities preferences decide how headings are matched.",
+    "Import the authorities first (Magic Import Tool). AutoCreateAuthorities and Koha's other linker preferences still apply; the matching chosen here is used for that run only and Koha's saved LinkerModule preference is not changed.",
+    "With Fuzzy matching, always run the simulation first and read the headings listed as fuzzily linked.",
+    "Record warnings (\"Error while searching for authorities for biblionumber N\") go to the tool's log; the report with the counts is a separate file next to it.",
     "Schedule it daily or weekly in Schedules & cron tasks."
    ],
    "related": [
@@ -2028,7 +2031,7 @@
     "reports"
    ],
    "overview": [
-    "Authority records keep one standard form of each name, subject and series. Linking writes the authority number (`$9`) into the catalogue's headings (100, 110, 600, 650, 700...), so a change in the authority reaches every record and searches by author or subject group variant spellings together. The routine uses Koha's own `link_bibs_to_authorities.pl`: first its dry run, with the counts and the headings no authority matches, then the real run and the index update."
+    "Authority records keep one standard form of each name, subject and series. Linking writes the authority number (`$9`) into the catalogue's headings (100, 110, 600, 650, 700...), so a change in the authority reaches every record and searches by author or subject group variant spellings together. The routine uses Koha's own `link_bibs_to_authorities.pl`: the simulation runs it with `--test` and counts the records that would change, the permanent run saves the links and reports the records updated."
    ]
   },
   "patron-category": {
