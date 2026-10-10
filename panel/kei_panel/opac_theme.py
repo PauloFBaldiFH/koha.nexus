@@ -97,9 +97,11 @@ DEFAULTS: dict = {
     # Quick access buttons at the top of the home page (link-tree style):
     # [{"icon": "📖", "text": "...", "url": "https://...", "target": "_blank"}]
     "links": {"enabled": False, "style": "glass", "items": []},
-    # The staff interface (IntranetUserCSS): the same colours, its own type,
-    # contrast and table density.
-    "staff": {"enabled": False, "density": "normal", "contrast": "normal", "font": 100},
+    # The staff interface (IntranetUserCSS): its own palette, type, contrast
+    # and table density, nothing shared with the OPAC. Settings saved before
+    # it had colours start from the OPAC's (normalize()).
+    "staff": {"enabled": False, "accent": "#2563eb", "accent2": "#7c3aed", "surface": "#ffffff",
+              "density": "normal", "contrast": "normal", "font": 100},
 }
 
 RANGES = {"blur": (0, 30), "opacity": (30, 100), "radius_block": (0, 30), "radius_input": (0, 30),
@@ -212,6 +214,9 @@ def normalize(raw: dict | None) -> dict:
                     "items": [x for x in (_link(i) for i in items) if x][:MAX_LINKS]}
     st = raw.get("staff") if isinstance(raw.get("staff"), dict) else {}
     cfg["staff"] = {"enabled": bool(st.get("enabled", False)),
+                    "accent": _hex(st.get("accent"), cfg["accent"]),
+                    "accent2": _hex(st.get("accent2"), cfg["accent2"]),
+                    "surface": _hex(st.get("surface"), DEFAULTS["staff"]["surface"]),
                     "density": st.get("density") if st.get("density") in STAFF_DENSITY else "normal",
                     "contrast": st.get("contrast") if st.get("contrast") in STAFF_CONTRAST else "normal",
                     "font": _clamp(st.get("font", 100), *STAFF_FONT, 100)}
@@ -367,6 +372,10 @@ html[data-kei-theme="dark"] textarea {{ background-color: #161b22; color: var(--
 html[data-kei-theme="dark"] a:not(.btn) {{ color: #79b8ff; }}
 html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb-item {{ color: var(--kei-muted) !important; }}
 {_texture_css(cfg)}
+/* The header and its menus above the search bar: the glass of each block
+   is a stacking context of its own, so the header's one has to win. */
+html body #header-region, html body #header-region .navbar {{ position: relative; z-index: 1030; overflow: visible !important; }}
+html body #header-region .dropdown-menu {{ z-index: 1060; }}
 html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
@@ -429,6 +438,8 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     if cfg["news_buttons"]:
         out.append(""".kei-action {
     display: flex;
+    width: 100%;
+    box-sizing: border-box;
     gap: .9rem;
     align-items: center;
     padding: .9rem 1.1rem;
@@ -443,7 +454,7 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
 .kei-action:hover, .kei-action:focus { transform: translateY(-2px); border-color: var(--kei-accent);
     box-shadow: 0 10px 24px rgba(var(--kei-accent-rgb), .18); }
 .kei-action-icon { font-size: 1.6rem; color: var(--kei-accent); min-width: 2rem; text-align: center; }
-.kei-action-title { display: block; font-weight: 600; }
+.kei-action-title { display: block; font-weight: 600; overflow-wrap: anywhere; }
 .kei-action-text { display: block; color: var(--kei-muted); font-size: .92em; }""")
     if car["enabled"]:
         out.append(_carousel_css(car))
@@ -462,7 +473,7 @@ _BTN_SOFT = ('.btn-default, .btn-secondary, .btn-light, .btn-outline-primary, .b
 # Buttons inside the news and the library's own home page block: action
 # cards, full width, big enough to tap.
 _CARD_AREAS = ("#news .newsitem", ".newsitem", ".news-item", "#opacmainuserblock", "#OpacMainUserBlock")
-_CARD_BUTTONS = (".btn", 'input[type="submit"]', 'input[type="button"]', 'button[type="submit"]')
+_CARD_BUTTONS = (".btn", ".btn-acesso", 'input[type="submit"]', 'input[type="button"]', 'button[type="submit"]')
 
 
 def _buttons_css(cfg: dict) -> str:
@@ -552,17 +563,25 @@ html[data-kei-theme="dark"] body {{
 
 
 def _links_css() -> str:
+    # One full-width button per line, like the buttons of the home page block.
     return """#kei-links {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    width: 100%;
     margin: 0 0 1.25rem;
 }
 html body a.kei-link {
     display: flex;
     align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
     gap: .75rem;
-    padding: .85rem 1.1rem;
+    padding: .8rem 1.1rem;
+    text-align: center;
+    overflow-wrap: anywhere;
     border-radius: var(--kei-r-btn);
     font-weight: 600;
     text-decoration: none !important;
@@ -701,37 +720,245 @@ _STAFF_PAD = {"compact": ".2rem .45rem", "comfortable": ".65rem .85rem"}
 
 
 def staff_css_body(cfg: dict) -> str:
-    """The OPAC's colours on the staff interface, with its own type size,
-    contrast and table density. Only CSS: no carousel, buttons or other
-    OPAC widget ever reaches the staff pages."""
-    cfg = normalize(cfg)
-    st = cfg["staff"]
-    on = text_on(cfg["accent"])
+    """The staff interface's own look, from cfg["staff"] only: one hue for
+    the top bar and the quick search bar under it, the home page modules as
+    cards, the news column on a tinted surface, the buttons and links in the
+    palette; its own type size, contrast and table density. Only CSS: no
+    carousel, button or other OPAC widget ever reaches the staff pages.
+
+    Koha's own rules are beaten by specificity (html body + the same ids);
+    !important only where Koha or Bootstrap use it themselves (.bg-dark) or
+    where a library's own inline <style> (news buttons) would win."""
+    st = normalize(cfg)["staff"]
+    accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
+    light = luminance(surface) >= 0.30
+    bar = mix(accent, "#000000", .22)              # the quick search bar: the top bar's hue, darker
+    page = mix(surface, accent, .04) if light else mix(surface, accent, .08)
+    card = surface
+    text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
+    ink = mix(accent, "#000000", .30) if light else mix(accent, "#ffffff", .45)
+    link = mix(accent, "#000000", .12) if light else mix(accent, "#ffffff", .35)
     out = [f""":root {{
-    --nexus-primary: {cfg['accent']};
-    --nexus-secondary: {cfg['accent2']};
-    --nexus-on-primary: {on};
-    --nexus-primary-rgb: {_rgb(cfg['accent'])};
+    --nexus-staff-primary: {accent};
+    --nexus-staff-secondary: {accent2};
+    --nexus-staff-on-primary: {text_on(accent)};
+    --nexus-staff-on-secondary: {text_on(accent2)};
+    --nexus-staff-bar: {bar};
+    --nexus-staff-primary-rgb: {_rgb(accent)};
+    --nexus-staff-secondary-rgb: {_rgb(accent2)};
+    --nexus-staff-page: {page};
+    --nexus-staff-card: {card};
+    --nexus-staff-text: {text};
+    --nexus-staff-muted: {muted};
+    --nexus-staff-ink: {ink};
+    --nexus-staff-link: {link};
+    --nexus-staff-edge: rgba({_rgb(accent)}, .16);
+    --nexus-staff-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 6px 18px -6px rgba(15, 23, 42, .16);
+    --nexus-staff-shadow-hi: 0 2px 4px rgba(15, 23, 42, .08), 0 14px 28px -8px rgba({_rgb(accent)}, .35);
+    --nexus-staff-radius: 12px;
 }}
 html {{ font-size: {st['font']}%; }}
-html body #header.navbar, html body #header, html body .navbar.navbar-expand#header {{
-    background: linear-gradient(90deg, var(--nexus-primary), var(--nexus-secondary)) !important;
-    border-color: transparent !important;
+html body {{ background-color: var(--nexus-staff-page); color: var(--nexus-staff-text); }}
+html body #container-main a:not(.btn):not(.icon_general):not(.btn-acesso):not(.dropdown-item),
+html body .main a:not(.btn):not(.dropdown-item):not(.nav-link),
+html body #breadcrumbs a {{ color: var(--nexus-staff-link); }}
+
+/* Top bar: one hue, a gentle fall to a darker shade of it. */
+html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
+    background: linear-gradient(90deg, var(--nexus-staff-primary), {mix(accent, "#000000", .12)}) !important;
+    border: 0;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .08) inset;
 }}
-html body #header a, html body #header .navbar-nav > li > a, html body #header .nav-link,
-html body #header .navbar-text {{ color: var(--nexus-on-primary) !important; }}
-html body .btn-primary, html body .btn-primary:hover, html body .btn-primary:focus {{
-    background-color: var(--nexus-primary) !important;
-    border-color: var(--nexus-primary) !important;
-    color: var(--nexus-on-primary) !important;
+html body nav.navbar #header .nav-link, html body nav.navbar #logged-in-info-full,
+html body nav.navbar .navbar-text {{ color: var(--nexus-staff-on-primary); }}
+html body nav.navbar #header .nav-link:hover, html body nav.navbar #header .nav-link:focus {{
+    background-color: rgba(255, 255, 255, .14);
+    border-radius: 8px;
 }}
+html body nav.navbar #catalog-search-link {{ border-right-color: rgba(255, 255, 255, .25); }}
+html body nav.navbar .dropdown-menu-dark {{
+    --bs-dropdown-bg: {mix(accent, "#000000", .55)};
+    --bs-dropdown-link-hover-bg: rgba(255, 255, 255, .12);
+    --bs-dropdown-link-active-bg: var(--nexus-staff-primary);
+    border: 0;
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .3);
+}}
+
+/* Quick search bar: the same hue, darker; the field and its button as one piece. */
+html body #header_search, html body #header_search ul, html body #header_search .form-title,
+html body #header_search .nav-tabs > li > a, html body #header_search .nav-tabs > li > a:hover,
+html body #header_search .nav-tabs > li > a:focus {{
+    background-color: var(--nexus-staff-bar);
+    border-color: var(--nexus-staff-bar);
+}}
+html body #header_search {{ padding-top: .45rem; padding-bottom: .45rem; gap: .5rem; }}
+html body #header_search form {{ align-items: center; }}
+html body #header_search .form-title label {{ color: #fff; letter-spacing: .01em; }}
+html body #header_search .form-content {{
+    background-color: var(--nexus-staff-card);
+    border-radius: 10px 0 0 10px;
+    margin-left: 0;
+    padding-left: .35rem;
+    min-height: 2.25rem;
+    align-items: center;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, .12);
+}}
+html body #header_search .form-content input[type="text"] {{ color: var(--nexus-staff-text); height: 2.25rem; }}
+html body #header_search input[type="submit"], html body #header_search button[type="submit"] {{
+    height: 2.25rem;
+    margin-left: 0;
+    padding: 0 1rem;
+    border-radius: 0 10px 10px 0;
+    background-color: var(--nexus-staff-secondary);
+    color: var(--nexus-staff-on-secondary);
+    transition: filter .15s ease;
+}}
+html body #header_search input[type="submit"]:hover,
+html body #header_search button[type="submit"]:hover {{ background-color: var(--nexus-staff-secondary); filter: brightness(1.1); }}
+html body #header_search .nav-tabs > li > a {{
+    color: rgba(255, 255, 255, .82);
+    border-radius: 8px;
+    margin: 0 .1rem;
+    padding: .15rem .4rem;
+    transition: background-color .15s ease, color .15s ease;
+}}
+html body #header_search .nav-tabs > li > a:hover, html body #header_search .nav-tabs > li > a:focus {{
+    background-color: rgba(255, 255, 255, .12);
+    border-color: transparent;
+    color: #fff;
+}}
+html body #header_search .nav-tabs > li > a.active, html body #header_search .nav-tabs > li > a.active:hover {{
+    background-color: rgba(255, 255, 255, .16);
+    border-color: transparent;
+    border-bottom: 2px solid var(--nexus-staff-secondary);
+    color: #fff;
+}}
+html body #header_search .form-extra-content {{ border-color: var(--nexus-staff-bar); border-radius: 0 0 10px 10px; }}
+
+/* Home page modules: cards with an icon tile, a lift on hover. */
+html body ul.biglinks-list li {{ margin-bottom: .85rem; }}
+html body ul.biglinks-list li a.icon_general {{
+    height: auto;
+    min-height: 56px;
+    gap: .8rem;
+    padding: .7rem 1rem;
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-text);
+    font-weight: 600;
+    border: 1px solid var(--nexus-staff-edge);
+    border-radius: var(--nexus-staff-radius);
+    box-shadow: var(--nexus-staff-shadow);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}}
+html body ul.biglinks-list li a.icon_general > .fa-fw, html body ul.biglinks-list li a.icon_general > .fa-stack {{
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1;
+    border-radius: 10px;
+    color: var(--nexus-staff-primary);
+    background-color: rgba(var(--nexus-staff-primary-rgb), .12);
+}}
+html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-2x {{ font-size: 1.15rem; color: var(--nexus-staff-primary); }}
+html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-1x {{ color: var(--nexus-staff-secondary); }}
+html body ul.biglinks-list li a.icon_general:hover, html body ul.biglinks-list li a.icon_general:focus-visible {{
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-ink);
+    border-color: var(--nexus-staff-primary);
+    box-shadow: var(--nexus-staff-shadow-hi);
+    transform: translateY(-2px);
+}}
+html body ul.biglinks-list li a.icon_general:hover > .fa-fw, html body ul.biglinks-list li a.icon_general:hover > .fa-stack {{
+    background-color: var(--nexus-staff-primary);
+    color: var(--nexus-staff-on-primary);
+}}
+html body ul.biglinks-list li a.icon_general:hover > .fa-stack i {{ color: var(--nexus-staff-on-primary); }}
+html body #koha_version a {{ color: var(--nexus-staff-muted); }}
+
+/* News column: a tinted card, clear headings, an airy list. */
+html body #area-news {{
+    background-color: {mix(surface, accent, .06)};
+    border: 1px solid var(--nexus-staff-edge);
+    border-radius: var(--nexus-staff-radius);
+    box-shadow: var(--nexus-staff-shadow);
+    padding: .9rem 1rem;
+}}
+html body #area-news h3 {{
+    opacity: 1;
+    padding: 0 0 .5rem;
+    color: var(--nexus-staff-ink);
+    font-size: .82rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--nexus-staff-primary);
+}}
+html body #area-news .newsitem {{
+    opacity: 1;
+    margin: .75rem 0 0;
+    padding: .75rem .85rem;
+    background-color: var(--nexus-staff-card);
+    border: 0;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+    line-height: 1.5;
+}}
+html body #area-news .newsitem h4 {{ color: var(--nexus-staff-text); font-size: 1rem; font-weight: 700; margin-bottom: .4rem; }}
+html body #area-news .newsitem ul {{ padding-left: 1.1rem; margin: .4rem 0; }}
+html body #area-news .newsitem li {{ margin: .2rem 0; }}
+html body #area-news .newsfooter {{ color: var(--nexus-staff-muted); font-size: .82rem; margin: .5rem 0 0; }}
+html body #area-news .newsitem .btn-acesso {{
+    display: flex !important;
+    align-items: center;
+    gap: .5rem;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 44px;
+    margin: 0 0 .5rem !important;
+    padding: .55rem .8rem !important;
+    font-size: .95rem !important;
+    font-weight: 600;
+    background-color: var(--nexus-staff-card) !important;
+    color: var(--nexus-staff-text) !important;
+    border: 1px solid var(--nexus-staff-edge) !important;
+    border-radius: 10px !important;
+    text-decoration: none !important;
+}}
+html body #area-news .newsitem .btn-acesso:hover, html body #area-news .newsitem .btn-acesso:focus-visible {{
+    background-color: var(--nexus-staff-primary) !important;
+    border-color: var(--nexus-staff-primary) !important;
+    color: var(--nexus-staff-on-primary) !important;
+}}
+
+/* Buttons, tabs, focus. */
+html body .btn-primary, html body input[type="submit"].btn-primary {{
+    background-color: var(--nexus-staff-primary);
+    border-color: var(--nexus-staff-primary);
+    color: var(--nexus-staff-on-primary);
+}}
+html body .btn-primary:hover, html body .btn-primary:focus {{
+    background-color: {mix(accent, "#000000", .12)};
+    border-color: {mix(accent, "#000000", .12)};
+    color: var(--nexus-staff-on-primary);
+}}
+html body .btn-default:hover, html body .btn-default:focus {{ border-color: var(--nexus-staff-primary); }}
 html body .nav-tabs .nav-link.active, html body .ui-tabs .ui-tabs-nav li.ui-tabs-active {{
-    border-top: 3px solid var(--nexus-primary) !important;
+    border-top: 3px solid var(--nexus-staff-primary);
 }}
 html body a:focus-visible, html body .btn:focus-visible, html body input:focus, html body select:focus,
 html body textarea:focus {{
-    outline: 3px solid rgba(var(--nexus-primary-rgb), .45) !important;
+    outline: 3px solid rgba(var(--nexus-staff-primary-rgb), .45);
     outline-offset: 1px;
+}}
+@media (prefers-reduced-motion: reduce) {{
+    html body ul.biglinks-list li a.icon_general {{ transition: none; }}
+    html body ul.biglinks-list li a.icon_general:hover {{ transform: none; }}
 }}"""]
     pad = _STAFF_PAD.get(st["density"])
     if pad:

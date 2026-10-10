@@ -260,3 +260,27 @@ def test_blocks_take_the_chosen_colours():
     assert "rgba(var(--kei-accent-rgb), .22) 0%, rgba(var(--kei-accent2-rgb), .16) 100%" in css
     assert f"--kei-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css
     assert ot.mix("#000000", "#ffffff", .5) == "#808080"
+
+
+def test_staff_has_its_own_palette():
+    # Settings saved before the staff palette existed start from the OPAC's colours...
+    old = ot.normalize({"accent": "#123456", "accent2": "#654321", "staff": {"enabled": True}})
+    assert (old["staff"]["accent"], old["staff"]["accent2"]) == ("#123456", "#654321")
+    # ...and after that the two are independent.
+    cfg = ot.normalize({"accent": "#123456", "staff": {"enabled": True, "accent": "#0f766e", "accent2": "#f59e0b",
+                                                       "surface": "zzz"}})
+    assert cfg["staff"]["surface"] == "#ffffff"
+    staff = ot.staff_css_body(cfg)
+    assert "--nexus-staff-primary: #0f766e" in staff and "#123456" not in staff
+    for sel in ("nav.navbar.bg-dark", "#header_search .form-content", "ul.biglinks-list li a.icon_general",
+                "#area-news .newsitem .btn-acesso", "--nexus-staff-bar: " + ot.mix("#0f766e", "#000000", .22)):
+        assert sel in staff, sel
+    assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["accent"] == "#0f766e"
+    assert "#0f766e" not in ot.css_body(cfg)
+
+
+def test_opac_header_menu_and_quick_links():
+    css = ot.css_body(ot.normalize({"links": {"enabled": True, "items": [{"text": "A", "url": "/x"}]}}))
+    assert "#header-region .dropdown-menu { z-index: 1060; }" in css and "overflow: visible !important" in css
+    assert "flex-direction: column" in css and "auto-fill" not in css
+    assert "html body .newsitem .btn-acesso" in css

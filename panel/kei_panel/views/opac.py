@@ -138,10 +138,15 @@ class OpacView(SectionView):
                 yield Button(t("Add a button"), id="o-link-add", classes="small")
         st = c["staff"]
         with Vertical(id="o-staff", classes="opac-box"):
-            yield Static(t("The accent colours on the staff interface too (IntranetUserCSS), with its own text "
-                           "size, contrast and table density. Nothing of the public catalogue (carousel, "
-                           "buttons) goes there."), classes="ai-note", markup=False)
+            yield Static(t("The staff interface's own look (IntranetUserCSS), set apart from the public "
+                           "catalogue: its own colours for the top bar, the quick search bar and the buttons, the "
+                           "home page modules as cards, the news column, the text size, contrast and table "
+                           "density."), classes="ai-note", markup=False)
             yield from _row(t("Apply color theme to Staff Client"), Switch(st["enabled"], id="o-staff-enabled"))
+            yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
+            yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
+            yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
+                              id="o-pick-staff-surface")
             yield from _row(t("Table density"), Select([(t(v), k) for k, v in ot.STAFF_DENSITY.items()],
                                                        value=st["density"], allow_blank=False, id="o-staff-density"))
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
@@ -256,6 +261,8 @@ class OpacView(SectionView):
         self.set_links(cfg["links"]["items"])
         st = cfg["staff"]
         q("#o-staff-enabled", Switch).value = st["enabled"]
+        for key in ("accent", "accent2", "surface"):
+            q(f"#o-staff-{key}", Input).value = st[key]
         q("#o-staff-density", Select).value = st["density"]
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
@@ -276,7 +283,9 @@ class OpacView(SectionView):
                             "amazon_tag": q("#o-car-tag", Input).value.strip()},
                "ghost": {key: q(f"#o-g-{key}", Switch).value for key in GHOST},
                "news_buttons": q("#o-news_buttons", Switch).value,
-               "staff": {"enabled": q("#o-staff-enabled", Switch).value, "density": q("#o-staff-density", Select).value,
+               "staff": {"enabled": q("#o-staff-enabled", Switch).value,
+                         "accent": q("#o-staff-accent", Input).value, "accent2": q("#o-staff-accent2", Input).value,
+                         "surface": q("#o-staff-surface", Input).value, "density": q("#o-staff-density", Select).value,
                          "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value

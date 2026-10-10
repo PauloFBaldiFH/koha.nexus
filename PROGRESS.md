@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.36** (1.5.37: OPAC depth and buttons PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.37** (1.5.38: OPAC header menu, staff theme PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -280,6 +280,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   wash of both accents (content blocks .22/.16, with an accent border) and headings use
   `--kei-ink` (the accent, darkened or lightened). No new settings: KEI-THEME-DATA unchanged. His
   site-specific bits (image URLs, link hiding, mobile results layout) were not made defaults.
+
+- **1.5.38 (OPAC header menu, staff theme)**: from Paulo's rendered opac.html/staff.html (Koha
+  26.05). OPAC: the user menu opened behind the search bar (each glass block is its own stacking
+  context), so #header-region gets z-index 1030 and its menus 1060; the quick access buttons
+  (#kei-links) were a 230px auto-fill grid, now one full-width button per line; .btn-acesso
+  joins the full-width news buttons. Staff: `staff` has its own accent/accent2/surface (old
+  settings start from the OPAC's), pickers in the Staff box. `staff_css_body` targets Koha 26's
+  real markup: `nav.navbar.bg-dark` (#header is only the collapse div inside it), #header_search
+  in a darker shade of the same hue (no more blue/green clash), the .biglinks-list modules as
+  cards with icon tiles, #area-news as a tinted card (his .btn-acesso links included). Koha
+  rules beaten by specificity; !important only against .bg-dark and his inline news styles.
 
 ---
 
