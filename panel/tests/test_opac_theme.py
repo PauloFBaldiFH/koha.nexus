@@ -320,3 +320,89 @@ def test_staff_pictures_and_single_icon(tmp_path):
         assert "IntranetFavicon" not in (work / "prefs").read_text()
     finally:
         shutil.rmtree(work)
+
+
+def test_button_order_layout_and_metal():
+    # Saved before buttons had a place: 1..n as listed, nothing moves.
+    old = ot.normalize({"links": {"enabled": True, "items": [{"text": "A", "url": "/a"}, {"text": "B", "url": "/b"},
+                                                              {"text": "C", "url": "/c"}]}})
+    assert [(i["text"], i["sort_order"]) for i in old["links"]["items"]] == [("A", 1), ("B", 2), ("C", 3)]
+    assert old["links"]["layout"] == "list" and old["staff_links"]["enabled"] is False
+    cfg = ot.normalize({"links": {"enabled": True, "style": "metal", "layout": "grid2", "items": [
+        {"text": "A", "url": "/a", "sort_order": 9}, {"text": "B", "url": "/b", "sort_order": "x"},
+        {"text": "C", "url": "/c", "sort_order": -4}, {"text": "D", "url": "/d", "sort_order": 9}]}})
+    assert [(i["text"], i["sort_order"]) for i in cfg["links"]["items"]] == [("C", 1), ("B", 2), ("A", 9), ("D", 9)]
+    assert ot.normalize({"links": {"layout": "grid9"}})["links"]["layout"] == "list"
+    css = ot.css_body(cfg)
+    assert "html body #kei-links.kei-layout-grid2" in css and "repeat(2, minmax(0, 1fr))" in css
+    assert "@media (max-width: 340px)" in css
+    assert "kei-links-metal a.kei-link::after" in css and "translateX(120%)" in css
+    assert 'html[data-kei-theme="dark"] body #kei-links.kei-links-metal' in css
+    conf = ot.js_config(cfg)["links"]
+    assert conf["layout"] == "grid2" and [i["text"] for i in conf["items"]] == ["C", "B", "A", "D"]
+    # The texture's own brushed metal is untouched, and glass stays the default.
+    assert ot.normalize({})["links"]["style"] == "glass" and ot.normalize({})["texture"] == "frosted"
+
+
+def test_staff_home_buttons(tmp_path):
+    cfg = ot.normalize({"staff": {"accent": "#0f766e"}, "staff_links": {"enabled": True, "style": "solid", "items": [
+        {"icon": "fa-exchange", "text": "Circulação", "url": "/cgi-bin/koha/circ/circulation-home.pl"},
+        {"text": "Bad", "url": "javascript:alert(1)"}]}})
+    assert [i["text"] for i in cfg["staff_links"]["items"]] == ["Circulação"]
+    assert ot.staff_active(cfg) and not cfg["staff"]["enabled"]
+    css = ot.staff_css_block(cfg)
+    assert ot.check_block(css, ot.CSS_BEGIN, ot.CSS_END) == ""
+    assert "--nexus-primary: #0f766e" in css and "#kei-staff-links.kei-links-solid" in css
+    assert "nexus-staff-page" not in css                     # the colour theme stays off
+    js = ot.staff_js_block(cfg, {"links": "Acesso rápido"})
+    assert ot.check_block(js, ot.JS_BEGIN, ot.JS_END) == "" and "main_intranet-main" in js
+    assert ot.staff_js_config(cfg)["links"]["items"][0]["icon"] == "fa-exchange"
+    assert '"label": "Acesso r\\u00e1pido"' in js
+    if shutil.which("node"):
+        f = tmp_path / "staff.js"
+        f.write_text(js, encoding="utf-8")
+        subprocess.run(["node", "--check", str(f)], check=True)
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        assert (work / "staff.js").read_text() == ot.staff_js_block(cfg)
+        assert "#kei-staff-links" in (work / "staff.css").read_text()
+    finally:
+        shutil.rmtree(work)
+    cfg["staff_links"]["enabled"] = False
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        assert not (work / "staff.js").exists() and not (work / "staff.css").exists()
+    finally:
+        shutil.rmtree(work)
+    # Colours on and buttons on: both in IntranetUserCSS.
+    both = ot.staff_css_block(ot.normalize({"staff": {"enabled": True}, "staff_links": cfg["staff_links"] | {"enabled": True}}))
+    assert "nexus-staff-page" in both and "#kei-staff-links" in both
+
+
+def test_sync_settings():
+    cfg = ot.normalize({"texture": "gradient", "news_buttons": False})
+    got, notes = ot.sync_settings({"data": ot.data_line(cfg), "block_OpacUserCSS": "yes", "block_OpacUserJS": "yes",
+                                   "mainblock": "yes", "mainblock_buttons": "2", "own_IntranetUserJS": "40"})
+    text = [n for n, _v in notes]
+    assert got["texture"] == "gradient" and got["news_buttons"] is True
+    assert "Settings: read from OpacUserCSS." in text
+    assert not any("missing" in n for n in text)
+    assert ("${pref}: ${n} lines of the library's own, kept as they are.", {"pref": "IntranetUserJS", "n": "40"}) in notes
+    # No settings line: the copy of the last apply.
+    got, notes = ot.sync_settings({"state": json.dumps({"accent": "#ff0066"}), "block_OpacUserCSS": "no"})
+    assert got["accent"] == "#ff0066" and "theme-settings.json" in notes[0][0]
+    assert any(v.get("prefs") == "OpacUserCSS, OpacUserJS" for _n, v in notes)
+    # Only our scripts left: what their config tells.
+    opac = ot.js_config(ot.normalize({"default_theme": "dark", "carousel": {"enabled": False},
+                                      "links": {"enabled": True, "style": "metal", "layout": "grid2",
+                                                "items": [{"text": "A", "url": "/a", "sort_order": 3}]}}))
+    staff = ot.staff_js_config(ot.normalize({"staff_links": {"items": [{"text": "S", "url": "/s"}]}}))
+    got, notes = ot.sync_settings({"config_OpacUserJS": json.dumps(opac), "config_IntranetUserJS": json.dumps(staff),
+                                   "block_OpacUserJS": "yes", "block_IntranetUserJS": "yes"})
+    assert got["default_theme"] == "dark" and not got["carousel"]["enabled"]
+    assert got["links"]["style"] == "metal" and got["links"]["items"][0]["sort_order"] == 3
+    assert got["staff_links"]["enabled"] and got["staff_links"]["items"][0]["text"] == "S"
+    assert "rebuilt" in notes[0][0]
+    # Nothing at all: None, the screen keeps its fields.
+    got, notes = ot.sync_settings({"data": "/* KEI-THEME-DATA: {broken */", "state": "[]"})
+    assert got is None and "Nothing of the panel" in notes[0][0]

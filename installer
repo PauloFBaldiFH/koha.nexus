@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.41"
+PANEL_VERSION=" 1.5.43"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -27355,9 +27355,17 @@ z3950_server_status() {
 #                        preferences), assets/ (pictures for
 #                        /usr/share/koha/opac/htdocs/images/custom) and
 #                        carousel ("on N" or "off")
-#                        and staff.css when the staff interface takes the
-#                        colours (IntranetUserCSS; without it our block there
-#                        is taken out)
+#                        and staff.css / staff.js when the staff interface
+#                        takes the colours or has home page buttons
+#                        (IntranetUserCSS / IntranetUserJS; without them our
+#                        blocks there are taken out)
+#   opac-theme-sync      what is live in Koha for the panel's "Sync current
+#                        settings": the settings line (in our block or
+#                        anywhere in OpacUserCSS), the saved theme-settings.json,
+#                        the config of our scripts in OpacUserJS and
+#                        IntranetUserJS, which of our blocks are there, the
+#                        library's own lines and the [kei-button] markers of
+#                        OpacMainUserBlock
 #   opac-theme-remove    the blocks, the pictures, the feed and its schedule
 #   opac-carousel-refresh  the feed now
 # Each apply also saves what it wrote in theme-settings.json (CONF_DIR,
@@ -27567,11 +27575,62 @@ opac_theme_get() {
     return 0
 }
 
+# opac_block_in: our marked block of the text on stdin (without the markers).
+opac_block_in() { awk -v b="$OPAC_BEGIN" -v e="$OPAC_END" '$0 == b { on = 1; next } $0 == e { on = 0 } on'; }
+
+# opac_own_lines: the non-empty lines of stdin outside our block.
+opac_own_lines() {
+    awk -v b="$OPAC_BEGIN" -v e="$OPAC_END" '$0 == b { skip = 1 } !skip && NF { n++ } $0 == e { skip = 0 } END { print n + 0 }'
+}
+
+# The home page block of the OPAC: an HTML customization (Koha 22.11 and
+# later, translated contents from 23.11) or the old preference.
+opac_mainblock_raw() {
+    mysql --default-character-set=utf8mb4 -N -B --raw -e "SELECT l.content FROM ${DB_NAME}.additional_contents c
+        JOIN ${DB_NAME}.additional_contents_localizations l ON l.additional_content_id = c.id
+        WHERE c.location = 'OpacMainUserBlock';" 2>/dev/null && return 0
+    mysql --default-character-set=utf8mb4 -N -B --raw -e "SELECT content FROM ${DB_NAME}.additional_contents
+        WHERE location = 'OpacMainUserBlock';" 2>/dev/null && return 0
+    opac_pref_raw OpacMainUserBlock
+}
+
+opac_theme_sync() {
+    require_database || return 1
+    local pref text line main
+    opac_theme_get
+    text=$(opac_pref_raw OpacUserCSS)
+    if ! printf '%s\n' "$text" | opac_block_in | grep -qF 'KEI-THEME-DATA:'; then
+        line=$(printf '%s\n' "$text" | grep -m1 -F 'KEI-THEME-DATA:')
+        [ -n "$line" ] && kei_result data "$line"
+    fi
+    for pref in OpacUserCSS OpacUserJS IntranetUserCSS IntranetUserJS; do
+        text=$(opac_pref_raw "$pref")
+        if printf '%s\n' "$text" | grep -qxF -e "$OPAC_BEGIN"; then kei_result "block_$pref" yes; else kei_result "block_$pref" no; fi
+        kei_result "own_$pref" "$(printf '%s\n' "$text" | opac_own_lines)"
+        case "$pref" in
+            OpacUserJS|IntranetUserJS)
+                line=$(printf '%s\n' "$text" | opac_block_in | grep -m1 '^    var C = ')
+                line="${line#    var C = }"
+                [ -n "$line" ] && kei_result "config_$pref" "${line%;}" ;;
+        esac
+    done
+    if [ -s "$THEME_STATE" ]; then
+        line=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8")).get("settings") or {}))' \
+            "$THEME_STATE" 2>/dev/null) && [ -n "$line" ] && kei_result state "$line"
+    fi
+    main=$(opac_mainblock_raw)
+    if [ -n "${main//[[:space:]]/}" ]; then kei_result mainblock yes; else kei_result mainblock no; fi
+    kei_result mainblock_buttons "$(printf '%s\n' "$main" | grep -o '\[kei-button' | wc -l)"
+    log "opac-theme: settings read back for the panel"
+    return 0
+}
+
 opac_theme_apply() {
     local dir="$1" f
     require_database || return 1
     if [ ! -d "$dir" ] || ! opac_block_ok "$dir/user.css" || ! opac_block_ok "$dir/user.js" \
-       || { [ -e "$dir/staff.css" ] && ! opac_block_ok "$dir/staff.css"; }; then
+       || { [ -e "$dir/staff.css" ] && ! opac_block_ok "$dir/staff.css"; } \
+       || { [ -e "$dir/staff.js" ] && ! opac_block_ok "$dir/staff.js"; }; then
         msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
         return 1
     fi
@@ -27598,6 +27657,11 @@ _opac_theme_apply() {
             opac_pref_block_sql IntranetUserCSS "$dir/staff.css"
         else
             opac_pref_block_sql IntranetUserCSS -
+        fi
+        if [ -f "$dir/staff.js" ]; then
+            opac_pref_block_sql IntranetUserJS "$dir/staff.js"
+        else
+            opac_pref_block_sql IntranetUserJS -
         fi
         if [ -f "$dir/prefs" ]; then
             while IFS=$'\t' read -r name value; do
@@ -27666,6 +27730,8 @@ prefs = [l.split("\t", 1) for l in (read("prefs") or "").splitlines() if "\t" in
 blocks = {"OpacUserCSS": css, "OpacUserJS": read("user.js") or ""}
 if read("staff.css") is not None:
     blocks["IntranetUserCSS"] = read("staff.css")
+if read("staff.js") is not None:
+    blocks["IntranetUserJS"] = read("staff.js")
 json.dump({"format": 1, "saved": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "panel": version, "settings": settings,
            "blocks": blocks, "prefs": prefs, "carousel": (read("carousel") or "off").strip()},
           sys.stdout, ensure_ascii=False, indent=1)
@@ -27679,7 +27745,7 @@ PY
 
 # theme_state_reapply: after a database restore, the look saved by the last
 # apply (theme-settings.json) goes back into systempreferences: the blocks of
-# OpacUserCSS, OpacUserJS and IntranetUserCSS (the rest of each preference is
+# OpacUserCSS, OpacUserJS, IntranetUserCSS and IntranetUserJS (the rest of each preference is
 # the restored one) and the allowed preferences. Nothing saved: nothing done.
 theme_state_reapply() {
     [ -s "$THEME_STATE" ] || return 0
@@ -27689,7 +27755,8 @@ theme_state_reapply() {
 import json, os, sys
 state, d = json.load(open(sys.argv[1], encoding="utf-8")), sys.argv[2]
 blocks = state.get("blocks") or {}
-for pref, name in (("OpacUserCSS", "user.css"), ("OpacUserJS", "user.js"), ("IntranetUserCSS", "staff.css")):
+for pref, name in (("OpacUserCSS", "user.css"), ("OpacUserJS", "user.js"), ("IntranetUserCSS", "staff.css"),
+                   ("IntranetUserJS", "staff.js")):
     if isinstance(blocks.get(pref), str) and blocks[pref]:
         open(os.path.join(d, name), "w", encoding="utf-8").write(blocks[pref])
 with open(os.path.join(d, "prefs"), "w", encoding="utf-8") as fh:
@@ -27703,7 +27770,7 @@ PY
         log "theme: $THEME_STATE could not be read; the look was not re-applied"
         return 1
     fi
-    for f in user.css user.js staff.css; do
+    for f in user.css user.js staff.css staff.js; do
         if [ -e "$dir/$f" ] && ! opac_block_ok "$dir/$f"; then
             rm -rf -- "$dir"
             log "theme: $THEME_STATE holds a damaged block ($f); the look was not re-applied"
@@ -27720,6 +27787,7 @@ PY
         opac_pref_block_sql OpacUserCSS "$dir/user.css"
         opac_pref_block_sql OpacUserJS "$dir/user.js"
         if [ -e "$dir/staff.css" ]; then opac_pref_block_sql IntranetUserCSS "$dir/staff.css"; else opac_pref_block_sql IntranetUserCSS -; fi
+        if [ -e "$dir/staff.js" ]; then opac_pref_block_sql IntranetUserJS "$dir/staff.js"; else opac_pref_block_sql IntranetUserJS -; fi
         while IFS=$'\t' read -r name value; do
             [ -n "$name" ] && opac_pref_line "$name" "$value"
         done < "$dir/prefs"
@@ -27757,6 +27825,7 @@ _opac_theme_remove() {
         opac_pref_block_sql OpacUserCSS -
         opac_pref_block_sql OpacUserJS -
         opac_pref_block_sql IntranetUserCSS -
+        opac_pref_block_sql IntranetUserJS -
         fav=$(opac_pref_raw OpacFavicon)
         [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
         fav=$(opac_pref_raw IntranetFavicon)
@@ -28797,6 +28866,7 @@ kei_task() {
                 *)   return 2 ;;
             esac ;;
         opac-theme-get)  opac_theme_get ;;
+        opac-theme-sync) opac_theme_sync ;;
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;
         opac-carousel-refresh) opac_carousel_refresh ;;

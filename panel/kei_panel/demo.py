@@ -212,6 +212,10 @@ _SCRIPTS: dict[str, list[str]] = {
                   "@@msg ok OK\tZ39.50/SRU servers added to Koha: 2\\nAlready in Koha: 1\\n\\nThey are in "
                   "Administration > Z39.50/SRU servers, checked for the cataloguing searches."],
     "opac-theme-get": ["@@result amazon=0"],
+    "opac-theme-sync": ["@@result amazon=0", "@@result block_OpacUserCSS=no", "@@result block_OpacUserJS=no",
+                        "@@result block_IntranetUserCSS=no", "@@result block_IntranetUserJS=no",
+                        "@@result own_OpacUserCSS=12", "@@result own_OpacUserJS=0", "@@result own_IntranetUserCSS=3",
+                        "@@result own_IntranetUserJS=40", "@@result mainblock=yes", "@@result mainblock_buttons=2"],
     "opac-theme-apply": ["@@note Generating the backup...", "@@note Writing the OPAC preferences...",
                          "@@note Looking for the covers of the newest titles...",
                          "@@result feed=9 of 14 titles with an ISBN have an Amazon cover", "@@result applied=yes",

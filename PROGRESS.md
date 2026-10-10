@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR; 1.5.43: OPAC/staff quick access buttons PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -327,6 +327,19 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   maximumRecords=0 count call fetches no records; the result list is cached 10 minutes.
   recordSchema is the full info:srw URI as in Paulo's spec (PERGAMUM_SRU_RECORD_SCHEMA=marcxml
   switches it; yaz-client 5.34 reads both).
+
+- **1.5.43 (OPAC and staff quick access buttons)**: each quick access button has a `sort_order`
+  (settings saved before it get 1..n as listed, so nothing moves) and the buttons are shown by it;
+  a layout per set (`list` or `grid2`: two columns, icon over text below 576px, one column below
+  340px); a `metal` style next to solid, gradient and glass (silver gradient with a fine grain,
+  bevel, a specular band sweeping across on hover, gunmetal in the OPAC's dark mode; glass stays
+  the default). `cfg["staff_links"]` puts the same buttons on the staff home page (above the
+  module tiles of mainpage.pl) through a marked block in IntranetUserJS (staff.js) and its CSS in
+  IntranetUserCSS, in the staff colours whether or not the staff colour theme is on. "Sync current
+  OPAC settings" (replaces Reload) runs `--task opac-theme-sync`: the settings line of OpacUserCSS,
+  else theme-settings.json, else the config of our scripts; which of our blocks are present, the
+  library's own lines, and [kei-button] markers in OpacMainUserBlock (additional_contents), which
+  turn the news buttons on. Nothing is written until Apply.
 
 ---
 
