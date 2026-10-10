@@ -6,7 +6,8 @@
                    (menus, text to type, files to pick, yes/no, messages,
                    long texts, a file to edit) is one of the panel's own
                    screens, asked over the Pac-Man loader while it waits.
-  languages        the same, then the panel starts again in the new language
+  languages, language_activate
+                   the same, then the panel starts again in the new language
   update_panel     the same; a new version closes the panel (open it again)
   monitor, mc
                    full-screen programs of their own: the choice and the
@@ -33,12 +34,20 @@ def generic(action: str, title: str):
     return routine
 
 
-async def languages(app) -> None:
-    result = await run_interactive(app, t("Koha & Panel Languages"), "run", "languages")
+async def _language_change(app, title: str, action: str) -> None:
+    result = await run_interactive(app, t(title), "run", action)
     out = result.value if result else None
     lang = out.get("panel_lang") if out is not None and hasattr(out, "get") else ""
     if lang and normalize_panel_language(lang) != app.env.lang:
         app.exit(return_code=RESTART_CODE)
+
+
+async def languages(app) -> None:
+    await _language_change(app, "Koha & Panel Languages", "languages")
+
+
+async def language_activate(app) -> None:
+    await _language_change(app, "✅  Set an installed language as active", "lang-activate")
 
 
 async def update_panel(app) -> None:

@@ -46,6 +46,7 @@ ROUTINES: dict[str, Routine] = {
     "interoperability": settings.interoperability,
     "clock": settings.clock,
     "languages": tools.languages,
+    "lang-activate": tools.language_activate,
     "update-panel": tools.update_panel,
     "monitor": tools.monitor,
     "mc": tools.mc,
@@ -75,6 +76,8 @@ GENERIC: dict[str, str] = {
     "cutter": "🧮  Cutter Calculator",
     "ai-assistant": "💬  AI assistant on the staff home page",
     "crons": "⏰  Schedules & cron tasks",
+    "lang-download": "📥  Download a language pack only",
+    "lang-list": "📋  Installed languages & active one",
     "update-system": "🆙  Update OS packages & Koha schemas",
     "about": "💡  About the program & support",
     "reboot": "🔁  Reboot server",
@@ -89,7 +92,7 @@ def has(action: str) -> bool:
 
 def task_of(action: str) -> str:
     """The `--task` the routine needs from the installer ("" = its own)."""
-    if action in GENERIC or action in ("languages", "update-panel"):
+    if action in GENERIC or action in ("languages", "lang-activate", "update-panel"):
         return "run"
     if action in ("monitor", "mc"):
         return "tool-install"

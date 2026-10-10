@@ -155,8 +155,12 @@ SECTIONS: tuple[Section, ...] = (
     # The visual cron manager (views/crons.py); the entry is the classic routine.
     Section("crons", "⏰  Schedules & cron tasks", entries=(
         Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s"),
-    Section("languages", "🌍  Koha languages", entries=(
-        Entry("🌍  Koha languages", "languages", kind="native"),)),
+    Section("languages", "🌍  Koha languages", "🌍 Koha & Panel Languages", "Choose an action:", (
+        Entry("🌍  Download & activate a language", "languages", kind="native"),
+        Entry("📥  Download a language pack only", "lang-download", kind="native"),
+        Entry("✅  Set an installed language as active", "lang-activate", kind="native"),
+        Entry("📋  Installed languages & active one", "lang-list", kind="native"),
+    )),
     Section("update", "🔄  Update center", "🔄 Update Center", "Choose what to update:", (
         Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
         Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
@@ -231,7 +235,10 @@ DESCRIPTIONS: dict[str, str] = {
     "monitor": "Watches CPU, memory and network live",
     "mc": "Browses the server's files in Midnight Commander",
     "crons": "Turns Koha's scheduled jobs on or off",
-    "languages": "Installs or removes Koha's interface languages",
+    "languages": "Downloads a language and makes it the OPAC, staff and panel one",
+    "lang-download": "Downloads a Koha language pack and changes nothing else",
+    "lang-activate": "Makes an installed language the active one, no download",
+    "lang-list": "Lists the installed languages and the active ones",
     "update-system": "Updates the system packages and Koha's database",
     "update-panel": "Downloads the newest version of this panel",
     "about": "Version, license and where to get help",
