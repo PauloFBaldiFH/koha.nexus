@@ -51,3 +51,12 @@ The page reads `?lang=`, then `localStorage.koha_lang` (the site's key), then
 the browser. It writes back both, listens to `storage` events, and accepts
 `postMessage({type: "koha-nexus:lang", lang: "br"})` from a parent page when
 embedded in an iframe.
+
+## Paths on the live site
+
+The site's home page links here as `preview/` (menu and the Panel section).
+`assets/preview.js` resolves `data-src` and `data-asset-base` from the
+preview folder (the parent of `assets/`), not from the page URL, and a small
+script in `index.html` adds the trailing slash when a host serves `/preview`
+without one. The page therefore works at `/preview`, `/preview/` and
+`/preview/index.html`, at the domain root or under a subpath.
