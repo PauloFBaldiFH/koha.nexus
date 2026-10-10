@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.47** (1.5.48: authority linking modes PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.48** (1.5.49: staff authority links PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.49 (staff authority links)**: the magnifying glass next to a heading on the staff record
+  page opened `opac-authoritiesdetail.pl` (404 on the staff port). Koha's staff stylesheet
+  (25.05 to 26.05) links to `authorities/detail.pl`; only the OPAC one makes that link, so the staff
+  page was being drawn by an OPAC stylesheet. `staff_authlinks_fix` (after install, Koha update,
+  restore, and at the start of Sync & link authorities): any of `XSLTDetailsDisplay`,
+  `XSLTResultsDisplay`, `XSLTListsDisplay` whose file (or a file it imports) links to the OPAC page
+  goes back to `default` (the catalogue card files are written again instead when the preference is
+  the card's), then a jQuery rewrite is appended to `IntranetUserJS` when the text there does not
+  mention `opac-authoritiesdetail.pl` yet, written through `C4::Context->set_preference` by
+  `koha-shell -c "perl -"` (script from a quoted heredoc), then memcached and Plack restart, only
+  when something changed. Log: `tools/staff-authority-links-*.log`. Not run on a live Koha.
 - **1.5.48 (Sync & link authorities: simulation or apply, linker choice)**: the old flow always
   ran `link_bibs_to_authorities.pl --test` first and decided on its "Number of bibs modified",
   which Koha only counts outside `--test`, so it always said "nothing to change". Now the menu
