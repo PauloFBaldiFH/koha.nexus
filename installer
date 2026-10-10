@@ -6127,56 +6127,100 @@ lang_task_install() {
     return 0
 }
 
-function_install_languages() {
-    export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+# The language menu has four actions (classic menu 13, panel section
+# "languages"): download a pack only, download and activate, activate a
+# pack already installed, list the installed ones. The first install keeps
+# its own flow (it downloads the pack of the server's language; Koha's Web
+# Installer then makes it the active one).
 
-    local sudo_cmd=""
-    [ "$EUID" -ne 0 ] && sudo_cmd="sudo"
-    local created_mock=0
+# Koha's koha-translate, or "" when it is missing.
+lang_translate_cmd() {
+    local c
+    c=$(command -v koha-translate 2>/dev/null) || c=/usr/sbin/koha-translate
+    [ -x "$c" ] && printf '%s' "$c"
+}
 
-    # ==================================================================
-    # LANGUAGE SELECTOR (native names)
-    # ==================================================================
-    local choice
-    ask_menu "$(t "Koha & Panel Languages")" \
-        "$(t "Choose the language to install in Koha and apply to this Panel:")" \
-        "${KOHA_PANEL_LANG_FULL:-pt-BR}" "${PANEL_LANG_ITEMS[@]}" || return 0
-    choice="$REPLY"
-    [ -z "$choice" ] && return 0
+# Codes of the installed Koha languages, one per line. English ("en") is
+# built into Koha and always listed first.
+lang_installed() {
+    local cmd
+    cmd=$(lang_translate_cmd)
+    {
+        echo en
+        [ -n "$cmd" ] && "$cmd" --list 2>/dev/null
+    } | awk 'NF && $1 ~ /^[A-Za-z0-9-]+$/ && !seen[$1]++ { print $1 }'
+}
 
-    # ==================================================================
-    # APPLY AND PERSIST THE PANEL LANGUAGE (works even without Koha)
-    # ==================================================================
-    set_panel_language "$choice"
-    log "panel language set to $choice ($SYS_LANG)"
-    kei_result panel_lang "$choice"
+lang_is_installed() { lang_installed | grep -Fxq -- "$1"; }
 
-    if ! is_koha_installed || ! mysql -e "USE ${DB_NAME};" >/dev/null 2>&1; then
-        msg_info "$(t "Koha & Panel Languages")" \
-            "$(t "The panel language was changed.\n\nKoha is not installed yet, so its language pack will be installed later (the installer uses the panel language automatically).")" 12 74
-        return 0
+# The name of a language code ("pt-BR" -> "Português (Brasil)").
+lang_name() {
+    local i
+    [ "$1" = en ] && { printf 'English'; return 0; }
+    for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
+        [ "${PANEL_LANG_ITEMS[i]}" = "$1" ] && { printf '%s' "${PANEL_LANG_ITEMS[i+1]}"; return 0; }
+    done
+    printf '%s' "$1"
+}
+
+# A comma-separated preference value with $2 moved to the front: Koha shows
+# the first language of OPACLanguages / StaffInterfaceLanguages when the
+# browser asks for none of the enabled ones.
+lang_list_first() {
+    local out="$2" x
+    local -a items
+    IFS=',' read -ra items <<< "$1"
+    for x in "${items[@]}"; do
+        x="${x//[[:space:]]/}"
+        [ -n "$x" ] && [ "$x" != "$2" ] && out+=",$x"
+    done
+    printf '%s' "$out"
+}
+
+lang_pref() {
+    run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = '$1' LIMIT 1;"
+}
+lang_pref_exists() {
+    [ -n "$(run_sql "SELECT 1 FROM ${DB_NAME}.systempreferences WHERE variable = '$1' LIMIT 1;")" ]
+}
+lang_pref_set() {
+    run_sql "INSERT INTO ${DB_NAME}.systempreferences (variable, value, type) VALUES ('$1', '$2', 'Free')
+             ON DUPLICATE KEY UPDATE value = VALUES(value);"
+}
+
+# The staff preference of this Koha: StaffInterfaceLanguages (22.11 and
+# later) or "language" (older releases).
+lang_staff_pref() {
+    if ! lang_pref_exists StaffInterfaceLanguages && lang_pref_exists language; then
+        printf 'language'
+    else
+        printf 'StaffInterfaceLanguages'
     fi
+}
 
-    if ! command -v koha-foreach >/dev/null 2>&1; then
-        echo -e '#!/bin/bash\nexit 0' |
-            $sudo_cmd tee /usr/local/bin/koha-foreach >/dev/null 2>&1 && chmod +x /usr/local/bin/koha-foreach 2>/dev/null || {
-                echo -e '#!/bin/bash\nexit 0' > /tmp/koha-foreach
-                chmod +x /tmp/koha-foreach
-                export PATH="/tmp:$PATH"
-            }
-        created_mock=1
-    fi
+# Makes $1 the default language of the OPAC and of the staff interface
+# (first in each list, the other enabled languages kept after it).
+lang_activate() {
+    local code="$1" staff opac_v staff_v
+    staff=$(lang_staff_pref)
+    opac_v=$(lang_list_first "$(lang_pref OPACLanguages)" "$code")
+    staff_v=$(lang_list_first "$(lang_pref "$staff")" "$code")
+    lang_pref_set OPACLanguages "$opac_v" || return 1
+    lang_pref_set "$staff" "$staff_v" || return 1
+    # Older Koha read both names; keep the legacy one in step when present.
+    [ "$staff" = StaffInterfaceLanguages ] && lang_pref_exists language \
+        && run_sql "UPDATE ${DB_NAME}.systempreferences SET value = '$staff_v' WHERE variable = 'language';"
+    memcached_flush || true
+    plack_restart || true
+    log "languages: $code active (OPACLanguages=$opac_v, $staff=$staff_v)"
+    return 0
+}
 
-    # ==================================================================
-    # PREPARE SYSTEM LOCALE
-    # ==================================================================
-    clear
-    tui_title "🌍" "$(t "Koha & Panel Languages")"
-
+# Turns on the system locale of a language (koha-translate needs it).
+lang_prepare_locale() {
     local loc_prefix
-    loc_prefix=$(echo "$choice" | cut -d'-' -f1,2 | sed 's/-/_/')
-
-    case "$choice" in
+    loc_prefix=$(echo "$1" | cut -d'-' -f1,2 | sed 's/-/_/')
+    case "$1" in
         zh-Hans-CN) loc_prefix="zh_CN" ;;
         zh-Hant-TW) loc_prefix="zh_TW" ;;
         ja-Jpan-JP) loc_prefix="ja_JP" ;;
@@ -6196,108 +6240,196 @@ function_install_languages() {
         eu)         loc_prefix="eu_ES" ;;
         my)         loc_prefix="my_MM" ;;
     esac
-
     if [ -f /etc/locale.gen ]; then
-        $sudo_cmd sed -i -E \
-            "s/^#[[:space:]]*(${loc_prefix}[^[:space:]]*\.UTF-8[[:space:]]+UTF-8)/\1/i" \
+        sed -i -E "s/^#[[:space:]]*(${loc_prefix}[^[:space:]]*\.UTF-8[[:space:]]+UTF-8)/\1/i" \
             /etc/locale.gen 2>/dev/null || true
-
-        tui_run "$(t "Setting up language and UTF-8")" $sudo_cmd locale-gen || true
+        tui_run "$(t "Setting up language and UTF-8")" locale-gen || true
     fi
+}
 
-    # ==================================================================
-    # KOHA TRANSLATION PACKAGE
-    # ==================================================================
-    local koha_trans_cmd
-    koha_trans_cmd="$(command -v koha-translate || echo "/usr/sbin/koha-translate")"
+# Downloads (or updates) the Koha pack of $1. 0 = installed afterwards.
+lang_download() {
+    local code="$1" cmd
+    cmd=$(lang_translate_cmd)
+    if [ -z "$cmd" ]; then
+        msg_error "" "$(t "Koha translation utility was not found.\n\nExpected:\n/usr/sbin/koha-translate")" 11 74
+        return 1
+    fi
+    lang_prepare_locale "$code"
+    # koha-translate calls koha-foreach; a Koha without it gets a stand-in
+    # for this run only.
+    local stub=""
+    if ! command -v koha-foreach >/dev/null 2>&1; then
+        stub=/usr/local/bin/koha-foreach
+        printf '#!/bin/bash\nexit 0\n' > "$stub" && chmod +x "$stub" || stub=""
+    fi
+    : > /tmp/koha_lang.log
+    if lang_is_installed "$code"; then
+        TUI_LOG=/tmp/koha_lang.log tui_run "$(t "Updating the Koha language pack")" "$cmd" --update "$code"
+    else
+        TUI_LOG=/tmp/koha_lang.log tui_run "$(t "Installing the Koha language pack")" \
+            lang_task_install "$cmd" "$code"
+    fi
+    [ -n "$stub" ] && rm -f "$stub"
+    if lang_is_installed "$code"; then
+        log "languages: pack $code installed"
+        systemctl restart memcached >/dev/null 2>&1 || true
+        plack_restart || true
+        return 0
+    fi
+    local err_msg choice="$code"
+    err_msg=$(tail -n 12 /tmp/koha_lang.log 2>/dev/null || echo "$(t "Empty log.")")
+    log "languages: pack $code failed"
+    msg_error "" "$(t "Failed to process language '\$choice'.\n\nKoha native error details:\n\$err_msg")" 18 80
+    return 1
+}
 
-    if [ ! -x "$koha_trans_cmd" ]; then
-        msg_error "" \
-            "$(t "Koha translation utility was not found.\n\nExpected:\n/usr/sbin/koha-translate")" \
-            11 74
+# Menu of languages: every language the panel knows ($1 = all) or only the
+# installed ones ($1 = installed). The chosen code in REPLY.
+lang_pick() {
+    local which="$1" title="$2" text="$3" items=() code i
+    if [ "$which" = installed ]; then
+        while read -r code; do
+            items+=("$code" "$(lang_name "$code")")
+        done < <(lang_installed)
+    else
+        for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
+            items+=("${PANEL_LANG_ITEMS[i]}" "${PANEL_LANG_ITEMS[i+1]}")
+        done
+    fi
+    REPLY=$(ui_menu "$title" "$text" "${items[@]}") || return 1
+    [ -n "$REPLY" ]
+}
 
-        [ "$created_mock" -eq 1 ] && rm -f /tmp/koha-foreach /usr/local/bin/koha-foreach 2>/dev/null
+# Koha's database is there and the Web Installer has run (it has the
+# preferences); otherwise a message and 1.
+lang_require_preferences() {
+    if ! is_koha_installed || ! is_database_ready; then
+        msg_error "" "$(t "Koha's database is not ready yet. Finish the Web Installer first: it asks for the language and makes it the active one.")" 10 76
+        return 1
+    fi
+}
+
+# 1. Download a language pack only: no preference is changed. A pack that
+#    is already there is left as it is.
+function_lang_download() {
+    local title choice
+    title="$(t "📥  Download a language pack only")"
+    lang_pick all "$title" "$(t "Choose the language pack to download (nothing else changes):")" || return 0
+    choice="$REPLY"
+    require_koha || return 0
+    if lang_is_installed "$choice"; then
+        log "languages: $choice already installed, download skipped"
+        msg_info "$title" "$(t "The language '\$choice' is already installed. Nothing was downloaded.\n\nTo make it the active language, use \"Set an installed language as active\".")" 11 76
+        return 0
+    fi
+    lang_download "$choice" || return 0
+    msg_ok "$(t "Language pack '\$choice' downloaded.\nThe active language of the OPAC and the staff interface did not change.")" 10 76
+}
+
+# 2. Download and activate (the routine of the menu since the beginning):
+#    the panel language, the Koha pack, then the OPAC and staff default.
+function_install_languages() {
+    local choice
+    lang_pick all "$(t "Koha & Panel Languages")" \
+        "$(t "Choose the language to install in Koha and apply to this Panel:")" || return 0
+    choice="$REPLY"
+
+    set_panel_language "$choice"
+    log "panel language set to $choice ($SYS_LANG)"
+    kei_result panel_lang "$choice"
+
+    if ! is_koha_installed || ! mysql -e "USE ${DB_NAME};" >/dev/null 2>&1; then
+        msg_info "$(t "Koha & Panel Languages")" \
+            "$(t "The panel language was changed.\n\nKoha is not installed yet, so its language pack will be installed later (the installer uses the panel language automatically).")" 12 74
         return 0
     fi
 
-    : > /tmp/koha_lang.log
-    if $sudo_cmd "$koha_trans_cmd" --list 2>/dev/null | grep -Fq "$choice"; then
-        TUI_LOG=/tmp/koha_lang.log tui_run "$(t "Updating the Koha language pack")" \
-            $sudo_cmd "$koha_trans_cmd" --update "$choice"
-    else
-        TUI_LOG=/tmp/koha_lang.log tui_run "$(t "Installing the Koha language pack")" \
-            lang_task_install "$koha_trans_cmd" "$choice" "$sudo_cmd"
+    clear
+    tui_title "🌍" "$(t "Koha & Panel Languages")"
+    lang_download "$choice" || return 0
+
+    if ! is_database_ready; then
+        msg_ok "$(t "Language pack '\$choice' downloaded.\nThe Web Installer will offer it as the language of Koha.")" 10 76
+        return 0
     fi
+    lang_activate "$choice"
+    msg_ok "$(t "Language '\$choice' enabled successfully.\nFine tuning in: Administration > Preferences > I18N/L10N.")" 10 74
+}
 
-    # ==================================================================
-    # VERIFY KOHA LANGUAGE
-    # ==================================================================
-    if $sudo_cmd "$koha_trans_cmd" --list 2>/dev/null | grep -Fq "$choice"; then
-        $sudo_cmd systemctl restart memcached >/dev/null 2>&1 || true
-        plack_restart || true
+# 3. Set an installed language as active (OPAC, staff and this panel),
+#    without downloading anything.
+function_lang_activate() {
+    local title choice
+    title="$(t "✅  Set an installed language as active")"
+    require_koha || return 0
+    lang_require_preferences || return 0
+    lang_pick installed "$title" "$(t "Choose the installed language to make active in the OPAC, the staff interface and this panel:")" || return 0
+    choice="$REPLY"
+    lang_activate "$choice" || {
+        msg_error "" "$(t "Could not change the language preferences of Koha.")" 9 70
+        return 0
+    }
+    set_panel_language "$choice"
+    kei_result panel_lang "$choice"
+    msg_ok "$(t "Language '\$choice' is now the active language of the OPAC, the staff interface and this panel.\nNothing was downloaded.")" 10 76
+}
 
-        # ==============================================================
-        # ENABLE LANGUAGE IN KOHA
-        # ==============================================================
-        if prompt_yes_no "$(t "Enable language")" "$(t "Package processed.\n\nEnable it right away in the preferences (OPAC and Staff)?")" 10 70; then
-            local mysql_runner="mysql"
-
-            if ! mysql -e "SELECT 1" >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
-                mysql_runner="sudo mysql"
-            fi
-
-            # ----------------------------------------------------------
-            # OPAC
-            # ----------------------------------------------------------
-            $mysql_runner -e "
-                INSERT INTO ${DB_NAME}.systempreferences (variable, value, type)
-                VALUES ('OPACLanguages', '${choice}', 'Free')
-                ON DUPLICATE KEY UPDATE value = CASE
-                    WHEN value = '' OR value IS NULL THEN '${choice}'
-                    WHEN FIND_IN_SET('${choice}', value) THEN value
-                    ELSE CONCAT(value, ',', '${choice}')
-                END;
-            " >/dev/null 2>&1 || true
-
-            # ----------------------------------------------------------
-            # STAFF INTERFACE
-            # ----------------------------------------------------------
-            $mysql_runner -e "
-                INSERT INTO ${DB_NAME}.systempreferences (variable, value, type)
-                VALUES ('StaffInterfaceLanguages', '${choice}', 'Free')
-                ON DUPLICATE KEY UPDATE value = CASE
-                    WHEN value = '' OR value IS NULL THEN '${choice}'
-                    WHEN FIND_IN_SET('${choice}', value) THEN value
-                    ELSE CONCAT(value, ',', '${choice}')
-                END;
-            " >/dev/null 2>&1 || true
-
-            # ----------------------------------------------------------
-            # Legacy compatibility
-            # ----------------------------------------------------------
-            $mysql_runner -e "
-                UPDATE ${DB_NAME}.systempreferences SET value='${choice}' WHERE variable='language';
-            " >/dev/null 2>&1 || true
-
-            # ----------------------------------------------------------
-            # Clear sessions
-            # ----------------------------------------------------------
-            $mysql_runner -e "DELETE FROM ${DB_NAME}.sessions;" >/dev/null 2>&1 || true
-
-            $sudo_cmd systemctl restart memcached >/dev/null 2>&1 || true
-            plack_restart || true
-            $sudo_cmd systemctl reload apache2 >/dev/null 2>&1 || true
+# 4. The installed languages, with the default and the enabled ones of the
+#    OPAC and of the staff interface.
+function_lang_list() {
+    local title code opac="" staff="" sp tmp mark_o mark_s
+    title="$(t "📋  Installed languages & active one")"
+    require_koha || return 0
+    if is_database_ready; then
+        sp=$(lang_staff_pref)
+        opac=$(lang_pref OPACLanguages)
+        staff=$(lang_pref "$sp")
+    fi
+    tmp=$(mktemp)
+    {
+        printf '%s\n\n' "$(t "Koha languages installed on this server:")"
+        while read -r code; do
+            mark_o="-"
+            mark_s="-"
+            case ",${opac// /}," in *",$code,"*) mark_o="$(t "enabled")" ;; esac
+            case ",${staff// /}," in *",$code,"*) mark_s="$(t "enabled")" ;; esac
+            [ "${opac%%,*}" = "$code" ] && mark_o="$(t "ACTIVE")"
+            [ "${staff%%,*}" = "$code" ] && mark_s="$(t "ACTIVE")"
+            printf '  %-12s %-22s OPAC: %-10s %s: %s\n' "$code" "$(lang_name "$code")" "$mark_o" "$(t "Staff")" "$mark_s"
+        done < <(lang_installed)
+        printf '\n'
+        if is_database_ready; then
+            printf '%s %s\n' "$(t "Active in the OPAC:")" "${opac%%,*}"
+            printf '%s %s\n' "$(t "Active in the staff interface:")" "${staff%%,*}"
+            printf '\n%s\n' "$(t "A browser that asks for another enabled language gets that one.")"
+        else
+            printf '%s\n' "$(t "Koha's database is not ready yet. Finish the Web Installer first: it asks for the language and makes it the active one.")"
         fi
+        printf '%s %s\n' "$(t "This panel:")" "${KOHA_PANEL_LANG_FULL:-en-GB}"
+    } > "$tmp"
+    log "languages: listed ($(lang_installed | paste -sd, -)); OPAC=${opac:-?} staff=${staff:-?}"
+    ui_textbox "$title" "$tmp"
+    rm -f "$tmp"
+}
 
-        msg_ok "$(t "Language '\$choice' enabled successfully.\nFine tuning in: Administration > Preferences > I18N/L10N.")" 10 74
-
-    else
-        local err_msg
-        err_msg=$(tail -n 12 /tmp/koha_lang.log 2>/dev/null || echo "$(t "Empty log.")")
-        msg_error "" "$(t "Failed to process language '\$choice'.\n\nKoha native error details:\n\$err_msg")" 18 80
-    fi
-
-    [ "$created_mock" -eq 1 ] && rm -f /tmp/koha-foreach /usr/local/bin/koha-foreach 2>/dev/null
+# The classic panel's language menu (option 13).
+function_languages_menu() {
+    local opt
+    while true; do
+        opt=$(ui_menu "$(t "🌍 Koha & Panel Languages")" "$(t "Choose an action:")" \
+            "1" "$(t "🌍  Download & activate a language")" \
+            "2" "$(t "📥  Download a language pack only")" \
+            "3" "$(t "✅  Set an installed language as active")" \
+            "4" "$(t "📋  Installed languages & active one")") || return 0
+        case "$opt" in
+            1) function_install_languages ;;
+            2) function_lang_download ;;
+            3) function_lang_activate ;;
+            4) function_lang_list ;;
+            *) return 0 ;;
+        esac
+    done
 }
 
 # ======================================================================
@@ -28764,6 +28896,9 @@ panel_action_function() {
         mc)                 echo function_run_mc ;;
         crons)              echo function_manage_crons ;;
         languages)          echo function_install_languages ;;
+        lang-download)      echo function_lang_download ;;
+        lang-activate)      echo function_lang_activate ;;
+        lang-list)          echo function_lang_list ;;
         update-system)      echo function_update_system ;;
         update-panel)       echo function_autoupdate ;;
         about)              echo function_about ;;
@@ -29196,7 +29331,7 @@ while true; do
             esac
             ;;
         12) function_manage_crons ;;
-        13) function_install_languages ;;
+        13) function_languages_menu ;;
         14)
             SUB_OPT=$(whiptail --title "$(t '🔄 Update Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose what to update:')" 16 76 2 \

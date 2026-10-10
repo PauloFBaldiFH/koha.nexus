@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR; 1.5.43: OPAC/staff quick access buttons PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR; 1.5.42: language menu PR; 1.5.43: OPAC/staff quick access buttons PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -327,6 +327,16 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   maximumRecords=0 count call fetches no records; the result list is cached 10 minutes.
   recordSchema is the full info:srw URI as in Paulo's spec (PERGAMUM_SRU_RECORD_SCHEMA=marcxml
   switches it; yaz-client 5.34 reads both).
+
+- **1.5.42 (language menu)**: section "Koha languages" (classic option 13, panel cards) has four
+  actions: download a pack only (koha-translate --install, no preference changed; a pack already
+  there is skipped), download & activate (the old routine, now without its yes/no), set an
+  installed language as active (no download), and list the installed packs with the active and
+  enabled ones. "Active" = first in OPACLanguages and StaffInterfaceLanguages (or `language` on
+  Koha before 22.11), the other enabled languages kept after it; Koha shows the first one when
+  the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
+  is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
+  `tests/languages.bats` (MariaDB only) runs in the cloud.
 
 - **1.5.43 (OPAC and staff quick access buttons)**: each quick access button has a `sort_order`
   (settings saved before it get 1..n as listed, so nothing moves) and the buttons are shown by it;
