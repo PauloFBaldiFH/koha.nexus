@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.38"
+PANEL_VERSION=" 1.5.39"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -27180,6 +27180,9 @@ z3950_server_status() {
 # first, under the backup/restore lock.
 # ======================================================================
 OPAC_CUSTOM_DIR="/usr/share/koha/opac/htdocs/images/custom"
+# The staff interface's own pictures (logo, favicon, wallpaper): its web root
+# is another folder, served as /intranet-tmpl/kei-custom.
+STAFF_CUSTOM_DIR="${KEI_STAFF_CUSTOM_DIR:-/usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom}"
 OPAC_NA_BIN="/usr/local/bin/koha-kei-new-arrivals"
 OPAC_NA_FEED="kei-new-arrivals.json"
 CRON_OPAC="/etc/cron.d/koha_kei_opac"
@@ -27216,6 +27219,7 @@ opac_pref_line() {
         OPACAmazonCoverImages) [[ "$2" =~ ^[01]$ ]] || return 1 ;;
         AmazonAssocTag)        [[ "$2" =~ ^[A-Za-z0-9-]{0,40}$ ]] || return 1 ;;
         OpacFavicon)           [[ "$2" =~ ^(https://[A-Za-z0-9.-]+(:[0-9]+)?/|/images/custom/kei-)[A-Za-z0-9._~%/?=\&+-]*$ ]] || return 1 ;;
+        IntranetFavicon)       [[ "$2" =~ ^(https://[A-Za-z0-9.-]+(:[0-9]+)?/|/intranet-tmpl/kei-custom/kei-staff-)[A-Za-z0-9._~%/?=\&+-]*$ ]] || return 1 ;;
         *) return 1 ;;
     esac
     printf "UPDATE systempreferences SET value = %s WHERE variable = %s;\n" "$(sql_quote "$2")" "$(sql_quote "$1")"
@@ -27347,6 +27351,17 @@ opac_custom_drop() {
     return 0
 }
 
+# staff_custom_drop NAME...: the staff interface's pictures kei-NAME.* (NAME is staff-*).
+staff_custom_drop() {
+    local n f
+    for n in "$@"; do
+        for f in "${STAFF_CUSTOM_DIR:?}/kei-${n:?}".*; do
+            [ -f "$f" ] && rm -f -- "$f"
+        done
+    done
+    return 0
+}
+
 opac_theme_get() {
     require_database || return 1
     local line
@@ -27371,7 +27386,7 @@ opac_theme_apply() {
     fi
     for f in "$dir"/assets/*; do
         [ -e "$f" ] || continue
-        if [[ ! "${f##*/}" =~ ^kei-(background|logo|favicon)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
+        if [[ ! "${f##*/}" =~ ^kei-(staff-)?(background|logo|favicon)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
             msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
             return 1
         fi
@@ -27406,12 +27421,18 @@ _opac_theme_apply() {
         return 1
     fi
     if compgen -G "$dir/assets/kei-*" >/dev/null; then
-        mkdir -p "$OPAC_CUSTOM_DIR" && chmod 755 "$OPAC_CUSTOM_DIR"
         for f in "$dir"/assets/kei-*; do
             name="${f##*/}"
             name="${name#kei-}"
-            opac_custom_drop "${name%.*}"
-            install -m 644 "$f" "${OPAC_CUSTOM_DIR}/kei-${name}" && printf 'picture: kei-%s\n' "$name" >> "$log"
+            if [[ "$name" == staff-* ]]; then
+                mkdir -p "$STAFF_CUSTOM_DIR" && chmod 755 "$STAFF_CUSTOM_DIR"
+                staff_custom_drop "${name%.*}"
+                install -m 644 "$f" "${STAFF_CUSTOM_DIR}/kei-${name}" && printf 'staff picture: kei-%s\n' "$name" >> "$log"
+            else
+                mkdir -p "$OPAC_CUSTOM_DIR" && chmod 755 "$OPAC_CUSTOM_DIR"
+                opac_custom_drop "${name%.*}"
+                install -m 644 "$f" "${OPAC_CUSTOM_DIR}/kei-${name}" && printf 'picture: kei-%s\n' "$name" >> "$log"
+            fi
         done
     fi
     read -r mode count < "$dir/carousel" 2>/dev/null
@@ -27547,6 +27568,8 @@ _opac_theme_remove() {
         opac_pref_block_sql IntranetUserCSS -
         fav=$(opac_pref_raw OpacFavicon)
         [[ "$fav" == /images/custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'OpacFavicon';\n"
+        fav=$(opac_pref_raw IntranetFavicon)
+        [[ "$fav" == /intranet-tmpl/kei-custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'IntranetFavicon';\n"
         printf 'COMMIT;\n'
     } > "$sql"
     if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "$log" 2>&1; then
@@ -27555,6 +27578,7 @@ _opac_theme_remove() {
     fi
     opac_na_remove
     opac_custom_drop background logo favicon
+    staff_custom_drop staff-background staff-logo staff-favicon
     rm -f -- "$THEME_STATE"
     memcached_flush || true
     log "opac-theme: removed"

@@ -37,6 +37,11 @@ from .base import SectionView
 
 ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon"}
 FILE_SOURCES = ("local", "imgbb", "cloudinary")
+def _picture(raw: dict, name: str) -> dict:
+    """The settings entry of a picture: raw[name], or raw["staff"][...] for staff-*."""
+    return raw["staff"][name.removeprefix("staff-")] if name.startswith("staff-") else raw[name]
+
+
 SLIDERS = {   # id: (label, unit, step)
     "blur": ("Blur", "px", 1),
     "opacity": ("Opacity", "%", 1),
@@ -96,11 +101,7 @@ class OpacView(SectionView):
                            "ImgBB or Cloudinary, or a direct https address (Postimages and other hosts)."),
                          classes="ai-note", markup=False)
             for name in ot.ASSETS:
-                with Horizontal(classes="form-row"):
-                    yield Label(t(ASSET_LABELS[name]), classes="form-label")
-                    yield Select([(t(v), k) for k, v in ot.SOURCES.items()], value=c[name]["source"],
-                                 allow_blank=False, id=f"o-src-{name}", classes="opac-source")
-                    yield Input(c[name]["url"], id=f"o-val-{name}", placeholder=t("File or address"))
+                yield from self._asset_row(name, c[name])
         with Vertical(id="o-dark", classes="opac-box"):
             yield from self._slider("film")
             yield from _row(t("Light/dark switch"), Switch(c["dark_switch"], id="o-dark_switch"))
@@ -147,6 +148,10 @@ class OpacView(SectionView):
             yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
+            for name in ot.STAFF_ASSETS:
+                yield from self._asset_row(f"staff-{name}", st[name])
+            yield from _row(t("Legibility film"), Slider(*ot.STAFF_FILM, st["film"], step=5, unit="%",
+                                                         id="o-staff-film"))
             yield from _row(t("Table density"), Select([(t(v), k) for k, v in ot.STAFF_DENSITY.items()],
                                                        value=st["density"], allow_blank=False, id="o-staff-density"))
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
@@ -160,6 +165,15 @@ class OpacView(SectionView):
             yield Static(t("In a news item (Tools > News), this marker becomes a button:") + "\n  "
                          + '[kei-button url="https://..." icon="fa-book"]' + t("Text") + "[/kei-button]",
                          classes="ai-note", markup=False)
+
+    def _asset_row(self, name: str, current: dict) -> ComposeResult:
+        """A picture: where it comes from and the file or address. name is
+        background/logo/favicon, or staff-* for the staff interface's own."""
+        with Horizontal(classes="form-row"):
+            yield Label(t(ASSET_LABELS[name.removeprefix("staff-")]), classes="form-label")
+            yield Select([(t(v), k) for k, v in ot.SOURCES.items()], value=current["source"],
+                         allow_blank=False, id=f"o-src-{name}", classes="opac-source")
+            yield Input(current["url"], id=f"o-val-{name}", placeholder=t("File or address"))
 
     def _slider(self, key: str) -> ComposeResult:
         label, unit, step = SLIDERS[key]
@@ -263,6 +277,10 @@ class OpacView(SectionView):
         q("#o-staff-enabled", Switch).value = st["enabled"]
         for key in ("accent", "accent2", "surface"):
             q(f"#o-staff-{key}", Input).value = st[key]
+        for name in ot.STAFF_ASSETS:
+            q(f"#o-src-staff-{name}", Select).value = st[name]["source"]
+            q(f"#o-val-staff-{name}", Input).value = st[name]["url"]
+        q("#o-staff-film", Slider).value = st["film"]
         q("#o-staff-density", Select).value = st["density"]
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
@@ -285,7 +303,8 @@ class OpacView(SectionView):
                "news_buttons": q("#o-news_buttons", Switch).value,
                "staff": {"enabled": q("#o-staff-enabled", Switch).value,
                          "accent": q("#o-staff-accent", Input).value, "accent2": q("#o-staff-accent2", Input).value,
-                         "surface": q("#o-staff-surface", Input).value, "density": q("#o-staff-density", Select).value,
+                         "surface": q("#o-staff-surface", Input).value, "film": q("#o-staff-film", Slider).value,
+                         "density": q("#o-staff-density", Select).value,
                          "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
@@ -297,21 +316,24 @@ class OpacView(SectionView):
         if raw["carousel"]["amazon_tag"] and not ot.normalize(raw)["carousel"]["amazon_tag"]:
             return raw, {}, t("The Amazon tag has only letters, digits and hyphens.")
         pending: dict[str, tuple[str, Path]] = {}
-        for name in ot.ASSETS:
+        pictures = [(name, raw, self.cfg[name], t(ASSET_LABELS[name])) for name in ot.ASSETS]
+        pictures += [(f"staff-{name}", raw["staff"], self.cfg["staff"][name],
+                      f"{t('Staff interface')}: {t(ASSET_LABELS[name])}") for name in ot.STAFF_ASSETS]
+        for name, holder, current, label in pictures:
+            key = name.removeprefix("staff-")
             source = q(f"#o-src-{name}", Select).value
             value = q(f"#o-val-{name}", Input).value.strip()
-            label = t(ASSET_LABELS[name])
-            raw[name] = {"source": source, "url": ""}
+            holder[key] = {"source": source, "url": ""}
             if source == "none":
                 continue
             if not value:
                 return raw, {}, t("${name}: choose a file or type an address.", name=label)
-            if value == self.cfg[name]["url"] and source == self.cfg[name]["source"]:
-                raw[name]["url"] = value                      # already published
+            if value == current["url"] and source == current["source"]:
+                holder[key]["url"] = value                      # already published
             elif source == "url":
                 if not ot.safe_url(value):
                     return raw, {}, t("${name}: the address must start with https://.", name=label)
-                raw[name]["url"] = value
+                holder[key]["url"] = value
             else:
                 path = Path(value).expanduser()
                 problem = ot.image_problem(path)
@@ -389,10 +411,10 @@ class OpacView(SectionView):
                 self.app.task_failed(t("Sending the pictures"), result)
                 return
             for name, url in result.value.items():
-                raw[name]["url"] = url
+                _picture(raw, name)["url"] = url
         files = {n: p for n, (s, p) in pending.items() if s == "local"}
         for name, path in files.items():
-            raw[name]["url"] = ot.local_url(name, path)
+            _picture(raw, name)["url"] = ot.local_url(name, path)
         cfg = ot.normalize(raw)
         car = cfg["carousel"]
         lines = [f"{t('Texture')}: {t(ot.TEXTURES[cfg['texture']])}",
@@ -401,6 +423,9 @@ class OpacView(SectionView):
                  f"{t('Quick access buttons')}: {len(cfg['links']['items']) if cfg['links']['enabled'] else t('off')}",
                  f"{t('Staff interface')}: {t('on') if cfg['staff']['enabled'] else t('off')}"]
         lines += [f"{t(ASSET_LABELS[n])}: {cfg[n]['url']}" for n in ot.ASSETS if cfg[n]["url"]]
+        if cfg["staff"]["enabled"]:
+            lines += [f"{t('Staff interface')}: {t(ASSET_LABELS[n])}: {cfg['staff'][n]['url']}"
+                      for n in ot.STAFF_ASSETS if cfg["staff"][n]["url"]]
         if not await self.app.push_screen_wait(ConfirmScreen(
                 title, t("Write this look into Koha's OPAC? A backup of the database is taken first."),
                 preview="\n".join(lines))):

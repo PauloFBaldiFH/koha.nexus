@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.37** (1.5.38: OPAC header menu, staff theme PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.38** (1.5.39: staff icons and staff pictures PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -291,6 +291,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   in a darker shade of the same hue (no more blue/green clash), the .biglinks-list modules as
   cards with icon tiles, #area-news as a tinted card (his .btn-acesso links included). Koha
   rules beaten by specificity; !important only against .bg-dark and his inline news styles.
+
+- **1.5.39 (staff icons, staff pictures)**: Koha draws Pesquisa avançada / de exemplares with
+  two stacked icons (.fa-stack-1x under .fa-stack-2x); in the 2.4rem tile they collided, so the
+  small one is hidden and the magnifier centred. cfg["staff"] gains its own logo, favicon and
+  background (same sources as the OPAC's pictures) and a film (40-95 %, default 75) over the
+  wallpaper; the content boxes stay opaque. Local staff files are kei-staff-*.* in
+  /usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom (served as /intranet-tmpl/kei-custom,
+  the OPAC's folder is not served on the staff side); the favicon is the IntranetFavicon
+  preference (allowed values: https or that folder), cleared by Remove like OpacFavicon.
 
 ---
 

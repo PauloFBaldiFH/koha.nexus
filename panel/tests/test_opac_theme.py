@@ -284,3 +284,39 @@ def test_opac_header_menu_and_quick_links():
     assert "#header-region .dropdown-menu { z-index: 1060; }" in css and "overflow: visible !important" in css
     assert "flex-direction: column" in css and "auto-fill" not in css
     assert "html body .newsitem .btn-acesso" in css
+
+
+def test_staff_pictures_and_single_icon(tmp_path):
+    cfg = ot.normalize({"favicon": {"source": "url", "url": "https://example.org/opac.ico"},
+                        "staff": {"enabled": True, "film": 5,
+                                  "logo": {"source": "local", "url": "/intranet-tmpl/kei-custom/kei-staff-logo.png?v=1"},
+                                  "favicon": {"source": "url", "url": "https://example.org/staff.ico"},
+                                  "background": {"source": "url", "url": "javascript:alert(1)"}}})
+    st = cfg["staff"]
+    assert st["film"] == ot.STAFF_FILM[0] and st["background"]["url"] == ""
+    staff = ot.staff_css_body(cfg)
+    assert 'url("/intranet-tmpl/kei-custom/kei-staff-logo.png?v=1")' in staff and "#logo.navbar-brand img { display: none; }" in staff
+    assert ".fa-stack .fa-stack-1x {{ display: none; }}".replace("{{", "{").replace("}}", "}") in staff
+    assert "html body::before" not in staff                     # no wallpaper, no film
+    with_bg = ot.staff_css_body(ot.normalize({"staff": {"background": {"source": "url",
+                                                                       "url": "https://i.ibb.co/x/s.jpg"}}}))
+    assert 'url("https://i.ibb.co/x/s.jpg")' in with_bg and "html body::before" in with_bg
+    # The staff pictures stay out of the OPAC's stylesheet.
+    assert "kei-staff-logo" not in ot.css_body(cfg)
+    pic = tmp_path / "logo.png"
+    pic.write_bytes(b"\x89PNG\r\n\x1a\nx")
+    assert ot.local_url("staff-logo", pic).startswith("/intranet-tmpl/kei-custom/kei-staff-logo.png?v=")
+    assert ot.local_url("logo", pic).startswith("/images/custom/kei-logo.png?v=")
+    work = ot.write_apply_dir(cfg, {"staff-logo": pic})
+    try:
+        prefs = (work / "prefs").read_text()
+        assert "OpacFavicon\thttps://example.org/opac.ico" in prefs and "IntranetFavicon\thttps://example.org/staff.ico" in prefs
+        assert (work / "assets" / "kei-staff-logo.png").exists()
+    finally:
+        shutil.rmtree(work)
+    cfg["staff"]["enabled"] = False
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        assert "IntranetFavicon" not in (work / "prefs").read_text()
+    finally:
+        shutil.rmtree(work)

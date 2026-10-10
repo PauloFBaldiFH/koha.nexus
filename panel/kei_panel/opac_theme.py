@@ -47,6 +47,7 @@ JS_BEGIN = CSS_BEGIN
 JS_END = CSS_END
 DATA_TAG = "KEI-THEME-DATA:"
 CUSTOM_URL = "/images/custom"                       # /usr/share/koha/opac/htdocs/images/custom
+STAFF_CUSTOM_URL = "/intranet-tmpl/kei-custom"      # /usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom
 FEED_URL = CUSTOM_URL + "/kei-new-arrivals.json"    # written by the nightly job
 KEYS_FILE = "opac-theme.conf"                       # image host keys (0600)
 
@@ -68,6 +69,9 @@ THEMES = {"light": "Light", "dark": "Dark", "auto": "Follow the device"}
 SOURCES = {"none": "None", "local": "File on this server", "url": "Direct URL", "imgbb": "Upload to ImgBB",
            "cloudinary": "Upload to Cloudinary"}
 ASSETS = ("background", "logo", "favicon")
+# The staff interface's own pictures, in cfg["staff"]; their files are
+# kei-staff-<name>.* on the staff side (STAFF_CUSTOM_URL).
+STAFF_ASSETS = ASSETS
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
                ".webp": "image/webp", ".ico": "image/x-icon"}
 MAX_IMAGE = 8_000_000
@@ -101,13 +105,16 @@ DEFAULTS: dict = {
     # and table density, nothing shared with the OPAC. Settings saved before
     # it had colours start from the OPAC's (normalize()).
     "staff": {"enabled": False, "accent": "#2563eb", "accent2": "#7c3aed", "surface": "#ffffff",
-              "density": "normal", "contrast": "normal", "font": 100},
+              "density": "normal", "contrast": "normal", "font": 100,
+              "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
+              "favicon": {"source": "none", "url": ""}, "film": 75},
 }
 
 RANGES = {"blur": (0, 30), "opacity": (30, 100), "radius_block": (0, 30), "radius_input": (0, 30),
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
+STAFF_FILM = (40, 95)       # % of the film over the staff wallpaper: tables and forms stay readable
 
 
 # ----------------------------------------------------------------------
@@ -172,6 +179,13 @@ def _link(raw) -> dict | None:
     return {"icon": icon, "text": text, "url": url, "target": target}
 
 
+def _asset(raw) -> dict:
+    a = raw if isinstance(raw, dict) else {}
+    source = a.get("source") if a.get("source") in SOURCES else "none"
+    url = safe_url(a.get("url", ""))
+    return {"source": source, "url": url if source != "none" else ""}
+
+
 def normalize(raw: dict | None) -> dict:
     """Every setting checked: unknown keys dropped, numbers clamped, colours
     and URLs validated, defaults where missing."""
@@ -185,10 +199,7 @@ def normalize(raw: dict | None) -> dict:
     cfg["surface"] = _hex(raw.get("surface"), DEFAULTS["surface"])
     cfg["page"] = _hex(raw.get("page"), "") if raw.get("page") else ""
     for name in ASSETS:
-        a = raw.get(name) if isinstance(raw.get(name), dict) else {}
-        source = a.get("source") if a.get("source") in SOURCES else "none"
-        url = safe_url(a.get("url", ""))
-        cfg[name] = {"source": source, "url": url if source != "none" else ""}
+        cfg[name] = _asset(raw.get(name))
     cfg["dark_switch"] = bool(raw.get("dark_switch", DEFAULTS["dark_switch"]))
     cfg["default_theme"] = raw.get("default_theme") if raw.get("default_theme") in THEMES else "light"
     c = raw.get("carousel") if isinstance(raw.get("carousel"), dict) else {}
@@ -219,7 +230,10 @@ def normalize(raw: dict | None) -> dict:
                     "surface": _hex(st.get("surface"), DEFAULTS["staff"]["surface"]),
                     "density": st.get("density") if st.get("density") in STAFF_DENSITY else "normal",
                     "contrast": st.get("contrast") if st.get("contrast") in STAFF_CONTRAST else "normal",
-                    "font": _clamp(st.get("font", 100), *STAFF_FONT, 100)}
+                    "font": _clamp(st.get("font", 100), *STAFF_FONT, 100),
+                    "film": _clamp(st.get("film", DEFAULTS["staff"]["film"]), *STAFF_FILM, DEFAULTS["staff"]["film"])}
+    for name in STAFF_ASSETS:
+        cfg["staff"][name] = _asset(st.get(name))
     return cfg
 
 
@@ -865,8 +879,17 @@ html body ul.biglinks-list li a.icon_general > .fa-fw, html body ul.biglinks-lis
     color: var(--nexus-staff-primary);
     background-color: rgba(var(--nexus-staff-primary-rgb), .12);
 }}
-html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-2x {{ font-size: 1.15rem; color: var(--nexus-staff-primary); }}
-html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-1x {{ color: var(--nexus-staff-secondary); }}
+/* Koha draws the two search modules with two stacked icons (a book or a list
+   under a magnifier); in a small tile they collide, so only the magnifier stays. */
+html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-1x {{ display: none; }}
+html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-2x {{
+    position: static;
+    width: auto;
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: inherit;
+}}
 html body ul.biglinks-list li a.icon_general:hover, html body ul.biglinks-list li a.icon_general:focus-visible {{
     background-color: var(--nexus-staff-card);
     color: var(--nexus-staff-ink);
@@ -878,7 +901,6 @@ html body ul.biglinks-list li a.icon_general:hover > .fa-fw, html body ul.biglin
     background-color: var(--nexus-staff-primary);
     color: var(--nexus-staff-on-primary);
 }}
-html body ul.biglinks-list li a.icon_general:hover > .fa-stack i {{ color: var(--nexus-staff-on-primary); }}
 html body #koha_version a {{ color: var(--nexus-staff-muted); }}
 
 /* News column: a tinted card, clear headings, an airy list. */
@@ -967,6 +989,7 @@ html body textarea:focus {{
 }}""")
         if st["density"] == "compact":
             out.append("html body table { line-height: 1.25; }")
+    out += _staff_pictures_css(st)
     if st["contrast"] == "high":
         out.append("""html body { color: #000 !important; }
 html body .text-muted, html body .hint, html body .help-block, html body .form-text { color: #1f1f1f !important; }
@@ -974,6 +997,49 @@ html body table, html body table td, html body table th { border-color: #4b5563 
 html body a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
 html body .btn { border-width: 2px; }""")
     return "\n".join(out) + "\n"
+
+
+def _staff_pictures_css(st: dict) -> list[str]:
+    """The staff logo in the top bar and the staff wallpaper under a film of
+    the page colour (STAFF_FILM keeps it strong enough for tables and forms;
+    the content boxes stay opaque). The favicon is IntranetFavicon."""
+    out = []
+    logo = st["logo"]["url"]
+    if logo:
+        out.append(f"""html body nav.navbar #logo.navbar-brand {{
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    width: 150px;
+    height: 34px;
+    padding: 0;
+    background: url("{logo}") left center / contain no-repeat;
+}}
+html body nav.navbar #logo.navbar-brand img {{ display: none; }}
+@media (max-width: 575px) {{ html body nav.navbar #logo.navbar-brand {{ width: 96px; height: 28px; }} }}""")
+    bg = st["background"]["url"]
+    if bg:
+        page = mix(st["surface"], st["accent"], .04) if luminance(st["surface"]) >= 0.30 \
+            else mix(st["surface"], st["accent"], .08)
+        out.append(f"""html body {{
+    background: url("{bg}") center / cover no-repeat fixed;
+    position: relative;
+    z-index: 0;
+}}
+html body::before {{
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: rgba({_rgb(page)}, {st['film'] / 100:.2f});
+}}
+html body .main, html body .page-section, html body #container-main .row > div > .page-section,
+html body .dataTables_wrapper, html body fieldset.rows, html body form .action {{
+    background-color: var(--nexus-staff-card);
+    border-radius: var(--nexus-staff-radius);
+}}""")
+    return out
 
 
 def staff_css_block(cfg: dict) -> str:
@@ -1432,8 +1498,11 @@ def local_name(role: str, path: Path) -> str:
 
 
 def local_url(role: str, path: Path) -> str:
+    """The address of a picture copied to the server: the OPAC's folder, or
+    the staff interface's for the staff-* roles (another web root)."""
     digest = hashlib.sha256(path.read_bytes()).hexdigest()[:10]
-    return f"{CUSTOM_URL}/{local_name(role, path)}?v={digest}"
+    base = STAFF_CUSTOM_URL if role.startswith("staff-") else CUSTOM_URL
+    return f"{base}/{local_name(role, path)}?v={digest}"
 
 
 def keys_file() -> Path:
@@ -1522,6 +1591,8 @@ def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None)
             prefs.append(("AmazonAssocTag", car["amazon_tag"]))
     if cfg["favicon"]["url"]:
         prefs.append(("OpacFavicon", cfg["favicon"]["url"]))
+    if cfg["staff"]["enabled"] and cfg["staff"]["favicon"]["url"]:
+        prefs.append(("IntranetFavicon", cfg["staff"]["favicon"]["url"]))
     (work / "prefs").write_text("".join(f"{k}\t{v}\n" for k, v in prefs), encoding="utf-8")
     (work / "carousel").write_text(f"on {car['count']}\n" if car["enabled"] else "off\n", encoding="utf-8")
     assets = work / "assets"
