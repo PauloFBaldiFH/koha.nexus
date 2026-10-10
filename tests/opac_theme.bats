@@ -40,7 +40,7 @@ CREATE TABLE systempreferences (variable varchar(50) NOT NULL PRIMARY KEY, value
 INSERT INTO systempreferences (variable, value) VALUES
   ('OpacUserCSS', '#mine { color: red; }'), ('OpacUserJS', 'console.log(\"mine\");'),
   ('OPACAmazonCoverImages', '0'), ('AmazonAssocTag', ''), ('OpacFavicon', ''), ('OpacNav', 'keep'),
-  ('IntranetUserCSS', '#staff { color: navy; }');"
+  ('IntranetUserCSS', '#staff { color: navy; }'), ('IntranetFavicon', '');"
     mkdir -p "$W/custom" "$W/work"
     cat > "$W/extra.sh" <<SH
 SYS_LANG=en
@@ -52,6 +52,7 @@ tools_safety_backup() { TOOLS_PRE="$W/PRE-\$1.sql.gz"; echo "\$1" >> "$W/backups
 memcached_flush() { return 0; }
 TOOLS_LOG_DIR="$W/logs"
 OPAC_CUSTOM_DIR="$W/custom"
+STAFF_CUSTOM_DIR="$W/staff-custom"
 OPAC_NA_BIN="$W/koha-kei-new-arrivals"
 CRON_OPAC="$W/cron"
 THEME_STATE="$W/etc/theme-settings.json"
@@ -169,6 +170,28 @@ task() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat
     task opac_theme_remove
     [ "$status" -eq 0 ]
     [ "$(pref OpacFavicon)" = "https://example.org/f.ico" ]
+}
+
+@test "opac-theme-apply: the staff interface's own pictures go to its web root, and out with remove" {
+    printf '\x89PNG\r\n\x1a\nfake' > "$W/apply/assets/kei-staff-logo.png"
+    printf '\x00\x00\x01\x00fake' > "$W/apply/assets/kei-staff-favicon.ico"
+    printf 'IntranetFavicon\t/intranet-tmpl/kei-custom/kei-staff-favicon.ico?v=1\n' >> "$W/apply/prefs"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ -f "$W/staff-custom/kei-staff-logo.png" ] && [ -f "$W/staff-custom/kei-staff-favicon.ico" ]
+    [ ! -e "$W/custom/kei-staff-logo.png" ]
+    [ "$(pref IntranetFavicon)" = "/intranet-tmpl/kei-custom/kei-staff-favicon.ico?v=1" ]
+    task opac_theme_remove
+    [ "$status" -eq 0 ]
+    [ "$(pref IntranetFavicon)" = "" ]
+    [ ! -e "$W/staff-custom/kei-staff-logo.png" ] && [ ! -e "$W/staff-custom/kei-staff-favicon.ico" ]
+}
+
+@test "opac-theme-apply: a staff favicon outside the staff folder or https is refused" {
+    printf 'IntranetFavicon\tjavascript:alert(1)\nIntranetFavicon\t/images/custom/kei-favicon.png\n' >> "$W/apply/prefs"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ "$(pref IntranetFavicon)" = "" ]
 }
 
 @test "opac-theme-apply: staff.css goes in IntranetUserCSS, and out again without it" {
