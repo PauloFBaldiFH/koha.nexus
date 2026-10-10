@@ -84,3 +84,66 @@ setup() {
     run bash -c "set -o pipefail; source '$W/dump.sh'; source '$W/koha.sh'; magic_is_koha_dump \"$W/BKP_BIBLIOTECA (2).backup\""
     [ "$status" -eq 0 ]
 }
+
+# The codec helpers and create_safety_backup alone, with a mysqldump double
+# that prints a complete dump bigger than the 10 KB minimum.
+codec_env() {
+    { sed -n '/^dump_is_complete() {/,/^}/p' "$REPO/installer"
+      sed -n '/^# Compression of new backups: BACKUP_COMPRESSION/,/^# FILE EXPLORER/p' "$REPO/installer"; } > "$W/codec.sh"
+    cat > "$W/env.sh" <<EOF
+t() { printf '%s' "\$1"; }; log() { :; }; msg_error() { echo "ERROR \$2"; }; kei_result() { :; }
+apt_install() { return 1; }; write_backup_scripts() { echo rewritten; }
+CONF_DIR="$W/conf"; BACKUP_CONF="$W/conf/backup.conf"; LOG_DIR="$W"; DB_NAME=koha_library
+write_backup_config() { [ -f "\$BACKUP_CONF" ] || printf 'KEEP_DAYS=7\n' > "\$BACKUP_CONF"; }
+mysqldump() { cat "$W/big.sql"; }
+source "$W/dump.sh"; source "$W/codec.sh"
+EOF
+    { printf -- '-- MariaDB dump 10.19\n'; head -c 200000 /dev/urandom | base64 -w 76 | sed "s/^/INSERT INTO \`biblio\` VALUES ('/; s/\$/');/"; printf -- '-- Dump completed on 2026-10-10\n'; } > "$W/big.sql"
+}
+
+@test "new backups use the compression chosen in backup.conf and pass the same checks" {
+    command -v zstd >/dev/null || skip "zstd not installed"
+    codec_env
+    for c in gz zst xz; do
+        run bash -c "source '$W/env.sh'; backup_set_codec $c >/dev/null; f=\"$W/out\$(backup_ext)\"; create_safety_backup \"\$f\" && echo \"\$f \$(dump_codec \"\$f\")\"; dump_cat \"\$f\" | md5sum"
+        [ "$status" -eq 0 ]
+        [ "${lines[0]}" = "$W/out.sql.$c $c" ]
+        [ "${lines[1]}" = "$(md5sum < "$W/big.sql")" ]
+        grep -qx "BACKUP_COMPRESSION=\"$c\"" "$W/conf/backup.conf"
+    done
+    [ "$(grep -c '^BACKUP_COMPRESSION=' "$W/conf/backup.conf")" = "1" ]
+}
+
+@test "an unknown compression is refused; a missing program falls back to gzip" {
+    codec_env
+    run bash -c "source '$W/env.sh'; backup_set_codec rar; echo rc=\$?"
+    [ "$output" = "rc=2" ]
+    mkdir -p "$W/conf"; printf 'BACKUP_COMPRESSION="zst"\n' > "$W/conf/backup.conf"
+    run bash -c "source '$W/env.sh'; PATH=/nonexistent; backup_codec_setting; echo; backup_codec"
+    [ "${lines[0]}" = "zst" ] && [ "${lines[1]}" = "gz" ]
+    printf 'BACKUP_COMPRESSION="bogus"\n' > "$W/conf/backup.conf"
+    run bash -c "source '$W/env.sh'; backup_codec"
+    [ "$output" = "gz" ]
+}
+
+@test "the nightly script compresses with the codec of backup.conf and keeps every kind in its clean-up" {
+    command -v zstd >/dev/null || skip "zstd not installed"
+    codec_env
+    # The heredoc of write_backup_scripts, expanded by bash as the installer does.
+    n=$(grep -n '^    cat > /root/backup_sql.sh << EOF' "$REPO/installer" | cut -d: -f1)
+    sed -n "${n},/^EOF\$/p" "$REPO/installer" | sed "1s|/root/backup_sql.sh|$W/nightly.sh|" > "$W/gen.sh"
+    BACKUP_CONF="$W/conf/backup.conf" DB_NAME=koha_library DIR_SQL="$W/sql" LOG_DIR="$W" bash "$W/gen.sh"
+    sed -i "s|/var/lock/koha_backup.lock|$W/lock|" "$W/nightly.sh"
+    grep -q 'sql.\${BACKUP_COMPRESSION}' "$W/nightly.sh"
+    grep -q "name '\*.sql.zst' -o -name '\*.sql.xz'" "$W/nightly.sh"
+    mkdir -p "$W/conf" "$W/bin"
+    printf '#!/bin/bash\ncat "%s"\n' "$W/big.sql" > "$W/bin/mysqldump"; chmod +x "$W/bin/mysqldump"
+    for c in zst xz gz; do
+        printf 'BACKUP_COMPRESSION="%s"\n' "$c" > "$W/conf/backup.conf"
+        rm -rf "$W/sql"
+        run env PATH="$W/bin:$PATH" bash "$W/nightly.sh"
+        [ "$status" -eq 0 ]
+        f=$(ls "$W/sql")
+        [[ "$f" == koha_library_*.sql.$c ]]
+    done
+}

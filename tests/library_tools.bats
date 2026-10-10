@@ -86,19 +86,86 @@ bibs()        { tools_sql "SELECT COUNT(*) FROM biblio;"; }
 
 # --- SQL reports pack ------------------------------------------------------
 
+# The other Koha columns and tables the reports read (same names and types
+# as kohastructure.sql), with a row for each report to find.
+reports_catalog() {
+    tools_sql "
+ALTER TABLE borrowers ADD COLUMN IF NOT EXISTS address2 mediumtext, ADD COLUMN IF NOT EXISTS city longtext;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS itype varchar(10), ADD COLUMN IF NOT EXISTS ccode varchar(80),
+  ADD COLUMN IF NOT EXISTS booksellerid longtext, ADD COLUMN IF NOT EXISTS itemnotes_nonpublic longtext,
+  ADD COLUMN IF NOT EXISTS price decimal(8,2), ADD COLUMN IF NOT EXISTS replacementprice decimal(8,2),
+  ADD COLUMN IF NOT EXISTS withdrawn tinyint(1) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS withdrawn_on datetime,
+  ADD COLUMN IF NOT EXISTS damaged tinyint(1) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS damaged_on datetime,
+  ADD COLUMN IF NOT EXISTS datelastborrowed date;
+ALTER TABLE statistics ADD COLUMN IF NOT EXISTS itemtype varchar(10);
+CREATE TABLE IF NOT EXISTS itemtypes (itemtype varchar(10) NOT NULL PRIMARY KEY, description longtext) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE accountlines (accountlines_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11), amountoutstanding decimal(28,6));
+CREATE TABLE borrower_debarments (borrower_debarment_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11) NOT NULL,
+  expiration date, type varchar(50) NOT NULL DEFAULT 'MANUAL', comment mediumtext);
+CREATE TABLE reserves (reserve_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11) NOT NULL, biblionumber int(11) NOT NULL,
+  itemnumber int(11), branchcode varchar(10), found varchar(1), waitingdate date);
+CREATE TABLE auth_header (authid bigint(20) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, authtypecode varchar(10) NOT NULL DEFAULT '',
+  datecreated date, marcxml longtext NOT NULL) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO itemtypes VALUES ('LIVRO', 'Livro') ON DUPLICATE KEY UPDATE description = VALUES(description);
+UPDATE items SET itype = 'LIVRO', itemcallnumber = '869.3 A1', booksellerid = 'Doação da prefeitura', dateaccessioned = CURDATE() WHERE itemnumber = 20;
+UPDATE items SET withdrawn = 1, withdrawn_on = '2025-05-01' WHERE itemnumber = 30;
+UPDATE biblio SET datecreated = CURDATE() WHERE biblionumber = 20;
+UPDATE biblio_metadata SET metadata = REPLACE(metadata, '</record>', '<controlfield tag=\"008\">250101s2025    bl     j      000 1 por d</controlfield><datafield tag=\"650\" ind1=\" \" ind2=\"4\"><subfield code=\"a\">Contos</subfield><subfield code=\"9\">1</subfield></datafield></record>') WHERE biblionumber = 20;
+UPDATE borrowers SET city = 'Curitiba', address2 = 'Centro' WHERE cardnumber IN ('S1', 'S2');
+UPDATE borrowers SET dateenrolled = CURDATE() WHERE cardnumber = 'S2';
+INSERT INTO statistics (datetime, branch, type, itemnumber, borrowernumber, itemtype)
+  SELECT NOW(), 'CPL', 'issue', 20, borrowernumber, 'LIVRO' FROM borrowers WHERE cardnumber = 'S1';
+INSERT INTO accountlines (borrowernumber, amountoutstanding) SELECT borrowernumber, 2.5 FROM borrowers WHERE cardnumber = 'S2';
+INSERT INTO borrower_debarments (borrowernumber, expiration, comment) SELECT borrowernumber, NULL, 'Overdue' FROM borrowers WHERE cardnumber = 'S3';
+INSERT INTO reserves (borrowernumber, biblionumber, itemnumber, branchcode, found, waitingdate)
+  SELECT borrowernumber, 5, 5, 'CPL', 'W', CURDATE() FROM borrowers WHERE cardnumber = 'S1';
+INSERT INTO auth_header (authid, authtypecode, datecreated, marcxml) VALUES
+  (1, 'TOPIC_TERM', '2025-01-01', '<record><datafield tag=\"150\" ind1=\" \" ind2=\" \"><subfield code=\"a\">Contos</subfield></datafield></record>'),
+  (2, 'PERSO_NAME', '2025-01-01', '<record><datafield tag=\"100\" ind1=\"1\" ind2=\" \"><subfield code=\"a\">Ninguém, Fulano</subfield></datafield></record>');"
+}
+# report_run KEY: the saved report of the pack, run as Koha would (dates asked at run time: 2000-01-01..2099-12-31).
+report_run() {
+    local q
+    q=$(tools_sql "SELECT savedsql FROM saved_sql WHERE notes LIKE '%[koha-easy-installer:$1]%';")
+    [ -n "$q" ] || return 1
+    q=$(sed -E -e "s/<<From[^<>]*>>/'2000-01-01'/g" -e "s/<<[^<>]*>>/'2099-12-31'/g" <<< "$q")
+    tools_sql "$q"
+}
+
 @test "L08 reports pack: tagged read-only reports, idempotent, removal keeps other reports" {
+    reports_catalog
     inputs "1"; answer yes
     panel lt_reports
     assert '[ "$status" -eq 0 ]' "$output"
     local n ids
     n=$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '%[koha-easy-installer:%';")
-    assert '[ "$n" = "8" ]' "8 reports expected, got $n: $(dialogs)"
+    assert '[ "$n" = "22" ]' "22 reports expected, got $n: $(dialogs) $(cat "$KEI_S/textbox.last")"
+    # C4::Reports::Guided refuses these words anywhere in a saved report.
+    assert '[ "$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '"'"'%[koha-easy-installer:%'"'"' AND savedsql REGEXP '"'"'[[:<:]](UPDATE|DELETE|DROP|INSERT|SHOW|CREATE)[[:>:]]'"'"';")" = "0" ]' "a report has a word Koha refuses"
+    # Each new report finds the row made for it.
+    assert 'report_run acquisitions | grep -q "Donation"' "$(report_run acquisitions)"
+    assert 'report_run zero-loans | grep -q .'
+    assert 'report_run ddc-classes | grep -qP "^800\tLiterature\t1\t1$"' "$(report_run ddc-classes)"
+    assert 'report_run patrons-district | grep -qP "^Curitiba\tCentro\t2\t2$"' "$(report_run patrons-district)"
+    assert 'report_run patrons-new | grep -qP "\tST\tCPL\t1$"' "$(report_run patrons-new)"
+    assert 'report_run inventory-out | grep -q "Withdrawn: 1"' "$(report_run inventory-out)"
+    assert 'report_run inventory-out | grep -q "Lost: Lost"' "$(report_run inventory-out)"
+    assert 'report_run loans-type | grep -qP "^Livro\t1\t0\t0$"' "$(report_run loans-type)"
+    assert 'report_run children-new | grep -q "869.3 A1"' "$(report_run children-new)"
+    assert '[ "$(report_run fines-debarred | wc -l)" = "2" ]' "$(report_run fines-debarred)"
+    assert '[ "$(report_run orphan-authorities | cut -f1)" = "2" ]' "$(report_run orphan-authorities)"
+    assert 'report_run active-patrons | grep -qP "^ST\tStudent\t1\t1$"' "$(report_run active-patrons)"
+    assert '[ "$(report_run holds-waiting | wc -l)" = "1" ]'
+    assert 'report_run collection-type | grep -qP "^CPL\tLivro\t1\t1\t0$"' "$(report_run collection-type)"
+    assert 'report_run circ-daily | grep -q .'
+
     assert '[ "$(pre_backups REPORTS)" = "1" ]'
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '"'"'%[koha-easy-installer:%'"'"' AND savedsql NOT LIKE '"'"'SELECT %'"'"';")" = "0" ]' "only SELECT statements"
     assert '[ "$(tools_sql "SELECT DISTINCT borrowernumber FROM saved_sql WHERE report_group IS NOT NULL;")" = "$(tools_sql "SELECT borrowernumber FROM borrowers WHERE cardnumber = '"'"'E4'"'"';")" ]' "owner = the superlibrarian"
     # Every saved query runs on the catalog.
     local q
     while IFS= read -r q; do
+        q=$(sed -E "s/<<[^<>]*>>/'2000-01-01'/g" <<< "$q")      # the dates Koha asks for
         assert 'mysql koha_library -e "$q" >/dev/null' "report does not run: $q"
     done < <(tools_sql "SELECT savedsql FROM saved_sql WHERE notes LIKE '%[koha-easy-installer:%';")
     ids=$(tools_sql "SELECT GROUP_CONCAT(id ORDER BY id) FROM saved_sql;")

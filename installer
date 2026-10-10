@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.39"
+PANEL_VERSION=" 1.5.40"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2757,14 +2757,86 @@ koha_schema_missing() {
     printf '%s' "${missing% }"
 }
 
-# Dumps the Koha database to $1 and checks the result (gzip test, complete
+# ----------------------------------------------------------------------
+# Compression of new backups: BACKUP_COMPRESSION in backup.conf.
+#   gz   gzip, the default: opens anywhere (Windows, 7-Zip, any Linux)
+#   zst  Zstandard: smaller than gzip and much faster to make and to read
+#        back, the best for large catalogs
+#   xz   LZMA: the smallest file, slow to make; for long-term storage
+# Restores never depend on it: dump_codec reads the first bytes.
+# ----------------------------------------------------------------------
+BACKUP_CODECS="gz zst xz"
+# find expression for every SQL backup the panel makes, whatever its codec.
+SQL_BACKUP_NAMES=( \( -name '*.sql.gz' -o -name '*.sql.zst' -o -name '*.sql.xz' \) )
+
+# The codec set in backup.conf (gz when unset or unknown).
+backup_codec_setting() {
+    local c
+    c=$(grep -E '^BACKUP_COMPRESSION=' "$BACKUP_CONF" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]')
+    case " $BACKUP_CODECS " in *" ${c:-gz} "*) printf '%s' "${c:-gz}" ;; *) printf 'gz' ;; esac
+}
+
+# The codec new backups use: the setting, or gzip when its program is missing.
+backup_codec() {
+    local c
+    c=$(backup_codec_setting)
+    case "$c" in
+        zst) command -v zstd >/dev/null 2>&1 || c=gz ;;
+        xz)  command -v xz >/dev/null 2>&1 || c=gz ;;
+    esac
+    printf '%s' "$c"
+}
+
+# ".sql.gz", ".sql.zst" or ".sql.xz": the end of a new backup's name.
+backup_ext() { printf '.sql.%s' "${1:-$(backup_codec)}"; }
+
+# backup_compress CODEC: compresses stdin to stdout. zstd and xz use every
+# core; xz keeps under 40% of the RAM (it lowers its level itself if needed).
+backup_compress() {
+    case "$1" in
+        zst) zstd -q -T0 -9 ;;
+        xz)  xz -q -T0 -9 --memlimit-compress=40% ;;
+        *)   gzip ;;
+    esac
+}
+
+# backup_set_codec CODEC: saves the choice in backup.conf, installing the
+# program first when it is missing, and rewrites the nightly script so it
+# reads the setting. Returns 2 for an unknown codec.
+backup_set_codec() {
+    local c="$1"
+    case " $BACKUP_CODECS " in *" $c "*) ;; *) return 2 ;; esac
+    local prog=gzip pkg=gzip
+    case "$c" in zst) prog=zstd; pkg=zstd ;; xz) prog=xz; pkg=xz-utils ;; esac
+    command -v "$prog" >/dev/null 2>&1 || apt_install "$pkg" >/dev/null 2>&1
+    if ! command -v "$prog" >/dev/null 2>&1; then
+        msg_error "" "$(t 'The compression program could not be installed (${c}). New backups stay gzip (.sql.gz).')" 9 72
+        return 1
+    fi
+    mkdir -p "$CONF_DIR" 2>/dev/null
+    write_backup_config
+    if grep -qE '^BACKUP_COMPRESSION=' "$BACKUP_CONF" 2>/dev/null; then
+        sed -i -E "s|^BACKUP_COMPRESSION=.*|BACKUP_COMPRESSION=\"${c}\"|" "$BACKUP_CONF"
+    else
+        printf 'BACKUP_COMPRESSION="%s"\n' "$c" >> "$BACKUP_CONF"
+    fi
+    chmod 600 "$BACKUP_CONF"
+    [ -f /root/backup_sql.sh ] && write_backup_scripts
+    log "backup compression set to $c"
+    [ -n "${KEI_TASK:-}" ] && kei_result compression "$c"
+    return 0
+}
+
+# Dumps the Koha database to $1 (compressed as its name ends: .sql.gz,
+# .sql.zst or .sql.xz) and checks the result (compression test, complete
 # mysqldump, minimum size). Removes the file and returns 1 on any failure.
 create_safety_backup() {
-    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}"
+    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec
+    case "$out" in *.zst) codec=zst ;; *.xz) codec=xz ;; *) codec=gz ;; esac
     mkdir -p "$(dirname "$out")" 2>/dev/null
     if mysqldump --single-transaction --quick --routines --triggers \
-            --default-character-set=utf8mb4 "$DB_NAME" 2>>"$errlog" | gzip 2>/dev/null > "$out" \
-       && gzip -t "$out" 2>/dev/null \
+            --default-character-set=utf8mb4 "$DB_NAME" 2>>"$errlog" | backup_compress "$codec" 2>/dev/null > "$out" \
+       && [ "$(dump_codec "$out")" = "$codec" ] && dump_test "$out" \
        && [ "$(stat -c %s "$out" 2>/dev/null || echo 0)" -ge 10240 ] \
        && dump_is_complete "$out"; then
         return 0
@@ -3067,7 +3139,7 @@ validate_ufw() {
 validate_backups() {
     local newest age
     if [ -d "$DIR_SQL" ]; then
-        newest=$(find "$DIR_SQL" -name '*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+        newest=$(newest_sql_backup)
         if [ -n "$newest" ]; then
             age=$(( ( $(date +%s) - $(stat -c %Y "$newest") ) / 86400 ))
             if [ "$age" -le 2 ]; then
@@ -3075,7 +3147,7 @@ validate_backups() {
             else
                 v_warn "Backup SQL: $(t "newest is") ${age} $(t "days old")."
             fi
-            gzip -t "$newest" >/dev/null 2>&1 \
+            dump_test "$newest" >/dev/null 2>&1 \
                 && v_ok "Backup SQL: $(t "archive is intact")." \
                 || v_fail "Backup SQL: $(t "archive is CORRUPT"): $newest"
         else
@@ -4076,6 +4148,9 @@ RCLONE_REMOTE=""
 RCLONE_SQL_FOLDER="Backup_SQL_Koha"
 RCLONE_MARC_FOLDER="Backup_MARC_Koha"
 KEEP_DAYS=7
+# Compression of new SQL backups: gz (opens anywhere), zst (fast, smaller)
+# or xz (smallest, slow). Restores read any of them.
+BACKUP_COMPRESSION="gz"
 EOF
     chmod 600 "$BACKUP_CONF"
 }
@@ -4094,9 +4169,36 @@ DB="${DB_NAME}"
 DIR="${DIR_SQL}"
 LOG="${LOG_DIR}/backup_sql.log"
 LOCK_FILE="/var/lock/koha_backup.lock"
-RCLONE_REMOTE=""; RCLONE_SQL_FOLDER="Backup_SQL_Koha"; KEEP_DAYS=7
+RCLONE_REMOTE=""; RCLONE_SQL_FOLDER="Backup_SQL_Koha"; KEEP_DAYS=7; BACKUP_COMPRESSION="gz"
 [ -f "\$CONF" ] && . "\$CONF"
 case "\${KEEP_DAYS}" in ''|*[!0-9]*) KEEP_DAYS=7;; esac
+# gz (default), zst or xz; gzip when the chosen program is missing.
+case "\${BACKUP_COMPRESSION}" in
+    zst) command -v zstd >/dev/null 2>&1 || BACKUP_COMPRESSION=gz ;;
+    xz)  command -v xz >/dev/null 2>&1 || BACKUP_COMPRESSION=gz ;;
+    *)   BACKUP_COMPRESSION=gz ;;
+esac
+compress() {
+    case "\$BACKUP_COMPRESSION" in
+        zst) zstd -q -T0 -9 ;;
+        xz)  xz -q -T0 -9 --memlimit-compress=40% ;;
+        *)   gzip ;;
+    esac
+}
+decompress() {
+    case "\$BACKUP_COMPRESSION" in
+        zst) zstd -dcq -- "\$1" ;;
+        xz)  xz -dc -- "\$1" ;;
+        *)   gzip -dc -- "\$1" ;;
+    esac
+}
+test_archive() {
+    case "\$BACKUP_COMPRESSION" in
+        zst) zstd -tq -- "\$1" ;;
+        xz)  xz -t -- "\$1" ;;
+        *)   gzip -t -- "\$1" ;;
+    esac
+}
 
 log_backup() { mkdir -p "\$(dirname "\$LOG")" 2>/dev/null || true; printf '%s | %s\n' "\$(date '+%F %T')" "\$*" >> "\$LOG"; }
 exec 9>"\$LOCK_FILE"
@@ -4109,23 +4211,23 @@ if ! mkdir -p "\$DIR" 2>/dev/null; then
     exit 1
 fi
 
-FILE="\$DIR/\${DB}_\$(date +%Y-%m-%d_%Hh%M).sql.gz"
+FILE="\$DIR/\${DB}_\$(date +%Y-%m-%d_%Hh%M).sql.\${BACKUP_COMPRESSION}"
 
 if ! mysqldump --single-transaction --quick --routines --triggers \
-        --default-character-set=utf8mb4 "\$DB" 2>>"\$LOG" | gzip 2>>"\$LOG" > "\$FILE"; then
+        --default-character-set=utf8mb4 "\$DB" 2>>"\$LOG" | compress 2>>"\$LOG" > "\$FILE"; then
     log_backup "FAILED to generate \$FILE"
     rm -f "\$FILE"
     exit 1
 fi
 
-if ! gzip -t "\$FILE" 2>/dev/null; then
+if ! test_archive "\$FILE" 2>/dev/null; then
     log_backup "FAILED: corrupt file removed: \$FILE"
     rm -f "\$FILE"
     exit 1
 fi
 
 # A complete dump ends with mysqldump's "-- Dump completed" line.
-if [ "\$(zcat "\$FILE" | tail -c 512 | grep -c '^-- Dump completed')" -eq 0 ]; then
+if [ "\$(decompress "\$FILE" | tail -c 512 | grep -c '^-- Dump completed')" -eq 0 ]; then
     log_backup "FAILED: incomplete dump (no completion line) removed: \$FILE"
     rm -f "\$FILE"
     exit 1
@@ -4150,7 +4252,7 @@ if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
     fi
 fi
 
-find "\$DIR" -name '*.sql.gz' -mtime "+\${KEEP_DAYS}" -delete 2>/dev/null || true
+find "\$DIR" \\( -name '*.sql.gz' -o -name '*.sql.zst' -o -name '*.sql.xz' \\) -mtime "+\${KEEP_DAYS}" -delete 2>/dev/null || true
 exit 0
 EOF
 
@@ -5237,7 +5339,7 @@ function_install_koha() {
             return 1
         fi
         local rescue db_has_tables
-        rescue="${DIR_SQL}/PRE-REINSTALLATION_$(date +%Y-%m-%d_%Hh%M%S).sql.gz"
+        rescue="${DIR_SQL}/PRE-REINSTALLATION_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
         # "Could not count" is not "empty": no DROP without a verified copy.
         db_has_tables=$(koha_table_count) || db_has_tables="unknown"
         if [ "$db_has_tables" != "0" ]; then
@@ -5770,7 +5872,7 @@ _function_restore_database() {
     fi
     pre_engine=$(get_search_engine)
     if [ "$cur_tables" -gt 0 ]; then
-        rescue="${DIR_SQL}/PRE-RESTORE_$(date +%Y-%m-%d_%Hh%M%S).sql.gz"
+        rescue="${DIR_SQL}/PRE-RESTORE_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
         CLEANUP_FILE="$rescue"
         if ! tui_run "$(t "Saving a safety backup")" create_safety_backup "$rescue" "$import_log"; then
             CLEANUP_FILE=""
@@ -5879,7 +5981,7 @@ function_manual_backup() {
         msg_error "" "$(t "The folder does not exist or cannot be written:") $target_dir" 9 74
         return 1
     fi
-    target_file="${target_dir%/}/${DB_NAME}_manual_$(date +%Y-%m-%d_%Hh%M).sql.gz"
+    target_file="${target_dir%/}/${DB_NAME}_manual_$(date +%Y-%m-%d_%Hh%M)$(backup_ext)"
 
     clear
     display_explanation "Generating the backup..."
@@ -5931,7 +6033,7 @@ function_manual_backup() {
 # 5. TEST THE LATEST BACKUP
 # ======================================================================
 newest_sql_backup() {
-    find "$DIR_SQL" -name '*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-
+    find "$DIR_SQL" "${SQL_BACKUP_NAMES[@]}" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-
 }
 # function_test_backup [FILE]: the newest automatic backup unless the new
 # panel names another file.
@@ -6461,7 +6563,7 @@ require_koha_tables() {
     tables=$(koha_table_count)
     if [ "${tables:-0}" -lt 50 ] 2>/dev/null; then
         local rescue
-        rescue=$(ls -1t "${DIR_SQL}"/PRE-RESTORE_*.sql.gz "${DIR_SQL}"/PRE-REINSTALLATION_*.sql.gz 2>/dev/null | head -n1)
+        rescue=$(ls -1t "${DIR_SQL}"/PRE-RESTORE_*.sql.* "${DIR_SQL}"/PRE-REINSTALLATION_*.sql.* 2>/dev/null | head -n1)
         [ -n "$rescue" ] && rescue_hint="\n\n$(t "Safety copy made before the last restore:")\n${rescue}"
         msg_error "" "$(t 'The Koha database is empty or incomplete (${tables} tables).\n\nRestore a backup (option 3) or finish the Web Installer first.')${rescue_hint}" 15 80
         return 1
@@ -8768,7 +8870,7 @@ function_update_system() {
             msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")" 10 72
             return 1
         fi
-        pre_update="${DIR_SQL}/PRE-UPDATE_$(date +%Y-%m-%d_%Hh%M%S).sql.gz"
+        pre_update="${DIR_SQL}/PRE-UPDATE_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
         CLEANUP_FILE="$pre_update"
         if ! tui_run "$(t "Saving a safety backup")" create_safety_backup "$pre_update"; then
             CLEANUP_FILE=""
@@ -8958,7 +9060,7 @@ detailed_status_rows() {
     [ -n "$pub" ] && printf '%s\t%s\t%s\n' "$g" "$(t "Public IP")" "$pub"
     g=$(t "BACKUP")
     printf '%s\t%s\t%s\n' \
-        "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" -name '*.sql.gz' -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
+        "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" "${SQL_BACKUP_NAMES[@]}" -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
         "$g" "$(t "Cloud")" "$(grep -o 'RCLONE_REMOTE="[^"]*"' "$BACKUP_CONF" 2>/dev/null | cut -d'"' -f2 | grep . || echo "$(t "not configured")")"
 }
 
@@ -9018,7 +9120,7 @@ kei_http_code() {
 # Prints: epoch size result file   (result: ok | failed | skipped | none)
 kei_backup_summary() {
     local newest epoch=0 size=0 file="" last result="none"
-    newest=$(find "$DIR_SQL" -maxdepth 1 -name '*.sql.gz' -printf '%T@ %s %p\n' 2>/dev/null | sort -rn | head -n1)
+    newest=$(find "$DIR_SQL" -maxdepth 1 "${SQL_BACKUP_NAMES[@]}" -printf '%T@ %s %p\n' 2>/dev/null | sort -rn | head -n1)
     if [ -n "$newest" ]; then
         epoch="${newest%%.*}"
         size=$(printf '%s' "$newest" | awk '{print $2}')
@@ -9791,11 +9893,12 @@ tools_locked() {
 # Verified PRE-<TAG> dump taken right before a tool writes (the caller holds
 # the lock). Sets TOOLS_PRE; returns 1, with nothing changed, if it failed.
 tools_safety_backup() {
-    local base n=1
+    local base n=1 ext
     base="${DIR_SQL}/PRE-${1}_$(date +%Y-%m-%d_%Hh%M%S)"
-    TOOLS_PRE="${base}.sql.gz"
+    ext=$(backup_ext)
+    TOOLS_PRE="${base}${ext}"
     # Two changes in the same second never share (and overwrite) a backup.
-    while [ -e "$TOOLS_PRE" ]; do n=$((n + 1)); TOOLS_PRE="${base}-${n}.sql.gz"; done
+    while [ -e "$TOOLS_PRE" ]; do n=$((n + 1)); TOOLS_PRE="${base}-${n}${ext}"; done
     display_explanation "Generating the backup..."
     CLEANUP_FILE="$TOOLS_PRE"
     if ! create_safety_backup "$TOOLS_PRE"; then
@@ -10071,6 +10174,35 @@ reports_define() {
         "SELECT b.biblionumber AS \`$(t "Record")\`, b.title AS \`$(t "Title")\`, i.barcode AS \`$(t "Barcode")\`, i.itemcallnumber AS \`$(t "Call number")\`, i.homebranch AS \`$(t "Library")\` FROM items i JOIN biblio b ON b.biblionumber = i.biblionumber WHERE COALESCE(i.barcode, '') = '' OR COALESCE(i.itemcallnumber, '') = '' ORDER BY b.title"
     _rp lost-items CAT "$(t "Lost items")" \
         "SELECT i.barcode AS \`$(t "Barcode")\`, b.title AS \`$(t "Title")\`, i.itemcallnumber AS \`$(t "Call number")\`, COALESCE(av.lib, i.itemlost) AS \`$(t "Status")\`, i.itemlost_on AS \`$(t "Since")\`, i.homebranch AS \`$(t "Library")\` FROM items i JOIN biblio b ON b.biblionumber = i.biblionumber LEFT JOIN authorised_values av ON av.category = 'LOST' AND av.authorised_value = i.itemlost WHERE i.itemlost <> 0 ORDER BY i.itemlost_on DESC"
+    # Reports for public and municipal libraries (Paulo, 2026-10-10).
+    _rp acquisitions ACQ "$(t "Acquisitions and donations by period")" \
+        "SELECT DATE_FORMAT(i.dateaccessioned, '%Y-%m') AS \`$(t "Month")\`, CASE WHEN LOWER(CONCAT_WS(' ', i.booksellerid, i.itemnotes_nonpublic)) REGEXP 'doa|donat' THEN '$(t "Donation")' ELSE '$(t "Purchase or other")' END AS \`$(t "Origin")\`, i.homebranch AS \`$(t "Library")\`, COUNT(*) AS \`$(t "Items")\`, COUNT(DISTINCT i.biblionumber) AS \`$(t "Titles")\`, SUM(COALESCE(i.price, 0)) AS \`$(t "Total value")\` FROM items i WHERE i.dateaccessioned BETWEEN <<$(t "From (YYYY-MM-DD)")|date>> AND <<$(t "To (YYYY-MM-DD)")|date>> GROUP BY 1, 2, 3 ORDER BY 1, 2, 3"
+    _rp zero-loans CAT "$(t "Items with no loan ever")" \
+        "SELECT i.barcode AS \`$(t "Barcode")\`, i.itemcallnumber AS \`$(t "Call number")\`, b.title AS \`$(t "Title")\`, b.author AS \`$(t "Author")\`, i.dateaccessioned AS \`$(t "Acquired")\`, i.homebranch AS \`$(t "Library")\` FROM items i JOIN biblio b ON b.biblionumber = i.biblionumber WHERE COALESCE(i.issues, 0) = 0 AND i.datelastborrowed IS NULL AND i.itemlost = 0 AND i.withdrawn = 0 AND NOT EXISTS (SELECT 1 FROM issues c WHERE c.itemnumber = i.itemnumber) AND NOT EXISTS (SELECT 1 FROM old_issues o WHERE o.itemnumber = i.itemnumber) ORDER BY i.itemcallnumber"
+    _rp ddc-classes CAT "$(t "Collection by Dewey class (000-900)")" \
+        "SELECT CASE WHEN TRIM(i.itemcallnumber) REGEXP '^[0-9]' THEN CONCAT(LEFT(TRIM(i.itemcallnumber), 1), '00') ELSE '$(t "No Dewey number")' END AS \`$(t "Class")\`, CASE LEFT(TRIM(i.itemcallnumber), 1) WHEN '0' THEN '$(t "Computer science, information and general works")' WHEN '1' THEN '$(t "Philosophy and psychology")' WHEN '2' THEN '$(t "Religion")' WHEN '3' THEN '$(t "Social sciences")' WHEN '4' THEN '$(t "Language")' WHEN '5' THEN '$(t "Science")' WHEN '6' THEN '$(t "Technology")' WHEN '7' THEN '$(t "Arts and recreation")' WHEN '8' THEN '$(t "Literature")' WHEN '9' THEN '$(t "History and geography")' ELSE '' END AS \`$(t "Subject")\`, COUNT(*) AS \`$(t "Items")\`, COUNT(DISTINCT i.biblionumber) AS \`$(t "Titles")\` FROM items i WHERE i.withdrawn = 0 GROUP BY 1, 2 ORDER BY 1"
+    _rp patrons-district PAT "$(t "Patrons by neighbourhood and city")" \
+        "SELECT COALESCE(NULLIF(TRIM(p.city), ''), '-') AS \`$(t "City")\`, COALESCE(NULLIF(TRIM(p.address2), ''), '-') AS \`$(t "Neighbourhood (address line 2)")\`, COUNT(*) AS \`$(t "Patrons")\`, SUM(p.dateexpiry >= CURDATE()) AS \`$(t "Active accounts")\` FROM borrowers p GROUP BY 1, 2 ORDER BY 1, 3 DESC"
+    _rp patrons-new PAT "$(t "New patron registrations per month (last 24 months)")" \
+        "SELECT DATE_FORMAT(p.dateenrolled, '%Y-%m') AS \`$(t "Month")\`, p.categorycode AS \`$(t "Category")\`, p.branchcode AS \`$(t "Library")\`, COUNT(*) AS \`$(t "New patrons")\` FROM borrowers p WHERE p.dateenrolled >= DATE_SUB(CURDATE(), INTERVAL 24 MONTH) GROUP BY 1, 2, 3 ORDER BY 1, 2, 3"
+    _rp inventory-out CAT "$(t "Withdrawn, damaged or lost items (inventory)")" \
+        "SELECT i.barcode AS \`$(t "Barcode")\`, b.title AS \`$(t "Title")\`, i.itemcallnumber AS \`$(t "Call number")\`, CONCAT_WS(' / ', IF(i.withdrawn <> 0, CONCAT('$(t "Withdrawn")', ': ', COALESCE(aw.lib, i.withdrawn)), NULL), IF(i.damaged <> 0, CONCAT('$(t "Damaged")', ': ', COALESCE(ad.lib, i.damaged)), NULL), IF(i.itemlost <> 0, CONCAT('$(t "Lost")', ': ', COALESCE(al.lib, i.itemlost)), NULL)) AS \`$(t "Status")\`, NULLIF(GREATEST(COALESCE(i.withdrawn_on, '1000-01-01'), COALESCE(i.damaged_on, '1000-01-01'), COALESCE(i.itemlost_on, '1000-01-01')), '1000-01-01') AS \`$(t "Since")\`, i.replacementprice AS \`$(t "Replacement price")\`, i.homebranch AS \`$(t "Library")\` FROM items i JOIN biblio b ON b.biblionumber = i.biblionumber LEFT JOIN authorised_values aw ON aw.category = 'WITHDRAWN' AND aw.authorised_value = i.withdrawn LEFT JOIN authorised_values ad ON ad.category = 'DAMAGED' AND ad.authorised_value = i.damaged LEFT JOIN authorised_values al ON al.category = 'LOST' AND al.authorised_value = i.itemlost WHERE i.withdrawn <> 0 OR i.damaged <> 0 OR i.itemlost <> 0 ORDER BY 5 DESC"
+    _rp loans-type CIRC "$(t "Loans by material type (last 12 months)")" \
+        "SELECT COALESCE(it.description, s.itemtype, '-') AS \`$(t "Material type")\`, SUM(s.type = 'issue') AS \`$(t "Loans")\`, SUM(s.type = 'renew') AS \`$(t "Renewals")\`, SUM(s.type = 'localuse') AS \`$(t "In-library use")\` FROM statistics s LEFT JOIN itemtypes it ON it.itemtype = s.itemtype WHERE s.type IN ('issue', 'renew', 'localuse') AND s.datetime >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY 1 ORDER BY 2 DESC"
+    _rp children-new CAT "$(t "Children's books catalogued recently (last 90 days)")" \
+        "SELECT b.datecreated AS \`$(t "Catalogued")\`, b.title AS \`$(t "Title")\`, b.author AS \`$(t "Author")\`, i.itemcallnumber AS \`$(t "Call number")\`, i.barcode AS \`$(t "Barcode")\`, i.homebranch AS \`$(t "Library")\` FROM biblio b JOIN biblio_metadata bm ON bm.biblionumber = b.biblionumber JOIN items i ON i.biblionumber = b.biblionumber WHERE b.datecreated >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) AND (SUBSTRING(ExtractValue(bm.metadata, '//controlfield[@tag=\"008\"]'), 23, 1) IN ('a', 'b', 'c', 'j') OR LOWER(COALESCE(i.ccode, '')) REGEXP 'inf|juv|child' OR UPPER(COALESCE(i.itemcallnumber, '')) REGEXP '^(J|IJ|INF)') ORDER BY b.datecreated DESC, b.title"
+    _rp fines-debarred PAT "$(t "Patrons with pending fines or suspensions")" \
+        "SELECT p.cardnumber AS \`$(t "Card number")\`, CONCAT_WS(', ', p.surname, p.firstname) AS \`$(t "Patron")\`, p.email AS \`$(t "E-mail")\`, p.phone AS \`$(t "Phone")\`, COALESCE(f.amount, 0) AS \`$(t "Amount due")\`, d.until AS \`$(t "Suspended until")\`, d.comment AS \`$(t "Reason")\`, p.branchcode AS \`$(t "Library")\` FROM borrowers p LEFT JOIN (SELECT borrowernumber, SUM(amountoutstanding) AS amount FROM accountlines WHERE amountoutstanding > 0 GROUP BY borrowernumber) f ON f.borrowernumber = p.borrowernumber LEFT JOIN (SELECT borrowernumber, MAX(COALESCE(expiration, '9999-12-31')) AS until, GROUP_CONCAT(comment SEPARATOR ' / ') AS comment FROM borrower_debarments WHERE expiration IS NULL OR expiration >= CURDATE() GROUP BY borrowernumber) d ON d.borrowernumber = p.borrowernumber WHERE f.amount IS NOT NULL OR d.until IS NOT NULL ORDER BY 5 DESC, 2"
+    _rp orphan-authorities CAT "$(t "Authority records not used by any bibliographic record")" \
+        "SELECT a.authid AS \`$(t "Authority")\`, a.authtypecode AS \`$(t "Type")\`, ExtractValue(a.marcxml, '//datafield[@tag=\"100\" or @tag=\"110\" or @tag=\"111\" or @tag=\"130\" or @tag=\"150\" or @tag=\"151\" or @tag=\"155\"]/subfield[@code=\"a\"]') AS \`$(t "Heading")\`, a.datecreated AS \`$(t "Created")\` FROM auth_header a WHERE NOT EXISTS (SELECT 1 FROM biblio_metadata bm WHERE LOCATE(CONCAT('<subfield code=\"9\">', a.authid, '</subfield>'), bm.metadata) > 0) ORDER BY a.authtypecode, 3"
+    _rp active-patrons PAT "$(t "Active readers by category (last 12 months)")" \
+        "SELECT p.categorycode AS \`$(t "Category")\`, COALESCE(c.description, p.categorycode) AS \`$(t "Description")\`, COUNT(DISTINCT s.borrowernumber) AS \`$(t "Active readers")\`, SUM(s.type = 'issue') AS \`$(t "Loans")\` FROM statistics s JOIN borrowers p ON p.borrowernumber = s.borrowernumber LEFT JOIN categories c ON c.categorycode = p.categorycode WHERE s.type = 'issue' AND s.datetime >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY 1, 2 ORDER BY 3 DESC"
+    _rp holds-waiting CIRC "$(t "Holds waiting for pickup")" \
+        "SELECT r.waitingdate AS \`$(t "Waiting since")\`, p.cardnumber AS \`$(t "Card number")\`, CONCAT_WS(', ', p.surname, p.firstname) AS \`$(t "Patron")\`, p.email AS \`$(t "E-mail")\`, p.phone AS \`$(t "Phone")\`, b.title AS \`$(t "Title")\`, i.barcode AS \`$(t "Barcode")\`, r.branchcode AS \`$(t "Pickup library")\` FROM reserves r JOIN borrowers p ON p.borrowernumber = r.borrowernumber JOIN biblio b ON b.biblionumber = r.biblionumber LEFT JOIN items i ON i.itemnumber = r.itemnumber WHERE r.found = 'W' ORDER BY r.waitingdate"
+    _rp collection-type CAT "$(t "Collection by library and material type")" \
+        "SELECT i.homebranch AS \`$(t "Library")\`, COALESCE(it.description, i.itype, '-') AS \`$(t "Material type")\`, COUNT(*) AS \`$(t "Items")\`, COUNT(DISTINCT i.biblionumber) AS \`$(t "Titles")\`, SUM(i.itemlost <> 0) AS \`$(t "Lost")\` FROM items i LEFT JOIN itemtypes it ON it.itemtype = i.itype WHERE i.withdrawn = 0 GROUP BY 1, 2 ORDER BY 1, 3 DESC"
+    _rp circ-daily CIRC "$(t "Daily circulation (last 30 days)")" \
+        "SELECT DATE(s.datetime) AS \`$(t "Day")\`, s.branch AS \`$(t "Library")\`, SUM(s.type = 'issue') AS \`$(t "Loans")\`, SUM(s.type = 'return') AS \`$(t "Returns")\`, SUM(s.type = 'renew') AS \`$(t "Renewals")\`, COUNT(DISTINCT s.borrowernumber) AS \`$(t "Patrons served")\` FROM statistics s WHERE s.type IN ('issue', 'return', 'renew') AND s.datetime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY 1, 2 ORDER BY 1 DESC, 2"
 }
 
 # Query of a report with a sample value in each of Koha's run-time
@@ -15453,9 +15585,9 @@ use Time::HiRes qw( time );
 our $VERSION = '1';
 
 our %DEFAULTS = (
-    openai     => { url => 'https://api.openai.com/v1', model => 'gpt-4.1-mini' },
-    anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5' },
-    gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-2.5-flash' },
+    openai     => { url => 'https://api.openai.com/v1', model => 'gpt-5-mini' },
+    anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5-5' },
+    gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-flash-latest' },
     ollama     => { url => 'http://127.0.0.1:11434',    model => 'qwen2.5vl:7b' },
     compatible => { url => 'http://localhost:1234/v1',  model => '' },
 );
@@ -24652,9 +24784,9 @@ my $JSON = JSON::PP->new->utf8(0)->canonical(1)->allow_nonref(1);
 # The model's settings (vision.conf of the AI cataloguing, read-only here)
 # ----------------------------------------------------------------------
 our %DEFAULTS = (
-    openai     => { url => 'https://api.openai.com/v1', model => 'gpt-4.1-mini' },
-    anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5' },
-    gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-2.5-flash' },
+    openai     => { url => 'https://api.openai.com/v1', model => 'gpt-5-mini' },
+    anthropic  => { url => 'https://api.anthropic.com', model => 'claude-sonnet-5-5' },
+    gemini     => { url => 'https://generativelanguage.googleapis.com/v1beta/openai', model => 'gemini-flash-latest' },
     ollama     => { url => 'http://127.0.0.1:11434',    model => 'qwen2.5vl:7b' },
     compatible => { url => 'http://localhost:1234/v1',  model => '' },
 );
@@ -28328,6 +28460,8 @@ kei_task_info() {
     kei_result server_ip "$(get_server_ip)"
     kei_result timezone "$(get_current_timezone)"
     kei_result dir_sql "$DIR_SQL"
+    kei_result compression "$(backup_codec_setting)"
+    kei_result compression_used "$(backup_codec)"
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
     newest=$(newest_sql_backup)
     if [ -n "$newest" ]; then
@@ -28523,6 +28657,7 @@ kei_task() {
         info)            kei_task_info ;;
         backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
         backup-test)     function_test_backup "${1:-}" ;;
+        backup-compression) [ -n "${1:-}" ] || return 2; backup_set_codec "$1" ;;
         restore-check)
             [ -n "${1:-}" ] || return 2
             require_koha || return 1

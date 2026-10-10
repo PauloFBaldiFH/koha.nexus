@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.38** (1.5.39: staff icons and staff pictures PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.39** (1.5.40: backup compression, AI model lists, 22 SQL reports PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -300,6 +300,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   /usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom (served as /intranet-tmpl/kei-custom,
   the OPAC's folder is not served on the staff side); the favicon is the IntranetFavicon
   preference (allowed values: https or that folder), cleared by Remove like OpacFavicon.
+
+- **1.5.40 (backup compression, AI model lists, reports)**: BACKUP_COMPRESSION in backup.conf
+  (gz default, zst, xz; installer backup_codec / backup_set_codec, task `backup-compression`,
+  Backup center Select) drives the nightly script (it reads the setting at run time and falls
+  back to gzip when zstd/xz is missing), manual backups and every PRE-* safety copy; restores
+  were already codec-blind (dump_codec reads the magic bytes). panel/kei_panel/aimodels.py
+  reads each provider's /models with the key (aiclient.check_connection), drops non-chat
+  models and splits Free / Accessible from Advanced (Gemini Pro, OpenAI non-mini/nano, Claude
+  non-Haiku: a label, not a billing fact; BILLING_NOTE says so); FALLBACK lists "latest"
+  aliases when the live list cannot be read. Defaults: gemini-flash-latest, gpt-5-mini,
+  claude-sonnet-5-5 (aiconf and both Perl DEFAULTS). Reports pack 8 -> 22 (tests/library_tools
+  L08 builds the extra Koha columns and runs each new report on a row made for it).
 
 ---
 

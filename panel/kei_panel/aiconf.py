@@ -22,9 +22,9 @@ import re
 from pathlib import Path
 
 DEFAULTS = {
-    "openai": ("https://api.openai.com/v1", "gpt-4.1-mini"),
-    "anthropic": ("https://api.anthropic.com", "claude-sonnet-5"),
-    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
+    "openai": ("https://api.openai.com/v1", "gpt-5-mini"),
+    "anthropic": ("https://api.anthropic.com", "claude-sonnet-5-5"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-flash-latest"),
     "ollama": ("http://127.0.0.1:11434", "qwen2.5vl:7b"),     # vision: MARC Replace reads photos
     "compatible": ("http://localhost:1234/v1", ""),
 }
