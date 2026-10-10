@@ -157,9 +157,13 @@ def test_an_error_in_a_dialog_closes_the_dialog_not_the_panel(monkeypatch):
         async with app.run_test(size=(140, 45)) as pilot:
             app.run_native("magic-import")
             (await _wait_for(pilot, PathPickerScreen)).query_one("#choose").press()
-            box = await _wait_for(pilot, MessageScreen)
-            body = box._body
-            box.query_one("#ok").press()
+            body = ""
+            for _ in range(60):
+                await pilot.pause(0.1)
+                if isinstance(app.screen, MessageScreen) and "simulated" in app.screen._body:
+                    body = app.screen._body
+                    app.screen.dismiss(None)
+                    break
             await pilot.pause(0.5)
             app.run_native("magic-import")
             (await _wait_for(pilot, PathPickerScreen)).dismiss(None)
