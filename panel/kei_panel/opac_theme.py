@@ -87,7 +87,7 @@ DEFAULTS: dict = {
     "texture": "frosted",
     "blur": 12,               # px, frosted glass
     "opacity": 78,            # % of the block surface
-    "panel_opacity": 94,      # % of the content panels (.main, tabs, menus): text never sits on the bare wallpaper
+    "panel_opacity": 76,      # % of the content panels (.main, tabs, menus): frosted glass, 12px blur behind
     "radius_block": 14,       # px, 0-30
     "radius_input": 10,
     "radius_button": 10,
@@ -136,7 +136,7 @@ DEFAULTS: dict = {
                 "note": "", "links": []},
 }
 
-RANGES = {"blur": (0, 30), "opacity": (30, 100), "panel_opacity": (80, 100), "radius_block": (0, 30), "radius_input": (0, 30),
+RANGES = {"blur": (0, 30), "opacity": (30, 100), "panel_opacity": (50, 100), "radius_block": (0, 30), "radius_input": (0, 30),
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
@@ -730,27 +730,45 @@ def readable(color: str, bg: str, minimum: float = 4.5) -> str:
     return target
 
 
+# Koha's inner panels (tabs, toolbars, cards) on the content panel: a
+# translucent layer too, so the glass reads through every level.
+INNER_ALPHA = .55
+
+
 def panel_colors(cfg: dict, dark: bool) -> dict:
-    """The content panels' colours: in light mode a light surface (the
-    block background when it is light, else white) with #1a1a1a text; in
-    dark mode #161b22 / #0d1117 with #e6edf3 text. Muted text, links and
-    headings are checked for 4.5:1 on both panel layers."""
+    """The content panels' colours: in light mode a light glass (the block
+    background when it is light, else white) with #1a1a1a text; in dark
+    mode #161b22 / #0d1117 glass with #e6edf3 text. The panels are
+    translucent (panel_opacity), so every colour is checked against the
+    worst case: the panel and the inner panel over a black and over a white
+    wallpaper. Text gets 7:1, muted text, links and headings 4.5:1."""
     accent = cfg["accent"]
     if dark:
         panel, inner, text = "#161b22", "#0d1117", "#e6edf3"
         muted, link, ink = "#9da7b3", "#79b8ff", mix(accent, "#ffffff", .45)
-        edge = "rgba(240, 246, 252, .12)"
+        edge, shadow = "rgba(240, 246, 252, .16)", "0 1px 2px rgba(0, 0, 0, .65)"
     else:
         base = cfg["surface"] if luminance(cfg["surface"]) >= .30 else "#ffffff"
         panel, inner, text = mix(base, accent, .03), mix(base, accent, .07), "#1a1a1a"
         muted, link, ink = "#4b5563", mix(accent, "#000000", .15), mix(accent, "#000000", .30)
-        edge = "rgba(15, 23, 42, .12)"
-    worst = panel if contrast(text, panel) < contrast(text, inner) else inner
+        edge, shadow = "rgba(15, 23, 42, .16)", "0 1px 1px rgba(255, 255, 255, .55)"
+    a = cfg["panel_opacity"] / 100
+    grounds = []
+    for wall in ("#000000", "#ffffff"):
+        under = mix(panel, wall, 1 - a)
+        grounds += [under, mix(inner, under, 1 - INNER_ALPHA)]
 
-    def both(c: str) -> str:
-        return readable(readable(c, panel), inner)
-    return {"panel": panel, "inner": inner, "text": readable(text, worst, 7), "muted": both(muted),
-            "link": both(link), "ink": both(ink), "edge": edge}
+    def fit(c: str, minimum: float = 4.5) -> str:
+        # Towards white on the dark glass, towards black on the light one,
+        # until the colour holds on every ground.
+        target = "#ffffff" if dark else "#000000"
+        for step in range(21):
+            out = mix(c, target, step / 20)
+            if min(contrast(out, g) for g in grounds) >= minimum:
+                return out
+        return target
+    return {"panel": panel, "inner": inner, "text": fit(text, 7), "muted": fit(muted),
+            "link": fit(link), "ink": fit(ink), "edge": edge, "shadow": shadow, "grounds": grounds}
 
 
 # ----------------------------------------------------------------------
@@ -760,7 +778,7 @@ def panel_colors(cfg: dict, dark: bool) -> dict:
 # solid card with the accent on its edge). "html body" before each one, and
 # !important, so Koha's Bootstrap rules never win over the chosen colours.
 # The page's content (.main) is not one of them: it is a content panel
-# (_panels_css), near-solid so text never sits on the bare wallpaper.
+# (_panels_css), frosted glass with text colours checked for contrast.
 _BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .mastheadsearch"
 _CONTENT = "#opacmainuserblock, #opacmainblock, #news .newsitem, .newsitem, .news-item"
 
@@ -968,19 +986,19 @@ _LINK_SKIP = (".btn", ".nav-link", ".dropdown-item", ".kei-link", ".kei-action",
 
 
 def _panels_css(cfg: dict) -> str:
-    """Readability first (WCAG AA): the page's content (.main) and the
-    footer credits are near-solid panels (panel_opacity, a light blur
-    behind), Koha's own panels inside them share one solid inner colour,
-    edge and radius, and text, labels, headings and links take colours
-    checked against both (panel_colors), in light and in dark mode. Fixes
-    white tab panes with light text in dark mode, a stark white breadcrumb
-    bar, and light text on bare wallpaper in light mode."""
+    """Frosted glass that stays readable: the page's content (.main) is a
+    translucent panel (panel_opacity) with a 12px blur behind it, Koha's
+    own panels inside it a second translucent layer with one edge and
+    radius, and text, labels, headings and links take colours checked
+    against the worst wallpaper (panel_colors), plus a soft text shadow and
+    bolder labels, in light and in dark mode. The footer credits sit on the
+    page with no box, readable through a halo around the letters."""
     light, dark = panel_colors(cfg, False), panel_colors(cfg, True)
 
     def tokens(c: dict) -> str:
-        return (f"    --kei-panel-rgb: {_rgb(c['panel']).replace(',', ', ')};\n    --kei-panel-2: {c['inner']};\n"
+        return (f"    --kei-panel-rgb: {_rgb(c['panel']).replace(',', ', ')};\n    --kei-panel-2: rgba({_rgb(c['inner']).replace(',', ', ')}, {INNER_ALPHA});\n"
                 f"    --kei-p-text: {c['text']};\n    --kei-p-muted: {c['muted']};\n    --kei-p-link: {c['link']};\n"
-                f"    --kei-p-ink: {c['ink']};\n    --kei-p-edge: {c['edge']};")
+                f"    --kei-p-ink: {c['ink']};\n    --kei-p-edge: {c['edge']};\n    --kei-p-shadow: {c['shadow']};")
 
     def sel(items, prefix: str = "html body .main ") -> str:
         return ", ".join(prefix + x for x in items)
@@ -994,29 +1012,39 @@ def _panels_css(cfg: dict) -> str:
 html[data-kei-theme="dark"] {{
 {tokens(dark)}
 }}
-html body .main, html body #opaccredits {{
+html body .main {{
     position: relative;
     isolation: isolate;
     background: rgba(var(--kei-panel-rgb), var(--kei-panel-a)) !important;
     color: var(--kei-p-text) !important;
+    text-shadow: var(--kei-p-shadow);
     border: 1px solid var(--kei-p-edge) !important;
     border-radius: var(--kei-r-block) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .14), inset 0 1px 0 rgba(255, 255, 255, .22);
 }}
 /* The blur on a layer behind the content: on the panel itself it would
    become the frame of every position: fixed thing inside (Koha's modals). */
-html body .main::before, html body #opaccredits::before {{
+html body .main::before {{
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    -webkit-backdrop-filter: blur(6px) saturate(120%);
-    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
 }}
-html body #opaccredits {{ margin: 1rem 0; padding: 1rem 1.25rem; text-align: center; }}
+html body .main .btn, html body .main input, html body .main select, html body .main textarea,
+html body .main .form-control, html body .main .badge {{ text-shadow: none; }}
+html body .main label, html body .main dt, html body .main th, html body .main legend,
+html body .main .results_summary .label {{ font-weight: 600; }}
+/* The footer credits: no box, straight on the page, a halo around the
+   letters (light in light mode, dark in dark mode) keeps them readable. */
+html body #opaccredits {{ margin: 1rem 0; padding: .5rem 1rem; text-align: center; background: transparent !important; }}
 html body #opaccredits, html body #opaccredits p, html body #opaccredits li {{ color: var(--kei-p-text) !important; }}
-html body #opaccredits a {{ color: var(--kei-p-link) !important; }}
+html body #opaccredits a {{ color: var(--kei-p-link) !important; font-weight: 600; }}
+html body #opaccredits {{ text-shadow: 0 0 6px rgba(255, 255, 255, .95), 0 1px 1px rgba(255, 255, 255, .95); }}
+html[data-kei-theme="dark"] body #opaccredits {{ text-shadow: 0 0 6px rgba(0, 0, 0, .95), 0 1px 2px rgba(0, 0, 0, .95); }}
 html body .kei-credits p {{ margin: .2rem 0; }}
 html body .kei-credits-name {{ font-size: 1.05rem; }}
 html body .kei-login-banner-wrap {{ margin: 0 0 1rem; }}
@@ -1060,7 +1088,7 @@ html body .main #menu li a:hover, html body .main #usermenu li a:hover {{
     box-shadow: inset 3px 0 0 var(--nexus-primary);
 }}
 html body .main #search-facets ul, html body .main #search-facets li {{ background: transparent !important; }}
-/* Tables and search results: rows on the panel, stripes in the inner colour. */
+/* Tables and search results: rows on the panel, stripes in the inner glass. */
 html body .main table, html body .main .table {{
     --bs-table-bg: transparent;
     --bs-table-color: var(--kei-p-text);
