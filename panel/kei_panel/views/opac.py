@@ -9,9 +9,11 @@ rest of both preferences kept). The settings travel inside the CSS block
 More boxes: the quick access buttons of the home page (icon, text,
 address, tab and order; solid, gradient, glass or brushed metal; one per
 line or two columns), the same buttons for the staff interface's home page
-(IntranetUserJS) and the staff interface's colours ("Apply color theme to
-Staff Client": IntranetUserCSS, with its own type size, contrast and table
-density, never the OPAC's widgets).
+(IntranetUserJS) and the staff interface's look ("Apply color theme to
+Staff Client": IntranetUserCSS, with the OPAC's materials (textures, blur,
+opacity, corners) and colour pickers, its own type size, contrast and table
+density, never the OPAC's widgets). "Copy OPAC preset" fills the staff
+fields with the OPAC's material, colours and pictures in one click.
 
 "Sync current OPAC settings" reads what is live in Koha (OpacUserCSS,
 OpacUserJS, the staff preferences, OpacMainUserBlock) into the fields and
@@ -147,14 +149,28 @@ class OpacView(SectionView):
         st = c["staff"]
         with Vertical(id="o-staff", classes="opac-box"):
             yield Static(t("The staff interface's own look (IntranetUserCSS), set apart from the public "
-                           "catalogue: its own colours for the top bar, the quick search bar and the buttons, the "
-                           "home page modules as cards, the news column, the text size, contrast and table "
-                           "density."), classes="ai-note", markup=False)
+                           "catalogue: the OPAC's textures, blur, opacity and rounded corners, its own colours for "
+                           "the top bar, the quick search bar and the buttons, the home page modules as cards, the "
+                           "news column, the text size, contrast and table density. Copy OPAC preset brings the "
+                           "OPAC's look here in one click."), classes="ai-note", markup=False)
             yield from _row(t("Apply color theme to Staff Client"), Switch(st["enabled"], id="o-staff-enabled"))
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("Copy OPAC preset"), id="o-staff-copy", classes="small",
+                             tooltip=t("The OPAC's texture, sliders, colours and pictures into the staff fields; "
+                                       "Apply writes them."))
+            yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=st["texture"],
+                                                 allow_blank=False, id="o-staff-texture"))
+            for key in ot.STAFF_MATERIAL:
+                label, unit, step = SLIDERS[key]
+                yield from _row(t(label), Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
+                                                 id=f"o-staff-{key}"))
             yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
             yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
+            yield from _row(t("Page colour"), Switch(bool(st["page"]), id="o-staff-page-on"))
+            yield ColorPicker(t("Page background"), st["page"] or "#f3f4f6", "o-staff-page", bars,
+                              id="o-pick-staff-page")
             for name in ot.STAFF_ASSETS:
                 yield from self._asset_row(f"staff-{name}", st[name])
             yield from _row(t("Legibility film"), Slider(*ot.STAFF_FILM, st["film"], step=5, unit="%",
@@ -304,10 +320,19 @@ class OpacView(SectionView):
             q(f"#{p}s-style", Select).value = cfg[key]["style"]
             q(f"#{p}s-layout", Select).value = cfg[key]["layout"]
             self.set_links(cfg[key]["items"], key)
-        st = cfg["staff"]
+        self.fill_staff(cfg["staff"])
+
+    def fill_staff(self, st: dict) -> None:
+        q = self.query_one
         q("#o-staff-enabled", Switch).value = st["enabled"]
         for key in ("accent", "accent2", "surface"):
             q(f"#o-staff-{key}", Input).value = st[key]
+        q("#o-staff-texture", Select).value = st["texture"]
+        for key in ot.STAFF_MATERIAL:
+            q(f"#o-staff-{key}", Slider).value = st[key]
+        q("#o-staff-page-on", Switch).value = bool(st["page"])
+        if st["page"]:
+            q("#o-staff-page", Input).value = st["page"]
         for name in ot.STAFF_ASSETS:
             q(f"#o-src-staff-{name}", Select).value = st[name]["source"]
             q(f"#o-val-staff-{name}", Input).value = st[name]["url"]
@@ -336,7 +361,10 @@ class OpacView(SectionView):
                          "accent": q("#o-staff-accent", Input).value, "accent2": q("#o-staff-accent2", Input).value,
                          "surface": q("#o-staff-surface", Input).value, "film": q("#o-staff-film", Slider).value,
                          "density": q("#o-staff-density", Select).value,
-                         "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value}}
+                         "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value,
+                         "texture": q("#o-staff-texture", Select).value,
+                         "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
+                         **{key: q(f"#o-staff-{key}", Slider).value for key in ot.STAFF_MATERIAL}}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
         for key, p in LINK_SETS.items():
@@ -384,6 +412,7 @@ class OpacView(SectionView):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {"o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
                    "o-refresh": self.refresh_carousel, "o-keys": self.keys, "o-remove": self.remove_look,
+                   "o-staff-copy": self.copy_opac_preset,
                    "o-link-add": lambda: self.add_link(None, "links"),
                    "o-slink-add": lambda: self.add_link(None, "staff_links")}
         bid = event.button.id or ""
@@ -442,6 +471,22 @@ class OpacView(SectionView):
         if self.carousel_on:
             text += " · " + t("Carousel: ${n} titles with a cover.", n=self.feed_items or "0")
         self.query_one("#o-summary", Label).update(text)
+
+    def copy_opac_preset(self) -> None:
+        """Copy OPAC preset: the OPAC fields as they are now (saved or not)
+        into the staff fields. Nothing is written to Koha until Apply."""
+        raw, _pending, problem = self.collect()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        # A picture still to publish has no address yet: the staff keeps its own.
+        cfg, skipped = ot.copy_opac_to_staff(raw)
+        self.fill_staff(cfg["staff"])
+        msg = t("OPAC preset copied to the staff interface. Apply writes it into Koha.")
+        if skipped:
+            msg += " " + t("Files of this server stay on the OPAC side, choose them again for the staff: ${names}.",
+                           names=", ".join(t(ASSET_LABELS[n]) for n in skipped))
+        self.app.notify(msg, timeout=8)
 
     def preview(self) -> None:
         raw, _pending, problem = self.collect()

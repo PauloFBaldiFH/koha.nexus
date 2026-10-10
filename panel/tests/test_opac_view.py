@@ -4,7 +4,7 @@ import asyncio
 import time
 
 from conftest import INSTALLER
-from textual.widgets import Input, Select, Switch
+from textual.widgets import Button, Input, Select, Switch
 
 from kei_panel import opac_theme as ot
 from kei_panel.env import PanelEnv
@@ -379,5 +379,61 @@ def test_sync_reads_what_is_live_in_koha(monkeypatch):
             assert view.query_one("#o-texture", Select).value == "smooth"
             assert view.query_one("#o-news_buttons", Switch).value is True
             assert len(view.query(".link-row")) == 2
+
+    asyncio.run(main())
+
+
+def test_staff_material_and_copy_opac_preset(monkeypatch):
+    """The staff box has the OPAC's material (texture, blur, opacity, corners,
+    page colour); Copy OPAC preset fills it from the OPAC fields in one click,
+    the staff's own text size and density kept, and Apply sends it."""
+    seen = {}
+    real = ot.write_apply_dir
+
+    def spy(cfg, files, text=None):
+        work = real(cfg, files, text)
+        seen["staff"] = (work / "staff.css").read_text() if (work / "staff.css").exists() else ""
+        return work
+    monkeypatch.setattr(ot, "write_apply_dir", spy)
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            q = view.query_one
+            await _until(pilot, lambda: "Not applied" in str(q("#o-summary").render()))
+            assert q("#o-staff-texture", Select).value == "flat"         # nothing changes until chosen
+            q("#o-texture", Select).value = "metal"
+            q("#o-blur", Slider).value = 21
+            q("#o-radius_input", Slider).value = 3
+            q("#o-accent", Input).value = "#0f766e"
+            q("#o-val-logo", Input).value = "https://img.example.org/logo.png"
+            q("#o-src-logo", Select).value = "url"
+            q("#o-staff-font", Slider).value = 110
+            await pilot.pause(0.1)
+            q("#o-staff-copy", Button).press()
+            await pilot.pause(0.2)
+            assert q("#o-staff-enabled", Switch).value is True
+            assert q("#o-staff-texture", Select).value == "metal"
+            assert q("#o-staff-blur", Slider).value == 21 and q("#o-staff-radius_input", Slider).value == 3
+            assert q("#o-staff-accent", Input).value == "#0f766e"
+            assert q("#o-val-staff-logo", Input).value == "https://img.example.org/logo.png"
+            assert q("#o-staff-font", Slider).value == 110                # the staff's own, kept
+            q("#o-staff-page-on", Switch).value = True
+            q("#o-staff-page", Input).value = "#101820"
+            cfg, _p, problem = view.collect()
+            assert problem == "" and cfg["staff"]["page"] == "#101820"
+
+            view.apply()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            app.screen.query_one("#yes").press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            await pilot.press("escape")
+            assert "--nexus-staff-r-input: 3px" in seen["staff"] and "--nexus-staff-blur: 21px" in seen["staff"]
+            assert "repeating-linear-gradient" in seen["staff"]          # brushed metal on the staff blocks
+            assert "html { font-size: 110%; }" in seen["staff"]
 
     asyncio.run(main())

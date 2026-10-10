@@ -9,6 +9,7 @@ import pytest
 from kei_panel import aiclient
 
 SECRET = "sk-very-secret-key-0000"
+LOADED: list[str] = []   # what the fake Ollama holds in memory (/api/ps)
 
 
 class Fake(BaseHTTPRequestHandler):
@@ -28,6 +29,8 @@ class Fake(BaseHTTPRequestHandler):
             return self._json(200, {"version": "0.12.3"})
         if self.path == "/api/tags":
             return self._json(200, {"models": [{"name": "qwen2.5vl:7b"}, {"name": "llama3:latest"}]})
+        if self.path == "/api/ps":
+            return self._json(200, {"models": [{"name": m} for m in LOADED]})
         if self.path == "/v1/models":
             if self.headers.get("Authorization") != f"Bearer {SECRET}":
                 return self._json(401, {"error": "bad key"})
@@ -35,6 +38,11 @@ class Fake(BaseHTTPRequestHandler):
         self._json(404, {})
 
     def do_POST(self):
+        if self.path == "/api/generate":
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if body.get("keep_alive") == 0 and body["model"] in LOADED:
+                LOADED.remove(body["model"])
+            return self._json(200, {"done": True, "done_reason": "unload"})
         if self.path == "/api/pull":
             self.send_response(200)
             self.end_headers()
@@ -93,3 +101,11 @@ def test_ollama_pull_reports_progress(server):
     seen = []
     aiclient.ollama_pull(server, "qwen2.5vl:7b", lambda s, d, t: seen.append((s, d, t)), lambda: False)
     assert ("downloading", 100, 100) in seen and seen[-1][0] == "success"
+
+
+def test_ollama_keeps_only_the_chosen_models_in_memory(server):
+    LOADED[:] = ["qwen2.5vl:7b", "llama3:latest", "qwen2.5:3b"]
+    assert aiclient.ollama_loaded(server) == ["qwen2.5vl:7b", "llama3:latest", "qwen2.5:3b"]
+    assert aiclient.ollama_keep_only(server, ["llama3", ""]) == ["qwen2.5vl:7b", "qwen2.5:3b"]
+    assert aiclient.ollama_loaded(server) == ["llama3:latest"]
+    assert aiclient.ollama_keep_only(server, []) == ["llama3:latest"] and LOADED == []

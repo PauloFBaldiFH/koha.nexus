@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.44** (1.5.45: Find duplicate authors PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.46** (1.5.47: Find duplicate authors PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,7 +337,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
-- **1.5.45 (Find duplicate authors, Library tools > 18, panel action `authority-match`)**: the
+- **1.5.47 (Find duplicate authors, Library tools > 18, panel action `authority-match`)**: the
   personal names of the authority file (100 $a/$q/$d) are compared by the Magic Import engine,
   new module `kei_import/authorities.py` (`kei_import_run.py authorities --in TSV|MARCXML --work DIR
   [--uses FILE] [--threshold 0.85]`, exit 3 = nothing alike). Names are compared word by word in
@@ -358,6 +358,50 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `tests/authority_match.bats` (MariaDB + perl MARC::File::XML; doubles C4/AuthoritiesMarc.pm and
   Koha/Authorities.pm in tests/mocks/perl5) and pytest cases in `panel/tests/test_magic_engine.py`;
   sample data `tests/data/authorities_sample.xml`. pt and es translations added by hand.
+- **1.5.46 (staff material, AI chat input, Ollama memory, local-model tool calls)**:
+  - Staff interface: `cfg["staff"]` gets the OPAC's material (`texture`, `blur`, `opacity`,
+    `radius_block`, `radius_input`, `radius_button`, `STAFF_MATERIAL`, same `RANGES`) and an optional
+    `page` colour. Settings saved before default to `flat` with the old 12px blocks, so their look does
+    not change. `_staff_material_css` puts the texture on `.page-section, #area-news, fieldset.rows`
+    (cards: module tiles and news items); frosted glass blurs a `::before` layer, never the block, so
+    Koha's `position: fixed` modals are not trapped; metal also brushes the top bar and buttons; glass
+    without a staff wallpaper gets the OPAC's accent-glow canvas. "Copy OPAC preset" (staff box) =
+    `copy_opac_to_staff()`: material, colours, page colour and https pictures (OPAC files on this
+    server are skipped, the staff side does not serve /images/custom); the staff's text size,
+    contrast and density are kept. Nothing reaches Koha before Apply.
+  - AI assistant input: auto-grow measured from scratch (height auto, then scrollHeight) whatever box
+    model a theme gives textareas; three lines to start, max `min(176px, 33vh)` (wide view
+    `min(240px, 30vh)`), then an inner scrollbar; shrinks when text is deleted and after sending; a
+    click no longer pins the grown height (only a grip drag sets the start height). Before: up to half
+    the window (450px at 900px) plus a 60vh log.
+  - Ollama memory: "Connected: N models" counted the downloaded models (/api/tags), not the loaded
+    ones. Now the assistant (`ollama_unload_others` in KohaEasy::Assistant::chat) and MARC Replace
+    (KohaEasy::Cataloguing::Vision::extract) unload every other model (`keep_alive: 0`) before each
+    request, and Ollama loads the asked one on demand. Panel: the Ollama box shows installed and in
+    memory (/api/ps), Save unloads models not in the fields, "Free memory" unloads all
+    (`aiclient.ollama_loaded/ollama_unload/ollama_keep_only`).
+  - Tool calls of local models: `normalize_envelope` reads Llama 3 `{"name","parameters"}`, Qwen
+    `<tool_call>` with string arguments, OpenAI `tool_calls`/`function`, ReAct `action_input`, a nested
+    `{"tool":{...}}`, arguments next to the name, `functions.` prefixes and `search_catalog`. A first
+    reply that only announces a search ("Vou usar o termo 'Bandeira'...", `$ANNOUNCE`) or names
+    records before any tool ran gets one reminder, then the catalogue is searched with the quoted
+    words (else the question's); any other plain answer is kept. The prompt has a worked example and
+    forbids announcing. Not tried against a live Koha or a real local model.
+
+- **1.5.45 (reader alerts and daily digest)**: `panel/kei_panel/notify.py` (standard library only)
+  sends due-date reminders and overdue alerts to readers (one message per reader, by e-mail and/or
+  WhatsApp/Telegram through `KohaEasy::Messaging`) and a daily summary to the library (loans plus
+  `config.sh --status-json`). Each alert is off until switched on in Messaging > Alerts (new hub
+  tab, `/etc/koha-easy-install/notifications.conf`); its dry run shows what would go out today.
+  Runs from Schedules & cron tasks: preset `notify`, daily at 07:00, off; the Alerts tab's Save
+  switches it on; `cron-apply` writes `/usr/local/bin/koha-kei-notify` (panel venv Python, else
+  python3). Koha is only read (koha-mysql); e-mail goes through Koha's default SMTP server
+  (`smtp_servers`, else localhost:25, as Koha does) from KohaAdminEmailAddress and only when
+  Koha's e-mail is on. What was sent: `/var/lib/koha/<instance>/kei-notify/sent.tsv` (written after
+  each message, under a lock), so repeated runs never send twice on the same day; due keys carry the
+  due date (a renewal brings a new reminder); overdue repeats every N days (0: once), loans overdue
+  over 90 days only in the summary. Log: `/var/log/koha-easy-install/notify.log`. Not tried live.
+
 - **1.5.44 (last-backup indicator, pre-restore safety backup)**: one source of truth for "the
   newest backup", `latest_sql_backup` (EPOCH MTIME SIZE PATH): top-level, non-empty `*.sql.{gz,zst,xz}`
   in $DIR_SQL, dated by the timestamp in the name (`backup_name_epoch`: `_23h00`, `_14h0733`,
