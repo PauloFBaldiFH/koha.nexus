@@ -6,9 +6,11 @@ share one provider; each may have its own model.
   │ (•) Ollama   │ │ Server URL      [http://127.0.0.1:11434] │
   │ ( ) Gemini   │ │ Vision model    [qwen2.5vl:7b..........] │
   │ ( ) OpenAI   │ │ Chat model      [qwen2.5:3b............] │
-  │ ( ) Claude   │ └──────────────────────────────────────────┘
-  │ ( ) Other    │  [Test connection] [Save]
-  └──────────────┘ ┌ Ollama on this server ───────────────────┐
+  │ ( ) Claude   │ │ Models [Free / Accessible ...         v] │
+  │ ( ) Other    │ │ [Load models] [Use for cataloguing] [chat]│
+  └──────────────┘ └──────────────────────────────────────────┘
+                    [Test connection] [Save]
+                   ┌ Ollama on this server ───────────────────┐
                    │ Ollama 0.12 · 3 models · ...             │
                    │ Model [qwen2.5:3b · Balanced (CPU)    v] │
                    │ [Check] [Install] [Download] [Use for…]  │
@@ -18,6 +20,11 @@ share one provider; each may have its own model.
   │ MARC Replace: ready ...               [Open MARC Replace]│
   │ AI assistant: installed ...  [Install, update or remove] │
   └──────────────────────────────────────────────────────────┘
+
+Models: the list under the fields comes from the provider itself (Load
+models, or a passed connection test) with the key typed or saved, in two
+groups, Free / Accessible and Advanced (💳, needs a paid key or billing);
+until it can be read, a built-in list is shown and says so (aimodels).
 
 The Ollama box is always there and needs only Ollama itself: a model can be
 downloaded whatever the provider and whether or not the assistant is
@@ -41,7 +48,7 @@ from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Select
 
-from .. import aiclient, aiconf, marcreplace
+from .. import aiclient, aiconf, aimodels, marcreplace
 from ..i18n import t
 from ..tasks import Reporter, TaskFailed, TaskResult, run_with_loader
 from ..widgets.cards import StatusCard
@@ -49,6 +56,8 @@ from .base import SectionView
 
 # The preset list's first choice: the models typed in the fields.
 FIELDS = "@fields"
+# Group headers of the model list: choosing one picks nothing.
+HEADERS = ("@free", "@paid")
 
 
 class AIView(SectionView):
@@ -63,6 +72,7 @@ class AIView(SectionView):
         self.check: aiclient.Check | None = None
         self.check_error = ""
         self.ollama_models: list[str] = []
+        self.discovery: aimodels.Discovery | None = None
 
     # ------------------------------------------------------------------
     # Files
@@ -106,6 +116,14 @@ class AIView(SectionView):
                         yield Label(t("API key"), classes="form-label", id="ai-token-label")
                         yield Input("", password=True, id="ai-token")
                     yield Label("", id="ai-key-note", classes="ai-note")
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Models"), classes="form-label")
+                        yield Select([], allow_blank=True, prompt=t("Choose a model"), id="ai-model-list")
+                    with Horizontal(classes="form-buttons"):
+                        yield Button(t("Load models"), id="ai-models-load")
+                        yield Button(t("Use for cataloguing"), id="ai-list-vision")
+                        yield Button(t("Use for chat"), id="ai-list-chat")
+                    yield Label("", id="ai-models-note", classes="ai-note")
                 with Horizontal(classes="form-buttons"):
                     yield Button(t("Test connection"), id="ai-test", variant="primary")
                     yield Button(t("Save"), id="ai-save", variant="success")
@@ -184,6 +202,7 @@ class AIView(SectionView):
         self.query_one("#ai-form").border_title = t(aiconf.LABELS[provider])
         self.query_one("#ai-token-row").display = provider != "ollama"
         self.show_key_note()
+        self.show_models(aimodels.fallback(provider, "not loaded yet"))
         self.refresh_cards()
 
     def saved_key(self) -> str:
@@ -230,6 +249,9 @@ class AIView(SectionView):
             "ai-use-chat": lambda: self.use_preset("chat"),
             "ai-use-vision": lambda: self.use_preset("vision"),
             "ai-marc": self.open_marc_replace,
+            "ai-models-load": self.load_models,
+            "ai-list-vision": lambda: self.use_listed("vision"),
+            "ai-list-chat": lambda: self.use_listed("chat"),
         }
         if event.button.id in actions:
             event.stop()
@@ -277,6 +299,8 @@ class AIView(SectionView):
     def _tested(self, result: TaskResult) -> None:
         if result.ok:
             self.check, self.check_error = result.value, ""
+            if not self.app.env.demo:
+                self.show_models(aimodels.from_ids(self.provider, self.check.models))
             msg = f"{t('Connected.')} {len(self.check.models)} {t('models')}"
             missing = self.missing(self.check.models)
             for model in missing:
@@ -292,6 +316,99 @@ class AIView(SectionView):
         c = self.values()
         wanted = dict.fromkeys(m for m in (c["model"], aiconf.chat_model(c)) if m)
         return [m for m in wanted if not aiclient.model_found(c["provider"], m, ids)]
+
+    # ------------------------------------------------------------------
+    # The provider's models (aimodels): live list or built-in one
+    # ------------------------------------------------------------------
+    def load_models(self) -> None:
+        conf = self.values()
+        demo = self.app.env.demo
+
+        def job(reporter: Reporter) -> aimodels.Discovery:    # thread worker
+            reporter.status(conf["url"])
+            if demo:
+                _demo_wait(reporter, 1.0)
+                return aimodels.fallback(conf["provider"], "demo mode")
+            return aimodels.discover(conf)
+
+        run_with_loader(self.app, t("Loading the provider's models"), job, on_done=self._models_loaded)
+
+    def _models_loaded(self, result: TaskResult) -> None:
+        if result.ok:
+            found: aimodels.Discovery = result.value
+            if found.provider == self.provider:
+                self.show_models(found)
+            if found.live:
+                self.app.notify(t("${n} models available with this key.", n=len(found.models)))
+            else:
+                self.app.notify(t("The live list could not be read (${reason}): showing the built-in list.",
+                                  reason=t(found.reason)), severity="warning", timeout=8)
+        elif not result.cancelled:
+            self.app.task_failed(t("Loading the provider's models"), result)
+
+    def model_options(self, found: aimodels.Discovery) -> list[tuple[str, str]]:
+        """Both groups under their headers; 💳 on the advanced models."""
+        options: list[tuple[str, str]] = []
+        for tier_, header, value in ((aimodels.FREE, aimodels.FREE_HEADER, HEADERS[0]),
+                                     (aimodels.PAID, aimodels.PAID_HEADER, HEADERS[1])):
+            group = found.group(tier_)
+            if not group:
+                continue
+            options.append((f"── {t(header)} ──", value))
+            for m in group:
+                badge = f"  {aimodels.PAID_BADGE} {t('paid')}" if tier_ == aimodels.PAID else ""
+                options.append((f"   {m.id}{badge}", m.id))
+        return options
+
+    def show_models(self, found: aimodels.Discovery) -> None:
+        self.discovery = found
+        select = self.query_one("#ai-model-list", Select)
+        select.set_options(self.model_options(found))
+        self.show_models_note()
+
+    def show_models_note(self) -> None:
+        found = self.discovery
+        if found is None:
+            return
+        name = t(aiconf.LABELS[found.provider])
+        if found.live:
+            parts = [t("Live list from ${name}: ${n} models.", name=name, n=len(found.models))]
+        elif found.models:
+            parts = [t("Built-in list (${reason}).", reason=t(found.reason))]
+            if found.provider not in ("ollama", "compatible"):
+                parts.append(t("Paste the API key and press Load models for the models your key can use."))
+        else:
+            parts = [t("Press Load models to read the models of this server.")]
+        note = aimodels.BILLING_NOTE.get(found.provider, "")
+        if note:
+            parts.append(t(note))
+        chosen = self.listed_model()
+        if chosen and aimodels.tier(found.provider, chosen) == aimodels.PAID:
+            parts.append(f"{aimodels.PAID_BADGE} " + t(aimodels.PAID_WARNING, provider=name))
+        self.query_one("#ai-models-note", Label).update("\n".join(parts))
+
+    def listed_model(self) -> str:
+        value = self.query_one("#ai-model-list", Select).value
+        return value if isinstance(value, str) and value not in HEADERS else ""
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "ai-model-list":
+            event.stop()
+            self.show_models_note()
+
+    def use_listed(self, use: str) -> None:
+        """Puts the model chosen in the list in the vision or chat field;
+        Save keeps it. An advanced model is set too, with the warning."""
+        model = self.listed_model()
+        if not model:
+            self.app.notify(t("Choose a model in the list first."), severity="warning")
+            return
+        field = "#ai-chat-model" if use == "chat" else "#ai-model"
+        self.query_one(field, Input).value = model
+        if self.discovery and aimodels.tier(self.provider, model) == aimodels.PAID:
+            self.app.notify(t(aimodels.PAID_WARNING, provider=t(aiconf.LABELS[self.provider])),
+                            severity="warning", timeout=8)
+        self.app.notify(t("${model} set. Save to keep it.", model=model))
 
     def ollama_url(self) -> str:
         """Ollama's address: the field's when it is the provider, else the

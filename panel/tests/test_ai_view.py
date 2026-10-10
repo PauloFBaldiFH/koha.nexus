@@ -165,3 +165,42 @@ def test_models_download_without_the_assistant_and_presets_fill_the_fields(demo_
             assert "llama3.2:1b" in str(q("#ai-aia-text").render())
 
     asyncio.run(main())
+
+
+def test_model_list_free_and_paid_groups(demo_dir):
+    from kei_panel.app import KohaPanelApp
+    from kei_panel import aimodels
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(140, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("a")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-ai")
+            q = view.query_one
+            await pilot.click("#ai-p-gemini")
+            await pilot.pause(0.1)
+            options = [o[1] for o in view.model_options(view.discovery)]
+            assert options[0] == "@free" and "@paid" in options
+            assert options.index("gemini-pro-latest") > options.index("@paid") > options.index("gemini-flash-latest")
+            note = str(q("#ai-models-note").render())
+            assert "Built-in list" in note and "Load models" in note        # says it is not the live list
+
+            q("#ai-model-list", Select).value = "@paid"                    # a header picks nothing
+            view.use_listed("vision")
+            assert q("#ai-model").value == aiconf.DEFAULTS["gemini"][1]
+
+            q("#ai-model-list", Select).value = "gemini-pro-latest"
+            await pilot.pause(0.1)
+            assert aimodels.PAID_BADGE in str(q("#ai-models-note").render())  # the billing warning
+            view.use_listed("chat")
+            assert q("#ai-chat-model").value == "gemini-pro-latest"
+
+            view.load_models()
+            await pilot.pause(0.2)
+            assert isinstance(app.screen, LoadingScreen)
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
+            assert "demo mode" in str(q("#ai-models-note").render())
+
+    asyncio.run(main())
