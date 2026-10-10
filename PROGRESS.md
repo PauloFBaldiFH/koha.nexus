@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.50** (1.5.51: frosted glass follow-up PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.51** (1.5.52: one glass surface PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.52 (one glass surface)**: Paulo found the header, content, sidebar and breadcrumbs
+  each a different surface. Now every surface reads shared variables (`--koha-card-bg` =
+  rgba(`--koha-card-rgb`, `--koha-card-alpha`), `--koha-glass-blur`, `--koha-card-border`,
+  `--koha-card-radius`, `--koha-card-sheen/-shadow` from the texture), set in css_body's :root; the old
+  `--kei-*` names are aliases. One opacity slider, free 0-100 (`panel_opacity` removed). `_cards_css`:
+  header, search and `.main` are the card; Koha's boxes (`_OWN_CARDS`) are the same card only outside
+  .main (`:not(.main *)`, outermost only). `_panels_css`: inside .main every box (`_PANES`, `_FILLS` from
+  Koha's opac.scss) is transparent with `--koha-pane-border`, so nothing stacks.
 - **1.5.51 (frosted glass follow-up to 1.5.50)**: Paulo asked to keep the glass look. The
   content panels are translucent again (`panel_opacity` 50-100, default 76) with
   `backdrop-filter: blur(12px)` (and `-webkit-`), Koha's inner panels a second translucent layer

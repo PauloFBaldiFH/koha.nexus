@@ -994,11 +994,7 @@
     },
     {
      "name": "Blur and Opacity",
-     "text": "How much the glass textures blur what is behind them and how solid the blocks are."
-    },
-    {
-     "name": "Content panels",
-     "text": "How see-through the page's content is (50% to 100%, 76% by default): the main area, tabs, menus, facets and breadcrumbs are frosted glass with a 12px blur behind, so the wallpaper shows through. Text, labels and links on the glass are checked for WCAG AA contrast against the darkest and the lightest wallpaper, in light and dark mode, with a soft shadow and bolder labels: 7:1 from 76% up, at least 4.5:1 from 60% up. The footer credits have no box: a halo around the letters keeps them readable."
+     "text": "How much the glass blurs what is behind it, and how see-through it is: one opacity for every surface (header, search bar, content, sidebars, breadcrumbs, tabs), from 0% (clear) to 100% (solid), 78% by default. Koha's boxes inside the content show the same glass, with a thin border instead of a white or grey fill. Text, labels and links are checked for WCAG AA contrast against the darkest and the lightest wallpaper as far as the opacity allows (7:1 from about 76% up), with a soft shadow and bolder labels for the clearer settings. The footer credits have no box: a halo around the letters keeps them readable."
     },
     {
      "name": "Blocks, Inputs, Buttons",

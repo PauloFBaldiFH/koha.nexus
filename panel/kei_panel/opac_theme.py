@@ -86,8 +86,7 @@ DEFAULTS: dict = {
     "version": 1,
     "texture": "frosted",
     "blur": 12,               # px, frosted glass
-    "opacity": 78,            # % of the block surface
-    "panel_opacity": 76,      # % of the content panels (.main, tabs, menus): frosted glass, 12px blur behind
+    "opacity": 78,            # % of every glass card (header, search, content, sidebars): 0 clear, 100 solid
     "radius_block": 14,       # px, 0-30
     "radius_input": 10,
     "radius_button": 10,
@@ -136,7 +135,7 @@ DEFAULTS: dict = {
                 "note": "", "links": []},
 }
 
-RANGES = {"blur": (0, 30), "opacity": (30, 100), "panel_opacity": (50, 100), "radius_block": (0, 30), "radius_input": (0, 30),
+RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius_input": (0, 30),
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
@@ -730,33 +729,28 @@ def readable(color: str, bg: str, minimum: float = 4.5) -> str:
     return target
 
 
-# Koha's inner panels (tabs, toolbars, cards) on the content panel: a
-# translucent layer too, so the glass reads through every level.
-INNER_ALPHA = .55
-
-
 def panel_colors(cfg: dict, dark: bool) -> dict:
-    """The content panels' colours: in light mode a light glass (the block
-    background when it is light, else white) with #1a1a1a text; in dark
-    mode #161b22 / #0d1117 glass with #e6edf3 text. The panels are
-    translucent (panel_opacity), so every colour is checked against the
-    worst case: the panel and the inner panel over a black and over a white
-    wallpaper. Text gets 7:1, muted text, links and headings 4.5:1."""
+    """The colours of the one glass card every surface shares: in light
+    mode a light glass (the block background when it is light, else white)
+    with #1a1a1a text; in dark mode #161b22 glass with #e6edf3 text. The
+    card is as see-through as the opacity slider says, so every colour is
+    checked against the card over a black and over a white wallpaper: text
+    gets 7:1, muted text, links and headings 4.5:1, as far as the opacity
+    allows (a clear card leans on the text shadow)."""
     accent = cfg["accent"]
     if dark:
-        panel, inner, text = "#161b22", "#0d1117", "#e6edf3"
+        card, text = "#161b22", "#e6edf3"
         muted, link, ink = "#9da7b3", "#79b8ff", mix(accent, "#ffffff", .45)
-        edge, shadow = "rgba(240, 246, 252, .16)", "0 1px 2px rgba(0, 0, 0, .65)"
+        border, pane, stripe = "rgba(255, 255, 255, .08)", "rgba(255, 255, 255, .10)", "rgba(255, 255, 255, .05)"
+        shadow = "0 1px 2px rgba(0, 0, 0, .65)"
     else:
         base = cfg["surface"] if luminance(cfg["surface"]) >= .30 else "#ffffff"
-        panel, inner, text = mix(base, accent, .03), mix(base, accent, .07), "#1a1a1a"
+        card, text = mix(base, accent, .03), "#1a1a1a"
         muted, link, ink = "#4b5563", mix(accent, "#000000", .15), mix(accent, "#000000", .30)
-        edge, shadow = "rgba(15, 23, 42, .16)", "0 1px 1px rgba(255, 255, 255, .55)"
-    a = cfg["panel_opacity"] / 100
-    grounds = []
-    for wall in ("#000000", "#ffffff"):
-        under = mix(panel, wall, 1 - a)
-        grounds += [under, mix(inner, under, 1 - INNER_ALPHA)]
+        border, pane, stripe = "rgba(255, 255, 255, .2)", "rgba(15, 23, 42, .12)", "rgba(15, 23, 42, .04)"
+        shadow = "0 1px 1px rgba(255, 255, 255, .55)"
+    a = cfg["opacity"] / 100
+    grounds = [mix(card, wall, 1 - a) for wall in ("#000000", "#ffffff")]
 
     def fit(c: str, minimum: float = 4.5) -> str:
         # Towards white on the dark glass, towards black on the light one,
@@ -767,76 +761,132 @@ def panel_colors(cfg: dict, dark: bool) -> dict:
             if min(contrast(out, g) for g in grounds) >= minimum:
                 return out
         return target
-    return {"panel": panel, "inner": inner, "text": fit(text, 7), "muted": fit(muted),
-            "link": fit(link), "ink": fit(ink), "edge": edge, "shadow": shadow, "grounds": grounds}
+    return {"card": card, "text": fit(text, 7), "muted": fit(muted), "link": fit(link), "ink": fit(ink),
+            "border": border, "pane": pane, "stripe": stripe, "shadow": shadow, "grounds": grounds}
 
 
 # ----------------------------------------------------------------------
 # The stylesheet
 # ----------------------------------------------------------------------
-# The big blocks (the texture) and the content blocks inside them (a
-# solid card with the accent on its edge). "html body" before each one, and
-# !important, so Koha's Bootstrap rules never win over the chosen colours.
-# The page's content (.main) is not one of them: it is a content panel
-# (_panels_css), frosted glass with text colours checked for contrast.
+# One glass card for every surface (_cards_css): the header and search
+# blocks, the page's content (.main), and Koha's own boxes when a page puts
+# them outside .main. Inside .main the boxes take no background of their own
+# (_panels_css): they show the card's glass, so nothing stacks into a
+# thicker layer. "html body" before each one, and !important, so Koha's
+# Bootstrap rules never win over the shared variables.
 _BLOCKS = "#header-region .navbar, .navbar.navbar-expand, #opac-main-search, .mastheadsearch"
 _CONTENT = "#opacmainuserblock, #opacmainblock, #news .newsitem, .newsitem, .news-item"
+# Koha's boxes: the record, its action sidebar, breadcrumbs, the account
+# menu, facets, tabs, toolbars. A card of their own outside .main (and
+# outside dialogs), the card's glass showing through inside it.
+_PANES = ("#catalogue_detail_biblio", "#ulactioncontainer", ".searchresults-sidebar", "#breadcrumbs", ".breadcrumb",
+          "#usermenu", "#menu", "#facets", "#search-facets", ".tab-content", "#notes", "#toolbar", ".toolbar",
+          ".selections-toolbar", "#action", ".nav_results", ".card", ".well", ".nav-pills", "#views .view a",
+          "#views .view span", ".current-view", "#opacmainuserblock", "#opacmainblock", "#news .newsitem",
+          ".newsitem", ".news-item")
+# Outside .main only the outermost of those boxes is a card (never a card
+# in a card), and never inside a dialog or a menu.
+_OWN_CARDS = ("#catalogue_detail_biblio", "#ulactioncontainer", ".searchresults-sidebar", "#breadcrumbs",
+              ".breadcrumb", "#usermenu", "#menu", "#facets", "#search-facets", ".tab-content", "#notes",
+              "#opacmainuserblock", "#opacmainblock", ".newsitem", ".news-item")
+_OUTSIDE = (":not(.main *):not(.modal *):not(.dropdown-menu *)"
+            ":not(:is(" + ", ".join(_OWN_CARDS) + ") *)")
+# Koha's own fills inside those boxes (opac.scss): pagers, toolbars, the
+# "Browse results" box, the facet headings, the "Did you mean" bar.
+_FILLS = (".tab-pane", ".list-group-item", ".card-body", ".card-header", ".nav-pills li", "#action li",
+          ".view", ".results-pagination", ".pagination_footer", ".l_Results", ".pg_menu", ".pg_menu .pg_link span",
+          ".pages .inactive", ".pages a", ".pages .currentPage", "#didyoumean", "#search-facets h2 a",
+          "#toolbar.clearfix", ".nav_results ul", ".nav_results li")
 
 
 def _strong(selectors: str) -> str:
     return ", ".join("html body " + x.strip() for x in selectors.split(","))
 
 
-def _texture_css(cfg: dict) -> str:
+def _texture(cfg: dict) -> dict:
+    """What the texture adds to the shared card, the same on every surface:
+    a sheen layered over the glass, a shadow, and whether it blurs."""
     t = cfg["texture"]
-    surface = "rgba(var(--kei-surface-rgb), var(--kei-surface-a))"
-    wash = "linear-gradient(135deg, rgba(var(--kei-accent-rgb), .10), rgba(var(--kei-accent2-rgb), .10))"
-    base = [f"{_strong(_BLOCKS)} {{", f"    background: {wash}, {surface} !important;", "    color: var(--kei-text);",
-            "    border-radius: var(--kei-r-block) !important;", "    border: 1px solid var(--kei-edge) !important;"]
-    if t == "frosted":
-        base += ["    -webkit-backdrop-filter: blur(var(--kei-blur)) saturate(140%);",
-                 "    backdrop-filter: blur(var(--kei-blur)) saturate(140%);",
-                 "    box-shadow: 0 8px 32px rgba(0, 0, 0, .12);"]
-    elif t == "smooth":
-        base += ["    box-shadow: 0 4px 18px rgba(0, 0, 0, .08);"]
-    elif t == "metal":
-        base[1] = (f"    background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
-                   "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px), "
-                   f"{wash}, {surface} !important;")
-        base += ["    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
-                 "0 2px 8px rgba(0, 0, 0, .14);"]
-    elif t == "flat":
-        base[1] = f"    background: {wash}, rgb(var(--kei-surface-rgb)) !important;"
-    elif t == "gradient":
-        base[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
-                   "rgba(var(--kei-accent-rgb), .10) 55%, rgba(var(--kei-accent2-rgb), .14) 100%) !important;")
-    base.append("}")
-    base.append(f"""{_strong(_CONTENT)} {{
-    background: linear-gradient(135deg, rgba(var(--kei-accent-rgb), .14) 0%, rgba(var(--kei-accent2-rgb), .10) 100%),
-        var(--kei-panel-2) !important;
-    color: var(--kei-p-text) !important;
-    border: 1px solid rgba(var(--kei-accent-rgb), .35) !important;
-    border-left: 4px solid var(--nexus-primary) !important;
-    border-radius: calc(var(--kei-r-block) * .7) !important;
-    padding: .9rem 1.1rem;
+    none = "linear-gradient(transparent, transparent)"
+    if t == "metal":
+        return {"sheen": "linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
+                         "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px)",
+                "shadow": "inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
+                          "0 2px 8px rgba(0, 0, 0, .14)", "blur": cfg["blur"]}
+    if t == "gradient":
+        return {"sheen": "linear-gradient(135deg, transparent 0%, rgba(var(--kei-accent-rgb), .10) 55%, "
+                         "rgba(var(--kei-accent2-rgb), .14) 100%)", "shadow": "0 4px 18px rgba(0, 0, 0, .08)",
+                "blur": cfg["blur"]}
+    if t == "flat":
+        return {"sheen": none, "shadow": "none", "blur": 0}
+    if t == "smooth":
+        return {"sheen": none, "shadow": "0 4px 18px rgba(0, 0, 0, .08)", "blur": cfg["blur"]}
+    return {"sheen": none, "shadow": "0 8px 32px rgba(0, 0, 0, .12)", "blur": cfg["blur"]}
+
+
+def _card_tokens(c: dict) -> str:
+    return (f"    --koha-card-rgb: {_rgb(c['card']).replace(',', ', ')};\n"
+            f"    --koha-card-border: {c['border']};\n    --koha-pane-border: {c['pane']};\n    --koha-text: {c['text']};\n    --koha-muted: {c['muted']};\n"
+            f"    --koha-link: {c['link']};\n    --koha-ink: {c['ink']};\n    --koha-stripe: {c['stripe']};\n"
+            f"    --koha-text-shadow: {c['shadow']};")
+
+
+def _cards_css(cfg: dict) -> str:
+    """The one glass card: the same background (--koha-card-bg), blur
+    (--koha-glass-blur), border and radius on the header and search
+    blocks, the page's content and any of Koha's boxes outside it. The
+    content's blur sits on a layer behind it: on .main itself it would
+    become the frame of every position: fixed thing inside (Koha's modals)."""
+    own = ", ".join(f"html body {x}{_OUTSIDE}" for x in _OWN_CARDS)
+    card = """    background: var(--koha-card-sheen), var(--koha-card-bg) !important;
+    color: var(--koha-text) !important;
+    border: 1px solid var(--koha-card-border) !important;
+    border-radius: var(--koha-card-radius) !important;
+    box-shadow: var(--koha-card-shadow) !important;"""
+    blur = """    -webkit-backdrop-filter: blur(var(--koha-glass-blur));
+    backdrop-filter: blur(var(--koha-glass-blur));"""
+    return f"""/* One glass card for every surface. */
+{_strong(_BLOCKS)}, html body .main {{
+{card}
+}}
+{_strong(_BLOCKS)} {{
+{blur}
+}}
+/* Koha's boxes when a page puts them outside .main: the same card. A rule
+   of its own, so a browser without :is() / :not(a b) keeps the others. */
+{own} {{
+{card}
+{blur}
+    padding: .75rem 1rem;
     margin-bottom: 1rem;
+    text-shadow: var(--koha-text-shadow);
+}}
+html body .main {{
+    position: relative;
+    isolation: isolate;
+    text-shadow: var(--koha-text-shadow);
+}}
+html body .main::before {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+{blur}
 }}
 html body .main h1, html body .main h2, html body .main h3, html body .main h4, html body .main legend,
-html body .newsitem h3, html body .news-item h3 {{ color: var(--kei-ink); }}
-html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--kei-muted) !important; }}""")
-    return "\n".join(base)
+html body .newsitem h3, html body .news-item h3 {{ color: var(--koha-ink); }}
+html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--koha-muted) !important; }}"""
 
 
 def css_body(cfg: dict) -> str:
     cfg = normalize(cfg)
     car, ghost = cfg["carousel"], cfg["ghost"]
-    # The blocks take the chosen colours: the surface tinted with the accent
-    # (the blocks then add a wash of both accents), headings in the accent.
-    tint = mix(cfg["surface"], cfg["accent"], .12)
-    dark_surface = luminance(tint) < 0.30
-    text, muted, edge = (("#f1f5f9", "#cbd5e1", "rgba(255, 255, 255, .14)") if dark_surface
-                         else ("#1f2933", "#52606d", f"rgba({_rgb(cfg['accent'])}, .22)"))
-    ink = mix(cfg["accent"], "#ffffff", .45) if dark_surface else mix(cfg["accent"], "#000000", .30)
+    # One source of truth: every surface is the same glass card, its colours
+    # from panel_colors (light and dark), its opacity and blur the sliders'.
+    light, dark, tex = panel_colors(cfg, False), panel_colors(cfg, True), _texture(cfg)
+    text = light["text"]
     out = [f""":root {{
     --nexus-primary: {cfg['accent']};
     --nexus-secondary: {cfg['accent2']};
@@ -846,24 +896,27 @@ def css_body(cfg: dict) -> str:
     --kei-accent: {cfg['accent']};
     --kei-accent-rgb: {_rgb(cfg['accent'])};
     --kei-accent2-rgb: {_rgb(cfg['accent2'])};
-    --kei-surface-rgb: {_rgb(tint)};
-    --kei-surface-a: {cfg['opacity'] / 100:.2f};
-    --kei-text: {text};
-    --kei-muted: {muted};
-    --kei-ink: {ink};
-    --kei-edge: {edge};
-    --kei-blur: {cfg['blur']}px;
-    --kei-r-block: {cfg['radius_block']}px;
+{_card_tokens(light)}
+    --koha-card-alpha: {cfg['opacity'] / 100:.2f};
+    --koha-card-bg: rgba(var(--koha-card-rgb), var(--koha-card-alpha));
+    --koha-glass-blur: {tex['blur']}px;
+    --koha-card-radius: {cfg['radius_block']}px;
+    --koha-card-sheen: {tex['sheen']};
+    --koha-card-shadow: {tex['shadow']};
+    --kei-surface-rgb: var(--koha-card-rgb);
+    --kei-surface-a: var(--koha-card-alpha);
+    --kei-text: var(--koha-text);
+    --kei-muted: var(--koha-muted);
+    --kei-ink: var(--koha-ink);
+    --kei-edge: var(--koha-card-border);
+    --kei-blur: var(--koha-glass-blur);
+    --kei-r-block: var(--koha-card-radius);
     --kei-r-input: {cfg['radius_input']}px;
     --kei-r-btn: {cfg['radius_button']}px;
     --kei-film: {cfg['film'] / 100:.2f};
 }}
 html[data-kei-theme="dark"] {{
-    --kei-surface-rgb: {_rgb(mix("#161b22", cfg["accent"], .14))};
-    --kei-ink: {mix(cfg["accent"], "#ffffff", .45)};
-    --kei-text: #e6edf3;
-    --kei-muted: #9da7b3;
-    --kei-edge: rgba(255, 255, 255, .10);
+{_card_tokens(dark)}
     color-scheme: dark;
 }}
 html[data-kei-theme="dark"] body {{ background-color: #0d1117; color: var(--kei-text); }}
@@ -877,7 +930,7 @@ html[data-kei-theme="dark"] textarea {{ background-color: #161b22; color: var(--
 html[data-kei-theme="dark"] a:not(.btn) {{ color: #79b8ff; }}
 html[data-kei-theme="dark"] ::placeholder {{ color: #9da7b3; opacity: 1; }}
 html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb-item {{ color: var(--kei-muted) !important; }}
-{_texture_css(cfg)}
+{_cards_css(cfg)}
 /* The header and its menus above the search bar: the glass of each block
    is a stacking context of its own, so the header's one has to win. */
 html body #header-region, html body #header-region .navbar {{ position: relative; z-index: 1030; overflow: visible !important; }}
@@ -970,12 +1023,6 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     return "\n".join(out) + "\n"
 
 
-# The panels inside the page's content: Koha paints them white or grey
-# (breadcrumbs, the user menu, facets, tabs, toolbars, the record's side
-# box); here they all take the inner panel colour, one edge, one radius.
-_INNER = (".breadcrumb", ".main .tab-content", ".main #search-facets", ".main #toolbar", ".main .toolbar",
-          ".main .selections-toolbar", ".main #action", ".main .nav_results", ".main .card", ".main .well",
-          ".main #views .view a", ".main #views .view span", ".main .current-view")
 _TEXT = ("p", "li", "dd", "dt", "td", "th", "label", "legend", "caption", "blockquote", ".results_summary",
          ".note", ".content_set", ".authstanza", ".authstanzaheading", ".usedin", ".maincontent", ".tab-pane",
          ".heading", ".authorized")
@@ -986,54 +1033,40 @@ _LINK_SKIP = (".btn", ".nav-link", ".dropdown-item", ".kei-link", ".kei-action",
 
 
 def _panels_css(cfg: dict) -> str:
-    """Frosted glass that stays readable: the page's content (.main) is a
-    translucent panel (panel_opacity) with a 12px blur behind it, Koha's
-    own panels inside it a second translucent layer with one edge and
-    radius, and text, labels, headings and links take colours checked
-    against the worst wallpaper (panel_colors), plus a soft text shadow and
-    bolder labels, in light and in dark mode. The footer credits sit on the
-    page with no box, readable through a halo around the letters."""
-    light, dark = panel_colors(cfg, False), panel_colors(cfg, True)
-
-    def tokens(c: dict) -> str:
-        return (f"    --kei-panel-rgb: {_rgb(c['panel']).replace(',', ', ')};\n    --kei-panel-2: rgba({_rgb(c['inner']).replace(',', ', ')}, {INNER_ALPHA});\n"
-                f"    --kei-p-text: {c['text']};\n    --kei-p-muted: {c['muted']};\n    --kei-p-link: {c['link']};\n"
-                f"    --kei-p-ink: {c['ink']};\n    --kei-p-edge: {c['edge']};\n    --kei-p-shadow: {c['shadow']};")
-
+    """Inside the card (.main): Koha paints its boxes white or grey (the
+    record, its sidebar, breadcrumbs, the account menu, facets, tabs,
+    toolbars, table stripes); here none keeps a background of its own, they
+    show the card's glass with one hairline border (--koha-pane-border) and radius, so the page
+    reads as one surface at any opacity. Text, labels, headings and links
+    take colours checked against the card (panel_colors), with a soft text
+    shadow and bolder labels. The footer credits sit on the page with no
+    box, readable through a halo around the letters."""
     def sel(items, prefix: str = "html body .main ") -> str:
         return ", ".join(prefix + x for x in items)
-    inner = ", ".join("html body " + x for x in _INNER)
+    panes = sel(_PANES)
     links = "html body .main a" + "".join(f":not({x})" for x in _LINK_SKIP)
-    return f"""/* Content panels: readable on any wallpaper, in light and dark mode. */
-:root {{
-{tokens(light)}
-    --kei-panel-a: {cfg['panel_opacity'] / 100:.2f};
+    return f"""/* Inside the card: Koha's boxes show its glass, no fills of their own. */
+{panes} {{
+    background: transparent !important;
+    color: var(--koha-text) !important;
+    border: 1px solid var(--koha-pane-border) !important;
+    border-radius: calc(var(--koha-card-radius) * .6) !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
 }}
-html[data-kei-theme="dark"] {{
-{tokens(dark)}
+/* The breadcrumbs blend into the card: a line under them, no box. */
+html body .main #breadcrumbs, html body .main .breadcrumb {{
+    border: 0 !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--koha-pane-border) !important;
+    padding: 0 0 .6rem !important;
+    margin: 0 0 1rem !important;
 }}
-html body .main {{
-    position: relative;
-    isolation: isolate;
-    background: rgba(var(--kei-panel-rgb), var(--kei-panel-a)) !important;
-    color: var(--kei-p-text) !important;
-    text-shadow: var(--kei-p-shadow);
-    border: 1px solid var(--kei-p-edge) !important;
-    border-radius: var(--kei-r-block) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, .14), inset 0 1px 0 rgba(255, 255, 255, .22);
-}}
-/* The blur on a layer behind the content: on the panel itself it would
-   become the frame of every position: fixed thing inside (Koha's modals). */
-html body .main::before {{
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    pointer-events: none;
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-}}
+html body .main #breadcrumbs .breadcrumb {{ border-bottom: 0 !important; padding: 0 !important; margin: 0 !important; }}
+html body .breadcrumb a {{ color: var(--koha-link) !important; }}
+html body .breadcrumb-item, html body .breadcrumb-item.active {{ color: var(--koha-muted) !important; }}
+html[data-kei-theme="dark"] body .breadcrumb-item + .breadcrumb-item::before {{ filter: invert(1); opacity: .7; }}
 html body .main .btn, html body .main input, html body .main select, html body .main textarea,
 html body .main .form-control, html body .main .badge {{ text-shadow: none; }}
 html body .main label, html body .main dt, html body .main th, html body .main legend,
@@ -1041,97 +1074,86 @@ html body .main .results_summary .label {{ font-weight: 600; }}
 /* The footer credits: no box, straight on the page, a halo around the
    letters (light in light mode, dark in dark mode) keeps them readable. */
 html body #opaccredits {{ margin: 1rem 0; padding: .5rem 1rem; text-align: center; background: transparent !important; }}
-html body #opaccredits, html body #opaccredits p, html body #opaccredits li {{ color: var(--kei-p-text) !important; }}
-html body #opaccredits a {{ color: var(--kei-p-link) !important; font-weight: 600; }}
+html body #opaccredits, html body #opaccredits p, html body #opaccredits li {{ color: var(--koha-text) !important; }}
+html body #opaccredits a {{ color: var(--koha-link) !important; font-weight: 600; }}
 html body #opaccredits {{ text-shadow: 0 0 6px rgba(255, 255, 255, .95), 0 1px 1px rgba(255, 255, 255, .95); }}
 html[data-kei-theme="dark"] body #opaccredits {{ text-shadow: 0 0 6px rgba(0, 0, 0, .95), 0 1px 2px rgba(0, 0, 0, .95); }}
 html body .kei-credits p {{ margin: .2rem 0; }}
 html body .kei-credits-name {{ font-size: 1.05rem; }}
 html body .kei-login-banner-wrap {{ margin: 0 0 1rem; }}
-{inner} {{
-    background: var(--kei-panel-2) !important;
-    color: var(--kei-p-text) !important;
-    border: 1px solid var(--kei-p-edge) !important;
-    border-radius: calc(var(--kei-r-block) * .6) !important;
-    box-shadow: none !important;
-}}
-html body .breadcrumb {{ padding: .5rem .9rem !important; margin: 0 0 1rem !important; }}
-html body .breadcrumb a {{ color: var(--kei-p-link) !important; }}
-html body .breadcrumb-item, html body .breadcrumb-item.active {{ color: var(--kei-p-muted) !important; }}
-html[data-kei-theme="dark"] body .breadcrumb-item + .breadcrumb-item::before {{ filter: invert(1); opacity: .7; }}
 html body .main .tab-content {{ border-top-left-radius: 0 !important; padding: .9rem 1rem; }}
-html body .main .nav-tabs {{ border-bottom-color: var(--kei-p-edge); }}
-html body .main .nav-tabs .nav-link {{ color: var(--kei-p-link) !important; background: transparent; }}
+{sel(_FILLS)} {{ background: transparent !important; color: var(--koha-text); }}
+html body .main .pages .currentPage {{ background: rgba(var(--kei-accent-rgb), .14) !important; }}
+html body .main .nav-tabs {{ border-bottom-color: var(--koha-pane-border); }}
+html body .main .nav-tabs .nav-link {{ color: var(--koha-link) !important; background: transparent !important; }}
 html body .main .nav-tabs .nav-link.active, html body .main .nav-tabs .nav-item.show .nav-link,
 html body .main .nav-tabs .active > a {{
-    background: var(--kei-panel-2) !important;
-    color: var(--kei-p-text) !important;
-    border-color: var(--kei-p-edge) var(--kei-p-edge) var(--kei-panel-2) !important;
+    background: var(--koha-stripe) !important;
+    color: var(--koha-text) !important;
+    border-color: var(--koha-pane-border) var(--koha-pane-border) transparent !important;
 }}
-/* The user menu (account pages) and the facets: one list, one radius. */
-html body .main #menu ul, html body .main #usermenu ul {{
-    border: 1px solid var(--kei-p-edge);
-    border-radius: calc(var(--kei-r-block) * .6);
-    overflow: hidden;
-}}
+/* The user menu (account pages), the facets and the action sidebar: one list, one radius. */
+html body .main #menu ul, html body .main #usermenu ul {{ border: 0; overflow: hidden; }}
 html body .main #menu li a, html body .main #usermenu li a {{
-    background: var(--kei-panel-2) !important;
-    color: var(--kei-p-link) !important;
+    background: transparent !important;
+    color: var(--koha-link) !important;
     border: 0 !important;
-    border-bottom: 1px solid var(--kei-p-edge) !important;
+    border-bottom: 1px solid var(--koha-pane-border) !important;
 }}
 html body .main #menu li:last-child a, html body .main #usermenu li:last-child a {{ border-bottom: 0 !important; }}
 html body .main #menu li.active a, html body .main #usermenu li.active a,
-html body .main #menu li a:hover, html body .main #usermenu li a:hover {{
+html body .main #menu li a:hover, html body .main #usermenu li a:hover,
+html body .main .nav-pills .nav-link.active {{
     background: rgba(var(--kei-accent-rgb), .14) !important;
-    color: var(--kei-p-ink) !important;
+    color: var(--koha-ink) !important;
     box-shadow: inset 3px 0 0 var(--nexus-primary);
 }}
-html body .main #search-facets ul, html body .main #search-facets li {{ background: transparent !important; }}
-/* Tables and search results: rows on the panel, stripes in the inner glass. */
+html body .main #search-facets ul, html body .main #search-facets li, html body .main #facets ul,
+html body .main #facets li {{ background: transparent !important; }}
+/* Tables and search results: rows on the card, stripes a faint see-through tint. */
 html body .main table, html body .main .table {{
     --bs-table-bg: transparent;
-    --bs-table-color: var(--kei-p-text);
-    --bs-table-striped-bg: var(--kei-panel-2);
-    --bs-table-striped-color: var(--kei-p-text);
+    --bs-table-color: var(--koha-text);
+    --bs-table-striped-bg: var(--koha-stripe);
+    --bs-table-striped-color: var(--koha-text);
     --bs-table-hover-bg: rgba(var(--kei-accent-rgb), .08);
-    --bs-table-hover-color: var(--kei-p-text);
-    --bs-table-border-color: var(--kei-p-edge);
+    --bs-table-hover-color: var(--koha-text);
+    --bs-table-border-color: var(--koha-pane-border);
     background-color: transparent !important;
-    color: var(--kei-p-text);
+    color: var(--koha-text);
 }}
 html body .main table > * > tr > td, html body .main table > * > tr > th {{
     background-color: transparent !important;
-    border-color: var(--kei-p-edge) !important;
+    border-color: var(--koha-pane-border) !important;
 }}
 html body .main table > thead > tr > th, html body .main .table-striped > tbody > tr:nth-of-type(odd) > *,
-html body .main .searchresults table > tbody > tr:nth-of-type(odd) > * {{ background-color: var(--kei-panel-2) !important; }}
-html body .main .pagination .page-link {{ background: var(--kei-panel-2); border-color: var(--kei-p-edge); color: var(--kei-p-link); }}
+html body .main .searchresults table > tbody > tr:nth-of-type(odd) > * {{ background-color: var(--koha-stripe) !important; }}
+html body .main .pagination .page-link {{ background: transparent; border-color: var(--koha-pane-border); color: var(--koha-link); }}
 html body .main .pagination .active .page-link, html body .main .pagination .page-item.active .page-link {{
     background: var(--nexus-primary); border-color: var(--nexus-primary); color: var(--nexus-on-primary);
 }}
-/* Text: crisp on the panels, never the faint grey of Koha's defaults. */
-html body .main, {sel(_TEXT)} {{ color: var(--kei-p-text) !important; }}
-{sel(_MUTED)} {{ color: var(--kei-p-muted) !important; }}
-{sel(_HEADINGS)} {{ color: var(--kei-p-ink) !important; }}
+/* Text: crisp on the card, never the faint grey of Koha's defaults. */
+html body .main, {sel(_TEXT)} {{ color: var(--koha-text) !important; }}
+{sel(_MUTED)} {{ color: var(--koha-muted) !important; }}
+{sel(_HEADINGS)} {{ color: var(--koha-ink) !important; }}
 html body .main .alert h1, html body .main .alert h2, html body .main .alert h3, html body .main .alert h4,
 html body .main .alert h5, html body .main .alert p, html body .main .alert li {{ color: inherit !important; }}
-{links} {{ color: var(--kei-p-link); }}
-/* Dark mode: Koha's light alerts and status colours on the dark panels. */
-html[data-kei-theme="dark"] body .main .alert {{
-    background: rgba(var(--kei-accent-rgb), .16) !important;
+{links} {{ color: var(--koha-link); }}
+html body .main .nav_results a, html body .main #a_listResults, html body .main #action a {{ color: var(--koha-link) !important; }}
+/* Koha's alerts: a see-through tint of their colour on the card, in both modes. */
+html body .main .alert {{
+    background: rgba(var(--kei-accent-rgb), .12) !important;
     border-color: rgba(var(--kei-accent-rgb), .40) !important;
-    color: var(--kei-p-text) !important;
+    color: var(--koha-text) !important;
 }}
-html[data-kei-theme="dark"] body .main .alert-warning {{ background: rgba(227, 179, 65, .14) !important; border-color: rgba(227, 179, 65, .45) !important; }}
-html[data-kei-theme="dark"] body .main .alert-danger, html[data-kei-theme="dark"] body .main .alert-error {{
-    background: rgba(248, 81, 73, .14) !important; border-color: rgba(248, 81, 73, .45) !important; }}
-html[data-kei-theme="dark"] body .main .alert-success {{ background: rgba(63, 185, 80, .14) !important; border-color: rgba(63, 185, 80, .45) !important; }}
+html body .main .alert-warning {{ background: rgba(227, 179, 65, .14) !important; border-color: rgba(227, 179, 65, .45) !important; }}
+html body .main .alert-danger, html body .main .alert-error {{
+    background: rgba(248, 81, 73, .12) !important; border-color: rgba(248, 81, 73, .45) !important; }}
+html body .main .alert-success {{ background: rgba(63, 185, 80, .12) !important; border-color: rgba(63, 185, 80, .45) !important; }}
 html[data-kei-theme="dark"] body .main .available, html[data-kei-theme="dark"] body .main .text-success {{ color: #56d364 !important; }}
 html[data-kei-theme="dark"] body .main .unavailable, html[data-kei-theme="dark"] body .main .text-danger {{ color: #ff7b72 !important; }}
 html[data-kei-theme="dark"] body .main .text-warning {{ color: #e3b341 !important; }}
 html[data-kei-theme="dark"] body .main .term {{ color: #1a1a1a !important; }}"""
-
 
 # Every kind of button Koha draws: Bootstrap's, the masthead search button
 # and the bare submit inputs of older templates and news. The carousel
@@ -1225,10 +1247,8 @@ def _canvas_css(cfg: dict) -> str:
 html[data-kei-theme="dark"] body {{
     background: {glows.replace(".16", ".10").replace(".14", ".08")}, #0d1117 !important;
 }}"""]
-    if cfg["texture"] != "metal":
-        lines.append(f"""{_strong(_BLOCKS + ", .main, " + _CONTENT)} {{
-    box-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"});
-}}""")
+    if cfg["texture"] not in ("metal", "flat"):
+        lines.append(f""":root {{ --koha-card-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"}); }}""")
     return "\n".join(lines)
 
 

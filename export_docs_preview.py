@@ -240,8 +240,7 @@ FEATURES: tuple[Feature, ...] = (
     ]),
     # OPAC and Staff Appearance
     Feature("opac-material", "opac", "views/opac.py", "Material", [
-        select("Texture", "opac_theme.TEXTURES"), slider("Blur", 12, "px"), slider("Opacity", 82),
-        slider("Content panels", 76),
+        select("Texture", "opac_theme.TEXTURES"), slider("Blur", 12, "px"), slider("Opacity", 78),
         slider("Blocks", 14, "px"), slider("Inputs", 10, "px"), slider("Buttons", 10, "px"),
         color("Accent colour", "#2f7d5b"), color("Second colour", "#1e4f86"), color("Block background", "#ffffff"),
         switch("Page colour", False),
