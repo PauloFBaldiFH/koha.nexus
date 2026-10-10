@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "updated": "2026-10-08",
+ "updated": "2026-10-10",
  "about": "koha.nexus curated Z39.50/SRU targets. verified=true: the connection data came from the library's or Koha's own published page; false: an older or indirect source. The panel's scan on your server tells which ones answer today.",
  "targets": [
   {
@@ -20,6 +20,24 @@
    "verified": true,
    "source": "https://github.com/PauloFBaldiFH/koha.nexus/tree/main/sru-bridge",
    "notes": "The local sru-bridge service (unit koha-zeus-sru): searches BU/UFSC's catalogue through Catálogo Zeus and answers MARCXML, so Koha's syntax is MARC21. Answers only while the service runs on this server."
+  },
+  {
+   "name": "Catálogo Rede Pergamum (CRP bridge, SRU)",
+   "host": "127.0.0.1",
+   "port": 5006,
+   "db": "sru",
+   "kind": "sru",
+   "syntax": "MARC21",
+   "encoding": "utf8",
+   "schema": "marcxml",
+   "sru_fields": "title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice",
+   "sru_options": "sru=get,sru_version=1.1",
+   "region": "latam",
+   "country": "BR",
+   "preselect": false,
+   "verified": false,
+   "source": "https://github.com/PauloFBaldiFH/koha.nexus/tree/main/sru-bridge",
+   "notes": "The local sru-bridge service (unit koha-pergamum-sru): searches Rede Pergamum's shared catalogue (PUCPR, site CRP) and answers MARCXML, so Koha's syntax is MARC21. Answers only while the service runs on this server."
   },
   {
    "name": "UTFPR (Universidade Tecnológica Federal do Paraná)",

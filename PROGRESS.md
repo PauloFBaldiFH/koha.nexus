@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.39** (1.5.40: backup compression, AI model lists, 22 SQL reports PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -82,6 +82,12 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `targets[0]` (BU/UFSC; the other targets hang) and reads the MARCXML Zeus embeds; Koha's row is
   syntax MARC21 (USMARC shows 0 results), `sru=get,sru_version=1.1`, timeout 15, written by
   `sru_bridge_register`, which also unticks `z3950.ufsc.br` (dropped from the curated list).
+  Since 1.5.41 a second bridge, Rede Pergamum (PUCPR, site CRP), lives in the same directory as
+  package `pergamum_sru` on 127.0.0.1:5006/sru, unit `koha-pergamum-sru`, `--task pergamum-bridge`
+  (and automatically when z3950-add gets the 127.0.0.1:5006 row, offered unticked in the Brazil
+  list). Both bridges share one venv and the SRU endpoint code (`zeus_sru.app.sru_app`).
+  `pergamum_bridge_register` deletes then inserts Koha's row (z3950servers has no unique key but
+  `id`, so ON DUPLICATE KEY never matches). Not yet tried against the live Pergamum site.
   Since 1.5.22 a server is working once it answers the protocol (Z39.50 Init accepted, or any SRU
   response), even with 0 hits, a slow search or a refused Present; BER indefinite lengths are read.
   `History` resets automatic hides when `HISTORY_RULES` changes. Confirmed dead and left out:
@@ -312,6 +318,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   aliases when the live list cannot be read. Defaults: gemini-flash-latest, gpt-5-mini,
   claude-sonnet-5-5 (aiconf and both Perl DEFAULTS). Reports pack 8 -> 22 (tests/library_tools
   L08 builds the extra Koha columns and runs each new report on a row made for it).
+
+- **1.5.41 (Rede Pergamum SRU bridge)**: `sru-bridge/pergamum_sru` turns Koha's SRU searches
+  into Pergamum's Sajax calls (ajax_resultados for the acervo ids of the first 50 hits,
+  ajax_conteudo_pastas for each record's MARC text between <inicio> and <fim>) and the MARC text
+  into MARCXML: bare \r line ends, \u001e and XML-invalid controls removed, entities decoded
+  without unicode_escape, datafields without a subfield dropped (Koha refuses them). Koha's
+  maximumRecords=0 count call fetches no records; the result list is cached 10 minutes.
+  recordSchema is the full info:srw URI as in Paulo's spec (PERGAMUM_SRU_RECORD_SCHEMA=marcxml
+  switches it; yaz-client 5.34 reads both).
 
 ---
 

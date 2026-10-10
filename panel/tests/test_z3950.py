@@ -470,10 +470,14 @@ def test_koha_ranks_follow_latency():
 
 def test_curated_brazil_list_and_zeus_bridge():
     latam = [t for t in z.load_curated() if t.region == "latam"]
-    assert [t.host for t in latam] == ["127.0.0.1", "z3950.utfpr.edu.br", "z3950.unifesp.br"]
-    zeus = latam[0]
+    assert [t.host for t in latam] == ["127.0.0.1", "127.0.0.1", "z3950.utfpr.edu.br", "z3950.unifesp.br"]
+    zeus, pergamum = latam[:2]
     assert (zeus.kind, zeus.port, zeus.db, zeus.syntax, zeus.preselect) == ("sru", 5000, "sru", "MARC21", True)
-    assert all((t.kind, t.port, t.db, t.preselect) == ("zed", 210, "Default", False) for t in latam[1:])
+    # The Rede Pergamum bridge is offered, not ticked.
+    assert (pergamum.kind, pergamum.port, pergamum.db, pergamum.syntax, pergamum.preselect) == (
+        "sru", 5006, "sru", "MARC21", False)
+    assert pergamum.sru_options == "sru=get,sru_version=1.1"
+    assert all((t.kind, t.port, t.db, t.preselect) == ("zed", 210, "Default", False) for t in latam[2:])
     hosts = {t.host for t in z.load_curated()}
     assert not hosts & {"162.214.168.248", "unesp.alma.exlibrisgroup.com", "z3950.ufsc.br"}
 
