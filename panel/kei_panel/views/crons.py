@@ -24,6 +24,7 @@ from .base import SectionView
 class CronView(SectionView):
     loaded = False
     drawn = False
+    seen = ""
 
     def __init__(self, section):
         super().__init__(section)
@@ -48,7 +49,9 @@ class CronView(SectionView):
         yield Vertical(id="cr-rows")
 
     def on_show(self) -> None:
-        if not self.loaded:
+        # Again when another screen changed the file (Messaging > Alerts
+        # switches its job on): a Save here must not undo that.
+        if not self.loaded or cron.read() != self.seen:
             self.loaded = True
             self.reload()
 
@@ -56,7 +59,8 @@ class CronView(SectionView):
     # Rows
     # ------------------------------------------------------------------
     def reload(self) -> None:
-        self.cf = cron.parse(cron.read(), self.app.env.instance)
+        self.seen = cron.read()
+        self.cf = cron.parse(self.seen, self.app.env.instance)
         self.draw()
 
     def draw(self) -> None:

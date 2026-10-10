@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.44"
+PANEL_VERSION=" 1.5.45"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28099,7 +28099,8 @@ opac_carousel_refresh() {
 #                          koha_tasks file (panel/kei_panel/cron.py); every
 #                          line is checked before it replaces the old one
 #                          (kept as koha_tasks.bak). A full index rebuild job
-#                          brings its helper, koha-kei-reindex.
+#                          brings its helper, koha-kei-reindex; the reader
+#                          alerts job brings koha-kei-notify.
 #   hub-status             Messaging & interoperability: e-mail, SMTP servers
 #                          (no passwords), SMS driver, SIP2 and Z39.50 state,
 #                          the libraries and the staff address for the links.
@@ -28113,6 +28114,7 @@ opac_carousel_refresh() {
 #                          Google Drive flows (section 10) are not used here.
 # ======================================================================
 CRON_REINDEX_BIN="/usr/local/bin/koha-kei-reindex"
+CRON_NOTIFY_BIN="/usr/local/bin/koha-kei-notify"
 SIP_CONF="/etc/koha/sites/${INSTANCE}/SIPconfig.xml"
 
 # cron_file_ok FILE: a PATH line, and nothing but comments, VAR= lines and
@@ -28147,6 +28149,29 @@ exec /usr/sbin/koha-rebuild-zebra -f -v -b -a "$inst"
 SH
 }
 
+# Reader alerts and the daily digest (Messaging > Alerts of the panel): the
+# panel's notify.py, with the panel's own Python when it is there (it has
+# Rich, so the messages come in the panel's language), else the system's.
+cron_notify_script() {
+    cat <<SH
+#!/bin/sh
+# koha.nexus: reader alerts and the daily status digest (Schedules & cron
+# tasks; settings in Messaging > Alerts). Usage: koha-kei-notify INSTANCE [--dry-run]
+inst="\$1"
+case "\$inst" in ''|*[!A-Za-z0-9_-]*) echo "usage: \$0 INSTANCE [--dry-run]" >&2; exit 2 ;; esac
+shift
+src="${KEI_PANEL_SRC}"
+if [ ! -f "\$src/kei_panel/notify.py" ]; then
+    echo "koha-kei-notify: the panel is not installed in \$src (open sudo config.sh once)" >&2
+    exit 1
+fi
+py="${KEI_PANEL_VENV}/bin/python"
+[ -x "\$py" ] || py=python3
+PYTHONPATH="\$src" PYTHONDONTWRITEBYTECODE=1 KEI_INSTALLER=/usr/local/bin/config.sh \\
+    exec "\$py" -m kei_panel.notify "\$inst" "\$@"
+SH
+}
+
 cron_apply() {
     local f="$1"
     require_koha || return 1
@@ -28157,6 +28182,9 @@ cron_apply() {
     fi
     if grep -q 'koha-kei-reindex' "$f"; then
         cron_reindex_script > "$CRON_REINDEX_BIN" && chmod 755 "$CRON_REINDEX_BIN"
+    fi
+    if grep -q 'koha-kei-notify' "$f"; then
+        cron_notify_script > "$CRON_NOTIFY_BIN" && chmod 755 "$CRON_NOTIFY_BIN"
     fi
     [ -f "$CRON_TASKS" ] && cp -f "$CRON_TASKS" "${CRON_TASKS}.bak"
     if ! cat "$f" > "$CRON_TASKS"; then

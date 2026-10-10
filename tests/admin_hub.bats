@@ -250,3 +250,24 @@ SH
         grep -q "^        ${task}) " "$KEI_REPO/installer"
     done
 }
+
+@test "cron-apply: the reader alerts job brings koha-kei-notify" {
+    good_cron "$W/new.txt"
+    echo '0 7 * * * root /usr/local/bin/koha-kei-notify library >/dev/null 2>&1' >> "$W/new.txt"
+    cat >> "$W/extra.sh" <<SH
+CRON_NOTIFY_BIN="$W/koha-kei-notify"
+KEI_PANEL_SRC="$KEI_REPO/panel"
+KEI_PANEL_VENV="$W/no-venv"
+SH
+    task cron_apply "$W/new.txt"
+    [ "$status" -eq 0 ]
+    [ -x "$W/koha-kei-notify" ]
+    sh -n "$W/koha-kei-notify"
+    grep -q "src=\"$KEI_REPO/panel\"" "$W/koha-kei-notify"
+    # It runs the panel's notify.py (system python3 here: no venv); every alert is off.
+    run env KEI_NOTIFY_CONF="$W/none.conf" KEI_NOTIFY_STATE="$W/state" "$W/koha-kei-notify" library --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Every alert is off"* ]]
+    run "$W/koha-kei-notify" 'bad name'
+    [ "$status" -eq 2 ]
+}
