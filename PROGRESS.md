@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.41** (1.5.42: last-backup indicator and pre-restore safety backup PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.42** (1.5.43: last-backup indicator and pre-restore safety backup PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -328,7 +328,16 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   recordSchema is the full info:srw URI as in Paulo's spec (PERGAMUM_SRU_RECORD_SCHEMA=marcxml
   switches it; yaz-client 5.34 reads both).
 
-- **1.5.42 (last-backup indicator, pre-restore safety backup)**: one source of truth for "the
+- **1.5.42 (language menu)**: section "Koha languages" (classic option 13, panel cards) has four
+  actions: download a pack only (koha-translate --install, no preference changed; a pack already
+  there is skipped), download & activate (the old routine, now without its yes/no), set an
+  installed language as active (no download), and list the installed packs with the active and
+  enabled ones. "Active" = first in OPACLanguages and StaffInterfaceLanguages (or `language` on
+  Koha before 22.11), the other enabled languages kept after it; Koha shows the first one when
+  the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
+  is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
+  `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.43 (last-backup indicator, pre-restore safety backup)**: one source of truth for "the
   newest backup", `latest_sql_backup` (EPOCH MTIME SIZE PATH): top-level, non-empty `*.sql.{gz,zst,xz}`
   in $DIR_SQL, dated by the timestamp in the name (`backup_name_epoch`: `_23h00`, `_14h0733`,
   `_14h07m33`, `20261002-0300`), else the mtime, so a copied-back old backup no longer looks new;

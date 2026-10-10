@@ -294,6 +294,10 @@ _RUN: dict[str, list[str]] = {
     "languages": [
         "@@choose Koha & Panel Languages\tChoose the language:\tpt-BR\ten\tEnglish\tpt-BR\tPortuguês (Brasil)",
         "@@result panel_lang=en", "@@say ok OK\tLanguage 'en' enabled successfully."],
+    "lang-list": ["@@view Installed languages & active one\tKoha languages installed on this server:\n\n"
+                  "  en           English                OPAC: enabled    Staff: enabled\n"
+                  "  pt-BR        Português (Brasil)     OPAC: ACTIVE     Staff: ACTIVE\n\n"
+                  "Active in the OPAC: pt-BR\nActive in the staff interface: pt-BR"],
 }
 _RUN_DEFAULT = ["@@step Working", "@@done 0 Working", "@@say ok OK\tDone (demo)."]
 
