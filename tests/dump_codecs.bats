@@ -60,3 +60,27 @@ setup() {
         esac
     done
 }
+
+@test "a Koha backup in a tar.gz or zip is unpacked for Restore database; a PostgreSQL one is refused" {
+    mkdir -p "$W/in"
+    cp "$W/k.sql" "$W/in/BKP_BIBLIOTECA (2).sql"
+    printf 'x' > "$W/in/readme.txt"
+    tar czf "$W/BKP (2).tar.gz" -C "$W/in" .
+    (cd "$W/in" && zip -q "$W/BKP (3).zip" "BKP_BIBLIOTECA (2).sql")
+    mkdir "$W/pg" && echo x > "$W/pg/toc.dat" && tar cf "$W/pg.tar" -C "$W/pg" toc.dat
+    sed -n '/^restore_unpack() {/,/^}/p' "$REPO/installer" > "$W/unpack.sh"
+    for f in "BKP (2).tar.gz:tar" "BKP (3).zip:zip" "pg.tar:tar"; do
+        run bash -c "set -o pipefail; t() { printf '%s' \"\$1\"; }; log() { :; }; get_free_space_mb() { echo 99999; }; source '$W/dump.sh'; source '$W/unpack.sh'; restore_unpack \"$W/${f%:*}\" ${f#*:}; echo \"rc=\$? \$RESTORE_UNPACK_FILE|\$RESTORE_UNPACK_ERROR\"; rm -rf \"\$RESTORE_UNPACK_DIR\""
+        case "$f" in
+            pg*) [[ "$output" == "rc=1 |This is a PostgreSQL backup"* ]] ;;
+            *)   [[ "$output" == "rc=0 /var/tmp/kei-unpack."*"/BKP_BIBLIOTECA (2).sql|" ]] ;;
+        esac
+    done
+}
+
+@test "a compressed Koha backup is recognised as one (no SIGPIPE under pipefail)" {
+    { cat "$W/k.sql"; for t in biblio_metadata items borrowers systempreferences; do printf 'CREATE TABLE `%s` (x int);\n' "$t"; done; seq 1 200000 | sed 's/^/INSERT INTO `x` VALUES (/; s/$/);/'; } | gzip > "$W/BKP_BIBLIOTECA (2).backup"
+    sed -n '/^magic_is_koha_dump() {/,/^}/p' "$REPO/installer" > "$W/koha.sh"
+    run bash -c "set -o pipefail; source '$W/dump.sh'; source '$W/koha.sh'; magic_is_koha_dump \"$W/BKP_BIBLIOTECA (2).backup\""
+    [ "$status" -eq 0 ]
+}

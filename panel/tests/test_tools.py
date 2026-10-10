@@ -143,3 +143,31 @@ def test_installer_runs_a_classic_routine_as_a_task():
     bad = subprocess.run(["bash", str(INSTALLER), "--task", "run", "no-such-action"],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=60)
     assert bad.returncode == 2
+
+
+def test_an_error_in_a_dialog_closes_the_dialog_not_the_panel(monkeypatch):
+    """The routine waiting on the dialog gets "cancelled", the error is
+    shown, and the panel goes on (another routine opens)."""
+    def boom(self, path):
+        raise RuntimeError("simulated picker failure")
+    monkeypatch.setattr(PathPickerScreen, "_choose", boom)
+
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("magic-import")
+            (await _wait_for(pilot, PathPickerScreen)).query_one("#choose").press()
+            body = ""
+            for _ in range(60):
+                await pilot.pause(0.1)
+                if isinstance(app.screen, MessageScreen) and "simulated" in app.screen._body:
+                    body = app.screen._body
+                    app.screen.dismiss(None)
+                    break
+            await pilot.pause(0.5)
+            app.run_native("magic-import")
+            (await _wait_for(pilot, PathPickerScreen)).dismiss(None)
+            await pilot.pause(0.3)
+            return body, app.return_code
+    body, rc = asyncio.run(main())
+    assert "simulated picker failure" in body and rc is None

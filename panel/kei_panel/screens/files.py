@@ -36,7 +36,8 @@ from ..i18n import t
 from ..transfer import dropped_path
 from .dialogs import CopyValues, MessageScreen
 
-BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst", ".backup", ".bkp", ".dump")
+BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst", ".backup", ".bkp", ".dump",
+                   ".tar", ".tgz", ".zip")
 
 
 def path_kind(path: Path) -> str:
