@@ -1,0 +1,2062 @@
+{
+ "language": "pt-BR",
+ "ui": {
+  "title": "Prévia interativa e manual",
+  "subtitle": "Cada tela do painel de controle, explicada.",
+  "search": "Buscar",
+  "language": "Idioma",
+  "menu": "Menu",
+  "mockup": "Simulador",
+  "screenshot": "Captura de tela",
+  "loading": "Carregando o manual…",
+  "load_error": "Não foi possível carregar o manual.",
+  "footer": "Gerado a partir do código do painel por export_docs_preview.py.",
+  "version": "Versão do painel",
+  "overview": "O que faz",
+  "steps": "Passo a passo",
+  "options": "Opções explicadas",
+  "tips": "Boas práticas",
+  "warnings": "Atenção",
+  "related": "Veja também",
+  "where": "Onde",
+  "shortcut": "Tecla",
+  "kind_section": "Tela",
+  "kind_entry": "Cartão",
+  "kind_feature": "Parte da tela",
+  "pending": "Pendente",
+  "pending_note": "Esta parte está descrita como planejada: ainda não está no painel publicado.",
+  "untranslated": "Este guia ainda não foi traduzido para este idioma: ele aparece em inglês.",
+  "outdated": "O texto em inglês deste guia mudou depois da tradução: a tradução pode estar desatualizada.",
+  "no_manual": "Ainda não há guia escrito para este item.",
+  "no_results": "Nada encontrado.",
+  "full_manual": "Manual completo",
+  "panel_only": "Textos do painel (guia em inglês)",
+  "exit": "Sair",
+  "back_to_site": "Voltar para koha.nexus",
+  "screenshot_of": "O painel real"
+ },
+ "items": {
+  "sec-dashboard": {
+   "summary": "O Painel de Controle é a tela inicial do painel: num relance você vê se o Koha está funcionando, quando foi feito o último backup, quanto disco resta e em quais endereços o catálogo responde.",
+   "overview": [
+    "O Painel de Controle abre quando você inicia o painel com `sudo config.sh` e está sempre a uma tecla de distância (**d**). Ele lê o estado do servidor pelo verbo de status, somente leitura, do instalador: abri-lo nunca altera nada.",
+    "A tela é organizada de cima para baixo: o estado geral do Koha com o último backup e o espaço livre em disco; os endereços do catálogo público (OPAC) e da intranet para cada forma de acesso; e os componentes (MariaDB, Apache, Memcached, Plack, o motor de busca) com a resposta HTTP dos dois sites.",
+    "Dois botões agem sobre o servidor: **Reiniciar Koha**, para reiniciar os serviços rapidamente, e **Exportar diagnóstico**, para gerar um pacote de suporte com todas as senhas removidas."
+   ],
+   "steps": [
+    "Abra o painel com `sudo config.sh` (ou pelo ícone **Koha** no Windows). O Painel de Controle é a primeira tela.",
+    "Leia a linha de cima: **Koha** deve dizer *Funcionando*, **Último backup** deve ter menos de um dia e **Disco livre** deve comportar pelo menos dois backups.",
+    "Confira **Endereços** para saber os links a passar aos leitores (OPAC) e à equipe (intranet, porta 8080).",
+    "Olhe o **Estado dos componentes**: todos os serviços devem estar ativos e os dois sites devem responder com HTTP 200.",
+    "Depois de corrigir algo, pressione **Atualizar** para ler o estado de novo."
+   ],
+   "tips": [
+    "Faça do Painel de Controle a sua verificação da manhã: um cartão vermelho ou amarelo é mais fácil de resolver no dia em que aparece do que uma semana depois.",
+    "Se o último backup tiver mais de 24 horas, abra a Central de cópias de segurança e gere um backup manual antes de qualquer outra coisa.",
+    "Mantenha pelo menos 15–20% do disco livre: o MariaDB, o índice de busca e os backups noturnos precisam de espaço para trabalhar."
+   ],
+   "_en": "61795aa2e3"
+  },
+  "dash-status": {
+   "title": "Cartões de status",
+   "summary": "Quatro cartões resumem a saúde do servidor: o estado geral do Koha, a idade do backup mais recente, o espaço livre em disco e a memória disponível.",
+   "options": [
+    {
+     "name": "Koha",
+     "text": "*Funcionando* quando todos os serviços principais respondem; *Atenção* quando algum está degradado; *Parado* quando o Koha está desligado; *não instalado* antes da instalação. A nota abaixo mostra a memória em uso."
+    },
+    {
+     "name": "Último backup",
+     "text": "Quando foi feito o backup mais recente deste servidor e o nome do arquivo. Desde a versão 1.5.44, o Painel de Controle, a Central de cópias de segurança e as telas de restauração leem a mesma fonte, por isso sempre concordam. O cartão fica amarelo quando o backup está antigo ou a última execução noturna falhou."
+    },
+    {
+     "name": "Disco livre",
+     "text": "Espaço livre no disco que guarda o banco do Koha e os backups, com o tamanho total."
+    },
+    {
+     "name": "Memória disponível",
+     "text": "RAM que o sistema ainda pode entregar. Só o Elasticsearch precisa de cerca de 1,5 GB a mais que o Zebra."
+    },
+    {
+     "name": "Atualizar",
+     "text": "Lê de novo o estado do servidor. O Painel de Controle nunca altera nada sozinho."
+    }
+   ],
+   "tips": [
+    "Um cartão **Último backup** amarelo é um chamado à ação: abra a Central de cópias de segurança e use **Gerar backup manual** ou **Testar a integridade do último backup**.",
+    "Quando o disco livre ficar abaixo de duas vezes o tamanho de um backup, limpe arquivos antigos com **Otimização profunda do banco e limpeza de logs** ou leve backups antigos para a nuvem."
+   ],
+   "_en": "7a8f4cfcfe"
+  },
+  "dash-addresses": {
+   "title": "Endereços",
+   "summary": "Os links do catálogo público (OPAC, porta 80) e da intranet (porta 8080) para cada forma de acesso: do próprio servidor, dos outros computadores da biblioteca e da Internet.",
+   "options": [
+    {
+     "name": "No próprio servidor",
+     "text": "`http://localhost` e `http://localhost:8080`: funcionam no servidor, ou no PC com Windows que roda o Koha no WSL."
+    },
+    {
+     "name": "Outros computadores da rede",
+     "text": "O endereço local do servidor (por exemplo `http://192.168.0.20:8080`). No WSL com rede NAT, os outros computadores não o alcançam, e o painel avisa."
+    },
+    {
+     "name": "Túnel Cloudflare / Endereço gratuito koha.nexus",
+     "text": "O endereço público quando o catálogo é publicado por um Túnel Cloudflare, com *online* ou *offline*. *Acesso remoto da equipe desligado* significa que só o OPAC foi publicado."
+    },
+    {
+     "name": "IP público",
+     "text": "Num servidor na nuvem (VPS), o painel também mostra o IP público e lembra de abrir as portas 80 e 8080 no firewall do provedor, ou de usar um Túnel Cloudflare."
+    }
+   ],
+   "tips": [
+    "Passe aos leitores o endereço do OPAC e deixe o endereço da intranet (8080) para a equipe: são sites diferentes, com permissões diferentes.",
+    "Prefira o Túnel Cloudflare a abrir portas: ele já traz HTTPS e não expõe o IP do servidor."
+   ],
+   "warnings": [
+    "Abrir a porta 8080 para toda a Internet expõe a tela de login da intranet. Restrinja-a com **Firewall do Staff** ou acesse-a pela VPN WireGuard."
+   ],
+   "_en": "34d16a3d3a"
+  },
+  "dash-components": {
+   "title": "Estado dos componentes",
+   "summary": "O estado de cada serviço de que o Koha depende e a resposta HTTP da intranet e do OPAC.",
+   "overview": [
+    "Cada componente mostra *ativo* ou *inativo*: MariaDB (o banco de dados), Apache (o servidor web), Memcached (o cache), Plack (o servidor de aplicação do Koha), o motor de busca (Zebra ou Elasticsearch) e o Túnel Cloudflare, quando configurado.",
+    "**Resposta HTTP** pede a página inicial dos dois sites: *Responde (HTTP 200)* significa que leitores e equipe conseguem usá-los; *Não responde* aponta para o Apache, o Plack ou o banco de dados."
+   ],
+   "tips": [
+    "Quando um site não responder, tente primeiro **Reiniciar Koha**; se o problema continuar, rode a **Verificação completa do sistema** para achar a causa.",
+    "Um motor de busca inativo faz as buscas falharem enquanto o resto do Koha continua funcionando: use **Reparar / reconstruir a indexação**."
+   ],
+   "_en": "5185f9b604"
+  },
+  "dash-restart": {
+   "title": "Reiniciar Koha",
+   "summary": "Reinicia de uma vez o Memcached, o Plack, os processos em segundo plano e o Apache, sem reiniciar o servidor.",
+   "steps": [
+    "Pressione **Reiniciar Koha** no Painel de Controle.",
+    "Confirme: as páginas do Koha param de responder por alguns segundos e nada se perde.",
+    "Aguarde o resultado: ele mostra o estado do Memcached e do Plack depois de reiniciar.",
+    "Pressione **Atualizar** e confira se os dois sites voltaram a responder."
+   ],
+   "tips": [
+    "Use depois de mudar preferências do sistema que o Koha guarda em cache, depois de instalar um plugin, ou quando as páginas ficarem lentas.",
+    "Reinicie num momento tranquilo: quem estiver no meio de um empréstimo terá de repetir o último clique."
+   ],
+   "_en": "d618850497"
+  },
+  "dash-export": {
+   "title": "Exportar diagnóstico",
+   "summary": "Reúne os logs e o estado do sistema numa pasta que você pode enviar a quem dá suporte à sua biblioteca, com senhas, tokens e chaves trocados por [REDACTED].",
+   "steps": [
+    "Pressione **Exportar diagnóstico** no Painel de Controle.",
+    "Aguarde enquanto o painel reúne os logs do Koha, do Apache, do MariaDB e do painel, além do estado do sistema.",
+    "Anote a pasta mostrada no final. No Windows (WSL), o painel oferece abri-la no Explorador de Arquivos.",
+    "Compacte a pasta e envie com uma descrição curta do problema e de quando começou."
+   ],
+   "tips": [
+    "Exporte logo depois que o problema acontecer: os logs são rotacionados e as linhas úteis podem sumir em poucos dias.",
+    "Mesmo com as senhas removidas, os logs podem conter nomes de leitores: envie apenas a pessoas de confiança e apague a cópia depois."
+   ],
+   "_en": "5be686fb44"
+  },
+  "install": {
+   "summary": "Instala o Koha com MariaDB, Apache, Memcached e Plack neste servidor numa única execução guiada, com as verificações, os ajustes e os agendamentos de que uma biblioteca em produção precisa.",
+   "overview": [
+    "A instalação primeiro verifica o servidor: sistema operacional (Debian 11/12/13 ou Ubuntu 22.04/24.04, amd64 ou arm64), disco livre, acesso de rede ao repositório do Koha e se as portas 80 e 8080 estão livres. Depois configura UTF-8 e o idioma, sincroniza o relógio (NTP), pergunta o fuso horário, cria 4 GB de swap, atualiza o sistema, adiciona os repositórios oficiais do Koha e instala os pacotes.",
+    "Ela mostra sete etapas numeradas, uma linha por tarefa com uma pequena barra de progresso do Pac-Man. A saída dos comandos vai para `/var/log/koha-easy-install/apt.log`, o arquivo a enviar ao suporte se alguma etapa falhar. No final, uma tela lista os endereços do catálogo e da intranet.",
+    "O backup noturno, a exportação MARC semanal, os vigias do índice e as tarefas de limpeza são agendados automaticamente em `/etc/cron.d/koha_tasks`."
+   ],
+   "steps": [
+    "Prepare um servidor com pelo menos 2 GB de RAM (4 GB recomendados), 5 GB de disco livre (10 GB recomendados) e acesso à Internet.",
+    "Rode `sudo bash installer`, escolha o idioma do painel e abra **Instalar servidor Koha**.",
+    "Escolha o fuso horário quando for perguntado e deixe o instalador trabalhar: costuma levar de 10 a 30 minutos.",
+    "No final, anote o usuário e a senha do banco de dados: eles também ficam salvos em `/root/koha_credentials.txt`.",
+    "Abra a intranet em `http://IP-DO-SERVIDOR:8080`, entre com essas credenciais e conclua o **Instalador Web** do Koha.",
+    "De volta ao painel, crie a sua própria conta da equipe com **Criar superbibliotecário**."
+   ],
+   "tips": [
+    "Use um servidor ou máquina virtual dedicado: o Koha, o MariaDB e o motor de busca preferem ter a máquina só para eles.",
+    "Instale numa conexão cabeada: um download interrompido é a causa mais comum de etapa com falha.",
+    "Depois do Instalador Web, rode uma vez a **Verificação completa do sistema** para confirmar que está tudo verde."
+   ],
+   "warnings": [
+    "Rodar a instalação de novo num servidor que já tem o Koha oferece uma reinstalação que APAGA o banco de dados. Ela pede uma confirmação digitada (REINSTALL): faça um backup antes."
+   ],
+   "_en": "dc7cd9ccb0"
+  },
+  "credentials": {
+   "summary": "Mostra todos os endereços e logins de que você precisa no primeiro dia: os links do OPAC e da intranet (local, rede e Internet), o acesso SSH e o usuário e a senha do banco de dados para o Instalador Web do Koha.",
+   "overview": [
+    "As credenciais vêm de `/root/koha_credentials.txt`, gravado pela instalação. A tela agrupa os links por onde você está: nesta máquina (localhost), em outros computadores da rede ou na Internet por um Túnel Cloudflare. Num servidor na nuvem, também mostra o IP público.",
+    "O usuário e a senha do banco são os que o Instalador Web do Koha pede. Depois do Instalador Web, o trabalho do dia a dia é feito com a sua própria conta da equipe, não com eles."
+   ],
+   "steps": [
+    "Abra **Visualizar credenciais de primeiro acesso**.",
+    "Copie o endereço da intranet e o usuário e a senha do banco (cada valor tem um botão Copiar).",
+    "Abra o endereço da intranet num navegador e conclua o Instalador Web com eles.",
+    "Crie uma conta pessoal de superbibliotecário e use-a dali em diante."
+   ],
+   "tips": [
+    "Guarde a senha do banco no gerenciador de senhas da biblioteca: você vai precisar dela para restaurar backups em outro servidor.",
+    "Depois do Instalador Web, troque a senha do banco com **Trocar a senha do banco de dados** se a tela já foi compartilhada ou fotografada."
+   ],
+   "warnings": [
+    "Nunca entregue o login do banco à equipe como conta do dia a dia: ele passa por cima das permissões do Koha e o seu uso não fica ligado a uma pessoa."
+   ],
+   "_en": "68e9c48f84"
+  },
+  "restore": {
+   "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
+   "overview": [
+    "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
+    "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
+    "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de cópias de segurança) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
+    "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
+   ],
+   "steps": [
+    "Abra **Restaurar base de dados** (pela lista principal ou pela Central de cópias de segurança).",
+    "Escolha o arquivo de backup, ou solte-o na janela do painel.",
+    "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
+    "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
+    "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
+    "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
+   ],
+   "tips": [
+    "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
+    "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
+    "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
+    "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
+   ],
+   "warnings": [
+    "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
+    "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
+   ],
+   "_en": "d5ee863a6a"
+  },
+  "backup-manual": {
+   "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
+   "steps": [
+    "Abra a Central de cópias de segurança e escolha **Gerar backup manual e baixar no computador**.",
+    "Escolha a pasta de destino: a pasta padrão de backups, um pen drive (normalmente em `/media` ou `/mnt`) ou outra pasta.",
+    "Aguarde o dump e a verificação.",
+    "Leia o resultado: nome e tamanho do arquivo e, em seguida, o comando para colar no PowerShell ou no Terminal do seu computador e salvá-lo na pasta Downloads."
+   ],
+   "overview": [
+    "O backup usa a compressão escolhida em **Novos backups** (gzip, Zstandard ou XZ). Ele se recusa a começar enquanto outro backup ou uma restauração estiver rodando, para que dois trabalhos nunca gravem ao mesmo tempo.",
+    "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de cópias de segurança, copia o arquivo mais novo direto para a sua pasta Downloads."
+   ],
+   "tips": [
+    "Faça um backup manual antes de qualquer mudança grande: uma atualização, uma importação em massa, uma troca de motor de busca.",
+    "Mantenha pelo menos uma cópia fora do servidor (um PC, um pen drive guardado em outro lugar, ou a nuvem): um backup no mesmo disco não sobrevive a uma falha do disco.",
+    "Dê às cópias que você guarda um nome com data e motivo, por exemplo `antes-da-atualizacao-2026-10.sql.zst`."
+   ],
+   "_en": "2235ff5dc0"
+  },
+  "backup-cloud": {
+   "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
+   "options": [
+    {
+     "name": "Expresso: gerar o token em outro computador (SSH / sem tela)",
+     "text": "Para um servidor sem navegador: você roda um comando do rclone no seu próprio computador, entra na conta Google ali e cola o token (um texto JSON que começa com `{` e termina com `}`) de volta no painel."
+    },
+    {
+     "name": "Expresso: autenticar diretamente neste servidor",
+     "text": "Quando o servidor tem navegador, ou por um túnel SSH até a porta 53682: o painel abre o login do Google e captura o token sozinho."
+    },
+    {
+     "name": "Outros serviços: OneDrive, MEGA ou S3 (passo a passo)",
+     "text": "O painel pergunta só o que cada serviço precisa: o login do OneDrive (copie o link e depois cole de volta o endereço em que o navegador terminou), o e-mail e a senha do MEGA, ou a chave de acesso, a região, o endpoint e o bucket do S3 (AWS, Cloudflare R2, Wasabi, MinIO). Ninguém digita comandos do rclone."
+    }
+   ],
+   "steps": [
+    "Abra a Central de cópias de segurança e escolha **Configurar backup na nuvem (Google Drive)**.",
+    "Escolha como conectar (veja as opções).",
+    "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
+    "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
+    "Se o teste falhar, escolha **Testar de novo** ou **Editar o token**."
+   ],
+   "tips": [
+    "Use uma conta da biblioteca, compartilhada com pelo menos duas pessoas, para que os backups não dependam de uma só pessoa.",
+    "Confira a pasta na nuvem uma vez por mês: o log noturno diz se cada envio funcionou.",
+    "Combine a cópia na nuvem com a compressão **XZ** ou **Zstandard** para economizar tempo de envio e espaço."
+   ],
+   "warnings": [
+    "O token e as chaves ficam guardados só no arquivo privado do rclone no servidor. Quem tiver acesso root ao servidor pode usá-los: proteja o servidor à altura."
+   ],
+   "_en": "4ebbd0f2a6"
+  },
+  "backup-test": {
+   "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
+   "steps": [
+    "Abra a Central de cópias de segurança e escolha **Testar a integridade do último backup**.",
+    "Confira o arquivo e a data mostrados, ou pressione **Escolher outro arquivo** para testar outro.",
+    "Confirme **Executar o teste agora?**.",
+    "Leia o resultado: *O BACKUP ESTÁ ÍNTEGRO E PODE SER RESTAURADO*, com o número de tabelas, registros bibliográficos e leitores, ou o motivo da falha."
+   ],
+   "tips": [
+    "Teste um backup pelo menos uma vez por mês e sempre antes de depender dele para uma restauração ou migração.",
+    "Compare o número de registros e de leitores com o que você espera: um backup que restaura mas tem bem menos registros aponta para um problema na origem."
+   ],
+   "warnings": [
+    "*O backup NÃO foi restaurado* é urgente: faça um novo backup manual na hora e descubra por que o noturno está quebrado."
+   ],
+   "_en": "fabc1a7ea1"
+  },
+  "sec-backup": {
+   "summary": "Tudo sobre backups numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, os backups manual e na nuvem, o teste de integridade e a restauração.",
+   "overview": [
+    "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de cópias de segurança (tecla **b**) mostra como isso está indo e permite agir.",
+    "No topo ficam três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
+   ],
+   "tips": [
+    "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
+    "Um backup que nunca foi testado é uma esperança, não um backup: agende um teste de integridade mensal."
+   ],
+   "_en": "46a26ecb86"
+  },
+  "backup-download": {
+   "title": "Baixar Backup Recente",
+   "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
+   "overview": [
+    "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
+   ],
+   "steps": [
+    "Abra a Central de cópias de segurança (tecla **b**).",
+    "Pressione **Baixar Backup Recente**.",
+    "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
+   ],
+   "tips": [
+    "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
+    "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
+   ],
+   "_en": "bbcdd3556f"
+  },
+  "backup-status": {
+   "title": "Cartões de status do backup",
+   "summary": "Três cartões contam como vão os backups: quando foi feito o mais recente, o tamanho dele e como terminou a última execução noturna.",
+   "options": [
+    {
+     "name": "Último backup",
+     "text": "A idade e o nome do backup mais novo do servidor, da mesma fonte que o Painel de Controle e as telas de restauração usam. Arquivos parciais ainda sendo gravados (`.part`) nunca entram na conta."
+    },
+    {
+     "name": "Tamanho",
+     "text": "O tamanho desse arquivo. Uma queda repentina de tamanho de uma noite para outra merece uma olhada."
+    },
+    {
+     "name": "Resultado",
+     "text": "*OK*, *FALHOU*, *Pulado (ocupado)* (outro backup ou uma restauração estava rodando) ou *Ainda não executado*, com a data da última execução noturna."
+    }
+   ],
+   "tips": [
+    "*Pulado (ocupado)* uma vez é normal depois de uma restauração longa; várias noites seguidas significa que algo mantém a trava ocupada: confira **Tarefas agendadas e automações**."
+   ],
+   "_en": "350c37619e"
+  },
+  "backup-compression": {
+   "title": "Compressão dos novos backups",
+   "summary": "Escolhe como os novos backups são compactados: gzip (abre em qualquer lugar), Zstandard (rápido e menor, para acervos grandes) ou XZ (o menor, lento para gerar, para guarda de longo prazo).",
+   "overview": [
+    "A escolha é salva como `BACKUP_COMPRESSION` nas configurações de backup do painel e vale para o backup noturno, para os backups manuais e para as cópias de segurança feitas antes de uma alteração (uma restauração, uma atualização, uma ferramenta da biblioteca). O script noturno a lê toda noite, então o próximo backup já a usa.",
+    "A restauração não depende desta configuração: **Restaurar base de dados** reconhece `.sql`, `.sql.gz`, `.sql.zst` e `.sql.xz` pelo conteúdo. Backups antigos em outro formato continuam funcionando.",
+    "Se o programa da compressão escolhida (`zstd` ou `xz`) não estiver no servidor, os backups voltam para o gzip e a caixa avisa; escolher a compressão de novo instala o programa."
+   ],
+   "options": [
+    {
+     "name": "Gzip (.sql.gz)",
+     "text": "O padrão. Qualquer sistema abre (7-Zip, WinRAR, qualquer Linux). Bom equilíbrio para acervos pequenos e médios."
+    },
+    {
+     "name": "Zstandard (.sql.zst)",
+     "text": "Compacta e descompacta muito mais rápido que o gzip e gera arquivos menores. A melhor escolha para acervos grandes e para envios à nuvem. No Windows, abre com o 7-Zip ZS ou o PeaZip."
+    },
+    {
+     "name": "XZ / LZMA (.sql.xz)",
+     "text": "Os menores arquivos, mas mais lento para gerar e mais pesado para a CPU. Bom para arquivos guardados por anos ou para conexões de envio lentas."
+    }
+   ],
+   "steps": [
+    "Abra a Central de cópias de segurança (tecla **b**).",
+    "Na caixa **Novos backups**, abra **Compressão** e escolha uma opção.",
+    "Aguarde *Salvando as configurações de backup*; um aviso confirma a nova escolha.",
+    "Na manhã seguinte, confira se o **Último backup** mostra a nova extensão."
+   ],
+   "tips": [
+    "Escolha Zstandard quando o backup do acervo passar de algumas centenas de MB ou quando você enviar para a nuvem toda noite.",
+    "Escolha XZ em servidores pequenos com tempo livre à noite e Internet lenta.",
+    "Mantenha o gzip quando os backups forem abertos por pessoas de fora da biblioteca, que talvez não tenham outras ferramentas."
+   ],
+   "_en": "ae0f01078c"
+  },
+  "backup-safety": {
+   "title": "Backup de segurança antes da restauração",
+   "summary": "Antes que a restauração substitua o catálogo, o painel salva e valida uma cópia completa do banco atual. Sem ela, o catálogo atual nunca é apagado; e se a restauração falhar, essa cópia é recolocada automaticamente.",
+   "overview": [
+    "A cópia é gravada como `pre_restore_safety_backup_<data>_<hora>` na pasta de backups (`/var/backups/koha_sql`), com a compressão escolhida em **Novos backups**. Ela é gravada primeiro num arquivo `.part` e só é renomeada quando está completa, para que uma cópia pela metade nunca seja confundida com um backup.",
+    "Se a cópia não puder ser criada ou validada (por exemplo, por falta de espaço em disco), a restauração para com *Falha no backup de segurança* e nada muda. Um banco sem tabelas não tem o que salvar, e a tela avisa.",
+    "A tela de resultado da restauração mostra o caminho da cópia de segurança. Se depois o reparo do índice encontrar um banco vazio, ele também aponta para a cópia de segurança mais nova."
+   ],
+   "steps": [
+    "Inicie **Restaurar base de dados** normalmente: a cópia de segurança é automática.",
+    "Acompanhe a etapa *Salvando um backup de segurança do banco de dados atual*.",
+    "No final, anote o caminho do **Backup de segurança** mostrado no resultado.",
+    "Para desfazer a restauração, rode **Restaurar base de dados** de novo e escolha esse arquivo."
+   ],
+   "tips": [
+    "Deixe livre pelo menos o dobro do tamanho de um backup antes de restaurar: uma parte para o banco temporário de teste, outra para a cópia de segurança.",
+    "Apague cópias de segurança antigas só depois de conferir o catálogo restaurado por alguns dias."
+   ],
+   "_en": "b5819e5c76"
+  },
+  "magic-import": {
+   "summary": "Uma única entrada para todas as importações: solte um arquivo, uma pasta ou um compactado com registros, exemplares, leitores, empréstimos ou reservas, e a Ferramenta de Importação Mágica reconhece o formato, pergunta só o que não consegue deduzir, mostra uma prévia e importa com as ferramentas do próprio Koha depois de um backup verificado.",
+   "overview": [
+    "Ela lê planilhas (CSV/TSV com qualquer separador e codificação, Excel `.xlsx`/`.xls`, LibreOffice `.ods`, dBase `.dbf`), MARC 21 (ISO 2709 `.mrc`/`.iso` e MARCXML), o banco do Biblioteca Fácil, catálogos ISIS (backups PostgreSQL) e compactados com eles (`.zip`, `.tar`, `.gz`, `.bz2`, `.xz`). Os formatos são reconhecidos pelos bytes, nunca só pelo nome do arquivo.",
+    "Numa planilha, cada coluna recebe uma nota para cada campo MARC 21 e de leitor, pelo cabeçalho e pelos valores (dígitos verificadores de ISBN e CPF, datas, e-mails, números de chamada). Linhas do mesmo livro viram um registro com um exemplar por cópia; pessoas com CPF válido, e-mail ou número de carteirinha viram leitores; uma planilha de empréstimos alimenta os dois.",
+    "Exemplares guardados no campo de item de outro sistema (949, 950, 990, ou os dados de acervo MARC 21 em 852) viram itens do Koha (952), lendo cada subcampo pelo seu significado; assim, exportações do Biblivre, do SophiA e do Pergamum são entendidas.",
+    "Um backup do Koha nunca é importado: ele substitui todo o catálogo, por isso a ferramenta o encaminha para **Restaurar base de dados**."
+   ],
+   "steps": [
+    "Coloque os arquivos na pasta `importar` da sua pasta pessoal (no Windows, também em `C:\\Koha\\Importar`), ou deixe-os em qualquer lugar e use **Another file** (Outro arquivo).",
+    "Abra a **Ferramenta de Importação Mágica** (tecla **i**) e escolha o que importar.",
+    "Responda às perguntas, se houver: uma coluna de que a ferramenta não tem certeza aparece com valores de exemplo. As respostas ficam guardadas para o próximo arquivo com as mesmas colunas.",
+    "Leia a prévia com atenção: o que foi encontrado em cada arquivo, para onde vai cada coluna, as contagens, registros de amostra e as linhas rejeitadas com o motivo.",
+    "Confirme cada parte (registros, leitores, empréstimos e reservas). Cada uma ganha o seu próprio backup `PRE-*` verificado antes de ser gravada.",
+    "Leia o resumo e depois pesquise alguns registros e leitores no Koha para conferir."
+   ],
+   "tips": [
+    "Comece com uma pequena amostra do arquivo para ver como as colunas são lidas antes de importar tudo.",
+    "Escolha com cuidado a biblioteca e o tipo de item padrão da importação: eles são usados sempre que o arquivo não tiver os seus.",
+    "Compare as contagens da prévia com os relatórios do sistema antigo antes de confirmar.",
+    "Se uma importação MARC deu errado, use **Desfazer uma importação MARC** em vez de apagar registros à mão."
+   ],
+   "warnings": [
+    "O que a ferramenta não consegue ler aparece listado com o que fazer: texto `.mrk` do MarcEdit (salve como `.mrc`), um arquivo mestre do CDS/ISIS (exporte do WinISIS em ISO 2709) ou um dump SQL de outro sistema.",
+    "Arquivos de leitores contêm dados pessoais: apague-os da pasta `importar` depois da importação."
+   ],
+   "_en": "ece8a76968"
+  },
+  "sec-database": {
+   "summary": "As tabelas do Koha num relance, das maiores para as menores, com a manutenção do banco e o pacote de relatórios a um clique.",
+   "overview": [
+    "A tela (tecla **t**) é somente leitura: lista cada tabela do banco do Koha com o número de linhas e o tamanho, e os totais. Ajuda a entender o que cresce (logs de ações, sessões, estatísticas) e se uma limpeza está na hora.",
+    "Os dois cartões abaixo rodam as rotinas que alteram o banco, cada uma com prévia e backup verificado antes."
+   ],
+   "tips": [
+    "Rode a manutenção depois de grandes limpezas (anonimizar histórico, excluir leitores): o espaço só volta ao MariaDB depois da otimização.",
+    "Abra esta tela antes de uma migração para estimar quanto tempo um backup e uma restauração vão levar."
+   ],
+   "_en": "f2d6111b49"
+  },
+  "db-tables": {
+   "title": "Lista de tabelas",
+   "summary": "Todas as tabelas do banco do Koha com linhas e tamanho, das maiores para as menores, e o tamanho total do banco.",
+   "steps": [
+    "Abra **Tabelas do banco de dados** (tecla **t**): a lista carrega por trás da animação do Pac-Man.",
+    "Leia as maiores tabelas no topo. `biblio_metadata` e `items` crescem com o acervo; `action_logs`, `sessions` e `statistics` crescem com o uso.",
+    "Pressione **Atualizar** depois de uma manutenção para ver a diferença."
+   ],
+   "tips": [
+    "Se `action_logs` ou `sessions` estiverem entre as maiores tabelas, rode a **Otimização profunda do banco e limpeza de logs**.",
+    "Acompanhe o tamanho total ao longo dos meses para planejar o espaço em disco e o armazenamento dos backups."
+   ],
+   "_en": "86bb996137"
+  },
+  "db-maintenance": {
+   "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
+   "overview": [
+    "Com o tempo, as tabelas do MariaDB se fragmentam e o diário do sistema cresce. A rotina repara e otimiza as tabelas, remove do diário do sistema as entradas com mais de sete dias, apaga arquivos temporários antigos e reinicia os serviços do Koha para liberar memória. Ela mostra uma prévia do que vai fazer e pergunta antes de começar."
+   ],
+   "steps": [
+    "Abra **Otimização profunda do banco e limpeza de logs** (em Tabelas do banco de dados ou em Diagnóstico).",
+    "Leia a lista do que será feito e confirme.",
+    "Aguarde as três etapas: otimização do banco, limpeza dos logs do sistema, reinício dos serviços do Koha.",
+    "Leia o resumo e depois confira o Painel de Controle."
+   ],
+   "tips": [
+    "Rode uma vez por mês, ou depois de uma grande importação ou exclusão, num momento tranquilo.",
+    "Confira se o backup noturno daquele dia terminou antes de começar."
+   ],
+   "warnings": [
+    "Otimizar tabelas grandes pode demorar e o Koha reinicia no final: os usuários são desconectados por um instante."
+   ],
+   "_en": "c8bfcb147e"
+  },
+  "reports": {
+   "summary": "Instala 22 relatórios SQL prontos e somente leitura no módulo Relatórios do Koha, para circulação, acervo, leitores e aquisição, sem tocar nos seus próprios relatórios.",
+   "overview": [
+    "O pacote traz: títulos mais emprestados, empréstimos em atraso com contato do leitor, itens nunca emprestados, itens sem nenhum empréstimo, novas aquisições, aquisições e doações por período, contas que vencem em breve, novos leitores por mês, leitores por bairro e cidade, leitores ativos por categoria, leitores com multas ou suspensões, empréstimos por mês e biblioteca, empréstimos por tipo de material, circulação diária, reservas aguardando retirada, acervo por classe da CDD e por biblioteca e tipo de material, livros infantis recentes, itens baixados, danificados ou perdidos, itens perdidos, itens sem código de barras ou número de chamada, e registros de autoridade que nenhum registro usa.",
+    "Cada consulta é verificada contra esta versão do Koha antes de ser salva. Os relatórios são marcados, então atualizar ou remover o pacote nunca mexe nos relatórios que a biblioteca escreveu. Um backup `PRE-REPORTS` verificado vem antes."
+   ],
+   "steps": [
+    "Abra **Pacote de relatórios SQL essenciais**.",
+    "Escolha **Prévia (simulação)** para ver quais relatórios são novos ou atualizados.",
+    "Escolha **Instalar ou atualizar o pacote** e confirme.",
+    "No Koha, abra **Relatórios > Relatórios salvos** e rode os que precisar."
+   ],
+   "tips": [
+    "Use *Empréstimos em atraso com contato do leitor* na rodada semanal de cobrança e *Itens sem código de barras ou número de chamada* para limpar o catálogo.",
+    "Rode o pacote de novo depois de uma atualização do Koha: as consultas são reverificadas contra o novo esquema.",
+    "Para os números dos censos do governo (INEP, IBGE, SNBP), use **Brasil: localização > Relatórios para os censos oficiais**."
+   ],
+   "_en": "993a41efc1"
+  },
+  "sec-ai": {
+   "summary": "As duas ferramentas de IA numa só tela: a catalogação com IA (o MARC Replace rascunha um registro MARC a partir de fotos do livro) e o assistente de IA na página inicial da intranet, com um mesmo provedor e um modelo para cada uma.",
+   "overview": [
+    "A tela de IA (tecla **a**) é onde você escolhe o provedor (Ollama local, Google Gemini, OpenAI, Anthropic Claude ou um servidor compatível com OpenAI, como o LM Studio), digita a chave, testa, carrega a lista de modelos e escolhe um modelo para a catalogação (ele precisa ler imagens) e outro para o chat.",
+    "Uma caixa separada cuida do **Ollama neste servidor**: dá para verificá-lo, instalá-lo e baixar modelos mesmo quando o assistente usa um provedor na nuvem. A última caixa mostra o estado das duas ferramentas e as abre.",
+    "Nenhuma chave vem com o painel, e as chaves nunca aparecem de novo depois de salvas: só os quatro últimos caracteres."
+   ],
+   "steps": [
+    "Escolha o provedor e digite a chave (provedores locais não precisam).",
+    "Pressione **Testar conexão** e depois **Carregar modelos**.",
+    "Escolha um modelo e pressione **Usar na catalogação** e/ou **Usar no chat**.",
+    "Pressione **Salvar**.",
+    "Instale as ferramentas pelos cartões: **Substituir um registro MARC** e **Assistente de IA na página inicial da equipe**."
+   ],
+   "tips": [
+    "Para manter os dados dos leitores dentro da biblioteca, use um provedor local (Ollama ou LM Studio).",
+    "Dê ao chat um modelo leve e barato e à catalogação um modelo de visão: as necessidades são diferentes."
+   ],
+   "_en": "8fe5074dbb"
+  },
+  "ai-provider": {
+   "title": "Provedor de IA",
+   "summary": "Escolhe quem responde às ferramentas de IA e como alcançá-lo: o provedor, o endereço, a chave e os dois modelos (visão para a catalogação, chat para o assistente).",
+   "options": [
+    {
+     "name": "Provedor",
+     "text": "*Ollama local* (roda neste servidor, nada sai da máquina), *Google Gemini* (camada gratuita para os modelos Flash), *OpenAI*, *Anthropic Claude*, ou *LM Studio / compatível com OpenAI* (o seu próprio servidor)."
+    },
+    {
+     "name": "URL do servidor",
+     "text": "Preenchida para cada provedor. Mude só para o seu próprio servidor ou um proxy."
+    },
+    {
+     "name": "Chave de API",
+     "text": "Colada uma vez e depois mostrada só pelos quatro últimos caracteres. Deixe vazia para manter a chave salva. Trocar de provedor traz de volta a chave digitada para ele antes. O painel mostra onde cada empresa entrega as chaves."
+    },
+    {
+     "name": "Modelo de visão",
+     "text": "O modelo que o MARC Replace usa para ler as fotos da capa e da folha de rosto. Ele precisa aceitar imagens."
+    },
+    {
+     "name": "Modelo de chat",
+     "text": "O modelo do assistente na página inicial da intranet. Vazio significa o mesmo do modelo de visão."
+    },
+    {
+     "name": "Testar conexão / Salvar",
+     "text": "O teste pede ao provedor a lista de modelos e diz se o escolhido está nela. Salvar grava as configurações para as duas ferramentas."
+    }
+   ],
+   "steps": [
+    "Abra a tela de IA (tecla **a**) e escolha o provedor.",
+    "Cole a chave de API (só para provedores na nuvem).",
+    "Pressione **Testar conexão**: *Conectado* com o número de modelos significa que funciona.",
+    "Escolha os modelos (ou use **Modelos**, logo abaixo) e pressione **Salvar**."
+   ],
+   "tips": [
+    "Crie uma chave só para a biblioteca, com limite de gastos no site do provedor.",
+    "Com o Gemini, comece por um modelo Flash: ele está na camada gratuita (com limites diários)."
+   ],
+   "warnings": [
+    "A OpenAI e a Anthropic cobram por cada requisição, mesmo nos modelos menores: a conta precisa ter créditos.",
+    "Uma chave é recusada por `http` puro para um servidor fora da rede local."
+   ],
+   "_en": "00f5576b44"
+  },
+  "ai-models": {
+   "title": "Lista de modelos",
+   "summary": "Lê, do próprio provedor, os modelos que a sua chave pode usar de fato e os lista em dois grupos: Gratuitos / Acessíveis e Avançados (chave paga ou faturamento ativo, marcados com 💳).",
+   "overview": [
+    "**Carregar modelos** consulta o endpoint de modelos do próprio provedor com a chave digitada ou salva. Modelos de embeddings, fala, imagem e vídeo ficam de fora: só aparecem modelos capazes de conversar.",
+    "A divisão é um guia, não uma fatura: Gemini Flash e Flash-Lite, Gemma, OpenAI mini/nano, Claude Haiku e todos os modelos locais são *Gratuitos / Acessíveis*; Gemini Pro e os modelos completos da OpenAI e do Claude são *Avançados*. Escolher um modelo avançado mostra o aviso de que ele precisa de créditos ou assinatura.",
+    "Sem chave, sem Internet ou com a chave recusada, aparece uma lista embutida com os apelidos mais novos de cada provedor (por exemplo `gemini-flash-latest`, `gpt-5-mini`, `claude-sonnet-5-5`), e a tela diz o porquê."
+   ],
+   "steps": [
+    "Salve ou cole a chave do provedor.",
+    "Pressione **Carregar modelos** e aguarde a lista (*Lista ao vivo de …*).",
+    "Escolha um modelo em **Escolha um modelo**.",
+    "Pressione **Usar na catalogação** (só modelos de visão) ou **Usar no chat** e depois **Salvar**."
+   ],
+   "tips": [
+    "Prefira os apelidos *latest*: eles passam para o modelo mais novo sem mudar a configuração.",
+    "Recarregue a lista de vez em quando: os provedores adicionam e aposentam modelos com frequência."
+   ],
+   "_en": "6df9b68070"
+  },
+  "ai-ollama": {
+   "title": "Ollama neste servidor",
+   "summary": "Roda modelos de IA no próprio servidor da biblioteca com o Ollama: sem chave, sem custo por requisição e nada sai da máquina.",
+   "options": [
+    {
+     "name": "Verificar o Ollama",
+     "text": "Pergunta ao Ollama local (`http://127.0.0.1:11434`) se ele está rodando e quais modelos tem."
+    },
+    {
+     "name": "Instalar o Ollama",
+     "text": "Instala o Ollama no servidor quando ele não está lá."
+    },
+    {
+     "name": "Modelos sugeridos",
+     "text": "`llama3.2:1b`, `qwen2.5:1.5b` e `llama3.2:3b` para chat rápido na CPU; `qwen2.5:3b` equilibrado e multiuso; `qwen2.5vl:7b` para visão e catalogação (CPU alta, lento em ARM)."
+    },
+    {
+     "name": "Baixar / Usar no chat / Usar na catalogação",
+     "text": "Baixa o modelo escolhido para o Ollama e o define para uma ferramenta. Um modelo só de texto não serve para a catalogação, que precisa de um modelo de visão."
+    }
+   ],
+   "steps": [
+    "Pressione **Verificar o Ollama**; se ele não responder, pressione **Instalar o Ollama**.",
+    "Escolha um modelo em **Modelo** e pressione **Baixar**.",
+    "Pressione **Usar no chat** ou **Usar na catalogação** e depois **Salvar** na caixa do provedor, com *Ollama local* selecionado."
+   ],
+   "tips": [
+    "Sem GPU, prefira os modelos leves: um modelo de visão de 7B pode levar minutos por resposta na CPU.",
+    "Confira o disco livre antes de baixar: cada modelo ocupa de cerca de 1 GB a vários GB."
+   ],
+   "_en": "70962154b5"
+  },
+  "ai-tools": {
+   "title": "As ferramentas de IA",
+   "summary": "O estado das duas ferramentas de IA, com os botões para abri-las ou instalá-las: o MARC Replace (catalogação com IA) e o assistente na página inicial da intranet.",
+   "overview": [
+    "Cada linha diz se a ferramenta está instalada e qual provedor e modelo ela usa. *Configure e salve um provedor de IA primeiro* significa que a caixa do provedor, acima, ainda não foi salva."
+   ],
+   "steps": [
+    "Leia as duas linhas para ver o que está pronto.",
+    "Pressione **Abrir o MARC Replace** para abrir a página na intranet, ou instale-a pelo cartão dela.",
+    "Pressione **Instalar, atualizar ou remover o assistente** para cuidar do chat na página inicial da intranet."
+   ],
+   "_en": "3893ad65d9"
+  },
+  "marc-replace": {
+   "summary": "Instala na intranet do Koha uma página que substitui o MARC de um registro pelo seu biblionumber, a partir de um arquivo, de texto colado ou de fotos do livro (catalogação com IA), sempre com prévia antes e sem tocar nos exemplares.",
+   "overview": [
+    "A página (`/cgi-bin/koha/tools/marc_replace.pl`) exige a permissão `edit_catalogue`. Ela substitui um registro por um arquivo `.mrc` ou `.xml` ou por texto MARC colado; o registro atual é salvo em MARCXML antes da mudança e pode ser baixado e recolocado para desfazê-la. Campos de item no arquivo são sempre ignorados.",
+    "A aba **Catalogação com IA** rascunha um registro novo a partir de fotos da capa, da folha de rosto e do verso (com a ficha CIP). O modelo responde num formato fixo; depois são aplicadas as regras brasileiras e internacionais (pontuação AACR2 e ISBD, nomes invertidos, caracteres a desconsiderar na ordenação, dígitos verificadores do ISBN, a CDD da ficha CIP e a notação de autor da própria biblioteca). O catalogador corrige o rascunho ao lado das fotos e uma prévia obrigatória vem antes de o registro ser adicionado.",
+    "Atalhos opcionais podem ser colocados ao lado de **Novo registro** e de **Editar** na intranet."
+   ],
+   "steps": [
+    "Configure e salve um provedor de IA na tela de IA (só para a catalogação com IA).",
+    "Abra **Substituir um registro MARC (ferramenta da equipe)** e escolha **Instalar ou atualizar a página**.",
+    "Na intranet, abra a página pelas ferramentas de catalogação ou pelo menu Editar de um registro.",
+    "Escolha o registro, carregue o arquivo, o texto ou as fotos e leia a prévia.",
+    "Confirme a substituição ou o novo registro."
+   ],
+   "tips": [
+    "Use fotos bem iluminadas e retas da folha de rosto e do verso: a ficha CIP dá ao modelo os melhores dados.",
+    "Leia sempre o rascunho: a IA ajuda o catalogador, não substitui a revisão.",
+    "Use **Versões guardadas pela página** para achar e recolocar uma versão anterior de um registro."
+   ],
+   "_en": "a2675e1bf1"
+  },
+  "ai-assistant": {
+   "summary": "Coloca um chat de IA na página inicial da intranet do Koha, onde os bibliotecários perguntam em linguagem natural sobre livros, leitores, empréstimos, relatórios, configurações e horários.",
+   "overview": [
+    "O assistente pesquisa com o próprio motor de busca do Koha e com consultas fixas somente leitura, nunca com SQL escrito pela IA. Perguntas de continuação usam os registros das respostas anteriores, e as respostas trazem links para os registros.",
+    "Uma mudança que ele sugere (uma reserva, campos de um leitor ou de um registro, o perdão de uma multa) é uma proposta de ação que mostra cada campo antes e depois. O Koha só a executa depois de **Aprovar e executar**, com as permissões do próprio bibliotecário, e os valores anteriores ficam salvos numa pasta para desfazer."
+   ],
+   "steps": [
+    "Configure e salve um provedor de IA na tela de IA, com um modelo de chat.",
+    "Abra **Assistente de IA na página inicial da equipe** e escolha **Instalar ou atualizar o assistente**.",
+    "Abra a página inicial da intranet: o chat ocupa o lugar do bloco de notícias.",
+    "Faça uma pergunta, por exemplo *quais livros de Machado de Assis estão emprestados?*"
+   ],
+   "tips": [
+    "Escolha um modelo de chat rápido: os bibliotecários esperam respostas em segundos.",
+    "Use um modelo local (Ollama) se a política da biblioteca não permitir que dados de leitores saiam do servidor.",
+    "Revise **Alterações confirmadas no assistente** de vez em quando."
+   ],
+   "_en": "4cc1ab982e"
+  },
+  "sec-z3950": {
+   "summary": "Catalogação por cópia e compartilhamento de catálogo numa só tela: o servidor Z39.50/SRU deste Koha, a rede comunitária koha.nexus e uma lista curada de catálogos públicos de onde copiar registros, testados e ordenados por velocidade.",
+   "overview": [
+    "Z39.50 e SRU são os protocolos que as bibliotecas usam para pesquisar os catálogos umas das outras e copiar registros. No Koha, os servidores listados em **Administração > Servidores Z39.50/SRU** aparecem na busca da catalogação; esta tela (tecla **z**) preenche essa lista para você.",
+    "Ela tem três caixas: **Servidor Z39.50 / SRU deste catálogo (entrada)**, a **Rede comunitária** e **Catálogos de onde copiar registros (saída)**. Duas pontes locais alcançam catálogos brasileiros que bloqueiam o Z39.50: o Catálogo Zeus (UFSC) e a Rede Pergamum."
+   ],
+   "steps": [
+    "Na caixa de saída, marque os servidores da sua região (barra de espaço, ou marque uma região inteira).",
+    "Pressione **Testar**: cada servidor recebe um pedido de registro real, e os que funcionam são ordenados por velocidade.",
+    "Pressione **Adicionar ao Koha**: os servidores marcados que funcionam entram na lista do Koha, marcados para as buscas da catalogação.",
+    "No Koha, catalogue com **Novo a partir de Z39.50/SRU** e escolha o registro a copiar."
+   ],
+   "tips": [
+    "Mantenha de 5 a 10 servidores rápidos marcados: servidores demais deixam cada busca da catalogação lenta.",
+    "Teste de novo a cada poucos meses: catálogos mudam de endereço e servidores aparecem e somem."
+   ],
+   "_en": "c2963bb1f0"
+  },
+  "z3950-inbound": {
+   "title": "Servidor deste catálogo (entrada)",
+   "summary": "Liga ou desliga o servidor Z39.50/SRU deste Koha (koha-z3950-daemon), para que outras bibliotecas pesquisem o seu catálogo e copiem os seus registros.",
+   "overview": [
+    "Ligar inicia o daemon e abre a porta dele no firewall; desligar o para e fecha a porta, também depois de reiniciar. A linha de estado mostra *Funcionando* ou *Parado*, com a porta."
+   ],
+   "steps": [
+    "Abra a tela Z39.50 / SRU (tecla **z**).",
+    "Ligue **Servidor Z39.50/SRU (koha-z3950-daemon)** e confirme.",
+    "Passe às bibliotecas parceiras o endereço e a porta do seu servidor."
+   ],
+   "tips": [
+    "Compartilhe o seu catálogo: a catalogação original feita pela sua biblioteca ajuda todas as outras que a copiam."
+   ],
+   "warnings": [
+    "A porta fica aberta para a rede: num servidor exposto à Internet, confirme que você quer mesmo o catálogo pesquisável de fora."
+   ],
+   "_en": "4cd4488a1e"
+  },
+  "z3950-network": {
+   "title": "Rede comunitária",
+   "summary": "Adiciona o catálogo compartilhado das bibliotecas koha.nexus aos servidores Z39.50/SRU do Koha, marcado para as buscas da catalogação; desligar o retira.",
+   "overview": [
+    "A rede é um serviço SRU compartilhado (o serviço `catalog-network/` do projeto) onde as bibliotecas koha.nexus reúnem os seus registros. O endereço aparece abaixo do botão."
+   ],
+   "steps": [
+    "Abra a tela Z39.50 / SRU (tecla **z**).",
+    "Ligue **Rede comunitária** e confirme.",
+    "Pesquise nela pela catalogação do Koha como em qualquer outro servidor Z39.50/SRU."
+   ],
+   "_en": "97726df1c9"
+  },
+  "z3950-outbound": {
+   "title": "Catálogos de onde copiar registros",
+   "summary": "Uma lista curada de catálogos públicos por região (Brasil / América Latina, América do Norte, Europa, Ásia-Pacífico, especializados), mais a lista da comunidade e as suas importações, testados com registros reais e adicionados ao Koha por ordem de velocidade.",
+   "options": [
+    {
+     "name": "Testar",
+     "text": "Tenta cada servidor marcado com 3 segundos de limite na porta listada, depois 210, 2100 e 2210; faz uma busca real e só o aceita quando ele devolve um registro MARC válido. O resultado mostra quantos funcionaram e o mais rápido, com a latência em ms."
+    },
+    {
+     "name": "Adicionar ao Koha",
+     "text": "Adiciona os servidores marcados ao `z3950servers` do Koha, por ordem de velocidade no último teste. Os servidores que o Koha já tem ficam como estão."
+    },
+    {
+     "name": "Login",
+     "text": "Usuário e senha para servidores por assinatura (OCLC e outros). Guardados só no arquivo privado do painel e no Koha, nunca num log."
+    },
+    {
+     "name": "Ocultar / Mostrar ocultos",
+     "text": "Esconde servidores que você não quer ver. Servidores que falham repetidamente se escondem sozinhos."
+    },
+    {
+     "name": "Lista da comunidade",
+     "text": "Baixa a lista mantida pela comunidade no GitHub e adiciona os servidores novos."
+    },
+    {
+     "name": "Importar / Exportar",
+     "text": "Importa servidores de JSON, YAML, CSV, de um dump SQL do `z3950servers` do Koha ou de uma página web que os liste; exporta os servidores marcados (ou os mostrados) em `.json`, `.csv` ou `.sql` para outro Koha, sem senhas."
+    }
+   ],
+   "steps": [
+    "Marque servidores com a barra de espaço, ou marque uma região para levá-la inteira.",
+    "Pressione **Testar** e aguarde os resultados.",
+    "Pressione **Adicionar ao Koha** e confirme.",
+    "Digite os logins dos servidores por assinatura com **Login**, se o painel pedir."
+   ],
+   "tips": [
+    "Um endereço marcado com * vem de uma lista antiga: o teste diz se ele ainda funciona.",
+    "Exporte a sua lista testada e importe-a nos seus outros servidores Koha para ganhar tempo."
+   ],
+   "_en": "d62774a8b8"
+  },
+  "z3950-zeus": {
+   "title": "Ponte do Catálogo Zeus (UFSC)",
+   "summary": "Uma ponte local que deixa o Koha copiar registros do Catálogo Zeus da BU/UFSC como se ele fosse um servidor SRU comum, alcançando catálogos universitários brasileiros que bloqueiam o Z39.50.",
+   "overview": [
+    "A maioria dos catálogos universitários brasileiros bloqueia o Z39.50 (porta 210), mas o Catálogo Zeus os pesquisa por HTTP e inclui cada registro completo. A ponte, um pequeno serviço neste servidor (`127.0.0.1:5000`, unidade systemd `koha-zeus-sru`), transforma a busca SRU do Koha numa busca no Zeus (por ISBN ou título) e devolve os registros em MARCXML.",
+    "Ela é o primeiro servidor da lista do Brasil e já vem marcada. Adicioná-la ao Koha instala e inicia a ponte automaticamente, com as configurações de que o Koha precisa: sintaxe MARC21, SRU 1.1 com GET e limite de 15 segundos. Os resultados ficam em cache por 10 minutos, para que a paginação não pesquise de novo."
+   ],
+   "steps": [
+    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Catálogo Zeus (UFSC bridge, SRU)**.",
+    "Pressione **Adicionar ao Koha**: a ponte é instalada e iniciada.",
+    "Na catalogação do Koha, pesquise pelo ISBN para ter os melhores resultados."
+   ],
+   "tips": [
+    "Pesquise pelo ISBN sempre que tiver: o Zeus aceita um único texto de busca, e o ISBN tem prioridade sobre o título.",
+    "Se as buscas voltarem vazias, confira o serviço com `systemctl status koha-zeus-sru`."
+   ],
+   "warnings": [
+    "A ponte só responde enquanto o serviço dela roda neste servidor, e depende de o Catálogo Zeus estar no ar."
+   ],
+   "_en": "d9b1f8ac34"
+  },
+  "z3950-pergamum": {
+   "title": "Ponte da Rede Pergamum",
+   "summary": "Uma segunda ponte local, ao lado da do Zeus, que pesquisa o catálogo compartilhado da Rede Pergamum (PUCPR) e responde ao Koha como um servidor SRU com registros em MARCXML.",
+   "overview": [
+    "Ela roda neste servidor em `127.0.0.1:5006` como a unidade systemd `koha-pergamum-sru`, com as mesmas configurações da ponte do Zeus no Koha (sintaxe MARC21, SRU 1.1). Diferente do Zeus, ela não vem marcada: marque-a quando quiser usá-la.",
+    "A ponte da Pergamum ainda não foi testada contra o catálogo real; o teste da tela diz se ela devolve registros no seu servidor."
+   ],
+   "steps": [
+    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Catálogo Rede Pergamum (CRP bridge, SRU)**.",
+    "Pressione **Testar** para conferir se ela devolve registros e depois **Adicionar ao Koha**.",
+    "Pesquise nela pela catalogação do Koha."
+   ],
+   "tips": [
+    "Use-a junto com a ponte do Zeus: os dois catálogos cobrem bibliotecas diferentes."
+   ],
+   "_en": "c2951126cb"
+  },
+  "sec-opac": {
+   "summary": "A aparência do catálogo público (OPAC) e da intranet, desenhada numa só tela e gravada no Koha com um clique, depois de um backup, preservando o CSS e o JavaScript da própria biblioteca.",
+   "overview": [
+    "A tela Aparência do OPAC (tecla **o**) grava as suas escolhas nas preferências `OpacUserCSS` e `OpacUserJS` do Koha (e em `IntranetUserCSS`/`IntranetUserJS` para a intranet) entre marcadores, para que o seu próprio código fique intacto.",
+    "Ela cobre o material dos blocos (texturas, cantos, cores), as imagens (papel de parede, logotipo, favicon), legibilidade e modo escuro, um Carrossel de Novidades, botões de acesso rápido para o OPAC e para a página inicial da equipe, as cores próprias da intranet, a limpeza de partes que você não usa e botões dentro das notícias.",
+    "Cada aplicação fica salva em `/etc/koha-nexus/theme-settings.json` e é regravada depois de uma restauração do banco."
+   ],
+   "steps": [
+    "Abra **Aparência do OPAC** (tecla **o**). Pressione **Sincronizar configurações atuais do OPAC** para começar pelo que está no ar.",
+    "Ajuste cada caixa: material, imagens, modo escuro, carrossel, botões, interface da equipe.",
+    "Pressione **Prévia** para ver o que vai para o Koha.",
+    "Pressione **Aplicar**: um backup do banco é feito e a aparência é gravada.",
+    "Abra o OPAC numa janela anônima (ou pressione CTRL+F5) para ver o resultado."
+   ],
+   "tips": [
+    "Mude uma coisa de cada vez e confira o OPAC no celular, além do computador.",
+    "Escolha cores com bom contraste: leitores com baixa visão dependem disso."
+   ],
+   "_en": "3b8f321e82"
+  },
+  "opac-material": {
+   "title": "Material",
+   "summary": "A textura, os cantos e as cores da barra de navegação, da barra de busca e dos blocos principais do OPAC.",
+   "options": [
+    {
+     "name": "Textura",
+     "text": "*Vidro fosco*, *Vidro liso*, *Metal escovado*, *Cor sólida* ou *Gradiente diagonal suave*."
+    },
+    {
+     "name": "Desfoque e Opacidade",
+     "text": "Quanto as texturas de vidro desfocam o que está atrás e quão sólidos são os blocos."
+    },
+    {
+     "name": "Blocos, Campos, Botões",
+     "text": "O raio dos cantos, em pixels: 0 para quadrado, mais alto para mais arredondado."
+    },
+    {
+     "name": "Cor de destaque e Segunda cor",
+     "text": "Escolhidas em barras de matiz, saturação e luminosidade; colorem botões, links, cabeçalhos e os blocos de conteúdo (pelas variáveis `--nexus-primary` e relacionadas)."
+    },
+    {
+     "name": "Fundo dos blocos e Cor da página",
+     "text": "A cor dos blocos de conteúdo e uma cor opcional para a página atrás deles."
+    }
+   ],
+   "tips": [
+    "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
+    "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente."
+   ],
+   "_en": "710ff8ebb0"
+  },
+  "opac-pictures": {
+   "title": "Imagens",
+   "summary": "O papel de parede, o logotipo e o favicon do OPAC, a partir de um arquivo no servidor, de um serviço de hospedagem de imagens ou de um endereço direto.",
+   "options": [
+    {
+     "name": "Origem",
+     "text": "*Nenhuma*, *Arquivo neste servidor* (copiado para a pasta pública de imagens do Koha), *URL direta* (qualquer endereço https, por exemplo do Postimages), *Enviar ao ImgBB* (precisa de uma chave de API) ou *Enviar ao Cloudinary* (nome da nuvem e um upload preset sem assinatura)."
+    },
+    {
+     "name": "Formatos",
+     "text": "PNG, JPEG, GIF, WebP ou ICO. SVG é recusado, porque pode carregar scripts."
+    },
+    {
+     "name": "Chaves de hospedagem de imagens",
+     "text": "A chave do ImgBB e as configurações do Cloudinary ficam no arquivo privado do painel; nenhum segredo de API é necessário."
+    }
+   ],
+   "tips": [
+    "Mantenha o papel de parede abaixo de 500 KB (WebP é o ideal): uma imagem pesada deixa o OPAC lento no celular.",
+    "Use um favicon quadrado de pelo menos 64×64 pixels."
+   ],
+   "_en": "716ada2d75"
+  },
+  "opac-dark": {
+   "title": "Legibilidade e modo escuro",
+   "summary": "Uma película de legibilidade sobre o papel de parede e um botão claro/escuro que os leitores podem usar, lembrado pelo navegador deles.",
+   "options": [
+    {
+     "name": "Película de legibilidade",
+     "text": "O quanto o papel de parede fica velado atrás do texto, em porcentagem. Mais alto significa mais legível."
+    },
+    {
+     "name": "Botão claro/escuro",
+     "text": "Mostra um botão 🌓 no OPAC; a escolha de cada leitor fica guardada no navegador dele."
+    },
+    {
+     "name": "Tema padrão",
+     "text": "*Claro*, *Escuro* ou *Seguir o dispositivo*."
+    }
+   ],
+   "tips": [
+    "*Seguir o dispositivo* respeita os leitores que deixam o celular em modo escuro à noite."
+   ],
+   "_en": "7d7955950a"
+  },
+  "opac-carousel": {
+   "title": "Carrossel de Novidades",
+   "summary": "Um carrossel na página inicial do OPAC com os títulos mais novos que têm exemplar na estante e capa real da Amazon, refeito toda noite; cada capa abre o seu registro.",
+   "options": [
+    {
+     "name": "Mostrar",
+     "text": "Liga o carrossel. Também liga o `OPACAmazonCoverImages` do Koha."
+    },
+    {
+     "name": "Estilo",
+     "text": "*2D plano* (uma faixa que gira sem fim) ou *3D coverflow*."
+    },
+    {
+     "name": "Título, Reprodução automática, Velocidade",
+     "text": "O título acima dele, se ele gira sozinho e com que rapidez (3,5 s por padrão); ele continua girando depois de um clique ou de um deslizar."
+    },
+    {
+     "name": "Títulos",
+     "text": "Quantos livros ele mostra (de 4 a 24)."
+    },
+    {
+     "name": "Efeito ao passar o mouse e Detalhes",
+     "text": "*Zoom suave*, *Sombra de elevação*, *Inclinação* ou nenhum; Detalhes mostra o título e a disponibilidade sobre a capa."
+    },
+    {
+     "name": "Tag da Amazon",
+     "text": "Tag de associado opcional acrescentada aos links das capas."
+    }
+   ],
+   "steps": [
+    "Ligue **Mostrar** e escolha o estilo e o número de títulos.",
+    "Pressione **Aplicar**.",
+    "Pressione **Atualizar carrossel** para montar a lista agora, em vez de esperar a noite."
+   ],
+   "tips": [
+    "Livros sem ISBN não têm capa da Amazon e ficam de fora: catalogue o ISBN sempre que o livro tiver um."
+   ],
+   "_en": "9181da7831"
+  },
+  "opac-links": {
+   "title": "Botões de acesso rápido",
+   "summary": "Botões no estilo link-tree no topo da página inicial do OPAC: um ícone ou emoji, um texto, um endereço, onde ele abre e a sua posição na lista.",
+   "options": [
+    {
+     "name": "Estilo",
+     "text": "*Cor sólida*, *Gradiente*, *Vidro (desfoque)* ou *Metal escovado*."
+    },
+    {
+     "name": "Disposição",
+     "text": "*Um por linha* ou *Duas colunas*."
+    },
+    {
+     "name": "Ordem (1 vem primeiro)",
+     "text": "A posição de cada botão; os botões são ordenados por esse número."
+    },
+    {
+     "name": "Texto, endereço e destino",
+     "text": "O endereço precisa começar com `https://`, `http://`, `/`, `mailto:` ou `tel:`; ele abre na mesma aba ou numa nova aba. Até 12 botões."
+    }
+   ],
+   "steps": [
+    "Ligue **Mostrar** e escolha o estilo e a disposição.",
+    "Pressione **Adicionar botão** para cada link e preencha ícone, texto, endereço e ordem.",
+    "Pressione **Aplicar**."
+   ],
+   "tips": [
+    "Coloque primeiro as ações mais usadas: renovar empréstimos, horário de funcionamento, contato, as redes sociais da biblioteca.",
+    "Use textos curtos (duas ou três palavras) para que a disposição em duas colunas fique arrumada no celular."
+   ],
+   "_en": "2e44e587db"
+  },
+  "opac-staff-links": {
+   "title": "Botões da página inicial da equipe",
+   "summary": "O mesmo tipo de botão na página inicial da intranet, acima dos blocos dos módulos: atalhos para os fluxos de trabalho da própria biblioteca, nas cores da equipe.",
+   "overview": [
+    "Eles são gravados em `IntranetUserJS` e usam os mesmos estilos, disposições e ordenação dos botões do OPAC."
+   ],
+   "tips": [
+    "Ponha links para as tarefas diárias da equipe: reservas a separar, o relatório de atrasos, o documento de procedimentos internos."
+   ],
+   "_en": "8949d5643f"
+  },
+  "opac-staff": {
+   "title": "Aparência da interface da equipe",
+   "summary": "A aparência própria da intranet, separada do OPAC: as suas cores para a barra superior, a busca rápida e os botões, os módulos da página inicial como cartões, além do tamanho do texto, do contraste e da densidade das tabelas.",
+   "options": [
+    {
+     "name": "Aplicar o tema de cores à Interface da Equipe",
+     "text": "Liga o tema da equipe (gravado em `IntranetUserCSS`)."
+    },
+    {
+     "name": "Cores de destaque, segunda e dos blocos",
+     "text": "A paleta da equipe, independente da do OPAC."
+    },
+    {
+     "name": "Papel de parede, logotipo, favicon e Película de legibilidade",
+     "text": "As imagens próprias da intranet, com uma película que mantém tabelas e formulários legíveis."
+    },
+    {
+     "name": "Densidade das tabelas",
+     "text": "Linhas *Confortável*, *Normal* ou *Compacta* nas tabelas."
+    },
+    {
+     "name": "Contraste e Tamanho do texto",
+     "text": "Contraste *Normal* ou *Alto*, e texto de 90% a 120%."
+    }
+   ],
+   "tips": [
+    "Dê à intranet uma cor diferente da do OPAC: a equipe vê na hora em qual site está.",
+    "A densidade *Compacta* mostra mais linhas na circulação e nos relatórios; o contraste *Alto* ajuda em monitores antigos."
+   ],
+   "_en": "06813d2a72"
+  },
+  "opac-hide": {
+   "title": "Ocultar",
+   "summary": "Esconde partes do OPAC que a maioria das bibliotecas não usa: ícones de RSS, o contador do carrinho, os links da comunidade e colunas de tabela vazias.",
+   "overview": [
+    "Cada botão esconde uma parte do OPAC padrão do Koha com CSS, sem apagar nada: **Ícones de RSS** (os links de feed ao lado das buscas e notícias), **Contador do carrinho** (o contador da sacola de livros), **Links da comunidade** (os links do rodapé da comunidade Koha) e **Colunas de tabela vazias** (colunas sem valor em nenhuma linha de uma tabela de resultados ou de exemplares)."
+   ],
+   "steps": [
+    "Ligue o que você quer esconder.",
+    "Pressione **Aplicar** e confira o OPAC."
+   ],
+   "tips": [
+    "Esconda o contador do carrinho só se a biblioteca não usar o carrinho (sacola de livros) do Koha."
+   ],
+   "_en": "e2eef23b65"
+  },
+  "opac-news": {
+   "title": "Botões de ação nas notícias",
+   "summary": "Transforma uma marcação dentro de uma notícia (Ferramentas > Notícias) num botão estilizado, para que as notícias tragam chamadas para ação.",
+   "overview": [
+    "Escreva `[kei-button url=\"https://...\" icon=\"fa-book\"]Texto[/kei-button]` no texto da notícia: com **Botões** ligado, o OPAC mostra a marcação como um botão nas cores do tema."
+   ],
+   "steps": [
+    "Ligue **Botões** e pressione **Aplicar**.",
+    "Na intranet, abra **Ferramentas > Notícias** e escreva uma notícia com a marcação.",
+    "Abra a página inicial do OPAC: a marcação aparece como botão."
+   ],
+   "tips": [
+    "Use nomes de ícones do Font Awesome como `fa-book`, `fa-calendar` ou `fa-envelope` no atributo icon."
+   ],
+   "_en": "05ea27d2dd"
+  },
+  "opac-actions": {
+   "title": "Aplicar, prévia, sincronizar e remover",
+   "summary": "Os botões que levam o desenho para o Koha e de volta.",
+   "options": [
+    {
+     "name": "Aplicar",
+     "text": "Grava a aparência no Koha depois de um backup do banco. O seu próprio OpacUserCSS e OpacUserJS são preservados."
+    },
+    {
+     "name": "Prévia",
+     "text": "Mostra o que vai para o Koha, sem gravar nada."
+    },
+    {
+     "name": "Sincronizar configurações atuais do OPAC",
+     "text": "Traz de volta para a tela a aparência que está no ar no Koha. Nada é gravado até você pressionar Aplicar."
+    },
+    {
+     "name": "Atualizar carrossel",
+     "text": "Refaz agora a lista do Carrossel de Novidades."
+    },
+    {
+     "name": "Chaves de hospedagem de imagens",
+     "text": "A chave de API do ImgBB e o nome da nuvem e o upload preset do Cloudinary."
+    },
+    {
+     "name": "Remover",
+     "text": "Tira esta aparência e traz de volta a do próprio Koha, depois de um backup; o seu próprio CSS e JS ficam."
+    }
+   ],
+   "steps": [
+    "Pressione **Sincronizar configurações atuais do OPAC** antes da primeira mudança, para a tela começar pelo que está no ar.",
+    "Pressione **Prévia** para revisar e depois **Aplicar**.",
+    "Se o resultado não for o esperado, ajuste e aplique de novo, ou pressione **Remover** para voltar à aparência do próprio Koha."
+   ],
+   "tips": [
+    "Cada Aplicar faz um backup do banco antes: você sempre pode voltar ao estado anterior com Restaurar base de dados."
+   ],
+   "_en": "b02b629719"
+  },
+  "sec-hub": {
+   "summary": "Como o Koha conversa com os leitores e com outros sistemas, numa só tela: e-mail, WhatsApp e Telegram, SMS, máquinas de autoatendimento (SIP2) e catálogos de outras bibliotecas (Z39.50).",
+   "overview": [
+    "Cada caixa (tecla **m**) mostra o estado atual e os links que abrem a página certa da intranet do Koha, para você não precisar procurar nos menus da Administração."
+   ],
+   "steps": [
+    "Abra **Mensagens e interoperabilidade** (tecla **m**).",
+    "Leia a linha de estado de cada caixa.",
+    "Use os botões para abrir a página certa do Koha ou rodar a rotina de configuração.",
+    "Pressione **Recarregar** depois de uma mudança."
+   ],
+   "tips": [
+    "Configure o e-mail primeiro: é o canal que todo leitor tem, e os avisos do Koha são escritos para ele."
+   ],
+   "_en": "75baf9c7f3"
+  },
+  "hub-email": {
+   "title": "E-mail",
+   "summary": "Se o Koha envia e-mails, o endereço da biblioteca e o servidor SMTP padrão, com uma cola para o Gmail.",
+   "options": [
+    {
+     "name": "Ligar o e-mail do Koha",
+     "text": "Roda a rotina que ativa o e-mail para a instância (veja Configurar e-mail)."
+    },
+    {
+     "name": "Servidores SMTP / Novo servidor SMTP",
+     "text": "Abrem as páginas correspondentes da administração do Koha."
+    },
+    {
+     "name": "Gmail",
+     "text": "Preencha o formulário Novo servidor SMTP do Koha com `smtp.gmail.com`, porta 587, STARTTLS e uma senha de app: o Google exige a verificação em duas etapas e uma senha de app, não a senha da conta."
+    }
+   ],
+   "overview": [
+    "A caixa lê as configurações do Koha: *E-mail: ligado* ou *desligado* (desligado, o Koha não envia avisos), o endereço da biblioteca e o servidor SMTP padrão. Sem servidor SMTP, o Koha usa o correio do próprio servidor, que a maioria dos provedores rejeita como spam.",
+    "A cola do Gmail lista exatamente o que digitar no formulário **Novo servidor SMTP** do Koha: host `smtp.gmail.com`, porta 587, timeout 60, SSL *STARTTLS*, o Gmail da biblioteca como usuário, uma senha de app (16 letras) como senha e *Servidor padrão: Sim*."
+   ],
+   "steps": [
+    "Pressione **Ligar o e-mail do Koha** se a caixa disser *desligado*.",
+    "Pressione **Novo servidor SMTP** e preencha o formulário (use os valores do Gmail para uma conta Gmail).",
+    "Pressione **Criar uma senha de app do Google** para abrir a página do Google (a verificação em duas etapas precisa estar ligada) e cole a senha de app no formulário do Koha.",
+    "Pressione **E-mail da biblioteca** e defina o endereço remetente dos avisos.",
+    "Pressione **Recarregar** para conferir o novo estado."
+   ],
+   "tips": [
+    "Use um endereço do domínio da própria biblioteca quando tiver: avisos enviados dele têm menos chance de cair no spam.",
+    "Nunca use a senha da conta Gmail no Koha: uma senha de app pode ser revogada sem mudar a senha da conta."
+   ],
+   "_en": "2f23c99a99"
+  },
+  "hub-whatsapp": {
+   "title": "WhatsApp e Telegram",
+   "summary": "Se os avisos do Koha também saem por WhatsApp ou Telegram, e o botão para configurar.",
+   "overview": [
+    "A caixa mostra *instalado* ou *não configurado*. A configuração em si (o gateway, o bot, os números de telefone e a mensagem de teste) é a rotina **Mensagens: WhatsApp e Telegram**, aberta pelo botão."
+   ],
+   "steps": [
+    "Pressione **Configurar WhatsApp e Telegram**.",
+    "Siga a rotina (veja o guia dela).",
+    "Volte à central e pressione **Recarregar**: a caixa deve dizer *instalado*."
+   ],
+   "_en": "9a5f0e7571"
+  },
+  "hub-sms": {
+   "title": "SMS",
+   "summary": "O Koha envia SMS por um driver SMS::Send do seu provedor: digite o nome do driver na preferência SMSSendDriver e depois ligue as preferências de mensagens dos leitores.",
+   "overview": [
+    "O Koha entrega cada aviso do tipo SMS ao driver Perl indicado na preferência do sistema `SMSSendDriver`. Provedores como a Twilio, ou um gateway de e-mail para SMS, oferecem esses drivers. A caixa mostra o driver em uso, ou *SMS: nenhum driver escolhido*."
+   ],
+   "steps": [
+    "Instale no servidor o driver SMS::Send do seu provedor (veja a documentação do provedor).",
+    "Pressione **Driver de SMS (SMSSendDriver)** e digite o nome do driver na preferência.",
+    "Pressione **Preferências de mensagens dos leitores** e ligue o SMS para os avisos que você quiser.",
+    "Confira o número de SMS e as preferências de mensagens de cada leitor."
+   ],
+   "tips": [
+    "A configuração do WhatsApp e do Telegram instala o seu próprio driver no mesmo lugar: use um ou outro."
+   ],
+   "_en": "35d2d9858d"
+  },
+  "hub-sip2": {
+   "title": "SIP2 (autoatendimento)",
+   "summary": "Conecta uma máquina de autoatendimento ou um portal RFID ao servidor SIP2 do Koha: preencha o formulário e salve; o SIPconfig.xml é escrito para você e o servidor SIP2 reinicia.",
+   "options": [
+    {
+     "name": "Porta",
+     "text": "Entre 1024 e 65535 (6001 por padrão)."
+    },
+    {
+     "name": "Rede",
+     "text": "*Só este servidor (127.0.0.1)* ou *Todas as redes*, que abre a porta no firewall."
+    },
+    {
+     "name": "Login SIP e Senha",
+     "text": "O login próprio da máquina (senha com pelo menos 8 caracteres)."
+    },
+    {
+     "name": "Biblioteca",
+     "text": "A biblioteca a que a máquina pertence."
+    },
+    {
+     "name": "Remover exemplos",
+     "text": "Remove os logins de exemplo do Koha (term1, koha...), cujas senhas qualquer um pode ler. Deixe ligado."
+    }
+   ],
+   "steps": [
+    "Preencha o formulário e pressione **Salvar**: uma cópia do SIPconfig.xml antigo é guardada.",
+    "Pressione **Criar o usuário SIP no Koha** e crie um leitor com o mesmo usuário e senha e a permissão *circulate*.",
+    "Configure a máquina com o endereço do servidor, a porta, o login e a senha."
+   ],
+   "warnings": [
+    "Abra a porta para todas as redes só se a máquina estiver em outra rede; senão, mantenha-a local."
+   ],
+   "_en": "ee81c6bf17"
+  },
+  "hub-z3950": {
+   "title": "Z39.50",
+   "summary": "Um atalho para a tela Servidores Z39.50 / SRU, onde ficam o servidor deste catálogo, a rede koha.nexus e os catálogos de onde copiar.",
+   "overview": [
+    "A central mantém uma caixa para o Z39.50 para você encontrá-lo onde espera, mas o trabalho é feito na tela própria: ligar o servidor deste catálogo, a rede comunitária e adicionar catálogos de onde copiar registros."
+   ],
+   "steps": [
+    "Pressione **Servidores Z39.50 / SRU** (ou a tecla **z** em qualquer lugar do painel)."
+   ],
+   "_en": "03bdd4b9f3"
+  },
+  "email": {
+   "summary": "Ativa o e-mail da instância do Koha, para que o próprio agendamento do Koha envie os avisos: avisos de atraso e de vencimento uma vez por dia e a fila de mensagens a cada 15 minutos.",
+   "steps": [
+    "Abra **Configurar e-mail e avisos de circulação**.",
+    "Aguarde enquanto o painel roda `koha-email-enable` para a instância.",
+    "Na intranet, cadastre o servidor SMTP em **Administração > Servidores SMTP** (a tela Mensagens e interoperabilidade tem os links).",
+    "Defina o e-mail da biblioteca e confira os avisos em **Ferramentas > Avisos e boletos**."
+   ],
+   "tips": [
+    "Mande um aviso de teste para você mesmo antes de avisar os leitores.",
+    "Defina os gatilhos de aviso de atraso em **Ferramentas > Gatilhos de aviso/status de atraso**."
+   ],
+   "_en": "9a42531dac"
+  },
+  "messaging": {
+   "summary": "Entrega os avisos do próprio Koha (empréstimo, devolução, atraso, vencimento, reserva) por WhatsApp, por um gateway da própria biblioteca, ou por Telegram, pelo bot da biblioteca, com os números dos leitores completados e corrigidos no caminho.",
+   "overview": [
+    "O Koha escreve os avisos; o painel instala um driver de SMS que manda cada um para o Telegram quando o leitor vinculou o bot, e senão para o WhatsApp. Nada muda no Koha até o envio dos avisos ser ligado, e desligá-lo traz de volta o driver anterior.",
+    "O WhatsApp usa um gateway auto-hospedado, como a Evolution API. O Telegram usa um token de bot do @BotFather: os leitores abrem o bot, tocam em Iniciar e compartilham o próprio contato. Os números ganham o código do país e o DDD, e o 9º dígito dos celulares brasileiros."
+   ],
+   "steps": [
+    "Abra **Mensagens: WhatsApp e Telegram**.",
+    "Configure o gateway do WhatsApp e/ou o bot do Telegram.",
+    "Rode a verificação do que o Koha precisa e crie versões curtas de SMS dos avisos quando for oferecido.",
+    "Use **Enviar uma mensagem de teste**.",
+    "Ligue o envio dos avisos do Koha."
+   ],
+   "warnings": [
+    "Respeite o consentimento dos leitores e a LGPD: envie só para os leitores que concordaram em receber mensagens."
+   ],
+   "_en": "5177525f89"
+  },
+  "sec-vpn": {
+   "summary": "Uma rede privada WireGuard para a equipe: de casa ou de outra unidade, um computador ou celular alcança a intranet e o SSH deste servidor como se estivesse dentro da biblioteca.",
+   "overview": [
+    "Só os endereços da biblioteca (10.66.0.x) passam pela VPN; a Internet, o DNS e as capas dos livros do dispositivo continuam na conexão dele (split tunnel). A tela (tecla **v**, dentro da Central de Segurança & Acesso) configura o servidor e cuida dos dispositivos."
+   ],
+   "steps": [
+    "Configure o servidor (veja Servidor da VPN).",
+    "Adicione um dispositivo por pessoa e por computador ou celular (veja Dispositivos da VPN).",
+    "Instale o aplicativo WireGuard no dispositivo e importe o perfil dele.",
+    "Feche a porta 8080 para a Internet com **Firewall do Staff**."
+   ],
+   "tips": [
+    "Com a VPN funcionando, não há motivo para deixar a intranet aberta para a Internet."
+   ],
+   "_en": "40377fac7c"
+  },
+  "vpn-server": {
+   "title": "Servidor da VPN",
+   "summary": "Configura o servidor WireGuard nesta máquina: o endereço público a que os dispositivos se conectam e a porta UDP.",
+   "steps": [
+    "Digite o **Endereço**: o IP público do servidor ou um nome como `vpn.biblioteca.org`.",
+    "Mantenha ou mude a **Porta UDP**.",
+    "Pressione **Configurar a VPN** e leia o que ela faz: instala o WireGuard e escreve `/etc/wireguard/wg0.conf`, liga o encaminhamento de IP e o NAT para 10.66.0.0/24 e abre a porta UDP no firewall.",
+    "No roteador da biblioteca, encaminhe essa porta UDP para este servidor."
+   ],
+   "tips": [
+    "Use um nome (DNS dinâmico) em vez de um IP se o seu endereço de Internet mudar."
+   ],
+   "warnings": [
+    "No WSL sem rede espelhada, o servidor não pode ser alcançado diretamente e a VPN fica desligada."
+   ],
+   "_en": "ccf881f3ef"
+  },
+  "vpn-devices": {
+   "title": "Dispositivos da VPN",
+   "summary": "Adiciona e revoga os computadores e celulares da equipe e mostra cada perfil como QR code para o aplicativo WireGuard ou como texto para um computador.",
+   "steps": [
+    "Digite um nome em **Novo dispositivo** (por exemplo `maria-notebook`) e pressione **Adicionar dispositivo**.",
+    "Pressione **QR code e perfil**: escaneie o QR code com o aplicativo WireGuard, ou copie o perfil para o WireGuard num computador.",
+    "Conecte: a intranet responde em `http://10.66.0.1:8080` e o SSH em 10.66.0.1.",
+    "Quando um dispositivo se perder ou uma pessoa sair, selecione-o e pressione **Revogar**."
+   ],
+   "tips": [
+    "Crie um perfil por dispositivo e por pessoa, para poder revogar um sem afetar os outros.",
+    "A tabela mostra quando cada dispositivo foi visto por último e quanto enviou e recebeu."
+   ],
+   "_en": "121920821b"
+  },
+  "sec-security": {
+   "summary": "Segurança, acesso remoto e firewall numa só central: VPN WireGuard, Túnel Cloudflare, regras de firewall, a porta da intranet, HTTPS gratuito, Fail2ban, troca da senha do banco e Google Search Console.",
+   "overview": [
+    "A central (tecla **x**) reúne tudo o que decide quem alcança o seu Koha e como. Um padrão seguro para a maioria das bibliotecas: OPAC publicado por um Túnel Cloudflare, porta 8080 da intranet fechada para a Internet, equipe trabalhando de fora pela VPN WireGuard, Fail2ban ligado e a senha do banco trocada depois da instalação.",
+    "Os cartões: **VPN WireGuard** (abre a sua própria tela, tecla **v**), **Gerenciador do Túnel Cloudflare**, **Mostrar as regras ativas do UFW**, **Firewall do Staff**, **Certificado SSL gratuito**, **Status do Fail2ban**, **Trocar a senha do banco de dados** e **Assistente do Google Search Console**."
+   ],
+   "steps": [
+    "Publique o OPAC com o **Gerenciador do Túnel Cloudflare** (ou com o seu próprio domínio e o **Certificado SSL gratuito**).",
+    "Feche a porta da intranet para a Internet com o **Firewall do Staff**.",
+    "Configure a **VPN WireGuard** para a equipe que trabalha de casa ou de outras unidades.",
+    "Confira o **Status do Fail2ban** e as **regras ativas do UFW** uma vez por mês.",
+    "Ajude o Google a encontrar o catálogo com o **Assistente do Google Search Console**."
+   ],
+   "tips": [
+    "Revise a cada poucos meses quem tem perfil na VPN e revogue os que não são mais necessários.",
+    "Anote qual método de publicação você escolheu (túnel ou domínio próprio): é a primeira pergunta que o suporte vai fazer."
+   ],
+   "_en": "fe67b1d7fd"
+  },
+  "cloudflare": {
+   "summary": "Publica o OPAC (e, se você quiser, a intranet) na Internet por um Túnel Cloudflare: HTTPS incluído e nenhuma porta aberta no roteador.",
+   "overview": [
+    "Um Túnel Cloudflare é uma conexão de saída do seu servidor até a Cloudflare: os leitores chegam ao catálogo pela Cloudflare, com HTTPS, e nada é aberto no roteador nem no firewall. Funciona atrás de CGNAT, em links 4G e em redes que você não controla.",
+    "O gerenciador mostra se o túnel está *ATIVO* ou *INATIVO* e oferece cada ação abaixo. Quando a Cloudflare pede para autorizar o servidor, o painel deixa você escolher um QR code para escanear com o celular, o navegador deste computador (o navegador do Windows, no WSL) ou um link para copiar."
+   ],
+   "options": [
+    {
+     "name": "Endereço gratuito (sem precisar de domínio)",
+     "text": "Um endereço público para o catálogo sem comprar domínio nem abrir conta na Cloudflare, compartilhável como QR code. Esse serviço ainda está em testes e não está aberto às bibliotecas."
+    },
+    {
+     "name": "Usar meu próprio domínio (conta Cloudflare)",
+     "text": "Liga o túnel ao seu domínio na Cloudflare. O login pode ser feito por QR code no celular, pelo navegador ou por um link."
+    },
+    {
+     "name": "Ver links públicos e status de segurança",
+     "text": "Os endereços publicados e se o acesso remoto da equipe está protegido."
+    },
+    {
+     "name": "Compartilhar o link do catálogo",
+     "text": "QR code na tela, imagem de QR para imprimir ou link."
+    },
+    {
+     "name": "Reiniciar / Desativar e remover o túnel",
+     "text": "Reinicia o serviço do túnel, ou tira o catálogo da Internet."
+    }
+   ],
+   "steps": [
+    "Abra o **Gerenciador do Túnel Cloudflare (recomendado)** na Central de Segurança & Acesso.",
+    "Escolha **Usar meu próprio domínio** (ou o endereço gratuito, quando ele abrir) e autorize o servidor na sua conta Cloudflare.",
+    "Escolha os endereços do OPAC e, se precisar, da intranet.",
+    "Use **Ver links públicos e status de segurança** para conferir o resultado e depois **Compartilhar o link do catálogo** para divulgá-lo."
+   ],
+   "tips": [
+    "Publique o OPAC e deixe a intranet para a VPN; se você publicar a intranet, mantenha ligada a senha extra na Cloudflare."
+   ],
+   "warnings": [
+    "**Desativar e remover o túnel** tira o catálogo da Internet na hora: o Koha fica acessível só na rede local."
+   ],
+   "_en": "4826de08cc"
+  },
+  "ufw": {
+   "summary": "Lista as regras de firewall (UFW) ativas neste servidor: quais portas estão abertas e para quem.",
+   "overview": [
+    "O UFW (Uncomplicated Firewall) é instalado e configurado pela instalação. Este cartão só lê: mostra as regras ativas com os números, as portas e os endereços permitidos. As regras são mudadas pelas rotinas que precisam delas (firewall do staff, VPN, SIP2, o servidor Z39.50)."
+   ],
+   "steps": [
+    "Abra **Mostrar as regras ativas do UFW**.",
+    "Leia a lista: cada linha é uma porta (ou serviço) e quem pode alcançá-la.",
+    "Use a rotina dona de uma regra para mudá-la, por exemplo o **Firewall do Staff** para a porta 8080."
+   ],
+   "tips": [
+    "Espere ver as portas 80 (OPAC) e SSH; a 8080 só se a intranet for para ser acessada de fora da rede local."
+   ],
+   "warnings": [
+    "Mudar as regras do UFW à mão, fora do painel, pode trancar você fora do SSH. Se for preciso, libere sempre o SSH antes de ativar ou recarregar o firewall."
+   ],
+   "_en": "2bb98f5f5f"
+  },
+  "staff-firewall": {
+   "summary": "Bloqueia ou libera a porta 8080 da intranet para a Internet. Bloqueada, ela continua acessível pelo próprio servidor e pela rede local.",
+   "overview": [
+    "A intranet do Koha escuta na porta 8080. A porta 80 (OPAC) precisa ficar aberta ao público, mas a 8080 pode ser fechada para a Internet quando a equipe trabalha só dentro da biblioteca, pela VPN WireGuard ou por um Túnel Cloudflare. Bloqueada, ela continua liberada para o próprio servidor e para a rede local."
+   ],
+   "steps": [
+    "Abra **Firewall do Staff (restringir a porta 8080)**.",
+    "Responda se quer bloquear o acesso externo direto à 8080.",
+    "Confira o resultado: *liberada só para 127.0.0.1 e a rede local*, ou *aberta*."
+   ],
+   "tips": [
+    "Bloqueie quando a equipe trabalhar só dentro da biblioteca, pela VPN ou por um Túnel Cloudflare."
+   ],
+   "warnings": [
+    "Se a equipe acessa a intranet de casa pelo IP público, bloquear a 8080 a deixa de fora: configure a VPN primeiro."
+   ],
+   "_en": "7a198118b9"
+  },
+  "ssl": {
+   "summary": "Emite um certificado HTTPS gratuito do Let's Encrypt com o Certbot e configura o Apache, com renovação automática.",
+   "overview": [
+    "O Certbot pede ao Let's Encrypt um certificado gratuito para o seu domínio, configura o Apache para servir HTTPS e instala a renovação automática. O Let's Encrypt verifica o domínio pela porta 80, então o domínio precisa apontar para o IP público deste servidor e a porta 80 precisa estar acessível pela Internet.",
+    "Se algo der errado (o Certbot falhar, ou a configuração do Apache ficar inválida), o Apache não é recarregado, e o site continua funcionando em HTTP."
+   ],
+   "steps": [
+    "Aponte o registro A de um domínio para o IP público do servidor e confira se a porta 80 está acessível.",
+    "Abra **Certificado SSL gratuito (Certbot / Apache)** e digite o domínio e um e-mail para os avisos de renovação.",
+    "Aguarde *HTTPS configurado com sucesso*."
+   ],
+   "tips": [
+    "Use o e-mail de uma caixa compartilhada da biblioteca: os avisos de renovação vão para lá.",
+    "Teste o endereço com `https://` num celular com dados móveis, fora da rede da biblioteca."
+   ],
+   "warnings": [
+    "Se você usa um Túnel Cloudflare, cancele: o HTTPS já vem dele."
+   ],
+   "_en": "672350d41a"
+  },
+  "fail2ban": {
+   "summary": "Mostra o estado do Fail2ban: os IPs bloqueados e as tentativas de invasão barradas em cada jail.",
+   "overview": [
+    "O Fail2ban lê os logs e bloqueia por um tempo os endereços que erram o login repetidas vezes, por exemplo no SSH. O cartão mostra cada jail (inativa ou ativa), quantas tentativas foram barradas e quais IPs estão bloqueados agora."
+   ],
+   "steps": [
+    "Abra **Status do Fail2ban (tentativas de invasão)**.",
+    "Leia cada jail: IPs bloqueados e tentativas barradas."
+   ],
+   "tips": [
+    "Muitos bloqueios no SSH são normais num servidor público; eles mostram o Fail2ban fazendo o seu trabalho."
+   ],
+   "warnings": [
+    "Se alguém da equipe for bloqueado depois de errar a senha várias vezes, espere o bloqueio expirar ou libere o endereço com `fail2ban-client set sshd unbanip ENDERECO`."
+   ],
+   "_en": "717f300b75"
+  },
+  "rotate-db-password": {
+   "summary": "Gera uma nova senha forte para o usuário do banco do Koha, atualiza o koha-conf.xml e reinicia os serviços, desfazendo tudo se o Koha parar de responder.",
+   "overview": [
+    "O Koha se conecta ao MariaDB com o usuário e a senha guardados no `koha-conf.xml`. A rotina gera uma senha forte, troca-a no MariaDB, atualiza o `koha-conf.xml` (guardando um backup do arquivo), reinicia os serviços e confere se o Koha ainda responde.",
+    "Se o MariaDB recusar a troca, nada muda. Se o novo `koha-conf.xml` ficar inválido, a senha é desfeita e nada é reiniciado. Se o Koha não responder ao teste final, a tela diz onde está a cópia anterior do XML."
+   ],
+   "steps": [
+    "Abra **Trocar a senha do banco de dados** e confirme.",
+    "Aguarde o teste: *Senha trocada e o Koha continua respondendo*.",
+    "Guarde a nova senha no gerenciador de senhas da biblioteca."
+   ],
+   "tips": [
+    "Troque depois de uma mudança na equipe, ou sempre que a senha antiga possa ter sido vista."
+   ],
+   "warnings": [
+    "Cópias antigas de `/root/koha_credentials.txt` e anotações com a senha anterior deixam de valer: atualize-as."
+   ],
+   "_en": "39d3ef687a"
+  },
+  "search-console": {
+   "summary": "Prepara o catálogo público para o Google: confere se ele responde pela Internet, se não está marcado como noindex, se o sitemap e o robots.txt estão lá, e guia você pelo Google Search Console.",
+   "overview": [
+    "O assistente verifica, pela Internet, se o OPAC responde (código HTTP), se o `OpacMetaRobots` não contém *noindex* (que manda o Google não indexar), se o sitemap do Koha está publicado e se o `robots.txt` existe e aponta para ele. Depois oferece guias passo a passo para o próprio Search Console: verificar a propriedade, enviar o sitemap e pedir a indexação."
+   ],
+   "steps": [
+    "Abra o **Assistente do Google Search Console** e digite o endereço público do OPAC (não localhost nem um IP privado).",
+    "Leia cada verificação: acesso, OpacMetaRobots, sitemap, robots.txt.",
+    "Siga os guias passo a passo: verificação da propriedade, envio do sitemap, pedido de indexação."
+   ],
+   "tips": [
+    "Publique o OPAC com HTTPS antes (Túnel Cloudflare ou Certificado SSL gratuito): o Google prefere sites seguros.",
+    "A indexação leva de dias a semanas: confira o relatório de cobertura do Search Console depois de uma semana."
+   ],
+   "_en": "7007a643e1"
+  },
+  "sec-search": {
+   "summary": "Escolha e mantenha saudável o motor de busca por trás de todas as pesquisas do catálogo: Zebra ou Elasticsearch.",
+   "overview": [
+    "Toda busca no Koha, no OPAC e na intranet, passa por um motor de busca que mantém um índice do catálogo. O Koha aceita dois: o **Zebra**, leve e confiável, e o **Elasticsearch**, com busca avançada e facetas dinâmicas, mas mais exigente em memória.",
+    "Registros adicionados ou alterados são indexados em segundo plano; um vigia (a cada 2 minutos para o Zebra, a cada 5 minutos para o Elasticsearch) mantém o indexador rodando. Quando as buscas deixam de achar registros novos, o índice precisa de reparo."
+   ],
+   "tips": [
+    "Não troque de motor no meio do dia: o catálogo é reindexado e as buscas ficam incompletas até terminar."
+   ],
+   "_en": "00c97d8d18"
+  },
+  "search-toggle": {
+   "summary": "Troca a busca do Koha entre o Zebra e o Elasticsearch 7 com segurança, reindexando o catálogo e voltando atrás se o novo motor não iniciar.",
+   "overview": [
+    "A troca para o motor atual, ajusta a preferência `SearchEngine` do Koha, inicia o novo motor (instalando o Elasticsearch 7 quando necessário), reinicia o Koha e reindexa o catálogo inteiro; depois valida o sistema e oferece o relatório.",
+    "Cada etapa pode voltar atrás: se o Elasticsearch não instalar ou não iniciar, o Zebra é restaurado; se a preferência não puder ser ajustada, a configuração anterior volta. Antes de instalar o Elasticsearch, o painel avisa quando há menos de 4 GB de disco livre. Ele se recusa a começar enquanto um backup ou uma restauração estiver rodando."
+   ],
+   "options": [
+    {
+     "name": "Zebra",
+     "text": "O motor clássico do Koha. Leve (cerca de 1,5 GB a menos de RAM), confiável, indexação incremental a cada 2 minutos."
+    },
+    {
+     "name": "Elasticsearch",
+     "text": "Busca avançada e facetas dinâmicas, mas cerca de 1,5 GB a mais de RAM e mais disco. Não disponível em todas as arquiteturas."
+    }
+   ],
+   "steps": [
+    "Faça um backup manual.",
+    "Abra **Alternar motor de busca (Zebra ⇄ Elasticsearch)** e leia o motor atual.",
+    "Confirme a troca e aguarde a reindexação.",
+    "Pesquise alguns títulos conhecidos no OPAC."
+   ],
+   "tips": [
+    "Fique no Zebra em servidores com menos de 4 GB de RAM.",
+    "Use o **Dimensionamento do servidor** depois da troca: o Elasticsearch muda quanta memória sobra para o resto."
+   ],
+   "_en": "d32d6c6423"
+  },
+  "search-repair": {
+   "summary": "Diagnostica o índice de busca (busca do catálogo, indexador, trabalhos pendentes, índice comparado ao banco) e o repara: reinstala o serviço do indexador, limpa o cache, reconstrói o índice do zero.",
+   "overview": [
+    "O diagnóstico mostra: se a busca do catálogo funciona, o daemon indexador (*rodando*, *PARADO*, *ausente*), os trabalhos esperando indexação e o número de registros no índice comparado ao banco. *Fila crescendo + índice menor* significa que o indexador caiu.",
+    "**Reparar** reinstala o serviço do indexador, limpa o cache e reinicia tudo. **Reindexar** reconstrói o índice inteiro do zero (vários minutos em acervos grandes). Com o Elasticsearch, se a busca continuar falhando, o painel oferece refazer o índice com os mapeamentos de busca padrão do Koha."
+   ],
+   "steps": [
+    "Abra **Reparar / reconstruir a indexação** e leia o diagnóstico.",
+    "Escolha **Reparar** para consertar o indexador, ou **Reindexar** para reconstruir tudo.",
+    "Adicione um registro de teste e pesquise por ele depois de uns 10 segundos."
+   ],
+   "tips": [
+    "*Fila crescendo + índice menor* significa indexador parado: repare-o antes de reindexar."
+   ],
+   "warnings": [
+    "Refazer com os mapeamentos padrão do Koha substitui qualquer mudança feita em **Administração > Configuração do motor de busca**.",
+    "Um banco vazio ou incompleto (menos de 50 tabelas) não pode ser indexado: o painel avisa e aponta para o backup de segurança mais novo."
+   ],
+   "_en": "bfacc203ab"
+  },
+  "sec-diagnostics": {
+   "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco e reparo dos serviços.",
+   "overview": [
+    "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns."
+   ],
+   "steps": [
+    "Rode a **Verificação completa do sistema**.",
+    "Abra **Ver o último relatório de validação** e leia primeiro as falhas, depois os avisos.",
+    "Corrija o que ele apontar (serviços, índice de busca, disco) e rode a verificação de novo."
+   ],
+   "tips": [
+    "Exporte o diagnóstico pelo Painel de Controle antes de pedir ajuda: isso poupa uma rodada de perguntas."
+   ],
+   "_en": "ac5c11cc48"
+  },
+  "status": {
+   "summary": "Mostra um retrato detalhado do servidor e do Koha: serviços, motor de busca, disco e o último backup.",
+   "overview": [
+    "O status agrupa os dados que o painel lê do servidor: **SERVIÇOS** (MariaDB, Apache, Memcached, Plack, o indexador, o túnel, cada um *rodando*, *parado* ou *não configurado*), **BUSCA** (motor, trabalhos pendentes, índice comparado ao banco) e **MÁQUINA** (memória, disco livre do total, o último backup)."
+   ],
+   "steps": [
+    "Abra **Status detalhado do servidor e do Koha**.",
+    "Percorra os três grupos.",
+    "Para qualquer coisa *parada*, use **Reiniciar / reparar os serviços do Koha** ou a verificação completa."
+   ],
+   "_en": "407b718a28"
+  },
+  "health": {
+   "summary": "Roda todas as verificações que o painel conhece e grava um relatório de validação com OK, avisos e falhas.",
+   "overview": [
+    "A verificação (validação) testa os serviços, as respostas web do OPAC e da intranet, o banco, o motor de busca e o seu índice, o disco, a memória, os agendamentos e os arquivos do próprio painel. Cada verificação é OK, aviso ou falha, e o relatório completo vai para o log de validação.",
+    "A mesma validação roda no final da instalação, depois de uma atualização do sistema e depois de uma troca de motor de busca."
+   ],
+   "steps": [
+    "Abra **Verificação completa do sistema** e aguarde.",
+    "Leia o resumo: *Nenhuma falha crítica*, ou o número de falhas e avisos.",
+    "Abra **Ver o último relatório de validação** para os detalhes de cada item."
+   ],
+   "tips": [
+    "Rode depois de instalar, depois de uma atualização e sempre que algo parecer errado."
+   ],
+   "_en": "202ffda098"
+  },
+  "validation-report": {
+   "summary": "Abre o último relatório de validação gravado pela verificação completa, por uma atualização ou por uma troca de motor de busca.",
+   "overview": [
+    "O relatório lista cada verificação com o resultado e, para avisos e falhas, o que foi encontrado e o que conferir. É o arquivo a enviar ao suporte junto com o diagnóstico exportado."
+   ],
+   "steps": [
+    "Abra **Ver o último relatório de validação**.",
+    "Vá primeiro às falhas (FAIL), depois aos avisos (WARN)."
+   ],
+   "_en": "5d7f37617e"
+  },
+  "apache-log": {
+   "summary": "Acompanha ao vivo o log de erros da intranet ou do OPAC (as últimas 50 linhas e cada nova), para ver os erros enquanto acontecem.",
+   "overview": [
+    "O Apache grava os erros de cada site num log próprio: `intranet-error.log` para a intranet e `opac-error.log` para o catálogo público. Acompanhar o log enquanto você repete a ação que falha mostra o erro exato que o Koha gerou."
+   ],
+   "steps": [
+    "Escolha o log da intranet (intranet-error.log) ou do OPAC (opac-error.log).",
+    "Reproduza o problema no navegador e observe as linhas que aparecem.",
+    "Pressione CTRL+C para parar e voltar."
+   ],
+   "tips": [
+    "Anote a hora do erro: ajuda a achar o mesmo momento nos logs do próprio Koha (`plack-error.log`)."
+   ],
+   "_en": "99a73e5c0d"
+  },
+  "repair-services": {
+   "summary": "Reinicia o Memcached, o Plack e os serviços do Koha e informa o estado deles.",
+   "overview": [
+    "A rotina reinicia o Memcached (o cache do Koha), o Plack (o servidor de aplicação que roda as páginas do Koha) e os serviços do Koha, e depois mostra o estado do Memcached e do Plack. É o mesmo reinício do botão **Reiniciar Koha** do Painel de Controle."
+   ],
+   "steps": [
+    "Abra **Reiniciar / reparar os serviços do Koha (Memcached, Plack)**.",
+    "Aguarde o reinício e leia os estados: os dois devem estar *ativos* e *rodando*."
+   ],
+   "tips": [
+    "Use quando as páginas estiverem lentas ou mostrarem erros depois de uma mudança de preferências ou da instalação de um plugin."
+   ],
+   "_en": "ad15da7891"
+  },
+  "sec-settings": {
+   "summary": "Parâmetros básicos do Koha: dimensionamento do servidor, o primeiro superbibliotecário e o relógio.",
+   "overview": [
+    "Alguns parâmetros que o Instalador Web não cobre e que importam desde o primeiro dia: quanta memória cada parte do Koha pode usar, a sua primeira conta pessoal da equipe com todas as permissões, e o relógio e o fuso horário do servidor. Os avisos por e-mail são configurados na central Mensagens e interoperabilidade."
+   ],
+   "steps": [
+    "Rode o **Dimensionamento do servidor** logo depois da instalação.",
+    "Crie o seu **superbibliotecário** depois do Instalador Web.",
+    "Confira o **Relógio e fuso horário** uma vez."
+   ],
+   "_en": "033d5553ad"
+  },
+  "sizing": {
+   "summary": "Ajusta os workers do Plack, o Memcached e o buffer InnoDB do MariaDB à RAM do servidor, com um perfil recomendado e volta automática se o MariaDB não iniciar.",
+   "overview": [
+    "A rotina detecta a RAM do servidor e recomenda um perfil. Aplicá-lo define o número de workers do Plack (quantas requisições o Koha atende ao mesmo tempo), o tamanho do Memcached e o buffer pool InnoDB do MariaDB, e ajusta a memória do Elasticsearch quando ele está em uso. Ela faz backup do arquivo de ajustes do MariaDB antes; se o MariaDB não iniciar com o novo buffer, a mudança é desfeita e o banco volta a funcionar."
+   ],
+   "options": [
+    {
+     "name": "< 4 GB",
+     "text": "2 workers do Plack, 64 MB de cache, 512 MB de InnoDB."
+    },
+    {
+     "name": "4–8 GB",
+     "text": "3 workers do Plack, 128 MB de cache, 768 MB de InnoDB."
+    },
+    {
+     "name": "8–16 GB",
+     "text": "4 workers do Plack, 128 MB de cache, 1 GB de InnoDB."
+    },
+    {
+     "name": "16 GB+",
+     "text": "6 workers do Plack, 256 MB de cache, 2 GB de InnoDB."
+    }
+   ],
+   "steps": [
+    "Abra **Dimensionamento do servidor (memória / workers)** e leia a RAM detectada e o perfil recomendado.",
+    "Escolha o perfil.",
+    "Aguarde os serviços reiniciarem e leia o resumo."
+   ],
+   "tips": [
+    "Escolha o perfil recomendado, e um degrau abaixo se o servidor também rodar o Elasticsearch ou o Ollama."
+   ],
+   "warnings": [
+    "Um perfil maior que a RAM do servidor faz o sistema usar swap e deixa tudo lento: na dúvida, escolha o menor."
+   ],
+   "_en": "5779a26631"
+  },
+  "superlibrarian": {
+   "summary": "Cria uma conta da equipe com todas as permissões (superbibliotecário), depois do Instalador Web do Koha.",
+   "overview": [
+    "Um superbibliotecário tem todas as permissões no Koha. A rotina cria o leitor numa biblioteca e numa categoria que já existem, com a senha cifrada: a senha não fica guardada em lugar nenhum, então guarde-a bem. Se o usuário ou o número da carteirinha já existir, ela avisa e não muda nada."
+   ],
+   "steps": [
+    "Conclua o Instalador Web antes: ele cria as bibliotecas e as categorias de leitores.",
+    "Abra **Criar superbibliotecário** e digite usuário, número da carteirinha, senha (8 ou mais caracteres), nome e sobrenome.",
+    "Entre na intranet com essa conta."
+   ],
+   "tips": [
+    "Crie uma conta por pessoa; dê às contas do dia a dia só as permissões de que elas precisam."
+   ],
+   "warnings": [
+    "Não compartilhe uma conta de superbibliotecário: cada ação nos logs do Koha fica ligada à conta que a fez."
+   ],
+   "_en": "d5383f1dad"
+  },
+  "clock": {
+   "summary": "Define o fuso horário e sincroniza o relógio por NTP, depois reinicia o cron para que os agendamentos sigam a nova hora.",
+   "overview": [
+    "As datas de devolução, as multas, o vencimento das reservas e todas as tarefas agendadas do Koha dependem do relógio do servidor. A rotina define o fuso horário, sincroniza o relógio com servidores NTP e reinicia o cron para que os agendamentos usem a nova hora."
+   ],
+   "steps": [
+    "Abra **Relógio e fuso horário (NTP)**.",
+    "Escolha o fuso horário (por exemplo *America/Sao_Paulo*).",
+    "Leia a hora atual mostrada e compare com a do seu celular."
+   ],
+   "tips": [
+    "Um relógio errado desloca vencimentos, multas e as tarefas noturnas: confira depois de mudar um servidor de lugar."
+   ],
+   "_en": "b12cc33548"
+  },
+  "sec-library": {
+   "summary": "Ferramentas do dia a dia para a equipe da biblioteca, todas com os scripts do próprio Koha: importações e o desfazer delas, autoridades, relatórios, virada de categorias, qualidade dos dados, privacidade (LGPD), localização brasileira e plugins.",
+   "overview": [
+    "Tudo o que altera dados segue os mesmos passos: a trava de backup/restauração (nenhum backup noturno ou restauração roda no meio), uma prévia (a simulação do próprio Koha), uma confirmação explícita, um backup `PRE-*` verificado em `/var/backups/koha_sql` e só então a execução real. As ferramentas nunca param os serviços do Koha, e o backup `PRE-*` desfaz qualquer mudança por Restaurar base de dados.",
+    "Cada execução fica registrada em `/var/log/koha-easy-install/tools/`, legível só pelo root porque os logs podem conter nomes de leitores, e pode ser vista em **Ver logs das ferramentas**."
+   ],
+   "tips": [
+    "Leia cada prévia até o fim antes de confirmar: é o momento mais barato para pegar um erro.",
+    "Anote o nome do backup `PRE-*` de cada execução: é o caminho de volta se o resultado não for o esperado."
+   ],
+   "_en": "249ba7c3ad"
+  },
+  "marc-undo": {
+   "summary": "Remove os registros e exemplares de um lote MARC importado com a reversão do próprio Koha, depois de uma prévia e de um backup verificado.",
+   "overview": [
+    "Cada importação MARC feita pela importação em etapas do Koha (inclusive pela Ferramenta de Importação Mágica) é um lote. Desfazê-lo roda o `commit_file.pl --revert` do próprio Koha: os registros e exemplares que o lote adicionou são removidos, e os registros que ele substituiu voltam à versão anterior que o Koha guardou."
+   ],
+   "steps": [
+    "Abra **Desfazer uma importação MARC** e escolha o lote (data, registros, arquivo).",
+    "Leia a prévia dos registros e exemplares que serão removidos.",
+    "Confirme: um backup `PRE-UNDO-IMPORT` vem antes."
+   ],
+   "warnings": [
+    "Exemplares do lote que foram emprestados ou editados depois da importação podem ser pulados ou precisar de atenção: leia a prévia."
+   ],
+   "_en": "2edbc111cb"
+  },
+  "authority-sync": {
+   "summary": "Vincula os cabeçalhos do catálogo (autores, assuntos, séries) aos registros de autoridade com o link_bibs_to_authorities.pl do Koha, depois de uma simulação que mostra as contagens e os cabeçalhos sem correspondência.",
+   "overview": [
+    "Os registros de autoridade guardam uma forma padronizada de cada nome, assunto e série. Vincular grava o número da autoridade (`$9`) nos cabeçalhos do catálogo (100, 110, 600, 650, 700...), para que uma mudança na autoridade chegue a todos os registros e as buscas por autor ou assunto juntem as grafias variantes. A rotina usa o `link_bibs_to_authorities.pl` do próprio Koha: primeiro a simulação, com as contagens e os cabeçalhos que nenhuma autoridade atende, depois a execução real e a atualização do índice."
+   ],
+   "steps": [
+    "Escolha o alcance: o catálogo inteiro, uma faixa de números de registro ou os registros de uma biblioteca.",
+    "Leia a simulação: cabeçalhos vinculados e cabeçalhos sem autoridade correspondente.",
+    "Confirme: seguem-se um backup verificado, a execução real e a atualização do índice."
+   ],
+   "tips": [
+    "Importe as autoridades antes (Ferramenta de Importação Mágica). As preferências LinkerModule e AutoCreateAuthorities do Koha decidem como os cabeçalhos são casados.",
+    "Agende diária ou semanalmente em Tarefas agendadas e automações."
+   ],
+   "_en": "8f2017e90c"
+  },
+  "patron-category": {
+   "summary": "Move leitores de uma categoria para outra (virada do ano letivo): todos, só os que passaram do limite de idade da categoria, ou os cadastrados antes de uma data.",
+   "overview": [
+    "No fim do ano letivo, os alunos sobem de turma (por exemplo de *Infantil* para *Juvenil*). A rotina usa o `update_patrons_category.pl` do Koha com a simulação nativa, que lista os leitores que vão mudar, e um backup `PRE-PATRONS` verificado antes da mudança."
+   ],
+   "steps": [
+    "Escolha as categorias DE e PARA.",
+    "Escolha quais leitores e, se quiser, a biblioteca.",
+    "Leia a simulação do Koha com a lista de leitores e confirme."
+   ],
+   "tips": [
+    "Rode uma vez por par de categorias, do grupo mais velho para o mais novo, para que nenhum leitor mude duas vezes."
+   ],
+   "_en": "695972983c"
+  },
+  "data-quality": {
+   "summary": "Roda a verificação de inconsistências do próprio Koha sobre o catálogo (somente leitura) e lista os registros com dados ausentes ou inválidos.",
+   "overview": [
+    "A verificação roda o `search_for_data_inconsistencies.pl` do Koha, somente leitura: itens sem biblioteca de origem ou sem tipo de item, registros sem uma planilha de catalogação válida, datas inválidas, tipos de item errados no registro e outros problemas que quebram a circulação ou a busca. O resultado vai para um log que você pode abrir em **Ver logs das ferramentas**."
+   ],
+   "steps": [
+    "Abra **Verificação da qualidade do catálogo** e aguarde.",
+    "Leia o resultado: *Nenhuma inconsistência encontrada* ou a lista de problemas.",
+    "Corrija os registros no Koha e rode a verificação de novo."
+   ],
+   "_en": "9d0ecd738e"
+  },
+  "privacy-anonymise": {
+   "summary": "Anonimiza o histórico de empréstimos e reservas encerrados há mais de um número de dias (30 ou mais), em conformidade com a LGPD; leitores que escolheram guardar o histórico ficam de fora.",
+   "overview": [
+    "O Koha guarda quem emprestou o quê. A LGPD pede que as bibliotecas guardem dados pessoais só pelo tempo necessário. A rotina roda o `batch_anonymise.pl` do Koha para empréstimos e reservas encerrados há mais do número de dias escolhido, depois de mostrar as contagens e de fazer um backup `PRE-PRIVACY` verificado. As estatísticas por título ficam; o vínculo com o leitor sai."
+   ],
+   "steps": [
+    "Abra **Privacidade (LGPD): anonimizar histórico antigo**.",
+    "Digite o número de dias (30 ou mais), por exemplo 365.",
+    "Leia as contagens e confirme."
+   ],
+   "warnings": [
+    "O histórico anonimizado não pode ser ligado de volta aos leitores: relatórios por leitor daquele período deixam de ser possíveis."
+   ],
+   "_en": "8793065dbf"
+  },
+  "privacy-delete": {
+   "summary": "Exclui leitores cuja conta venceu antes de uma data e que não emprestaram nada desde então, depois da simulação do Koha e de uma confirmação digitada. Leitores com empréstimos, multas, vínculos de responsável ou permissões da equipe nunca são excluídos.",
+   "overview": [
+    "A rotina roda o `delete_patrons.pl` do Koha com a simulação nativa para leitores cuja conta venceu antes da data escolhida e que não emprestaram nada depois, opcionalmente só de uma categoria. Ela pede uma confirmação digitada e faz um backup `PRE-PRIVACY` verificado antes."
+   ],
+   "steps": [
+    "Abra **Privacidade (LGPD): excluir leitores antigos**.",
+    "Digite a data limite de vencimento (AAAA-MM-DD) e escolha a categoria.",
+    "Leia a simulação e digite a confirmação."
+   ],
+   "warnings": [
+    "Leitores excluídos só voltam restaurando o backup `PRE-PRIVACY`, que também traz de volta todo o resto como estava."
+   ],
+   "_en": "479be1f498"
+  },
+  "tool-logs": {
+   "summary": "Mostra o que as ferramentas da biblioteca fizeram e quando, dos mais novos para os mais antigos. Os logs são legíveis só pelo root, porque podem conter nomes de leitores.",
+   "overview": [
+    "Cada execução de uma ferramenta da biblioteca grava um log com o que foi mostrado na prévia, o que foi confirmado, o backup feito e a saída do próprio Koha. A lista mostra os mais novos primeiro; abra um para lê-lo."
+   ],
+   "steps": [
+    "Abra **Ver logs das ferramentas**.",
+    "Escolha um log na lista (os mais novos primeiro) para lê-lo."
+   ],
+   "warnings": [
+    "Não copie esses logs para pastas compartilhadas: eles podem conter nomes de leitores."
+   ],
+   "_en": "7f048a50eb"
+  },
+  "brazil": {
+   "summary": "Predefinições opcionais para bibliotecas brasileiras: verificação de CPF (módulo 11), modelos de etiquetas Pimaco, a ficha catalográfica, feriados brasileiros no calendário, relatórios para os censos oficiais (MEC/INEP/IBGE) e referências ABNT (NBR 6023).",
+   "overview": [
+    "Nada aqui é aplicado pela instalação nem por agendamento: cada opção só age quando você a escolhe, segue os mesmos passos das outras ferramentas (trava, prévia, confirmação, backup `PRE-*` verificado) e pode ser desfeita. As migrações do Biblivre, SophiA, Pergamum, Biblioteca Fácil e ISIS estão na Ferramenta de Importação Mágica."
+   ],
+   "options": [
+    {
+     "name": "Verificar CPFs dos leitores (módulo 11)",
+     "text": "Relatório somente leitura de CPFs válidos, inválidos e duplicados, a partir do número da carteirinha, do usuário, dos campos de ordenação ou do atributo `CPF`."
+    },
+    {
+     "name": "Modelos de etiquetas Pimaco",
+     "text": "Folhas 6180, 6181, 6287 (Carta) e A4256, A4251 (A4) com leiautes de lombada, código de barras e título no criador de etiquetas do Koha."
+    },
+    {
+     "name": "Ficha catalográfica",
+     "text": "A ficha AACR2 abaixo de cada registro no OPAC e na intranet, com botão de imprimir e a referência ABNT; esconder a ficha devolve a exibição anterior."
+    },
+    {
+     "name": "Feriados brasileiros no calendário",
+     "text": "Os feriados nacionais de um ano, Carnaval, Sexta-feira Santa, Corpus Christi e um feriado municipal opcional, para uma biblioteca ou para todas."
+    },
+    {
+     "name": "Relatórios para os censos oficiais (MEC/INEP/IBGE)",
+     "text": "10 relatórios somente leitura com os números dos censos do INEP, das pesquisas do IBGE, do cadastro do SNBP e das avaliações do MEC; o Koha pergunta o ano quando um deles roda."
+    },
+    {
+     "name": "Referências e bibliografias ABNT (NBR 6023)",
+     "text": "Referências montadas a partir dos registros MARC, de uma lista, de um período, de uma classe de número de chamada ou de uma biblioteca, em HTML (A4, Times 12) e em texto puro."
+    }
+   ],
+   "tips": [
+    "Imprima antes uma folha de teste da Pimaco em papel comum e ajuste o modelo se a sua impressora deslocar a página.",
+    "Carnaval e Corpus Christi são ponto facultativo, não feriados nacionais: retire-os em Ferramentas > Calendário se a biblioteca abrir."
+   ],
+   "_en": "d114fae5c0"
+  },
+  "plugins": {
+   "summary": "Liga ou desliga o sistema de plugins do Koha, escolhe de onde os plugins podem ser instalados e registra plugins copiados à mão para a pasta.",
+   "overview": [
+    "Um Koha novo do Debian vem com os plugins desligados (`enable_plugins` 0 no `koha-conf.xml`). Ligá-los muda o valor para 1, cria a pasta de plugins quando falta, liga o `UseKohaPlugins` nas versões que ainda o têm e reinicia o Plack e os processos em segundo plano. Cada mudança só grava o `koha-conf.xml` se ele estiver bem formado e for lido de volta corretamente, e guarda o arquivo anterior como `koha-conf.xml.bak-<data>`."
+   ],
+   "options": [
+    {
+     "name": "Ligar / Desligar os plugins do Koha",
+     "text": "Desligar guarda os plugins e os dados deles: ligados de novo, eles voltam como estavam."
+    },
+    {
+     "name": "De onde os plugins podem ser instalados",
+     "text": "Envio de `.kpz` mais os repositórios de plugins, ou só os repositórios."
+    },
+    {
+     "name": "Registrar plugins copiados para a pasta",
+     "text": "Roda o instalador de plugins do Koha depois de um backup verificado."
+    }
+   ],
+   "steps": [
+    "Abra **Plugins do Koha (ligar ou desligar)** e leia o estado atual.",
+    "Escolha **Ligar os plugins do Koha**.",
+    "Escolha de onde os plugins podem ser instalados.",
+    "Na intranet, abra **Administração > Gerenciar plugins** para instalá-los."
+   ],
+   "warnings": [
+    "Instale plugins só de fontes em que você confia: um plugin roda com acesso total do Koha ao banco de dados."
+   ],
+   "_en": "d6e4523569"
+  },
+  "sec-tools": {
+   "summary": "Ferramentas de terminal instaladas sob demanda: monitoramento de recursos ao vivo e um explorador de arquivos.",
+   "overview": [
+    "Dois programas clássicos de terminal, instalados por trás da animação na primeira vez que você os abre: htop/nethogs para ver o que está usando a máquina, e o Midnight Commander para navegar pelos arquivos. Saia de cada programa com a tecla dele (F10 ou q) para voltar ao painel."
+   ],
+   "tips": [
+    "Deixe esses programas abertos só enquanto precisar: o próprio htop usa um pouco de CPU."
+   ],
+   "_en": "180a35bef4"
+  },
+  "monitor": {
+   "summary": "Acompanha ao vivo CPU, memória e processos (htop) ou o uso de rede por processo (nethogs); instala-os quando faltam.",
+   "overview": [
+    "O **Htop** mostra CPU, memória e cada processo, ordenáveis pelo uso: o lugar para ver se o MariaDB, o Elasticsearch, o Plack ou o Ollama estão consumindo a máquina. O **Nethogs** mostra o uso de rede por processo: útil quando o envio do backup ou um robô satura o link."
+   ],
+   "steps": [
+    "Abra **Monitoramento de recursos (Htop / Nethogs)**.",
+    "Escolha o Htop ou o Nethogs.",
+    "Pressione q (ou F10 no htop) para voltar."
+   ],
+   "_en": "9edbe1f16a"
+  },
+  "mc": {
+   "summary": "Navega pelos arquivos do servidor no Midnight Commander, instalado quando falta.",
+   "overview": [
+    "O Midnight Commander é um gerenciador de arquivos de dois painéis no terminal: copie, mova e veja arquivos com as setas e as teclas F. Prático para achar um backup, conferir o espaço de uma pasta ou ler um log."
+   ],
+   "steps": [
+    "Abra **Explorador de arquivos (Midnight Commander)**.",
+    "Mova-se com as setas, Enter para abrir, F3 para ver, F5 para copiar, F10 para sair."
+   ],
+   "warnings": [
+    "O painel roda como root: apagar ou editar arquivos do sistema aqui pode quebrar o servidor."
+   ],
+   "_en": "1402550ca2"
+  },
+  "crons": {
+   "summary": "Cada tarefa que o servidor roda sozinho, com um botão, a frequência e a hora, em vez de um editor de texto; o agendamento antigo fica guardado como koha_tasks.bak.",
+   "overview": [
+    "As tarefas padrão incluem o backup noturno (23:00), a exportação MARC semanal (domingos às 03:00), a limpeza de sessões e da fila (01:30), o reinício do Plack (05:00) e os vigias do indexador. Predefinições adicionam a reconstrução completa do índice, as multas e a vinculação de autoridades. Linhas escritas à mão são preservadas como estão."
+   ],
+   "options": [
+    {
+     "name": "Botão",
+     "text": "Liga ou desliga uma tarefa. Uma tarefa desligada fica no arquivo como comentário, então ligá-la de novo a restaura."
+    },
+    {
+     "name": "Frequência e hora",
+     "text": "Diária, semanal (com o dia), mensal (com o dia do mês) ou um agendamento próprio, e a hora no formato HH:MM."
+    },
+    {
+     "name": "Prévia / Salvar / Recarregar / Padrões",
+     "text": "Prévia mostra o arquivo que será gravado; Salvar grava e guarda o antigo como `koha_tasks.bak`; Recarregar lê o arquivo de novo; Padrões põe os agendamentos padrão na tela (Salvar para mantê-los)."
+    }
+   ],
+   "steps": [
+    "Abra **Tarefas agendadas e automações** (tecla **s**).",
+    "Ligue ou desligue tarefas e escolha diária, semanal ou mensal e a hora (HH:MM).",
+    "Pressione **Prévia** e depois **Salvar**. **Padrões** põe os agendamentos padrão na tela."
+   ],
+   "tips": [
+    "Deixe pelo menos uma hora entre o backup noturno e tarefas pesadas como uma reindexação completa.",
+    "Os avisos por e-mail seguem o agendamento do próprio Koha (koha-common), não este arquivo."
+   ],
+   "_en": "d689c724fe"
+  },
+  "sec-languages": {
+   "summary": "Os pacotes de idioma do Koha e o idioma do painel, divididos em quatro ações claras: só baixar, baixar e ativar, ativar um idioma já instalado e listar.",
+   "overview": [
+    "A interface do Koha (OPAC e intranet) pode aparecer em vários idiomas, cada um instalado como um *pacote de idioma*. O próprio painel tem os seus 23 idiomas. Desde a versão 1.5.42 as quatro ações são separadas, para você nunca mudar o idioma ativo sem querer quando só queria baixar um pacote.",
+    "Num servidor onde o Koha ainda não está instalado, escolher um idioma muda o idioma do painel, e a instalação instala o pacote correspondente depois."
+   ],
+   "tips": [
+    "Instale primeiro os pacotes de que você precisa, depois decida qual fica ativo: navegadores de leitores que pedem outro idioma habilitado recebem aquele."
+   ],
+   "_en": "bf8eb9af75"
+  },
+  "languages": {
+   "summary": "Baixa um pacote de idioma do Koha e o torna o idioma do OPAC, da intranet e deste painel de uma vez.",
+   "overview": [
+    "Esta é a rotina do menu desde o começo: você escolhe um idioma; o painel troca o seu próprio idioma, baixa o pacote do Koha e o torna o padrão do OPAC e da intranet."
+   ],
+   "steps": [
+    "Abra **Baixar e ativar um idioma**.",
+    "Escolha o idioma.",
+    "Leia o resultado e faça os ajustes finos em **Administração > Preferências > I18N/L10N** se precisar."
+   ],
+   "tips": [
+    "Os ajustes finos ficam em Administração > Preferências > I18N/L10N do Koha."
+   ],
+   "_en": "8829f96e77"
+  },
+  "lang-download": {
+   "summary": "Baixa um pacote de idioma do Koha e não muda mais nada: o idioma ativo do OPAC e da intranet continua o mesmo.",
+   "overview": [
+    "Use para preparar um idioma sem mostrá-lo ainda, ou para deixar os leitores o escolherem no menu de idiomas do OPAC. Um pacote que já está instalado fica como está."
+   ],
+   "steps": [
+    "Abra **Só baixar um pacote de idioma**.",
+    "Escolha o pacote.",
+    "Habilite-o para os leitores nas preferências I18N/L10N do Koha, ou ative-o depois com **Ativar um idioma já instalado**."
+   ],
+   "_en": "786bbe94bd"
+  },
+  "lang-activate": {
+   "summary": "Torna ativo no OPAC, na intranet e neste painel um idioma que já está instalado, sem baixar nada.",
+   "overview": [
+    "Nada é baixado: só mudam as preferências de idioma do Koha, para o OPAC e a intranet, junto com o idioma do próprio painel."
+   ],
+   "steps": [
+    "Abra **Ativar um idioma já instalado**.",
+    "Escolha entre os idiomas instalados.",
+    "Recarregue o OPAC e a intranet para ver a mudança."
+   ],
+   "_en": "a75316bbc5"
+  },
+  "lang-list": {
+   "summary": "Lista os idiomas do Koha instalados no servidor, os habilitados e o ativo no OPAC e na intranet, e o idioma do painel.",
+   "overview": [
+    "A lista marca cada idioma instalado como *habilitado* no OPAC e na intranet e mostra qual é o *ATIVO* (o padrão). Também mostra o idioma do painel. Antes de o Instalador Web terminar, o banco do Koha ainda não está pronto, e a lista avisa."
+   ],
+   "steps": [
+    "Abra **Idiomas instalados e o ativo**.",
+    "Leia as linhas do OPAC e da equipe: o idioma ATIVO é o padrão; os habilitados podem ser escolhidos pelos leitores."
+   ],
+   "_en": "98f47f46a3"
+  },
+  "sec-update": {
+   "summary": "Atualiza o sistema operacional e o Koha, e atualiza este painel pelo GitHub.",
+   "overview": [
+    "Dois tipos de atualização: o sistema operacional com o Koha (pacotes e migrações do banco) e o próprio painel (este programa). Os dois protegem o servidor: a atualização do sistema faz um backup de segurança verificado antes, e a do painel confere uma assinatura SHA-256 antes de substituir qualquer coisa."
+   ],
+   "tips": [
+    "Atualize num momento tranquilo e depois de um backup bem-sucedido.",
+    "Leia as notas de versão do Koha antes de uma atualização de versão maior."
+   ],
+   "_en": "67cb85a0dc"
+  },
+  "update-system": {
+   "summary": "Atualiza os pacotes do sistema e do Koha e aplica as migrações do banco do Koha, depois de um backup de segurança verificado; em seguida reinicia os serviços e valida o sistema.",
+   "overview": [
+    "A atualização faz um backup de segurança verificado do banco, atualiza os pacotes do sistema e do Koha, aplica as migrações do banco do Koha, reinicia os serviços (serviços principais, Plack, Zebra ou o indexador do Elasticsearch), limpa arquivos temporários e roda a validação. O resultado diz *Atualização concluída sem erros críticos* ou lista falhas e avisos com o log de validação."
+   ],
+   "steps": [
+    "Confira se o último backup é recente e foi testado.",
+    "Abra **Atualizar pacotes do sistema e esquemas do Koha** e confirme.",
+    "Aguarde todas as etapas; não feche a janela.",
+    "Leia o resultado e rode a **Verificação completa do sistema** se houver avisos."
+   ],
+   "warnings": [
+    "Se o backup de segurança não puder ser feito, nada é atualizado. Se uma migração falhar, os serviços não são reiniciados, para não esconder o erro."
+   ],
+   "_en": "3e3693ba7c"
+  },
+  "update-panel": {
+   "summary": "Baixa a versão mais nova deste painel do GitHub, confere a assinatura SHA-256 e a sintaxe, guarda uma cópia da versão antiga e a substitui.",
+   "overview": [
+    "O painel compara a sua versão com a mais nova do GitHub. Quando há uma nova, ele a baixa presa ao commit exato publicado, confere a assinatura SHA-256 e a sintaxe do script, guarda uma cópia da versão atual e só então a substitui. Qualquer divergência cancela a atualização e deixa a versão atual intacta."
+   ],
+   "steps": [
+    "Abra **Atualizar este painel pelo GitHub**.",
+    "Leia a versão atual e a nova e confirme.",
+    "Quando terminar, abra o painel de novo com `sudo config.sh`."
+   ],
+   "tips": [
+    "Se ele disser que os arquivos no GitHub ainda não conferem entre si, espere alguns minutos: o GitHub mantém cópias em cache por até 5 minutos depois de um lançamento."
+   ],
+   "warnings": [
+    "Um *ALERTA DE SEGURANÇA* sobre a assinatura significa que o arquivo baixado não é o publicado: não force a atualização."
+   ],
+   "_en": "02ff4b16dc"
+  },
+  "about": {
+   "summary": "A versão do painel, a licença, o repositório oficial e o site, e como apoiar o projeto.",
+   "overview": [
+    "O koha.nexus nasceu da experiência real de enfrentar barreiras técnicas na gestão de acervos, pensado para bibliotecas sem orçamento para sistemas comerciais caros nem suporte técnico dedicado. A tela mostra a versão instalada, a licença, o repositório oficial e o site, e as formas de ajudar: dar uma estrela ao repositório e compartilhá-lo com colegas e outras instituições."
+   ],
+   "steps": [
+    "Abra **Sobre o programa e suporte**.",
+    "Anote a versão quando for pedir ajuda: é a primeira coisa de que o suporte precisa."
+   ],
+   "_en": "ca6dbfe666"
+  },
+  "reboot": {
+   "summary": "Reinicia o servidor inteiro depois de uma confirmação; no WSL, reinicia os serviços do Koha em vez disso.",
+   "overview": [
+    "O servidor reinicia cinco segundos depois da confirmação, e o Koha sobe sozinho quando ele volta. No Windows (WSL), o cartão vira **Reiniciar os serviços do Koha**, porque o WSL é reiniciado pelo Windows."
+   ],
+   "steps": [
+    "Avise a equipe e confira se nenhum backup ou restauração está rodando.",
+    "Abra **Reiniciar servidor** e confirme.",
+    "Depois de um ou dois minutos, abra o painel de novo e confira o Painel de Controle."
+   ],
+   "warnings": [
+    "Todos que estiverem usando o catálogo são desconectados. Prefira Reiniciar Koha quando só o Koha precisar."
+   ],
+   "_en": "59f7b89246"
+  }
+ }
+}

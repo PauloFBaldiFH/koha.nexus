@@ -1,0 +1,2434 @@
+{
+ "language": "en",
+ "ui": {
+  "title": "Interactive preview & manual",
+  "subtitle": "Every screen of the control panel, explained.",
+  "search": "Search",
+  "language": "Language",
+  "menu": "Menu",
+  "mockup": "Simulator",
+  "screenshot": "Screenshot",
+  "loading": "Loading the manual…",
+  "load_error": "The manual could not be loaded.",
+  "footer": "Generated from the panel's code by export_docs_preview.py.",
+  "version": "Panel version",
+  "overview": "What it does",
+  "steps": "Step by step",
+  "options": "Options explained",
+  "tips": "Best practices",
+  "warnings": "Watch out",
+  "related": "Related",
+  "where": "Where",
+  "shortcut": "Key",
+  "kind_section": "Screen",
+  "kind_entry": "Card",
+  "kind_feature": "Screen part",
+  "pending": "Pending",
+  "pending_note": "This part is described as planned: it is not in the published panel yet.",
+  "untranslated": "This guide is not translated into this language yet: it is shown in English.",
+  "outdated": "The English text of this guide changed after it was translated: the translation may be behind.",
+  "no_manual": "No guide has been written for this item yet.",
+  "no_results": "Nothing matches.",
+  "full_manual": "Full manual",
+  "panel_only": "Panel texts (guide in English)",
+  "exit": "Exit",
+  "back_to_site": "Back to koha.nexus",
+  "screenshot_of": "The real panel"
+ },
+ "items": {
+  "sec-dashboard": {
+   "summary": "The Control Dashboard is the panel's home screen: one look tells you whether Koha is running, when the last backup was made, how much disk is left and at which addresses the catalogue answers.",
+   "overview": [
+    "The dashboard opens when you start the panel with `sudo config.sh` and is always one key away (**d**). It reads the server's state through the installer's read-only status verb, so opening it never changes anything.",
+    "It is organised top to bottom: the overall state of Koha with the last backup and the free disk space, the addresses of the public catalogue (OPAC) and of the staff interface for each way of reaching them, and the components (MariaDB, Apache, Memcached, Plack, the search engine) with the HTTP answer of both sites.",
+    "Two buttons act on the server: **Restart Koha** for a quick service restart and **Export diagnostics** for a support package with every password removed."
+   ],
+   "steps": [
+    "Open the panel with `sudo config.sh` (or the **Koha** icon on Windows). The dashboard is the first screen.",
+    "Read the top row: **Koha** should say *Running*, **Last backup** should be less than a day old and **Disk free** should leave room for at least two backups.",
+    "Check **Addresses** to find the links to give to readers (OPAC) and to staff (staff interface, port 8080).",
+    "Look at **Components**: every service should be active and both sites should answer with HTTP 200.",
+    "Press **Refresh** after fixing something to read the state again."
+   ],
+   "tips": [
+    "Make the dashboard your morning check: a red or yellow card is easier to fix the day it appears than a week later.",
+    "If the last backup is older than 24 hours, open the Backup center and run a manual backup before doing anything else.",
+    "Keep at least 15–20% of the disk free: MariaDB, the search index and the nightly backups all need room to work."
+   ],
+   "related": [
+    "dash-status",
+    "dash-addresses",
+    "dash-components",
+    "sec-backup",
+    "sec-diagnostics"
+   ]
+  },
+  "dash-status": {
+   "title": "Status cards",
+   "summary": "Four cards sum up the health of the server: Koha's overall state, the age of the newest backup, the free disk space and the memory available.",
+   "options": [
+    {
+     "name": "Koha",
+     "text": "*Running* when every core service answers; *Attention* when one of them is degraded; *Stopped* when Koha is off; *not installed* before the installation. The note under it shows the memory in use."
+    },
+    {
+     "name": "Last backup",
+     "text": "When the newest backup on this server was made and its file name. Since 1.5.44 the dashboard, the Backup center and the restore screens all read the same source, so they always agree. The card turns yellow when the backup is old or the last nightly run failed."
+    },
+    {
+     "name": "Disk free",
+     "text": "Free space on the disk that holds Koha's database and backups, with the total size."
+    },
+    {
+     "name": "Memory available",
+     "text": "RAM the system can still hand out. Elasticsearch alone needs about 1.5 GB more than Zebra."
+    },
+    {
+     "name": "Refresh",
+     "text": "Reads the server's state again. The dashboard never changes anything by itself."
+    }
+   ],
+   "tips": [
+    "A yellow **Last backup** card is a call to action: open the Backup center and press **Generate manual backup** or **Test integrity of latest backup**.",
+    "When the free disk falls below twice the size of a backup, clean old files with **Deep database optimization & log cleanup** or move old backups to the cloud."
+   ],
+   "related": [
+    "sec-dashboard",
+    "backup-status",
+    "db-maintenance"
+   ]
+  },
+  "dash-addresses": {
+   "title": "Addresses",
+   "summary": "The links of the public catalogue (OPAC, port 80) and of the staff interface (port 8080), for each way of reaching them: from the server itself, from other computers of the library and from the Internet.",
+   "options": [
+    {
+     "name": "On the server itself",
+     "text": "`http://localhost` and `http://localhost:8080`: they work on the server, or on the Windows PC that runs Koha in WSL."
+    },
+    {
+     "name": "Other computers on the network",
+     "text": "The server's local address (for example `http://192.168.0.20:8080`). Under WSL with NAT networking other computers cannot reach it, and the dashboard says so."
+    },
+    {
+     "name": "Cloudflare Tunnel / Free koha.nexus address",
+     "text": "The public address when the catalogue is published through a Cloudflare Tunnel, with *online* or *offline*. *Remote staff access is off* means only the OPAC is published."
+    },
+    {
+     "name": "Public IP",
+     "text": "On a cloud server (VPS) the panel also shows the public IP and reminds you to open ports 80 and 8080 in the provider's firewall, or to use a Cloudflare Tunnel instead."
+    }
+   ],
+   "tips": [
+    "Give readers the OPAC address and keep the staff address (8080) for the team: they are different sites with different permissions.",
+    "Prefer the Cloudflare Tunnel to opening ports: it brings HTTPS with it and does not expose the server's IP."
+   ],
+   "warnings": [
+    "Opening port 8080 to the whole Internet exposes the staff login page. Restrict it with **Staff firewall** or reach it through the WireGuard VPN."
+   ],
+   "related": [
+    "cloudflare",
+    "staff-firewall",
+    "sec-vpn",
+    "credentials"
+   ]
+  },
+  "dash-components": {
+   "title": "Components",
+   "summary": "The state of every service Koha depends on and the HTTP answer of the staff interface and of the OPAC.",
+   "overview": [
+    "Each component shows *active* or *inactive*: MariaDB (the database), Apache (the web server), Memcached (the cache), Plack (Koha's application server), the search engine (Zebra or Elasticsearch) and the Cloudflare Tunnel when it is set up.",
+    "**HTTP response** asks both sites for their home page: *Answers (HTTP 200)* means readers and staff can use them; *Does not answer* points at Apache, Plack or the database."
+   ],
+   "tips": [
+    "When a site does not answer, try **Restart Koha** first; if the problem stays, run **Full system health check** to find the cause.",
+    "An inactive search engine makes searches fail while the rest of Koha keeps working: use **Repair / rebuild indexing**."
+   ],
+   "related": [
+    "dash-restart",
+    "health",
+    "search-repair",
+    "repair-services"
+   ]
+  },
+  "dash-restart": {
+   "title": "Restart Koha",
+   "summary": "Restarts Memcached, Plack, the background workers and Apache in one go, without rebooting the server.",
+   "steps": [
+    "Press **Restart Koha** on the dashboard.",
+    "Confirm: Koha's pages stop answering for a few seconds and nothing is lost.",
+    "Wait for the result: it lists the state of Memcached and Plack after the restart.",
+    "Press **Refresh** and check that both sites answer again."
+   ],
+   "tips": [
+    "Use it after changing system preferences that Koha caches, after installing a plugin, or when pages become slow.",
+    "Restart at a quiet moment: users in the middle of a checkout have to repeat their last click."
+   ],
+   "related": [
+    "repair-services",
+    "reboot",
+    "dash-components"
+   ]
+  },
+  "dash-export": {
+   "title": "Export diagnostics",
+   "summary": "Collects the logs and the system state into one folder you can send to whoever supports your library, with passwords, tokens and keys replaced by [REDACTED].",
+   "steps": [
+    "Press **Export diagnostics** on the dashboard.",
+    "Wait while the panel gathers the Koha, Apache, MariaDB and panel logs and the system status.",
+    "Note the folder shown at the end. On Windows (WSL) the panel offers to open it in Windows Explorer.",
+    "Compress the folder and send it with a short description of the problem and when it started."
+   ],
+   "tips": [
+    "Export right after the problem happens: logs rotate, and the useful lines may be gone a few days later.",
+    "Even redacted, logs can contain patron names: send them only to people you trust and delete the copy afterwards."
+   ],
+   "related": [
+    "health",
+    "validation-report",
+    "apache-log"
+   ]
+  },
+  "install": {
+   "summary": "Installs Koha with MariaDB, Apache, Memcached and Plack on this server in one guided run, with the checks, tuning and schedules a production library needs.",
+   "overview": [
+    "The installation first checks the server: operating system (Debian 11/12/13 or Ubuntu 22.04/24.04, amd64 or arm64), free disk, network access to the Koha repository and whether ports 80 and 8080 are free. It then sets up UTF-8 and the language, syncs the clock (NTP), asks for the timezone, creates 4 GB of swap, updates the system, adds the official Koha repositories and installs the packages.",
+    "It shows seven numbered steps, one line per task with a small Pac-Man progress bar. The commands' own output goes to `/var/log/koha-easy-install/apt.log`, the file to send to support if a step fails. At the end a screen lists the addresses of the catalogue and of the staff interface.",
+    "The nightly backup, the weekly MARC export, the index watchdogs and the clean-up jobs are scheduled automatically in `/etc/cron.d/koha_tasks`."
+   ],
+   "steps": [
+    "Prepare a server with at least 2 GB of RAM (4 GB recommended), 5 GB of free disk (10 GB recommended) and Internet access.",
+    "Run `sudo bash installer`, choose the panel language and open **Install Koha server**.",
+    "Choose the timezone when asked, then let the installer work: it usually takes 10 to 30 minutes.",
+    "At the end, note the database user and password: they are also saved in `/root/koha_credentials.txt`.",
+    "Open the staff interface at `http://SERVER-IP:8080`, log in with those credentials and complete Koha's **Web Installer**.",
+    "Back in the panel, create your own staff account with **Create super librarian**."
+   ],
+   "tips": [
+    "Use a dedicated server or virtual machine: Koha, MariaDB and the search engine like to have the machine to themselves.",
+    "Install on a wired connection: a dropped download is the most common cause of a failed step.",
+    "After the Web Installer, run **Full system health check** once to confirm that everything is green."
+   ],
+   "warnings": [
+    "Running the installation again on a server that already has Koha offers a reinstallation that DELETES the database. It asks for a typed confirmation (REINSTALL): make a backup first."
+   ],
+   "related": [
+    "credentials",
+    "superlibrarian",
+    "health",
+    "sizing"
+   ]
+  },
+  "credentials": {
+   "summary": "Shows every address and login you need on the first day: the OPAC and staff links (local, network and Internet), the SSH access and the database user and password for Koha's Web Installer.",
+   "overview": [
+    "The credentials come from `/root/koha_credentials.txt`, written by the installation. The screen groups the links by where you are: on this machine (localhost), on other computers of the network, or on the Internet through a Cloudflare Tunnel. On a cloud server it also shows the public IP.",
+    "The database user and password are the ones Koha's Web Installer asks for. After the Web Installer, the daily work is done with your own staff account, not with them."
+   ],
+   "steps": [
+    "Open **View first-access credentials**.",
+    "Copy the staff address and the database user and password (each value has a Copy button).",
+    "Open the staff address in a browser and complete the Web Installer with them.",
+    "Create a personal super librarian account and use it from then on."
+   ],
+   "tips": [
+    "Store the database password in the library's password manager: you need it to restore backups on another server.",
+    "After the Web Installer, rotate the database password with **Rotate database password** if the screen was ever shared or photographed."
+   ],
+   "warnings": [
+    "Never give the database login to staff as their everyday account: it bypasses Koha's permissions and its use is not tied to a person."
+   ],
+   "related": [
+    "install",
+    "superlibrarian",
+    "rotate-db-password",
+    "dash-addresses"
+   ]
+  },
+  "restore": {
+   "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
+   "overview": [
+    "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
+    "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
+    "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
+    "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
+   ],
+   "steps": [
+    "Open **Restore database** (from the main list or from the Backup center).",
+    "Pick the backup file, or drop it onto the panel window.",
+    "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
+    "Confirm the restore. The screen shows the file, its size and the free disk space.",
+    "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
+    "Read the result: the search engine in use, the number of tables and the path of the safety backup."
+   ],
+   "tips": [
+    "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
+    "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
+    "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
+    "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
+   ],
+   "warnings": [
+    "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
+    "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
+   ],
+   "related": [
+    "backup-safety",
+    "backup-test",
+    "backup-compression",
+    "magic-import"
+   ]
+  },
+  "backup-manual": {
+   "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
+   "steps": [
+    "Open the Backup center and choose **Generate manual backup and download to PC**.",
+    "Pick the destination folder: the default backups folder, a USB drive (usually under `/media` or `/mnt`) or another folder.",
+    "Wait for the dump and its verification.",
+    "Read the result: file name and size, then the command to paste in PowerShell or Terminal on your computer to save it in your Downloads folder."
+   ],
+   "overview": [
+    "The backup uses the compression chosen in **New backups** (gzip, Zstandard or XZ). It refuses to start while another backup or a restore runs, so two jobs never write at the same time.",
+    "On a Linux desktop or under WSL, **Download latest backup** in the Backup center copies the newest file straight into your Downloads folder instead."
+   ],
+   "tips": [
+    "Make a manual backup before any big change: an update, a mass import, a change of search engine.",
+    "Keep at least one copy off the server (a PC, a USB drive kept elsewhere, or the cloud): a backup on the same disk does not survive a disk failure.",
+    "Name the copies you keep by date and purpose, for example `before-update-2026-10.sql.zst`."
+   ],
+   "related": [
+    "backup-download",
+    "backup-cloud",
+    "backup-test",
+    "backup-compression"
+   ]
+  },
+  "backup-cloud": {
+   "summary": "Connects a cloud storage to the nightly backup with rclone, so every backup also goes off the server: Google Drive in two express ways, or OneDrive, MEGA and S3-compatible storage step by step.",
+   "options": [
+    {
+     "name": "Express: Generate token on another PC (SSH / Headless)",
+     "text": "For a server without a browser: you run one rclone command on your own computer, sign in to Google there and paste the token (a JSON text starting with `{` and ending with `}`) back into the panel."
+    },
+    {
+     "name": "Express: Authenticate directly on this server",
+     "text": "When the server has a browser, or through an SSH tunnel to port 53682: the panel opens the Google sign-in and captures the token by itself."
+    },
+    {
+     "name": "Other services: OneDrive, MEGA or S3 (step by step)",
+     "text": "The panel asks only what each service needs: a OneDrive sign-in (copy the link, then paste back the address the browser ended on), the MEGA e-mail and password, or an S3 access key, region, endpoint and bucket (AWS, Cloudflare R2, Wasabi, MinIO). Nobody types an rclone command."
+    }
+   ],
+   "steps": [
+    "Open the Backup center and choose **Configure cloud backup (Google Drive)**.",
+    "Choose how to connect (see the options).",
+    "Sign in with the library's own account, not a personal one.",
+    "Wait for the real upload test: the panel sends a small file to the cloud and checks it arrived.",
+    "If the test fails, choose **Try the test again** or **Edit the token**."
+   ],
+   "tips": [
+    "Use an account owned by the library and shared with at least two people, so the backups do not depend on one person.",
+    "Check the cloud folder once a month: the nightly log says whether each upload worked.",
+    "Combine the cloud copy with **XZ** or **Zstandard** compression to save upload time and space."
+   ],
+   "warnings": [
+    "The token and keys are stored only in rclone's private file on the server. Anyone with root access to the server can use them: protect the server accordingly."
+   ],
+   "related": [
+    "backup-manual",
+    "backup-compression",
+    "crons"
+   ]
+  },
+  "backup-test": {
+   "summary": "Proves that a backup really restores: the newest file is imported into a temporary database and checked, while the production data is not touched.",
+   "steps": [
+    "Open the Backup center and choose **Test integrity of latest backup**.",
+    "Check the file and date shown, or press **Choose another file** to test a different one.",
+    "Confirm **Run the test now?**.",
+    "Read the result: *BACKUP IS INTACT AND RESTORABLE* with the number of tables, bibliographic records and patrons, or the reason it failed."
+   ],
+   "tips": [
+    "Test a backup at least once a month and always before relying on one for a restore or a migration.",
+    "Compare the counts of records and patrons with what you expect: a backup that restores but has far fewer records points at a problem upstream."
+   ],
+   "warnings": [
+    "*The backup DID NOT restore* is urgent: make a new manual backup right away and find out why the nightly one is broken."
+   ],
+   "related": [
+    "restore",
+    "backup-manual",
+    "backup-status"
+   ]
+  },
+  "sec-backup": {
+   "summary": "Everything about backups on one screen: the state of the newest backup, the compression of new backups, one-click download, manual and cloud backups, the integrity test and the restore.",
+   "overview": [
+    "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
+    "The top shows three cards (**Last backup**, **Size**, **Result** of the last nightly run), then the **New backups** box with the compression choice, then the backup routines as cards."
+   ],
+   "tips": [
+    "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
+    "A backup you never tested is a hope, not a backup: schedule a monthly integrity test."
+   ],
+   "related": [
+    "backup-status",
+    "backup-compression",
+    "backup-download",
+    "backup-safety",
+    "backup-cloud"
+   ]
+  },
+  "backup-download": {
+   "title": "Download latest backup",
+   "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
+   "overview": [
+    "Under WSL the file goes to the Windows Downloads folder; on a Linux desktop to your own Downloads. When the panel runs over SSH from another computer it cannot write there, so it shows the `scp` command to paste on your computer instead, with a Copy button."
+   ],
+   "steps": [
+    "Open the Backup center (key **b**).",
+    "Press **Download latest backup**.",
+    "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
+   ],
+   "tips": [
+    "Use it weekly to keep an off-server copy even without a cloud account.",
+    "Move the downloaded file to an external drive or a different building: a copy on the same desk does not protect against theft or fire."
+   ],
+   "related": [
+    "backup-manual",
+    "backup-cloud",
+    "backup-status"
+   ]
+  },
+  "backup-status": {
+   "title": "Backup status cards",
+   "summary": "Three cards tell how the backups are going: when the newest backup was made, how big it is and how the last nightly run ended.",
+   "options": [
+    {
+     "name": "Last backup",
+     "text": "The age and name of the newest backup on the server, from the same source the dashboard and the restore screens use. Partial files still being written (`.part`) are never counted."
+    },
+    {
+     "name": "Size",
+     "text": "The size of that file. A sudden drop in size between two nights deserves a look."
+    },
+    {
+     "name": "Result",
+     "text": "*OK*, *FAILED*, *Skipped (busy)* (another backup or a restore was running) or *Not run yet*, with the date of the last nightly run."
+    }
+   ],
+   "tips": [
+    "*Skipped (busy)* once is normal after a long restore; several nights in a row means something keeps the lock busy: check **Schedules & cron tasks**."
+   ],
+   "related": [
+    "dash-status",
+    "backup-test",
+    "crons"
+   ]
+  },
+  "backup-compression": {
+   "title": "Compression of new backups",
+   "summary": "Chooses how new backups are compressed: gzip (opens anywhere), Zstandard (fast and smaller, for large catalogues) or XZ (smallest, slow to make, for long-term storage).",
+   "overview": [
+    "The choice is saved as `BACKUP_COMPRESSION` in the panel's backup settings and is used by the nightly backup, by manual backups and by the safety copies made before a change (a restore, an update, a library tool). The nightly script reads it every night, so the next backup already uses it.",
+    "Restores do not care about this setting: **Restore database** recognises `.sql`, `.sql.gz`, `.sql.zst` and `.sql.xz` by their content. Old backups in another format keep working.",
+    "If the program for the chosen compression (`zstd` or `xz`) is missing on the server, the backups fall back to gzip and the box says so; choosing the compression again installs it."
+   ],
+   "options": [
+    {
+     "name": "Gzip (.sql.gz)",
+     "text": "The default. Every system can open it (7-Zip, WinRAR, any Linux). Good balance for small and medium catalogues."
+    },
+    {
+     "name": "Zstandard (.sql.zst)",
+     "text": "Compresses and decompresses much faster than gzip and makes smaller files. The best choice for large catalogues and for cloud uploads. On Windows it opens with 7-Zip ZS or PeaZip."
+    },
+    {
+     "name": "XZ / LZMA (.sql.xz)",
+     "text": "The smallest files, but slower to make and more CPU-hungry. Good for archives kept for years or for slow upload links."
+    }
+   ],
+   "steps": [
+    "Open the Backup center (key **b**).",
+    "In **New backups**, open **Compression** and pick an option.",
+    "Wait for *Saving the backup settings*; a notice confirms the new choice.",
+    "Check the next morning that **Last backup** shows the new extension."
+   ],
+   "tips": [
+    "Choose Zstandard when the catalogue's backup is larger than a few hundred MB or when you upload to the cloud every night.",
+    "Choose XZ on small servers with spare night time and a slow Internet link.",
+    "Keep gzip when the backups are opened by people outside the library who may not have other tools."
+   ],
+   "related": [
+    "sec-backup",
+    "backup-safety",
+    "restore",
+    "backup-cloud"
+   ]
+  },
+  "backup-safety": {
+   "title": "Safety backup before a restore",
+   "summary": "Before Restore database replaces the catalogue, the panel saves and validates a complete copy of the current database. Without it the current catalogue is never dropped, and if the restore fails that copy is put back automatically.",
+   "overview": [
+    "The copy is written as `pre_restore_safety_backup_<date>_<time>` in the backups folder (`/var/backups/koha_sql`), with the compression chosen in **New backups**. It is written to a `.part` file first and renamed only when complete, so a half-written copy is never mistaken for a backup.",
+    "If the copy cannot be created or validated (for example, not enough free disk), the restore stops with *Safety backup failed* and nothing changes. A database with no tables has nothing to save, and the screen says so.",
+    "The result screen of the restore shows the path of the safety copy. If the index repair later finds an empty database, it also points at the newest safety copy."
+   ],
+   "steps": [
+    "Start **Restore database** as usual: the safety copy is automatic.",
+    "Watch for the step *Saving a safety backup of the current database*.",
+    "At the end, note the **Safety backup** path shown in the result.",
+    "To undo the restore, run **Restore database** again and pick that file."
+   ],
+   "tips": [
+    "Leave free space of at least twice the size of a backup before a restore: one for the temporary test database, one for the safety copy.",
+    "Delete old safety copies only after you have checked the restored catalogue for a few days."
+   ],
+   "related": [
+    "restore",
+    "backup-compression",
+    "backup-status"
+   ]
+  },
+  "magic-import": {
+   "summary": "One entry for every import: drop a file, a folder or an archive with records, copies, patrons, loans or holds, and the Magic Import Tool recognises the format, asks only what it cannot work out, shows a preview and imports with Koha's own tools after a verified backup.",
+   "overview": [
+    "It reads spreadsheets (CSV/TSV in any separator and encoding, Excel `.xlsx`/`.xls`, LibreOffice `.ods`, dBase `.dbf`), MARC 21 (ISO 2709 `.mrc`/`.iso` and MARCXML), the database of Biblioteca Fácil, ISIS catalogues (PostgreSQL backups) and archives of them (`.zip`, `.tar`, `.gz`, `.bz2`, `.xz`). Formats are recognised by their bytes, never by the file name alone.",
+    "In a spreadsheet, each column is scored against every MARC 21 and patron field from its header and its values (ISBN and CPF check digits, dates, e-mails, call numbers). Rows of the same book become one record with one item per copy; people with a valid CPF, e-mail or card number become patrons; a loans sheet feeds both.",
+    "Copies kept in another system's item field (949, 950, 990, or MARC 21 holdings in 852) become Koha items (952), reading each subfield by its meaning, so exports of Biblivre, SophiA and Pergamum are understood.",
+    "A Koha backup is never imported: it replaces the whole catalogue, so the tool sends it to **Restore database**."
+   ],
+   "steps": [
+    "Put the files in the `importar` folder of your home (on Windows also `C:\\Koha\\Importar`), or keep them anywhere and use **Another file**.",
+    "Open **Magic Import Tool** (key **i**) and pick what to import.",
+    "Answer the questions, if any: a column the tool is not sure about is shown with sample values. Your answers are remembered for the next file with the same columns.",
+    "Read the preview carefully: what was found in each file, where each column goes, the counts, sample records and rejected lines with the reason.",
+    "Confirm each part (records, patrons, loans and holds). Each one gets its own verified `PRE-*` backup before it is written.",
+    "Read the summary, then search a few records and patrons in Koha to check them."
+   ],
+   "tips": [
+    "Start with a small sample of the file to see how the columns are read before importing everything.",
+    "Choose the default library and item type for the import carefully: they are used whenever the file has none.",
+    "Compare the preview's counts with the old system's own reports before confirming.",
+    "If a MARC import went wrong, use **Undo a MARC import** instead of deleting records by hand."
+   ],
+   "warnings": [
+    "What the tool cannot read is listed with what to do: MarcEdit `.mrk` text (save it as `.mrc`), a CDS/ISIS master file (export it from WinISIS as ISO 2709) or an SQL dump of another system.",
+    "Patron files contain personal data: delete them from the `importar` folder after the import."
+   ],
+   "related": [
+    "marc-undo",
+    "authority-sync",
+    "data-quality",
+    "restore"
+   ]
+  },
+  "sec-database": {
+   "summary": "Koha's tables at a glance, largest first, with the database maintenance and the reports pack one click away.",
+   "overview": [
+    "The screen (key **t**) is read-only: it lists every table of Koha's database with its number of rows and its size, and the totals. It helps to understand what grows (action logs, sessions, statistics) and whether a clean-up is due.",
+    "The two cards below run the routines that change the database, each with a preview and a verified backup first."
+   ],
+   "related": [
+    "db-tables",
+    "db-maintenance",
+    "reports"
+   ],
+   "tips": [
+    "Run the maintenance after big clean-ups (anonymising history, deleting patrons): the space comes back to MariaDB only after optimising.",
+    "Open this screen before a migration to estimate how long a backup and a restore will take."
+   ]
+  },
+  "db-tables": {
+   "title": "Table list",
+   "summary": "Every table of Koha's database with its rows and size, largest first, and the total size of the database.",
+   "steps": [
+    "Open **Database tables** (key **t**): the list loads behind the Pac-Man loader.",
+    "Read the biggest tables at the top. `biblio_metadata` and `items` grow with the collection; `action_logs`, `sessions` and `statistics` grow with use.",
+    "Press **Refresh** after a maintenance run to see the difference."
+   ],
+   "tips": [
+    "If `action_logs` or `sessions` are among the largest tables, run **Deep database optimization & log cleanup**.",
+    "Watch the total size over the months to plan disk space and backup storage."
+   ],
+   "related": [
+    "db-maintenance",
+    "dash-status"
+   ]
+  },
+  "db-maintenance": {
+   "summary": "Repairs and optimises MariaDB's tables, cleans system logs older than seven days and old temporary files, then restarts Koha's services to free memory.",
+   "steps": [
+    "Open **Deep database optimization & log cleanup** (Database tables or Diagnostics).",
+    "Read the list of what it will do and confirm.",
+    "Wait for the three steps: optimising the database, cleaning system logs, restarting Koha services.",
+    "Read the summary, then check the dashboard."
+   ],
+   "tips": [
+    "Run it once a month, or after a large import or deletion, at a quiet moment.",
+    "Make sure the nightly backup of that day finished before you start."
+   ],
+   "warnings": [
+    "Optimising large tables can take a while and Koha restarts at the end: users are disconnected for a moment."
+   ],
+   "related": [
+    "db-tables",
+    "repair-services",
+    "health"
+   ],
+   "overview": [
+    "Over time MariaDB's tables fragment and the system journal grows. The routine repairs and optimises the tables, removes system journal entries older than seven days, clears old temporary files and restarts Koha's services to free memory. It shows a preview of what it will do and asks before starting."
+   ]
+  },
+  "reports": {
+   "summary": "Installs 22 ready-made, read-only SQL reports in Koha's Reports module, for circulation, collection, patrons and acquisitions, without touching your own reports.",
+   "overview": [
+    "The pack includes: most borrowed titles, overdue loans with patron contacts, items never borrowed, items with no loan ever, new acquisitions, acquisitions and donations by period, accounts expiring soon, new patrons per month, patrons by neighbourhood and city, active readers by category, patrons with fines or suspensions, loans per month and library, loans by material type, daily circulation, holds waiting for pickup, collection by Dewey class and by library and material type, recent children's books, withdrawn, damaged or lost items, lost items, items without barcode or call number, and authority records no record uses.",
+    "Each query is checked against this Koha version before it is saved. The reports are tagged, so updating or removing the pack never touches reports the library wrote itself. A verified `PRE-REPORTS` backup comes first."
+   ],
+   "steps": [
+    "Open **Essential SQL reports pack**.",
+    "Choose **Preview (dry run)** to see which reports are new or updated.",
+    "Choose **Install or update the pack** and confirm.",
+    "In Koha, open **Reports > Saved reports** and run the ones you need."
+   ],
+   "tips": [
+    "Use *Overdue loans with patron contacts* for the weekly overdue round and *Items without barcode or call number* to clean the catalogue.",
+    "Run the pack again after a Koha update: the queries are re-checked against the new schema.",
+    "For government census figures (INEP, IBGE, SNBP) use **Brazil: localization > Government census reports**."
+   ],
+   "related": [
+    "sec-library",
+    "brazil",
+    "data-quality"
+   ]
+  },
+  "sec-ai": {
+   "summary": "Both AI tools on one screen: AI cataloguing (MARC Replace drafts a MARC record from photos of a book) and the AI assistant on the staff home page, sharing one provider, each with its own model.",
+   "overview": [
+    "The AI screen (key **a**) is where you choose the provider (local Ollama, Google Gemini, OpenAI, Anthropic Claude or an OpenAI-compatible server such as LM Studio), type its key, test it, load the list of models and pick one model for cataloguing (it must read images) and one for the chat.",
+    "A separate box manages **Ollama on this server**: it can be checked, installed and fed with models even when the assistant uses a cloud provider. The last box shows the state of the two tools and opens them.",
+    "No key ships with the panel, and keys are never shown again once saved: only their last four characters."
+   ],
+   "steps": [
+    "Choose the provider and type its key (local providers need none).",
+    "Press **Test connection**, then **Load models**.",
+    "Pick a model and press **Use for cataloguing** and/or **Use for chat**.",
+    "Press **Save**.",
+    "Install the tools from the cards: **Replace a MARC record** and **AI assistant on the staff home page**."
+   ],
+   "tips": [
+    "To keep patron data inside the library, use a local provider (Ollama or LM Studio).",
+    "Give the chat a light, cheap model and the cataloguing a vision model: they have different needs."
+   ],
+   "related": [
+    "ai-provider",
+    "ai-models",
+    "ai-ollama",
+    "marc-replace",
+    "ai-assistant"
+   ]
+  },
+  "ai-provider": {
+   "title": "AI provider",
+   "summary": "Chooses who answers the AI tools and how to reach them: the provider, its address, the key and the two models (vision for cataloguing, chat for the assistant).",
+   "options": [
+    {
+     "name": "Provider",
+     "text": "*Local Ollama* (runs on this server, nothing leaves the machine), *Google Gemini* (free tier for the Flash models), *OpenAI*, *Anthropic Claude*, or *LM Studio / OpenAI-compatible* (your own server)."
+    },
+    {
+     "name": "Server URL",
+     "text": "Filled in for each provider. Change it only for your own server or a proxy."
+    },
+    {
+     "name": "API key",
+     "text": "Pasted once and then shown only as its last four characters. Leave it empty to keep the saved key. Switching provider brings back the key typed for it before. The panel shows where each company hands out keys."
+    },
+    {
+     "name": "Vision model",
+     "text": "The model MARC Replace uses to read photos of the cover and title page. It must accept images."
+    },
+    {
+     "name": "Chat model",
+     "text": "The model of the assistant on the staff home page. Empty means the same as the vision model."
+    },
+    {
+     "name": "Test connection / Save",
+     "text": "The test asks the provider for its models and says whether the chosen one is among them. Save writes the settings for both tools."
+    }
+   ],
+   "steps": [
+    "Open the AI screen (key **a**) and choose the provider.",
+    "Paste the API key (cloud providers only).",
+    "Press **Test connection**: *Connected* with the number of models means it works.",
+    "Pick the models (or use **Models** below) and press **Save**."
+   ],
+   "tips": [
+    "Create a key just for the library, with a spending limit on the provider's site.",
+    "With Gemini, start with a Flash model: it is in the free tier (with daily limits)."
+   ],
+   "warnings": [
+    "OpenAI and Anthropic bill every request, even for their smaller models: the account needs credits.",
+    "A key is refused over plain `http` to a server outside the local network."
+   ],
+   "related": [
+    "ai-models",
+    "ai-ollama",
+    "sec-ai"
+   ]
+  },
+  "ai-models": {
+   "title": "Model list",
+   "summary": "Reads the models your key can actually use from the provider itself and lists them in two groups: Free / Accessible and Advanced (paid key or active billing, marked 💳).",
+   "overview": [
+    "**Load models** asks the provider's own models endpoint with the key typed or saved. Embedding, speech, image and video models are left out: only chat-capable models are listed.",
+    "The split is a guide, not a bill: Gemini Flash and Flash-Lite, Gemma, OpenAI mini/nano, Claude Haiku and every local model are *Free / Accessible*; Gemini Pro and the full OpenAI and Claude models are *Advanced*. Choosing an advanced model shows a warning that it needs credits or a subscription.",
+    "Without a key, offline, or with a refused key, a built-in list of each provider's newest aliases is shown (for example `gemini-flash-latest`, `gpt-5-mini`, `claude-sonnet-5-5`) and the screen says why."
+   ],
+   "steps": [
+    "Save or paste the key of the provider.",
+    "Press **Load models** and wait for the list (*Live list from …*).",
+    "Choose a model in **Choose a model**.",
+    "Press **Use for cataloguing** (vision models only) or **Use for chat**, then **Save**."
+   ],
+   "tips": [
+    "Prefer the *latest* aliases: they move to the newest model without changing the setting.",
+    "Reload the list now and then: providers add and retire models often."
+   ],
+   "related": [
+    "ai-provider",
+    "ai-ollama"
+   ]
+  },
+  "ai-ollama": {
+   "title": "Ollama on this server",
+   "summary": "Runs AI models on the library's own server with Ollama: no key, no cost per request and nothing leaves the machine.",
+   "options": [
+    {
+     "name": "Check Ollama",
+     "text": "Asks the local Ollama (`http://127.0.0.1:11434`) whether it runs and which models it has."
+    },
+    {
+     "name": "Install Ollama",
+     "text": "Installs Ollama on the server when it is missing."
+    },
+    {
+     "name": "Model presets",
+     "text": "`llama3.2:1b`, `qwen2.5:1.5b` and `llama3.2:3b` for fast chat on a CPU; `qwen2.5:3b` balanced and multipurpose; `qwen2.5vl:7b` for vision and cataloguing (high CPU, slow on ARM)."
+    },
+    {
+     "name": "Download / Use for chat / Use for cataloguing",
+     "text": "Downloads the chosen model into Ollama and sets it for a tool. A text-only model cannot be used for cataloguing, which needs a vision model."
+    }
+   ],
+   "steps": [
+    "Press **Check Ollama**; if it is not answering, press **Install Ollama**.",
+    "Choose a preset in **Model** and press **Download**.",
+    "Press **Use for chat** or **Use for cataloguing**, then **Save** in the provider box with *Local Ollama* selected."
+   ],
+   "tips": [
+    "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU.",
+    "Check the free disk before downloading: models take from about 1 GB to several GB each."
+   ],
+   "related": [
+    "ai-provider",
+    "ai-models",
+    "sizing"
+   ]
+  },
+  "ai-tools": {
+   "title": "The AI tools",
+   "summary": "The state of the two AI tools, with the buttons to open or install them: MARC Replace (AI cataloguing) and the assistant on the staff home page.",
+   "overview": [
+    "Each line says whether the tool is installed and which provider and model it uses. *Set up and save an AI provider first* means the provider box above is not saved yet."
+   ],
+   "related": [
+    "marc-replace",
+    "ai-assistant",
+    "ai-provider"
+   ],
+   "steps": [
+    "Read the two lines to see what is ready.",
+    "Press **Open MARC Replace** to open the page in the staff interface, or install it from its card.",
+    "Press **Install, update or remove the assistant** to manage the chat on the staff home page."
+   ]
+  },
+  "marc-replace": {
+   "summary": "Installs a page in Koha's staff interface that replaces a record's MARC by its biblionumber, from a file, pasted text or photos of the book (AI cataloguing), always with a preview first and without touching the items.",
+   "overview": [
+    "The page (`/cgi-bin/koha/tools/marc_replace.pl`) needs the `edit_catalogue` permission. It replaces a record with an `.mrc` or `.xml` file or pasted MARC text; the current record is saved as MARCXML before the change and can be downloaded and put back to undo it. Item fields in the file are always ignored.",
+    "Its **AI cataloguing** tab drafts a new record from photos of the cover, the title page and its verso (with the CIP block). The model answers in a fixed format; then Brazilian and international rules are applied (AACR2 and ISBD punctuation, names inverted, non-filing characters, ISBN check digits, the CDD of the CIP block and the library's own author notation). The librarian corrects the draft next to the photos and a mandatory preview comes before the record is added.",
+    "Optional shortcuts can be added next to **New record** and **Edit** in the staff interface."
+   ],
+   "steps": [
+    "Set up and save an AI provider on the AI screen (only for AI cataloguing).",
+    "Open **Replace a MARC record (staff tool)** and choose **Install or update the page**.",
+    "In the staff interface, open the page from the cataloguing tools or a record's Edit menu.",
+    "Pick the record, load the file, text or photos, and read the preview.",
+    "Confirm the replacement or the new record."
+   ],
+   "tips": [
+    "Use well-lit, straight photos of the title page and of its verso: the CIP block gives the model the best data.",
+    "Always read the draft: AI helps the cataloguer, it does not replace the review.",
+    "Use **Versions saved by the page** to find and restore a previous version of a record."
+   ],
+   "related": [
+    "sec-ai",
+    "ai-provider",
+    "authority-sync"
+   ]
+  },
+  "ai-assistant": {
+   "summary": "Puts an AI chat on the home page of Koha's staff interface where librarians ask in plain language about books, patrons, loans, reports, settings and opening hours.",
+   "overview": [
+    "The assistant searches with Koha's own search engine and fixed read-only queries, never with SQL written by the AI. Follow-up questions use the records of the previous answers, and the answers link to the records.",
+    "A change it suggests (a hold, a patron's or a record's fields, a fine write-off) is an action proposal that shows each field before and after. Koha makes it only after **Approve & Execute**, with the librarian's own permissions, and the previous values are saved in an undo folder."
+   ],
+   "steps": [
+    "Set up and save an AI provider on the AI screen, with a chat model.",
+    "Open **AI assistant on the staff home page** and choose **Install or update the assistant**.",
+    "Open the staff interface home page: the chat replaces the news block.",
+    "Ask a question, for example *which books by Machado de Assis are on loan?*"
+   ],
+   "tips": [
+    "Choose a fast chat model: librarians expect answers in seconds.",
+    "Use a local model (Ollama) if the library's policy does not allow patron data to leave the server.",
+    "Review **Changes confirmed in the assistant** from time to time."
+   ],
+   "related": [
+    "sec-ai",
+    "ai-provider",
+    "ai-ollama"
+   ]
+  },
+  "sec-z3950": {
+   "summary": "Copy cataloguing and catalogue sharing on one screen: this Koha's own Z39.50/SRU server, the koha.nexus community network and a curated list of public catalogues to copy records from, scanned and ranked by speed.",
+   "overview": [
+    "Z39.50 and SRU are the protocols libraries use to search each other's catalogues and copy records. In Koha, the servers listed in **Administration > Z39.50/SRU servers** appear in the cataloguing search; this screen (key **z**) fills that list for you.",
+    "It has three boxes: **This catalogue's Z39.50 / SRU server (inbound)**, the **Community network** and **Catalogues to copy records from (outbound)**. Two local bridges reach Brazilian catalogues that block Z39.50: Catálogo Zeus (UFSC) and Rede Pergamum."
+   ],
+   "steps": [
+    "In the outbound box, tick the servers of your region (space bar, or tick a whole region).",
+    "Press **Scan**: each server is asked for a real record and the working ones are ranked by speed.",
+    "Press **Add to Koha**: the working ticked servers go into Koha's list, checked for the cataloguing searches.",
+    "In Koha, catalogue with **New from Z39.50/SRU** and pick the record to copy."
+   ],
+   "tips": [
+    "Keep 5 to 10 fast servers ticked: too many make every cataloguing search slow.",
+    "Scan again every few months: catalogues change addresses and servers come and go."
+   ],
+   "related": [
+    "z3950-outbound",
+    "z3950-zeus",
+    "z3950-pergamum",
+    "z3950-inbound",
+    "z3950-network"
+   ]
+  },
+  "z3950-inbound": {
+   "title": "This catalogue's server (inbound)",
+   "summary": "Turns on or off this Koha's own Z39.50/SRU server (koha-z3950-daemon), so other libraries can search your catalogue and copy your records.",
+   "overview": [
+    "Turning it on starts the daemon and opens its port in the firewall; turning it off stops it and closes the port, also after a restart. The status line shows *Running* or *Stopped* with the port."
+   ],
+   "steps": [
+    "Open the Z39.50 / SRU screen (key **z**).",
+    "Switch on **Z39.50/SRU server (koha-z3950-daemon)** and confirm.",
+    "Give partner libraries your server's address and port."
+   ],
+   "tips": [
+    "Share your catalogue: original cataloguing done by your library helps every other library that copies it."
+   ],
+   "warnings": [
+    "The port is opened to the network: on a server exposed to the Internet, make sure you really want the catalogue searchable from outside."
+   ],
+   "related": [
+    "sec-z3950",
+    "z3950-network",
+    "ufw"
+   ]
+  },
+  "z3950-network": {
+   "title": "Community network",
+   "summary": "Adds the shared catalogue of the koha.nexus libraries to Koha's Z39.50/SRU servers, checked for the cataloguing searches; switching it off takes it out.",
+   "overview": [
+    "The network is a shared SRU service (the `catalog-network/` service of the project) where koha.nexus libraries pool their records. The address is shown under the switch."
+   ],
+   "steps": [
+    "Open the Z39.50 / SRU screen (key **z**).",
+    "Switch on **Community network** and confirm.",
+    "Search it from Koha's cataloguing like any other Z39.50/SRU server."
+   ],
+   "related": [
+    "sec-z3950",
+    "z3950-inbound"
+   ]
+  },
+  "z3950-outbound": {
+   "title": "Catalogues to copy records from",
+   "summary": "A curated list of public catalogues by region (Brazil / Latin America, North America, Europe, Asia-Pacific, specialised), plus the community list and your own imports, scanned for real records and added to Koha ranked by speed.",
+   "options": [
+    {
+     "name": "Scan",
+     "text": "Tries each ticked server with a 3-second timeout on its listed port, then 210, 2100 and 2210; runs a real search and accepts it only when it returns a valid MARC record. The result shows how many worked and the fastest with its latency in ms."
+    },
+    {
+     "name": "Add to Koha",
+     "text": "Adds the ticked servers to Koha's `z3950servers`, ranked by speed in the last scan. Servers Koha already has are kept as they are."
+    },
+    {
+     "name": "Login",
+     "text": "User and password for subscription servers (OCLC and others). Kept only in the panel's private file and in Koha, never in a log."
+    },
+    {
+     "name": "Hide / Show hidden",
+     "text": "Hides servers you do not want to see. Servers that keep failing are hidden by themselves."
+    },
+    {
+     "name": "Community list",
+     "text": "Downloads the list kept by the community on GitHub and adds the new servers."
+    },
+    {
+     "name": "Import / Export",
+     "text": "Imports servers from JSON, YAML, CSV, a Koha SQL dump of `z3950servers` or a web page that lists them; exports the ticked (or shown) servers as `.json`, `.csv` or `.sql` for another Koha, without passwords."
+    }
+   ],
+   "steps": [
+    "Tick servers with the space bar, or tick a region to take all of it.",
+    "Press **Scan** and wait for the results.",
+    "Press **Add to Koha** and confirm.",
+    "Type the logins of subscription servers with **Login** if the panel asks."
+   ],
+   "tips": [
+    "An address marked * comes from an older list: the scan tells whether it still works.",
+    "Export your tested list and import it on your other Koha servers to save time."
+   ],
+   "related": [
+    "sec-z3950",
+    "z3950-zeus",
+    "z3950-pergamum"
+   ]
+  },
+  "z3950-zeus": {
+   "title": "Catálogo Zeus bridge (UFSC)",
+   "summary": "A local bridge that lets Koha copy records from Catálogo Zeus of BU/UFSC as if it were an ordinary SRU server, reaching Brazilian university catalogues that block Z39.50.",
+   "overview": [
+    "Most Brazilian university catalogues block Z39.50 (port 210), but Catálogo Zeus searches them over HTTP and includes each full record. The bridge, a small service on this server (`127.0.0.1:5000`, systemd unit `koha-zeus-sru`), turns Koha's SRU search into a Zeus search (ISBN or title) and hands the records back as MARCXML.",
+    "It is the first server of the Brazil list and comes preselected. Adding it to Koha installs and starts the bridge automatically, with the settings Koha needs: syntax MARC21, SRU 1.1 with GET, timeout 15 seconds. Results are cached for 10 minutes so paging does not search again."
+   ],
+   "steps": [
+    "Open the Z39.50 / SRU screen (key **z**) and tick **Catálogo Zeus (UFSC bridge, SRU)**.",
+    "Press **Add to Koha**: the bridge is installed and started.",
+    "In Koha's cataloguing, search by ISBN for the best results."
+   ],
+   "tips": [
+    "Search by ISBN whenever you have it: Zeus takes one search string, and the ISBN wins over the title.",
+    "If searches come back empty, check the service with `systemctl status koha-zeus-sru`."
+   ],
+   "warnings": [
+    "The bridge answers only while its service runs on this server, and depends on Catálogo Zeus being online."
+   ],
+   "related": [
+    "z3950-pergamum",
+    "z3950-outbound",
+    "sec-z3950"
+   ]
+  },
+  "z3950-pergamum": {
+   "title": "Rede Pergamum bridge",
+   "summary": "A second local bridge, next to the Zeus one, that searches the shared catalogue of Rede Pergamum (PUCPR) and answers Koha as an SRU server with MARCXML records.",
+   "overview": [
+    "It runs on this server at `127.0.0.1:5006` as the systemd unit `koha-pergamum-sru`, with the same Koha settings as the Zeus bridge (syntax MARC21, SRU 1.1). Unlike Zeus it is not preselected: tick it when you want it.",
+    "The Pergamum bridge has not yet been tried against the live catalogue; the scan tells whether it returns records on your server."
+   ],
+   "steps": [
+    "Open the Z39.50 / SRU screen (key **z**) and tick **Catálogo Rede Pergamum (CRP bridge, SRU)**.",
+    "Press **Scan** to check it returns records, then **Add to Koha**.",
+    "Search it from Koha's cataloguing."
+   ],
+   "tips": [
+    "Use it together with the Zeus bridge: the two catalogues cover different libraries."
+   ],
+   "related": [
+    "z3950-zeus",
+    "z3950-outbound"
+   ]
+  },
+  "sec-opac": {
+   "summary": "The look of the public catalogue (OPAC) and of the staff interface, designed on one screen and written into Koha in one click, after a backup, keeping the library's own CSS and JavaScript.",
+   "overview": [
+    "The OPAC appearance screen (key **o**) writes your choices into Koha's `OpacUserCSS` and `OpacUserJS` preferences (and `IntranetUserCSS`/`IntranetUserJS` for the staff interface) between markers, so your own code stays untouched.",
+    "It covers the material of the blocks (textures, corners, colours), the pictures (wallpaper, logo, favicon), legibility and dark mode, a New arrivals carousel, quick access buttons for the OPAC and the staff home page, the staff interface's own colours, the clean-up of parts you do not use and buttons inside news items.",
+    "Each apply is saved in `/etc/koha-nexus/theme-settings.json` and written back after a database restore."
+   ],
+   "steps": [
+    "Open **OPAC appearance** (key **o**). Press **Sync current OPAC settings** to start from what is live.",
+    "Adjust each box: material, pictures, dark mode, carousel, buttons, staff interface.",
+    "Press **Preview** to see what goes into Koha.",
+    "Press **Apply**: a database backup is taken and the look is written.",
+    "Open the OPAC in a private window (or press CTRL+F5) to see the result."
+   ],
+   "tips": [
+    "Change one thing at a time and check the OPAC on a phone as well as on a computer.",
+    "Pick colours with good contrast: readers with low vision depend on it."
+   ],
+   "related": [
+    "opac-material",
+    "opac-pictures",
+    "opac-carousel",
+    "opac-links",
+    "opac-staff",
+    "opac-actions"
+   ]
+  },
+  "opac-material": {
+   "title": "Material",
+   "summary": "The texture, corners and colours of the OPAC's navigation bar, search bar and main blocks.",
+   "options": [
+    {
+     "name": "Texture",
+     "text": "*Frosted glass*, *Smooth glass*, *Brushed metal*, *Flat solid colour* or *Soft diagonal gradient*."
+    },
+    {
+     "name": "Blur and Opacity",
+     "text": "How much the glass textures blur what is behind them and how solid the blocks are."
+    },
+    {
+     "name": "Blocks, Inputs, Buttons",
+     "text": "The radius of the corners, in pixels: 0 for square, higher for rounder."
+    },
+    {
+     "name": "Accent colour and Second colour",
+     "text": "Picked on hue, saturation and lightness bars; they colour buttons, links, headers and the content blocks (through `--nexus-primary` and related variables)."
+    },
+    {
+     "name": "Block background and Page colour",
+     "text": "The colour of the content blocks, and an optional colour for the page behind them."
+    }
+   ],
+   "tips": [
+    "Use the library's brand colours for the accent and second colour, and keep the block background light for long reading.",
+    "Glass textures look best over a wallpaper; over a plain page, prefer flat or gradient."
+   ],
+   "related": [
+    "opac-pictures",
+    "opac-dark",
+    "sec-opac"
+   ]
+  },
+  "opac-pictures": {
+   "title": "Pictures",
+   "summary": "The OPAC's wallpaper, logo and favicon, from a file on the server, an image host or a direct address.",
+   "options": [
+    {
+     "name": "Source",
+     "text": "*None*, *File on this server* (copied to Koha's public images folder), *Direct URL* (any https address, for example Postimages), *Upload to ImgBB* (needs an API key) or *Upload to Cloudinary* (cloud name and an unsigned upload preset)."
+    },
+    {
+     "name": "Formats",
+     "text": "PNG, JPEG, GIF, WebP or ICO. SVG is refused, because it can carry scripts."
+    },
+    {
+     "name": "Image host keys",
+     "text": "The ImgBB key and the Cloudinary settings stay in the panel's private file; no API secret is needed."
+    }
+   ],
+   "tips": [
+    "Keep the wallpaper under 500 KB (WebP is ideal): a heavy picture slows the OPAC on phones.",
+    "Use a square favicon of at least 64×64 pixels."
+   ],
+   "related": [
+    "opac-material",
+    "opac-dark"
+   ]
+  },
+  "opac-dark": {
+   "title": "Legibility and dark mode",
+   "summary": "A legibility film over the wallpaper and a light/dark switch that readers can use, remembered by their browser.",
+   "options": [
+    {
+     "name": "Legibility film",
+     "text": "How much the wallpaper is veiled behind the text, in percent. Higher means more readable."
+    },
+    {
+     "name": "Light/dark switch",
+     "text": "Shows a 🌓 button in the OPAC; each reader's choice is remembered by their browser."
+    },
+    {
+     "name": "Default theme",
+     "text": "*Light*, *Dark* or *Follow the device*."
+    }
+   ],
+   "tips": [
+    "*Follow the device* respects readers who set their phone to dark mode at night."
+   ],
+   "related": [
+    "opac-material",
+    "opac-pictures"
+   ]
+  },
+  "opac-carousel": {
+   "title": "New arrivals carousel",
+   "summary": "A carousel on the OPAC home page with the newest titles that have a copy on the shelf and a real Amazon cover, rebuilt every night; each cover opens its record.",
+   "options": [
+    {
+     "name": "Show",
+     "text": "Turns the carousel on. It also turns on Koha's `OPACAmazonCoverImages`."
+    },
+    {
+     "name": "Style",
+     "text": "*2D flat* (a strip that loops forever) or *3D coverflow*."
+    },
+    {
+     "name": "Title, Autoplay, Speed",
+     "text": "The heading above it, whether it turns by itself and how fast (3.5 s by default); it keeps turning after a click or a swipe."
+    },
+    {
+     "name": "Titles",
+     "text": "How many books it shows (4 to 24)."
+    },
+    {
+     "name": "Hover effect and Details",
+     "text": "*Smooth zoom*, *Elevation shadow*, *Tilt* or none; Details shows title and availability over the cover."
+    },
+    {
+     "name": "Amazon tag",
+     "text": "Optional associate tag added to the cover links."
+    }
+   ],
+   "steps": [
+    "Switch **Show** on and choose the style and number of titles.",
+    "Press **Apply**.",
+    "Press **Refresh carousel** to build the list now instead of waiting for the night."
+   ],
+   "tips": [
+    "Books without an ISBN have no Amazon cover and are left out: catalogue the ISBN whenever the book has one."
+   ],
+   "related": [
+    "sec-opac",
+    "opac-actions"
+   ]
+  },
+  "opac-links": {
+   "title": "Quick access buttons",
+   "summary": "Link-tree style buttons at the top of the OPAC home page: an icon or emoji, a text, an address, where it opens and its position in the list.",
+   "options": [
+    {
+     "name": "Style",
+     "text": "*Solid colour*, *Gradient*, *Glass (blur)* or *Brushed metal*."
+    },
+    {
+     "name": "Layout",
+     "text": "*One per line* or *Two columns*."
+    },
+    {
+     "name": "Order (1 comes first)",
+     "text": "Each button's position; buttons are sorted by this number."
+    },
+    {
+     "name": "Text, address and target",
+     "text": "The address must start with `https://`, `http://`, `/`, `mailto:` or `tel:`; it opens in the same tab or a new tab. Up to 12 buttons."
+    }
+   ],
+   "steps": [
+    "Switch **Show** on, choose style and layout.",
+    "Press **Add a button** for each link and fill in icon, text, address and order.",
+    "Press **Apply**."
+   ],
+   "tips": [
+    "Put the most used actions first: renew loans, opening hours, contact, the library's social media.",
+    "Keep texts short (two or three words) so the two-column layout stays tidy on phones."
+   ],
+   "related": [
+    "opac-staff-links",
+    "sec-opac"
+   ]
+  },
+  "opac-staff-links": {
+   "title": "Staff home page buttons",
+   "summary": "The same kind of buttons on the staff interface's home page, above the module tiles: shortcuts to the library's own workflows, in the staff colours.",
+   "overview": [
+    "They are written into `IntranetUserJS` and use the same styles, layouts and ordering as the OPAC buttons."
+   ],
+   "tips": [
+    "Link the team's daily tasks: holds to pull, the overdue report, the internal procedures document."
+   ],
+   "related": [
+    "opac-links",
+    "opac-staff"
+   ]
+  },
+  "opac-staff": {
+   "title": "Staff interface look",
+   "summary": "The staff interface's own look, separate from the OPAC: its colours for the top bar, quick search and buttons, the home modules as cards, plus text size, contrast and table density.",
+   "options": [
+    {
+     "name": "Apply color theme to Staff Client",
+     "text": "Turns the staff theme on (written into `IntranetUserCSS`)."
+    },
+    {
+     "name": "Accent, second and block colours",
+     "text": "The staff palette, independent from the OPAC's."
+    },
+    {
+     "name": "Wallpaper, logo, favicon and Legibility film",
+     "text": "The staff interface's own pictures, with a film that keeps tables and forms readable."
+    },
+    {
+     "name": "Table density",
+     "text": "*Comfortable*, *Normal* or *Compact* rows in tables."
+    },
+    {
+     "name": "Contrast and Text size",
+     "text": "*Normal* or *High* contrast, and text from 90% to 120%."
+    }
+   ],
+   "tips": [
+    "Give the staff interface a different colour from the OPAC: staff see at once which site they are on.",
+    "*Compact* density shows more rows in circulation and reports; *High* contrast helps on old screens."
+   ],
+   "related": [
+    "opac-staff-links",
+    "sec-opac"
+   ]
+  },
+  "opac-hide": {
+   "title": "Hide",
+   "summary": "Hides parts of the OPAC most libraries do not use: RSS icons, the cart badge, the community links and empty table columns.",
+   "tips": [
+    "Hide the cart badge only if the library does not use Koha's cart (book bag)."
+   ],
+   "related": [
+    "sec-opac"
+   ],
+   "overview": [
+    "Each switch hides one part of Koha's default OPAC with CSS, without deleting anything: **RSS icons** (the feed links next to searches and news), **Cart badge** (the counter of the book bag), **Community links** (the Koha community footer links) and **Empty table columns** (columns with no value in any row of a results or holdings table)."
+   ],
+   "steps": [
+    "Switch on what you want to hide.",
+    "Press **Apply** and check the OPAC."
+   ]
+  },
+  "opac-news": {
+   "title": "News action buttons",
+   "summary": "Turns a marker inside a news item (Tools > News) into a styled button, so news can carry calls to action.",
+   "overview": [
+    "Write `[kei-button url=\"https://...\" icon=\"fa-book\"]Text[/kei-button]` in the news text: with **Buttons** on, the OPAC shows it as a button in the theme's colours."
+   ],
+   "related": [
+    "sec-opac"
+   ],
+   "steps": [
+    "Switch **Buttons** on and press **Apply**.",
+    "In the staff interface, open **Tools > News** and write a news item with the marker.",
+    "Open the OPAC home page: the marker shows as a button."
+   ],
+   "tips": [
+    "Use Font Awesome icon names such as `fa-book`, `fa-calendar` or `fa-envelope` in the icon attribute."
+   ]
+  },
+  "opac-actions": {
+   "title": "Apply, preview, sync and remove",
+   "summary": "The buttons that move the design into Koha and back.",
+   "options": [
+    {
+     "name": "Apply",
+     "text": "Writes the look into Koha after a database backup. Your own OpacUserCSS and OpacUserJS are kept."
+    },
+    {
+     "name": "Preview",
+     "text": "Shows what will go into Koha, without writing anything."
+    },
+    {
+     "name": "Sync current OPAC settings",
+     "text": "Reads the look that is live in Koha back into the screen. Nothing is written until you press Apply."
+    },
+    {
+     "name": "Refresh carousel",
+     "text": "Rebuilds the New arrivals list now."
+    },
+    {
+     "name": "Image host keys",
+     "text": "The ImgBB API key and the Cloudinary cloud name and upload preset."
+    },
+    {
+     "name": "Remove",
+     "text": "Takes this look out and brings Koha's own back, after a backup; your own CSS and JS stay."
+    }
+   ],
+   "related": [
+    "sec-opac",
+    "opac-carousel"
+   ],
+   "steps": [
+    "Press **Sync current OPAC settings** before your first change, so the screen starts from what is live.",
+    "Press **Preview** to review, then **Apply**.",
+    "If the result is not what you wanted, adjust and apply again, or press **Remove** to go back to Koha's own look."
+   ],
+   "tips": [
+    "Each Apply takes a database backup first: you can always return to the previous state with Restore database."
+   ]
+  },
+  "sec-hub": {
+   "summary": "How Koha talks to readers and to other systems, on one screen: e-mail, WhatsApp and Telegram, SMS, self-check machines (SIP2) and other libraries' catalogues (Z39.50).",
+   "overview": [
+    "Each box (key **m**) shows the current state and the links that open the right page of Koha's staff interface, so you do not have to hunt through the Administration menus."
+   ],
+   "related": [
+    "hub-email",
+    "hub-whatsapp",
+    "hub-sms",
+    "hub-sip2",
+    "email",
+    "messaging"
+   ],
+   "steps": [
+    "Open **Messaging & interoperability** (key **m**).",
+    "Read each box's state line.",
+    "Use the buttons to open the right Koha page or to run the setup routine.",
+    "Press **Reload** after a change."
+   ],
+   "tips": [
+    "Set up e-mail first: it is the channel every reader has, and Koha's notices are written for it."
+   ]
+  },
+  "hub-email": {
+   "title": "E-mail",
+   "summary": "Whether Koha sends e-mail, the library's address and the default SMTP server, with a Gmail cheat sheet.",
+   "options": [
+    {
+     "name": "Turn on Koha's e-mail",
+     "text": "Runs the routine that enables e-mail for the instance (see Configure email)."
+    },
+    {
+     "name": "SMTP servers / New SMTP server",
+     "text": "Open the matching pages of Koha's administration."
+    },
+    {
+     "name": "Gmail",
+     "text": "Fill Koha's New SMTP server form with `smtp.gmail.com`, port 587, STARTTLS and an app password: Google requires 2-step verification and an app password, not the account password."
+    }
+   ],
+   "related": [
+    "email",
+    "sec-hub"
+   ],
+   "overview": [
+    "The box reads Koha's settings: *E-mail: on* or *off* (when off, Koha sends no notices), the library's address and the default SMTP server. With no SMTP server, Koha uses the server's own mail, which most providers reject as spam.",
+    "The Gmail cheat sheet lists exactly what to type in Koha's **New SMTP server** form: host `smtp.gmail.com`, port 587, timeout 60, SSL *STARTTLS*, the library's Gmail address as user name, an app password (16 letters) as password, and *Default server: Yes*."
+   ],
+   "steps": [
+    "Press **Turn on Koha's e-mail** if the box says *off*.",
+    "Press **New SMTP server** and fill in the form (use the Gmail values for a Gmail account).",
+    "Press **Create a Google app password** to open Google's page (2-step verification must be on) and paste the app password in Koha's form.",
+    "Press **Library e-mail address** and set the sender address of the notices.",
+    "Press **Reload** to check the new state."
+   ],
+   "tips": [
+    "Use an address of the library's own domain when you have one: notices from it are less likely to end in spam.",
+    "Never use the Gmail account password in Koha: an app password can be revoked without changing the account password."
+   ]
+  },
+  "hub-whatsapp": {
+   "title": "WhatsApp & Telegram",
+   "summary": "Whether Koha's notices also go out by WhatsApp or Telegram, and the button to set it up.",
+   "related": [
+    "messaging",
+    "sec-hub"
+   ],
+   "overview": [
+    "The box shows *installed* or *not set up*. The setup itself (the gateway, the bot, the phone numbers and the test message) is the **Messaging: WhatsApp and Telegram** routine, run by the button."
+   ],
+   "steps": [
+    "Press **Set up WhatsApp and Telegram**.",
+    "Follow the routine (see its own guide).",
+    "Come back to the hub and press **Reload**: the box should say *installed*."
+   ]
+  },
+  "hub-sms": {
+   "title": "SMS",
+   "summary": "Koha sends SMS through an SMS::Send driver of your provider: type the driver's name in the SMSSendDriver preference, then turn on the readers' messaging preferences.",
+   "tips": [
+    "The WhatsApp and Telegram setup installs its own driver in the same place: use one or the other."
+   ],
+   "related": [
+    "messaging",
+    "hub-whatsapp"
+   ],
+   "overview": [
+    "Koha hands every notice of the SMS type to the Perl driver named in the `SMSSendDriver` system preference. Providers such as Twilio, or an e-mail-to-SMS gateway, ship such drivers. The box shows the driver in use, or *SMS: no driver chosen*."
+   ],
+   "steps": [
+    "Install your provider's SMS::Send driver on the server (see the provider's documentation).",
+    "Press **SMS driver (SMSSendDriver)** and type the driver's name in the preference.",
+    "Press **Readers' messaging preferences** and turn on SMS for the notices you want.",
+    "Check each patron's SMS number and messaging preferences."
+   ]
+  },
+  "hub-sip2": {
+   "title": "SIP2 (self-check)",
+   "summary": "Connects a self-check machine or an RFID gate to Koha's SIP2 server: fill in the form and Save, and SIPconfig.xml is written for you and the SIP2 server restarts.",
+   "options": [
+    {
+     "name": "Port",
+     "text": "Between 1024 and 65535 (6001 by default)."
+    },
+    {
+     "name": "Network",
+     "text": "*Only this server (127.0.0.1)* or *Every network*, which opens the port in the firewall."
+    },
+    {
+     "name": "SIP login and Password",
+     "text": "The machine's own login (at least 8 characters for the password)."
+    },
+    {
+     "name": "Library",
+     "text": "The library the machine belongs to."
+    },
+    {
+     "name": "Remove examples",
+     "text": "Removes Koha's example logins (term1, koha...), whose passwords anyone can read. Leave it on."
+    }
+   ],
+   "steps": [
+    "Fill in the form and press **Save**: a copy of the old SIPconfig.xml is kept.",
+    "Press **Create the SIP patron in Koha** and create a patron with the same user name and password and the *circulate* permission.",
+    "Configure the machine with the server address, port, login and password."
+   ],
+   "warnings": [
+    "Open the port to every network only if the machine is on another network; otherwise keep it local."
+   ],
+   "related": [
+    "sec-hub",
+    "staff-firewall"
+   ]
+  },
+  "hub-z3950": {
+   "title": "Z39.50",
+   "summary": "A shortcut to the Z39.50 / SRU servers screen, where this catalogue's server, the koha.nexus network and the catalogues to copy from are managed.",
+   "related": [
+    "sec-z3950"
+   ],
+   "overview": [
+    "The hub keeps a box for Z39.50 so you find it where you expect it, but the work is done on its own screen: turning on this catalogue's server, the community network and adding catalogues to copy records from."
+   ],
+   "steps": [
+    "Press **📡  Z39.50 / SRU servers** (or the key **z** anywhere in the panel)."
+   ]
+  },
+  "email": {
+   "summary": "Enables e-mail for the Koha instance, so Koha's own schedule sends the notices: overdue and advance notices once a day and the message queue every 15 minutes.",
+   "steps": [
+    "Open **Configure email and circulation notices**.",
+    "Wait while the panel runs `koha-email-enable` for the instance.",
+    "In the staff interface, register the SMTP server in **Administration > SMTP servers** (the Messaging & interoperability screen has the links).",
+    "Set the library's e-mail address and check the notices in **Tools > Notices & slips**."
+   ],
+   "tips": [
+    "Send a test notice to yourself before telling readers.",
+    "Set the overdue notice triggers in **Tools > Overdue notice/status triggers**."
+   ],
+   "related": [
+    "hub-email",
+    "messaging",
+    "crons"
+   ]
+  },
+  "messaging": {
+   "summary": "Delivers Koha's own notices (checkout, check-in, overdue, due, hold) by WhatsApp through a gateway of the library's own, or by Telegram through the library's bot, with the patrons' numbers completed and corrected on the way.",
+   "overview": [
+    "Koha writes the notices; the panel installs an SMS driver that sends each one to Telegram when the patron linked the bot, otherwise to WhatsApp. Nothing changes in Koha until **Send Koha notices** is turned on, and turning it off brings back the previous driver.",
+    "WhatsApp uses a self-hosted gateway such as Evolution API. Telegram uses a bot token from @BotFather: patrons open the bot, tap Start and share their contact. Numbers get the country and area code and the 9th digit of Brazilian mobiles."
+   ],
+   "steps": [
+    "Open **Messaging: WhatsApp and Telegram**.",
+    "Configure the WhatsApp gateway and/or the Telegram bot.",
+    "Run **What Koha needs** and create short SMS versions of the notices when offered.",
+    "Use **Send a test message**.",
+    "Turn on **Send Koha notices**."
+   ],
+   "warnings": [
+    "Respect the patrons' consent and the LGPD: send only to patrons who agreed to receive messages."
+   ],
+   "related": [
+    "hub-whatsapp",
+    "hub-sms",
+    "email"
+   ]
+  },
+  "sec-vpn": {
+   "summary": "A private WireGuard network for the staff: from home or another branch, a computer or phone reaches the staff interface and SSH of this server as if it were inside the library.",
+   "overview": [
+    "Only the library's addresses (10.66.0.x) go through the VPN; the device's Internet, DNS and book covers stay on its own connection (split tunnel). The screen (key **v**, inside the Security & access hub) sets up the server and manages the devices."
+   ],
+   "related": [
+    "vpn-server",
+    "vpn-devices",
+    "staff-firewall"
+   ],
+   "steps": [
+    "Set up the server (see VPN server).",
+    "Add one device per person and computer or phone (see VPN devices).",
+    "Install the WireGuard app on the device and import its profile.",
+    "Close port 8080 to the Internet with **Staff firewall**."
+   ],
+   "tips": [
+    "With the VPN in place, there is no reason to keep the staff interface open to the Internet."
+   ]
+  },
+  "vpn-server": {
+   "title": "VPN server",
+   "summary": "Sets up the WireGuard server on this machine: the public address devices connect to and the UDP port.",
+   "steps": [
+    "Type the **Address**: the server's public IP or a name such as `vpn.library.org`.",
+    "Keep or change the **UDP port**.",
+    "Press **Set up the VPN** and read what it does: installs WireGuard and writes `/etc/wireguard/wg0.conf`, turns on IP forwarding and NAT for 10.66.0.0/24 and opens the UDP port in the firewall.",
+    "On the library's router, forward that UDP port to this server."
+   ],
+   "tips": [
+    "Use a name (dynamic DNS) instead of an IP if your Internet address changes."
+   ],
+   "warnings": [
+    "Under WSL without mirrored networking the server cannot be reached directly and the VPN stays off."
+   ],
+   "related": [
+    "vpn-devices",
+    "sec-vpn"
+   ]
+  },
+  "vpn-devices": {
+   "title": "VPN devices",
+   "summary": "Adds and revokes the staff's computers and phones, and shows each profile as a QR code for the WireGuard app or as text for a computer.",
+   "steps": [
+    "Type a name in **New device** (for example `maria-laptop`) and press **Add device**.",
+    "Press **QR code & profile**: scan the QR code with the WireGuard app, or copy the profile into WireGuard on a computer.",
+    "Connect: the staff interface answers at `http://10.66.0.1:8080` and SSH at 10.66.0.1.",
+    "When a device is lost or a person leaves, select it and press **Revoke**."
+   ],
+   "tips": [
+    "Create one profile per device and per person, so you can revoke one without affecting the others.",
+    "The table shows when each device was last seen and how much it sent and received."
+   ],
+   "related": [
+    "vpn-server",
+    "sec-vpn"
+   ]
+  },
+  "sec-security": {
+   "summary": "Security, remote access and the firewall in one hub: WireGuard VPN, Cloudflare Tunnel, firewall rules, the staff port, free HTTPS, Fail2ban, database password rotation and Google Search Console.",
+   "overview": [
+    "The hub (key **x**) gathers everything that decides who can reach your Koha and how. A safe default for most libraries: OPAC published through a Cloudflare Tunnel, staff port 8080 closed to the Internet, staff working remotely through the WireGuard VPN, Fail2ban on, and the database password rotated after the installation.",
+    "Its cards: **WireGuard VPN** (opens its own screen, key **v**), **Cloudflare Tunnel Manager**, **Show active UFW rules**, **Staff firewall**, **Free SSL certificate**, **Fail2ban status**, **Rotate database password** and **Google Search Console Assistant**."
+   ],
+   "related": [
+    "sec-vpn",
+    "cloudflare",
+    "staff-firewall",
+    "fail2ban",
+    "ssl"
+   ],
+   "steps": [
+    "Publish the OPAC with **Cloudflare Tunnel Manager** (or with your own domain and **Free SSL certificate**).",
+    "Close the staff port to the Internet with **Staff firewall**.",
+    "Set up the **WireGuard VPN** for staff who work from home or other branches.",
+    "Check **Fail2ban status** and **Show active UFW rules** once a month.",
+    "Help Google find the catalogue with **Google Search Console Assistant**."
+   ],
+   "tips": [
+    "Review who has a VPN profile every few months and revoke the ones no longer needed.",
+    "Write down which publishing method you chose (tunnel or own domain): it is the first question support will ask."
+   ]
+  },
+  "cloudflare": {
+   "summary": "Publishes the OPAC (and, if you want, the staff interface) on the Internet through a Cloudflare Tunnel: HTTPS included and no port opened on the router.",
+   "options": [
+    {
+     "name": "Free Address (no domain needed)",
+     "text": "A public catalogue address without buying a domain or opening a Cloudflare account, shareable as a QR code. This service is still being tested and not open to libraries yet."
+    },
+    {
+     "name": "Use My Own Domain (Cloudflare account)",
+     "text": "Connects the tunnel to your domain on Cloudflare. Sign-in can be done with a QR code on your phone, the browser or a link."
+    },
+    {
+     "name": "View Public Links and Security Status",
+     "text": "The published addresses and whether remote staff access is protected."
+    },
+    {
+     "name": "Share the Catalog Link",
+     "text": "QR code on screen, printable QR image or link."
+    },
+    {
+     "name": "Restart / Disable and Remove Tunnel",
+     "text": "Restarts the tunnel service, or takes the catalogue offline from the Internet."
+    }
+   ],
+   "tips": [
+    "Publish the OPAC and keep the staff interface for the VPN; if you do publish it, keep the extra password at Cloudflare on."
+   ],
+   "related": [
+    "dash-addresses",
+    "search-console",
+    "staff-firewall"
+   ],
+   "overview": [
+    "A Cloudflare Tunnel is an outgoing connection from your server to Cloudflare: readers reach the catalogue through Cloudflare, with HTTPS, and nothing is opened on the router or the firewall. It works behind CGNAT, on 4G links and on networks you do not control.",
+    "The manager shows whether the tunnel is *ACTIVE* or *INACTIVE* and offers each action below. When Cloudflare asks you to authorise the server, the panel lets you choose a QR code to scan with your phone, the browser of this computer (the Windows browser under WSL) or a link to copy."
+   ],
+   "steps": [
+    "Open **Cloudflare Tunnel Manager (Recommended)** in the Security & access hub.",
+    "Choose **Use My Own Domain** (or the free address once it opens) and authorise the server in your Cloudflare account.",
+    "Choose the addresses for the OPAC and, if needed, the staff interface.",
+    "Use **View Public Links and Security Status** to check the result, then **Share the Catalog Link** to hand it out."
+   ],
+   "warnings": [
+    "**Disable and Remove Tunnel** takes the catalogue off the Internet at once: Koha stays reachable only on the local network."
+   ]
+  },
+  "ufw": {
+   "summary": "Lists the firewall (UFW) rules active on this server: which ports are open and to whom.",
+   "tips": [
+    "Expect ports 80 (OPAC) and SSH; 8080 only if the staff interface is meant to be reached from outside the local network."
+   ],
+   "related": [
+    "staff-firewall",
+    "fail2ban"
+   ],
+   "overview": [
+    "UFW (Uncomplicated Firewall) is installed and configured by the installation. This card only reads: it shows the active rules with their numbers, the ports and the addresses allowed. Rules are changed by the routines that need them (staff firewall, VPN, SIP2, the Z39.50 server)."
+   ],
+   "steps": [
+    "Open **Show active UFW rules**.",
+    "Read the list: each line is a port (or service) and who may reach it.",
+    "Use the routine that owns a rule to change it, for example **Staff firewall** for port 8080."
+   ],
+   "warnings": [
+    "Changing UFW rules by hand outside the panel can lock you out of SSH. If you must, always allow SSH before enabling or reloading the firewall."
+   ]
+  },
+  "staff-firewall": {
+   "summary": "Blocks or opens the staff port 8080 to the Internet. Blocked, it stays reachable from the server itself and from the local network.",
+   "steps": [
+    "Open **Staff firewall (restrict port 8080)**.",
+    "Answer whether to block direct external access to 8080.",
+    "Check the result: *allowed only from 127.0.0.1 and the local network*, or *open*."
+   ],
+   "tips": [
+    "Block it when the staff work only inside the library, through the VPN or through a Cloudflare Tunnel."
+   ],
+   "related": [
+    "ufw",
+    "sec-vpn",
+    "cloudflare"
+   ],
+   "overview": [
+    "Koha's staff interface listens on port 8080. Port 80 (OPAC) must stay open to the public, but 8080 can be closed to the Internet when staff work only inside the library, through the WireGuard VPN or through a Cloudflare Tunnel. Blocked, it stays allowed from the server itself and from the local network."
+   ],
+   "warnings": [
+    "If staff reach the staff interface from home by its public IP, blocking 8080 cuts them off: set up the VPN first."
+   ]
+  },
+  "ssl": {
+   "summary": "Gets a free HTTPS certificate from Let's Encrypt with Certbot and configures Apache, with automatic renewal.",
+   "steps": [
+    "Point a domain's A record to the server's public IP and make sure port 80 is reachable.",
+    "Open **Free SSL certificate (Certbot / Apache)** and type the domain and an e-mail for renewal notices.",
+    "Wait for *HTTPS configured successfully*."
+   ],
+   "warnings": [
+    "If you use a Cloudflare Tunnel, cancel: HTTPS already comes from it."
+   ],
+   "related": [
+    "cloudflare",
+    "search-console"
+   ],
+   "overview": [
+    "Certbot asks Let's Encrypt for a free certificate for your domain, configures Apache to serve HTTPS and installs the automatic renewal. Let's Encrypt checks the domain over port 80, so the domain must point to this server's public IP and port 80 must be reachable from the Internet.",
+    "If anything goes wrong (Certbot fails, or Apache's configuration becomes invalid), Apache is not reloaded, so the site keeps working on HTTP."
+   ],
+   "tips": [
+    "Use the e-mail of a shared library mailbox: renewal warnings go there.",
+    "Test the address with `https://` from a phone on mobile data, outside the library's network."
+   ]
+  },
+  "fail2ban": {
+   "summary": "Shows Fail2ban's state: the banned IPs and the intrusion attempts blocked by each jail.",
+   "tips": [
+    "Many bans on SSH are normal on a public server; they show Fail2ban doing its job."
+   ],
+   "related": [
+    "ufw",
+    "sec-security"
+   ],
+   "overview": [
+    "Fail2ban reads the logs and bans for a while the addresses that keep failing to log in, for example on SSH. The card shows each jail (inactive or active), how many attempts were blocked and which IPs are banned right now."
+   ],
+   "steps": [
+    "Open **Fail2ban status (intrusion attempts)**.",
+    "Read each jail: banned IPs and blocked attempts."
+   ],
+   "warnings": [
+    "If a member of staff is banned after mistyping a password several times, wait for the ban to expire or unban the address with `fail2ban-client set sshd unbanip ADDRESS`."
+   ]
+  },
+  "rotate-db-password": {
+   "summary": "Generates a new strong password for Koha's database user, updates koha-conf.xml and restarts the services, rolling everything back if Koha stops answering.",
+   "steps": [
+    "Open **Rotate database password** and confirm.",
+    "Wait for the test: *Password rotated and Koha still responds*.",
+    "Save the new password in the library's password manager."
+   ],
+   "tips": [
+    "Rotate after a staff change or whenever the old password may have been seen."
+   ],
+   "related": [
+    "credentials",
+    "sec-security"
+   ],
+   "overview": [
+    "Koha connects to MariaDB with the user and password stored in `koha-conf.xml`. The routine generates a strong password, changes it in MariaDB, updates `koha-conf.xml` (keeping a backup of the file), restarts the services and checks that Koha still answers.",
+    "If MariaDB refuses the change, nothing changes. If the new `koha-conf.xml` is invalid, the password is rolled back and nothing is restarted. If Koha does not answer the final test, the screen says where the previous XML copy is."
+   ],
+   "warnings": [
+    "Old copies of `/root/koha_credentials.txt` and notes with the previous password stop working: update them."
+   ]
+  },
+  "search-console": {
+   "summary": "Prepares the public catalogue for Google: checks that it answers from the Internet, that it is not marked noindex, that the sitemap and robots.txt are there, and guides you through Google Search Console.",
+   "steps": [
+    "Open **Google Search Console Assistant** and type the public OPAC address (not localhost or a private IP).",
+    "Read each check: accessibility, OpacMetaRobots, sitemap, robots.txt.",
+    "Follow the step-by-step guides: property verification, sitemap submission, indexing request."
+   ],
+   "related": [
+    "cloudflare",
+    "ssl"
+   ],
+   "overview": [
+    "The assistant checks, from the Internet, that the OPAC answers (HTTP status), that `OpacMetaRobots` does not contain *noindex* (which tells Google not to index), that Koha's sitemap is published and that `robots.txt` exists and points to it. Then it offers step-by-step guides for the Search Console itself: verifying the property, submitting the sitemap and requesting indexing."
+   ],
+   "tips": [
+    "Publish the OPAC with HTTPS first (Cloudflare Tunnel or Free SSL certificate): Google prefers secure sites.",
+    "Indexing takes days to weeks: check the Search Console coverage report after a week."
+   ]
+  },
+  "sec-search": {
+   "summary": "Choose and keep healthy the search engine that powers every catalogue search: Zebra or Elasticsearch.",
+   "related": [
+    "search-toggle",
+    "search-repair"
+   ],
+   "overview": [
+    "Every search in Koha, in the OPAC and in the staff interface, goes through a search engine that keeps an index of the catalogue. Koha supports two: **Zebra**, light and reliable, and **Elasticsearch**, with advanced search and dynamic facets but hungrier for memory.",
+    "Records added or changed are indexed in the background; a watchdog (every 2 minutes for Zebra, every 5 minutes for Elasticsearch) keeps the indexer running. When searches stop finding new records, the index needs a repair."
+   ],
+   "tips": [
+    "Do not switch engines in the middle of the day: the catalogue is reindexed and searches are incomplete until it finishes."
+   ]
+  },
+  "search-toggle": {
+   "summary": "Switches Koha's search between Zebra and Elasticsearch 7 safely, reindexing the catalogue and rolling back if the new engine fails to start.",
+   "options": [
+    {
+     "name": "Zebra",
+     "text": "Koha's classic engine. Light (about 1.5 GB less RAM), reliable, incremental indexing every 2 minutes."
+    },
+    {
+     "name": "Elasticsearch",
+     "text": "Advanced search and dynamic facets, but about 1.5 GB more RAM and more disk. Not available on every architecture."
+    }
+   ],
+   "tips": [
+    "Stay on Zebra on servers with less than 4 GB of RAM.",
+    "Use **Server sizing** after switching: Elasticsearch changes how much memory is left for the rest."
+   ],
+   "related": [
+    "search-repair",
+    "sizing"
+   ],
+   "overview": [
+    "Switching stops the current engine, sets Koha's `SearchEngine` preference, starts the new engine (installing Elasticsearch 7 when needed), restarts Koha and reindexes the whole catalogue, then validates the system and offers the report.",
+    "Every step can roll back: if Elasticsearch fails to install or start, Zebra is restored; if the preference cannot be set, the previous configuration comes back. Before installing Elasticsearch the panel warns when less than 4 GB of disk is free. It refuses to start while a backup or a restore runs."
+   ],
+   "steps": [
+    "Make a manual backup.",
+    "Open **Toggle search engine (Zebra ⇄ Elasticsearch)** and read the current engine.",
+    "Confirm the switch and wait for the reindex.",
+    "Search for a few known titles in the OPAC."
+   ]
+  },
+  "search-repair": {
+   "summary": "Diagnoses the search index (catalogue search, indexer, pending jobs, index against database) and repairs it: reinstalls the indexer service, flushes the cache, rebuilds the index from scratch.",
+   "steps": [
+    "Open **Repair / rebuild indexing** and read the diagnosis.",
+    "Choose **Repair** to fix the indexer, or **Reindex** to rebuild everything.",
+    "Add a test record and search for it after about 10 seconds."
+   ],
+   "tips": [
+    "*Growing queue + smaller index* means the indexer is down: repair it before reindexing."
+   ],
+   "related": [
+    "search-toggle",
+    "health"
+   ],
+   "overview": [
+    "The diagnosis shows: whether the catalogue search works, the indexer daemon (*running*, *STOPPED*, *absent*), the jobs waiting to be indexed and the number of records in the index compared with the database. *Growing queue + smaller index* means the indexer is down.",
+    "**Repair** reinstalls the indexer service, flushes the cache and restarts everything. **Reindex** rebuilds the whole index from scratch (several minutes on large catalogues). With Elasticsearch, if the search still fails the panel offers to rebuild the index with Koha's default search mappings."
+   ],
+   "warnings": [
+    "Rebuilding with Koha's default mappings replaces any change made in **Administration > Search engine configuration**.",
+    "An empty or incomplete database (fewer than 50 tables) cannot be indexed: the panel says so and points at the newest safety backup."
+   ]
+  },
+  "sec-diagnostics": {
+   "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance and service repair.",
+   "related": [
+    "status",
+    "health",
+    "validation-report",
+    "apache-log",
+    "repair-services"
+   ],
+   "overview": [
+    "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns."
+   ],
+   "steps": [
+    "Run **Full system health check**.",
+    "Open **View latest validation report** and read the failures first, then the warnings.",
+    "Fix what it points at (services, search index, disk), then run the check again."
+   ],
+   "tips": [
+    "Export the diagnostics from the dashboard before asking for help: it saves a round of questions."
+   ]
+  },
+  "status": {
+   "summary": "Shows a detailed snapshot of the server and Koha: services, search engine, disk and the last backup.",
+   "related": [
+    "health",
+    "sec-dashboard"
+   ],
+   "overview": [
+    "The status groups the facts the panel reads from the server: **SERVICES** (MariaDB, Apache, Memcached, Plack, the indexer, the tunnel, each *running*, *stopped* or *not configured*), **SEARCH** (engine, pending jobs, index compared with the database) and **MACHINE** (memory, disk free of total, the last backup)."
+   ],
+   "steps": [
+    "Open **Detailed server & Koha status**.",
+    "Scroll through the three groups.",
+    "For anything *stopped*, use **Restart / repair Koha services** or the health check."
+   ]
+  },
+  "health": {
+   "summary": "Runs every check the panel knows and writes a validation report with OK, warnings and failures.",
+   "steps": [
+    "Open **Full system health check** and wait.",
+    "Read the summary: *No critical failures*, or the number of failures and warnings.",
+    "Open **View latest validation report** for the details of each item."
+   ],
+   "tips": [
+    "Run it after installing, after an update and whenever something feels wrong."
+   ],
+   "related": [
+    "validation-report",
+    "dash-export"
+   ],
+   "overview": [
+    "The health check (validation) tests the services, the web answers of the OPAC and staff interface, the database, the search engine and its index, the disk, the memory, the schedules and the panel's own files. Each check is OK, a warning or a failure, and the full report is written to the validation log.",
+    "The same validation runs at the end of the installation, after a system update and after a search engine switch."
+   ]
+  },
+  "validation-report": {
+   "summary": "Opens the latest validation report written by the health check, an update or a search engine switch.",
+   "related": [
+    "health"
+   ],
+   "overview": [
+    "The report lists each check with its result and, for warnings and failures, what was found and what to check. It is the file to send to support together with the exported diagnostics."
+   ],
+   "steps": [
+    "Open **View latest validation report**.",
+    "Scroll to the failures (FAIL) first, then the warnings (WARN)."
+   ]
+  },
+  "apache-log": {
+   "summary": "Follows the staff or OPAC error log live (the last 50 lines and every new one), to see errors as they happen.",
+   "steps": [
+    "Choose the staff (intranet-error.log) or the OPAC (opac-error.log) log.",
+    "Reproduce the problem in the browser and watch the lines that appear.",
+    "Press CTRL+C to stop and go back."
+   ],
+   "related": [
+    "dash-export",
+    "health"
+   ],
+   "overview": [
+    "Apache writes the errors of each site in its own log: `intranet-error.log` for the staff interface and `opac-error.log` for the public catalogue. Following the log while you repeat the action that fails shows the exact error Koha raised."
+   ],
+   "tips": [
+    "Note the time of the error: it helps to find the same moment in Koha's own logs (`plack-error.log`)."
+   ]
+  },
+  "repair-services": {
+   "summary": "Restarts Memcached, Plack and Koha's services and reports their state.",
+   "related": [
+    "dash-restart",
+    "reboot"
+   ],
+   "overview": [
+    "The routine restarts Memcached (Koha's cache), Plack (the application server that runs Koha's pages) and Koha's services, then shows the state of Memcached and Plack. It is the same restart as the dashboard's **Restart Koha** button."
+   ],
+   "steps": [
+    "Open **Restart / repair Koha services (Memcached, Plack)**.",
+    "Wait for the restart and read the states: both should be *active* and *running*."
+   ],
+   "tips": [
+    "Use it when pages are slow or show errors after a change of preferences or a plugin install."
+   ]
+  },
+  "sec-settings": {
+   "summary": "Basic Koha parameters: server sizing, the first super librarian and the clock.",
+   "related": [
+    "sizing",
+    "superlibrarian",
+    "clock"
+   ],
+   "overview": [
+    "A few parameters that the Web Installer does not cover and that matter from the first day: how much memory each part of Koha may use, your first personal staff account with every permission, and the server's clock and timezone. E-mail notices are configured in the Messaging & interoperability hub."
+   ],
+   "steps": [
+    "Run **Server sizing** right after the installation.",
+    "Create your **super librarian** after the Web Installer.",
+    "Check the **Clock and timezone** once."
+   ]
+  },
+  "sizing": {
+   "summary": "Tunes Plack workers, Memcached and MariaDB's InnoDB buffer to the server's RAM, with a recommended profile and automatic rollback if MariaDB does not start.",
+   "options": [
+    {
+     "name": "< 4 GB",
+     "text": "2 Plack workers, 64 MB cache, 512 MB InnoDB."
+    },
+    {
+     "name": "4–8 GB",
+     "text": "3 Plack workers, 128 MB cache, 768 MB InnoDB."
+    },
+    {
+     "name": "8–16 GB",
+     "text": "4 Plack workers, 128 MB cache, 1 GB InnoDB."
+    },
+    {
+     "name": "16 GB+",
+     "text": "6 Plack workers, 256 MB cache, 2 GB InnoDB."
+    }
+   ],
+   "tips": [
+    "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama."
+   ],
+   "related": [
+    "search-toggle",
+    "ai-ollama"
+   ],
+   "overview": [
+    "The routine detects the server's RAM and recommends a profile. Applying it sets the number of Plack workers (how many requests Koha serves at the same time), the Memcached size and MariaDB's InnoDB buffer pool, and tunes Elasticsearch's memory when it is in use. It backs up MariaDB's tuning file first; if MariaDB does not start with the new buffer, the change is reverted and the database comes back up."
+   ],
+   "steps": [
+    "Open **Server sizing (memory / workers)** and read the detected RAM and the recommended profile.",
+    "Choose the profile.",
+    "Wait for the services to restart and read the summary."
+   ],
+   "warnings": [
+    "A profile larger than the server's RAM makes the system swap and slows everything down: when in doubt, choose the smaller one."
+   ]
+  },
+  "superlibrarian": {
+   "summary": "Creates a staff account with every permission (super librarian), after Koha's Web Installer.",
+   "steps": [
+    "Finish the Web Installer first: it creates the libraries and patron categories.",
+    "Open **Create super librarian** and type user name, card number, password (8+ characters), first name and surname.",
+    "Log in to the staff interface with it."
+   ],
+   "tips": [
+    "Create one account per person; give everyday staff accounts only the permissions they need."
+   ],
+   "related": [
+    "credentials",
+    "install"
+   ],
+   "overview": [
+    "A super librarian has every permission in Koha. The routine creates the patron in a library and category that already exist, with a hashed password: the password is not stored anywhere, so keep it safe. If the user name or card number already exists, it says so and changes nothing."
+   ],
+   "warnings": [
+    "Do not share a super librarian account: each action in Koha's logs is tied to the account that made it."
+   ]
+  },
+  "clock": {
+   "summary": "Sets the timezone and syncs the clock with NTP, then restarts cron so schedules follow the new time.",
+   "tips": [
+    "A wrong clock shifts due dates, fines and the nightly jobs: check it after moving a server."
+   ],
+   "related": [
+    "crons"
+   ],
+   "overview": [
+    "Koha's due dates, fines, holds expiry and every scheduled job depend on the server's clock. The routine sets the timezone, syncs the clock with NTP servers and restarts cron so the schedules use the new time."
+   ],
+   "steps": [
+    "Open **Clock and timezone (NTP)**.",
+    "Choose the timezone (for example *America/Sao_Paulo*).",
+    "Read the current time shown and check it against your phone."
+   ]
+  },
+  "sec-library": {
+   "summary": "Day-to-day tools for the library staff, all with Koha's own scripts: imports and their undo, authorities, reports, patron turnover, data quality, privacy (LGPD), Brazilian localisation and plugins.",
+   "overview": [
+    "Anything that changes data follows the same steps: the backup/restore lock (no nightly backup or restore runs in the middle), a preview (Koha's own dry run), an explicit confirmation, a verified `PRE-*` backup in `/var/backups/koha_sql`, and only then the real run. The tools never stop Koha's services, and the `PRE-*` backup undoes any change through Restore database.",
+    "Every run is logged in `/var/log/koha-easy-install/tools/`, readable by root only because the logs may contain patron names, and viewable with **View tool logs**."
+   ],
+   "related": [
+    "magic-import",
+    "marc-undo",
+    "authority-sync",
+    "reports",
+    "brazil"
+   ],
+   "tips": [
+    "Read every preview to the end before confirming: it is the cheapest moment to catch a mistake.",
+    "Note the name of the `PRE-*` backup of each run: it is the way back if the result is not what you expected."
+   ]
+  },
+  "marc-undo": {
+   "summary": "Removes the records and items of an imported MARC batch with Koha's own revert, after a preview and a verified backup.",
+   "steps": [
+    "Open **Undo a MARC import** and pick the batch (date, records, file).",
+    "Read the preview of records and items to be removed.",
+    "Confirm: a `PRE-UNDO-IMPORT` backup comes first."
+   ],
+   "related": [
+    "magic-import"
+   ],
+   "overview": [
+    "Each MARC import made through Koha's staged import (including the Magic Import Tool) is a batch. Undoing it runs Koha's own `commit_file.pl --revert`: the records and items the batch added are removed, and records it replaced go back to their previous version as Koha kept them."
+   ],
+   "warnings": [
+    "Items of the batch that were borrowed or edited since the import may be skipped or need attention: read the preview."
+   ]
+  },
+  "authority-sync": {
+   "summary": "Links the catalogue's headings (authors, subjects, series) to their authority records with Koha's link_bibs_to_authorities.pl, after a dry run that shows the counts and unmatched headings.",
+   "steps": [
+    "Choose the scope: the whole catalogue, a range of record numbers or the records of one library.",
+    "Read the dry run: headings linked and headings no authority matches.",
+    "Confirm: a verified backup, the real run and the index update follow."
+   ],
+   "tips": [
+    "Import the authorities first (Magic Import Tool). Koha's LinkerModule and AutoCreateAuthorities preferences decide how headings are matched.",
+    "Schedule it daily or weekly in Schedules & cron tasks."
+   ],
+   "related": [
+    "magic-import",
+    "crons",
+    "reports"
+   ],
+   "overview": [
+    "Authority records keep one standard form of each name, subject and series. Linking writes the authority number (`$9`) into the catalogue's headings (100, 110, 600, 650, 700...), so a change in the authority reaches every record and searches by author or subject group variant spellings together. The routine uses Koha's own `link_bibs_to_authorities.pl`: first its dry run, with the counts and the headings no authority matches, then the real run and the index update."
+   ]
+  },
+  "patron-category": {
+   "summary": "Moves patrons from one category to another (school-year turnover): all of them, only those over the category's age limit, or those registered before a date.",
+   "steps": [
+    "Choose the FROM and TO categories.",
+    "Choose which patrons and, optionally, the library.",
+    "Read Koha's dry run with the list of patrons and confirm."
+   ],
+   "related": [
+    "privacy-delete"
+   ],
+   "overview": [
+    "At the end of a school year, students move up (for example from *Children* to *Young adults*). The routine uses Koha's `update_patrons_category.pl` with its native dry run, which lists the patrons who will move, and a verified `PRE-PATRONS` backup before the change."
+   ],
+   "tips": [
+    "Run it once per category pair, from the oldest group to the youngest, so no patron moves twice."
+   ]
+  },
+  "data-quality": {
+   "summary": "Runs Koha's own data-inconsistency check on the catalogue (read-only) and lists records with missing or broken data.",
+   "related": [
+    "reports",
+    "magic-import",
+    "tool-logs"
+   ],
+   "overview": [
+    "The check runs Koha's `search_for_data_inconsistencies.pl`, read-only: items without a home library or item type, records without a valid framework, invalid dates, wrong item types in the record, and other problems that break circulation or searching. The result is written to a log you can open from **View tool logs**."
+   ],
+   "steps": [
+    "Open **Catalog data-quality check** and wait.",
+    "Read the result: *No inconsistencies found* or the list of problems.",
+    "Fix the records in Koha, then run the check again."
+   ]
+  },
+  "privacy-anonymise": {
+   "summary": "Anonymises the loan and hold history that ended more than a number of days ago (30 or more), for LGPD compliance; patrons who chose to keep their history are skipped.",
+   "warnings": [
+    "Anonymised history cannot be linked back to patrons: reports by patron for that period will no longer be possible."
+   ],
+   "related": [
+    "privacy-delete"
+   ],
+   "overview": [
+    "Koha keeps who borrowed what. The LGPD (Brazil's data protection law) asks libraries to keep personal data only as long as needed. The routine runs Koha's `batch_anonymise.pl` for loans and holds that ended more than the chosen number of days ago, after showing the counts and taking a verified `PRE-PRIVACY` backup. Statistics by title stay; the link to the patron goes."
+   ],
+   "steps": [
+    "Open **Privacy (LGPD): anonymise old history**.",
+    "Type the number of days (30 or more), for example 365.",
+    "Read the counts and confirm."
+   ]
+  },
+  "privacy-delete": {
+   "summary": "Deletes patrons whose account expired before a date and who borrowed nothing since, after Koha's dry run and a typed confirmation. Patrons with loans, fines, guarantees or staff permissions are never deleted.",
+   "related": [
+    "privacy-anonymise",
+    "patron-category"
+   ],
+   "overview": [
+    "The routine runs Koha's `delete_patrons.pl` with its native dry run for patrons whose account expired before the chosen date and who borrowed nothing since then, optionally limited to one category. It asks for a typed confirmation and takes a verified `PRE-PRIVACY` backup first."
+   ],
+   "steps": [
+    "Open **Privacy (LGPD): delete old patrons**.",
+    "Type the expiry date limit (YYYY-MM-DD) and choose the category.",
+    "Read the dry run and type the confirmation."
+   ],
+   "warnings": [
+    "Deleted patrons can only come back by restoring the `PRE-PRIVACY` backup, which also brings back everything else as it was."
+   ]
+  },
+  "tool-logs": {
+   "summary": "Shows what the library tools did and when, newest first. The logs are readable by root only, because they may contain patron names.",
+   "related": [
+    "sec-library"
+   ],
+   "overview": [
+    "Each run of a library tool writes a log with what was previewed, what was confirmed, the backup taken and Koha's own output. The list shows the newest first; open one to read it."
+   ],
+   "steps": [
+    "Open **View tool logs**.",
+    "Pick a log from the list (newest first) to read it."
+   ],
+   "warnings": [
+    "Do not copy these logs to shared folders: they may contain patron names."
+   ]
+  },
+  "brazil": {
+   "summary": "Optional presets for Brazilian libraries: CPF check (modulo 11), Pimaco label templates, the cataloguing card (ficha catalográfica), Brazilian holidays in the calendar, government census reports (MEC/INEP/IBGE) and ABNT references (NBR 6023).",
+   "overview": [
+    "Nothing here is applied by the installation or by a schedule: each option acts only when you choose it, follows the same steps as the other tools (lock, preview, confirmation, verified `PRE-*` backup) and can be undone. The migrations from Biblivre, SophiA, Pergamum, Biblioteca Fácil and ISIS are in the Magic Import Tool."
+   ],
+   "related": [
+    "reports",
+    "magic-import"
+   ],
+   "options": [
+    {
+     "name": "Check patron CPFs (modulo 11)",
+     "text": "Read-only report of valid, invalid and duplicated CPFs, from the card number, user name, sort fields or the `CPF` attribute."
+    },
+    {
+     "name": "Pimaco label templates",
+     "text": "Sheets 6180, 6181, 6287 (Letter) and A4256, A4251 (A4) with spine, barcode and title layouts in Koha's label creator."
+    },
+    {
+     "name": "Cataloguing card (ficha catalográfica)",
+     "text": "The AACR2 card below each record in the OPAC and the staff interface, with a print button and the ABNT reference; **Hide the card** puts the previous display back."
+    },
+    {
+     "name": "Brazilian holidays in the calendar",
+     "text": "National holidays of a year, Carnival, Good Friday, Corpus Christi and an optional municipal holiday, for one library or all."
+    },
+    {
+     "name": "Government census reports (MEC/INEP/IBGE)",
+     "text": "10 read-only reports with the figures of the INEP censuses, the IBGE surveys, the SNBP registry and the MEC evaluations; Koha asks for the year when one runs."
+    },
+    {
+     "name": "ABNT references and bibliographies (NBR 6023)",
+     "text": "References built from the MARC records, from a list, a period, a call number class or a library, as HTML (A4, Times 12) and plain text."
+    }
+   ],
+   "tips": [
+    "Print a Pimaco test sheet on plain paper first and adjust the template if your printer shifts the page.",
+    "Carnival and Corpus Christi are optional days off, not national holidays: remove them in Tools > Calendar if the library opens."
+   ]
+  },
+  "plugins": {
+   "summary": "Turns Koha's plugin system on or off, chooses where plugins can be installed from and registers plugins copied into the folder by hand.",
+   "options": [
+    {
+     "name": "Turn Koha plugins on / off",
+     "text": "Off keeps the plugins and their data: turned on again, they come back as they were."
+    },
+    {
+     "name": "Where plugins can be installed from",
+     "text": "`.kpz` upload plus the plugin repositories, or only the repositories."
+    },
+    {
+     "name": "Register plugins copied into the folder",
+     "text": "Runs Koha's plugin installer after a verified backup."
+    }
+   ],
+   "related": [
+    "sec-library"
+   ],
+   "overview": [
+    "A new Debian Koha ships with plugins turned off (`enable_plugins` 0 in `koha-conf.xml`). Turning them on sets it to 1, adds the plugins folder when missing, sets `UseKohaPlugins` on versions that still have it and restarts Plack and the background workers. Every change writes `koha-conf.xml` only if it is well-formed and reads back correctly, and keeps the previous file as `koha-conf.xml.bak-<date>`."
+   ],
+   "steps": [
+    "Open **Koha plugins (turn on or off)** and read the current state.",
+    "Choose **Turn Koha plugins on**.",
+    "Choose where plugins can be installed from.",
+    "In the staff interface, open **Administration > Manage plugins** to install them."
+   ],
+   "warnings": [
+    "Install plugins only from sources you trust: a plugin runs with Koha's full access to the database."
+   ]
+  },
+  "sec-tools": {
+   "summary": "Terminal tools installed on demand: live resource monitoring and a file explorer.",
+   "related": [
+    "monitor",
+    "mc"
+   ],
+   "overview": [
+    "Two classic terminal programs, installed on demand behind the loader the first time you open them: htop/nethogs to see what uses the machine, and Midnight Commander to browse files. Leave each program with its own exit key (F10 or q) to come back to the panel."
+   ],
+   "tips": [
+    "Leave these programs open only while you need them: htop itself uses a little CPU."
+   ]
+  },
+  "monitor": {
+   "summary": "Watches CPU, memory and processes (htop) or network bandwidth per process (nethogs) live; installs them when missing.",
+   "related": [
+    "mc",
+    "sizing"
+   ],
+   "overview": [
+    "**Htop** shows CPU, memory and every process, sortable by use: the place to see whether MariaDB, Elasticsearch, Plack or Ollama is eating the machine. **Nethogs** shows network bandwidth per process: useful when the backup upload or a crawler saturates the link."
+   ],
+   "steps": [
+    "Open **Resource monitoring (Htop / Nethogs)**.",
+    "Choose Htop or Nethogs.",
+    "Press q (or F10 in htop) to come back."
+   ]
+  },
+  "mc": {
+   "summary": "Browses the server's files in Midnight Commander, installed when missing.",
+   "warnings": [
+    "The panel runs as root: deleting or editing system files here can break the server."
+   ],
+   "related": [
+    "monitor"
+   ],
+   "overview": [
+    "Midnight Commander is a two-pane file manager in the terminal: copy, move and view files with the arrow keys and F-keys. Handy to find a backup, check free space in a folder or read a log."
+   ],
+   "steps": [
+    "Open **File explorer (Midnight Commander)**.",
+    "Move with the arrows, Enter to open, F3 to view, F5 to copy, F10 to leave."
+   ]
+  },
+  "crons": {
+   "summary": "Every job the server runs by itself, with a switch, how often and at what time, instead of a text editor; the old schedule is kept as koha_tasks.bak.",
+   "overview": [
+    "The default jobs include the nightly backup (23:00), the weekly MARC export (Sundays 03:00), the session and queue clean-up (01:30), the Plack restart (05:00) and the indexer watchdogs. Presets add a full index rebuild, fines and authority linking. Lines written by hand are kept as they are."
+   ],
+   "steps": [
+    "Open **Schedules & cron tasks** (key **s**).",
+    "Switch jobs on or off and choose daily, weekly or monthly and the time (HH:MM).",
+    "Press **Preview**, then **Save**. **Defaults** puts the default schedules on the screen."
+   ],
+   "related": [
+    "sec-backup",
+    "authority-sync",
+    "clock"
+   ],
+   "options": [
+    {
+     "name": "Switch",
+     "text": "Turns a job on or off. A job off is kept in the file as a comment, so turning it on again restores it."
+    },
+    {
+     "name": "How often and time",
+     "text": "Daily, weekly (with the day), monthly (with the day of the month) or a schedule of your own, and the time as HH:MM."
+    },
+    {
+     "name": "Preview / Save / Reload / Defaults",
+     "text": "Preview shows the file that will be written; Save writes it and keeps the old one as `koha_tasks.bak`; Reload reads the file again; Defaults puts the default schedules on the screen (Save to keep them)."
+    }
+   ],
+   "tips": [
+    "Leave at least an hour between the nightly backup and heavy jobs such as a full reindex.",
+    "E-mail notices follow Koha's own schedule (koha-common), not this file."
+   ]
+  },
+  "sec-languages": {
+   "summary": "Koha's language packs and the panel's language, split into four clear actions: download only, download and activate, set an installed language as active, and list.",
+   "related": [
+    "languages",
+    "lang-download",
+    "lang-activate",
+    "lang-list"
+   ],
+   "overview": [
+    "Koha's interface (OPAC and staff) can be shown in many languages, each installed as a *language pack*. The panel itself has its own 23 languages. Since 1.5.42 the four actions are separate, so you never change the active language by accident when you only meant to download a pack.",
+    "On a server where Koha is not installed yet, choosing a language changes the panel's language and the installation installs the matching pack later."
+   ],
+   "tips": [
+    "Install the packs you need first, then decide which one is active: readers' browsers asking for another enabled language get that one."
+   ]
+  },
+  "languages": {
+   "summary": "Downloads a Koha language pack and makes it the language of the OPAC, the staff interface and this panel in one go.",
+   "tips": [
+    "Fine tuning is in Koha's Administration > Preferences > I18N/L10N."
+   ],
+   "related": [
+    "lang-download",
+    "lang-activate",
+    "lang-list"
+   ],
+   "overview": [
+    "This is the routine of the menu since the beginning: you choose one language; the panel switches its own language, downloads the Koha pack and makes it the default of the OPAC and the staff interface."
+   ],
+   "steps": [
+    "Open **Download & activate a language**.",
+    "Choose the language.",
+    "Read the result and fine-tune in **Administration > Preferences > I18N/L10N** if needed."
+   ]
+  },
+  "lang-download": {
+   "summary": "Downloads a Koha language pack and changes nothing else: the active language of the OPAC and the staff interface stays the same.",
+   "related": [
+    "lang-activate",
+    "languages"
+   ],
+   "overview": [
+    "Use it to prepare a language without showing it yet, or to let readers choose it in the OPAC's language menu. A pack that is already installed is left as it is."
+   ],
+   "steps": [
+    "Open **Download a language pack only**.",
+    "Choose the pack.",
+    "Enable it for readers in Koha's I18N/L10N preferences, or activate it later with **Set an installed language as active**."
+   ]
+  },
+  "lang-activate": {
+   "summary": "Makes an already installed language the active one in the OPAC, the staff interface and this panel, without downloading anything.",
+   "related": [
+    "lang-download",
+    "lang-list"
+   ],
+   "overview": [
+    "Nothing is downloaded: only Koha's language preferences change, for the OPAC and the staff interface, together with the panel's own language."
+   ],
+   "steps": [
+    "Open **Set an installed language as active**.",
+    "Choose among the installed languages.",
+    "Reload the OPAC and the staff interface to see the change."
+   ]
+  },
+  "lang-list": {
+   "summary": "Lists the Koha languages installed on the server, the ones enabled and the active one in the OPAC and in the staff interface, and the panel's language.",
+   "related": [
+    "languages",
+    "lang-activate"
+   ],
+   "overview": [
+    "The list marks each installed language as *enabled* in the OPAC and in the staff interface and shows which one is *ACTIVE* (the default). It also shows the panel's language. Before the Web Installer is finished, Koha's database is not ready and the list says so."
+   ],
+   "steps": [
+    "Open **Installed languages & active one**.",
+    "Read the OPAC and staff lines: the ACTIVE language is the default; enabled ones can be chosen by readers."
+   ]
+  },
+  "sec-update": {
+   "summary": "Updates the operating system and Koha, and updates this panel from GitHub.",
+   "related": [
+    "update-system",
+    "update-panel"
+   ],
+   "overview": [
+    "Two kinds of update: the operating system with Koha (packages and database migrations), and the panel itself (this program). Both protect the server: the system update takes a verified safety backup first, and the panel update checks a SHA-256 signature before replacing anything."
+   ],
+   "tips": [
+    "Update at a quiet moment and after a successful backup.",
+    "Read Koha's release notes before a major version upgrade."
+   ]
+  },
+  "update-system": {
+   "summary": "Updates the system and Koha packages and applies Koha's database migrations, after a verified safety backup, then restarts the services and validates the system.",
+   "warnings": [
+    "If the safety backup cannot be made, nothing is updated. If a migration fails, the services are not restarted, so the error is not hidden."
+   ],
+   "related": [
+    "update-panel",
+    "backup-manual",
+    "health"
+   ],
+   "overview": [
+    "The update takes a verified safety backup of the database, upgrades the system and Koha packages, applies Koha's database migrations, restarts the services (core services, Plack, Zebra or the Elasticsearch indexer), cleans temporary files and runs the validation. The result says *Update finished with no critical errors* or lists failures and warnings with the validation log."
+   ],
+   "steps": [
+    "Make sure the last backup is recent and tested.",
+    "Open **Update OS packages & Koha schemas** and confirm.",
+    "Wait for every step; do not close the window.",
+    "Read the result and run **Full system health check** if it reports warnings."
+   ]
+  },
+  "update-panel": {
+   "summary": "Downloads the newest version of this panel from GitHub, checks its SHA-256 signature and syntax, keeps a copy of the old version and replaces it.",
+   "tips": [
+    "If it reports that the files on GitHub do not match yet, wait a few minutes: GitHub keeps cached copies for up to 5 minutes after a release."
+   ],
+   "related": [
+    "update-system",
+    "about"
+   ],
+   "overview": [
+    "The panel compares its version with the latest on GitHub. When a new one exists it downloads it pinned to the exact published commit, checks the SHA-256 signature and the script's syntax, keeps a copy of the current version and only then replaces it. Any mismatch aborts the update and leaves the current version intact."
+   ],
+   "steps": [
+    "Open **Update this panel via GitHub**.",
+    "Read the current and the new version and confirm.",
+    "When it finishes, open the panel again with `sudo config.sh`."
+   ],
+   "warnings": [
+    "A *SECURITY ALERT* about the signature means the downloaded file is not the published one: do not force the update."
+   ]
+  },
+  "about": {
+   "summary": "The panel's version, license, official repository and website, and how to support the project.",
+   "related": [
+    "update-panel"
+   ],
+   "overview": [
+    "koha.nexus was born from real-life experience facing technical barriers in collection management, designed for libraries without budget for expensive commercial systems or dedicated technical support. The screen shows the installed version, the license, the official repository and website, and the ways to help: star the repository and share it with colleagues and other institutions."
+   ],
+   "steps": [
+    "Open **About the program & support**.",
+    "Note the version when you ask for help: it is the first thing support needs."
+   ]
+  },
+  "reboot": {
+   "summary": "Restarts the whole server after a confirmation; under WSL it restarts Koha's services instead.",
+   "warnings": [
+    "Everyone using the catalogue is disconnected. Prefer Restart Koha when only Koha needs it."
+   ],
+   "related": [
+    "dash-restart",
+    "repair-services"
+   ],
+   "overview": [
+    "The server reboots five seconds after the confirmation, and Koha starts by itself when it comes back. Under Windows (WSL), the card becomes **Restart Koha services** instead, because WSL is restarted from Windows."
+   ],
+   "steps": [
+    "Warn the staff and make sure no backup or restore is running.",
+    "Open **Reboot server** and confirm.",
+    "After a minute or two, open the panel again and check the dashboard."
+   ]
+  }
+ }
+}

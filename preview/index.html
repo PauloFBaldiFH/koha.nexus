@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08110d">
+  <meta name="description" content="koha.nexus interactive preview and manual: every screen, option and button of the control panel, explained step by step.">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title>koha.nexus Panel Manual</title>
+  <link rel="stylesheet" href="assets/preview.css">
+</head>
+<body>
+  <!--
+    Interactive preview and manual of the koha.nexus panel.
+    Data: data/preview.json, written by export_docs_preview.py from the panel's
+    code and preview/manual/<language>.json. No build step: serve this folder
+    as it is. data-src and data-asset-base can point elsewhere when the page is
+    copied into another site.
+  -->
+  <div id="kp-app" class="kp" data-src="data/preview.json" data-asset-base="../">
+    <header class="kp-top">
+      <a class="kp-brand" href="../" data-ui-title="back_to_site" title="koha.nexus">
+        <span class="kp-brand-dot" aria-hidden="true"></span>koha.nexus
+      </a>
+      <div class="kp-heading">
+        <h1 data-ui="title">Interactive preview &amp; manual</h1>
+        <p data-ui="subtitle">Every screen of the control panel, explained.</p>
+      </div>
+      <div class="kp-tools">
+        <label class="kp-search">
+          <span class="kp-sr" data-ui="search">Search</span>
+          <input id="kp-search" type="search" autocomplete="off" placeholder="Search">
+        </label>
+        <label class="kp-lang">
+          <span class="kp-sr" data-ui="language">Language</span>
+          <select id="kp-lang"></select>
+        </label>
+        <button id="kp-menu" class="kp-menu-btn" type="button" aria-controls="kp-nav" aria-expanded="false">
+          <span aria-hidden="true">☰</span><span class="kp-sr" data-ui="menu">Menu</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="kp-body">
+      <nav id="kp-nav" class="kp-nav" aria-label="Panel sections"></nav>
+
+      <main class="kp-main">
+        <section class="kp-stage" aria-label="Panel preview">
+          <div class="kp-stage-tabs" role="tablist">
+            <button type="button" role="tab" id="kp-tab-mock" aria-selected="true" data-ui="mockup">Simulator</button>
+            <button type="button" role="tab" id="kp-tab-shot" aria-selected="false" data-ui="screenshot">Screenshot</button>
+          </div>
+          <div id="kp-mock" class="kp-window" role="tabpanel" aria-labelledby="kp-tab-mock"></div>
+          <figure id="kp-shot" class="kp-shot" role="tabpanel" aria-labelledby="kp-tab-shot" hidden></figure>
+        </section>
+
+        <article id="kp-doc" class="kp-doc" aria-live="polite">
+          <p class="kp-loading" data-ui="loading">Loading the manual…</p>
+        </article>
+      </main>
+    </div>
+
+    <footer class="kp-foot">
+      <span id="kp-version"></span>
+      <span data-ui="footer">Generated from the panel's code by export_docs_preview.py.</span>
+    </footer>
+  </div>
+
+  <script src="assets/preview.js"></script>
+</body>
+</html>
