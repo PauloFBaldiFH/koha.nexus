@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.45** (1.5.46: staff material, AI chat input, Ollama memory and local-model tool calls PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.46** (1.5.47: Find duplicate authors PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,27 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.47 (Find duplicate authors, Library tools > 18, panel action `authority-match`)**: the
+  personal names of the authority file (100 $a/$q/$d) are compared by the Magic Import engine,
+  new module `kei_import/authorities.py` (`kei_import_run.py authorities --in TSV|MARCXML --work DIR
+  [--uses FILE] [--threshold 0.85]`, exit 3 = nothing alike). Names are compared word by word in
+  direct order (inverted and direct forms line up; particles dropped; surname split reuses the
+  rules of `rules.py`); a word matches by the mean of Jaro-Winkler and Levenshtein, by its sound in
+  Portuguese/Spanish (`sound()`: Souza/Sousa, Luiz/Luís, Thereza/Teresa, Mattos/Matos) or by its
+  initial; masculine/feminine of one name (Mário/Maria), other dates or another agnomen (Filho,
+  Neto, Júnior) never match, and two forms below 0.75 never end up in one group through a third
+  (`Silva, J.` is flagged "also like"). Blocking by the sound and the first 4 letters of the last
+  surname (5,000 names in 20 surnames: about 7 s). The form kept by default is the most complete
+  (whole words, dates, inverted, accents, not capitals), then the most used ($9 counts from
+  biblio_metadata, tags below 900 so not 952), then the oldest authid. Nothing is merged on a
+  guess: each group is a menu (pick the form to keep, "not the same person", or "suggested form
+  for every group left"); then a confirmation, a verified PRE-AUTHORITIES backup, and a Perl script
+  run through koha-shell does what the staff interface's Merge does: the variant's $a added as a
+  400 to the record kept, `C4::AuthoritiesMarc::merge` (override_limit) and `DelAuthority
+  (skip_merge)`; one failed pair does not stop the others. Not tried on a live Koha yet.
+  `tests/authority_match.bats` (MariaDB + perl MARC::File::XML; doubles C4/AuthoritiesMarc.pm and
+  Koha/Authorities.pm in tests/mocks/perl5) and pytest cases in `panel/tests/test_magic_engine.py`;
+  sample data `tests/data/authorities_sample.xml`. pt and es translations added by hand.
 - **1.5.46 (staff material, AI chat input, Ollama memory, local-model tool calls)**:
   - Staff interface: `cfg["staff"]` gets the OPAC's material (`texture`, `blur`, `opacity`,
     `radius_block`, `radius_input`, `radius_button`, `STAFF_MATERIAL`, same `RANGES`) and an optional

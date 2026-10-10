@@ -245,3 +245,71 @@ def test_unknown_files_say_what_they_are(engine, tmp_path):
     assert "format not recognised" in out
     if __import__("shutil").which("file"):
         assert "application/pdf" in out and "export the records" in out
+
+
+# ---------------------------------------------------------------- authorities
+
+@pytest.fixture(scope="module")
+def auth(engine):
+    return importlib.import_module("kei_import.authorities")
+
+
+@pytest.mark.parametrize("a, b, why", [
+    ("Assis, Machado de", "Machado de Assis", "inverted"),
+    ("Assis, Machado de", "Assis, M. de", "abbreviated"),
+    ("Assis, Machado de", "Asis, Machado de", "sounds alike"),
+    ("Lispector, Clarice", "Lispecter, Clarice", "spelling"),
+    ("García Márquez, Gabriel", "GARCIA MARQUEZ, GABRIEL", "accents or case"),
+    ("Andrade, Carlos Drummond de", "Drummond de Andrade, Carlos", "filed under another surname"),
+    ("Sousa, Thereza", "Souza, Teresa", "sounds alike"),
+])
+def test_authority_variants_match(auth, a, b, why):
+    score, reasons = auth.compare(auth.Name(1, a), auth.Name(2, b))
+    assert score >= auth.THRESHOLD and why in reasons, (score, reasons)
+
+
+@pytest.mark.parametrize("a, b", [
+    ("Silva, João", "Silva, José"),               # other given name
+    ("Santos, Maria", "Santos, Mário"),           # the feminine and the masculine
+    ("Silva Filho, Carlos", "Silva Neto, Carlos"),  # other agnomen
+    ("Silva Filho, Carlos", "Silva, Carlos"),     # the son is not the father
+    ("Costa, Ana", "Souza, Ana"),                 # other surname
+    ("Silva", "Silva, José"),                     # a surname alone
+])
+def test_authority_different_people_never_match(auth, a, b):
+    assert auth.compare(auth.Name(1, a), auth.Name(2, b))[0] < auth.THRESHOLD
+
+
+def test_authority_dates_and_fuller_form(auth):
+    n = auth.Name(7, "Rosa, J. G.", "(João Guimarães)", "1908-1967.")
+    assert n.heading == "Rosa, J. G. (João Guimarães), 1908-1967" and n.born == "1908" and n.died == "1967"
+    assert auth.compare(n, auth.Name(8, "Guimarães Rosa, João"))[0] == 1.0
+    assert auth.compare(auth.Name(1, "Assis, Machado de, 1839-1908."), auth.Name(2, "Assis, Machado de, 1950-"))[0] == 0
+
+
+def test_authority_groups_keep_the_complete_form_and_never_chain(auth):
+    names = [auth.Name(1, "Silva, J."), auth.Name(2, "Silva, José"), auth.Name(3, "Silva, João"),
+             auth.Name(4, "Machado de Assis", uses=9), auth.Name(5, "Assis, Machado de", "", "1839-1908")]
+    groups = auth.find_groups(names)
+    by_keep = {g.keep.authid: sorted(n.authid for n in g.names) for g in groups}
+    assert by_keep["5"] == ["4", "5"]                 # dated and inverted, though 4 is used more
+    silva = [ids for ids in by_keep.values() if "1" in ids][0]
+    assert not {"2", "3"} <= set(silva)               # José and João never in one group
+    g = [g for g in groups if "1" in [n.authid for n in g.names]][0]
+    assert "1" in g.ambiguous or g.keep.authid == "1"
+
+
+def test_authority_command_writes_the_groups(engine, tmp_path):
+    d, _ = engine
+    src = tmp_path / "heads.tsv"
+    src.write_text("1\tPERSO_NAME\tSouza, Ana\t\t\n2\tPERSO_NAME\tSousa, Ana\t\t\n3\tPERSO_NAME\tLima, Rui\t\t\n",
+                   encoding="utf-8")
+    uses = tmp_path / "uses.txt"
+    uses.write_text("2 9\n2\n", encoding="utf-8")
+    p = subprocess.run([sys.executable, str(d / "kei_import_run.py"), "authorities", "--in", str(src),
+                        "--work", str(tmp_path), "--uses", str(uses)], capture_output=True, text=True, cwd=d)
+    assert p.returncode == 0, p.stdout + p.stderr
+    rows = [r.split("\t") for r in (tmp_path / "authority-groups.tsv").read_text(encoding="utf-8").splitlines()]
+    assert rows == [["1", "2", "keep", "1.00", "-", "2", "Sousa, Ana", "Sousa, Ana"],
+                    ["1", "1", "variant", "0.97", "sounds alike", "0", "Souza, Ana", "Souza, Ana"]]
+    assert all(c for r in rows for c in r)            # no empty field: the panel reads it with IFS=tab

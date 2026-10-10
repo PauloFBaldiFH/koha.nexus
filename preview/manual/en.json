@@ -2429,6 +2429,27 @@
     "Open **Reboot server** and confirm.",
     "After a minute or two, open the panel again and check the dashboard."
    ]
+  },
+  "authority-match": {
+   "summary": "Finds the variant forms of one author in the authority file (inverted, abbreviated, misspelt, without accents, spelt as it sounds) and merges the ones you confirm, group by group.",
+   "steps": [
+    "Read the preview: each group shows the form suggested to keep and every variant with its score (0 to 1) and why it matched.",
+    "For each group, pick the form that stays, or say it is not the same person. 'Keep the suggested form here and in every group left' answers the rest at once.",
+    "Confirm: a verified backup is made, then Koha merges each variant into the form kept, the records that used it follow, and the variant stays as a 'see from' reference (400)."
+   ],
+   "tips": [
+    "Only groups scoring 0.85 or more are suggested. Different dates, Filho and Neto, or Mário and Maria are never grouped.",
+    "A variant marked 'also like' matches more than one person (for example 'Silva, J.'): check it before merging.",
+    "Run Sync & link authorities afterwards to link headings that still have no authority."
+   ],
+   "related": [
+    "authority-sync",
+    "magic-import",
+    "reports"
+   ],
+   "overview": [
+    "Catalogues built over years end up with one author under several headings: 'Assis, Machado de', 'Machado de Assis', 'Assis, M. de', 'Asis, Machado de'. The tool compares the personal names (100) word by word in their direct order, with string distance (Jaro-Winkler and Levenshtein), how the word sounds in Portuguese and Spanish (Souza and Sousa, Luiz and Luís) and initials. Nothing is merged without your confirmation, and the merge is the one Koha's staff interface does."
+   ]
   }
  }
 }

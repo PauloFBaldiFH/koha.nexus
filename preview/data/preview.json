@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.44",
+ "panel_version": "1.5.47",
  "languages": [
   {
    "code": "en",
@@ -585,6 +585,7 @@
    "entries": [
     "marc-undo",
     "authority-sync",
+    "authority-match",
     "reports",
     "patron-category",
     "data-quality",
@@ -1178,6 +1179,16 @@
    "section": "library",
    "label": "🔗  Sync & link authorities",
    "description": "Links the catalog headings to their authorities",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "authority-match": {
+   "id": "authority-match",
+   "type": "entry",
+   "section": "library",
+   "label": "👥  Find duplicate authors (authorities)",
+   "description": "Finds variant forms of one author and merges the ones you confirm",
    "kind": "native",
    "status": "available",
    "media": []
@@ -5268,6 +5279,56 @@
    "en": "Links the catalog headings to their authorities",
    "pt-BR": "Vincula os cabeçalhos do catálogo às autoridades",
    "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "👥  Find duplicate authors (authorities)": {
+   "en": "👥  Find duplicate authors (authorities)",
+   "pt-BR": "👥  Encontrar autores duplicados (autoridades)",
+   "es": "👥  Encontrar autores duplicados (autoridades)",
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Finds variant forms of one author and merges the ones you confirm": {
+   "en": "Finds variant forms of one author and merges the ones you confirm",
+   "pt-BR": "Encontra formas variantes de um mesmo autor e une as que você confirmar",
+   "es": "Encuentra formas variantes de un mismo autor y une las que usted confirme",
    "fr": null,
    "it": null,
    "de": null,
@@ -13828,6 +13889,45 @@
     ]
    }
   },
+  "authority-match": {
+   "en": {
+    "summary": "Finds the variant forms of one author in the authority file (inverted, abbreviated, misspelt, without accents, spelt as it sounds) and merges the ones you confirm, group by group.",
+    "overview": [
+     "Catalogues built over years end up with one author under several headings: 'Assis, Machado de', 'Machado de Assis', 'Assis, M. de', 'Asis, Machado de'. The tool compares the personal names (100) word by word in their direct order, with string distance (Jaro-Winkler and Levenshtein), how the word sounds in Portuguese and Spanish (Souza and Sousa, Luiz and Luís) and initials. Nothing is merged without your confirmation, and the merge is the one Koha's staff interface does."
+    ],
+    "steps": [
+     "Read the preview: each group shows the form suggested to keep and every variant with its score (0 to 1) and why it matched.",
+     "For each group, pick the form that stays, or say it is not the same person. 'Keep the suggested form here and in every group left' answers the rest at once.",
+     "Confirm: a verified backup is made, then Koha merges each variant into the form kept, the records that used it follow, and the variant stays as a 'see from' reference (400)."
+    ],
+    "tips": [
+     "Only groups scoring 0.85 or more are suggested. Different dates, Filho and Neto, or Mário and Maria are never grouped.",
+     "A variant marked 'also like' matches more than one person (for example 'Silva, J.'): check it before merging.",
+     "Run Sync & link authorities afterwards to link headings that still have no authority."
+    ],
+    "related": [
+     "authority-sync",
+     "magic-import",
+     "reports"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Encontra as formas variantes de um mesmo autor no arquivo de autoridades (invertidas, abreviadas, com erro de digitação, sem acento, escritas como soam) e une as que você confirmar, grupo a grupo.",
+    "overview": [
+     "Catálogos construídos ao longo de anos acabam com um autor em vários cabeçalhos: 'Assis, Machado de', 'Machado de Assis', 'Assis, M. de', 'Asis, Machado de'. A ferramenta compara os nomes pessoais (100) palavra por palavra na ordem direta, com distância entre textos (Jaro-Winkler e Levenshtein), o som da palavra em português e espanhol (Souza e Sousa, Luiz e Luís) e as iniciais. Nada é unido sem a sua confirmação, e a união é a mesma que a interface da equipe do Koha faz."
+    ],
+    "steps": [
+     "Leia a prévia: cada grupo mostra a forma sugerida para ficar e cada variante com sua pontuação (0 a 1) e o motivo.",
+     "Em cada grupo, escolha a forma que fica, ou diga que não é a mesma pessoa. 'Manter a forma sugerida neste e em todos os grupos restantes' responde o resto de uma vez.",
+     "Confirme: um backup verificado é feito, o Koha une cada variante à forma mantida, os registros que a usavam acompanham, e a variante fica como remissiva 'ver de' (400)."
+    ],
+    "tips": [
+     "Só grupos com pontuação 0,85 ou mais são sugeridos. Datas diferentes, Filho e Neto, ou Mário e Maria nunca são agrupados.",
+     "Uma variante marcada 'also like' combina com mais de uma pessoa (por exemplo 'Silva, J.'): confira antes de unir.",
+     "Rode Sincronizar e ligar autoridades depois, para vincular os cabeçalhos que ainda não têm autoridade."
+    ]
+   }
+  },
   "patron-category": {
    "en": {
     "summary": "Moves patrons from one category to another (school-year turnover): all of them, only those over the category's age limit, or those registered before a date.",
@@ -16446,165 +16546,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 102,
-   "manual_total": 102,
+   "manual": 103,
+   "manual_total": 103,
    "manual_outdated": [],
-   "strings": 351,
-   "strings_total": 351
+   "strings": 353,
+   "strings_total": 353
   },
   "pt-BR": {
-   "manual": 102,
-   "manual_total": 102,
+   "manual": 103,
+   "manual_total": 103,
    "manual_outdated": [],
-   "strings": 342,
-   "strings_total": 351
+   "strings": 344,
+   "strings_total": 353
   },
   "es": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
-   "strings": 259,
-   "strings_total": 351
+   "strings": 261,
+   "strings_total": 353
   },
   "fr": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 351
+   "strings_total": 353
   },
   "it": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 351
+   "strings_total": 353
   },
   "de": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 351
+   "strings_total": 353
   },
   "nl": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "sv": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "pl": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "cs": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "ru": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "uk": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "tr": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "tl": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "id": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "ar": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "fa": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "hi": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "bn": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "vi": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "zh": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "ja": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   },
   "ko": {
    "manual": 0,
-   "manual_total": 102,
+   "manual_total": 103,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 351
+   "strings_total": 353
   }
  }
 }

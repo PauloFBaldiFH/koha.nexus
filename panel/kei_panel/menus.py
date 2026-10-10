@@ -136,6 +136,7 @@ SECTIONS: tuple[Section, ...] = (
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
         Entry("🔗  Sync & link authorities", "authority-sync", kind="native"),
+        Entry("👥  Find duplicate authors (authorities)", "authority-match", kind="native"),
         Entry("📋  Essential SQL reports pack", "reports", kind="native"),
         Entry("🎓  School-year turnover (patron categories)", "patron-category", kind="native"),
         Entry("🧪  Catalog data-quality check", "data-quality", kind="native"),
@@ -222,6 +223,7 @@ DESCRIPTIONS: dict[str, str] = {
     "clock": "Sets the timezone and syncs the clock with NTP",
     "marc-undo": "Removes the records of an imported MARC batch",
     "authority-sync": "Links the catalog headings to their authorities",
+    "authority-match": "Finds variant forms of one author and merges the ones you confirm",
     "patron-category": "Moves patrons from one category to another",
     "data-quality": "Finds records with missing or broken data",
     "privacy-anonymise": "Anonymises loans and holds that ended long ago",
