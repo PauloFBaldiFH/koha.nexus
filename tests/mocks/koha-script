@@ -2,7 +2,7 @@
 # Test double for the Koha command-line scripts used by the library tools
 # (stage_file.pl, commit_file.pl, import_patrons.pl, update_patrons_category.pl,
 # delete_patrons.pl, batch_anonymise.pl, search_for_data_inconsistencies.pl,
-# koha-preferences).
+# link_bibs_to_authorities.pl, koha-preferences).
 # Installed by tests/run.sh as symlinks under /usr/share/koha/bin, on
 # disposable test machines only. They change the test database the way Koha
 # would and print Koha's report lines, so the panel's dry-run / confirmation
@@ -207,6 +207,58 @@ search_for_data_inconsistencies.pl)
         for i in $bad; do echo "* Item with itemnumber=$i does not have home and holding library defined"; done
         echo "=> Edit these items and set valid homebranch and/or holdingbranch"
     fi
+    ;;
+link_bibs_to_authorities.pl)
+    # Like Koha's: its options only (GetOptions refuses any other, e.g.
+    # --linker), the linker from LinkerModule (OVERRIDE_SYSPREF_* first),
+    # "bibs modified" counted only outside --test, -v lines per changed
+    # record in both modes, warnings on stderr. Simulated catalogue: a
+    # record is linked once its metadata carries <kei-linked/>; Default
+    # links the even record numbers (one authority matches), FirstMatch /
+    # LastMatch also the odd ones (several match: fuzzily linked); record 7
+    # fails the authority search.
+    test=0 verbose=0 report=0 limit=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -t|--test) test=1 ;;
+            -v|--verbose) verbose=1 ;;
+            -l|--link-report) report=1 ;;
+            -b|--bib-limit) shift; limit="$1" ;;
+            *) echo "Unknown option: ${1#-}" >&2; echo "Usage: link_bibs_to_authorities.pl [options]"; exit 2 ;;
+        esac
+        shift
+    done
+    linker="${OVERRIDE_SYSPREF_LinkerModule:-$(sql "SELECT value FROM systempreferences WHERE variable = 'LinkerModule';")}"
+    linker="${linker:-Default}"
+    printf '%s %s\n' "$linker" "$test" > "$S/last-linker"
+    checked=0 modified=0 bad=0 linked=0 unlinked=0 fuzzy=0
+    for b in $(sql "SELECT biblionumber FROM biblio ${limit:+WHERE $limit} ORDER BY biblionumber;"); do
+        checked=$((checked + 1))
+        if [ "$b" = 7 ]; then
+            echo "Error while searching for authorities for biblionumber $b at $(date)" >&2
+            bad=$((bad + 1)); continue
+        fi
+        if [ "$(sql "SELECT COUNT(*) FROM biblio_metadata WHERE biblionumber = $b AND metadata LIKE '%<kei-linked/>%';")" != 0 ]; then
+            linked=$((linked + 1)); continue
+        fi
+        if [ $((b % 2)) = 1 ] && [ "$linker" = Default ]; then
+            unlinked=$((unlinked + 1)); continue
+        fi
+        linked=$((linked + 1))
+        [ $((b % 2)) = 1 ] && fuzzy=$((fuzzy + 1))
+        [ "$verbose" = 1 ] && printf 'Bib %12d (%-20s): %3d headings changed\n' "$b" "title $b" 1
+        if [ "$test" = 0 ]; then
+            sql "UPDATE biblio_metadata SET metadata = CONCAT(metadata, '<kei-linked/>') WHERE biblionumber = $b;"
+            modified=$((modified + 1))
+        fi
+    done
+    printf '\nBib authority heading linking report\n=======================================================\n'
+    printf 'Linker module:                          C4::Linker::%s\n' "$linker"
+    printf 'Number of bibs checked:                 %s\nNumber of bibs modified:                %s\n' "$checked" "$modified"
+    printf 'Number of bibs with errors:             %s\nNumber of headings linked:              %s\n' "$bad" "$linked"
+    printf 'Number of headings unlinked:            %s\nNumber of headings fuzzily linked:      %s\n' "$unlinked" "$fuzzy"
+    [ "$test" = 1 ] && printf '\n****  Ran in test mode only  ****\n'
+    [ "$report" = 1 ] && printf '\nLinked headings (from most frequent to least):\n-------------------------------------------------------\n\n'
     ;;
 *)
     echo "koha-script: unknown script $name" >&2; exit 2 ;;

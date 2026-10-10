@@ -284,10 +284,16 @@ _RUN: dict[str, list[str]] = {
     "authority-sync": [
         "@@choose Sync & link authorities\tWhich records should be linked to the authorities?\t"
         "\tall\tThe whole catalog\trange\tA range of record numbers (biblionumber)",
-        "@@step Preview (dry run): nothing is changed yet...", "@@done 0 Preview (dry run): nothing is changed yet...",
-        "@@ask Sync & link authorities\tRecords checked: 120\\nRecords to update: 37\\nHeadings to link: 52 (by similarity: 3)"
-        "\\nHeadings without a matching authority: 18\\n\\nLink them now?",
-        "@@say ok OK\tHeadings linked to the authorities: 52."],
+        "@@choose Sync & link authorities\tHow should a heading be matched to an authority?\t"
+        "\tDefault\tDefault (exact, safe): only when a single authority matches"
+        "\tFirstMatch\tFuzzy: when several authorities match, take the first",
+        "@@choose Sync & link authorities\tWhat should be done?\t"
+        "\tpreview\tSimulation / preview (dry run): nothing is written\tapply\tApply the changes permanently",
+        "@@step Simulation (dry run): nothing is written...", "@@done 0 Simulation (dry run): nothing is written...",
+        "@@ask Simulation (dry run)\tNothing was written (simulation).\\n\\nLinker: Default\\nRecords checked: 120"
+        "\\nRecords that would be updated: 37\\nHeadings that would be linked: 52 (fuzzily: 0)"
+        "\\nHeadings without a matching authority: 18\\n\\nApply these changes permanently now?",
+        "@@say ok OK\tChanges saved permanently. Records updated: 37. The search index is being rebuilt in the background."],
     "authority-match": [
         "@@step Comparing the names...", "@@done 0 Comparing the names...",
         "@@view Preview (nothing is changed yet)\t== Smart authority matching\nPersonal names checked: 412"

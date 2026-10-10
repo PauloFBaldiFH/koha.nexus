@@ -1707,20 +1707,23 @@
    "_en": "2edbc111cb"
   },
   "authority-sync": {
-   "summary": "Vincula os cabeçalhos do catálogo (autores, assuntos, séries) aos registros de autoridade com o link_bibs_to_authorities.pl do Koha, depois de uma simulação que mostra as contagens e os cabeçalhos sem correspondência.",
+   "summary": "Vincula os cabeçalhos do catálogo (autores, assuntos, séries) aos registros de autoridade com o link_bibs_to_authorities.pl do Koha, como simulação que nada grava ou como execução permanente, com o algoritmo de correspondência que você escolher.",
    "overview": [
-    "Os registros de autoridade guardam uma forma padronizada de cada nome, assunto e série. Vincular grava o número da autoridade (`$9`) nos cabeçalhos do catálogo (100, 110, 600, 650, 700...), para que uma mudança na autoridade chegue a todos os registros e as buscas por autor ou assunto juntem as grafias variantes. A rotina usa o `link_bibs_to_authorities.pl` do próprio Koha: primeiro a simulação, com as contagens e os cabeçalhos que nenhuma autoridade atende, depois a execução real e a atualização do índice."
+    "Os registros de autoridade guardam uma forma padronizada de cada nome, assunto e série. Vincular grava o número da autoridade (`$9`) nos cabeçalhos do catálogo (100, 110, 600, 650, 700...), para que uma mudança na autoridade chegue a todos os registros e as buscas por autor ou assunto juntem as grafias variantes. A rotina usa o `link_bibs_to_authorities.pl` do próprio Koha: a simulação o executa com `--test` e conta os registros que mudariam; a execução permanente grava as ligações e informa os registros atualizados."
    ],
    "steps": [
     "Escolha o alcance: o catálogo inteiro, uma faixa de números de registro ou os registros de uma biblioteca.",
-    "Leia a simulação: cabeçalhos vinculados e cabeçalhos sem autoridade correspondente.",
-    "Confirme: seguem-se um backup verificado, a execução real e a atualização do índice."
+    "Escolha a correspondência: Default (exata, segura: o cabeçalho só é ligado quando uma única autoridade corresponde) ou Aproximada (quando várias autoridades correspondem, usa a primeira ou a última).",
+    "Escolha Simulação / prévia para ver o que mudaria sem gravar nada, ou Aplicar as alterações de forma permanente.",
+    "Depois de uma simulação você pode aplicar a mesma execução na hora. Aplicar faz antes um backup verificado e reconstrói o índice de busca em segundo plano depois."
    ],
    "tips": [
-    "Importe as autoridades antes (Ferramenta de Importação Mágica). As preferências LinkerModule e AutoCreateAuthorities do Koha decidem como os cabeçalhos são casados.",
+    "Importe as autoridades antes (Ferramenta de Importação Mágica). AutoCreateAuthorities e as outras preferências de ligação do Koha continuam valendo; a correspondência escolhida aqui vale só para aquela execução e a preferência LinkerModule gravada no Koha não muda.",
+    "Com a correspondência Aproximada, rode sempre a simulação primeiro e leia os cabeçalhos listados como ligados por aproximação.",
+    "Os avisos por registro (\"Error while searching for authorities for biblionumber N\") vão para o log da ferramenta; o relatório com as contagens é um arquivo separado ao lado dele.",
     "Agende diária ou semanalmente em Tarefas agendadas e automações."
    ],
-   "_en": "8f2017e90c"
+   "_en": "b9122ed99c"
   },
   "patron-category": {
    "summary": "Move leitores de uma categoria para outra (virada do ano letivo): todos, só os que passaram do limite de idade da categoria, ou os cadastrados antes de uma data.",
