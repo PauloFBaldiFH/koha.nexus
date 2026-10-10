@@ -1,0 +1,24 @@
+# systemd unit for the Rede Pergamum SRU bridge (same venv as zeus-sru).
+# Copy to /etc/systemd/system/, adjust the paths, then:
+#   systemctl daemon-reload && systemctl enable --now pergamum-sru
+[Unit]
+Description=Pergamum SRU bridge (Koha -> Rede Pergamum, PUCPR/CRP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/koha.nexus/sru-bridge
+Environment=PERGAMUM_SRU_HOST=127.0.0.1
+Environment=PERGAMUM_SRU_PORT=5006
+ExecStart=/opt/koha.nexus/sru-bridge/.venv/bin/python -m pergamum_sru
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

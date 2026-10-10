@@ -12,6 +12,7 @@ import httpx
 import pymarc
 
 from . import marc
+from .sru import SourceUnavailable
 from .config import Settings
 from .cql import ZeusQuery
 
@@ -151,5 +152,5 @@ class ZeusClient:
             self._cache.popitem(last=False)
 
 
-class ZeusUnavailable(RuntimeError):
+class ZeusUnavailable(SourceUnavailable):
     """Every chunk failed: Zeus is down or unreachable (SRU diagnostic 1)."""

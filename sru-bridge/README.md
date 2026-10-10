@@ -1,4 +1,6 @@
-# Zeus SRU bridge
+# SRU bridges: Zeus (UFSC) and Rede Pergamum (PUCPR)
+
+## Zeus SRU bridge
 
 A small FastAPI service that lets Koha copy-catalogue from **Catálogo Zeus**
 (BU/UFSC, `https://catalogo.bu.ufsc.br/zbib/`) as if it were an ordinary
@@ -104,3 +106,65 @@ network. The HTML around it in `tests/fixtures/zeus_results.html` is a
 stand-in: if Zeus's real page puts `rawRecord` somewhere the extractor
 (`zeus_sru/zeus.py`) misses, save a real result page over that fixture and
 adjust the patterns there.
+
+## Rede Pergamum SRU bridge
+
+The same directory holds a second bridge, `pergamum_sru`, for the **Rede
+Pergamum** shared catalogue (PUCPR, site CRP,
+`https://www.pergamum.pucpr.br/redepergamum/consultas/site_CRP/pesquisa.php`).
+It uses the same SRU endpoint code as the Zeus bridge (`zeus_sru.app.sru_app`:
+GET, form and SOAP requests, diagnostics, explain), the same venv and the same
+requirements; only the catalogue behind it differs.
+
+```
+Koha ──SRU 1.1 GET──▶ 127.0.0.1:5006/sru ──Sajax GET──▶ pesquisa.php
+     ◀─searchRetrieveResponse (MARCXML)──   ◀─result list, then one MARC text a record─
+```
+
+1. The CQL query becomes a Pergamum search: `ISBN`, `AUTOR`, else `TITULO`
+   (same CQL reading as Zeus).
+2. `rs=ajax_resultados` returns the hit list; the `mostrar_marc(<id>)` links
+   give the acervo ids of the first 50 hits, which is the count Koha is told.
+   That list is cached for 10 minutes, so Koha's first call
+   (`maximumRecords=0`, the count only) and the page that follows cost one
+   search, and the count call fetches no record.
+3. For each record of the page, `rs=ajax_conteudo_pastas` returns its tabs;
+   the MARC text between `<inicio>` and `<fim>` becomes MARCXML. Five records
+   are fetched at once.
+4. The MARC text is cleaned the way Koha needs it: bare `\r` line ends (left
+   in, Koha stops with `Tag "\r0" is not a valid tag`), `&nbsp;` and other
+   entities decoded (never with `unicode_escape`, which breaks accents),
+   `\u001e` and characters XML cannot carry removed, and a datafield without a
+   subfield, such as Pergamum's empty `852    $`, dropped (Koha stops with
+   `Field 852 must have at least one subfield`).
+5. Records go out with `recordSchema` `info:srw/schema/1/marcxml-v1.1`,
+   `recordPacking` xml and `recordPosition`. If Koha shows hits but no
+   records, set `PERGAMUM_SRU_RECORD_SCHEMA=marcxml` (what the Zeus bridge
+   sends).
+
+On a koha.nexus server, adding the "Catálogo Rede Pergamum" target from the
+panel (or `config.sh --task pergamum-bridge`) installs it under
+`/usr/local/lib/koha-easy-installer/sru-bridge` as the systemd unit
+`koha-pergamum-sru`, enabled at boot, and writes Koha's row: host
+`127.0.0.1`, port `5006`, database `sru`, SRU, MARC21, utf8, timeout 15,
+`sru=get,sru_version=1.1`, `title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice`.
+By hand: `.venv/bin/python -m pergamum_sru`, or
+[`deploy/pergamum-sru.service`](deploy/pergamum-sru.service).
+
+| Variable | Default | |
+|---|---|---|
+| `PERGAMUM_SRU_HOST` / `PERGAMUM_SRU_PORT` | `127.0.0.1` / `5006` | where to listen |
+| `PERGAMUM_SRU_BASE_URL` | the CRP `pesquisa.php` above | |
+| `PERGAMUM_SRU_TIMEOUT` | `12` | seconds per Pergamum request |
+| `PERGAMUM_SRU_PAGE_SIZE` | `50` | ids asked of Pergamum per search |
+| `PERGAMUM_SRU_CONCURRENCY` | `5` | records fetched at once |
+| `PERGAMUM_SRU_CACHE_TTL` / `PERGAMUM_SRU_CACHE_SIZE` | `600` / `512` | `0` turns the cache off |
+| `PERGAMUM_SRU_MAX_RECORDS` | `50` | ceiling on `maximumRecords` |
+| `PERGAMUM_SRU_RECORD_SCHEMA` | `info:srw/schema/1/marcxml-v1.1` | |
+| `PERGAMUM_SRU_USER_AGENT` | a desktop Chrome string | |
+
+Its tests (`tests/test_pergamum.py`) use stand-in pages built from the
+working script's description (`tests/fixtures/pergamum_*.html`); they were
+not captured from the live site. If a real search finds nothing, save a real
+`ajax_resultados` and `ajax_conteudo_pastas` answer over those fixtures and
+adjust the patterns in `pergamum_sru/pergamum.py`.

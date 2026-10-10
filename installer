@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.40"
+PANEL_VERSION=" 1.5.41"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -26937,24 +26937,31 @@ z3950_valid() {
 }
 
 # ----------------------------------------------------------------------
-# The Zeus SRU bridge (sru-bridge/ in the repository): Koha's "Catálogo
-# Zeus" target is 127.0.0.1:5000/sru, answered by this small service. It is
-# installed under KEI_LIB_DIR with its own venv and runs as the systemd unit
-# koha-zeus-sru (enabled at boot, restarted on failure).
+# The SRU bridges (sru-bridge/ in the repository): Koha's "Catálogo Zeus"
+# target is 127.0.0.1:5000/sru and its "Catálogo Rede Pergamum" target is
+# 127.0.0.1:5006/sru, each answered by a small service. Both share one
+# directory under KEI_LIB_DIR and one venv, and each runs as its own systemd
+# unit (koha-zeus-sru, koha-pergamum-sru), enabled at boot and restarted on
+# failure.
 # ----------------------------------------------------------------------
 SRU_BRIDGE_DIR="/usr/local/lib/koha-easy-installer/sru-bridge"
 SRU_BRIDGE_UNIT="koha-zeus-sru"
 SRU_BRIDGE_PORT=5000
+PERGAMUM_BRIDGE_UNIT="koha-pergamum-sru"
+PERGAMUM_BRIDGE_PORT=5006
 
-# 0 when $1 holds the bridge's sources.
-sru_bridge_src_ok() { [ -f "$1/zeus_sru/app.py" ] && [ -f "$1/requirements.txt" ]; }
+# 0 when $1 holds the bridges' sources.
+sru_bridge_src_ok() {
+    [ -f "$1/zeus_sru/app.py" ] && [ -f "$1/pergamum_sru/app.py" ] && [ -f "$1/requirements.txt" ]
+}
 
-# 0 when something answers on 127.0.0.1:SRU_BRIDGE_PORT.
+# 0 when something answers on 127.0.0.1:PORT (default: the Zeus bridge's).
 sru_bridge_listening() {
+    local port="${1:-$SRU_BRIDGE_PORT}"
     if command -v ss >/dev/null 2>&1; then
-        ss -ltn "sport = :${SRU_BRIDGE_PORT}" 2>/dev/null | grep -q LISTEN
+        ss -ltn "sport = :${port}" 2>/dev/null | grep -q LISTEN
     else
-        (exec 3<>"/dev/tcp/127.0.0.1/${SRU_BRIDGE_PORT}") 2>/dev/null
+        (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null
     fi
 }
 
@@ -26987,8 +26994,45 @@ SQL
     fi
 }
 
-# Sources (next to this script, else from GitHub), venv, unit, start, check.
+# Koha's row for the Pergamum bridge: the same settings as Zeus's (SRU,
+# MARC21, utf8, GET, 15 s). z3950servers has no unique key but its id, so
+# an older row (same name, or 127.0.0.1:5006) is deleted first rather than
+# relying on ON DUPLICATE KEY. $1 is "checked" (1 when chosen in the panel).
+PERGAMUM_BRIDGE_NAME="Catálogo Rede Pergamum (CRP bridge, SRU)"
+pergamum_bridge_register() {
+    is_koha_installed 2>/dev/null || return 0
+    mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
+    local name checked="${1:-0}"
+    [[ "$checked" =~ ^[01]$ ]] || checked=0
+    name=$(sql_quote "$PERGAMUM_BRIDGE_NAME")
+    if mysql --default-character-set=utf8mb4 "$DB_NAME" <<SQL
+DELETE FROM z3950servers WHERE recordtype = 'biblio'
+  AND (servername = ${name} OR (host = '127.0.0.1' AND port = ${PERGAMUM_BRIDGE_PORT}));
+INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout,
+  servertype, recordtype, sru_fields, sru_options, add_xslt)
+VALUES ('127.0.0.1', ${PERGAMUM_BRIDGE_PORT}, 'sru', ${name}, ${checked}, 1, 'MARC21', 'utf8', 15, 'sru', 'biblio',
+  'title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice', 'sru=get,sru_version=1.1', '');
+SQL
+    then
+        log "pergamum-bridge: Koha's Rede Pergamum target set (SRU, MARC21)"
+        kei_result koha-target set
+    else
+        kei_result koha-target failed
+        return 1
+    fi
+}
+
+# sru_bridge_install [zeus|pergamum]: sources (next to this script, else
+# from GitHub), the shared venv, that bridge's unit, start, check.
 sru_bridge_install() {
+    local which="${1:-zeus}" unit port module env desc
+    case "$which" in
+        zeus)     unit="$SRU_BRIDGE_UNIT"; port="$SRU_BRIDGE_PORT"; module=zeus_sru; env=ZEUS_SRU
+                  desc="Zeus SRU bridge for Koha (127.0.0.1:${SRU_BRIDGE_PORT}/sru -> Catálogo Zeus, UFSC)" ;;
+        pergamum) unit="$PERGAMUM_BRIDGE_UNIT"; port="$PERGAMUM_BRIDGE_PORT"; module=pergamum_sru; env=PERGAMUM_SRU
+                  desc="Pergamum SRU bridge for Koha (127.0.0.1:${PERGAMUM_BRIDGE_PORT}/sru -> Rede Pergamum, PUCPR/CRP)" ;;
+        *)        return 2 ;;
+    esac
     local src="" tmp="" log cert=""
     log=$(tools_log sru-bridge 2>/dev/null || echo "${LOG_DIR:-/tmp}/sru-bridge.log")
     if [ -n "${_SCRIPT_DIR:-}" ] && sru_bridge_src_ok "${_SCRIPT_DIR}/sru-bridge"; then
@@ -27010,8 +27054,9 @@ sru_bridge_install() {
     command -v python3 >/dev/null 2>&1 || apt_install python3 >>"$log" 2>&1
     python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv >>"$log" 2>&1
     mkdir -p "$SRU_BRIDGE_DIR"
-    rm -rf "$SRU_BRIDGE_DIR/zeus_sru"
-    cp -r "$src/zeus_sru" "$src/requirements.txt" "$SRU_BRIDGE_DIR/" || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
+    rm -rf "$SRU_BRIDGE_DIR/zeus_sru" "$SRU_BRIDGE_DIR/pergamum_sru"
+    cp -r "$src/zeus_sru" "$src/pergamum_sru" "$src/requirements.txt" "$SRU_BRIDGE_DIR/" \
+        || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
     [ -n "$tmp" ] && rm -rf "$tmp"
     find "$SRU_BRIDGE_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
     [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
@@ -27026,9 +27071,9 @@ sru_bridge_install() {
         fi
         cp -f "$SRU_BRIDGE_DIR/requirements.txt" "$SRU_BRIDGE_DIR/.venv/.requirements"
     fi
-    cat > "/etc/systemd/system/${SRU_BRIDGE_UNIT}.service" <<UNIT
+    cat > "/etc/systemd/system/${unit}.service" <<UNIT
 [Unit]
-Description=Zeus SRU bridge for Koha (127.0.0.1:${SRU_BRIDGE_PORT}/sru -> Catálogo Zeus, UFSC)
+Description=${desc}
 After=network-online.target
 Wants=network-online.target
 
@@ -27036,9 +27081,9 @@ Wants=network-online.target
 Type=simple
 DynamicUser=yes
 WorkingDirectory=${SRU_BRIDGE_DIR}
-Environment=ZEUS_SRU_HOST=127.0.0.1
-Environment=ZEUS_SRU_PORT=${SRU_BRIDGE_PORT}
-ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m zeus_sru
+Environment=${env}_HOST=127.0.0.1
+Environment=${env}_PORT=${port}
+ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m ${module}
 Restart=always
 RestartSec=5
 NoNewPrivileges=yes
@@ -27050,14 +27095,20 @@ PrivateTmp=yes
 WantedBy=multi-user.target
 UNIT
     systemctl daemon-reload >>"$log" 2>&1
-    systemctl enable "$SRU_BRIDGE_UNIT" >>"$log" 2>&1
-    systemctl restart "$SRU_BRIDGE_UNIT" >>"$log" 2>&1
+    systemctl enable "$unit" >>"$log" 2>&1
+    systemctl restart "$unit" >>"$log" 2>&1
+    # The other bridge runs the code just replaced: it restarts too.
+    local other
+    for other in "$SRU_BRIDGE_UNIT" "$PERGAMUM_BRIDGE_UNIT"; do
+        [ "$other" != "$unit" ] && systemctl is-active --quiet "$other" 2>/dev/null \
+            && systemctl restart "$other" >>"$log" 2>&1
+    done
     local i
     for i in 1 2 3 4 5 6 7 8 9 10; do
-        sru_bridge_listening && { log "sru-bridge: ${SRU_BRIDGE_UNIT} listening on 127.0.0.1:${SRU_BRIDGE_PORT}"; kei_result bridge running; return 0; }
+        sru_bridge_listening "$port" && { log "sru-bridge: ${unit} listening on 127.0.0.1:${port}"; kei_result bridge running; return 0; }
         sleep 1
     done
-    systemctl status "$SRU_BRIDGE_UNIT" --no-pager >>"$log" 2>&1
+    systemctl status "$unit" --no-pager >>"$log" 2>&1
     kei_result bridge "not-listening"
     return 1
 }
@@ -27065,7 +27116,7 @@ UNIT
 z3950_add() {
     local file="$1" log sql before after err host port db syntax enc name rank timeout kind user pass sru sruopt
     local -a secrets=()
-    local valid=0 invalid=0 n wants_bridge=0
+    local valid=0 invalid=0 n wants_bridge=0 wants_pergamum=0
     require_database || { rm -f -- "$file"; return 1; }
     if [ ! -f "$file" ]; then
         msg_error "" "$(t "The list of servers to add was not found.")"
@@ -27087,6 +27138,7 @@ z3950_add() {
         fi
         [ -n "$pass" ] && secrets+=("$pass")
         [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$SRU_BRIDGE_PORT" ] && wants_bridge=1
+        [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$PERGAMUM_BRIDGE_PORT" ] && wants_pergamum=1
         # SRU settings belong to SRU targets only.
         [ "$kind" = sru ] || { sru=""; sruopt=""; }
         valid=$((valid + 1))
@@ -27121,6 +27173,13 @@ z3950_add() {
             sru_bridge_install || log "z3950: the Zeus SRU bridge could not be started (see logs)"
         fi
         sru_bridge_register
+    fi
+    # So does the Rede Pergamum one.
+    if [ "${wants_pergamum:-0}" = 1 ]; then
+        if ! sru_bridge_listening "$PERGAMUM_BRIDGE_PORT"; then
+            sru_bridge_install pergamum || log "z3950: the Pergamum SRU bridge could not be started (see logs)"
+        fi
+        pergamum_bridge_register 1
     fi
     kei_result added "$n"
     kei_result existing "$((valid - n))"
@@ -28728,6 +28787,7 @@ kei_task() {
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
         sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
+        pergamum-bridge) sru_bridge_install pergamum; local prc=$?; pergamum_bridge_register; return "$prc" ;;
         z3950-server-status) z3950_server_status ;;
         z3950-daemon)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; z3950_daemon "$1" ;;
         catalog-network)

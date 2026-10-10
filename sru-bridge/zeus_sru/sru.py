@@ -40,6 +40,10 @@ UNKNOWN_SCHEMA = 66
 UNSUPPORTED_PACKING = 71
 
 
+class SourceUnavailable(RuntimeError):
+    """The catalogue behind a bridge did not answer (SRU diagnostic 1)."""
+
+
 @dataclass
 class Diagnostic:
     code: int
@@ -79,6 +83,7 @@ def search_retrieve_response(
     packing: str = "xml",
     echo: dict[str, str] | None = None,
     diagnostics: list[Diagnostic] | None = None,
+    schema: str = MARCXML_SCHEMA,
 ) -> bytes:
     root = ET.Element(f"{{{ZS}}}searchRetrieveResponse")
     _el(root, "version", "1.1")
@@ -87,7 +92,7 @@ def search_retrieve_response(
         box = _el(root, "records")
         for offset, data in enumerate(records):
             rec = _el(box, "record")
-            _el(rec, "recordSchema", MARCXML_SCHEMA)
+            _el(rec, "recordSchema", schema)
             _el(rec, "recordPacking", packing)
             holder = _el(rec, "recordData")
             if packing == "string":
@@ -118,7 +123,13 @@ def diagnostic_response(diag: Diagnostic, operation: str = "searchRetrieve") -> 
     return serialize(root)
 
 
-def explain_response(host: str, port: int, database: str, max_records: int) -> bytes:
+def explain_response(host: str, port: int, database: str, max_records: int, *,
+                     title: str = "Catálogo Zeus (BU/UFSC) via SRU",
+                     description: str = "Federated search of Brazilian university catalogues"
+                                         " through Catálogo Zeus.",
+                     indexes: tuple[tuple[str, str, str], ...] = (
+                         ("ISBN", "dc", "isbn"), ("ISBN", "bath", "isbn"),
+                         ("Title", "dc", "title"), ("Any", "cql", "serverChoice"))) -> bytes:
     root = ET.Element(f"{{{ZS}}}explainResponse")
     _el(root, "version", "1.1")
     rec = _el(root, "record")
@@ -138,17 +149,14 @@ def explain_response(host: str, port: int, database: str, max_records: int) -> b
     x(server, "port", port)
     x(server, "database", database)
     info = x(explain, "databaseInfo")
-    x(info, "title", "Catálogo Zeus (BU/UFSC) via SRU", lang="pt", primary="true")
-    x(info, "description",
-      "Federated search of Brazilian university catalogues through Catálogo Zeus.", lang="en")
+    x(info, "title", title, lang="pt", primary="true")
+    x(info, "description", description, lang="en")
     index_info = x(explain, "indexInfo")
     x(index_info, "set", name="dc", identifier="info:srw/cql-context-set/1/dc-v1.1")
     x(index_info, "set", name="bath", identifier="http://zing.z3950.org/cql/bath/2.0/")
-    for title, set_name, name in (("ISBN", "dc", "isbn"), ("ISBN", "bath", "isbn"),
-                                  ("Title", "dc", "title"),
-                                  ("Any", "cql", "serverChoice")):
+    for label, set_name, name in indexes:
         idx = x(index_info, "index")
-        x(idx, "title", title)
+        x(idx, "title", label)
         m = x(idx, "map")
         x(m, "name", name, set=set_name)
     schema_info = x(explain, "schemaInfo")

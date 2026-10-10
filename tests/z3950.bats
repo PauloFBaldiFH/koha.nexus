@@ -34,7 +34,7 @@ is_koha_installed() { return 0; }
 TOOLS_LOG_DIR="$W/logs"
 # The Zeus bridge: not running, and its install only noted.
 sru_bridge_listening() { return 1; }
-sru_bridge_install() { echo called >> "$W/bridge"; }
+sru_bridge_install() { echo "called \${1:-}" >> "$W/bridge"; }
 SH
     ( umask 077
       printf '%s\t' lx2.loc.gov 210 LCDB USMARC utf8 'Library of Congress' 3 0 zed '' '' ''; printf '\n'
@@ -68,7 +68,7 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     # The UFSC Z39.50 server does not answer: kept, but unticked.
     [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-'), checked FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t\t0')" ]
     # The Zeus row asked for its bridge to be installed and started.
-    [ "$(cat "$W/bridge")" = called ]
+    [ "$(cat "$W/bridge")" = "called " ]
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
     grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
@@ -128,10 +128,27 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ ! -e "$W/bridge" ]
 }
 
-@test "sru-bridge: the panel task exists and the unit starts the bridge on boot" {
+@test "sru-bridge: the panel tasks exist and the unit starts the bridge on boot" {
     grep -q '^        sru-bridge)' "$KEI_REPO/installer"
+    grep -q '^        pergamum-bridge)' "$KEI_REPO/installer"
     grep -q 'WantedBy=multi-user.target' "$KEI_REPO/installer"
-    grep -q 'ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m zeus_sru' "$KEI_REPO/installer"
+    grep -q 'ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m ${module}' "$KEI_REPO/installer"
+}
+
+@test "z3950-add: the Rede Pergamum row installs its bridge and gets the bridge's settings, once" {
+    ( printf '%s\t' 127.0.0.1 5006 sru USMARC utf8 'Pergamum' 0 0 sru '' '' 'title=dc.title' ''; printf '\n' ) > "$W/p.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/p.tsv"
+    echo "$output"; cat "$KEI_S/dialogs.log"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$W/bridge")" = "called pergamum" ]
+    [ "$(zsql "SELECT servername, servertype, port, db, syntax, encoding, timeout, checked, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = \
+      "$(printf 'Catálogo Rede Pergamum (CRP bridge, SRU)\tsru\t5006\tsru\tMARC21\tutf8\t15\t1\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
+    # Again (the task, as from config.sh): still one row; Zeus's row untouched.
+    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, servertype) VALUES ('127.0.0.1', 5000, 'sru', 'Zeus', 'sru')"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" pergamum_bridge_register
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*), MIN(checked) FROM z3950servers WHERE port = 5006")" = "$(printf '1\t0')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE port = 5000")" = "1" ]
 }
 
 # ---------------------------------------------------------------------

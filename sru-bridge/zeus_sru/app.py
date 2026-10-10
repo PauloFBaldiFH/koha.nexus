@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from typing import Callable, Protocol
 from urllib.parse import parse_qsl
 from xml.etree import ElementTree as ET
 
@@ -17,12 +18,19 @@ from fastapi.responses import JSONResponse, Response
 
 from . import __version__, cql, marc, sru
 from .config import Settings
-from .zeus import ZeusClient, ZeusUnavailable
+from .zeus import ZeusClient
 
 log = logging.getLogger("zeus_sru")
 XML = "text/xml; charset=utf-8"
 SRU_PARAMS = ("operation", "version", "query", "startRecord", "maximumRecords", "recordPacking",
               "recordSchema", "sortKeys", "stylesheet", "resultSetTTL")
+
+
+class Backend(Protocol):
+    async def search(self, query: cql.ZeusQuery, start: int,
+                     maximum: int) -> tuple[int, list[ET.Element]]: ...
+
+    async def aclose(self) -> None: ...
 
 
 async def read_params(request: Request) -> tuple[dict[str, str], bool]:
@@ -58,20 +66,50 @@ async def read_params(request: Request) -> tuple[dict[str, str], bool]:
     return p, soap
 
 
+class ZeusBackend:
+    """Zeus answers a search with every record at once; pages are sliced here."""
+
+    def __init__(self, client: ZeusClient):
+        self.client = client
+
+    async def search(self, query: cql.ZeusQuery, start: int,
+                     maximum: int) -> tuple[int, list[ET.Element]]:
+        records = await self.client.search(query)
+        page = records[start - 1:start - 1 + maximum]
+        return len(records), [marc.to_marcxml(r) for r in page]
+
+    async def aclose(self) -> None:
+        await self.client.aclose()
+
+
 def create_app(settings: Settings | None = None, client: ZeusClient | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    return sru_app(
+        title="Zeus SRU bridge", version=__version__, source="Catálogo Zeus",
+        max_records=settings.max_records,
+        open_backend=lambda: ZeusBackend(client or ZeusClient(settings)),
+        health={"targets": list(settings.targets), "chunk_size": settings.chunk_size})
+
+
+def sru_app(*, title: str, version: str, source: str, max_records: int,
+            open_backend: Callable[[], Backend], health: dict | None = None,
+            explain: dict | None = None, record_schema: str = sru.MARCXML_SCHEMA) -> FastAPI:
+    """The SRU 1.1 endpoint shared by the bridges in this directory.
+
+    open_backend() is called once at startup; its search(query, start,
+    maximum) returns the hit count and the MARCXML records of that page, and
+    raises sru.SourceUnavailable when the catalogue behind it is down."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.zeus = client or ZeusClient(settings)
+        app.state.backend = open_backend()
         try:
             yield
         finally:
-            await app.state.zeus.aclose()
+            await app.state.backend.aclose()
 
-    app = FastAPI(title="Zeus SRU bridge", version=__version__, lifespan=lifespan,
+    app = FastAPI(title=title, version=version, lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
-    app.state.settings = settings
 
     def xml(body: bytes) -> Response:
         return Response(content=body, media_type=XML)
@@ -80,9 +118,8 @@ def create_app(settings: Settings | None = None, client: ZeusClient | None = Non
         return xml(sru.diagnostic_response(sru.Diagnostic(code, details, message), operation))
 
     @app.get("/health")
-    async def health() -> JSONResponse:
-        return JSONResponse({"status": "ok", "version": __version__,
-                             "targets": list(settings.targets), "chunk_size": settings.chunk_size})
+    async def health_endpoint() -> JSONResponse:
+        return JSONResponse({"status": "ok", "version": version, **(health or {})})
 
     @app.api_route("/sru", methods=["GET", "POST"])
     @app.api_route("/sru/{database:path}", methods=["GET", "POST"])
@@ -105,7 +142,8 @@ def create_app(settings: Settings | None = None, client: ZeusClient | None = Non
         if operation == "explain":
             url = request.url
             return xml(sru.explain_response(url.hostname or "127.0.0.1", url.port or 80,
-                                            url.path.lstrip("/") or "sru", settings.max_records))
+                                            url.path.lstrip("/") or "sru", max_records,
+                                            **(explain or {})))
         if operation != "searchRetrieve":
             return fail(sru.UNSUPPORTED_OPERATION, operation, f"unsupported operation {operation}")
 
@@ -127,32 +165,30 @@ def create_app(settings: Settings | None = None, client: ZeusClient | None = Non
             return fail(sru.UNSUPPORTED_PARAMETER_VALUE, "startRecord/maximumRecords", str(exc))
         if start < 1:
             return fail(sru.UNSUPPORTED_PARAMETER_VALUE, "startRecord", "startRecord must be >= 1")
-        maximum = max(0, min(maximum, settings.max_records))
+        maximum = max(0, min(maximum, max_records))
 
         try:
-            zq = cql.parse(query)
+            q = cql.parse(query)
         except cql.CQLError as exc:
             return fail(sru.QUERY_SYNTAX_ERROR, query, str(exc))
 
         try:
-            records = await request.app.state.zeus.search(zq)
-        except ZeusUnavailable as exc:
-            log.error("Zeus unreachable: %s", exc)
-            return fail(sru.GENERAL_ERROR, "Catálogo Zeus", "Catálogo Zeus did not answer")
+            total, records = await request.app.state.backend.search(q, start, maximum)
+        except sru.SourceUnavailable as exc:
+            log.error("%s unreachable: %s", source, exc)
+            return fail(sru.GENERAL_ERROR, source, f"{source} did not answer")
 
-        total = len(records)
         echo = {k: p.get(k, "") for k in ("version", "query", "startRecord", "maximumRecords",
                                           "recordPacking", "recordSchema")}
         echo["version"] = "1.1"
         if total and start > total:
             return xml(sru.search_retrieve_response(
-                total=total, records=[], start=start, echo=echo,
+                total=total, records=[], start=start, echo=echo, schema=record_schema,
                 diagnostics=[sru.Diagnostic(sru.FIRST_RECORD_OUT_OF_RANGE, str(start),
                                             "first record position out of range")]))
-        page = records[start - 1:start - 1 + maximum]
         body = sru.search_retrieve_response(
-            total=total, records=[marc.to_marcxml(r) for r in page], start=start,
-            packing=packing, echo=echo)
+            total=total, records=records, start=start,
+            packing=packing, echo=echo, schema=record_schema)
         return xml(body)
 
     return app
