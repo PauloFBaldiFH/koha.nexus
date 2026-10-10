@@ -107,10 +107,15 @@ DEFAULTS: dict = {
     # The same buttons on the staff interface's home page (IntranetUserJS),
     # above the module tiles: shortcuts to the library's internal workflows.
     "staff_links": {"enabled": False, "style": "glass", "layout": "list", "items": []},
-    # The staff interface (IntranetUserCSS): its own palette, type, contrast
-    # and table density, nothing shared with the OPAC. Settings saved before
-    # it had colours start from the OPAC's (normalize()).
+    # The staff interface (IntranetUserCSS): its own palette, material
+    # (the OPAC's textures, blur, opacity and corners), type, contrast and
+    # table density, nothing shared with the OPAC unless "Copy OPAC preset"
+    # copies it (copy_opac_to_staff()). Settings saved before it had colours
+    # start from the OPAC's (normalize()); before it had a material, "flat"
+    # with the corners it had, so their look does not change.
     "staff": {"enabled": False, "accent": "#2563eb", "accent2": "#7c3aed", "surface": "#ffffff",
+              "page": "", "texture": "flat", "blur": 12, "opacity": 100,
+              "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
               "favicon": {"source": "none", "url": ""}, "film": 75},
@@ -121,6 +126,8 @@ RANGES = {"blur": (0, 30), "opacity": (30, 100), "radius_block": (0, 30), "radiu
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
 STAFF_FILM = (40, 95)       # % of the film over the staff wallpaper: tables and forms stay readable
+# The staff material: the OPAC's sliders, same ranges.
+STAFF_MATERIAL = ("blur", "opacity", "radius_block", "radius_input", "radius_button")
 
 
 # ----------------------------------------------------------------------
@@ -252,10 +259,39 @@ def normalize(raw: dict | None) -> dict:
                     "density": st.get("density") if st.get("density") in STAFF_DENSITY else "normal",
                     "contrast": st.get("contrast") if st.get("contrast") in STAFF_CONTRAST else "normal",
                     "font": _clamp(st.get("font", 100), *STAFF_FONT, 100),
-                    "film": _clamp(st.get("film", DEFAULTS["staff"]["film"]), *STAFF_FILM, DEFAULTS["staff"]["film"])}
+                    "film": _clamp(st.get("film", DEFAULTS["staff"]["film"]), *STAFF_FILM, DEFAULTS["staff"]["film"]),
+                    "texture": st.get("texture") if st.get("texture") in TEXTURES else DEFAULTS["staff"]["texture"],
+                    "page": _hex(st.get("page"), "") if st.get("page") else ""}
+    for key in STAFF_MATERIAL:
+        default = DEFAULTS["staff"][key]
+        cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
     for name in STAFF_ASSETS:
         cfg["staff"][name] = _asset(st.get(name))
     return cfg
+
+
+# Pictures an https address shows on both sides; a file of this server is
+# in the OPAC's folder (/images/custom), which the staff side does not serve.
+def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
+    """"Copy OPAC preset": the OPAC's material, colours, page colour and
+    pictures into cfg["staff"] (turned on), the staff's own type size,
+    contrast and table density kept. Returns (settings, the names of the
+    pictures left out: OPAC files on this server, re-chosen on the staff
+    side)."""
+    cfg = normalize(raw)
+    st = cfg["staff"]
+    st["enabled"] = True
+    for key in ("texture", "accent", "accent2", "surface", "page", *STAFF_MATERIAL):
+        st[key] = cfg[key]
+    st["film"] = _clamp(cfg["film"], *STAFF_FILM, DEFAULTS["staff"]["film"])
+    skipped = []
+    for name in STAFF_ASSETS:
+        pic = cfg[name]
+        if pic["url"].startswith("https://"):
+            st[name] = {"source": "url", "url": pic["url"]}
+        elif pic["url"]:
+            skipped.append(name)
+    return normalize(cfg), skipped
 
 
 def data_line(cfg: dict) -> str:
@@ -919,8 +955,10 @@ def staff_css_body(cfg: dict) -> str:
     """The staff interface's own look, from cfg["staff"] only: one hue for
     the top bar and the quick search bar under it, the home page modules as
     cards, the news column on a tinted surface, the buttons and links in the
-    palette; its own type size, contrast and table density. Only CSS: no
-    carousel, button or other OPAC widget ever reaches the staff pages.
+    palette; its own material (the OPAC's textures, blur, opacity and
+    corner rounding, _staff_material_css), type size, contrast and table
+    density. Only CSS: no carousel, button or other OPAC widget ever
+    reaches the staff pages.
 
     Koha's own rules are beaten by specificity (html body + the same ids);
     !important only where Koha or Bootstrap use it themselves (.bg-dark) or
@@ -929,7 +967,7 @@ def staff_css_body(cfg: dict) -> str:
     accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
     light = luminance(surface) >= 0.30
     bar = mix(accent, "#000000", .22)              # the quick search bar: the top bar's hue, darker
-    page = mix(surface, accent, .04) if light else mix(surface, accent, .08)
+    page = staff_page(st)
     card = surface
     text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
     ink = mix(accent, "#000000", .30) if light else mix(accent, "#ffffff", .45)
@@ -951,7 +989,12 @@ def staff_css_body(cfg: dict) -> str:
     --nexus-staff-edge: rgba({_rgb(accent)}, .16);
     --nexus-staff-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 6px 18px -6px rgba(15, 23, 42, .16);
     --nexus-staff-shadow-hi: 0 2px 4px rgba(15, 23, 42, .08), 0 14px 28px -8px rgba({_rgb(accent)}, .35);
-    --nexus-staff-radius: 12px;
+    --nexus-staff-radius: {st['radius_block']}px;
+    --nexus-staff-r-input: {st['radius_input']}px;
+    --nexus-staff-r-btn: {st['radius_button']}px;
+    --nexus-staff-surface-rgb: {_rgb(surface)};
+    --nexus-staff-surface-a: {st['opacity'] / 100:.2f};
+    --nexus-staff-blur: {st['blur']}px;
 }}
 html {{ font-size: {st['font']}%; }}
 html body {{ background-color: var(--nexus-staff-page); color: var(--nexus-staff-text); }}
@@ -993,7 +1036,7 @@ html body #header_search form {{ align-items: center; }}
 html body #header_search .form-title label {{ color: #fff; letter-spacing: .01em; }}
 html body #header_search .form-content {{
     background-color: var(--nexus-staff-card);
-    border-radius: 10px 0 0 10px;
+    border-radius: var(--nexus-staff-r-input) 0 0 var(--nexus-staff-r-input);
     margin-left: 0;
     padding-left: .35rem;
     min-height: 2.25rem;
@@ -1005,7 +1048,7 @@ html body #header_search input[type="submit"], html body #header_search button[t
     height: 2.25rem;
     margin-left: 0;
     padding: 0 1rem;
-    border-radius: 0 10px 10px 0;
+    border-radius: 0 var(--nexus-staff-r-input) var(--nexus-staff-r-input) 0;
     background-color: var(--nexus-staff-secondary);
     color: var(--nexus-staff-on-secondary);
     transition: filter .15s ease;
@@ -1109,7 +1152,7 @@ html body #area-news .newsitem {{
     padding: .75rem .85rem;
     background-color: var(--nexus-staff-card);
     border: 0;
-    border-radius: 10px;
+    border-radius: calc(var(--nexus-staff-radius) * .8);
     box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
     line-height: 1.5;
 }}
@@ -1131,7 +1174,7 @@ html body #area-news .newsitem .btn-acesso {{
     background-color: var(--nexus-staff-card) !important;
     color: var(--nexus-staff-text) !important;
     border: 1px solid var(--nexus-staff-edge) !important;
-    border-radius: 10px !important;
+    border-radius: var(--nexus-staff-r-btn) !important;
     text-decoration: none !important;
 }}
 html body #area-news .newsitem .btn-acesso:hover, html body #area-news .newsitem .btn-acesso:focus-visible {{
@@ -1152,6 +1195,12 @@ html body .btn-primary:hover, html body .btn-primary:focus {{
     color: var(--nexus-staff-on-primary);
 }}
 html body .btn-default:hover, html body .btn-default:focus {{ border-color: var(--nexus-staff-primary); }}
+html body .btn, html body input[type="submit"], html body input[type="button"], html body input[type="reset"],
+html body button.btn {{ border-radius: var(--nexus-staff-r-btn); }}
+html body .main .form-control, html body .main .form-select, html body .main input[type="text"],
+html body .main input[type="search"], html body .main input[type="password"], html body .main input[type="email"],
+html body .main input[type="number"], html body .main input[type="tel"], html body .main select,
+html body .main textarea, html body #area-news textarea {{ border-radius: var(--nexus-staff-r-input); }}
 html body .nav-tabs .nav-link.active, html body .ui-tabs .ui-tabs-nav li.ui-tabs-active {{
     border-top: 3px solid var(--nexus-staff-primary);
 }}
@@ -1171,6 +1220,7 @@ html body textarea:focus {{
 }}""")
         if st["density"] == "compact":
             out.append("html body table { line-height: 1.25; }")
+    out += _staff_material_css(st)
     out += _staff_pictures_css(st)
     if st["contrast"] == "high":
         out.append("""html body { color: #000 !important; }
@@ -1179,6 +1229,101 @@ html body table, html body table td, html body table th { border-color: #4b5563 
 html body a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
 html body .btn { border-width: 2px; }""")
     return "\n".join(out) + "\n"
+
+
+def staff_page(st: dict) -> str:
+    """The staff page colour: the chosen one, else the surface with a hint of the accent."""
+    if st["page"]:
+        return st["page"]
+    light = luminance(st["surface"]) >= 0.30
+    return mix(st["surface"], st["accent"], .04 if light else .08)
+
+
+# The staff blocks that take the texture (the content sections, the news
+# column, the forms) and the cards inside them (home page modules, news).
+_STAFF_BLOCKS = ".page-section, #area-news, fieldset.rows"
+_STAFF_CARDS = "ul.biglinks-list li a.icon_general, #area-news .newsitem"
+
+
+def _staff_material_css(st: dict) -> list[str]:
+    """The OPAC's materials on the staff blocks, from cfg["staff"]: frosted
+    glass (blur + opacity), smooth glass, brushed metal (and metal buttons
+    like the OPAC's), a soft diagonal gradient. "flat" adds nothing: the
+    solid cards of the staff palette. Without a staff wallpaper, glass gets a
+    page with two faint accent glows to blur (the OPAC's canvas)."""
+    t = st["texture"]
+    if t == "flat":
+        return []
+    blocks, cards = _strong(_STAFF_BLOCKS), _strong(_STAFF_CARDS)
+    surface = "rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a))"
+    wash = ("linear-gradient(135deg, rgba(var(--nexus-staff-primary-rgb), .08), "
+            "rgba(var(--nexus-staff-secondary-rgb), .08))")
+    light = luminance(st["surface"]) >= 0.30
+    shadow = ("0 1px 2px rgba(15, 23, 42, .06), 0 12px 32px -10px rgba(15, 23, 42, .22)" if light
+              else "0 1px 2px rgba(0, 0, 0, .25), 0 12px 32px -10px rgba(0, 0, 0, .55)")
+    rule = [f"{blocks} {{", f"    background: {wash}, {surface};",
+            "    border: 1px solid var(--nexus-staff-edge);", "    border-radius: var(--nexus-staff-radius);"]
+    if t == "frosted":
+        # The blur sits on a layer behind the content, not on the block: a
+        # backdrop-filter on the block would make it the frame of every
+        # position: fixed thing inside it (Koha's modals, the assistant's
+        # wider view).
+        rule += ["    position: relative;", "    isolation: isolate;", f"    box-shadow: {shadow};"]
+    elif t == "smooth":
+        rule += [f"    box-shadow: {shadow};"]
+    elif t == "metal":
+        rule[1] = ("    background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
+                   "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px), "
+                   f"{wash}, {surface};")
+        rule += ["    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
+                 "0 2px 8px rgba(0, 0, 0, .14);"]
+    elif t == "gradient":
+        rule[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
+                   "rgba(var(--nexus-staff-primary-rgb), .10) 55%, rgba(var(--nexus-staff-secondary-rgb), .14) 100%);")
+        rule += [f"    box-shadow: {shadow};"]
+    rule.append("}")
+    # The cards inside: the same surface, a touch more solid, so text stays crisp.
+    rule.append(f"""{cards} {{
+    background-color: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .5 + .5));
+}}""")
+    if t == "frosted":
+        layer = ", ".join(f"{x}::before" for x in blocks.split(", "))
+        rule.append(f"""{layer} {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--nexus-staff-blur)) saturate(140%);
+    backdrop-filter: blur(var(--nexus-staff-blur)) saturate(140%);
+}}""")
+    if t == "metal":
+        # The top bar and the buttons in brushed metal, like the OPAC's.
+        rule.append(f"""html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
+    background: linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, .04) 50%, rgba(0, 0, 0, .14) 100%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 3px),
+        var(--nexus-staff-primary) !important;
+}}
+html body .btn-primary, html body input[type="submit"].btn-primary {{
+    background: linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .08) 50%, rgba(0, 0, 0, .14) 100%),
+        var(--nexus-staff-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), 0 4px 6px rgba(0, 0, 0, .12);
+}}
+html body .btn-default, html body .btn-secondary, html body .btn-light {{
+    background: linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 50%, #c9c9c9 100%);
+    border-color: #b3b3b3;
+    color: #333;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), 0 2px 4px rgba(0, 0, 0, .1);
+}}""")
+    if not st["background"]["url"] and t in ("frosted", "smooth"):
+        base = staff_page(st)
+        rule.append(f"""html body {{
+    background: radial-gradient(1200px 600px at 0% 0%, rgba(var(--nexus-staff-primary-rgb), .14), transparent 60%),
+        radial-gradient(1000px 600px at 100% 100%, rgba(var(--nexus-staff-secondary-rgb), .12), transparent 60%), {base};
+    background-attachment: fixed;
+}}""")
+    return ["\n".join(rule)]
 
 
 def _staff_pictures_css(st: dict) -> list[str]:
@@ -1201,8 +1346,7 @@ html body nav.navbar #logo.navbar-brand img {{ display: none; }}
 @media (max-width: 575px) {{ html body nav.navbar #logo.navbar-brand {{ width: 96px; height: 28px; }} }}""")
     bg = st["background"]["url"]
     if bg:
-        page = mix(st["surface"], st["accent"], .04) if luminance(st["surface"]) >= 0.30 \
-            else mix(st["surface"], st["accent"], .08)
+        page = staff_page(st)
         out.append(f"""html body {{
     background: url("{bg}") center / cover no-repeat fixed;
     position: relative;

@@ -167,3 +167,45 @@ def ollama_pull(url: str, model: str, on_progress: Callable[[str, int, int], Non
         raise RuntimeError(f"HTTP {e.code} from {b}/api/pull") from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise RuntimeError(f"{_reason(e)} ({b}/api/pull)") from None
+
+
+def same_model(a: str, b: str) -> bool:
+    return a.removesuffix(":latest") == b.removesuffix(":latest")
+
+
+def ollama_loaded(url: str, timeout: float = 5) -> list[str]:
+    """The models Ollama holds in memory now (GET /api/ps), not the ones
+    downloaded (/api/tags): each takes its RAM until it is unloaded."""
+    b = base({"provider": "ollama", "url": url})
+    data = _get_json(b + "/api/ps", {"User-Agent": UA}, timeout)
+    items = data.get("models") if isinstance(data, dict) else None
+    return [str(m.get("name") or m.get("model")) for m in items or []
+            if isinstance(m, dict) and (m.get("name") or m.get("model"))]
+
+
+def ollama_unload(url: str, model: str, timeout: float = 15) -> None:
+    """Frees the memory of one model now (keep_alive 0); Ollama loads it
+    again on demand, on the next request that names it."""
+    b = base({"provider": "ollama", "url": url})
+    body = json.dumps({"model": model, "keep_alive": 0}).encode()
+    req = urllib.request.Request(b + "/api/generate", data=body, method="POST",
+                                 headers={"User-Agent": UA, "Content-Type": "application/json"})
+    try:
+        with _open(req, timeout) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code} from {b}/api/generate") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RuntimeError(f"{_reason(e)} ({b}/api/generate)") from None
+
+
+def ollama_keep_only(url: str, keep: list[str]) -> list[str]:
+    """Unloads every model in memory that is not in keep (all of them when
+    keep is empty); returns the ones unloaded. The AI assistant and MARC
+    Replace do the same before each request, for their own model."""
+    gone = []
+    for model in ollama_loaded(url):
+        if not any(same_model(model, k) for k in keep if k):
+            ollama_unload(url, model)
+            gone.append(model)
+    return gone
