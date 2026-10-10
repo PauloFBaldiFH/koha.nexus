@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.40** (1.5.41: Rede Pergamum SRU bridge PR; 1.5.42: language menu PR; 1.5.43: OPAC/staff quick access buttons PR)._
+_Last updated: 2026-10-10. Panel version on `main`: **1.5.43** (1.5.44: last-backup indicator and pre-restore safety backup PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.44 (last-backup indicator, pre-restore safety backup)**: one source of truth for "the
+  newest backup", `latest_sql_backup` (EPOCH MTIME SIZE PATH): top-level, non-empty `*.sql.{gz,zst,xz}`
+  in $DIR_SQL, dated by the timestamp in the name (`backup_name_epoch`: `_23h00`, `_14h0733`,
+  `_14h07m33`, `20261002-0300`), else the mtime, so a copied-back old backup no longer looks new;
+  a manual backup saved elsewhere counts while its file exists (`/var/lib/koha-easy-install/last-manual-backup`).
+  The dashboard, Backup center, Download latest backup, Test the latest backup, the validation report
+  and the detailed status all read it (before, four separate `find`s disagreed on depth and order).
+  Nightly script and `create_safety_backup` write `FILE.part` and rename once verified (a dump in
+  progress was the "newest"); an old nightly script is rewritten by `--task info`. Status JSON adds
+  `backup.last_kind` (nightly|safety|manual|other|none). The Last backup card shows the date and time,
+  "N h ago · file", green under two days unless the last nightly run failed; "None yet" when empty.
+  Restore's safety copy is now `pre_restore_safety_backup_<YYYY-MM-DD_HHhMMmSS>.sql.<codec>` (codec
+  from Backup center); older `PRE-RESTORE_*` copies are still found by require_koha_tables. A failed
+  safety copy still aborts before the live database is touched, now logged.
 
 - **1.5.43 (OPAC and staff quick access buttons)**: each quick access button has a `sort_order`
   (settings saved before it get 1..n as listed, so nothing moves) and the buttons are shown by it;

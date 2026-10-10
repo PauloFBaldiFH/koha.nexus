@@ -3,6 +3,8 @@ then the backup routines."""
 
 from __future__ import annotations
 
+import time
+
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Button, Label, Select
@@ -10,7 +12,7 @@ from textual.widgets import Button, Label, Select
 from ..i18n import t
 from ..widgets.cards import StatusCard
 from .base import SectionView
-from .dashboard import age, human_bytes
+from .dashboard import backup_card, human_bytes
 
 # BACKUP_COMPRESSION in backup.conf (installer: backup_set_codec). Restores
 # read any of them, whatever this setting says.
@@ -18,6 +20,13 @@ CODECS = {
     "gz": "Gzip (.sql.gz) · opens anywhere",
     "zst": "Zstandard (.sql.zst) · fast and smaller: large catalogs",
     "xz": "XZ / LZMA (.sql.xz) · smallest, slow to make: long-term storage",
+}
+# The last nightly run, as backup_sql.log tells it (kei_backup_summary).
+RESULTS = {
+    "ok": ("OK", "ok"),
+    "failed": ("FAILED", "bad"),
+    "skipped": ("Skipped (busy)", "warn"),
+    "none": ("Not run yet", "warn"),
 }
 CODEC_NOTE = ("Used by the nightly backup, manual backups and the safety copies made before a change. "
               "Restore database recognises .sql, .sql.gz, .sql.zst and .sql.xz on its own.")
@@ -102,7 +111,10 @@ class BackupView(SectionView):
         except Exception as e:
             self.query_one("#bk-age", StatusCard).set("-", str(e)[:60], "bad")
             return
-        self.query_one("#bk-age", StatusCard).set(age(b.get("last_epoch")), b.get("last_file") or "-")
+        self.query_one("#bk-age", StatusCard).set(*backup_card(b))
         self.query_one("#bk-size", StatusCard).set(human_bytes(b.get("last_size")))
-        ok = b.get("last_result") == "ok"
-        self.query_one("#bk-result", StatusCard).set(b.get("last_result") or "-", "", "ok" if ok else "warn")
+        text, state = RESULTS.get(b.get("last_result") or "none", RESULTS["none"])
+        note = t("Last nightly backup")
+        if b.get("log_epoch"):
+            note += " · " + time.strftime("%Y-%m-%d %H:%M", time.localtime(int(b["log_epoch"])))
+        self.query_one("#bk-result", StatusCard).set(t(text), note, state)

@@ -61,3 +61,22 @@ def test_cloud_server_on_a_private_address_shows_its_public_ip():
     assert links["public", "opac"][0] == "http://203.0.113.7"
     assert links["public", "staff"][0] == "http://203.0.113.7:8080"
     assert "Cloudflare Tunnel" in links["public", "staff"][1]
+
+
+def test_last_backup_card_shows_when_how_long_ago_and_which_file():
+    import time as _time
+
+    from kei_panel.views.dashboard import backup_card
+    now = 1_791_640_000
+    b = {"last_file": "koha_library_2026-10-09_23h00.sql.gz", "last_epoch": now - 3 * 3600, "last_result": "ok"}
+    value, note, state = backup_card(b, now=now)
+    assert value == _time.strftime("%Y-%m-%d %H:%M", _time.localtime(now - 3 * 3600))
+    assert note == "3 h ago · koha_library_2026-10-09_23h00.sql.gz" and state == "ok"
+    # No nightly run yet (a manual or safety copy is the newest): still green.
+    assert backup_card(dict(b, last_result="none"), now=now)[2] == "ok"
+    # Old, or the last nightly run failed: amber.
+    assert backup_card(dict(b, last_epoch=now - 3 * 86400), now=now)[2] == "warn"
+    assert backup_card(dict(b, last_result="failed"), now=now)[2] == "warn"
+    # No backup at all, or an installer that sent nothing.
+    for empty in ({"last_epoch": 0, "last_file": ""}, {}, None, {"last_epoch": "x"}):
+        assert backup_card(empty, now=now) == ("None yet", "No backup on this server yet", "warn")

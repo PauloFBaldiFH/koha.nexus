@@ -54,7 +54,7 @@ on_exit() {
     restore_apt_timers
     declare -F panel_lock_release >/dev/null && panel_lock_release
     [ -n "$RESTORE_TRIAL_DB" ] && mysql -e "DROP DATABASE IF EXISTS \`${RESTORE_TRIAL_DB}\`;" >/dev/null 2>&1
-    [ -n "$CLEANUP_FILE" ] && rm -f "$CLEANUP_FILE"
+    [ -n "$CLEANUP_FILE" ] && rm -f "$CLEANUP_FILE" "${CLEANUP_FILE}.part"
     [ -n "$MAINT_MARKER_OWNED" ] && rm -f "$MAINT_MARKER_OWNED"
     case "$TOOLS_WORK" in /tmp/koha_tools.?*) rm -rf "$TOOLS_WORK" ;; esac
     rm -f /tmp/koha_tmp_* 2>/dev/null || true
@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.43"
+PANEL_VERSION=" 1.5.44"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2769,6 +2769,84 @@ BACKUP_CODECS="gz zst xz"
 # find expression for every SQL backup the panel makes, whatever its codec.
 SQL_BACKUP_NAMES=( \( -name '*.sql.gz' -o -name '*.sql.zst' -o -name '*.sql.xz' \) )
 
+# backup_name_epoch FILE: when the backup was made, read from its name
+# (koha_library_2026-10-10_23h00.sql.gz, PRE-UPDATE_2026-10-10_14h0733...,
+# pre_restore_safety_backup_2026-10-10_14h07m33..., koha-library-20261002-0300...).
+# A copy (scp, a USB drive, a cloud download) gets a new mtime but keeps its
+# name. Empty when the name has no date, or one more than a day ahead.
+backup_name_epoch() {
+    local name="${1##*/}" epoch
+    if [[ "$name" =~ ([0-9]{4})-([0-9]{2})-([0-9]{2})[_T]([0-9]{2})h?([0-9]{2})m?([0-9]{2})? ]] \
+       || [[ "$name" =~ ([0-9]{4})([0-9]{2})([0-9]{2})[-_]([0-9]{2})([0-9]{2})([0-9]{2})? ]]; then
+        local r=("${BASH_REMATCH[@]}")
+        epoch=$(date -d "${r[1]}-${r[2]}-${r[3]} ${r[4]}:${r[5]}:${r[6]:-00}" +%s 2>/dev/null) || return 0
+        [ "$epoch" -le $(( $(date +%s) + 86400 )) ] && printf '%s' "$epoch"
+    fi
+    return 0
+}
+
+# What made a backup, from its name: nightly | safety | manual | other.
+backup_kind() {
+    local name="${1##*/}"
+    case "$name" in
+        PRE-*|pre_restore_*) echo safety ;;
+        *_manual_*)          echo manual ;;
+        "${DB_NAME}"_[0-9]*) echo nightly ;;
+        *)                   echo other ;;
+    esac
+}
+
+# Every SQL backup in $DIR_SQL (top level, regular files, not empty; a dump
+# still being written ends in .part), newest first, one per line:
+#   EPOCH MTIME SIZE PATH
+# EPOCH is the time in the name, else the mtime; MTIME breaks ties.
+sql_backup_list() {
+    local mtime size path epoch
+    find "$DIR_SQL" -maxdepth 1 -type f -size +0 "${SQL_BACKUP_NAMES[@]}" -printf '%T@ %s %p\n' 2>/dev/null \
+    | while read -r mtime size path; do
+        mtime=${mtime%%.*}
+        epoch=$(backup_name_epoch "$path")
+        printf '%s %s %s %s\n' "${epoch:-$mtime}" "$mtime" "$size" "$path"
+    done | sort -k1,1nr -k2,2nr
+}
+
+# The newest backup: "EPOCH MTIME SIZE PATH", or nothing. The panel's
+# dashboard, Download latest backup, Test the latest backup and the
+# validation report all read this one, so they always name the same file.
+# A manual backup saved outside $DIR_SQL counts while its file is there.
+LAST_MANUAL_BACKUP="${STOP_GUARD_STATE_DIR}/last-manual-backup"
+latest_sql_backup() {
+    local best manual m_epoch m_path m_size
+    best=$(sql_backup_list | awk 'NR == 1')
+    manual=$(head -n1 "$LAST_MANUAL_BACKUP" 2>/dev/null)
+    if [ -n "$manual" ]; then
+        m_epoch=${manual%% *} m_path=${manual#* }
+        case "$m_epoch" in ''|*[!0-9]*) m_epoch=0 ;; esac
+        if [ "$m_epoch" -gt "${best%% *}" ] 2>/dev/null || { [ -z "$best" ] && [ "$m_epoch" -gt 0 ]; }; then
+            if [ -s "$m_path" ]; then
+                m_size=$(stat -c %s "$m_path" 2>/dev/null || echo 0)
+                best="$m_epoch $(stat -c %Y "$m_path" 2>/dev/null || echo "$m_epoch") $m_size $m_path"
+            fi
+        fi
+    fi
+    [ -n "$best" ] && printf '%s\n' "$best"
+    return 0
+}
+
+# backup_date FILE: "2026-10-10 23:00", from the name like sql_backup_list.
+backup_date() {
+    local epoch
+    epoch=$(backup_name_epoch "$1")
+    [ -n "$epoch" ] || epoch=$(stat -c %Y -- "$1" 2>/dev/null) || return 0
+    date -d "@$epoch" '+%Y-%m-%d %H:%M'
+}
+
+# Remembers a manual backup saved outside $DIR_SQL (latest_sql_backup).
+record_manual_backup() {
+    mkdir -p "${LAST_MANUAL_BACKUP%/*}" 2>/dev/null || return 0
+    printf '%s %s\n' "$(date +%s)" "$1" > "$LAST_MANUAL_BACKUP" 2>/dev/null || true
+}
+
 # The codec set in backup.conf (gz when unset or unknown).
 backup_codec_setting() {
     local c
@@ -2831,17 +2909,20 @@ backup_set_codec() {
 # .sql.zst or .sql.xz) and checks the result (compression test, complete
 # mysqldump, minimum size). Removes the file and returns 1 on any failure.
 create_safety_backup() {
-    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec
+    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec part="${1}.part"
     case "$out" in *.zst) codec=zst ;; *.xz) codec=xz ;; *) codec=gz ;; esac
     mkdir -p "$(dirname "$out")" 2>/dev/null
+    # Written as FILE.part and renamed once verified: a dump in progress or
+    # cut short is never taken for the newest backup (sql_backup_list).
     if mysqldump --single-transaction --quick --routines --triggers \
-            --default-character-set=utf8mb4 "$DB_NAME" 2>>"$errlog" | backup_compress "$codec" 2>/dev/null > "$out" \
-       && [ "$(dump_codec "$out")" = "$codec" ] && dump_test "$out" \
-       && [ "$(stat -c %s "$out" 2>/dev/null || echo 0)" -ge 10240 ] \
-       && dump_is_complete "$out"; then
+            --default-character-set=utf8mb4 "$DB_NAME" 2>>"$errlog" | backup_compress "$codec" 2>/dev/null > "$part" \
+       && [ "$(dump_codec "$part")" = "$codec" ] && dump_test "$part" \
+       && [ "$(stat -c %s "$part" 2>/dev/null || echo 0)" -ge 10240 ] \
+       && dump_is_complete "$part" \
+       && mv -f -- "$part" "$out"; then
         return 0
     fi
-    rm -f "$out"
+    rm -f -- "$part" "$out"
     return 1
 }
 
@@ -3137,11 +3218,12 @@ validate_ufw() {
 }
 
 validate_backups() {
-    local newest age
+    local latest newest age
     if [ -d "$DIR_SQL" ]; then
-        newest=$(newest_sql_backup)
+        latest=$(latest_sql_backup)
+        newest=$(printf '%s' "$latest" | cut -d' ' -f4-)
         if [ -n "$newest" ]; then
-            age=$(( ( $(date +%s) - $(stat -c %Y "$newest") ) / 86400 ))
+            age=$(( ( $(date +%s) - ${latest%% *} ) / 86400 ))
             if [ "$age" -le 2 ]; then
                 v_ok "Backup SQL: $(t "newest is") ${age}d ($(basename "$newest"))."
             else
@@ -4212,33 +4294,39 @@ if ! mkdir -p "\$DIR" 2>/dev/null; then
 fi
 
 FILE="\$DIR/\${DB}_\$(date +%Y-%m-%d_%Hh%M).sql.\${BACKUP_COMPRESSION}"
+# Written as FILE.part and renamed once every check passed: a dump in
+# progress or cut short is never taken for the newest backup.
+PART="\${FILE}.part"
+trap 'rm -f -- "\$PART"' EXIT
+find "\$DIR" -maxdepth 1 -name '*.sql.*.part' -mmin +1440 -delete 2>/dev/null || true
 
 if ! mysqldump --single-transaction --quick --routines --triggers \
-        --default-character-set=utf8mb4 "\$DB" 2>>"\$LOG" | compress 2>>"\$LOG" > "\$FILE"; then
+        --default-character-set=utf8mb4 "\$DB" 2>>"\$LOG" | compress 2>>"\$LOG" > "\$PART"; then
     log_backup "FAILED to generate \$FILE"
-    rm -f "\$FILE"
+    rm -f "\$PART"
     exit 1
 fi
 
-if ! test_archive "\$FILE" 2>/dev/null; then
+if ! test_archive "\$PART" 2>/dev/null; then
     log_backup "FAILED: corrupt file removed: \$FILE"
-    rm -f "\$FILE"
+    rm -f "\$PART"
     exit 1
 fi
 
 # A complete dump ends with mysqldump's "-- Dump completed" line.
-if [ "\$(decompress "\$FILE" | tail -c 512 | grep -c '^-- Dump completed')" -eq 0 ]; then
+if [ "\$(decompress "\$PART" | tail -c 512 | grep -c '^-- Dump completed')" -eq 0 ]; then
     log_backup "FAILED: incomplete dump (no completion line) removed: \$FILE"
-    rm -f "\$FILE"
+    rm -f "\$PART"
     exit 1
 fi
 
-SIZE=\$(stat -c %s "\$FILE" 2>/dev/null || echo 0)
+SIZE=\$(stat -c %s "\$PART" 2>/dev/null || echo 0)
 if [ "\$SIZE" -lt 10240 ]; then
     log_backup "FAILED: suspicious backup (\$SIZE bytes), removed: \$FILE"
-    rm -f "\$FILE"
+    rm -f "\$PART"
     exit 1
 fi
+mv -f -- "\$PART" "\$FILE"
 log_backup "OK: \$FILE (\$SIZE bytes)"
 
 RCLONE_REMOTE="\$(printf '%s' "\$RCLONE_REMOTE" | xargs)"
@@ -5862,8 +5950,10 @@ _function_restore_database() {
         return 1
     fi
 
-    # 4) Verified safety copy of the current catalog: without it, the
-    #    current catalog is never dropped.
+    # 4) Verified safety copy of the current catalog
+    #    (pre_restore_safety_backup_<date>.sql.gz, or .zst / .xz as set in
+    #    Backup center): without it, the current catalog is never dropped.
+    #    Only a database with no tables has nothing to save.
     local rescue="" cur_tables pre_engine
     if ! cur_tables=$(koha_table_count); then
         restore_release
@@ -5872,17 +5962,21 @@ _function_restore_database() {
     fi
     pre_engine=$(get_search_engine)
     if [ "$cur_tables" -gt 0 ]; then
-        rescue="${DIR_SQL}/PRE-RESTORE_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
+        rescue="${DIR_SQL}/pre_restore_safety_backup_$(date +%Y-%m-%d_%Hh%Mm%S)$(backup_ext)"
         CLEANUP_FILE="$rescue"
-        if ! tui_run "$(t "Saving a safety backup")" create_safety_backup "$rescue" "$import_log"; then
+        if ! tui_run "$(t "Saving a safety backup of the current database")" create_safety_backup "$rescue" "$import_log"; then
             CLEANUP_FILE=""
+            log "restore aborted: the pre-restore safety backup failed (${rescue}); the current database was not touched"
             restore_release
             msg_error "$(t "Safety backup failed")" "$(t 'The safety backup of the current database could not be created or validated (check the free space and ${DIR_SQL}).\n\nNothing was changed.')" 12 76
             return 1
         fi
         CLEANUP_FILE=""
         display_explanation "$(t "Safety backup:") $rescue"
-        log "pre-restore safety backup: $rescue"
+        log "pre-restore safety backup: $rescue ($(stat -c %s "$rescue" 2>/dev/null || echo 0) bytes)"
+    else
+        display_explanation "$(t "The current database has no tables: there is nothing to save before the restore.")"
+        log "pre-restore safety backup: skipped, the current database has no tables"
     fi
 
     # 5) Replace the catalog. From here on the restore can only end with the
@@ -5990,6 +6084,7 @@ function_manual_backup() {
     if create_safety_backup "$target_file"; then
 
         log "manual backup generated: $target_file"
+        record_manual_backup "$target_file"
         backup_lock_release
 
         local size ip_addr
@@ -6033,7 +6128,7 @@ function_manual_backup() {
 # 5. TEST THE LATEST BACKUP
 # ======================================================================
 newest_sql_backup() {
-    find "$DIR_SQL" "${SQL_BACKUP_NAMES[@]}" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-
+    latest_sql_backup | cut -d' ' -f4-
 }
 # function_test_backup [FILE]: the newest automatic backup unless the new
 # panel names another file.
@@ -6053,7 +6148,7 @@ function_test_backup() {
 
     local b_name b_date p_msg
     b_name="$(basename "$newest")"
-    b_date="$(date -r "$newest" '+%Y-%m-%d %H:%M')"
+    b_date="$(backup_date "$newest")"
     p_msg="$(printf "%s\n\n%s: %s\n%s: %s\n\n%s" \
         "$(t "A backup is only worth it if it restores. This test imports the newest file into a temporary database and checks it. Production data is NOT touched.")" \
         "$(t "File")" "$b_name" \
@@ -6695,7 +6790,8 @@ require_koha_tables() {
     tables=$(koha_table_count)
     if [ "${tables:-0}" -lt 50 ] 2>/dev/null; then
         local rescue
-        rescue=$(ls -1t "${DIR_SQL}"/PRE-RESTORE_*.sql.* "${DIR_SQL}"/PRE-REINSTALLATION_*.sql.* 2>/dev/null | head -n1)
+        rescue=$(ls -1t "${DIR_SQL}"/pre_restore_safety_backup_*.sql.* "${DIR_SQL}"/PRE-RESTORE_*.sql.* \
+                 "${DIR_SQL}"/PRE-REINSTALLATION_*.sql.* 2>/dev/null | grep -v '\.part$' | head -n1)
         [ -n "$rescue" ] && rescue_hint="\n\n$(t "Safety copy made before the last restore:")\n${rescue}"
         msg_error "" "$(t 'The Koha database is empty or incomplete (${tables} tables).\n\nRestore a backup (option 3) or finish the Web Installer first.')${rescue_hint}" 15 80
         return 1
@@ -9192,7 +9288,7 @@ detailed_status_rows() {
     [ -n "$pub" ] && printf '%s\t%s\t%s\n' "$g" "$(t "Public IP")" "$pub"
     g=$(t "BACKUP")
     printf '%s\t%s\t%s\n' \
-        "$g" "$(t "Latest SQL")" "$(find "$DIR_SQL" "${SQL_BACKUP_NAMES[@]}" -printf '%TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort -r | head -n1 | grep . || echo '-')" \
+        "$g" "$(t "Latest SQL")" "$(latest_sql_backup | awk '{print $1}' | xargs -r -I{} date -d @{} '+%Y-%m-%d %H:%M' | grep . || echo '-')" \
         "$g" "$(t "Cloud")" "$(grep -o 'RCLONE_REMOTE="[^"]*"' "$BACKUP_CONF" 2>/dev/null | cut -d'"' -f2 | grep . || echo "$(t "not configured")")"
 }
 
@@ -9248,15 +9344,16 @@ kei_http_code() {
     case "$code" in [0-9][0-9][0-9]) printf '%s' "$code" ;; *) printf '000' ;; esac
 }
 
-# Newest nightly SQL backup and the last line the backup script logged.
-# Prints: epoch size result file   (result: ok | failed | skipped | none)
+# Newest SQL backup (latest_sql_backup: nightly, manual or safety copy) and
+# the last line the nightly backup script logged.
+# Prints: epoch size result kind file
+#   result: ok | failed | skipped | none    kind: see backup_kind, or none
 kei_backup_summary() {
-    local newest epoch=0 size=0 file="" last result="none"
-    newest=$(find "$DIR_SQL" -maxdepth 1 "${SQL_BACKUP_NAMES[@]}" -printf '%T@ %s %p\n' 2>/dev/null | sort -rn | head -n1)
+    local newest epoch=0 mtime size=0 file="" kind="none" last result="none"
+    newest=$(latest_sql_backup)
     if [ -n "$newest" ]; then
-        epoch="${newest%%.*}"
-        size=$(printf '%s' "$newest" | awk '{print $2}')
-        file="${newest#* * }"
+        read -r epoch mtime size file <<< "$newest"
+        kind=$(backup_kind "$file")
     fi
     last=$(grep -E '\| (OK|FAILED|INFO: SQL backup skipped)' "${LOG_DIR}/backup_sql.log" 2>/dev/null | tail -n1)
     case "$last" in
@@ -9264,7 +9361,7 @@ kei_backup_summary() {
         *'| FAILED'*) result="failed" ;;
         *skipped*) result="skipped" ;;
     esac
-    printf '%s %s %s %s\n' "$(json_num "$epoch")" "$(json_num "$size")" "$result" "$file"
+    printf '%s %s %s %s %s\n' "$(json_num "$epoch")" "$(json_num "$size")" "$result" "$kind" "$file"
 }
 
 # Time of the last line of the backup log (epoch), 0 when there is none.
@@ -9309,7 +9406,7 @@ kei_access_json() {
 
 kei_status_json() {
     local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false
-    local b_epoch b_size b_result b_file df_line d_total d_free mem_total mem_avail
+    local b_epoch b_size b_result b_kind b_file df_line d_total d_free mem_total mem_avail
     local r_epoch r_state r_finished r_db r_backup r_index
     for svc in apache2 mariadb memcached rabbitmq-server koha-common cron elasticsearch cloudflared; do
         state=$(systemctl is-active "$svc" 2>/dev/null | head -n1)
@@ -9322,7 +9419,7 @@ kei_status_json() {
     staff=$(kei_http_code "http://127.0.0.1:8080/")
     opac=$(kei_http_code "http://127.0.0.1/")
     plack_running 2>/dev/null && plack=true
-    read -r b_epoch b_size b_result b_file < <(kei_backup_summary)
+    read -r b_epoch b_size b_result b_kind b_file < <(kei_backup_summary)
     read -r r_epoch r_state r_finished r_db r_backup r_index < <(stop_guard_summary)
     df_line=$(df -P -B1 / 2>/dev/null | awk 'NR==2{print $2" "$4}')
     d_total="${df_line%% *}" d_free="${df_line##* }"
@@ -9333,8 +9430,8 @@ kei_status_json() {
     printf '"state":%s,"koha_installed":%s,' "$(json_str "$(kei_overall_state "$apache" "$db" "$koha" "$staff")")" "$(is_koha_installed && echo true || echo false)"
     printf '"services":{%s},"plack":%s,' "$json" "$plack"
     printf '"http":{"staff":%s,"opac":%s},' "$(json_num "$staff")" "$(json_num "$opac")"
-    printf '"backup":{"last_file":%s,"last_epoch":%s,"last_size":%s,"last_result":%s,"log_epoch":%s},' \
-        "$(json_str "${b_file##*/}")" "$(json_num "$b_epoch")" "$(json_num "$b_size")" "$(json_str "$b_result")" "$(json_num "$(kei_backup_log_epoch)")"
+    printf '"backup":{"last_file":%s,"last_epoch":%s,"last_size":%s,"last_kind":%s,"last_result":%s,"log_epoch":%s},' \
+        "$(json_str "${b_file##*/}")" "$(json_num "$b_epoch")" "$(json_num "$b_size")" "$(json_str "$b_kind")" "$(json_str "$b_result")" "$(json_num "$(kei_backup_log_epoch)")"
     printf '"recovery":{"epoch":%s,"state":%s,"finished":%s,"db":%s,"backup":%s,"index":%s},' \
         "$(json_num "$r_epoch")" "$(json_str "$r_state")" "$(json_num "$r_finished")" "$(json_str "$r_db")" "$(json_str "$r_backup")" "$(json_str "$r_index")"
     kei_access_json
@@ -28722,11 +28819,16 @@ kei_task_info() {
     kei_result dir_sql "$DIR_SQL"
     kei_result compression "$(backup_codec_setting)"
     kei_result compression_used "$(backup_codec)"
+    # A nightly script written before 1.5.44 dumps straight into its final
+    # name, so a dump in progress looked like the newest backup: rewritten.
+    if [ -f /root/backup_sql.sh ] && ! grep -q 'PART=' /root/backup_sql.sh 2>/dev/null; then
+        write_backup_scripts >/dev/null 2>&1 || true
+    fi
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
     newest=$(newest_sql_backup)
     if [ -n "$newest" ]; then
         kei_result newest "$newest"
-        kei_result newest_date "$(date -r "$newest" '+%Y-%m-%d %H:%M')"
+        kei_result newest_date "$(backup_date "$newest")"
         kei_result newest_size "$(du -h "$newest" | cut -f1)"
     fi
     kei_result rclone "$(command -v rclone >/dev/null 2>&1 && echo yes || echo no)"

@@ -44,6 +44,30 @@ def age(epoch: int | None) -> str:
     return f"{secs // 86400} d"
 
 
+# A backup counts as recent for two days, like the validation report's
+# "Backup SQL" line (installer: validate_backups).
+BACKUP_FRESH_SECS = 2 * 86400
+
+
+def backup_card(b: dict | None, now: float | None = None) -> tuple[str, str, str]:
+    """The "Last backup" card from --status-json's "backup" block: the date
+    and time of the newest backup (from its name, else its mtime: see the
+    installer's latest_sql_backup), how long ago and which file. Green while
+    it is under two days old and the last nightly run did not fail."""
+    b = b or {}
+    try:
+        epoch = int(b.get("last_epoch") or 0)
+    except (TypeError, ValueError):
+        epoch = 0
+    if epoch <= 0:
+        return t("None yet"), t("No backup on this server yet"), "warn"
+    now = time.time() if now is None else now
+    when = time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
+    note = t("${age} ago", age=age(epoch)) + f" · {b.get('last_file') or '-'}"
+    fresh = now - epoch < BACKUP_FRESH_SECS
+    return when, note, "ok" if fresh and b.get("last_result") != "failed" else "warn"
+
+
 # The components the Koha window on Windows lists, in the order Koha needs
 # them (KohaServices in windows/KohaEasy.Core.psm1), then the staff page.
 COMPONENTS = (
@@ -198,10 +222,7 @@ class DashboardView(SectionView):
         self.query_one("#card-state", StatusCard).set(
             t(text), f"v{s.get('panel_version', '?')} · {s.get('platform', '')}"
             f" · {t('Memory available')} {human_bytes(m.get('available'))}", state)
-        b = s.get("backup", {})
-        self.query_one("#card-backup", StatusCard).set(
-            age(b.get("last_epoch")), b.get("last_file") or "-",
-            "ok" if b.get("last_result") == "ok" else "warn")
+        self.query_one("#card-backup", StatusCard).set(*backup_card(s.get("backup")))
         d = s.get("disk", {})
         free, total = d.get("free") or 0, d.get("total") or 0
         self.query_one("#card-disk", StatusCard).set(
