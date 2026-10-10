@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-09. Panel version on `main`: **1.5.35** (1.5.36: Magic Import restore fixes PR)._
+_Last updated: 2026-10-09. Panel version on `main`: **1.5.36** (1.5.37: OPAC depth and buttons PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -267,6 +267,16 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the largest MariaDB dump inside; a pg_dump tar is refused) and its errors are titled
   "Incompatible file format" / "SQL restore error". Tested end to end here: the real panel and
   installer, mock Koha, a gzip and a tar.gz named "BKP_BIBLIOTECA (2).backup".
+
+- **1.5.37 (OPAC depth and buttons)**: from Paulo's production "Glass & Metal" stylesheet.
+  Without a wallpaper the page gets a canvas (the library's page colour, or #e8ecf2, under two
+  faint accent glows; dark mode its own) and the blocks a layered shadow, so white blocks and
+  glass no longer sit flat on Koha's white page (`_canvas_css`). `_buttons_css` styles every
+  button kind: main ones (.btn-primary, #searchsubmit, bare submit inputs) in the accent,
+  secondary ones (.btn-default/.btn-secondary/#backtotop...) on the surface; with the metal
+  texture they take his brushed/silver gradients. Buttons inside news and #opacmainuserblock
+  are full-width, 44px+ touch targets. No new settings: KEI-THEME-DATA unchanged. His
+  site-specific bits (image URLs, link hiding, mobile results layout) were not made defaults.
 
 ---
 

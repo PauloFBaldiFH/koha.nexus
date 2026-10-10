@@ -356,14 +356,13 @@ html[data-kei-theme="dark"] .text-muted, html[data-kei-theme="dark"] .breadcrumb
 html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
-.btn, button.btn, input[type="submit"] {{ border-radius: var(--kei-r-btn) !important; }}
-html body .btn-primary {{ background-color: var(--nexus-primary) !important; border-color: var(--nexus-primary) !important;
-    color: var(--nexus-on-primary) !important; }}
-.btn-primary:hover, .btn-primary:focus {{ filter: brightness(1.08); }}
+{_buttons_css(cfg)}
 a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}"""]
-    if cfg["page"]:
-        out.append(f"html body {{ background-color: {cfg['page']} !important; }}")
     bg = cfg["background"]["url"]
+    if not bg:
+        out.append(_canvas_css(cfg))
+    elif cfg["page"]:
+        out.append(f"html body {{ background-color: {cfg['page']} !important; }}")
     if bg:
         out.append(f"""body.kei-wallpaper {{
     background: url("{bg}") center / cover no-repeat fixed !important;
@@ -437,6 +436,105 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     if cfg["links"]["enabled"] and cfg["links"]["items"]:
         out.append(_links_css())
     return "\n".join(out) + "\n"
+
+
+# Every kind of button Koha draws: Bootstrap's, the masthead search button
+# and the bare submit inputs of older templates and news. The carousel
+# arrows, the theme switch and the quick-access links keep their own look.
+_BTN_MAIN = ('.btn-primary, #searchsubmit, .btn-acesso, input[type="submit"]:not(.btn), '
+             'button[type="submit"]:not(.btn):not(.kei-nav)')
+_BTN_SOFT = ('.btn-default, .btn-secondary, .btn-light, .btn-outline-primary, .btn-outline-secondary, '
+             'input[type="button"]:not(.btn), input[type="reset"]:not(.btn), #backtotop')
+# Buttons inside the news and the library's own home page block: action
+# cards, full width, big enough to tap.
+_CARD_AREAS = ("#news .newsitem", ".newsitem", ".news-item", "#opacmainuserblock", "#OpacMainUserBlock")
+_CARD_BUTTONS = (".btn", 'input[type="submit"]', 'input[type="button"]', 'button[type="submit"]')
+
+
+def _buttons_css(cfg: dict) -> str:
+    """The OPAC's buttons: the main ones in the accent colour (a brushed
+    sheen with the metal texture), the secondary ones on the block surface,
+    and full-width touch targets inside the news and the home page block."""
+    main, soft = _strong(_BTN_MAIN), _strong(_BTN_SOFT)
+
+    def hover(sel: str) -> str:
+        return ", ".join(f"{x}:hover, {x}:focus" for x in sel.split(", "))
+
+    if cfg["texture"] == "metal":
+        main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .08) 50%, "
+                   "rgba(0, 0, 0, .14) 100%), var(--nexus-primary)")
+        soft_bg = "linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 50%, #c9c9c9 100%)"
+        soft_fg, soft_edge = "#333", "#b3b3b3"
+        shadow = ("inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), "
+                  "0 4px 6px rgba(0, 0, 0, .12)")
+    else:
+        main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), "
+                   "var(--nexus-primary)")
+        soft_bg = "rgba(var(--kei-surface-rgb), calc(var(--kei-surface-a) * .5 + .5))"
+        soft_fg, soft_edge = "var(--kei-text)", "var(--kei-edge)"
+        shadow = "inset 0 1px 0 rgba(255, 255, 255, .25), 0 2px 6px rgba(15, 23, 42, .14)"
+    areas = ", ".join(f"html body {a} {b}" for a in _CARD_AREAS for b in _CARD_BUTTONS)
+    return f""".btn, button.btn, input[type="submit"], input[type="button"], input[type="reset"] {{
+    border-radius: var(--kei-r-btn) !important; }}
+{main} {{
+    background: {main_bg} !important;
+    border: 1px solid var(--nexus-primary) !important;
+    color: var(--nexus-on-primary) !important;
+    font-weight: 600 !important;
+    box-shadow: {shadow} !important;
+    transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
+    cursor: pointer;
+}}
+{soft} {{
+    background: {soft_bg} !important;
+    border: 1px solid {soft_edge} !important;
+    color: {soft_fg} !important;
+    font-weight: 600 !important;
+    box-shadow: {shadow} !important;
+    transition: filter .18s ease, transform .18s ease, border-color .18s ease;
+    cursor: pointer;
+}}
+{hover(main)}, {hover(soft)} {{ filter: brightness(1.06); transform: translateY(-1px); }}
+{hover(soft)} {{ border-color: var(--nexus-primary) !important; }}
+{areas} {{
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 44px;
+    padding: .75rem 1.1rem !important;
+    line-height: 1.4;
+    text-decoration: none !important;
+    margin: .5rem 0 !important;
+    font-size: 1.02rem;
+    text-align: center;
+    white-space: normal;
+}}
+@media (prefers-reduced-motion: reduce) {{ {main}, {soft} {{ transition: none; }} }}"""
+
+
+def _canvas_css(cfg: dict) -> str:
+    """No wallpaper: a page with some depth instead of a flat white sheet,
+    so the blocks (white ones above all) stand out and glass has something
+    to blur. The library's page colour, or a soft grey, under two faint
+    glows of the accent colours; the blocks get a layered shadow."""
+    light = luminance(cfg["surface"]) >= 0.30
+    base = cfg["page"] or ("#e8ecf2" if light else "#1b2230")
+    shadow = ("0 1px 2px rgba(15, 23, 42, .06), 0 12px 32px -10px rgba(15, 23, 42, .22)" if light
+              else "0 1px 2px rgba(0, 0, 0, .25), 0 12px 32px -10px rgba(0, 0, 0, .55)")
+    glows = ("radial-gradient(1200px 600px at 0% 0%, rgba(var(--kei-accent-rgb), .16), transparent 60%), "
+             "radial-gradient(1000px 600px at 100% 100%, rgba(var(--kei-accent2-rgb), .14), transparent 60%)")
+    lines = [f"""html body {{
+    background: {glows}, {base} !important;
+    background-attachment: fixed !important;
+}}
+html[data-kei-theme="dark"] body {{
+    background: {glows.replace(".16", ".10").replace(".14", ".08")}, #0d1117 !important;
+}}"""]
+    if cfg["texture"] != "metal":
+        lines.append(f"""{_strong(_BLOCKS + ", " + _CONTENT)} {{
+    box-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"});
+}}""")
+    return "\n".join(lines)
 
 
 def _links_css() -> str:
