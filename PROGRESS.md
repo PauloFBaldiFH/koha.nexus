@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-11. Panel version on `main`: **1.5.53** (1.5.54: news buttons, restore menu, MARC stream PR)._
+_Last updated: 2026-10-11. Panel version on `main`: **1.5.54** (1.5.55: MARC21 export output PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,13 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.55 (MARC21 export output)**: Paulo saw raw records (leader, tags, $a) in the export's error
+  box. `/root/backup_marc.sh` no longer passes `--filename` to export_records.pl: its stdout is
+  redirected by the root shell into `biblios_/authorities_<date>.mrc` and its stderr into
+  `backup_marc_export_errors.log`; the bib file must start with 5 digits (ISO 2709); log_backup starts
+  a fresh line after a partial one. function_marc_backup rewrites a script without `EXPORT_ERR=`,
+  reads only this run's `date | ...` lines by byte offset, quotes only the last stderr message (record
+  dumps skipped) and reports `contents` (the .mrc names) in the success box. Not tried on a live Koha.
 - **1.5.54 (follow-up from Paulo)**: News items (OPAC and staff) take a list of buttons
   (`news.<side>.buttons` = `[{text, url}]`, at most 6, "Adicionar botão" + ✕ rows like the staff home
   buttons; a 1.5.53 `button_text`/`button_url` pair is read as the first button). The main menu (panel

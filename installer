@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.54"
+PANEL_VERSION=" 1.5.55"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -4358,7 +4358,12 @@ RCLONE_REMOTE=""; RCLONE_MARC_FOLDER="Backup_MARC_Koha"; KEEP_DAYS=7
 [ -f "\$CONF" ] && . "\$CONF"
 case "\${KEEP_DAYS}" in ''|*[!0-9]*) KEEP_DAYS=7;; esac
 
-log_backup() { mkdir -p "\$(dirname "\$LOG")" 2>/dev/null || true; printf '%s | %s\n' "\$(date '+%F %T')" "\$*" >> "\$LOG"; }
+# Each outcome on a line of its own, even after a run that left a partial line.
+log_backup() {
+    mkdir -p "\$(dirname "\$LOG")" 2>/dev/null || true
+    [ -s "\$LOG" ] && [ -n "\$(tail -c1 "\$LOG")" ] && printf '\n' >> "\$LOG"
+    printf '%s | %s\n' "\$(date '+%F %T')" "\$*" >> "\$LOG"
+}
 exec 9>"\$LOCK_FILE"
 if ! flock -n 9; then
     log_backup "INFO: MARC backup skipped because another backup/restore is running"
@@ -4378,18 +4383,41 @@ BIB_FILE="\$DIR/biblios_\${DATE}.mrc"
 AUTH_FILE="\$DIR/authorities_\${DATE}.mrc"
 PACKAGE="\$DIR/koha_marc_\${DATE}.tar.gz"
 
-if ! /usr/sbin/koha-shell "\$INST" -c "perl \$EXPORT_CMD --record-type=bibs --format=marc --filename=\$BIB_FILE" >>"\$LOG" 2>&1; then
-    log_backup "FAILED: bibliographic export"; rm -f "\$BIB_FILE" "\$AUTH_FILE"; exit 1
-fi
-if ! /usr/sbin/koha-shell "\$INST" -c "perl \$EXPORT_CMD --record-type=auths --format=marc --filename=\$AUTH_FILE" >>"\$LOG" 2>&1; then
-    log_backup "FAILED: authority export"; rm -f "\$BIB_FILE" "\$AUTH_FILE"; exit 1
-fi
+# The records are export_records.pl's standard output: written by this
+# (root) shell straight into the .mrc file, so neither the --filename
+# handling of each Koha version nor the folder's owner matters. Standard
+# error (warnings, failures) goes to its own file, never into the records
+# or the log; a failure quotes only its last message line.
+EXPORT_ERR="\${LOG%.log}_export_errors.log"
+: > "\$EXPORT_ERR"
+export_part() {
+    printf '== %s %s\n' "\$(date '+%F %T')" "\$1" >> "\$EXPORT_ERR"
+    /usr/sbin/koha-shell "\$INST" -c "perl \$EXPORT_CMD --record-type=\$1 --format=marc" \\
+        > "\$2" 2>> "\$EXPORT_ERR" < /dev/null
+}
+export_failed() {
+    local why
+    # The last line that is a message, not a record dump (=LDR, =245, \$a).
+    why=\$(grep -avE '^== |=LDR|^=[0-9]{3} |[\\$][a-z0-9]' "\$EXPORT_ERR" 2>/dev/null | tail -n 1 | LC_ALL=C tr -c '[:print:]\\n' ' ' | tr '\\n' ' ' | cut -c1-300 || true)
+    log_backup "FAILED: \$1\${why:+: \$why} (\$EXPORT_ERR)"
+    rm -f "\$BIB_FILE" "\$AUTH_FILE"
+    exit 1
+}
+export_part bibs "\$BIB_FILE" || export_failed "bibliographic export"
+export_part auths "\$AUTH_FILE" || export_failed "authority export"
 
 if [ ! -s "\$BIB_FILE" ]; then
     log_backup "FAILED: empty bibliographic export"
     rm -f "\$BIB_FILE" "\$AUTH_FILE"
     exit 1
 fi
+# ISO 2709 starts with the record length (5 digits): anything else is not MARC21.
+case "\$(head -c 5 "\$BIB_FILE")" in
+    [0-9][0-9][0-9][0-9][0-9]) ;;
+    *) log_backup "FAILED: the bibliographic export is not MARC21 (ISO 2709)"
+       rm -f "\$BIB_FILE" "\$AUTH_FILE"
+       exit 1 ;;
+esac
 if [ ! -s "\$AUTH_FILE" ]; then
     log_backup "WARN: empty authority export"
 fi
@@ -6135,29 +6163,37 @@ function_manual_backup() {
 # script takes the backup lock itself and logs one line per outcome.
 function_marc_backup() {
     require_koha || return 1
-    [ -f /root/backup_marc.sh ] || write_backup_scripts >/dev/null 2>&1 || true
+    # A script written before 1.5.55 sent export_records.pl's output to the
+    # log, where the records broke the outcome lines: rewritten.
+    if [ ! -f /root/backup_marc.sh ] || ! grep -q 'EXPORT_ERR=' /root/backup_marc.sh 2>/dev/null; then
+        write_backup_scripts >/dev/null 2>&1 || true
+    fi
     if [ ! -f /root/backup_marc.sh ]; then
         msg_error "" "$(t "The MARC21 backup script is missing (/root/backup_marc.sh). Run Install Koha server again to write it.")" 9 76
         return 1
     fi
-    local log_file="${LOG_DIR}/backup_marc.log" before new ok pkg size ip_addr
+    local log_file="${LOG_DIR}/backup_marc.log" err_file="${LOG_DIR}/backup_marc_export_errors.log"
+    local before new ok pkg size ip_addr contents
     before=0
-    [ -f "$log_file" ] && before=$(wc -l < "$log_file")
+    [ -f "$log_file" ] && before=$(stat -c %s "$log_file" 2>/dev/null || echo 0)
     clear
     display_explanation "Exporting the MARC21 records..."
-    # Whatever the script or koha-shell prints (an older script may stream
-    # the records themselves) goes to the log, never to the panel's pipe.
+    # The records go into the .mrc files and the errors into their own file;
+    # anything else the script prints is kept apart, never shown as an error.
     mkdir -p "$LOG_DIR" 2>/dev/null || true
-    koha_ctl /bin/bash /root/backup_marc.sh >>"$log_file" 2>&1 || true
-    new=$(tail -n +"$((before + 1))" "$log_file" 2>/dev/null | grep ' | ' || true)
+    koha_ctl /bin/bash /root/backup_marc.sh >"${LOG_DIR}/backup_marc_output.log" 2>&1 || true
+    # Only this run's outcome lines ("date time | ..."), read as text.
+    new=$(tail -c +"$((before + 1))" "$log_file" 2>/dev/null \
+        | grep -aE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:]{8} \| ' | LC_ALL=C tr -c '[:print:]\n' ' ' || true)
     ok=$(printf '%s\n' "$new" | sed -n 's/^[^|]* | OK: //p' | tail -n1)
     if [ -z "$ok" ]; then
         if printf '%s\n' "$new" | grep -q 'skipped because another backup'; then
             msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
         else
             local why
-            why=$(printf '%s\n' "$new" | grep -E ' \| (FAILED|WARN):' | tail -n1 | cut -d'|' -f2- | sed 's/^ //')
-            msg_error "" "$(t "The MARC21 export failed.") ${why:-}\n\n$(t "Log:") $log_file" 11 76
+            why=$(printf '%s\n' "$new" | grep -E ' \| (FAILED|WARN):' | tail -n1 | cut -d'|' -f2- \
+                | sed -e 's/^ //' -e 's/ *([^()]*_export_errors\.log)$//' | cut -c1-400)
+            msg_error "" "$(t "The MARC21 export failed.") ${why:-}\n\n$(t "Log:") $log_file\n$(t "Errors:") $err_file" 13 76
         fi
         return 1
     fi
@@ -6165,8 +6201,10 @@ function_marc_backup() {
     size=$(du -h "$pkg" 2>/dev/null | cut -f1)
     ip_addr=$(get_server_ip)
     log "MARC21 export generated: $pkg"
+    contents=$(tar -tzf "$pkg" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
     if [ -n "${KEI_TASK:-}" ]; then
         kei_result file "$pkg"
+        kei_result contents "$contents"
         kei_result size "$size"
         kei_result scp "scp ${REAL_USER:-root}@${ip_addr}:${pkg} Downloads/"
         kei_result user "${REAL_USER:-root}"
@@ -6178,6 +6216,7 @@ function_marc_backup() {
     echo "======================================================================"
     echo "$(t "File:") $pkg"
     echo "$(t "Size:") $size"
+    echo "$(t "Contents:") $contents"
     echo ""
     echo -e "\e[1;33mscp ${REAL_USER:-root}@${ip_addr}:${pkg} Downloads/\e[0m"
     echo ""

@@ -105,6 +105,8 @@ async def marc_backup(app) -> None:
         return
     out = result.value
     details = [(t("File:"), out.get("file")), (t("Size:"), out.get("size"))]
+    if out.get("contents"):    # the .mrc files (ISO 2709) inside the package
+        details.append((t("Contents:"), out.get("contents")))
     if out.get("cloud") == "yes":
         details.append((t("Cloud"), t("sent")))
     steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
