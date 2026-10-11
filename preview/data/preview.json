@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.51",
+ "panel_version": "1.5.52",
  "languages": [
   {
    "code": "en",
@@ -2217,13 +2217,7 @@
     {
      "type": "slider",
      "label": "Opacity",
-     "value": 82,
-     "unit": "%"
-    },
-    {
-     "type": "slider",
-     "label": "Content panels",
-     "value": 76,
+     "value": 78,
      "unit": "%"
     },
     {
@@ -9211,31 +9205,6 @@
    "ja": null,
    "ko": null
   },
-  "Content panels": {
-   "en": "Content panels",
-   "pt-BR": "Painéis de conteúdo",
-   "es": "Paneles de contenido",
-   "fr": "Panneaux de contenu",
-   "it": "Pannelli dei contenuti",
-   "de": "Inhaltsflächen",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "Blocks": {
    "en": "Blocks",
    "pt-BR": "Blocos",
@@ -16157,11 +16126,7 @@
      },
      {
       "name": "Blur and Opacity",
-      "text": "How much the glass textures blur what is behind them and how solid the blocks are."
-     },
-     {
-      "name": "Content panels",
-      "text": "How see-through the page's content is (50% to 100%, 76% by default): the main area, tabs, menus, facets and breadcrumbs are frosted glass with a 12px blur behind, so the wallpaper shows through. Text, labels and links on the glass are checked for WCAG AA contrast against the darkest and the lightest wallpaper, in light and dark mode, with a soft shadow and bolder labels: 7:1 from 76% up, at least 4.5:1 from 60% up. The footer credits have no box: a halo around the letters keeps them readable."
+      "text": "How much the glass blurs what is behind it, and how see-through it is: one opacity for every surface (header, search bar, content, sidebars, breadcrumbs, tabs), from 0% (clear) to 100% (solid), 78% by default. Koha's boxes inside the content show the same glass, with a thin border instead of a white or grey fill. Text, labels and links are checked for WCAG AA contrast against the darkest and the lightest wallpaper as far as the opacity allows (7:1 from about 76% up), with a soft shadow and bolder labels for the clearer settings. The footer credits have no box: a halo around the letters keeps them readable."
      },
      {
       "name": "Blocks, Inputs, Buttons",
@@ -16196,11 +16161,7 @@
      },
      {
       "name": "Desfoque e Opacidade",
-      "text": "Quanto as texturas de vidro desfocam o que está atrás e quão sólidos são os blocos."
-     },
-     {
-      "name": "Painéis de conteúdo",
-      "text": "Quão opaco é o conteúdo da página (de 50% a 100%, 76% por padrão): a área principal, abas, menus, facetas e trilha de navegação são vidro fosco com desfoque de 12px atrás, e o papel de parede aparece através. Textos, rótulos e links sobre o vidro são conferidos para contraste WCAG AA contra o papel de parede mais escuro e o mais claro, no modo claro e no escuro, com uma sombra suave e rótulos mais fortes: 7:1 a partir de 76%, pelo menos 4,5:1 a partir de 60%. Os créditos do rodapé não têm caixa: um halo em volta das letras os mantém legíveis."
+      "text": "Quanto o vidro desfoca o que está atrás e quão transparente ele é: uma só opacidade para todas as superfícies (cabeçalho, barra de busca, conteúdo, barras laterais, trilha de navegação, abas), de 0% (transparente) a 100% (sólido), 78% por padrão. As caixas do Koha dentro do conteúdo mostram o mesmo vidro, com uma borda fina em vez de fundo branco ou cinza. Textos, rótulos e links são conferidos para contraste WCAG AA contra o papel de parede mais escuro e o mais claro até onde a opacidade permite (7:1 a partir de cerca de 76%), com sombra suave e rótulos mais fortes nos ajustes mais transparentes. Os créditos do rodapé não têm caixa: um halo em volta das letras os mantém legíveis."
      },
      {
       "name": "Blocos, Campos, Botões",
@@ -17182,162 +17143,162 @@
    "manual": 106,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 365
+   "strings": 364,
+   "strings_total": 364
   },
   "pt-BR": {
    "manual": 106,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 354,
-   "strings_total": 365
+   "strings": 353,
+   "strings_total": 364
   },
   "es": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 271,
-   "strings_total": 365
+   "strings": 270,
+   "strings_total": 364
   },
   "fr": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 266,
-   "strings_total": 365
+   "strings": 265,
+   "strings_total": 364
   },
   "it": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 266,
-   "strings_total": 365
+   "strings": 265,
+   "strings_total": 364
   },
   "de": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
-   "strings": 266,
-   "strings_total": 365
+   "strings": 265,
+   "strings_total": 364
   },
   "nl": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "sv": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "pl": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "cs": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "ru": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "uk": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "tr": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "tl": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "id": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "ar": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "fa": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "hi": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "bn": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "vi": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "zh": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "ja": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   },
   "ko": {
    "manual": 0,
    "manual_total": 106,
    "manual_outdated": [],
    "strings": 103,
-   "strings_total": 365
+   "strings_total": 364
   }
  }
 }

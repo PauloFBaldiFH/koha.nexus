@@ -833,11 +833,7 @@
     },
     {
      "name": "Desfoque e Opacidade",
-     "text": "Quanto as texturas de vidro desfocam o que está atrás e quão sólidos são os blocos."
-    },
-    {
-     "name": "Painéis de conteúdo",
-     "text": "Quão opaco é o conteúdo da página (de 50% a 100%, 76% por padrão): a área principal, abas, menus, facetas e trilha de navegação são vidro fosco com desfoque de 12px atrás, e o papel de parede aparece através. Textos, rótulos e links sobre o vidro são conferidos para contraste WCAG AA contra o papel de parede mais escuro e o mais claro, no modo claro e no escuro, com uma sombra suave e rótulos mais fortes: 7:1 a partir de 76%, pelo menos 4,5:1 a partir de 60%. Os créditos do rodapé não têm caixa: um halo em volta das letras os mantém legíveis."
+     "text": "Quanto o vidro desfoca o que está atrás e quão transparente ele é: uma só opacidade para todas as superfícies (cabeçalho, barra de busca, conteúdo, barras laterais, trilha de navegação, abas), de 0% (transparente) a 100% (sólido), 78% por padrão. As caixas do Koha dentro do conteúdo mostram o mesmo vidro, com uma borda fina em vez de fundo branco ou cinza. Textos, rótulos e links são conferidos para contraste WCAG AA contra o papel de parede mais escuro e o mais claro até onde a opacidade permite (7:1 a partir de cerca de 76%), com sombra suave e rótulos mais fortes nos ajustes mais transparentes. Os créditos do rodapé não têm caixa: um halo em volta das letras os mantém legíveis."
     },
     {
      "name": "Blocos, Campos, Botões",
@@ -856,7 +852,7 @@
     "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
     "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente."
    ],
-   "_en": "a7e41b790e"
+   "_en": "6a41376c9e"
   },
   "opac-pictures": {
    "title": "Imagens",

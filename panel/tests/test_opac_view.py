@@ -123,7 +123,7 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
 
             view.preview()
             await _until(pilot, lambda: isinstance(app.screen, TextScreen))
-            assert "repeating-linear-gradient" in app.screen._text and "--kei-r-block: 24px" in app.screen._text
+            assert "repeating-linear-gradient" in app.screen._text and "--koha-card-radius: 24px" in app.screen._text
             await pilot.press("escape")
 
             view.apply()
@@ -261,7 +261,7 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
             assert [i["text"] for i in sent["links"]["items"]] == ["Catálogo", "Contato"]
             assert sent["links"]["items"][0]["target"] == "_blank"
             assert '"mode": "coverflow"' in seen["js"] and "kei-links" in seen["js"]
-            assert "--kei-text: #f1f5f9" in seen["css"]           # light text on the dark blocks
+            assert "--kei-text: var(--koha-text);" in seen["css"]   # one text colour for every glass card
             assert "padding: .2rem .45rem" in seen["staff"] and "kei-carousel" not in seen["staff"]
 
             # The same settings fill the screen again.

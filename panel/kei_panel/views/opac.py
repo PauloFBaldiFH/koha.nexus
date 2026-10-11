@@ -71,7 +71,6 @@ def _picture(raw: dict, name: str) -> dict:
 SLIDERS = {   # id: (label, unit, step)
     "blur": ("Blur", "px", 1),
     "opacity": ("Opacity", "%", 1),
-    "panel_opacity": ("Content panels", "%", 1),
     "radius_block": ("Blocks", "px", 1),
     "radius_input": ("Inputs", "px", 1),
     "radius_button": ("Buttons", "px", 1),
@@ -117,7 +116,7 @@ class OpacView(SectionView):
         with Vertical(id="o-material", classes="opac-box"):
             yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=c["texture"],
                                                  allow_blank=False, id="o-texture"))
-            for key in ("blur", "opacity", "panel_opacity", "radius_block", "radius_input", "radius_button"):
+            for key in ("blur", "opacity", "radius_block", "radius_input", "radius_button"):
                 yield from self._slider(key)
             bars = (t("Hue"), t("Saturation"), t("Lightness"))
             yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")

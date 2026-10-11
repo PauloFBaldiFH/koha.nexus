@@ -1,6 +1,7 @@
 """opac_theme: the settings, the CSS/JS blocks Koha receives, the pictures."""
 
 import json
+import re
 import shutil
 import subprocess
 import urllib.parse
@@ -22,7 +23,7 @@ def test_normalize_clamps_and_drops():
                         "carousel": {"speed": 1, "count": 99, "hover": "spin", "title": "<b>New</b>\n",
                                      "amazon_tag": "bad tag!"},
                         "ghost": {"rss": False, "unknown": True}, "extra": 1})
-    assert cfg["texture"] == "frosted" and cfg["blur"] == 30 and cfg["opacity"] == 30
+    assert cfg["texture"] == "frosted" and cfg["blur"] == 30 and cfg["opacity"] == 5   # free from 0 to 100
     assert cfg["radius_block"] == 0 and cfg["radius_input"] == ot.DEFAULTS["radius_input"]
     assert cfg["accent"] == "#aabbcc" and cfg["accent2"] == ot.DEFAULTS["accent2"]
     assert cfg["film"] == 90 and cfg["default_theme"] == "light"
@@ -60,10 +61,10 @@ def test_settings_travel_in_the_css_and_come_back():
 
 
 @pytest.mark.parametrize("texture, needle", [
-    ("frosted", "backdrop-filter: blur(var(--kei-blur))"),
+    ("frosted", "backdrop-filter: blur(var(--koha-glass-blur))"),
     ("metal", "repeating-linear-gradient"),
     ("gradient", "linear-gradient(135deg"),
-    ("flat", "background: rgba(var(--kei-surface-rgb)"),
+    ("flat", "--koha-glass-blur: 0px;"),
 ])
 def test_textures(texture, needle):
     css = ot.css_body(ot.normalize({"texture": texture}))
@@ -77,7 +78,7 @@ def test_css_variables_ghosts_and_wallpaper():
                         "logo": {"source": "local", "url": "/images/custom/kei-logo.png?v=1"},
                         "ghost": {"rss": True, "cart_badge": False, "community": True, "empty_columns": True}})
     css = ot.css_body(cfg)
-    for var in ("--kei-r-block: 22px", "--kei-r-input: 4px", "--kei-r-btn: 30px", "--kei-accent: #112233"):
+    for var in ("--koha-card-radius: 22px", "--kei-r-input: 4px", "--kei-r-btn: 30px", "--kei-accent: #112233"):
         assert var in css
     assert 'url("https://i.ibb.co/x/wall.jpg")' in css and "--kei-film" in css
     assert 'url("/images/custom/kei-logo.png?v=1")' in css
@@ -254,12 +255,9 @@ def test_depth_and_buttons():
 
 def test_blocks_take_the_chosen_colours():
     css = ot.css_body(ot.normalize({"accent": "#7c3aed", "accent2": "#db2777", "surface": "#ffffff"}))
-    tint = ot.mix("#ffffff", "#7c3aed", .12)
-    assert tint != "#ffffff" and f"--kei-surface-rgb: {ot._rgb(tint)};" in css
-    assert "--kei-surface-rgb: 255,255,255;" not in css
-    # The news and home page blocks: the accent wash over the readable inner panel.
-    assert "rgba(var(--kei-accent-rgb), .14) 0%, rgba(var(--kei-accent2-rgb), .10) 100%),\n        var(--kei-panel-2)" in css
-    assert f"--kei-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css
+    card = ot.mix("#ffffff", "#7c3aed", .03)
+    assert card != "#ffffff" and f"--koha-card-rgb: {ot._rgb(card).replace(',', ', ')};" in css
+    assert f"--koha-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css and "--kei-ink: var(--koha-ink);" in css
     assert ot.mix("#000000", "#ffffff", .5) == "#808080"
 
 
@@ -418,9 +416,9 @@ def test_staff_material_like_the_opac():
     st = {"enabled": True, "texture": "frosted", "blur": 99, "opacity": 10, "radius_block": 4,
           "radius_input": 2, "radius_button": 30, "page": "#0b1220"}
     cfg = ot.normalize({"staff": st})
-    assert cfg["staff"]["blur"] == ot.RANGES["blur"][1] and cfg["staff"]["opacity"] == ot.RANGES["opacity"][0]
+    assert cfg["staff"]["blur"] == ot.RANGES["blur"][1] and cfg["staff"]["opacity"] == 10
     css = ot.staff_css_body(cfg)
-    for part in ("--nexus-staff-blur: 30px", "--nexus-staff-surface-a: 0.30", "--nexus-staff-radius: 4px",
+    for part in ("--nexus-staff-blur: 30px", "--nexus-staff-surface-a: 0.10", "--nexus-staff-radius: 4px",
                  "--nexus-staff-r-input: 2px", "--nexus-staff-r-btn: 30px", "--nexus-staff-page: #0b1220",
                  "html body .page-section::before", "backdrop-filter: blur(var(--nexus-staff-blur))",
                  "border-radius: var(--nexus-staff-r-input) 0 0 var(--nexus-staff-r-input)"):
@@ -462,45 +460,63 @@ def test_panels_reach_wcag_aa_in_light_and_dark():
     for accent in ("#2563eb", "#facc15", "#ffffff", "#000000", "#7c3aed", "#10b981"):
         for surface in ("#ffffff", "#333844", "#0b0b0b", "#fde68a"):
             cfg = ot.normalize({"accent": accent, "surface": surface})
-            for dark, opacity in ((False, 76), (True, 76), (False, 100), (True, 100)):
-                c = ot.panel_colors({**cfg, "panel_opacity": opacity}, dark)
-                assert len(c["grounds"]) == 4
+            for dark, opacity in ((False, 76), (True, 76), (False, 78), (True, 78), (False, 100), (True, 100)):
+                c = ot.panel_colors({**cfg, "opacity": opacity}, dark)
+                assert len(c["grounds"]) == 2
                 for bg in c["grounds"]:
                     assert ot.contrast(c["text"], bg) >= 7, (accent, surface, dark)
                     for key in ("muted", "link", "ink"):
                         assert ot.contrast(c[key], bg) >= 4.5, (accent, surface, dark, key)
-            # More see-through than the default: the text still reaches AA (4.5:1) on any wallpaper.
+            # More see-through: the text still reaches AA (4.5:1) on any wallpaper down to 60%.
             for dark in (False, True):
-                c = ot.panel_colors({**cfg, "panel_opacity": 60}, dark)
+                c = ot.panel_colors({**cfg, "opacity": 60}, dark)
                 assert min(ot.contrast(c["text"], bg) for bg in c["grounds"]) >= 4.5, (accent, surface, dark)
+            # Fully clear is allowed: the colours fall back to black or white, no error.
+            assert ot.panel_colors({**cfg, "opacity": 0}, True)["text"] == "#ffffff"
     # Light mode reads dark on light even when the block background is dark (the screenshots' case).
     light = ot.panel_colors(ot.normalize({"surface": "#333844"}), False)
-    assert ot.luminance(light["panel"]) > .8 and light["text"] == "#1a1a1a"
+    assert ot.luminance(light["card"]) > .8 and light["text"] == "#1a1a1a"
     dark = ot.panel_colors(ot.normalize({}), True)
-    assert (dark["panel"], dark["inner"]) == ("#161b22", "#0d1117") and dark["text"].startswith("#e")
+    assert dark["card"] == "#161b22" and dark["text"].startswith("#e")
 
 
-def test_panels_css_covers_koha_panels():
-    assert ot.normalize({})["panel_opacity"] == 76
-    css = ot.css_body(ot.normalize({"panel_opacity": 72, "surface": "#333844"}))
-    assert "--kei-panel-a: 0.72;" in css and "--kei-panel-rgb: 22, 27, 34;" in css
-    for sel in ("html body .breadcrumb", "html body .main .tab-content", "html body .main #search-facets",
-                "html body .main #menu li a", "html body .main #usermenu li a", "html body .main #action",
-                "html body .main .nav_results", "html body .main .selections-toolbar", "html body #opaccredits",
-                "html body .main .results_summary", "html body .main .note", "html body .main p.details"):
+def test_one_glass_card_for_every_surface():
+    # The opacity slider is free from 0 to 100; the old second slider is gone.
+    assert ot.normalize({"opacity": 0})["opacity"] == 0 and ot.normalize({"opacity": 100})["opacity"] == 100
+    assert ot.normalize({"opacity": -5})["opacity"] == 0 and "panel_opacity" not in ot.normalize({"panel_opacity": 90})
+    css = ot.css_body(ot.normalize({"opacity": 35, "blur": 11, "surface": "#333844"}))
+    for token in ("--koha-card-alpha: 0.35;", "--koha-card-bg: rgba(var(--koha-card-rgb), var(--koha-card-alpha));",
+                  "--koha-glass-blur: 11px;", "--koha-card-border: rgba(255, 255, 255, .2);",
+                  "--koha-card-border: rgba(255, 255, 255, .08);", "--kei-surface-a: var(--koha-card-alpha);",
+                  "--koha-pane-border: rgba(15, 23, 42, .12);"):
+        assert token in css, token
+    # Header, search bar and content: one rule, the same background, border, radius.
+    head = css[css.index("/* One glass card"):]
+    first = head[:head.index("}")]
+    for sel in ("html body #header-region .navbar", "html body #opac-main-search", "html body .main {"):
+        assert sel in first, sel
+    assert "background: var(--koha-card-sheen), var(--koha-card-bg) !important;" in first
+    assert "-webkit-backdrop-filter: blur(var(--koha-glass-blur));" in css and "backdrop-filter: blur(var(--koha-glass-blur));" in css
+    assert "html body .main::before {" in css
+    # Koha's boxes outside .main are the same card, never a card in a card.
+    assert "html body #ulactioncontainer:not(.main *):not(.modal *)" in css and ":not(:is(#catalogue_detail_biblio" in css
+    # Inside .main they show the card's glass: no fills of their own, no white or grey anywhere.
+    for sel in ("html body .main .breadcrumb", "html body .main #breadcrumbs", "html body .main #ulactioncontainer",
+                "html body .main .searchresults-sidebar", "html body .main .nav-pills", "html body .main #usermenu",
+                "html body .main #facets", "html body .main .tab-content", "html body .main #notes",
+                "html body .main #catalogue_detail_biblio", "html body .main .nav_results ul",
+                "html body .main .pg_menu", "html body .main .l_Results", "html body .main #didyoumean"):
         assert sel in css, sel
-    # The main area left the glass blocks: header and search keep the texture, .main is a panel.
-    texture = css[:css.index("Content panels")]
-    assert "html body .main," not in texture and "html body .main {" in css
-    # Frosted glass: translucent panels with a 12px blur (WebKit too), inner panels translucent as well.
-    assert "html body .main::before {" in css and "-webkit-backdrop-filter: blur(12px);" in css
-    assert "    backdrop-filter: blur(12px);" in css and "--kei-panel-2: rgba(" in css
-    assert "text-shadow: var(--kei-p-shadow);" in css and "font-weight: 600;" in css
+    assert "background: transparent !important;" in css
+    glass = (css[css.index("/* One glass card"):css.index("/* The header and its menus")]
+             + css[css.index("/* Inside the card"):css.index(".term {")])
+    assert not re.search(r"background(-color)?:\s*(#[0-9a-f]{3,6}|white|rgb\()", glass, re.I)
     # The footer credits: no box behind them, only a halo around the letters.
     assert "#opaccredits::before" not in css and "html body .main, html body #opaccredits" not in css
-    assert "background: transparent !important; }" in css and 'html[data-kei-theme="dark"] body #opaccredits {' in css
-    assert 'html[data-kei-theme="dark"] body .main .alert {' in css
-    assert ot.normalize({"panel_opacity": 10})["panel_opacity"] == 50
+    assert 'html[data-kei-theme="dark"] body #opaccredits {' in css
+    # Flat: no blur; metal: its sheen on every card.
+    assert "--koha-glass-blur: 0px;" in ot.css_body(ot.normalize({"texture": "flat"}))
+    assert "--koha-card-sheen: linear-gradient(180deg" in ot.css_body(ot.normalize({"texture": "metal"}))
     assert ot.check_block(ot.css_block(ot.normalize({})), ot.CSS_BEGIN, ot.CSS_END) == ""
 
 
