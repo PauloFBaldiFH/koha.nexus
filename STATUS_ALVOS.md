@@ -54,3 +54,6 @@ Portas de rede já testadas e abertas na VPS:
 - **DNB (Alemanha)**: Descartado (Cluster entrega apenas RDF/XML e falha no conversor interno MARC21).
 - **Yale University (EUA)**: Operacional via SRU Alma (`01YALE_INST`) - MARCXML nativo.
 - **University of Michigan (EUA)**: Operacional via SRU Alma (`01UMICH_INST`) - MARCXML nativo.
+- **University of Oxford (UK)**: Operacional via SRU Alma (`44OXF_INST`) - MARCXML nativo.
+- **University of Cambridge (UK)**: Operacional via SRU Alma (`44CAM_INST`) - MARCXML nativo.
+- **University of Manchester (UK)**: Operacional via SRU Alma (`44MAN_INST`) - MARCXML nativo.

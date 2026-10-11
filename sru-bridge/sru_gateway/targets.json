@@ -187,8 +187,18 @@
     },
     {
       "id": "oxford",
-      "name": "Oxford University, UK",
-      "kind": "missing"
+      "name": "University of Oxford, Reino Unido",
+      "kind": "sru",
+      "url": "https://oxford.alma.exlibrisgroup.com/view/sru/44OXF_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
     },
     {
       "id": "bne",
@@ -342,6 +352,36 @@
       "name": "University of Michigan (UMich), EUA",
       "kind": "sru",
       "url": "https://umich.alma.exlibrisgroup.com/view/sru/01UMICH_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
+    },
+    {
+      "id": "cambridge",
+      "name": "University of Cambridge, Reino Unido",
+      "kind": "sru",
+      "url": "https://cambridge.alma.exlibrisgroup.com/view/sru/44CAM_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
+    },
+    {
+      "id": "manchester",
+      "name": "University of Manchester, Reino Unido",
+      "kind": "sru",
+      "url": "https://manchester.alma.exlibrisgroup.com/view/sru/44MAN_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {
