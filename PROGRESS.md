@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-11. Panel version on `main`: **1.5.52** (1.5.53: panel fixes PR)._
+_Last updated: 2026-10-11. Panel version on `main`: **1.5.53** (1.5.54: news buttons, restore menu, MARC stream PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.54 (follow-up from Paulo)**: News items (OPAC and staff) take a list of buttons
+  (`news.<side>.buttons` = `[{text, url}]`, at most 6, "Adicionar botão" + ✕ rows like the staff home
+  buttons; a 1.5.53 `button_text`/`button_url` pair is read as the first button). The main menu (panel
+  and classic, now 16 options) has no "Restore database" of its own: restore lives only in the Backup
+  center. bridge.stream reads output in 64 KiB chunks (`read_lines`): "\n", else after 1 MiB the last
+  \r / 0x1D / 0x1E, else a hard cut, so a routine printing MARC records no longer raises "Separator is
+  not found, and chunk exceed the limit"; function_marc_backup also sends the script's output to its
+  log. Not tried on a live Koha.
 - **1.5.53 (eight panel fixes from Paulo)**: Cloudflare and free-address examples say `example-library`
   (no TLD, no town names). Corner sliders (Blocos/Campos/Botões) explain border-radius in a note and
   tooltips. Reader alerts job runs daily, weekly or monthly: cron.py writes `--every weekly|monthly`

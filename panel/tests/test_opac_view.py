@@ -530,17 +530,35 @@ def test_corner_help_postimages_and_news(monkeypatch):
             _cfg, _pending, problem = view.collect()
             assert problem == "OPAC news: A news item needs its title."
             view.query_one("#o-newsitem-opac-title", Input).value = "Férias"
-            view.query_one("#o-newsitem-opac-btext", Input).value = "Ver horários"
+            rows = view.query_one("#o-newsitem-opac-btns")
+            assert len(rows.children) == 0
+            # "Add a button" adds a row of text and address; ✕ removes it.
+            for _ in range(3):
+                view.query_one("#o-newsitem-opac-badd", Button).press()
+            await pilot.pause(0.2)
+            first, second, third = rows.children
+            first.query_one(".link-text", Input).value = "Ver horários"
             _cfg, _pending, problem = view.collect()
             assert problem == "OPAC news: A button needs its text and its address."
-            view.query_one("#o-newsitem-opac-burl", Input).value = "javascript:alert(1)"
+            first.query_one(".link-url", Input).value = "javascript:alert(1)"
             assert "the address must start with" in view.collect()[2]
-            view.query_one("#o-newsitem-opac-burl", Input).value = "https://biblioteca.gov.br/horarios"
+            first.query_one(".link-url", Input).value = "https://biblioteca.gov.br/horarios"
+            second.query_one(".link-text", Input).value = "Contato"
+            second.query_one(".link-url", Input).value = "mailto:bib@example.org"
+            third.query_one(".link-del", Button).press()
+            await pilot.pause(0.2)
+            assert len(rows.children) == 2
             view.query_one("#o-newsitem-opac-html", TextArea).text = "<p>Julho</p>"
             raw, _pending, problem = view.collect()
             assert problem == ""
+            assert [b["text"] for b in raw["news"]["opac"]["buttons"]] == ["Ver horários", "Contato"]
             out = ot.contents(raw)
-            assert "Ver horários</a>" in out["news-opac"] and "Reunião" in out["news-staff"]
+            assert "Ver horários</a>" in out["news-opac"] and "Contato</a>" in out["news-opac"]
+            assert "Reunião" in out["news-staff"]
+            # Filling from saved settings brings the rows back.
+            view.fill_contents(ot.normalize(raw))
+            await pilot.pause(0.2)
+            assert len(view.query_one("#o-newsitem-opac-btns").children) == 2
 
     asyncio.run(main())
 

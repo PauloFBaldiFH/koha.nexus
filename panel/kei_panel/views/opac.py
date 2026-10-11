@@ -252,8 +252,8 @@ class OpacView(SectionView):
         for side, (box, _title) in NEWS_BOXES.items():
             nw = c["news"][side]
             with Vertical(id=box, classes="opac-box"):
-                yield Static(t("A news item of your own on ${where} (Koha's News): a title, the text and a "
-                               "button that opens an address. HTML is allowed as in the login text. Apply "
+                yield Static(t("A news item of your own on ${where} (Koha's News): a title, the text and "
+                               "buttons that open an address. HTML is allowed as in the login text. Apply "
                                "publishes it; switching it off takes it down. The library's own news in Tools > "
                                "News stay as they are.",
                                where=t("the OPAC home page") if side == "opac" else t("the staff home page")),
@@ -262,10 +262,12 @@ class OpacView(SectionView):
                 yield from _row(t("Title"), Input(nw["title"], id=f"{box}-title", max_length=120,
                                                   placeholder=t("Library news")))
                 yield from _row(t("Text (HTML)"), TextArea(nw["html"], id=f"{box}-html", classes="o-html"))
-                yield from _row(t("Button text"), Input(nw["button_text"], id=f"{box}-btext", max_length=60,
-                                                        placeholder=t("Learn more")))
-                yield from _row(t("Button address"), Input(nw["button_url"], id=f"{box}-burl",
-                                                           placeholder="https://..."))
+                yield Static(t("Buttons under the text: the text on the button and the address it "
+                               "opens. Add as many as you need (at most ${n}); ✕ removes one.",
+                               n=str(ot.MAX_NEWS_BUTTONS)), classes="ai-note", markup=False)
+                yield Vertical(id=f"{box}-btns", classes="link-rows")
+                with Horizontal(classes="quick-actions"):
+                    yield Button(t("Add a button"), id=f"{box}-badd", classes="small")
         with Vertical(id="o-ghost", classes="opac-box"):
             for key, label in GHOST.items():
                 yield from _row(t(label), Switch(c["ghost"][key], id=f"o-g-{key}"))
@@ -313,6 +315,43 @@ class OpacView(SectionView):
             self.query_one(f"#{wid}").border_title = t(title)
         for key in LINK_SETS:
             self.set_links(self.cfg[key]["items"], key)
+        for side, (box, _title) in NEWS_BOXES.items():
+            self.set_news_buttons(box, self.cfg["news"][side]["buttons"])
+
+    # ------------------------------------------------------------------
+    # News buttons (o-newsitem-<side>-b-<n>): text and address, one row
+    # each, added and removed like the quick access buttons
+    # ------------------------------------------------------------------
+    def set_news_buttons(self, box: str, items: list[dict]) -> None:
+        self.query_one(f"#{box}-btns", Vertical).remove_children()
+        for item in items:
+            self.add_news_button(box, item)
+
+    def add_news_button(self, box: str, item: dict | None = None) -> None:
+        rows = self.query_one(f"#{box}-btns", Vertical)
+        if len(rows.children) >= ot.MAX_NEWS_BUTTONS:
+            self.app.notify(t("At most ${n} buttons.", n=str(ot.MAX_NEWS_BUTTONS)), severity="warning")
+            return
+        item = item or {"text": "", "url": ""}
+        self.link_rows += 1
+        n = self.link_rows
+        rows.mount(Horizontal(
+            Input(item["text"], placeholder=t("Learn more"), max_length=60, id=f"{box}-bt-{n}",
+                  classes="link-text", tooltip=t("Button text")),
+            Input(item["url"], placeholder="https://...", id=f"{box}-bu-{n}", classes="link-url",
+                  tooltip=t("Button address")),
+            Button("✕", id=f"{box}-bdel-{n}", classes="small link-del", tooltip=t("Remove")),
+            classes="form-row news-button-row", id=f"{box}-b-{n}"))
+
+    def collect_news_buttons(self, box: str) -> list[dict]:
+        out = []
+        for row in self.query_one(f"#{box}-btns", Vertical).children:
+            n = (row.id or "").rsplit("-", 1)[-1]
+            text = row.query_one(f"#{box}-bt-{n}", Input).value.strip()
+            url = row.query_one(f"#{box}-bu-{n}", Input).value.strip()
+            if text or url:
+                out.append({"text": text, "url": url})
+        return out
 
     # ------------------------------------------------------------------
     # Quick access buttons (OPAC: o-link-*, staff: o-slink-*): one row of
@@ -428,8 +467,7 @@ class OpacView(SectionView):
             q(f"#{box}-enabled", Switch).value = nw["enabled"]
             q(f"#{box}-title", Input).value = nw["title"]
             q(f"#{box}-html", TextArea).text = nw["html"]
-            q(f"#{box}-btext", Input).value = nw["button_text"]
-            q(f"#{box}-burl", Input).value = nw["button_url"]
+            self.set_news_buttons(box, nw["buttons"])
         cr = cfg["credits"]
         q("#o-cr-enabled", Switch).value = cr["enabled"]
         q("#o-cr-text", TextArea).text = _credits_text(cr)
@@ -485,8 +523,7 @@ class OpacView(SectionView):
         raw["news"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value,
                               "title": q(f"#{box}-title", Input).value.strip(),
                               "html": q(f"#{box}-html", TextArea).text,
-                              "button_text": q(f"#{box}-btext", Input).value.strip(),
-                              "button_url": q(f"#{box}-burl", Input).value.strip()}
+                              "buttons": self.collect_news_buttons(box)}
                        for side, (box, _title) in NEWS_BOXES.items()}
         for side, (_box, title) in NEWS_BOXES.items():
             problem = _news_problem(raw["news"][side])
@@ -562,6 +599,14 @@ class OpacView(SectionView):
         if gone:
             event.stop()
             self.query_one(f"#{gone.group(1)}-{gone.group(2)}").remove()
+            return
+        news = re.fullmatch(r"(o-newsitem-(?:opac|staff))-(badd|bdel-(\d+))", bid)
+        if news:
+            event.stop()
+            if news.group(3):
+                self.query_one(f"#{news.group(1)}-b-{news.group(3)}").remove()
+            else:
+                self.add_news_button(news.group(1))
             return
         if event.button.id in actions:
             event.stop()
@@ -846,15 +891,18 @@ def _credit_links(text: str) -> tuple[list[dict], str]:
 
 def _news_problem(raw: dict) -> str:
     """Why a news item switched on cannot be published, said plainly."""
-    if raw["button_url"] and not ot.safe_link(raw["button_url"]):
-        return t("${name}: the address must start with https://, http://, / , mailto: or tel:.",
-                 name=raw["button_text"] or t("Button address"))
-    if bool(raw["button_text"]) != bool(raw["button_url"]):
-        return t("A button needs its text and its address.")
+    for b in raw["buttons"]:
+        if b["url"] and not ot.safe_link(b["url"]):
+            return t("${name}: the address must start with https://, http://, / , mailto: or tel:.",
+                     name=b["text"] or t("Button address"))
+        if bool(b["text"]) != bool(b["url"]):
+            return t("A button needs its text and its address.")
+    if len(raw["buttons"]) > ot.MAX_NEWS_BUTTONS:
+        return t("At most ${n} buttons.", n=str(ot.MAX_NEWS_BUTTONS))
     if raw["enabled"] and not raw["title"]:
         return t("A news item needs its title.")
-    if raw["enabled"] and not (raw["html"].strip() or raw["button_text"]):
-        return t("Write the text of the news item or its button.")
+    if raw["enabled"] and not (raw["html"].strip() or raw["buttons"]):
+        return t("Write the text of the news item or add a button.")
     return ""
 
 

@@ -50,6 +50,51 @@ Asker = Callable[["TaskOutcome", str, str, str, object], Awaitable[object]]
 
 _PROMPTS = ("@@ask ", "@@choose ", "@@input ", "@@say ", "@@view ", "@@check ", "@@file ", "@@edit ")
 
+# Output is read in chunks, not with readline(): a program that prints a long
+# run of bytes with no newline (MARC21 records end in 0x1D, not "\n") made
+# readline() raise "Separator is not found, and chunk exceed the limit".
+_CHUNK = 1 << 16
+_MAX_LINE = 1 << 20
+_SHOWN = 2000
+_FALLBACK_SEPS = (b"\r", b"\x1d", b"\x1e")
+
+
+def _split_line(buf: bytearray, limit: int = _MAX_LINE) -> bytes | None:
+    """Pop one line off buf: up to "\n", else (when buf outgrew limit) up to
+    the last fallback separator, else the first limit bytes. None while a
+    short line is still incomplete."""
+    nl = buf.find(b"\n")
+    if nl >= 0:
+        line = bytes(buf[:nl])
+        del buf[:nl + 1]
+        return line
+    if len(buf) < limit:
+        return None
+    cut = max(buf.rfind(sep, 0, limit) for sep in _FALLBACK_SEPS)
+    end = cut + 1 if cut >= 0 else limit
+    line = bytes(buf[:end])
+    del buf[:end]
+    return line
+
+
+async def read_lines(reader: asyncio.StreamReader, limit: int = _MAX_LINE):
+    """Every output line of reader, never raising on an over-long one."""
+    buf = bytearray()
+    while True:
+        chunk = await reader.read(_CHUNK)
+        if not chunk:
+            break
+        buf += chunk
+        while (line := _split_line(buf, limit)) is not None:
+            yield line
+    if buf:
+        yield bytes(buf)
+
+
+def _clean(raw: bytes) -> str:
+    line = _ANSI.sub("", raw.decode("utf-8", errors="replace")).rstrip()
+    return line if len(line) <= _SHOWN else line[:_SHOWN] + " …"
+
 
 async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
     """The reply line a routine waits for after a prompt line."""
@@ -291,8 +336,8 @@ class Bridge:
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=child_env, limit=1 << 20)
         assert proc.stdout is not None
         try:
-            async for raw in proc.stdout:
-                line = _ANSI.sub("", raw.decode("utf-8", errors="replace")).rstrip()
+            async for raw in read_lines(proc.stdout):
+                line = _clean(raw)
                 if not line:
                     continue
                 if on_line:

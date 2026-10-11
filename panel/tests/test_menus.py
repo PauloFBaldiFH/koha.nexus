@@ -56,6 +56,14 @@ def test_magic_import_is_on_the_main_menu():
     assert places == ["import"]
 
 
+def test_restore_is_only_in_the_backup_center():
+    # Paulo, 2026-10-11: no main-menu entry of its own any more.
+    ids = [s.id for s in SECTIONS]
+    assert "restore" not in ids
+    places = [s.id for s in SECTIONS for e in s.entries if e.action == "restore"]
+    assert places == ["backup"]
+
+
 def test_security_and_access_hub():
     # VPN, Cloudflare Tunnel, firewall, HTTPS and Fail2ban in one place.
     from kei_panel.menus import section
@@ -78,9 +86,12 @@ def test_security_and_access_hub():
 def test_the_bash_main_menu_matches():
     # The classic menu has the same order: Magic Import under the backups,
     # one Security & access hub.
-    body = TEXT[TEXT.index("# MAIN MENU (17 OPTIONS)"):]
-    assert body.index("m4=$(t '💾  Backup center')") < body.index("m5=$(t '🪄  Magic Import Tool')")
-    assert "m7=$(t '🔒  Security & access hub')" in body
+    body = TEXT[TEXT.index("# MAIN MENU (16 OPTIONS)"):]
+    assert body.index("m3=$(t '💾  Backup center')") < body.index("m4=$(t '🪄  Magic Import Tool')")
+    assert "m6=$(t '🔒  Security & access hub')" in body
+    # Restoring lives in the Backup center only (Paulo, 2026-10-11).
+    menu = body[:body.index("case \"$SUB_OPT\"")]
+    assert "📥  Restore database')" not in menu[:menu.index("MAIN_OPT=")]
     assert "🌐  Publish system to internet')" not in body
 
 

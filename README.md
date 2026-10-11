@@ -159,21 +159,20 @@ Real-Windows behaviour (the installer, notifications, the tray, Task Scheduler, 
 |---|--------|--------------|
 | 1 | Install Koha server | Complete installation and tuning |
 | 2 | View first-access credentials | Addresses, user and password |
-| 3 | Restore database | Imports a `.sql` backup (also `.gz`, `.bz2`, `.xz` or `.zst`) |
-| 4 | Backup center | Manual backup, cloud backup, integrity test |
-| 5 | Magic Import Tool | Any file, folder or archive with records, copies, patrons, loans or holds; a Koha backup goes to Restore database |
-| 6 | Search engine & indexing | Zebra ⇄ Elasticsearch, repair indexes |
-| 7 | Security & access hub | WireGuard VPN, Cloudflare Tunnel, UFW rules, staff firewall, free SSL (Certbot), Fail2ban, database password rotation, Google Search Console |
-| 8 | Diagnostics & maintenance | Status, health check, logs, optimization |
-| 9 | Koha settings & parameters | Sizing, e-mail, super librarian, SIP2/Z39.50, clock |
-| 10 | Library tools | Magic Import Tool, undo of a MARC import, SQL reports pack, school-year turnover, data-quality check, privacy (LGPD), Brazil: localization, WhatsApp / Telegram messaging, cataloguing aids, replace a MARC record, CDD lookup, Koha plugins on or off, Cutter Calculator |
-| 11 | General tools | htop/nethogs, file manager |
-| 12 | Schedules & cron tasks | View, explain, regenerate or edit automated tasks |
-| 13 | Koha languages | Koha language packs and panel language |
-| 14 | Update center | System/Koha updates and panel self-update |
-| 15 | About | Project information and support |
-| 16 | Reboot server | |
-| 17 | Exit | |
+| 3 | Backup center | Manual backup, MARC21 export, cloud backup, integrity test, and **Restore database** (imports a `.sql` backup, also `.gz`, `.bz2`, `.xz` or `.zst`) |
+| 4 | Magic Import Tool | Any file, folder or archive with records, copies, patrons, loans or holds; a Koha backup goes to Restore database |
+| 5 | Search engine & indexing | Zebra ⇄ Elasticsearch, repair indexes |
+| 6 | Security & access hub | WireGuard VPN, Cloudflare Tunnel, UFW rules, staff firewall, free SSL (Certbot), Fail2ban, database password rotation, Google Search Console |
+| 7 | Diagnostics & maintenance | Status, health check, logs, optimization |
+| 8 | Koha settings & parameters | Sizing, e-mail, super librarian, SIP2/Z39.50, clock |
+| 9 | Library tools | Magic Import Tool, undo of a MARC import, SQL reports pack, school-year turnover, data-quality check, privacy (LGPD), Brazil: localization, WhatsApp / Telegram messaging, cataloguing aids, replace a MARC record, CDD lookup, Koha plugins on or off, Cutter Calculator |
+| 10 | General tools | htop/nethogs, file manager |
+| 11 | Schedules & cron tasks | View, explain, regenerate or edit automated tasks |
+| 12 | Koha languages | Koha language packs and panel language |
+| 13 | Update center | System/Koha updates and panel self-update |
+| 14 | About | Project information and support |
+| 15 | Reboot server | |
+| 16 | Exit | |
 
 In the new panel each of these is a card on the home screen, and the newest tools have screens and shortcut keys of their own: **d** Control Dashboard, **i** Magic Import Tool, **b** Backup center, **t** Database tables, **a** AI, **z** Z39.50 / SRU servers, **o** OPAC and Staff Appearance, **m** Messaging & interoperability, **x** Security & access hub (**v** opens its WireGuard VPN screen), **l** Library tools, **s** Schedules & cron tasks, and **ctrl+p** searches every action by name.
 

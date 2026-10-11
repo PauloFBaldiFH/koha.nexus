@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.53"
+PANEL_VERSION=" 1.5.54"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6145,7 +6145,10 @@ function_marc_backup() {
     [ -f "$log_file" ] && before=$(wc -l < "$log_file")
     clear
     display_explanation "Exporting the MARC21 records..."
-    koha_ctl /bin/bash /root/backup_marc.sh || true
+    # Whatever the script or koha-shell prints (an older script may stream
+    # the records themselves) goes to the log, never to the panel's pipe.
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    koha_ctl /bin/bash /root/backup_marc.sh >>"$log_file" 2>&1 || true
     new=$(tail -n +"$((before + 1))" "$log_file" 2>/dev/null | grep ' | ' || true)
     ok=$(printf '%s\n' "$new" | sed -n 's/^[^|]* | OK: //p' | tail -n1)
     if [ -z "$ok" ]; then
@@ -30629,7 +30632,7 @@ fi
 kei_panel_language_set || kei_ask_panel_language
 
 # ======================================================================
-# MAIN MENU (17 OPTIONS)
+# MAIN MENU (16 OPTIONS)
 # ======================================================================
 while true; do
     restore_apt_timers
@@ -30645,22 +30648,21 @@ while true; do
 
     m1=$(t '📦  Install Koha server')
     m2=$(t '🔑  View first-access credentials')
-    m3=$(t '📥  Restore database')
-    m4=$(t '💾  Backup center')
-    m5=$(t '🪄  Magic Import Tool')
-    m6=$(t '🔍  Search engine & indexing')
-    m7=$(t '🔒  Security & access hub')
-    m8=$(t '🩺  Diagnostics & maintenance center')
-    m9=$(t '🔧  Koha settings & parameters')
-    m10=$(t '📚  Library tools')
-    m11=$(t '🧰  General tools')
-    m12=$(t '⏰  Schedules & cron tasks')
-    m13=$(t '🌍  Koha languages')
-    m14=$(t '🔄  Update center')
-    m15=$(t '💡  About the program & support')
-    m16=$(t '🔁  Reboot server')
-    host_can reboot || m16=$(t '🔁  Restart Koha services')
-    m17=$(t '🚪  Exit')
+    m3=$(t '💾  Backup center')
+    m4=$(t '🪄  Magic Import Tool')
+    m5=$(t '🔍  Search engine & indexing')
+    m6=$(t '🔒  Security & access hub')
+    m7=$(t '🩺  Diagnostics & maintenance center')
+    m8=$(t '🔧  Koha settings & parameters')
+    m9=$(t '📚  Library tools')
+    m10=$(t '🧰  General tools')
+    m11=$(t '⏰  Schedules & cron tasks')
+    m12=$(t '🌍  Koha languages')
+    m13=$(t '🔄  Update center')
+    m14=$(t '💡  About the program & support')
+    m15=$(t '🔁  Reboot server')
+    host_can reboot || m15=$(t '🔁  Restart Koha services')
+    m16=$(t '🚪  Exit')
 
     MAIN_OPT=$(whiptail --title "${title_dash}" \
         --cancel-button "${exit_btn}" \
@@ -30680,20 +30682,18 @@ while true; do
         "13" "$m13" \
         "14" "$m14" \
         "15" "$m15" \
-        "16" "$m16" \
-        "17" "$m17" 3>&1 1>&2 2>&3) || { clear; exit 0; }
+        "16" "$m16" 3>&1 1>&2 2>&3) || { clear; exit 0; }
 
     # Under WSL nothing works without systemd: only About and Exit are left.
     case "$MAIN_OPT" in
-        15|17) ;;
+        14|16) ;;
         *) require_systemd || continue ;;
     esac
 
     case "$MAIN_OPT" in
         1) function_install_koha ;;
         2) function_view_credentials ;;
-        3) function_restore_database ;;
-        4)
+        3)
             SUB_OPT=$(whiptail --title "$(t '💾 Backup Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a backup routine:')" 19 76 5 \
                 "1" "$(t '💾  Generate manual backup and download to PC')" \
@@ -30709,8 +30709,8 @@ while true; do
                 5) function_restore_database ;;
             esac
             ;;
-        5) lt_magic_import ;;
-        6)
+        4) lt_magic_import ;;
+        5)
             SUB_OPT=$(whiptail --title "$(t '🔍 Search Engine & Indexing')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose an action:')" 16 76 2 \
                 "1" "$(t '🔃  Toggle search engine (Zebra ⇄ Elasticsearch)')" \
@@ -30720,7 +30720,7 @@ while true; do
                 2) function_repair_indexing ;;
             esac
             ;;
-        7)
+        6)
             SUB_OPT=$(whiptail --title "$(t '🔒 Security & Access Hub')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a security or remote-access tool:')" 22 78 8 \
                 "1" "$(t '🔐  WireGuard VPN')" \
@@ -30742,7 +30742,7 @@ while true; do
                 8) function_google_search_console ;;
             esac
             ;;
-        8)
+        7)
             SUB_OPT=$(whiptail --title "$(t '🩺 Diagnostics & Maintenance Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 20 76 6 \
                 "1" "$(t '📡  Detailed server & Koha status')" \
@@ -30760,7 +30760,7 @@ while true; do
                 6) function_repair_services ;;
             esac
             ;;
-        9)
+        8)
             SUB_OPT=$(whiptail --title "$(t '🔧 Koha Settings & Parameters')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a parameter:')" 19 76 5 \
                 "1" "$(t '📏  Server sizing (memory / workers)')" \
@@ -30776,8 +30776,8 @@ while true; do
                 5) function_configure_clock ;;
             esac
             ;;
-        10) function_library_tools ;;
-        11)
+        9) function_library_tools ;;
+        10)
             SUB_OPT=$(whiptail --title "$(t '🧰 General Tools')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose a tool:')" 16 76 2 \
                 "1" "$(t '📊  Resource monitoring (Htop / Nethogs)')" \
@@ -30787,9 +30787,9 @@ while true; do
                 2) function_run_mc ;;
             esac
             ;;
-        12) function_manage_crons ;;
-        13) function_languages_menu ;;
-        14)
+        11) function_manage_crons ;;
+        12) function_languages_menu ;;
+        13)
             SUB_OPT=$(whiptail --title "$(t '🔄 Update Center')" --cancel-button "$(t 'Back')" \
                 --menu "$(t 'Choose what to update:')" 16 76 2 \
                 "1" "$(t '🆙  Update OS packages & Koha schemas')" \
@@ -30799,9 +30799,9 @@ while true; do
                 2) function_autoupdate ;;
             esac
             ;;
-        15) function_about ;;
-        16) function_reboot_server ;;
-        17) clear; exit 0 ;;
+        14) function_about ;;
+        15) function_reboot_server ;;
+        16) clear; exit 0 ;;
     esac
     clear
 done

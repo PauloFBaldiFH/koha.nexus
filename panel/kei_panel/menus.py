@@ -56,8 +56,6 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📦  Install Koha server", "install", kind="native"),)),
     Section("credentials", "🔑  View first-access credentials", entries=(
         Entry("🔑  View first-access credentials", "credentials", kind="native"),)),
-    Section("restore", "📥  Restore database", entries=(
-        Entry("📥  Restore database", "restore", kind="native"),)),
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
         Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native"),
         Entry("📚  Export MARC21 records now", "backup-marc", kind="native"),
