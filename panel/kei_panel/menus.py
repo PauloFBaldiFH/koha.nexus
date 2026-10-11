@@ -60,6 +60,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📥  Restore database", "restore", kind="native"),)),
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
         Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native"),
+        Entry("📚  Export MARC21 records now", "backup-marc", kind="native"),
         Entry("📤  Configure cloud backup (Google Drive)", "backup-cloud", kind="native"),
         Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
         Entry("📥  Restore database", "restore", kind="native"),
@@ -193,6 +194,7 @@ DESCRIPTIONS: dict[str, str] = {
     "credentials": "Shows the logins and passwords of the first access",
     "restore": "Replaces Koha's database with a backup, tested first",
     "backup-manual": "Makes a full backup and shows how to copy it to a PC",
+    "backup-marc": "Exports the catalogue and the authorities in MARC21 now",
     "backup-cloud": "Connects Google Drive to keep the backups in the cloud",
     "backup-test": "Imports a backup into a test database to check it",
     "magic-import": "Imports catalogs in any format: MARC, ISIS, CSV, backups",

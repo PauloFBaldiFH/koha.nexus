@@ -2,6 +2,9 @@
 
   manual_backup  folder picker -> backup under Pac-Man -> file, size and the
                  scp command to copy it to a PC
+  marc_backup    the weekly MARC21 export (bibliographic + authority
+                 records, koha_marc_<date>.tar.gz) run now -> file, size
+                 and the scp command
   test_backup    which backup (newest, or another file) -> trial import ->
                  tables, records, patrons
   restore        how to send a file + file picker (a file can be dropped on
@@ -84,6 +87,32 @@ async def manual_backup(app) -> None:
         command_notes=after, extra=t(DOWNLOAD_LABEL) if here else ""))
     if choice == "extra":
         await download_latest(app, file=out.get("file"))
+
+
+# ----------------------------------------------------------------------
+# MARC21 export now (the weekly /root/backup_marc.sh, run at once)
+# ----------------------------------------------------------------------
+async def marc_backup(app) -> None:
+    title = t("📚  Export MARC21 records now")
+    if not await app.push_screen_wait(ConfirmScreen(
+            title, t("Exports every bibliographic and authority record in MARC21 (ISO 2709) into one "
+                     ".tar.gz package in the MARC backup folder, the same file the weekly backup makes. "
+                     "Koha keeps working while it runs. Export now?"))):
+        return
+    result = await run_task(app, t("Exporting the MARC21 records..."), "backup-marc")
+    if failed(result):
+        await show_failure(app, title, result)
+        return
+    out = result.value
+    details = [(t("File:"), out.get("file")), (t("Size:"), out.get("size"))]
+    if out.get("cloud") == "yes":
+        details.append((t("Cloud"), t("sent")))
+    steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
+    await app.push_screen_wait(MessageScreen(
+        t("MARC21 RECORDS EXPORTED"), "", details=details, command=out.get("scp"),
+        command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
+        command_notes=tx("3. You will be asked for the password of user '${REAL_USER:-root}'.",
+                         REAL_USER=out.get("user", "root"))))
 
 
 # ----------------------------------------------------------------------

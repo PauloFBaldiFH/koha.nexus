@@ -20,6 +20,7 @@ Routine = Callable[[object], Awaitable[None]]
 ROUTINES: dict[str, Routine] = {
     "backup-manual": backup.manual_backup,
     "backup-test": backup.test_backup,
+    "backup-marc": backup.marc_backup,
     "backup-cloud": backup.cloud_backup,
     "restore": backup.restore,
     "backup-download": backup.download_latest,           # backup view

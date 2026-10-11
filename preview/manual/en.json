@@ -254,7 +254,7 @@
     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
    ],
    "steps": [
-    "Open **Restore database** (from the main list or from the Backup center).",
+    "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
     "Pick the backup file, or drop it onto the panel window.",
     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
     "Confirm the restore. The screen shows the file, its size and the free disk space.",
@@ -361,10 +361,10 @@
    ]
   },
   "sec-backup": {
-   "summary": "Everything about backups on one screen: the state of the newest backup, the compression of new backups, one-click download, manual and cloud backups, the integrity test and the restore.",
+   "summary": "Everything about backups and restores on one screen: the state of the newest backup, the compression of new backups, one-click download, restore, the MARC21 export, manual and cloud backups and the integrity test.",
    "overview": [
     "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
-    "The top shows three cards (**Last backup**, **Size**, **Result** of the last nightly run), then the **New backups** box with the compression choice, then the backup routines as cards."
+    "The top row has **Download latest backup**, **Restore database** and **Export MARC21 records now**. Then three cards (**Last backup**, **Size**, **Result** of the last nightly run), the **New backups** box with the compression choice, and the backup routines as cards."
    ],
    "tips": [
     "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
@@ -375,7 +375,9 @@
     "backup-compression",
     "backup-download",
     "backup-safety",
-    "backup-cloud"
+    "backup-cloud",
+    "backup-marc",
+    "restore"
    ]
   },
   "backup-download": {
@@ -665,7 +667,8 @@
    ],
    "tips": [
     "Create a key just for the library, with a spending limit on the provider's site.",
-    "With Gemini, start with a Flash model: it is in the free tier (with daily limits)."
+    "With Gemini, start with a Flash model: it is in the free tier (with daily limits).",
+    "**Get an API key** opens the provider's key page (Google AI Studio: aistudio.google.com/api-keys), and the Copy button next to it copies the address when no browser can be opened from the server."
    ],
    "warnings": [
     "OpenAI and Anthropic bill every request, even for their smaller models: the account needs credits.",
@@ -1011,7 +1014,8 @@
    ],
    "tips": [
     "Use the library's brand colours for the accent and second colour, and keep the block background light for long reading.",
-    "Glass textures look best over a wallpaper; over a plain page, prefer flat or gradient."
+    "Glass textures look best over a wallpaper; over a plain page, prefer flat or gradient.",
+    "**Blocks**, **Inputs** and **Buttons** set the rounded corners (border-radius): more pixels curve the corners more, 0 makes them square. Hover a slider to see which elements it rounds."
    ],
    "related": [
     "opac-pictures",
@@ -1038,7 +1042,8 @@
    ],
    "tips": [
     "Keep the wallpaper under 500 KB (WebP is ideal): a heavy picture slows the OPAC on phones.",
-    "Use a square favicon of at least 64×64 pixels."
+    "Use a square favicon of at least 64×64 pixels.",
+    "No image host yet? **Postimages** (postimages.org) is free and needs no account: the box has its link with Open and Copy buttons. Paste the picture's *Direct link* with the source **Direct URL**."
    ],
    "related": [
     "opac-material",
@@ -1346,6 +1351,9 @@
     "Press **Set up WhatsApp and Telegram**.",
     "Follow the routine (see its own guide).",
     "Come back to the hub and press **Reload**: the box should say *installed*."
+   ],
+   "tips": [
+    "The tab links the Evolution API guide (doc.evolution-api.com) and lists the four steps: install the gateway, create an instance and scan its QR code with the library's WhatsApp, then type the address, instance and API key in **Set up WhatsApp and Telegram**."
    ]
   },
   "hub-sms": {
@@ -2268,7 +2276,8 @@
    ],
    "tips": [
     "Leave at least an hour between the nightly backup and heavy jobs such as a full reindex.",
-    "E-mail notices follow Koha's own schedule (koha-common), not this file."
+    "E-mail notices follow Koha's own schedule (koha-common), not this file.",
+    "**Reader alerts & daily digest** can run daily, weekly or monthly: a weekly or monthly run reminds of every loan that falls due before the next run, and the summary is titled weekly or monthly."
    ]
   },
   "sec-languages": {
@@ -2507,7 +2516,7 @@
   },
   "opac-credits": {
    "title": "Footer credits",
-   "summary": "The footer of every OPAC page (Koha's `opaccredits`), built from a form: no HTML to type.",
+   "summary": "The footer of every OPAC page (Koha's `opaccredits`), built from one text box: one `Field: value` per line, no HTML to type.",
    "options": [
     {
      "name": "Library name, Address, Opening hours, Note",
@@ -2527,7 +2536,7 @@
     },
     {
      "name": "Other links",
-     "text": "One per line: the text, a `|` and the address (at most 6)."
+     "text": "One per line: the text, a `|` and the address (at most 6), for example `Portal | https://biblioteca.gov.br`."
     }
    ],
    "tips": [
@@ -2535,6 +2544,51 @@
    ],
    "related": [
     "opac-login",
+    "sec-opac"
+   ],
+   "overview": [
+    "Write only the lines you need, for example `Library name: Biblioteca Municipal`, `Phone: (00) 0000-0000`, `E-mail: contato@biblioteca.gov.br`. The field names can be typed in English or in the panel's language, with or without accents. The example under the box shows every field."
+   ]
+  },
+  "backup-marc": {
+   "summary": "Exports every bibliographic and authority record in MARC21 right now, the same package the weekly backup makes, and shows how to copy it to your computer.",
+   "overview": [
+    "The export runs Koha's own `export_records.pl` for the bibliographic records and for the authorities and packs both files into `koha_marc_<date>.tar.gz` in the MARC backup folder (`/var/backups/koha_marc`). When a cloud backup is set up, the package is also sent there.",
+    "Koha keeps working while it runs. If another backup or a restore is running, the export waits for another time and says so."
+   ],
+   "steps": [
+    "Open the Backup center (key **b**).",
+    "Press **Export MARC21 records now** (on the top row or among the cards) and confirm.",
+    "Wait for the export: the result shows the file, its size and the `scp` command to paste on your computer to save it in Downloads."
+   ],
+   "tips": [
+    "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
+    "The weekly export runs every Sunday at 03:00; change its day and time in **Schedules & cron tasks**."
+   ],
+   "related": [
+    "sec-backup",
+    "backup-manual",
+    "restore"
+   ]
+  },
+  "opac-news-items": {
+   "title": "OPAC news and Staff news",
+   "summary": "Writes and publishes one news item of your own on the OPAC home page and another on the staff home page, each with a title, text and a call-to-action button.",
+   "overview": [
+    "The item goes into Koha's News (category news) as `kei-news-opac` (OPAC only) or `kei-news-staff` (staff interface only). The library's own news in **Tools > News** are never changed.",
+    "The text accepts the same safe HTML as the login text: paragraphs, bold, lists, links and pictures; scripts and styles are taken out. The button is a plain link styled as Koha's main button, so it works on both sides without any script."
+   ],
+   "steps": [
+    "Open **OPAC and Staff Appearance** (key **o**) and go to the **OPAC news** or **Staff news** box.",
+    "Switch **Publish** on and type the **Title** and the **Text (HTML)**.",
+    "Optionally type the **Button text** and the **Button address** (https://..., a Koha path such as /cgi-bin/koha/opac-search.pl, mailto: or tel:).",
+    "Press **Apply**: the news item is published after a backup. Switch **Publish** off and Apply again to take it down."
+   ],
+   "tips": [
+    "A button needs both its text and its address; the panel says which one is missing before anything is written."
+   ],
+   "related": [
+    "opac-news",
     "sec-opac"
    ]
   }

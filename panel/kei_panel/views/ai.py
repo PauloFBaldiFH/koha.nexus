@@ -60,6 +60,7 @@ from .. import aiclient, aiconf, aimodels, marcreplace
 from ..i18n import t
 from ..tasks import Reporter, TaskFailed, TaskResult, run_with_loader
 from ..widgets.cards import StatusCard
+from ..widgets.copy import CopyButton
 from .base import SectionView
 
 # The preset list's first choice: the models typed in the fields.
@@ -124,6 +125,13 @@ class AIView(SectionView):
                         yield Label(t("API key"), classes="form-label", id="ai-token-label")
                         yield Input("", password=True, id="ai-token")
                     yield Label("", id="ai-key-note", classes="ai-note")
+                    # The provider's page that makes the key: open it, or copy
+                    # its address (over SSH no browser opens from here).
+                    with Horizontal(classes="form-buttons", id="ai-key-links"):
+                        yield Button(t("🔗 Get an API key"), id="ai-key-open", classes="small",
+                                     tooltip=t("Opens the page where the provider creates your API key. Create "
+                                               "the key there, copy it and paste it in the API key field."))
+                        yield CopyButton(id="ai-key-copy", classes="small", tooltip=t("Copy the address"))
                     with Horizontal(classes="form-row"):
                         yield Label(t("Models"), classes="form-label")
                         yield Select([], allow_blank=True, prompt=t("Choose a model"), id="ai-model-list")
@@ -230,6 +238,9 @@ class AIView(SectionView):
         help_ = aiconf.KEY_HELP.get(self.provider, "")
         if help_ and self.provider != "ollama":
             parts.append(t("Get a key at:") + f" {help_}" if help_.startswith("http") else help_)
+        if help_.startswith("http"):
+            parts.append(t("Press Get an API key, create the key on that page and paste it in the field above."))
+        self.query_one("#ai-key-links").display = help_.startswith("http")
         if self.provider == "ollama":
             parts.append(t("Runs on this server: no key, nothing leaves the machine."))
         self.query_one("#ai-key-note", Label).update(" · ".join(parts))
@@ -264,6 +275,8 @@ class AIView(SectionView):
             "ai-models-load": self.load_models,
             "ai-list-vision": lambda: self.use_listed("vision"),
             "ai-list-chat": lambda: self.use_listed("chat"),
+            "ai-key-open": lambda: self.app.open_url(aiconf.KEY_HELP[self.provider]),
+            "ai-key-copy": lambda: self.app.copy_to_clipboard(aiconf.KEY_HELP[self.provider]),
         }
         if event.button.id in actions:
             event.stop()

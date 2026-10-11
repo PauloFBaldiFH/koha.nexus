@@ -192,3 +192,27 @@ def test_alerts_tab_dry_run_and_schedule(tmp_path, monkeypatch):
             assert notify.Settings().any_on() is False
 
     asyncio.run(main())
+
+
+def test_whatsapp_tab_links_the_gateway_guide():
+    import asyncio
+    from conftest import INSTALLER
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.env import PanelEnv
+    from kei_panel.views.hub import EVOLUTION_URL
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        copied = []
+        app.copy_to_clipboard = lambda text, quiet=False: copied.append(text)
+        async with app.run_test(size=(140, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("m")
+            await pilot.pause(0.3)
+            row = app.screen.query_one("#h-msg-evolution")
+            assert row.url == EVOLUTION_URL and "AUTHENTICATION_API_KEY" in row.note
+            row.query_one(".link-row-copy").press()
+            await pilot.pause(0.1)
+            assert copied == [EVOLUTION_URL]
+
+    asyncio.run(main())

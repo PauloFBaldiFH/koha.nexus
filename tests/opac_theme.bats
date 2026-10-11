@@ -486,6 +486,31 @@ ac() { mysql --default-character-set=utf8mb4 -N --raw "$DB" -e "$1"; }
     [ ! -e "$W/etc/theme-retired.tsv" ]
 }
 
+@test "news: the panel's news item of each side goes in with its title, the library's news stay" {
+    contents_tables
+    ac "INSERT INTO additional_contents (id, category, code, location, published_on) VALUES (10, 'news', 'News_10', 'staff_and_opac', '2025-01-01');
+INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (10, 'Ours too', '<p>Library news</p>', 'default');"
+    contents "$W/apply" news-opac=on news-staff=off
+    printf '<!-- kei-news-title: Férias de julho -->\n<div class="kei-news">\n<p>Fechado</p>\n</div>\n' > "$W/apply/contents/news-opac.html"
+    task opac_theme_apply "$W/apply"
+    [ "$status" -eq 0 ]
+    [ "$(ac "SELECT CONCAT(c.category, '|', c.location, '|', l.title) FROM additional_contents c
+             JOIN additional_contents_localizations l ON l.additional_content_id = c.id WHERE c.code = 'kei-news-opac'")" = "news|opac_only|Férias de julho" ]
+    [ "$(ac "SELECT l.content FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
+             WHERE c.code = 'kei-news-opac'")" = $'<div class="kei-news">\n<p>Fechado</p>\n</div>' ]
+    [ "$(ac "SELECT IFNULL(expirationdate, 'none') FROM additional_contents WHERE id = 10")" = "none" ]
+    # Applied twice, then moved to the staff side: one of ours, on the right side.
+    task opac_theme_apply "$W/apply"
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-news-opac'")" = "1" ]
+    contents "$W/apply" news-opac=off news-staff=on
+    printf '<!-- kei-news-title: Equipe -->\n<p>Reunião</p>\n' > "$W/apply/contents/news-staff.html"
+    task opac_theme_apply "$W/apply"
+    [ "$(ac "SELECT GROUP_CONCAT(CONCAT(code, ':', location)) FROM additional_contents WHERE code LIKE 'kei-news-%'")" = "kei-news-staff:staff_only" ]
+    task opac_theme_remove
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-%'")" = "0" ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE id = 10")" = "1" ]
+}
+
 @test "contents: scripts, handlers, unknown places or a missing file change nothing" {
     contents_tables
     contents "$W/apply" opaccredits=on

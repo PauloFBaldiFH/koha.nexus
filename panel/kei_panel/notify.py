@@ -51,6 +51,11 @@ CONF_FILE = CONFIG_DIR / "notifications.conf"
 LOG_FILE = Path("/var/log/koha-easy-install/notify.log")
 INSTALLED_PANEL = Path("/usr/local/bin/config.sh")
 PERL_DIR = Path("/usr/local/lib/site_perl")
+# How far ahead a run looks (koha-kei-notify --every, from the job's
+# frequency in Schedules & cron tasks): a weekly run reminds of every loan
+# that falls due before the next run. A month is 31 days so nothing slips
+# between two runs; the sent log keeps a reminder from going out twice.
+PERIODS = {"daily": 1, "weekly": 7, "monthly": 31}
 OVERDUE_LIMIT = 90          # days: older overdue loans are only in the digest
 DIGEST_LIST = 15            # overdue loans listed in the digest
 KEEP_DAYS = 400             # sent.tsv forgets keys older than this
@@ -286,14 +291,14 @@ SMTP_SQL = ("SELECT host, port, timeout, ssl_mode, IFNULL(user_name, ''), IFNULL
 BRANCH_SQL = "SELECT branchname FROM branches ORDER BY branchname LIMIT 1"
 
 
-def read_koha(run: Runner, today: dt.date, due_days: int) -> Koha:
+def read_koha(run: Runner, today: dt.date, due_days: int, span: int = 1) -> Koha:
     k = Koha()
     prefs = dict((r[0], r[1]) for r in rows(run, PREFS_SQL, 2))
     k.admin_email = prefs.get("KohaAdminEmailAddress", "").strip()
     k.library = prefs.get("LibraryName", "").strip()
     if not k.library:
         k.library = next((r[0] for r in rows(run, BRANCH_SQL, 1)), "") or "Koha"
-    until = today + dt.timedelta(days=due_days + 1)
+    until = today + dt.timedelta(days=due_days + span)
     for r in rows(run, LOANS_SQL.format(until=until.isoformat()), 9):
         with contextlib.suppress(ValueError):
             k.loans.append(Loan(r[0], r[1], dt.date.fromisoformat(r[2]), *r[3:]))
@@ -352,13 +357,20 @@ def _by_reader(loans: Iterable[Loan]) -> dict[str, list[Loan]]:
     return out
 
 
-def plan(s: Settings, k: Koha, log: SentLog, today: dt.date, t: Callable[..., str] = _identity) -> list[Message]:
-    """The reader messages due today (the digest is built after they went out)."""
+def plan(s: Settings, k: Koha, log: SentLog, today: dt.date, t: Callable[..., str] = _identity,
+         span: int = 1) -> list[Message]:
+    """The reader messages due today (the digest is built after they went out).
+    span: the days until the next run; the reminders cover all of them."""
     msgs: list[Message] = []
     if s.due_soon:
-        day = today + dt.timedelta(days=s.due_days)
-        due = [ln for ln in k.loans if ln.due == day and not log.last(f"due:{ln.issue_id}:{ln.due}")]
-        for loans in _by_reader(due).values():
+        start = today + dt.timedelta(days=s.due_days)
+        end = start + dt.timedelta(days=max(span, 1))
+        due = [ln for ln in k.loans if start <= ln.due < end and not log.last(f"due:{ln.issue_id}:{ln.due}")]
+        # One message per reader and due date, so each one names its date.
+        groups: dict[tuple[str, dt.date], list[Loan]] = {}
+        for ln in due:
+            groups.setdefault((ln.borrower, ln.due), []).append(ln)
+        for (_who, day), loans in sorted(groups.items(), key=lambda g: (g[0][1], g[0][0])):
             first = loans[0]
             items = "\n".join(f"  - {ln.title}" + (f" ({ln.barcode})" if ln.barcode else "") for ln in loans)
             body = t("Hello ${name},\n\nThese items you borrowed from ${library} are due on ${date}:\n${items}\n\n"
@@ -388,10 +400,16 @@ def plan(s: Settings, k: Koha, log: SentLog, today: dt.date, t: Callable[..., st
     return msgs
 
 
+DIGEST_TITLES = {"daily": ("${library} - daily summary, ${date}", "${library}: daily summary"),
+                 "weekly": ("${library} - weekly summary, ${date}", "${library}: weekly summary"),
+                 "monthly": ("${library} - monthly summary, ${date}", "${library}: monthly summary")}
+
+
 def digest(s: Settings, k: Koha, status: dict, sent: dict[str, int], today: dt.date,
-           t: Callable[..., str] = _identity) -> Message:
+           t: Callable[..., str] = _identity, every: str = "daily") -> Message:
     late = [ln for ln in k.loans if ln.due < today]
-    lines = [t("${library} - daily summary, ${date}", library=k.library, date=fmt_date(today, t)), "",
+    head, subj = DIGEST_TITLES.get(every, DIGEST_TITLES["daily"])
+    lines = [t(head, library=k.library, date=fmt_date(today, t)), "",
              t("Loans"), "  " + t("Out now: ${n}", n=k.loans_out),
              "  " + t("Due today: ${n}", n=sum(1 for ln in k.loans if ln.due == today)),
              "  " + t("Overdue: ${n} (${readers} readers)", n=len(late),
@@ -409,7 +427,7 @@ def digest(s: Settings, k: Koha, status: dict, sent: dict[str, int], today: dt.d
     lines += ["", t("Server")] + ["  " + ln for ln in server]
     to = _addresses(s.digest_to) or _addresses(k.admin_email)
     problem = any(ln.startswith("!") for ln in server)
-    subject = t("${library}: daily summary", library=k.library) + (" - " + t("needs attention") if problem else "")
+    subject = t(subj, library=k.library) + (" - " + t("needs attention") if problem else "")
     return Message("digest", [f"digest:{today.isoformat()}"], t("the library"), subject, "\n".join(lines), to)
 
 
@@ -590,18 +608,19 @@ class Report:
 
 def run(instance: str, s: Settings, *, dry_run: bool = False, today: dt.date | None = None,
         runner: Runner | None = None, status: Callable[[], dict] | None = None,
-        channels: Channels | None = None, t: Callable[..., str] = _identity) -> Report:
+        channels: Channels | None = None, t: Callable[..., str] = _identity, every: str = "daily") -> Report:
     today = today or dt.date.today()
+    span = PERIODS.get(every, 1)
     rep = Report()
     head = "dry run: nothing is sent" if dry_run else "run"
-    rep.add(f"koha-kei-notify {instance} {today.isoformat()} ({head})")
+    rep.add(f"koha-kei-notify {instance} {today.isoformat()} ({head}, {every})")
     if not s.any_on():
         rep.add("Every alert is off (Messaging > Alerts): nothing to do.")
         return rep
-    k = read_koha(runner or koha_mysql(instance), today, s.due_days if s.due_soon else 0)
+    k = read_koha(runner or koha_mysql(instance), today, s.due_days if s.due_soon else 0, span)
     log = SentLog(state_dir(instance) / "sent.tsv", dry_run=dry_run)
     ch = channels or Channels(instance, k)
-    for m in plan(s, k, log, today, t):
+    for m in plan(s, k, log, today, t, span):
         ok, how = deliver(m, s, ch, dry_run)
         if ok:
             log.mark(m.keys, today)
@@ -614,7 +633,7 @@ def run(instance: str, s: Settings, *, dry_run: bool = False, today: dt.date | N
         if log.last(key):
             rep.add("digest   already sent today")
         else:
-            m = digest(s, k, (status or server_status)(), rep.sent, today, t)
+            m = digest(s, k, (status or server_status)(), rep.sent, today, t, every)
             ok, how = deliver(m, s, ch, dry_run)
             if ok:
                 log.mark(m.keys, today)
@@ -646,6 +665,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("instance", nargs="?", default=os.environ.get("KEI_INSTANCE", "library"))
     ap.add_argument("--dry-run", action="store_true", help="print what would be sent; send and record nothing")
     ap.add_argument("--today", help="YYYY-MM-DD (tests)")
+    ap.add_argument("--every", choices=tuple(PERIODS), default="daily",
+                    help="how often the job runs: the reminders cover the days until the next run")
     a = ap.parse_args(argv)
     if not re.fullmatch(r"[A-Za-z0-9_-]+", a.instance):
         ap.error("bad instance name")
@@ -657,7 +678,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         with run_lock(state_dir(a.instance)):
-            rep = run(a.instance, s, dry_run=a.dry_run, today=today, t=translator())
+            rep = run(a.instance, s, dry_run=a.dry_run, today=today, t=translator(), every=a.every)
     except BlockingIOError:
         print("Another run is in progress.", file=sys.stderr)
         return 1

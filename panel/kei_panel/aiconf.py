@@ -40,7 +40,7 @@ LABELS = {
 SELECTOR_ORDER = ("ollama", "gemini", "openai", "anthropic", "compatible")
 # Where each company hands out its keys (shown under the key field).
 KEY_HELP = {
-    "gemini": "https://aistudio.google.com/apikey",
+    "gemini": "https://aistudio.google.com/api-keys",
     "openai": "https://platform.openai.com/api-keys",
     "anthropic": "https://console.anthropic.com/settings/keys",
     "compatible": "LM Studio (http://localhost:1234/v1), vLLM, llama.cpp, OpenRouter...",

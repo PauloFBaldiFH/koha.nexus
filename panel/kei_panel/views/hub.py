@@ -33,6 +33,7 @@ from textual.widgets import Button, DataTable, Input, Label, Select, Static, Swi
 from .. import cron, notify, sip
 from ..i18n import t
 from ..screens.dialogs import ConfirmScreen, TextScreen
+from ..widgets.linkrow import LinkRow
 from .base import SectionView
 
 # Koha staff pages the links open (staff address + path).
@@ -63,6 +64,19 @@ POLICY = {"checkout": "Check out", "checkin": "Check in", "renewal": "Renew",
 # Buttons that run a panel routine (menus.py entries of this section).
 ROUTINE_BUTTONS = {"h-email-setup": "email", "h-msg-setup": "messaging"}
 
+
+# WhatsApp goes through a gateway of the library's own; the setup
+# (installer: lt_msg_whatsapp) speaks Evolution API v2 first.
+EVOLUTION_URL = "https://doc.evolution-api.com/"
+WHATSAPP_STEPS = (
+    "How to get the WhatsApp credentials (Evolution API v2):\n"
+    "1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The "
+    "AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n"
+    "2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR "
+    "code with the library's WhatsApp (Linked devices).\n"
+    "3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the "
+    "instance name and the API key.\n"
+    "4. Send a test message to check that it arrives.")
 
 class HubView(SectionView):
     loaded = False
@@ -124,6 +138,7 @@ class HubView(SectionView):
         yield Static(t("Sends Koha's notices (holds waiting, overdue, due soon) by WhatsApp or Telegram too, "
                        "with the reader's mobile number. The setup asks for the service's keys."),
                      classes="ai-note", markup=False)
+        yield LinkRow(EVOLUTION_URL, t(WHATSAPP_STEPS), "Evolution API", id="h-msg-evolution")
         with Horizontal(classes="form-buttons"):
             yield Button(t("Set up WhatsApp and Telegram"), id="h-msg-setup", variant="primary")
             yield Button(t("Notices & slips"), id="h-l-msg-notices")

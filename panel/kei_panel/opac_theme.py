@@ -133,6 +133,10 @@ DEFAULTS: dict = {
     "credits": {"enabled": False, "name": "", "address": "", "phone": "", "whatsapp": "", "email": "",
                 "website": "", "hours": "", "instagram": "", "facebook": "", "youtube": "", "cnpj": "",
                 "note": "", "links": []},
+    # One news item of the panel's own on each side (Koha's News, category
+    # "news"): a title, allow-listed HTML and a call-to-action button.
+    "news": {"opac": {"enabled": False, "title": "", "html": "", "button_text": "", "button_url": ""},
+             "staff": {"enabled": False, "title": "", "html": "", "button_text": "", "button_url": ""}},
 }
 
 RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius_input": (0, 30),
@@ -236,10 +240,15 @@ def _asset(raw) -> dict:
 # ----------------------------------------------------------------------
 # Koha's places for them (additional_contents.location, Koha 23.11 and later):
 # the OPAC login page, the staff login page and the OPAC footer.
-CONTENT_LOCATIONS = ("OpacLoginInstructions", "StaffLoginInstructions", "opaccredits")
+CONTENT_LOCATIONS = ("OpacLoginInstructions", "StaffLoginInstructions", "opaccredits", "news-opac", "news-staff")
 LOGIN_SIDES = {"opac": "OpacLoginInstructions", "staff": "StaffLoginInstructions"}
 # The login banners: kei-login.* in the OPAC's folder, kei-staff-login.* in the staff one.
 LOGIN_ASSETS = {"opac": "login", "staff": "staff-login"}
+# The panel's news items: contents.list place -> Koha's News location. Their
+# code is kei-<place>; the title rides on the first line of the HTML file.
+NEWS_SIDES = {"opac": "news-opac", "staff": "news-staff"}
+NEWS_LOCATIONS = {"news-opac": "opac_only", "news-staff": "staff_only"}
+NEWS_TITLE = "<!-- kei-news-title: {} -->"
 MAX_HTML = 20_000
 MAX_CREDIT_LINKS = 6
 # What the login instructions keep of the HTML typed or pasted in the panel:
@@ -390,6 +399,32 @@ def _credits(raw) -> dict:
     return out
 
 
+def _news(raw) -> dict:
+    r = raw if isinstance(raw, dict) else {}
+    # The title goes into an HTML comment and Koha's own title field.
+    title = re.sub(r"-{2,}", "-", re.sub(r"[<>\r\n]", "", _text(r.get("title"), "", 120)))
+    return {"enabled": bool(r.get("enabled", False)), "title": title.strip(),
+            "html": sanitize_html(r.get("html", "")), "button_text": _text(r.get("button_text"), "", 60),
+            "button_url": safe_link(r.get("button_url", ""))}
+
+
+def news_on(n: dict) -> bool:
+    return bool(n["enabled"] and n["title"] and (n["html"] or (n["button_text"] and n["button_url"])))
+
+
+def news_html(n: dict) -> str:
+    """A news item as Koha prints it: the text, then the button (a plain
+    link styled as Koha's primary button on both sides, no script)."""
+    parts = [NEWS_TITLE.format(n["title"]), '<div class="kei-news">']
+    if n["html"]:
+        parts.append(n["html"])
+    if n["button_text"] and n["button_url"]:
+        extra = ' target="_blank" rel="noopener noreferrer"' if n["button_url"].startswith("http") else ""
+        parts.append(f'<p class="kei-news-cta"><a class="btn btn-primary kei-news-button" '
+                     f'href="{html.escape(n["button_url"], quote=True)}"{extra}>{html.escape(n["button_text"])}</a></p>')
+    return "\n".join(parts + ["</div>"])
+
+
 def credits_on(cr: dict) -> bool:
     return bool(cr["enabled"] and any(v for k, v in cr.items() if k != "enabled"))
 
@@ -473,6 +508,8 @@ def contents(cfg: dict, text: dict | None = None) -> dict[str, str]:
     out = {loc: (login_html(cfg["login"][side]) if login_on(cfg["login"][side]) else "")
            for side, loc in LOGIN_SIDES.items()}
     out["opaccredits"] = credits_html(cfg["credits"], text) if credits_on(cfg["credits"]) else ""
+    for side, place in NEWS_SIDES.items():
+        out[place] = news_html(cfg["news"][side]) if news_on(cfg["news"][side]) else ""
     return out
 
 
@@ -485,15 +522,15 @@ def parse_contents(text: str) -> dict:
         return {}
     if not isinstance(data, dict):
         return {}
-    cfg = normalize({k: data.get(k) for k in ("login", "credits")})
-    return {k: cfg[k] for k in ("login", "credits") if k in data}
+    cfg = normalize({k: data.get(k) for k in ("login", "credits", "news")})
+    return {k: cfg[k] for k in ("login", "credits", "news") if k in data}
 
 
 def contents_settings(cfg: dict) -> dict:
     """The settings of the HTML customizations, kept out of the public
     stylesheet (theme-settings.json holds them)."""
     cfg = normalize(cfg)
-    return {"login": cfg["login"], "credits": cfg["credits"]}
+    return {"login": cfg["login"], "credits": cfg["credits"], "news": cfg["news"]}
 
 
 def normalize(raw: dict | None) -> dict:
@@ -549,6 +586,8 @@ def normalize(raw: dict | None) -> dict:
     lg = raw.get("login") if isinstance(raw.get("login"), dict) else {}
     cfg["login"] = {side: _login(lg.get(side)) for side in LOGIN_SIDES}
     cfg["credits"] = _credits(raw.get("credits"))
+    nw = raw.get("news") if isinstance(raw.get("news"), dict) else {}
+    cfg["news"] = {side: _news(nw.get(side)) for side in NEWS_SIDES}
     return cfg
 
 
@@ -578,9 +617,9 @@ def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
 
 def data_line(cfg: dict) -> str:
     """The settings as a CSS comment (one line; "*/" cannot end it early).
-    The login instructions and credits stay out (contents_settings())."""
+    The login instructions, credits and news stay out (contents_settings())."""
     data = normalize(cfg)
-    for key in ("login", "credits"):
+    for key in ("login", "credits", "news"):
         data.pop(key)
     text = json.dumps(data, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
     text = text.replace("*/", "*\\/").replace("</", "<\\/")

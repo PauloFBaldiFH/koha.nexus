@@ -458,17 +458,20 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
             await pilot.pause(0.2)
             await pilot.press("o")
             view = app.screen.query_one("#view-opac")
-            await _until(pilot, lambda: view.query_one("#o-cr-name", Input).value == "Biblioteca Municipal")
-            assert view.query_one("#o-cr-cnpj", Input).value == "00.000.000/0000-00"
+            box = view.query_one("#o-cr-text", TextArea)
+            await _until(pilot, lambda: "Library name: Biblioteca Municipal" in box.text)
+            assert "CNPJ: 00.000.000/0000-00" in box.text
             assert view.query_one("#o-credits").border_title == "Footer credits"
-            view.query_one("#o-cr-email", Input).value = "not-an-email"
+            box.text = "Library name: Biblioteca Municipal\nE-mail: not-an-email"
             _cfg, _pending, problem = view.collect()
             assert problem.startswith("Footer credits: E-mail")
-            view.query_one("#o-cr-email", Input).value = "contato@biblioteca.gov.br"
-            view.query_one("#o-cr-links", TextArea).text = "Portal | https://biblioteca.gov.br\nno bar here"
+            box.text = "Library name: Biblioteca Municipal\nPortal | https://biblioteca.gov.br\nno bar here"
             _cfg, _pending, problem = view.collect()
-            assert "write the text, a | and the address" in problem
-            view.query_one("#o-cr-links", TextArea).text = "Portal | https://biblioteca.gov.br"
+            assert "start the line with a field name" in problem
+            box.text = "Portal https://biblioteca.gov.br"
+            assert "start the line with a field name" in view.collect()[2]
+            box.text = ("library NAME: Biblioteca Municipal\nphone: (00) 0000-0000\n"
+                        "E-mail: contato@biblioteca.gov.br\nPortal | https://biblioteca.gov.br")
             view.query_one("#o-login-opac-enabled", Switch).value = True
             view.query_one("#o-login-opac-html", TextArea).text = "<h2>Ask at the desk</h2><script>x()</script>"
             view.query_one("#o-src-login", Select).value = "local"
@@ -480,6 +483,8 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
             assert problem == "" and set(pending) == {"login"}
             cfg = ot.normalize(raw)
             assert cfg["credits"]["links"] == [{"text": "Portal", "url": "https://biblioteca.gov.br"}]
+            assert (cfg["credits"]["name"], cfg["credits"]["phone"], cfg["credits"]["cnpj"]) == \
+                ("Biblioteca Municipal", "(00) 0000-0000", "")
             assert cfg["login"]["opac"]["html"] == "<h2>Ask at the desk</h2>"
             assert cfg["login"]["staff"]["image"]["url"] == "https://i.ibb.co/x/staff.png"
             assert ot.local_url("login", banner).startswith("/images/custom/kei-login.png?v=")
@@ -492,3 +497,72 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
             await pilot.press("escape")
 
     asyncio.run(main())
+
+
+def test_corner_help_postimages_and_news(monkeypatch):
+    """The corner sliders say they round the corners, Postimages is one copy
+    away, and each side's news item is checked and comes back."""
+    from kei_panel import demo
+    from textual.widgets import TextArea
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.views.opac import POSTIMAGES_URL
+    saved = ot.normalize({"news": {"staff": {"enabled": True, "title": "Equipe", "html": "<p>Reunião</p>"}}})
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [
+        f"@@result data={ot.data_line(saved)}",
+        "@@result contents_settings=" + __import__("json").dumps(ot.contents_settings(saved))])
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        copied = []
+        app.copy_to_clipboard = lambda text, quiet=False: copied.append(text)
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            for wid in ("#o-radius_block", "#o-staff-radius_button"):
+                assert "border-radius" in str(view.query_one(wid, Slider).tooltip)
+            view.query_one("#o-postimages").query_one(".link-row-copy").press()
+            await pilot.pause(0.1)
+            assert copied == [POSTIMAGES_URL]
+            await _until(pilot, lambda: view.query_one("#o-newsitem-staff-title", Input).value == "Equipe")
+            assert view.query_one("#o-newsitem-staff-enabled", Switch).value
+            view.query_one("#o-newsitem-opac-enabled", Switch).value = True
+            _cfg, _pending, problem = view.collect()
+            assert problem == "OPAC news: A news item needs its title."
+            view.query_one("#o-newsitem-opac-title", Input).value = "Férias"
+            view.query_one("#o-newsitem-opac-btext", Input).value = "Ver horários"
+            _cfg, _pending, problem = view.collect()
+            assert problem == "OPAC news: A button needs its text and its address."
+            view.query_one("#o-newsitem-opac-burl", Input).value = "javascript:alert(1)"
+            assert "the address must start with" in view.collect()[2]
+            view.query_one("#o-newsitem-opac-burl", Input).value = "https://biblioteca.gov.br/horarios"
+            view.query_one("#o-newsitem-opac-html", TextArea).text = "<p>Julho</p>"
+            raw, _pending, problem = view.collect()
+            assert problem == ""
+            out = ot.contents(raw)
+            assert "Ver horários</a>" in out["news-opac"] and "Reunião" in out["news-staff"]
+
+    asyncio.run(main())
+
+
+def test_credits_text_in_portuguese():
+    """Field names in the panel's language (with or without accents) or in English."""
+    from pathlib import Path
+    from kei_panel import i18n
+    from kei_panel.views import opac
+    old = i18n._current
+    i18n.install(i18n.Translator("pt", Path(INSTALLER)))
+    try:
+        fields, links, problem = opac._credits_parse(
+            "Nome da biblioteca: Biblioteca Municipal\nendereco: Rua Exemplo, 123\nPhone: (00) 0000-0000\n"
+            "Horário de funcionamento: seg-sex 8:00-18:00\nPortal | https://biblioteca.gov.br")
+        assert problem == ""
+        assert (fields["name"], fields["address"], fields["phone"], fields["hours"]) == \
+            ("Biblioteca Municipal", "Rua Exemplo, 123", "(00) 0000-0000", "seg-sex 8:00-18:00")
+        assert links == [{"text": "Portal", "url": "https://biblioteca.gov.br"}]
+        text = opac._credits_text({**fields, "links": links})
+        assert text.splitlines()[0] == "Nome da biblioteca: Biblioteca Municipal"
+        assert opac._credits_parse(text)[:2] == (fields, links)                 # round trip
+        assert "comece a linha" in opac._credits_parse("sem campo")[2]
+    finally:
+        i18n.install(old)

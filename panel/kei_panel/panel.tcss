@@ -605,6 +605,6 @@ App.-plain #picker-drop {
     width: 1fr;
     height: 8;
 }
-.opac-box TextArea.o-links-text {
-    height: 5;
+.opac-box TextArea.o-credits-text {
+    height: 14;
 }

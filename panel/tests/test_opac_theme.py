@@ -588,7 +588,7 @@ def test_contents_stay_out_of_the_public_stylesheet(tmp_path):
     work = ot.write_apply_dir(cfg, {})
     try:
         assert (work / "contents.list").read_text() == ("OpacLoginInstructions\toff\nStaffLoginInstructions\ton\n"
-                                                        "opaccredits\ton\n")
+                                                        "opaccredits\ton\nnews-opac\toff\nnews-staff\toff\n")
         assert "Internal extension 123" in (work / "contents" / "StaffLoginInstructions.html").read_text()
         assert not (work / "contents" / "OpacLoginInstructions.html").exists()
         assert json.loads((work / "contents.json").read_text())["credits"]["name"] == "Biblioteca"
@@ -598,3 +598,28 @@ def test_contents_stay_out_of_the_public_stylesheet(tmp_path):
     found = {"data": ot.data_line(ot.normalize({})), "contents_settings": json.dumps(ot.contents_settings(cfg))}
     synced, notes = ot.sync_settings(found)
     assert synced["credits"]["name"] == "Biblioteca" and any("theme-settings.json" in n for n, _ in notes)
+
+
+def test_news_items_for_each_side():
+    cfg = ot.normalize({"news": {
+        "opac": {"enabled": True, "title": "Férias <b>--</b>", "html": "<p>Fechado</p><script>x()</script>",
+                 "button_text": "Ver horários", "button_url": "https://biblioteca.gov.br/horarios"},
+        "staff": {"enabled": True, "title": "", "html": "<p>no title</p>"}}})
+    opac, staff = cfg["news"]["opac"], cfg["news"]["staff"]
+    assert opac["title"] == "Férias b-/b" and "<script>" not in opac["html"]
+    assert ot.news_on(opac) and not ot.news_on(staff)           # a news item needs a title
+    out = ot.contents(cfg)
+    assert out["news-staff"] == ""
+    first, *rest = out["news-opac"].splitlines()
+    assert first == "<!-- kei-news-title: Férias b-/b -->"
+    assert 'href="https://biblioteca.gov.br/horarios" target="_blank"' in out["news-opac"]
+    assert "Ver horários</a>" in out["news-opac"] and "<p>Fechado</p>" in out["news-opac"]
+    assert "Fechado" not in ot.data_line(cfg) and '"news":' not in ot.data_line(cfg)   # not public
+    assert ot.parse_contents(json.dumps(ot.contents_settings(cfg)))["news"] == cfg["news"]
+    work = ot.write_apply_dir(cfg, {})
+    try:
+        listing = (work / "contents.list").read_text()
+        assert "news-opac\ton\n" in listing and "news-staff\toff\n" in listing
+        assert (work / "contents" / "news-opac.html").read_text().startswith("<!-- kei-news-title:")
+    finally:
+        __import__("shutil").rmtree(work)
