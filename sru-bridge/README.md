@@ -1,4 +1,4 @@
-# SRU bridges: Zeus (UFSC) and Rede Pergamum (PUCPR)
+# SRU bridges: Zeus (UFSC), Rede Pergamum (PUCPR) and the SRU gateway
 
 ## Zeus SRU bridge
 
@@ -168,3 +168,61 @@ working script's description (`tests/fixtures/pergamum_*.html`); they were
 not captured from the live site. If a real search finds nothing, save a real
 `ajax_resultados` and `ajax_conteudo_pastas` answer over those fixtures and
 adjust the patterns in `pergamum_sru/pergamum.py`.
+
+## SRU gateway (one address, many catalogues)
+
+`sru_gateway` serves every catalogue of
+[`sru_gateway/targets.json`](sru_gateway/targets.json) from one port, one SRU
+database per catalogue: `/sru/bn`, `/sru/ufsc`, `/sru/pergamum` and so on. It
+is meant for the central server (the project's Oracle VPS), so Koha servers
+need nothing installed: each catalogue is an ordinary SRU row in Koha.
+
+```
+Koha ──SRU 1.1──▶ <vps>:5000/sru/{id} ──▶ Zeus | Pergamum | Z39.50 | SRU
+```
+
+Each entry of `targets.json` has an `id`, a `name` and a `kind`:
+
+| kind | goes to | needs |
+|---|---|---|
+| `zeus` | Catálogo Zeus (the `zeus_sru` client, `ZEUS_SRU_*` settings) | |
+| `pergamum` | Rede Pergamum (the `pergamum_sru` client, `PERGAMUM_SRU_*` settings) | |
+| `z3950` | a Z39.50 server (Init, Search, Present; the panel's BER client) | `host`, `port`, `db`, `syntax` USMARC/MARC21, `encoding` |
+| `sru` | another SRU server | `url`; optional `version`, `schema`, `indexes` |
+| `missing` | nothing yet | a search answers SRU diagnostic 1, "no catalogue address configured yet" |
+
+The 48 entries are the list of 2026-10-11. Only five have an address the
+repository already recorded: `ufsc` (Zeus target 0, tested live), `pergamum`,
+and `bl`, `sbn_it`, `swb_de` (Z39.50 addresses from the panel's curated list,
+not verified there; SWB is part of K10plus today). The other 43 are `missing`:
+fill each with its catalogue's published Z39.50 or SRU address and restart the
+service. UNIMARC servers are refused when the file is loaded, because Koha's
+rows say MARC21 and the gateway does not convert.
+
+How a search goes: Koha's CQL is read like the other bridges read it (ISBN,
+then title, then author, else any field). A Z39.50 target gets one session per
+request with Bib-1 use 7, 4, 1003 or 1016 and a Present of the page Koha asked
+for (Koha's first call, `maximumRecords=0`, only searches). An SRU target is
+asked `<index>="<term>"` with its own index names (default `bath.isbn`,
+`dc.title`, `dc.creator`, `cql.serverChoice`); its records, prefixed or
+string-packed, go back as MARC21/slim. An unknown id answers diagnostic 235.
+A path with two slashes (`//sru/bn`, what Koha asks for when the database is
+written `/sru/bn`) is read as `/sru/bn`.
+
+Run it: `.venv/bin/python -m sru_gateway` (127.0.0.1:5000), or on the VPS
+[`deploy/sru-gateway.service`](deploy/sru-gateway.service), which listens on
+0.0.0.0:5000. `GET /health` lists the configured and missing ids.
+
+| Variable | Default | |
+|---|---|---|
+| `SRU_GATEWAY_HOST` / `SRU_GATEWAY_PORT` | `127.0.0.1` / `5000` | where to listen |
+| `SRU_GATEWAY_TARGETS` | `sru_gateway/targets.json` | another targets file |
+| `SRU_GATEWAY_TIMEOUT` | `25` | seconds per remote catalogue (Koha's rows wait 30) |
+| `SRU_GATEWAY_MAX_RECORDS` | `50` | ceiling on `maximumRecords` |
+| `SRU_GATEWAY_LOGIN_<ID>` | | `user:password` for a catalogue that needs a login |
+
+Koha's row for a catalogue: host the VPS address, port `5000`, database
+`sru/<id>`, SRU, MARC21, utf8, `sru=get,sru_version=1.1`, SRU search fields
+`title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice`.
+Its tests (`tests/test_gateway.py`) use a fake Z39.50 server and mocked SRU
+answers; none of the remote catalogues was reached from the tests.

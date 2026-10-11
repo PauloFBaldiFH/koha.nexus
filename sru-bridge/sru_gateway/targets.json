@@ -1,0 +1,272 @@
+{
+ "schema": 1,
+ "updated": "2026-10-11",
+ "about": "The catalogues of the koha.nexus SRU gateway, one per /sru/{id}. kind missing: no address known yet, so a search answers an SRU diagnostic saying so. To add one, give it kind z3950 (host, port, db, syntax USMARC or MARC21, encoding) or sru (url, version, schema, indexes) and restart the service. Logins go in the environment, never here: SRU_GATEWAY_LOGIN_<ID>=user:password.",
+ "targets": [
+  {
+   "id": "bn",
+   "name": "Fundação Biblioteca Nacional (BN)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufsc",
+   "name": "Universidade Federal de Santa Catarina (UFSC)",
+   "kind": "zeus",
+   "verified": true,
+   "source": "sru-bridge/zeus_sru: Catálogo Zeus target 0, tested live on 2026-10-09"
+  },
+  {
+   "id": "unicamp",
+   "name": "Universidade Estadual de Campinas (UNICAMP)",
+   "kind": "missing"
+  },
+  {
+   "id": "usp",
+   "name": "Universidade de São Paulo (USP)",
+   "kind": "missing"
+  },
+  {
+   "id": "uerj",
+   "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufg",
+   "name": "Universidade Federal de Goiás (UFG)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufmg",
+   "name": "Universidade Federal de Minas Gerais (UFMG)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufpe",
+   "name": "Universidade Federal de Pernambuco (UFPE)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufscar",
+   "name": "Universidade Federal de São Carlos (UFSCar)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufu",
+   "name": "Universidade Federal de Uberlândia (UFU)",
+   "kind": "missing"
+  },
+  {
+   "id": "ufrgs",
+   "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
+   "kind": "missing"
+  },
+  {
+   "id": "uff",
+   "name": "Universidade Federal Fluminense (UFF)",
+   "kind": "missing"
+  },
+  {
+   "id": "senado",
+   "name": "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
+   "kind": "missing"
+  },
+  {
+   "id": "nlm",
+   "name": "National Library of Medicine, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "harvard",
+   "name": "Harvard University, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "uw_madison",
+   "name": "University of Wisconsin-Madison, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "mit",
+   "name": "Massachusetts Institute of Technology, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "psu",
+   "name": "Penn State University, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "upenn",
+   "name": "University of Pennsylvania, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "tufts",
+   "name": "Tufts University Libraries, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "fsu",
+   "name": "Florida State University, EUA",
+   "kind": "missing"
+  },
+  {
+   "id": "ubc",
+   "name": "University of British Columbia, Canadá",
+   "kind": "missing"
+  },
+  {
+   "id": "trent",
+   "name": "Trent University Library & Archives, Canadá",
+   "kind": "missing"
+  },
+  {
+   "id": "sfu",
+   "name": "Simon Fraser University, Canadá",
+   "kind": "missing"
+  },
+  {
+   "id": "utoronto",
+   "name": "University of Toronto, Canadá",
+   "kind": "missing"
+  },
+  {
+   "id": "bl",
+   "name": "British Library, UK",
+   "kind": "z3950",
+   "host": "z3950cat.bl.uk",
+   "port": 9909,
+   "db": "BLAC",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "verified": false,
+   "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)"
+  },
+  {
+   "id": "oxford",
+   "name": "Oxford University, UK",
+   "kind": "missing"
+  },
+  {
+   "id": "bne",
+   "name": "Biblioteca Nacional de España, Espanha",
+   "kind": "missing"
+  },
+  {
+   "id": "bcl",
+   "name": "Biblioteca de Castilla y León, Espanha",
+   "kind": "missing"
+  },
+  {
+   "id": "bizkaia",
+   "name": "Biblioteca Foral de Bizkaia, Espanha",
+   "kind": "missing"
+  },
+  {
+   "id": "aladi",
+   "name": "Aladí: Barcelona Municipal Libraries Network, Espanha",
+   "kind": "missing"
+  },
+  {
+   "id": "sbn_it",
+   "name": "Servizio Bibliotecario Nazionale, Itália",
+   "kind": "z3950",
+   "host": "opac.sbn.it",
+   "port": 3950,
+   "db": "nopac",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "verified": false,
+   "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)"
+  },
+  {
+   "id": "abes_fr",
+   "name": "Agence Bibliographique de l'Enseignement Supérieur, França",
+   "kind": "missing"
+  },
+  {
+   "id": "swb_de",
+   "name": "SWB-Online-Katalog, Alemanha",
+   "kind": "z3950",
+   "host": "z3950.k10plus.de",
+   "port": 210,
+   "db": "opac-de-627",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "verified": false,
+   "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there); SWB is now part of K10plus (GBV/SWB)"
+  },
+  {
+   "id": "uhamburg",
+   "name": "Hamburg University of Technology (TUHH), Alemanha",
+   "kind": "missing"
+  },
+  {
+   "id": "bn_polonia",
+   "name": "National Library of Poland, Polônia",
+   "kind": "missing"
+  },
+  {
+   "id": "slsp",
+   "name": "Swiss Library Service Platform, Suíça",
+   "kind": "missing"
+  },
+  {
+   "id": "nkc",
+   "name": "National Library of the Czech Republic, Tchéquia",
+   "kind": "missing"
+  },
+  {
+   "id": "rsl",
+   "name": "Russian State Library, Rússia",
+   "kind": "missing"
+  },
+  {
+   "id": "bashkir",
+   "name": "Bashkir State University, Rússia",
+   "kind": "missing"
+  },
+  {
+   "id": "bna",
+   "name": "Biblioteca Nacional da Argentina",
+   "kind": "missing"
+  },
+  {
+   "id": "biblored",
+   "name": "Red Distrital de Bibliotecas Públicas (BibloRed), Colômbia",
+   "kind": "missing"
+  },
+  {
+   "id": "pucp",
+   "name": "Pontificia Universidad Católica del Perú, Peru",
+   "kind": "missing"
+  },
+  {
+   "id": "upc_peru",
+   "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
+   "kind": "missing"
+  },
+  {
+   "id": "christchurch",
+   "name": "Christchurch City Libraries, Nova Zelândia",
+   "kind": "missing"
+  },
+  {
+   "id": "juac_julac",
+   "name": "Joint University Librarians Advisory Committee, Hong Kong",
+   "kind": "missing"
+  },
+  {
+   "id": "monash_sa",
+   "name": "Monash South Africa, África do Sul",
+   "kind": "missing"
+  },
+  {
+   "id": "pergamum",
+   "name": "Rede Pergamum",
+   "kind": "pergamum",
+   "verified": false,
+   "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live"
+  }
+ ]
+}
