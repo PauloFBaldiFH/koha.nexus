@@ -125,12 +125,12 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
     @app.api_route("/sru/{database:path}", methods=["GET", "POST"])
     async def sru_endpoint(request: Request, database: str = "") -> Response:
         p, soap = await read_params(request)
-        resp = await handle(request, p)
+        resp = await handle(request, p, database.strip("/"))
         if soap:
             resp = xml(sru.soap_wrap(resp.body))
         return resp
 
-    async def handle(request: Request, p: dict[str, str]) -> Response:
+    async def handle(request: Request, p: dict[str, str], database: str = "") -> Response:
         # SRU parameter names are case-sensitive; Koha sends them as spelled here.
         operation = p.get("operation", "").strip() or ("searchRetrieve" if p.get("query", "").strip()
                                                        else "explain")
@@ -172,23 +172,34 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
         except cql.CQLError as exc:
             return fail(sru.QUERY_SYNTAX_ERROR, query, str(exc))
 
+        # A backend with for_database() serves several catalogues, one per
+        # /sru/{database}; it answers a Diagnostic for a database it cannot serve.
+        backend, name, schema_out = request.app.state.backend, source, record_schema
+        pick = getattr(backend, "for_database", None)
+        if pick is not None:
+            backend = pick(database)
+            if isinstance(backend, sru.Diagnostic):
+                return xml(sru.diagnostic_response(backend))
+            name = getattr(backend, "name", name)
+            schema_out = getattr(backend, "record_schema", schema_out)
+
         try:
-            total, records = await request.app.state.backend.search(q, start, maximum)
+            total, records = await backend.search(q, start, maximum)
         except sru.SourceUnavailable as exc:
-            log.error("%s unreachable: %s", source, exc)
-            return fail(sru.GENERAL_ERROR, source, f"{source} did not answer")
+            log.error("%s unreachable: %s", name, exc)
+            return fail(sru.GENERAL_ERROR, name, getattr(exc, "sru_message", "") or f"{name} did not answer")
 
         echo = {k: p.get(k, "") for k in ("version", "query", "startRecord", "maximumRecords",
                                           "recordPacking", "recordSchema")}
         echo["version"] = "1.1"
         if total and start > total:
             return xml(sru.search_retrieve_response(
-                total=total, records=[], start=start, echo=echo, schema=record_schema,
+                total=total, records=[], start=start, echo=echo, schema=schema_out,
                 diagnostics=[sru.Diagnostic(sru.FIRST_RECORD_OUT_OF_RANGE, str(start),
                                             "first record position out of range")]))
         body = sru.search_retrieve_response(
             total=total, records=records, start=start,
-            packing=packing, echo=echo, schema=record_schema)
+            packing=packing, echo=echo, schema=schema_out)
         return xml(body)
 
     return app

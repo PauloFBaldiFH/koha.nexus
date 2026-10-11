@@ -344,6 +344,12 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   a fresh line after a partial one. function_marc_backup rewrites a script without `EXPORT_ERR=`,
   reads only this run's `date | ...` lines by byte offset, quotes only the last stderr message (record
   dumps skipped) and reports `contents` (the .mrc names) in the success box. Not tried on a live Koha.
+- **SRU gateway (sru-bridge/sru_gateway, bridge-only, no panel version)**: the central VPS serves
+  one SRU database per catalogue, `/sru/{id}` on port 5000, from `sru_gateway/targets.json` (the 48
+  ids of Paulo's 2026-10-11 list; Koha rows from `/mnt/project-files/sru-servers/insert_z3950servers.sql`,
+  database `sru/<id>`). Kinds zeus, pergamum, z3950 (the panel's BER client with a paged Present), sru,
+  missing (diagnostic 1). Only ufsc, pergamum, bl, sbn_it, swb_de have addresses; the other 43 wait
+  for real addresses. `//sru/bn` is read as `/sru/bn`. Unit `deploy/sru-gateway.service` (0.0.0.0:5000).
 - **1.5.54 (follow-up from Paulo)**: News items (OPAC and staff) take a list of buttons
   (`news.<side>.buttons` = `[{text, url}]`, at most 6, "Adicionar botão" + ✕ rows like the staff home
   buttons; a 1.5.53 `button_text`/`button_url` pair is read as the first button). The main menu (panel
