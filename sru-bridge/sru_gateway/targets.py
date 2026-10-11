@@ -49,6 +49,7 @@ class Target:
     password: str = ""
     verified: bool = False
     source: str = ""
+    target_index: int = 0
 
     @property
     def configured(self) -> bool:
@@ -79,6 +80,7 @@ def make_target(raw: dict) -> Target:
         url=str(raw.get("url", "")).strip(), version=str(raw.get("version", "1.1")).strip(),
         schema=str(raw.get("schema", "marcxml")).strip(), indexes=dict(raw.get("indexes") or {}),
         verified=bool(raw.get("verified")), source=str(raw.get("source", "")),
+        target_index=int(raw.get("target_index") or 0),
         **dict(zip(("user", "password"), _login(tid))),
     )
     if kind == "z3950":

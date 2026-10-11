@@ -91,8 +91,18 @@ class Gateway:
         self.backends: dict[str, object] = {}
         for t in table.values():
             if t.kind == "zeus":
-                zeus = zeus or ZeusClient(ZeusSettings.from_env())
-                self.backends[t.id] = Named(ZeusBackend(zeus), t.name)
+                base_cfg = ZeusSettings.from_env()
+                t_cfg = ZeusSettings(
+                    base_url=base_cfg.base_url,
+                    targets=(t.target_index,),
+                    chunk_size=base_cfg.chunk_size,
+                    timeout=base_cfg.timeout,
+                    cache_ttl=base_cfg.cache_ttl,
+                    cache_size=base_cfg.cache_size,
+                    max_records=base_cfg.max_records,
+                    user_agent=base_cfg.user_agent,
+                )
+                self.backends[t.id] = Named(ZeusBackend(ZeusClient(t_cfg, client=self.http)), t.name)
             elif t.kind == "pergamum":
                 ps = PergamumSettings.from_env()
                 pergamum = pergamum or PergamumClient(ps)
