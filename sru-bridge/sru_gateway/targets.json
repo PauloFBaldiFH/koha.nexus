@@ -110,8 +110,18 @@
     },
     {
       "id": "mit",
-      "name": "Massachusetts Institute of Technology, EUA",
-      "kind": "missing"
+      "name": "Massachusetts Institute of Technology (MIT), EUA",
+      "kind": "sru",
+      "url": "https://mit.alma.exlibrisgroup.com/view/sru/01MIT_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
     },
     {
       "id": "psu",
@@ -120,8 +130,18 @@
     },
     {
       "id": "upenn",
-      "name": "University of Pennsylvania, EUA",
-      "kind": "missing"
+      "name": "University of Pennsylvania (UPenn), EUA",
+      "kind": "sru",
+      "url": "https://upenn.alma.exlibrisgroup.com/view/sru/01UPENN_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
     },
     {
       "id": "tufts",
