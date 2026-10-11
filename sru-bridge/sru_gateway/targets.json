@@ -321,6 +321,36 @@
       "syntax": "USMARC",
       "encoding": "utf8",
       "verified": true
+    },
+    {
+      "id": "yale",
+      "name": "Yale University, EUA",
+      "kind": "sru",
+      "url": "https://yale.alma.exlibrisgroup.com/view/sru/01YALE_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
+    },
+    {
+      "id": "umich",
+      "name": "University of Michigan (UMich), EUA",
+      "kind": "sru",
+      "url": "https://umich.alma.exlibrisgroup.com/view/sru/01UMICH_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "indexes": {
+        "title": "alma.title",
+        "author": "alma.creator",
+        "isbn": "alma.isbn",
+        "any": "alma.all_for_ui"
+      },
+      "verified": true
     }
   ]
 }
