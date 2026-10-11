@@ -363,10 +363,10 @@
       "verified": true
     },
     {
-      "id": "cambridge",
-      "name": "University of Cambridge, Reino Unido",
+      "id": "manchester",
+      "name": "University of Manchester, Reino Unido",
       "kind": "sru",
-      "url": "https://cambridge.alma.exlibrisgroup.com/view/sru/44CAM_INST",
+      "url": "https://manchester.alma.exlibrisgroup.com/view/sru/44MAN_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {
@@ -378,10 +378,10 @@
       "verified": true
     },
     {
-      "id": "manchester",
-      "name": "University of Manchester, Reino Unido",
+      "id": "kcl",
+      "name": "King's College London, Reino Unido",
       "kind": "sru",
-      "url": "https://manchester.alma.exlibrisgroup.com/view/sru/44MAN_INST",
+      "url": "https://kcl.alma.exlibrisgroup.com/view/sru/44KCL_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {

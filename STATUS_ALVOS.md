@@ -55,5 +55,7 @@ Portas de rede já testadas e abertas na VPS:
 - **Yale University (EUA)**: Operacional via SRU Alma (`01YALE_INST`) - MARCXML nativo.
 - **University of Michigan (EUA)**: Operacional via SRU Alma (`01UMICH_INST`) - MARCXML nativo.
 - **University of Oxford (UK)**: Operacional via SRU Alma (`44OXF_INST`) - MARCXML nativo.
-- **University of Cambridge (UK)**: Operacional via SRU Alma (`44CAM_INST`) - MARCXML nativo.
+- **University of Cambridge (UK)**: Descartado (Código de instituição 44CAM_INST inválido no Alma).
 - **University of Manchester (UK)**: Operacional via SRU Alma (`44MAN_INST`) - MARCXML nativo.
+
+- **King's College London (UK)**: Operacional via SRU Alma (`44KCL_INST`) - MARCXML nativo.
