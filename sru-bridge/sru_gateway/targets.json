@@ -86,12 +86,22 @@
     {
       "id": "nlm",
       "name": "National Library of Medicine, EUA",
-      "kind": "missing"
+      "kind": "z3950",
+      "host": "locatorplus.nlm.nih.gov",
+      "port": 7090,
+      "db": "voyager",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "verified": true
     },
     {
       "id": "harvard",
       "name": "Harvard University, EUA",
-      "kind": "missing"
+      "kind": "sru",
+      "url": "https://harvard-primo.hosted.exlibrisgroup.com/view/sru/01HVD_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "verified": true
     },
     {
       "id": "uw_madison",
@@ -280,6 +290,17 @@
       "kind": "pergamum",
       "verified": false,
       "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live"
+    },
+    {
+      "id": "loc",
+      "name": "Library of Congress, EUA",
+      "kind": "z3950",
+      "host": "lx2.loc.gov",
+      "port": 210,
+      "db": "LCDB",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "verified": true
     }
   ]
 }
