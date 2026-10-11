@@ -599,6 +599,17 @@ App.-plain #picker-drop {
     min-width: 5;
     width: 5;
 }
+/* News buttons: text and address, one row each */
+.news-button-row Input.link-text {
+    width: 1fr;
+}
+.news-button-row Input.link-url {
+    width: 2fr;
+}
+.news-button-row Button.link-del {
+    min-width: 5;
+    width: 5;
+}
 
 /* ---- OPAC and Staff Appearance: login instructions and credits ------ */
 .opac-box TextArea.o-html {

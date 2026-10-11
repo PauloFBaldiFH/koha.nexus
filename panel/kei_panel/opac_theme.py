@@ -134,9 +134,9 @@ DEFAULTS: dict = {
                 "website": "", "hours": "", "instagram": "", "facebook": "", "youtube": "", "cnpj": "",
                 "note": "", "links": []},
     # One news item of the panel's own on each side (Koha's News, category
-    # "news"): a title, allow-listed HTML and a call-to-action button.
-    "news": {"opac": {"enabled": False, "title": "", "html": "", "button_text": "", "button_url": ""},
-             "staff": {"enabled": False, "title": "", "html": "", "button_text": "", "button_url": ""}},
+    # "news"): a title, allow-listed HTML and call-to-action buttons.
+    "news": {"opac": {"enabled": False, "title": "", "html": "", "buttons": []},
+             "staff": {"enabled": False, "title": "", "html": "", "buttons": []}},
 }
 
 RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius_input": (0, 30),
@@ -249,6 +249,7 @@ LOGIN_ASSETS = {"opac": "login", "staff": "staff-login"}
 NEWS_SIDES = {"opac": "news-opac", "staff": "news-staff"}
 NEWS_LOCATIONS = {"news-opac": "opac_only", "news-staff": "staff_only"}
 NEWS_TITLE = "<!-- kei-news-title: {} -->"
+MAX_NEWS_BUTTONS = 6
 MAX_HTML = 20_000
 MAX_CREDIT_LINKS = 6
 # What the login instructions keep of the HTML typed or pasted in the panel:
@@ -403,25 +404,37 @@ def _news(raw) -> dict:
     r = raw if isinstance(raw, dict) else {}
     # The title goes into an HTML comment and Koha's own title field.
     title = re.sub(r"-{2,}", "-", re.sub(r"[<>\r\n]", "", _text(r.get("title"), "", 120)))
+    raw_buttons = r.get("buttons") if isinstance(r.get("buttons"), list) else []
+    if not raw_buttons and r.get("button_text"):     # 1.5.53 kept a single button
+        raw_buttons = [{"text": r.get("button_text"), "url": r.get("button_url", "")}]
+    buttons = []
+    for item in raw_buttons:
+        if not isinstance(item, dict):
+            continue
+        text, url = _text(item.get("text"), "", 60), safe_link(item.get("url", ""))
+        if text and url:
+            buttons.append({"text": text, "url": url})
     return {"enabled": bool(r.get("enabled", False)), "title": title.strip(),
-            "html": sanitize_html(r.get("html", "")), "button_text": _text(r.get("button_text"), "", 60),
-            "button_url": safe_link(r.get("button_url", ""))}
+            "html": sanitize_html(r.get("html", "")), "buttons": buttons[:MAX_NEWS_BUTTONS]}
 
 
 def news_on(n: dict) -> bool:
-    return bool(n["enabled"] and n["title"] and (n["html"] or (n["button_text"] and n["button_url"])))
+    return bool(n["enabled"] and n["title"] and (n["html"] or n["buttons"]))
 
 
 def news_html(n: dict) -> str:
-    """A news item as Koha prints it: the text, then the button (a plain
-    link styled as Koha's primary button on both sides, no script)."""
+    """A news item as Koha prints it: the text, then its buttons in one row
+    (plain links styled as Koha's primary button on both sides, no script)."""
     parts = [NEWS_TITLE.format(n["title"]), '<div class="kei-news">']
     if n["html"]:
         parts.append(n["html"])
-    if n["button_text"] and n["button_url"]:
-        extra = ' target="_blank" rel="noopener noreferrer"' if n["button_url"].startswith("http") else ""
-        parts.append(f'<p class="kei-news-cta"><a class="btn btn-primary kei-news-button" '
-                     f'href="{html.escape(n["button_url"], quote=True)}"{extra}>{html.escape(n["button_text"])}</a></p>')
+    links = []
+    for b in n["buttons"]:
+        extra = ' target="_blank" rel="noopener noreferrer"' if b["url"].startswith("http") else ""
+        links.append(f'<a class="btn btn-primary kei-news-button" style="margin:0 .4em .4em 0" '
+                     f'href="{html.escape(b["url"], quote=True)}"{extra}>{html.escape(b["text"])}</a>')
+    if links:
+        parts.append('<p class="kei-news-cta">' + "\n".join(links) + "</p>")
     return "\n".join(parts + ["</div>"])
 
 

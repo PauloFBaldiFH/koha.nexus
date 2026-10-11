@@ -290,6 +290,8 @@ FEATURES: tuple[Feature, ...] = (
         switch("Publish"), field_("Title", "Férias de julho"),
         field_("Text (HTML)", "<p>A biblioteca fecha de 15 a 31 de julho.</p>"),
         field_("Button text", "Ver horários"), field_("Button address", "https://biblioteca.gov.br/horarios"),
+        field_("Button text", "Fale conosco"), field_("Button address", "mailto:contato@biblioteca.gov.br"),
+        button("Add a button"),
     ]),
     Feature("opac-hide", "opac", "views/opac.py", "Hide", [
         switch("RSS icons"), switch("Cart badge", False), switch("Community links"), switch("Empty table columns"),

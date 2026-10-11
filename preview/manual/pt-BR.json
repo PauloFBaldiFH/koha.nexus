@@ -210,6 +210,7 @@
   "restore": {
    "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
    "overview": [
+    "A restauração é aberta pela **Central de backups e restauração** (o botão **Restaurar base de dados** na linha de cima, ou o cartão dela); desde a 1.5.54 ela não tem mais uma opção própria no menu principal.",
     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
@@ -233,7 +234,7 @@
     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
    ],
-   "_en": "86b7ee690b"
+   "_en": "5911426d59"
   },
   "backup-manual": {
    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
@@ -308,13 +309,14 @@
    "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
    "overview": [
     "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
+    "Desde a 1.5.54 a restauração do banco fica só aqui: o menu principal não tem mais a opção separada **Restaurar base de dados**, então a restauração, a exportação MARC21 e as rotinas de backup ficam todas nesta mesma tela (no painel e no menu clássico).",
     "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
    ],
    "tips": [
     "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
     "Um backup que nunca foi testado é uma esperança, não um backup: agende um teste de integridade mensal."
    ],
-   "_en": "6d9bdb2519"
+   "_en": "5553d3364d"
   },
   "backup-download": {
    "title": "Baixar Backup Recente",
@@ -2183,25 +2185,25 @@
   },
   "opac-news-items": {
    "title": "Notícias do OPAC e Notícias da equipe",
-   "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e um botão de chamada para ação.",
+   "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e quantos botões de chamada para ação forem necessários.",
    "overview": [
     "A notícia entra nas Notícias do Koha (categoria news) como `kei-news-opac` (só no OPAC) ou `kei-news-staff` (só na interface da equipe). As notícias da própria biblioteca em **Ferramentas > Notícias** nunca são alteradas.",
-    "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. O botão é um link comum com o estilo do botão principal do Koha, então funciona nos dois lados sem nenhum script."
+    "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. Cada botão é um link comum com o estilo do botão principal do Koha, lado a lado abaixo do texto, então funcionam nos dois lados sem nenhum script."
    ],
    "steps": [
     "Abra **Aparência do OPAC e da equipe** (tecla **o**) e vá à caixa **Notícias do OPAC** ou **Notícias da equipe**.",
     "Ligue **Publicar** e digite o **Título** e o **Texto (HTML)**.",
-    "Se quiser, digite o **Texto do botão** e o **Endereço do botão** (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:).",
+    "Se quiser, pressione **Adicionar botão** uma vez para cada botão e digite o texto e o endereço dele (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:). Até 6 botões; **✕** remove um.",
     "Pressione **Aplicar**: a notícia é publicada depois de um backup. Desligue **Publicar** e aplique de novo para retirá-la."
    ],
    "tips": [
-    "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa."
+    "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa. O botão único salvo pela 1.5.53 volta como a primeira linha."
    ],
    "related": [
     "opac-news",
     "sec-opac"
    ],
-   "_en": "6d3d80066f"
+   "_en": "063008b7e7"
   }
  }
 }

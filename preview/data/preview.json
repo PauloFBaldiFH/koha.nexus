@@ -272,24 +272,6 @@
    "single": "credentials"
   },
   {
-   "id": "restore",
-   "item": "sec-restore",
-   "label": "📥  Restore database",
-   "title": "",
-   "prompt": "",
-   "icon": "",
-   "key": "",
-   "view": "section",
-   "sidebar": true,
-   "parent": "",
-   "entries": [
-    "restore"
-   ],
-   "features": [],
-   "media": [],
-   "single": "restore"
-  },
-  {
    "id": "backup",
    "item": "sec-backup",
    "label": "💾  Backup center",
@@ -756,16 +738,6 @@
    "status": "available",
    "media": []
   },
-  "restore": {
-   "id": "restore",
-   "type": "entry",
-   "section": "restore",
-   "label": "📥  Restore database",
-   "description": "Replaces Koha's database with a backup, tested first",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
   "backup-manual": {
    "id": "backup-manual",
    "type": "entry",
@@ -802,6 +774,16 @@
    "section": "backup",
    "label": "🧾  Test integrity of latest backup",
    "description": "Imports a backup into a test database to check it",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "restore": {
+   "id": "restore",
+   "type": "entry",
+   "section": "backup",
+   "label": "📥  Restore database",
+   "description": "Replaces Koha's database with a backup, tested first",
    "kind": "native",
    "status": "available",
    "media": []
@@ -2871,6 +2853,23 @@
      "label": "Button address",
      "value": "https://biblioteca.gov.br/horarios",
      "placeholder": ""
+    },
+    {
+     "type": "input",
+     "label": "Button text",
+     "value": "Fale conosco",
+     "placeholder": ""
+    },
+    {
+     "type": "input",
+     "label": "Button address",
+     "value": "mailto:contato@biblioteca.gov.br",
+     "placeholder": ""
+    },
+    {
+     "type": "button",
+     "label": "Add a button",
+     "primary": false
     }
    ],
    "media": []
@@ -3370,56 +3369,6 @@
    "ja": null,
    "ko": null
   },
-  "📥  Restore database": {
-   "en": "📥  Restore database",
-   "pt-BR": "📥  Restaurar base de dados",
-   "es": "📥  Restaurar base de datos",
-   "fr": "📥  Restaurer la base de données",
-   "it": "📥  Ripristina il database",
-   "de": "📥  Datenbank wiederherstellen",
-   "nl": "📥  Database herstellen",
-   "sv": "📥  Återställ databasen",
-   "pl": "📥  Przywróć bazę danych",
-   "cs": "📥  Obnovit databázi",
-   "ru": "📥  Восстановить базу данных",
-   "uk": "📥  Відновити базу даних",
-   "tr": "📥  Veritabanını geri yükle",
-   "tl": "📥  Ibalik ang database",
-   "id": "📥  Pulihkan basis data",
-   "ar": "📥  استعادة قاعدة البيانات",
-   "fa": "📥  بازیابی پایگاه داده",
-   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
-   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
-   "vi": "📥  Khôi phục cơ sở dữ liệu",
-   "zh": "📥  恢复数据库",
-   "ja": "📥  データベースを復元",
-   "ko": "📥  데이터베이스 복원"
-  },
-  "Replaces Koha's database with a backup, tested first": {
-   "en": "Replaces Koha's database with a backup, tested first",
-   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "💾  Backup center": {
    "en": "💾  Backup center",
    "pt-BR": "💾  Central de backups e restauração",
@@ -3673,6 +3622,56 @@
   "Imports a backup into a test database to check it": {
    "en": "Imports a backup into a test database to check it",
    "pt-BR": "Importa um backup num banco de teste para validá-lo",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📥  Restore database": {
+   "en": "📥  Restore database",
+   "pt-BR": "📥  Restaurar base de dados",
+   "es": "📥  Restaurar base de datos",
+   "fr": "📥  Restaurer la base de données",
+   "it": "📥  Ripristina il database",
+   "de": "📥  Datenbank wiederherstellen",
+   "nl": "📥  Database herstellen",
+   "sv": "📥  Återställ databasen",
+   "pl": "📥  Przywróć bazę danych",
+   "cs": "📥  Obnovit databázi",
+   "ru": "📥  Восстановить базу данных",
+   "uk": "📥  Відновити базу даних",
+   "tr": "📥  Veritabanını geri yükle",
+   "tl": "📥  Ibalik ang database",
+   "id": "📥  Pulihkan basis data",
+   "ar": "📥  استعادة قاعدة البيانات",
+   "fa": "📥  بازیابی پایگاه داده",
+   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
+   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
+   "vi": "📥  Khôi phục cơ sở dữ liệu",
+   "zh": "📥  恢复数据库",
+   "ja": "📥  データベースを復元",
+   "ko": "📥  데이터베이스 복원"
+  },
+  "Replaces Koha's database with a backup, tested first": {
+   "en": "Replaces Koha's database with a backup, tested first",
+   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
    "es": null,
    "fr": null,
    "it": null,
@@ -12834,68 +12833,6 @@
     ]
    }
   },
-  "restore": {
-   "en": {
-    "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
-    "overview": [
-     "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
-     "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
-     "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
-     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
-    ],
-    "steps": [
-     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
-     "Pick the backup file, or drop it onto the panel window.",
-     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
-     "Confirm the restore. The screen shows the file, its size and the free disk space.",
-     "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
-     "Read the result: the search engine in use, the number of tables and the path of the safety backup."
-    ],
-    "tips": [
-     "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
-     "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
-     "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
-     "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
-    ],
-    "warnings": [
-     "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
-     "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
-    ],
-    "related": [
-     "backup-safety",
-     "backup-test",
-     "backup-compression",
-     "magic-import"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
-    "overview": [
-     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
-     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
-     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
-     "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
-    ],
-    "steps": [
-     "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
-     "Escolha o arquivo de backup, ou solte-o na janela do painel.",
-     "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
-     "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
-     "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
-     "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
-    ],
-    "tips": [
-     "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
-     "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
-     "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
-     "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
-    ],
-    "warnings": [
-     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
-     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
-    ]
-   }
-  },
   "backup-manual": {
    "en": {
     "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
@@ -13089,11 +13026,76 @@
     ]
    }
   },
+  "restore": {
+   "en": {
+    "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
+    "overview": [
+     "Restore is opened from the **Backup center** (the **Restore database** button in its top row, or its card); since 1.5.54 it has no main-menu entry of its own.",
+     "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
+     "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
+     "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
+     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
+    ],
+    "steps": [
+     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
+     "Pick the backup file, or drop it onto the panel window.",
+     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
+     "Confirm the restore. The screen shows the file, its size and the free disk space.",
+     "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
+     "Read the result: the search engine in use, the number of tables and the path of the safety backup."
+    ],
+    "tips": [
+     "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
+     "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
+     "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
+     "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
+    ],
+    "warnings": [
+     "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
+     "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
+    ],
+    "related": [
+     "backup-safety",
+     "backup-test",
+     "backup-compression",
+     "magic-import"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
+    "overview": [
+     "A restauração é aberta pela **Central de backups e restauração** (o botão **Restaurar base de dados** na linha de cima, ou o cartão dela); desde a 1.5.54 ela não tem mais uma opção própria no menu principal.",
+     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
+     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
+     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
+     "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
+    ],
+    "steps": [
+     "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
+     "Escolha o arquivo de backup, ou solte-o na janela do painel.",
+     "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
+     "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
+     "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
+     "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
+    ],
+    "tips": [
+     "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
+     "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
+     "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
+     "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
+    ],
+    "warnings": [
+     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
+     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
+    ]
+   }
+  },
   "sec-backup": {
    "en": {
     "summary": "Everything about backups and restores on one screen: the state of the newest backup, the compression of new backups, one-click download, restore, the MARC21 export, manual and cloud backups and the integrity test.",
     "overview": [
      "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
+     "Restoring the database lives only here since 1.5.54: the main menu no longer has a separate **Restore database** entry, so restore, the MARC21 export and the backup routines are all reached from this one screen (in the panel and in the classic menu).",
      "The top row has **Download latest backup**, **Restore database** and **Export MARC21 records now**. Then three cards (**Last backup**, **Size**, **Result** of the last nightly run), the **New backups** box with the compression choice, and the backup routines as cards."
     ],
     "tips": [
@@ -13114,6 +13116,7 @@
     "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
     "overview": [
      "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
+     "Desde a 1.5.54 a restauração do banco fica só aqui: o menu principal não tem mais a opção separada **Restaurar base de dados**, então a restauração, a exportação MARC21 e as rotinas de backup ficam todas nesta mesma tela (no painel e no menu clássico).",
      "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
     ],
     "tips": [
@@ -16999,19 +17002,19 @@
   "opac-news-items": {
    "en": {
     "title": "OPAC news and Staff news",
-    "summary": "Writes and publishes one news item of your own on the OPAC home page and another on the staff home page, each with a title, text and a call-to-action button.",
+    "summary": "Writes and publishes one news item of your own on the OPAC home page and another on the staff home page, each with a title, text and as many call-to-action buttons as you need.",
     "overview": [
      "The item goes into Koha's News (category news) as `kei-news-opac` (OPAC only) or `kei-news-staff` (staff interface only). The library's own news in **Tools > News** are never changed.",
-     "The text accepts the same safe HTML as the login text: paragraphs, bold, lists, links and pictures; scripts and styles are taken out. The button is a plain link styled as Koha's main button, so it works on both sides without any script."
+     "The text accepts the same safe HTML as the login text: paragraphs, bold, lists, links and pictures; scripts and styles are taken out. Each button is a plain link styled as Koha's main button, shown side by side under the text, so they work on both sides without any script."
     ],
     "steps": [
      "Open **OPAC and Staff Appearance** (key **o**) and go to the **OPAC news** or **Staff news** box.",
      "Switch **Publish** on and type the **Title** and the **Text (HTML)**.",
-     "Optionally type the **Button text** and the **Button address** (https://..., a Koha path such as /cgi-bin/koha/opac-search.pl, mailto: or tel:).",
+     "Optionally press **Add a button** once per button and type its text and its address (https://..., a Koha path such as /cgi-bin/koha/opac-search.pl, mailto: or tel:). Up to 6 buttons; **✕** removes one.",
      "Press **Apply**: the news item is published after a backup. Switch **Publish** off and Apply again to take it down."
     ],
     "tips": [
-     "A button needs both its text and its address; the panel says which one is missing before anything is written."
+     "A button needs both its text and its address; the panel says which one is missing before anything is written. A single button saved by 1.5.53 comes back as the first row."
     ],
     "related": [
      "opac-news",
@@ -17020,19 +17023,19 @@
    },
    "pt-BR": {
     "title": "Notícias do OPAC e Notícias da equipe",
-    "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e um botão de chamada para ação.",
+    "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e quantos botões de chamada para ação forem necessários.",
     "overview": [
      "A notícia entra nas Notícias do Koha (categoria news) como `kei-news-opac` (só no OPAC) ou `kei-news-staff` (só na interface da equipe). As notícias da própria biblioteca em **Ferramentas > Notícias** nunca são alteradas.",
-     "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. O botão é um link comum com o estilo do botão principal do Koha, então funciona nos dois lados sem nenhum script."
+     "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. Cada botão é um link comum com o estilo do botão principal do Koha, lado a lado abaixo do texto, então funcionam nos dois lados sem nenhum script."
     ],
     "steps": [
      "Abra **Aparência do OPAC e da equipe** (tecla **o**) e vá à caixa **Notícias do OPAC** ou **Notícias da equipe**.",
      "Ligue **Publicar** e digite o **Título** e o **Texto (HTML)**.",
-     "Se quiser, digite o **Texto do botão** e o **Endereço do botão** (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:).",
+     "Se quiser, pressione **Adicionar botão** uma vez para cada botão e digite o texto e o endereço dele (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:). Até 6 botões; **✕** remove um.",
      "Pressione **Aplicar**: a notícia é publicada depois de um backup. Desligue **Publicar** e aplique de novo para retirá-la."
     ],
     "tips": [
-     "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa."
+     "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa. O botão único salvo pela 1.5.53 volta como a primeira linha."
     ]
    }
   },

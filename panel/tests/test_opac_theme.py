@@ -600,10 +600,20 @@ def test_contents_stay_out_of_the_public_stylesheet(tmp_path):
     assert synced["credits"]["name"] == "Biblioteca" and any("theme-settings.json" in n for n, _ in notes)
 
 
+def test_news_single_button_of_1_5_53_is_kept():
+    cfg = ot.normalize({"news": {"opac": {"enabled": True, "title": "T", "button_text": "Ir",
+                                          "button_url": "https://example.org"}}})
+    assert cfg["news"]["opac"]["buttons"] == [{"text": "Ir", "url": "https://example.org"}]
+    many = [{"text": f"B{i}", "url": "https://example.org"} for i in range(10)]
+    assert len(ot.normalize({"news": {"opac": {"buttons": many}}})["news"]["opac"]["buttons"]) == ot.MAX_NEWS_BUTTONS
+
+
 def test_news_items_for_each_side():
     cfg = ot.normalize({"news": {
         "opac": {"enabled": True, "title": "Férias <b>--</b>", "html": "<p>Fechado</p><script>x()</script>",
-                 "button_text": "Ver horários", "button_url": "https://biblioteca.gov.br/horarios"},
+                 "buttons": [{"text": "Ver horários", "url": "https://biblioteca.gov.br/horarios"},
+                             {"text": "Contato", "url": "mailto:bib@example.org"},
+                             {"text": "Sem endereço", "url": "javascript:x()"}]},
         "staff": {"enabled": True, "title": "", "html": "<p>no title</p>"}}})
     opac, staff = cfg["news"]["opac"], cfg["news"]["staff"]
     assert opac["title"] == "Férias b-/b" and "<script>" not in opac["html"]
@@ -614,6 +624,8 @@ def test_news_items_for_each_side():
     assert first == "<!-- kei-news-title: Férias b-/b -->"
     assert 'href="https://biblioteca.gov.br/horarios" target="_blank"' in out["news-opac"]
     assert "Ver horários</a>" in out["news-opac"] and "<p>Fechado</p>" in out["news-opac"]
+    assert [b["text"] for b in opac["buttons"]] == ["Ver horários", "Contato"]     # unsafe address dropped
+    assert out["news-opac"].count("kei-news-button") == 2 and 'href="mailto:bib@example.org">' in out["news-opac"]
     assert "Fechado" not in ot.data_line(cfg) and '"news":' not in ot.data_line(cfg)   # not public
     assert ot.parse_contents(json.dumps(ot.contents_settings(cfg)))["news"] == cfg["news"]
     work = ot.write_apply_dir(cfg, {})
