@@ -48,3 +48,7 @@ Portas de rede já testadas e abertas na VPS:
 - **Europa:** `oxford`, `bne`, `bcl`, `bizkaia`, `aladi`, `abes_fr`, `uhamburg`, `bn_polonia`, `slsp`, `nkc`, `rsl`, `bashkir`
 - **América Latina:** `bna`, `biblored`, `pucp`, `upc_peru`
 - **Outros:** `christchurch`, `juac_julac`, `monash_sa`
+
+- **MIT (EUA)**: Operacional via SRU Alma (`01MIT_INST`) - MARCXML nativo.
+- **UPenn (EUA)**: Operacional via SRU Alma (`01UPENN_INST`) - MARCXML nativo.
+- **DNB (Alemanha)**: Descartado (Cluster entrega apenas RDF/XML e falha no conversor interno MARC21).
