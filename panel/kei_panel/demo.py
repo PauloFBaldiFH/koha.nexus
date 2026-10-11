@@ -60,6 +60,7 @@ _SCRIPTS: dict[str, list[str]] = {
     "backup-marc": [
         "@@note Exporting the MARC21 records...",
         "@@result file=/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz", "@@result size=21M",
+        "@@result contents=biblios_2026-10-03_1200.mrc authorities_2026-10-03_1200.mrc",
         "@@result scp=scp root@192.0.2.10:/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz Downloads/",
         "@@result user=root", "@@result cloud=no",
     ],

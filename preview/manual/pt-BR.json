@@ -2165,12 +2165,13 @@
    "summary": "Exporta agora todos os registros bibliográficos e de autoridade em MARC21, o mesmo pacote que o backup semanal gera, e mostra como copiá-lo para o seu computador.",
    "overview": [
     "A exportação usa o próprio `export_records.pl` do Koha para os registros bibliográficos e para as autoridades e junta os dois arquivos em `koha_marc_<data>.tar.gz` na pasta de backups MARC (`/var/backups/koha_marc`). Quando o backup na nuvem está configurado, o pacote também é enviado para lá.",
+    "Os registros são gravados direto em `biblios_<data>.mrc` e `authorities_<data>.mrc` (ISO 2709) dentro do pacote; as mensagens do Koha vão para `backup_marc_export_errors.log` na pasta de logs do painel. Uma exportação concluída mostra uma caixa de sucesso com o arquivo e o que ele contém; quando falha, a caixa cita só a última mensagem de erro, nunca os registros.",
     "O Koha continua funcionando durante a exportação. Se outro backup ou uma restauração estiver rodando, a exportação não começa e o painel avisa."
    ],
    "steps": [
     "Abra a Central de backups e restauração (tecla **b**).",
     "Pressione **Exportar registros MARC21 agora** (na linha de cima ou entre os cartões) e confirme.",
-    "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
+    "Aguarde a exportação: o resultado mostra o arquivo, o tamanho, os arquivos `.mrc` dentro dele e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
    ],
    "tips": [
     "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
@@ -2181,7 +2182,7 @@
     "backup-manual",
     "restore"
    ],
-   "_en": "e3e2b26e12"
+   "_en": "e1c0d51815"
   },
   "opac-news-items": {
    "title": "Notícias do OPAC e Notícias da equipe",
