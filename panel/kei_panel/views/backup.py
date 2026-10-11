@@ -1,5 +1,6 @@
 """BackupView: the last backup at a glance, the compression of new backups,
-then the backup routines."""
+then the backup routines. The top row also has the two actions asked for
+most: restore the database from a backup and export the MARC21 records now."""
 
 from __future__ import annotations
 
@@ -43,6 +44,10 @@ class BackupView(SectionView):
             # The newest backup straight into this PC's Downloads folder
             # (routines/backup.download_latest; over SSH: the scp command).
             yield Button(t("📥 Download latest backup"), id="backup-download", variant="success")
+            yield Button(t("📥  Restore database"), id="backup-restore",
+                         tooltip=t("Replaces Koha's database with a backup, tested first"))
+            yield Button(t("📚  Export MARC21 records now"), id="backup-marc",
+                         tooltip=t("Exports the catalogue and the authorities in MARC21 now"))
         with Grid(classes="status-grid"):
             yield StatusCard(t("Last backup"), id="bk-age")
             yield StatusCard(t("Size"), id="bk-size")
@@ -60,9 +65,10 @@ class BackupView(SectionView):
         self.refresh_data()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "backup-download":
+        actions = {"backup-download": "backup-download", "backup-restore": "restore", "backup-marc": "backup-marc"}
+        if event.button.id in actions:
             event.stop()
-            self.app.run_native("backup-download")
+            self.app.run_native(actions[event.button.id], after=self.refresh_data)
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id != "bk-codec":

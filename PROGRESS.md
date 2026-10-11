@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-10. Panel version on `main`: **1.5.51** (1.5.52: one glass surface PR)._
+_Last updated: 2026-10-11. Panel version on `main`: **1.5.52** (1.5.53: panel fixes PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,16 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.53 (eight panel fixes from Paulo)**: Cloudflare and free-address examples say `example-library`
+  (no TLD, no town names). Corner sliders (Blocos/Campos/Botões) explain border-radius in a note and
+  tooltips. Reader alerts job runs daily, weekly or monthly: cron.py writes `--every weekly|monthly`
+  after the instance and notify.py covers the whole period (dedupe by the sent log). Backup screen
+  (pt: "Central de backups e restauração") has Restore database and Export MARC21 now
+  (`--task backup-marc` runs `/root/backup_marc.sh` and reads its log). OPAC and staff news item of
+  our own (`news-opac`/`news-staff` in contents.list, Koha news `kei-news-*`, opac_only/staff_only,
+  title on the file's first line as `<!-- kei-news-title: ... -->`). Footer credits are one text box
+  of `Field: value` lines. widgets/linkrow.py (Open + Copy) for Postimages and the Evolution API guide;
+  AI screen has Get an API key + Copy (Gemini: aistudio.google.com/api-keys). Not tried on a live Koha.
 - **1.5.52 (one glass surface)**: Paulo found the header, content, sidebar and breadcrumbs
   each a different surface. Now every surface reads shared variables (`--koha-card-bg` =
   rgba(`--koha-card-rgb`, `--koha-card-alpha`), `--koha-glass-blur`, `--koha-card-border`,

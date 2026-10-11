@@ -52,7 +52,7 @@
    ],
    "tips": [
     "Faça do Painel de Controle a sua verificação da manhã: um cartão vermelho ou amarelo é mais fácil de resolver no dia em que aparece do que uma semana depois.",
-    "Se o último backup tiver mais de 24 horas, abra a Central de cópias de segurança e gere um backup manual antes de qualquer outra coisa.",
+    "Se o último backup tiver mais de 24 horas, abra a Central de backups e restauração e gere um backup manual antes de qualquer outra coisa.",
     "Mantenha pelo menos 15–20% do disco livre: o MariaDB, o índice de busca e os backups noturnos precisam de espaço para trabalhar."
    ],
    "_en": "61795aa2e3"
@@ -67,7 +67,7 @@
     },
     {
      "name": "Último backup",
-     "text": "Quando foi feito o backup mais recente deste servidor e o nome do arquivo. Desde a versão 1.5.44, o Painel de Controle, a Central de cópias de segurança e as telas de restauração leem a mesma fonte, por isso sempre concordam. O cartão fica amarelo quando o backup está antigo ou a última execução noturna falhou."
+     "text": "Quando foi feito o backup mais recente deste servidor e o nome do arquivo. Desde a versão 1.5.44, o Painel de Controle, a Central de backups e restauração e as telas de restauração leem a mesma fonte, por isso sempre concordam. O cartão fica amarelo quando o backup está antigo ou a última execução noturna falhou."
     },
     {
      "name": "Disco livre",
@@ -83,7 +83,7 @@
     }
    ],
    "tips": [
-    "Um cartão **Último backup** amarelo é um chamado à ação: abra a Central de cópias de segurança e use **Gerar backup manual** ou **Testar a integridade do último backup**.",
+    "Um cartão **Último backup** amarelo é um chamado à ação: abra a Central de backups e restauração e use **Gerar backup manual** ou **Testar a integridade do último backup**.",
     "Quando o disco livre ficar abaixo de duas vezes o tamanho de um backup, limpe arquivos antigos com **Otimização profunda do banco e limpeza de logs** ou leve backups antigos para a nuvem."
    ],
    "_en": "7a8f4cfcfe"
@@ -212,11 +212,11 @@
    "overview": [
     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
-    "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de cópias de segurança) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
+    "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
     "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
    ],
    "steps": [
-    "Abra **Restaurar base de dados** (pela lista principal ou pela Central de cópias de segurança).",
+    "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
     "Escolha o arquivo de backup, ou solte-o na janela do painel.",
     "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
     "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
@@ -233,19 +233,19 @@
     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
    ],
-   "_en": "d5ee863a6a"
+   "_en": "86b7ee690b"
   },
   "backup-manual": {
    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
    "steps": [
-    "Abra a Central de cópias de segurança e escolha **Gerar backup manual e baixar no computador**.",
+    "Abra a Central de backups e restauração e escolha **Gerar backup manual e baixar no computador**.",
     "Escolha a pasta de destino: a pasta padrão de backups, um pen drive (normalmente em `/media` ou `/mnt`) ou outra pasta.",
     "Aguarde o dump e a verificação.",
     "Leia o resultado: nome e tamanho do arquivo e, em seguida, o comando para colar no PowerShell ou no Terminal do seu computador e salvá-lo na pasta Downloads."
    ],
    "overview": [
     "O backup usa a compressão escolhida em **Novos backups** (gzip, Zstandard ou XZ). Ele se recusa a começar enquanto outro backup ou uma restauração estiver rodando, para que dois trabalhos nunca gravem ao mesmo tempo.",
-    "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de cópias de segurança, copia o arquivo mais novo direto para a sua pasta Downloads."
+    "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de backups e restauração, copia o arquivo mais novo direto para a sua pasta Downloads."
    ],
    "tips": [
     "Faça um backup manual antes de qualquer mudança grande: uma atualização, uma importação em massa, uma troca de motor de busca.",
@@ -271,7 +271,7 @@
     }
    ],
    "steps": [
-    "Abra a Central de cópias de segurança e escolha **Configurar backup na nuvem (Google Drive)**.",
+    "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem (Google Drive)**.",
     "Escolha como conectar (veja as opções).",
     "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
     "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
@@ -290,7 +290,7 @@
   "backup-test": {
    "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
    "steps": [
-    "Abra a Central de cópias de segurança e escolha **Testar a integridade do último backup**.",
+    "Abra a Central de backups e restauração e escolha **Testar a integridade do último backup**.",
     "Confira o arquivo e a data mostrados, ou pressione **Escolher outro arquivo** para testar outro.",
     "Confirme **Executar o teste agora?**.",
     "Leia o resultado: *O BACKUP ESTÁ ÍNTEGRO E PODE SER RESTAURADO*, com o número de tabelas, registros bibliográficos e leitores, ou o motivo da falha."
@@ -305,16 +305,16 @@
    "_en": "fabc1a7ea1"
   },
   "sec-backup": {
-   "summary": "Tudo sobre backups numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, os backups manual e na nuvem, o teste de integridade e a restauração.",
+   "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
    "overview": [
-    "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de cópias de segurança (tecla **b**) mostra como isso está indo e permite agir.",
-    "No topo ficam três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
+    "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
+    "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
    ],
    "tips": [
     "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
     "Um backup que nunca foi testado é uma esperança, não um backup: agende um teste de integridade mensal."
    ],
-   "_en": "46a26ecb86"
+   "_en": "6d9bdb2519"
   },
   "backup-download": {
    "title": "Baixar Backup Recente",
@@ -323,7 +323,7 @@
     "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
    ],
    "steps": [
-    "Abra a Central de cópias de segurança (tecla **b**).",
+    "Abra a Central de backups e restauração (tecla **b**).",
     "Pressione **Baixar Backup Recente**.",
     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
    ],
@@ -378,7 +378,7 @@
     }
    ],
    "steps": [
-    "Abra a Central de cópias de segurança (tecla **b**).",
+    "Abra a Central de backups e restauração (tecla **b**).",
     "Na caixa **Novos backups**, abra **Compressão** e escolha uma opção.",
     "Aguarde *Salvando as configurações de backup*; um aviso confirma a nova escolha.",
     "Na manhã seguinte, confira se o **Último backup** mostra a nova extensão."
@@ -560,13 +560,14 @@
    ],
    "tips": [
     "Crie uma chave só para a biblioteca, com limite de gastos no site do provedor.",
-    "Com o Gemini, comece por um modelo Flash: ele está na camada gratuita (com limites diários)."
+    "Com o Gemini, comece por um modelo Flash: ele está na camada gratuita (com limites diários).",
+    "**Obter chave de API** abre a página de chaves do provedor (Google AI Studio: aistudio.google.com/api-keys), e o botão Copiar ao lado copia o endereço quando nenhum navegador pode ser aberto a partir do servidor."
    ],
    "warnings": [
     "A OpenAI e a Anthropic cobram por cada requisição, mesmo nos modelos menores: a conta precisa ter créditos.",
     "Uma chave é recusada por `http` puro para um servidor fora da rede local."
    ],
-   "_en": "00f5576b44"
+   "_en": "0eb1e0ad81"
   },
   "ai-models": {
    "title": "Lista de modelos",
@@ -850,9 +851,10 @@
    ],
    "tips": [
     "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
-    "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente."
+    "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente.",
+    "**Blocos**, **Campos** e **Botões** ajustam o arredondamento das bordas (border-radius): mais pixels deixam os cantos mais curvos, 0 deixa os cantos retos. Passe o mouse sobre um controle para ver quais elementos ele arredonda."
    ],
-   "_en": "6a41376c9e"
+   "_en": "c0dffa51ec"
   },
   "opac-pictures": {
    "title": "Imagens",
@@ -873,9 +875,10 @@
    ],
    "tips": [
     "Mantenha o papel de parede abaixo de 500 KB (WebP é o ideal): uma imagem pesada deixa o OPAC lento no celular.",
-    "Use um favicon quadrado de pelo menos 64×64 pixels."
+    "Use um favicon quadrado de pelo menos 64×64 pixels.",
+    "Ainda não tem onde hospedar imagens? O **Postimages** (postimages.org) é gratuito e não pede conta: a caixa tem o link dele com os botões Abrir e Copiar. Cole o *Direct link* da imagem com a origem **URL direta**."
    ],
-   "_en": "716ada2d75"
+   "_en": "f66126988d"
   },
   "opac-dark": {
    "title": "Legibilidade e modo escuro",
@@ -1143,7 +1146,10 @@
     "Siga a rotina (veja o guia dela).",
     "Volte à central e pressione **Recarregar**: a caixa deve dizer *instalado*."
    ],
-   "_en": "9a5f0e7571"
+   "_en": "1a11c8abe5",
+   "tips": [
+    "A aba traz o link do guia da Evolution API (doc.evolution-api.com) e os quatro passos: instalar o gateway, criar uma instância e ler o QR code com o WhatsApp da biblioteca, e então digitar o endereço, a instância e a chave de API em **Configurar WhatsApp e Telegram**."
+   ]
   },
   "hub-sms": {
    "title": "SMS",
@@ -1926,9 +1932,10 @@
    ],
    "tips": [
     "Deixe pelo menos uma hora entre o backup noturno e tarefas pesadas como uma reindexação completa.",
-    "Os avisos por e-mail seguem o agendamento do próprio Koha (koha-common), não este arquivo."
+    "Os avisos por e-mail seguem o agendamento do próprio Koha (koha-common), não este arquivo.",
+    "**Alertas aos leitores e resumo diário** pode rodar diariamente, semanalmente ou mensalmente: uma execução semanal ou mensal lembra de todos os empréstimos que vencem antes da próxima execução, e o resumo passa a se chamar semanal ou mensal."
    ],
-   "_en": "d689c724fe"
+   "_en": "6a983f34ad"
   },
   "sec-languages": {
    "summary": "Os pacotes de idioma do Koha e o idioma do painel, divididos em quatro ações claras: só baixar, baixar e ativar, ativar um idioma já instalado e listar.",
@@ -2121,7 +2128,7 @@
   },
   "opac-credits": {
    "title": "Créditos do rodapé",
-   "summary": "O rodapé de todas as páginas do OPAC (`opaccredits` do Koha), montado por um formulário: sem HTML para digitar.",
+   "summary": "O rodapé de todas as páginas do OPAC (o `opaccredits` do Koha), montado a partir de uma única caixa de texto: um `Campo: valor` por linha, sem HTML para digitar.",
    "options": [
     {
      "name": "Nome da biblioteca, Endereço, Horário de funcionamento, Observação",
@@ -2141,13 +2148,60 @@
     },
     {
      "name": "Outros links",
-     "text": "Um por linha: o texto, uma `|` e o endereço (no máximo 6)."
+     "text": "Um por linha: o texto, uma `|` e o endereço (no máximo 6), por exemplo `Portal | https://biblioteca.gov.br`."
     }
    ],
    "tips": [
     "Enquanto os créditos estão ligados, as entradas de rodapé da própria biblioteca ficam expiradas, e voltam quando eles são desligados ou a aparência é removida."
    ],
-   "_en": "bfb3a41f09"
+   "_en": "6900e39d14",
+   "overview": [
+    "Escreva só as linhas de que precisa, por exemplo `Nome da biblioteca: Biblioteca Municipal`, `Telefone: (00) 0000-0000`, `E-mail: contato@biblioteca.gov.br`. Os nomes dos campos podem ser escritos em português ou em inglês, com ou sem acento. O exemplo embaixo da caixa mostra todos os campos."
+   ]
+  },
+  "backup-marc": {
+   "summary": "Exporta agora todos os registros bibliográficos e de autoridade em MARC21, o mesmo pacote que o backup semanal gera, e mostra como copiá-lo para o seu computador.",
+   "overview": [
+    "A exportação usa o próprio `export_records.pl` do Koha para os registros bibliográficos e para as autoridades e junta os dois arquivos em `koha_marc_<data>.tar.gz` na pasta de backups MARC (`/var/backups/koha_marc`). Quando o backup na nuvem está configurado, o pacote também é enviado para lá.",
+    "O Koha continua funcionando durante a exportação. Se outro backup ou uma restauração estiver rodando, a exportação não começa e o painel avisa."
+   ],
+   "steps": [
+    "Abra a Central de backups e restauração (tecla **b**).",
+    "Pressione **Exportar registros MARC21 agora** (na linha de cima ou entre os cartões) e confirme.",
+    "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
+   ],
+   "tips": [
+    "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
+    "A exportação semanal roda todo domingo às 03:00; mude o dia e o horário em **Agendamentos e tarefas cron**."
+   ],
+   "related": [
+    "sec-backup",
+    "backup-manual",
+    "restore"
+   ],
+   "_en": "e3e2b26e12"
+  },
+  "opac-news-items": {
+   "title": "Notícias do OPAC e Notícias da equipe",
+   "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e um botão de chamada para ação.",
+   "overview": [
+    "A notícia entra nas Notícias do Koha (categoria news) como `kei-news-opac` (só no OPAC) ou `kei-news-staff` (só na interface da equipe). As notícias da própria biblioteca em **Ferramentas > Notícias** nunca são alteradas.",
+    "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. O botão é um link comum com o estilo do botão principal do Koha, então funciona nos dois lados sem nenhum script."
+   ],
+   "steps": [
+    "Abra **Aparência do OPAC e da equipe** (tecla **o**) e vá à caixa **Notícias do OPAC** ou **Notícias da equipe**.",
+    "Ligue **Publicar** e digite o **Título** e o **Texto (HTML)**.",
+    "Se quiser, digite o **Texto do botão** e o **Endereço do botão** (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:).",
+    "Pressione **Aplicar**: a notícia é publicada depois de um backup. Desligue **Publicar** e aplique de novo para retirá-la."
+   ],
+   "tips": [
+    "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa."
+   ],
+   "related": [
+    "opac-news",
+    "sec-opac"
+   ],
+   "_en": "6d3d80066f"
   }
  }
 }

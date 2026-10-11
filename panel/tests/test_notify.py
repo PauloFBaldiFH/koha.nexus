@@ -320,3 +320,44 @@ def test_with_job_on_switches_only_that_job():
     assert "\n0 7 * * * root /usr/local/bin/koha-kei-notify library" in new
     assert "\n15 22 * * * root /bin/bash /root/backup_sql.sh" in new and cron.file_problem(new) == ""
     assert cron.with_job_on(new, "notify", "library") == ""
+
+
+def test_weekly_and_monthly_jobs_carry_their_period():
+    p = cron.BY_KEY["notify"]
+    assert {"daily", "weekly", "monthly"} <= set(p.freqs)
+    job = cron.preset_job(p, "library")
+    job.enabled, job.freq, job.day = True, "weekly", 1
+    line = job.line()
+    assert line == "0 7 * * 1 root /usr/local/bin/koha-kei-notify library --every weekly >/dev/null 2>&1"
+    back = cron.parse(f"PATH=/usr/bin\n{line}\n", "library").job("notify")
+    assert back.freq == "weekly"
+    back = cron.with_freq(back, "monthly")
+    back.day = 5
+    assert back.line() == ("0 7 5 * * root /usr/local/bin/koha-kei-notify library --every monthly "
+                           ">/dev/null 2>&1")
+    back = cron.with_freq(back, "daily")
+    assert "--every" not in back.line() and cron.file_problem(cron.render(cron.CronFile([back], [], []))) == ""
+
+
+def test_a_weekly_run_reminds_of_the_whole_week():
+    ch = Recorder()
+    rep = notify.run("library", notify.Settings(due_soon=True, due_days=1, digest=True), today=TODAY,
+                     runner=fake_koha(), status=lambda: STATUS, channels=ch, every="weekly")
+    reminders = [m for m in ch.mails if "Reminder" in m[1]]
+    # due 13th (Eva) and 14th (Ana, both items): the daily run on the 12th would only see the 13th
+    assert [(m[0], m[1][-10:]) for m in reminders] == [(["eva@example.org"], "2026-10-13"),
+                                                      (["ana@example.org"], "2026-10-14")]
+    assert rep.sent["due_soon"] == 2
+    assert any("weekly summary" in m[1] for m in ch.mails)
+    later = Recorder()                       # switched back to daily: nobody is reminded twice
+    notify.run("library", notify.Settings(due_soon=True, due_days=1), today=TODAY + dt.timedelta(days=1),
+               runner=fake_koha(), status=lambda: STATUS, channels=later)
+    assert later.mails == []
+
+
+def test_main_accepts_every(monkeypatch, capsys):
+    monkeypatch.setattr(notify, "run_lock", lambda folder: __import__("contextlib").nullcontext())
+    monkeypatch.setattr(notify, "run", lambda *a, **kw: notify.Report() if kw["every"] == "monthly" else None)
+    assert notify.main(["library", "--every", "monthly", "--dry-run"]) == 0
+    with pytest.raises(SystemExit):
+        notify.main(["library", "--every", "yearly"])

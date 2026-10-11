@@ -44,3 +44,30 @@ def test_compression_choice_runs_the_task():
             assert ".sql.zst" in str(view.query_one("#bk-codec-note").render())
 
     asyncio.run(main())
+
+
+def test_restore_and_marc_export_buttons():
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.screens.dialogs import ConfirmScreen, MessageScreen
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        ran = []
+        app.run_native_real = app.run_native
+        async with app.run_test(size=(140, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("b")
+            view = app.screen.query_one("#view-backup")
+            assert view.query_one("#backup-restore") and view.query_one("#backup-marc")
+            app.run_native = lambda action, after=None: ran.append(action)
+            view.query_one("#backup-restore").press()
+            await pilot.pause(0.1)
+            assert ran == ["restore"]
+            app.run_native = app.run_native_real
+            view.query_one("#backup-marc").press()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            app.screen.dismiss(True)
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert "koha_marc_" in str(app.screen._details)
+
+    asyncio.run(main())

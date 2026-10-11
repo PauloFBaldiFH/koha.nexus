@@ -90,13 +90,16 @@ PRESETS: tuple[Preset, ...] = (
     Preset("journal", "System log cleanup (keeps 14 days)", "/usr/bin/journalctl --vacuum-time=14d >/dev/null 2>&1",
            "journalctl --vacuum", minute=30),
     Preset("notify", "Reader alerts & daily digest", NOTIFY_BIN + " {instance} >/dev/null 2>&1",
-           "koha-kei-notify", hour=7, enabled=False, freqs=("daily", "custom"),
+           "koha-kei-notify", hour=7, enabled=False, freqs=("daily", "weekly", "monthly", "custom"),
            help="Due-date reminders, overdue alerts and the status digest chosen in Messaging > Alerts."),
     Preset("mysqlcheck", "Database table check",
            "/usr/bin/mysqlcheck --check --databases koha_{instance} >/dev/null 2>&1", "mysqlcheck",
            freq="monthly", day=5, hour=1),
 )
 BY_KEY = {p.key: p for p in PRESETS}
+# The reader alerts look ahead a whole period when they run weekly or
+# monthly: the job's command carries "--every weekly|monthly" (notify.py).
+PERIOD_FLAG = re.compile(r"\s+--every\s+\S+")
 
 
 @dataclass
@@ -124,10 +127,23 @@ class Job:
         return self.raw
 
     def line(self) -> str:
-        return (OFF if not self.enabled else "") + f"{self.schedule()} {self.user} {self.command}"
+        return (OFF if not self.enabled else "") + f"{self.schedule()} {self.user} {run_command(self)}"
 
     def time(self) -> str:
         return f"{self.hour:02d}:{self.minute:02d}"
+
+
+def run_command(job: Job) -> str:
+    """The command written for a job: the reader alerts get the period they
+    run at ("--every weekly"), right after the instance name."""
+    if job.key != "notify":
+        return job.command
+    cmd = PERIOD_FLAG.sub("", job.command)
+    if job.freq not in ("weekly", "monthly"):
+        return cmd
+    flag = f" --every {job.freq}"
+    head, sep, tail = cmd.partition(" >")
+    return head + flag + sep + tail
 
 
 def schedule_problem(text: str) -> str:

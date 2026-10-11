@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.52",
+ "panel_version": "1.5.53",
  "languages": [
   {
    "code": "en",
@@ -302,6 +302,7 @@
    "parent": "",
    "entries": [
     "backup-manual",
+    "backup-marc",
     "backup-cloud",
     "backup-test",
     "restore"
@@ -429,6 +430,7 @@
     "opac-login",
     "opac-staff-login",
     "opac-credits",
+    "opac-news-items",
     "opac-hide",
     "opac-news",
     "opac-actions"
@@ -770,6 +772,16 @@
    "section": "backup",
    "label": "💾  Generate manual backup and download to PC",
    "description": "Makes a full backup and shows how to copy it to a PC",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "backup-marc": {
+   "id": "backup-marc",
+   "type": "entry",
+   "section": "backup",
+   "label": "📚  Export MARC21 records now",
+   "description": "Exports the catalogue and the authorities in MARC21 now",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1596,6 +1608,16 @@
      "type": "button",
      "label": "📥 Download latest backup",
      "primary": true
+    },
+    {
+     "type": "button",
+     "label": "📥  Restore database",
+     "primary": false
+    },
+    {
+     "type": "button",
+     "label": "📚  Export MARC21 records now",
+     "primary": false
     }
    ],
    "media": []
@@ -1781,6 +1803,11 @@
      "label": "API key",
      "value": "",
      "placeholder": "paste the API key here"
+    },
+    {
+     "type": "button",
+     "label": "🔗 Get an API key",
+     "primary": false
     },
     {
      "type": "input",
@@ -2221,6 +2248,10 @@
      "unit": "%"
     },
     {
+     "type": "note",
+     "text": "Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising the value in px curves the corners more, lowering it makes them straighter, 0 makes them square."
+    },
+    {
      "type": "slider",
      "label": "Blocks",
      "value": 14,
@@ -2336,6 +2367,15 @@
       }
      ],
      "value": 0
+    },
+    {
+     "type": "note",
+     "text": "Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link (ends in .png or .jpg) and paste it here with the source Direct URL."
+    },
+    {
+     "type": "button",
+     "label": "🔗 Open link",
+     "primary": false
     }
    ],
    "media": []
@@ -2781,39 +2821,55 @@
      "on": true
     },
     {
+     "type": "note",
+     "text": "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines."
+    },
+    {
      "type": "input",
-     "label": "Library name",
-     "value": "Biblioteca Municipal",
+     "label": "Example:",
+     "value": "Library name: Biblioteca Municipal · Phone: (00) 0000-0000 · E-mail: contato@biblioteca.gov.br · Portal | https://biblioteca.gov.br",
+     "placeholder": ""
+    }
+   ],
+   "media": []
+  },
+  "opac-news-items": {
+   "id": "opac-news-items",
+   "type": "feature",
+   "section": "opac",
+   "label": "OPAC news",
+   "description": "",
+   "kind": "screen",
+   "status": "available",
+   "source": "panel/kei_panel/views/opac.py",
+   "controls": [
+    {
+     "type": "switch",
+     "label": "Publish",
+     "on": true
+    },
+    {
+     "type": "input",
+     "label": "Title",
+     "value": "Férias de julho",
      "placeholder": ""
     },
     {
      "type": "input",
-     "label": "Address",
-     "value": "Rua Exemplo, 123",
+     "label": "Text (HTML)",
+     "value": "<p>A biblioteca fecha de 15 a 31 de julho.</p>",
      "placeholder": ""
     },
     {
      "type": "input",
-     "label": "Phone",
-     "value": "(00) 0000-0000",
+     "label": "Button text",
+     "value": "Ver horários",
      "placeholder": ""
     },
     {
      "type": "input",
-     "label": "E-mail",
-     "value": "contato@biblioteca.gov.br",
-     "placeholder": ""
-    },
-    {
-     "type": "input",
-     "label": "Instagram",
-     "value": "https://instagram.com/biblioteca",
-     "placeholder": ""
-    },
-    {
-     "type": "input",
-     "label": "CNPJ",
-     "value": "00.000.000/0000-00",
+     "label": "Button address",
+     "value": "https://biblioteca.gov.br/horarios",
      "placeholder": ""
     }
    ],
@@ -2968,6 +3024,15 @@
     {
      "type": "note",
      "text": "Sends Koha's notices (holds waiting, overdue, due soon) by WhatsApp or Telegram too, with the reader's mobile number. The setup asks for the service's keys."
+    },
+    {
+     "type": "note",
+     "text": "How to get the WhatsApp credentials (Evolution API v2):\n1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR code with the library's WhatsApp (Linked devices).\n3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the instance name and the API key.\n4. Send a test message to check that it arrives."
+    },
+    {
+     "type": "button",
+     "label": "🔗 Open link",
+     "primary": false
     },
     {
      "type": "button",
@@ -3357,7 +3422,7 @@
   },
   "💾  Backup center": {
    "en": "💾  Backup center",
-   "pt-BR": "💾  Central de cópias de segurança",
+   "pt-BR": "💾  Central de backups e restauração",
    "es": "💾  Centro de copias de seguridad",
    "fr": "💾  Centre de sauvegarde",
    "it": "💾  Centro backup",
@@ -3382,7 +3447,7 @@
   },
   "💾 Backup Center": {
    "en": "💾 Backup Center",
-   "pt-BR": "💾 Central de backup",
+   "pt-BR": "💾 Central de backups e restauração",
    "es": "💾 Centro de copias de seguridad",
    "fr": "💾 Centre de sauvegarde",
    "it": "💾 Centro backup",
@@ -3458,6 +3523,56 @@
   "Makes a full backup and shows how to copy it to a PC": {
    "en": "Makes a full backup and shows how to copy it to a PC",
    "pt-BR": "Gera um backup completo e mostra como baixá-lo no PC",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📚  Export MARC21 records now": {
+   "en": "📚  Export MARC21 records now",
+   "pt-BR": "📚  Exportar registros MARC21 agora",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Exports the catalogue and the authorities in MARC21 now": {
+   "en": "Exports the catalogue and the authorities in MARC21 now",
+   "pt-BR": "Exporta agora o catálogo e as autoridades em MARC21",
    "es": null,
    "fr": null,
    "it": null,
@@ -7830,6 +7945,31 @@
    "ja": null,
    "ko": null
   },
+  "🔗 Get an API key": {
+   "en": "🔗 Get an API key",
+   "pt-BR": "🔗 Obter chave de API",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "Vision model": {
    "en": "Vision model",
    "pt-BR": "Modelo de visão",
@@ -9205,6 +9345,31 @@
    "ja": null,
    "ko": null
   },
+  "Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.": {
+   "en": "Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.",
+   "pt-BR": "Blocos, Campos e Botões ajustam o arredondamento das bordas (border-radius) desses elementos: aumentar o valor em px deixa os cantos mais curvos, diminuir deixa os cantos mais retos e 0 deixa os cantos totalmente retos.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "Blocks": {
    "en": "Blocks",
    "pt-BR": "Blocos",
@@ -9587,6 +9752,56 @@
    "fr": "Favicon",
    "it": "Favicon",
    "de": "Favicon",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link (ends in .png or .jpg) and paste it here with the source Direct URL.": {
+   "en": "Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link (ends in .png or .jpg) and paste it here with the source Direct URL.",
+   "pt-BR": "Hospedagem de imagens gratuita, sem precisar de conta: envie a imagem no Postimages, copie o Direct link (link direto, termina em .png ou .jpg) e cole aqui com a origem URL direta.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔗 Open link": {
+   "en": "🔗 Open link",
+   "pt-BR": "🔗 Abrir link",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -10830,84 +11045,9 @@
    "ja": null,
    "ko": null
   },
-  "Library name": {
-   "en": "Library name",
-   "pt-BR": "Nome da biblioteca",
-   "es": "Nombre de la biblioteca",
-   "fr": "Nom de la bibliothèque",
-   "it": "Nome della biblioteca",
-   "de": "Name der Bibliothek",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "Phone": {
-   "en": "Phone",
-   "pt-BR": "Telefone",
-   "es": "Teléfono",
-   "fr": "Téléphone",
-   "it": "Telefono",
-   "de": "Telefon",
-   "nl": "Telefoon",
-   "sv": "Telefon",
-   "pl": "Telefon",
-   "cs": "Telefon",
-   "ru": "Телефон",
-   "uk": "Телефон",
-   "tr": "Telefon",
-   "tl": "Telepono",
-   "id": "Telepon",
-   "ar": "الهاتف",
-   "fa": "تلفن",
-   "hi": "फ़ोन",
-   "bn": "ফোন",
-   "vi": "Điện thoại",
-   "zh": "电话",
-   "ja": "電話",
-   "ko": "전화"
-  },
-  "E-mail": {
-   "en": "E-mail",
-   "pt-BR": "E-mail",
-   "es": "Correo electrónico",
-   "fr": "Courriel",
-   "it": "E-mail",
-   "de": "E-Mail",
-   "nl": "E-mail",
-   "sv": "E-post",
-   "pl": "E-mail",
-   "cs": "E-mail",
-   "ru": "Эл. почта",
-   "uk": "Ел. пошта",
-   "tr": "E-posta",
-   "tl": "Email",
-   "id": "Email",
-   "ar": "البريد الإلكتروني",
-   "fa": "ایمیل",
-   "hi": "ईमेल",
-   "bn": "ইমেইল",
-   "vi": "Email",
-   "zh": "电子邮件",
-   "ja": "メール",
-   "ko": "이메일"
-  },
-  "Instagram": {
-   "en": "Instagram",
-   "pt-BR": null,
+  "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines.": {
+   "en": "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines.",
+   "pt-BR": "Escreva um item por linha no formato Campo: valor, só os campos de que precisa. Outros links vão um por linha no formato texto | endereço (no máximo 6). Sem HTML para digitar: o rodapé é montado a partir dessas linhas.",
    "es": null,
    "fr": null,
    "it": null,
@@ -10930,9 +11070,9 @@
    "ja": null,
    "ko": null
   },
-  "CNPJ": {
-   "en": "CNPJ",
-   "pt-BR": null,
+  "Example:": {
+   "en": "Example:",
+   "pt-BR": "Exemplo:",
    "es": null,
    "fr": null,
    "it": null,
@@ -10962,6 +11102,106 @@
    "fr": "Crédits du pied de page",
    "it": "Crediti a piè di pagina",
    "de": "Fußzeile",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Publish": {
+   "en": "Publish",
+   "pt-BR": "Publicar",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Button text": {
+   "en": "Button text",
+   "pt-BR": "Texto do botão",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Button address": {
+   "en": "Button address",
+   "pt-BR": "Endereço do botão",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "OPAC news": {
+   "en": "OPAC news",
+   "pt-BR": "Notícias do OPAC",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -11437,6 +11677,31 @@
    "fr": "Envoie aussi les avis de Koha (réservation disponible, retard, échéance proche) par WhatsApp ou Telegram, au mobile du lecteur. La configuration demande les clés du service.",
    "it": "Invia gli avvisi di Koha (prenotazione disponibile, ritardo, scadenza vicina) anche via WhatsApp o Telegram, al cellulare del lettore. La configurazione chiede le chiavi del servizio.",
    "de": "Versendet Kohas Benachrichtigungen (Vormerkung abholbereit, überfällig, bald fällig) auch per WhatsApp oder Telegram an die Handynummer des Lesers. Die Einrichtung fragt nach den Schlüsseln des Dienstes.",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "How to get the WhatsApp credentials (Evolution API v2):\n1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR code with the library's WhatsApp (Linked devices).\n3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the instance name and the API key.\n4. Send a test message to check that it arrives.": {
+   "en": "How to get the WhatsApp credentials (Evolution API v2):\n1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR code with the library's WhatsApp (Linked devices).\n3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the instance name and the API key.\n4. Send a test message to check that it arrives.",
+   "pt-BR": "Como obter as credenciais do WhatsApp (Evolution API v2):\n1. Instale a Evolution API neste ou em outro servidor (o Docker é o caminho mais fácil, veja o guia abaixo). A AUTHENTICATION_API_KEY que você define no arquivo .env dela é o token (chave de API).\n2. Abra o gerenciador (http://SERVIDOR:8080/manager), crie uma instância (por exemplo biblioteca) e leia o QR code com o WhatsApp da biblioteca (Aparelhos conectados).\n3. Pressione Configurar WhatsApp e Telegram > WhatsApp e digite o endereço do gateway (http://SERVIDOR:8080), o nome da instância e a chave de API.\n4. Envie uma mensagem de teste para conferir se ela chega.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -12460,7 +12725,7 @@
     ],
     "tips": [
      "Faça do Painel de Controle a sua verificação da manhã: um cartão vermelho ou amarelo é mais fácil de resolver no dia em que aparece do que uma semana depois.",
-     "Se o último backup tiver mais de 24 horas, abra a Central de cópias de segurança e gere um backup manual antes de qualquer outra coisa.",
+     "Se o último backup tiver mais de 24 horas, abra a Central de backups e restauração e gere um backup manual antes de qualquer outra coisa.",
      "Mantenha pelo menos 15–20% do disco livre: o MariaDB, o índice de busca e os backups noturnos precisam de espaço para trabalhar."
     ]
    }
@@ -12579,7 +12844,7 @@
      "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
     ],
     "steps": [
-     "Open **Restore database** (from the main list or from the Backup center).",
+     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
      "Pick the backup file, or drop it onto the panel window.",
      "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
      "Confirm the restore. The screen shows the file, its size and the free disk space.",
@@ -12608,11 +12873,11 @@
     "overview": [
      "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
      "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
-     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de cópias de segurança) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
+     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
      "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
     ],
     "steps": [
-     "Abra **Restaurar base de dados** (pela lista principal ou pela Central de cópias de segurança).",
+     "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
      "Escolha o arquivo de backup, ou solte-o na janela do painel.",
      "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
      "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
@@ -12660,10 +12925,10 @@
     "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
     "overview": [
      "O backup usa a compressão escolhida em **Novos backups** (gzip, Zstandard ou XZ). Ele se recusa a começar enquanto outro backup ou uma restauração estiver rodando, para que dois trabalhos nunca gravem ao mesmo tempo.",
-     "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de cópias de segurança, copia o arquivo mais novo direto para a sua pasta Downloads."
+     "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de backups e restauração, copia o arquivo mais novo direto para a sua pasta Downloads."
     ],
     "steps": [
-     "Abra a Central de cópias de segurança e escolha **Gerar backup manual e baixar no computador**.",
+     "Abra a Central de backups e restauração e escolha **Gerar backup manual e baixar no computador**.",
      "Escolha a pasta de destino: a pasta padrão de backups, um pen drive (normalmente em `/media` ou `/mnt`) ou outra pasta.",
      "Aguarde o dump e a verificação.",
      "Leia o resultado: nome e tamanho do arquivo e, em seguida, o comando para colar no PowerShell ou no Terminal do seu computador e salvá-lo na pasta Downloads."
@@ -12672,6 +12937,45 @@
      "Faça um backup manual antes de qualquer mudança grande: uma atualização, uma importação em massa, uma troca de motor de busca.",
      "Mantenha pelo menos uma cópia fora do servidor (um PC, um pen drive guardado em outro lugar, ou a nuvem): um backup no mesmo disco não sobrevive a uma falha do disco.",
      "Dê às cópias que você guarda um nome com data e motivo, por exemplo `antes-da-atualizacao-2026-10.sql.zst`."
+    ]
+   }
+  },
+  "backup-marc": {
+   "en": {
+    "summary": "Exports every bibliographic and authority record in MARC21 right now, the same package the weekly backup makes, and shows how to copy it to your computer.",
+    "overview": [
+     "The export runs Koha's own `export_records.pl` for the bibliographic records and for the authorities and packs both files into `koha_marc_<date>.tar.gz` in the MARC backup folder (`/var/backups/koha_marc`). When a cloud backup is set up, the package is also sent there.",
+     "Koha keeps working while it runs. If another backup or a restore is running, the export waits for another time and says so."
+    ],
+    "steps": [
+     "Open the Backup center (key **b**).",
+     "Press **Export MARC21 records now** (on the top row or among the cards) and confirm.",
+     "Wait for the export: the result shows the file, its size and the `scp` command to paste on your computer to save it in Downloads."
+    ],
+    "tips": [
+     "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
+     "The weekly export runs every Sunday at 03:00; change its day and time in **Schedules & cron tasks**."
+    ],
+    "related": [
+     "sec-backup",
+     "backup-manual",
+     "restore"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Exporta agora todos os registros bibliográficos e de autoridade em MARC21, o mesmo pacote que o backup semanal gera, e mostra como copiá-lo para o seu computador.",
+    "overview": [
+     "A exportação usa o próprio `export_records.pl` do Koha para os registros bibliográficos e para as autoridades e junta os dois arquivos em `koha_marc_<data>.tar.gz` na pasta de backups MARC (`/var/backups/koha_marc`). Quando o backup na nuvem está configurado, o pacote também é enviado para lá.",
+     "O Koha continua funcionando durante a exportação. Se outro backup ou uma restauração estiver rodando, a exportação não começa e o painel avisa."
+    ],
+    "steps": [
+     "Abra a Central de backups e restauração (tecla **b**).",
+     "Pressione **Exportar registros MARC21 agora** (na linha de cima ou entre os cartões) e confirme.",
+     "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
+    ],
+    "tips": [
+     "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
+     "A exportação semanal roda todo domingo às 03:00; mude o dia e o horário em **Agendamentos e tarefas cron**."
     ]
    }
   },
@@ -12716,7 +13020,7 @@
    "pt-BR": {
     "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
     "steps": [
-     "Abra a Central de cópias de segurança e escolha **Configurar backup na nuvem (Google Drive)**.",
+     "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem (Google Drive)**.",
      "Escolha como conectar (veja as opções).",
      "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
      "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
@@ -12771,7 +13075,7 @@
    "pt-BR": {
     "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
     "steps": [
-     "Abra a Central de cópias de segurança e escolha **Testar a integridade do último backup**.",
+     "Abra a Central de backups e restauração e escolha **Testar a integridade do último backup**.",
      "Confira o arquivo e a data mostrados, ou pressione **Escolher outro arquivo** para testar outro.",
      "Confirme **Executar o teste agora?**.",
      "Leia o resultado: *O BACKUP ESTÁ ÍNTEGRO E PODE SER RESTAURADO*, com o número de tabelas, registros bibliográficos e leitores, ou o motivo da falha."
@@ -12787,10 +13091,10 @@
   },
   "sec-backup": {
    "en": {
-    "summary": "Everything about backups on one screen: the state of the newest backup, the compression of new backups, one-click download, manual and cloud backups, the integrity test and the restore.",
+    "summary": "Everything about backups and restores on one screen: the state of the newest backup, the compression of new backups, one-click download, restore, the MARC21 export, manual and cloud backups and the integrity test.",
     "overview": [
      "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
-     "The top shows three cards (**Last backup**, **Size**, **Result** of the last nightly run), then the **New backups** box with the compression choice, then the backup routines as cards."
+     "The top row has **Download latest backup**, **Restore database** and **Export MARC21 records now**. Then three cards (**Last backup**, **Size**, **Result** of the last nightly run), the **New backups** box with the compression choice, and the backup routines as cards."
     ],
     "tips": [
      "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
@@ -12801,14 +13105,16 @@
      "backup-compression",
      "backup-download",
      "backup-safety",
-     "backup-cloud"
+     "backup-cloud",
+     "backup-marc",
+     "restore"
     ]
    },
    "pt-BR": {
-    "summary": "Tudo sobre backups numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, os backups manual e na nuvem, o teste de integridade e a restauração.",
+    "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
     "overview": [
-     "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de cópias de segurança (tecla **b**) mostra como isso está indo e permite agir.",
-     "No topo ficam três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
+     "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
+     "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
     ],
     "tips": [
      "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
@@ -14810,7 +15116,8 @@
     ],
     "tips": [
      "Leave at least an hour between the nightly backup and heavy jobs such as a full reindex.",
-     "E-mail notices follow Koha's own schedule (koha-common), not this file."
+     "E-mail notices follow Koha's own schedule (koha-common), not this file.",
+     "**Reader alerts & daily digest** can run daily, weekly or monthly: a weekly or monthly run reminds of every loan that falls due before the next run, and the summary is titled weekly or monthly."
     ],
     "related": [
      "sec-backup",
@@ -14844,7 +15151,8 @@
     ],
     "tips": [
      "Deixe pelo menos uma hora entre o backup noturno e tarefas pesadas como uma reindexação completa.",
-     "Os avisos por e-mail seguem o agendamento do próprio Koha (koha-common), não este arquivo."
+     "Os avisos por e-mail seguem o agendamento do próprio Koha (koha-common), não este arquivo.",
+     "**Alertas aos leitores e resumo diário** pode rodar diariamente, semanalmente ou mensalmente: uma execução semanal ou mensal lembra de todos os empréstimos que vencem antes da próxima execução, e o resumo passa a se chamar semanal ou mensal."
     ]
    }
   },
@@ -15201,7 +15509,7 @@
      },
      {
       "name": "Último backup",
-      "text": "Quando foi feito o backup mais recente deste servidor e o nome do arquivo. Desde a versão 1.5.44, o Painel de Controle, a Central de cópias de segurança e as telas de restauração leem a mesma fonte, por isso sempre concordam. O cartão fica amarelo quando o backup está antigo ou a última execução noturna falhou."
+      "text": "Quando foi feito o backup mais recente deste servidor e o nome do arquivo. Desde a versão 1.5.44, o Painel de Controle, a Central de backups e restauração e as telas de restauração leem a mesma fonte, por isso sempre concordam. O cartão fica amarelo quando o backup está antigo ou a última execução noturna falhou."
      },
      {
       "name": "Disco livre",
@@ -15217,7 +15525,7 @@
      }
     ],
     "tips": [
-     "Um cartão **Último backup** amarelo é um chamado à ação: abra a Central de cópias de segurança e use **Gerar backup manual** ou **Testar a integridade do último backup**.",
+     "Um cartão **Último backup** amarelo é um chamado à ação: abra a Central de backups e restauração e use **Gerar backup manual** ou **Testar a integridade do último backup**.",
      "Quando o disco livre ficar abaixo de duas vezes o tamanho de um backup, limpe arquivos antigos com **Otimização profunda do banco e limpeza de logs** ou leve backups antigos para a nuvem."
     ]
    }
@@ -15419,7 +15727,7 @@
      "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
     ],
     "steps": [
-     "Abra a Central de cópias de segurança (tecla **b**).",
+     "Abra a Central de backups e restauração (tecla **b**).",
      "Pressione **Baixar Backup Recente**.",
      "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
     ],
@@ -15528,7 +15836,7 @@
      "Se o programa da compressão escolhida (`zstd` ou `xz`) não estiver no servidor, os backups voltam para o gzip e a caixa avisa; escolher a compressão de novo instala o programa."
     ],
     "steps": [
-     "Abra a Central de cópias de segurança (tecla **b**).",
+     "Abra a Central de backups e restauração (tecla **b**).",
      "Na caixa **Novos backups**, abra **Compressão** e escolha uma opção.",
      "Aguarde *Salvando as configurações de backup*; um aviso confirma a nova escolha.",
      "Na manhã seguinte, confira se o **Último backup** mostra a nova extensão."
@@ -15669,7 +15977,8 @@
     ],
     "tips": [
      "Create a key just for the library, with a spending limit on the provider's site.",
-     "With Gemini, start with a Flash model: it is in the free tier (with daily limits)."
+     "With Gemini, start with a Flash model: it is in the free tier (with daily limits).",
+     "**Get an API key** opens the provider's key page (Google AI Studio: aistudio.google.com/api-keys), and the Copy button next to it copies the address when no browser can be opened from the server."
     ],
     "warnings": [
      "OpenAI and Anthropic bill every request, even for their smaller models: the account needs credits.",
@@ -15718,7 +16027,8 @@
     ],
     "tips": [
      "Crie uma chave só para a biblioteca, com limite de gastos no site do provedor.",
-     "Com o Gemini, comece por um modelo Flash: ele está na camada gratuita (com limites diários)."
+     "Com o Gemini, comece por um modelo Flash: ele está na camada gratuita (com limites diários).",
+     "**Obter chave de API** abre a página de chaves do provedor (Google AI Studio: aistudio.google.com/api-keys), e o botão Copiar ao lado copia o endereço quando nenhum navegador pode ser aberto a partir do servidor."
     ],
     "warnings": [
      "A OpenAI e a Anthropic cobram por cada requisição, mesmo nos modelos menores: a conta precisa ter créditos.",
@@ -16143,7 +16453,8 @@
     ],
     "tips": [
      "Use the library's brand colours for the accent and second colour, and keep the block background light for long reading.",
-     "Glass textures look best over a wallpaper; over a plain page, prefer flat or gradient."
+     "Glass textures look best over a wallpaper; over a plain page, prefer flat or gradient.",
+     "**Blocks**, **Inputs** and **Buttons** set the rounded corners (border-radius): more pixels curve the corners more, 0 makes them square. Hover a slider to see which elements it rounds."
     ],
     "related": [
      "opac-pictures",
@@ -16178,7 +16489,8 @@
     ],
     "tips": [
      "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
-     "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente."
+     "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente.",
+     "**Blocos**, **Campos** e **Botões** ajustam o arredondamento das bordas (border-radius): mais pixels deixam os cantos mais curvos, 0 deixa os cantos retos. Passe o mouse sobre um controle para ver quais elementos ele arredonda."
     ]
    }
   },
@@ -16202,7 +16514,8 @@
     ],
     "tips": [
      "Keep the wallpaper under 500 KB (WebP is ideal): a heavy picture slows the OPAC on phones.",
-     "Use a square favicon of at least 64×64 pixels."
+     "Use a square favicon of at least 64×64 pixels.",
+     "No image host yet? **Postimages** (postimages.org) is free and needs no account: the box has its link with Open and Copy buttons. Paste the picture's *Direct link* with the source **Direct URL**."
     ],
     "related": [
      "opac-material",
@@ -16228,7 +16541,8 @@
     ],
     "tips": [
      "Mantenha o papel de parede abaixo de 500 KB (WebP é o ideal): uma imagem pesada deixa o OPAC lento no celular.",
-     "Use um favicon quadrado de pelo menos 64×64 pixels."
+     "Use um favicon quadrado de pelo menos 64×64 pixels.",
+     "Ainda não tem onde hospedar imagens? O **Postimages** (postimages.org) é gratuito e não pede conta: a caixa tem o link dele com os botões Abrir e Copiar. Cole o *Direct link* da imagem com a origem **URL direta**."
     ]
    }
   },
@@ -16615,7 +16929,10 @@
   "opac-credits": {
    "en": {
     "title": "Footer credits",
-    "summary": "The footer of every OPAC page (Koha's `opaccredits`), built from a form: no HTML to type.",
+    "summary": "The footer of every OPAC page (Koha's `opaccredits`), built from one text box: one `Field: value` per line, no HTML to type.",
+    "overview": [
+     "Write only the lines you need, for example `Library name: Biblioteca Municipal`, `Phone: (00) 0000-0000`, `E-mail: contato@biblioteca.gov.br`. The field names can be typed in English or in the panel's language, with or without accents. The example under the box shows every field."
+    ],
     "options": [
      {
       "name": "Library name, Address, Opening hours, Note",
@@ -16635,7 +16952,7 @@
      },
      {
       "name": "Other links",
-      "text": "One per line: the text, a `|` and the address (at most 6)."
+      "text": "One per line: the text, a `|` and the address (at most 6), for example `Portal | https://biblioteca.gov.br`."
      }
     ],
     "tips": [
@@ -16648,7 +16965,10 @@
    },
    "pt-BR": {
     "title": "Créditos do rodapé",
-    "summary": "O rodapé de todas as páginas do OPAC (`opaccredits` do Koha), montado por um formulário: sem HTML para digitar.",
+    "summary": "O rodapé de todas as páginas do OPAC (o `opaccredits` do Koha), montado a partir de uma única caixa de texto: um `Campo: valor` por linha, sem HTML para digitar.",
+    "overview": [
+     "Escreva só as linhas de que precisa, por exemplo `Nome da biblioteca: Biblioteca Municipal`, `Telefone: (00) 0000-0000`, `E-mail: contato@biblioteca.gov.br`. Os nomes dos campos podem ser escritos em português ou em inglês, com ou sem acento. O exemplo embaixo da caixa mostra todos os campos."
+    ],
     "options": [
      {
       "name": "Nome da biblioteca, Endereço, Horário de funcionamento, Observação",
@@ -16668,11 +16988,51 @@
      },
      {
       "name": "Outros links",
-      "text": "Um por linha: o texto, uma `|` e o endereço (no máximo 6)."
+      "text": "Um por linha: o texto, uma `|` e o endereço (no máximo 6), por exemplo `Portal | https://biblioteca.gov.br`."
      }
     ],
     "tips": [
      "Enquanto os créditos estão ligados, as entradas de rodapé da própria biblioteca ficam expiradas, e voltam quando eles são desligados ou a aparência é removida."
+    ]
+   }
+  },
+  "opac-news-items": {
+   "en": {
+    "title": "OPAC news and Staff news",
+    "summary": "Writes and publishes one news item of your own on the OPAC home page and another on the staff home page, each with a title, text and a call-to-action button.",
+    "overview": [
+     "The item goes into Koha's News (category news) as `kei-news-opac` (OPAC only) or `kei-news-staff` (staff interface only). The library's own news in **Tools > News** are never changed.",
+     "The text accepts the same safe HTML as the login text: paragraphs, bold, lists, links and pictures; scripts and styles are taken out. The button is a plain link styled as Koha's main button, so it works on both sides without any script."
+    ],
+    "steps": [
+     "Open **OPAC and Staff Appearance** (key **o**) and go to the **OPAC news** or **Staff news** box.",
+     "Switch **Publish** on and type the **Title** and the **Text (HTML)**.",
+     "Optionally type the **Button text** and the **Button address** (https://..., a Koha path such as /cgi-bin/koha/opac-search.pl, mailto: or tel:).",
+     "Press **Apply**: the news item is published after a backup. Switch **Publish** off and Apply again to take it down."
+    ],
+    "tips": [
+     "A button needs both its text and its address; the panel says which one is missing before anything is written."
+    ],
+    "related": [
+     "opac-news",
+     "sec-opac"
+    ]
+   },
+   "pt-BR": {
+    "title": "Notícias do OPAC e Notícias da equipe",
+    "summary": "Escreve e publica uma notícia sua na página inicial do OPAC e outra na página inicial da equipe, cada uma com título, texto e um botão de chamada para ação.",
+    "overview": [
+     "A notícia entra nas Notícias do Koha (categoria news) como `kei-news-opac` (só no OPAC) ou `kei-news-staff` (só na interface da equipe). As notícias da própria biblioteca em **Ferramentas > Notícias** nunca são alteradas.",
+     "O texto aceita o mesmo HTML seguro do texto de login: parágrafos, negrito, listas, links e imagens; scripts e estilos são removidos. O botão é um link comum com o estilo do botão principal do Koha, então funciona nos dois lados sem nenhum script."
+    ],
+    "steps": [
+     "Abra **Aparência do OPAC e da equipe** (tecla **o**) e vá à caixa **Notícias do OPAC** ou **Notícias da equipe**.",
+     "Ligue **Publicar** e digite o **Título** e o **Texto (HTML)**.",
+     "Se quiser, digite o **Texto do botão** e o **Endereço do botão** (https://..., um caminho do Koha como /cgi-bin/koha/opac-search.pl, mailto: ou tel:).",
+     "Pressione **Aplicar**: a notícia é publicada depois de um backup. Desligue **Publicar** e aplique de novo para retirá-la."
+    ],
+    "tips": [
+     "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa."
     ]
    }
   },
@@ -16910,6 +17270,9 @@
      "Follow the routine (see its own guide).",
      "Come back to the hub and press **Reload**: the box should say *installed*."
     ],
+    "tips": [
+     "The tab links the Evolution API guide (doc.evolution-api.com) and lists the four steps: install the gateway, create an instance and scan its QR code with the library's WhatsApp, then type the address, instance and API key in **Set up WhatsApp and Telegram**."
+    ],
     "related": [
      "messaging",
      "sec-hub"
@@ -16925,6 +17288,9 @@
      "Pressione **Configurar WhatsApp e Telegram**.",
      "Siga a rotina (veja o guia dela).",
      "Volte à central e pressione **Recarregar**: a caixa deve dizer *instalado*."
+    ],
+    "tips": [
+     "A aba traz o link do guia da Evolution API (doc.evolution-api.com) e os quatro passos: instalar o gateway, criar uma instância e ler o QR code com o WhatsApp da biblioteca, e então digitar o endereço, a instância e a chave de API em **Configurar WhatsApp e Telegram**."
     ]
    }
   },
@@ -17140,165 +17506,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 106,
-   "manual_total": 106,
+   "manual": 108,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 364,
-   "strings_total": 364
+   "strings": 372,
+   "strings_total": 372
   },
   "pt-BR": {
-   "manual": 106,
-   "manual_total": 106,
+   "manual": 108,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 353,
-   "strings_total": 364
+   "strings": 363,
+   "strings_total": 372
   },
   "es": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 270,
-   "strings_total": 364
+   "strings": 267,
+   "strings_total": 372
   },
   "fr": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 265,
-   "strings_total": 364
+   "strings": 262,
+   "strings_total": 372
   },
   "it": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 265,
-   "strings_total": 364
+   "strings": 262,
+   "strings_total": 372
   },
   "de": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 265,
-   "strings_total": 364
+   "strings": 262,
+   "strings_total": 372
   },
   "nl": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "sv": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "pl": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "cs": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "ru": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "uk": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "tr": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "tl": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "id": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "ar": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "fa": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "hi": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "bn": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "vi": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "zh": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "ja": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   },
   "ko": {
    "manual": 0,
-   "manual_total": 106,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 103,
-   "strings_total": 364
+   "strings": 101,
+   "strings_total": 372
   }
  }
 }

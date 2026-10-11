@@ -57,6 +57,12 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@result scp=scp root@192.0.2.10:{0}/koha_library_manual_2026-10-03_12h00.sql.gz Downloads/",
         "@@result user=root",
     ],
+    "backup-marc": [
+        "@@note Exporting the MARC21 records...",
+        "@@result file=/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz", "@@result size=21M",
+        "@@result scp=scp root@192.0.2.10:/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz Downloads/",
+        "@@result user=root", "@@result cloud=no",
+    ],
     "backup-test": [
         "@@ask Test Backup\tRun the test now?", "@@note Importing into a temporary database...",
         f"@@result file={_NEWEST}", "@@result tables=312", "@@result biblios=48210",

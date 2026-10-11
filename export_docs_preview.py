@@ -178,7 +178,8 @@ FEATURES: tuple[Feature, ...] = (
     Feature("dash-export", "dashboard", "views/dashboard.py", "Export diagnostics", [button("Export diagnostics")]),
     # Backup center
     Feature("backup-download", "backup", "views/backup.py", "📥 Download latest backup", [
-        button("📥 Download latest backup", True),
+        button("📥 Download latest backup", True), button("📥  Restore database"),
+        button("📚  Export MARC21 records now"),
     ]),
     Feature("backup-status", "backup", "views/backup.py", "Last backup", [
         status("Last backup", "${age} ago"), status("Size", "184 MB"), status("Result", "OK"),
@@ -199,7 +200,8 @@ FEATURES: tuple[Feature, ...] = (
     # AI
     Feature("ai-provider", "ai", "views/ai.py", "Provider", [
         select("Provider", "aiconf.LABELS", 1), field_("Server URL", "https://generativelanguage.googleapis.com"),
-        field_("API key", "", "paste the API key here"), field_("Vision model", "gemini-flash-latest"),
+        field_("API key", "", "paste the API key here"), button("🔗 Get an API key"),
+        field_("Vision model", "gemini-flash-latest"),
         field_("Chat model", "", "empty: the same as the vision model"),
         button("Test connection"), button("Save", True),
     ]),
@@ -241,14 +243,14 @@ FEATURES: tuple[Feature, ...] = (
     # OPAC and Staff Appearance
     Feature("opac-material", "opac", "views/opac.py", "Material", [
         select("Texture", "opac_theme.TEXTURES"), slider("Blur", 12, "px"), slider("Opacity", 78),
-        slider("Blocks", 14, "px"), slider("Inputs", 10, "px"), slider("Buttons", 10, "px"),
+        note("RADIUS_NOTE"), slider("Blocks", 14, "px"), slider("Inputs", 10, "px"), slider("Buttons", 10, "px"),
         color("Accent colour", "#2f7d5b"), color("Second colour", "#1e4f86"), color("Block background", "#ffffff"),
         switch("Page colour", False),
     ]),
     Feature("opac-pictures", "opac", "views/opac.py", "Pictures", [
         select("Wallpaper", "opac_theme.SOURCES", 1), select("Logo", "opac_theme.SOURCES", 3),
-        select("Favicon", "opac_theme.SOURCES", 0),
-    ]),
+        select("Favicon", "opac_theme.SOURCES", 0), note("POSTIMAGES_NOTE"), button("🔗 Open link"),
+    ], extra_sources=("widgets/linkrow.py",)),
     Feature("opac-dark", "opac", "views/opac.py", "Legibility and dark mode", [
         slider("Legibility film", 70), switch("Light/dark switch"), select("Default theme", "opac_theme.THEMES", 2),
     ]),
@@ -280,10 +282,14 @@ FEATURES: tuple[Feature, ...] = (
         field_("Text (HTML)", "<p>Staff only. Forgot your password? Call the coordinator.</p>"),
     ]),
     Feature("opac-credits", "opac", "views/opac.py", "Footer credits", [
-        switch("Show"), field_("Library name", "Biblioteca Municipal"), field_("Address", "Rua Exemplo, 123"),
-        field_("Phone", "(00) 0000-0000"), field_("E-mail", "contato@biblioteca.gov.br"),
-        field_("Instagram", "https://instagram.com/biblioteca"),
-        field_("CNPJ", "00.000.000/0000-00"),
+        switch("Show"), note("CREDITS_NOTE"),
+        field_("Example:", "Library name: Biblioteca Municipal · Phone: (00) 0000-0000 · "
+                           "E-mail: contato@biblioteca.gov.br · Portal | https://biblioteca.gov.br"),
+    ]),
+    Feature("opac-news-items", "opac", "views/opac.py", "OPAC news", [
+        switch("Publish"), field_("Title", "Férias de julho"),
+        field_("Text (HTML)", "<p>A biblioteca fecha de 15 a 31 de julho.</p>"),
+        field_("Button text", "Ver horários"), field_("Button address", "https://biblioteca.gov.br/horarios"),
     ]),
     Feature("opac-hide", "opac", "views/opac.py", "Hide", [
         switch("RSS icons"), switch("Cart badge", False), switch("Community links"), switch("Empty table columns"),
@@ -303,8 +309,8 @@ FEATURES: tuple[Feature, ...] = (
     Feature("hub-whatsapp", "hub", "views/hub.py", "💬  WhatsApp & Telegram", [
         note("Sends Koha's notices (holds waiting, overdue, due soon) by WhatsApp or Telegram too, with the "
              "reader's mobile number. The setup asks for the service's keys."),
-        button("Set up WhatsApp and Telegram", True),
-    ]),
+        note("WHATSAPP_STEPS"), button("🔗 Open link"), button("Set up WhatsApp and Telegram", True),
+    ], extra_sources=("widgets/linkrow.py",)),
     Feature("hub-sms", "hub", "views/hub.py", "📱  SMS", [
         button("SMS driver (SMSSendDriver)"), button("Readers' messaging preferences"),
     ]),

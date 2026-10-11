@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import unicodedata
 from pathlib import Path
 
 from textual.app import ComposeResult
@@ -40,6 +41,7 @@ from ..i18n import t
 from ..screens.dialogs import ConfirmScreen, InputScreen, TextScreen
 from ..tasks import Reporter, TaskFailed
 from ..widgets.colorpick import ColorPicker
+from ..widgets.linkrow import LinkRow
 from ..widgets.slider import Slider
 from .base import SectionView
 
@@ -47,7 +49,11 @@ ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon",
 FILE_SOURCES = ("local", "imgbb", "cloudinary")
 # The login pages: settings side -> (box id, title, picture name).
 LOGIN_BOXES = {"opac": ("o-login-opac", "OPAC login page"), "staff": ("o-login-staff", "Staff login page")}
-# The credits form: field -> (label, placeholder, max length).
+# The panel's own news item of each side: settings side -> (box id, title).
+NEWS_BOXES = {"opac": ("o-newsitem-opac", "OPAC news"), "staff": ("o-newsitem-staff", "Staff news")}
+# The credits text: field -> (label, example, max length). One text area,
+# "Label: value" lines (the label in English or in the panel's language)
+# and "text | address" lines for the other links.
 CREDIT_FIELDS = {
     "name": ("Library name", "Biblioteca Municipal", 120), "address": ("Address", "Rua Exemplo, 123", 200),
     "phone": ("Phone", "(00) 0000-0000", 40), "whatsapp": ("WhatsApp", "(00) 00000-0000", 30),
@@ -57,6 +63,8 @@ CREDIT_FIELDS = {
     "youtube": ("YouTube", "https://youtube.com/@biblioteca", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
     "note": ("Note", "", 300),
 }
+CREDITS_NOTE = ("Write one item per line as Field: value, only the fields you need. Other links go one per line "
+                "as text | address (at most 6). No HTML to type: the footer is built from these lines.")
 
 
 def _picture(raw: dict, name: str) -> dict:
@@ -76,8 +84,22 @@ SLIDERS = {   # id: (label, unit, step)
     "radius_button": ("Buttons", "px", 1),
     "film": ("Legibility film", "%", 5),
 }
+# The three corner sliders: what each one rounds (border-radius).
+RADIUS_HELP = {
+    "radius_block": "Rounded corners (border-radius) of the blocks: header, panels, cards and boxes. More "
+                    "pixels make the corners rounder; 0 makes them square.",
+    "radius_input": "Rounded corners (border-radius) of the fields: search bar, text boxes and lists. More "
+                    "pixels make the corners rounder; 0 makes them square.",
+    "radius_button": "Rounded corners (border-radius) of the buttons. More pixels make the corners rounder; "
+                     "0 makes them square.",
+}
+RADIUS_NOTE = ("Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising "
+               "the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.")
 GHOST = {"rss": "RSS icons", "cart_badge": "Cart badge", "community": "Community links",
          "empty_columns": "Empty table columns"}
+POSTIMAGES_URL = "https://postimages.org/"
+POSTIMAGES_NOTE = ("Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link "
+                   "(ends in .png or .jpg) and paste it here with the source Direct URL.")
 ICON_EXAMPLES = "📖 📜 💬 📧 📷 🔐 📅 ❓ fa-book"
 # The two sets of quick access buttons: settings key -> id prefix of their fields.
 LINK_SETS = {"links": "o-link", "staff_links": "o-slink"}
@@ -116,7 +138,10 @@ class OpacView(SectionView):
         with Vertical(id="o-material", classes="opac-box"):
             yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=c["texture"],
                                                  allow_blank=False, id="o-texture"))
-            for key in ("blur", "opacity", "radius_block", "radius_input", "radius_button"):
+            for key in ("blur", "opacity"):
+                yield from self._slider(key)
+            yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
+            for key in RADIUS_HELP:
                 yield from self._slider(key)
             bars = (t("Hue"), t("Saturation"), t("Lightness"))
             yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")
@@ -128,6 +153,7 @@ class OpacView(SectionView):
             yield Static(t("A file on this server (PNG, JPEG, GIF, WebP or ICO; SVG is refused), a file sent to "
                            "ImgBB or Cloudinary, or a direct https address (Postimages and other hosts)."),
                          classes="ai-note", markup=False)
+            yield LinkRow(POSTIMAGES_URL, t(POSTIMAGES_NOTE), "Postimages", id="o-postimages")
             for name in ot.ASSETS:
                 yield from self._asset_row(name, c[name])
         with Vertical(id="o-dark", classes="opac-box"):
@@ -180,8 +206,10 @@ class OpacView(SectionView):
                                                  allow_blank=False, id="o-staff-texture"))
             for key in ot.STAFF_MATERIAL:
                 label, unit, step = SLIDERS[key]
-                yield from _row(t(label), Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
-                                                 id=f"o-staff-{key}"))
+                if key == next(iter(RADIUS_HELP)):
+                    yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
+                yield from _row(t(label), _tip(Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
+                                                      id=f"o-staff-{key}"), RADIUS_HELP.get(key, "")))
             yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
             yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
@@ -217,12 +245,27 @@ class OpacView(SectionView):
                            "type. While it is on, the library's own footer entries are set to expired, and come "
                            "back when it is turned off or the look is removed."), classes="ai-note", markup=False)
             yield from _row(t("Show"), Switch(cr["enabled"], id="o-cr-enabled"))
-            for key, (label, hint, size) in CREDIT_FIELDS.items():
-                yield from _row(t(label), Input(cr[key], id=f"o-cr-{key}", max_length=size, placeholder=hint))
-            yield from _row(t("Other links"), TextArea(_credit_links_text(cr["links"]), id="o-cr-links",
-                                                       classes="o-html o-links-text"))
-            yield Static(t("One per line: text | address (at most ${n}).", n=str(ot.MAX_CREDIT_LINKS)),
-                         classes="ai-note", markup=False)
+            yield Static(t(CREDITS_NOTE) + "\n" + t("Fields: ${names}.", names=", ".join(
+                t(v[0]) for v in CREDIT_FIELDS.values())), classes="ai-note", markup=False)
+            yield TextArea(_credits_text(cr), id="o-cr-text", classes="o-html o-credits-text")
+            yield Static(t("Example:") + "\n" + _credits_example(), classes="ai-note", markup=False)
+        for side, (box, _title) in NEWS_BOXES.items():
+            nw = c["news"][side]
+            with Vertical(id=box, classes="opac-box"):
+                yield Static(t("A news item of your own on ${where} (Koha's News): a title, the text and a "
+                               "button that opens an address. HTML is allowed as in the login text. Apply "
+                               "publishes it; switching it off takes it down. The library's own news in Tools > "
+                               "News stay as they are.",
+                               where=t("the OPAC home page") if side == "opac" else t("the staff home page")),
+                             classes="ai-note", markup=False)
+                yield from _row(t("Publish"), Switch(nw["enabled"], id=f"{box}-enabled"))
+                yield from _row(t("Title"), Input(nw["title"], id=f"{box}-title", max_length=120,
+                                                  placeholder=t("Library news")))
+                yield from _row(t("Text (HTML)"), TextArea(nw["html"], id=f"{box}-html", classes="o-html"))
+                yield from _row(t("Button text"), Input(nw["button_text"], id=f"{box}-btext", max_length=60,
+                                                        placeholder=t("Learn more")))
+                yield from _row(t("Button address"), Input(nw["button_url"], id=f"{box}-burl",
+                                                           placeholder="https://..."))
         with Vertical(id="o-ghost", classes="opac-box"):
             for key, label in GHOST.items():
                 yield from _row(t(label), Switch(c["ghost"][key], id=f"o-g-{key}"))
@@ -255,7 +298,8 @@ class OpacView(SectionView):
     def _slider(self, key: str) -> ComposeResult:
         label, unit, step = SLIDERS[key]
         lo, hi = ot.RANGES[key]
-        yield from _row(t(label), Slider(lo, hi, self.cfg[key], step=step, unit=unit, id=f"o-{key}"))
+        yield from _row(t(label), _tip(Slider(lo, hi, self.cfg[key], step=step, unit=unit, id=f"o-{key}"),
+                                       RADIUS_HELP.get(key, "")))
 
     def on_mount(self) -> None:
         titles = {"o-material": "Material", "o-images": "Pictures", "o-dark": "Legibility and dark mode",
@@ -263,6 +307,7 @@ class OpacView(SectionView):
                   "o-slinks": "Staff home page buttons",
                   "o-staff": "Staff interface", "o-ghost": "Hide", "o-news": "News action buttons",
                   "o-credits": "Footer credits",
+                  **{box: title for box, title in NEWS_BOXES.values()},
                   **{box: title for box, title in LOGIN_BOXES.values()}}
         for wid, title in titles.items():
             self.query_one(f"#{wid}").border_title = t(title)
@@ -378,11 +423,16 @@ class OpacView(SectionView):
             name = ot.LOGIN_ASSETS[side]
             q(f"#o-src-{name}", Select).value = lg["image"]["source"]
             q(f"#o-val-{name}", Input).value = lg["image"]["url"]
+        for side, (box, _title) in NEWS_BOXES.items():
+            nw = cfg["news"][side]
+            q(f"#{box}-enabled", Switch).value = nw["enabled"]
+            q(f"#{box}-title", Input).value = nw["title"]
+            q(f"#{box}-html", TextArea).text = nw["html"]
+            q(f"#{box}-btext", Input).value = nw["button_text"]
+            q(f"#{box}-burl", Input).value = nw["button_url"]
         cr = cfg["credits"]
         q("#o-cr-enabled", Switch).value = cr["enabled"]
-        for key in CREDIT_FIELDS:
-            q(f"#o-cr-{key}", Input).value = cr[key]
-        q("#o-cr-links", TextArea).text = _credit_links_text(cr["links"])
+        q("#o-cr-text", TextArea).text = _credits_text(cr)
 
     def fill_staff(self, st: dict) -> None:
         q = self.query_one
@@ -432,10 +482,18 @@ class OpacView(SectionView):
         raw["login"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value, "alt": q(f"#{box}-alt", Input).value,
                                "html": q(f"#{box}-html", TextArea).text, "image": {"source": "none", "url": ""}}
                         for side, (box, _title) in LOGIN_BOXES.items()}
-        raw["credits"] = {"enabled": q("#o-cr-enabled", Switch).value,
-                          **{key: q(f"#o-cr-{key}", Input).value.strip() for key in CREDIT_FIELDS}}
-        links, problem = _credit_links(q("#o-cr-links", TextArea).text)
-        raw["credits"]["links"] = links
+        raw["news"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value,
+                              "title": q(f"#{box}-title", Input).value.strip(),
+                              "html": q(f"#{box}-html", TextArea).text,
+                              "button_text": q(f"#{box}-btext", Input).value.strip(),
+                              "button_url": q(f"#{box}-burl", Input).value.strip()}
+                       for side, (box, _title) in NEWS_BOXES.items()}
+        for side, (_box, title) in NEWS_BOXES.items():
+            problem = _news_problem(raw["news"][side])
+            if problem:
+                return raw, {}, f"{t(title)}: {problem}"
+        fields, links, problem = _credits_parse(q("#o-cr-text", TextArea).text)
+        raw["credits"] = {"enabled": q("#o-cr-enabled", Switch).value, **fields, "links": links}
         if problem:
             return raw, {}, f"{t('Footer credits')}: {problem}"
         problem = _credits_problem(raw["credits"])
@@ -622,6 +680,8 @@ class OpacView(SectionView):
                  f"{t('OPAC login page')}: {t('on') if ot.login_on(cfg['login']['opac']) else t('off')}",
                  f"{t('Staff login page')}: {t('on') if ot.login_on(cfg['login']['staff']) else t('off')}",
                  f"{t('Footer credits')}: {t('on') if ot.credits_on(cfg['credits']) else t('off')}"]
+        lines += [f"{t(title)}: {t('on') if ot.news_on(cfg['news'][side]) else t('off')}"
+                  for side, (_box, title) in NEWS_BOXES.items()]
         lines += [f"{t(ASSET_LABELS[n])}: {cfg[n]['url']}" for n in ot.ASSETS if cfg[n]["url"]]
         if cfg["staff"]["enabled"]:
             lines += [f"{t('Staff interface')}: {t(ASSET_LABELS[n])}: {cfg['staff'][n]['url']}"
@@ -717,8 +777,53 @@ class OpacView(SectionView):
         self.app.notify(t("Image host keys saved."))
 
 
-def _credit_links_text(links: list[dict]) -> str:
-    return "\n".join(f"{x['text']} | {x['url']}" for x in links)
+def _credits_text(cr: dict) -> str:
+    """The credits as the text area shows them: the filled fields, then the links."""
+    lines = [f"{t(label)}: {cr[key]}" for key, (label, _hint, _size) in CREDIT_FIELDS.items() if cr.get(key)]
+    return "\n".join(lines + [f"{x['text']} | {x['url']}" for x in cr.get("links") or []])
+
+
+def _credits_example() -> str:
+    lines = [f"{t(label)}: {hint}" for label, hint, _size in CREDIT_FIELDS.values() if hint]
+    return "\n".join(lines + [t("Catalogue guide") + " | https://biblioteca.gov.br/guia"])
+
+
+def _fold(text: str) -> str:
+    """A field name compared without case or accents (Endereço = endereco)."""
+    plain = unicodedata.normalize("NFKD", text.strip().casefold())
+    return "".join(c for c in plain if not unicodedata.combining(c))
+
+
+def _credits_parse(text: str) -> tuple[dict, list[dict], str]:
+    """(fields, other links, problem) from the credits text: "Field: value"
+    lines (the label in English, in the panel's language or the key) and
+    "text | address" lines."""
+    names = {}
+    for key, (label, _hint, _size) in CREDIT_FIELDS.items():
+        for name in (key, label, t(label)):
+            names[_fold(name)] = key
+    fields = {key: "" for key in CREDIT_FIELDS}
+    link_lines = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        name, sep, value = line.partition(":")
+        key = names.get(_fold(name)) if sep else None
+        if key:
+            label, _hint, size = CREDIT_FIELDS[key]
+            value = value.strip()
+            if len(value) > size:
+                return fields, [], t("${name}: at most ${n} characters.", name=t(label), n=str(size))
+            fields[key] = value
+        elif "|" in line:
+            link_lines.append(line)
+        else:
+            return fields, [], t("${line}: start the line with a field name and a colon (for example "
+                                 "${example}), or write text | address for a link.",
+                                 line=line, example=t("Phone") + ": (00) 0000-0000")
+    links, problem = _credit_links("\n".join(link_lines))
+    return fields, links, problem
 
 
 def _credit_links(text: str) -> tuple[list[dict], str]:
@@ -739,6 +844,20 @@ def _credit_links(text: str) -> tuple[list[dict], str]:
     return links, ""
 
 
+def _news_problem(raw: dict) -> str:
+    """Why a news item switched on cannot be published, said plainly."""
+    if raw["button_url"] and not ot.safe_link(raw["button_url"]):
+        return t("${name}: the address must start with https://, http://, / , mailto: or tel:.",
+                 name=raw["button_text"] or t("Button address"))
+    if bool(raw["button_text"]) != bool(raw["button_url"]):
+        return t("A button needs its text and its address.")
+    if raw["enabled"] and not raw["title"]:
+        return t("A news item needs its title.")
+    if raw["enabled"] and not (raw["html"].strip() or raw["button_text"]):
+        return t("Write the text of the news item or its button.")
+    return ""
+
+
 def _credits_problem(raw: dict) -> str:
     """The first credits field that would be dropped, said plainly."""
     clean = ot.normalize({"credits": raw})["credits"]
@@ -756,8 +875,17 @@ def _credits_problem(raw: dict) -> str:
 
 def _row(label: str, widget) -> ComposeResult:
     with Horizontal(classes="form-row"):
-        yield Label(label, classes="form-label")
+        tag = Label(label, classes="form-label")
+        tag.tooltip = widget.tooltip       # the field's tooltip on its label too
+        yield tag
         yield widget
+
+
+def _tip(widget, text: str):
+    """widget with text (translated) as its tooltip, when there is one."""
+    if text:
+        widget.tooltip = t(text)
+    return widget
 
 
 def _order(value: str) -> int:

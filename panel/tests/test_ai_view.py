@@ -205,3 +205,32 @@ def test_model_list_free_and_paid_groups(demo_dir):
             assert "demo mode" in str(q("#ai-models-note").render())
 
     asyncio.run(main())
+
+
+def test_key_page_buttons_follow_the_provider(demo_dir):
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        copied, opened = [], []
+        app.copy_to_clipboard = lambda text, quiet=False: copied.append(text)
+        app.open_url = lambda url, new_tab=True: opened.append(url)
+        async with app.run_test(size=(140, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("a")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-ai")
+            q = view.query_one
+            await pilot.click("#ai-p-gemini")
+            await pilot.pause(0.1)
+            assert q("#ai-key-links").display
+            assert "Get an API key" in str(q("#ai-key-note").render())
+            q("#ai-key-open").press()
+            q("#ai-key-copy").press()
+            await pilot.pause(0.1)
+            assert opened == copied == ["https://aistudio.google.com/api-keys"]
+            await pilot.click("#ai-p-ollama")
+            await pilot.pause(0.1)
+            assert not q("#ai-key-links").display                    # no key on this server
+
+    asyncio.run(main())

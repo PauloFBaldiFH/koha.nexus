@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.52"
+PANEL_VERSION=" 1.5.53"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -205,7 +205,7 @@ declare -A _MENU_PT=(
     ["📦  Install Koha server"]="📦  Instalar servidor Koha"
     ["🔑  View first-access credentials"]="🔑  Visualizar credenciais de primeiro acesso"
     ["📥  Restore database"]="📥  Restaurar base de dados"
-    ["💾  Backup center"]="💾  Central de cópias de segurança"
+    ["💾  Backup center"]="💾  Central de backups e restauração"
     ["🔍  Search engine & indexing"]="🔍  Motor de busca e indexação"
     ["🌐  Publish system to internet"]="🌐  Publicar sistema na Internet"
     ["🩺  Diagnostics & maintenance center"]="🩺  Diagnóstico e manutenção"
@@ -6127,6 +6127,61 @@ function_manual_backup() {
 }
 
 # ======================================================================
+# 4.1 MARC21 EXPORT NOW
+# ======================================================================
+# Runs the weekly MARC21 script (/root/backup_marc.sh: bibliographic and
+# authority records packed in DIR_MARC/koha_marc_<date>.tar.gz, sent to the
+# cloud when one is set) right now, and reports the package it made. The
+# script takes the backup lock itself and logs one line per outcome.
+function_marc_backup() {
+    require_koha || return 1
+    [ -f /root/backup_marc.sh ] || write_backup_scripts >/dev/null 2>&1 || true
+    if [ ! -f /root/backup_marc.sh ]; then
+        msg_error "" "$(t "The MARC21 backup script is missing (/root/backup_marc.sh). Run Install Koha server again to write it.")" 9 76
+        return 1
+    fi
+    local log_file="${LOG_DIR}/backup_marc.log" before new ok pkg size ip_addr
+    before=0
+    [ -f "$log_file" ] && before=$(wc -l < "$log_file")
+    clear
+    display_explanation "Exporting the MARC21 records..."
+    koha_ctl /bin/bash /root/backup_marc.sh || true
+    new=$(tail -n +"$((before + 1))" "$log_file" 2>/dev/null | grep ' | ' || true)
+    ok=$(printf '%s\n' "$new" | sed -n 's/^[^|]* | OK: //p' | tail -n1)
+    if [ -z "$ok" ]; then
+        if printf '%s\n' "$new" | grep -q 'skipped because another backup'; then
+            msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
+        else
+            local why
+            why=$(printf '%s\n' "$new" | grep -E ' \| (FAILED|WARN):' | tail -n1 | cut -d'|' -f2- | sed 's/^ //')
+            msg_error "" "$(t "The MARC21 export failed.") ${why:-}\n\n$(t "Log:") $log_file" 11 76
+        fi
+        return 1
+    fi
+    pkg=${ok%% (*}
+    size=$(du -h "$pkg" 2>/dev/null | cut -f1)
+    ip_addr=$(get_server_ip)
+    log "MARC21 export generated: $pkg"
+    if [ -n "${KEI_TASK:-}" ]; then
+        kei_result file "$pkg"
+        kei_result size "$size"
+        kei_result scp "scp ${REAL_USER:-root}@${ip_addr}:${pkg} Downloads/"
+        kei_result user "${REAL_USER:-root}"
+        kei_result cloud "$(printf '%s\n' "$new" | grep -q ' | Cloud OK:' && echo yes || echo no)"
+        return 0
+    fi
+    echo "======================================================================"
+    echo -e "\e[1;32m$(t "MARC21 RECORDS EXPORTED")\e[0m"
+    echo "======================================================================"
+    echo "$(t "File:") $pkg"
+    echo "$(t "Size:") $size"
+    echo ""
+    echo -e "\e[1;33mscp ${REAL_USER:-root}@${ip_addr}:${pkg} Downloads/\e[0m"
+    echo ""
+    pause_terminal
+}
+
+# ======================================================================
 # 5. TEST THE LATEST BACKUP
 # ======================================================================
 newest_sql_backup() {
@@ -7869,7 +7924,7 @@ cloudflare_service_install() {
 
 function_cloudflare_setup() {
     msg_info "$(t "Step 1: Domain & Nameservers")" \
-"$(t "HOW TO LINK YOUR DOMAIN TO CLOUDFLARE:\n\n1. GET A FREE DOMAIN:\n    - Digital Plat (fast/automated): https://domain.digitalplat.org/\n    - nic.eu.org (manual, takes 14 to 45 days): https://nic.eu.org\n    - Or ask local IT for an official CNAME (e.g. catalog.palotina.pr.gov.br)\n\n2. ADD TO CLOUDFLARE (dash.cloudflare.com):\n    - Click 'Add a site/domain', type your domain and select Free.\n    - Cloudflare provides TWO Nameservers. Copy both.\n\n3. UPDATE AT YOUR DOMAIN REGISTRAR:\n    - Replace existing servers with the TWO from Cloudflare.\n    - In Cloudflare, click 'Check nameservers' until status is Active.\n\nThis part can't be automated, but everything from here on is fully automatic.")" 22 78
+"$(t "HOW TO LINK YOUR DOMAIN TO CLOUDFLARE:\n\n1. GET A FREE DOMAIN:\n    - Digital Plat (fast/automated): https://domain.digitalplat.org/\n    - nic.eu.org (manual, takes 14 to 45 days): https://nic.eu.org\n    - Or ask local IT for an official CNAME (e.g. catalog.example-library)\n\n2. ADD TO CLOUDFLARE (dash.cloudflare.com):\n    - Click 'Add a site/domain', type your domain and select Free.\n    - Cloudflare provides TWO Nameservers. Copy both.\n\n3. UPDATE AT YOUR DOMAIN REGISTRAR:\n    - Replace existing servers with the TWO from Cloudflare.\n    - In Cloudflare, click 'Check nameservers' until status is Active.\n\nThis part can't be automated, but everything from here on is fully automatic.")" 22 78
 
     if tunnel_mode_is broker; then
         msg_error "" "$(t "This server uses a free address. Leave it first (Free address menu), then set up your own domain.")" 10 74
@@ -7923,7 +7978,7 @@ function_cloudflare_setup() {
     fi
 
     local dominio opac_sub staff_sub
-    dominio=$(ui_input "$(t "Your Domain")" "$(t "Enter the domain you already activated in Cloudflare (e.g. bibliotecapalotina.org):")") || return 0
+    dominio=$(ui_input "$(t "Your Domain")" "$(t "Enter the domain you already activated in Cloudflare (e.g. example-library):")") || return 0
     [ -z "$dominio" ] && return 0
 
     dominio=$(printf '%s' "$dominio" | tr 'A-Z' 'a-z' | sed -e 's|^[a-z]*://||' -e 's|/.*$||' -e 's/[[:space:]]//g')
@@ -7971,7 +8026,7 @@ EOF
 # ----------------------------------------------------------------------
 # A library without its own domain asks the Koha broker (broker/ in this
 # repository, a Cloudflare Worker) for an address such as
-# palotina-pr.<central domain>. The request is approved on the broker's
+# example-library.<central domain>. The request is approved on the broker's
 # side; the panel only ever receives the token of its own tunnel, never a
 # Cloudflare API credential. Every call after the request is signed with
 # an Ed25519 key that never leaves this server (same format as
@@ -8238,7 +8293,7 @@ broker_new_request() {
     email=$(ui_input "$(t "Free address")" "$(t "Contact e-mail of the library (preferably the institutional one):")") || return 1
     email=$(printf '%s' "$email" | tr -d '[:space:]')
     [[ "$email" =~ ^[^@]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { msg_error "" "$(t "Invalid e-mail address.")" 8 60; return 1; }
-    name=$(ui_input "$(t "Free address")" "$(t "Name wanted for the address (letters, numbers and hyphens, e.g. palotina-pr). Leave blank to use the library name:")") || return 1
+    name=$(ui_input "$(t "Free address")" "$(t "Name wanted for the address (letters, numbers and hyphens, e.g. example-library). Leave blank to use the library name:")") || return 1
     name=$(printf '%s' "$name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
     clear
@@ -14197,7 +14252,7 @@ function_messaging() {
 
 lt_msg_whatsapp() {
     local act type url inst token
-    act=$(ui_menu "WhatsApp" "$(t "WhatsApp needs a gateway of your own (for example Evolution API, which uses Baileys), installed on this or another server and connected to the WhatsApp account of the library.")" \
+    act=$(ui_menu "WhatsApp" "$(t "WhatsApp needs a gateway of your own (for example Evolution API, which uses Baileys), installed on this or another server and connected to the WhatsApp account of the library.\n\nEvolution API: https://doc.evolution-api.com/")" \
         "setup" "$(t "Set up or change")" \
         "off"   "$(t "Turn off")") || return 0
     if [ "$act" = "off" ]; then
@@ -28861,7 +28916,7 @@ staff_custom_drop() {
 # same place are set to expired (Koha would show both); OPAC_RETIRED keeps
 # what they had, for when ours goes off or the look is removed.
 # ----------------------------------------------------------------------
-OPAC_CONTENT_LOCATIONS="OpacLoginInstructions|StaffLoginInstructions|opaccredits"
+OPAC_CONTENT_LOCATIONS="OpacLoginInstructions|StaffLoginInstructions|opaccredits|news-opac|news-staff"
 
 # opac_contents_ok DIR: only the three places, each "on" one with its file,
 # and no script, style, frame, event handler or javascript: address (the
@@ -28933,6 +28988,10 @@ opac_contents_sql() {
     if [ -f "$OPAC_RETIRED" ]; then cp -f "$OPAC_RETIRED" "$OPAC_RETIRED.new"; else : > "$OPAC_RETIRED.new"; fi
     while IFS=$'\t' read -r loc state; do
         [ -n "$loc" ] || continue
+        if [[ "$loc" == news-* ]]; then
+            opac_news_sql "$dir" "$loc" "$state" "$log"
+            continue
+        fi
         printf "DELETE FROM additional_contents WHERE category = 'html_customizations' AND code = %s;\n" "$(sql_quote "kei-$loc")"
         if [ "$state" != "on" ]; then
             opac_retired_restore_sql "$loc" "$OPAC_RETIRED.new"
@@ -28955,6 +29014,31 @@ opac_contents_sql() {
         printf 'html customizations: %s written\n' "$loc" >> "$log"
     done < "$dir/contents.list"
     kei_result contents yes
+}
+
+# opac_news_sql DIR PLACE STATE LOG: the panel's own news item of one side
+# (news-opac: OPAC only, news-staff: staff interface only), code kei-PLACE.
+# Its title is on the first line of the file (<!-- kei-news-title: ... -->).
+# The library's own news are never touched.
+opac_news_sql() {
+    local dir="$1" loc="$2" state="$3" log="$4" where title f
+    case "$loc" in
+        news-opac)  where=opac_only ;;
+        news-staff) where=staff_only ;;
+        *) return 0 ;;
+    esac
+    printf "DELETE FROM additional_contents WHERE category = 'news' AND code = %s;\n" "$(sql_quote "kei-$loc")"
+    if [ "$state" != "on" ]; then
+        printf 'news: %s off\n' "$loc" >> "$log"
+        return 0
+    fi
+    f="$dir/contents/$loc.html"
+    title=$(sed -n '1s/^<!-- kei-news-title: \(.*\) -->$/\1/p' "$f")
+    printf "INSERT INTO additional_contents (category, code, location, branchcode, published_on, number) VALUES ('news', %s, %s, NULL, CURDATE(), 0);\n" \
+        "$(sql_quote "kei-$loc")" "$(sql_quote "$where")"
+    printf "INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (LAST_INSERT_ID(), %s, %s, 'default');\n" \
+        "$(sql_quote "$title")" "$(sql_quote "$(sed '1{/^<!-- kei-news-title: .* -->$/d}' "$f")")"
+    printf 'news: %s written (%s)\n' "$loc" "$where" >> "$log"
 }
 
 opac_retired_commit() {
@@ -29287,6 +29371,7 @@ _opac_theme_remove() {
         [[ "$fav" == /intranet-tmpl/kei-custom/kei-* ]] && printf "UPDATE systempreferences SET value = '' WHERE variable = 'IntranetFavicon';\n"
         if opac_contents_supported; then
             printf "DELETE FROM additional_contents WHERE category = 'html_customizations' AND code IN ('kei-OpacLoginInstructions', 'kei-StaffLoginInstructions', 'kei-opaccredits');\n"
+            printf "DELETE FROM additional_contents WHERE category = 'news' AND code IN ('kei-news-opac', 'kei-news-staff');\n"
             if [ -f "$OPAC_RETIRED" ]; then
                 cp -f "$OPAC_RETIRED" "$OPAC_RETIRED.new"
                 opac_retired_restore_sql "" "$OPAC_RETIRED.new"
@@ -30219,6 +30304,7 @@ panel_action_function() {
         backup-manual)      echo function_manual_backup ;;
         backup-cloud)       echo function_configure_rclone ;;
         backup-test)        echo function_test_backup ;;
+        backup-marc)        echo function_marc_backup ;;
         search-toggle)      echo function_toggle_search_engine ;;
         search-repair)      echo function_repair_indexing ;;
         cloudflare)         echo function_configure_cloudflare ;;
@@ -30286,6 +30372,7 @@ kei_task() {
         info)            kei_task_info ;;
         backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
         backup-test)     function_test_backup "${1:-}" ;;
+        backup-marc)     function_marc_backup ;;
         backup-compression) [ -n "${1:-}" ] || return 2; backup_set_codec "$1" ;;
         restore-check)
             [ -n "${1:-}" ] || return 2
@@ -30608,14 +30695,18 @@ while true; do
         3) function_restore_database ;;
         4)
             SUB_OPT=$(whiptail --title "$(t '💾 Backup Center')" --cancel-button "$(t 'Back')" \
-                --menu "$(t 'Choose a backup routine:')" 17 76 3 \
+                --menu "$(t 'Choose a backup routine:')" 19 76 5 \
                 "1" "$(t '💾  Generate manual backup and download to PC')" \
-                "2" "$(t '📤  Configure cloud backup (Google Drive)')" \
-                "3" "$(t '🧾  Test integrity of latest backup')" 3>&1 1>&2 2>&3) || continue
+                "2" "$(t '📚  Export MARC21 records now')" \
+                "3" "$(t '📤  Configure cloud backup (Google Drive)')" \
+                "4" "$(t '🧾  Test integrity of latest backup')" \
+                "5" "$(t '📥  Restore database')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in
                 1) function_manual_backup ;;
-                2) function_configure_rclone ;;
-                3) function_test_backup ;;
+                2) function_marc_backup ;;
+                3) function_configure_rclone ;;
+                4) function_test_backup ;;
+                5) function_restore_database ;;
             esac
             ;;
         5) lt_magic_import ;;
