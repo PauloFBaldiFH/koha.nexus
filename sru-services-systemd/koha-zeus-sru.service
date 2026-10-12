@@ -1,0 +1,21 @@
+[Unit]
+Description=Zeus SRU bridge for Koha (0.0.0.0:5002/sru -> Catálogo Zeus, UFSC)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/usr/local/lib/koha-easy-installer/sru-bridge
+Environment=ZEUS_SRU_HOST=0.0.0.0
+Environment=ZEUS_SRU_PORT=5002
+ExecStart=/usr/local/lib/koha-easy-installer/sru-bridge/.venv/bin/python -m zeus_sru
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

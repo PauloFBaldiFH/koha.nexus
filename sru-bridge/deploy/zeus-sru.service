@@ -10,8 +10,8 @@ Wants=network-online.target
 Type=simple
 User=www-data
 WorkingDirectory=/opt/koha.nexus/sru-bridge
-Environment=ZEUS_SRU_HOST=127.0.0.1
-Environment=ZEUS_SRU_PORT=5000
+Environment=ZEUS_SRU_HOST=0.0.0.0
+Environment=ZEUS_SRU_PORT=5002
 ExecStart=/opt/koha.nexus/sru-bridge/.venv/bin/python -m zeus_sru
 Restart=on-failure
 RestartSec=5
