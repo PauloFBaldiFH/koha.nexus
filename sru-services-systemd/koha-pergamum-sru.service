@@ -1,0 +1,21 @@
+[Unit]
+Description=Pergamum SRU bridge for Koha (127.0.0.1:5006/sru -> Rede Pergamum, PUCPR/CRP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/usr/local/lib/koha-easy-installer/sru-bridge
+Environment=PERGAMUM_SRU_HOST=127.0.0.1
+Environment=PERGAMUM_SRU_PORT=5006
+ExecStart=/usr/local/lib/koha-easy-installer/sru-bridge/.venv/bin/python -m pergamum_sru
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
