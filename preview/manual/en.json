@@ -919,23 +919,22 @@
    ]
   },
   "z3950-zeus": {
-   "title": "Catálogo Zeus bridge (UFSC)",
-   "summary": "A local bridge that lets Koha copy records from Catálogo Zeus of BU/UFSC as if it were an ordinary SRU server, reaching Brazilian university catalogues that block Z39.50.",
+   "title": "Catálogo Zeus through the koha.nexus gateway (UFSC)",
+   "summary": "UFSC and the other Brazilian university catalogues that Catálogo Zeus searches, reached through the koha.nexus SRU gateway as ordinary SRU servers, even though they block Z39.50.",
    "overview": [
-    "Most Brazilian university catalogues block Z39.50 (port 210), but Catálogo Zeus searches them over HTTP and includes each full record. The bridge, a small service on this server (`127.0.0.1:5000`, systemd unit `koha-zeus-sru`), turns Koha's SRU search into a Zeus search (ISBN or title) and hands the records back as MARCXML.",
-    "It is the first server of the Brazil list and comes preselected. Adding it to Koha installs and starts the bridge automatically, with the settings Koha needs: syntax MARC21, SRU 1.1 with GET, timeout 15 seconds. Results are cached for 10 minutes so paging does not search again."
+    "Most Brazilian university catalogues block Z39.50 (port 210), but Catálogo Zeus searches them over HTTP and includes each full record. The koha.nexus SRU gateway (`sru.koha.nexus`, port 443) turns Koha's SRU search into a Zeus search (ISBN or title) and hands the records back as MARCXML, so nothing is installed on this server.",
+    "Each catalogue is its own SRU database on the gateway: UFSC is `sru/ufsc`, USP `sru/usp`, and so on, under the heading **[2] Brazilian universities**. UFSC and USP come ticked. Adding them to Koha writes rows with host `https://sru.koha.nexus`, port 443, syntax MARC21 and SRU 1.1 with GET."
    ],
    "steps": [
-    "Open the Z39.50 / SRU screen (key **z**) and tick **Catálogo Zeus (UFSC bridge, SRU)**.",
-    "Press **Add to Koha**: the bridge is installed and started.",
+    "Open the Z39.50 / SRU screen (key **z**) and tick **Universidade Federal de Santa Catarina (UFSC)** under **[2] Brazilian universities**.",
+    "Press **Scan** to check it answers, then **Add to Koha**.",
     "In Koha's cataloguing, search by ISBN for the best results."
    ],
    "tips": [
-    "Search by ISBN whenever you have it: Zeus takes one search string, and the ISBN wins over the title.",
-    "If searches come back empty, check the service with `systemctl status koha-zeus-sru`."
+    "Search by ISBN whenever you have it: Zeus takes one search string, and the ISBN wins over the title."
    ],
    "warnings": [
-    "The bridge answers only while its service runs on this server, and depends on Catálogo Zeus being online."
+    "The catalogues answer only while the koha.nexus gateway and Catálogo Zeus are online."
    ],
    "related": [
     "z3950-pergamum",
@@ -944,19 +943,19 @@
    ]
   },
   "z3950-pergamum": {
-   "title": "Rede Pergamum bridge",
-   "summary": "A second local bridge, next to the Zeus one, that searches the shared catalogue of Rede Pergamum (PUCPR) and answers Koha as an SRU server with MARCXML records.",
+   "title": "Rede Pergamum through the koha.nexus gateway",
+   "summary": "The shared catalogue of Rede Pergamum (PUCPR), reached through the koha.nexus SRU gateway as an SRU server with MARCXML records.",
    "overview": [
-    "It runs on this server at `127.0.0.1:5006` as the systemd unit `koha-pergamum-sru`, with the same Koha settings as the Zeus bridge (syntax MARC21, SRU 1.1). Unlike Zeus it is not preselected: tick it when you want it.",
-    "The Pergamum bridge has not yet been tried against the live catalogue; the scan tells whether it returns records on your server."
+    "It is the gateway's database `sru/all`, listed first under **[4] Specialized and union catalogues**, with the same Koha settings as the other gateway rows (host `https://sru.koha.nexus`, port 443, syntax MARC21, SRU 1.1). It is not ticked: tick it when you want it.",
+    "The scan tells whether it returns records from your server."
    ],
    "steps": [
-    "Open the Z39.50 / SRU screen (key **z**) and tick **Catálogo Rede Pergamum (CRP bridge, SRU)**.",
+    "Open the Z39.50 / SRU screen (key **z**) and tick **Rede Pergamum** under **[4] Specialized and union catalogues**.",
     "Press **Scan** to check it returns records, then **Add to Koha**.",
     "Search it from Koha's cataloguing."
    ],
    "tips": [
-    "Use it together with the Zeus bridge: the two catalogues cover different libraries."
+    "Use it together with the Brazilian universities: the catalogues cover different libraries."
    ],
    "related": [
     "z3950-zeus",

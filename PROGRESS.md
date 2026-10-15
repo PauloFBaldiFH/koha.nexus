@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.58** (1.5.59: dropped backups and Open Debian terminal PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.59** (1.5.60: dropped backups and Open Debian terminal PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.59 (SRU gateway: 72 catalogues in four groups at sru.koha.nexus)**: Paulo's list of 2026-10-15.
+  `sru-bridge/sru_gateway/targets.json` has 72 ids in his order, each with a `group` (`national`,
+  `br_universities`, `intl_universities`, `specialized`; `targets.GROUPS` has his Portuguese names);
+  21 old ids renamed (uw_madison→wisconsin, pergamum→all, ...: `koha_sql.RENAMED`), umich, manchester
+  and kcl dropped (not in his list), new ids without a known address are kind `missing`.
+  `python -m sru_gateway.koha_sql --write` generates `deploy/koha-z3950servers.sql` (Koha's rows:
+  https://sru.koha.nexus, 443, sru/<id>, MARC21, utf8; moves rows from 137.131.205.31/10.0.0.60,
+  follows renames, removes retired ids, keeps checked/rank, re-runnable) and the panel's curated list
+  (`panel/kei_panel/data/z3950_targets.json`, now only gateway rows). Panel Z39.50 screen: the four
+  groups as `[1]`..`[4]` headings (`z3950.REGIONS`, translated in pt/es/fr/it/de). `z3950-add` writes
+  `https://` before the host of an SRU row on port 443 (Koha speaks HTTPS only then). Syntax stays
+  MARC21 and encoding utf8 although Paulo wrote USMARC/utf-8 (PR #62: USMARC shows no record).
 - **1.5.58 (Paulo's four Windows fixes)**: (1) the panel's bottom bar shows Dashboard and **Open the
   terminal** (key `c`, also a General tools card `terminal` in `PANEL_ONLY`: `runuser -l <real_user>`
   in the same window via `bridge.run_command_interactive`, "Type exit..." printed first); `b` still
@@ -352,7 +364,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   WSL uses explorer.exe (absolute path; wslview only without it), started in C:\Windows after
   `opener._interop_ready()` re-registers a lost WSLInterop binfmt handler (systemd), and the address
   is copied too. Not tried on a real PC.
-- **1.5.59 (Paulo: dropped backups, Open Debian terminal)**: a file dropped on the panel's main
+- **1.5.60 (Paulo: dropped backups, Open Debian terminal)**: a file dropped on the panel's main
   screen did nothing: Windows Terminal pastes the path, and only PathPickerScreen read pastes.
   `MainScreen.on_paste` sends anything `transfer.looks_like_path` accepts to `app.drop_file`: a backup
   (.sql, .sql.gz, .sql.xz, .sql.zst, .sql.bz2) opens `backup.restore(app, file=path)`; another file,

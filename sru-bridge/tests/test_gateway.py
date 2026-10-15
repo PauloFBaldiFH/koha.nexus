@@ -19,10 +19,17 @@ from zeus_sru.cql import parse
 NS = {"zs": "http://www.loc.gov/zing/srw/", "marc": "http://www.loc.gov/MARC21/slim",
       "diag": "http://www.loc.gov/zing/srw/diagnostic/"}
 TARGETS_JSON = Path(__file__).resolve().parents[1] / "sru_gateway" / "targets.json"
-IDS = ("bn ufsc unicamp usp uerj ufg ufmg ufpe ufscar ufu ufrgs uff senado nlm harvard uw_madison mit psu "
-       "upenn tufts fsu ubc trent sfu utoronto bl oxford bne bcl bizkaia aladi sbn_it abes_fr swb_de "
-       "uhamburg bn_polonia slsp nkc rsl bashkir bna biblored pucp upc_peru christchurch juac_julac "
-       "monash_sa pergamum loc yale umich manchester kcl").split()
+# Paulo's list of 2026-10-15, in his order and under his four headings.
+GROUPS = {
+    "national": "bn fundacentro senado senado-folio bn-portugal porbase bne bl loc argentina colombia polonia "
+                "suica suecia tchequia grecia russia-state bashkir-russia africa-do-sul taiwan nysl",
+    "br_universities": "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs uff utfpr",
+    "intl_universities": "harvard yale mit wisconsin pennstate upenn tufts fsu suno ubc toronto sfu trent memorial "
+                         "oxford coimbra porto barcelona gent-belgica tuhh-alemanha macau buap-mexico pucp-peru upc-peru",
+    "specialized": "all nlm art-chicago nga castilla-leon bizkaia italia abes-franca kobv-alemanha swb-alemanha "
+                   "christchurch hong-kong",
+}
+IDS = [i for ids in GROUPS.values() for i in ids.split()]
 
 
 def marc_record(title: str, isbn: str = "9788535902778") -> bytes:
@@ -51,19 +58,21 @@ def diag(root):
 
 # --- targets.json -------------------------------------------------------
 
-def test_targets_json_has_the_53_ids_in_order():
+def test_targets_json_has_the_72_ids_in_order():
     data = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))
     assert [t["id"] for t in data["targets"]] == IDS
     table = tg.load(TARGETS_JSON)
-    assert len(table) == 53
+    assert len(table) == 72
+    assert {g: " ".join(t.id for t in table.values() if t.group == g) for g in tg.GROUPS} == GROUPS
     kinds = {t.id: t.kind for t in table.values()}
-    assert kinds["ufsc"] == "zeus" and kinds["pergamum"] == "pergamum"
-    assert {k for k, v in kinds.items() if v == "z3950"} == {"nlm", "bl", "sbn_it", "swb_de", "loc"}
+    assert kinds["ufsc"] == "zeus" and kinds["all"] == "pergamum"
+    assert {k for k, v in kinds.items() if v == "z3950"} == {"nlm", "bl", "loc", "italia", "swb-alemanha",
+                                                                  "utfpr", "unifesp", "suecia"}
     assert not any({"user", "password"} & set(t) for t in data["targets"])
     # Every entry says what is known about it (the old STATUS_ALVOS.md).
     assert all("status" in t for t in data["targets"])
     status = {t.id: t.status for t in table.values()}
-    assert status["bl"] == status["nlm"] == "broken" and status["sbn_it"] == "untested"
+    assert status["bl"] == status["nlm"] == "broken" and status["italia"] == "untested"
     assert {i for i, s in status.items() if s == "missing"} == {i for i, k in kinds.items() if k == "missing"}
 
 
@@ -127,7 +136,7 @@ def test_explain_and_health():
         r = client.get("/sru/bn")
         assert b"explainResponse" in r.content
         h = client.get("/health").json()
-    assert h["targets"] == 53 and "ufsc" in h["configured"] and "bne" in h["missing"]
+    assert h["targets"] == 72 and "ufsc" in h["configured"] and "bne" in h["missing"]
 
 
 def test_ufsc_goes_to_zeus(marcxml_page):
@@ -297,3 +306,17 @@ def test_readme_table_matches_targets_json():
     text = status_table.README.read_text(encoding="utf-8")
     assert status_table.readme_block(text) == status_table.block(tg.load(TARGETS_JSON)), \
         "README.md is behind targets.json: run python -m sru_gateway.status_table --write"
+
+
+def test_koha_sql_and_panel_list_match_targets_json():
+    from sru_gateway import koha_sql
+    table = tg.load(TARGETS_JSON)
+    assert koha_sql.OUT.read_text(encoding="utf-8") == koha_sql.render(table), \
+        "deploy/koha-z3950servers.sql is behind targets.json: run python -m sru_gateway.koha_sql --write"
+    panel = json.loads(koha_sql.PANEL_LIST.read_text(encoding="utf-8"))
+    updated = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))["updated"]
+    assert koha_sql.PANEL_LIST.read_text(encoding="utf-8") == koha_sql.panel_list(table, updated)
+    assert [r["db"] for r in panel["targets"]] == [f"sru/{i}" for i in IDS]
+    assert {(r["host"], r["port"], r["syntax"]) for r in panel["targets"]} == {("sru.koha.nexus", 443, "MARC21")}
+    # Renames only point at ids that exist, and never from one that still does.
+    assert set(koha_sql.RENAMED.values()) <= set(table) and not set(koha_sql.RENAMED) & set(table)
