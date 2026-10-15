@@ -1,7 +1,9 @@
 """Backup center and restore, as panel screens.
 
-  manual_backup  folder picker -> backup under Pac-Man -> file, size and the
-                 scp command to copy it to a PC
+  manual_backup  folder picker (under WSL it opens on the Windows Downloads
+                 folder) -> backup under Pac-Man -> a backup saved on the
+                 Windows disk is shown selected in Explorer; else file,
+                 size and the scp command to copy it to a PC
   marc_backup    the weekly MARC21 export (bibliographic + authority
                  records, koha_marc_<date>.tar.gz) run now -> file, size,
                  the scp command and, on WSL or a Linux desktop, a button
@@ -16,7 +18,8 @@
   download_latest
                  the newest backup copied to the Downloads folder of this
                  PC (WSL: Windows; a Linux desktop), with size, speed and
-                 time left; over SSH, the scp command instead
+                 time left, then shown selected in Explorer (WSL) or its
+                 folder opened (desktop); over SSH, the scp command instead
   cloud_backup   Google Drive with a token from another PC, or authorized on
                  this server (both untouched); or another service step by
                  step (cloud_provider): OneDrive with a sign-in link to copy
@@ -28,12 +31,14 @@ Texts are the installer's own (same translations as the classic panel).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
 
 from .. import cloud, transfer
 from ..i18n import t
+from ..opener import reveal_file
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..screens.files import PathPickerScreen
 from ..screens.loading import LoadingScreen
@@ -46,13 +51,30 @@ DOWNLOAD_FILE = "📥 Download to computer"
 RESTORE_STEPS = 10   # tui_run steps of function_restore_database
 
 
-def _places(info) -> list[tuple[str, str]]:
-    return [
+def _places(info, downloads: Path | None = None) -> list[tuple[str, str]]:
+    places = [
         (t("Home"), info.get("real_home", "/root")),
         (t("Backups"), info.get("dir_sql", "/var/backups/koha_sql")),
         ("/media", "/media"),
         ("/mnt", "/mnt"),
     ]
+    if downloads is not None:
+        places.insert(0, (t("Downloads (Windows)"), str(downloads)))
+    return places
+
+
+async def _windows_downloads(app) -> Path | None:
+    """The Windows Downloads folder under WSL (None elsewhere, or in the demo)."""
+    if app.env.demo or transfer.where() != "wsl":
+        return None
+    return await asyncio.to_thread(transfer.downloads_folder, "wsl")
+
+
+def _reveal(app, path: str) -> None:
+    """The file shown selected in Windows Explorer (or its folder on a
+    desktop), so nobody has to type a Linux path to find it."""
+    if not app.env.demo and reveal_file(path):
+        app.notify(tx("Shown in the file manager: ${file}", file=Path(path).name), timeout=6)
 
 
 # ----------------------------------------------------------------------
@@ -61,8 +83,10 @@ def _places(info) -> list[tuple[str, str]]:
 async def manual_backup(app) -> None:
     info = await facts(app)
     srv_ip = info.get("server_ip")
+    downloads = await _windows_downloads(app)
+    start = str(downloads) if downloads is not None else info.get("real_home", "/root")
     folder = await app.push_screen_wait(PathPickerScreen(
-        t("Backup Destination"), info.get("real_home", "/root"), mode="dir", shortcuts=_places(info),
+        t("Backup Destination"), start, mode="dir", shortcuts=_places(info, downloads),
         help_text=tx("Choose where to save the file.\n\n  USB drive: usually under /media or /mnt\n  "
                      "To download later: scp root@${srv_ip}:PATH Downloads/", srv_ip=srv_ip)))
     if folder is None:
@@ -73,6 +97,13 @@ async def manual_backup(app) -> None:
         await show_failure(app, title, result)
         return
     out = result.value
+    if transfer.on_windows_disk(out.get("file") or ""):
+        # Saved on the Windows disk: Explorer shows it, nothing to copy.
+        _reveal(app, out.get("file"))
+        await app.push_screen_wait(MessageScreen(
+            t("BACKUP GENERATED AND VERIFIED SUCCESSFULLY!"), "",
+            details=[(t("File:"), out.get("file")), (t("Size:"), out.get("size"))]))
+        return
     user = out.get("user", "root")
     steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
     after = "\n".join([
@@ -314,6 +345,7 @@ async def download_file(app, src: Path, title: str, info: dict | None = None) ->
             command_help=t("Open Terminal or PowerShell on your personal computer and paste the exact command:")))
         return
     app.notify(tx("Backup saved in your Downloads folder: ${file}", file=saved.name), timeout=8)
+    _reveal(app, str(saved))
     await app.push_screen_wait(MessageScreen(title, "", details=[
         (t("File:"), saved.name), (t("Size:"), transfer.human_size(saved.stat().st_size)),
         (t("Folder"), str(saved.parent))]))

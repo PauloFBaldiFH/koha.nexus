@@ -8,13 +8,11 @@ on:
     paths:
       - "nexus_core/**"
       - "installer"
-      - "panel/kei_panel/menus.py"
       - ".github/workflows/nexus-core.yml"
   pull_request:
     paths:
       - "nexus_core/**"
       - "installer"
-      - "panel/kei_panel/menus.py"
       - ".github/workflows/nexus-core.yml"
 
 permissions:

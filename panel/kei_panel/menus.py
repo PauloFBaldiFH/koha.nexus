@@ -155,6 +155,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
     ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
+        Entry("📂  Open user folder", "user-folder", kind="native"),
         Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
         Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
     )),
@@ -186,7 +187,7 @@ def section(section_id: str) -> Section:
 
 
 # Panel routines with no installer routine of their own (routines/).
-PANEL_ONLY = frozenset({"backup-download"})
+PANEL_ONLY = frozenset({"backup-download", "user-folder"})
 
 
 def all_actions() -> set[str]:
@@ -248,6 +249,7 @@ DESCRIPTIONS: dict[str, str] = {
     "cutter": "Finds the Cutter number of an author",
     "monitor": "Watches CPU, memory and network live",
     "mc": "Browses the server's files in Midnight Commander",
+    "user-folder": "Opens your home folder in Windows Explorer or the file manager",
     "crons": "Turns Koha's scheduled jobs on or off",
     "languages": "Downloads a language and makes it the OPAC, staff and panel one",
     "lang-download": "Downloads a Koha language pack and changes nothing else",

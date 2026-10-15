@@ -1,7 +1,6 @@
 """nexus_core: koha.nexus logic shared by every platform.
 
-What a desktop client (the Windows tray and window today, others later)
-needs to know about Koha, written once and tested on Linux:
+What a desktop client (a future Python tray on any platform) needs to know about Koha, written once and tested on Linux:
 
   * status.py   reads `config.sh --status-json` (schema 1), the one JSON
                 object the Linux side already prints for the Windows tray,
@@ -16,21 +15,16 @@ needs to know about Koha, written once and tested on Linux:
   * health.py   the component rows and the one-line summary of the status
                 window (Get-KohaHealthSummary);
   * langcache.py  reads lang/*.cache so a client speaks the installer's
-                language;
-  * taskproto.py  reads the @@ lines of `installer --task NAME` (the
-                protocol panel/kei_panel/bridge.py also reads) and writes
-                the reply lines;
-  * menucatalog.py  turns panel/kei_panel/menus.py into sidebar data.
+                language.
 
 Ported from windows/KohaEasy.Core.psm1 (Get-KohaLinuxStatus,
 Resolve-KohaState, Get-KohaBootGraceUntil, Get-KohaStateText,
-Get-KohaNotifications, Format-KohaSize), which stay the reference until the
-Python tray replaces the PowerShell one.
+Get-KohaNotifications, Format-KohaSize), which stay the reference: the
+PowerShell tray is what Windows runs.
 
 Standard library only, Python 3.9+, and no platform imports (winreg,
 ctypes.windll, pywin32, Textual): the same files run on Debian, Ubuntu and
-Windows. The panel and the Linux install never import it; only the
-Windows Python client (windows/client) does.
+Windows. The panel and the Linux install never import it.
 """
 
-__all__ = ["alerts", "health", "langcache", "menucatalog", "monitor", "ports", "state", "status", "taskproto"]
+__all__ = ["alerts", "health", "langcache", "monitor", "ports", "state", "status"]

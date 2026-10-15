@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.55** (1.5.56: panel clean-ups PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.56** (1.5.57: Windows terminal panel and tray PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,24 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
+  pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
+  `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes
+  `bin\client`, `bin\python`, `bin\nexus_core` and `downloads\python` of test builds (nexus_core stays,
+  unused). The Textual panel is the only interface. It opens in Windows Terminal with a "Koha Nexus"
+  profile (a fragment in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\KohaEasy\koha-nexus.json`, removed by the uninstaller: title,
+  padding, Cascadia Mono, icon), else `cmd.exe /c` with chcp 65001. `koha-window` (version line
+  `# koha-window 2`, rewritten when older) cleans up also when the window is closed: a watcher waits
+  on the WSL parent (`tail --pid`), then stops tty holders and the window's session; setsid jobs keep
+  running. Tray: dot green running / yellow starting / red otherwise, check every 30 s, menu Open
+  Dashboard (panel, also double-click) / Open User Folder (`KohaEasy.ps1 UserFolder`, wslpath -w of the
+  default user's ~) / Restart Services / More options (the old items) / Exit. Toasts at the end of long
+  panel jobs: `kei_event` writes `$STOP_GUARD_STATE_DIR/events.log`, `--status-json` has `events`
+  (last 10), Get-KohaNotifications shows each new one once (`lastEventId`). Panel: card "Open user
+  folder" (General tools, `opener.folder_command`); manual backup starts on the Windows Downloads
+  folder under WSL and a backup on the Windows disk or a download is shown selected in Explorer
+  (`opener.reveal_command`, `explorer.exe /select,`). New CI `windows-tools.yml`: PowerShell 5.1
+  checks (`tests/windows_checks.ps1`) and `tests/koha_window_test.sh`. Not tried on a real PC.
 - **1.5.56 (panel clean-ups from Paulo)**: Backup center has no button row any more: its cards are
   the only actions (Download latest backup is now a card, `backup-download` in `menus.PANEL_ONLY`, so it
   is not an installer action); the codec box is "Backup compression type"; the cloud card is

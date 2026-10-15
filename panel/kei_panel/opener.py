@@ -80,3 +80,73 @@ def open_folder(path: str) -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return True
+
+
+def _windows_path(path: str) -> str:
+    """path as Windows sees it (C:\\... or \\\\wsl.localhost\\...), "" when wslpath fails."""
+    if not shutil.which("wslpath"):
+        return ""
+    try:
+        return subprocess.run(["wslpath", "-w", path], capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _start(argv: list[str]) -> bool:
+    try:
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        return False
+    return True
+
+
+def folder_command(path: str, wsl: bool | None = None, ssh: bool | None = None, which=shutil.which,
+                   environ: dict[str, str] | None = None, winpath=_windows_path) -> list[str] | None:
+    """The command that shows the folder path to the person: under WSL
+    explorer.exe "$(wslpath -w PATH)"; on a Linux desktop xdg-open PATH (as
+    the person who ran sudo); None over SSH or on a server with no screen."""
+    environ = os.environ if environ is None else environ
+    wsl = _is_wsl() if wsl is None else wsl
+    ssh = over_ssh() if ssh is None else ssh
+    if ssh:
+        return None
+    if wsl:
+        explorer = which("explorer.exe") or (str(_EXPLORER) if _EXPLORER.exists() else None)
+        win = winpath(path) if explorer else ""
+        return [explorer, win] if explorer and win else None
+    if not (environ.get("DISPLAY") or environ.get("WAYLAND_DISPLAY")) or not which("xdg-open"):
+        return None
+    user = environ.get("SUDO_USER")
+    if os.geteuid() == 0 and user and user != "root" and which("runuser"):
+        return ["runuser", "-u", user, "--", "xdg-open", path]
+    return ["xdg-open", path]
+
+
+def reveal_command(path: str, wsl: bool | None = None, ssh: bool | None = None, which=shutil.which,
+                   environ: dict[str, str] | None = None, winpath=_windows_path) -> list[str] | None:
+    """The command that shows a file selected in its folder: under WSL
+    explorer.exe /select,"C:\\..." ; on a Linux desktop the folder that
+    holds it (xdg-open cannot select); None where nothing can be shown."""
+    wsl = _is_wsl() if wsl is None else wsl
+    if wsl and not (over_ssh() if ssh is None else ssh):
+        explorer = which("explorer.exe") or (str(_EXPLORER) if _EXPLORER.exists() else None)
+        win = winpath(path) if explorer else ""
+        # "/select," and the path as two words: Explorer reads them so, and a
+        # path with spaces gets its quotes from WSL.
+        return [explorer, "/select,", win] if explorer and win else None
+    return folder_command(str(Path(path).parent), wsl=wsl, ssh=ssh, which=which, environ=environ, winpath=winpath)
+
+
+def open_user_folder(path: str) -> bool:
+    """The user's home folder in Windows Explorer (WSL) or the desktop's
+    file manager. False when it cannot be shown here (SSH, no screen)."""
+    argv = folder_command(path)
+    return bool(argv) and _start(argv)
+
+
+def reveal_file(path: str) -> bool:
+    """A file shown selected in Windows Explorer (WSL), or its folder on a
+    Linux desktop. False when nothing can show it here."""
+    argv = reveal_command(path)
+    return bool(argv) and _start(argv)

@@ -1,4 +1,4 @@
-# koha.nexus for Windows - bootstrapper.
+﻿# koha.nexus for Windows - bootstrapper.
 #
 #   How to install Koha on Windows: this line, in PowerShell opened as
 #   Administrator from your own (administrator) Windows account:
@@ -75,17 +75,16 @@ function Install-KohaEasyBootstrap {
     if ($expected -ne $actual) { throw 'The installer file is damaged (SHA-256 does not match installer.sha256). Download it again.' }
 
     New-Item -ItemType Directory -Path (Join-Path $bin 'lang') -Force | Out-Null
-    # The Python tray and window (bin\client) and their shared code
-    # (bin\nexus_core) are replaced whole, so no file from an older
-    # version is left behind.
-    foreach ($old in 'client', 'nexus_core') {
+    # The Python tray and window of 1.5.x test builds (bin\client, its
+    # bin\python runtime and bin\nexus_core) were dropped: removed, with
+    # their download cache, so nothing of them is left on this PC.
+    foreach ($old in 'client', 'nexus_core', 'python') {
         $oldBin = Join-Path $bin $old
-        if (Test-Path -LiteralPath $oldBin) { Remove-Item -LiteralPath $oldBin -Recurse -Force }
+        if (Test-Path -LiteralPath $oldBin) { Remove-Item -LiteralPath $oldBin -Recurse -Force -ErrorAction SilentlyContinue }
     }
+    $oldCache = Join-Path $root 'downloads\python'
+    if (Test-Path -LiteralPath $oldCache) { Remove-Item -LiteralPath $oldCache -Recurse -Force -ErrorAction SilentlyContinue }
     Copy-Item -Path (Join-Path $src 'windows\*') -Destination $bin -Recurse -Force
-    if (Test-Path -LiteralPath (Join-Path $src 'nexus_core')) {
-        Copy-Item -LiteralPath (Join-Path $src 'nexus_core') -Destination $bin -Recurse -Force
-    }
     Copy-Item -LiteralPath (Join-Path $src 'installer'), (Join-Path $src 'installer.sha256') -Destination $bin -Force
     Copy-Item -Path (Join-Path $src 'lang\*.cache') -Destination (Join-Path $bin 'lang') -Force
     # The new panel (Python/Textual); KohaEasy.Install copies it into Debian.

@@ -2,18 +2,22 @@
 # Started at sign-in (HKCU Run, KohaEasy.ps1 Tray) whatever the automatic
 # start mode, so a stopped Koha still has its Start button. It never starts
 # the distro by itself: the status is read only while Koha is already running.
-#   * icon colour: green running, yellow starting, red not responding, grey stopped
-#   * menu: Service status (the Koha window), staff interface, catalog,
-#     Start, Stop, Restart Koha services, Rebuild search index, diagnostics
-#     (.txt and .zip), disk space, backups folder, control panel, automatic
-#     start, Shut down the PC safely (Koha stopped step by step, then
-#     Windows), and a Close that asks whether Koha keeps running
+#   * icon dot: green while Koha's services run, red when they do not
+#     (stopped or not responding), yellow while Koha starts
+#   * menu: the four quick actions first (Open Dashboard: the control
+#     panel in Windows Terminal; Open User Folder: the Debian user's home in
+#     Explorer; Restart Services; Exit, which asks whether Koha keeps
+#     running), the rest under More options: the Koha window, staff
+#     interface, catalog, Start, Stop, Rebuild search index, Shut down the
+#     PC safely, diagnostics (.txt and .zip), disk space, backups folder,
+#     automatic start and the backup notification
 #   * shown next to the clock the first time on Windows 11 (which hides new
 #     icons behind ^), with a one-time tip where it is
 #   * brought back by the keep-alive task within a minute if it crashed or
 #     was ended; after its own Close, only at the next sign-in
 #   * notifications: service events, nightly backups, disk space, the
-#     repair after an unclean stop
+#     repair after an unclean stop, and the end (or failure) of long tasks
+#     run in the control panel: backups, restores, reindexing
 #   * Windows shutdown, restart or sign-out while Koha runs: Koha is stopped
 #     cleanly first, with "Koha is saving..." on Windows' shutdown screen
 # Checks run in a background runspace so the menu never freezes.
@@ -29,7 +33,7 @@ Set-KohaState @{ trayClosed = $false } | Out-Null
 $cfg = Get-KohaConfig
 $here = $PSScriptRoot
 $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$STATUS_EVERY_S = 60
+$STATUS_EVERY_S = 30
 $DISK_EVERY_S = 1800
 
 # The Koha icon (koha.ico) with a status dot in the lower right corner, at
@@ -73,8 +77,8 @@ $icons = @{
     running         = New-DotIcon ([System.Drawing.Color]::FromArgb(46, 160, 67))
     starting        = New-DotIcon ([System.Drawing.Color]::FromArgb(230, 170, 20))
     not_responding  = New-DotIcon ([System.Drawing.Color]::FromArgb(210, 50, 45))
-    stopped         = New-DotIcon ([System.Drawing.Color]::FromArgb(140, 140, 140))
-    stopped_by_user = New-DotIcon ([System.Drawing.Color]::FromArgb(140, 140, 140))
+    stopped         = New-DotIcon ([System.Drawing.Color]::FromArgb(210, 50, 45))
+    stopped_by_user = New-DotIcon ([System.Drawing.Color]::FromArgb(210, 50, 45))
     not_installed   = New-DotIcon ([System.Drawing.Color]::FromArgb(140, 140, 140))
 }
 
@@ -185,57 +189,66 @@ function Invoke-KohaCommand {
 }
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
+# -To: the More options submenu instead of the menu itself.
 function Add-Item {
-    param([string]$Text, [scriptblock]$OnClick)
+    param([string]$Text, [scriptblock]$OnClick, $To = $null)
     $item = New-Object System.Windows.Forms.ToolStripMenuItem $Text
     if ($OnClick) { $item.add_Click($OnClick) }
-    [void]$menu.Items.Add($item)
+    if ($To) { [void]$To.DropDownItems.Add($item) } else { [void]$menu.Items.Add($item) }
     return $item
 }
-function Add-Separator { [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) }
+function Add-Separator {
+    param($To = $null)
+    $sep = New-Object System.Windows.Forms.ToolStripSeparator
+    if ($To) { [void]$To.DropDownItems.Add($sep) } else { [void]$menu.Items.Add($sep) }
+}
 
 $header = Add-Item (Get-KohaStateText 'stopped') $null
 $header.Enabled = $false
 Add-Separator
-$miWindow = Add-Item (T 'Service status') { Invoke-KohaCommand 'Window' }
-$miWindow.Font = New-Object System.Drawing.Font($miWindow.Font, [System.Drawing.FontStyle]::Bold)
-$miStaff = Add-Item (T 'Open the staff interface') { Start-Process $cfg.StaffUrl }
-$miOpac = Add-Item (T 'Open the public catalog') { Start-Process $cfg.OpacUrl }
+# The quick actions. Open Dashboard is also the double-click.
+$miPanel = Add-Item (T 'Open Dashboard') { Invoke-KohaCommand 'Panel'; Request-Check 5 }
+$miPanel.Font = New-Object System.Drawing.Font($miPanel.Font, [System.Drawing.FontStyle]::Bold)
+Add-Item (T 'Open User Folder') { Invoke-KohaCommand 'UserFolder' } | Out-Null
+$miRestart = Add-Item (T 'Restart Services') { Invoke-KohaCommand 'RestartServices'; Request-Check 20 }
 Add-Separator
-$miStart = Add-Item (T 'Start Koha') { Invoke-KohaCommand 'Start'; Request-Check 5 }
-$miStop = Add-Item (T 'Stop Koha') { Invoke-KohaCommand 'Stop'; Request-Check 5 }
-$miRestart = Add-Item (T 'Restart Koha services') { Invoke-KohaCommand 'RestartServices'; Request-Check 20 }
+$more = Add-Item (T 'More options') $null
+$miWindow = Add-Item (T 'Service status') { Invoke-KohaCommand 'Window' } $more
+$miStaff = Add-Item (T 'Open the staff interface') { Start-Process $cfg.StaffUrl } $more
+$miOpac = Add-Item (T 'Open the public catalog') { Start-Process $cfg.OpacUrl } $more
+Add-Separator $more
+$miStart = Add-Item (T 'Start Koha') { Invoke-KohaCommand 'Start'; Request-Check 5 } $more
+$miStop = Add-Item (T 'Stop Koha') { Invoke-KohaCommand 'Stop'; Request-Check 5 } $more
 $miReindex = Add-Item (T 'Rebuild search index') {
     $q = (T 'Rebuild the search index from scratch?') + "`n`n" + (T 'Searches in the catalog may be incomplete until it finishes. On large catalogs this takes several minutes.')
     if ([string][System.Windows.Forms.MessageBox]::Show($q, (Get-KohaAppTitle), 'YesNo', 'Question') -eq 'Yes') { Invoke-KohaCommand 'RebuildIndex' }
-}
-Add-Separator
-$miPowerOff = Add-Item (T 'Shut down the PC safely') { Invoke-KohaCommand 'SafeShutdown'; Request-Check 5 }
-Add-Separator
-Add-Item (T 'Export diagnostics (.txt)') { Invoke-KohaCommand 'ExportReport' } | Out-Null
-Add-Item (T 'Export diagnostics (.zip)') { Invoke-KohaCommand 'ExportDiagnostics' } | Out-Null
-Add-Item (T 'Check disk space') { Invoke-KohaCommand 'CheckDisk' } | Out-Null
+} $more
+Add-Separator $more
+$miPowerOff = Add-Item (T 'Shut down the PC safely') { Invoke-KohaCommand 'SafeShutdown'; Request-Check 5 } $more
+Add-Separator $more
+Add-Item (T 'Export diagnostics (.txt)') { Invoke-KohaCommand 'ExportReport' } $more | Out-Null
+Add-Item (T 'Export diagnostics (.zip)') { Invoke-KohaCommand 'ExportDiagnostics' } $more | Out-Null
+Add-Item (T 'Check disk space') { Invoke-KohaCommand 'CheckDisk' } $more | Out-Null
 Add-Item (T 'Open the backups folder') {
     $b = Get-KohaPath Backups
     if (-not (Test-Path -LiteralPath $b)) { New-Item -ItemType Directory -Path $b -Force | Out-Null }
     Start-Process explorer.exe -ArgumentList ('"{0}"' -f $b)
-} | Out-Null
-Add-Item (T 'Open the control panel') { Invoke-KohaCommand 'Panel'; Request-Check 5 } | Out-Null
-Add-Separator
+} $more | Out-Null
+Add-Separator $more
 $miAuto = Add-Item (T 'Start Koha when I sign in to Windows') {
     $mode = 'logon'
     if ((Get-KohaState).autostart -eq 'logon') { $mode = 'manual' }
     Invoke-KohaCommand ('SetAutostart -Mode ' + $mode)
     $miAuto.Checked = ($mode -eq 'logon')
-}
+} $more
 $miBackupOk = Add-Item (T 'Notify me when the nightly backup succeeds') {
     $on = -not [bool](Get-KohaState).notifyBackupOk
     Set-KohaState @{ notifyBackupOk = $on } | Out-Null
     $miBackupOk.Checked = $on
-}
+} $more
 Add-Separator
-# Closing the icon never stops Koha by surprise: the librarian chooses.
-Add-Item (T 'Close this icon') {
+# Exit never stops Koha by surprise: the librarian chooses.
+Add-Item (T 'Exit') {
     $choice = Show-KohaChoice -Text (T 'Close the Koha icon? Koha can keep running in the background, so the catalog and the nightly backup keep working.') -Choices ([ordered]@{
             keep   = (T 'Keep Koha running')
             stop   = (T 'Stop Koha too')
@@ -249,7 +262,7 @@ Add-Item (T 'Close this icon') {
     [System.Windows.Forms.Application]::Exit()
 } | Out-Null
 $tray.ContextMenuStrip = $menu
-$tray.add_DoubleClick({ Invoke-KohaCommand 'Window' })
+$tray.add_DoubleClick({ Invoke-KohaCommand 'Panel'; Request-Check 5 })
 
 # ----------------------------------------------------------------------
 # Background checks

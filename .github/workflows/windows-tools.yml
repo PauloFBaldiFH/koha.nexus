@@ -1,0 +1,43 @@
+# windows/: the PowerShell tray and tools of koha.nexus for Windows.
+# - powershell: on a Windows runner, Windows PowerShell 5.1 parses every
+#   script and checks the pure functions behind the tray (the control panel
+#   launch in Windows Terminal or cmd, the Koha Nexus terminal profile, the
+#   notifications at the end of long panel jobs);
+# - koha-window: the script every Koha window runs inside Debian, checked
+#   on Linux with a pseudo-terminal: nothing is left running behind a
+#   closed window, and jobs started on purpose in the background survive.
+name: windows-tools
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - "lang/pt.cache"
+      - "tests/windows_checks.ps1"
+      - "tests/koha_window_test.sh"
+      - ".github/workflows/windows-tools.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "lang/pt.cache"
+      - "tests/windows_checks.ps1"
+      - "tests/koha_window_test.sh"
+      - ".github/workflows/windows-tools.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows PowerShell 5.1 checks
+        shell: powershell
+        run: .\tests\windows_checks.ps1
+
+  koha-window:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tests/koha_window_test.sh

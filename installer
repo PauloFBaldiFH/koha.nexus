@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.56"
+PANEL_VERSION=" 1.5.57"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9504,6 +9504,57 @@ kei_access_json() {
     printf '"tunnel_mode":%s,"public_opac":%s,"public_staff":%s,"public_ip":%s},' "$(json_str "$mode")" "$(json_str "$opac")" "$(json_str "$staff")" "$(json_str "$pub")"
 }
 
+# The end of a long job (a backup, a restore, a reindex), for the Windows
+# tray's notifications: one line per job in $KEI_EVENTS,
+# "id<TAB>level<TAB>kind" (id: epoch in milliseconds, level ok|failed),
+# the newest 50 kept. --status-json hands the last ones to Windows, which
+# shows each new one once.
+KEI_EVENTS="${KEI_EVENTS:-${STOP_GUARD_STATE_DIR}/events.log}"
+kei_event() {
+    local level="$1" kind="$2" tmp
+    case "$level" in ok|failed) ;; *) return 0 ;; esac
+    [[ "$kind" =~ ^[a-z][a-z0-9_]*$ ]] || return 0
+    mkdir -p "$(dirname "$KEI_EVENTS")" 2>/dev/null || return 0
+    printf '%s\t%s\t%s\n' "$(date +%s%3N)" "$level" "$kind" >> "$KEI_EVENTS" 2>/dev/null || return 0
+    if [ "$(wc -l < "$KEI_EVENTS" 2>/dev/null)" -gt 50 ] && tmp=$(mktemp "${KEI_EVENTS}.XXXXXX" 2>/dev/null); then
+        tail -n 50 "$KEI_EVENTS" > "$tmp" 2>/dev/null && mv -f "$tmp" "$KEI_EVENTS" || rm -f "$tmp"
+    fi
+    return 0
+}
+
+# kei_task_event RC TASK [ARG...]: the event of a panel task that takes long.
+kei_task_event() {
+    local rc="$1" name="${2:-}" kind="" level=failed
+    case "$name" in
+        backup-manual) kind=backup_manual ;;
+        backup-marc) kind=backup_marc ;;
+        backup-test) kind=backup_test ;;
+        restore) kind=restore ;;
+        db-maintenance) kind=db_maintenance ;;
+        search-repair) kind=reindex ;;
+        *) return 0 ;;
+    esac
+    # 2: the task was called wrong (an argument missing), no job ran.
+    [ "$rc" -eq 2 ] && return 0
+    [ "$rc" -eq 0 ] && level=ok
+    kei_event "$level" "$kind"
+}
+
+# "events":[...], (trailing comma): the last 10 lines of $KEI_EVENTS.
+kei_events_json() {
+    local id level kind first=1
+    printf '"events":['
+    if [ -r "$KEI_EVENTS" ]; then
+        while IFS=$'\t' read -r id level kind; do
+            [[ "$id" =~ ^[0-9]+$ && "$level" =~ ^(ok|failed)$ && "$kind" =~ ^[a-z][a-z0-9_]*$ ]] || continue
+            [ "$first" = 1 ] || printf ','
+            first=0
+            printf '{"id":%s,"level":"%s","kind":"%s"}' "$id" "$level" "$kind"
+        done < <(tail -n 10 "$KEI_EVENTS" 2>/dev/null)
+    fi
+    printf '],'
+}
+
 kei_status_json() {
     local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false
     local b_epoch b_size b_result b_kind b_file df_line d_total d_free mem_total mem_avail
@@ -9535,6 +9586,7 @@ kei_status_json() {
     printf '"recovery":{"epoch":%s,"state":%s,"finished":%s,"db":%s,"backup":%s,"index":%s},' \
         "$(json_num "$r_epoch")" "$(json_str "$r_state")" "$(json_num "$r_finished")" "$(json_str "$r_db")" "$(json_str "$r_backup")" "$(json_str "$r_index")"
     kei_access_json
+    kei_events_json
     printf '"disk":{"total":%s,"free":%s},' "$(json_num "$d_total")" "$(json_num "$d_free")"
     printf '"memory":{"total":%s,"available":%s}}\n' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
 }
@@ -10745,7 +10797,11 @@ tools_reindex_bg() {
     fi
     printf '$ %s\n' "${*#/usr/sbin/}" >> "$log"
     log "tools: background reindex: ${*#/usr/sbin/}"
-    koha_ctl nohup setsid "$@" >> "$log" 2>&1 </dev/null &
+    # Its end is an event for the Windows tray (kei_event, written here
+    # because the panel may be closed by then).
+    koha_ctl nohup setsid bash -c '"${@:2}"; rc=$?; l=failed; [ "$rc" -eq 0 ] && l=ok
+        printf "%s\t%s\treindex\n" "$(date +%s%3N)" "$l" >> "$1" 2>/dev/null; exit "$rc"' \
+        kei-tools-reindex "$KEI_EVENTS" "$@" >> "$log" 2>&1 </dev/null &
 }
 
 # ----------------------------------------------------------------------
@@ -30583,7 +30639,11 @@ if [ -n "$KEI_CLI_MODE" ]; then
         # data-safety settings of an existing Koha without opening the panel.
         --install-data-safety) is_koha_installed && install_data_safety ;;
         --rebuild-search-index) kei_rebuild_search_index ;;
-        --task) kei_task "${@:2}" ;;
+        --task)
+            kei_task "${@:2}"
+            kei_rc=$?
+            kei_task_event "$kei_rc" "${@:2}"
+            exit "$kei_rc" ;;
     esac
     exit $?
 fi
