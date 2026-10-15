@@ -3,15 +3,15 @@
 One resizable pywebview window (Microsoft Edge WebView2) with the control
 panel's sections in a sidebar, read from panel/kei_panel/menus.py
 (nexus_core.menucatalog), and a workspace on the right. The dashboard is
-the Phase 1 status view. In Phase A an entry opens its routine in the
-terminal panel (KohaEasy.ps1 Panel -Action NAME); the read-only ones in
-INLINE_TASKS already run inside the window through the task engine, which
-proves the path every section takes in Phase B.
+the Phase 1 status view. A card runs its routine in Debian through the task
+engine (`koha-panel --task run ACTION`, no console): its steps, log and
+results fill the task panel, and its questions open dialogs in the page,
+whose answers go back to the routine (nexus_core.taskproto).
 
 app.js calls the Api methods (window.pywebview.api.*); task events reach the
-page through engine.EventPump as nexus.onEvents(batch). Like the PowerShell
-window, the window reads Debian through wsl.exe and never starts it: only
-its Start button does.
+page through engine.EventPump as nexus.onEvents(batch). The status view
+reads Debian through wsl.exe and never starts it; a routine does, as the
+terminal panel always did.
 """
 
 from __future__ import annotations
@@ -38,9 +38,14 @@ VERB_OF = {
     "poweroff": ("SafeShutdown",),
 }
 
-# Menu actions that already run inside the window: read-only tasks whose
-# --task name is the menu action's own name.
-INLINE_TASKS: FrozenSet[str] = frozenset({"status", "validation-report"})
+# Every routine of the menu runs inside the window, silently, as
+# `koha-panel --task run ACTION` (the installer's --task mode asks its
+# questions as @@ lines, drawn here as dialogs; no terminal, no whiptail).
+# These have a --task of their own, with result rows, named as the action.
+OWN_TASKS: FrozenSet[str] = frozenset({"status", "validation-report"})
+# Full-screen terminal programs (htop, Midnight Commander): they need a
+# terminal by nature, so they open one.
+TERMINAL_TOOLS: FrozenSet[str] = frozenset({"monitor", "mc"})
 
 
 def ui_labels(t: Translate) -> Dict[str, str]:
@@ -49,10 +54,9 @@ def ui_labels(t: Translate) -> Dict[str, str]:
         "dashboard": "Dashboard",
         "terminal_panel": "Advanced: terminal panel",
         "terminal_hint": "Opens the classic control panel in a terminal window",
-        "opens_terminal": "Opens in the terminal panel",
-        "runs_here": "Runs here",
-        "not_ported": "This screen is in the terminal panel for now.",
-        "open_terminal": "Open the terminal panel",
+        "opens_terminal": "Opens a terminal window (a full-screen program)",
+        "later": "Comes to this window in a later version",
+        "not_ported": "This screen comes to this window in a later version.",
         "running": "Running...",
         "finished": "Finished",
         "failed": "Failed",
@@ -67,7 +71,7 @@ def ui_labels(t: Translate) -> Dict[str, str]:
         "busy": "Another task is running. Wait for it to finish.",
         "results": "Results",
         "path": "Path in Debian",
-        "edit_later": "Editing files from this window comes in a later version. Use the terminal panel.",
+        "edit_later": "Editing files from this window comes in a later version.",
     }
     return {k: t(v) for k, v in words.items()}
 
@@ -78,8 +82,7 @@ class Api:
 
     def __init__(self, monitor: HealthMonitor, actions: Actions, t: Translate,
                  debian_running: Callable[[], bool], sections: Optional[List[Dict[str, Any]]] = None,
-                 engine: Any = None, panel_only: FrozenSet[str] = frozenset(),
-                 inline: FrozenSet[str] = INLINE_TASKS):
+                 engine: Any = None, panel_only: FrozenSet[str] = frozenset()):
         self._monitor = monitor
         self._actions = actions
         self._t = t
@@ -87,7 +90,6 @@ class Api:
         self._sections = sections or []
         self._engine = engine
         self._panel_only = panel_only
-        self._inline = inline
         self._kinds = {e["action"]: e["kind"] for s in self._sections for e in s["entries"]}
 
     def set_engine(self, engine: Any) -> None:
@@ -118,20 +120,21 @@ class Api:
 
     # --- sidebar and sections -------------------------------------------
     def sections(self) -> Dict[str, Any]:
-        return {"sections": self._sections, "inline": sorted(self._inline), "labels": ui_labels(self._t)}
+        return {"sections": self._sections, "terminal": sorted(TERMINAL_TOOLS),
+                "later": sorted(self._panel_only), "labels": ui_labels(self._t)}
 
     def open_entry(self, action: str) -> Dict[str, Any]:
-        """A card was clicked: run it here when it can, else open it in the
-        terminal panel. Only actions of the menu are accepted."""
-        if action not in self._kinds:
+        """A card was clicked: its routine starts here, in the window. Only
+        actions of the menu are accepted."""
+        if self._kinds.get(action) != "native":
             return {"ok": False}
-        if action in self._inline and self._engine is not None:
-            return {"ok": True, "how": "inline", **self._engine.start(action)}
-        if action in self._panel_only:
-            self._actions.verb("Panel")
-        else:
+        if action in TERMINAL_TOOLS:
             self._actions.verb("Panel", "-Action", action)
-        return {"ok": True, "how": "terminal"}
+            return {"ok": True, "how": "terminal"}
+        if action in self._panel_only or self._engine is None:
+            return {"ok": False, "how": "later"}
+        task = self._engine.start(action) if action in OWN_TASKS else self._engine.start("run", [action])
+        return {"how": "inline", **task}
 
     def terminal_panel(self) -> bool:
         self._actions.verb("Panel")

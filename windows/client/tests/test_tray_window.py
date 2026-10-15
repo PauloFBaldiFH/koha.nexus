@@ -88,6 +88,8 @@ SECTIONS = [
         {"action": "status", "kind": "native"},
         {"action": "backup-now", "kind": "native"},
         {"action": "backup-download", "kind": "native"},
+        {"action": "mc", "kind": "native"},
+        {"action": "vpn", "kind": "view"},
     ]},
 ]
 
@@ -96,9 +98,9 @@ class FakeEngine:
     def __init__(self):
         self.calls = []
 
-    def start(self, name):
-        self.calls.append(("start", name))
-        return {"ok": True, "id": 7, "name": name, "total": None}
+    def start(self, name, args=()):
+        self.calls.append(("start", name, *args))
+        return {"ok": True, "id": 7, "name": name, "total": 0}
 
     def answer(self, run_id, value):
         self.calls.append(("answer", run_id, value))
@@ -116,22 +118,30 @@ def section_api():
     return api, a, e
 
 
-def test_sections_carry_the_menu_inline_tasks_and_labels():
+def test_sections_carry_the_menu_and_what_does_not_run_here_yet():
     api, _, _ = section_api()
     data = api.sections()
     assert data["sections"] == SECTIONS
-    assert "status" in data["inline"]
+    assert data["terminal"] == ["mc", "monitor"] and data["later"] == ["backup-download"]
     assert data["labels"]["terminal_panel"] == "Advanced: terminal panel"
 
 
-def test_open_entry_runs_inline_tasks_here_and_the_rest_in_the_terminal_panel():
+def test_every_routine_runs_in_the_window_through_the_task_engine():
     api, a, e = section_api()
-    assert api.open_entry("status") == {"ok": True, "how": "inline", "id": 7, "name": "status", "total": None}
-    assert e.calls == [("start", "status")]
-    assert api.open_entry("backup-now") == {"ok": True, "how": "terminal"}
-    assert api.open_entry("backup-download") == {"ok": True, "how": "terminal"}
-    assert a.calls == [("Panel", "-Action", "backup-now"), ("Panel",)]
+    assert api.open_entry("backup-now") == {"how": "inline", "ok": True, "id": 7, "name": "run", "total": 0}
+    assert api.open_entry("status")["how"] == "inline"
+    assert e.calls == [("start", "run", "backup-now"), ("start", "status")]
+    assert a.calls == []  # no terminal opened
+
+
+def test_only_terminal_programs_open_a_terminal_and_nothing_else_gets_through():
+    api, a, e = section_api()
+    assert api.open_entry("mc") == {"ok": True, "how": "terminal"}
+    assert a.calls == [("Panel", "-Action", "mc")]
+    assert api.open_entry("backup-download") == {"ok": False, "how": "later"}
+    assert api.open_entry("vpn") == {"ok": False}       # a view: the page navigates
     assert api.open_entry("rm -rf") == {"ok": False}
+    assert e.calls == []
     assert api.terminal_panel() and a.calls[-1] == ("Panel",)
 
 
