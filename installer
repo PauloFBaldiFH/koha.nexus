@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.55"
+PANEL_VERSION=" 1.5.56"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -30737,7 +30737,7 @@ while true; do
                 --menu "$(t 'Choose a backup routine:')" 19 76 5 \
                 "1" "$(t '💾  Generate manual backup and download to PC')" \
                 "2" "$(t '📚  Export MARC21 records now')" \
-                "3" "$(t '📤  Configure cloud backup (Google Drive)')" \
+                "3" "$(t '📤  Configure cloud backup')" \
                 "4" "$(t '🧾  Test integrity of latest backup')" \
                 "5" "$(t '📥  Restore database')" 3>&1 1>&2 2>&3) || continue
             case "$SUB_OPT" in

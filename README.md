@@ -174,7 +174,7 @@ Real-Windows behaviour (the installer, notifications, the tray, Task Scheduler, 
 | 15 | Reboot server | |
 | 16 | Exit | |
 
-In the new panel each of these is a card on the home screen, and the newest tools have screens and shortcut keys of their own: **d** Control Dashboard, **i** Magic Import Tool, **b** Backup center, **t** Database tables, **a** AI, **z** Z39.50 / SRU servers, **o** OPAC and Staff Appearance, **m** Messaging & interoperability, **x** Security & access hub (**v** opens its WireGuard VPN screen), **l** Library tools, **s** Schedules & cron tasks, and **ctrl+p** searches every action by name.
+In the new panel each of these is a card on the home screen, and the newest tools have screens and shortcut keys of their own: **d** Control Dashboard, **i** Magic Import Tool, **b** Backup center, **t** Database tables (inside Diagnostics & maintenance), **a** AI, **z** Z39.50 / SRU servers, **o** OPAC and Staff Appearance, **m** Messaging & interoperability, **x** Security & access hub (**v** opens its WireGuard VPN screen), **l** Library tools, **s** Schedules & cron tasks, and **ctrl+p** searches every action by name.
 
 The classic panel's dialogs use a dark theme, a fixed width and adapt to small terminals. For newt's default colours in a monochrome terminal, start the panel with `NO_COLOR=1`.
 

@@ -177,14 +177,10 @@ FEATURES: tuple[Feature, ...] = (
     Feature("dash-restart", "dashboard", "views/dashboard.py", "Restart Koha", [button("Restart Koha", True)]),
     Feature("dash-export", "dashboard", "views/dashboard.py", "Export diagnostics", [button("Export diagnostics")]),
     # Backup center
-    Feature("backup-download", "backup", "views/backup.py", "📥 Download latest backup", [
-        button("📥 Download latest backup", True), button("📥  Restore database"),
-        button("📚  Export MARC21 records now"),
-    ]),
     Feature("backup-status", "backup", "views/backup.py", "Last backup", [
         status("Last backup", "${age} ago"), status("Size", "184 MB"), status("Result", "OK"),
     ], extra_sources=("views/dashboard.py",)),
-    Feature("backup-compression", "backup", "views/backup.py", "New backups", [
+    Feature("backup-compression", "backup", "views/backup.py", "Backup compression type", [
         select("Compression", "CODECS", 1), note("CODEC_NOTE"),
     ]),
     Feature("backup-safety", "backup", "routines/backup.py", "Safety backup:", [
@@ -212,7 +208,7 @@ FEATURES: tuple[Feature, ...] = (
     Feature("ai-ollama", "ai", "views/ai.py", "Ollama on this server", [
         button("Check Ollama"), button("Install Ollama"), select("Model", "aiconf.OLLAMA_PRESETS", 3),
         button("Download", True), note("Without a GPU, prefer the light models: a 7B vision model can take "
-                                       "minutes per answer on a CPU."),
+                                       "minutes per answer on a CPU."), note("PERFORMANCE_WARNING"),
     ]),
     Feature("ai-tools", "ai", "views/ai.py", "The AI tools", [
         status("MARC Replace", "Open MARC Replace"), status("💬  AI assistant", "Installed"),
@@ -295,9 +291,6 @@ FEATURES: tuple[Feature, ...] = (
     ]),
     Feature("opac-hide", "opac", "views/opac.py", "Hide", [
         switch("RSS icons"), switch("Cart badge", False), switch("Community links"), switch("Empty table columns"),
-    ]),
-    Feature("opac-news", "opac", "views/opac.py", "News action buttons", [
-        switch("Buttons"), note("In a news item (Tools > News), this marker becomes a button:"),
     ]),
     Feature("opac-actions", "opac", "views/opac.py", "Apply", [
         button("Apply", True), button("Preview"), button("Sync current OPAC settings"), button("Refresh carousel"),

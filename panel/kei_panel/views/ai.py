@@ -67,6 +67,10 @@ from .base import SectionView
 FIELDS = "@fields"
 # Group headers of the model list: choosing one picks nothing.
 HEADERS = ("@free", "@paid")
+# Shown at the top of the screen (Paulo, 2026-10-15).
+PERFORMANCE_WARNING = ("Local AI models and tools are heavy on the computer: while they work they can take most "
+                       "of the processor and memory and slow down the whole system, Koha included, depending on "
+                       "this server's hardware.")
 
 
 class AIView(SectionView):
@@ -105,6 +109,7 @@ class AIView(SectionView):
                       "page and drafts its MARC record, and the AI assistant answers librarians on the home page "
                       "of the staff interface. They use the AI provider below; each can have its own model."),
                     classes="view-prompt")
+        yield Label("⚠  " + t(PERFORMANCE_WARNING), id="ai-performance", classes="ai-warning")
         with Horizontal(id="ai-body"):
             with RadioSet(id="ai-providers"):
                 for p in aiconf.SELECTOR_ORDER:

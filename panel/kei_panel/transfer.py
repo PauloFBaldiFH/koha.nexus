@@ -166,7 +166,7 @@ def downloads_folder(place: str | None = None) -> Path | None:
 def free_target(folder: Path, name: str) -> Path:
     """name in folder, or name (2), name (3)... when it is taken."""
     target = folder / name
-    double = next((s for s in BACKUP_SUFFIXES[1:] if name.lower().endswith(s)), "")
+    double = next((s for s in BACKUP_SUFFIXES[1:] + (".tar.gz",) if name.lower().endswith(s)), "")
     stem, suffix = (name[:-len(double)], name[-len(double):]) if double else (Path(name).stem, Path(name).suffix)
     n = 2
     while target.exists():

@@ -283,14 +283,14 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "backup-download",
     "backup-manual",
     "backup-marc",
+    "restore",
     "backup-cloud",
-    "backup-test",
-    "restore"
+    "backup-test"
    ],
    "features": [
-    "backup-download",
     "backup-status",
     "backup-compression",
     "backup-safety"
@@ -305,7 +305,7 @@
    "item": "sec-import",
    "label": "🪄  Magic Import Tool",
    "title": "",
-   "prompt": "",
+   "prompt": "Imports bibliographic records, authority records and patron (reader) data from other systems: MARC, ISIS, CSV and spreadsheets, and old-system backups.",
    "icon": "",
    "key": "i",
    "view": "section",
@@ -327,12 +327,9 @@
    "icon": "",
    "key": "t",
    "view": "database",
-   "sidebar": true,
-   "parent": "",
-   "entries": [
-    "db-maintenance",
-    "reports"
-   ],
+   "sidebar": false,
+   "parent": "diagnostics",
+   "entries": [],
    "features": [
     "db-tables"
    ],
@@ -414,7 +411,6 @@
     "opac-credits",
     "opac-news-items",
     "opac-hide",
-    "opac-news",
     "opac-actions"
    ],
    "media": [
@@ -532,6 +528,7 @@
     "validation-report",
     "apache-log",
     "db-maintenance",
+    "sec-database",
     "repair-services"
    ],
    "features": [],
@@ -738,6 +735,16 @@
    "status": "available",
    "media": []
   },
+  "backup-download": {
+   "id": "backup-download",
+   "type": "entry",
+   "section": "backup",
+   "label": "📥 Download latest backup",
+   "description": "Copies the newest backup to this computer's Downloads folder",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "backup-manual": {
    "id": "backup-manual",
    "type": "entry",
@@ -758,12 +765,22 @@
    "status": "available",
    "media": []
   },
+  "restore": {
+   "id": "restore",
+   "type": "entry",
+   "section": "backup",
+   "label": "📥  Restore database",
+   "description": "Replaces Koha's database with a backup, tested first",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "backup-cloud": {
    "id": "backup-cloud",
    "type": "entry",
    "section": "backup",
-   "label": "📤  Configure cloud backup (Google Drive)",
-   "description": "Connects Google Drive to keep the backups in the cloud",
+   "label": "📤  Configure cloud backup",
+   "description": "Automates backups uploaded to cloud storage services",
    "kind": "native",
    "status": "available",
    "media": []
@@ -774,16 +791,6 @@
    "section": "backup",
    "label": "🧾  Test integrity of latest backup",
    "description": "Imports a backup into a test database to check it",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "restore": {
-   "id": "restore",
-   "type": "entry",
-   "section": "backup",
-   "label": "📥  Restore database",
-   "description": "Replaces Koha's database with a backup, tested first",
    "kind": "native",
    "status": "available",
    "media": []
@@ -805,27 +812,7 @@
    "type": "entry",
    "section": "import",
    "label": "🪄  Magic Import Tool (drop anything here)",
-   "description": "Imports catalogs in any format: MARC, ISIS, CSV, backups",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "db-maintenance": {
-   "id": "db-maintenance",
-   "type": "entry",
-   "section": "database",
-   "label": "🧹  Deep database optimization & log cleanup",
-   "description": "Optimizes the tables and clears old logs, with a preview",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "reports": {
-   "id": "reports",
-   "type": "entry",
-   "section": "database",
-   "label": "📋  Essential SQL reports pack",
-   "description": "Adds ready-made SQL reports to Koha's Reports module",
+   "description": "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1100,6 +1087,16 @@
    "status": "available",
    "media": []
   },
+  "db-maintenance": {
+   "id": "db-maintenance",
+   "type": "entry",
+   "section": "diagnostics",
+   "label": "🧹  Deep database optimization & log cleanup",
+   "description": "Optimizes the tables and clears old logs, with a preview",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "repair-services": {
    "id": "repair-services",
    "type": "entry",
@@ -1186,6 +1183,16 @@
    "section": "library",
    "label": "👥  Find duplicate authors (authorities)",
    "description": "Finds variant forms of one author and merges the ones you confirm",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "reports": {
+   "id": "reports",
+   "type": "entry",
+   "section": "library",
+   "label": "📋  Essential SQL reports pack",
+   "description": "Adds ready-made SQL reports to Koha's Reports module",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1576,34 +1583,6 @@
    ],
    "media": []
   },
-  "backup-download": {
-   "id": "backup-download",
-   "type": "feature",
-   "section": "backup",
-   "label": "📥 Download latest backup",
-   "description": "",
-   "kind": "screen",
-   "status": "available",
-   "source": "panel/kei_panel/views/backup.py",
-   "controls": [
-    {
-     "type": "button",
-     "label": "📥 Download latest backup",
-     "primary": true
-    },
-    {
-     "type": "button",
-     "label": "📥  Restore database",
-     "primary": false
-    },
-    {
-     "type": "button",
-     "label": "📚  Export MARC21 records now",
-     "primary": false
-    }
-   ],
-   "media": []
-  },
   "backup-status": {
    "id": "backup-status",
    "type": "feature",
@@ -1639,7 +1618,7 @@
    "id": "backup-compression",
    "type": "feature",
    "section": "backup",
-   "label": "New backups",
+   "label": "Backup compression type",
    "description": "",
    "kind": "screen",
    "status": "available",
@@ -1942,6 +1921,10 @@
     {
      "type": "note",
      "text": "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU."
+    },
+    {
+     "type": "note",
+     "text": "Local AI models and tools are heavy on the computer: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on this server's hardware."
     }
    ],
    "media": []
@@ -2907,28 +2890,6 @@
    ],
    "media": []
   },
-  "opac-news": {
-   "id": "opac-news",
-   "type": "feature",
-   "section": "opac",
-   "label": "News action buttons",
-   "description": "",
-   "kind": "screen",
-   "status": "available",
-   "source": "panel/kei_panel/views/opac.py",
-   "controls": [
-    {
-     "type": "switch",
-     "label": "Buttons",
-     "on": true
-    },
-    {
-     "type": "note",
-     "text": "In a news item (Tools > News), this marker becomes a button:"
-    }
-   ],
-   "media": []
-  },
   "opac-actions": {
    "id": "opac-actions",
    "type": "feature",
@@ -3444,6 +3405,56 @@
    "ja": "バックアップの操作を選んでください:",
    "ko": "백업 작업을 선택하세요:"
   },
+  "📥 Download latest backup": {
+   "en": "📥 Download latest backup",
+   "pt-BR": "📥 Baixar Backup Recente",
+   "es": "📥 Descargar la copia más reciente",
+   "fr": "📥 Télécharger la dernière sauvegarde",
+   "it": "📥 Scarica l'ultimo backup",
+   "de": "📥 Neueste Sicherung herunterladen",
+   "nl": "📥 Nieuwste back-up downloaden",
+   "sv": "📥 Hämta senaste säkerhetskopian",
+   "pl": "📥 Pobierz najnowszą kopię zapasową",
+   "cs": "📥 Stáhnout nejnovější zálohu",
+   "ru": "📥 Скачать последнюю резервную копию",
+   "uk": "📥 Завантажити останню резервну копію",
+   "tr": "📥 En son yedeği indir",
+   "tl": "📥 I-download ang pinakabagong backup",
+   "id": "📥 Unduh cadangan terbaru",
+   "ar": "📥 تنزيل أحدث نسخة احتياطية",
+   "fa": "📥 دانلود آخرین نسخه پشتیبان",
+   "hi": "📥 नवीनतम बैकअप डाउनलोड करें",
+   "bn": "📥 সর্বশেষ ব্যাকআপ ডাউনলোড করুন",
+   "vi": "📥 Tải bản sao lưu mới nhất",
+   "zh": "📥 下载最新备份",
+   "ja": "📥 最新のバックアップをダウンロード",
+   "ko": "📥 최신 백업 다운로드"
+  },
+  "Copies the newest backup to this computer's Downloads folder": {
+   "en": "Copies the newest backup to this computer's Downloads folder",
+   "pt-BR": "Copia o backup mais recente para a pasta Downloads deste computador",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "💾  Generate manual backup and download to PC": {
    "en": "💾  Generate manual backup and download to PC",
    "pt-BR": "💾  Gerar backup manual e baixar no computador",
@@ -3544,34 +3555,84 @@
    "ja": null,
    "ko": null
   },
-  "📤  Configure cloud backup (Google Drive)": {
-   "en": "📤  Configure cloud backup (Google Drive)",
-   "pt-BR": "📤  Configurar backup na nuvem (Google Drive)",
-   "es": "📤  Configurar copia en la nube (Google Drive)",
-   "fr": "📤  Configurer la sauvegarde cloud (Google Drive)",
-   "it": "📤  Configura il backup nel cloud (Google Drive)",
-   "de": "📤  Cloud-Sicherung einrichten (Google Drive)",
-   "nl": "📤  Cloudback-up instellen (Google Drive)",
-   "sv": "📤  Konfigurera molnsäkerhetskopia (Google Drive)",
-   "pl": "📤  Skonfiguruj kopię w chmurze (Google Drive)",
-   "cs": "📤  Nastavit zálohu do cloudu (Google Drive)",
-   "ru": "📤  Настроить резервное копирование в облако (Google Drive)",
-   "uk": "📤  Налаштувати резервне копіювання в хмару (Google Drive)",
-   "tr": "📤  Bulut yedeklemeyi yapılandır (Google Drive)",
-   "tl": "📤  I-configure ang cloud backup (Google Drive)",
-   "id": "📤  Atur cadangan cloud (Google Drive)",
-   "ar": "📤  إعداد النسخ الاحتياطي السحابي (Google Drive)",
-   "fa": "📤  پیکربندی پشتیبان ابری (Google Drive)",
-   "hi": "📤  क्लाउड बैकअप कॉन्फ़िगर करें (Google Drive)",
-   "bn": "📤  ক্লাউড ব্যাকআপ কনফিগার করুন (Google Drive)",
-   "vi": "📤  Cấu hình sao lưu đám mây (Google Drive)",
-   "zh": "📤  配置云备份（Google Drive）",
-   "ja": "📤  クラウドバックアップの設定 (Google Drive)",
-   "ko": "📤  클라우드 백업 설정 (Google Drive)"
+  "📥  Restore database": {
+   "en": "📥  Restore database",
+   "pt-BR": "📥  Restaurar base de dados",
+   "es": "📥  Restaurar base de datos",
+   "fr": "📥  Restaurer la base de données",
+   "it": "📥  Ripristina il database",
+   "de": "📥  Datenbank wiederherstellen",
+   "nl": "📥  Database herstellen",
+   "sv": "📥  Återställ databasen",
+   "pl": "📥  Przywróć bazę danych",
+   "cs": "📥  Obnovit databázi",
+   "ru": "📥  Восстановить базу данных",
+   "uk": "📥  Відновити базу даних",
+   "tr": "📥  Veritabanını geri yükle",
+   "tl": "📥  Ibalik ang database",
+   "id": "📥  Pulihkan basis data",
+   "ar": "📥  استعادة قاعدة البيانات",
+   "fa": "📥  بازیابی پایگاه داده",
+   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
+   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
+   "vi": "📥  Khôi phục cơ sở dữ liệu",
+   "zh": "📥  恢复数据库",
+   "ja": "📥  データベースを復元",
+   "ko": "📥  데이터베이스 복원"
   },
-  "Connects Google Drive to keep the backups in the cloud": {
-   "en": "Connects Google Drive to keep the backups in the cloud",
-   "pt-BR": "Conecta o Google Drive para guardar os backups na nuvem",
+  "Replaces Koha's database with a backup, tested first": {
+   "en": "Replaces Koha's database with a backup, tested first",
+   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📤  Configure cloud backup": {
+   "en": "📤  Configure cloud backup",
+   "pt-BR": "📤  Configurar backup na nuvem",
+   "es": "📤  Configurar copia en la nube",
+   "fr": "📤  Configurer la sauvegarde cloud",
+   "it": "📤  Configura il backup nel cloud",
+   "de": "📤  Cloud-Sicherung einrichten",
+   "nl": "📤  Cloudback-up instellen",
+   "sv": "📤  Konfigurera molnsäkerhetskopia",
+   "pl": "📤  Skonfiguruj kopię w chmurze",
+   "cs": "📤  Nastavit zálohu do cloudu",
+   "ru": "📤  Настроить резервное копирование в облако",
+   "uk": "📤  Налаштувати резервне копіювання в хмару",
+   "tr": "📤  Bulut yedeklemeyi yapılandır",
+   "tl": "📤  I-configure ang cloud backup",
+   "id": "📤  Atur cadangan cloud",
+   "ar": "📤  إعداد النسخ الاحتياطي السحابي",
+   "fa": "📤  پیکربندی پشتیبان ابری",
+   "hi": "📤  क्लाउड बैकअप कॉन्फ़िगर करें",
+   "bn": "📤  ক্লাউড ব্যাকআপ কনফিগার করুন",
+   "vi": "📤  Cấu hình sao lưu đám mây",
+   "zh": "📤  配置云备份",
+   "ja": "📤  クラウドバックアップの設定",
+   "ko": "📤  클라우드 백업 설정"
+  },
+  "Automates backups uploaded to cloud storage services": {
+   "en": "Automates backups uploaded to cloud storage services",
+   "pt-BR": "Automatizar backups para upload em serviços de armazenamento em nuvem",
    "es": null,
    "fr": null,
    "it": null,
@@ -3644,56 +3705,6 @@
    "ja": null,
    "ko": null
   },
-  "📥  Restore database": {
-   "en": "📥  Restore database",
-   "pt-BR": "📥  Restaurar base de dados",
-   "es": "📥  Restaurar base de datos",
-   "fr": "📥  Restaurer la base de données",
-   "it": "📥  Ripristina il database",
-   "de": "📥  Datenbank wiederherstellen",
-   "nl": "📥  Database herstellen",
-   "sv": "📥  Återställ databasen",
-   "pl": "📥  Przywróć bazę danych",
-   "cs": "📥  Obnovit databázi",
-   "ru": "📥  Восстановить базу данных",
-   "uk": "📥  Відновити базу даних",
-   "tr": "📥  Veritabanını geri yükle",
-   "tl": "📥  Ibalik ang database",
-   "id": "📥  Pulihkan basis data",
-   "ar": "📥  استعادة قاعدة البيانات",
-   "fa": "📥  بازیابی پایگاه داده",
-   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
-   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
-   "vi": "📥  Khôi phục cơ sở dữ liệu",
-   "zh": "📥  恢复数据库",
-   "ja": "📥  データベースを復元",
-   "ko": "📥  데이터베이스 복원"
-  },
-  "Replaces Koha's database with a backup, tested first": {
-   "en": "Replaces Koha's database with a backup, tested first",
-   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "🪄  Magic Import Tool": {
    "en": "🪄  Magic Import Tool",
    "pt-BR": "🪄  Ferramenta Mágica de Importação",
@@ -3718,6 +3729,31 @@
    "zh": "🪄  神奇导入工具",
    "ja": "🪄  マジック取り込みツール",
    "ko": "🪄  마법 가져오기 도구"
+  },
+  "Imports bibliographic records, authority records and patron (reader) data from other systems: MARC, ISIS, CSV and spreadsheets, and old-system backups.": {
+   "en": "Imports bibliographic records, authority records and patron (reader) data from other systems: MARC, ISIS, CSV and spreadsheets, and old-system backups.",
+   "pt-BR": "Importa registros bibliográficos, registros de autoridade e dados de leitores/usuários de outros sistemas: MARC, ISIS, CSV e planilhas, e backups do sistema antigo.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🪄  Magic Import Tool (drop anything here)": {
    "en": "🪄  Magic Import Tool (drop anything here)",
@@ -3744,9 +3780,9 @@
    "ja": "🪄  マジック取り込みツール (何でもここに置くだけ)",
    "ko": "🪄  마법 가져오기 도구 (무엇이든 여기에 넣으세요)"
   },
-  "Imports catalogs in any format: MARC, ISIS, CSV, backups": {
-   "en": "Imports catalogs in any format: MARC, ISIS, CSV, backups",
-   "pt-BR": "Importa catálogos em qualquer formato: MARC, ISIS, CSV, backups",
+  "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups": {
+   "en": "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups",
+   "pt-BR": "Importa registros bibliográficos e de autoridade e também dados de leitores/usuários: MARC, ISIS, CSV, backups",
    "es": null,
    "fr": null,
    "it": null,
@@ -3772,106 +3808,6 @@
   "📑  Database tables": {
    "en": "📑  Database tables",
    "pt-BR": "📑  Tabelas do banco de dados",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "🧹  Deep database optimization & log cleanup": {
-   "en": "🧹  Deep database optimization & log cleanup",
-   "pt-BR": "🧹  Otimização profunda do banco e limpeza de logs",
-   "es": "🧹  Optimización profunda de la base y limpieza de logs",
-   "fr": "🧹  Optimisation approfondie de la base et nettoyage des journaux",
-   "it": "🧹  Ottimizzazione profonda del database e pulizia dei log",
-   "de": "🧹  Gründliche Datenbankoptimierung und Protokollbereinigung",
-   "nl": "🧹  Grondige database-optimalisatie en logopschoning",
-   "sv": "🧹  Djupoptimering av databasen och loggrensning",
-   "pl": "🧹  Gruntowna optymalizacja bazy i czyszczenie dzienników",
-   "cs": "🧹  Důkladná optimalizace databáze a čištění protokolů",
-   "ru": "🧹  Глубокая оптимизация базы и очистка журналов",
-   "uk": "🧹  Глибока оптимізація бази та очищення журналів",
-   "tr": "🧹  Veritabanını derinlemesine optimize et ve günlükleri temizle",
-   "tl": "🧹  Malalimang optimization ng database at paglilinis ng log",
-   "id": "🧹  Optimasi mendalam basis data dan pembersihan log",
-   "ar": "🧹  تحسين عميق لقاعدة البيانات وتنظيف السجلات",
-   "fa": "🧹  بهینه‌سازی عمیق پایگاه داده و پاک‌سازی گزارش‌ها",
-   "hi": "🧹  डेटाबेस का गहन अनुकूलन और लॉग सफ़ाई",
-   "bn": "🧹  ডাটাবেসের গভীর অপ্টিমাইজেশন ও লগ পরিষ্কার",
-   "vi": "🧹  Tối ưu sâu cơ sở dữ liệu và dọn nhật ký",
-   "zh": "🧹  深度优化数据库并清理日志",
-   "ja": "🧹  データベースの徹底最適化とログ整理",
-   "ko": "🧹  데이터베이스 심층 최적화 및 로그 정리"
-  },
-  "Optimizes the tables and clears old logs, with a preview": {
-   "en": "Optimizes the tables and clears old logs, with a preview",
-   "pt-BR": "Otimiza as tabelas e limpa logs antigos, com prévia",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "📋  Essential SQL reports pack": {
-   "en": "📋  Essential SQL reports pack",
-   "pt-BR": "📋  Pacote de relatórios SQL essenciais",
-   "es": "📋  Paquete de informes SQL esenciales",
-   "fr": "📋  Pack de rapports SQL essentiels",
-   "it": "📋  Pacchetto di report SQL essenziali",
-   "de": "📋  Paket mit wichtigen SQL-Berichten",
-   "nl": "📋  Pakket met essentiële SQL-rapporten",
-   "sv": "📋  Paket med grundläggande SQL-rapporter",
-   "pl": "📋  Pakiet podstawowych raportów SQL",
-   "cs": "📋  Balíček základních SQL sestav",
-   "ru": "📋  Набор основных SQL-отчётов",
-   "uk": "📋  Набір основних SQL-звітів",
-   "tr": "📋  Temel SQL raporları paketi",
-   "tl": "📋  Pakete ng mahahalagang ulat na SQL",
-   "id": "📋  Paket laporan SQL penting",
-   "ar": "📋  حزمة تقارير SQL الأساسية",
-   "fa": "📋  بسته گزارش‌های SQL ضروری",
-   "hi": "📋  आवश्यक SQL रिपोर्ट पैक",
-   "bn": "📋  প্রয়োজনীয় SQL রিপোর্ট প্যাক",
-   "vi": "📋  Gói báo cáo SQL thiết yếu",
-   "zh": "📋  基础 SQL 报表包",
-   "ja": "📋  基本 SQL レポートパック",
-   "ko": "📋  필수 SQL 보고서 팩"
-  },
-  "Adds ready-made SQL reports to Koha's Reports module": {
-   "en": "Adds ready-made SQL reports to Koha's Reports module",
-   "pt-BR": "Adiciona relatórios SQL prontos ao módulo Relatórios do Koha",
    "es": null,
    "fr": null,
    "it": null,
@@ -5144,6 +5080,56 @@
    "ja": null,
    "ko": null
   },
+  "🧹  Deep database optimization & log cleanup": {
+   "en": "🧹  Deep database optimization & log cleanup",
+   "pt-BR": "🧹  Otimização profunda do banco e limpeza de logs",
+   "es": "🧹  Optimización profunda de la base y limpieza de logs",
+   "fr": "🧹  Optimisation approfondie de la base et nettoyage des journaux",
+   "it": "🧹  Ottimizzazione profonda del database e pulizia dei log",
+   "de": "🧹  Gründliche Datenbankoptimierung und Protokollbereinigung",
+   "nl": "🧹  Grondige database-optimalisatie en logopschoning",
+   "sv": "🧹  Djupoptimering av databasen och loggrensning",
+   "pl": "🧹  Gruntowna optymalizacja bazy i czyszczenie dzienników",
+   "cs": "🧹  Důkladná optimalizace databáze a čištění protokolů",
+   "ru": "🧹  Глубокая оптимизация базы и очистка журналов",
+   "uk": "🧹  Глибока оптимізація бази та очищення журналів",
+   "tr": "🧹  Veritabanını derinlemesine optimize et ve günlükleri temizle",
+   "tl": "🧹  Malalimang optimization ng database at paglilinis ng log",
+   "id": "🧹  Optimasi mendalam basis data dan pembersihan log",
+   "ar": "🧹  تحسين عميق لقاعدة البيانات وتنظيف السجلات",
+   "fa": "🧹  بهینه‌سازی عمیق پایگاه داده و پاک‌سازی گزارش‌ها",
+   "hi": "🧹  डेटाबेस का गहन अनुकूलन और लॉग सफ़ाई",
+   "bn": "🧹  ডাটাবেসের গভীর অপ্টিমাইজেশন ও লগ পরিষ্কার",
+   "vi": "🧹  Tối ưu sâu cơ sở dữ liệu và dọn nhật ký",
+   "zh": "🧹  深度优化数据库并清理日志",
+   "ja": "🧹  データベースの徹底最適化とログ整理",
+   "ko": "🧹  데이터베이스 심층 최적화 및 로그 정리"
+  },
+  "Optimizes the tables and clears old logs, with a preview": {
+   "en": "Optimizes the tables and clears old logs, with a preview",
+   "pt-BR": "Otimiza as tabelas e limpa logs antigos, com prévia",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "🔁  Restart / repair Koha services (Memcached, Plack)": {
    "en": "🔁  Restart / repair Koha services (Memcached, Plack)",
    "pt-BR": "🔁  Reiniciar / reparar os serviços do Koha (Memcached, Plack)",
@@ -5598,6 +5584,56 @@
    "en": "Finds variant forms of one author and merges the ones you confirm",
    "pt-BR": "Encontra formas variantes de um mesmo autor e une as que você confirmar",
    "es": "Encuentra formas variantes de un mismo autor y une las que usted confirme",
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📋  Essential SQL reports pack": {
+   "en": "📋  Essential SQL reports pack",
+   "pt-BR": "📋  Pacote de relatórios SQL essenciais",
+   "es": "📋  Paquete de informes SQL esenciales",
+   "fr": "📋  Pack de rapports SQL essentiels",
+   "it": "📋  Pacchetto di report SQL essenziali",
+   "de": "📋  Paket mit wichtigen SQL-Berichten",
+   "nl": "📋  Pakket met essentiële SQL-rapporten",
+   "sv": "📋  Paket med grundläggande SQL-rapporter",
+   "pl": "📋  Pakiet podstawowych raportów SQL",
+   "cs": "📋  Balíček základních SQL sestav",
+   "ru": "📋  Набор основных SQL-отчётов",
+   "uk": "📋  Набір основних SQL-звітів",
+   "tr": "📋  Temel SQL raporları paketi",
+   "tl": "📋  Pakete ng mahahalagang ulat na SQL",
+   "id": "📋  Paket laporan SQL penting",
+   "ar": "📋  حزمة تقارير SQL الأساسية",
+   "fa": "📋  بسته گزارش‌های SQL ضروری",
+   "hi": "📋  आवश्यक SQL रिपोर्ट पैक",
+   "bn": "📋  প্রয়োজনীয় SQL রিপোর্ট প্যাক",
+   "vi": "📋  Gói báo cáo SQL thiết yếu",
+   "zh": "📋  基础 SQL 报表包",
+   "ja": "📋  基本 SQL レポートパック",
+   "ko": "📋  필수 SQL 보고서 팩"
+  },
+  "Adds ready-made SQL reports to Koha's Reports module": {
+   "en": "Adds ready-made SQL reports to Koha's Reports module",
+   "pt-BR": "Adiciona relatórios SQL prontos ao módulo Relatórios do Koha",
+   "es": null,
    "fr": null,
    "it": null,
    "de": null,
@@ -7294,31 +7330,6 @@
    "ja": "診断をエクスポート",
    "ko": "진단 내보내기"
   },
-  "📥 Download latest backup": {
-   "en": "📥 Download latest backup",
-   "pt-BR": "📥 Baixar Backup Recente",
-   "es": "📥 Descargar la copia más reciente",
-   "fr": "📥 Télécharger la dernière sauvegarde",
-   "it": "📥 Scarica l'ultimo backup",
-   "de": "📥 Neueste Sicherung herunterladen",
-   "nl": "📥 Nieuwste back-up downloaden",
-   "sv": "📥 Hämta senaste säkerhetskopian",
-   "pl": "📥 Pobierz najnowszą kopię zapasową",
-   "cs": "📥 Stáhnout nejnovější zálohu",
-   "ru": "📥 Скачать последнюю резервную копию",
-   "uk": "📥 Завантажити останню резервну копію",
-   "tr": "📥 En son yedeği indir",
-   "tl": "📥 I-download ang pinakabagong backup",
-   "id": "📥 Unduh cadangan terbaru",
-   "ar": "📥 تنزيل أحدث نسخة احتياطية",
-   "fa": "📥 دانلود آخرین نسخه پشتیبان",
-   "hi": "📥 नवीनतम बैकअप डाउनलोड करें",
-   "bn": "📥 সর্বশেষ ব্যাকআপ ডাউনলোড করুন",
-   "vi": "📥 Tải bản sao lưu mới nhất",
-   "zh": "📥 下载最新备份",
-   "ja": "📥 最新のバックアップをダウンロード",
-   "ko": "📥 최신 백업 다운로드"
-  },
   "${age} ago": {
    "en": "${age} ago",
    "pt-BR": "há ${age}",
@@ -7544,13 +7555,13 @@
    "ja": null,
    "ko": null
   },
-  "New backups": {
-   "en": "New backups",
-   "pt-BR": "Novos backups",
-   "es": "Nuevas copias",
-   "fr": "Nouvelles sauvegardes",
-   "it": "Nuovi backup",
-   "de": "Neue Sicherungen",
+  "Backup compression type": {
+   "en": "Backup compression type",
+   "pt-BR": "Tipo de compressão dos backups",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -8401,6 +8412,31 @@
    "fr": "Sans GPU, préférez les modèles légers : un modèle de vision de 7B peut prendre des minutes par réponse sur un CPU.",
    "it": "Senza GPU, preferisci i modelli leggeri: un modello di visione da 7B può richiedere minuti per risposta su una CPU.",
    "de": "Ohne GPU besser die leichten Modelle: Ein 7B-Bildmodell kann auf einer CPU Minuten pro Antwort brauchen.",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Local AI models and tools are heavy on the computer: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on this server's hardware.": {
+   "en": "Local AI models and tools are heavy on the computer: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on this server's hardware.",
+   "pt-BR": "Modelos e ferramentas de IA locais são pesados para o computador: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware deste servidor.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -11319,56 +11355,6 @@
    "ja": null,
    "ko": null
   },
-  "In a news item (Tools > News), this marker becomes a button:": {
-   "en": "In a news item (Tools > News), this marker becomes a button:",
-   "pt-BR": "Em uma notícia (Ferramentas > Notícias), esta marcação vira um botão:",
-   "es": "En una noticia (Herramientas > Noticias), esta marca se convierte en un botón:",
-   "fr": "Dans une actualité (Outils > Actualités), ce marqueur devient un bouton :",
-   "it": "In una notizia (Strumenti > Notizie), questo marcatore diventa un pulsante:",
-   "de": "In einer Neuigkeit (Werkzeuge > Neuigkeiten) wird diese Markierung zu einer Schaltfläche:",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "News action buttons": {
-   "en": "News action buttons",
-   "pt-BR": "Botões de ação nas notícias",
-   "es": "Botones de acción en las noticias",
-   "fr": "Boutons d'action des actualités",
-   "it": "Pulsanti di azione nelle notizie",
-   "de": "Aktionsschaltflächen in Neuigkeiten",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "Apply": {
    "en": "Apply",
    "pt-BR": "Aplicar",
@@ -12833,6 +12819,45 @@
     ]
    }
   },
+  "backup-download": {
+   "en": {
+    "title": "Download latest backup",
+    "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
+    "overview": [
+     "Under WSL the file goes to the Windows Downloads folder; on a Linux desktop to your own Downloads. When the panel runs over SSH from another computer it cannot write there, so it shows the `scp` command to paste on your computer instead, with a Copy button."
+    ],
+    "steps": [
+     "Open the Backup center (key **b**).",
+     "Press the **Download latest backup** card (the first card of the screen).",
+     "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
+    ],
+    "tips": [
+     "Use it weekly to keep an off-server copy even without a cloud account.",
+     "Move the downloaded file to an external drive or a different building: a copy on the same desk does not protect against theft or fire."
+    ],
+    "related": [
+     "backup-manual",
+     "backup-cloud",
+     "backup-status"
+    ]
+   },
+   "pt-BR": {
+    "title": "Baixar Backup Recente",
+    "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
+    "overview": [
+     "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
+    ],
+    "steps": [
+     "Abra a Central de backups e restauração (tecla **b**).",
+     "Pressione o cartão **Baixar Backup Recente** (o primeiro cartão da tela).",
+     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
+    ],
+    "tips": [
+     "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
+     "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
+    ]
+   }
+  },
   "backup-manual": {
    "en": {
     "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
@@ -12887,8 +12912,8 @@
     ],
     "steps": [
      "Open the Backup center (key **b**).",
-     "Press **Export MARC21 records now** (on the top row or among the cards) and confirm.",
-     "Wait for the export: the result shows the file, its size, the `.mrc` files inside it and the `scp` command to paste on your computer to save it in Downloads."
+     "Press the **Export MARC21 records now** card and confirm.",
+     "Wait for the export: the result shows the file, its size and the `.mrc` files inside it. Press **Download to computer** to copy the `.tar.gz` package straight into your Downloads folder (WSL or a Linux desktop); over SSH, paste the `scp` command shown on your computer instead."
     ],
     "tips": [
      "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
@@ -12909,8 +12934,8 @@
     ],
     "steps": [
      "Abra a Central de backups e restauração (tecla **b**).",
-     "Pressione **Exportar registros MARC21 agora** (na linha de cima ou entre os cartões) e confirme.",
-     "Aguarde a exportação: o resultado mostra o arquivo, o tamanho, os arquivos `.mrc` dentro dele e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
+     "Pressione o cartão **Exportar registros MARC21 agora** e confirme.",
+     "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e os arquivos `.mrc` dentro dele. Pressione **Baixar no computador** para copiar o pacote `.tar.gz` direto para a sua pasta Downloads (WSL ou desktop Linux); por SSH, cole no seu computador o comando `scp` mostrado."
     ],
     "tips": [
      "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
@@ -12918,11 +12943,75 @@
     ]
    }
   },
+  "restore": {
+   "en": {
+    "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
+    "overview": [
+     "Restore is opened from the **Backup center** (the **Restore database** button in its top row, or its card); since 1.5.54 it has no main-menu entry of its own.",
+     "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
+     "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
+     "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
+     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
+    ],
+    "steps": [
+     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
+     "Pick the backup file, or drop it onto the panel window.",
+     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
+     "Confirm the restore. The screen shows the file, its size and the free disk space.",
+     "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
+     "Read the result: the search engine in use, the number of tables and the path of the safety backup."
+    ],
+    "tips": [
+     "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
+     "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
+     "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
+     "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
+    ],
+    "warnings": [
+     "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
+     "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
+    ],
+    "related": [
+     "backup-safety",
+     "backup-test",
+     "backup-compression",
+     "magic-import"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
+    "overview": [
+     "A restauração é aberta pela **Central de backups e restauração** (o botão **Restaurar base de dados** na linha de cima, ou o cartão dela); desde a 1.5.54 ela não tem mais uma opção própria no menu principal.",
+     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
+     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
+     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
+     "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
+    ],
+    "steps": [
+     "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
+     "Escolha o arquivo de backup, ou solte-o na janela do painel.",
+     "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
+     "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
+     "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
+     "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
+    ],
+    "tips": [
+     "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
+     "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
+     "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
+     "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
+    ],
+    "warnings": [
+     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
+     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
+    ]
+   }
+  },
   "backup-cloud": {
    "en": {
     "summary": "Connects a cloud storage to the nightly backup with rclone, so every backup also goes off the server: Google Drive in two express ways, or OneDrive, MEGA and S3-compatible storage step by step.",
     "steps": [
-     "Open the Backup center and choose **Configure cloud backup (Google Drive)**.",
+     "Open the Backup center and choose **Configure cloud backup**.",
      "Choose how to connect (see the options).",
      "Sign in with the library's own account, not a personal one.",
      "Wait for the real upload test: the panel sends a small file to the cloud and checks it arrived.",
@@ -12959,7 +13048,7 @@
    "pt-BR": {
     "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
     "steps": [
-     "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem (Google Drive)**.",
+     "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem**.",
      "Escolha como conectar (veja as opções).",
      "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
      "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
@@ -13028,77 +13117,13 @@
     ]
    }
   },
-  "restore": {
-   "en": {
-    "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
-    "overview": [
-     "Restore is opened from the **Backup center** (the **Restore database** button in its top row, or its card); since 1.5.54 it has no main-menu entry of its own.",
-     "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
-     "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
-     "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
-     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
-    ],
-    "steps": [
-     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
-     "Pick the backup file, or drop it onto the panel window.",
-     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
-     "Confirm the restore. The screen shows the file, its size and the free disk space.",
-     "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
-     "Read the result: the search engine in use, the number of tables and the path of the safety backup."
-    ],
-    "tips": [
-     "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
-     "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
-     "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
-     "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
-    ],
-    "warnings": [
-     "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
-     "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
-    ],
-    "related": [
-     "backup-safety",
-     "backup-test",
-     "backup-compression",
-     "magic-import"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
-    "overview": [
-     "A restauração é aberta pela **Central de backups e restauração** (o botão **Restaurar base de dados** na linha de cima, ou o cartão dela); desde a 1.5.54 ela não tem mais uma opção própria no menu principal.",
-     "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
-     "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
-     "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
-     "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
-    ],
-    "steps": [
-     "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
-     "Escolha o arquivo de backup, ou solte-o na janela do painel.",
-     "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
-     "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
-     "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
-     "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
-    ],
-    "tips": [
-     "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
-     "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
-     "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
-     "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
-    ],
-    "warnings": [
-     "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
-     "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
-    ]
-   }
-  },
   "sec-backup": {
    "en": {
     "summary": "Everything about backups and restores on one screen: the state of the newest backup, the compression of new backups, one-click download, restore, the MARC21 export, manual and cloud backups and the integrity test.",
     "overview": [
      "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
      "Restoring the database lives only here since 1.5.54: the main menu no longer has a separate **Restore database** entry, so restore, the MARC21 export and the backup routines are all reached from this one screen (in the panel and in the classic menu).",
-     "The top row has **Download latest backup**, **Restore database** and **Export MARC21 records now**. Then three cards (**Last backup**, **Size**, **Result** of the last nightly run), the **New backups** box with the compression choice, and the backup routines as cards."
+     "Three cards come first (**Last backup**, **Size**, **Result** of the last nightly run), then the **Backup compression type** box with the compression choice, then the actions as cards, the only place for them since 1.5.56: **Download latest backup**, **Generate manual backup**, **Export MARC21 records now**, **Restore database**, **Configure cloud backup** and **Test integrity of latest backup**."
     ],
     "tips": [
      "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
@@ -13119,7 +13144,7 @@
     "overview": [
      "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
      "Desde a 1.5.54 a restauração do banco fica só aqui: o menu principal não tem mais a opção separada **Restaurar base de dados**, então a restauração, a exportação MARC21 e as rotinas de backup ficam todas nesta mesma tela (no painel e no menu clássico).",
-     "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
+     "Primeiro vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Tipo de compressão dos backups** com a escolha da compressão e, por fim, as ações em cartões, o único lugar delas desde a 1.5.56: **Baixar Backup Recente**, **Gerar backup manual**, **Exportar registros MARC21 agora**, **Restaurar base de dados**, **Configurar backup na nuvem** e **Testar integridade do último backup**."
     ],
     "tips": [
      "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
@@ -13189,100 +13214,12 @@
     ]
    }
   },
-  "db-maintenance": {
-   "en": {
-    "summary": "Repairs and optimises MariaDB's tables, cleans system logs older than seven days and old temporary files, then restarts Koha's services to free memory.",
-    "overview": [
-     "Over time MariaDB's tables fragment and the system journal grows. The routine repairs and optimises the tables, removes system journal entries older than seven days, clears old temporary files and restarts Koha's services to free memory. It shows a preview of what it will do and asks before starting."
-    ],
-    "steps": [
-     "Open **Deep database optimization & log cleanup** (Database tables or Diagnostics).",
-     "Read the list of what it will do and confirm.",
-     "Wait for the three steps: optimising the database, cleaning system logs, restarting Koha services.",
-     "Read the summary, then check the dashboard."
-    ],
-    "tips": [
-     "Run it once a month, or after a large import or deletion, at a quiet moment.",
-     "Make sure the nightly backup of that day finished before you start."
-    ],
-    "warnings": [
-     "Optimising large tables can take a while and Koha restarts at the end: users are disconnected for a moment."
-    ],
-    "related": [
-     "db-tables",
-     "repair-services",
-     "health"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
-    "overview": [
-     "Com o tempo, as tabelas do MariaDB se fragmentam e o diário do sistema cresce. A rotina repara e otimiza as tabelas, remove do diário do sistema as entradas com mais de sete dias, apaga arquivos temporários antigos e reinicia os serviços do Koha para liberar memória. Ela mostra uma prévia do que vai fazer e pergunta antes de começar."
-    ],
-    "steps": [
-     "Abra **Otimização profunda do banco e limpeza de logs** (em Tabelas do banco de dados ou em Diagnóstico).",
-     "Leia a lista do que será feito e confirme.",
-     "Aguarde as três etapas: otimização do banco, limpeza dos logs do sistema, reinício dos serviços do Koha.",
-     "Leia o resumo e depois confira o Painel de Controle."
-    ],
-    "tips": [
-     "Rode uma vez por mês, ou depois de uma grande importação ou exclusão, num momento tranquilo.",
-     "Confira se o backup noturno daquele dia terminou antes de começar."
-    ],
-    "warnings": [
-     "Otimizar tabelas grandes pode demorar e o Koha reinicia no final: os usuários são desconectados por um instante."
-    ]
-   }
-  },
-  "reports": {
-   "en": {
-    "summary": "Installs 22 ready-made, read-only SQL reports in Koha's Reports module, for circulation, collection, patrons and acquisitions, without touching your own reports.",
-    "overview": [
-     "The pack includes: most borrowed titles, overdue loans with patron contacts, items never borrowed, items with no loan ever, new acquisitions, acquisitions and donations by period, accounts expiring soon, new patrons per month, patrons by neighbourhood and city, active readers by category, patrons with fines or suspensions, loans per month and library, loans by material type, daily circulation, holds waiting for pickup, collection by Dewey class and by library and material type, recent children's books, withdrawn, damaged or lost items, lost items, items without barcode or call number, and authority records no record uses.",
-     "Each query is checked against this Koha version before it is saved. The reports are tagged, so updating or removing the pack never touches reports the library wrote itself. A verified `PRE-REPORTS` backup comes first."
-    ],
-    "steps": [
-     "Open **Essential SQL reports pack**.",
-     "Choose **Preview (dry run)** to see which reports are new or updated.",
-     "Choose **Install or update the pack** and confirm.",
-     "In Koha, open **Reports > Saved reports** and run the ones you need."
-    ],
-    "tips": [
-     "Use *Overdue loans with patron contacts* for the weekly overdue round and *Items without barcode or call number* to clean the catalogue.",
-     "Run the pack again after a Koha update: the queries are re-checked against the new schema.",
-     "For government census figures (INEP, IBGE, SNBP) use **Brazil: localization > Government census reports**."
-    ],
-    "related": [
-     "sec-library",
-     "brazil",
-     "data-quality"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Instala 22 relatórios SQL prontos e somente leitura no módulo Relatórios do Koha, para circulação, acervo, leitores e aquisição, sem tocar nos seus próprios relatórios.",
-    "overview": [
-     "O pacote traz: títulos mais emprestados, empréstimos em atraso com contato do leitor, itens nunca emprestados, itens sem nenhum empréstimo, novas aquisições, aquisições e doações por período, contas que vencem em breve, novos leitores por mês, leitores por bairro e cidade, leitores ativos por categoria, leitores com multas ou suspensões, empréstimos por mês e biblioteca, empréstimos por tipo de material, circulação diária, reservas aguardando retirada, acervo por classe da CDD e por biblioteca e tipo de material, livros infantis recentes, itens baixados, danificados ou perdidos, itens perdidos, itens sem código de barras ou número de chamada, e registros de autoridade que nenhum registro usa.",
-     "Cada consulta é verificada contra esta versão do Koha antes de ser salva. Os relatórios são marcados, então atualizar ou remover o pacote nunca mexe nos relatórios que a biblioteca escreveu. Um backup `PRE-REPORTS` verificado vem antes."
-    ],
-    "steps": [
-     "Abra **Pacote de relatórios SQL essenciais**.",
-     "Escolha **Prévia (simulação)** para ver quais relatórios são novos ou atualizados.",
-     "Escolha **Instalar ou atualizar o pacote** e confirme.",
-     "No Koha, abra **Relatórios > Relatórios salvos** e rode os que precisar."
-    ],
-    "tips": [
-     "Use *Empréstimos em atraso com contato do leitor* na rodada semanal de cobrança e *Itens sem código de barras ou número de chamada* para limpar o catálogo.",
-     "Rode o pacote de novo depois de uma atualização do Koha: as consultas são reverificadas contra o novo esquema.",
-     "Para os números dos censos do governo (INEP, IBGE, SNBP), use **Brasil: localização > Relatórios para os censos oficiais**."
-    ]
-   }
-  },
   "sec-database": {
    "en": {
-    "summary": "Koha's tables at a glance, largest first, with the database maintenance and the reports pack one click away.",
+    "summary": "Koha's tables at a glance, largest first, opened from the Diagnostics & maintenance center.",
     "overview": [
-     "The screen (key **t**) is read-only: it lists every table of Koha's database with its number of rows and its size, and the totals. It helps to understand what grows (action logs, sessions, statistics) and whether a clean-up is due.",
-     "The two cards below run the routines that change the database, each with a preview and a verified backup first."
+     "The screen is read-only: it lists every table of Koha's database with its number of rows and its size, and the totals. It helps to understand what grows (action logs, sessions, statistics) and whether a clean-up is due.",
+     "Since 1.5.56 it is no longer on the sidebar: open **Diagnostics & maintenance center** and choose **Database tables** (the **t** key still opens it). The database maintenance is a card of the same center, and the reports pack is in **Library tools**."
     ],
     "tips": [
      "Run the maintenance after big clean-ups (anonymising history, deleting patrons): the space comes back to MariaDB only after optimising.",
@@ -13290,15 +13227,16 @@
     ],
     "related": [
      "db-tables",
+     "sec-diagnostics",
      "db-maintenance",
      "reports"
     ]
    },
    "pt-BR": {
-    "summary": "As tabelas do Koha num relance, das maiores para as menores, com a manutenção do banco e o pacote de relatórios a um clique.",
+    "summary": "As tabelas do Koha num relance, das maiores para as menores, abertas pela Central de diagnóstico e manutenção.",
     "overview": [
-     "A tela (tecla **t**) é somente leitura: lista cada tabela do banco do Koha com o número de linhas e o tamanho, e os totais. Ajuda a entender o que cresce (logs de ações, sessões, estatísticas) e se uma limpeza está na hora.",
-     "Os dois cartões abaixo rodam as rotinas que alteram o banco, cada uma com prévia e backup verificado antes."
+     "A tela é somente leitura: lista cada tabela do banco do Koha com o número de linhas e o tamanho, e os totais. Ajuda a entender o que cresce (logs de ações, sessões, estatísticas) e se uma limpeza está na hora.",
+     "Desde a 1.5.56 ela não fica mais na barra lateral: abra a **Central de diagnóstico e manutenção** e escolha **Tabelas do banco de dados** (a tecla **t** continua abrindo a tela). A manutenção do banco é um cartão da mesma central, e o pacote de relatórios fica em **Ferramentas da biblioteca**."
     ],
     "tips": [
      "Rode a manutenção depois de grandes limpezas (anonimizar histórico, excluir leitores): o espaço só volta ao MariaDB depois da otimização.",
@@ -14317,6 +14255,51 @@
     ]
    }
   },
+  "db-maintenance": {
+   "en": {
+    "summary": "Repairs and optimises MariaDB's tables, cleans system logs older than seven days and old temporary files, then restarts Koha's services to free memory.",
+    "overview": [
+     "Over time MariaDB's tables fragment and the system journal grows. The routine repairs and optimises the tables, removes system journal entries older than seven days, clears old temporary files and restarts Koha's services to free memory. It shows a preview of what it will do and asks before starting."
+    ],
+    "steps": [
+     "Open **Deep database optimization & log cleanup** (Database tables or Diagnostics).",
+     "Read the list of what it will do and confirm.",
+     "Wait for the three steps: optimising the database, cleaning system logs, restarting Koha services.",
+     "Read the summary, then check the dashboard."
+    ],
+    "tips": [
+     "Run it once a month, or after a large import or deletion, at a quiet moment.",
+     "Make sure the nightly backup of that day finished before you start."
+    ],
+    "warnings": [
+     "Optimising large tables can take a while and Koha restarts at the end: users are disconnected for a moment."
+    ],
+    "related": [
+     "db-tables",
+     "repair-services",
+     "health"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
+    "overview": [
+     "Com o tempo, as tabelas do MariaDB se fragmentam e o diário do sistema cresce. A rotina repara e otimiza as tabelas, remove do diário do sistema as entradas com mais de sete dias, apaga arquivos temporários antigos e reinicia os serviços do Koha para liberar memória. Ela mostra uma prévia do que vai fazer e pergunta antes de começar."
+    ],
+    "steps": [
+     "Abra **Otimização profunda do banco e limpeza de logs** (em Tabelas do banco de dados ou em Diagnóstico).",
+     "Leia a lista do que será feito e confirme.",
+     "Aguarde as três etapas: otimização do banco, limpeza dos logs do sistema, reinício dos serviços do Koha.",
+     "Leia o resumo e depois confira o Painel de Controle."
+    ],
+    "tips": [
+     "Rode uma vez por mês, ou depois de uma grande importação ou exclusão, num momento tranquilo.",
+     "Confira se o backup noturno daquele dia terminou antes de começar."
+    ],
+    "warnings": [
+     "Otimizar tabelas grandes pode demorar e o Koha reinicia no final: os usuários são desconectados por um instante."
+    ]
+   }
+  },
   "repair-services": {
    "en": {
     "summary": "Restarts Memcached, Plack and Koha's services and reports their state.",
@@ -14351,9 +14334,9 @@
   },
   "sec-diagnostics": {
    "en": {
-    "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance and service repair.",
+    "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance, the database tables and service repair.",
     "overview": [
-     "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns."
+     "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
     ],
     "steps": [
      "Run **Full system health check**.",
@@ -14368,13 +14351,14 @@
      "health",
      "validation-report",
      "apache-log",
-     "repair-services"
+     "repair-services",
+     "sec-database"
     ]
    },
    "pt-BR": {
-    "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco e reparo dos serviços.",
+    "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco, as tabelas do banco e reparo dos serviços.",
     "overview": [
-     "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns."
+     "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
     ],
     "steps": [
      "Rode a **Verificação completa do sistema**.",
@@ -14676,6 +14660,49 @@
      "Só grupos com pontuação 0,85 ou mais são sugeridos. Datas diferentes, Filho e Neto, ou Mário e Maria nunca são agrupados.",
      "Uma variante marcada 'also like' combina com mais de uma pessoa (por exemplo 'Silva, J.'): confira antes de unir.",
      "Rode Sincronizar e ligar autoridades depois, para vincular os cabeçalhos que ainda não têm autoridade."
+    ]
+   }
+  },
+  "reports": {
+   "en": {
+    "summary": "Installs 22 ready-made, read-only SQL reports in Koha's Reports module, for circulation, collection, patrons and acquisitions, without touching your own reports.",
+    "overview": [
+     "The pack includes: most borrowed titles, overdue loans with patron contacts, items never borrowed, items with no loan ever, new acquisitions, acquisitions and donations by period, accounts expiring soon, new patrons per month, patrons by neighbourhood and city, active readers by category, patrons with fines or suspensions, loans per month and library, loans by material type, daily circulation, holds waiting for pickup, collection by Dewey class and by library and material type, recent children's books, withdrawn, damaged or lost items, lost items, items without barcode or call number, and authority records no record uses.",
+     "Each query is checked against this Koha version before it is saved. The reports are tagged, so updating or removing the pack never touches reports the library wrote itself. A verified `PRE-REPORTS` backup comes first."
+    ],
+    "steps": [
+     "Open **Essential SQL reports pack**.",
+     "Choose **Preview (dry run)** to see which reports are new or updated.",
+     "Choose **Install or update the pack** and confirm.",
+     "In Koha, open **Reports > Saved reports** and run the ones you need."
+    ],
+    "tips": [
+     "Use *Overdue loans with patron contacts* for the weekly overdue round and *Items without barcode or call number* to clean the catalogue.",
+     "Run the pack again after a Koha update: the queries are re-checked against the new schema.",
+     "For government census figures (INEP, IBGE, SNBP) use **Brazil: localization > Government census reports**."
+    ],
+    "related": [
+     "sec-library",
+     "brazil",
+     "data-quality"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Instala 22 relatórios SQL prontos e somente leitura no módulo Relatórios do Koha, para circulação, acervo, leitores e aquisição, sem tocar nos seus próprios relatórios.",
+    "overview": [
+     "O pacote traz: títulos mais emprestados, empréstimos em atraso com contato do leitor, itens nunca emprestados, itens sem nenhum empréstimo, novas aquisições, aquisições e doações por período, contas que vencem em breve, novos leitores por mês, leitores por bairro e cidade, leitores ativos por categoria, leitores com multas ou suspensões, empréstimos por mês e biblioteca, empréstimos por tipo de material, circulação diária, reservas aguardando retirada, acervo por classe da CDD e por biblioteca e tipo de material, livros infantis recentes, itens baixados, danificados ou perdidos, itens perdidos, itens sem código de barras ou número de chamada, e registros de autoridade que nenhum registro usa.",
+     "Cada consulta é verificada contra esta versão do Koha antes de ser salva. Os relatórios são marcados, então atualizar ou remover o pacote nunca mexe nos relatórios que a biblioteca escreveu. Um backup `PRE-REPORTS` verificado vem antes."
+    ],
+    "steps": [
+     "Abra **Pacote de relatórios SQL essenciais**.",
+     "Escolha **Prévia (simulação)** para ver quais relatórios são novos ou atualizados.",
+     "Escolha **Instalar ou atualizar o pacote** e confirme.",
+     "No Koha, abra **Relatórios > Relatórios salvos** e rode os que precisar."
+    ],
+    "tips": [
+     "Use *Empréstimos em atraso com contato do leitor* na rodada semanal de cobrança e *Itens sem código de barras ou número de chamada* para limpar o catálogo.",
+     "Rode o pacote de novo depois de uma atualização do Koha: as consultas são reverificadas contra o novo esquema.",
+     "Para os números dos censos do governo (INEP, IBGE, SNBP), use **Brasil: localização > Relatórios para os censos oficiais**."
     ]
    }
   },
@@ -15703,45 +15730,6 @@
     ]
    }
   },
-  "backup-download": {
-   "en": {
-    "title": "Download latest backup",
-    "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
-    "overview": [
-     "Under WSL the file goes to the Windows Downloads folder; on a Linux desktop to your own Downloads. When the panel runs over SSH from another computer it cannot write there, so it shows the `scp` command to paste on your computer instead, with a Copy button."
-    ],
-    "steps": [
-     "Open the Backup center (key **b**).",
-     "Press **Download latest backup**.",
-     "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
-    ],
-    "tips": [
-     "Use it weekly to keep an off-server copy even without a cloud account.",
-     "Move the downloaded file to an external drive or a different building: a copy on the same desk does not protect against theft or fire."
-    ],
-    "related": [
-     "backup-manual",
-     "backup-cloud",
-     "backup-status"
-    ]
-   },
-   "pt-BR": {
-    "title": "Baixar Backup Recente",
-    "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
-    "overview": [
-     "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
-    ],
-    "steps": [
-     "Abra a Central de backups e restauração (tecla **b**).",
-     "Pressione **Baixar Backup Recente**.",
-     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
-    ],
-    "tips": [
-     "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
-     "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
-    ]
-   }
-  },
   "backup-status": {
    "en": {
     "title": "Backup status cards",
@@ -15793,7 +15781,7 @@
   },
   "backup-compression": {
    "en": {
-    "title": "Compression of new backups",
+    "title": "Backup compression type",
     "summary": "Chooses how new backups are compressed: gzip (opens anywhere), Zstandard (fast and smaller, for large catalogues) or XZ (smallest, slow to make, for long-term storage).",
     "overview": [
      "The choice is saved as `BACKUP_COMPRESSION` in the panel's backup settings and is used by the nightly backup, by manual backups and by the safety copies made before a change (a restore, an update, a library tool). The nightly script reads it every night, so the next backup already uses it.",
@@ -15833,7 +15821,7 @@
     ]
    },
    "pt-BR": {
-    "title": "Compressão dos novos backups",
+    "title": "Tipo de compressão dos backups",
     "summary": "Escolhe como os novos backups são compactados: gzip (abre em qualquer lugar), Zstandard (rápido e menor, para acervos grandes) ou XZ (o menor, lento para gerar, para guarda de longo prazo).",
     "overview": [
      "A escolha é salva como `BACKUP_COMPRESSION` nas configurações de backup do painel e vale para o backup noturno, para os backups manuais e para as cópias de segurança feitas antes de uma alteração (uma restauração, uma atualização, uma ferramenta da biblioteca). O script noturno a lê toda noite, então o próximo backup já a usa.",
@@ -15917,7 +15905,7 @@
     "title": "Table list",
     "summary": "Every table of Koha's database with its rows and size, largest first, and the total size of the database.",
     "steps": [
-     "Open **Database tables** (key **t**): the list loads behind the Pac-Man loader.",
+     "Open **Diagnostics & maintenance center** and choose **Database tables** (or press **t**): the list loads behind the Pac-Man loader.",
      "Read the biggest tables at the top. `biblio_metadata` and `items` grow with the collection; `action_logs`, `sessions` and `statistics` grow with use.",
      "Press **Refresh** after a maintenance run to see the difference."
     ],
@@ -15934,7 +15922,7 @@
     "title": "Lista de tabelas",
     "summary": "Todas as tabelas do banco do Koha com linhas e tamanho, das maiores para as menores, e o tamanho total do banco.",
     "steps": [
-     "Abra **Tabelas do banco de dados** (tecla **t**): a lista carrega por trás da animação do Pac-Man.",
+     "Abra a **Central de diagnóstico e manutenção** e escolha **Tabelas do banco de dados** (ou pressione **t**): a lista carrega por trás da animação do Pac-Man.",
      "Leia as maiores tabelas no topo. `biblio_metadata` e `items` crescem com o acervo; `action_logs`, `sessions` e `statistics` crescem com o uso.",
      "Pressione **Atualizar** depois de uma manutenção para ver a diferença."
     ],
@@ -16116,6 +16104,9 @@
      "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU.",
      "Check the free disk before downloading: models take from about 1 GB to several GB each."
     ],
+    "warnings": [
+     "Local AI models and tools are heavy: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on the server's hardware. The AI screen says so at the top."
+    ],
     "related": [
      "ai-provider",
      "ai-models",
@@ -16151,6 +16142,9 @@
     "tips": [
      "Sem GPU, prefira os modelos leves: um modelo de visão de 7B pode levar minutos por resposta na CPU.",
      "Confira o disco livre antes de baixar: cada modelo ocupa de cerca de 1 GB a vários GB."
+    ],
+    "warnings": [
+     "Modelos e ferramentas de IA locais são pesados: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware do servidor. A tela de IA avisa isso no topo."
     ]
    }
   },
@@ -17019,7 +17013,6 @@
      "A button needs both its text and its address; the panel says which one is missing before anything is written. A single button saved by 1.5.53 comes back as the first row."
     ],
     "related": [
-     "opac-news",
      "sec-opac"
     ]
    },
@@ -17071,41 +17064,6 @@
     ],
     "tips": [
      "Esconda o contador do carrinho só se a biblioteca não usar o carrinho (sacola de livros) do Koha."
-    ]
-   }
-  },
-  "opac-news": {
-   "en": {
-    "title": "News action buttons",
-    "summary": "Turns a marker inside a news item (Tools > News) into a styled button, so news can carry calls to action.",
-    "overview": [
-     "Write `[kei-button url=\"https://...\" icon=\"fa-book\"]Text[/kei-button]` in the news text: with **Buttons** on, the OPAC shows it as a button in the theme's colours."
-    ],
-    "steps": [
-     "Switch **Buttons** on and press **Apply**.",
-     "In the staff interface, open **Tools > News** and write a news item with the marker.",
-     "Open the OPAC home page: the marker shows as a button."
-    ],
-    "tips": [
-     "Use Font Awesome icon names such as `fa-book`, `fa-calendar` or `fa-envelope` in the icon attribute."
-    ],
-    "related": [
-     "sec-opac"
-    ]
-   },
-   "pt-BR": {
-    "title": "Botões de ação nas notícias",
-    "summary": "Transforma uma marcação dentro de uma notícia (Ferramentas > Notícias) num botão estilizado, para que as notícias tragam chamadas para ação.",
-    "overview": [
-     "Escreva `[kei-button url=\"https://...\" icon=\"fa-book\"]Texto[/kei-button]` no texto da notícia: com **Botões** ligado, o OPAC mostra a marcação como um botão nas cores do tema."
-    ],
-    "steps": [
-     "Ligue **Botões** e pressione **Aplicar**.",
-     "Na intranet, abra **Ferramentas > Notícias** e escreva uma notícia com a marcação.",
-     "Abra a página inicial do OPAC: a marcação aparece como botão."
-    ],
-    "tips": [
-     "Use nomes de ícones do Font Awesome como `fa-book`, `fa-calendar` ou `fa-envelope` no atributo icon."
     ]
    }
   },
@@ -17511,165 +17469,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 108,
-   "manual_total": 108,
+   "manual": 107,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 372,
-   "strings_total": 372
+   "strings": 373,
+   "strings_total": 373
   },
   "pt-BR": {
-   "manual": 108,
-   "manual_total": 108,
+   "manual": 107,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 363,
-   "strings_total": 372
+   "strings": 364,
+   "strings_total": 373
   },
   "es": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 267,
-   "strings_total": 372
+   "strings": 264,
+   "strings_total": 373
   },
   "fr": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 262,
-   "strings_total": 372
+   "strings": 259,
+   "strings_total": 373
   },
   "it": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 262,
-   "strings_total": 372
+   "strings": 259,
+   "strings_total": 373
   },
   "de": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
-   "strings": 262,
-   "strings_total": 372
+   "strings": 259,
+   "strings_total": 373
   },
   "nl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "sv": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "pl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "cs": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "ru": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "uk": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "tr": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "tl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "id": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "ar": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "fa": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "hi": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "bn": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "vi": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "zh": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "ja": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   },
   "ko": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 107,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 372
+   "strings_total": 373
   }
  }
 }

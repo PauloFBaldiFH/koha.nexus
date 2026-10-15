@@ -1,6 +1,7 @@
 """BackupView: the last backup at a glance, the compression of new backups,
-then the backup routines. The top row also has the two actions asked for
-most: restore the database from a backup and export the MARC21 records now."""
+then the backup routines as cards, the only place of the backup actions
+(download the newest backup, manual backup, MARC21 export, restore, cloud,
+test)."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import time
 
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
-from textual.widgets import Button, Label, Select
+from textual.widgets import Label, Select
 
 from ..i18n import t
 from ..widgets.cards import StatusCard
@@ -40,14 +41,6 @@ class BackupView(SectionView):
 
     def compose(self) -> ComposeResult:
         yield from self.heading()
-        with Horizontal(classes="quick-actions"):
-            # The newest backup straight into this PC's Downloads folder
-            # (routines/backup.download_latest; over SSH: the scp command).
-            yield Button(t("📥 Download latest backup"), id="backup-download", variant="success")
-            yield Button(t("📥  Restore database"), id="backup-restore",
-                         tooltip=t("Replaces Koha's database with a backup, tested first"))
-            yield Button(t("📚  Export MARC21 records now"), id="backup-marc",
-                         tooltip=t("Exports the catalogue and the authorities in MARC21 now"))
         with Grid(classes="status-grid"):
             yield StatusCard(t("Last backup"), id="bk-age")
             yield StatusCard(t("Size"), id="bk-size")
@@ -61,14 +54,8 @@ class BackupView(SectionView):
         yield from self.cards()
 
     def on_mount(self) -> None:
-        self.query_one("#bk-codec-box").border_title = t("New backups")
+        self.query_one("#bk-codec-box").border_title = t("Backup compression type")
         self.refresh_data()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {"backup-download": "backup-download", "backup-restore": "restore", "backup-marc": "backup-marc"}
-        if event.button.id in actions:
-            event.stop()
-            self.app.run_native(actions[event.button.id], after=self.refresh_data)
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id != "bk-codec":

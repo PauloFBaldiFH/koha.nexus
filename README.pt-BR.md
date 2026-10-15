@@ -175,7 +175,7 @@ O comportamento em um Windows real (o instalador, notificações, ícone de stat
 | 16 | Reiniciar servidor | |
 | 17 | Sair | |
 
-No painel novo cada item é um cartão na tela inicial, e as ferramentas mais novas têm telas e teclas de atalho próprias: **d** Painel de controle, **i** Ferramenta de Importação Mágica, **b** Central de backup, **t** Tabelas do banco, **a** IA, **z** Servidores Z39.50 / SRU, **o** Aparência do OPAC, **m** Mensagens e interoperabilidade, **x** Central de Segurança & Acesso (**v** abre a tela da VPN WireGuard), **l** Ferramentas da biblioteca, **s** Agendamentos e tarefas cron, e **ctrl+p** procura qualquer ação pelo nome.
+No painel novo cada item é um cartão na tela inicial, e as ferramentas mais novas têm telas e teclas de atalho próprias: **d** Painel de controle, **i** Ferramenta de Importação Mágica, **b** Central de backup, **t** Tabelas do banco (dentro de Diagnóstico e manutenção), **a** IA, **z** Servidores Z39.50 / SRU, **o** Aparência do OPAC, **m** Mensagens e interoperabilidade, **x** Central de Segurança & Acesso (**v** abre a tela da VPN WireGuard), **l** Ferramentas da biblioteca, **s** Agendamentos e tarefas cron, e **ctrl+p** procura qualquer ação pelo nome.
 
 As janelas do painel clássico usam um tema escuro, largura fixa e se adaptam a terminais pequenos. Para as cores padrão do newt em um terminal monocromático, abra o painel com `NO_COLOR=1`.
 

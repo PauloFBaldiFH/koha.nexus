@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-11. Panel version on `main`: **1.5.54** (1.5.55: MARC21 export output PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.55** (1.5.56: panel clean-ups PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.56 (panel clean-ups from Paulo)**: Backup center has no button row any more: its cards are
+  the only actions (Download latest backup is now a card, `backup-download` in `menus.PANEL_ONLY`, so it
+  is not an installer action); the codec box is "Backup compression type"; the cloud card is
+  "Configure cloud backup" (installer menu key re-keyed in all 22 caches, Google Drive stays inside
+  the provider choice). The MARC21 result box has "Download to computer" on WSL/desktop
+  (`routines/backup.download_file` copies the `.tar.gz` to Downloads; over SSH only the scp command).
+  Database tables left the sidebar: a `kind="view"` card of Diagnostics (`sidebar=False`,
+  `parent="diagnostics"`, no cards of its own). OPAC: the "News action buttons" box is gone and
+  `news_buttons` is always saved on. AI screen: a warning that local models can slow the whole
+  server. Magic Import: a subtitle naming patron data. Manual (en + pt-BR) and preview.json updated.
+  Not tried on a live Koha.
 - **1.5.55 (MARC21 export output)**: Paulo saw raw records (leader, tags, $a) in the export's error
   box. `/root/backup_marc.sh` no longer passes `--filename` to export_records.pl: its stdout is
   redirected by the root shell into `biblios_/authorities_<date>.mrc` and its stderr into
