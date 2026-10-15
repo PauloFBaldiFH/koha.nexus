@@ -51,6 +51,7 @@ ROUTINES: dict[str, Routine] = {
     "update-panel": tools.update_panel,
     "monitor": tools.monitor,
     "mc": tools.mc,
+    "user-folder": tools.user_folder,
 }
 
 # The rest run their classic routine with `--task run ACTION`; the title is

@@ -13,6 +13,7 @@
     KohaEasy.ps1 Panel                         the Koha window and the tray: starts Koha, opens the control panel
     KohaEasy.ps1 Panel -Action <name>          the Koha window's Painel de Gestão: the same, straight on one routine (installer --run <name>)
     KohaEasy.ps1 Terminal                      the Koha window: a Debian shell as the Debian user (advanced), while Debian runs
+    KohaEasy.ps1 UserFolder                    the tray: the Debian user's home folder in Windows Explorer
     KohaEasy.ps1 RebuildIndex                  the tray: rebuilds the search index, with notifications
     KohaEasy.ps1 Open                          starts Koha if needed, opens the staff interface
     KohaEasy.ps1 Run                           action of the "Keep Koha running" task
@@ -36,7 +37,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install', 'Uninstall', 'UninstallAdmin')]
+    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install', 'Uninstall', 'UninstallAdmin')]
     [string]$Command = 'Status',
     [ValidateSet('user', 'logon')][string]$Trigger = 'user',
     [ValidateSet('logon', 'manual')][string]$Mode,
@@ -66,7 +67,7 @@ trap {
             Add-Content -LiteralPath (Join-Path $logDir ('koha-{0}.log' -f (Get-Date -Format 'yyyyMMdd'))) -Value ('{0} | {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $failure)
         } catch { }
     }
-    if (@('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'SafeShutdown') -contains $Command -and -not $Quiet) {
+    if (@('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'UserFolder', 'SafeShutdown') -contains $Command -and -not $Quiet) {
         try {
             Add-Type -AssemblyName System.Windows.Forms
             [void][System.Windows.Forms.MessageBox]::Show(('Koha: {0}{1}{1}{2}' -f $_.Exception.Message, [Environment]::NewLine, $logDir), 'Koha', 'OK', 'Error')
@@ -155,6 +156,10 @@ switch ($Command) {
         # Never starts Debian: WSL would end it abruptly after the shell.
         if (-not (Test-KohaDistroRunning)) { Show-Box (T 'Debian is stopped. Start Koha first.') 'OK' 'Warning' | Out-Null; break }
         Open-KohaDebianTerminal
+    }
+    'UserFolder' {
+        if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
+        if (-not (Open-KohaUserFolder)) { Show-Box (T 'The Debian user folder could not be found. Open the control panel and try again.') 'OK' 'Warning' | Out-Null }
     }
     'RebuildIndex' {
         if (-not $Quiet) { Show-KohaNotification -Title 'Koha' -Text (T 'Rebuilding the search index... On large catalogs this takes several minutes.') | Out-Null }

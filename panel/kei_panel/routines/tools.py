@@ -9,6 +9,8 @@
   languages, language_activate
                    the same, then the panel starts again in the new language
   update_panel     the same; a new version closes the panel (open it again)
+  user_folder      the user's home folder in Windows Explorer (WSL) or the
+                   desktop's file manager; elsewhere its path, to copy
   monitor, mc
                    full-screen programs of their own: the choice and the
                    installation are panel screens, then the program gets the
@@ -20,8 +22,9 @@ from __future__ import annotations
 
 from ..env import normalize_panel_language
 from ..i18n import t
-from ..screens.dialogs import ChoiceScreen
-from .common import failed, run_interactive, run_task, show_failure, tx
+from ..opener import open_user_folder
+from ..screens.dialogs import ChoiceScreen, MessageScreen
+from .common import facts, failed, run_interactive, run_task, show_failure, tx
 
 RESTART_CODE = 3   # config.sh starts the panel again (screens/language.py)
 
@@ -55,6 +58,20 @@ async def update_panel(app) -> None:
     out = result.value if result else None
     if out is not None and hasattr(out, "get") and out.get("updated") == "yes":
         app.exit()
+
+
+async def user_folder(app) -> None:
+    """The home folder of the person behind the panel (the installer's
+    REAL_HOME: the Debian user under WSL, the sudo user on a Linux desktop)."""
+    info = await facts(app)
+    home = info.get("real_home") or "/root"
+    if not app.env.demo and open_user_folder(home):
+        app.notify(tx("Opened ${folder}", folder=home), timeout=5)
+        return
+    await app.push_screen_wait(MessageScreen(
+        t("📂  Open user folder"), "", kind="info", command=home,
+        command_help=t("This computer has no file manager for the panel to open. The folder is:"),
+        is_command=False))
 
 
 async def _terminal_tool(app, title: str, tool: str, argv: list[str] | None = None) -> None:

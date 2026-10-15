@@ -1895,6 +1895,17 @@
    ],
    "_en": "1402550ca2"
   },
+  "user-folder": {
+   "summary": "Abre a sua pasta pessoal no Explorador do Windows (Windows) ou no gerenciador de arquivos da área de trabalho (Linux).",
+   "overview": [
+    "No Windows a pasta abre como \\\\wsl.localhost\\koha\\home\\<seu usuário>, então os arquivos que você coloca nela (uma importação, um backup para restaurar) ficam a um arrastar de distância, sem caminho Linux para digitar. O ícone ao lado do relógio tem a mesma ação: Abrir a pasta do usuário."
+   ],
+   "steps": [
+    "Abra **Ferramentas gerais** e depois **Abrir a pasta do usuário**.",
+    "O Explorador (ou o gerenciador de arquivos) abre na sua pasta. Por SSH ou num servidor sem tela, o painel mostra o caminho da pasta para copiar."
+   ],
+   "_en": "9aa1098521"
+  },
   "crons": {
    "summary": "Cada tarefa que o servidor roda sozinho, com um botão, a frequência e a hora, em vez de um editor de texto; o agendamento antigo fica guardado como koha_tasks.bak.",
    "overview": [

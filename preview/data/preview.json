@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.55",
+ "panel_version": "1.5.57",
  "languages": [
   {
    "code": "en",
@@ -598,6 +598,7 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "user-folder",
     "monitor",
     "mc"
    ],
@@ -1304,6 +1305,16 @@
    "label": "📚  Library tools",
    "description": "Changes are always previewed first and protected by a verified backup.",
    "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "user-folder": {
+   "id": "user-folder",
+   "type": "entry",
+   "section": "tools",
+   "label": "📂  Open user folder",
+   "description": "Opens your home folder in Windows Explorer or the file manager",
+   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -6204,6 +6215,56 @@
    "zh": "🧰 常用工具",
    "ja": "🧰 一般ツール",
    "ko": "🧰 일반 도구"
+  },
+  "📂  Open user folder": {
+   "en": "📂  Open user folder",
+   "pt-BR": "📂  Abrir a pasta do usuário",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Opens your home folder in Windows Explorer or the file manager": {
+   "en": "Opens your home folder in Windows Explorer or the file manager",
+   "pt-BR": "Abre a sua pasta pessoal no Explorador do Windows ou no gerenciador de arquivos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "📊  Resource monitoring (Htop / Nethogs)": {
    "en": "📊  Resource monitoring (Htop / Nethogs)",
@@ -15038,6 +15099,32 @@
     ]
    }
   },
+  "user-folder": {
+   "en": {
+    "summary": "Opens your home folder in Windows Explorer (Windows) or in the desktop's file manager (Linux).",
+    "overview": [
+     "On Windows the folder opens as \\\\wsl.localhost\\koha\\home\\<your user>, so files you put there (an import, a backup to restore) are one drag away, with no Linux path to type. The tray icon next to the clock has the same action: Open User Folder."
+    ],
+    "steps": [
+     "Open **General tools**, then **Open user folder**.",
+     "Explorer (or the file manager) opens on your folder. Over SSH or on a server without a screen, the panel shows the folder's path to copy instead."
+    ],
+    "related": [
+     "mc",
+     "magic-import"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Abre a sua pasta pessoal no Explorador do Windows (Windows) ou no gerenciador de arquivos da área de trabalho (Linux).",
+    "overview": [
+     "No Windows a pasta abre como \\\\wsl.localhost\\koha\\home\\<seu usuário>, então os arquivos que você coloca nela (uma importação, um backup para restaurar) ficam a um arrastar de distância, sem caminho Linux para digitar. O ícone ao lado do relógio tem a mesma ação: Abrir a pasta do usuário."
+    ],
+    "steps": [
+     "Abra **Ferramentas gerais** e depois **Abrir a pasta do usuário**.",
+     "O Explorador (ou o gerenciador de arquivos) abre na sua pasta. Por SSH ou num servidor sem tela, o painel mostra o caminho da pasta para copiar."
+    ]
+   }
+  },
   "monitor": {
    "en": {
     "summary": "Watches CPU, memory and processes (htop) or network bandwidth per process (nethogs) live; installs them when missing.",
@@ -17469,165 +17556,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 107,
-   "manual_total": 107,
+   "manual": 108,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 373,
-   "strings_total": 373
+   "strings": 375,
+   "strings_total": 375
   },
   "pt-BR": {
-   "manual": 107,
-   "manual_total": 107,
+   "manual": 108,
+   "manual_total": 108,
    "manual_outdated": [],
-   "strings": 364,
-   "strings_total": 373
+   "strings": 366,
+   "strings_total": 375
   },
   "es": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 264,
-   "strings_total": 373
+   "strings_total": 375
   },
   "fr": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 373
+   "strings_total": 375
   },
   "it": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 373
+   "strings_total": 375
   },
   "de": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 373
+   "strings_total": 375
   },
   "nl": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "sv": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "pl": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "cs": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "ru": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "uk": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "tr": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "tl": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "id": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "ar": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "fa": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "hi": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "bn": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "vi": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "zh": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "ja": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   },
   "ko": {
    "manual": 0,
-   "manual_total": 107,
+   "manual_total": 108,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 373
+   "strings_total": 375
   }
  }
 }

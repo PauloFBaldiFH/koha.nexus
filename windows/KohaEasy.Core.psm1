@@ -112,6 +112,7 @@ $script:StateDefaults = [ordered]@{
     lastDiskWarn         = 0
     lastRecoveryEpoch    = 0
     lastRecoveryNotice   = 0
+    lastEventId          = 0
     notifyBackupOk       = $true
     handshakePending     = $false
     hiddenLaunch         = 'conhost'
@@ -515,6 +516,24 @@ function Format-KohaSize {
 #   $Previous  last state word shown ('' on the first check)
 #   $Status    Get-KohaStatus result
 #   $Disk      Get-KohaDiskHealth result or $null
+# Pure: the notification of one event of --status-json (kei_event in the
+# installer), $null for a kind this version does not know.
+function Get-KohaEventNotification {
+    param([string]$Kind, [bool]$Ok)
+    $texts = @{
+        backup_manual  = @((T 'Backup completed'), (T 'The manual backup was saved and checked.'), (T 'Backup FAILED'), (T 'The manual backup failed. Open the control panel to see why.'))
+        backup_marc    = @((T 'MARC21 export completed'), (T 'The MARC21 records were exported.'), (T 'MARC21 export FAILED'), (T 'The MARC21 export failed. Open the control panel to see why.'))
+        backup_test    = @((T 'Backup test passed'), (T 'The backup was imported into a test database: it can be restored.'), (T 'Backup test FAILED'), (T 'The backup could not be imported into a test database. Open the control panel to see why.'))
+        restore        = @((T 'Restore completed'), (T 'The catalog was restored and indexed.'), (T 'Restore FAILED'), (T 'The catalog was not restored. Open the control panel to see why.'))
+        reindex        = @('Koha', (T 'The search index was rebuilt.'), 'Koha', (T 'Rebuilding the search index failed. Export the diagnostics and send them to whoever supports your library.'))
+        db_maintenance = @((T 'Database maintenance completed'), (T 'The database tables were optimized.'), (T 'Database maintenance FAILED'), (T 'The database maintenance failed. Open the control panel to see why.'))
+    }
+    if (-not $texts.ContainsKey($Kind)) { return $null }
+    $t = $texts[$Kind]
+    if ($Ok) { return @{ Level = 'info'; Title = $t[0]; Text = $t[1] } }
+    return @{ Level = 'error'; Title = $t[2]; Text = $t[3] }
+}
+
 function Get-KohaNotifications {
     param([string]$Previous, $Status, $Disk, [System.Collections.IDictionary]$State, [int64]$Now = (Get-UnixTime))
     $out = New-Object System.Collections.ArrayList
@@ -586,6 +605,23 @@ function Get-KohaNotifications {
                 [void]$out.Add(@{ Level = 'error'; Title = (T 'Koha needs attention'); Text = ((T 'The computer was turned off while Koha was running, and the check afterwards found problems: {0}. Export the diagnostics from the tray menu and send them to support.') -f (@($problems) -join '; ')) })
             }
         }
+    }
+
+    # The end of long jobs run in the control panel (or started by it in the
+    # background): one notification per new event of --status-json. The
+    # first time, only events of the last 10 minutes are told.
+    if ($null -ne $Status.Linux -and $Status.Linux.PSObject.Properties['events'] -and $null -ne $Status.Linux.events) {
+        $last = [int64]$State.lastEventId
+        $newest = $last
+        foreach ($e in @($Status.Linux.events)) {
+            $id = [int64]$e.id
+            if ($id -le $last) { continue }
+            if ($id -gt $newest) { $newest = $id }
+            if ($last -le 0 -and ($Now * 1000 - $id) -gt 600000) { continue }
+            $n = Get-KohaEventNotification -Kind ([string]$e.kind) -Ok ([string]$e.level -eq 'ok')
+            if ($null -ne $n) { [void]$out.Add($n) }
+        }
+        if ($newest -gt $last) { $changes.lastEventId = $newest }
     }
 
     # Disk space: on every level change, and a critical level again every 6 hours.
@@ -803,7 +839,7 @@ function Get-KohaWscriptPath {
 # tray and what the shortcuts and the tray menu run. The scheduled tasks'
 # Run and UpdatePortProxy, and the commands the installer waits on, are
 # left alone.
-$script:HiddenCommands = @('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'ExportReport', 'ExportDiagnostics', 'CheckDisk')
+$script:HiddenCommands = @('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'ExportReport', 'ExportDiagnostics', 'CheckDisk')
 
 # Pure: whether KohaEasy.ps1 should start itself again the hidden way and
 # end, which closes the console it was given. That console comes from a
@@ -1842,22 +1878,98 @@ function Get-KohaLanReport {
 # koha-window, inside Debian: what every Windows window of Koha runs (the
 # control panel from the Windows tools and from the installer, and the
 # "Debian terminal (advanced)" button), so the window ends cleanly when the
-# panel or the shell ends. Anything they left holding the terminal is
-# stopped: wsl.exe waits for every process that still has the terminal
-# open, so one background process kept the window open and black after
-# Exit. The exit code is 0, so Windows Terminal closes the window; when
+# panel or the shell ends, or when the window itself is closed (the closed
+# terminal hangs up: SIGHUP, or TERM from WSL). Anything they left holding
+# the terminal is stopped: wsl.exe waits for every process that still has
+# the terminal open, so one background process kept the window open and
+# black after Exit. When the window is closed under the panel, every other
+# process of the window's session is stopped too (the task the panel was
+# running, a helper that ignored the hang-up), so nothing is left running
+# behind a closed window; the jobs the panel starts on purpose in the
+# background (a reindex, the first cloud backup, ollama) run in a session of
+# their own (setsid) and keep going. The exit code is 0, so Windows Terminal closes the window; when
 # KEI_WINDOW_PAUSE (base64 text) is set and the panel failed, that text is
 # shown until Enter is pressed. With --shell, the user's login shell runs
-# instead of the panel.
+# instead of the panel. Confirm-KohaWindowScript writes it again when the
+# version line below changes.
+$script:WindowScriptVersion = '# koha-window 2'
 $script:WindowScript = @'
 #!/bin/sh
+# koha-window 2
 # Written by koha.nexus for Windows (KohaEasy.Core.psm1).
 # koha-window [--shell | command...]: see Install-KohaWindowScript.
 shell=0
 if [ "${1:-}" = "--shell" ]; then shell=1; shift; fi
+# This script and the WSL processes above it keep running until the end.
+keep=" $$ "
+p=$$
+while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+  p=$(awk '/^PPid:/ {print $2}' "/proc/$p/status" 2>/dev/null)
+  [ -n "$p" ] && keep="$keep$p "
+done
+tty=$(readlink "/proc/$$/fd/0" 2>/dev/null)
+# The session this window runs in (field 6 of /proc/PID/stat, counted after
+# the command name in parentheses).
+session_of() {
+  l=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  l=${l##*") "}
+  set -- $l
+  printf '%s' "$4"
+}
+sid=$(session_of $$)
+# Only a session that belongs to this window: its leader has the window's
+# terminal (never a session other WSL commands share).
+case "$tty" in /dev/pts/*) ;; *) sid="" ;; esac
+[ -n "$sid" ] && [ "$(readlink "/proc/$sid/fd/0" 2>/dev/null)" != "$tty" ] && sid=""
+cleaned=0
+# cleanup [closed]: the processes left holding the terminal; with "closed"
+# (the window was closed under the panel) also the rest of its session.
+cleanup() {
+  [ "$cleaned" = 1 ] && return 0
+  cleaned=1
+  left=""
+  case "$tty" in
+    /dev/pts/*|/dev/tty*)
+      for p in $(find /proc/[0-9]*/fd -maxdepth 1 -lname "$tty" 2>/dev/null </dev/null | sed -n 's|^/proc/\([0-9]*\)/fd/.*|\1|p' | sort -u); do
+        case "$keep" in *" $p "*) continue ;; esac
+        # The find, sed and sort above have ended already.
+        [ -d "/proc/$p" ] || continue
+        left="$left $p"
+      done
+      ;;
+  esac
+  if [ "${1:-}" = closed ] && [ "$shell" = 0 ] && [ -n "$sid" ]; then
+    for d in /proc/[0-9]*; do
+      p=${d#/proc/}
+      case "$keep $left " in *" $p "*) continue ;; esac
+      [ "$(session_of "$p")" = "$sid" ] && left="$left $p"
+    done
+  fi
+  if [ -n "$left" ]; then
+    kill -HUP $left 2>/dev/null
+    kill -TERM $left 2>/dev/null
+    sleep 1
+    for p in $left; do [ -d "/proc/$p" ] && kill -KILL "$p" 2>/dev/null; done
+  fi
+}
 # Ctrl+C reaches the panel (or the shell), not this script, which still
-# has to clean up after it.
+# has to clean up after it. A hang-up waits until the program in front
+# ends, so a closed window is also noticed from the WSL process above this
+# one: when it is gone, the watcher stops the window's processes.
 trap ':' INT
+trap 'cleanup closed; exit 0' HUP TERM
+parent=$(awk '/^PPid:/ {print $2}' "/proc/$$/status" 2>/dev/null)
+watcher=""
+if [ -n "$parent" ] && [ "$parent" -gt 1 ] && command -v tail >/dev/null 2>&1; then
+  (
+    trap '' HUP INT
+    read -r self _ < /proc/self/stat
+    keep="$keep$self "
+    tail --pid="$parent" -f /dev/null 2>/dev/null
+    cleanup closed
+  ) </dev/null >/dev/null 2>&1 &
+  watcher=$!
+fi
 if [ "$shell" = 1 ]; then
   login=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
   [ -x "$login" ] || login=/bin/bash
@@ -1868,30 +1980,9 @@ else
   "$@"
   rc=$?
 fi
-tty=$(readlink "/proc/$$/fd/0" 2>/dev/null)
-case "$tty" in
-  /dev/pts/*|/dev/tty*)
-    # This script and the WSL processes above it keep the terminal.
-    keep=" $$ "
-    p=$$
-    while [ -n "$p" ] && [ "$p" -gt 1 ]; do
-      p=$(awk '/^PPid:/ {print $2}' "/proc/$p/status" 2>/dev/null)
-      [ -n "$p" ] && keep="$keep$p "
-    done
-    left=""
-    for p in $(find /proc/[0-9]*/fd -maxdepth 1 -lname "$tty" 2>/dev/null </dev/null | sed -n 's|^/proc/\([0-9]*\)/fd/.*|\1|p' | sort -u); do
-      case "$keep" in *" $p "*) continue ;; esac
-      # The find, sed and sort above have ended already.
-      [ -d "/proc/$p" ] || continue
-      left="$left $p"
-    done
-    if [ -n "$left" ]; then
-      kill -HUP $left 2>/dev/null
-      sleep 1
-      for p in $left; do [ -d "/proc/$p" ] && kill -KILL "$p" 2>/dev/null; done
-    fi
-    ;;
-esac
+# Ended by itself: the watcher is not needed any more.
+[ -n "$watcher" ] && kill "$watcher" 2>/dev/null
+cleanup
 # 130: left with Ctrl+C, not a failure.
 if [ "$rc" -ne 0 ] && [ "$rc" -ne 130 ] && [ -n "${KEI_WINDOW_PAUSE:-}" ] && [ -t 0 ]; then
   printf '\n[%s] ' "$rc"
@@ -1921,7 +2012,8 @@ function Install-KohaWindowScript {
 }
 
 function Confirm-KohaWindowScript {
-    if ((Invoke-KohaLinux -Command @('test', '-x', $script:Cfg.WindowPath)).ExitCode -eq 0) { return $true }
+    # Written again when it is missing or older than this version.
+    if ((Invoke-KohaLinux -Command @('grep', '-qxF', $script:WindowScriptVersion, $script:Cfg.WindowPath)).ExitCode -eq 0) { return $true }
     return (Install-KohaWindowScript)
 }
 
@@ -1933,30 +2025,103 @@ function Open-KohaPanel {
     if (-not $NoStart) { Start-Koha -Trigger user | Out-Null }
     Confirm-KohaWindowScript | Out-Null
     $wsl = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'wsl.exe')
-    $launch = Get-KohaPanelLaunch -Wsl $wsl -Terminal (Get-KohaTerminalPath) -Pause (T 'The control panel ended with an error. Press Enter to close this window.') -Action $Action
+    $terminal = Get-KohaTerminalPath
+    if ($terminal) { Install-KohaTerminalProfile -Wsl $wsl | Out-Null }
+    $cmd = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'cmd.exe')
+    $launch = Get-KohaPanelLaunch -Wsl $wsl -Terminal $terminal -Cmd $cmd -Pause (T 'The control panel ended with an error. Press Enter to close this window.') -Action $Action
     Start-Process -FilePath $launch.File -ArgumentList $launch.Arguments -WindowStyle $launch.WindowStyle | Out-Null
     if ($Action) { Write-KohaLog ('control panel opened on ' + $Action) } else { Write-KohaLog 'control panel opened' }
 }
 
+$script:PanelTitle = 'Koha Nexus'
+
 # Pure: how the control panel window opens. In Windows Terminal the panel
-# shows emoji; in the classic console, plain symbols. The choice travels as
-# "env KEI_PLAIN_GLYPHS=..." on the command line, because a Windows Terminal
-# that is already open does not see this process's environment; the text
-# shown after a failure travels in base64 (no spaces or ";" for wt.exe).
+# shows emoji and uses the "Koha Nexus" profile (Install-KohaTerminalProfile:
+# title, padding, font, icon); without Windows Terminal, the classic console
+# through cmd.exe, switched to UTF-8 (chcp 65001), titled "Koha Nexus", with
+# plain symbols. The choice travels as "env KEI_PLAIN_GLYPHS=..." on the
+# command line, because a Windows Terminal that is already open does not see
+# this process's environment; the text shown after a failure travels in
+# base64 (no spaces or ";" for wt.exe).
 function Get-KohaPanelLaunch {
-    param([string]$Wsl, [string]$Terminal, [string]$Pause = '', [string]$Action = '')
+    param([string]$Wsl, [string]$Terminal, [string]$Cmd = 'cmd.exe', [string]$Pause = '', [string]$Action = '')
     $plain = '1'
     if ($Terminal) { $plain = '0' }
     $vars = 'KEI_PLAIN_GLYPHS=' + $plain
     if ($Pause) { $vars += ' KEI_WINDOW_PAUSE=' + [Convert]::ToBase64String((New-Object System.Text.UTF8Encoding($false)).GetBytes($Pause)) }
-    $cmd = '-d {0} -u root --cd /root -- env {1} {2} {3}' -f $script:Cfg.Distro, $vars, $script:Cfg.WindowPath, $script:Cfg.PanelPath
+    $cmdLine = '-d {0} -u root --cd /root -- env {1} {2} {3}' -f $script:Cfg.Distro, $vars, $script:Cfg.WindowPath, $script:Cfg.PanelPath
     # One routine only (the Koha window's Painel de Gestão): the panel runs it
     # and ends, with no main menu. Only plain action names get through.
-    if ($Action -cmatch '^[a-z][a-z0-9-]*$') { $cmd += ' --run ' + $Action }
+    if ($Action -cmatch '^[a-z][a-z0-9-]*$') { $cmdLine += ' --run ' + $Action }
     # Maximized: Windows Terminal with -M, the classic console with the
     # window style (Open-KohaPanel passes WindowStyle to Start-Process).
-    if ($Terminal) { return [pscustomobject]@{ File = $Terminal; Arguments = ('-w new -M --title Koha "{0}" {1}' -f $Wsl, $cmd); WindowStyle = 'Maximized' } }
-    return [pscustomobject]@{ File = $Wsl; Arguments = $cmd; WindowStyle = 'Maximized' }
+    if ($Terminal) {
+        return [pscustomobject]@{ File = $Terminal; Arguments = ('-w new -M -p "{0}" --title "{0}" "{1}" {2}' -f $script:PanelTitle, $Wsl, $cmdLine); WindowStyle = 'Maximized' }
+    }
+    return [pscustomobject]@{ File = $Cmd; Arguments = ('/c chcp 65001 >nul & title {0}& "{1}" {2}' -f $script:PanelTitle, $Wsl, $cmdLine); WindowStyle = 'Maximized' }
+}
+
+# Pure: the Windows Terminal fragment of the "Koha Nexus" profile (JSON):
+# the panel's command line, its title kept (the panel cannot rename the
+# tab), padding around the text, Cascadia Mono (shipped with Windows
+# Terminal; emoji come from Segoe UI Emoji by itself), Koha's icon, and the
+# tab closed when the panel ends.
+function Get-KohaTerminalProfileJson {
+    param([string]$Wsl, [string]$Icon)
+    $cmd = '"{0}" -d {1} -u root --cd /root -- env KEI_PLAIN_GLYPHS=0 {2} {3}' -f $Wsl, $script:Cfg.Distro, $script:Cfg.WindowPath, $script:Cfg.PanelPath
+    $p = [ordered]@{
+        name                     = $script:PanelTitle
+        commandline              = $cmd
+        tabTitle                 = $script:PanelTitle
+        suppressApplicationTitle = $true
+        icon                     = $Icon
+        padding                  = '12, 8'
+        font                     = [ordered]@{ face = 'Cascadia Mono'; size = 11 }
+        closeOnExit              = 'always'
+    }
+    return (ConvertTo-Json -InputObject ([ordered]@{ profiles = @($p) }) -Depth 4)
+}
+
+# Writes the profile where Windows Terminal reads extensions
+# (%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\KohaEasy, next to
+# Set-KohaDistroIcon's koha.json; the uninstaller removes the folder), only
+# when it changed. Without it, wt.exe opens the panel in the default profile.
+function Install-KohaTerminalProfile {
+    param([string]$Wsl = ([System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'wsl.exe')))
+    try {
+        if (-not $env:LOCALAPPDATA) { return $false }
+        $dir = [System.IO.Path]::Combine($env:LOCALAPPDATA, 'Microsoft', 'Windows Terminal', 'Fragments', 'KohaEasy')
+        $file = Join-Path $dir 'koha-nexus.json'
+        $json = Get-KohaTerminalProfileJson -Wsl $Wsl -Icon (Get-KohaIconPath)
+        if ((Test-Path -LiteralPath $file) -and ([System.IO.File]::ReadAllText($file) -eq $json)) { return $true }
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        [System.IO.File]::WriteAllText($file, $json, (New-Object System.Text.UTF8Encoding($false)))
+        Write-KohaLog ('Windows Terminal profile written: ' + $file)
+        return $true
+    } catch {
+        Write-KohaLog ('Windows Terminal profile not written: ' + $_.Exception.Message)
+        return $false
+    }
+}
+
+# The Debian user's home folder in Windows Explorer (\\wsl.localhost\koha\
+# home\<user>): Linux works out the path itself, as the distro's default
+# user (wslpath -w "$HOME", started in ~), so Explorer opens it with that
+# user's rights. Debian starts if it was stopped (Explorer would start it
+# too). Returns the path opened, or '' when Debian could not tell it.
+function Get-KohaUserFolder {
+    $r = Invoke-KohaWsl -Arguments @('-d', $script:Cfg.Distro, '--cd', '~', '--', 'wslpath', '-w', '.')
+    $path = ([string]$r.Output).Trim()
+    if ($r.ExitCode -ne 0 -or $path -notmatch '^\\\\') { Write-KohaLog ('user folder: wslpath said: ' + $path); return '' }
+    return $path
+}
+
+function Open-KohaUserFolder {
+    $path = Get-KohaUserFolder
+    if (-not $path) { return $false }
+    Start-Process explorer.exe -ArgumentList ('"{0}"' -f $path) | Out-Null
+    Write-KohaLog ('user folder opened: ' + $path)
+    return $true
 }
 
 # The Koha window's "Debian terminal (advanced)": a shell in Debian as the

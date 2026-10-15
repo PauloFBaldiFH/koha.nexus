@@ -2234,6 +2234,20 @@
     "Move with the arrows, Enter to open, F3 to view, F5 to copy, F10 to leave."
    ]
   },
+  "user-folder": {
+   "summary": "Opens your home folder in Windows Explorer (Windows) or in the desktop's file manager (Linux).",
+   "overview": [
+    "On Windows the folder opens as \\\\wsl.localhost\\koha\\home\\<your user>, so files you put there (an import, a backup to restore) are one drag away, with no Linux path to type. The tray icon next to the clock has the same action: Open User Folder."
+   ],
+   "steps": [
+    "Open **General tools**, then **Open user folder**.",
+    "Explorer (or the file manager) opens on your folder. Over SSH or on a server without a screen, the panel shows the folder's path to copy instead."
+   ],
+   "related": [
+    "mc",
+    "magic-import"
+   ]
+  },
   "crons": {
    "summary": "Every job the server runs by itself, with a switch, how often and at what time, instead of a text editor; the old schedule is kept as koha_tasks.bak.",
    "overview": [
