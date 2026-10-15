@@ -1,0 +1,76 @@
+# windows/client: the Python tray and status window for Windows (Phase 1).
+# - tests: the pure unit tests (nexus_core and the client) on Linux, and the
+#   check that runtime.lock.json still matches PyPI and python.org;
+# - runtime: on a real Windows runner, KohaEasy.Python.psm1 installs the
+#   embeddable Python and the locked wheels into a scratch bin folder, then
+#   imports the tray and the window with that Python.
+# Nothing here touches the Linux installer or the panel.
+name: windows-client
+
+on:
+  push:
+    paths:
+      - "windows/client/**"
+      - "windows/KohaEasy.Python.psm1"
+      - "windows/KohaEasy.Install.psm1"
+      - "windows/install.ps1"
+      - "nexus_core/**"
+      - ".github/workflows/windows-client.yml"
+  pull_request:
+    paths:
+      - "windows/client/**"
+      - "windows/KohaEasy.Python.psm1"
+      - "windows/KohaEasy.Install.psm1"
+      - "windows/install.ps1"
+      - "nexus_core/**"
+      - ".github/workflows/windows-client.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest nexus_core/tests windows/client/tests -v
+      - name: runtime.lock.json matches upstream
+        run: python windows/client/tools/lock_runtime.py --check
+
+  client-tests-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest nexus_core/tests windows/client/tests -v
+
+  runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the embeddable Python from runtime.lock.json
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bin = Join-Path $env:RUNNER_TEMP 'Koha\bin'
+          New-Item -ItemType Directory -Path $bin -Force | Out-Null
+          Copy-Item -LiteralPath 'windows\client' -Destination $bin -Recurse
+          Copy-Item -LiteralPath 'nexus_core' -Destination $bin -Recurse
+          Import-Module (Resolve-Path 'windows\KohaEasy.Python.psm1')
+          $cache = Join-Path $env:RUNNER_TEMP 'Koha\downloads\python'
+          $dir = Install-KohaPythonRuntime -Bin $bin -Cache $cache
+          $check = Test-KohaPythonRuntime -PythonDir $dir
+          Write-Host "import check: $check"
+          if ($check -ne 'ok') { throw "the tray does not load: $check" }
+          & (Join-Path $dir 'python.exe') -m koha_nexus_win version
+          if ($LASTEXITCODE -ne 0) { throw 'koha_nexus_win version failed' }
+          # A second run with everything cached must also work.
+          $dir = Install-KohaPythonRuntime -Bin $bin -Cache $cache
+          if ((Test-KohaPythonRuntime -PythonDir $dir) -ne 'ok') { throw 'second install failed' }

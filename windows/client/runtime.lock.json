@@ -1,0 +1,147 @@
+{
+  "lock": 1,
+  "python": {
+    "version": "3.12.10",
+    "url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip",
+    "sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+  },
+  "packages": [
+    {
+      "name": "pystray",
+      "version": "0.19.5",
+      "kind": "wheel",
+      "file": "pystray-0.19.5-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5c/64/927a4b9024196a4799eba0180e0ca31568426f258a4a5c90f87a97f51d28/pystray-0.19.5-py2.py3-none-any.whl",
+      "sha256": "a0c2229d02cf87207297c22d86ffc57c86c227517b038c0d3c59df79295ac617"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "kind": "wheel",
+      "file": "six-1.17.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "kind": "wheel",
+      "file": "pillow-12.3.0-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/45/89/da2f7971a317f83d807fdd4065c0af40208e59e692cc43d315a71a0e96d1/pillow-12.3.0-cp312-cp312-win_amd64.whl",
+      "sha256": "a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09"
+    },
+    {
+      "name": "pywebview",
+      "version": "6.2.1",
+      "kind": "wheel",
+      "file": "pywebview-6.2.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3d/25/9491695c22c4842c5b3903b4dc172e0eecf67a27c0af34a71512c9b76a0a/pywebview-6.2.1-py3-none-any.whl",
+      "sha256": "9d07275f53894ab4d5e2e0e996227193e7187dec276d9b624dccbce029216b46"
+    },
+    {
+      "name": "proxy-tools",
+      "version": "0.1.0",
+      "kind": "sdist",
+      "file": "proxy_tools-0.1.0.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/f2/cf/77d3e19b7fabd03895caca7857ef51e4c409e0ca6b37ee6e9f7daa50b642/proxy_tools-0.1.0.tar.gz",
+      "sha256": "ccb3751f529c047e2d8a58440d86b205303cf0fe8146f784d1cbcd94f0a28010",
+      "copy": "proxy_tools-0.1.0/proxy_tools"
+    },
+    {
+      "name": "bottle",
+      "version": "0.13.4",
+      "kind": "wheel",
+      "file": "bottle-0.13.4-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/83/f6/b55ec74cfe68c6584163faa311503c20b0da4c09883a41e8e00d6726c954/bottle-0.13.4-py2.py3-none-any.whl",
+      "sha256": "045684fbd2764eac9cdeb824861d1551d113e8b683d8d26e296898d3dd99a12e"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "kind": "wheel",
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+    },
+    {
+      "name": "pythonnet",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "pythonnet-3.2.1-cp311.cp312.cp313.cp314.cp315-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d8/dc/c96a542079a69d3d091e91808fc8aaf9a0d5e2f8e73a63560e4379134bb6/pythonnet-3.2.1-cp311.cp312.cp313.cp314.cp315-none-any.whl",
+      "sha256": "dd5668b74b0c903d9a24e1ba86f728fc490f8e919d56b3c24bf06739b9ee2b7f"
+    },
+    {
+      "name": "clr-loader",
+      "version": "0.3.1",
+      "kind": "wheel",
+      "file": "clr_loader-0.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5e/da/ec1a6e36624000b6df0dd61183c42342ee5814c073315e802cadaad04d2f/clr_loader-0.3.1-py3-none-any.whl",
+      "sha256": "cbad189de20d202a7d621956b0fc38049e13c9bf7ca2923441eff725cd121aa1"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "kind": "wheel",
+      "file": "cffi-2.1.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/d9/79/615cc094e2fb508cade7de88d3b4f6c4ec2bab695c97bce9153dc65aadf5/cffi-2.1.1-cp312-cp312-win_amd64.whl",
+      "sha256": "f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.11",
+      "kind": "wheel",
+      "file": "pycparser-3.11-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/90/11/0e6f11117525ff0eec40ebac3d313376f102df93ca44ad9e893ee85e4f89/pycparser-3.11-py3-none-any.whl",
+      "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+    },
+    {
+      "name": "windows-toasts",
+      "version": "1.3.1",
+      "kind": "wheel",
+      "file": "windows_toasts-1.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/51/44/21c8e10ae6bc4411f35d5e05d17179d04a3ad52dcad4b210bc37a0422a45/windows_toasts-1.3.1-py3-none-any.whl",
+      "sha256": "fb1ab71cc3b7c239508dce0acb651a2a5b7dcaee98921dc4e7355ea0a5355998"
+    },
+    {
+      "name": "winrt-runtime",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "winrt_runtime-3.2.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/ca/a1/1d7248d5c62ccbea5f3e0da64ca4529ce99c639c3be2485b6ed709f5c740/winrt_runtime-3.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "06510db215d4f0dc45c00fbb1251c6544e91742a0ad928011db33b30677e1576"
+    },
+    {
+      "name": "winrt-Windows.Data.Xml.Dom",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "winrt_windows_data_xml_dom-3.2.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/9f/f0/b44bdce659118fb684a45f6c4e4932cb7356883079b7ce284352433ecf3f/winrt_windows_data_xml_dom-3.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "b531a61a30106ecc7c7b3ad8f1b22e98d8366bbc2c60c47f5053fe62479109d6"
+    },
+    {
+      "name": "winrt-Windows.Foundation",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "winrt_windows_foundation-3.2.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/9b/5e/b5059e4ece095351c496c9499783130c302d25e353c18031d5231b1b3b3c/winrt_windows_foundation-3.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "45550c5b6c2125cde495c409633e6b1ea5aa1677724e3b95eb8140bfccbe30c9"
+    },
+    {
+      "name": "winrt-Windows.Foundation.Collections",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "winrt_windows_foundation_collections-3.2.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/37/94/5b888713e472746635a382e523513ab1b8200af55c5b56bc70e1e4369115/winrt_windows_foundation_collections-3.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "550dfb8c82fe74d9e0728a2a16a9175cc9e34ca2b8ef758d69b2a398894b698b"
+    },
+    {
+      "name": "winrt-Windows.UI.Notifications",
+      "version": "3.2.1",
+      "kind": "wheel",
+      "file": "winrt_windows_ui_notifications-3.2.1-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/f7/68/0775e390275cc8fcbd0515eed51e43d78562bfa5d647454e3c8992c2ac8c/winrt_windows_ui_notifications-3.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "7f2378246f6db14d16bf93830f1bcd8efa1c5b4c740878ad86d2f482fb08feab"
+    }
+  ]
+}

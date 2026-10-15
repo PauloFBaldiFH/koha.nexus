@@ -18,6 +18,7 @@
 Set-StrictMode -Version 2.0
 Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Lang.psm1')
 Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Core.psm1')
+Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Python.psm1')
 
 $script:ManifestUrl = 'https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json'
 $script:Phases = @('checks', 'wsl', 'distro', 'systemd', 'koha', 'windows', 'done')
@@ -908,6 +909,7 @@ function Install-Koha {
         # the tasks and shortcuts start through it. Made already in this run
         # when Koha was installed in the panel just now (above).
         if (-not $entryDone) { Invoke-KohaSafeStep { Install-KohaLauncherStep } }
+        Invoke-KohaSafeStep { Install-KohaPythonStep }
         Invoke-KohaSafeStep { Register-KohaTasks -Autostart $mode }
         if (-not $entryDone) {
             Invoke-KohaSafeStep { Install-KohaShortcuts }
@@ -944,6 +946,7 @@ function Install-Koha {
         # tray itself of this version (older tasks started PowerShell with a
         # window of its own).
         Invoke-KohaSafeStep { Install-KohaLauncherStep }
+        Invoke-KohaSafeStep { Install-KohaPythonStep }
         $outdated = Test-KohaKeepAliveOutdated
         Invoke-KohaSafeStep { Register-KohaTasks -Autostart ([string](Get-KohaState).autostart) }
         Invoke-KohaSafeStep { Install-KohaShortcuts }
@@ -1019,6 +1022,28 @@ function Install-KohaLauncherStep {
     $r = Install-KohaLauncher
     if ($r -eq 'built') { Write-KohaStep (T 'koha.nexus.exe is ready: Koha starts in the background with no windows.') 'ok' }
     if ($r -eq 'failed') { Write-KohaStep (T 'koha.nexus.exe could not be used on this PC; Koha starts through a hidden console instead.') 'warn' }
+}
+
+# The Python runtime of the new tray and window (KohaEasy.Python.psm1), in
+# bin\python. Done again only when bin\client\runtime.lock.json changed
+# (state.json pythonLock holds the hash of the lock it was built from) or
+# the runtime went missing. Nothing uses it yet, so a failure is only a
+# warning and Koha works as before.
+function Install-KohaPythonStep {
+    $bin = Get-KohaPath Bin
+    $lock = [System.IO.Path]::Combine($bin, 'client', 'runtime.lock.json')
+    if (-not (Test-Path -LiteralPath $lock)) { Write-KohaLog 'python: no runtime.lock.json in this package, skipped' 'install'; return }
+    $want = Get-KohaSha256 $lock
+    $pyw = [System.IO.Path]::Combine($bin, 'python', 'pythonw.exe')
+    if ([string](Get-KohaState)['pythonLock'] -eq $want -and (Test-Path -LiteralPath $pyw)) { return }
+    Write-KohaStep (T 'Preparing the new Koha tray (Python, about 30 MB)...')
+    $cache = [System.IO.Path]::Combine((Get-KohaPath Root), 'downloads', 'python')
+    $dir = Install-KohaPythonRuntime -Bin $bin -Cache $cache
+    $check = Test-KohaPythonRuntime -PythonDir $dir
+    Write-KohaLog ('python: runtime in {0}, check: {1}' -f $dir, $check) 'install'
+    if ($check -ne 'ok') { throw ('the new tray does not load: ' + $check) }
+    Set-KohaState @{ pythonLock = $want } | Out-Null
+    Write-KohaStep (T 'The new Koha tray is ready to try (the current tray stays in use).') 'ok'
 }
 
 # The library network test, printed: what works, what to fix, and the
