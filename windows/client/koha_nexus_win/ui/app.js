@@ -1,6 +1,8 @@
 // The Control Center page: a sidebar built from the panel's menu
-// (Api.sections), the status dashboard (Api.status) and a job drawer that
-// draws the events of a task run (nexus.onEvents, fed by engine.EventPump).
+// (Api.sections), the status dashboard (Api.status) and a task panel that
+// draws the events of a routine running in Debian (nexus.onEvents, fed by
+// engine.EventPump): steps, progress, log, results, and its questions as
+// dialogs whose answers go back to it (Api.answer).
 // Every text comes from Python or from Debian and is set with textContent only.
 "use strict";
 
@@ -17,7 +19,8 @@ function el(tag, cls, text) {
 const state = {
   ready: false,
   sections: [],
-  inline: new Set(),
+  terminal: new Set(),
+  later: new Set(),
   labels: {},
   current: "dashboard",
   job: null, // {run, ended, rc, events, logOpen}
@@ -92,9 +95,10 @@ function navButton(id, icon, label) {
   return li;
 }
 
-function buildSidebar(dashboardLabel) {
+function buildSidebar() {
   const nav = $("nav");
-  nav.replaceChildren(navButton("dashboard", "🏠", dashboardLabel));
+  nav.replaceChildren();
+  // The menu's own "dashboard" section is this page's status view.
   state.sections.filter((s) => s.sidebar).forEach((s) => nav.appendChild(navButton(s.id, s.icon, s.label)));
   const foot = $("terminal-panel");
   foot.textContent = "⌨ " + L("terminal_panel");
@@ -127,10 +131,6 @@ function drawSection(id) {
   if (!entries.length) {
     const box = el("div", "card");
     box.appendChild(el("p", "muted", L("not_ported")));
-    const b = el("button", "primary", L("open_terminal"));
-    b.type = "button";
-    b.addEventListener("click", () => api().terminal_panel());
-    box.appendChild(b);
     cards.appendChild(box);
     return;
   }
@@ -143,9 +143,10 @@ function drawSection(id) {
     card.appendChild(top);
     if (e.description) card.appendChild(el("div", "muted small", e.description));
     const view = e.kind === "view" ? sectionById(e.action) : null;
-    if (!view) {
-      const here = state.inline.has(e.action);
-      card.appendChild(el("div", here ? "how here" : "how", L(here ? "runs_here" : "opens_terminal")));
+    if (!view && state.terminal.has(e.action)) card.appendChild(el("div", "how", L("opens_terminal")));
+    if (!view && state.later.has(e.action)) {
+      card.classList.add("later");
+      card.appendChild(el("div", "how", L("later")));
     }
     card.addEventListener("click", () => openEntry(e, view));
     cards.appendChild(card);
@@ -160,6 +161,7 @@ function openEntry(entry, view) {
   api().open_entry(entry.action).then((r) => {
     if (!r || !r.ok) {
       if (r && r.busy) message("error", "", L("busy"));
+      else if (r && r.how === "later") message("", "", L("later"));
       return;
     }
     if (r.how !== "inline") return;
@@ -472,9 +474,10 @@ window.addEventListener("pywebviewready", () => {
   });
   api().sections().then((data) => {
     state.sections = data.sections || [];
-    state.inline = new Set(data.inline || []);
+    state.terminal = new Set(data.terminal || []);
+    state.later = new Set(data.later || []);
     state.labels = data.labels || {};
-    buildSidebar(L("dashboard"));
+    buildSidebar();
     show("dashboard");
     state.ready = true;
   });
