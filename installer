@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.57"
+PANEL_VERSION=" 1.5.58"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2941,7 +2941,7 @@ picker_start_dir() {
 # select_file [START] [EXTENSIONS] [PROMPT] [LABEL]: default = SQL backups.
 select_file() {
     local current exts="${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump tar tar.gz tgz zip}" prompt="${3:-}" label="${4:-}" choice items=() e fexpr=()
-    [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql or .sql.gz):")"
+    [ -n "$prompt" ] || prompt="$(t "Pick the backup (.sql, .sql.gz, .sql.xz, .sql.zst):")"
     [ -n "$label" ] || label="$(t "Backup file")"
     if [ "$exts" = "*" ]; then
         fexpr=(-true)
@@ -30136,7 +30136,7 @@ kei_task_ui() {
         printf '%s' "$REPLY"
     }
     select_file() {
-        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql or .sql.gz):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump tar tar.gz tgz zip}"
+        kei_pick file "$(t "File Explorer")" "${3:-$(t "Pick the backup (.sql, .sql.gz, .sql.xz, .sql.zst):")}" "${1:-}" "${2:-sql sql.gz sql.bz2 sql.xz sql.zst backup bkp dump tar tar.gz tgz zip}"
     }
     select_directory() { kei_pick dir "$(t "Folder Picker")" "" "${1:-}" ""; }
     # A file to change by hand (the classic panel opens nano):

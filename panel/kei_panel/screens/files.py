@@ -122,7 +122,7 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                         yield Button(t("Up"), id="up", classes="picker-go")
                     if self.accepts_drops:
                         yield Static(t("📥 Drop the file here, or paste its path.") if self._suffixes is None
-                                     else t("📥 Drop a .sql or .sql.gz file here, or paste its path."),
+                                     else t("📥 Drop a .sql, .sql.gz, .sql.xz or .sql.zst file here, or paste its path."),
                                      id="picker-drop", markup=False)
                     yield PathInput(str(self._start), id="picker-path")
                     yield FilteredTree(self._start, self._suffixes if self._mode == "file" else None,
@@ -239,7 +239,7 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
             return
         if kind == "file":
             if not self._wanted(path):
-                err.update(t("Choose a .sql or .sql.gz file.") if self._suffixes == BACKUP_SUFFIXES
+                err.update(t("Choose a .sql, .sql.gz, .sql.xz or .sql.zst file.") if self._suffixes == BACKUP_SUFFIXES
                            else t('Choose a file of this kind: ${kinds}', kinds=", ".join(self._suffixes)))
                 return
             self.dismiss(path)

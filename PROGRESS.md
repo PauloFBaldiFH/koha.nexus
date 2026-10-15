@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.56** (1.5.57: Windows terminal panel and tray PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.57** (1.5.58: Paulo's four Windows fixes PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -337,6 +337,21 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   the browser asks for none of the enabled ones. Sessions are no longer deleted. The first install
   is unchanged: it downloads the pack of the server's language and the Web Installer activates it.
   `tests/languages.bats` (MariaDB only) runs in the cloud.
+- **1.5.58 (Paulo's four Windows fixes)**: (1) the panel's bottom bar shows Dashboard and **Open the
+  terminal** (key `c`, also a General tools card `terminal` in `PANEL_ONLY`: `runuser -l <real_user>`
+  in the same window via `bridge.run_command_interactive`, "Type exit..." printed first); `b` still
+  opens the Backup center but is no longer in the bar. Tray: Open the terminal (`KohaEasy.ps1 Terminal`)
+  next to Open User Folder. (2) The WinForms Koha status window (`KohaEasy.Window.ps1`) is removed:
+  Launch (the Koha icon) and Window (old shortcuts) open the panel; "Koha - Status" shortcut and the
+  tray's "Service status" are gone; install.ps1 deletes the old file and ends a still running
+  `bin\python` pythonw; Restart-KohaTray ends an open old window; tray checks every 60 s again.
+  (3) Drag and drop: the elevated installer started the tray elevated, so every panel window it opened
+  was elevated and Windows (UIPI) refused drops from Explorer. Start-KohaTray now starts it through
+  Explorer (`bin\koha-tray.lnk`) when elevated, direct start as fallback. Drop/pick texts name
+  .sql, .sql.gz, .sql.xz, .sql.zst (the checks already read the codec from the content). (4) Open link:
+  WSL uses explorer.exe (absolute path; wslview only without it), started in C:\Windows after
+  `opener._interop_ready()` re-registers a lost WSLInterop binfmt handler (systemd), and the address
+  is copied too. Not tried on a real PC.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes

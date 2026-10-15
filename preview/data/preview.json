@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.57",
+ "panel_version": "1.5.58",
  "languages": [
   {
    "code": "en",
@@ -599,6 +599,7 @@
    "parent": "",
    "entries": [
     "user-folder",
+    "terminal",
     "monitor",
     "mc"
    ],
@@ -1314,6 +1315,16 @@
    "section": "tools",
    "label": "📂  Open user folder",
    "description": "Opens your home folder in Windows Explorer or the file manager",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "terminal": {
+   "id": "terminal",
+   "type": "entry",
+   "section": "tools",
+   "label": "💻  Open the terminal",
+   "description": "A Debian command line in this window; type exit to come back",
    "kind": "native",
    "status": "available",
    "media": []
@@ -6244,6 +6255,56 @@
   "Opens your home folder in Windows Explorer or the file manager": {
    "en": "Opens your home folder in Windows Explorer or the file manager",
    "pt-BR": "Abre a sua pasta pessoal no Explorador do Windows ou no gerenciador de arquivos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "💻  Open the terminal": {
+   "en": "💻  Open the terminal",
+   "pt-BR": "💻  Abrir o terminal",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "A Debian command line in this window; type exit to come back": {
+   "en": "A Debian command line in this window; type exit to come back",
+   "pt-BR": "Uma linha de comando do Debian nesta janela; digite exit para voltar",
    "es": null,
    "fr": null,
    "it": null,
@@ -15125,6 +15186,32 @@
     ]
    }
   },
+  "terminal": {
+   "en": {
+    "summary": "A Debian command line inside the panel's own window, as your Debian user (sudo for root). Type exit to come back to the panel.",
+    "overview": [
+     "The same shell as the Debian terminal of Windows, without a second window: the panel steps aside while it runs and comes back as it was. The bar at the bottom of the panel has it too (key C)."
+    ],
+    "steps": [
+     "Press **C**, or open **General tools**, then **Open the terminal**.",
+     "Type your commands. **exit** (or Ctrl+D) brings the panel back."
+    ],
+    "related": [
+     "user-folder",
+     "mc"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Uma linha de comando do Debian dentro da própria janela do painel, com o seu usuário do Debian (sudo para root). Digite exit para voltar ao painel.",
+    "overview": [
+     "O mesmo shell do terminal do Debian no Windows, sem uma segunda janela: o painel sai da frente enquanto ele roda e volta como estava. A barra no rodapé do painel também tem essa opção (tecla C)."
+    ],
+    "steps": [
+     "Aperte **C**, ou abra **Ferramentas gerais** e depois **Abrir o terminal**.",
+     "Digite os seus comandos. **exit** (ou Ctrl+D) traz o painel de volta."
+    ]
+   }
+  },
   "monitor": {
    "en": {
     "summary": "Watches CPU, memory and processes (htop) or network bandwidth per process (nethogs) live; installs them when missing.",
@@ -17556,165 +17643,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 108,
-   "manual_total": 108,
+   "manual": 109,
+   "manual_total": 109,
    "manual_outdated": [],
-   "strings": 375,
-   "strings_total": 375
+   "strings": 377,
+   "strings_total": 377
   },
   "pt-BR": {
-   "manual": 108,
-   "manual_total": 108,
+   "manual": 109,
+   "manual_total": 109,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 375
+   "strings": 368,
+   "strings_total": 377
   },
   "es": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 264,
-   "strings_total": 375
+   "strings_total": 377
   },
   "fr": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 375
+   "strings_total": 377
   },
   "it": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 375
+   "strings_total": 377
   },
   "de": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 375
+   "strings_total": 377
   },
   "nl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "sv": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "pl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "cs": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "ru": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "uk": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "tr": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "tl": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "id": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "ar": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "fa": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "hi": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "bn": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "vi": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "zh": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "ja": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   },
   "ko": {
    "manual": 0,
-   "manual_total": 108,
+   "manual_total": 109,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 375
+   "strings_total": 377
   }
  }
 }

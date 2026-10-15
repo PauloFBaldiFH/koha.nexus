@@ -1002,7 +1002,40 @@ function Install-Koha {
     return 0
 }
 
-function Start-KohaTray { Start-KohaHidden 'Tray' }
+# The tray runs with the librarian's normal rights, never as administrator,
+# even when the installer runs elevated: everything it opens (the control
+# panel in Windows Terminal, Explorer) inherits its rights, and Windows
+# refuses files dragged from Explorer onto an elevated window. From an
+# elevated installer it starts through Explorer (a shortcut opened by the
+# shell runs unelevated); if that brings no tray, it starts directly.
+function Start-KohaTray {
+    if (Test-KohaAdmin) {
+        try {
+            $l = Get-KohaHiddenLaunch -Arguments 'Tray'
+            $lnk = [System.IO.Path]::Combine((Get-KohaPath Bin), 'koha-tray.lnk')
+            Save-KohaLnkShortcut -Path $lnk -Target $l.Target -Arguments $l.Arguments -Icon (Get-KohaIconPath)
+            Start-Process -FilePath ([System.IO.Path]::Combine([string]$env:SystemRoot, 'explorer.exe')) -ArgumentList ('"{0}"' -f $lnk) | Out-Null
+            for ($i = 0; $i -lt 12; $i++) {
+                Start-Sleep -Milliseconds 500
+                if (Test-KohaTrayRunning) { Write-KohaLog 'tray started without administrator rights (through Explorer)' 'install'; return }
+            }
+            Write-KohaLog 'the tray did not start through Explorer; starting it directly' 'install'
+        } catch {
+            Write-KohaLog ('the tray could not start through Explorer: ' + $_.Exception.Message) 'install'
+        }
+    }
+    Start-KohaHidden 'Tray'
+}
+
+# The Koha status window of older versions (KohaEasy.ps1 Window or Launch,
+# still open from before the update) is closed: the panel replaced it.
+function Stop-KohaOldWindow {
+    try {
+        Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
+            Where-Object { ([string]$_.CommandLine) -match 'KohaEasy\.ps1"?\s+(Window|Launch)\b' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    } catch { }
+}
 
 # koha.nexus.exe for this PC, with what it means for the librarian.
 function Install-KohaLauncherStep {
@@ -1135,6 +1168,7 @@ function Start-KohaTrayChecked {
 
 # The tray of an older version keeps its old menu until it is restarted.
 function Restart-KohaTray {
+    Stop-KohaOldWindow
     try {
         Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
             Where-Object { ([string]$_.CommandLine) -match 'KohaEasy\.ps1"?\s+Tray' } |

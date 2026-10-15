@@ -36,11 +36,23 @@ foreach ($f in Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') {
     }
 }
 
+# One interface: the Koha status window is gone (only install.ps1 names it,
+# to delete it from older installs), and nothing opens it any more.
+$names = @(Get-ChildItem (Join-Path $repo 'windows') -File | Where-Object { (Get-Content -Raw -LiteralPath $_.FullName) -match 'KohaEasy\.Window\.ps1' } | ForEach-Object { $_.Name })
+Check 'no Koha status window' (-not (Test-Path (Join-Path $repo 'windows\KohaEasy.Window.ps1')) -and ($names -join ',') -eq 'install.ps1') ($names -join ',')
+$tray = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
+Check 'tray: Open the terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
+
 $env:KOHAEASY_ROOT = Join-Path ([IO.Path]::GetTempPath()) ('koha-checks-' + [guid]::NewGuid().ToString('N'))
 Import-Module (Join-Path $repo 'windows\KohaEasy.Lang.psm1') -Force
 Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
 Import-KeiLanguage -LangDir (Join-Path $repo 'lang') -Culture 'en-US'
 $wsl = 'C:\Windows\System32\wsl.exe'
+
+# The Koha icon opens the panel; no shortcut opens the old status window.
+$cmds = @(Get-KohaShortcutList | Where-Object { $_.Kind -eq 'lnk' } | ForEach-Object { $_.Arguments })
+Check 'shortcuts: no Window verb' (@($cmds | Where-Object { $_ -match '\sWindow(\s|$)' }).Count -eq 0) ($cmds -join ' | ')
+Check 'shortcuts: the Koha icon is Launch' (@($cmds | Where-Object { $_ -match '\sLaunch(\s|$)' }).Count -eq 1) ($cmds -join ' | ')
 
 # The control panel: Windows Terminal with the Koha Nexus profile and title,
 # else cmd.exe in UTF-8 with the same title.

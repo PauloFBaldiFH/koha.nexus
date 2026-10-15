@@ -6,7 +6,7 @@
   │  Install     │  [status cards]                        │
   │  Backup      │  [action card] [action card] ...       │
   │  ...         │                                        │
-  └ Footer: shortcuts ────────────────────────────────────┘
+  └ Footer: Dashboard, Open the terminal, Exit ───────────┘
 Views are mounted the first time they are shown; Tab moves between the
 sidebar and the view.
 """
@@ -35,10 +35,13 @@ def sidebar_prompt(label: str, plain: bool, own_icon: str = "") -> str:
 
 
 class MainScreen(Screen):
+    # The bar at the bottom: the dashboard and a shell. Every section keeps
+    # its letter (b still opens the Backup center), out of the bar.
     BINDINGS = [
-        Binding(s.key, f"show('{s.id}')", split_icon(t(s.label))[1], show=s.key in "db")
+        Binding(s.key, f"show('{s.id}')", split_icon(t(s.label))[1], show=s.key == "d")
         for s in SECTIONS if s.key
-    ] + [Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=False)]
+    ] + [Binding("c", "terminal", t("Open the terminal")),
+         Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=False)]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -75,6 +78,9 @@ class MainScreen(Screen):
         if not from_sidebar:
             sidebar = self.query_one("#sidebar", OptionList)
             sidebar.highlighted = sidebar.get_option_index(sec.parent or section_id)
+
+    def action_terminal(self) -> None:
+        self.app.run_native("terminal")
 
     def action_toggle_sidebar(self) -> None:
         sidebar = self.query_one("#sidebar")

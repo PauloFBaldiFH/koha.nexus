@@ -2611,12 +2611,10 @@ function Get-KohaShortcutList {
     $ps = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
     $lnk = { param($name, $a) $l = Get-KohaHiddenLaunch -Arguments $a; @{ Name = $name; Kind = 'lnk'; Target = $l.Target; Arguments = $l.Arguments } }
     $list = @(
-        # The one desktop icon: starts what is not running (the tray, Koha)
-        # and opens the Koha window, or brings the open one to the front
-        # (Invoke-KohaLaunch). The window works even when Koha itself does
-        # not answer. Also in the Start menu, where it carries Koha's
-        # identity (AppId): the taskbar pins the Koha window as Koha, and
-        # notifications show Koha's name.
+        # The one desktop icon: starts what is not running (the tray, Koha;
+        # Invoke-KohaLaunch) and opens the control panel. Also in the Start
+        # menu, where it carries Koha's identity (AppId): notifications show
+        # Koha's name.
         (& $lnk 'Koha' 'Launch') + @{ Desktop = $true; StartMenu = $true; AppId = $true }
         @{ Name = (T 'Koha - Staff interface'); Kind = 'url'; Target = $script:Cfg.StaffUrl }
         @{ Name = (T 'Koha - Public catalog'); Kind = 'url'; Target = $script:Cfg.OpacUrl }
@@ -2626,7 +2624,6 @@ function Get-KohaShortcutList {
         (& $lnk (T 'Koha - Stop') 'Stop')
         (& $lnk (T 'Koha - Restart') 'Restart')
         (& $lnk (T 'Koha - Shut down the PC safely') 'SafeShutdown')
-        (& $lnk (T 'Koha - Status') 'Window')
         (& $lnk (T 'Koha - Export diagnostics') 'ExportReport')
         (& $lnk (T 'Koha - Status icon') 'Tray')
     )
@@ -2749,11 +2746,16 @@ function New-KohaShortcuts {
     try { New-Item -ItemType Directory -Path $StartMenu -Force -ErrorAction Stop | Out-Null } catch { Add-KohaShortcutError $StartMenu $_.Exception.Message }
     if ($Desktop) {
         # Older versions also put the two web shortcuts on the desktop; the
-        # one Koha icon (the Koha window) replaces them.
+        # one Koha icon (the control panel) replaces them.
         foreach ($n in @('Koha - Staff interface', 'Koha - Public catalog', (T 'Koha - Staff interface'), (T 'Koha - Public catalog'))) {
             $old = [System.IO.Path]::Combine($Desktop, (ConvertTo-KohaFileName $n) + '.url')
             if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue }
         }
+    }
+    # The Koha status window of older versions is gone, with its shortcut.
+    foreach ($n in @('Koha - Status', (T 'Koha - Status'))) {
+        $old = [System.IO.Path]::Combine($StartMenu, (ConvertTo-KohaFileName $n) + '.lnk')
+        if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue }
     }
     $made = New-Object System.Collections.ArrayList
     $identity = $false

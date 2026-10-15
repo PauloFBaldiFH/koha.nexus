@@ -77,7 +77,18 @@ function Install-KohaEasyBootstrap {
     New-Item -ItemType Directory -Path (Join-Path $bin 'lang') -Force | Out-Null
     # The Python tray and window of 1.5.x test builds (bin\client, its
     # bin\python runtime and bin\nexus_core) were dropped: removed, with
-    # their download cache, so nothing of them is left on this PC.
+    # their download cache, so nothing of them is left on this PC. One still
+    # running from bin\python is ended first (Windows keeps a running
+    # program's files). The Koha status window (KohaEasy.Window.ps1) went
+    # too: the control panel replaced it.
+    try {
+        $pyDir = (Join-Path $bin 'python') + '\'
+        Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe' OR Name = 'python.exe'" -ErrorAction Stop |
+            Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($pyDir, [StringComparison]::OrdinalIgnoreCase) } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    } catch { }
+    $oldWindow = Join-Path $bin 'KohaEasy.Window.ps1'
+    if (Test-Path -LiteralPath $oldWindow) { Remove-Item -LiteralPath $oldWindow -Force -ErrorAction SilentlyContinue }
     foreach ($old in 'client', 'nexus_core', 'python') {
         $oldBin = Join-Path $bin $old
         if (Test-Path -LiteralPath $oldBin) { Remove-Item -LiteralPath $oldBin -Recurse -Force -ErrorAction SilentlyContinue }

@@ -11,6 +11,8 @@
   update_panel     the same; a new version closes the panel (open it again)
   user_folder      the user's home folder in Windows Explorer (WSL) or the
                    desktop's file manager; elsewhere its path, to copy
+  terminal         a shell in this window (the Debian user's, as the
+                   Windows "Debian terminal"); exit comes back to the panel
   monitor, mc
                    full-screen programs of their own: the choice and the
                    installation are panel screens, then the program gets the
@@ -72,6 +74,26 @@ async def user_folder(app) -> None:
         t("📂  Open user folder"), "", kind="info", command=home,
         command_help=t("This computer has no file manager for the panel to open. The folder is:"),
         is_command=False))
+
+
+def shell_command(user: str, hint: str) -> list[str]:
+    """The shell of "Open the terminal": a login shell of user (the person
+    behind the panel, sudo for root), root's own when there is none. The
+    hint is printed first, so the way back is on the screen."""
+    if user and user != "root":
+        login = ["runuser", "-l", user]
+    else:
+        login = ["bash", "-l"]
+    return ["sh", "-c", 'printf "%s\\n\\n" "$1"; shift; exec "$@"', "sh", hint, *login]
+
+
+async def terminal(app) -> None:
+    info = await facts(app)
+    user = (info.get("real_user") if info else "") or "root"
+    rc = app.bridge.run_command_interactive(
+        app, shell_command(user, t("Type exit to go back to the panel.")))
+    if rc not in (0, None, 130):
+        app.notify(f"{t('Open the terminal')}: exit {rc}", severity="warning")
 
 
 async def _terminal_tool(app, title: str, tool: str, argv: list[str] | None = None) -> None:

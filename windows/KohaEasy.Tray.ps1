@@ -4,11 +4,11 @@
 # the distro by itself: the status is read only while Koha is already running.
 #   * icon dot: green while Koha's services run, red when they do not
 #     (stopped or not responding), yellow while Koha starts
-#   * menu: the four quick actions first (Open Dashboard: the control
-#     panel in Windows Terminal; Open User Folder: the Debian user's home in
-#     Explorer; Restart Services; Exit, which asks whether Koha keeps
-#     running), the rest under More options: the Koha window, staff
-#     interface, catalog, Start, Stop, Rebuild search index, Shut down the
+#   * menu: the quick actions first (Open Dashboard: the control panel in
+#     Windows Terminal; Open User Folder: the Debian user's home in
+#     Explorer; Open the terminal: a Debian shell; Restart Services; Exit,
+#     which asks whether Koha keeps running), the rest under More options:
+#     staff interface, catalog, Start, Stop, Rebuild search index, Shut down the
 #     PC safely, diagnostics (.txt and .zip), disk space, backups folder,
 #     automatic start and the backup notification
 #   * shown next to the clock the first time on Windows 11 (which hides new
@@ -33,7 +33,7 @@ Set-KohaState @{ trayClosed = $false } | Out-Null
 $cfg = Get-KohaConfig
 $here = $PSScriptRoot
 $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$STATUS_EVERY_S = 30
+$STATUS_EVERY_S = 60
 $DISK_EVERY_S = 1800
 
 # The Koha icon (koha.ico) with a status dot in the lower right corner, at
@@ -210,10 +210,10 @@ Add-Separator
 $miPanel = Add-Item (T 'Open Dashboard') { Invoke-KohaCommand 'Panel'; Request-Check 5 }
 $miPanel.Font = New-Object System.Drawing.Font($miPanel.Font, [System.Drawing.FontStyle]::Bold)
 Add-Item (T 'Open User Folder') { Invoke-KohaCommand 'UserFolder' } | Out-Null
+$miTerminal = Add-Item (T 'Open the terminal') { Invoke-KohaCommand 'Terminal' }
 $miRestart = Add-Item (T 'Restart Services') { Invoke-KohaCommand 'RestartServices'; Request-Check 20 }
 Add-Separator
 $more = Add-Item (T 'More options') $null
-$miWindow = Add-Item (T 'Service status') { Invoke-KohaCommand 'Window' } $more
 $miStaff = Add-Item (T 'Open the staff interface') { Start-Process $cfg.StaffUrl } $more
 $miOpac = Add-Item (T 'Open the public catalog') { Start-Process $cfg.OpacUrl } $more
 Add-Separator $more
@@ -310,6 +310,7 @@ function Update-Menu {
     $miStart.Enabled = (-not $on) -and $s -ne 'not_installed'
     $miStop.Enabled = $on
     $miRestart.Enabled = $on
+    $miTerminal.Enabled = $on
     $miReindex.Enabled = $on
     if ($on) { $session.Block($blockReason) } else { $session.Unblock() }
     $miStaff.Enabled = ($s -eq 'running')
