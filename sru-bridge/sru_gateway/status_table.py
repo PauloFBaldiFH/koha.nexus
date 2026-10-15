@@ -38,9 +38,10 @@ def _where(t: tg.Target) -> str:
 def render(table: dict[str, tg.Target]) -> str:
     counts = Counter(t.status for t in table.values())
     lines = [", ".join(f"{counts[s]} {s}" for s in tg.STATUSES if counts[s]) + f" ({len(table)} in all).", "",
-             "| id | Catalogue | Status | Kind | Address | Note |", "|---|---|---|---|---|---|"]
+             "| id | Catalogue | Group | Status | Kind | Address | Note |", "|---|---|---|---|---|---|---|"]
+    groups = {g: n for n, g in enumerate(tg.GROUPS, 1)}
     for t in sorted(table.values(), key=lambda t: ORDER[t.status]):
-        lines.append(f"| `{t.id}` | {t.name} | {t.status} | {t.kind} | {_where(t)} | {t.note.replace('|', '/')} |")
+        lines.append(f"| `{t.id}` | {t.name} | {groups[t.group]} | {t.status} | {t.kind} | {_where(t)} | {t.note.replace('|', '/')} |")
     return "\n".join(lines)
 
 

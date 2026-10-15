@@ -49,12 +49,13 @@ COMMUNITY_URL = ("https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/mai
 LOCAL_FILE = "z3950-targets.json"     # the person's imports and logins
 HISTORY_FILE = "z3950-history.json"   # scan results and the blacklist
 
+# The four headings of the list, in order (the groups of the koha.nexus SRU
+# gateway's targets.json; the screen numbers them [1] to [4]).
 REGIONS = {
-    "latam": "Brazil / Latin America",
-    "north_america": "North America",
-    "europe": "Europe",
-    "asia_pacific": "Asia-Pacific",
-    "academia": "Specialized / Academia",
+    "national": "National libraries and official bodies",
+    "br_universities": "Brazilian universities (federal and state)",
+    "intl_universities": "International universities",
+    "specialized": "Specialized and union catalogues",
 }
 SYNTAXES = ("USMARC", "MARC21", "UNIMARC", "NORMARC", "DANMARC")
 ENCODINGS = ("utf8", "MARC-8", "ISO_5426", "ISO_6937", "ISO_8859-1", "EUC-KR")
@@ -109,7 +110,7 @@ class Target:
     kind: str = "zed"            # zed (Z39.50) or sru, Koha's servertype
     syntax: str = "USMARC"
     encoding: str = "utf8"
-    region: str = "academia"
+    region: str = "specialized"
     country: str = ""
     login: bool = False          # the server needs a user and password
     user: str = ""
@@ -188,20 +189,19 @@ def normalize_kind(s: str) -> str:
 
 
 def guess_region(country: str, host: str) -> str:
+    """The heading of a server someone imported: Brazilian ones with the
+    Brazilian universities, other universities with the international
+    ones, national and government catalogues first, the rest last."""
     c = (country or "").upper()
-    tld = host.rsplit(".", 1)[-1].lower() if "." in host else ""
-    if c in ("BR", "AR", "MX", "CL", "CO", "PE", "UY", "PY", "BO", "VE", "EC", "CU") or tld in (
-            "br", "ar", "mx", "cl", "co", "pe", "uy", "py", "bo", "ve", "ec", "cu"):
-        return "latam"
-    if c in ("US", "CA") or tld in ("gov", "edu", "us", "ca"):
-        return "north_america"
-    if c in ("AU", "NZ", "JP", "CN", "KR", "IN", "SG", "TW", "HK") or tld in (
-            "au", "nz", "jp", "cn", "kr", "in", "sg", "tw", "hk"):
-        return "asia_pacific"
-    if c and len(c) == 2 or tld in ("fr", "de", "es", "pt", "it", "uk", "se", "no", "dk", "fi", "nl", "be",
-                                    "ch", "at", "pl", "cz", "ie", "eu"):
-        return "europe"
-    return "academia"
+    h = host.lower()
+    tld = h.rsplit(".", 1)[-1] if "." in h else ""
+    if c == "BR" or tld == "br":
+        return "br_universities"
+    if re.search(r"(^|[.-])(univ|uni|ac|edu)([.-]|$)|university|\.edu\b|\.ac\.", h) or tld == "edu":
+        return "intl_universities"
+    if tld == "gov" or ".gov." in h or re.search(r"(^|[.-])(bn|bne|bnf|dnb|nla|ndl|loc|nl)([.-]|$)", h):
+        return "national"
+    return "specialized"
 
 
 def make_target(raw: dict, origin: str = "imported") -> Target | None:

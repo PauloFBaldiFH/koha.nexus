@@ -212,7 +212,7 @@ _SCRIPTS: dict[str, list[str]] = {
     ],
     "cloud-remote": ["@@note Testing the real cloud upload...",
                      "@@msg ok OK\tCloud enabled and tested successfully."],
-    "z3950-list": ["@@result row=lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS"],
+    "z3950-list": ["@@result row=https://sru.koha.nexus\t443\tsru/loc\tLibrary of Congress, EUA"],
     "z3950-server-status": ["@@result daemon=running", "@@result port=2100", "@@result network=off"],
     "z3950-daemon": ["@@msg ok OK\tThis catalogue's Z39.50/SRU server: {0}."],
     "catalog-network": ["@@msg ok OK\tThe koha.nexus network: {0}."],

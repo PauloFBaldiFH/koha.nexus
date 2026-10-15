@@ -34,47 +34,49 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             table = view.query_one("#z-table", DataTable)
             curated = z3950.load_curated()
             assert table.row_count == len(curated) + len(z3950.REGIONS)
-            assert table.get_row("region:latam")[1] == "[b]Brazil / Latin America[/b]"
-            # Koha's own list was read: the LoC target is marked.
-            loc = next(t for t in curated if t.host == "lx2.loc.gov")
+            assert table.get_row("region:national")[1] == "[b]\\[1] National libraries and official bodies[/b]"
+            assert table.get_row("region:specialized")[1] == "[b]\\[4] Specialized and union catalogues[/b]"
+            # Koha's own list was read: its LoC row (https://sru.koha.nexus) is marked.
+            loc = next(t for t in curated if t.db == "sru/loc")
             await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
 
-            # The Zeus bridge comes ticked; untick it before the regions.
-            zeus = next(t for t in curated if t.preselect)
-            assert view.selected == {zeus.key}
-            view.toggle(zeus.key)
+            # BN, Senado, USP and UFSC come ticked; untick them before the groups.
+            ticked = {t.key for t in curated if t.preselect}
+            assert view.selected == ticked and len(ticked) == 4
+            for key in ticked:
+                view.toggle(key)
             assert view.selected == set()
 
-            # A region ticks all of it; space on a server unticks one.
-            view.toggle("region:europe")
-            europe = [t for t in curated if t.region == "europe"]
-            assert view.selected == {t.key for t in europe}
-            view.toggle(europe[0].key)
-            assert len(view.selected) == len(europe) - 1
-            view.toggle("region:europe")
-            assert len(view.selected) == len(europe)
+            # A group ticks all of it; space on a server unticks one.
+            view.toggle("region:specialized")
+            group = [t for t in curated if t.region == "specialized"]
+            assert view.selected == {t.key for t in group}
+            view.toggle(group[0].key)
+            assert len(view.selected) == len(group) - 1
+            view.toggle("region:specialized")
+            assert len(view.selected) == len(group)
 
             view.scan()
             await pilot.pause(0.1)
             assert isinstance(app.screen, LoadingScreen)
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
             history = json.loads((tmp_path / z3950.HISTORY_FILE).read_text())
-            assert set(history) - {z3950.RULES_KEY} == {t.key for t in europe}
-            bnp = next(t for t in europe if t.host == "z3950.libris.kb.se")
-            assert history[bnp.key]["status"] == "ok"
-            assert "Working" in table.get_row(bnp.key)[2] and table.get_row(bnp.key)[3]
+            assert set(history) - {z3950.RULES_KEY} == {t.key for t in group}
+            rede = next(t for t in group if t.db == "sru/all")
+            assert history[rede.key]["status"] == "ok"
+            assert "Working" in table.get_row(rede.key)[2] and table.get_row(rede.key)[3]
 
             # Hide one by hand: gone from the list, back with "Show hidden".
-            table.move_cursor(row=table.get_row_index(bnp.key))
+            table.move_cursor(row=table.get_row_index(rede.key))
             view.hide()
-            assert bnp.key not in [k.value for k in table.rows]
-            assert bnp.key not in view.selected
+            assert rede.key not in [k.value for k in table.rows]
+            assert rede.key not in view.selected
             view.toggle_hidden()
-            assert "Hidden" in table.get_row(bnp.key)[2]
+            assert "Hidden" in table.get_row(rede.key)[2]
             view.toggle_hidden()
 
             # A login: typed in the panel, kept privately, never shown.
-            bl = next(t for t in europe if t.host == "z3950cat.bl.uk")
+            bl = next(t for t in group if t.db == "sru/nlm")
             table.move_cursor(row=table.get_row_index(bl.key))
             view.login()
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))

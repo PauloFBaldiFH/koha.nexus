@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import re
 import tempfile
 import urllib.request
 from dataclasses import replace
@@ -231,7 +232,9 @@ class Z3950View(SectionView):
         for row in out.lists.get("row", []):
             parts = row.split("\t")
             if len(parts) >= 3 and parts[1].isdigit():
-                keys.add(f"{parts[0].lower()}:{parts[1]}/{parts[2]}")
+                # An HTTPS SRU row's host carries https:// in Koha, not in the list.
+                host = re.sub(r"^https?://", "", parts[0].lower())
+                keys.add(f"{host}:{parts[1]}/{parts[2]}")
         self.in_koha = keys
         self.draw()
 
@@ -246,13 +249,14 @@ class Z3950View(SectionView):
         row = table.cursor_row
         table.clear()
         shown = self.visible()
-        for region, label in z3950.REGIONS.items():
+        for n, (region, label) in enumerate(z3950.REGIONS.items(), 1):
             group = [tg for tg in shown if tg.region == region]
             if not group:
                 continue
             ticked = sum(tg.key in self.selected for tg in group)
             mark = "☑" if ticked == len(group) else ("◩" if ticked else "☐")
-            table.add_row(mark, f"[b]{t(label)}[/b]", f"{len(group)} {t('servers')}", "", "", "",
+            # "\[" keeps the heading's number from being read as Rich markup.
+            table.add_row(mark, f"[b]\\[{n}] {t(label)}[/b]", f"{len(group)} {t('servers')}", "", "", "",
                           key=f"region:{region}")
             for tg in sorted(group, key=self._order):
                 table.add_row(*self._cells(tg), key=tg.key)
