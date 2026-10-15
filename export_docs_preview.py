@@ -230,11 +230,11 @@ FEATURES: tuple[Feature, ...] = (
         button("Import"), button("Export"), button("Show hidden"),
         table(["Server", "Status", "Format", "Address"], "targets"),
     ]),
-    Feature("z3950-zeus", "z3950", "data/z3950_targets.json", "Catálogo Zeus (UFSC bridge, SRU)", [
-        table(["Server", "Status", "Format", "Address"], "targets:Zeus"),
+    Feature("z3950-zeus", "z3950", "data/z3950_targets.json", "Universidade Federal de Santa Catarina (UFSC)", [
+        table(["Server", "Status", "Format", "Address"], "targets:(UFSC)"),
     ]),
-    Feature("z3950-pergamum", "z3950", "data/z3950_targets.json", "Catálogo Rede Pergamum (CRP bridge, SRU)", [
-        table(["Server", "Status", "Format", "Address"], "targets:Pergamum"),
+    Feature("z3950-pergamum", "z3950", "data/z3950_targets.json", "Rede Pergamum", [
+        table(["Server", "Status", "Format", "Address"], "targets:Rede Pergamum"),
     ]),
     # OPAC and Staff Appearance
     Feature("opac-material", "opac", "views/opac.py", "Material", [
