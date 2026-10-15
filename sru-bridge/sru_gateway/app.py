@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import replace
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -83,26 +84,22 @@ class Gateway:
     only when targets.json uses them."""
 
     def __init__(self, table: dict[str, Target], settings: Settings,
-                 http: httpx.AsyncClient | None = None, zeus: ZeusClient | None = None,
+                 http: httpx.AsyncClient | None = None, zeus_http: httpx.AsyncClient | None = None,
                  pergamum: PergamumClient | None = None):
+        """zeus_http, when given, is the HTTP client every zeus entry uses
+        (tests pass a mocked one); else the first zeus entry opens one with
+        Zeus's own headers (Referer, user agent) and the others share it."""
         self.table = table
         self.http = http or httpx.AsyncClient(timeout=settings.timeout, follow_redirects=True,
                                               headers={"User-Agent": settings.user_agent})
         self.backends: dict[str, object] = {}
+        zeus_base = ZeusSettings.from_env()
         for t in table.values():
             if t.kind == "zeus":
-                base_cfg = ZeusSettings.from_env()
-                t_cfg = ZeusSettings(
-                    base_url=base_cfg.base_url,
-                    targets=(t.target_index,),
-                    chunk_size=base_cfg.chunk_size,
-                    timeout=base_cfg.timeout,
-                    cache_ttl=base_cfg.cache_ttl,
-                    cache_size=base_cfg.cache_size,
-                    max_records=base_cfg.max_records,
-                    user_agent=base_cfg.user_agent,
-                )
-                self.backends[t.id] = Named(ZeusBackend(ZeusClient(t_cfg, client=self.http)), t.name)
+                # One Zeus client per entry, each asking only for its own targets[n].
+                zeus = ZeusClient(replace(zeus_base, targets=(t.target_index,)), client=zeus_http)
+                zeus_http = zeus_http or zeus.http
+                self.backends[t.id] = Named(ZeusBackend(zeus), t.name)
             elif t.kind == "pergamum":
                 ps = PergamumSettings.from_env()
                 pergamum = pergamum or PergamumClient(ps)
@@ -111,7 +108,7 @@ class Gateway:
                 self.backends[t.id] = Z3950Backend(t, settings.timeout)
             elif t.kind == "sru":
                 self.backends[t.id] = SRUBackend(t, self.http)
-        self._closers = [c for c in (zeus, pergamum) if c is not None]
+        self._closers = [c for c in (zeus_http, pergamum) if c is not None]
 
     def for_database(self, database: str):
         tid = database.strip("/").rsplit("/", 1)[-1].lower()
