@@ -1,4 +1,4 @@
-﻿# koha.nexus for Windows - bootstrapper.
+# koha.nexus for Windows - bootstrapper.
 #
 #   How to install Koha on Windows: this line, in PowerShell opened as
 #   Administrator from your own (administrator) Windows account:

@@ -16,6 +16,26 @@ foreach ($f in Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') {
     Check ('parses: ' + $f.Name) (@($errors).Count -eq 0) ((@($errors) | ForEach-Object { $_.Message }) -join '; ')
 }
 
+# Encoding. The one-liner scripts (irm ... | iex) must have no BOM: Windows
+# PowerShell 5.1 keeps it in front of the first "#", and iex then fails with
+# ObjectNotFound (#:String). They stay ASCII so no BOM is ever needed. Every
+# other script with accents or emoji keeps its BOM: without one, Windows
+# PowerShell 5.1 reads the file as ANSI and mangles them.
+foreach ($f in Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') {
+    $bytes = [IO.File]::ReadAllBytes($f.FullName)
+    $bom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    $start = 0
+    if ($bom) { $start = 3 }
+    $ascii = $true
+    for ($i = $start; $i -lt $bytes.Length; $i++) { if ($bytes[$i] -gt 0x7F) { $ascii = $false; break } }
+    if (@('install.ps1', 'diagnose.ps1') -contains $f.Name) {
+        Check ('no BOM (irm | iex): ' + $f.Name) (-not $bom)
+        Check ('ASCII only (irm | iex): ' + $f.Name) $ascii
+    } elseif (-not $ascii) {
+        Check ('BOM for its accents (PS 5.1): ' + $f.Name) $bom
+    }
+}
+
 $env:KOHAEASY_ROOT = Join-Path ([IO.Path]::GetTempPath()) ('koha-checks-' + [guid]::NewGuid().ToString('N'))
 Import-Module (Join-Path $repo 'windows\KohaEasy.Lang.psm1') -Force
 Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
