@@ -70,6 +70,7 @@ def uptime_ms() -> int:
 
 
 MB_YESNO = 0x4
+MB_ICONINFORMATION = 0x40
 MB_ICONQUESTION = 0x20
 MB_SETFOREGROUND = 0x10000
 IDYES = 6
@@ -81,6 +82,14 @@ def ask(question: str, title: str = "Koha") -> bool:
         return True
     u32 = ctypes.windll.user32  # type: ignore[attr-defined]
     return u32.MessageBoxW(None, question, title, MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND) == IDYES
+
+
+def inform(text: str, title: str = "Koha") -> None:
+    """An OK message box; nothing off Windows (tests)."""
+    if os.name != "nt":
+        return
+    u32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    u32.MessageBoxW(None, text, title, MB_ICONINFORMATION | MB_SETFOREGROUND)
 
 
 SYNCHRONIZE = 0x00100000

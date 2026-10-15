@@ -174,3 +174,19 @@ def test_tray_menu_items_satisfy_pystray(monkeypatch):
     assert [m[0] for m in made] == ["Start", "OPAC"]
     made[1][1](None, None)
     assert a.calls[-1] == ("opac",)
+
+
+def test_a_start_blocked_by_the_old_tray_says_why(monkeypatch, tmp_path):
+    """The PowerShell tray holds the same mutex: `app` must not end silently."""
+    from koha_nexus_win import __main__ as main, app, winapi
+
+    shown = []
+    monkeypatch.setenv("KOHAEASY_ROOT", str(tmp_path))
+    monkeypatch.setattr(winapi.NamedMutex, "acquire", lambda self: False)
+    monkeypatch.setattr(app, "signal_running_app", lambda: False)
+    monkeypatch.setattr(winapi, "inform", lambda text, title="Koha": shown.append(text))
+    assert main.main(["app"]) == 0
+    assert shown == [main.OLD_TRAY_RUNNING]
+    shown.clear()
+    assert main.main(["tray"]) == 0
+    assert shown == []

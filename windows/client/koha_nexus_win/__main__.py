@@ -29,6 +29,9 @@ from .wsl import WslRunner
 
 APP_TITLE = "koha.nexus : A smart, free and easy-to-use assistant for library management"
 REPO = Path(__file__).resolve().parents[3]
+OLD_TRAY_RUNNING = ("The Koha icon of the current version is running, so the new Control Center "
+                    "cannot open. Right-click the Koha icon next to the clock, choose "
+                    "\"Close this icon\", then start the Control Center again.")
 
 
 def _logging(paths: config.KohaPaths) -> None:
@@ -108,7 +111,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not hidden and signal_running_app():
             logging.getLogger(__name__).info("the app already runs: its window was asked to show")
         else:
+            # The PowerShell tray (same mutex) holds the place: say so, or
+            # the start looks like it did nothing.
             logging.getLogger(__name__).info("another Koha tray is running; this one ends")
+            if not hidden:
+                winapi.inform(t(OLD_TRAY_RUNNING), t(APP_TITLE))
         return 0
     try:
         store.save({"trayClosed": False})
