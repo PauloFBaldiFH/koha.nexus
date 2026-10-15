@@ -1,13 +1,17 @@
-"""koha_nexus_win: the Python tray and status window of koha.nexus for Windows.
+"""koha_nexus_win: the koha.nexus Control Center for Windows.
 
-Phase 1 foundation: installed next to the PowerShell tools in
-C:\\Koha\\bin\\client and run by the embeddable Python in C:\\Koha\\bin\\python
-(KohaEasy.Python.psm1 puts both in place). Nothing starts it yet: the
+One process with the tray icon and one resizable window: the control
+panel's sections in a sidebar (read from panel/kei_panel/menus.py), the
+status dashboard, and tasks of the installer (--task) running inside the
+window. Phase A of the Control Center study, on the Phase 1 foundation:
+installed next to the PowerShell tools in C:\\Koha\\bin\\client and run
+by the embeddable Python in C:\\Koha\\bin\\python (KohaEasy.Python.psm1
+puts both in place). Nothing starts it yet: the
 PowerShell tray and window (KohaEasy.Tray.ps1, KohaEasy.Window.ps1) stay
-what librarians use until the switch of Phase 2. To try it by hand:
+what librarians use until the switch of Phase E. To try it by hand:
 
-    C:\\Koha\\bin\\python\\pythonw.exe -m koha_nexus_win window
-    C:\\Koha\\bin\\python\\pythonw.exe -m koha_nexus_win tray     (close the Koha icon first)
+    C:\\Koha\\bin\\python\\pythonw.exe -m koha_nexus_win app      (close the Koha icon first)
+    C:\\Koha\\bin\\python\\pythonw.exe -m koha_nexus_win tray     (the same, only the icon at first)
     C:\\Koha\\bin\\python\\python.exe  -m koha_nexus_win check    (one status check, printed)
 
 Layout:
@@ -19,10 +23,13 @@ Layout:
   menu.py     the tray menu as data (which items, enabled when)
   viewmodel.py  what the window shows, as plain JSON for ui/app.js
   tray.py     pystray icon + background checks (nexus_core.monitor)
-  window.py   pywebview window on ui/index.html
-  winapi.py   the few Win32 calls (named mutex, UI language, uptime)
+  window.py   the Api the page calls (dashboard, sections, tasks)
+  engine.py   runs `koha-panel --task NAME` in Debian, reads its @@ events
+              (nexus_core.taskproto) and batches them for the page
+  app.py      the window (pywebview on ui/) and the tray in one process
+  winapi.py   the few Win32 calls (named mutex and event, UI language, uptime)
 
-Only tray.py, window.py, notify.py and winapi.py touch Windows-only modules,
+Only tray.py, app.py, notify.py and winapi.py touch Windows-only modules,
 and only inside functions, so everything else is tested on Linux.
 """
 

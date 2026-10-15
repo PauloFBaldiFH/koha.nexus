@@ -81,3 +81,51 @@ def ask(question: str, title: str = "Koha") -> bool:
         return True
     u32 = ctypes.windll.user32  # type: ignore[attr-defined]
     return u32.MessageBoxW(None, question, title, MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND) == IDYES
+
+
+SYNCHRONIZE = 0x00100000
+EVENT_MODIFY_STATE = 0x0002
+WAIT_OBJECT_0 = 0
+
+
+class NamedEvent:
+    """An auto-reset named event: a second start of the app sets it, and the
+    running app (wait()) shows its window. Off Windows, signal() reports
+    that no app is running and wait() returns False."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.handle: Optional[int] = None
+
+    def create(self) -> bool:
+        if os.name != "nt":
+            return False
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        k32.CreateEventW.restype = ctypes.c_void_p
+        self.handle = k32.CreateEventW(None, False, False, self.name)
+        return bool(self.handle)
+
+    def signal(self) -> bool:
+        """Sets the event of the app already running; False when none is."""
+        if os.name != "nt":
+            return False
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        k32.OpenEventW.restype = ctypes.c_void_p
+        h = k32.OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, False, self.name)
+        if not h:
+            return False
+        try:
+            return bool(k32.SetEvent(ctypes.c_void_p(h)))
+        finally:
+            k32.CloseHandle(ctypes.c_void_p(h))
+
+    def wait(self, timeout_ms: int = 1000) -> bool:
+        if os.name != "nt" or not self.handle:
+            return False
+        k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        return k32.WaitForSingleObject(ctypes.c_void_p(self.handle), timeout_ms) == WAIT_OBJECT_0
+
+    def close(self) -> None:
+        if self.handle and os.name == "nt":
+            ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(self.handle))  # type: ignore[attr-defined]
+        self.handle = None
