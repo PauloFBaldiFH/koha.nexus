@@ -147,3 +147,30 @@ def test_js_call_is_plain_json():
     from koha_nexus_win.app import js_call
     assert js_call("nexus.onEvents", [{"text": "</script>é"}]) == \
         'nexus.onEvents([{"text": "</script>\\u00e9"}])'
+
+
+def test_tray_menu_items_satisfy_pystray(monkeypatch):
+    """pystray.MenuItem raises ValueError for an action of more than two
+    arguments (defaults included): the whole menu then fails to build."""
+    import sys
+    import types
+
+    from koha_nexus_win import menu
+
+    made = []
+
+    class MenuItem:
+        def __init__(self, text, action, checked=None, enabled=True, default=False):
+            if action.__code__.co_argcount > 2:
+                raise ValueError(action)
+            made.append((text, action))
+
+    fake = types.SimpleNamespace(MenuItem=MenuItem, Menu=types.SimpleNamespace(SEPARATOR="-"))
+    monkeypatch.setitem(sys.modules, "pystray", fake)
+    t, a, _ = tray()
+    entries = [menu.Entry(key="start", text="Start"), menu.Entry(key="opac", text="OPAC")]
+    monkeypatch.setattr(t, "_entries", lambda: entries)
+    t._items()
+    assert [m[0] for m in made] == ["Start", "OPAC"]
+    made[1][1](None, None)
+    assert a.calls[-1] == ("opac",)

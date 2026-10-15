@@ -116,10 +116,12 @@ class Tray:
             if entry.key == "-":
                 return pystray.Menu.SEPARATOR
 
-            def action(icon, item, e=entry):
-                if e.confirm and not self.ask(e.confirm):
+            # pystray accepts an action of at most two arguments (icon,
+            # item), defaults included, so the entry comes from the closure.
+            def action(icon, item):
+                if entry.confirm and not self.ask(entry.confirm):
                     return
-                self._run(e.key)
+                self._run(entry.key)
 
             # The menu is rebuilt from menu.entries() each time it opens
             # (pystray.Menu with a callable), so plain values are current.

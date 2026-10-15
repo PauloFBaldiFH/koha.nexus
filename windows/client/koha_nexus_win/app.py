@@ -126,8 +126,10 @@ class ControlCenter:
             result["self_test"] = self.window.evaluate_js("nexus.selfTest()")
             icon = getattr(self.tray, "icon", None)
             result["tray"] = bool(icon is not None and getattr(icon, "visible", False))
+            result["tray_menu"] = len(self.tray._items()) if self.tray is not None else 0
             st = result["self_test"] or {}
-            result["ok"] = bool(result["page"] and result["ended"] and st.get("sidebar", 0) >= 10 and result["tray"])
+            result["ok"] = bool(result["page"] and result["ended"] and st.get("sidebar", 0) >= 10
+                                and result["tray"] and result["tray_menu"] > 0)
         except Exception as e:  # noqa: BLE001 - the report says what broke
             log.exception("smoke test failed")
             result["error"] = repr(e)
