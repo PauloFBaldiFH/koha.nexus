@@ -377,7 +377,9 @@ def test_sync_reads_what_is_live_in_koha(monkeypatch):
             assert "OpacUserCSS: 4 lines" in report and "Nothing was written to Koha" in report
             await pilot.press("escape")
             assert view.query_one("#o-texture", Select).value == "smooth"
-            assert view.query_one("#o-news_buttons", Switch).value is True
+            # No News action buttons switch any more (Paulo, 2026-10-15): always on.
+            assert not view.query("#o-news_buttons") and not view.query("#o-news")
+            assert view.collect()[0]["news_buttons"] is True
             assert len(view.query(".link-row")) == 2
 
     asyncio.run(main())

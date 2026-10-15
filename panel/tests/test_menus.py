@@ -32,14 +32,21 @@ def test_every_entry_is_native():
 
 def test_existing_labels_are_installer_texts():
     # New screens (database, ai) bring new texts; everything else must be
-    # the installer's own English key, or its translations are lost.
+    # the installer's own English key, or its translations are lost. A
+    # panel-only text (Download latest backup, the Magic Import subtitle,
+    # Database tables under Diagnostics) needs its PT-BR text by hand.
+    from kei_panel.i18n import load_cache
+
+    from conftest import REPO
+
+    pt = load_cache(REPO / "lang" / "pt.cache")
     new = {"database", "ai", "dashboard", "z3950", "opac", "hub", "vpn"}
     for s in SECTIONS:
         if s.id in new:
             continue
         for text in [s.label, s.title, s.prompt] + [e.label for e in s.entries]:
             if text:
-                assert text in TEXT, f"{s.id}: {text!r} is not an installer text"
+                assert text in TEXT or pt.get(text), f"{s.id}: {text!r} is not an installer text"
 
 
 def test_unique_ids_and_keys():
@@ -144,3 +151,13 @@ def test_every_card_says_what_it_does():
             assert pt.get(text), f"no PT-BR text for {text!r}"
     assert set(DESCRIPTIONS) == {e.action for s in SECTIONS for e in s.entries}
     assert "Step by step, in this panel" not in pt
+
+
+def test_database_tables_live_under_diagnostics():
+    # Paulo, 2026-10-15: not on the sidebar; a card of Diagnostics &
+    # maintenance, and no maintenance / reports cards of its own.
+    from kei_panel.menus import section
+    db = section("database")
+    assert not db.sidebar and db.parent == "diagnostics" and not db.entries
+    views = [e for e in section("diagnostics").entries if e.kind == "view"]
+    assert [e.action for e in views] == ["database"]

@@ -320,7 +320,7 @@
     }
    ],
    "steps": [
-    "Open the Backup center and choose **Configure cloud backup (Google Drive)**.",
+    "Open the Backup center and choose **Configure cloud backup**.",
     "Choose how to connect (see the options).",
     "Sign in with the library's own account, not a personal one.",
     "Wait for the real upload test: the panel sends a small file to the cloud and checks it arrived.",
@@ -366,7 +366,7 @@
    "overview": [
     "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
     "Restoring the database lives only here since 1.5.54: the main menu no longer has a separate **Restore database** entry, so restore, the MARC21 export and the backup routines are all reached from this one screen (in the panel and in the classic menu).",
-    "The top row has **Download latest backup**, **Restore database** and **Export MARC21 records now**. Then three cards (**Last backup**, **Size**, **Result** of the last nightly run), the **New backups** box with the compression choice, and the backup routines as cards."
+    "Three cards come first (**Last backup**, **Size**, **Result** of the last nightly run), then the **Backup compression type** box with the compression choice, then the actions as cards, the only place for them since 1.5.56: **Download latest backup**, **Generate manual backup**, **Export MARC21 records now**, **Restore database**, **Configure cloud backup** and **Test integrity of latest backup**."
    ],
    "tips": [
     "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
@@ -390,7 +390,7 @@
    ],
    "steps": [
     "Open the Backup center (key **b**).",
-    "Press **Download latest backup**.",
+    "Press the **Download latest backup** card (the first card of the screen).",
     "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
    ],
    "tips": [
@@ -430,7 +430,7 @@
    ]
   },
   "backup-compression": {
-   "title": "Compression of new backups",
+   "title": "Backup compression type",
    "summary": "Chooses how new backups are compressed: gzip (opens anywhere), Zstandard (fast and smaller, for large catalogues) or XZ (smallest, slow to make, for long-term storage).",
    "overview": [
     "The choice is saved as `BACKUP_COMPRESSION` in the panel's backup settings and is used by the nightly backup, by manual backups and by the safety copies made before a change (a restore, an update, a library tool). The nightly script reads it every night, so the next backup already uses it.",
@@ -527,13 +527,14 @@
    ]
   },
   "sec-database": {
-   "summary": "Koha's tables at a glance, largest first, with the database maintenance and the reports pack one click away.",
+   "summary": "Koha's tables at a glance, largest first, opened from the Diagnostics & maintenance center.",
    "overview": [
-    "The screen (key **t**) is read-only: it lists every table of Koha's database with its number of rows and its size, and the totals. It helps to understand what grows (action logs, sessions, statistics) and whether a clean-up is due.",
-    "The two cards below run the routines that change the database, each with a preview and a verified backup first."
+    "The screen is read-only: it lists every table of Koha's database with its number of rows and its size, and the totals. It helps to understand what grows (action logs, sessions, statistics) and whether a clean-up is due.",
+    "Since 1.5.56 it is no longer on the sidebar: open **Diagnostics & maintenance center** and choose **Database tables** (the **t** key still opens it). The database maintenance is a card of the same center, and the reports pack is in **Library tools**."
    ],
    "related": [
     "db-tables",
+    "sec-diagnostics",
     "db-maintenance",
     "reports"
    ],
@@ -546,7 +547,7 @@
    "title": "Table list",
    "summary": "Every table of Koha's database with its rows and size, largest first, and the total size of the database.",
    "steps": [
-    "Open **Database tables** (key **t**): the list loads behind the Pac-Man loader.",
+    "Open **Diagnostics & maintenance center** and choose **Database tables** (or press **t**): the list loads behind the Pac-Man loader.",
     "Read the biggest tables at the top. `biblio_metadata` and `items` grow with the collection; `action_logs`, `sessions` and `statistics` grow with use.",
     "Press **Refresh** after a maintenance run to see the difference."
    ],
@@ -739,6 +740,9 @@
     "ai-provider",
     "ai-models",
     "sizing"
+   ],
+   "warnings": [
+    "Local AI models and tools are heavy: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on the server's hardware. The AI screen says so at the top."
    ]
   },
   "ai-tools": {
@@ -1217,24 +1221,6 @@
    "steps": [
     "Switch on what you want to hide.",
     "Press **Apply** and check the OPAC."
-   ]
-  },
-  "opac-news": {
-   "title": "News action buttons",
-   "summary": "Turns a marker inside a news item (Tools > News) into a styled button, so news can carry calls to action.",
-   "overview": [
-    "Write `[kei-button url=\"https://...\" icon=\"fa-book\"]Text[/kei-button]` in the news text: with **Buttons** on, the OPAC shows it as a button in the theme's colours."
-   ],
-   "related": [
-    "sec-opac"
-   ],
-   "steps": [
-    "Switch **Buttons** on and press **Apply**.",
-    "In the staff interface, open **Tools > News** and write a news item with the marker.",
-    "Open the OPAC home page: the marker shows as a button."
-   ],
-   "tips": [
-    "Use Font Awesome icon names such as `fa-book`, `fa-calendar` or `fa-envelope` in the icon attribute."
    ]
   },
   "opac-actions": {
@@ -1794,16 +1780,17 @@
    ]
   },
   "sec-diagnostics": {
-   "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance and service repair.",
+   "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance, the database tables and service repair.",
    "related": [
     "status",
     "health",
     "validation-report",
     "apache-log",
-    "repair-services"
+    "repair-services",
+    "sec-database"
    ],
    "overview": [
-    "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns."
+    "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
    ],
    "steps": [
     "Run **Full system health check**.",
@@ -2561,8 +2548,8 @@
    ],
    "steps": [
     "Open the Backup center (key **b**).",
-    "Press **Export MARC21 records now** (on the top row or among the cards) and confirm.",
-    "Wait for the export: the result shows the file, its size, the `.mrc` files inside it and the `scp` command to paste on your computer to save it in Downloads."
+    "Press the **Export MARC21 records now** card and confirm.",
+    "Wait for the export: the result shows the file, its size and the `.mrc` files inside it. Press **Download to computer** to copy the `.tar.gz` package straight into your Downloads folder (WSL or a Linux desktop); over SSH, paste the `scp` command shown on your computer instead."
    ],
    "tips": [
     "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
@@ -2591,7 +2578,6 @@
     "A button needs both its text and its address; the panel says which one is missing before anything is written. A single button saved by 1.5.53 comes back as the first row."
    ],
    "related": [
-    "opac-news",
     "sec-opac"
    ]
   }

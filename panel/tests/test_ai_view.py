@@ -43,6 +43,7 @@ def test_gemini_key_test_save_and_marc_hook(demo_dir):
             q = view.query_one
             assert q("#ai-ollama").display                          # always there: needs only Ollama
             assert q("#ai-assistant") and q("#ai-marc")              # both tools on one screen
+            assert "slow down the whole system" in str(q("#ai-performance").render())
             assert q("#ai-marc").disabled                           # nothing set up yet
 
             await pilot.click("#ai-p-gemini")

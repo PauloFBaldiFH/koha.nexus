@@ -272,7 +272,7 @@
     }
    ],
    "steps": [
-    "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem (Google Drive)**.",
+    "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem**.",
     "Escolha como conectar (veja as opções).",
     "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
     "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
@@ -286,7 +286,7 @@
    "warnings": [
     "O token e as chaves ficam guardados só no arquivo privado do rclone no servidor. Quem tiver acesso root ao servidor pode usá-los: proteja o servidor à altura."
    ],
-   "_en": "4ebbd0f2a6"
+   "_en": "ed3a20759d"
   },
   "backup-test": {
    "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
@@ -310,13 +310,13 @@
    "overview": [
     "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
     "Desde a 1.5.54 a restauração do banco fica só aqui: o menu principal não tem mais a opção separada **Restaurar base de dados**, então a restauração, a exportação MARC21 e as rotinas de backup ficam todas nesta mesma tela (no painel e no menu clássico).",
-    "Na linha de cima ficam **Baixar Backup Recente**, **Restaurar base de dados** e **Exportar registros MARC21 agora**. Depois vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), a caixa **Novos backups** com a escolha da compressão e, por fim, as rotinas de backup em cartões."
+    "Primeiro vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Tipo de compressão dos backups** com a escolha da compressão e, por fim, as ações em cartões, o único lugar delas desde a 1.5.56: **Baixar Backup Recente**, **Gerar backup manual**, **Exportar registros MARC21 agora**, **Restaurar base de dados**, **Configurar backup na nuvem** e **Testar integridade do último backup**."
    ],
    "tips": [
     "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
     "Um backup que nunca foi testado é uma esperança, não um backup: agende um teste de integridade mensal."
    ],
-   "_en": "5553d3364d"
+   "_en": "aac9b45396"
   },
   "backup-download": {
    "title": "Baixar Backup Recente",
@@ -326,14 +326,14 @@
    ],
    "steps": [
     "Abra a Central de backups e restauração (tecla **b**).",
-    "Pressione **Baixar Backup Recente**.",
+    "Pressione o cartão **Baixar Backup Recente** (o primeiro cartão da tela).",
     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
    ],
    "tips": [
     "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
     "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
    ],
-   "_en": "bbcdd3556f"
+   "_en": "f89a413327"
   },
   "backup-status": {
    "title": "Cartões de status do backup",
@@ -358,7 +358,7 @@
    "_en": "350c37619e"
   },
   "backup-compression": {
-   "title": "Compressão dos novos backups",
+   "title": "Tipo de compressão dos backups",
    "summary": "Escolhe como os novos backups são compactados: gzip (abre em qualquer lugar), Zstandard (rápido e menor, para acervos grandes) ou XZ (o menor, lento para gerar, para guarda de longo prazo).",
    "overview": [
     "A escolha é salva como `BACKUP_COMPRESSION` nas configurações de backup do painel e vale para o backup noturno, para os backups manuais e para as cópias de segurança feitas antes de uma alteração (uma restauração, uma atualização, uma ferramenta da biblioteca). O script noturno a lê toda noite, então o próximo backup já a usa.",
@@ -390,7 +390,7 @@
     "Escolha XZ em servidores pequenos com tempo livre à noite e Internet lenta.",
     "Mantenha o gzip quando os backups forem abertos por pessoas de fora da biblioteca, que talvez não tenham outras ferramentas."
    ],
-   "_en": "ae0f01078c"
+   "_en": "7c9dda9d5a"
   },
   "backup-safety": {
    "title": "Backup de segurança antes da restauração",
@@ -441,22 +441,22 @@
    "_en": "ece8a76968"
   },
   "sec-database": {
-   "summary": "As tabelas do Koha num relance, das maiores para as menores, com a manutenção do banco e o pacote de relatórios a um clique.",
+   "summary": "As tabelas do Koha num relance, das maiores para as menores, abertas pela Central de diagnóstico e manutenção.",
    "overview": [
-    "A tela (tecla **t**) é somente leitura: lista cada tabela do banco do Koha com o número de linhas e o tamanho, e os totais. Ajuda a entender o que cresce (logs de ações, sessões, estatísticas) e se uma limpeza está na hora.",
-    "Os dois cartões abaixo rodam as rotinas que alteram o banco, cada uma com prévia e backup verificado antes."
+    "A tela é somente leitura: lista cada tabela do banco do Koha com o número de linhas e o tamanho, e os totais. Ajuda a entender o que cresce (logs de ações, sessões, estatísticas) e se uma limpeza está na hora.",
+    "Desde a 1.5.56 ela não fica mais na barra lateral: abra a **Central de diagnóstico e manutenção** e escolha **Tabelas do banco de dados** (a tecla **t** continua abrindo a tela). A manutenção do banco é um cartão da mesma central, e o pacote de relatórios fica em **Ferramentas da biblioteca**."
    ],
    "tips": [
     "Rode a manutenção depois de grandes limpezas (anonimizar histórico, excluir leitores): o espaço só volta ao MariaDB depois da otimização.",
     "Abra esta tela antes de uma migração para estimar quanto tempo um backup e uma restauração vão levar."
    ],
-   "_en": "f2d6111b49"
+   "_en": "aa68de0828"
   },
   "db-tables": {
    "title": "Lista de tabelas",
    "summary": "Todas as tabelas do banco do Koha com linhas e tamanho, das maiores para as menores, e o tamanho total do banco.",
    "steps": [
-    "Abra **Tabelas do banco de dados** (tecla **t**): a lista carrega por trás da animação do Pac-Man.",
+    "Abra a **Central de diagnóstico e manutenção** e escolha **Tabelas do banco de dados** (ou pressione **t**): a lista carrega por trás da animação do Pac-Man.",
     "Leia as maiores tabelas no topo. `biblio_metadata` e `items` crescem com o acervo; `action_logs`, `sessions` e `statistics` crescem com o uso.",
     "Pressione **Atualizar** depois de uma manutenção para ver a diferença."
    ],
@@ -464,7 +464,7 @@
     "Se `action_logs` ou `sessions` estiverem entre as maiores tabelas, rode a **Otimização profunda do banco e limpeza de logs**.",
     "Acompanhe o tamanho total ao longo dos meses para planejar o espaço em disco e o armazenamento dos backups."
    ],
-   "_en": "86bb996137"
+   "_en": "7d12fef360"
   },
   "db-maintenance": {
    "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
@@ -621,7 +621,10 @@
     "Sem GPU, prefira os modelos leves: um modelo de visão de 7B pode levar minutos por resposta na CPU.",
     "Confira o disco livre antes de baixar: cada modelo ocupa de cerca de 1 GB a vários GB."
    ],
-   "_en": "70962154b5"
+   "_en": "e1b554fbcb",
+   "warnings": [
+    "Modelos e ferramentas de IA locais são pesados: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware do servidor. A tela de IA avisa isso no topo."
+   ]
   },
   "ai-tools": {
    "title": "As ferramentas de IA",
@@ -1031,22 +1034,6 @@
     "Esconda o contador do carrinho só se a biblioteca não usar o carrinho (sacola de livros) do Koha."
    ],
    "_en": "e2eef23b65"
-  },
-  "opac-news": {
-   "title": "Botões de ação nas notícias",
-   "summary": "Transforma uma marcação dentro de uma notícia (Ferramentas > Notícias) num botão estilizado, para que as notícias tragam chamadas para ação.",
-   "overview": [
-    "Escreva `[kei-button url=\"https://...\" icon=\"fa-book\"]Texto[/kei-button]` no texto da notícia: com **Botões** ligado, o OPAC mostra a marcação como um botão nas cores do tema."
-   ],
-   "steps": [
-    "Ligue **Botões** e pressione **Aplicar**.",
-    "Na intranet, abra **Ferramentas > Notícias** e escreva uma notícia com a marcação.",
-    "Abra a página inicial do OPAC: a marcação aparece como botão."
-   ],
-   "tips": [
-    "Use nomes de ícones do Font Awesome como `fa-book`, `fa-calendar` ou `fa-envelope` no atributo icon."
-   ],
-   "_en": "05ea27d2dd"
   },
   "opac-actions": {
    "title": "Aplicar, prévia, sincronizar e remover",
@@ -1525,9 +1512,9 @@
    "_en": "bfacc203ab"
   },
   "sec-diagnostics": {
-   "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco e reparo dos serviços.",
+   "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco, as tabelas do banco e reparo dos serviços.",
    "overview": [
-    "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns."
+    "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
    ],
    "steps": [
     "Rode a **Verificação completa do sistema**.",
@@ -1537,7 +1524,7 @@
    "tips": [
     "Exporte o diagnóstico pelo Painel de Controle antes de pedir ajuda: isso poupa uma rodada de perguntas."
    ],
-   "_en": "ac5c11cc48"
+   "_en": "35f32d890a"
   },
   "status": {
    "summary": "Mostra um retrato detalhado do servidor e do Koha: serviços, motor de busca, disco e o último backup.",
@@ -2170,8 +2157,8 @@
    ],
    "steps": [
     "Abra a Central de backups e restauração (tecla **b**).",
-    "Pressione **Exportar registros MARC21 agora** (na linha de cima ou entre os cartões) e confirme.",
-    "Aguarde a exportação: o resultado mostra o arquivo, o tamanho, os arquivos `.mrc` dentro dele e o comando `scp` para colar no seu computador e salvá-lo na pasta Downloads."
+    "Pressione o cartão **Exportar registros MARC21 agora** e confirme.",
+    "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e os arquivos `.mrc` dentro dele. Pressione **Baixar no computador** para copiar o pacote `.tar.gz` direto para a sua pasta Downloads (WSL ou desktop Linux); por SSH, cole no seu computador o comando `scp` mostrado."
    ],
    "tips": [
     "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
@@ -2182,7 +2169,7 @@
     "backup-manual",
     "restore"
    ],
-   "_en": "e1c0d51815"
+   "_en": "93e8c0d128"
   },
   "opac-news-items": {
    "title": "Notícias do OPAC e Notícias da equipe",
@@ -2201,7 +2188,6 @@
     "Um botão precisa do texto e do endereço; o painel diz qual falta antes de gravar qualquer coisa. O botão único salvo pela 1.5.53 volta como a primeira linha."
    ],
    "related": [
-    "opac-news",
     "sec-opac"
    ],
    "_en": "063008b7e7"

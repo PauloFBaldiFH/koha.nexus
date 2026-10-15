@@ -3,8 +3,9 @@
   manual_backup  folder picker -> backup under Pac-Man -> file, size and the
                  scp command to copy it to a PC
   marc_backup    the weekly MARC21 export (bibliographic + authority
-                 records, koha_marc_<date>.tar.gz) run now -> file, size
-                 and the scp command
+                 records, koha_marc_<date>.tar.gz) run now -> file, size,
+                 the scp command and, on WSL or a Linux desktop, a button
+                 that copies the .tar.gz to the Downloads folder
   test_backup    which backup (newest, or another file) -> trial import ->
                  tables, records, patrons
   restore        how to send a file + file picker (a file can be dropped on
@@ -40,6 +41,7 @@ from ..screens.oauth import OAuthScreen
 from .common import facts, failed, last_message, run_task, show_failure, tx
 
 DOWNLOAD_LABEL = "📥 Download latest backup"
+DOWNLOAD_FILE = "📥 Download to computer"
 
 RESTORE_STEPS = 10   # tui_run steps of function_restore_database
 
@@ -110,11 +112,17 @@ async def marc_backup(app) -> None:
     if out.get("cloud") == "yes":
         details.append((t("Cloud"), t("sent")))
     steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
-    await app.push_screen_wait(MessageScreen(
+    # On WSL or a Linux desktop the Downloads folder is reachable from here:
+    # one button copies the package there, no scp needed.
+    here = transfer.where() in ("wsl", "desktop")
+    choice = await app.push_screen_wait(MessageScreen(
         t("MARC21 RECORDS EXPORTED"), "", details=details, command=out.get("scp"),
         command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
         command_notes=tx("3. You will be asked for the password of user '${REAL_USER:-root}'.",
-                         REAL_USER=out.get("user", "root"))))
+                         REAL_USER=out.get("user", "root")),
+        extra=t(DOWNLOAD_FILE) if here else ""))
+    if choice == "extra":
+        await download_file(app, Path(out.get("file") or ""), t(DOWNLOAD_FILE))
 
 
 # ----------------------------------------------------------------------
@@ -271,6 +279,15 @@ async def download_latest(app, file: str | None = None) -> None:
         await app.push_screen_wait(MessageScreen(title, tx("No backup found in ${dir}.", dir=info.get("dir_sql")),
                                                  kind="error"))
         return
+    await download_file(app, src, title, info)
+
+
+async def download_file(app, src: Path, title: str, info: dict | None = None) -> None:
+    """src (a backup or the MARC21 package) copied to the Downloads folder."""
+    if not src.is_file():
+        await app.push_screen_wait(MessageScreen(title, f"{t('File not found.')}\n{src}", kind="error"))
+        return
+    info = info if info is not None else await facts(app)
     place = transfer.where()
 
     def job(reporter):

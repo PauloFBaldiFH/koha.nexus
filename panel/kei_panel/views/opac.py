@@ -271,11 +271,6 @@ class OpacView(SectionView):
         with Vertical(id="o-ghost", classes="opac-box"):
             for key, label in GHOST.items():
                 yield from _row(t(label), Switch(c["ghost"][key], id=f"o-g-{key}"))
-        with Vertical(id="o-news", classes="opac-box"):
-            yield from _row(t("Buttons"), Switch(c["news_buttons"], id="o-news_buttons"))
-            yield Static(t("In a news item (Tools > News), this marker becomes a button:") + "\n  "
-                         + '[kei-button url="https://..." icon="fa-book"]' + t("Text") + "[/kei-button]",
-                         classes="ai-note", markup=False)
 
     def _asset_row(self, name: str, current: dict) -> ComposeResult:
         """A picture: where it comes from and the file or address. name is
@@ -307,7 +302,7 @@ class OpacView(SectionView):
         titles = {"o-material": "Material", "o-images": "Pictures", "o-dark": "Legibility and dark mode",
                   "o-carousel": "New arrivals carousel", "o-links": "Quick access buttons",
                   "o-slinks": "Staff home page buttons",
-                  "o-staff": "Staff interface", "o-ghost": "Hide", "o-news": "News action buttons",
+                  "o-staff": "Staff interface", "o-ghost": "Hide",
                   "o-credits": "Footer credits",
                   **{box: title for box, title in NEWS_BOXES.values()},
                   **{box: title for box, title in LOGIN_BOXES.values()}}
@@ -443,7 +438,6 @@ class OpacView(SectionView):
         q("#o-car-tag", Input).value = car["amazon_tag"]
         for key in GHOST:
             q(f"#o-g-{key}", Switch).value = cfg["ghost"][key]
-        q("#o-news_buttons", Switch).value = cfg["news_buttons"]
         for key, p in LINK_SETS.items():
             q(f"#{p}s-enabled", Switch).value = cfg[key]["enabled"]
             q(f"#{p}s-style", Select).value = cfg[key]["style"]
@@ -506,7 +500,10 @@ class OpacView(SectionView):
                             "overlay": q("#o-car-overlay", Switch).value, "mode": q("#o-car-mode", Select).value,
                             "amazon_tag": q("#o-car-tag", Input).value.strip()},
                "ghost": {key: q(f"#o-g-{key}", Switch).value for key in GHOST},
-               "news_buttons": q("#o-news_buttons", Switch).value,
+               # No switch of its own any more (Paulo, 2026-10-15): the news
+               # boxes above make the buttons, and [kei-button] markers in
+               # Koha's own news always become buttons.
+               "news_buttons": True,
                "staff": {"enabled": q("#o-staff-enabled", Switch).value,
                          "accent": q("#o-staff-accent", Input).value, "accent2": q("#o-staff-accent2", Input).value,
                          "surface": q("#o-staff-surface", Input).value, "film": q("#o-staff-film", Slider).value,

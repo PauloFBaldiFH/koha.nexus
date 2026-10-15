@@ -56,21 +56,26 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📦  Install Koha server", "install", kind="native"),)),
     Section("credentials", "🔑  View first-access credentials", entries=(
         Entry("🔑  View first-access credentials", "credentials", kind="native"),)),
+    # The cards are the only place of the backup actions (Paulo, 2026-10-15:
+    # no buttons above the status cards any more).
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
+        Entry("📥 Download latest backup", "backup-download", kind="native"),
         Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native"),
         Entry("📚  Export MARC21 records now", "backup-marc", kind="native"),
-        Entry("📤  Configure cloud backup (Google Drive)", "backup-cloud", kind="native"),
-        Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
         Entry("📥  Restore database", "restore", kind="native"),
+        Entry("📤  Configure cloud backup", "backup-cloud", kind="native"),
+        Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
     ), view="backup", key="b"),
     # Every import in one place, right under the backups (Paulo, 2026-10-09).
-    Section("import", "🪄  Magic Import Tool", entries=(
+    Section("import", "🪄  Magic Import Tool",
+            prompt="Imports bibliographic records, authority records and patron (reader) data from other systems: "
+                   "MARC, ISIS, CSV and spreadsheets, and old-system backups.", entries=(
         Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
-    # New screen: Koha's tables at a glance (no bash menu of its own).
-    Section("database", "📑  Database tables", "📑  Database tables", entries=(
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
-        Entry("📋  Essential SQL reports pack", "reports", kind="native"),
-    ), view="database", key="t"),
+    # New screen: Koha's tables at a glance (no bash menu of its own), opened
+    # from Diagnostics & maintenance (Paulo, 2026-10-15: not on the sidebar;
+    # maintenance and the reports pack have their own cards elsewhere).
+    Section("database", "📑  Database tables", "📑  Database tables", view="database", key="t",
+            sidebar=False, parent="diagnostics"),
     # New screen: both AI tools on one page (views/ai.py). AI cataloguing
     # (Module 1: MARC Replace, which opens the routine below) and the AI
     # assistant (Module 2: the chat on the Koha staff home page) share the
@@ -124,6 +129,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📄  View latest validation report", "validation-report", kind="native"),
         Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
         Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
+        Entry("📑  Database tables", "database", kind="view"),
         Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
@@ -179,9 +185,13 @@ def section(section_id: str) -> Section:
     raise KeyError(section_id)
 
 
+# Panel routines with no installer routine of their own (routines/).
+PANEL_ONLY = frozenset({"backup-download"})
+
+
 def all_actions() -> set[str]:
     """Installer actions (a view entry opens a screen, not a routine)."""
-    return {e.action for s in SECTIONS for e in s.entries if e.kind != "view"}
+    return {e.action for s in SECTIONS for e in s.entries if e.kind != "view" and e.action not in PANEL_ONLY}
 
 
 # The line under each card (widgets/cards.py): what the routine does, in a
@@ -193,9 +203,11 @@ DESCRIPTIONS: dict[str, str] = {
     "restore": "Replaces Koha's database with a backup, tested first",
     "backup-manual": "Makes a full backup and shows how to copy it to a PC",
     "backup-marc": "Exports the catalogue and the authorities in MARC21 now",
-    "backup-cloud": "Connects Google Drive to keep the backups in the cloud",
+    "backup-download": "Copies the newest backup to this computer's Downloads folder",
+    "backup-cloud": "Automates backups uploaded to cloud storage services",
     "backup-test": "Imports a backup into a test database to check it",
-    "magic-import": "Imports catalogs in any format: MARC, ISIS, CSV, backups",
+    "magic-import": "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups",
+    "database": "Koha's tables, largest first, with rows and size",
     "db-maintenance": "Optimizes the tables and clears old logs, with a preview",
     "reports": "Adds ready-made SQL reports to Koha's Reports module",
     "marc-replace": "Installs a staff page that replaces a record's MARC",

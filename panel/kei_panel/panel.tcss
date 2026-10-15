@@ -193,6 +193,13 @@ Button.small {
     color: $text-muted;
     padding-top: 1;
 }
+.ai-warning {
+    width: 1fr;
+    color: $warning;
+    border: round $warning;
+    padding: 0 1;
+    margin-bottom: 1;
+}
 #ai-ollama {
     border: round $warning;
 }
