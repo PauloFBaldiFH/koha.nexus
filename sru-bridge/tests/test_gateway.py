@@ -14,9 +14,7 @@ from sru_gateway import z3950
 from sru_gateway.app import create_app
 from sru_gateway.config import Settings
 from sru_gateway.upstream_sru import cql_for, parse_response
-from zeus_sru.config import Settings as ZeusSettings
 from zeus_sru.cql import parse
-from zeus_sru.zeus import ZeusClient
 
 NS = {"zs": "http://www.loc.gov/zing/srw/", "marc": "http://www.loc.gov/MARC21/slim",
       "diag": "http://www.loc.gov/zing/srw/diagnostic/"}
@@ -24,7 +22,7 @@ TARGETS_JSON = Path(__file__).resolve().parents[1] / "sru_gateway" / "targets.js
 IDS = ("bn ufsc unicamp usp uerj ufg ufmg ufpe ufscar ufu ufrgs uff senado nlm harvard uw_madison mit psu "
        "upenn tufts fsu ubc trent sfu utoronto bl oxford bne bcl bizkaia aladi sbn_it abes_fr swb_de "
        "uhamburg bn_polonia slsp nkc rsl bashkir bna biblored pucp upc_peru christchurch juac_julac "
-       "monash_sa pergamum").split()
+       "monash_sa pergamum loc yale umich manchester kcl").split()
 
 
 def marc_record(title: str, isbn: str = "9788535902778") -> bytes:
@@ -53,15 +51,35 @@ def diag(root):
 
 # --- targets.json -------------------------------------------------------
 
-def test_targets_json_has_the_48_ids_in_order():
+def test_targets_json_has_the_53_ids_in_order():
     data = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))
     assert [t["id"] for t in data["targets"]] == IDS
     table = tg.load(TARGETS_JSON)
-    assert len(table) == 48
+    assert len(table) == 53
     kinds = {t.id: t.kind for t in table.values()}
     assert kinds["ufsc"] == "zeus" and kinds["pergamum"] == "pergamum"
-    assert {k for k, v in kinds.items() if v == "z3950"} == {"bl", "sbn_it", "swb_de"}
+    assert {k for k, v in kinds.items() if v == "z3950"} == {"nlm", "bl", "sbn_it", "swb_de", "loc"}
     assert not any({"user", "password"} & set(t) for t in data["targets"])
+    # Every entry says what is known about it (the old STATUS_ALVOS.md).
+    assert all("status" in t for t in data["targets"])
+    status = {t.id: t.status for t in table.values()}
+    assert status["bl"] == status["nlm"] == "broken" and status["sbn_it"] == "untested"
+    assert {i for i, s in status.items() if s == "missing"} == {i for i, k in kinds.items() if k == "missing"}
+
+
+def test_zeus_target_indexes_are_distinct():
+    table = tg.load(TARGETS_JSON)
+    indexes = [t.target_index for t in table.values() if t.kind == "zeus"]
+    assert len(indexes) == len(set(indexes)) == 13
+
+
+def test_status_is_checked():
+    assert tg.make_target({"id": "x", "kind": "missing"}).status == "missing"
+    assert tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru"}).status == "untested"
+    with pytest.raises(tg.TargetError):
+        tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru", "status": "fine"})
+    with pytest.raises(tg.TargetError):
+        tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru", "status": "missing"})
 
 
 def test_make_target_rejects_what_it_cannot_serve():
@@ -105,11 +123,11 @@ def test_missing_address_says_so_and_both_slash_forms_route():
 
 def test_explain_and_health():
     table = tg.load(TARGETS_JSON)
-    with gateway(table, zeus=ZeusClient(ZeusSettings(), httpx.AsyncClient())) as client:
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
         r = client.get("/sru/bn")
         assert b"explainResponse" in r.content
         h = client.get("/health").json()
-    assert h["targets"] == 48 and "ufsc" in h["configured"] and "bn" in h["missing"]
+    assert h["targets"] == 53 and "ufsc" in h["configured"] and "bne" in h["missing"]
 
 
 def test_ufsc_goes_to_zeus(marcxml_page):
@@ -118,12 +136,17 @@ def test_ufsc_goes_to_zeus(marcxml_page):
     def answer(request):
         seen.append(request)
         return httpx.Response(200, text=marcxml_page)
-    zeus = ZeusClient(ZeusSettings(), httpx.AsyncClient(transport=httpx.MockTransport(answer)))
-    table = {"ufsc": tg.make_target({"id": "ufsc", "name": "UFSC", "kind": "zeus"})}
-    with gateway(table, zeus=zeus) as client:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    table = {"ufsc": tg.make_target({"id": "ufsc", "name": "UFSC", "kind": "zeus", "target_index": 11}),
+             "usp": tg.make_target({"id": "usp", "name": "USP", "kind": "zeus", "target_index": 4})}
+    with gateway(table, zeus_http=http) as client:
         root = search(client, "/sru/ufsc", query="dc.isbn=9684291426", maximumRecords="5")
-    assert seen and int(root.findtext("zs:numberOfRecords", namespaces=NS)) >= 1
-    assert titles(root)
+        assert seen and int(root.findtext("zs:numberOfRecords", namespaces=NS)) >= 1
+        assert titles(root)
+        search(client, "/sru/usp", query="dc.isbn=9684291426", maximumRecords="5")
+    # Each id asks Zeus for its own target only.
+    asked = [[k for k in r.url.params if k.startswith("targets[")] for r in seen]
+    assert asked == [["targets[11]"], ["targets[4]"]]
 
 
 # --- upstream SRU -------------------------------------------------------
@@ -267,3 +290,10 @@ def test_z3950_down_is_diagnostic_1():
     with gateway(z_table(1)) as client:
         uri, msg = diag(search(client, "/sru/bl", query="dc.title=x"))
     assert uri == "info:srw/diagnostic/1/1" and "127.0.0.1:1" in msg
+
+
+def test_readme_table_matches_targets_json():
+    from sru_gateway import status_table
+    text = status_table.README.read_text(encoding="utf-8")
+    assert status_table.readme_block(text) == status_table.block(tg.load(TARGETS_JSON)), \
+        "README.md is behind targets.json: run python -m sru_gateway.status_table --write"

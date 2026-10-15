@@ -1,0 +1,39 @@
+# The SRU services: sru-bridge/ (Zeus and Pergamum bridges, SRU gateway) and
+# catalog-network/ (the shared catalogue). Unit tests only; they never reach
+# the remote catalogues (fakes and saved pages stand in for them).
+name: sru-services
+
+on:
+  push:
+    paths:
+      - "sru-bridge/**"
+      - "catalog-network/**"
+      - ".github/workflows/sru-services.yml"
+  pull_request:
+    paths:
+      - "sru-bridge/**"
+      - "catalog-network/**"
+      - ".github/workflows/sru-services.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [sru-bridge, catalog-network]
+        # Debian 12's Python and Debian 13's.
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest tests -v

@@ -18,7 +18,7 @@ USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 @dataclass(frozen=True)
 class Settings:
     base_url: str = BASE_URL
-    timeout: float = 12.0         # seconds per Pergamum request (Koha waits 15)
+    timeout: float = 30.0         # seconds per Pergamum request: it searches every campus
     page_size: int = 50           # ids Pergamum lists per search (its "50" argument)
     concurrency: int = 5          # MARC records fetched at once
     cache_ttl: int = 600          # seconds a search or a record is reused
