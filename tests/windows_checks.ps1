@@ -41,7 +41,7 @@ foreach ($f in Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') {
 $names = @(Get-ChildItem (Join-Path $repo 'windows') -File | Where-Object { (Get-Content -Raw -LiteralPath $_.FullName) -match 'KohaEasy\.Window\.ps1' } | ForEach-Object { $_.Name })
 Check 'no Koha status window' (-not (Test-Path (Join-Path $repo 'windows\KohaEasy.Window.ps1')) -and ($names -join ',') -eq 'install.ps1') ($names -join ',')
 $tray = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
-Check 'tray: Open the terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
+Check 'tray: Open Debian terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
 
 $env:KOHAEASY_ROOT = Join-Path ([IO.Path]::GetTempPath()) ('koha-checks-' + [guid]::NewGuid().ToString('N'))
 Import-Module (Join-Path $repo 'windows\KohaEasy.Lang.psm1') -Force

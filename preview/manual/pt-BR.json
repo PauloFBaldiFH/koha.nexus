@@ -1906,15 +1906,15 @@
    "_en": "9aa1098521"
   },
   "terminal": {
-   "summary": "Uma linha de comando do Debian dentro da própria janela do painel, com o seu usuário do Debian (sudo para root). Digite exit para voltar ao painel.",
+   "summary": "Uma linha de comando do Debian. No Windows ela abre em uma janela própria (Windows Terminal, ou um console), como o Abrir o terminal do Debian do ícone da bandeja; nos outros casos o painel sai da frente e o shell roda na janela dele.",
    "overview": [
-    "O mesmo shell do terminal do Debian no Windows, sem uma segunda janela: o painel sai da frente enquanto ele roda e volta como estava. A barra no rodapé do painel também tem essa opção (tecla C)."
+    "O shell roda com o seu usuário do Debian (sudo para root). Digite exit para fechá-lo; dentro da janela do painel, exit traz o painel de volta. A barra no rodapé do painel também tem essa opção (tecla C)."
    ],
    "steps": [
-    "Aperte **C**, ou abra **Ferramentas gerais** e depois **Abrir o terminal**.",
-    "Digite os seus comandos. **exit** (ou Ctrl+D) traz o painel de volta."
+    "Aperte **C**, ou abra **Ferramentas gerais** e depois **Abrir o terminal do Debian**.",
+    "Digite os seus comandos. **exit** (ou Ctrl+D) fecha o terminal."
    ],
-   "_en": "b839c8ea2b"
+   "_en": "fd1b77df3a"
   },
   "crons": {
    "summary": "Cada tarefa que o servidor roda sozinho, com um botão, a frequência e a hora, em vez de um editor de texto; o agendamento antigo fica guardado como koha_tasks.bak.",

@@ -51,6 +51,17 @@ def where() -> str:
     return "server"
 
 
+def looks_like_path(text: str) -> bool:
+    """Whether pasted text is a dropped file's path: one line that starts
+    like a path (/ ~ C:\\ \\\\server file://), maybe quoted or after
+    PowerShell's "& "."""
+    lines = (text or "").strip().splitlines()
+    line = lines[0].strip() if lines else ""
+    line = re.sub(r"^&\s+", "", line)
+    line = re.sub(r"^(\\?[\"'])+", "", line)
+    return bool(re.match(r"^(/|~|[A-Za-z]:[\\/]|\\\\|file:)", line, re.I))
+
+
 def dropped_path(text: str) -> str:
     """The path a terminal pastes when a file is dropped on it (or the one
     typed in the path box), as a path of this machine: blanks around it,

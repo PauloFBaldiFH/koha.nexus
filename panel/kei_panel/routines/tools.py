@@ -11,8 +11,10 @@
   update_panel     the same; a new version closes the panel (open it again)
   user_folder      the user's home folder in Windows Explorer (WSL) or the
                    desktop's file manager; elsewhere its path, to copy
-  terminal         a shell in this window (the Debian user's, as the
-                   Windows "Debian terminal"); exit comes back to the panel
+  terminal         Open Debian terminal: under WSL a Debian terminal in a
+                   window of its own (Windows Terminal, else wsl.exe), as
+                   the tray's; elsewhere (or when Windows cannot start it) a
+                   shell in this window; exit comes back to the panel
   monitor, mc
                    full-screen programs of their own: the choice and the
                    installation are panel screens, then the program gets the
@@ -24,7 +26,7 @@ from __future__ import annotations
 
 from ..env import normalize_panel_language
 from ..i18n import t
-from ..opener import open_user_folder
+from ..opener import open_debian_terminal, open_user_folder
 from ..screens.dialogs import ChoiceScreen, MessageScreen
 from .common import facts, failed, run_interactive, run_task, show_failure, tx
 
@@ -77,7 +79,7 @@ async def user_folder(app) -> None:
 
 
 def shell_command(user: str, hint: str) -> list[str]:
-    """The shell of "Open the terminal": a login shell of user (the person
+    """The in-window shell of "Open Debian terminal": a login shell of user (the person
     behind the panel, sudo for root), root's own when there is none. The
     hint is printed first, so the way back is on the screen."""
     if user and user != "root":
@@ -88,12 +90,15 @@ def shell_command(user: str, hint: str) -> list[str]:
 
 
 async def terminal(app) -> None:
+    if not app.env.demo and open_debian_terminal():
+        app.notify(t("Opening the Debian terminal in a new window."), timeout=5)
+        return
     info = await facts(app)
     user = (info.get("real_user") if info else "") or "root"
     rc = app.bridge.run_command_interactive(
         app, shell_command(user, t("Type exit to go back to the panel.")))
     if rc not in (0, None, 130):
-        app.notify(f"{t('Open the terminal')}: exit {rc}", severity="warning")
+        app.notify(f"{t('Open Debian terminal')}: exit {rc}", severity="warning")
 
 
 async def _terminal_tool(app, title: str, tool: str, argv: list[str] | None = None) -> None:

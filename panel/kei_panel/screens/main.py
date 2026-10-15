@@ -6,13 +6,14 @@
   │  Install     │  [status cards]                        │
   │  Backup      │  [action card] [action card] ...       │
   │  ...         │                                        │
-  └ Footer: Dashboard, Open the terminal, Exit ───────────┘
+  └ Footer: Dashboard, Open Debian terminal, Exit ────────┘
 Views are mounted the first time they are shown; Tab moves between the
 sidebar and the view.
 """
 
 from __future__ import annotations
 
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
@@ -23,6 +24,7 @@ from textual.widgets.option_list import Option
 from ..glyphs import split_icon
 from ..i18n import t
 from ..menus import SECTIONS, section
+from ..transfer import looks_like_path
 from ..views import VIEWS
 
 
@@ -40,7 +42,7 @@ class MainScreen(Screen):
     BINDINGS = [
         Binding(s.key, f"show('{s.id}')", split_icon(t(s.label))[1], show=s.key == "d")
         for s in SECTIONS if s.key
-    ] + [Binding("c", "terminal", t("Open the terminal")),
+    ] + [Binding("c", "terminal", t("Open Debian terminal")),
          Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=False)]
 
     def compose(self) -> ComposeResult:
@@ -78,6 +80,15 @@ class MainScreen(Screen):
         if not from_sidebar:
             sidebar = self.query_one("#sidebar", OptionList)
             sidebar.highlighted = sidebar.get_option_index(sec.parent or section_id)
+
+    # A file dropped on the window: the terminal pastes its path (Windows
+    # Terminal C:\..., a Linux terminal /home/...). A backup goes straight
+    # to Restore database; anything else is said, never ignored. Boxes that
+    # take text (Input) keep what is pasted into them.
+    def on_paste(self, event: events.Paste) -> None:
+        if looks_like_path(event.text):
+            event.stop()
+            self.app.drop_file(event.text)
 
     def action_terminal(self) -> None:
         self.app.run_native("terminal")

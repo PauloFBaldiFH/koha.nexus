@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.59"
+PANEL_VERSION=" 1.5.60"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2711,6 +2711,15 @@ check_dump_file() {
     codec=$(dump_codec "$file")
     if [ "$codec" = "zst" ] && ! command -v zstd >/dev/null 2>&1; then
         DUMP_ERROR="$(t "This backup is compressed with zstd, which is not installed. Install it (sudo apt install zstd) and try again.\nNothing was changed.")"
+        return 1
+    fi
+    # Without its program a good .xz or .bz2 would fail the test below and
+    # be called corrupt.
+    if { [ "$codec" = "xz" ] && ! command -v xz >/dev/null 2>&1; } \
+        || { [ "$codec" = "bz2" ] && ! command -v bzip2 >/dev/null 2>&1; }; then
+        local pkg="xz-utils"
+        [ "$codec" = "bz2" ] && pkg="bzip2"
+        DUMP_ERROR="$(t 'This backup is compressed with ${codec}, which is not installed. Install it (sudo apt install ${pkg}) and try again.\nNothing was changed.')"
         return 1
     fi
     if [ "$codec" != "plain" ]; then
