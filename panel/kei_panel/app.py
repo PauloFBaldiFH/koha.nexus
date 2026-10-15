@@ -180,6 +180,33 @@ class KohaPanelApp(App):
 
         self.run_worker(flow(), group="routine", exclusive=True, exit_on_error=False)
 
+    def drop_file(self, text: str) -> None:
+        """A file dropped on the main window (its path pasted by the
+        terminal): a backup (.sql, .sql.gz, .sql.bz2, .sql.xz, .sql.zst)
+        opens Restore database with it; anything else gets a message."""
+        from . import transfer
+        from .routines import backup
+        from .screens.files import path_kind
+        path = transfer.dropped_path(text)
+        name = Path(path).name or path
+        kind = path_kind(Path(path))
+        if kind == "file" and transfer.is_backup_name(path):
+            async def flow() -> None:
+                await backup.restore(self, file=path)
+            self.notify(t("Backup dropped: ${name}", name=name), timeout=4)
+            self.run_worker(flow(), group="routine", exclusive=True, exit_on_error=False)
+        elif kind == "file":
+            self.notify(t("${name} is not a Koha backup (.sql, .sql.gz, .sql.xz or .sql.zst). Other files go to "
+                          "the Magic Import Tool.", name=name), severity="warning", timeout=8)
+        elif kind == "denied":
+            self.notify(t("This file cannot be read: no permission to open it."),
+                        severity="error", timeout=8)
+        elif transfer.where() == "ssh":
+            self.notify(t("That file is on your computer, not on this server. Open Restore database: it shows "
+                          "the command that sends it here."), severity="warning", timeout=10)
+        else:
+            self.notify(t("File not found: ${path}", path=path), severity="error", timeout=8)
+
     def run_entry(self, entry: Entry, after: Callable[[], None] | None = None) -> None:
         label = t(entry.label)
         if self.is_native(entry):

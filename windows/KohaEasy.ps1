@@ -12,7 +12,7 @@
     KohaEasy.ps1 RestartServices               restart Koha's services inside Debian, without restarting WSL (tray)
     KohaEasy.ps1 Panel                         Open Dashboard (tray, double-click): starts Koha, opens the control panel
     KohaEasy.ps1 Panel -Action <name>          the same, straight on one routine (installer --run <name>)
-    KohaEasy.ps1 Terminal                      the tray (Open the terminal): a Debian shell as the Debian user (advanced), while Debian runs
+    KohaEasy.ps1 Terminal                      the tray (Open Debian terminal): a Debian shell as the Debian user (advanced), while Debian runs
     KohaEasy.ps1 UserFolder                    the tray: the Debian user's home folder in Windows Explorer
     KohaEasy.ps1 RebuildIndex                  the tray: rebuilds the search index, with notifications
     KohaEasy.ps1 Open                          starts Koha if needed, opens the staff interface

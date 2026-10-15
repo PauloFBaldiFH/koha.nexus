@@ -2249,13 +2249,13 @@
    ]
   },
   "terminal": {
-   "summary": "A Debian command line inside the panel's own window, as your Debian user (sudo for root). Type exit to come back to the panel.",
+   "summary": "A Debian command line. On Windows it opens in a window of its own (Windows Terminal, else a console), like the tray's Open Debian terminal; elsewhere the panel steps aside and the shell runs in its window.",
    "overview": [
-    "The same shell as the Debian terminal of Windows, without a second window: the panel steps aside while it runs and comes back as it was. The bar at the bottom of the panel has it too (key C)."
+    "The shell runs as your Debian user (sudo for root). Type exit to close it; inside the panel window, exit brings the panel back. The bar at the bottom of the panel has it too (key C)."
    ],
    "steps": [
-    "Press **C**, or open **General tools**, then **Open the terminal**.",
-    "Type your commands. **exit** (or Ctrl+D) brings the panel back."
+    "Press **C**, or open **General tools**, then **Open Debian terminal**.",
+    "Type your commands. **exit** (or Ctrl+D) closes the terminal."
    ],
    "related": [
     "user-folder",

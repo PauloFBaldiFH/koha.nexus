@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.57** (1.5.58: Paulo's four Windows fixes PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.58** (1.5.59: dropped backups and Open Debian terminal PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -352,6 +352,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   WSL uses explorer.exe (absolute path; wslview only without it), started in C:\Windows after
   `opener._interop_ready()` re-registers a lost WSLInterop binfmt handler (systemd), and the address
   is copied too. Not tried on a real PC.
+- **1.5.59 (Paulo: dropped backups, Open Debian terminal)**: a file dropped on the panel's main
+  screen did nothing: Windows Terminal pastes the path, and only PathPickerScreen read pastes.
+  `MainScreen.on_paste` sends anything `transfer.looks_like_path` accepts to `app.drop_file`: a backup
+  (.sql, .sql.gz, .sql.xz, .sql.zst, .sql.bz2) opens `backup.restore(app, file=path)`; another file,
+  a missing one, an unreadable one or one on the SSH client gets a message, never silence.
+  check_dump_file names a missing xz/bzip2 program instead of calling the file corrupt. "Open the
+  terminal" is now **Open Debian terminal** (tray item always clickable; panel footer `c` and the
+  General tools card): under WSL the panel opens its own window through powershell.exe
+  -EncodedCommand: `wt.exe -w new ... wsl.exe -d <WSL_DISTRO_NAME> --cd ~ -- koha-window --shell`,
+  else `wsl.exe -d <distro>`; elsewhere the in-window shell. Not `wt -p "Debian"`: the distro is
+  `koha`, so a "Debian" profile may not exist.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes

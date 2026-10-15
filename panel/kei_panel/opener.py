@@ -23,6 +23,7 @@ would see as \\\\wsl.localhost\\...).
 
 from __future__ import annotations
 
+import base64
 import os
 import shutil
 import subprocess
@@ -31,6 +32,7 @@ from pathlib import Path
 from .env import _is_wsl
 
 _EXPLORER = Path("/mnt/c/Windows/explorer.exe")
+_POWERSHELL = Path("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
 _WINDOWS_DIR = Path("/mnt/c/Windows")
 _BINFMT = Path("/proc/sys/fs/binfmt_misc")
 _INTEROP_RULE = ":WSLInterop:M::MZ::/init:PF"
@@ -159,6 +161,36 @@ def reveal_command(path: str, wsl: bool | None = None, ssh: bool | None = None, 
         # path with spaces gets its quotes from WSL.
         return [explorer, "/select,", win] if explorer and win else None
     return folder_command(str(Path(path).parent), wsl=wsl, ssh=ssh, which=which, environ=environ, winpath=winpath)
+
+
+def debian_terminal_command(distro: str, home_shell: str = "", which=shutil.which) -> list[str] | None:
+    """Under WSL, the command that opens a Debian terminal of distro in a
+    window of its own, as Windows' "Open Debian terminal" does: Windows
+    Terminal (wt.exe -w new) when it is installed, else wsl.exe in a
+    console window. PowerShell picks between them on the Windows side
+    (wt.exe is an app alias Linux cannot see)."""
+    ps = which("powershell.exe") or (str(_POWERSHELL) if _POWERSHELL.exists() else None)
+    if not ps or not distro:
+        return None
+    tail = f"-d {distro} --cd ~" + (f" -- {home_shell} --shell" if home_shell else "")
+    script = ("$w = Get-Command wt.exe -ErrorAction SilentlyContinue; "
+              f"if ($w) {{ Start-Process $w.Source -ArgumentList '-w new --title \"Koha - Debian\" wsl.exe {tail}' }} "
+              f"else {{ Start-Process wsl.exe -ArgumentList '{tail}' }}")
+    # -EncodedCommand (UTF-16LE, base64): no quote is lost between Linux,
+    # WSL interop and Windows PowerShell 5.1's own command-line parsing.
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return [ps, "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded]
+
+
+def open_debian_terminal() -> bool:
+    """A Debian terminal in its own window (WSL only). False elsewhere, or
+    when Windows programs cannot be started from here."""
+    if not _is_wsl() or over_ssh():
+        return False
+    distro = os.environ.get("WSL_DISTRO_NAME") or "koha"
+    window = "/usr/local/bin/koha-window"
+    argv = debian_terminal_command(distro, window if os.access(window, os.X_OK) else "")
+    return bool(argv) and _start(argv)
 
 
 def open_user_folder(path: str) -> bool:

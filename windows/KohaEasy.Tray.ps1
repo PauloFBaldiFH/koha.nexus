@@ -6,7 +6,8 @@
 #     (stopped or not responding), yellow while Koha starts
 #   * menu: the quick actions first (Open Dashboard: the control panel in
 #     Windows Terminal; Open User Folder: the Debian user's home in
-#     Explorer; Open the terminal: a Debian shell; Restart Services; Exit,
+#     Explorer; Open Debian terminal: a Debian shell in Windows Terminal;
+#     Restart Services; Exit,
 #     which asks whether Koha keeps running), the rest under More options:
 #     staff interface, catalog, Start, Stop, Rebuild search index, Shut down the
 #     PC safely, diagnostics (.txt and .zip), disk space, backups folder,
@@ -210,7 +211,7 @@ Add-Separator
 $miPanel = Add-Item (T 'Open Dashboard') { Invoke-KohaCommand 'Panel'; Request-Check 5 }
 $miPanel.Font = New-Object System.Drawing.Font($miPanel.Font, [System.Drawing.FontStyle]::Bold)
 Add-Item (T 'Open User Folder') { Invoke-KohaCommand 'UserFolder' } | Out-Null
-$miTerminal = Add-Item (T 'Open the terminal') { Invoke-KohaCommand 'Terminal' }
+Add-Item (T 'Open Debian terminal') { Invoke-KohaCommand 'Terminal' } | Out-Null
 $miRestart = Add-Item (T 'Restart Services') { Invoke-KohaCommand 'RestartServices'; Request-Check 20 }
 Add-Separator
 $more = Add-Item (T 'More options') $null
@@ -310,7 +311,6 @@ function Update-Menu {
     $miStart.Enabled = (-not $on) -and $s -ne 'not_installed'
     $miStop.Enabled = $on
     $miRestart.Enabled = $on
-    $miTerminal.Enabled = $on
     $miReindex.Enabled = $on
     if ($on) { $session.Block($blockReason) } else { $session.Unblock() }
     $miStaff.Enabled = ($s -eq 'running')

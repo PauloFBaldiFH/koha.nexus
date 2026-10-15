@@ -2124,7 +2124,7 @@ function Open-KohaUserFolder {
     return $true
 }
 
-# The Koha window's "Debian terminal (advanced)": a shell in Debian as the
+# Open Debian terminal (tray; the panel under WSL starts the same): a shell in Debian as the
 # Debian user chosen at install (sudo for root), in its own window. Exit
 # closes the window.
 function Open-KohaDebianTerminal {

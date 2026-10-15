@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.58",
+ "panel_version": "1.5.59",
  "languages": [
   {
    "code": "en",
@@ -1323,8 +1323,8 @@
    "id": "terminal",
    "type": "entry",
    "section": "tools",
-   "label": "💻  Open the terminal",
-   "description": "A Debian command line in this window; type exit to come back",
+   "label": "💻  Open Debian terminal",
+   "description": "A Debian command line: its own window on Windows, this window elsewhere",
    "kind": "native",
    "status": "available",
    "media": []
@@ -6277,9 +6277,9 @@
    "ja": null,
    "ko": null
   },
-  "💻  Open the terminal": {
-   "en": "💻  Open the terminal",
-   "pt-BR": "💻  Abrir o terminal",
+  "💻  Open Debian terminal": {
+   "en": "💻  Open Debian terminal",
+   "pt-BR": "💻  Abrir o terminal do Debian",
    "es": null,
    "fr": null,
    "it": null,
@@ -6302,9 +6302,9 @@
    "ja": null,
    "ko": null
   },
-  "A Debian command line in this window; type exit to come back": {
-   "en": "A Debian command line in this window; type exit to come back",
-   "pt-BR": "Uma linha de comando do Debian nesta janela; digite exit para voltar",
+  "A Debian command line: its own window on Windows, this window elsewhere": {
+   "en": "A Debian command line: its own window on Windows, this window elsewhere",
+   "pt-BR": "Uma linha de comando do Debian: em janela própria no Windows, nesta janela nos outros casos",
    "es": null,
    "fr": null,
    "it": null,
@@ -15188,13 +15188,13 @@
   },
   "terminal": {
    "en": {
-    "summary": "A Debian command line inside the panel's own window, as your Debian user (sudo for root). Type exit to come back to the panel.",
+    "summary": "A Debian command line. On Windows it opens in a window of its own (Windows Terminal, else a console), like the tray's Open Debian terminal; elsewhere the panel steps aside and the shell runs in its window.",
     "overview": [
-     "The same shell as the Debian terminal of Windows, without a second window: the panel steps aside while it runs and comes back as it was. The bar at the bottom of the panel has it too (key C)."
+     "The shell runs as your Debian user (sudo for root). Type exit to close it; inside the panel window, exit brings the panel back. The bar at the bottom of the panel has it too (key C)."
     ],
     "steps": [
-     "Press **C**, or open **General tools**, then **Open the terminal**.",
-     "Type your commands. **exit** (or Ctrl+D) brings the panel back."
+     "Press **C**, or open **General tools**, then **Open Debian terminal**.",
+     "Type your commands. **exit** (or Ctrl+D) closes the terminal."
     ],
     "related": [
      "user-folder",
@@ -15202,13 +15202,13 @@
     ]
    },
    "pt-BR": {
-    "summary": "Uma linha de comando do Debian dentro da própria janela do painel, com o seu usuário do Debian (sudo para root). Digite exit para voltar ao painel.",
+    "summary": "Uma linha de comando do Debian. No Windows ela abre em uma janela própria (Windows Terminal, ou um console), como o Abrir o terminal do Debian do ícone da bandeja; nos outros casos o painel sai da frente e o shell roda na janela dele.",
     "overview": [
-     "O mesmo shell do terminal do Debian no Windows, sem uma segunda janela: o painel sai da frente enquanto ele roda e volta como estava. A barra no rodapé do painel também tem essa opção (tecla C)."
+     "O shell roda com o seu usuário do Debian (sudo para root). Digite exit para fechá-lo; dentro da janela do painel, exit traz o painel de volta. A barra no rodapé do painel também tem essa opção (tecla C)."
     ],
     "steps": [
-     "Aperte **C**, ou abra **Ferramentas gerais** e depois **Abrir o terminal**.",
-     "Digite os seus comandos. **exit** (ou Ctrl+D) traz o painel de volta."
+     "Aperte **C**, ou abra **Ferramentas gerais** e depois **Abrir o terminal do Debian**.",
+     "Digite os seus comandos. **exit** (ou Ctrl+D) fecha o terminal."
     ]
    }
   },
