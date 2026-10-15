@@ -8,7 +8,7 @@ existing KohaEasy.ps1 verbs (actions.py).
 Not yet here, and the reason this tray is not the default: the clean stop
 of Koha when Windows shuts down (KohaSessionWindow in KohaEasy.Tray.ps1:
 WM_ENDSESSION, SetProcessShutdownParameters, ShutdownBlockReasonCreate), the
-disk-space watchdog and the Windows 11 promotion of the icon. Phase 2 adds
+disk-space watchdog and the Windows 11 promotion of the icon. Phase E adds
 them before the switch lets librarians use it.
 """
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from nexus_core.monitor import HealthMonitor
 from nexus_core.state import NOT_INSTALLED, Translate, state_text
@@ -60,7 +60,9 @@ def icon_image(state: str, leaf: Any = None, size: int = 64):
 class Tray:
     def __init__(self, monitor: HealthMonitor, actions: Actions, t: Translate,
                  load_state: Callable[[], Dict[str, Any]], save_state: Callable[[Dict[str, Any]], None],
-                 leaf: Any = None, ask: Callable[[str], bool] = lambda question: True):
+                 leaf: Any = None, ask: Callable[[str], bool] = lambda question: True,
+                 open_window: Optional[Callable[[], None]] = None,
+                 on_stop: Optional[Callable[[], None]] = None):
         self.monitor = monitor
         self.actions = actions
         self.t = t
@@ -68,6 +70,10 @@ class Tray:
         self.save_state = save_state
         self.leaf = leaf
         self.ask = ask
+        # In the Control Center (app.py) the window lives in this process:
+        # "Service status" shows it, and closing the icon ends the app.
+        self.open_window = open_window
+        self.on_stop = on_stop
         self.state = "stopped"
         self.icon = None
         self._wake = threading.Event()
@@ -81,7 +87,10 @@ class Tray:
             self.actions.verb(*menu.VERB_OF[key])
             self.check_in(menu.RECHECK_AFTER.get(key, 0))
         elif key == "window":
-            self.actions.python_window()
+            if self.open_window is not None:
+                self.open_window()
+            else:
+                self.actions.python_window()
         elif key == "staff":
             self.actions.staff()
         elif key == "opac":
@@ -107,10 +116,12 @@ class Tray:
             if entry.key == "-":
                 return pystray.Menu.SEPARATOR
 
-            def action(icon, item, e=entry):
-                if e.confirm and not self.ask(e.confirm):
+            # pystray accepts an action of at most two arguments (icon,
+            # item), defaults included, so the entry comes from the closure.
+            def action(icon, item):
+                if entry.confirm and not self.ask(entry.confirm):
                     return
-                self._run(e.key)
+                self._run(entry.key)
 
             # The menu is rebuilt from menu.entries() each time it opens
             # (pystray.Menu with a callable), so plain values are current.
@@ -154,8 +165,18 @@ class Tray:
         threading.Thread(target=self._loop, name="koha-checks", daemon=True).start()
         self.icon.run()
 
+    def start_in_thread(self) -> threading.Thread:
+        """The icon's own message loop on a thread of its own, so the
+        window's GUI loop keeps the main thread (pywebview needs it)."""
+        thread = threading.Thread(target=self.run, name="koha-tray", daemon=True)
+        thread.start()
+        return thread
+
     def stop(self) -> None:
         self._stop.set()
         self._wake.set()
         if self.icon is not None:
             self.icon.stop()
+        if self.on_stop is not None:
+            callback, self.on_stop = self.on_stop, None
+            callback()

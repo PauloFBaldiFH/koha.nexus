@@ -183,7 +183,7 @@ function Test-KohaPythonRuntime {
     if (-not (Test-Path -LiteralPath $py)) { return 'python.exe is missing' }
     # No double quote in $code: Windows PowerShell 5.1 drops them when it
     # passes an argument to a program.
-    $code = 'import nexus_core.monitor, koha_nexus_win.tray, koha_nexus_win.window, pystray, PIL, webview, windows_toasts; print(''ok'')'
+    $code = 'import nexus_core.monitor, koha_nexus_win.tray, koha_nexus_win.window, koha_nexus_win.app, pystray, PIL, webview, windows_toasts; print(''ok'')'
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try { $out = & $py -c $code 2>&1 } finally { $ErrorActionPreference = $prev }

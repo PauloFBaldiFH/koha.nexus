@@ -16,7 +16,11 @@ needs to know about Koha, written once and tested on Linux:
   * health.py   the component rows and the one-line summary of the status
                 window (Get-KohaHealthSummary);
   * langcache.py  reads lang/*.cache so a client speaks the installer's
-                language.
+                language;
+  * taskproto.py  reads the @@ lines of `installer --task NAME` (the
+                protocol panel/kei_panel/bridge.py also reads) and writes
+                the reply lines;
+  * menucatalog.py  turns panel/kei_panel/menus.py into sidebar data.
 
 Ported from windows/KohaEasy.Core.psm1 (Get-KohaLinuxStatus,
 Resolve-KohaState, Get-KohaBootGraceUntil, Get-KohaStateText,
@@ -29,4 +33,4 @@ Windows. The panel and the Linux install never import it; only the
 Windows Python client (windows/client) does.
 """
 
-__all__ = ["alerts", "health", "langcache", "monitor", "ports", "state", "status"]
+__all__ = ["alerts", "health", "langcache", "menucatalog", "monitor", "ports", "state", "status", "taskproto"]

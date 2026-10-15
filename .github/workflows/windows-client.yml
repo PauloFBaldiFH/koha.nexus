@@ -3,13 +3,17 @@
 #   check that runtime.lock.json still matches PyPI and python.org;
 # - runtime: on a real Windows runner, KohaEasy.Python.psm1 installs the
 #   embeddable Python and the locked wheels into a scratch bin folder, then
-#   imports the tray and the window with that Python.
+#   imports the tray and the window with that Python and runs the Control
+#   Center smoke test: one process with the window (WebView2) and the tray
+#   icon, the sidebar drawn from panel/kei_panel/menus.py and one task's
+#   events carried to the page.
 # Nothing here touches the Linux installer or the panel.
 name: windows-client
 
 on:
   push:
     paths:
+      - "panel/kei_panel/menus.py"
       - "windows/client/**"
       - "windows/KohaEasy.Python.psm1"
       - "windows/KohaEasy.Install.psm1"
@@ -18,6 +22,7 @@ on:
       - ".github/workflows/windows-client.yml"
   pull_request:
     paths:
+      - "panel/kei_panel/menus.py"
       - "windows/client/**"
       - "windows/KohaEasy.Python.psm1"
       - "windows/KohaEasy.Install.psm1"
@@ -63,6 +68,9 @@ jobs:
           New-Item -ItemType Directory -Path $bin -Force | Out-Null
           Copy-Item -LiteralPath 'windows\client' -Destination $bin -Recurse
           Copy-Item -LiteralPath 'nexus_core' -Destination $bin -Recurse
+          Copy-Item -LiteralPath 'panel' -Destination $bin -Recurse
+          Copy-Item -LiteralPath 'lang' -Destination $bin -Recurse
+          Copy-Item -LiteralPath 'windows\koha.ico' -Destination $bin
           Import-Module (Resolve-Path 'windows\KohaEasy.Python.psm1')
           $cache = Join-Path $env:RUNNER_TEMP 'Koha\downloads\python'
           $dir = Install-KohaPythonRuntime -Bin $bin -Cache $cache
@@ -74,3 +82,18 @@ jobs:
           # A second run with everything cached must also work.
           $dir = Install-KohaPythonRuntime -Bin $bin -Cache $cache
           if ((Test-KohaPythonRuntime -PythonDir $dir) -ne 'ok') { throw 'second install failed' }
+      - name: Control Center smoke test (window + tray icon in one process)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:KOHAEASY_ROOT = Join-Path $env:RUNNER_TEMP 'Koha'
+          $python = Join-Path $env:RUNNER_TEMP 'Koha\bin\python\python.exe'
+          $out = Join-Path $env:RUNNER_TEMP 'smoke.json'
+          $p = Start-Process -FilePath $python -ArgumentList '-m', 'koha_nexus_win', 'app', '--smoke', $out -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); throw 'the Control Center did not quit within 4 minutes' }
+          Get-ChildItem (Join-Path $env:KOHAEASY_ROOT 'logs') -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "--- $($_.FullName)"; Get-Content -LiteralPath $_.FullName -Tail 60 }
+          if (-not (Test-Path -LiteralPath $out)) { throw 'no smoke report was written' }
+          $report = Get-Content -LiteralPath $out -Raw
+          Write-Host $report
+          if (-not ($report | ConvertFrom-Json).ok) { throw 'the Control Center smoke test failed' }
