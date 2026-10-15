@@ -2248,6 +2248,20 @@
     "magic-import"
    ]
   },
+  "terminal": {
+   "summary": "A Debian command line inside the panel's own window, as your Debian user (sudo for root). Type exit to come back to the panel.",
+   "overview": [
+    "The same shell as the Debian terminal of Windows, without a second window: the panel steps aside while it runs and comes back as it was. The bar at the bottom of the panel has it too (key C)."
+   ],
+   "steps": [
+    "Press **C**, or open **General tools**, then **Open the terminal**.",
+    "Type your commands. **exit** (or Ctrl+D) brings the panel back."
+   ],
+   "related": [
+    "user-folder",
+    "mc"
+   ]
+  },
   "crons": {
    "summary": "Every job the server runs by itself, with a switch, how often and at what time, instead of a text editor; the old schedule is kept as koha_tasks.bak.",
    "overview": [

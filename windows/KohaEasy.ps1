@@ -5,14 +5,14 @@
     KohaEasy.ps1 Start [-Trigger user|logon]   Koha - Start shortcut, tray, sign-in task
     KohaEasy.ps1 Stop [-Force]                 Koha - Stop shortcut, tray
     KohaEasy.ps1 Restart [-Force]              Koha - Restart shortcut, tray
-    KohaEasy.ps1 SafeShutdown                  Koha - Shut down the PC safely (Start menu, tray, Koha window): stops Koha step by step with progress, then shuts down or restarts Windows
-    KohaEasy.ps1 Launch                        the Koha icon (desktop, Start menu): starts the tray and Koha when they are not running, puts back a deleted sign-in entry or task, then the Koha window (or brings it to the front)
-    KohaEasy.ps1 Window                        the Koha window: banner, quick access, components, actions (Koha - Status, tray)
+    KohaEasy.ps1 SafeShutdown                  Koha - Shut down the PC safely (Start menu, tray): stops Koha step by step with progress, then shuts down or restarts Windows
+    KohaEasy.ps1 Launch                        the Koha icon (desktop, Start menu): starts the tray and Koha when they are not running, puts back a deleted sign-in entry or task, then the control panel
+    KohaEasy.ps1 Window                        the same as Panel (the shortcut of the old Koha status window)
     KohaEasy.ps1 Status                        the same summary in a message box
     KohaEasy.ps1 RestartServices               restart Koha's services inside Debian, without restarting WSL (tray)
-    KohaEasy.ps1 Panel                         the Koha window and the tray: starts Koha, opens the control panel
-    KohaEasy.ps1 Panel -Action <name>          the Koha window's Painel de Gestão: the same, straight on one routine (installer --run <name>)
-    KohaEasy.ps1 Terminal                      the Koha window: a Debian shell as the Debian user (advanced), while Debian runs
+    KohaEasy.ps1 Panel                         Open Dashboard (tray, double-click): starts Koha, opens the control panel
+    KohaEasy.ps1 Panel -Action <name>          the same, straight on one routine (installer --run <name>)
+    KohaEasy.ps1 Terminal                      the tray (Open the terminal): a Debian shell as the Debian user (advanced), while Debian runs
     KohaEasy.ps1 UserFolder                    the tray: the Debian user's home folder in Windows Explorer
     KohaEasy.ps1 RebuildIndex                  the tray: rebuilds the search index, with notifications
     KohaEasy.ps1 Open                          starts Koha if needed, opens the staff interface
@@ -121,11 +121,13 @@ switch ($Command) {
     'Launch' {
         if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
         Invoke-KohaLaunch | Out-Null
-        & (Join-Path $PSScriptRoot 'KohaEasy.Window.ps1')
+        Open-KohaPanel
     }
+    # The Koha status window of older versions is gone: its shortcuts open
+    # the panel.
     'Window' {
         if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
-        & (Join-Path $PSScriptRoot 'KohaEasy.Window.ps1')
+        Open-KohaPanel
     }
     'RestartServices' {
         if (-not $Quiet) { Show-KohaNotification -Title 'Koha' -Text (T 'Restarting Koha services...') | Out-Null }

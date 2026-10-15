@@ -107,9 +107,12 @@ class KohaPanelApp(App):
         # Textual's own open_url uses the webbrowser module, which may start
         # a text browser over the panel on a server (opener.py). Where no
         # browser can be opened, the address is copied instead.
+        # The address is copied as well: a browser that opens behind this
+        # window (Windows keeps the focus where it is) can be pasted into.
         from .opener import open_url
         if open_url(url):
-            self.notify(t("Opening ${url} in the browser.", url=url), timeout=4)
+            self.copy_to_clipboard(url, quiet=True)
+            self.notify(t("Opening ${url} in the browser (address copied).", url=url), timeout=5)
         else:
             self.copy_to_clipboard(url, quiet=True)
             self.notify(t("No browser can be opened from here. Address copied: paste it in your browser."),

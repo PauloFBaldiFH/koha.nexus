@@ -49,7 +49,7 @@ function Invoke-KohaEasyDiagnose {
     try { Say ('  execution policy: ' + ((Get-ExecutionPolicy -List | ForEach-Object { '{0}={1}' -f $_.Scope, $_.ExecutionPolicy }) -join ', ')) } catch { Show-Err $_ }
 
     Head ('Files in ' + $bin)
-    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Window.ps1', 'KohaEasy.Hidden.js', 'koha.nexus.exe', 'koha.ico', 'koha-logo.png') {
+    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Hidden.js', 'koha.nexus.exe', 'koha.ico', 'koha-logo.png') {
         $p = Join-Path $bin $f
         if (Test-Path -LiteralPath $p) { Say ('  ok      {0} ({1:yyyy-MM-dd HH:mm})' -f $f, (Get-Item -LiteralPath $p).LastWriteTime) } else { Say ('  missing {0}' -f $f) 'Yellow' }
     }

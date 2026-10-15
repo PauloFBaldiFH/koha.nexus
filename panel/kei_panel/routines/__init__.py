@@ -52,6 +52,7 @@ ROUTINES: dict[str, Routine] = {
     "monitor": tools.monitor,
     "mc": tools.mc,
     "user-folder": tools.user_folder,
+    "terminal": tools.terminal,
 }
 
 # The rest run their classic routine with `--task run ACTION`; the title is
