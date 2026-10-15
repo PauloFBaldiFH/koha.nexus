@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,7 @@ def test_launcher_first_when_it_works():
 
 def test_wscript_then_conhost_then_powershell():
     st = {"launcher": "refused", "hiddenLaunch": "conhost"}
-    assert hidden_launch("Stop -Force", st, P, ENV, everything)[:3] == ["C:/Windows/System32/wscript.exe", "//B", "//Nologo"]
+    assert hidden_launch("Stop -Force", st, P, ENV, everything)[:3] == [os.path.join("C:/Windows", "System32", "wscript.exe"), "//B", "//Nologo"]
     assert hidden_launch("Stop -Force", st, P, ENV, everything)[-3:] == ["Stop", "-Force", "-Hidden"]
     st["hiddenLaunch"] = "nowscript"
     argv = hidden_launch("Stop", st, P, ENV, everything)
