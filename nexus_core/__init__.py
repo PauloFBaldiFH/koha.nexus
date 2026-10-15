@@ -12,7 +12,11 @@ needs to know about Koha, written once and tested on Linux:
                 to remember so each is shown once;
   * ports.py    the small interfaces a platform implements (Runner,
                 Notifier, StateStore);
-  * monitor.py  HealthMonitor: one check from start to end, through ports.
+  * monitor.py  HealthMonitor: one check from start to end, through ports;
+  * health.py   the component rows and the one-line summary of the status
+                window (Get-KohaHealthSummary);
+  * langcache.py  reads lang/*.cache so a client speaks the installer's
+                language.
 
 Ported from windows/KohaEasy.Core.psm1 (Get-KohaLinuxStatus,
 Resolve-KohaState, Get-KohaBootGraceUntil, Get-KohaStateText,
@@ -21,7 +25,8 @@ Python tray replaces the PowerShell one.
 
 Standard library only, Python 3.9+, and no platform imports (winreg,
 ctypes.windll, pywin32, Textual): the same files run on Debian, Ubuntu and
-Windows. No file of the installer or the panel imports this package yet.
+Windows. The panel and the Linux install never import it; only the
+Windows Python client (windows/client) does.
 """
 
-__all__ = ["alerts", "monitor", "ports", "state", "status"]
+__all__ = ["alerts", "health", "langcache", "monitor", "ports", "state", "status"]
