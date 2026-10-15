@@ -771,42 +771,41 @@
    "_en": "d62774a8b8"
   },
   "z3950-zeus": {
-   "title": "Ponte do Catálogo Zeus (UFSC)",
-   "summary": "Uma ponte local que deixa o Koha copiar registros do Catálogo Zeus da BU/UFSC como se ele fosse um servidor SRU comum, alcançando catálogos universitários brasileiros que bloqueiam o Z39.50.",
+   "title": "Catálogo Zeus pelo gateway do koha.nexus (UFSC)",
+   "summary": "A UFSC e os outros catálogos universitários brasileiros que o Catálogo Zeus pesquisa, alcançados pelo gateway SRU do koha.nexus como servidores SRU comuns, mesmo bloqueando o Z39.50.",
    "overview": [
-    "A maioria dos catálogos universitários brasileiros bloqueia o Z39.50 (porta 210), mas o Catálogo Zeus os pesquisa por HTTP e inclui cada registro completo. A ponte, um pequeno serviço neste servidor (`127.0.0.1:5000`, unidade systemd `koha-zeus-sru`), transforma a busca SRU do Koha numa busca no Zeus (por ISBN ou título) e devolve os registros em MARCXML.",
-    "Ela é o primeiro servidor da lista do Brasil e já vem marcada. Adicioná-la ao Koha instala e inicia a ponte automaticamente, com as configurações de que o Koha precisa: sintaxe MARC21, SRU 1.1 com GET e limite de 15 segundos. Os resultados ficam em cache por 10 minutos, para que a paginação não pesquise de novo."
+    "A maioria dos catálogos universitários brasileiros bloqueia o Z39.50 (porta 210), mas o Catálogo Zeus os pesquisa por HTTP e inclui cada registro completo. O gateway SRU do koha.nexus (`sru.koha.nexus`, porta 443) transforma a busca SRU do Koha numa busca no Zeus (por ISBN ou título) e devolve os registros em MARCXML, sem instalar nada neste servidor.",
+    "Cada catálogo é uma base SRU própria no gateway: a UFSC é `sru/ufsc`, a USP `sru/usp` e assim por diante, sob o título **[2] Universidades Brasileiras (Rede Federal e Estaduais)**. UFSC e USP já vêm marcadas. Adicioná-las ao Koha grava linhas com host `https://sru.koha.nexus`, porta 443, sintaxe MARC21 e SRU 1.1 com GET."
    ],
    "steps": [
-    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Catálogo Zeus (UFSC bridge, SRU)**.",
-    "Pressione **Adicionar ao Koha**: a ponte é instalada e iniciada.",
+    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Universidade Federal de Santa Catarina (UFSC)** em **[2] Universidades Brasileiras (Rede Federal e Estaduais)**.",
+    "Pressione **Testar** para conferir se ela responde e depois **Adicionar ao Koha**.",
     "Na catalogação do Koha, pesquise pelo ISBN para ter os melhores resultados."
    ],
    "tips": [
-    "Pesquise pelo ISBN sempre que tiver: o Zeus aceita um único texto de busca, e o ISBN tem prioridade sobre o título.",
-    "Se as buscas voltarem vazias, confira o serviço com `systemctl status koha-zeus-sru`."
+    "Pesquise pelo ISBN sempre que tiver: o Zeus aceita um único texto de busca, e o ISBN tem prioridade sobre o título."
    ],
    "warnings": [
-    "A ponte só responde enquanto o serviço dela roda neste servidor, e depende de o Catálogo Zeus estar no ar."
+    "Os catálogos só respondem enquanto o gateway do koha.nexus e o Catálogo Zeus estão no ar."
    ],
-   "_en": "d9b1f8ac34"
+   "_en": "166c4bf5bd"
   },
   "z3950-pergamum": {
-   "title": "Ponte da Rede Pergamum",
-   "summary": "Uma segunda ponte local, ao lado da do Zeus, que pesquisa o catálogo compartilhado da Rede Pergamum (PUCPR) e responde ao Koha como um servidor SRU com registros em MARCXML.",
+   "title": "Rede Pergamum pelo gateway do koha.nexus",
+   "summary": "O catálogo compartilhado da Rede Pergamum (PUCPR), alcançado pelo gateway SRU do koha.nexus como um servidor SRU com registros em MARCXML.",
    "overview": [
-    "Ela roda neste servidor em `127.0.0.1:5006` como a unidade systemd `koha-pergamum-sru`, com as mesmas configurações da ponte do Zeus no Koha (sintaxe MARC21, SRU 1.1). Diferente do Zeus, ela não vem marcada: marque-a quando quiser usá-la.",
-    "A ponte da Pergamum ainda não foi testada contra o catálogo real; o teste da tela diz se ela devolve registros no seu servidor."
+    "Ela é a base `sru/all` do gateway, a primeira em **[4] Especializados e Catálogos Coletivos**, com as mesmas configurações das outras linhas do gateway no Koha (host `https://sru.koha.nexus`, porta 443, sintaxe MARC21, SRU 1.1). Ela não vem marcada: marque-a quando quiser usá-la.",
+    "O teste da tela diz se ela devolve registros no seu servidor."
    ],
    "steps": [
-    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Catálogo Rede Pergamum (CRP bridge, SRU)**.",
+    "Abra a tela Z39.50 / SRU (tecla **z**) e marque **Rede Pergamum** em **[4] Especializados e Catálogos Coletivos**.",
     "Pressione **Testar** para conferir se ela devolve registros e depois **Adicionar ao Koha**.",
     "Pesquise nela pela catalogação do Koha."
    ],
    "tips": [
-    "Use-a junto com a ponte do Zeus: os dois catálogos cobrem bibliotecas diferentes."
+    "Use-a junto com as universidades brasileiras: os catálogos cobrem bibliotecas diferentes."
    ],
-   "_en": "c2951126cb"
+   "_en": "6cc24eef8c"
   },
   "sec-opac": {
    "summary": "A aparência do catálogo público (OPAC) e da intranet, desenhada numa só tela e gravada no Koha com um clique, depois de um backup, preservando o CSS e o JavaScript da própria biblioteca.",

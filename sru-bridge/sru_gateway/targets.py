@@ -15,6 +15,13 @@ Each entry also has a status, what is known about it today:
   broken    has an address that does not answer (kept until a new one is found)
   missing   no address known yet (kind "missing")
 
+and a group, the heading it is listed under (in the koha.nexus panel too):
+
+  national           [1] National libraries and official bodies
+  br_universities    [2] Brazilian universities (federal and state)
+  intl_universities  [3] International universities
+  specialized        [4] Specialised and union catalogues
+
 A login never goes in the file: SRU_GATEWAY_LOGIN_<ID>=user:password (id in
 capitals) supplies one from the environment.
 """
@@ -29,6 +36,12 @@ from pathlib import Path
 
 KINDS = ("zeus", "pergamum", "z3950", "sru", "missing")
 STATUSES = ("verified", "untested", "broken", "missing")
+GROUPS = {
+    "national": "Bibliotecas Nacionais e Órgãos Oficiais",
+    "br_universities": "Universidades Brasileiras (Rede Federal e Estaduais)",
+    "intl_universities": "Universidades Internacionais",
+    "specialized": "Especializados e Catálogos Coletivos",
+}
 MARC21_SYNTAXES = ("USMARC", "MARC21")
 DEFAULT_INDEXES = {"isbn": "bath.isbn", "title": "dc.title", "author": "dc.creator",
                    "any": "cql.serverChoice"}
@@ -44,6 +57,7 @@ class Target:
     id: str
     name: str
     kind: str
+    group: str = "specialized"
     host: str = ""
     port: int = 0
     db: str = ""
@@ -87,6 +101,7 @@ def make_target(raw: dict) -> Target:
         raise TargetError(f"{tid}: unknown kind {kind!r}")
     t = Target(
         id=tid, name=str(raw.get("name") or tid), kind=kind,
+        group=str(raw.get("group") or "specialized").strip().lower(),
         host=str(raw.get("host", "")).strip(), port=int(raw.get("port") or 0),
         db=str(raw.get("db", "")).strip(), syntax=str(raw.get("syntax", "USMARC")).strip().upper(),
         encoding=str(raw.get("encoding", "utf8")).strip().lower(),
@@ -97,6 +112,8 @@ def make_target(raw: dict) -> Target:
         target_index=int(raw.get("target_index") or 0),
         **dict(zip(("user", "password"), _login(tid))),
     )
+    if t.group not in GROUPS:
+        raise TargetError(f"{tid}: unknown group {t.group!r}")
     if t.status not in STATUSES:
         raise TargetError(f"{tid}: unknown status {t.status!r}")
     if (t.status == "missing") != (kind == "missing"):

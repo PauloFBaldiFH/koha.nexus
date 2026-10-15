@@ -34,15 +34,19 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) >= 15
-    assert {t.region for t in targets} == set(z.REGIONS)
+    assert len(targets) == 72
+    # The four headings, in Paulo's order, each opening with his first id.
+    assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized"]
+    firsts = {t.region: t.db for t in reversed(targets)}
+    assert firsts == {"national": "sru/bn", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
+                      "specialized": "sru/all"}
+    assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
-    loc = next(t for t in targets if t.host == "lx2.loc.gov")
-    assert (loc.port, loc.db, loc.syntax, loc.verified) == (210, "LCDB", "USMARC", True)
-    bnf = next(t for t in targets if t.host == "z3950.bnf.fr")
-    assert bnf.syntax == "UNIMARC" and bnf.login and bnf.login_env == "KEI_Z3950_BNF"
-    assert all(t.kind in ("zed", "sru") for t in targets)
+    # Every one goes through the koha.nexus SRU gateway.
+    assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in targets} == {
+        ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
+    assert all(t.db.startswith("sru/") and not t.login for t in targets)
 
 
 def test_curated_file_carries_no_login():
@@ -83,7 +87,7 @@ def test_make_target_aliases_and_urls():
     assert (t.name, t.host, t.port, t.db, t.syntax, t.kind) == ("Lib", "z.example.org", 2100, "books",
                                                                  "UNIMARC", "zed")
     s = z.make_target({"host": "https://sru.example.de/opac-1", "name": "SRU"})
-    assert (s.kind, s.port, s.db, s.region) == ("sru", 443, "opac-1", "europe")
+    assert (s.kind, s.port, s.db, s.region) == ("sru", 443, "opac-1", "specialized")
     assert z.make_target({"name": "no host"}) is None
     assert z.make_target({"host": "localhost"}) is None
     assert z.make_target({"host": "a.example.org", "port": "99999"}) is None
@@ -93,20 +97,20 @@ def test_csv_with_semicolons_and_header_aliases():
     text = "Nome;Servidor;Porta;Base;Formato\nBiblioteca X;z3950.x.br;210;acervo;MARC21\n;;;;\n"
     [t] = z.parse_csv(text)
     assert (t.name, t.host, t.port, t.db, t.syntax, t.region) == ("Biblioteca X", "z3950.x.br", 210, "acervo",
-                                                                   "USMARC", "latam")
+                                                                   "USMARC", "br_universities")
 
 
 def test_csv_without_header():
     [t] = z.parse_csv("Some Library,z.example.edu,7090,Voyager\n")
     assert (t.name, t.host, t.port, t.db, t.region) == ("Some Library", "z.example.edu", 7090, "Voyager",
-                                                         "north_america")
+                                                         "intl_universities")
 
 
 def test_yaml_registry():
     text = "targets:\n  - name: \"Test\"\n    host: z.example.jp\n    port: 210\n    database: OPAC\n" \
            "  - name: Other\n    host: sru.example.org\n    port: 80\n    type: sru\n    db: sru\n"
     a, b = z.parse_yaml(text)
-    assert (a.name, a.host, a.db, a.region) == ("Test", "z.example.jp", "OPAC", "asia_pacific")
+    assert (a.name, a.host, a.db, a.region) == ("Test", "z.example.jp", "OPAC", "specialized")
     assert b.kind == "sru"
 
 
@@ -468,28 +472,25 @@ def test_koha_ranks_follow_latency():
     assert z.koha_ranks([a, b, c], h) == {b.key: 1, a.key: 2, c.key: 3}
 
 
-def test_curated_brazil_list_and_zeus_bridge():
-    latam = [t for t in z.load_curated() if t.region == "latam"]
-    assert [t.host for t in latam] == ["127.0.0.1", "127.0.0.1", "z3950.utfpr.edu.br", "z3950.unifesp.br"]
-    zeus, pergamum = latam[:2]
-    assert (zeus.kind, zeus.port, zeus.db, zeus.syntax, zeus.preselect) == ("sru", 5000, "sru", "MARC21", True)
-    # The Rede Pergamum bridge is offered, not ticked.
-    assert (pergamum.kind, pergamum.port, pergamum.db, pergamum.syntax, pergamum.preselect) == (
-        "sru", 5006, "sru", "MARC21", False)
-    assert pergamum.sru_options == "sru=get,sru_version=1.1"
-    assert all((t.kind, t.port, t.db, t.preselect) == ("zed", 210, "Default", False) for t in latam[2:])
-    hosts = {t.host for t in z.load_curated()}
-    assert not hosts & {"162.214.168.248", "unesp.alma.exlibrisgroup.com", "z3950.ufsc.br"}
+def test_curated_brazil_list_and_the_gateway():
+    br = [t.db for t in z.load_curated() if t.region == "br_universities"]
+    assert br == ["sru/" + i for i in "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs "
+                                     "uff utfpr".split()]
+    ticked = {t.db for t in z.load_curated() if t.preselect}
+    assert ticked == {"sru/bn", "sru/senado", "sru/usp", "sru/ufsc"}
+    rede = next(t for t in z.load_curated() if t.db == "sru/all")
+    assert (rede.region, rede.sru_options) == ("specialized", "sru=get,sru_version=1.1")
 
 
 def test_add_file_and_sql_carry_the_sru_settings():
     zeus = next(t for t in z.load_curated() if t.preselect)
-    ufsc = next(t for t in z.load_curated() if t.host == "z3950.utfpr.edu.br")
-    dnb = next(t for t in z.load_curated() if t.host == "services.dnb.de")
+    utfpr = z.make_target({"name": "UTFPR", "host": "z3950.utfpr.edu.br", "port": 210, "db": "Default"})
+    dnb = z.make_target({"name": "DNB", "host": "https://services.dnb.de/sru/dnb"})
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in
-            z.add_file_text([zeus, ufsc, dnb], {}).splitlines()]
-    assert (rows[0]["kind"], rows[0]["sru_fields"], rows[0]["sru_options"]) == (
-        "sru", "title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice", "sru=get,sru_version=1.1")
+            z.add_file_text([zeus, utfpr, dnb], {}).splitlines()]
+    assert (rows[0]["host"], rows[0]["port"], rows[0]["db"]) == ("sru.koha.nexus", "443", "sru/bn")
+    assert (rows[0]["kind"], rows[0]["sru_options"]) == ("sru", "sru=get,sru_version=1.1")
+    assert rows[0]["sru_fields"].startswith("title=dc.title,isbn=dc.isbn")
     assert (rows[1]["kind"], rows[1]["sru_fields"], rows[1]["sru_options"]) == ("zed", "", "")
     assert rows[2]["sru_fields"] == z.DEFAULT_SRU_FIELDS
     sql = z.to_koha_sql([zeus])
@@ -617,13 +618,8 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
     assert again.get("a.example.org:210/x")["fails"] == 1  # no second reset
 
 
-def test_curated_list_without_the_confirmed_dead_servers():
-    targets = z.load_curated()
-    hosts = {t.host for t in targets}
-    assert not hosts & {"z3950.bnportugal.gov.pt", "eu00.alma.exlibrisgroup.com"}
-    assert not any(t.host == "z3950.loc.gov" for t in targets)
-    assert not any(re.fullmatch(r"[\d.]+", t.host) and t.host != "127.0.0.1" for t in targets)
-    keys = {t.key for t in targets}
-    assert {"lx2.loc.gov:210/LCDB", "services.dnb.de:443/sru/dnb", "z3950.libris.kb.se:210/libr"} <= keys
-    libris = next(t for t in targets if t.host == "z3950.libris.kb.se")
-    assert libris.encoding == "MARC-8"
+def test_curated_list_has_no_raw_address():
+    # The gateway's older addresses (the VPS's public and private IPs) never come back.
+    hosts = {t.host for t in z.load_curated()}
+    assert hosts == {"sru.koha.nexus"}
+    assert not any(re.fullmatch(r"[\d.]+", h) for h in hosts)

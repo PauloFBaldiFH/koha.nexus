@@ -60,7 +60,8 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov' AND db = 'LCDB'")" = "1" ]
     [ "$(mysql -N --raw "$DB" -e "SELECT password FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = 'Pa\ss'"'"'w0rd' ]
     [ "$(zsql "SELECT servername, checked, \`rank\` FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = "$(printf "BnF l'officielle\t1\t1")" ]
-    [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = 'services.dnb.de'")" = "$(printf 'sru\t443\tsru/dnb\ttitle=dc.title')" ]
+    # An SRU server on 443 speaks HTTPS: Koha needs https:// in the host for that.
+    [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = 'https://services.dnb.de'")" = "$(printf 'sru\t443\tsru/dnb\ttitle=dc.title')" ]
     # The Zeus bridge gets its SRU fields and options; a Z39.50 server gets none.
     # ...and then the bridge's own row replaced it: MARC21, GET, 15 s.
     [ "$(zsql "SELECT servertype, port, db, syntax, timeout, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\tMARC21\t15\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
@@ -108,6 +109,43 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     grep -q "ERROR .*did not take the servers" "$KEI_S/dialogs.log"
     grep -rq "sru_fields" "$W/logs"
     ! grep -rq "S3cr3tPass" "$W/logs" "$KEI_S/dialogs.log"
+}
+
+@test "z3950-add: a koha.nexus gateway row (SRU, 443) is written https://sru.koha.nexus" {
+    ( umask 077
+      printf '%s\t' sru.koha.nexus 443 sru/bn MARC21 utf8 'Biblioteca Nacional' 1 1 sru '' '' 'title=dc.title' \
+          'sru=get,sru_version=1.1'; printf '\n' ) > "$W/gw.tsv"
+    cp "$W/gw.tsv" "$W/gw2.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/gw.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT host, port, db, servertype FROM z3950servers WHERE db = 'sru/bn'")" = "$(printf 'https://sru.koha.nexus\t443\tsru/bn\tsru')" ]
+    # Again: already in Koha, under its https:// host.
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/gw2.tsv"
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
+}
+
+@test "gateway SQL: older addresses move to sru.koha.nexus:443, renames follow, re-runnable" {
+    SQL="$BATS_TEST_DIRNAME/../sru-bridge/deploy/koha-z3950servers.sql"
+    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype) VALUES
+      ('137.131.205.31', 5000, 'sru/bn', 'old BN', 1, 7, 'USMARC', 'utf8', 'sru', 'biblio'),
+      ('10.0.0.60', 5000, 'sru/bn', 'old BN twice', 0, 8, 'USMARC', 'utf8', 'sru', 'biblio'),
+      ('10.0.0.60', 5000, 'sru/uw_madison', 'old Wisconsin', 0, 9, 'USMARC', 'utf8', 'sru', 'biblio'),
+      ('137.131.205.31', 5000, 'sru/umich', 'retired', 0, 10, 'USMARC', 'utf8', 'sru', 'biblio'),
+      ('mine.example.org', 5000, 'sru/umich', 'not the gateway', 0, 11, 'USMARC', 'utf8', 'sru', 'biblio');"
+    mysql "$DB" < "$SQL"
+    gw="host = 'https://sru.koha.nexus' AND port = 443"
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE $gw")" = "72" ]
+    [ "$(zsql "SELECT COUNT(DISTINCT db) FROM z3950servers WHERE $gw")" = "72" ]
+    # BN kept once, with the librarian's tick and rank; MARC21 now.
+    [ "$(zsql "SELECT checked, \`rank\`, syntax, encoding FROM z3950servers WHERE $gw AND db = 'sru/bn'")" = "$(printf '1\t7\tMARC21\tutf8')" ]
+    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/wisconsin'")" = "9" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host IN ('137.131.205.31', '10.0.0.60')")" = "0" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/umich'")" = "1" ]       # only the other server's
+    [ "$(zsql "SELECT host FROM z3950servers WHERE db = 'sru/umich'")" = "mine.example.org" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov'")" = "2" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    mysql "$DB" < "$SQL"
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
 @test "z3950-list: Koha's catalogue targets, no authority ones" {
