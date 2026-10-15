@@ -643,6 +643,7 @@ function Install-KohaEntryPoints {
     $mode = [string](Get-KohaState).autostart
     if (@('logon', 'manual') -notcontains $mode) { $mode = 'logon' }
     Invoke-KohaSafeStep { Install-KohaLauncherStep }
+    Invoke-KohaSafeStep { Install-KohaPythonStep }
     Invoke-KohaSafeStep { Register-KohaTasks -Autostart $mode }
     Invoke-KohaSafeStep { Install-KohaShortcuts }
     Invoke-KohaSafeStep { Register-KohaUninstallEntry }
