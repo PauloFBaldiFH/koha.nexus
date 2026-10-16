@@ -175,50 +175,25 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
 }
 
-@test "gateway SQL: older addresses move to sru.koha.nexus:443, renames follow, re-runnable" {
-    SQL="$BATS_TEST_DIRNAME/../sru-bridge/deploy/koha-z3950servers.sql"
-    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype) VALUES
-      ('137.131.205.31', 5000, 'sru/bn', 'old BN', 1, 7, 'USMARC', 'utf8', 'sru', 'biblio'),
-      ('10.0.0.60', 5000, 'sru/bn', 'old BN twice', 0, 8, 'USMARC', 'utf8', 'sru', 'biblio'),
-      ('10.0.0.60', 5000, 'sru/uw_madison', 'old Wisconsin', 0, 9, 'USMARC', 'utf8', 'sru', 'biblio'),
-      ('137.131.205.31', 5000, 'sru/umich', 'retired', 0, 10, 'USMARC', 'utf8', 'sru', 'biblio'),
-      ('mine.example.org', 5000, 'sru/umich', 'not the gateway', 0, 11, 'USMARC', 'utf8', 'sru', 'biblio');"
-    mysql "$DB" < "$SQL"
-    gw="host = 'https://sru.koha.nexus' AND port = 443"
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE $gw")" = "72" ]
-    [ "$(zsql "SELECT COUNT(DISTINCT db) FROM z3950servers WHERE $gw")" = "72" ]
-    # BN kept once, with the librarian's tick and rank; MARC21 now.
-    [ "$(zsql "SELECT checked, \`rank\`, syntax, encoding FROM z3950servers WHERE $gw AND db = 'sru/bn'")" = "$(printf '1\t7\tMARC21\tutf8')" ]
-    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/wisconsin'")" = "9" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host IN ('137.131.205.31', '10.0.0.60')")" = "0" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/umich'")" = "1" ]       # only the other server's
-    [ "$(zsql "SELECT host FROM z3950servers WHERE db = 'sru/umich'")" = "mine.example.org" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov'")" = "2" ]
+@test "z3950-seed: the Library of Congress authority targets, kept as the librarian left them, re-runnable" {
+    # NAF is already there (setup), unticked, with its own name and rank.
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority'")" = "2" ]
+    [ "$(zsql "SELECT servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'NAF'")" = \
+      "$(printf 'LOC AUTHORITIES\t0\t0\tUSMARC\tutf8\t10\tzed')" ]
+    [ "$(zsql "SELECT host, port, servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'SAF'")" = \
+      "$(printf 'lx2.loc.gov\t210\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\tUSMARC\tutf8\t10\tzed')" ]
+    # The catalogue (biblio) rows are untouched.
+    [ "$(zsql "SELECT COUNT(*), MAX(timeout) FROM z3950servers WHERE recordtype = 'biblio'")" = "$(printf '1\t0')" ]
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
-    mysql "$DB" < "$SQL"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
-}
-
-@test "gateway SQL: rows on the VPS's private 10.0.0.60:5001 move to sru.koha.nexus:443/sru/<id>" {
-    SQL="$BATS_TEST_DIRNAME/../sru-bridge/deploy/koha-z3950servers.sql"
-    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype) VALUES
-      ('10.0.0.60', 5001, 'sru/usp', 'USP on 5001', 1, 3, 'MARC21', 'utf8', 'sru', 'biblio'),
-      ('http://10.0.0.60', 5001, '/sru/ufsc', 'UFSC, leading slash', 0, 4, 'MARC21', 'utf8', 'sru', 'biblio'),
-      ('10.0.0.60', 5001, 'harvard', 'Harvard, bare id', 0, 5, 'MARC21', 'utf8', 'sru', 'biblio'),
-      ('10.0.0.60', 5001, 'psu', 'Penn State, bare old id', 0, 6, 'MARC21', 'utf8', 'sru', 'biblio'),
-      ('mine.example.org', 5001, 'harvard', 'not the gateway', 0, 7, 'MARC21', 'utf8', 'sru', 'biblio');"
-    mysql "$DB" < "$SQL"
-    gw="host = 'https://sru.koha.nexus' AND port = 443"
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host LIKE '%10.0.0.60%'")" = "0" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE $gw")" = "72" ]
-    [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/usp'")" = "$(printf '1\t3')" ]
-    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/ufsc'")" = "4" ]
-    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/harvard'")" = "5" ]
-    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/pennstate'")" = "6" ]
-    [ "$(zsql "SELECT host, db FROM z3950servers WHERE servername = 'not the gateway'")" = "$(printf 'mine.example.org\tharvard')" ]
-    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
-    mysql "$DB" < "$SQL"
-    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+    # On a Koha without them: both inserted, ticked, NAF first.
+    zsql "DELETE FROM z3950servers WHERE recordtype = 'authority'"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
+    [ "$(zsql "SELECT db, servername, checked, \`rank\` FROM z3950servers WHERE recordtype = 'authority' ORDER BY \`rank\`")" = \
+      "$(printf 'NAF\tBIBLIOTECA DOS NOMES DO CONGRESSO\t1\t1\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2')" ]
 }
 
 @test "Catalog Network SQL: an older row is updated in place, keeping its tick and rank, re-runnable" {
@@ -261,6 +236,7 @@ print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
 @test "z3950: the panel knows the tasks" {
     grep -q '^        z3950-list)' "$KEI_REPO/installer"
     grep -q '^        z3950-add) ' "$KEI_REPO/installer"
+    grep -q '^        z3950-seed) ' "$KEI_REPO/installer"
 }
 
 @test "z3950-add: no bridge install without a Zeus row" {

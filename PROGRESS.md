@@ -426,8 +426,10 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   row's name; mode `named` (Zeus and Pergamum bridges, Catalog Network) matches host and port, sets the
   name and removes other rows with that name or address. The panel's SQL export (`to_koha_sql`) and
   `catalog-network/deploy/koha-z3950servers.sql` follow the same rule. Re-registering a bridge no
-  longer re-ticks it. tests/z3950.bats: re-run tests on MariaDB (the two gateway SQL tests fail on main
-  too: `sru-bridge/` now lives on a backup branch).
+  longer re-ticks it. `z3950_seed_authorities` (`--task z3950-seed`, and at install) upserts Paulo's
+  two Library of Congress authority targets (lx2.loc.gov:210 NAF rank 1 and SAF rank 2, USMARC, utf8,
+  timeout 10, recordtype authority). `sru-bridge/` now lives on a backup branch, so its CI job
+  (sru-services matrix) and the two gateway SQL tests in tests/z3950.bats were removed.
 - **1.5.64 (Paulo: translucent staff header)**: `cfg["staff"]` gains `header_glass` (off by default),
   `header_opacity` (0-100, default 85) and `header_blur` (0-30 px, default 8); switch and two sliders in
   the Staff interface box. `_staff_header_css` (after the texture, so it also beats the metal bar) paints

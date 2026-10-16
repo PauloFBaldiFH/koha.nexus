@@ -1,17 +1,15 @@
-# The SRU services: sru-bridge/ (Zeus and Pergamum bridges, SRU gateway) and
-# catalog-network/ (the shared catalogue). Unit tests only; they never reach
-# the remote catalogues (fakes and saved pages stand in for them).
+# The SRU services on main: catalog-network/ (the shared catalogue); the
+# sru-bridge/ services now live on their own backup branch. Unit tests only;
+# they never reach the remote catalogues (fakes and saved pages stand in).
 name: sru-services
 
 on:
   push:
     paths:
-      - "sru-bridge/**"
       - "catalog-network/**"
       - ".github/workflows/sru-services.yml"
   pull_request:
     paths:
-      - "sru-bridge/**"
       - "catalog-network/**"
       - ".github/workflows/sru-services.yml"
 
@@ -24,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [sru-bridge, catalog-network]
+        service: [catalog-network]
         # Debian 12's Python and Debian 13's.
         python: ["3.11", "3.13"]
     defaults:

@@ -5522,6 +5522,7 @@ function_install_koha() {
     tui_step 7 "$steps" "🌐" "$(t "Services")"
     tui_run "$(t "Restarting Koha services")" ensure_koha_services
     tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
+    z3950_seed_authorities >/dev/null 2>&1 || log "z3950: the Library of Congress authority targets were not seeded"
     tui_run "$(t "Cleaning temporary files")" install_task_cleanup
     restore_apt_timers
     tui_run "$(t "Checking that everything works")" install_task_check
@@ -28437,8 +28438,8 @@ z3950_valid() {
 # z3950_upsert_sql MODE: the SQL that puts the targets read on stdin in
 # z3950servers, safe to run again. One target per line, fields split by
 # \x1f: host, port, db, name, checked, rank, syntax, encoding, timeout,
-# servertype, sru_fields, sru_options, user, password (port, checked, rank
-# and timeout already checked as numbers). The table has no unique key but
+# servertype, sru_fields, sru_options, user, password, recordtype (biblio
+# when empty; port, checked, rank and timeout already checked as numbers). The table has no unique key but
 # its id, so each target first finds its row: the same host, port and
 # database, else (once every target has had its address) the same name,
 # never a row another target of the list already took. A row found gets
@@ -28452,46 +28453,61 @@ z3950_valid() {
 #          the name, and any other row with that name or address goes.
 z3950_upsert_sql() {
     local mode="$1" i=0 n line
-    local -a H P D N C R S E T K F O U W
-    local host port db name checked rank syntax enc timeout kind sru sruopt user pass
+    local -a H P D N C R S E T K F O U W Y
+    local host port db name checked rank syntax enc timeout kind sru sruopt user pass rtype
     while IFS= read -r line || [ -n "$line" ]; do
-        IFS=$'\x1f' read -r host port db name checked rank syntax enc timeout kind sru sruopt user pass <<< "$line"
+        IFS=$'\x1f' read -r host port db name checked rank syntax enc timeout kind sru sruopt user pass rtype <<< "$line"
+        [ "$rtype" = authority ] || rtype=biblio
         [ -n "$host" ] || continue
         H[i]=$(sql_quote "$host"); P[i]=$port; D[i]=$(sql_quote "$db"); N[i]=$(sql_quote "$name")
         C[i]=$checked; R[i]=$rank; S[i]=$(sql_quote "$syntax"); E[i]=$(sql_quote "$enc"); T[i]=$timeout
         K[i]=$(sql_quote "$kind"); F[i]=$(sql_quote "$sru"); O[i]=$(sql_quote "$sruopt")
-        U[i]=$(sql_quote "$user"); W[i]=$(sql_quote "$pass")
+        U[i]=$(sql_quote "$user"); W[i]=$(sql_quote "$pass"); Y[i]="'$rtype'"
         i=$((i + 1))
     done
     n=$i
     local addr claim="SET @kei_claimed := CONCAT_WS(',', NULLIF(@kei_claimed, ''), @kei_t%s);\n"
-    local free="recordtype = 'biblio' AND FIND_IN_SET(id, @kei_claimed) = 0"
+    local free="FIND_IN_SET(id, @kei_claimed) = 0"
     printf "SET @kei_claimed := '';\n"
     for ((i = 0; i < n; i++)); do
         addr="host = ${H[i]} AND port = ${P[i]}"
         [ "$mode" = named ] || addr="$addr AND IFNULL(db,'') = ${D[i]}"
-        printf "SET @kei_t%s := (SELECT id FROM z3950servers WHERE %s AND %s ORDER BY id LIMIT 1);\n" "$i" "$free" "$addr"
+        printf "SET @kei_t%s := (SELECT id FROM z3950servers WHERE recordtype = %s AND %s AND %s ORDER BY id LIMIT 1);\n" \
+            "$i" "${Y[i]}" "$free" "$addr"
         printf "$claim" "$i"
     done
     for ((i = 0; i < n; i++)); do
-        printf "SET @kei_t%s := IFNULL(@kei_t%s, (SELECT id FROM z3950servers WHERE %s AND servername = %s ORDER BY id LIMIT 1));\n" \
-            "$i" "$i" "$free" "${N[i]}"
+        printf "SET @kei_t%s := IFNULL(@kei_t%s, (SELECT id FROM z3950servers WHERE recordtype = %s AND %s AND servername = %s ORDER BY id LIMIT 1));\n" \
+            "$i" "$i" "${Y[i]}" "$free" "${N[i]}"
         printf "$claim" "$i"
     done
     for ((i = 0; i < n; i++)); do
         printf "UPDATE z3950servers SET host = %s, port = %s, db = %s, syntax = %s, encoding = %s, timeout = %s, servertype = %s, sru_fields = %s, sru_options = %s, userid = IF(%s = '', userid, %s), password = IF(%s = '', password, %s)%s WHERE id = @kei_t%s;\n" \
             "${H[i]}" "${P[i]}" "${D[i]}" "${S[i]}" "${E[i]}" "${T[i]}" "${K[i]}" "${F[i]}" "${O[i]}" \
             "${U[i]}" "${U[i]}" "${U[i]}" "${W[i]}" "$([ "$mode" = named ] && printf ', servername = %s' "${N[i]}")" "$i"
-        [ "$mode" = named ] && printf "DELETE FROM z3950servers WHERE recordtype = 'biblio' AND id <> IFNULL(@kei_t%s, 0) AND (servername = %s OR (host = %s AND port = %s));\n" \
-            "$i" "${N[i]}" "${H[i]}" "${P[i]}"
-        printf "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, \`rank\`, syntax, timeout, servertype, encoding, recordtype, sru_fields, sru_options, add_xslt) SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'biblio', %s, %s, '' FROM DUAL WHERE @kei_t%s IS NULL AND NOT EXISTS (SELECT 1 FROM z3950servers WHERE recordtype = 'biblio' AND host = %s AND port = %s AND IFNULL(db,'') = %s);\n" \
+        [ "$mode" = named ] && printf "DELETE FROM z3950servers WHERE recordtype = %s AND id <> IFNULL(@kei_t%s, 0) AND (servername = %s OR (host = %s AND port = %s));\n" \
+            "${Y[i]}" "$i" "${N[i]}" "${H[i]}" "${P[i]}"
+        printf "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, \`rank\`, syntax, timeout, servertype, encoding, recordtype, sru_fields, sru_options, add_xslt) SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '' FROM DUAL WHERE @kei_t%s IS NULL AND NOT EXISTS (SELECT 1 FROM z3950servers WHERE recordtype = %s AND host = %s AND port = %s AND IFNULL(db,'') = %s);\n" \
             "${H[i]}" "${P[i]}" "${D[i]}" "${U[i]}" "${W[i]}" "${N[i]}" "${C[i]}" "${R[i]}" "${S[i]}" "${T[i]}" \
-            "${K[i]}" "${E[i]}" "${F[i]}" "${O[i]}" "$i" "${H[i]}" "${P[i]}" "${D[i]}"
+            "${K[i]}" "${E[i]}" "${Y[i]}" "${F[i]}" "${O[i]}" "$i" "${Y[i]}" "${H[i]}" "${P[i]}" "${D[i]}"
     done
 }
 
 # z3950_row FIELD...: one line of z3950_upsert_sql's input.
 z3950_row() { local IFS=$'\x1f'; printf '%s\n' "$*"; }
+
+# The authority targets every Koha gets (Koha's authority search, Z39.50):
+# the Library of Congress name and subject files. Run again, it updates
+# their connection settings and keeps the librarian's tick, rank and name.
+# Only once Koha's database exists; quiet otherwise.
+z3950_seed_authorities() {
+    is_koha_installed 2>/dev/null || return 0
+    mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
+    {
+        z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 1 USMARC utf8 10 zed '' '' '' '' authority
+        z3950_row lx2.loc.gov 210 SAF 'BIBLIOTECA DOS ASSUNTOS DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
+    } | z3950_upsert_sql add | mysql --default-character-set=utf8mb4 "$DB_NAME"
+}
 
 # ----------------------------------------------------------------------
 # The SRU bridges (sru-bridge/ in the repository): Koha's "Catálogo Zeus"
@@ -30728,6 +30744,7 @@ kei_task() {
             done < <(z3950_rows)
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
+        z3950-seed)      z3950_seed_authorities ;;
         sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
         pergamum-bridge) sru_bridge_install pergamum; local prc=$?; pergamum_bridge_register; return "$prc" ;;
         z3950-server-status) z3950_server_status ;;
