@@ -1,9 +1,8 @@
 """Backup center and restore, as panel screens.
 
-  manual_backup  folder picker (under WSL it opens on the Windows Downloads
-                 folder) -> backup under Pac-Man -> a backup saved on the
-                 Windows disk is shown selected in Explorer; else file,
-                 size and the scp command to copy it to a PC
+  manual_backup  the save screen (screens/save_backup): folder of this server
+                 (~/backups) -> backup with progress -> copy to Windows
+                 Downloads or a folder in Windows (WSL2), or the scp command
   marc_backup    the weekly MARC21 export (bibliographic + authority
                  records, koha_marc_<date>.tar.gz) run now -> file, size,
                  the scp command and, on WSL or a Linux desktop, a button
@@ -31,7 +30,6 @@ Texts are the installer's own (same translations as the classic panel).
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 from pathlib import Path
@@ -43,6 +41,7 @@ from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageS
 from ..screens.files import PathPickerScreen
 from ..screens.loading import LoadingScreen
 from ..screens.oauth import OAuthScreen
+from ..screens.save_backup import SaveBackupScreen
 from .common import facts, failed, last_message, run_task, show_failure, tx
 
 DOWNLOAD_LABEL = "📥 Download latest backup"
@@ -51,23 +50,13 @@ DOWNLOAD_FILE = "📥 Download to computer"
 RESTORE_STEPS = 10   # tui_run steps of function_restore_database
 
 
-def _places(info, downloads: Path | None = None) -> list[tuple[str, str]]:
-    places = [
+def _places(info) -> list[tuple[str, str]]:
+    return [
         (t("Home"), info.get("real_home", "/root")),
         (t("Backups"), info.get("dir_sql", "/var/backups/koha_sql")),
         ("/media", "/media"),
         ("/mnt", "/mnt"),
     ]
-    if downloads is not None:
-        places.insert(0, (t("Downloads (Windows)"), str(downloads)))
-    return places
-
-
-async def _windows_downloads(app) -> Path | None:
-    """The Windows Downloads folder under WSL (None elsewhere, or in the demo)."""
-    if app.env.demo or transfer.where() != "wsl":
-        return None
-    return await asyncio.to_thread(transfer.downloads_folder, "wsl")
 
 
 def _reveal(app, path: str) -> None:
@@ -81,45 +70,11 @@ def _reveal(app, path: str) -> None:
 # Manual backup
 # ----------------------------------------------------------------------
 async def manual_backup(app) -> None:
+    """Save a backup into a folder of this server (~/backups by default), then
+    the ways to get it to the person: Windows Downloads or a folder in Windows
+    (WSL2 only), or the scp command for another computer. See screens/save_backup."""
     info = await facts(app)
-    srv_ip = info.get("server_ip")
-    downloads = await _windows_downloads(app)
-    start = str(downloads) if downloads is not None else info.get("real_home", "/root")
-    folder = await app.push_screen_wait(PathPickerScreen(
-        t("Backup Destination"), start, mode="dir", shortcuts=_places(info, downloads),
-        help_text=tx("Choose where to save the file.\n\n  USB drive: usually under /media or /mnt\n  "
-                     "To download later: scp root@${srv_ip}:PATH Downloads/", srv_ip=srv_ip)))
-    if folder is None:
-        return
-    title = t("💾  Generate manual backup and download to PC")
-    result = await run_task(app, tx("Generating the backup..."), "backup-manual", str(folder))
-    if failed(result):
-        await show_failure(app, title, result)
-        return
-    out = result.value
-    if transfer.on_windows_disk(out.get("file") or ""):
-        # Saved on the Windows disk: Explorer shows it, nothing to copy.
-        _reveal(app, out.get("file"))
-        await app.push_screen_wait(MessageScreen(
-            t("BACKUP GENERATED AND VERIFIED SUCCESSFULLY!"), "",
-            details=[(t("File:"), out.get("file")), (t("Size:"), out.get("size"))]))
-        return
-    user = out.get("user", "root")
-    steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
-    after = "\n".join([
-        t("1. The file will be saved directly into your Downloads folder."),
-        t("2. Make sure to include 'Downloads/' at the end of the command."),
-        tx("3. You will be asked for the password of user '${REAL_USER:-root}'.", REAL_USER=user),
-    ])
-    here = transfer.where() in ("wsl", "desktop")
-    choice = await app.push_screen_wait(MessageScreen(
-        t("BACKUP GENERATED AND VERIFIED SUCCESSFULLY!"), "",
-        details=[(t("File:"), out.get("file")), (t("Size:"), out.get("size"))],
-        command=out.get("scp"),
-        command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
-        command_notes=after, extra=t(DOWNLOAD_LABEL) if here else ""))
-    if choice == "extra":
-        await download_latest(app, file=out.get("file"))
+    await app.push_screen_wait(SaveBackupScreen(info))
 
 
 # ----------------------------------------------------------------------
