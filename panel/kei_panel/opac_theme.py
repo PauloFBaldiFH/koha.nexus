@@ -122,7 +122,8 @@ DEFAULTS: dict = {
               "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
-              "favicon": {"source": "none", "url": ""}, "film": 55},
+              "favicon": {"source": "none", "url": ""}, "film": 55,
+              "card": "sections", "card_padding": 16},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
     # writes: the login instructions of the OPAC and of the staff interface
     # (allow-listed HTML, a banner picture above it) and the OPAC footer
@@ -144,6 +145,11 @@ RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
 STAFF_FILM = (0, 90)        # % of the film over the staff wallpaper, the OPAC's range: the cards keep the text readable
+# The content card: one per section (Koha's .page-section, forms, tables) or
+# one for the whole page (.main, the content and its sidebar), with the
+# sections inside it clear: never a card inside a card.
+STAFF_CARD = {"sections": "One card per section", "page": "One card for the whole page"}
+STAFF_CARD_PADDING = (0, 40)  # px inside the card
 # The staff material: the OPAC's sliders, same ranges.
 STAFF_MATERIAL = ("blur", "opacity", "radius_block", "radius_input", "radius_button")
 
@@ -589,6 +595,9 @@ def normalize(raw: dict | None) -> dict:
                     "contrast": st.get("contrast") if st.get("contrast") in STAFF_CONTRAST else "normal",
                     "font": _clamp(st.get("font", 100), *STAFF_FONT, 100),
                     "film": _clamp(st.get("film", DEFAULTS["staff"]["film"]), *STAFF_FILM, DEFAULTS["staff"]["film"]),
+                    "card": st.get("card") if st.get("card") in STAFF_CARD else DEFAULTS["staff"]["card"],
+                    "card_padding": _clamp(st.get("card_padding", DEFAULTS["staff"]["card_padding"]),
+                                           *STAFF_CARD_PADDING, DEFAULTS["staff"]["card_padding"]),
                     "texture": st.get("texture") if st.get("texture") in TEXTURES else DEFAULTS["staff"]["texture"],
                     "page": _hex(st.get("page"), "") if st.get("page") else ""}
     for key in STAFF_MATERIAL:
@@ -1583,6 +1592,7 @@ def staff_css_body(cfg: dict) -> str:
     --nexus-staff-surface-rgb: {_rgb(surface)};
     --nexus-staff-surface-a: {st['opacity'] / 100:.2f};
     --nexus-staff-blur: {st['blur']}px;
+    --nexus-staff-card-pad: {st['card_padding']}px;
 }}
 html {{ font-size: {st['font']}%; }}
 html body {{ background-color: var(--nexus-staff-page); color: var(--nexus-staff-text); }}
@@ -1811,6 +1821,7 @@ html body textarea:focus {{
     out.append(_staff_panels_css(st))
     out += _staff_material_css(st)
     out += _staff_pictures_css(st)
+    out += _staff_inner_css(st)
     if st["contrast"] == "high":
         out.append("""html body { color: #000 !important; }
 html body .text-muted, html body .hint, html body .help-block, html body .form-text { color: #1f1f1f !important; }
@@ -1827,10 +1838,11 @@ def _staff_panels_css(st: dict) -> str:
     Koha's white tables, forms and dialogs follow it, so light text never
     lands on white."""
     light = luminance(st["surface"]) >= 0.30
+    page = st["card"] == "page"
     out = ["""/* Koha's page wrappers carry no colour of their own (Bootstrap paints the
    body white and the old .main rule painted the whole content area): only
    the cards below do, so the page colour or the wallpaper shows between them. */
-html body #container-main, html body .main, html body main, html body .container-fluid,
+html body #container-main,""" + ("" if page else " html body .main,") + """ html body main, html body .container-fluid:not(.main),
 html body #sub-header, html body #sidebar-container, html body #sidebar-container aside,
 html body .main > .row, html body .main > .row > [class*="col"],
 html body #container-main > .row, html body #container-main > .row > [class*="col"] {
@@ -1850,6 +1862,7 @@ html body .page-section {
     background-color: var(--nexus-staff-card);
     color: var(--nexus-staff-text);
     border-radius: var(--nexus-staff-radius);
+    padding: var(--nexus-staff-card-pad);
 }
 html body #login #StaffLoginInstructions {
     background-color: var(--nexus-staff-card);
@@ -1859,6 +1872,23 @@ html body #login #StaffLoginInstructions {
     box-shadow: var(--nexus-staff-shadow);
 }
 html body #login .kei-login-banner-wrap { margin: 0 0 .75rem; }"""]
+    if page:
+        # Koha's .main (main-container.inc) holds the content and its sidebar;
+        # pages without it (the home page) keep their section cards. No
+        # !important: the texture and the wallpaper set its background below.
+        out.append("""/* One card for the whole page: .main. */
+html body .main {
+    background-color: var(--nexus-staff-card);
+    color: var(--nexus-staff-text);
+    border: 1px solid var(--nexus-staff-edge);
+    border-radius: var(--nexus-staff-radius);
+    box-shadow: var(--nexus-staff-shadow);
+    /* Bootstrap's rows inside pull out by half a gutter: put it back on the
+       sides, so 0 is Koha's own spacing and the slider adds to it. */
+    padding: var(--nexus-staff-card-pad) calc(var(--nexus-staff-card-pad) + var(--bs-gutter-x, 1.5rem) * .5);
+    margin-top: .9rem;
+    margin-bottom: .9rem;
+}""")
     if not light:
         field = mix(st["surface"], "#000000", .25)
         out.append(f"""/* A dark block background: Koha's white surfaces follow it. */
@@ -1908,6 +1938,35 @@ _STAFF_BLOCKS = ".page-section, #area-news, fieldset.rows"
 _STAFF_CARDS = "ul.biglinks-list li a.icon_general, #area-news .newsitem"
 
 
+def _staff_blocks(st: dict, blocks: str = _STAFF_BLOCKS) -> str:
+    """The staff blocks that are cards: with one card for the whole page,
+    .main joins them (the sections inside it go clear, _staff_inner_css)."""
+    return blocks + (", .main" if st["card"] == "page" else "")
+
+
+# Inside the one page card these lose their own surface: one layer only.
+_STAFF_INNER = (".page-section, fieldset.rows, .sidebar_menu, .dataTables_wrapper, form .action, "
+                "#area-news, .tab-content")
+
+
+def _staff_inner_css(st: dict) -> list[str]:
+    """One card for the whole page: Koha's sections, forms, sidebar menus
+    and tables inside .main are clear (beaten by specificity, .main in the
+    selector), so the card's opacity is the only one on the page."""
+    if st["card"] != "page":
+        return []
+    inner = ", ".join("html body .main " + x.strip() for x in _STAFF_INNER.split(","))
+    # The frosted blur layers of the sections (_staff_material_css).
+    before = ", ".join(f"html body .main {x.strip()}::before" for x in _STAFF_BLOCKS.split(","))
+    return [f"""{inner} {{
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}}
+{before} {{ content: none; }}
+html body .main .page-section {{ padding: .5rem 0; }}"""]
+
+
 def _staff_material_css(st: dict) -> list[str]:
     """The OPAC's materials on the staff blocks, from cfg["staff"]: frosted
     glass (blur + opacity), smooth glass, brushed metal (and metal buttons
@@ -1917,7 +1976,7 @@ def _staff_material_css(st: dict) -> list[str]:
     t = st["texture"]
     if t == "flat":
         return []
-    blocks, cards = _strong(_STAFF_BLOCKS), _strong(_STAFF_CARDS)
+    blocks, cards = _strong(_staff_blocks(st)), _strong(_STAFF_CARDS)
     surface = "rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a))"
     wash = ("linear-gradient(135deg, rgba(var(--nexus-staff-primary-rgb), .08), "
             "rgba(var(--nexus-staff-secondary-rgb), .08))")
@@ -1961,6 +2020,12 @@ def _staff_material_css(st: dict) -> list[str]:
     -webkit-backdrop-filter: blur(var(--nexus-staff-blur)) saturate(140%);
     backdrop-filter: blur(var(--nexus-staff-blur)) saturate(140%);
 }}""")
+        if st["card"] == "page":
+            # .main holds Koha's modals and dropdowns: isolated, it would trap
+            # them under Bootstrap's backdrop (a child of body). Its blur layer
+            # sits in the body's stacking context instead.
+            rule.append("""html body { position: relative; z-index: 0; }
+html body .main { isolation: auto; }""")
     if t == "metal":
         # The top bar and the buttons in brushed metal, like the OPAC's.
         rule.append(f"""html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
@@ -2025,8 +2090,7 @@ html body::before {{
     pointer-events: none;
     background: rgba({_rgb(page)}, {st['film'] / 100:.2f});
 }}
-html body .page-section, html body .sidebar_menu, html body .dataTables_wrapper, html body fieldset.rows,
-html body form .action {{
+{_strong(_staff_blocks(st, ".page-section, .sidebar_menu, .dataTables_wrapper, fieldset.rows, form .action"))} {{
     background-color: rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a));
     border-radius: var(--nexus-staff-radius);
 }}

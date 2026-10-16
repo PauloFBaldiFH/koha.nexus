@@ -84,6 +84,11 @@ SLIDERS = {   # id: (label, unit, step)
     "radius_button": ("Buttons", "px", 1),
     "film": ("Legibility film", "%", 5),
 }
+# The staff content card: where the readable backdrop sits. Its opacity is
+# the Opacity slider and its corners the Blocks slider, as on every card.
+CARD_HELP = ("One card per section: each of Koha's boxes is a card. One card for the whole page: the content "
+             "and its sidebar sit on one card and the boxes inside it are clear. The Opacity and Blocks sliders "
+             "set its transparency and corners.")
 # The three corner sliders: what each one rounds (border-radius).
 RADIUS_HELP = {
     "radius_block": "Rounded corners (border-radius) of the blocks: header, panels, cards and boxes. More "
@@ -221,6 +226,11 @@ class OpacView(SectionView):
                 yield from self._asset_row(f"staff-{name}", st[name])
             yield from _row(t("Legibility film"), Slider(*ot.STAFF_FILM, st["film"], step=5, unit="%",
                                                          id="o-staff-film"))
+            yield from _row(t("Content card"), _tip(Select([(t(v), k) for k, v in ot.STAFF_CARD.items()],
+                                                           value=st["card"], allow_blank=False, id="o-staff-card"),
+                                                    CARD_HELP))
+            yield from _row(t("Card padding"), Slider(*ot.STAFF_CARD_PADDING, st["card_padding"], unit="px",
+                                                      id="o-staff-card_padding"))
             yield from _row(t("Table density"), Select([(t(v), k) for k, v in ot.STAFF_DENSITY.items()],
                                                        value=st["density"], allow_blank=False, id="o-staff-density"))
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
@@ -481,6 +491,8 @@ class OpacView(SectionView):
             q(f"#o-src-staff-{name}", Select).value = st[name]["source"]
             q(f"#o-val-staff-{name}", Input).value = st[name]["url"]
         q("#o-staff-film", Slider).value = st["film"]
+        q("#o-staff-card", Select).value = st["card"]
+        q("#o-staff-card_padding", Slider).value = st["card_padding"]
         q("#o-staff-density", Select).value = st["density"]
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
@@ -510,6 +522,8 @@ class OpacView(SectionView):
                          "density": q("#o-staff-density", Select).value,
                          "contrast": q("#o-staff-contrast", Select).value, "font": q("#o-staff-font", Slider).value,
                          "texture": q("#o-staff-texture", Select).value,
+                         "card": q("#o-staff-card", Select).value,
+                         "card_padding": q("#o-staff-card_padding", Slider).value,
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
                          **{key: q(f"#o-staff-{key}", Slider).value for key in ot.STAFF_MATERIAL}}}
         for key in SLIDERS:

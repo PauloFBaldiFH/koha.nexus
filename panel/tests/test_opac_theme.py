@@ -285,6 +285,30 @@ def test_opac_header_menu_and_quick_links():
     assert "html body .newsitem .btn-acesso" in css
 
 
+def test_staff_content_card_one_layer():
+    # Settings saved before the option: a card per section, Koha's 1rem padding.
+    old = ot.normalize({"staff": {"enabled": True}})["staff"]
+    assert (old["card"], old["card_padding"]) == ("sections", 16)
+    bad = ot.normalize({"staff": {"card": "solid", "card_padding": 99}})["staff"]
+    assert (bad["card"], bad["card_padding"]) == ("sections", ot.STAFF_CARD_PADDING[1])
+    sections = ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "card_padding": 24}}))
+    assert "--nexus-staff-card-pad: 24px" in sections and "html body .main .page-section" not in sections
+    assert "html body #container-main, html body .main, html body main" in sections
+    for texture in ot.TEXTURES:
+        cfg = ot.normalize({"staff": {"enabled": True, "card": "page", "texture": texture, "opacity": 92,
+                                      "background": {"source": "url", "url": "https://example.org/w.jpg"}}})
+        css = ot.staff_css_body(cfg)
+        # .main is the card: not in the transparent wrappers, and no !important on it,
+        # so the texture and the wallpaper give it the surface at the opacity slider.
+        assert "html body .main," not in css.split("background-color: transparent !important")[0]
+        assert "html body .main {\n    background-color: var(--nexus-staff-card);" in css
+        assert "--nexus-staff-surface-a: 0.92" in css
+        # ... and the sections inside it are clear: never a card inside a card.
+        inner = css.index("html body .main .page-section, html body .main fieldset.rows")
+        assert inner > css.index("rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a))")
+        assert "background: transparent;" in css[inner:]
+        if texture == "frosted":
+            assert "html body .main { isolation: auto; }" in css and "html body .main::before" in css
 def test_staff_pictures_and_single_icon(tmp_path):
     cfg = ot.normalize({"favicon": {"source": "url", "url": "https://example.org/opac.ico"},
                         "staff": {"enabled": True, "film": 5,

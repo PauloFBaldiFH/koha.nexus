@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.61** (1.5.62: staff wrappers transparent, catalogue card stylesheet repair PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.62** (1.5.63: staff content card, one per section or one for the whole page, PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -396,6 +396,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   at kei-xslt without a state file (restore from another server), after a language pack and in
   `staff_authlinks_fix` (install, update, restore); files are written as `.part` then moved; when they
   cannot be written the preferences go back to `default`. tests BR13b.
+- **1.5.63 (Paulo: configurable staff content card backdrop)**: Staff interface gets `card`
+  (`sections` default, as before / `page`: Koha's `.main`, content plus sidebar, is the one card) and
+  `card_padding` (0-40 px, default 16 = Koha's 1rem). Its transparency is the staff Opacity slider and its
+  corners the Blocks slider, so no second opacity. In `page` mode `.main` leaves the transparent-wrapper
+  list and joins the textured/wallpaper blocks; `.page-section`, `fieldset.rows`, `.sidebar_menu`,
+  `.dataTables_wrapper`, `form .action`, `.tab-content` inside it go clear by specificity
+  (`_staff_inner_css`), never a card inside a card. Frosted: `.main` drops `isolation` (body becomes the
+  stacking context), otherwise Koha's modals inside `.main` sit under Bootstrap's backdrop. Paulo's pasted
+  rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
+  `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
+  `.main-content` is not in Koha's staff templates.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes
