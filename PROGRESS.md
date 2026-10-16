@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.64** (1.5.65: staff content card, one per section or one for the whole page, PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.65** (1.5.66: Z39.50 / SRU rows written as idempotent upserts, PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -86,8 +86,8 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   package `pergamum_sru` on 127.0.0.1:5006/sru, unit `koha-pergamum-sru`, `--task pergamum-bridge`
   (and automatically when z3950-add gets the 127.0.0.1:5006 row, offered unticked in the Brazil
   list). Both bridges share one venv and the SRU endpoint code (`zeus_sru.app.sru_app`).
-  `pergamum_bridge_register` deletes then inserts Koha's row (z3950servers has no unique key but
-  `id`, so ON DUPLICATE KEY never matches). Not yet tried against the live Pergamum site.
+  `pergamum_bridge_register` upserts Koha's row through `z3950_upsert_sql` (z3950servers has no
+  unique key but `id`, so ON DUPLICATE KEY never matches). Not yet tried against the live Pergamum site.
   Since 1.5.22 a server is working once it answers the protocol (Z39.50 Init accepted, or any SRU
   response), even with 0 hits, a slow search or a refused Present; BER indefinite lengths are read.
   `History` resets automatic hides when `HISTORY_RULES` changes. Confirmed dead and left out:
@@ -418,6 +418,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.66 (Paulo: idempotent Z39.50 / SRU upsert)**: every write to `z3950servers` goes through
+  `z3950_upsert_sql` (installer): each target finds its row by host, port and database, else by name
+  (never a row another target of the same list took), gets the connection settings (host, port, db,
+  syntax, encoding, timeout, servertype, sru_fields, sru_options; the login only when one is given) and
+  keeps the librarian's `checked` and `rank`; no row means an INSERT. Mode `add` (z3950-add) keeps the
+  row's name; mode `named` (Zeus and Pergamum bridges, Catalog Network) matches host and port, sets the
+  name and removes other rows with that name or address. The panel's SQL export (`to_koha_sql`) and
+  `catalog-network/deploy/koha-z3950servers.sql` follow the same rule. Re-registering a bridge no
+  longer re-ticks it. `z3950_seed_authorities` (`--task z3950-seed`, and at install) upserts Paulo's
+  two Library of Congress authority targets (lx2.loc.gov:210 NAF rank 1 and SAF rank 2, USMARC, utf8,
+  timeout 10, recordtype authority). `sru-bridge/` now lives on a backup branch, so its CI job
+  (sru-services matrix) and the two gateway SQL tests in tests/z3950.bats were removed.
 - **1.5.64 (Paulo: translucent staff header)**: `cfg["staff"]` gains `header_glass` (off by default),
   `header_opacity` (0-100, default 85) and `header_blur` (0-30 px, default 8); switch and two sliders in
   the Staff interface box. `_staff_header_css` (after the texture, so it also beats the metal bar) paints
