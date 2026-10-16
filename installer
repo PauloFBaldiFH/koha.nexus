@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.66"
+PANEL_VERSION=" 1.5.67"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28496,16 +28496,22 @@ z3950_upsert_sql() {
 # z3950_row FIELD...: one line of z3950_upsert_sql's input.
 z3950_row() { local IFS=$'\x1f'; printf '%s\n' "$*"; }
 
-# The authority targets every Koha gets (Koha's authority search, Z39.50):
-# the Library of Congress name and subject files. Run again, it updates
-# their connection settings and keeps the librarian's tick, rank and name.
-# Only once Koha's database exists; quiet otherwise.
+# The authority targets every Koha gets (Koha's authority search): the
+# Library of Congress name and subject files (Z39.50) and the Biblioteca
+# Nacional's authority database on the koha.nexus SRU gateway
+# (sru.koha.nexus:443/sru/bn-aut: authority records built from the BN
+# catalogue's headings; MARC21, since the gateway answers MARCXML). Run
+# again, it updates their connection settings and keeps the librarian's
+# tick, rank and name. Only once Koha's database exists; quiet otherwise.
+Z3950_AUTH_SRU_FIELDS='nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice'
 z3950_seed_authorities() {
     is_koha_installed 2>/dev/null || return 0
     mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
     {
         z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 1 USMARC utf8 10 zed '' '' '' '' authority
         z3950_row lx2.loc.gov 210 SAF 'BIBLIOTECA DOS ASSUNTOS DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
+        z3950_row https://sru.koha.nexus 443 sru/bn-aut 'BIBLIOTECA NACIONAL (AUTORIDADES)' 1 3 MARC21 utf8 30 sru \
+            "$Z3950_AUTH_SRU_FIELDS" 'sru=get,sru_version=1.1' '' '' authority
     } | z3950_upsert_sql add | mysql --default-character-set=utf8mb4 "$DB_NAME"
 }
 

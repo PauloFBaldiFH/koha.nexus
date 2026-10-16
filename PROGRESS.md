@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.65** (1.5.66: Z39.50 / SRU rows written as idempotent upserts, PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.66** (1.5.67: BN authority target seeded, PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -418,6 +418,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.67 (Paulo: BN authority database)**: `z3950_seed_authorities` also upserts
+  `BIBLIOTECA NACIONAL (AUTORIDADES)`: https://sru.koha.nexus:443, db `sru/bn-aut`, SRU, MARC21, utf8,
+  timeout 30, rank 3, recordtype authority, SRU fields mapped from Koha's authority search form
+  (`authorpersonal=bath.personalName`, `authorcorp=bath.corporateName`, `nameany`/`authorany=dc.creator`,
+  ...). The `/sru/bn-aut` endpoint itself is in the SRU gateway (`sru-bridge/`, off `main`): it searches
+  `/sru/bn` by author and answers MARC21 authority records (leader `00000nz  a2200000n  4500`, 040
+  `$a BR-RjBN $b por`, the 100/110 heading `$a $d`, 670 `$a Acervo Fundação Biblioteca Nacional
+  (Pergamum)`); records with no 100/110 answer SRU diagnostic 1.
 - **1.5.66 (Paulo: idempotent Z39.50 / SRU upsert)**: every write to `z3950servers` goes through
   `z3950_upsert_sql` (installer): each target finds its row by host, port and database, else by name
   (never a row another target of the same list took), gets the connection settings (host, port, db,
