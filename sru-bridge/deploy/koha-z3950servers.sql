@@ -7,10 +7,14 @@
 SET NAMES utf8mb4;
 START TRANSACTION;
 
--- 1. Older addresses of the gateway move to https://sru.koha.nexus:443.
+-- 1. Older addresses of the gateway (any port, 10.0.0.60:5001 included) move to
+--    https://sru.koha.nexus:443, the database written sru/<id>.
+UPDATE z3950servers SET db = CONCAT('sru/', TRIM(LEADING '/' FROM db))
+ WHERE recordtype = 'biblio' AND servertype = 'sru' AND host IN ('137.131.205.31', '10.0.0.60', 'http://137.131.205.31', 'http://10.0.0.60', 'https://137.131.205.31', 'https://10.0.0.60', 'sru.koha.nexus', 'http://sru.koha.nexus', 'https://sru.koha.nexus') AND db <> '' AND db NOT LIKE 'sru/%' AND db NOT LIKE '/sru/%'
+   AND TRIM(LEADING '/' FROM db) NOT LIKE '%/%';
+UPDATE z3950servers SET db = TRIM(LEADING '/' FROM db) WHERE recordtype = 'biblio' AND servertype = 'sru' AND host IN ('137.131.205.31', '10.0.0.60', 'http://137.131.205.31', 'http://10.0.0.60', 'https://137.131.205.31', 'https://10.0.0.60', 'sru.koha.nexus', 'http://sru.koha.nexus', 'https://sru.koha.nexus') AND db LIKE '/sru/%';
 UPDATE z3950servers SET host = 'https://sru.koha.nexus', port = 443
- WHERE recordtype = 'biblio' AND servertype = 'sru' AND db LIKE 'sru/%'
-   AND host IN ('137.131.205.31', '10.0.0.60', 'sru.koha.nexus', 'http://sru.koha.nexus', 'https://sru.koha.nexus');
+ WHERE recordtype = 'biblio' AND servertype = 'sru' AND host IN ('137.131.205.31', '10.0.0.60', 'http://137.131.205.31', 'http://10.0.0.60', 'https://137.131.205.31', 'https://10.0.0.60', 'sru.koha.nexus', 'http://sru.koha.nexus', 'https://sru.koha.nexus') AND db LIKE 'sru/%';
 
 -- 2. Renamed ids, then one row per id.
 UPDATE z3950servers SET db = 'sru/wisconsin' WHERE recordtype = 'biblio' AND servertype = 'sru' AND host = 'https://sru.koha.nexus' AND port = 443 AND db = 'sru/uw_madison';

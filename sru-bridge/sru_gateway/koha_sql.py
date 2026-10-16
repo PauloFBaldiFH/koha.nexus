@@ -17,7 +17,9 @@ gateway's own rows (database sru/..., on the gateway's current or older
 addresses), so the librarian's other servers are never changed:
 
   1. rows on the gateway's older addresses (137.131.205.31:5000, the VPS's
-     private 10.0.0.60, sru.koha.nexus without https) move to the new one;
+     private 10.0.0.60 on any port, 5001 included, with or without http(s)://,
+     sru.koha.nexus without https) move to the new one; their database is
+     read as sru/<id> whether it was written sru/<id>, /sru/<id> or a bare <id>;
   2. renamed ids follow their new name, and a row left twice is kept once;
   3. ids the gateway no longer serves are removed;
   4. each target's name and settings are refreshed, keeping the librarian's
@@ -38,7 +40,12 @@ OUT = Path(__file__).resolve().parents[1] / "deploy" / "koha-z3950servers.sql"
 PANEL_LIST = Path(__file__).resolve().parents[2] / "panel" / "kei_panel" / "data" / "z3950_targets.json"
 HOST = "https://sru.koha.nexus"
 PORT = 443
-OLD_HOSTS = ("137.131.205.31", "10.0.0.60", "sru.koha.nexus", "http://sru.koha.nexus", HOST)
+# The gateway's older addresses. 10.0.0.60 is the VPS's private address: rows
+# on it (port 5000 or the 5001 of the old Zeus spec) time out from any other
+# machine. Every port counts, since no other server lives on these hosts.
+OLD_IPS = ("137.131.205.31", "10.0.0.60")
+OLD_HOSTS = (*OLD_IPS, *(f"{s}://{ip}" for s in ("http", "https") for ip in OLD_IPS),
+             "sru.koha.nexus", "http://sru.koha.nexus", HOST)
 # An SRU server answers MARCXML: Koha's syntax must say MARC21 (USMARC makes
 # Koha expect ISO 2709 and show no record; tested live, see PR #62).
 SYNTAX = "MARC21"
@@ -66,6 +73,8 @@ def q(value) -> str:
 def render(table: dict[str, tg.Target]) -> str:
     ids = list(table)
     mine = f"recordtype = 'biblio' AND servertype = 'sru' AND host = {q(HOST)} AND port = {PORT}"
+    old_rows = (f"recordtype = 'biblio' AND servertype = 'sru' "
+                f"AND host IN ({', '.join(q(h) for h in OLD_HOSTS)})")
     out = [
         "-- Koha's z3950servers rows for the koha.nexus SRU gateway (sru.koha.nexus).",
         "-- Generated from sru-bridge/sru_gateway/targets.json by",
@@ -76,10 +85,14 @@ def render(table: dict[str, tg.Target]) -> str:
         "SET NAMES utf8mb4;",
         "START TRANSACTION;",
         "",
-        "-- 1. Older addresses of the gateway move to https://sru.koha.nexus:443.",
+        "-- 1. Older addresses of the gateway (any port, 10.0.0.60:5001 included) move to",
+        "--    https://sru.koha.nexus:443, the database written sru/<id>.",
+        f"UPDATE z3950servers SET db = CONCAT('sru/', TRIM(LEADING '/' FROM db))",
+        f" WHERE {old_rows} AND db <> '' AND db NOT LIKE 'sru/%' AND db NOT LIKE '/sru/%'",
+        "   AND TRIM(LEADING '/' FROM db) NOT LIKE '%/%';",
+        f"UPDATE z3950servers SET db = TRIM(LEADING '/' FROM db) WHERE {old_rows} AND db LIKE '/sru/%';",
         f"UPDATE z3950servers SET host = {q(HOST)}, port = {PORT}",
-        f" WHERE recordtype = 'biblio' AND servertype = 'sru' AND db LIKE 'sru/%'",
-        f"   AND host IN ({', '.join(q(h) for h in OLD_HOSTS)});",
+        f" WHERE {old_rows} AND db LIKE 'sru/%';",
         "",
         "-- 2. Renamed ids, then one row per id.",
     ]
