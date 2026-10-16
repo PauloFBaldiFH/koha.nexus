@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.62** (1.5.63: staff content card, one per section or one for the whole page, PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.63** (1.5.64: staff content card, one per section or one for the whole page, PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -384,6 +384,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `📂 Open file manager` (WSL or a Linux desktop only) opens the tree's folder via
   `opener.open_user_folder` in a thread worker, ignoring clicks within 2 s.
   `panel/tests/test_picker_drops.py`.
+- **1.5.63 (Paulo: carousel from a Koha list)**: the nightly job `koha-kei-new-arrivals` also writes
+  `/images/custom/kei-list-<shelfnumber>.json` for every public list (`virtualshelves.public = 1`, or
+  `category = 2` before 21.05; max 50 lists, in the list's `sortfield` order; a list made private loses
+  its file). Covers for both feeds: Koha's uploaded one (`cover_images`/`biblioimages`, only with
+  `OPACLocalCoverImages` = 1) as `/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=N`, else
+  OpenLibrary (`?default=false`, 404 when missing), else Amazon. Server-side, not the REST API: Koha's
+  public list API differs by version and the OPAC page has no ISBN/availability. Carousel settings
+  `source` (new|list), `shelf`, `lists` (keep the job with the home carousel off). OPAC script:
+  `KEI.listCarousel(shelfId, selectorOrElement, {title, mode, count, ...})` returns a Promise of the
+  element; `<div data-kei-list="7" data-title=".." data-mode="coverflow">` mounts one from news/HTML
+  customizations. CSS selector is now `.kei-carousel` (home one keeps `#kei-carousel`).
 - **1.5.62 (Paulo: staff washed-out look, empty OPAC Normal view)**: the staff wrappers (`#container-main`,
   `.main`, `main`, `.container-fluid`, `#sub-header`, `#sidebar-container`, the rows and columns
   between them) are `background-color: transparent !important`; the old wallpaper rule painted `.main`
@@ -396,7 +407,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   at kei-xslt without a state file (restore from another server), after a language pack and in
   `staff_authlinks_fix` (install, update, restore); files are written as `.part` then moved; when they
   cannot be written the preferences go back to `default`. tests BR13b.
-- **1.5.63 (Paulo: configurable staff content card backdrop)**: Staff interface gets `card`
+- **1.5.64 (Paulo: configurable staff content card backdrop)**: Staff interface gets `card`
   (`sections` default, as before / `page`: Koha's `.main`, content plus sidebar, is the one card) and
   `card_padding` (0-40 px, default 16 = Koha's 1rem). Its transparency is the staff Opacity slider and its
   corners the Blocks slider, so no second opacity. In `page` mode `.main` leaves the transparent-wrapper

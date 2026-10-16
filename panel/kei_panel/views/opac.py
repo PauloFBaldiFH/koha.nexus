@@ -169,10 +169,19 @@ class OpacView(SectionView):
                                                        id="o-default_theme"))
         car = c["carousel"]
         with Vertical(id="o-carousel", classes="opac-box"):
-            yield Static(t("The newest titles with a copy on the shelf and a real Amazon cover, rebuilt every "
-                           "night. Each cover opens the record. Turns on OPACAmazonCoverImages."),
+            yield Static(t("The newest titles with a copy on the shelf and a real cover, or a Koha list, rebuilt "
+                           "every night. Each cover opens the record. Turns on OPACAmazonCoverImages."),
                          classes="ai-note", markup=False)
             yield from _row(t("Show"), Switch(car["enabled"], id="o-car-enabled"))
+            yield from _row(t("Source"), Select([(t(v), k) for k, v in ot.CAROUSEL_SOURCES.items()],
+                                                value=car["source"], allow_blank=False, id="o-car-source"))
+            yield from _row(t("List number"), Input(str(car["shelf"] or ""), id="o-car-shelf", max_length=9,
+                                                    restrict=r"[0-9]*", placeholder="shelfnumber="))
+            yield Static(t("A public list made in Lists (Koha's virtual shelves), in its own order. Covers: "
+                           "the one uploaded in Koha, else OpenLibrary, else Amazon. Any page can also show "
+                           "a list: <div data-kei-list=\"7\"></div> in a news item, or "
+                           "KEI.listCarousel(7, \"#box\") in OpacUserJS."), classes="ai-note", markup=False)
+            yield from _row(t("List feeds with the carousel off"), Switch(car["lists"], id="o-car-lists"))
             yield from _row(t("Style"), Select([(t(v), k) for k, v in ot.CAROUSEL_MODES.items()], value=car["mode"],
                                                allow_blank=False, id="o-car-mode"))
             yield from _row(t("Title"), Input(car["title"], id="o-car-title", max_length=60))
@@ -438,6 +447,9 @@ class OpacView(SectionView):
         q("#o-default_theme", Select).value = cfg["default_theme"]
         car = cfg["carousel"]
         q("#o-car-enabled", Switch).value = car["enabled"]
+        q("#o-car-source", Select).value = car["source"]
+        q("#o-car-shelf", Input).value = str(car["shelf"] or "")
+        q("#o-car-lists", Switch).value = car["lists"]
         q("#o-car-mode", Select).value = car["mode"]
         q("#o-car-title", Input).value = car["title"]
         q("#o-car-autoplay", Switch).value = car["autoplay"]
@@ -510,7 +522,9 @@ class OpacView(SectionView):
                             "autoplay": q("#o-car-autoplay", Switch).value, "speed": q("#o-speed", Slider).value,
                             "count": q("#o-count", Slider).value, "hover": q("#o-car-hover", Select).value,
                             "overlay": q("#o-car-overlay", Switch).value, "mode": q("#o-car-mode", Select).value,
-                            "amazon_tag": q("#o-car-tag", Input).value.strip()},
+                            "amazon_tag": q("#o-car-tag", Input).value.strip(),
+                            "source": q("#o-car-source", Select).value, "lists": q("#o-car-lists", Switch).value,
+                            "shelf": q("#o-car-shelf", Input).value.strip() or 0},
                "ghost": {key: q(f"#o-g-{key}", Switch).value for key in GHOST},
                # No switch of its own any more (Paulo, 2026-10-15): the news
                # boxes above make the buttons, and [kei-button] markers in
@@ -554,6 +568,8 @@ class OpacView(SectionView):
             if problem:
                 where = t("Staff home page buttons") if key == "staff_links" else t("Quick access buttons")
                 return raw, {}, f"{where}: {problem}"
+        if raw["carousel"]["source"] == "list" and not ot.normalize(raw)["carousel"]["shelf"]:
+            return raw, {}, t("Carousel: type the number of the Koha list (shelfnumber= in its address).")
         if raw["carousel"]["amazon_tag"] and not ot.normalize(raw)["carousel"]["amazon_tag"]:
             return raw, {}, t("The Amazon tag has only letters, digits and hyphens.")
         pending: dict[str, tuple[str, Path]] = {}

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.63"
+PANEL_VERSION=" 1.5.64"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28874,10 +28874,12 @@ z3950_server_status() {
 # brings back the backup's systempreferences, which would wipe the look, so
 # Restore database writes the saved blocks back (theme_state_reapply).
 # The carousel reads kei-new-arrivals.json, written every night by
-# koha-kei-new-arrivals: the newest titles with an ISBN, a copy that is not
-# lost or withdrawn, and a real Amazon cover (Amazon answers a missing one
-# with a 1x1 picture, which is skipped). Every write takes a verified backup
-# first, under the backup/restore lock.
+# koha-kei-new-arrivals: the newest titles with a copy that is not lost or
+# withdrawn and a real cover (Koha's uploaded one, else OpenLibrary, else
+# Amazon, which answers a missing one with a 1x1 picture, skipped). The same
+# job writes kei-list-<number>.json for each public Koha list, the
+# carousel's "Koha list" source and KEI.listCarousel(). Every write takes a
+# verified backup first, under the backup/restore lock.
 # ======================================================================
 OPAC_CUSTOM_DIR="/usr/share/koha/opac/htdocs/images/custom"
 # The staff interface's own pictures (logo, favicon, wallpaper): its web root
@@ -28930,9 +28932,10 @@ opac_pref_line() {
 }
 
 # The nightly job of the carousel (perl, run as root: DBI on the local
-# MariaDB socket). KEI_NA_DSN / KEI_NA_OUT / KEI_NA_COVER_BASE are for the tests.
+# MariaDB socket). KEI_NA_DSN / KEI_NA_OUT / KEI_NA_COVER_BASE / KEI_NA_OL_BASE
+# are for the tests.
 opac_na_script() {
-    printf '#!/usr/bin/perl\n# koha.nexus: "New arrivals" feed of the OPAC carousel (config.sh, OPAC appearance).\nour ($DB, $OUT) = (%s, %s);\n' \
+    printf '#!/usr/bin/perl\n# koha.nexus: "New arrivals" and public list feeds of the OPAC carousel (config.sh, OPAC appearance).\nour ($DB, $OUT) = (%s, %s);\n' \
         "$(sql_quote "$DB_NAME")" "$(sql_quote "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}")"
     cat <<'PL'
 use strict;
@@ -28974,22 +28977,46 @@ sub isbn10 {
 sub clean { my $v = $_[0] // ''; $v =~ s/[\s\/:;,.=]+$//; $v =~ s/^\s+//; return $v; }
 
 # Records hidden from the OPAC, where this Koha has the column.
-my $hide = eval { $dbh->selectall_arrayref('SELECT 1 FROM biblio WHERE 1 = 0 AND opac_suppressed = 0'); 1 }
-    ? ' AND (b.opac_suppressed IS NULL OR b.opac_suppressed = 0)' : '';
-my $limit = $count * 4 > 200 ? 200 : $count * 4;
-my $rows = $dbh->selectall_arrayref(
-    "SELECT b.biblionumber, b.title, b.author, bi.isbn FROM biblio b
-     JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
-     WHERE bi.isbn IS NOT NULL AND bi.isbn <> ''$hide
-     ORDER BY b.datecreated DESC, b.biblionumber DESC LIMIT $limit");
+sub has { my $sql = shift; return eval { $dbh->selectall_arrayref("$sql WHERE 1 = 0"); 1 }; }
+my $hide = has('SELECT opac_suppressed FROM biblio') ? ' AND (b.opac_suppressed IS NULL OR b.opac_suppressed = 0)' : '';
+# Covers uploaded in Koha (Tools > Upload local cover image): cover_images
+# since 20.11, biblioimages before. Only when the OPAC shows them.
+my ($local_table) = grep { has("SELECT biblionumber FROM $_") } qw(cover_images biblioimages);
+my $local_on = $local_table && eval { ($dbh->selectrow_array(
+    "SELECT value FROM systempreferences WHERE variable = 'OPACLocalCoverImages'") // '') eq '1' };
+my $has_local = $local_on ? $dbh->prepare("SELECT 1 FROM $local_table WHERE biblionumber = ? LIMIT 1") : undef;
+my $ol = $ENV{KEI_NA_OL_BASE} || 'https://covers.openlibrary.org/b/isbn/';
 my $items = $dbh->prepare('SELECT itemcallnumber, onloan, notforloan, itemlost, withdrawn FROM items WHERE biblionumber = ?');
 my $http = HTTP::Tiny->new(timeout => 8, agent => 'koha.nexus-new-arrivals');
-my (@feed, %seen, $tried);
-for my $r (@$rows) {
-    last if @feed >= $count;
+my ($tried, %covers) = (0);
+
+# The cover of a record: Koha's own upload, else OpenLibrary, else Amazon
+# (both by ISBN; a missing one is a 404 at OpenLibrary and a 1x1 picture
+# at Amazon, both skipped). One look-up per record per run.
+sub cover {
+    my ($id, $i10) = @_;
+    return $covers{$id} if exists $covers{$id};
+    $tried++;
+    if ($has_local) {
+        $has_local->execute($id);
+        my ($yes) = $has_local->fetchrow_array;
+        $has_local->finish;
+        return $covers{$id} = "/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=$id" if $yes;
+    }
+    if ($i10) {
+        for my $url ("$ol$i10-L.jpg?default=false", "$base$i10.01.LZZZZZZZ.jpg") {
+            my $res = $http->get($url);
+            return $covers{$id} = $url if $res->{success} && length($res->{content} // '') > 1000;
+        }
+    }
+    return $covers{$id} = undef;
+}
+
+# card(ROW, NEED_COPY): one carousel card, or nothing (no cover; no copy
+# that is not lost or withdrawn when NEED_COPY).
+sub card {
+    my ($r, $need_copy) = @_;
     my ($id, $title, $author, $isbn) = @$r;
-    my $i10 = isbn10($isbn) or next;
-    next if $seen{$i10};
     $items->execute($id);
     my ($total, $avail, $call) = (0, 0, '');
     while (my $it = $items->fetchrow_hashref) {
@@ -28998,24 +29025,77 @@ for my $r (@$rows) {
         $call ||= $it->{itemcallnumber} // '';
         $avail++ if !$it->{onloan} && !$it->{notforloan};
     }
-    next unless $total;
-    my $cover = "$base$i10.01.LZZZZZZZ.jpg";
-    $tried++;
-    my $res = $http->get($cover);
-    next unless $res->{success} && length($res->{content} // '') > 1000;
-    $seen{$i10} = 1;
-    push @feed, { biblionumber => $id + 0, title => clean($title), author => clean($author),
-                  callnumber => $call, available => $avail, total => $total, cover => $cover };
+    return if $need_copy && !$total;
+    my $cover = cover($id, isbn10($isbn)) or return;
+    return { biblionumber => $id + 0, title => clean($title), author => clean($author),
+             callnumber => $call, available => $avail, total => $total, cover => $cover };
 }
-my @t = gmtime;
-my $json = JSON::PP->new->utf8->canonical->encode({
-    generated => sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]), items => \@feed });
-open my $fh, '>', "$out.tmp" or die "$out.tmp: $!\n";
-print $fh $json;
-close $fh or die "$out.tmp: $!\n";
-chmod 0644, "$out.tmp";
-rename "$out.tmp", $out or die "$out: $!\n";
-printf "%d of %d titles with an ISBN have an Amazon cover\n", scalar @feed, $tried // 0;
+
+sub write_feed {
+    my ($file, $feed) = @_;
+    my @t = gmtime;
+    my $json = JSON::PP->new->utf8->canonical->encode({
+        generated => sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ', $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]), items => $feed });
+    open my $fh, '>', "$file.tmp" or die "$file.tmp: $!\n";
+    print $fh $json;
+    close $fh or die "$file.tmp: $!\n";
+    chmod 0644, "$file.tmp";
+    rename "$file.tmp", $file or die "$file: $!\n";
+}
+
+# New arrivals: the newest titles with an ISBN or an uploaded cover.
+my $own = $has_local ? " OR b.biblionumber IN (SELECT biblionumber FROM $local_table)" : '';
+my $limit = $count * 4 > 200 ? 200 : $count * 4;
+my $rows = $dbh->selectall_arrayref(
+    "SELECT b.biblionumber, b.title, b.author, bi.isbn FROM biblio b
+     JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
+     WHERE ((bi.isbn IS NOT NULL AND bi.isbn <> '')$own)$hide
+     ORDER BY b.datecreated DESC, b.biblionumber DESC LIMIT $limit");
+my (@feed, %seen);
+for my $r (@$rows) {
+    last if @feed >= $count;
+    my $key = isbn10($r->[3]) // "b$r->[0]";
+    next if $seen{$key};
+    my $card = card($r, 1) or next;
+    $seen{$key} = 1;
+    push @feed, $card;
+}
+write_feed($out, \@feed);
+my $found = $tried;
+
+# Public lists (Lists in the OPAC): kei-list-<number>.json next to the
+# feed, in the list's own order, for the carousel's "Koha list" source and
+# KEI.listCarousel(). A list made private or deleted loses its file.
+(my $dir = $out) =~ s{/[^/]*$}{};
+my $public = has('SELECT public FROM virtualshelves') ? 'public = 1' : 'category = 2';
+my %order = (title => 'b.title, c.dateadded DESC', author => 'b.author, b.title',
+             copyrightdate => 'b.copyrightdate DESC, c.dateadded DESC', dateadded => 'c.dateadded DESC');
+my (%keep, $lists);
+my $shelves = eval { $dbh->selectall_arrayref(
+    "SELECT shelfnumber, sortfield FROM virtualshelves WHERE $public ORDER BY shelfnumber LIMIT 50") } || [];
+for my $s (@$shelves) {
+    my ($shelf, $sort) = @$s;
+    my $by = $order{$sort // ''} || $order{dateadded};
+    my $list = eval { $dbh->selectall_arrayref(
+        "SELECT b.biblionumber, b.title, b.author, bi.isbn FROM virtualshelfcontents c
+         JOIN biblio b ON b.biblionumber = c.biblionumber
+         LEFT JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
+         WHERE c.shelfnumber = ?$hide ORDER BY $by, b.biblionumber LIMIT 200", undef, $shelf) } or next;
+    my (@cards, %in);
+    for my $r (@$list) {
+        last if @cards >= $count;
+        next if $in{$r->[0]}++;
+        my $card = card($r, 0) or next;
+        push @cards, $card;
+    }
+    write_feed("$dir/kei-list-$shelf.json", \@cards);
+    $keep{"kei-list-$shelf.json"} = 1;
+    $lists++;
+}
+opendir my $dh, $dir or die "$dir: $!\n";
+unlink map { "$dir/$_" } grep { /^kei-list-\d+\.json$/ && !$keep{$_} } readdir $dh;
+closedir $dh;
+printf "%d of %d new titles have a cover; %d public lists\n", scalar @feed, $found, $lists // 0;
 PL
 }
 
@@ -29042,7 +29122,9 @@ opac_na_run() {
     return 1
 }
 
-opac_na_remove() { rm -f -- "$CRON_OPAC" "$OPAC_NA_BIN" "${OPAC_CUSTOM_DIR:?}/${OPAC_NA_FEED:?}"; }
+opac_na_remove() {
+    rm -f -- "$CRON_OPAC" "$OPAC_NA_BIN" "${OPAC_CUSTOM_DIR:?}/${OPAC_NA_FEED:?}" "${OPAC_CUSTOM_DIR:?}"/kei-list-*.json
+}
 
 # opac_custom_drop NAME...: our pictures kei-NAME.* in Koha's images/custom.
 opac_custom_drop() {
