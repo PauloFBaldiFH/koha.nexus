@@ -22,6 +22,10 @@ and a group, the heading it is listed under (in the koha.nexus panel too):
   intl_universities  [3] International universities
   specialized        [4] Specialised and union catalogues
 
+An "authorities" list beside "targets" holds the authority databases: each
+has an id, a name and "from", the id of the catalogue whose bibliographic
+records it reads its headings from (see sru_gateway/authority.py).
+
 A login never goes in the file: SRU_GATEWAY_LOGIN_<ID>=user:password (id in
 capitals) supplies one from the environment.
 """
@@ -127,6 +131,30 @@ def make_target(raw: dict) -> Target:
     if kind == "sru" and not re.match(r"https?://", t.url):
         raise TargetError(f"{tid}: an sru target needs an http(s) url")
     return t
+
+
+@dataclass(frozen=True)
+class Authority:
+    """An authority database: name headings taken from another catalogue."""
+    id: str
+    name: str
+    source: str     # the targets.json id it reads
+
+
+def load_authorities(path: Path, table: dict[str, Target]) -> dict[str, Authority]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    out: dict[str, Authority] = {}
+    for raw in data.get("authorities", []):
+        aid = str(raw.get("id", "")).strip().lower()
+        if not _ID.fullmatch(aid):
+            raise TargetError(f"bad authority id {raw.get('id')!r}")
+        if aid in out or aid in table:
+            raise TargetError(f"{aid}: listed twice")
+        src = str(raw.get("from", "")).strip().lower()
+        if src not in table or not table[src].configured:
+            raise TargetError(f"{aid}: \"from\" must name a catalogue with an address, not {src!r}")
+        out[aid] = Authority(aid, str(raw.get("name") or aid), src)
+    return out
 
 
 def load(path: Path) -> dict[str, Target]:

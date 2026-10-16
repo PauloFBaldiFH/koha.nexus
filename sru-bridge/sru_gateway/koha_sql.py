@@ -23,7 +23,9 @@ addresses), so the librarian's other servers are never changed:
   2. renamed ids follow their new name, and a row left twice is kept once;
   3. ids the gateway no longer serves are removed;
   4. each target's name and settings are refreshed, keeping the librarian's
-     "checked" and rank, and a missing target is added.
+     "checked" and rank, and a missing target is added;
+  5. the same for the authority databases ("authorities" in targets.json),
+     as rows with recordtype "authority" (Koha's authority search).
 """
 
 from __future__ import annotations
@@ -55,6 +57,12 @@ SRU_OPTIONS = "sru=get,sru_version=1.1"
 SRU_FIELDS = ("title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,"
               "srchany=cql.serverChoice")
 CHECKED = ("bn", "ufsc", "usp", "senado")
+# Koha's authority search form: the fields an authority row maps to CQL.
+AUTH_SRU_FIELDS = ("nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,"
+                   "authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,"
+                   "srchany=cql.serverChoice")
+# After the Library of Congress name and subject files (ranks 1 and 2).
+AUTH_RANK = 3
 # Ids of the 2026-10-11 list that the 2026-10-15 list renamed.
 RENAMED = {
     "uw_madison": "wisconsin", "psu": "pennstate", "utoronto": "toronto", "bcl": "castilla-leon",
@@ -70,7 +78,7 @@ def q(value) -> str:
     return "'" + str(value).replace("\\", "\\\\").replace("'", "''") + "'"
 
 
-def render(table: dict[str, tg.Target]) -> str:
+def render(table: dict[str, tg.Target], authorities: dict[str, tg.Authority] | None = None) -> str:
     ids = list(table)
     mine = f"recordtype = 'biblio' AND servertype = 'sru' AND host = {q(HOST)} AND port = {PORT}"
     old_rows = (f"recordtype = 'biblio' AND servertype = 'sru' "
@@ -126,6 +134,19 @@ def render(table: dict[str, tg.Target]) -> str:
                    f"SELECT {q(HOST)}, {PORT}, {db}, {q(t.name)}, {1 if t.id in CHECKED else 0}, {rank}, "
                    f"{q(SYNTAX)}, {q(ENCODING)}, {TIMEOUT}, 'sru', 'biblio', {q(SRU_OPTIONS)}, {q(SRU_FIELDS)}, '' "
                    f"FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM z3950servers WHERE {mine} AND db = {db});")
+    if authorities:
+        auth = f"recordtype = 'authority' AND servertype = 'sru' AND host = {q(HOST)} AND port = {PORT}"
+        out += ["", "-- 5. Authority databases (recordtype authority): settings refreshed, added when missing."]
+        for a in authorities.values():
+            db = q("sru/" + a.id)
+            out.append(f"UPDATE z3950servers SET servername = {q(a.name)}, syntax = {q(SYNTAX)}, "
+                       f"encoding = {q(ENCODING)}, timeout = {TIMEOUT}, sru_options = {q(SRU_OPTIONS)}, "
+                       f"sru_fields = {q(AUTH_SRU_FIELDS)} WHERE {auth} AND db = {db};")
+            out.append("INSERT INTO z3950servers (host, port, db, servername, checked, `rank`, syntax, encoding, "
+                       "timeout, servertype, recordtype, sru_options, sru_fields, add_xslt) "
+                       f"SELECT {q(HOST)}, {PORT}, {db}, {q(a.name)}, 1, {AUTH_RANK}, {q(SYNTAX)}, {q(ENCODING)}, "
+                       f"{TIMEOUT}, 'sru', 'authority', {q(SRU_OPTIONS)}, {q(AUTH_SRU_FIELDS)}, '' "
+                       f"FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM z3950servers WHERE {auth} AND db = {db});")
     out += ["", "COMMIT;", ""]
     return "\n".join(out)
 
@@ -155,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--write", action="store_true", help=f"rewrite {OUT.name}")
     args = ap.parse_args(argv)
     table = tg.load(TARGETS_FILE)
-    text = render(table)
+    text = render(table, tg.load_authorities(TARGETS_FILE, table))
     if args.write:
         OUT.write_text(text, encoding="utf-8")
         updated = json.loads(TARGETS_FILE.read_text(encoding="utf-8")).get("updated", "")

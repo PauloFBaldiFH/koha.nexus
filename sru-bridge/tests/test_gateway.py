@@ -311,7 +311,7 @@ def test_readme_table_matches_targets_json():
 def test_koha_sql_and_panel_list_match_targets_json():
     from sru_gateway import koha_sql
     table = tg.load(TARGETS_JSON)
-    assert koha_sql.OUT.read_text(encoding="utf-8") == koha_sql.render(table), \
+    assert koha_sql.OUT.read_text(encoding="utf-8") == koha_sql.render(table, tg.load_authorities(TARGETS_JSON, table)), \
         "deploy/koha-z3950servers.sql is behind targets.json: run python -m sru_gateway.koha_sql --write"
     panel = json.loads(koha_sql.PANEL_LIST.read_text(encoding="utf-8"))
     updated = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))["updated"]

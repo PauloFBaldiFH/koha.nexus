@@ -375,3 +375,32 @@ behind.
 
 Its tests (`tests/test_gateway.py`) use a fake Z39.50 server and mocked SRU
 answers; none of the remote catalogues was reached from the tests.
+
+### Authority databases (`/sru/bn-aut`)
+
+Koha's authority search (rows with record type "authority") needs MARC21
+authority records, which a catalogue such as the BN's does not serve. The
+`authorities` list of `targets.json` adds one database per such source:
+`{"id": "bn-aut", "name": "BIBLIOTECA NACIONAL (AUTORIDADES)", "from": "bn"}`.
+`/sru/bn-aut` searches the `bn` catalogue (whatever its kind) by author, then
+turns the main entry of each record found into an authority record
+([`sru_gateway/authority.py`](sru_gateway/authority.py)):
+
+| | |
+|---|---|
+| Leader | `00000nz  a2200000n  4500` |
+| `040` | `$a BR-RjBN $b por` |
+| `100` / `110` | the heading's `$a` and `$d` (`$b` too for a 110), bibliographic end punctuation removed |
+| `670` | `$a Acervo Fundação Biblioteca Nacional (Pergamum)` |
+
+Nothing else of the bibliographic record is kept (no 245, 260, 300, 020).
+The same heading found on several records is answered once, and only
+headings holding every word of the search are answered. Records found with
+no 100 or 110 answer SRU diagnostic 1 instead of an empty authority record.
+Koha's row: host `https://sru.koha.nexus`, port 443, database `sru/bn-aut`,
+record type authority, SRU, MARC21, utf8, SRU search fields
+`nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice`
+(the names of Koha's authority search form). `deploy/koha-z3950servers.sql`
+writes it too, and the koha.nexus installer seeds it beside the Library of
+Congress name and subject files. Tests: `tests/test_authority.py`, with
+stand-in Zeus pages.

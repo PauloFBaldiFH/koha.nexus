@@ -23,6 +23,7 @@ from zeus_sru.cql import ZeusQuery
 from zeus_sru.zeus import ZeusClient
 
 from . import __version__, targets, upstream_sru, z3950
+from .authority import AuthorityBackend
 from .config import Settings
 from .targets import Target
 
@@ -85,7 +86,8 @@ class Gateway:
 
     def __init__(self, table: dict[str, Target], settings: Settings,
                  http: httpx.AsyncClient | None = None, zeus_http: httpx.AsyncClient | None = None,
-                 pergamum: PergamumClient | None = None):
+                 pergamum: PergamumClient | None = None,
+                 authorities: dict[str, targets.Authority] | None = None):
         """zeus_http, when given, is the HTTP client every zeus entry uses
         (tests pass a mocked one); else the first zeus entry opens one with
         Zeus's own headers (Referer, user agent) and the others share it."""
@@ -108,10 +110,15 @@ class Gateway:
                 self.backends[t.id] = Z3950Backend(t, settings.timeout)
             elif t.kind == "sru":
                 self.backends[t.id] = SRUBackend(t, self.http)
+        self.authorities = authorities or {}
+        for a in self.authorities.values():
+            self.backends[a.id] = AuthorityBackend(self.backends[a.source], a.name)
         self._closers = [c for c in (zeus_http, pergamum) if c is not None]
 
     def for_database(self, database: str):
         tid = database.strip("/").rsplit("/", 1)[-1].lower()
+        if tid in self.authorities:
+            return self.backends[tid]
         t = self.table.get(tid)
         if t is None:
             return sru.Diagnostic(sru.DATABASE_NOT_FOUND, tid or "(none)",
@@ -147,18 +154,24 @@ class CollapseSlashes:
 
 
 def create_app(settings: Settings | None = None, table: dict[str, Target] | None = None,
-               **clients) -> CollapseSlashes:
+               authorities: dict[str, targets.Authority] | None = None, **clients) -> CollapseSlashes:
     settings = settings or Settings.from_env()
-    table = table if table is not None else targets.load(settings.targets_file)
+    if table is None:
+        table = targets.load(settings.targets_file)
+        if authorities is None:
+            authorities = targets.load_authorities(settings.targets_file, table)
+    authorities = authorities or {}
     ready = sorted(t.id for t in table.values() if t.configured)
     missing = sorted(t.id for t in table.values() if not t.configured)
     api: FastAPI = sru_app(
         title="koha.nexus SRU gateway", version=__version__, source="SRU gateway",
         max_records=settings.max_records, openapi_url="/openapi.json",
-        open_backend=lambda: Gateway(table, settings, **clients),
-        health={"targets": len(table), "configured": ready, "missing": missing},
+        open_backend=lambda: Gateway(table, settings, authorities=authorities, **clients),
+        health={"targets": len(table), "configured": ready, "missing": missing,
+                "authorities": sorted(authorities)},
         explain={"title": "koha.nexus SRU gateway",
-                 "description": "One SRU database per catalogue: sru/<id>.",
+                 "description": "One SRU database per catalogue: sru/<id>; authority records: "
+                                "sru/<authority id> (bn-aut).",
                  "indexes": (("ISBN", "dc", "isbn"), ("Title", "dc", "title"),
                              ("Author", "dc", "author"), ("Any", "cql", "serverChoice"))})
     wrapped = CollapseSlashes(api)

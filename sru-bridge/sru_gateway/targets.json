@@ -652,5 +652,13 @@
       "kind": "missing",
       "status": "missing"
     }
+  ],
+  "authorities": [
+    {
+      "id": "bn-aut",
+      "name": "BIBLIOTECA NACIONAL (AUTORIDADES)",
+      "from": "bn",
+      "note": "MARC21 authority records (100/110) built from the author headings of /sru/bn's bibliographic records."
+    }
   ]
 }

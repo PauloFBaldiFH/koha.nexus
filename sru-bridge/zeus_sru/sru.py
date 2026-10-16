@@ -52,6 +52,14 @@ class Diagnostic:
     message: str = ""
 
 
+class DiagnosticError(Exception):
+    """A backend's search answers this diagnostic instead of records."""
+
+    def __init__(self, diagnostic: Diagnostic):
+        super().__init__(diagnostic.message)
+        self.diagnostic = diagnostic
+
+
 def _el(parent: ET.Element, tag: str, text: str | int | None = None, ns: str = ZS) -> ET.Element:
     node = ET.SubElement(parent, f"{{{ns}}}{tag}")
     if text is not None:

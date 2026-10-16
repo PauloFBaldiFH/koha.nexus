@@ -26,7 +26,8 @@ ANY = 1016
 
 ISBN_INDEXES = {"isbn", "identifier", "issn", "number", "standardidentifier"}
 TITLE_INDEXES = {"title", "titles", "ti"}
-AUTHOR_INDEXES = {"author", "creator", "au", "name"}
+AUTHOR_INDEXES = {"author", "creator", "au", "name", "personalname", "corporatename", "conferencename",
+                  "authorpersonal", "authorcorp", "authormeetingcon", "authorany", "nameany"}
 ANY_INDEXES = {"anywhere", "serverchoice", "keyword", "any", "all", "text"}
 
 _RELATIONS = r"==|<>|<=|>=|=|<|>|\b(?:exact|any|all|adj|within|encloses)\b"

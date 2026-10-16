@@ -213,6 +213,8 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
 
         try:
             total, records = await backend.search(q, start, maximum)
+        except sru.DiagnosticError as exc:
+            return xml(sru.diagnostic_response(exc.diagnostic))
         except sru.SourceUnavailable as exc:
             log.error("%s unreachable: %s", name, exc)
             return fail(sru.GENERAL_ERROR, name, getattr(exc, "sru_message", "") or f"{name} did not answer")
