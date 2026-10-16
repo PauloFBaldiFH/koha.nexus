@@ -14,17 +14,22 @@ from sru_gateway import z3950
 from sru_gateway.app import create_app
 from sru_gateway.config import Settings
 from sru_gateway.upstream_sru import cql_for, parse_response
-from zeus_sru.config import Settings as ZeusSettings
 from zeus_sru.cql import parse
-from zeus_sru.zeus import ZeusClient
 
 NS = {"zs": "http://www.loc.gov/zing/srw/", "marc": "http://www.loc.gov/MARC21/slim",
       "diag": "http://www.loc.gov/zing/srw/diagnostic/"}
 TARGETS_JSON = Path(__file__).resolve().parents[1] / "sru_gateway" / "targets.json"
-IDS = ("bn ufsc unicamp usp uerj ufg ufmg ufpe ufscar ufu ufrgs uff senado nlm harvard uw_madison mit psu "
-       "upenn tufts fsu ubc trent sfu utoronto bl oxford bne bcl bizkaia aladi sbn_it abes_fr swb_de "
-       "uhamburg bn_polonia slsp nkc rsl bashkir bna biblored pucp upc_peru christchurch juac_julac "
-       "monash_sa pergamum").split()
+# Paulo's list of 2026-10-15, in his order and under his four headings.
+GROUPS = {
+    "national": "bn fundacentro senado senado-folio bn-portugal porbase bne bl loc argentina colombia polonia "
+                "suica suecia tchequia grecia russia-state bashkir-russia africa-do-sul taiwan nysl",
+    "br_universities": "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs uff utfpr",
+    "intl_universities": "harvard yale mit wisconsin pennstate upenn tufts fsu suno ubc toronto sfu trent memorial "
+                         "oxford coimbra porto barcelona gent-belgica tuhh-alemanha macau buap-mexico pucp-peru upc-peru",
+    "specialized": "all nlm art-chicago nga castilla-leon bizkaia italia abes-franca kobv-alemanha swb-alemanha "
+                   "christchurch hong-kong",
+}
+IDS = [i for ids in GROUPS.values() for i in ids.split()]
 
 
 def marc_record(title: str, isbn: str = "9788535902778") -> bytes:
@@ -53,15 +58,37 @@ def diag(root):
 
 # --- targets.json -------------------------------------------------------
 
-def test_targets_json_has_the_48_ids_in_order():
+def test_targets_json_has_the_72_ids_in_order():
     data = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))
     assert [t["id"] for t in data["targets"]] == IDS
     table = tg.load(TARGETS_JSON)
-    assert len(table) == 48
+    assert len(table) == 72
+    assert {g: " ".join(t.id for t in table.values() if t.group == g) for g in tg.GROUPS} == GROUPS
     kinds = {t.id: t.kind for t in table.values()}
-    assert kinds["ufsc"] == "zeus" and kinds["pergamum"] == "pergamum"
-    assert {k for k, v in kinds.items() if v == "z3950"} == {"bl", "sbn_it", "swb_de"}
+    assert kinds["ufsc"] == "zeus" and kinds["all"] == "pergamum"
+    assert {k for k, v in kinds.items() if v == "z3950"} == {"nlm", "bl", "loc", "italia", "swb-alemanha",
+                                                                  "utfpr", "unifesp", "suecia"}
     assert not any({"user", "password"} & set(t) for t in data["targets"])
+    # Every entry says what is known about it (the old STATUS_ALVOS.md).
+    assert all("status" in t for t in data["targets"])
+    status = {t.id: t.status for t in table.values()}
+    assert status["bl"] == status["nlm"] == "broken" and status["italia"] == "untested"
+    assert {i for i, s in status.items() if s == "missing"} == {i for i, k in kinds.items() if k == "missing"}
+
+
+def test_zeus_target_indexes_are_distinct():
+    table = tg.load(TARGETS_JSON)
+    indexes = [t.target_index for t in table.values() if t.kind == "zeus"]
+    assert len(indexes) == len(set(indexes)) == 13
+
+
+def test_status_is_checked():
+    assert tg.make_target({"id": "x", "kind": "missing"}).status == "missing"
+    assert tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru"}).status == "untested"
+    with pytest.raises(tg.TargetError):
+        tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru", "status": "fine"})
+    with pytest.raises(tg.TargetError):
+        tg.make_target({"id": "x", "kind": "sru", "url": "https://h/sru", "status": "missing"})
 
 
 def test_make_target_rejects_what_it_cannot_serve():
@@ -105,11 +132,11 @@ def test_missing_address_says_so_and_both_slash_forms_route():
 
 def test_explain_and_health():
     table = tg.load(TARGETS_JSON)
-    with gateway(table, zeus=ZeusClient(ZeusSettings(), httpx.AsyncClient())) as client:
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
         r = client.get("/sru/bn")
         assert b"explainResponse" in r.content
         h = client.get("/health").json()
-    assert h["targets"] == 48 and "ufsc" in h["configured"] and "bn" in h["missing"]
+    assert h["targets"] == 72 and "ufsc" in h["configured"] and "bne" in h["missing"]
 
 
 def test_ufsc_goes_to_zeus(marcxml_page):
@@ -118,12 +145,17 @@ def test_ufsc_goes_to_zeus(marcxml_page):
     def answer(request):
         seen.append(request)
         return httpx.Response(200, text=marcxml_page)
-    zeus = ZeusClient(ZeusSettings(), httpx.AsyncClient(transport=httpx.MockTransport(answer)))
-    table = {"ufsc": tg.make_target({"id": "ufsc", "name": "UFSC", "kind": "zeus"})}
-    with gateway(table, zeus=zeus) as client:
+    http = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    table = {"ufsc": tg.make_target({"id": "ufsc", "name": "UFSC", "kind": "zeus", "target_index": 11}),
+             "usp": tg.make_target({"id": "usp", "name": "USP", "kind": "zeus", "target_index": 4})}
+    with gateway(table, zeus_http=http) as client:
         root = search(client, "/sru/ufsc", query="dc.isbn=9684291426", maximumRecords="5")
-    assert seen and int(root.findtext("zs:numberOfRecords", namespaces=NS)) >= 1
-    assert titles(root)
+        assert seen and int(root.findtext("zs:numberOfRecords", namespaces=NS)) >= 1
+        assert titles(root)
+        search(client, "/sru/usp", query="dc.isbn=9684291426", maximumRecords="5")
+    # Each id asks Zeus for its own target only.
+    asked = [[k for k in r.url.params if k.startswith("targets[")] for r in seen]
+    assert asked == [["targets[11]"], ["targets[4]"]]
 
 
 # --- upstream SRU -------------------------------------------------------
@@ -267,3 +299,109 @@ def test_z3950_down_is_diagnostic_1():
     with gateway(z_table(1)) as client:
         uri, msg = diag(search(client, "/sru/bl", query="dc.title=x"))
     assert uri == "info:srw/diagnostic/1/1" and "127.0.0.1:1" in msg
+
+
+def test_readme_table_matches_targets_json():
+    from sru_gateway import status_table
+    text = status_table.README.read_text(encoding="utf-8")
+    assert status_table.readme_block(text) == status_table.block(tg.load(TARGETS_JSON)), \
+        "README.md is behind targets.json: run python -m sru_gateway.status_table --write"
+
+
+def test_koha_sql_and_panel_list_match_targets_json():
+    from sru_gateway import koha_sql
+    table = tg.load(TARGETS_JSON)
+    assert koha_sql.OUT.read_text(encoding="utf-8") == koha_sql.render(table), \
+        "deploy/koha-z3950servers.sql is behind targets.json: run python -m sru_gateway.koha_sql --write"
+    panel = json.loads(koha_sql.PANEL_LIST.read_text(encoding="utf-8"))
+    updated = json.loads(TARGETS_JSON.read_text(encoding="utf-8"))["updated"]
+    assert koha_sql.PANEL_LIST.read_text(encoding="utf-8") == koha_sql.panel_list(table, updated)
+    assert [r["db"] for r in panel["targets"]] == [f"sru/{i}" for i in IDS]
+    assert {(r["host"], r["port"], r["syntax"]) for r in panel["targets"]} == {("sru.koha.nexus", 443, "MARC21")}
+    # Renames only point at ids that exist, and never from one that still does.
+    assert set(koha_sql.RENAMED.values()) <= set(table) and not set(koha_sql.RENAMED) & set(table)
+
+
+# --- every slug routes, and nothing answers JSON ------------------------
+
+def assert_sru_xml(r):
+    """What YAZ needs: HTTP 200, an XML content type and an SRU root, never
+    FastAPI's JSON {"detail": "Not Found"} (Koha reports that as "wrong protocol")."""
+    assert r.status_code == 200, (r.request.url, r.status_code, r.text[:200])
+    assert "xml" in r.headers["content-type"] and "json" not in r.headers["content-type"]
+    assert b'"detail"' not in r.content
+    root = ET.fromstring(r.content)
+    assert root.tag.startswith("{http://www.loc.gov/zing/srw/}")
+    return root
+
+
+def test_every_slug_answers_explain_with_and_without_trailing_slash():
+    table = tg.load(TARGETS_JSON)
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
+        for tid in IDS:
+            for path in (f"/sru/{tid}", f"/sru/{tid}/", f"http://testserver//sru/{tid}"):
+                root = assert_sru_xml(client.get(path, params={"operation": "explain", "version": "1.1"}))
+                assert root.tag.endswith("}explainResponse"), path
+                if table[tid].configured:
+                    assert root.findtext(".//{http://explain.z3950.org/dtd/2.0/}database") == f"sru/{tid}"
+                    assert table[tid].name in root.findtext(".//{http://explain.z3950.org/dtd/2.0/}title")
+                    assert diag(root) == (None, None)
+                else:
+                    # No upstream address in targets.json yet: said in SRU, not as a 404.
+                    uri, msg = diag(root)
+                    assert uri == "info:srw/diagnostic/1/1" and "no catalogue address" in msg
+
+
+def test_every_slug_answers_search_retrieve_in_sru(monkeypatch):
+    table = tg.load(TARGETS_JSON)
+
+    async def down(*args, **kwargs):
+        from zeus_sru import sru
+        raise sru.SourceUnavailable("offline in tests")
+    for mod, attr in ((z3950, "search"), (__import__("sru_gateway.upstream_sru").upstream_sru, "search")):
+        monkeypatch.setattr(mod, attr, down)
+    offline = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    with gateway(table, http=offline, zeus_http=offline) as client:
+        for tid in IDS:
+            for path in (f"/sru/{tid}", f"/sru/{tid}/"):
+                r = client.get(path, params={"operation": "searchRetrieve", "version": "1.1",
+                                             "query": "dc.title=x", "maximumRecords": "1"})
+                root = assert_sru_xml(r)
+                assert root.tag.endswith("}searchRetrieveResponse"), path
+                assert root.findtext("zs:numberOfRecords", namespaces=NS) is not None
+
+
+def test_unknown_slug_is_diagnostic_235_under_explain_and_search():
+    table = tg.load(TARGETS_JSON)
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
+        for path in ("/sru/nowhere", "/sru/nowhere/", "/sru/NoWhere"):
+            root = assert_sru_xml(client.get(path, params={"operation": "explain"}))
+            assert root.tag.endswith("}explainResponse")
+            assert diag(root)[0] == "info:srw/diagnostic/1/235"
+            assert root.findtext(".//diag:details", namespaces=NS) == "nowhere"
+            assert "Target not found or not configured" in diag(root)[1]
+            root = assert_sru_xml(client.get(path, params={"operation": "searchRetrieve",
+                                                           "query": "dc.title=x"}))
+            assert root.tag.endswith("}searchRetrieveResponse")
+            assert diag(root)[0] == "info:srw/diagnostic/1/235"
+
+
+def test_no_route_ever_answers_json_404():
+    with gateway(tg.load(TARGETS_JSON), zeus_http=httpx.AsyncClient()) as client:
+        for path in ("/", "/sr", "/nothing/here", "/srubn", "/sru/bn/x/y"):
+            root = assert_sru_xml(client.get(path, params={"operation": "explain"}))
+            assert root.tag.endswith("}explainResponse")
+            assert diag(root)[0] in ("info:srw/diagnostic/1/235", "info:srw/diagnostic/1/1")
+        root = assert_sru_xml(client.delete("/sru/bn"))
+        assert diag(root)[0] == "info:srw/diagnostic/1/4"
+        root = assert_sru_xml(client.get("/nothing"))
+        assert diag(root)[0] == "info:srw/diagnostic/1/235"
+
+
+def test_openapi_lists_the_dynamic_route():
+    # So a look at https://sru.koha.nexus/openapi.json shows whether this
+    # gateway is the one deployed: one /sru/{database} route, not /sru/ufsc.
+    with gateway({}) as client:
+        paths = client.get("/openapi.json").json()["paths"]
+    assert "/sru/{database}" in paths and "/health" in paths
+    assert not any(p.startswith("/sru/") and "{" not in p for p in paths)

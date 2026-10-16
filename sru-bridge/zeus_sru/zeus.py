@@ -85,6 +85,11 @@ class ZeusClient:
         )
         self._cache: OrderedDict[ZeusQuery, tuple[float, list[pymarc.Record]]] = OrderedDict()
 
+    @property
+    def http(self) -> httpx.AsyncClient:
+        """The HTTP client this Zeus client searches with."""
+        return self._client
+
     async def aclose(self) -> None:
         await self._client.aclose()
 

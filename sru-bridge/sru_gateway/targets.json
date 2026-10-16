@@ -1,341 +1,351 @@
 {
   "schema": 1,
-  "updated": "2026-10-11",
-  "about": "The catalogues of the koha.nexus SRU gateway, one per /sru/{id}. kind missing: no address known yet, so a search answers an SRU diagnostic saying so. To add one, give it kind z3950 (host, port, db, syntax USMARC or MARC21, encoding) or sru (url, version, schema, indexes) and restart the service. Logins go in the environment, never here: SRU_GATEWAY_LOGIN_<ID>=user:password.",
+  "updated": "2026-10-15",
+  "about": "The catalogues of the koha.nexus SRU gateway, one per /sru/{id}. kind missing: no address known yet, so a search answers an SRU diagnostic saying so. To add one, give it kind z3950 (host, port, db, syntax USMARC or MARC21, encoding) or sru (url, version, schema, indexes) and restart the service. status says what is known about it: verified (searched live, MARC came back), untested, broken (its address does not answer) or missing. Discarded and not listed: DNB (its SRU gives only RDF/XML, not MARC21) and Cambridge (44CAM_INST is not a valid Alma institution). Logins go in the environment, never here: SRU_GATEWAY_LOGIN_<ID>=user:password.",
   "targets": [
     {
       "id": "bn",
       "name": "Fundação Biblioteca Nacional (BN)",
+      "group": "national",
       "kind": "zeus",
-      "target_index": 0
+      "status": "verified",
+      "target_index": 0,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
-      "id": "ufsc",
-      "name": "Universidade Federal de Santa Catarina (UFSC)",
-      "kind": "zeus",
-      "verified": true,
-      "source": "sru-bridge/zeus_sru: Catálogo Zeus target 0, tested live on 2026-10-09",
-      "target_index": 11
-    },
-    {
-      "id": "unicamp",
-      "name": "Universidade Estadual de Campinas (UNICAMP)",
-      "kind": "zeus",
-      "target_index": 6
-    },
-    {
-      "id": "usp",
-      "name": "Universidade de São Paulo (USP)",
-      "kind": "zeus",
-      "target_index": 4
-    },
-    {
-      "id": "uerj",
-      "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
-      "kind": "zeus",
-      "target_index": 5
-    },
-    {
-      "id": "ufg",
-      "name": "Universidade Federal de Goiás (UFG)",
-      "kind": "zeus",
-      "target_index": 8
-    },
-    {
-      "id": "ufmg",
-      "name": "Universidade Federal de Minas Gerais (UFMG)",
-      "kind": "zeus",
-      "target_index": 9
-    },
-    {
-      "id": "ufpe",
-      "name": "Universidade Federal de Pernambuco (UFPE)",
-      "kind": "zeus",
-      "target_index": 10
-    },
-    {
-      "id": "ufscar",
-      "name": "Universidade Federal de São Carlos (UFSCar)",
-      "kind": "zeus",
-      "target_index": 12
-    },
-    {
-      "id": "ufu",
-      "name": "Universidade Federal de Uberlândia (UFU)",
-      "kind": "zeus",
-      "target_index": 14
-    },
-    {
-      "id": "ufrgs",
-      "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
-      "kind": "zeus",
-      "target_index": 16
-    },
-    {
-      "id": "uff",
-      "name": "Universidade Federal Fluminense (UFF)",
-      "kind": "zeus",
-      "target_index": 17
+      "id": "fundacentro",
+      "name": "Fundacentro, Biblioteca",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
     },
     {
       "id": "senado",
       "name": "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
+      "group": "national",
       "kind": "zeus",
-      "target_index": 2
+      "status": "verified",
+      "target_index": 2,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
-      "id": "nlm",
-      "name": "National Library of Medicine, EUA",
-      "kind": "z3950",
-      "host": "locatorplus.nlm.nih.gov",
-      "port": 7090,
-      "db": "voyager",
-      "syntax": "USMARC",
-      "encoding": "utf8",
-      "verified": true
+      "id": "senado-folio",
+      "name": "Senado Federal (FOLIO)",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
     },
     {
-      "id": "harvard",
-      "name": "Harvard University, EUA",
-      "kind": "sru",
-      "url": "https://harvard-primo.hosted.exlibrisgroup.com/view/sru/01HVD_INST",
-      "version": "1.1",
-      "schema": "marcxml",
-      "verified": true
+      "id": "bn-portugal",
+      "name": "Biblioteca Nacional de Portugal (BNP)",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
     },
     {
-      "id": "uw_madison",
-      "name": "University of Wisconsin-Madison, EUA",
-      "kind": "missing"
+      "id": "porbase",
+      "name": "PORBASE, Portugal",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
     },
     {
-      "id": "mit",
-      "name": "Massachusetts Institute of Technology (MIT), EUA",
-      "kind": "sru",
-      "url": "https://mit.alma.exlibrisgroup.com/view/sru/01MIT_INST",
-      "version": "1.1",
-      "schema": "marcxml",
-      "indexes": {
-        "title": "alma.title",
-        "author": "alma.creator",
-        "isbn": "alma.isbn",
-        "any": "alma.all_for_ui"
-      },
-      "verified": true
-    },
-    {
-      "id": "psu",
-      "name": "Penn State University, EUA",
-      "kind": "missing"
-    },
-    {
-      "id": "upenn",
-      "name": "University of Pennsylvania (UPenn), EUA",
-      "kind": "sru",
-      "url": "https://upenn.alma.exlibrisgroup.com/view/sru/01UPENN_INST",
-      "version": "1.1",
-      "schema": "marcxml",
-      "indexes": {
-        "title": "alma.title",
-        "author": "alma.creator",
-        "isbn": "alma.isbn",
-        "any": "alma.all_for_ui"
-      },
-      "verified": true
-    },
-    {
-      "id": "tufts",
-      "name": "Tufts University Libraries, EUA",
-      "kind": "missing"
-    },
-    {
-      "id": "fsu",
-      "name": "Florida State University, EUA",
-      "kind": "missing"
-    },
-    {
-      "id": "ubc",
-      "name": "University of British Columbia, Canadá",
-      "kind": "missing"
-    },
-    {
-      "id": "trent",
-      "name": "Trent University Library & Archives, Canadá",
-      "kind": "missing"
-    },
-    {
-      "id": "sfu",
-      "name": "Simon Fraser University, Canadá",
-      "kind": "missing"
-    },
-    {
-      "id": "utoronto",
-      "name": "University of Toronto, Canadá",
-      "kind": "missing"
+      "id": "bne",
+      "name": "Biblioteca Nacional de España, Espanha",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
     },
     {
       "id": "bl",
       "name": "British Library, UK",
+      "group": "national",
       "kind": "z3950",
+      "status": "broken",
       "host": "z3950cat.bl.uk",
       "port": 9909,
       "db": "BLAC",
       "syntax": "USMARC",
       "encoding": "utf8",
-      "verified": false,
-      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)"
-    },
-    {
-      "id": "oxford",
-      "name": "University of Oxford, Reino Unido",
-      "kind": "sru",
-      "url": "https://oxford.alma.exlibrisgroup.com/view/sru/44OXF_INST",
-      "version": "1.1",
-      "schema": "marcxml",
-      "indexes": {
-        "title": "alma.title",
-        "author": "alma.creator",
-        "isbn": "alma.isbn",
-        "any": "alma.all_for_ui"
-      },
-      "verified": true
-    },
-    {
-      "id": "bne",
-      "name": "Biblioteca Nacional de España, Espanha",
-      "kind": "missing"
-    },
-    {
-      "id": "bcl",
-      "name": "Biblioteca de Castilla y León, Espanha",
-      "kind": "missing"
-    },
-    {
-      "id": "bizkaia",
-      "name": "Biblioteca Foral de Bizkaia, Espanha",
-      "kind": "missing"
-    },
-    {
-      "id": "aladi",
-      "name": "Aladí: Barcelona Municipal Libraries Network, Espanha",
-      "kind": "missing"
-    },
-    {
-      "id": "sbn_it",
-      "name": "Servizio Bibliotecario Nazionale, Itália",
-      "kind": "z3950",
-      "host": "opac.sbn.it",
-      "port": 3950,
-      "db": "nopac",
-      "syntax": "USMARC",
-      "encoding": "utf8",
-      "verified": false,
-      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)"
-    },
-    {
-      "id": "abes_fr",
-      "name": "Agence Bibliographique de l'Enseignement Supérieur, França",
-      "kind": "missing"
-    },
-    {
-      "id": "swb_de",
-      "name": "SWB-Online-Katalog, Alemanha",
-      "kind": "z3950",
-      "host": "z3950.k10plus.de",
-      "port": 210,
-      "db": "opac-de-627",
-      "syntax": "USMARC",
-      "encoding": "utf8",
-      "verified": false,
-      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there); SWB is now part of K10plus (GBV/SWB)"
-    },
-    {
-      "id": "uhamburg",
-      "name": "Hamburg University of Technology (TUHH), Alemanha",
-      "kind": "missing"
-    },
-    {
-      "id": "bn_polonia",
-      "name": "National Library of Poland, Polônia",
-      "kind": "missing"
-    },
-    {
-      "id": "slsp",
-      "name": "Swiss Library Service Platform, Suíça",
-      "kind": "missing"
-    },
-    {
-      "id": "nkc",
-      "name": "National Library of the Czech Republic, Tchéquia",
-      "kind": "missing"
-    },
-    {
-      "id": "rsl",
-      "name": "Russian State Library, Rússia",
-      "kind": "missing"
-    },
-    {
-      "id": "bashkir",
-      "name": "Bashkir State University, Rússia",
-      "kind": "missing"
-    },
-    {
-      "id": "bna",
-      "name": "Biblioteca Nacional da Argentina",
-      "kind": "missing"
-    },
-    {
-      "id": "biblored",
-      "name": "Red Distrital de Bibliotecas Públicas (BibloRed), Colômbia",
-      "kind": "missing"
-    },
-    {
-      "id": "pucp",
-      "name": "Pontificia Universidad Católica del Perú, Peru",
-      "kind": "missing"
-    },
-    {
-      "id": "upc_peru",
-      "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
-      "kind": "missing"
-    },
-    {
-      "id": "christchurch",
-      "name": "Christchurch City Libraries, Nova Zelândia",
-      "kind": "missing"
-    },
-    {
-      "id": "juac_julac",
-      "name": "Joint University Librarians Advisory Committee, Hong Kong",
-      "kind": "missing"
-    },
-    {
-      "id": "monash_sa",
-      "name": "Monash South Africa, África do Sul",
-      "kind": "missing"
-    },
-    {
-      "id": "pergamum",
-      "name": "Rede Pergamum",
-      "kind": "pergamum",
-      "verified": false,
-      "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live"
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)",
+      "note": "Port 9909 refused; needs a current SRU or Z39.50 address."
     },
     {
       "id": "loc",
       "name": "Library of Congress, EUA",
+      "group": "national",
       "kind": "z3950",
+      "status": "verified",
       "host": "lx2.loc.gov",
       "port": 210,
       "db": "LCDB",
       "syntax": "USMARC",
       "encoding": "utf8",
-      "verified": true
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "argentina",
+      "name": "Biblioteca Nacional da Argentina",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "colombia",
+      "name": "Red Distrital de Bibliotecas Públicas (BibloRed), Colômbia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "polonia",
+      "name": "National Library of Poland, Polônia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "suica",
+      "name": "Swiss Library Service Platform, Suíça",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "suecia",
+      "name": "LIBRIS, Suécia",
+      "group": "national",
+      "kind": "z3950",
+      "status": "untested",
+      "host": "z3950.libris.kb.se",
+      "port": 210,
+      "db": "libr",
+      "encoding": "MARC-8",
+      "syntax": "USMARC",
+      "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet.",
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list)"
+    },
+    {
+      "id": "tchequia",
+      "name": "National Library of the Czech Republic, Tchéquia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "grecia",
+      "name": "Grécia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "russia-state",
+      "name": "Russian State Library, Rússia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "bashkir-russia",
+      "name": "Bashkir State University, Rússia",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "africa-do-sul",
+      "name": "Monash South Africa, África do Sul",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "taiwan",
+      "name": "Taiwan",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "nysl",
+      "name": "New York State Library (NYSL), EUA",
+      "group": "national",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "usp",
+      "name": "Universidade de São Paulo (USP)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 4,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "unicamp",
+      "name": "Universidade Estadual de Campinas (UNICAMP)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 6,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "unesp",
+      "name": "Universidade Estadual Paulista (UNESP)",
+      "group": "br_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "uerj",
+      "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 5,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "ufg",
+      "name": "Universidade Federal de Goiás (UFG)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 8,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "ufmg",
+      "name": "Universidade Federal de Minas Gerais (UFMG)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 9,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "ufpe",
+      "name": "Universidade Federal de Pernambuco (UFPE)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 10,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "ufsc",
+      "name": "Universidade Federal de Santa Catarina (UFSC)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "source": "sru-bridge/zeus_sru: Catálogo Zeus target 0, tested live on 2026-10-09",
+      "target_index": 11,
+      "note": "target_index to confirm with sru_gateway.zeus_labels."
+    },
+    {
+      "id": "ufscar",
+      "name": "Universidade Federal de São Carlos (UFSCar)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 12,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "unifesp",
+      "name": "Universidade Federal de São Paulo (UNIFESP)",
+      "group": "br_universities",
+      "kind": "z3950",
+      "status": "untested",
+      "host": "z3950.unifesp.br",
+      "port": 210,
+      "db": "Default",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet.",
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list)"
+    },
+    {
+      "id": "ufu",
+      "name": "Universidade Federal de Uberlândia (UFU)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 14,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "ufpr",
+      "name": "Universidade Federal do Paraná (UFPR)",
+      "group": "br_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "ufrgs",
+      "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 16,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "uff",
+      "name": "Universidade Federal Fluminense (UFF)",
+      "group": "br_universities",
+      "kind": "zeus",
+      "status": "verified",
+      "target_index": 17,
+      "note": "target_index to confirm with sru_gateway.zeus_labels.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "utfpr",
+      "name": "Universidade Tecnológica Federal do Paraná (UTFPR)",
+      "group": "br_universities",
+      "kind": "z3950",
+      "status": "untested",
+      "host": "z3950.utfpr.edu.br",
+      "port": 210,
+      "db": "Default",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet.",
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list)"
+    },
+    {
+      "id": "harvard",
+      "name": "Harvard University, EUA",
+      "group": "intl_universities",
+      "kind": "sru",
+      "status": "untested",
+      "url": "https://harvard-primo.hosted.exlibrisgroup.com/view/sru/01HVD_INST",
+      "version": "1.1",
+      "schema": "marcxml",
+      "note": "Listed as pending parameters in the 2026-10-11 status list; this Primo address has not been searched through the gateway.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
       "id": "yale",
       "name": "Yale University, EUA",
+      "group": "intl_universities",
       "kind": "sru",
+      "status": "verified",
       "url": "https://yale.alma.exlibrisgroup.com/view/sru/01YALE_INST",
       "version": "1.1",
       "schema": "marcxml",
@@ -345,13 +355,16 @@
         "isbn": "alma.isbn",
         "any": "alma.all_for_ui"
       },
-      "verified": true
+      "note": "Alma SRU, native MARCXML.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
-      "id": "umich",
-      "name": "University of Michigan (UMich), EUA",
+      "id": "mit",
+      "name": "Massachusetts Institute of Technology (MIT), EUA",
+      "group": "intl_universities",
       "kind": "sru",
-      "url": "https://umich.alma.exlibrisgroup.com/view/sru/01UMICH_INST",
+      "status": "verified",
+      "url": "https://mit.alma.exlibrisgroup.com/view/sru/01MIT_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {
@@ -360,13 +373,30 @@
         "isbn": "alma.isbn",
         "any": "alma.all_for_ui"
       },
-      "verified": true
+      "note": "Alma SRU, native MARCXML.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
-      "id": "manchester",
-      "name": "University of Manchester, Reino Unido",
+      "id": "wisconsin",
+      "name": "University of Wisconsin-Madison, EUA",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "pennstate",
+      "name": "Penn State University, EUA",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "upenn",
+      "name": "University of Pennsylvania (UPenn), EUA",
+      "group": "intl_universities",
       "kind": "sru",
-      "url": "https://manchester.alma.exlibrisgroup.com/view/sru/44MAN_INST",
+      "status": "verified",
+      "url": "https://upenn.alma.exlibrisgroup.com/view/sru/01UPENN_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {
@@ -375,13 +405,72 @@
         "isbn": "alma.isbn",
         "any": "alma.all_for_ui"
       },
-      "verified": true
+      "note": "Alma SRU, native MARCXML.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
     },
     {
-      "id": "kcl",
-      "name": "King's College London, Reino Unido",
+      "id": "tufts",
+      "name": "Tufts University Libraries, EUA",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "fsu",
+      "name": "Florida State University, EUA",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "suno",
+      "name": "Southern University at New Orleans (SUNO), EUA",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "ubc",
+      "name": "University of British Columbia, Canadá",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "toronto",
+      "name": "University of Toronto, Canadá",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "sfu",
+      "name": "Simon Fraser University, Canadá",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "trent",
+      "name": "Trent University Library & Archives, Canadá",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "memorial",
+      "name": "Memorial University of Newfoundland, Canadá",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "oxford",
+      "name": "University of Oxford, Reino Unido",
+      "group": "intl_universities",
       "kind": "sru",
-      "url": "https://kcl.alma.exlibrisgroup.com/view/sru/44KCL_INST",
+      "status": "verified",
+      "url": "https://oxford.alma.exlibrisgroup.com/view/sru/44OXF_INST",
       "version": "1.1",
       "schema": "marcxml",
       "indexes": {
@@ -390,7 +479,178 @@
         "isbn": "alma.isbn",
         "any": "alma.all_for_ui"
       },
-      "verified": true
+      "note": "Alma SRU, native MARCXML.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "coimbra",
+      "name": "Universidade de Coimbra, Portugal",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "porto",
+      "name": "Universidade do Porto, Portugal",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "barcelona",
+      "name": "Aladí: Barcelona Municipal Libraries Network, Espanha",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "gent-belgica",
+      "name": "Ghent University (UGent), Bélgica",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "tuhh-alemanha",
+      "name": "Hamburg University of Technology (TUHH), Alemanha",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "macau",
+      "name": "Macau",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "buap-mexico",
+      "name": "Benemérita Universidad Autónoma de Puebla (BUAP), México",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "pucp-peru",
+      "name": "Pontificia Universidad Católica del Perú, Peru",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "upc-peru",
+      "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
+      "group": "intl_universities",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "all",
+      "name": "Rede Pergamum",
+      "group": "specialized",
+      "kind": "pergamum",
+      "status": "verified",
+      "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live",
+      "note": "Dedicated Python backend (pergamum_sru)."
+    },
+    {
+      "id": "nlm",
+      "name": "National Library of Medicine, EUA",
+      "group": "specialized",
+      "kind": "z3950",
+      "status": "broken",
+      "host": "locatorplus.nlm.nih.gov",
+      "port": 7090,
+      "db": "voyager",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "note": "LocatorPlus (Voyager) was retired when NLM moved to Alma; needs the Alma SRU address.",
+      "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+    },
+    {
+      "id": "art-chicago",
+      "name": "Art Institute of Chicago, EUA",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "nga",
+      "name": "National Gallery of Art (NGA), EUA",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "castilla-leon",
+      "name": "Biblioteca de Castilla y León, Espanha",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "bizkaia",
+      "name": "Biblioteca Foral de Bizkaia, Espanha",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "italia",
+      "name": "Servizio Bibliotecario Nazionale, Itália",
+      "group": "specialized",
+      "kind": "z3950",
+      "status": "untested",
+      "host": "opac.sbn.it",
+      "port": 3950,
+      "db": "nopac",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there)",
+      "note": "Port open from the VPS; no search tried yet."
+    },
+    {
+      "id": "abes-franca",
+      "name": "Agence Bibliographique de l'Enseignement Supérieur, França",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "kobv-alemanha",
+      "name": "KOBV Berlin-Brandenburg, Alemanha",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "swb-alemanha",
+      "name": "SWB-Online-Katalog, Alemanha",
+      "group": "specialized",
+      "kind": "z3950",
+      "status": "untested",
+      "host": "z3950.k10plus.de",
+      "port": 210,
+      "db": "opac-de-627",
+      "syntax": "USMARC",
+      "encoding": "utf8",
+      "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list, verified=false there); SWB is now part of K10plus (GBV/SWB)",
+      "note": "Port open from the VPS; no search tried yet. SWB is part of K10plus today."
+    },
+    {
+      "id": "christchurch",
+      "name": "Christchurch City Libraries, Nova Zelândia",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
+    },
+    {
+      "id": "hong-kong",
+      "name": "Joint University Librarians Advisory Committee, Hong Kong",
+      "group": "specialized",
+      "kind": "missing",
+      "status": "missing"
     }
   ]
 }

@@ -4,7 +4,7 @@
 # Copy to /etc/systemd/system/, adjust the paths, then:
 #   systemctl daemon-reload && systemctl enable --now sru-gateway
 [Unit]
-Description=koha.nexus SRU gateway (Koha -> 48 catalogues by /sru/{id})
+Description=koha.nexus SRU gateway (Koha -> every catalogue in targets.json by /sru/{id})
 After=network-online.target
 Wants=network-online.target
 

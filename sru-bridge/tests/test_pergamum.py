@@ -19,15 +19,19 @@ MARC_PAGE = (FIXTURES / "pergamum_marc.html").read_text(encoding="utf-8")
 
 
 class FakePergamum:
-    def __init__(self, results=RESULTS, down=False, charset="utf-8"):
-        self.results, self.down, self.charset = results, down, charset
+    def __init__(self, results=RESULTS, down=False, charset="utf-8", empty=False):
+        self.results, self.down, self.charset, self.empty = results, down, charset, empty
         self.requests: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         if self.down:
             return httpx.Response(503, text="down")
-        rs = request.url.params["rs"]
+        rs = request.url.params.get("rs")
+        if rs is None:   # the search page, opened once for the PHPSESSID cookie
+            return httpx.Response(200, text="<html></html>", headers={"set-cookie": "PHPSESSID=abc; path=/"})
+        if self.empty:   # no hits: HTTP 500 with a valid Sajax body
+            return httpx.Response(500, text="+:var res = '';")
         body = self.results if rs == "ajax_resultados" else MARC_PAGE
         headers = {"content-type": "text/html" + (f"; charset={self.charset}" if self.charset else "")}
         enc = self.charset or "iso-8859-1"
@@ -50,7 +54,7 @@ def sru(client, **params):
 
 
 def calls(fake, rs):
-    return [r for r in fake.requests if r.url.params["rs"] == rs]
+    return [r for r in fake.requests if r.url.params.get("rs") == rs]
 
 
 # ---- MARC text ---------------------------------------------------------
@@ -152,6 +156,34 @@ def test_no_hits():
     with client:
         root = sru(client, query="dc.title=nothing")
     assert root.findtext("zs:numberOfRecords", namespaces=NS) == "0"
+
+
+def test_no_hits_answered_with_http_500():
+    # Pergamum answers a search with no hits with HTTP 500 and a valid Sajax body.
+    client, _ = make(empty=True)
+    with client:
+        root = sru(client, query="dc.title=nothing")
+    assert root.findtext("zs:numberOfRecords", namespaces=NS) == "0"
+    assert root.find(".//diag:uri", NS) is None
+
+
+def test_search_page_opened_once_for_the_session_cookie():
+    client, fake = make()
+    with client:
+        sru(client, query="dc.title=x", maximumRecords="2")
+        sru(client, query="dc.title=y", maximumRecords="0")
+    opens = [r for r in fake.requests if "rs" not in r.url.params]
+    assert len(opens) == 1 and fake.requests[0] is opens[0]
+    assert all("PHPSESSID=abc" in r.headers.get("cookie", "") for r in fake.requests[1:])
+
+
+@pytest.mark.parametrize("term,kind,clean", [
+    (" 978-85-359-0277-8 ", "ISBN", "9788535902778"),
+    ('"85-359-0277-x"', "ISBN", "853590277X"),
+    ('"dom casmurro" ', "TITULO", "dom casmurro"),
+])
+def test_sanitize_term(term, kind, clean):
+    assert pergamum.sanitize_term(term, kind) == clean
 
 
 def test_latin1_page_without_charset():
