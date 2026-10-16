@@ -156,7 +156,7 @@ task() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat
 
 @test "opac-theme-remove: Koha's own look back, the library's CSS and JS kept" {
     task opac_theme_apply "$W/apply"
-    touch "$W/cron" "$W/koha-kei-new-arrivals" "$W/custom/kei-new-arrivals.json" "$W/custom/library.png"
+    touch "$W/cron" "$W/koha-kei-new-arrivals" "$W/custom/kei-new-arrivals.json" "$W/custom/kei-list-7.json" "$W/custom/library.png"
     task opac_theme_remove
     [ "$status" -eq 0 ]
     [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
@@ -164,6 +164,7 @@ task() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat
     [ "$(pref OpacFavicon)" = "" ]
     [ ! -e "$W/custom/kei-favicon.png" ] && [ ! -e "$W/custom/kei-background.jpg" ]
     [ ! -e "$W/cron" ] && [ ! -e "$W/koha-kei-new-arrivals" ] && [ ! -e "$W/custom/kei-new-arrivals.json" ]
+    [ ! -e "$W/custom/kei-list-7.json" ]
     # Pictures the panel did not put there stay.
     [ -f "$W/custom/library.png" ]
     grep -q "OK .*back to Koha's own look" "$KEI_S/dialogs.log"
@@ -285,16 +286,23 @@ $d->do($_) for
 ' "$W/c.db"
 }
 
+# na COUNT: the job against the SQLite catalogue and the local cover server
+# (Amazon at /, OpenLibrary at /ol/).
+na() {
+    local base="http://127.0.0.1:$(cat "$BATS_FILE_TMPDIR/port")/"
+    run env KEI_NA_DSN="dbi:SQLite:dbname=$W/c.db" KEI_NA_OUT="$W/feed.json" \
+        KEI_NA_COVER_BASE="$base" KEI_NA_OL_BASE="${base}ol/" perl "$W/na.pl" "$1"
+}
+
 @test "new arrivals: only titles with a copy and a real Amazon cover, newest first" {
     catalog
     task opac_na_script
     printf '%s\n' "$output" > "$W/na.pl"
     perl -c "$W/na.pl"
-    run env KEI_NA_DSN="dbi:SQLite:dbname=$W/c.db" KEI_NA_OUT="$W/feed.json" \
-        KEI_NA_COVER_BASE="http://127.0.0.1:$(cat "$BATS_FILE_TMPDIR/port")/" perl "$W/na.pl" 4
+    na 4
     echo "$output"
     [ "$status" -eq 0 ]
-    [ "$output" = "2 of 3 titles with an ISBN have an Amazon cover" ]
+    [ "$output" = "2 of 3 new titles have a cover; 0 public lists" ]
     [ "$(stat -c %a "$W/feed.json")" = "644" ]
     python3 - "$W/feed.json" <<'PY'
 import json, sys
@@ -308,10 +316,53 @@ assert b["title"] == "Dom Casmurro" and b["available"] == 1 and b["total"] == 1,
 PY
 }
 
+@test "lists: one feed per public list in its order, uploaded covers first, then OpenLibrary" {
+    catalog
+    perl -MDBI -e '
+my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]", "", "", { RaiseError => 1 });
+$d->do($_) for
+  "CREATE TABLE systempreferences (variable TEXT PRIMARY KEY, value TEXT)",
+  "INSERT INTO systempreferences VALUES (\"OPACLocalCoverImages\", \"1\")",
+  "CREATE TABLE cover_images (imagenumber INTEGER PRIMARY KEY, biblionumber INTEGER)",
+  # 4 has no ISBN but an uploaded cover: it joins the new arrivals too.
+  "INSERT INTO cover_images VALUES (1, 4)",
+  "CREATE TABLE virtualshelves (shelfnumber INTEGER PRIMARY KEY, shelfname TEXT, public INTEGER, sortfield TEXT)",
+  "INSERT INTO virtualshelves VALUES (7, \"Reading club\", 1, \"title\"), (8, \"Private\", 0, \"title\")",
+  "CREATE TABLE virtualshelfcontents (shelfnumber INTEGER, biblionumber INTEGER, dateadded TEXT)",
+  # 3: only a lost copy, kept in a list (no badge); 2: no cover anywhere.
+  "INSERT INTO virtualshelfcontents VALUES (7, 5, \"2026-10-01\"), (7, 4, \"2026-10-02\"), (7, 2, \"2026-10-03\"),
+     (7, 3, \"2026-10-04\"), (8, 1, \"2026-10-01\")";
+' "$W/c.db"
+    mkdir -p "$BATS_FILE_TMPDIR/covers/ol"
+    head -c 4000 /dev/urandom > "$BATS_FILE_TMPDIR/covers/ol/0306406152-L.jpg"
+    echo old > "$W/kei-list-99.json"
+    task opac_na_script
+    printf '%s\n' "$output" > "$W/na.pl"
+    na 4
+    echo "$output"
+    rm -rf "$BATS_FILE_TMPDIR/covers/ol"
+    [ "$status" -eq 0 ]
+    [ "$output" = "3 of 4 new titles have a cover; 1 public lists" ]
+    [ ! -e "$W/kei-list-8.json" ] && [ ! -e "$W/kei-list-99.json" ]
+    [ "$(stat -c %a "$W/kei-list-7.json")" = "644" ]
+    python3 - "$W/kei-list-7.json" "$W/feed.json" <<'PY'
+import json, sys
+items = json.load(open(sys.argv[1]))["items"]
+# By title: Dom Casmurro, Lost, No ISBN (C language has no cover).
+assert [i["biblionumber"] for i in items] == [5, 3, 4], items
+assert items[0]["cover"].endswith("/8535902775.01.LZZZZZZZ.jpg"), items[0]
+assert items[1]["cover"].endswith("/ol/0306406152-L.jpg?default=false") and items[1]["total"] == 0, items[1]
+assert items[2]["cover"] == "/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=4", items[2]
+feed = json.load(open(sys.argv[2]))["items"]
+assert [i["biblionumber"] for i in feed] == [4, 1, 5], feed
+assert feed[1]["cover"].endswith("/ol/0306406152-L.jpg?default=false"), feed
+PY
+}
+
 @test "new arrivals: turning the carousel on installs the job and its schedule" {
     apply_dir "$W/on" "a { }" "on 8"
     cat >> "$W/extra.sh" <<SH
-opac_na_script() { printf '#!/bin/sh\necho "3 of 5 titles with an ISBN have an Amazon cover"\necho "\$1" > "$W/ran"\n'; }
+opac_na_script() { printf '#!/bin/sh\necho "3 of 5 new titles have a cover; 0 public lists"\necho "\$1" > "$W/ran"\n'; }
 SH
     task opac_theme_apply "$W/on"
     [ "$status" -eq 0 ]

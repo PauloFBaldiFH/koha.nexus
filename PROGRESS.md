@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.62** (1.5.63: translucent staff top bar PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.63** (1.5.64: translucent staff top bar PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -384,6 +384,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `📂 Open file manager` (WSL or a Linux desktop only) opens the tree's folder via
   `opener.open_user_folder` in a thread worker, ignoring clicks within 2 s.
   `panel/tests/test_picker_drops.py`.
+- **1.5.63 (Paulo: carousel from a Koha list)**: the nightly job `koha-kei-new-arrivals` also writes
+  `/images/custom/kei-list-<shelfnumber>.json` for every public list (`virtualshelves.public = 1`, or
+  `category = 2` before 21.05; max 50 lists, in the list's `sortfield` order; a list made private loses
+  its file). Covers for both feeds: Koha's uploaded one (`cover_images`/`biblioimages`, only with
+  `OPACLocalCoverImages` = 1) as `/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=N`, else
+  OpenLibrary (`?default=false`, 404 when missing), else Amazon. Server-side, not the REST API: Koha's
+  public list API differs by version and the OPAC page has no ISBN/availability. Carousel settings
+  `source` (new|list), `shelf`, `lists` (keep the job with the home carousel off). OPAC script:
+  `KEI.listCarousel(shelfId, selectorOrElement, {title, mode, count, ...})` returns a Promise of the
+  element; `<div data-kei-list="7" data-title=".." data-mode="coverflow">` mounts one from news/HTML
+  customizations. CSS selector is now `.kei-carousel` (home one keeps `#kei-carousel`).
 - **1.5.62 (Paulo: staff washed-out look, empty OPAC Normal view)**: the staff wrappers (`#container-main`,
   `.main`, `main`, `.container-fluid`, `#sub-header`, `#sidebar-container`, the rows and columns
   between them) are `background-color: transparent !important`; the old wallpaper rule painted `.main`
@@ -396,7 +407,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   at kei-xslt without a state file (restore from another server), after a language pack and in
   `staff_authlinks_fix` (install, update, restore); files are written as `.part` then moved; when they
   cannot be written the preferences go back to `default`. tests BR13b.
-- **1.5.63 (Paulo: translucent staff header)**: `cfg["staff"]` gains `header_glass` (off by default),
+- **1.5.64 (Paulo: translucent staff header)**: `cfg["staff"]` gains `header_glass` (off by default),
   `header_opacity` (0-100, default 85) and `header_blur` (0-30 px, default 8); switch and two sliders in
   the Staff interface box. `_staff_header_css` (after the texture, so it also beats the metal bar) paints
   `nav.navbar.bg-dark` and `#header_search` with the bar colours as `rgba(..., var(--nexus-staff-header-a))`,
