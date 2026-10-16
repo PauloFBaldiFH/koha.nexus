@@ -66,18 +66,27 @@ async def _wait_for(pilot, screen_type, tries=60):
 
 
 def test_manual_backup_flow(tmp_path):
+    """Save screen: the folder typed is created, the backup runs, the scp
+    command for the person's computer is shown (tests/test_save_backup.py
+    covers the screen's own rules)."""
+    from kei_panel.screens.save_backup import SaveBackupScreen
+
     async def main():
         app = _app()
         async with app.run_test(size=(140, 45)) as pilot:
             app.run_native("backup-manual")
-            picker = await _wait_for(pilot, PathPickerScreen)
-            picker.query_one("#picker-path").value = str(tmp_path)
-            picker.query_one("#choose").press()
-            await _wait_for(pilot, LoadingScreen)
-            done = await _wait_for(pilot, MessageScreen)
-            return done
-    done = asyncio.run(main())
-    assert done._command.startswith("scp root@") and str(tmp_path) in done._command
+            screen = await _wait_for(pilot, SaveBackupScreen)
+            screen.query_one("#sb-folder").value = str(tmp_path / "backups")
+            screen.query_one("#save").press()
+            for _ in range(200):
+                await pilot.pause(0.05)
+                if screen._file is not None:
+                    break
+            assert screen._file is not None
+            return screen
+    screen = asyncio.run(main())
+    assert screen._scp.startswith("scp root@") and str(tmp_path / "backups") in screen._scp
+    assert (tmp_path / "backups").is_dir()
 
 
 def test_restore_flow_asks_before_replacing(tmp_path):
