@@ -320,3 +320,88 @@ def test_koha_sql_and_panel_list_match_targets_json():
     assert {(r["host"], r["port"], r["syntax"]) for r in panel["targets"]} == {("sru.koha.nexus", 443, "MARC21")}
     # Renames only point at ids that exist, and never from one that still does.
     assert set(koha_sql.RENAMED.values()) <= set(table) and not set(koha_sql.RENAMED) & set(table)
+
+
+# --- every slug routes, and nothing answers JSON ------------------------
+
+def assert_sru_xml(r):
+    """What YAZ needs: HTTP 200, an XML content type and an SRU root, never
+    FastAPI's JSON {"detail": "Not Found"} (Koha reports that as "wrong protocol")."""
+    assert r.status_code == 200, (r.request.url, r.status_code, r.text[:200])
+    assert "xml" in r.headers["content-type"] and "json" not in r.headers["content-type"]
+    assert b'"detail"' not in r.content
+    root = ET.fromstring(r.content)
+    assert root.tag.startswith("{http://www.loc.gov/zing/srw/}")
+    return root
+
+
+def test_every_slug_answers_explain_with_and_without_trailing_slash():
+    table = tg.load(TARGETS_JSON)
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
+        for tid in IDS:
+            for path in (f"/sru/{tid}", f"/sru/{tid}/", f"http://testserver//sru/{tid}"):
+                root = assert_sru_xml(client.get(path, params={"operation": "explain", "version": "1.1"}))
+                assert root.tag.endswith("}explainResponse"), path
+                if table[tid].configured:
+                    assert root.findtext(".//{http://explain.z3950.org/dtd/2.0/}database") == f"sru/{tid}"
+                    assert table[tid].name in root.findtext(".//{http://explain.z3950.org/dtd/2.0/}title")
+                    assert diag(root) == (None, None)
+                else:
+                    # No upstream address in targets.json yet: said in SRU, not as a 404.
+                    uri, msg = diag(root)
+                    assert uri == "info:srw/diagnostic/1/1" and "no catalogue address" in msg
+
+
+def test_every_slug_answers_search_retrieve_in_sru(monkeypatch):
+    table = tg.load(TARGETS_JSON)
+
+    async def down(*args, **kwargs):
+        from zeus_sru import sru
+        raise sru.SourceUnavailable("offline in tests")
+    for mod, attr in ((z3950, "search"), (__import__("sru_gateway.upstream_sru").upstream_sru, "search")):
+        monkeypatch.setattr(mod, attr, down)
+    offline = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(503)))
+    with gateway(table, http=offline, zeus_http=offline) as client:
+        for tid in IDS:
+            for path in (f"/sru/{tid}", f"/sru/{tid}/"):
+                r = client.get(path, params={"operation": "searchRetrieve", "version": "1.1",
+                                             "query": "dc.title=x", "maximumRecords": "1"})
+                root = assert_sru_xml(r)
+                assert root.tag.endswith("}searchRetrieveResponse"), path
+                assert root.findtext("zs:numberOfRecords", namespaces=NS) is not None
+
+
+def test_unknown_slug_is_diagnostic_235_under_explain_and_search():
+    table = tg.load(TARGETS_JSON)
+    with gateway(table, zeus_http=httpx.AsyncClient()) as client:
+        for path in ("/sru/nowhere", "/sru/nowhere/", "/sru/NoWhere"):
+            root = assert_sru_xml(client.get(path, params={"operation": "explain"}))
+            assert root.tag.endswith("}explainResponse")
+            assert diag(root)[0] == "info:srw/diagnostic/1/235"
+            assert root.findtext(".//diag:details", namespaces=NS) == "nowhere"
+            assert "Target not found or not configured" in diag(root)[1]
+            root = assert_sru_xml(client.get(path, params={"operation": "searchRetrieve",
+                                                           "query": "dc.title=x"}))
+            assert root.tag.endswith("}searchRetrieveResponse")
+            assert diag(root)[0] == "info:srw/diagnostic/1/235"
+
+
+def test_no_route_ever_answers_json_404():
+    with gateway(tg.load(TARGETS_JSON), zeus_http=httpx.AsyncClient()) as client:
+        for path in ("/", "/sr", "/nothing/here", "/srubn", "/sru/bn/x/y"):
+            root = assert_sru_xml(client.get(path, params={"operation": "explain"}))
+            assert root.tag.endswith("}explainResponse")
+            assert diag(root)[0] in ("info:srw/diagnostic/1/235", "info:srw/diagnostic/1/1")
+        root = assert_sru_xml(client.delete("/sru/bn"))
+        assert diag(root)[0] == "info:srw/diagnostic/1/4"
+        root = assert_sru_xml(client.get("/nothing"))
+        assert diag(root)[0] == "info:srw/diagnostic/1/235"
+
+
+def test_openapi_lists_the_dynamic_route():
+    # So a look at https://sru.koha.nexus/openapi.json shows whether this
+    # gateway is the one deployed: one /sru/{database} route, not /sru/ufsc.
+    with gateway({}) as client:
+        paths = client.get("/openapi.json").json()["paths"]
+    assert "/sru/{database}" in paths and "/health" in paths
+    assert not any(p.startswith("/sru/") and "{" not in p for p in paths)

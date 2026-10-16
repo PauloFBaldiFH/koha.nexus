@@ -14,7 +14,9 @@ from urllib.parse import parse_qsl
 from xml.etree import ElementTree as ET
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from starlette.exceptions import HTTPException
 
 from . import __version__, cql, marc, sru
 from .config import Settings
@@ -93,12 +95,17 @@ def create_app(settings: Settings | None = None, client: ZeusClient | None = Non
 
 def sru_app(*, title: str, version: str, source: str, max_records: int,
             open_backend: Callable[[], Backend], health: dict | None = None,
-            explain: dict | None = None, record_schema: str = sru.MARCXML_SCHEMA) -> FastAPI:
+            explain: dict | None = None, record_schema: str = sru.MARCXML_SCHEMA,
+            openapi_url: str | None = None) -> FastAPI:
     """The SRU 1.1 endpoint shared by the bridges in this directory.
 
     open_backend() is called once at startup; its search(query, start,
     maximum) returns the hit count and the MARCXML records of that page, and
-    raises sru.SourceUnavailable when the catalogue behind it is down."""
+    raises sru.SourceUnavailable when the catalogue behind it is down.
+
+    Every answer is SRU XML, errors included: YAZ (Koha's ZOOM client) reads
+    FastAPI's JSON 404 as "wrong protocol", so an unknown path or method gets
+    an explainResponse diagnostic with HTTP 200 instead."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -109,7 +116,7 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
             await app.state.backend.aclose()
 
     app = FastAPI(title=title, version=version, lifespan=lifespan,
-                  docs_url=None, redoc_url=None, openapi_url=None)
+                  docs_url=None, redoc_url=None, openapi_url=openapi_url)
 
     def xml(body: bytes) -> Response:
         return Response(content=body, media_type=XML)
@@ -117,12 +124,29 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
     def fail(code: int, details: str, message: str, operation: str = "searchRetrieve") -> Response:
         return xml(sru.diagnostic_response(sru.Diagnostic(code, details, message), operation))
 
+    @app.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException) -> Response:
+        if exc.status_code == 404:
+            return fail(sru.DATABASE_NOT_FOUND, request.url.path,
+                        "Target not found or not configured: use /sru/<id>", "explain")
+        if exc.status_code == 405:
+            return fail(sru.UNSUPPORTED_OPERATION, request.method,
+                        f"method {request.method} not supported: use GET or POST", "explain")
+        return fail(sru.GENERAL_ERROR, request.url.path, str(exc.detail), "explain")
+
+    @app.exception_handler(RequestValidationError)
+    async def bad_request(request: Request, exc: RequestValidationError) -> Response:
+        return fail(sru.UNSUPPORTED_PARAMETER_VALUE, request.url.path, "malformed request", "explain")
+
     @app.get("/health")
     async def health_endpoint() -> JSONResponse:
         return JSONResponse({"status": "ok", "version": version, **(health or {})})
 
-    @app.api_route("/sru", methods=["GET", "POST"])
-    @app.api_route("/sru/{database:path}", methods=["GET", "POST"])
+    # One route per method keeps the operation ids of /openapi.json distinct.
+    @app.get("/sru")
+    @app.post("/sru")
+    @app.get("/sru/{database:path}")
+    @app.post("/sru/{database:path}")
     async def sru_endpoint(request: Request, database: str = "") -> Response:
         p, soap = await read_params(request)
         resp = await handle(request, p, database.strip("/"))
@@ -139,11 +163,26 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
         if version not in ("1.1", "1.2"):
             return fail(sru.UNSUPPORTED_VERSION, "1.1", f"unsupported version {version}", operation)
 
+        # A backend with for_database() serves several catalogues, one per
+        # /sru/{database}; it answers a Diagnostic for a database it cannot
+        # serve, under explain as well as under searchRetrieve.
+        backend, name, schema_out = request.app.state.backend, source, record_schema
+        pick = getattr(backend, "for_database", None)
+        if pick is not None and (database or operation != "explain"):
+            backend = pick(database)
+            if isinstance(backend, sru.Diagnostic):
+                return xml(sru.diagnostic_response(
+                    backend, "explain" if operation == "explain" else "searchRetrieve"))
+            name = getattr(backend, "name", name)
+            schema_out = getattr(backend, "record_schema", schema_out)
+
         if operation == "explain":
             url = request.url
+            info = dict(explain or {})
+            if pick is not None and database:
+                info["title"] = f"{name} (koha.nexus SRU gateway)"
             return xml(sru.explain_response(url.hostname or "127.0.0.1", url.port or 80,
-                                            url.path.lstrip("/") or "sru", max_records,
-                                            **(explain or {})))
+                                            url.path.strip("/") or "sru", max_records, **info))
         if operation != "searchRetrieve":
             return fail(sru.UNSUPPORTED_OPERATION, operation, f"unsupported operation {operation}")
 
@@ -171,17 +210,6 @@ def sru_app(*, title: str, version: str, source: str, max_records: int,
             q = cql.parse(query)
         except cql.CQLError as exc:
             return fail(sru.QUERY_SYNTAX_ERROR, query, str(exc))
-
-        # A backend with for_database() serves several catalogues, one per
-        # /sru/{database}; it answers a Diagnostic for a database it cannot serve.
-        backend, name, schema_out = request.app.state.backend, source, record_schema
-        pick = getattr(backend, "for_database", None)
-        if pick is not None:
-            backend = pick(database)
-            if isinstance(backend, sru.Diagnostic):
-                return xml(sru.diagnostic_response(backend))
-            name = getattr(backend, "name", name)
-            schema_out = getattr(backend, "record_schema", schema_out)
 
         try:
             total, records = await backend.search(q, start, maximum)
