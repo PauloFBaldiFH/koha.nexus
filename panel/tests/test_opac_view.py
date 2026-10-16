@@ -426,8 +426,12 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             assert q("#o-staff-font", Slider).value == 110                # the staff's own, kept
             q("#o-staff-page-on", Switch).value = True
             q("#o-staff-page", Input).value = "#101820"
+            assert q("#o-staff-header_glass", Switch).value is False     # the glass top bar stays off
+            q("#o-staff-header_glass", Switch).value = True
+            q("#o-staff-header_opacity", Slider).value = 70
             cfg, _p, problem = view.collect()
             assert problem == "" and cfg["staff"]["page"] == "#101820"
+            assert cfg["staff"]["header_glass"] is True and cfg["staff"]["header_opacity"] == 70
 
             view.apply()
             await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
@@ -437,6 +441,7 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             assert "--nexus-staff-r-input: 3px" in seen["staff"] and "--nexus-staff-blur: 21px" in seen["staff"]
             assert "repeating-linear-gradient" in seen["staff"]          # brushed metal on the staff blocks
             assert "html { font-size: 110%; }" in seen["staff"]
+            assert "--nexus-staff-header-a: 0.70" in seen["staff"]
 
     asyncio.run(main())
 

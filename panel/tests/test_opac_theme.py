@@ -478,6 +478,33 @@ def test_staff_material_like_the_opac():
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["texture"] == "frosted"
 
 
+def test_staff_translucent_header():
+    # Off by default: the bars stay solid, nothing of the glass bar is written.
+    off = ot.normalize({"staff": {"enabled": True}})["staff"]
+    assert (off["header_glass"], off["header_opacity"], off["header_blur"]) == (False, 85, 8)
+    assert "--nexus-staff-header-a" not in ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
+    cfg = ot.normalize({"staff": {"enabled": True, "accent": "#408540", "texture": "metal",
+                                  "header_glass": True, "header_opacity": 140, "header_blur": -3}})
+    assert (cfg["staff"]["header_opacity"], cfg["staff"]["header_blur"]) == (100, 0)
+    cfg["staff"].update(header_opacity=60, header_blur=8)
+    css = ot.staff_css_body(cfg)
+    for part in ("--nexus-staff-header-a: 0.60", "--nexus-staff-header-blur: 8px",
+                 "rgba(64,133,64, var(--nexus-staff-header-a))",
+                 "html body #header_search::before", "backdrop-filter: blur(var(--nexus-staff-header-blur))",
+                 "-webkit-backdrop-filter: blur(var(--nexus-staff-header-blur))",
+                 "prefers-reduced-transparency", "@supports not"):
+        assert part in css, part
+    # Translucent backgrounds, never opacity: the children keep full contrast,
+    # and the blur is on a layer behind the bar, not on the bar.
+    glass = css.split("--nexus-staff-header-a: 0.60", 1)[1]
+    assert "opacity: ." not in glass and "opacity: 0" not in glass
+    nav_rule = glass.split("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {", 1)[1].split("}", 1)[0]
+    assert "backdrop-filter" not in nav_rule and "!important" in nav_rule
+    # After the texture: the glass bar wins over the brushed metal one.
+    assert css.rindex("rgba(64,133,64, var(--nexus-staff-header-a))") > css.rindex("repeating-linear-gradient")
+    assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["header_glass"] is True
+
+
 def test_copy_opac_preset():
     raw = {"texture": "smooth", "blur": 7, "opacity": 64, "radius_block": 20, "radius_input": 5, "radius_button": 9,
            "accent": "#aa0000", "accent2": "#00aa00", "surface": "#fafafa", "page": "#e0e0e0", "film": 10,

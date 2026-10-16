@@ -131,7 +131,10 @@ DEFAULTS: dict = {
               "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
-              "favicon": {"source": "none", "url": ""}, "film": 55},
+              "favicon": {"source": "none", "url": ""}, "film": 55,
+              # The top bar and the quick search bar under it in translucent
+              # glass (_staff_header_css): off keeps them solid.
+              "header_glass": False, "header_opacity": 85, "header_blur": 8},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
     # writes: the login instructions of the OPAC and of the staff interface
     # (allow-listed HTML, a banner picture above it) and the OPAC footer
@@ -155,6 +158,8 @@ STAFF_FONT = (90, 120)
 STAFF_FILM = (0, 90)        # % of the film over the staff wallpaper, the OPAC's range: the cards keep the text readable
 # The staff material: the OPAC's sliders, same ranges.
 STAFF_MATERIAL = ("blur", "opacity", "radius_block", "radius_input", "radius_button")
+# The glass top bar: % of the bar's colour left (0 clear, 100 solid) and px of blur behind it.
+STAFF_HEADER = {"header_opacity": (0, 100), "header_blur": (0, 30)}
 
 
 # ----------------------------------------------------------------------
@@ -606,6 +611,10 @@ def normalize(raw: dict | None) -> dict:
     for key in STAFF_MATERIAL:
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
+    cfg["staff"]["header_glass"] = bool(st.get("header_glass", False))
+    for key, (lo, hi) in STAFF_HEADER.items():
+        default = DEFAULTS["staff"][key]
+        cfg["staff"][key] = _clamp(st.get(key, default), lo, hi, default)
     for name in STAFF_ASSETS:
         cfg["staff"][name] = _asset(st.get(name))
     lg = raw.get("login") if isinstance(raw.get("login"), dict) else {}
@@ -1824,6 +1833,7 @@ html body textarea:focus {{
             out.append("html body table { line-height: 1.25; }")
     out.append(_staff_panels_css(st))
     out += _staff_material_css(st)
+    out += _staff_header_css(st)
     out += _staff_pictures_css(st)
     if st["contrast"] == "high":
         out.append("""html body { color: #000 !important; }
@@ -2001,6 +2011,65 @@ html body .btn-default, html body .btn-secondary, html body .btn-light {{
     background-attachment: fixed;
 }}""")
     return ["\n".join(rule)]
+
+
+def _staff_header_css(st: dict) -> list[str]:
+    """The top bar (nav.navbar) and the quick search bar (#header_search) in
+    translucent glass: the bar's own colours at --nexus-staff-header-a over a
+    blur of --nexus-staff-header-blur. Only the bars' backgrounds go
+    translucent (rgba, never opacity), so the links, the search field, its
+    button and the dropdown menus keep full opacity and contrast. Off, or
+    where the device asks for less transparency or the browser has no
+    backdrop-filter, the bars stay solid. Comes after the texture, so it
+    also wins over the metal bar."""
+    if not st["header_glass"]:
+        return []
+    a = "var(--nexus-staff-header-a)"
+    top, end, bar = (_rgb(st["accent"]), _rgb(mix(st["accent"], "#000000", .12)),
+                     _rgb(mix(st["accent"], "#000000", .22)))
+    bars = "html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark, html body #header_search"
+    return [f""":root {{
+    --nexus-staff-header-a: {st['header_opacity'] / 100:.2f};
+    --nexus-staff-header-blur: {st['header_blur']}px;
+}}
+html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
+    background: linear-gradient(90deg, rgba({top}, {a}), rgba({end}, {a})) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, .18);
+}}
+html body #header_search {{ background-color: rgba({bar}, {a}) !important; border-color: transparent; }}
+/* One layer only: the tabs, labels and lists inside the search bar are clear,
+   the bar behind them carries the colour. */
+html body #header_search ul, html body #header_search .form-title,
+html body #header_search .nav-tabs > li > a:not(.active):not(:hover):not(:focus) {{
+    background-color: transparent;
+    border-color: transparent;
+}}
+/* The blur sits on a layer behind the bar (as on the frosted blocks), and the
+   bar stays above the page so its dropdown menus are never covered. */
+{bars} {{ position: relative; isolation: isolate; z-index: 1030; }}
+html body #header_search {{ z-index: 1029; }}
+{", ".join(f"{x}::before" for x in bars.split(", "))} {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(var(--nexus-staff-header-blur)) saturate(140%);
+    backdrop-filter: blur(var(--nexus-staff-header-blur)) saturate(140%);
+}}
+/* Full opacity and contrast for what sits on the glass. */
+html body nav.navbar #header .nav-link, html body nav.navbar #logged-in-info-full, html body nav.navbar .navbar-text,
+html body #header_search .form-title label, html body #header_search .nav-tabs > li > a {{
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}}
+html body #header_search .form-content, html body #header_search .form-extra-content,
+html body nav.navbar .dropdown-menu:not(.dropdown-menu-dark) {{ background-color: var(--nexus-staff-card); }}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {{
+    :root {{ --nexus-staff-header-a: 1; }}
+}}
+@media (prefers-reduced-transparency: reduce) {{
+    :root {{ --nexus-staff-header-a: 1; }}
+}}"""]
 
 
 def _staff_pictures_css(st: dict) -> list[str]:
