@@ -150,5 +150,16 @@ foreach ($k in 'Open Dashboard', 'Open User Folder', 'Restart Services', 'More o
     Check ('pt: ' + $k) ((T $k) -ne $k) (T $k)
 }
 
+# Store installer (windows\setup): its PowerShell parses, and every exit
+# code the script sets is a different value.
+foreach ($f in Get-ChildItem (Join-Path $repo 'windows\setup') -Filter '*.ps1') {
+    $tokens = $null; $errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
+    Check ('parses: setup\' + $f.Name) (@($errors).Count -eq 0) ((@($errors) | ForEach-Object { $_.Message }) -join '; ')
+}
+$iss = Get-Content -LiteralPath (Join-Path $repo 'windows\setup\koha-nexus.iss') -Raw
+$codes = @([regex]::Matches($iss, '(?m)^\s*Exit\w+\s*=\s*(\d+);') | ForEach-Object { $_.Groups[1].Value })
+Check 'store: exit codes are distinct' ((@($codes | Select-Object -Unique)).Count -eq $codes.Count -and $codes.Count -eq 7) ($codes -join ',')
+
 if ($failed) { throw "$failed check(s) failed" }
 Write-Host 'all checks passed'
