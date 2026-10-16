@@ -148,6 +148,28 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
+@test "gateway SQL: rows on the VPS's private 10.0.0.60:5001 move to sru.koha.nexus:443/sru/<id>" {
+    SQL="$BATS_TEST_DIRNAME/../sru-bridge/deploy/koha-z3950servers.sql"
+    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype) VALUES
+      ('10.0.0.60', 5001, 'sru/usp', 'USP on 5001', 1, 3, 'MARC21', 'utf8', 'sru', 'biblio'),
+      ('http://10.0.0.60', 5001, '/sru/ufsc', 'UFSC, leading slash', 0, 4, 'MARC21', 'utf8', 'sru', 'biblio'),
+      ('10.0.0.60', 5001, 'harvard', 'Harvard, bare id', 0, 5, 'MARC21', 'utf8', 'sru', 'biblio'),
+      ('10.0.0.60', 5001, 'psu', 'Penn State, bare old id', 0, 6, 'MARC21', 'utf8', 'sru', 'biblio'),
+      ('mine.example.org', 5001, 'harvard', 'not the gateway', 0, 7, 'MARC21', 'utf8', 'sru', 'biblio');"
+    mysql "$DB" < "$SQL"
+    gw="host = 'https://sru.koha.nexus' AND port = 443"
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host LIKE '%10.0.0.60%'")" = "0" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE $gw")" = "72" ]
+    [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/usp'")" = "$(printf '1\t3')" ]
+    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/ufsc'")" = "4" ]
+    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/harvard'")" = "5" ]
+    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE $gw AND db = 'sru/pennstate'")" = "6" ]
+    [ "$(zsql "SELECT host, db FROM z3950servers WHERE servername = 'not the gateway'")" = "$(printf 'mine.example.org\tharvard')" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    mysql "$DB" < "$SQL"
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+}
+
 @test "z3950-list: Koha's catalogue targets, no authority ones" {
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-list bash "$PANEL" z3950_rows
     [ "$status" -eq 0 ]

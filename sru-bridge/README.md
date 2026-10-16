@@ -363,8 +363,10 @@ in the four groups' order:
 sudo koha-mysql INSTANCE < deploy/koha-z3950servers.sql
 ```
 
-It touches only the gateway's rows (database `sru/...`): rows on its older
-addresses (137.131.205.31:5000, 10.0.0.60) move to sru.koha.nexus:443, renamed
+It touches only the gateway's rows: rows on its older addresses
+(137.131.205.31:5000, the VPS's private 10.0.0.60 on any port, 5001 included)
+move to sru.koha.nexus:443 with the database `sru/<id>` (also when it was
+written `/sru/<id>` or a bare `<id>`), renamed
 ids follow, ids no longer served are removed, the rest are refreshed keeping
 "checked" and rank. Running it again changes nothing. It and the panel's list
 (`panel/kei_panel/data/z3950_targets.json`) are generated from `targets.json`
