@@ -178,6 +178,45 @@ def test_upload_cloudinary(tmp_path):
         ot.upload_cloudinary(pic, "demo/../x", "p", post=post)
 
 
+def test_carousel_from_a_koha_list(tmp_path):
+    """Source "list": the home carousel reads that list's feed; the list
+    feeds (KEI.listCarousel, data-kei-list) follow the carousel or their own
+    switch, and both come back from the script's config."""
+    cfg = ot.normalize({"carousel": {"enabled": True, "source": "list", "shelf": "7", "mode": "coverflow"}})
+    car = cfg["carousel"]
+    assert car["source"] == "list" and car["shelf"] == 7 and not car["lists"]
+    conf = ot.js_config(cfg)
+    assert conf["carousel"]["feed"] == "/images/custom/kei-list-7.json" and conf["carousel"]["shelf"] == 7
+    assert conf["lists"] == {"feed": ot.LIST_FEED, "always": False, "count": 12, "autoplay": True, "speed": 3500,
+                             "hover": "lift", "overlay": True, "mode": "coverflow"}
+    # No list number: back to the new arrivals.
+    assert ot.normalize({"carousel": {"source": "list", "shelf": "x"}})["carousel"]["source"] == "new"
+    assert ot.normalize({"carousel": {"source": "list", "shelf": -3}})["carousel"]["shelf"] == 0
+    block = ot.js_block(cfg)
+    assert "KEI.listCarousel = function" in block and "[data-kei-list]" in block and "opac-image\\.pl" in block
+    # Home carousel off, list feeds kept: the job stays, the CSS too, no home carousel.
+    only = ot.normalize({"carousel": {"enabled": False, "lists": True, "count": 9}})
+    conf = ot.js_config(only)
+    assert conf["carousel"] is None and conf["lists"]["always"] and conf["lists"]["count"] == 9
+    assert ".kei-carousel {" in ot.css_body(only)
+    work = ot.write_apply_dir(only, {})
+    try:
+        assert (work / "carousel").read_text() == "on 9\n"
+    finally:
+        shutil.rmtree(work)
+    both_off = ot.normalize({"carousel": {"enabled": False}})
+    assert ot.js_config(both_off)["lists"] is None and ".kei-carousel {" not in ot.css_body(both_off)
+    # The script's config tells the settings again (Sync current settings).
+    back = ot.normalize(ot._from_script(ot.js_config(cfg)))["carousel"]
+    assert back["source"] == "list" and back["shelf"] == 7 and back["enabled"] and not back["lists"]
+    back = ot.normalize(ot._from_script(ot.js_config(only)))["carousel"]
+    assert not back["enabled"] and back["lists"] and back["count"] == 9
+    if shutil.which("node"):
+        f = tmp_path / "list.js"
+        f.write_text(block.split("\n", 1)[1].rsplit("\n", 2)[0], encoding="utf-8")
+        subprocess.run(["node", "--check", str(f)], check=True)
+
+
 def test_write_apply_dir(tmp_path):
     pic = tmp_path / "fav.png"
     pic.write_bytes(PNG)

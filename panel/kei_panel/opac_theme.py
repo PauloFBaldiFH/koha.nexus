@@ -53,6 +53,7 @@ DATA_TAG = "KEI-THEME-DATA:"
 CUSTOM_URL = "/images/custom"                       # /usr/share/koha/opac/htdocs/images/custom
 STAFF_CUSTOM_URL = "/intranet-tmpl/kei-custom"      # /usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom
 FEED_URL = CUSTOM_URL + "/kei-new-arrivals.json"    # written by the nightly job
+LIST_FEED = CUSTOM_URL + "/kei-list-"               # + <list number>.json: each public Koha list, same job
 KEYS_FILE = "opac-theme.conf"                       # image host keys (0600)
 
 TEXTURES = {
@@ -64,6 +65,8 @@ TEXTURES = {
 }
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
 CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
+CAROUSEL_SOURCES = {"new": "New arrivals", "list": "A public Koha list"}
+MAX_SHELF = 999_999_999
 LINK_STYLES = {"solid": "Solid colour", "gradient": "Gradient", "glass": "Glass (blur)", "metal": "Brushed metal"}
 LINK_LAYOUTS = {"list": "One per line", "grid2": "Two columns"}
 LINK_TARGETS = {"_self": "Same tab", "_blank": "New tab"}
@@ -101,7 +104,13 @@ DEFAULTS: dict = {
     "dark_switch": True,
     "default_theme": "light",
     "carousel": {"enabled": True, "autoplay": True, "speed": 3500, "count": 12, "hover": "lift",
-                 "overlay": True, "title": "New arrivals", "amazon_tag": "", "mode": "flat"},
+                 "overlay": True, "title": "New arrivals", "amazon_tag": "", "mode": "flat",
+                 # source "list": the public Koha list number shelf (Lists,
+                 # opac-shelves.pl?op=view&shelfnumber=N) instead of the
+                 # newest titles. lists: keep the nightly job (and so the
+                 # feeds of KEI.listCarousel and data-kei-list) with the home
+                 # page carousel off.
+                 "source": "new", "shelf": 0, "lists": False},
     "ghost": {"rss": True, "cart_badge": True, "community": True, "empty_columns": True},
     "news_buttons": True,
     # Quick access buttons at the top of the home page (link-tree style):
@@ -574,6 +583,9 @@ def normalize(raw: dict | None) -> dict:
     tag = str(c.get("amazon_tag", "")).strip()
     car["amazon_tag"] = tag if re.fullmatch(r"[A-Za-z0-9-]{0,40}", tag) else ""
     car["mode"] = c.get("mode") if c.get("mode") in CAROUSEL_MODES else car["mode"]
+    car["shelf"] = _clamp(c.get("shelf", 0), 0, MAX_SHELF, 0)
+    car["source"] = "list" if c.get("source") == "list" and car["shelf"] else "new"
+    car["lists"] = bool(c.get("lists", car["lists"]))
     g = raw.get("ghost") if isinstance(raw.get("ghost"), dict) else {}
     for key in cfg["ghost"]:
         cfg["ghost"][key] = bool(g.get(key, cfg["ghost"][key]))
@@ -663,11 +675,13 @@ def _from_script(conf: dict) -> dict:
     """The settings that the config of our OpacUserJS script still tells
     (when the settings line itself is gone)."""
     car = conf.get("carousel") if isinstance(conf.get("carousel"), dict) else None
+    lists = conf.get("lists") if isinstance(conf.get("lists"), dict) else None
     lk = conf.get("links") if isinstance(conf.get("links"), dict) else None
     return {"default_theme": conf.get("default_theme"), "dark_switch": conf.get("dark_switch", True),
             "news_buttons": conf.get("news_buttons", True),
             "ghost": {"empty_columns": conf.get("empty_columns", True)},
-            "carousel": {**(car or {}), "enabled": car is not None},
+            "carousel": {**(lists or {}), **(car or {}), "enabled": car is not None,
+                         "lists": bool(lists and lists.get("always"))},
             "links": {**(lk or {}), "enabled": lk is not None}}
 
 
@@ -1068,7 +1082,7 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
 .kei-action-icon { font-size: 1.6rem; color: var(--kei-accent); min-width: 2rem; text-align: center; }
 .kei-action-title { display: block; font-weight: 600; overflow-wrap: anywhere; }
 .kei-action-text { display: block; color: var(--kei-muted); font-size: .92em; }""")
-    if car["enabled"]:
+    if car["enabled"] or car["lists"]:
         out.append(_carousel_css(car))
     if links_on(cfg["links"]):
         out.append(_links_css("#kei-links"))
@@ -1432,8 +1446,8 @@ def _carousel_css(car: dict) -> str:
         "tilt": ".kei-card { transform-style: preserve-3d; will-change: transform; }",
         "none": "",
     }[car["hover"]]
-    return f"""#kei-carousel {{ position: relative; margin: 0 0 1.5rem; }}
-#kei-carousel h2 {{ font-size: 1.35rem; margin: 0 0 .75rem; }}
+    return f""".kei-carousel {{ position: relative; margin: 0 0 1.5rem; }}
+.kei-carousel h2 {{ font-size: 1.35rem; margin: 0 0 .75rem; }}
 .kei-track {{
     display: flex;
     gap: 1rem;
@@ -2115,6 +2129,31 @@ _JS = r"""(function () {
     }
     setTheme(theme);
 
+    // KEI.listCarousel(shelfId, target, options): mounts a carousel of the
+    // public Koha list shelfId (opac-shelves.pl?op=view&shelfnumber=N) inside
+    // target (a CSS selector or an element), at the end of what it holds.
+    // options: title, mode ("flat" | "coverflow"), count, autoplay, speed,
+    // overlay; the panel's carousel settings otherwise. Covers come
+    // from the nightly job's kei-list-N.json (Koha's uploaded cover, else
+    // OpenLibrary, else Amazon). Resolves to the carousel's element, or
+    // null (no such public list, no cover yet, no target).
+    var KEI = window.KEI = window.KEI || {};
+    KEI.listCarousel = function (shelfId, target, options) {
+        var id = parseInt(shelfId, 10);
+        var place = typeof target === "string" ? document.querySelector(target) : target;
+        var none = window.Promise ? Promise.resolve(null) : { then: function () {} };
+        if (!C.lists || !(id > 0) || !place || !place.appendChild) { return none; }
+        var K = {}, o = options || {};
+        Object.keys(C.lists).forEach(function (k) { K[k] = C.lists[k]; });
+        Object.keys(o).forEach(function (k) { if (o[k] !== undefined && o[k] !== null) { K[k] = o[k]; } });
+        K.count = Math.max(1, Math.min(parseInt(K.count, 10) || C.lists.count, 24));
+        K.speed = Math.max(2000, parseInt(K.speed, 10) || C.lists.speed);
+        K.title = String(K.title || "");
+        return feed(C.lists.feed + id + ".json").then(function (items) {
+            return carousel(items, K, function (box) { place.appendChild(box); });
+        });
+    };
+
     function ready(fn) {
         if (document.readyState !== "loading") { fn(); } else { document.addEventListener("DOMContentLoaded", fn); }
     }
@@ -2225,13 +2264,31 @@ _JS = r"""(function () {
         // Quick access buttons (link-tree style), at the top of the home page.
         if (C.links && home && !document.getElementById("kei-links")) { links(C.links); }
 
-        // New arrivals, on the OPAC home page only.
-        if (C.carousel && home && !document.getElementById("kei-carousel") && window.fetch) {
-            fetch(C.carousel.feed, { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : { items: [] }; })
-                .then(function (feed) { carousel(feed.items || []); })
-                .catch(function () { /* no feed yet: no carousel */ });
+        // New arrivals (or the list chosen in the panel), on the OPAC home page only.
+        if (C.carousel && home && !document.getElementById("kei-carousel")) {
+            feed(C.carousel.feed).then(function (items) { carousel(items, C.carousel, homePlace); });
         }
+
+        // <div data-kei-list="7" data-title="..." data-mode="coverflow"></div>
+        // in news or an HTML customization: a carousel of that public list.
+        Array.prototype.forEach.call(document.querySelectorAll("[data-kei-list]"), function (el) {
+            if (el.getAttribute("data-kei-mounted")) { return; }
+            el.setAttribute("data-kei-mounted", "1");
+            var opts = {};
+            ["title", "mode", "count"].forEach(function (k) {
+                if (el.hasAttribute("data-" + k)) { opts[k] = el.getAttribute("data-" + k); }
+            });
+            KEI.listCarousel(el.getAttribute("data-kei-list"), el, opts);
+        });
     });
+
+    // feed(url): the items of one of the nightly job's feeds ([] when missing).
+    function feed(url) {
+        if (!window.fetch || !window.Promise) { return { then: function () {} }; }
+        return fetch(url, { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : { items: [] }; })
+            .then(function (f) { return f.items || []; }, function () { return []; });
+    }
+
 
     function homeTarget() {
         return document.getElementById("opacmainuserblock") || document.getElementById("opacmainblock")
@@ -2251,34 +2308,51 @@ __LINK_NAV__
         }
     }
 
-    // New arrivals: 2D flat (a strip that loops for ever) or 3D coverflow
-    // (the cards turn around the centre one, like a real carousel). Both
+    // The home page carousel: under the quick access buttons, else above
+    // the main block.
+    function homePlace(box) {
+        var target = homeTarget();
+        if (!target) { return; }
+        box.id = "kei-carousel";
+        var after = document.getElementById("kei-links");
+        if (after && after.parentNode === target) {
+            target.insertBefore(box, after.nextSibling);
+        } else {
+            target.parentNode.insertBefore(box, target);
+        }
+    }
+
+    // carousel(items, K, place): 2D flat (a strip that loops for ever) or
+    // 3D coverflow (the cards turn around the centre one, like a real
+    // carousel), with the settings K, put in the page by place(box). Both
     // keep turning after a click or a swipe; only a hidden tab, keyboard
-    // focus inside or "reduce motion" stop them.
-    function carousel(items) {
-        var K = C.carousel;
+    // focus inside or "reduce motion" stop them. Returns the element (null
+    // with no card to show).
+    function carousel(items, K, place) {
         items = items.filter(function (it) {
-            return parseInt(it.biblionumber, 10) && /^https:\/\//.test(it.cover || "");
+            return parseInt(it.biblionumber, 10) &&
+                /^(https:\/\/|\/cgi-bin\/koha\/opac-image\.pl\?)/.test(it.cover || "");
         }).slice(0, K.count);
-        if (!items.length) { return; }
+        if (!items.length) { return null; }
         var flow = K.mode === "coverflow";
         var box = document.createElement("section");
-        box.id = "kei-carousel";
-        box.className = flow ? "kei-mode-coverflow" : "kei-mode-flat";
-        box.setAttribute("aria-label", K.title);
+        box.className = "kei-carousel " + (flow ? "kei-mode-coverflow" : "kei-mode-flat");
+        if (K.title) { box.setAttribute("aria-label", K.title); }
         box.setAttribute("aria-roledescription", "carousel");
-        var h = document.createElement("h2");
-        h.textContent = K.title;
+        if (K.title) {
+            var h = document.createElement("h2");
+            h.textContent = K.title;
+            box.appendChild(h);
+        }
         var track = document.createElement("div");
         track.className = flow ? "kei-stage" : "kei-track";
-        box.appendChild(h);
         box.appendChild(track);
         var pending = items.length;
         function settled() {
             pending -= 1;
             if (pending > 0) { return; }
             if (!track.children.length) { if (box.parentNode) { box.parentNode.removeChild(box); } return; }
-            (flow ? coverflow : flat)(box, track);
+            (flow ? coverflow : flat)(box, track, K);
         }
         items.forEach(function (it) {
             var card = document.createElement("a");
@@ -2305,10 +2379,13 @@ __LINK_NAV__
                 [it.author, it.callnumber].forEach(function (v) {
                     if (v) { var x = document.createElement("span"); x.textContent = v; info.appendChild(x); }
                 });
-                var badge = document.createElement("em");
-                badge.className = "kei-badge" + (it.available > 0 ? "" : " kei-out");
-                badge.textContent = it.available > 0 ? C.text.available : C.text.out;
-                info.appendChild(badge);
+                // A list may hold a title with no copy (an e-book): no badge then.
+                if (it.total !== 0) {
+                    var badge = document.createElement("em");
+                    badge.className = "kei-badge" + (it.available > 0 ? "" : " kei-out");
+                    badge.textContent = it.available > 0 ? C.text.available : C.text.out;
+                    info.appendChild(badge);
+                }
                 card.appendChild(info);
             }
             if (K.hover === "tilt" && !flow) {
@@ -2321,14 +2398,8 @@ __LINK_NAV__
             }
             track.appendChild(card);
         });
-        var target = homeTarget();
-        if (!target) { return; }
-        var after = document.getElementById("kei-links");
-        if (after && after.parentNode === target) {
-            target.insertBefore(box, after.nextSibling);
-        } else {
-            target.parentNode.insertBefore(box, target);
-        }
+        place(box);
+        return box;
     }
 
     function navButtons(box, step) {
@@ -2343,9 +2414,8 @@ __LINK_NAV__
         });
     }
 
-    // autoplay(box, step): every K.speed ms, for ever (a click restarts the count).
-    function autoplay(box, step) {
-        var K = C.carousel;
+    // autoplay(box, step, K): every K.speed ms, for ever (a click restarts the count).
+    function autoplay(box, step, K) {
         var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (!K.autoplay || still) { return function () {}; }
         var focused = false, timer = null;
@@ -2359,7 +2429,7 @@ __LINK_NAV__
         return arm;
     }
 
-    function flat(box, track) {
+    function flat(box, track, K) {
         // The cards twice in a row: past the first set the strip jumps back
         // by its width, so it loops with no visible end.
         var originals = Array.prototype.slice.call(track.children);
@@ -2395,10 +2465,10 @@ __LINK_NAV__
             });
         }
         navButtons(box, step);
-        restart = autoplay(box, step);
+        restart = autoplay(box, step, K);
     }
 
-    function coverflow(box, track) {
+    function coverflow(box, track, K) {
         var cards = Array.prototype.slice.call(track.children);
         var n = cards.length, current = 0;
         function layout() {
@@ -2451,7 +2521,7 @@ __LINK_NAV__
         });
         layout();
         navButtons(box, step);
-        restart = autoplay(box, step);
+        restart = autoplay(box, step, K);
     }
 })();"""
 
@@ -2488,15 +2558,18 @@ JS_TEXT = {"switch_title": "Light / dark mode", "available": "Available", "out":
 def js_config(cfg: dict, text: dict | None = None) -> dict:
     cfg = normalize(cfg)
     car = cfg["carousel"]
+    look = {k: car[k] for k in ("count", "autoplay", "speed", "hover", "overlay", "mode")}
     return {
         "default_theme": cfg["default_theme"],
         "dark_switch": cfg["dark_switch"],
         "wallpaper": bool(cfg["background"]["url"]),
         "empty_columns": cfg["ghost"]["empty_columns"],
         "news_buttons": cfg["news_buttons"],
-        "carousel": ({"feed": FEED_URL, "count": car["count"], "autoplay": car["autoplay"], "speed": car["speed"],
-                      "hover": car["hover"], "overlay": car["overlay"], "title": car["title"], "mode": car["mode"]}
+        "carousel": ({**look, "title": car["title"], "source": car["source"], "shelf": car["shelf"],
+                      "feed": f"{LIST_FEED}{car['shelf']}.json" if car["source"] == "list" else FEED_URL}
                      if car["enabled"] else None),
+        # KEI.listCarousel() and <div data-kei-list="N">: the same look.
+        "lists": {**look, "feed": LIST_FEED, "always": car["lists"]} if car["enabled"] or car["lists"] else None,
         "links": _links_conf(cfg["links"]) if links_on(cfg["links"]) else None,
         "text": {**JS_TEXT, **{k: v for k, v in (text or {}).items() if k in JS_TEXT}},
     }
@@ -2657,7 +2730,7 @@ def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None)
         (work / "staff.js").write_text(staff_js_block(cfg, text), encoding="utf-8")
     prefs = []
     car = cfg["carousel"]
-    if car["enabled"]:
+    if car["enabled"] or car["lists"]:
         prefs.append(("OPACAmazonCoverImages", "1"))
         if car["amazon_tag"]:
             prefs.append(("AmazonAssocTag", car["amazon_tag"]))
@@ -2666,7 +2739,8 @@ def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None)
     if cfg["staff"]["enabled"] and cfg["staff"]["favicon"]["url"]:
         prefs.append(("IntranetFavicon", cfg["staff"]["favicon"]["url"]))
     (work / "prefs").write_text("".join(f"{k}\t{v}\n" for k, v in prefs), encoding="utf-8")
-    (work / "carousel").write_text(f"on {car['count']}\n" if car["enabled"] else "off\n", encoding="utf-8")
+    on = car["enabled"] or car["lists"]
+    (work / "carousel").write_text(f"on {car['count']}\n" if on else "off\n", encoding="utf-8")
     assets = work / "assets"
     assets.mkdir()
     for role, src in files.items():
