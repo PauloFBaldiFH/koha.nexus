@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.61"
+PANEL_VERSION=" 1.5.62"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6476,6 +6476,8 @@ lang_download() {
     [ -n "$stub" ] && rm -f "$stub"
     if lang_is_installed "$code"; then
         log "languages: pack $code installed"
+        # The catalogue card needs a stylesheet in the new language too.
+        ficha_refresh
         systemctl restart memcached >/dev/null 2>&1 || true
         plack_restart || true
         return 0
@@ -12983,19 +12985,64 @@ ficha_write() {
         opac="$KOHA_OPAC_TMPL/$l/xslt/MARC21slim2OPACDetail.xsl"; [ -f "$opac" ] || opac="$KOHA_OPAC_TMPL/en/xslt/MARC21slim2OPACDetail.xsl"
         staff="$KOHA_INTRA_TMPL/$l/xslt/MARC21slim2intranetDetail.xsl"; [ -f "$staff" ] || staff="$KOHA_INTRA_TMPL/en/xslt/MARC21slim2intranetDetail.xsl"
         mkdir -p "$FICHA_DIR/$l" || return 1
-        ficha_xsl "$opac" "$title" "$print_label" "$abnt_label" "$show_label" > "$FICHA_DIR/$l/opac-detail.xsl" || return 1
-        ficha_xsl "$staff" "$title" "$print_label" "$abnt_label" "$show_label" > "$FICHA_DIR/$l/staff-detail.xsl" || return 1
+        # Written aside, then moved: Plack never reads a half-written file
+        # (a broken stylesheet empties the record's Normal view).
+        ficha_xsl "$opac" "$title" "$print_label" "$abnt_label" "$show_label" > "$FICHA_DIR/$l/opac-detail.xsl.part" \
+            && mv -f "$FICHA_DIR/$l/opac-detail.xsl.part" "$FICHA_DIR/$l/opac-detail.xsl" || return 1
+        ficha_xsl "$staff" "$title" "$print_label" "$abnt_label" "$show_label" > "$FICHA_DIR/$l/staff-detail.xsl.part" \
+            && mv -f "$FICHA_DIR/$l/staff-detail.xsl.part" "$FICHA_DIR/$l/staff-detail.xsl" || return 1
     done
-    chown -R "root:${INSTANCE}-koha" "$FICHA_DIR" 2>/dev/null || true
-    chmod -R u=rwX,g=rX,o= "$FICHA_DIR"
+    # Koha (Plack, user ${INSTANCE}-koha) reads them through the group; when
+    # that group cannot be given, they stay readable by all instead.
+    if chown -R "root:${INSTANCE}-koha" "$FICHA_DIR" 2>/dev/null; then
+        chmod -R u=rwX,g=rX,o= "$FICHA_DIR"
+    else
+        chmod -R u=rwX,go=rX "$FICHA_DIR"
+    fi
     printf '%s' "${#langs[@]}"
 }
 
-# Languages installed after the card was enabled get their stylesheet too
-# (at panel start): Koha would otherwise fail to show their detail pages.
+# ficha_pref_on PREF: true when PREF names the panel's card stylesheets.
+ficha_pref_on() {
+    local v
+    v=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = '$1';" 2>/dev/null)
+    [[ "$v" == "$FICHA_DIR/{langcode}/"* ]]
+}
+
+# Koha has no fallback for a stylesheet path of its own: when the file of
+# the active language is missing, the transform fails silently and the
+# record page shows the cover and the holdings with an empty Normal view
+# (the MARC view does not use it). That happens with a language installed
+# after the card was enabled, a database restored from another server (the
+# preferences come back, the folder does not) or a removed folder. So the
+# files are written again for every installed language whenever the card is
+# on, by its state file or by the preferences themselves; when they cannot
+# be written, the preferences go back to Koha's default view. Runs at panel
+# start, after a language pack, an install, an update and a restore.
 ficha_refresh() {
-    [ -s "$FICHA_STATE" ] || return 0
-    ficha_write >/dev/null 2>&1 || true
+    local on=1 db=1 pref log
+    [ -s "$FICHA_STATE" ] && on=0
+    if is_database_ready 2>/dev/null; then
+        db=0
+        for pref in OPACXSLTDetailsDisplay XSLTDetailsDisplay; do
+            ficha_pref_on "$pref" && on=0
+        done
+    fi
+    [ "$on" -eq 0 ] || return 0
+    if ficha_write >/dev/null 2>&1; then
+        # Restored from another server: no state file, so "Hide the card"
+        # would not know the card is on. Koha's default view is what it restores.
+        [ -s "$FICHA_STATE" ] || printf 'OPACXSLTDetailsDisplay=default\nXSLTDetailsDisplay=default\n' > "$FICHA_STATE" 2>/dev/null || true
+        return 0
+    fi
+    [ "$db" -eq 0 ] || return 0
+    log=$(tools_log ficha 2>/dev/null) || log=/dev/null
+    for pref in OPACXSLTDetailsDisplay XSLTDetailsDisplay; do
+        ficha_pref_on "$pref" || continue
+        koha_tool "$log" koha-preferences set "$pref" default
+        log "catalogue card: its stylesheets could not be written, $pref set back to default"
+    done
+    return 0
 }
 
 lt_br_ficha() {
@@ -13196,6 +13243,8 @@ staff_authlinks_js() {
 # the install, update, restore or tool that runs it.
 staff_authlinks_fix() {
     is_database_ready || return 0
+    # The record pages' stylesheets of the catalogue card, for every language.
+    ficha_refresh
     [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.systempreferences WHERE variable = 'IntranetUserJS';")" = "1" ] || return 0
     local log changed=1
     log=$(tools_log staff-authority-links) || return 0
