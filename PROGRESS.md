@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-16. Panel version on `main`: **1.5.63** (1.5.64: staff content card, one per section or one for the whole page, PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.64** (1.5.65: staff content card, one per section or one for the whole page, PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -407,7 +407,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   at kei-xslt without a state file (restore from another server), after a language pack and in
   `staff_authlinks_fix` (install, update, restore); files are written as `.part` then moved; when they
   cannot be written the preferences go back to `default`. tests BR13b.
-- **1.5.64 (Paulo: configurable staff content card backdrop)**: Staff interface gets `card`
+- **1.5.65 (Paulo: configurable staff content card backdrop)**: Staff interface gets `card`
   (`sections` default, as before / `page`: Koha's `.main`, content plus sidebar, is the one card) and
   `card_padding` (0-40 px, default 16 = Koha's 1rem). Its transparency is the staff Opacity slider and its
   corners the Blocks slider, so no second opacity. In `page` mode `.main` leaves the transparent-wrapper
@@ -418,6 +418,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.64 (Paulo: translucent staff header)**: `cfg["staff"]` gains `header_glass` (off by default),
+  `header_opacity` (0-100, default 85) and `header_blur` (0-30 px, default 8); switch and two sliders in
+  the Staff interface box. `_staff_header_css` (after the texture, so it also beats the metal bar) paints
+  `nav.navbar.bg-dark` and `#header_search` with the bar colours as `rgba(..., var(--nexus-staff-header-a))`,
+  blur on a `::before` layer (never on the bar), the search bar's inner tabs/labels clear (one layer),
+  bars `isolation: isolate; z-index: 1030/1029` so the nav dropdowns stay above the search bar and the
+  page. Only backgrounds go translucent (no `opacity`): links get a soft text-shadow, the search field,
+  `.form-extra-content` and light dropdowns stay on the solid staff card colour. Solid again under
+  `prefers-reduced-transparency` or without `backdrop-filter`.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes

@@ -89,6 +89,8 @@ SLIDERS = {   # id: (label, unit, step)
 CARD_HELP = ("One card per section: each of Koha's boxes is a card. One card for the whole page: the content "
              "and its sidebar sit on one card and the boxes inside it are clear. The Opacity and Blocks sliders "
              "set its transparency and corners.")
+# The staff glass top bar: id: (label, unit).
+STAFF_HEADER_SLIDERS = {"header_opacity": ("Top bar opacity", "%"), "header_blur": ("Top bar blur", "px")}
 # The three corner sliders: what each one rounds (border-radius).
 RADIUS_HELP = {
     "radius_block": "Rounded corners (border-radius) of the blocks: header, panels, cards and boxes. More "
@@ -224,6 +226,13 @@ class OpacView(SectionView):
                     yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
                 yield from _row(t(label), _tip(Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
                                                       id=f"o-staff-{key}"), RADIUS_HELP.get(key, "")))
+            yield from _row(t("Translucent top bar"),
+                            _tip(Switch(st["header_glass"], id="o-staff-header_glass"),
+                                 "The top bar and the quick search bar in frosted glass: the bar's colour lets "
+                                 "the page or wallpaper show through, blurred. The links, the search field and "
+                                 "the menus stay fully opaque."))
+            for key, (label, unit) in STAFF_HEADER_SLIDERS.items():
+                yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
             yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
             yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
@@ -508,6 +517,9 @@ class OpacView(SectionView):
         q("#o-staff-density", Select).value = st["density"]
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
+        q("#o-staff-header_glass", Switch).value = st["header_glass"]
+        for key in ot.STAFF_HEADER:
+            q(f"#o-staff-{key}", Slider).value = st[key]
 
     def collect(self) -> tuple[dict, dict[str, tuple[str, Path]], str]:
         """(settings, pictures still to publish {name: (source, file)}, problem)."""
@@ -539,7 +551,8 @@ class OpacView(SectionView):
                          "card": q("#o-staff-card", Select).value,
                          "card_padding": q("#o-staff-card_padding", Slider).value,
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
-                         **{key: q(f"#o-staff-{key}", Slider).value for key in ot.STAFF_MATERIAL}}}
+                         "header_glass": q("#o-staff-header_glass", Switch).value,
+                         **{key: q(f"#o-staff-{key}", Slider).value for key in (*ot.STAFF_MATERIAL, *ot.STAFF_HEADER)}}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
         raw["login"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value, "alt": q(f"#{box}-alt", Input).value,
