@@ -43,6 +43,56 @@ Check 'no Koha status window' (-not (Test-Path (Join-Path $repo 'windows\KohaEas
 $tray = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
 Check 'tray: Open Debian terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
 
+# install.ps1 Step 0 (Paulo, 2026-10-16): only its functions are loaded,
+# so nothing is installed and shutdown.exe is never called here.
+$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'windows\install.ps1'), [ref]$null, [ref]$null)
+foreach ($fn in $ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false)) {
+    if ($fn.Name -ne 'Install-KohaEasyBootstrap') { . ([scriptblock]::Create($fn.Extent.Text)) }
+}
+Check 'virt: firmware on' (Test-KohaVirtualizationOn @{ Firmware = $true; Hypervisor = $false })
+Check 'virt: off stops' (-not (Test-KohaVirtualizationOn @{ Firmware = $false; Hypervisor = $false }))
+Check 'virt: Hyper-V/WSL 2 running hides the flag, still on' (Test-KohaVirtualizationOn @{ Firmware = $false; Hypervisor = $true })
+Check 'virt: unknown does not stop' (Test-KohaVirtualizationOn @{ Firmware = $null; Hypervisor = $false })
+Check 'virt: AMD' ((Get-KohaCpuBrand @{ Cpu = 'AuthenticAMD'; CpuName = 'AMD Ryzen 5 5600X' }) -eq 'AMD')
+Check 'virt: Intel' ((Get-KohaCpuBrand @{ Cpu = 'GenuineIntel'; CpuName = 'Intel(R) Core(TM) i5' }) -eq 'Intel')
+Check 'virt: ARM unknown' ((Get-KohaCpuBrand @{ Cpu = 'Qualcomm'; CpuName = 'Snapdragon X' }) -eq '')
+$fam = @{ 'ASUSTeK COMPUTER INC.' = 'ASUS'; 'Gigabyte Technology Co., Ltd.' = 'Gigabyte'; 'Micro-Star International Co., Ltd.' = 'MSI'
+    'ASRock' = 'ASRock'; 'Dell Inc.' = 'Dell'; 'HP' = 'HP'; 'Hewlett-Packard' = 'HP'; 'LENOVO' = 'Lenovo'; 'Acer' = ''; '' = '' }
+foreach ($k in $fam.Keys) { Check ('virt: board ' + $k) ((Get-KohaBoardFamily $k) -eq $fam[$k]) (Get-KohaBoardFamily $k) }
+$steps = (Get-KohaBiosSteps -Family 'ASUS' -Brand 'AMD') -join ' | '
+Check 'virt: ASUS AMD path' ($steps -match 'F7' -and $steps -match 'Advanced > CPU Configuration > SVM Mode') $steps
+$steps = (Get-KohaBiosSteps -Family 'ASUS' -Brand 'Intel') -join ' | '
+Check 'virt: ASUS Intel path' ($steps -match 'CPU Configuration > Intel Virtualization Technology') $steps
+Check 'virt: Gigabyte path' (((Get-KohaBiosSteps -Family 'Gigabyte' -Brand 'AMD') -join ' ') -match 'Tweaker \(on older boards M\.I\.T\.\) > Advanced CPU Settings > SVM Mode')
+Check 'virt: MSI path' (((Get-KohaBiosSteps -Family 'MSI' -Brand 'Intel') -join ' ') -match 'OC > CPU Features > Intel Virtualization Tech')
+Check 'virt: ASRock path' (((Get-KohaBiosSteps -Family 'ASRock' -Brand 'Intel') -join ' ') -match 'CPU Configuration > Intel Virtualization Technology \(VMX\)')
+foreach ($f in 'Dell', 'HP', 'Lenovo', '') { Check ('virt: steps for ' + $(if ($f) { $f } else { 'generic' })) (@(Get-KohaBiosSteps -Family $f -Brand 'Intel').Count -ge 3) }
+Check 'virt: generic AMD names SVM' (((Get-KohaBiosSteps -Family '' -Brand 'AMD') -join ' ') -match 'SVM Mode.*AMD-V')
+# The restart: /fw first, Advanced startup (/o) when the firmware cannot be opened.
+$calls = New-Object System.Collections.ArrayList
+$r = Invoke-KohaFirmwareReboot -Run { param($a) [void]$calls.Add($a -join ' '); 0 }
+Check 'virt: reboot into firmware' ($r -eq 'fw' -and ($calls -join ';') -eq '/r /fw /t 2') ($calls -join ';')
+$calls.Clear()
+$r = Invoke-KohaFirmwareReboot -Run { param($a) [void]$calls.Add($a -join ' '); if ($a -contains '/fw') { 1 } else { 0 } }
+Check 'virt: legacy BIOS falls back to Advanced startup' ($r -eq 'o' -and ($calls -join ';') -eq '/r /fw /t 2;/r /o /t 2') ($calls -join ';')
+$r = Invoke-KohaFirmwareReboot -Run { param($a) 5 }
+Check 'virt: neither works' ($r -eq '')
+# Assert: on -> $true, no question. Off -> the steps, the question; N stops
+# without a restart, Y restarts.
+$off = @{ Firmware = $false; Hypervisor = $false; Cpu = 'AuthenticAMD'; CpuName = 'AMD Ryzen 7'; Board = 'ASUSTeK COMPUTER INC.'; Model = 'TUF GAMING B550M-PLUS' }
+$asked = 0; $rebooted = 0
+$ok = Assert-VirtualizationReady -Facts @{ Firmware = $true; Hypervisor = $false } -Ask { $script:asked++; 'Y' } -Reboot { $script:rebooted++; 'fw' } 6>$null
+Check 'virt: on continues without asking' ($ok -eq $true -and $asked -eq 0 -and $rebooted -eq 0)
+$ok = Assert-VirtualizationReady -Facts $off -Ask { $script:asked++; 'n' } -Reboot { $script:rebooted++; 'fw' } 6>$null
+Check 'virt: N pauses, no restart' ($ok -eq $false -and $asked -eq 1 -and $rebooted -eq 0)
+$answers = New-Object System.Collections.Queue
+'maybe', 'y' | ForEach-Object { $answers.Enqueue($_) }
+$ok = Assert-VirtualizationReady -Facts $off -Ask { $answers.Dequeue() } -Reboot { $script:rebooted++; 'o' } 6>$null
+Check 'virt: asks again until Y or N; Y restarts' ($ok -eq $false -and $rebooted -eq 1 -and $answers.Count -eq 0)
+$all = @(Assert-VirtualizationReady -Facts $off -Ask { 'N' } -Reboot { 'fw' } 6>&1)
+$shown = ($all | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { [string]$_.MessageData }) -join "`n"
+Check 'virt: warning names the board, the photo and the pause' ($shown -match 'TURNED OFF' -and $shown -match 'ASUSTeK COMPUTER INC\. TUF' -and $shown -match 'Take a photo of this screen' -and $shown -match 'installation is paused') $shown
+
 $env:KOHAEASY_ROOT = Join-Path ([IO.Path]::GetTempPath()) ('koha-checks-' + [guid]::NewGuid().ToString('N'))
 Import-Module (Join-Path $repo 'windows\KohaEasy.Lang.psm1') -Force
 Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
