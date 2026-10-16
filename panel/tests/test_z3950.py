@@ -167,7 +167,8 @@ def test_export_round_trips_and_hides_passwords():
            ("z3950.bnf.fr", 2211, "TOUT", "UNIMARC", "u", "s3cret")
     assert z.parse_csv(z.to_csv([t]))[0].key == t.key
     assert z.parse_koha_sql(z.to_koha_sql([t]))[0].key == t.key
-    assert "WHERE NOT EXISTS" in z.to_koha_sql([t])
+    assert "WHERE @kei_t0 IS NULL AND NOT EXISTS" in z.to_koha_sql([t])
+    assert "UPDATE z3950servers SET" in z.to_koha_sql([t])
 
 
 def test_password_never_in_repr_or_describe():

@@ -92,6 +92,57 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     grep -q "added to Koha: 0" "$KEI_S/dialogs.log"
 }
 
+@test "z3950-add: a target already in Koha is updated, keeping its tick, rank and login" {
+    # The librarian unticked LoC and moved it down; its settings are old.
+    zsql "UPDATE z3950servers SET checked = 0, \`rank\` = 9, timeout = 3, userid = 'mine', password = 'myPass'
+          WHERE host = 'lx2.loc.gov' AND db = 'LCDB'"
+    ( printf '%s\t' lx2.loc.gov 210 LCDB MARC21 utf8 'Library of Congress' 2 30 zed '' '' '' ''; printf '\n' ) > "$W/u.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/u.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov' AND recordtype = 'biblio'")" = "1" ]
+    [ "$(zsql "SELECT servername, checked, \`rank\`, syntax, timeout, userid, password FROM z3950servers WHERE host = 'lx2.loc.gov' AND db = 'LCDB'")" = \
+      "$(printf 'LIBRARY OF CONGRESS\t0\t9\tMARC21\t30\tmine\tmyPass')" ]
+    grep -q "added to Koha: 0" "$KEI_S/dialogs.log"
+    # A new login replaces the old one.
+    ( printf '%s\t' lx2.loc.gov 210 LCDB MARC21 utf8 'Library of Congress' 2 30 zed new 'n3w' '' ''; printf '\n' ) > "$W/u.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/u.tsv"
+    [ "$(zsql "SELECT userid, password, checked FROM z3950servers WHERE host = 'lx2.loc.gov' AND db = 'LCDB'")" = "$(printf 'new\tn3w\t0')" ]
+}
+
+@test "z3950-add: a server that moved (same name) is updated in place, no stale row, re-runnable" {
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype, sru_fields, sru_options)
+          VALUES ('old.example.org', 5000, 'sru/x', 'Catálogo X', 0, 6, 'USMARC', 'MARC-8', 5, 'zed', 'biblio', NULL, NULL)"
+    ( printf '%s\t' sru.koha.nexus 443 sru/x MARC21 utf8 'Catálogo X' 1 15 sru '' '' 'title=dc.title' 'sru=get,sru_version=1.1'; printf '\n'
+      printf '%s\t' other.example.org 210 Y USMARC utf8 'Catálogo X' 2 0 zed '' '' '' ''; printf '\n' ) > "$W/m.tsv"
+    cp "$W/m.tsv" "$W/m2.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/m.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'old.example.org'")" = "0" ]
+    [ "$(zsql "SELECT host, port, db, syntax, encoding, timeout, servertype, sru_fields, sru_options, checked, \`rank\` FROM z3950servers WHERE db = 'sru/x'")" = \
+      "$(printf 'https://sru.koha.nexus\t443\tsru/x\tMARC21\tutf8\t15\tsru\ttitle=dc.title\tsru=get,sru_version=1.1\t0\t6')" ]
+    # The second target of that name did not take the same row: it is a new one.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername = 'Catálogo X'")" = "2" ]
+    [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE host = 'other.example.org'")" = "$(printf '1\t2')" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/m2.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+}
+
+@test "sru-bridge: registering again updates the Zeus row in place, keeping its tick and rank" {
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype, sru_options)
+          VALUES ('127.0.0.1', 5000, 'zeus', 'Catálogo Zeus (UFSC bridge, SRU)', 0, 4, 'USMARC', 'utf8', 0, 'sru', 'biblio', 'sru_version=1.2'),
+                 ('127.0.0.1', 5000, 'sru', 'Zeus, by hand', 1, 2, 'USMARC', 'utf8', 0, 'sru', 'biblio', NULL)"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" sru_bridge_register
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE port = 5000")" = "1" ]
+    [ "$(zsql "SELECT servername, db, syntax, timeout, sru_options, checked, \`rank\` FROM z3950servers WHERE port = 5000")" = \
+      "$(printf 'Catálogo Zeus (UFSC bridge, SRU)\tsru\tMARC21\t15\tsru=get,sru_version=1.1\t0\t4')" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" sru_bridge_register
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+}
+
 @test "z3950-add: a list with nothing valid changes nothing and says why" {
     printf 'not a host\t99999\n' > "$W/bad.tsv"
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/bad.tsv"
@@ -170,6 +221,37 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
+@test "Catalog Network SQL: an older row is updated in place, keeping its tick and rank, re-runnable" {
+    SQL="$BATS_TEST_DIRNAME/../catalog-network/deploy/koha-z3950servers.sql"
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype) VALUES
+      ('http://10.0.0.5', 8088, 'old', 'Rede koha.nexus (Catalogação Compartilhada)', 0, 4, 'USMARC', 'utf8', 'zed', 'biblio')"
+    mysql --default-character-set=utf8mb4 "$DB" < "$SQL"
+    [ "$(zsql "SELECT host, port, db, syntax, servertype, timeout, checked, \`rank\` FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = \
+      "$(printf 'https://catalog.koha.nexus\t443\tsru\tMARC21\tsru\t15\t0\t4')" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    mysql --default-character-set=utf8mb4 "$DB" < "$SQL"
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+    # On a Koha without it: inserted, ticked.
+    zsql "DELETE FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'"
+    mysql --default-character-set=utf8mb4 "$DB" < "$SQL"
+    [ "$(zsql "SELECT COUNT(*), MIN(checked) FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "$(printf '1\t1')" ]
+}
+
+@test "panel export SQL: loads into another Koha, updates what is there, re-runnable" {
+    zsql "UPDATE z3950servers SET checked = 0, \`rank\` = 8, syntax = 'UNIMARC' WHERE host = 'lx2.loc.gov' AND recordtype = 'biblio'"
+    PYTHONPATH="$BATS_TEST_DIRNAME/../panel" python3 -c '
+from kei_panel.z3950 import Target, to_koha_sql
+print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
+                   Target("DNB", "services.dnb.de", 443, "sru/dnb", kind="sru")]), end="")' > "$W/export.sql"
+    mysql --default-character-set=utf8mb4 "$DB" < "$W/export.sql"
+    [ "$(zsql "SELECT servername, syntax, checked, \`rank\` FROM z3950servers WHERE host = 'lx2.loc.gov' AND recordtype = 'biblio'")" = \
+      "$(printf 'LIBRARY OF CONGRESS\tMARC21\t0\t8')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'services.dnb.de'")" = "1" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    mysql --default-character-set=utf8mb4 "$DB" < "$W/export.sql"
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+}
+
 @test "z3950-list: Koha's catalogue targets, no authority ones" {
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-list bash "$PANEL" z3950_rows
     [ "$status" -eq 0 ]
@@ -203,11 +285,12 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(cat "$W/bridge")" = "called pergamum" ]
     [ "$(zsql "SELECT servername, servertype, port, db, syntax, encoding, timeout, checked, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = \
       "$(printf 'Catálogo Rede Pergamum (CRP bridge, SRU)\tsru\t5006\tsru\tMARC21\tutf8\t15\t1\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
-    # Again (the task, as from config.sh): still one row; Zeus's row untouched.
+    # Again (the task, as from config.sh): still one row, still ticked (the
+    # librarian's choice is kept); Zeus's row untouched.
     mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, servertype) VALUES ('127.0.0.1', 5000, 'sru', 'Zeus', 'sru')"
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" pergamum_bridge_register
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*), MIN(checked) FROM z3950servers WHERE port = 5006")" = "$(printf '1\t0')" ]
+    [ "$(zsql "SELECT COUNT(*), MIN(checked) FROM z3950servers WHERE port = 5006")" = "$(printf '1\t1')" ]
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE port = 5000")" = "1" ]
 }
 
@@ -263,7 +346,7 @@ SH
     [ "$(grep -c "ufw allow 2111/tcp" "$W/calls")" = 2 ]
 }
 
-@test "catalog-network: on adds the shared catalogue as SRU (HTTPS, MARC21, utf8), again replaces it, off removes it" {
+@test "catalog-network: on adds the shared catalogue as SRU (HTTPS, MARC21, utf8), again updates it, off removes it" {
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "https://catalog.koha.nexus/sru"
     echo "$output"; cat "$KEI_S/dialogs.log"
     [ "$status" -eq 0 ]
@@ -274,10 +357,13 @@ SH
     grep -q "RESULT network=on" "$W/results"
     grep -q "RESULT network_url=https://catalog.koha.nexus:443/sru" "$W/results"
 
+    # Again at another address: the same row moves, keeping the librarian's
+    # tick and rank.
+    zsql "UPDATE z3950servers SET checked = 0, \`rank\` = 5 WHERE servername LIKE 'Rede koha.nexus%'"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "http://10.0.0.5:8088/"
     [ "$status" -eq 0 ]
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "1" ]
-    [ "$(zsql "SELECT host, port, db FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "$(printf 'http://10.0.0.5\t8088\tsru')" ]
+    [ "$(zsql "SELECT host, port, db, checked, \`rank\` FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "$(printf 'http://10.0.0.5\t8088\tsru\t0\t5')" ]
 
     : > "$W/results"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-server-status bash "$PANEL" z3950_server_status

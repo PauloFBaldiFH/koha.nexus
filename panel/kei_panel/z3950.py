@@ -528,20 +528,38 @@ def _q(v) -> str:
 
 
 def to_koha_sql(targets: list[Target], ranks: dict[str, int] | None = None, passwords: bool = False) -> str:
-    """INSERT statements another Koha can load (a target already there, same
-    host, port and database, is skipped)."""
-    lines = ["-- Z39.50/SRU targets exported by koha.nexus"]
+    """SQL another Koha can load, again and again (as config.sh's
+    z3950_upsert_sql): a target already there (same host, port and
+    database, else the same name) gets the connection settings and keeps
+    its tick and rank; the others are inserted."""
+    lines = ["-- Z39.50/SRU targets exported by koha.nexus", "SET @kei_claimed := '';"]
+    free = "recordtype = 'biblio' AND FIND_IN_SET(id, @kei_claimed) = 0"
+    claim = "SET @kei_claimed := CONCAT_WS(',', NULLIF(@kei_claimed, ''), @kei_t{i});"
+    for i, t in enumerate(targets):
+        lines.append(f"SET @kei_t{i} := (SELECT id FROM z3950servers WHERE {free} AND host = {_q(t.host)} "
+                     f"AND port = {int(t.port)} AND IFNULL(db,'') = {_q(t.db)} ORDER BY id LIMIT 1);")
+        lines.append(claim.format(i=i))
+    for i, t in enumerate(targets):
+        lines.append(f"SET @kei_t{i} := IFNULL(@kei_t{i}, (SELECT id FROM z3950servers WHERE {free} "
+                     f"AND servername = {_q(t.name)} ORDER BY id LIMIT 1));")
+        lines.append(claim.format(i=i))
     for i, t in enumerate(targets, 1):
         rank = (ranks or {}).get(t.key, i)
         pw = t.password if passwords else ""
+        user, sru, opts = _q(t.user), _q(sru_fields(t)), _q(t.sru_options if t.kind == "sru" else "")
+        lines.append(
+            f"UPDATE z3950servers SET host = {_q(t.host)}, port = {int(t.port)}, db = {_q(t.db)}, "
+            f"syntax = {_q(t.syntax)}, encoding = {_q(t.encoding)}, timeout = 0, servertype = {_q(t.kind)}, "
+            f"sru_fields = {sru}, sru_options = {opts}, userid = IF({user} = '', userid, {user}), "
+            f"password = IF({_q(pw)} = '', password, {_q(pw)}) WHERE id = @kei_t{i - 1};")
         lines.append(
             "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, `rank`, syntax, "
             "timeout, servertype, encoding, recordtype, sru_fields, sru_options) SELECT "
-            f"{_q(t.host)}, {int(t.port)}, {_q(t.db)}, {_q(t.user)}, {_q(pw)}, {_q(t.name)}, 1, {int(rank)}, "
-            f"{_q(t.syntax)}, 0, {_q(t.kind)}, {_q(t.encoding)}, 'biblio', {_q(sru_fields(t))}, "
-            f"{_q(t.sru_options if t.kind == 'sru' else '')} FROM DUAL WHERE NOT EXISTS "
+            f"{_q(t.host)}, {int(t.port)}, {_q(t.db)}, {user}, {_q(pw)}, {_q(t.name)}, 1, {int(rank)}, "
+            f"{_q(t.syntax)}, 0, {_q(t.kind)}, {_q(t.encoding)}, 'biblio', {sru}, {opts} "
+            f"FROM DUAL WHERE @kei_t{i - 1} IS NULL AND NOT EXISTS "
             f"(SELECT 1 FROM z3950servers WHERE host = {_q(t.host)} AND port = {int(t.port)} "
-            f"AND db = {_q(t.db)} AND recordtype = 'biblio');")
+            f"AND IFNULL(db,'') = {_q(t.db)} AND recordtype = 'biblio');")
     return "\n".join(lines) + "\n"
 
 

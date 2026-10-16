@@ -126,19 +126,34 @@ The koha.nexus panel does it: **Z39.50 / SRU servers › Rede koha.nexus
 
 ```sh
 sudo koha-mysql INSTANCE <<'SQL'
+SET @kei_t0 := (SELECT id FROM z3950servers WHERE recordtype = 'biblio'
+                 AND host = 'https://catalog.koha.nexus' AND port = 443 ORDER BY id LIMIT 1);
+SET @kei_t0 := IFNULL(@kei_t0, (SELECT id FROM z3950servers WHERE recordtype = 'biblio'
+                 AND servername = 'Rede koha.nexus (Catalogação Compartilhada)' ORDER BY id LIMIT 1));
+UPDATE z3950servers
+   SET host = 'https://catalog.koha.nexus', port = 443, db = 'sru',
+       servername = 'Rede koha.nexus (Catalogação Compartilhada)', syntax = 'MARC21', encoding = 'utf8',
+       timeout = 15, servertype = 'sru',
+       sru_fields = 'title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice',
+       sru_options = 'sru=get,sru_version=1.1'
+ WHERE id = @kei_t0;
 DELETE FROM z3950servers
- WHERE recordtype = 'biblio' AND servername = 'Rede koha.nexus (Catalogação Compartilhada)';
+ WHERE recordtype = 'biblio' AND id <> IFNULL(@kei_t0, 0)
+   AND (servername = 'Rede koha.nexus (Catalogação Compartilhada)'
+        OR (host = 'https://catalog.koha.nexus' AND port = 443));
 INSERT INTO z3950servers (host, port, db, servername, checked, `rank`, syntax, encoding, timeout,
                           servertype, recordtype, sru_fields, sru_options, add_xslt)
-VALUES ('https://catalog.koha.nexus', 443, 'sru', 'Rede koha.nexus (Catalogação Compartilhada)', 1, 1,
-        'MARC21', 'utf8', 15, 'sru', 'biblio',
-        'title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice',
-        'sru=get,sru_version=1.1', '');
+SELECT 'https://catalog.koha.nexus', 443, 'sru', 'Rede koha.nexus (Catalogação Compartilhada)', 1, 1,
+       'MARC21', 'utf8', 15, 'sru', 'biblio',
+       'title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice',
+       'sru=get,sru_version=1.1', ''
+  FROM DUAL WHERE @kei_t0 IS NULL;
 SQL
 ```
 
-SRU mode, syntax **MARC21** (USMARC makes Koha expect ISO 2709 and show no
-record), encoding **utf8** (Koha's name for UTF-8). A host starting with
+It can be run again: the row (same address, else same name) is updated in
+place and keeps the librarian's tick and rank. SRU mode, syntax **MARC21**
+(USMARC makes Koha expect ISO 2709 and show no record), encoding **utf8** (Koha's name for UTF-8). A host starting with
 `https://` makes Koha connect over HTTPS on port 443.
 
 ## Send records to the pool
