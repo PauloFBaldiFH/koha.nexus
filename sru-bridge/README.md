@@ -313,9 +313,22 @@ request with Bib-1 use 7, 4, 1003 or 1016 and a Present of the page Koha asked
 for (Koha's first call, `maximumRecords=0`, only searches). An SRU target is
 asked `<index>="<term>"` with its own index names (default `bath.isbn`,
 `dc.title`, `dc.creator`, `cql.serverChoice`); its records, prefixed or
-string-packed, go back as MARC21/slim. An unknown id answers diagnostic 235.
-A path with two slashes (`//sru/bn`, what Koha asks for when the database is
-written `/sru/bn`) is read as `/sru/bn`.
+string-packed, go back as MARC21/slim. One dynamic route, `/sru/{id}`, serves
+every id in `targets.json`; `/sru/{id}/` (trailing slash) and `//sru/{id}`
+(what Koha asks for when the database is written `/sru/bn`) are read as
+`/sru/{id}`.
+
+Every answer is SRU XML with HTTP 200, errors included, because YAZ (Koha's
+ZOOM client) reports FastAPI's JSON `{"detail":"Not Found"}` as "wrong
+protocol". An unknown id answers diagnostic 235 (details: the id) under
+explain and searchRetrieve alike; an id with no address yet answers
+diagnostic 1; any other path answers an explainResponse with diagnostic 235.
+
+**Is this the gateway that is deployed?** `GET /openapi.json` on this
+gateway lists `/health`, `/sru` and `/sru/{database}`, and `GET /health`
+shows `"version": "1.2.0"` or later with 72 targets. An `openapi.json` that
+lists `/sru/ufsc` (or any other single id) comes from some other program,
+not from this repository: stop it and run `deploy/sru-gateway.service`.
 
 Run it: `.venv/bin/python -m sru_gateway` (127.0.0.1:5000), or on the VPS
 [`deploy/sru-gateway.service`](deploy/sru-gateway.service), which listens on

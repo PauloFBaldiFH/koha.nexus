@@ -114,8 +114,9 @@ class Gateway:
         tid = database.strip("/").rsplit("/", 1)[-1].lower()
         t = self.table.get(tid)
         if t is None:
-            return sru.Diagnostic(sru.DATABASE_NOT_FOUND, database or "(none)",
-                                  f"no catalogue {tid!r} here: use database sru/<id>")
+            return sru.Diagnostic(sru.DATABASE_NOT_FOUND, tid or "(none)",
+                                  f"Target not found or not configured: no catalogue {tid!r} here,"
+                                  " use database sru/<id>")
         if not t.configured:
             return sru.Diagnostic(sru.GENERAL_ERROR, tid,
                                   f"{t.name}: no catalogue address configured yet")
@@ -153,7 +154,7 @@ def create_app(settings: Settings | None = None, table: dict[str, Target] | None
     missing = sorted(t.id for t in table.values() if not t.configured)
     api: FastAPI = sru_app(
         title="koha.nexus SRU gateway", version=__version__, source="SRU gateway",
-        max_records=settings.max_records,
+        max_records=settings.max_records, openapi_url="/openapi.json",
         open_backend=lambda: Gateway(table, settings, **clients),
         health={"targets": len(table), "configured": ready, "missing": missing},
         explain={"title": "koha.nexus SRU gateway",
