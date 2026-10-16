@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.59** (1.5.60: dropped backups and Open Debian terminal PR)._
+_Last updated: 2026-10-15. Panel version on `main`: **1.5.60** (1.5.61: restore screen drops typed as keys, Open file manager PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -375,6 +375,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   -EncodedCommand: `wt.exe -w new ... wsl.exe -d <WSL_DISTRO_NAME> --cd ~ -- koha-window --shell`,
   else `wsl.exe -d <distro>`; elsewhere the in-window shell. Not `wt -p "Debian"`: the distro is
   `koha`, so a "Debian" profile may not exist.
+- **1.5.61 (Paulo: restore screen drops, Open file manager)**: a terminal hands over a dropped file
+  as a bracketed paste or as plain keystrokes (classic console, some Windows Terminal versions);
+  keystrokes go to the focused widget, and PathPickerScreen focused the folder tree, which swallowed
+  them. In file mode the path box (PathInput) now has the focus; it times printable keys: a burst
+  (keys <= 25 ms apart, >= 6 of them) that reads as a path when it ends (120 ms idle) is undone and
+  handed to `dropped()`, Enter right after a burst takes the drop; typing by hand is untouched.
+  `📂 Open file manager` (WSL or a Linux desktop only) opens the tree's folder via
+  `opener.open_user_folder` in a thread worker, ignoring clicks within 2 s.
+  `panel/tests/test_picker_drops.py`.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes
