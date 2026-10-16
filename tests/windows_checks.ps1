@@ -99,6 +99,26 @@ Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
 Import-KeiLanguage -LangDir (Join-Path $repo 'lang') -Culture 'en-US'
 $wsl = 'C:\Windows\System32\wsl.exe'
 
+# RAM on Windows (a desktop or virtualized environment): 8 GB minimum, 12 GB
+# recommended. Windows reports the usable RAM, so an 8 GB PC shows about 7.7 GB
+# and must still pass. Row 2 of the preflight is the memory row.
+$ramAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'windows\KohaEasy.Install.psm1'), [ref]$null, [ref]$null)
+foreach ($fn in $ramAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Get-KohaPreflight' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+function Get-RamLevel {
+    param([double]$Gb)
+    $rows = @(Get-KohaPreflight @{ Build = 22631; Is64 = $true; MemGB = $Gb; FreeGB = 50; Hypervisor = $true; VirtFirmware = $null })
+    return $rows[2].Level
+}
+Check 'RAM: 3.8 GB is an error' ((Get-RamLevel 3.8) -eq 'error') (Get-RamLevel 3.8)
+Check 'RAM: 7.4 GB is an error' ((Get-RamLevel 7.4) -eq 'error') (Get-RamLevel 7.4)
+Check 'RAM: 7.7 GB (an 8 GB PC) meets the minimum, warns below 12 GB'((Get-RamLevel 7.7) -eq 'warn') (Get-RamLevel 7.7)
+Check 'RAM: 8 GB is a warning below 12 GB' ((Get-RamLevel 8.0) -eq 'warn') (Get-RamLevel 8.0)
+Check 'RAM: 11.4 GB is a warning' ((Get-RamLevel 11.4) -eq 'warn') (Get-RamLevel 11.4)
+Check 'RAM: 11.8 GB (a 12 GB PC) is fine' ((Get-RamLevel 11.8) -eq 'ok') (Get-RamLevel 11.8)
+Check 'RAM: 16 GB is fine' ((Get-RamLevel 16) -eq 'ok') (Get-RamLevel 16)
+
 # The Koha icon opens the panel; no shortcut opens the old status window.
 $cmds = @(Get-KohaShortcutList | Where-Object { $_.Kind -eq 'lnk' } | ForEach-Object { $_.Arguments })
 Check 'shortcuts: no Window verb' (@($cmds | Where-Object { $_ -match '\sWindow(\s|$)' }).Count -eq 0) ($cmds -join ' | ')

@@ -69,10 +69,13 @@ function Get-KohaPreflight {
     $add = { param($ok, $level, $text) [void]$rows.Add([pscustomobject]@{ Ok = $ok; Level = $(if ($ok) { 'ok' } else { $level }); Text = $text }) }
     & $add ($Facts.Build -ge 19041) 'error' ((T 'Windows 10 version 2004 (build 19041) or later, or Windows 11. This PC: build {0}.') -f $Facts.Build)
     & $add ([bool]$Facts.Is64) 'error' (T 'A 64-bit Windows.')
-    if ($Facts.MemGB -lt 4) {
-        & $add $false 'error' ((T 'At least 4 GB of memory (8 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
+    # Desktop or virtualized (Windows is always one): 8 GB minimum, 12 GB recommended.
+    # Windows reports the usable RAM, so an 8 GB PC shows about 7.7 GB: round to whole GB first.
+    $ramGb = [int][Math]::Round([double]$Facts.MemGB)
+    if ($ramGb -lt 8) {
+        & $add $false 'error' ((T 'At least 8 GB of memory (12 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
     } else {
-        & $add ($Facts.MemGB -ge 8) 'warn' ((T 'At least 4 GB of memory (8 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
+        & $add ($ramGb -ge 12) 'warn' ((T 'At least 8 GB of memory (12 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
     }
     if ($Facts.FreeGB -lt 10) {
         & $add $false 'error' ((T 'At least 10 GB free on drive C: (20 GB recommended). Free now: {0} GB.') -f $Facts.FreeGB)

@@ -12846,7 +12846,7 @@
      "The nightly backup, the weekly MARC export, the index watchdogs and the clean-up jobs are scheduled automatically in `/etc/cron.d/koha_tasks`."
     ],
     "steps": [
-     "Prepare a server with at least 2 GB of RAM (4 GB recommended), 5 GB of free disk (10 GB recommended) and Internet access.",
+     "Prepare a server with at least 4 GB of RAM (8 GB recommended), 5 GB of free disk (10 GB recommended) and Internet access.",
      "Run `sudo bash installer`, choose the panel language and open **Install Koha server**.",
      "Choose the timezone when asked, then let the installer work: it usually takes 10 to 30 minutes.",
      "At the end, note the database user and password: they are also saved in `/root/koha_credentials.txt`.",
@@ -12876,7 +12876,7 @@
      "O backup noturno, a exportação MARC semanal, os vigias do índice e as tarefas de limpeza são agendados automaticamente em `/etc/cron.d/koha_tasks`."
     ],
     "steps": [
-     "Prepare um servidor com pelo menos 2 GB de RAM (4 GB recomendados), 5 GB de disco livre (10 GB recomendados) e acesso à Internet.",
+     "Prepare um servidor com pelo menos 4 GB de RAM (8 GB recomendados), 5 GB de disco livre (10 GB recomendados) e acesso à Internet.",
      "Rode `sudo bash installer`, escolha o idioma do painel e abra **Instalar servidor Koha**.",
      "Escolha o fuso horário quando for perguntado e deixe o instalador trabalhar: costuma levar de 10 a 30 minutos.",
      "No final, anote o usuário e a senha do banco de dados: eles também ficam salvos em `/root/koha_credentials.txt`.",

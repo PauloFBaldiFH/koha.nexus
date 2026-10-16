@@ -52,7 +52,7 @@ Nasceu da experiência real com as barreiras técnicas da gestão de acervos e f
 | Item | Mínimo |
 |------|--------|
 | Sistema operacional | Debian 11/12/13 ou Ubuntu 22.04/24.04, 64 bits (amd64 ou arm64, ex.: Oracle Ampere, AWS Graviton, Raspberry Pi 4/5), ou Windows 10/11 pelo WSL 2 (veja [Windows](#windows-wsl-2)) |
-| RAM | 2 GB (recomendado 4 GB ou mais; o Elasticsearch precisa de ~1,5 GB a mais) |
+| RAM | Servidor dedicado: 4 GB (8 GB recomendados). Desktop ou virtualizado (Windows com WSL 2): 8 GB (12 GB recomendados). O Elasticsearch precisa de ~1,5 GB a mais |
 | Disco livre | 5 GB (recomendado 10 GB ou mais) |
 | Acesso | `root` ou usuário com `sudo` |
 | Rede | Acesso à internet para `debian.koha-community.org` |
@@ -140,7 +140,7 @@ irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/inst
 
 O instalador faz todo o resto e mostra cada etapa em linguagem simples:
 
-1. Verifica o computador: Windows 10 versão 2004 ou mais recente, ou Windows 11; 64 bits; pelo menos 4 GB de memória (8 GB recomendados); pelo menos 10 GB livres no C:; virtualização ativada na BIOS.
+1. Verifica o computador: Windows 10 versão 2004 ou mais recente, ou Windows 11; 64 bits; pelo menos 8 GB de memória (12 GB recomendados); pelo menos 10 GB livres no C:; virtualização ativada na BIOS.
 2. Pede um nome de usuário e uma senha para o Debian, antes de instalar qualquer coisa. Você os usa para abrir o Debian e com `sudo`; não são o login da equipe no Koha. A senha nunca é gravada nem registrada no log, e é pedida de novo se o Windows reiniciar antes de o Debian ficar pronto.
 3. Instala o WSL 2. O Windows pede permissão uma vez. Se o Windows precisar reiniciar, o instalador continua sozinho quando você entrar de novo.
 4. Pede ao WSL que instale o Debian da lista oficial do WSL da Microsoft como `koha` em `C:\Koha\wsl`. Em um WSL mais antigo, baixa a mesma imagem, confere o SHA-256 e a importa.

@@ -157,7 +157,7 @@ function Invoke-KohaEasyDiagnose {
             $tasks = @(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -like 'Koha - *' }) + @(Get-ScheduledTask -TaskPath '\KohaEasy\' -ErrorAction SilentlyContinue)
             if ($tasks.Count -eq 0) { throw 'none' }
             foreach ($t in $tasks) { Say ('  task {0}: {1} | {2} {3}' -f $t.TaskName, $t.State, @($t.Actions)[0].Execute, @($t.Actions)[0].Arguments) }
-        } catch { Say '  no KohaEasy tasks' 'Yellow' }
+        } catch { Say '  no Koha Nexus tasks' 'Yellow' }
 
         Head 'Starting the tray the way Windows does, and checking it stays up'
         try {

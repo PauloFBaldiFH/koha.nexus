@@ -52,7 +52,7 @@ It was born from real-life experience facing technical barriers in collection ma
 | Item | Minimum |
 |------|---------|
 | Operating system | Debian 11/12/13 or Ubuntu 22.04/24.04, 64-bit (amd64 or arm64, e.g. Oracle Ampere, AWS Graviton, Raspberry Pi 4/5), or Windows 10/11 through WSL 2 (see [Windows](#windows-wsl-2)) |
-| RAM | 2 GB (4 GB+ recommended; Elasticsearch needs ~1.5 GB more) |
+| RAM | Dedicated server: 4 GB (8 GB recommended). Desktop or virtualized (Windows with WSL 2): 8 GB (12 GB recommended). Elasticsearch needs ~1.5 GB more |
 | Free disk | 5 GB (10 GB+ recommended) |
 | Access | `root` or a user with `sudo` |
 | Network | Internet access to `debian.koha-community.org` |
@@ -140,7 +140,7 @@ irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/inst
 
 The installer does everything else and shows each step in plain language:
 
-1. It checks the PC: Windows 10 version 2004 or later, or Windows 11; 64-bit; at least 4 GB of memory (8 GB recommended); at least 10 GB free on C:; virtualization turned on in the BIOS.
+1. It checks the PC: Windows 10 version 2004 or later, or Windows 11; 64-bit; at least 8 GB of memory (12 GB recommended); at least 10 GB free on C:; virtualization turned on in the BIOS.
 2. It asks for a user name and password for Debian, before anything is installed. You use them to open Debian and with `sudo`; they are not the Koha staff login. The password is never saved or logged, and it is asked again if Windows restarts before Debian is ready.
 3. It installs WSL 2. Windows asks for permission once. If Windows needs a restart, the installer continues by itself after you sign in again.
 4. It has WSL install Debian from Microsoft's own WSL list as `koha` in `C:\Koha\wsl`. On an older WSL it downloads the same image itself, checks its SHA-256 and imports it.
