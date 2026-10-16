@@ -292,7 +292,7 @@ def test_staff_pictures_and_single_icon(tmp_path):
                                   "favicon": {"source": "url", "url": "https://example.org/staff.ico"},
                                   "background": {"source": "url", "url": "javascript:alert(1)"}}})
     st = cfg["staff"]
-    assert st["film"] == ot.STAFF_FILM[0] and st["background"]["url"] == ""
+    assert st["film"] == 5 and st["background"]["url"] == ""
     staff = ot.staff_css_body(cfg)
     assert 'url("/intranet-tmpl/kei-custom/kei-staff-logo.png?v=1")' in staff and "#logo.navbar-brand img { display: none; }" in staff
     assert ".fa-stack .fa-stack-1x {{ display: none; }}".replace("{{", "{").replace("}}", "}") in staff
@@ -300,6 +300,11 @@ def test_staff_pictures_and_single_icon(tmp_path):
     with_bg = ot.staff_css_body(ot.normalize({"staff": {"background": {"source": "url",
                                                                        "url": "https://i.ibb.co/x/s.jpg"}}}))
     assert 'url("https://i.ibb.co/x/s.jpg")' in with_bg and "html body::before" in with_bg
+    # Over the wallpaper only the cards have a surface, at the opacity slider; the wrappers stay clear.
+    assert "background-color: transparent !important" in with_bg and "html body .main, html body main" in with_bg
+    assert "html body .main, html body .page-section" not in with_bg       # no solid sheet over the whole content area
+    assert "background-color: rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a))" in with_bg
+    assert "html body .page-section .dataTables_wrapper" in with_bg
     # The staff pictures stay out of the OPAC's stylesheet.
     assert "kei-staff-logo" not in ot.css_body(cfg)
     pic = tmp_path / "logo.png"
@@ -445,7 +450,7 @@ def test_copy_opac_preset():
     assert st["enabled"] and (st["texture"], st["blur"], st["opacity"]) == ("smooth", 7, 64)
     assert (st["radius_block"], st["radius_input"], st["radius_button"]) == (20, 5, 9)
     assert (st["accent"], st["accent2"], st["surface"], st["page"]) == ("#aa0000", "#00aa00", "#fafafa", "#e0e0e0")
-    assert st["film"] == ot.STAFF_FILM[0]                          # the staff film keeps tables readable
+    assert st["film"] == 10                                        # the OPAC's film, no floor: the cards keep tables readable
     assert st["logo"] == {"source": "url", "url": "https://i.ibb.co/x/logo.png"}
     assert skipped == ["background"] and st["background"]["source"] == "none"   # an OPAC file: not served on staff
     assert st["favicon"]["url"] == "https://e.org/s.ico"          # nothing to copy: the staff's own kept

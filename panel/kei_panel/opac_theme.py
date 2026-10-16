@@ -122,7 +122,7 @@ DEFAULTS: dict = {
               "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
-              "favicon": {"source": "none", "url": ""}, "film": 75},
+              "favicon": {"source": "none", "url": ""}, "film": 55},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
     # writes: the login instructions of the OPAC and of the staff interface
     # (allow-listed HTML, a banner picture above it) and the OPAC footer
@@ -143,7 +143,7 @@ RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius
           "radius_button": (0, 30), "film": (0, 90)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
-STAFF_FILM = (40, 95)       # % of the film over the staff wallpaper: tables and forms stay readable
+STAFF_FILM = (0, 90)        # % of the film over the staff wallpaper, the OPAC's range: the cards keep the text readable
 # The staff material: the OPAC's sliders, same ranges.
 STAFF_MATERIAL = ("blur", "opacity", "radius_block", "radius_input", "radius_button")
 
@@ -1827,7 +1827,16 @@ def _staff_panels_css(st: dict) -> str:
     Koha's white tables, forms and dialogs follow it, so light text never
     lands on white."""
     light = luminance(st["surface"]) >= 0.30
-    out = ["""html body #breadcrumbs { background: transparent; border: 0; box-shadow: none; }
+    out = ["""/* Koha's page wrappers carry no colour of their own (Bootstrap paints the
+   body white and the old .main rule painted the whole content area): only
+   the cards below do, so the page colour or the wallpaper shows between them. */
+html body #container-main, html body .main, html body main, html body .container-fluid,
+html body #sub-header, html body #sidebar-container, html body #sidebar-container aside,
+html body .main > .row, html body .main > .row > [class*="col"],
+html body #container-main > .row, html body #container-main > .row > [class*="col"] {
+    background-color: transparent !important;
+}
+html body #breadcrumbs { background: transparent; border: 0; box-shadow: none; }
 html body #breadcrumbs .breadcrumb {
     background-color: var(--nexus-staff-card);
     border: 1px solid var(--nexus-staff-edge);
@@ -1982,8 +1991,10 @@ html body .btn-default, html body .btn-secondary, html body .btn-light {{
 
 def _staff_pictures_css(st: dict) -> list[str]:
     """The staff logo in the top bar and the staff wallpaper under a film of
-    the page colour (STAFF_FILM keeps it strong enough for tables and forms;
-    the content boxes stay opaque). The favicon is IntranetFavicon."""
+    the page colour. Over a wallpaper the cards (content sections, sidebar
+    menus, tables, forms) take the staff surface at the opacity slider, one
+    layer only: a card inside a card stays clear, as on the OPAC. The
+    favicon is IntranetFavicon."""
     out = []
     logo = st["logo"]["url"]
     if logo:
@@ -2014,10 +2025,20 @@ html body::before {{
     pointer-events: none;
     background: rgba({_rgb(page)}, {st['film'] / 100:.2f});
 }}
-html body .main, html body .page-section, html body #container-main .row > div > .page-section,
-html body .dataTables_wrapper, html body fieldset.rows, html body form .action {{
-    background-color: var(--nexus-staff-card);
+html body .page-section, html body .sidebar_menu, html body .dataTables_wrapper, html body fieldset.rows,
+html body form .action {{
+    background-color: rgba(var(--nexus-staff-surface-rgb), var(--nexus-staff-surface-a));
     border-radius: var(--nexus-staff-radius);
+}}
+html body .page-section .page-section, html body .page-section .dataTables_wrapper,
+html body .page-section fieldset.rows, html body .page-section form .action,
+html body fieldset.rows fieldset.rows, html body .dataTables_wrapper fieldset.rows {{
+    background: transparent;
+}}
+html body .page-section table, html body .page-section .table,
+html body .dataTables_wrapper table, html body .dataTables_wrapper .table {{
+    --bs-table-bg: transparent;
+    background-color: transparent;
 }}""")
     return out
 

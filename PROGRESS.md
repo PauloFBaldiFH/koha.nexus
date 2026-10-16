@@ -1,6 +1,6 @@
 # koha.nexus: Project Progress
 
-_Last updated: 2026-10-15. Panel version on `main`: **1.5.60** (1.5.61: restore screen drops typed as keys, Open file manager PR)._
+_Last updated: 2026-10-16. Panel version on `main`: **1.5.61** (1.5.62: staff wrappers transparent, catalogue card stylesheet repair PR)._
 
 This file is the hand-off context for a fresh chat session. It replaces the older
 PROGRESS.md (which described a WinForms "Management Panel" and a PR #62 that never
@@ -384,6 +384,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `📂 Open file manager` (WSL or a Linux desktop only) opens the tree's folder via
   `opener.open_user_folder` in a thread worker, ignoring clicks within 2 s.
   `panel/tests/test_picker_drops.py`.
+- **1.5.62 (Paulo: staff washed-out look, empty OPAC Normal view)**: the staff wrappers (`#container-main`,
+  `.main`, `main`, `.container-fluid`, `#sub-header`, `#sidebar-container`, the rows and columns
+  between them) are `background-color: transparent !important`; the old wallpaper rule painted `.main`
+  (the whole content area) with the solid card colour. Over a staff wallpaper the cards (`.page-section`,
+  `.sidebar_menu`, `.dataTables_wrapper`, `fieldset.rows`, `form .action`) take the staff surface at the
+  opacity slider, one layer only (nested ones and their tables clear). STAFF_FILM is now the OPAC's
+  0-90 range, staff default 55 (was 40-95, default 75: a 75 % page-colour film was the whitish wash).
+  Catalogue card: Koha has no fallback for a custom XSLT path, so a missing `{langcode}` file empties the
+  Normal view silently (C4::XSLT returns undef). `ficha_refresh` now also runs when the preferences point
+  at kei-xslt without a state file (restore from another server), after a language pack and in
+  `staff_authlinks_fix` (install, update, restore); files are written as `.part` then moved; when they
+  cannot be written the preferences go back to `default`. tests BR13b.
 - **1.5.57 (Windows: terminal panel + tray, web window dropped)**: Paulo chose to drop the
   pywebview Control Center (PRs #98-#104): `windows/client/`, `windows/KohaEasy.Python.psm1`,
   `nexus_core/taskproto.py` + `menucatalog.py` and the windows-client CI are gone; install.ps1 deletes

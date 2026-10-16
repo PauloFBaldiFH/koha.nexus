@@ -236,6 +236,21 @@ ficha_env() {
     assert '[ -f "$W/ficha/es-ES/opac-detail.xsl" ] && [ -f "$W/ficha/es-ES/staff-detail.xsl" ]' "$(ls -R "$W/ficha" 2>&1)"
 }
 
+@test "BR13b catalogue card restored from another server: files written again, else Koha's default view" {
+    ficha_env
+    # The database says the card is on, this server has neither the state file nor the folder.
+    tools_sql "UPDATE systempreferences SET value = '$W/ficha/{langcode}/opac-detail.xsl' WHERE variable = 'OPACXSLTDetailsDisplay';"
+    rm -f /etc/koha-easy-install/ficha.state
+    panel ficha_refresh
+    assert '[ -f "$W/ficha/en/opac-detail.xsl" ] && [ -f "$W/ficha/pt-BR/opac-detail.xsl" ] && [ -f "$W/ficha/pt-BR/staff-detail.xsl" ]' "$(ls -R "$W/ficha" 2>&1)"
+    assert '! ls "$W"/ficha/*/*.part >/dev/null 2>&1' "no half-written file is left"
+    assert 'grep -qx "OPACXSLTDetailsDisplay=default" /etc/koha-easy-install/ficha.state' "Hide the card knows the card is on"
+    # No Koha stylesheet to import: the detail page goes back to Koha's own view instead of an empty one.
+    rm -rf "$W/ficha" "$W/tmpl" /etc/koha-easy-install/ficha.state
+    panel ficha_refresh
+    assert '[ "$(tools_sql "SELECT value FROM systempreferences WHERE variable = \"OPACXSLTDetailsDisplay\";")" = "default" ]' "$(calls)"
+}
+
 # --- 4. Government census reports -----------------------------------------------
 
 # Koha columns used by the census reports, and a year (2025) with known
