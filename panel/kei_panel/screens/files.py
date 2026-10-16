@@ -17,11 +17,28 @@ any other. A file that is not on this server (the panel used over SSH) gets
 the command that sends it here, with its Copy button. A path that cannot be
 read (no permission, too long) is said under the box, never raised: an
 error in a screen's handler would close the whole panel.
+
+Drops (Paulo, 2026-10-16). A terminal hands a dropped file over in one of
+two ways: as a bracketed paste (events.Paste, read by on_paste and by the
+path box), or typed into the window as plain keystrokes (the classic
+console, some Windows Terminal versions). Keystrokes go to the focused
+widget, so in file mode the path box has the focus from the start: a
+folder tree with the focus swallowed them and the drop was lost. The box
+tells a drop from typing by speed: a drop arrives as one burst (the keys
+milliseconds apart, faster than anyone types); when the burst ends and
+reads as a path, the box gets back what it held and the path is handled as
+a drop. Typing by hand is never touched.
+
+"Open file manager" shows the folder of the tree in Windows Explorer (WSL)
+or the desktop's file manager, in a thread (wslpath and the interop check
+must not hold the screen), once at a time: clicks while one is opening,
+or within two seconds of it, open nothing more.
 """
 
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -33,7 +50,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, Static
 
 from ..i18n import t
-from ..transfer import dropped_path
+from ..transfer import dropped_path, looks_like_path, where
 from .dialogs import CopyValues, MessageScreen
 
 BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst", ".backup", ".bkp", ".dump",
@@ -60,8 +77,71 @@ def typed_path(text: str) -> Path:
     return Path(dropped_path(text) or "/")
 
 
+# Keys of one drop arrive microseconds to a few milliseconds apart; nobody
+# types six characters 25 ms apart.
+BURST_GAP = 0.025
+BURST_MIN = 6
+BURST_IDLE = 0.12
+
+
+def inserted_text(before: str, after: str) -> str:
+    """What was typed into before to give after (common start and end cut)."""
+    p = 0
+    while p < min(len(before), len(after)) and before[p] == after[p]:
+        p += 1
+    s = 0
+    while s < min(len(before), len(after)) - p and before[-1 - s] == after[-1 - s]:
+        s += 1
+    return after[p:len(after) - s]
+
+
 class PathInput(Input):
-    """The path box: a dropped file goes to the screen, not into the text."""
+    """The path box: a dropped file goes to the screen, not into the text,
+    whether the terminal pastes it or types it (see the module notes)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._burst_before: str | None = None
+        self._burst_len = 0
+        self._burst_last = 0.0
+        self._burst_timer = None
+
+    def _on_key(self, event: events.Key) -> None:
+        screen = self.screen
+        if event.is_printable and getattr(screen, "accepts_drops", False):
+            stamp = getattr(event, "time", None) or time.monotonic()
+            if self._burst_before is None or stamp - self._burst_last > BURST_GAP:
+                self._burst_before, self._burst_len = self.value, 0
+            self._burst_last = stamp
+            self._burst_len += 1
+            if self._burst_timer is not None:
+                self._burst_timer.stop()
+            self._burst_timer = self.set_timer(BURST_IDLE, self._burst_done)
+        # Input's own _on_key runs next (Textual calls each class's handler)
+        # and types the key as usual.
+
+    def _burst_done(self) -> bool:
+        """The burst ended: handled as a drop when it was one. True if so."""
+        before, count = self._burst_before, self._burst_len
+        self._burst_before, self._burst_len, self._burst_timer = None, 0, None
+        if before is None or count < BURST_MIN or not self.is_attached:
+            return False
+        text = inserted_text(before, self.value)
+        # A held "/" key repeats fast too: a drop names something.
+        if not looks_like_path(text) or not any(c.isalnum() for c in text):
+            return False
+        self.value = before
+        self.screen.dropped(text)
+        return True
+
+    async def action_submit(self) -> None:
+        # Enter right after a drop typed as keys: the drop, not the mix of
+        # the old path and the new one.
+        if self._burst_timer is not None:
+            self._burst_timer.stop()
+            if self._burst_done():
+                return
+        await super().action_submit()
 
     def _on_paste(self, event: events.Paste) -> None:
         screen = self.screen
@@ -110,6 +190,8 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
         start_path = Path(start)
         self._start = start_path if path_kind(start_path) == "dir" else Path("/")
         self._shortcuts = [(label, path) for label, path in (shortcuts or []) if path_kind(Path(path)) == "dir"]
+        self._can_open_folders = where() in ("wsl", "desktop")
+        self._folder_opened = 0.0
 
     def compose(self) -> ComposeResult:
         with Vertical(id="picker-box"):
@@ -120,6 +202,8 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                         for i, (label, _path) in enumerate(self._shortcuts):
                             yield Button(label, id=f"go-{i}", classes="picker-go")
                         yield Button(t("Up"), id="up", classes="picker-go")
+                        if self._can_open_folders:
+                            yield Button(t("📂 Open file manager"), id="open-folder")
                     if self.accepts_drops:
                         yield Static(t("📥 Drop the file here, or paste its path.") if self._suffixes is None
                                      else t("📥 Drop a .sql, .sql.gz, .sql.xz or .sql.zst file here, or paste its path."),
@@ -141,7 +225,8 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                 yield Button(t("Cancel"), id="cancel")
 
     def on_mount(self) -> None:
-        self.query_one("#picker-tree").focus()
+        # File mode: the path box, where a drop typed as keys must land.
+        self.query_one("#picker-path" if self.accepts_drops else "#picker-tree").focus()
 
     # ------------------------------------------------------------------
     def _open(self, folder: Path) -> None:
@@ -209,6 +294,28 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
             return
         current = Path(self.query_one("#picker-tree", FilteredTree).path)
         self._open(current.parent)
+
+    @on(Button.Pressed, "#open-folder")
+    def _open_folder(self) -> None:
+        now = time.monotonic()
+        if now - self._folder_opened < 2.0:
+            return
+        self._folder_opened = now
+        folder = str(self.query_one("#picker-tree", FilteredTree).path)
+        self.app.notify(t("Opening ${folder} in the file manager...", folder=folder), timeout=4)
+        self.run_worker(lambda: self._show_folder(folder), thread=True, exclusive=True,
+                        group="open-folder", exit_on_error=False)
+
+    def _show_folder(self, folder: str) -> None:
+        """In a thread: wslpath and the WSL interop check may take a moment."""
+        from ..opener import open_user_folder
+        try:
+            ok = open_user_folder(folder)
+        except Exception:  # noqa: BLE001 - an error here must not close the panel
+            ok = False
+        if not ok:
+            self.app.call_from_thread(self.app.notify, t("No file manager could be opened from here."),
+                                      severity="warning")
 
     @on(Button.Pressed, "#choose")
     def _choose_pressed(self) -> None:
