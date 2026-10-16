@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.59",
+ "panel_version": "1.5.63",
  "languages": [
   {
    "code": "en",
@@ -12890,7 +12890,8 @@
     ],
     "warnings": [
      "Rodar a instalação de novo num servidor que já tem o Koha oferece uma reinstalação que APAGA o banco de dados. Ela pede uma confirmação digitada (REINSTALL): faça um backup antes."
-    ]
+    ],
+    "outdated": true
    }
   },
   "credentials": {
@@ -17650,7 +17651,9 @@
   "pt-BR": {
    "manual": 109,
    "manual_total": 109,
-   "manual_outdated": [],
+   "manual_outdated": [
+    "install"
+   ],
    "strings": 368,
    "strings_total": 377
   },
