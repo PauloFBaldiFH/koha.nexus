@@ -28,7 +28,8 @@ globs work):
 ```json
 {"sources": [
   {"id": "zeus", "name": "Catálogo Zeus (harvest)", "paths": ["catalogo_zeus_enriquecimento.jsonl.zst"],
-   "mode": "pointer", "brazilian": true, "weight": 0.7, "source_field": "target"},
+   "mode": "pointer", "brazilian": true, "weight": 0.7, "source_field": "fonte",
+   "overrides": {"fundacentro": {"mode": "full"}}},
   {"id": "usp", "name": "USP (Aleph)", "paths": ["data_usp/*.mrc"], "mode": "pointer", "brazilian": true},
   {"id": "loc", "name": "Library of Congress", "paths": ["loc/*.xml.gz"], "mode": "full", "weight": 1.0},
   {"id": "pool", "name": "Rede koha.nexus", "paths": ["catalog.db"], "brazilian": true, "headings": false}
@@ -44,13 +45,20 @@ globs work):
 | `brazilian` | `false` | a Brazilian source: its subject headings may go on Portuguese records |
 | `weight` | `0.5` | 0–1 authority of the source, the third tie-breaker after class and completeness |
 | `headings` | `true` | gather the 1XX/6XX/7XX headings of its bibliographic records into `auth_headings` |
-| `source_field` | | a JSON key whose value becomes the source id per line (one Zeus dump holding several catalogues) |
+| `source_field` | | a JSON key naming the source per line (one Zeus dump holding several catalogues, e.g. `fonte`); its value becomes the source's name, and its id is the acronym in final parentheses ("… (Fundacentro)" -> `fundacentro`) or the folded words joined by `-` |
+| `source_map` | | `{"value of source_field": "id"}` for names whose derived id is not the one wanted |
+| `overrides` | | `{"id": {"mode", "brazilian", "weight", "name", "headings"}}` per derived source; the rest comes from the entry itself |
 
-A JSON line may hold the record as MARCXML (`marcxml`, `marc_xml`, `xml`,
-`record`, `marc`), as ISO 2709 text (`iso2709`, `mrc`, `raw`) or as
-MARC-in-JSON (`{"leader", "fields"}`); its id is read from `remote_id`, `id`,
-`_id`, `control_number`, `recid` or `source_id`, else 001. Lines the builder
-cannot read are counted in the report with the keys they had.
+A JSON line may hold the record as ISO 2709 text (`raw_iso2709`, `iso2709`,
+`mrc`, `raw`; tried first, and a line whose raw record is broken falls back
+to the other forms), as MARCXML (`marcxml`, `marc_xml`, `xml`, `record`,
+`marc`), as MARC-in-JSON (`{"leader", "fields"}`) or as the Zeus harvest's
+dict under `marc` (`{"LDR", "001": "…", "650": [{"ind": "07", "subcampos":
+{"$a": "…", "$x": ["…", "…"]}}]}`, a list being a repeated subfield). Its
+id is read from `remote_id`, `id`, `control_number`, `recid` or `source_id`,
+else 001, else `_id` or `id_hash`. `resumo` and other extra keys are
+ignored. Lines the builder cannot read are counted in the report with the
+keys they had.
 
 ```sh
 python -m enrich_build build sources.json --out static.db --report report.json

@@ -263,6 +263,61 @@ def to_iso2709(rec: Record) -> bytes:
     return leader.encode("ascii", "replace") + directory + FT + data + RT
 
 
+def from_iso2709_text(text: str) -> Record:
+    """ISO 2709 already decoded to text (a JSON string holding a raw
+    record). The directory's byte offsets no longer fit once the bytes are
+    text, so fields are paired with the directory's tags in order, split on
+    the field terminator; no MARC-8 conversion is attempted (the text is
+    taken as it is, whatever leader/09 says)."""
+    text = text.rstrip("\x1d")
+    if len(text) < 25:
+        raise RecordError("record shorter than a leader")
+    leader = text[:24]
+    end = text.find("\x1e", 24)
+    if end < 0:
+        raise RecordError("no field terminator after the directory")
+    directory = text[24:end]
+    if len(directory) % 12:
+        raise RecordError("directory length is not a multiple of 12")
+    tags = [directory[i:i + 3] for i in range(0, len(directory), 12)]
+    chunks = text[end + 1:].split("\x1e")
+    if len(chunks) < len(tags):
+        raise RecordError(f"directory names {len(tags)} fields, the record has {len(chunks)}")
+    rec = Record(leader=leader)
+    for tag, chunk in zip(tags, chunks):
+        if tag < "010" and tag.isdigit():
+            rec.fields.append(Field(tag, data=chunk))
+            continue
+        ind = chunk[:2].ljust(2)
+        subs = [(part[:1], part[1:]) for part in chunk[2:].split("\x1f")[1:] if part]
+        rec.fields.append(Field(tag, ind[0], ind[1], subs))
+    return rec
+
+
+def from_campos(obj: dict) -> Record:
+    """The Zeus harvest's own JSON form: {"LDR": "...", "001": "...",
+    "245": [{"ind": "10", "subcampos": {"$a": "...", "$x": ["...", "..."]}}]}.
+    A list under a subfield code is that subfield repeated."""
+    if not isinstance(obj, dict) or "LDR" not in obj:
+        raise RecordError("no LDR")
+    rec = Record(leader=str(obj["LDR"]).ljust(24)[:24])
+    for tag, value in obj.items():
+        if tag == "LDR":
+            continue
+        if isinstance(value, str):
+            rec.fields.append(Field(tag, data=value))
+            continue
+        for occ in value if isinstance(value, list) else [value]:
+            ind = str(occ.get("ind", "  ")).ljust(2)
+            subs = []
+            for code, v in (occ.get("subcampos") or {}).items():
+                code = code.lstrip("$")[:1]
+                for item in v if isinstance(v, list) else [v]:
+                    subs.append((code, "" if item is None else str(item)))
+            rec.fields.append(Field(tag, ind[0], ind[1], subs))
+    return rec
+
+
 # ----------------------------------------------------------------------
 # MARC-in-JSON (the LoC / pymarc JSON form)
 # ----------------------------------------------------------------------

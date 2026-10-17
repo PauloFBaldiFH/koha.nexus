@@ -25,6 +25,7 @@ from __future__ import annotations
 import glob
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 import time
@@ -42,6 +43,36 @@ DICT_SIZE = 112_640          # zstd's usual dictionary size
 LEVEL = 19                   # no --long / --ultra: decompression stays small
 
 
+@dataclass(frozen=True)
+class Settings:
+    """What one source id gets: the config's values, or for a source named
+    per line (source_field) the config's values with its overrides."""
+    id: str
+    name: str
+    mode: str
+    brazilian: bool
+    weight: float
+    headings: bool
+
+
+_SETTING_KEYS = ("name", "mode", "brazilian", "weight", "headings")
+
+
+def _check_mode(where: str, mode: str) -> str:
+    if mode not in ("full", "pointer"):
+        raise ValueError(f"{where}: mode must be full or pointer, not {mode!r}")
+    return mode
+
+
+def slug(value: str) -> str:
+    """A short source id for a name read from the dump: the acronym in
+    final parentheses when there is one ("Fundação … (Fundacentro)" ->
+    "fundacentro"), else the folded words joined by "-" (at most 40)."""
+    m = re.search(r"\(([^()]{2,40})\)\s*$", value or "")
+    text = normalize.fold(m.group(1) if m else value)
+    return "-".join(text.split())[:40].strip("-") or "unknown"
+
+
 @dataclass
 class SourceConfig:
     id: str
@@ -53,6 +84,8 @@ class SourceConfig:
     weight: float = 0.5
     headings: bool = True
     source_field: str = ""              # JSON key naming the source per line
+    source_map: dict = field(default_factory=dict)   # value of source_field -> source id
+    overrides: dict = field(default_factory=dict)    # source id -> {mode, brazilian, weight, name, headings}
 
     @classmethod
     def from_dict(cls, d: dict) -> "SourceConfig":
@@ -61,12 +94,31 @@ class SourceConfig:
         paths = d.get("paths") or ([d["path"]] if d.get("path") else [])
         if not paths:
             raise ValueError(f"source {d['id']}: no paths")
-        mode = d.get("mode", "full")
-        if mode not in ("full", "pointer"):
-            raise ValueError(f"source {d['id']}: mode must be full or pointer, not {mode!r}")
+        mode = _check_mode(f"source {d['id']}", d.get("mode", "full"))
+        overrides = d.get("overrides") or {}
+        for sid, o in overrides.items():
+            unknown = set(o) - set(_SETTING_KEYS)
+            if unknown:
+                raise ValueError(f"source {d['id']}: override {sid}: unknown keys {sorted(unknown)}")
+            if "mode" in o:
+                _check_mode(f"source {d['id']}: override {sid}", o["mode"])
         return cls(id=d["id"], paths=list(paths), name=d.get("name", ""), format=d.get("format", "auto"),
                    mode=mode, brazilian=bool(d.get("brazilian", False)), weight=float(d.get("weight", 0.5)),
-                   headings=bool(d.get("headings", True)), source_field=d.get("source_field", ""))
+                   headings=bool(d.get("headings", True)), source_field=d.get("source_field", ""),
+                   source_map=dict(d.get("source_map") or {}), overrides=dict(overrides))
+
+    def settings(self, raw: str = "") -> Settings:
+        """The settings of the source a record belongs to; RAW is the value of
+        source_field on its line ("" = the config's own id)."""
+        if not raw:
+            sid, name = self.id, self.name
+        else:
+            sid = self.source_map.get(raw) or slug(raw)
+            name = raw
+        o = self.overrides.get(sid, {})
+        return Settings(id=sid, name=o.get("name", name), mode=o.get("mode", self.mode),
+                        brazilian=bool(o.get("brazilian", self.brazilian)),
+                        weight=float(o.get("weight", self.weight)), headings=bool(o.get("headings", self.headings)))
 
     def files(self, base: Path) -> list[Path]:
         out: list[Path] = []
@@ -123,16 +175,18 @@ class Builder:
         self.sample = sample
         self.report = Report()
         self._cctx = None
+        self._seen: dict[tuple[str, str], Settings] = {}
 
     # -- pass 1 ------------------------------------------------------------
     def _train(self) -> bytes:
         samples: list[bytes] = []
         for src in self.sources:
-            if src.mode != "full":
+            if src.mode != "full" and not any(o.get("mode") == "full" for o in src.overrides.values()):
                 continue
             for path in src.files(self.base):
                 for item in readers.read(path, src.format, src.source_field):
-                    if item.record is not None and not item.record.is_authority:
+                    if (item.record is not None and not item.record.is_authority
+                            and src.settings(item.source).mode == "full"):
                         samples.append(marc.to_iso2709(item.record))
                     if len(samples) >= self.sample:
                         break
@@ -169,7 +223,8 @@ class Builder:
         for src in self.sources:
             stats = self.report.sources.setdefault(src.id, {"files": 0, "records": 0, "pointers": 0,
                                                             "authorities": 0, "errors": 0})
-            self._ensure_source(conn, src, src.id)
+            if not src.source_field:
+                self._ensure_source(conn, src.settings())
             files = src.files(self.base)
             if not files:
                 self.report.error(src.id, "no file matches " + ", ".join(src.paths))
@@ -180,10 +235,8 @@ class Builder:
                         stats["errors"] += 1
                         self.report.error(f"{src.id} {path.name}", item.error)
                         continue
-                    source_id = item.source or src.id
-                    if source_id != src.id:
-                        self._ensure_source(conn, src, source_id)
-                    self._add(conn, src, source_id, item, stats)
+                    st = self._settings(conn, src, item.source)
+                    self._add(conn, st, item, stats)
                     n += 1
                     if n % 50_000 == 0:
                         conn.execute("COMMIT")
@@ -196,12 +249,20 @@ class Builder:
         self.report.finished = datetime.now(timezone.utc).isoformat(timespec="seconds")
         return self.report
 
-    def _ensure_source(self, conn, src: SourceConfig, source_id: str) -> None:
-        conn.execute("INSERT OR IGNORE INTO sources (id, name, mode, brazilian, weight) VALUES (?, ?, ?, ?, ?)",
-                     (source_id, src.name if source_id == src.id else source_id, src.mode, int(src.brazilian),
-                      src.weight))
+    def _settings(self, conn, src: SourceConfig, raw: str) -> Settings:
+        key = (src.id, raw)
+        st = self._seen.get(key)
+        if st is None:
+            st = self._seen[key] = src.settings(raw)
+            self._ensure_source(conn, st)
+        return st
 
-    def _add(self, conn, src: SourceConfig, source_id: str, item: readers.Item, stats: dict) -> None:
+    def _ensure_source(self, conn, st: Settings) -> None:
+        conn.execute("INSERT OR IGNORE INTO sources (id, name, mode, brazilian, weight) VALUES (?, ?, ?, ?, ?)",
+                     (st.id, st.name or st.id, st.mode, int(st.brazilian), st.weight))
+
+    def _add(self, conn, st: Settings, item: readers.Item, stats: dict) -> None:
+        source_id = st.id
         rec = item.record
         if rec.marc8_fallback:
             self.report.marc8_fallback += 1
@@ -228,14 +289,14 @@ class Builder:
         cluster = self._cluster(conn, isbns, wkey, title)
         y, _ = normalize.year(rec)
         ed = edition.of(rec)
-        body = None if src.mode == "pointer" else self._cctx.compress(iso)
+        body = None if st.mode == "pointer" else self._cctx.compress(iso)
         old = conn.execute("SELECT id, cluster_id, checksum FROM versions WHERE source = ? AND remote_id = ?",
                            (source_id, remote)).fetchone()
         if old is not None:
             conn.execute("DELETE FROM idents WHERE version_id = ?", (old[0],))
             conn.execute("DELETE FROM versions WHERE id = ?", (old[0],))
             self.report.versions -= 1
-            if src.mode == "pointer":
+            if st.mode == "pointer":
                 self.report.pointers -= 1
         dup = conn.execute("SELECT 1 FROM versions WHERE cluster_id = ? AND checksum = ? LIMIT 1",
                            (cluster, checksum)).fetchone()
@@ -261,10 +322,10 @@ class Builder:
                       normalize.fold(names), normalize.fold(subjects)))
         self.report.versions += 1
         stats["records"] += 1
-        if src.mode == "pointer":
+        if st.mode == "pointer":
             self.report.pointers += 1
             stats["pointers"] += 1
-        if src.headings:
+        if st.headings:
             for h in headings.of_bib(rec):
                 self._put_heading(conn, h, source_id, preliminary=1)
 

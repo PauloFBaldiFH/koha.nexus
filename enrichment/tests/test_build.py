@@ -100,7 +100,7 @@ def test_build_counts_sources_and_errors(dumps):
     conn = sqlite3.connect(db)
     sources = dict(conn.execute("SELECT id, records FROM sources"))
     # source_field splits the Zeus dump by target; each gets the config's mode.
-    assert sources == {"zeus": 0, "ufsc": 1, "usp": 2, "loc": 1, "bn": 1, "pool": 1}
+    assert sources == {"ufsc": 1, "usp": 2, "loc": 1, "bn": 1, "pool": 1}
     assert conn.execute("SELECT mode, brazilian FROM sources WHERE id = 'usp'").fetchone() == ("pointer", 1)
 
 

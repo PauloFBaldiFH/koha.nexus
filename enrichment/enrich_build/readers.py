@@ -8,11 +8,13 @@ bytes):
     iso2709   .mrc .marc .iso .dat   binary MARC
     pool      .db .sqlite            catalog-network's pool (nexus_catalog)
 
-A JSON line may carry the record as MARCXML ("marcxml", "marc_xml",
-"xml", "record", "marc"), as ISO 2709 text ("iso2709", "mrc", "raw"), or
-as MARC-in-JSON ({"leader", "fields"}, also under "marc" / "record").
-Its id comes from "remote_id", "id", "_id", "control_number", "recid" or
-"source_id", else from 001. Lines that hold none of these are counted as
+A JSON line may carry the record as ISO 2709 text ("raw_iso2709",
+"iso2709", "mrc", "raw"; read first), as MARCXML ("marcxml", "marc_xml",
+"xml", "record", "marc"), as MARC-in-JSON ({"leader", "fields"}, also
+under "marc" / "record") or as the Zeus harvest's dict ({"LDR", "245":
+[{"ind", "subcampos"}]} under "marc"). Its id comes from "remote_id",
+"id", "control_number", "recid" or "source_id", else from 001, else from
+"_id" or "id_hash". Lines that hold none of these are counted as
 errors with their keys, so an unknown dump layout shows up in the report
 instead of silently loading nothing.
 """
@@ -36,8 +38,10 @@ _FORMATS = {".jsonl": "jsonl", ".ndjson": "jsonl", ".json": "jsonl", ".xml": "ma
             ".mrc": "iso2709", ".marc": "iso2709", ".iso": "iso2709", ".dat": "iso2709",
             ".db": "pool", ".sqlite": "pool", ".sqlite3": "pool"}
 _XML_KEYS = ("marcxml", "marc_xml", "xml", "record", "marc")
-_ISO_KEYS = ("iso2709", "mrc", "raw")
-_ID_KEYS = ("remote_id", "id", "_id", "control_number", "recid", "source_id")
+_ISO_KEYS = ("raw_iso2709", "iso2709", "mrc", "raw")
+# Ids that name the record at its source come before 001; content hashes after.
+_ID_KEYS = ("remote_id", "id", "control_number", "recid", "source_id")
+_LATE_ID_KEYS = ("_id", "id_hash")
 
 
 @dataclass
@@ -90,6 +94,16 @@ def _id_of(rec: marc.Record) -> str:
 
 
 def _from_json(obj: dict) -> marc.Record:
+    # Raw ISO 2709 first: the cheapest to read and the record exactly as
+    # harvested. A line that fails there falls through to the other forms.
+    first_error = None
+    for key in _ISO_KEYS:
+        value = obj.get(key)
+        if isinstance(value, str) and "\x1e" in value:
+            try:
+                return marc.from_iso2709_text(value)
+            except marc.RecordError as exc:
+                first_error = first_error or exc
     for key in _XML_KEYS:
         value = obj.get(key)
         if isinstance(value, str) and value.lstrip().startswith("<"):
@@ -99,12 +113,12 @@ def _from_json(obj: dict) -> marc.Record:
             return records[0]
         if isinstance(value, dict) and "leader" in value:
             return marc.from_json(value)
-    for key in _ISO_KEYS:
-        value = obj.get(key)
-        if isinstance(value, str) and "\x1e" in value:
-            return marc.from_iso2709(value.encode("utf-8"))
+        if isinstance(value, dict) and "LDR" in value:
+            return marc.from_campos(value)
     if "leader" in obj and "fields" in obj:
         return marc.from_json(obj)
+    if first_error is not None:
+        raise first_error
     raise marc.RecordError("no record in keys: " + ", ".join(sorted(obj)[:12]))
 
 
@@ -120,7 +134,8 @@ def read_jsonl(stream: IO[bytes], source_field: str = "") -> Iterator[Item]:
         except (ValueError, marc.RecordError) as exc:
             yield Item(None, error=f"line {n}: {exc}")
             continue
-        remote = next((str(obj[k]) for k in _ID_KEYS if obj.get(k) not in (None, "")), "") or _id_of(rec)
+        remote = (next((str(obj[k]) for k in _ID_KEYS if obj.get(k) not in (None, "")), "") or _id_of(rec)
+                  or next((str(obj[k]) for k in _LATE_ID_KEYS if obj.get(k) not in (None, "")), ""))
         source = str(obj.get(source_field, "")) if source_field else ""
         yield Item(rec, remote, source)
 

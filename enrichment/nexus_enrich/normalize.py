@@ -132,14 +132,20 @@ def author_surname(rec: Record) -> str:
     return words[-1] if words else ""
 
 
+_DATE_TYPES = set("bcdeikmnpqrstu|")
+
+
 def year(rec: Record) -> tuple[int | None, bool]:
     """(year, approximate). 008/07-10 first, then 264 #1 $c, then 260 $c.
     "c1998" -> 1998; "[1998?]" -> 1998 approximate; "199-" -> 1990
     approximate."""
-    raw = rec.control("008")[7:11]
-    if raw.isdigit() and raw != "0000":
+    f008 = rec.control("008")
+    # Only a well-formed 008 is trusted: 40 positions and a date type in /06
+    # (dumps carry 008s with collapsed spaces, where /07-10 is not a year).
+    raw = f008[7:11] if len(f008) == 40 and f008[6] in _DATE_TYPES else ""
+    if raw.isdigit() and 1000 <= int(raw) <= 2100:
         return int(raw), False
-    if re.fullmatch(r"\d{3}[u\-]", raw or ""):
+    if re.fullmatch(r"\d{3}[u\-]", raw):
         return int(raw[:3] + "0"), True
     texts = [f.get("c") for f in rec.get_fields("264") if f.ind2 == "1"]
     texts += [f.get("c") for f in rec.get_fields("260")]
@@ -173,7 +179,8 @@ def _pub_key(text: str) -> str:
 
 def language(rec: Record) -> str:
     """008/35-37, else the first 041 $a; "" when unknown."""
-    code = rec.control("008")[35:38].strip().lower()
+    f008 = rec.control("008")
+    code = f008[35:38].strip().lower() if len(f008) == 40 else ""
     if len(code) == 3 and code.isalpha() and code not in ("und", "zxx", "mul"):
         return code
     f = rec.first("041")
