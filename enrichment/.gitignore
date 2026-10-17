@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+*.db
+*.db.zst
+*.db.zst.sha256
+report.json

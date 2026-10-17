@@ -1,0 +1,191 @@
+{
+ "id_hash": "c29966117a01566635ac97f81e8d8343c1091d885b14dbe4e89fe288d8adde60",
+ "fonte": "Fundação Jorge Duprat Figueiredo, de Segurança e Medicina do Trabalho (Fundacentro)",
+ "resumo": {
+  "isbn_limpo": "9786588344217",
+  "isbn_original": "978-65-88344-21-7",
+  "autor": "Schmidt, José Renato Alves",
+  "titulo": "Organização coletiva e poder de entregadores que trabalham com moto e bicicleta para empresas-plataforma /",
+  "edicao": "",
+  "local": "São Paulo",
+  "editora": "Fundacentro",
+  "ano": "2026",
+  "paginas": "1 arquivo PDF (36 páginas)",
+  "classificacao": "629.227561362"
+ },
+ "marc": {
+  "LDR": "04657nmm  2200505 u 4500",
+  "001": "99571403509501",
+  "005": "20260310195000.0",
+  "008": "260114s2026 bl fo | f000 0 por d",
+  "020": [
+   {
+    "ind": "  ",
+    "subcampos": {
+     "$a": "978-65-88344-21-7"
+    }
+   }
+  ],
+  "024": [
+   {
+    "ind": "7 ",
+    "subcampos": {
+     "$a": "https://doi.org/10.63685/TZCI2412",
+     "$2": "DOI"
+    }
+   }
+  ],
+  "040": [
+   {
+    "ind": "  ",
+    "subcampos": {
+     "$a": "brspfc",
+     "$b": "por"
+    }
+   }
+  ],
+  "041": [
+   {
+    "ind": "07",
+    "subcampos": {
+     "$a": "por",
+     "$2": "iso639-2b"
+    }
+   }
+  ],
+  "082": [
+   {
+    "ind": "04",
+    "subcampos": {
+     "$a": "629.227561362",
+     "$q": "brspfc"
+    }
+   }
+  ],
+  "100": [
+   {
+    "ind": "1 ",
+    "subcampos": {
+     "$a": "Schmidt, José Renato Alves",
+     "$6": "https://orcid.org/0000-0002-3335-2534",
+     "$e": "[autor]"
+    }
+   }
+  ],
+  "245": [
+   {
+    "ind": "10",
+    "subcampos": {
+     "$a": "Organização coletiva e poder de entregadores que trabalham com moto e bicicleta para empresas-plataforma /",
+     "$c": "coordenador do projeto: Leo Vinicius Maia Liberato ; equipe do projeto: José Renato Alves Schmidt",
+     "$h": "[recurso eletrônico]"
+    }
+   }
+  ],
+  "264": [
+   {
+    "ind": "31",
+    "subcampos": {
+     "$a": "São Paulo",
+     "$b": "Fundacentro",
+     "$c": "2026"
+    }
+   }
+  ],
+  "300": [
+   {
+    "ind": "  ",
+    "subcampos": {
+     "$a": "1 arquivo PDF (36 páginas)"
+    }
+   }
+  ],
+  "505": [
+   {
+    "ind": "0 ",
+    "subcampos": {
+     "$a": "Conteúdo: 1 Introdução - 2 Metodologia - 3 Resultados e análise - Referências"
+    }
+   }
+  ],
+  "520": [
+   {
+    "ind": "3 ",
+    "subcampos": {
+     "$a": "A organização e a luta coletiva dos trabalhadores têm sido historicamente um importante fator de melhoria das condições e da organização do trabalho.",
+     "$c": "Resumo extraído da obra."
+    }
+   }
+  ],
+  "650": [
+   {
+    "ind": "07",
+    "subcampos": {
+     "$a": "Entregadores",
+     "$x": [
+      "Motocicletas",
+      "Condições de trabalho."
+     ],
+     "$2": "OSH"
+    }
+   },
+   {
+    "ind": "07",
+    "subcampos": {
+     "$a": "Entregadores",
+     "$x": [
+      "Motocicletas",
+      "Organização do trabalho."
+     ],
+     "$2": "OSH"
+    }
+   },
+   {
+    "ind": "07",
+    "subcampos": {
+     "$a": "Transporte de materiais.",
+     "$9": "por",
+     "$2": "OSH"
+    }
+   }
+  ],
+  "700": [
+   {
+    "ind": "1 ",
+    "subcampos": {
+     "$a": "Liberato, Leo Vinicius Maia",
+     "$e": "[coordenador]."
+    }
+   }
+  ],
+  "852": [
+   {
+    "ind": "7 ",
+    "subcampos": {
+     "$a": "brspfc",
+     "$c": "RELATÓRIO",
+     "$i": "S349o",
+     "$n": "bl"
+    }
+   }
+  ],
+  "901": [
+   {
+    "ind": "  ",
+    "subcampos": {
+     "$a": "Relatório técnico"
+    }
+   }
+  ],
+  "856": [
+   {
+    "ind": "40",
+    "subcampos": {
+     "$3": "Acesso on-line (Arquivo .pdf)",
+     "$u": "https://na07.alma.exlibrisgroup.com/discovery/delivery/55FJD_INST:Baseline/128969960009501",
+     "$z": ""
+    }
+   }
+  ]
+ }
+}

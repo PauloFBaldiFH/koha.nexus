@@ -1,0 +1,6 @@
+# koha.nexus enrichment: nexus_enrich (engine, standard library only) and
+# enrich_build (the static.db generator). zstandard compresses the record
+# bodies and the release asset; pymarc only decodes MARC-8 ISO 2709 (UTF-8
+# records do not need it).
+zstandard>=0.21,<1
+pymarc>=5,<6

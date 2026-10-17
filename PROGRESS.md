@@ -524,6 +524,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   gateway (VPS) / Zeus (Koha server), 5006 Pergamum, 8088 catalog network. Gateway 1.1.0: zeus
   entries share one Zeus HTTP client (Zeus's Referer); `python -m sru_gateway.zeus_labels` reads
   Zeus's search page to check each `target_index`. CI: `.github/workflows/sru-services.yml`.
+- **Enrichment, steps 1-2 (no panel version)**: the offline-first design (`design.md` revision 3,
+  approved 2026-10-17 in `/mnt/project-files/enrichment-design/`): no search or enrichment backend on
+  the VPS, a monthly `nexus-enrich-YYYY.MM.db.zst` on GitHub Releases, no HTML scraping on libraries'
+  machines. `enrichment/enrich_build` builds `static.db` from the harvest dumps (JSONL / MARCXML /
+  ISO 2709 / the catalog pool, streamed; per-source `full` or `pointer` mode; ISBN clusters with a
+  title check; authority records and bib headings into `auth_headings`; zstd dictionary bodies;
+  `release` / `verify`). `enrichment/nexus_enrich` classifies candidates M0 / M1 / W / R and only adds
+  missing fields (one donor per group, `883` + `$8 N\p`). Not yet tried on Paulo's real dumps
+  (their layout is unknown to the repo). CI: `.github/workflows/enrichment.yml`.
 - **1.5.54 (follow-up from Paulo)**: News items (OPAC and staff) take a list of buttons
   (`news.<side>.buttons` = `[{text, url}]`, at most 6, "Adicionar botão" + ✕ rows like the staff home
   buttons; a 1.5.53 `button_text`/`button_url` pair is read as the first button). The main menu (panel
