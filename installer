@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.78"
+PANEL_VERSION=" 1.5.79"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29029,7 +29029,7 @@ enrich_job_add() {
         msg_info "$title" "$(t "The enrichment database has not been downloaded yet. Its download has started in the background: start the job again once it is done.")" 10 76
         return 1
     fi
-    local log out id dir args=() n
+    local log out id dir args=() n why
     log=$(tools_log enrichment-job)
     if ! out=$(jobs_py add --scope "${1:-all}" --kind "$kind" --mode "$mode" 2>>"$log"); then
         kei_result job invalid-scope
@@ -29044,15 +29044,16 @@ enrich_job_add() {
     if [ -s "$dir/ids.txt" ]; then
         args+=("--id_list_file=$(tools_copy "$dir/ids.txt" "enrich-$id-ids.txt")")
     fi
-    : > "$dir/export.xml"
     display_explanation "Exporting the records (at low priority)..."
     # An empty file (not even <collection>) means the export never ran.
-    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/export.xml" koha_tool "$log" export_records.pl "${args[@]}" \
-        || [ ! -s "$dir/export.xml" ]; then
-        jobs_py fail "$id" --error "export_records.pl failed (see $log)" >>"$log" 2>&1
+    if ! enrich_export "$log" "$dir/export.xml" "${args[@]}"; then
+        why=$(enrich_export_why "$log")
+        jobs_py fail "$id" --error "export_records.pl failed${why:+: $why} (see $log)" >>"$log" 2>&1
         find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
         kei_result job failed
-        msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')" 10 76
+        msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')${why:+
+
+$why}" 12 76
         return 1
     fi
     find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
@@ -29065,12 +29066,13 @@ enrich_job_add() {
     fi
     enrich_own "$dir/export.xml"
     if [ "$kind" = auth ]; then
-        : > "$dir/authorities.xml"
-        if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml \
-            || [ ! -s "$dir/authorities.xml" ]; then
-            jobs_py fail "$id" --error "export_records.pl (authorities) failed (see $log)" >>"$log" 2>&1
+        if ! enrich_export "$log" "$dir/authorities.xml" --record-type=auths --format=xml; then
+            why=$(enrich_export_why "$log")
+            jobs_py fail "$id" --error "export_records.pl (authorities) failed${why:+: $why} (see $log)" >>"$log" 2>&1
             kei_result job failed
-            msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')" 10 76
+            msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')${why:+
+
+$why}" 12 76
             return 1
         fi
         enrich_own "$dir/authorities.xml"
@@ -29180,6 +29182,31 @@ _enrich_job_apply_run() {
     msg_ok "$(t '✅ Job ${id} applied: ${total} record(s) enriched.\n\nRecords edited in Koha after the report were left as they are. Revert undoes the job.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
 }
 
+# enrich_export LOG FILE ARGS...: export_records.pl ARGS into FILE. FILE is
+# opened by this (root) shell, never by the instance user, so its owner and
+# mode do not matter (koha_exec). The export runs at low priority first; if
+# FILE comes back empty, it runs once more plainly, as the MARC21 backup
+# runs it (koha-shell, no priority prefix, from /tmp), so a prefix the system
+# refuses cannot leave a job without its records. Fails while FILE is empty.
+enrich_export() {
+    local log="$1" out="$2"
+    shift 2
+    : > "$out"
+    if KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$out" koha_tool "$log" export_records.pl "$@" && [ -s "$out" ]; then
+        return 0
+    fi
+    printf 'export_records.pl: nothing exported at low priority, running it again without the priority prefix\n' >> "$log"
+    : > "$out"
+    TOOLS_WORK=/tmp KOHA_EXEC_OUT="$out" koha_tool "$log" export_records.pl "$@" && [ -s "$out" ]
+}
+
+# enrich_export_why LOG: the last message line in LOG (no record dump), for
+# the failure dialog.
+enrich_export_why() {
+    grep -avE '^\$ |^export_records.pl: nothing exported|=LDR|^=[0-9]{3} |<' "$1" 2>/dev/null | tail -n 1 \
+        | LC_ALL=C tr -c '[:print:]' ' ' | cut -c1-200
+}
+
 # _enrich_auth_apply ID DIR LOG: an authority job's new authorities, before
 # its records: Koha's authorities exported again (one Koha gained since the
 # report is linked instead of created), then each batch staged as
@@ -29187,9 +29214,7 @@ _enrich_job_apply_run() {
 # each one goes into the records' $9 (chunk-file).
 _enrich_auth_apply() {
     local id="$1" dir="$2" log="$3" c n file batch res
-    : > "$dir/koha-authorities.xml"
-    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/koha-authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml \
-        || [ ! -s "$dir/koha-authorities.xml" ]; then
+    if ! enrich_export "$log" "$dir/koha-authorities.xml" --record-type=auths --format=xml; then
         rm -f "$dir/koha-authorities.xml"
         return 1
     fi
