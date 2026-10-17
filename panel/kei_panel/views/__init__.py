@@ -5,7 +5,7 @@ from .backup import BackupView
 from .base import SectionView
 from .crons import CronView
 from .dashboard import DashboardView
-from .enrich import EnrichView
+from .enrich import AuthEnrichView, EnrichView
 from .database import DatabaseView
 from .hub import HubView
 from .opac import OpacView
@@ -20,6 +20,7 @@ VIEWS = {
     "ai": AIView,
     "z3950": Z3950View,
     "enrich": EnrichView,
+    "enrich-auth": AuthEnrichView,
     "opac": OpacView,
     "hub": HubView,
     "crons": CronView,

@@ -56,7 +56,11 @@ setup() {
     rm -f "$KEI_S/dialogs.log"
     mysql "$DB" <<'SQL'
 DROP TABLE IF EXISTS biblio_metadata, import_batches, import_records, import_biblios, marc_matchers, matchpoints,
-  matcher_matchpoints, matchpoint_components, matchpoint_component_norms, systempreferences, zebraqueue;
+  matcher_matchpoints, matchpoint_components, matchpoint_component_norms, systempreferences, zebraqueue,
+  auth_header, import_auths;
+CREATE TABLE auth_header (authid bigint(20) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  authtypecode varchar(10) NOT NULL DEFAULT '', marcxml longtext NOT NULL) DEFAULT CHARSET=utf8mb4;
+CREATE TABLE import_auths (import_record_id int(11) NOT NULL PRIMARY KEY, matched_authid int(11));
 CREATE TABLE biblio_metadata (id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, biblionumber int(11) NOT NULL,
   format varchar(16) NOT NULL, `schema` varchar(16) NOT NULL, metadata longtext NOT NULL) DEFAULT CHARSET=utf8mb4;
 CREATE TABLE import_batches (import_batch_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, matcher_id int(11),
@@ -214,9 +218,76 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     for d in "CPUQuota=25%" "MemoryMax=256M" "PrivateNetwork=yes" "ProtectSystem=strict" "IOSchedulingClass=idle" "Nice=19"; do
         awk '/\$\{ENRICH_WORKER_UNIT\}.service" <<UNIT/,/^UNIT$/' "$KEI_REPO/installer" | grep -qx "$d"
     done
-    for task in enrich-job-add enrich-jobs enrich-job-show enrich-job-diff enrich-job-apply enrich-job-revert enrich-job-cancel enrich-pause; do
+    for task in enrich-job-add enrich-auth-add enrich-jobs enrich-job-show enrich-job-diff enrich-job-apply enrich-job-revert enrich-job-cancel enrich-pause; do
         grep -q "^        ${task})" "$KEI_REPO/installer"
     done
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" throttle_cmd
     [[ "$output" == *"nice -n 19 ionice -c 3"* ]]
+}
+
+bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | grep -o '<subfield code="9">[0-9]*</subfield>' | sed 's/.*">\([0-9]*\)<.*/\1/' | paste -sd, -; }
+
+@test "authority job: new authorities created before the records, linked by \$9; Revert keeps one still in use" {
+    p enrich_job_add "1-2" auth exact
+    [ "$status" -eq 0 ]
+    grep -q "^job=1$" "$W/results"
+    grep -q "^export_records.pl \[throttled\] --record-type=auths --format=xml$" "$W/calls"
+    [ -f "$W/state/jobs/1/authorities.xml" ]
+    worker
+    [ -z "$(bib9 1)" ]
+    show=$("$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show 1)
+    echo "$show"
+    [[ "$show" == *'"kind": "auth"'* ]] && [[ "$show" == *'"state": "ready"'* ]]
+    [[ "$show" == *'"new_authorities": 1,'* ]] && [[ "$show" == *'"changed": 2'* ]]
+    grep -q "Saramago, José" "$W/state/jobs/1/report.html"
+    : > "$W/results"
+    p enrich_job_apply 1
+    [ "$status" -eq 0 ]
+    grep -q "^backup ENRICH$" "$W/calls"
+    grep -q "^stage_file.pl \[throttled\] --authorities --file .* --format MARCXML --encoding UTF-8 --comment koha.nexus authorities job 1 batch 1$" "$W/calls"
+    [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 1 ]
+    a=$(zsql "SELECT authid FROM auth_header")
+    zsql "SELECT marcxml FROM auth_header" | grep -q 'tag="667"'
+    zsql "SELECT marcxml FROM auth_header" | grep -q "<controlfield tag=\"001\">$a</controlfield>"
+    [ "$(bib9 1)" = "$a" ] && [ "$(bib9 2)" = "$a" ]
+    grep -q "^authorities=1$" "$W/results" && grep -q "^applied=2$" "$W/results"
+    grep -q "OK .*Job 1 applied: 1 new authority record(s), 2 record(s) linked" "$KEI_S/dialogs.log"
+    # 2 is edited after Apply: it keeps its link, so the authority stays too.
+    zsql "UPDATE biblio_metadata SET metadata = REPLACE(metadata, '$(f005 2)', '20261018080000.0') WHERE biblionumber = 2"
+    : > "$W/results"
+    p enrich_job_revert 1
+    [ "$status" -eq 0 ]
+    [ -z "$(bib9 1)" ] && [ "$(bib9 2)" = "$a" ]
+    [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 1 ]
+    grep -q "^reverted=1$" "$W/results" && grep -q "^kept=2$" "$W/results" && grep -q "^authorities=0$" "$W/results"
+    show=$("$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show 1)
+    [[ "$show" == *'"state": "reverted"'* ]]
+}
+
+@test "authority job: an authority Koha gained after the report is linked, not created; Revert removes what it made" {
+    p enrich_job_add "1" auth exact
+    worker
+    zsql "INSERT INTO auth_header (authid, marcxml) VALUES (500, '<record xmlns=\"http://www.loc.gov/MARC21/slim\"><leader>00000nz  a2200000n  4500</leader><controlfield tag=\"001\">500</controlfield><datafield tag=\"100\" ind1=\"1\" ind2=\" \"><subfield code=\"a\">Saramago, José</subfield></datafield></record>')"
+    : > "$W/results"
+    p enrich_job_apply 1
+    [ "$status" -eq 0 ]
+    ! grep -q -- "--authorities" "$W/calls"
+    [ "$(bib9 1)" = "500" ]
+    grep -q "^authorities=0$" "$W/results"
+    : > "$W/results"
+    p enrich_job_revert 1
+    [ "$status" -eq 0 ]
+    [ -z "$(bib9 1)" ]
+    [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 1 ]
+    # A second job creates the authority itself; reverting it removes it.
+    zsql "DELETE FROM auth_header"
+    p enrich_job_add "1" auth exact
+    worker
+    p enrich_job_apply 2
+    [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 1 ]
+    : > "$W/results"
+    p enrich_job_revert 2
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 0 ] && [ -z "$(bib9 1)" ]
+    grep -q "^authorities=1$" "$W/results"
 }

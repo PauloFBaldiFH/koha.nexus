@@ -140,9 +140,12 @@ SECTIONS: tuple[Section, ...] = (
     # Enrichment jobs (views/enrich.py), opened from Library tools (or its key).
     Section("enrich", "✨  Enrich bibliographic catalog", "✨  Enrich bibliographic catalog", view="enrich",
             key="e", sidebar=False, parent="library"),
+    Section("enrich-auth", "📇  Enrich & standardize authorities", "📇  Enrich & standardize authorities",
+            view="enrich-auth", key="h", sidebar=False, parent="library"),
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("✨  Enrich bibliographic catalog", "enrich", kind="view"),
+        Entry("📇  Enrich & standardize authorities", "enrich-auth", kind="view"),
         Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
         Entry("🔗  Sync & link authorities", "authority-sync", kind="native"),
         Entry("👥  Find duplicate authors (authorities)", "authority-match", kind="native"),
@@ -240,6 +243,7 @@ DESCRIPTIONS: dict[str, str] = {
     "superlibrarian": "Creates a staff account with every permission",
     "clock": "Sets the timezone and syncs the clock with NTP",
     "enrich": "Adds subjects, classification and notes from open catalogues, with a report before Apply",
+    "enrich-auth": "Links names and subjects to authorities (BN first) and creates the missing ones, with a report",
     "marc-undo": "Removes the records of an imported MARC batch",
     "authority-sync": "Links the catalog headings to their authorities",
     "authority-match": "Finds variant forms of one author and merges the ones you confirm",

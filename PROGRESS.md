@@ -436,6 +436,18 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `kei_result line`, added lines in green). Open report copies report.html to Downloads and opens it. Apply and
   Revert ask first (danger) and run uncancellable; Cancel job for jobs not applied. Manual page `sec-enrich`
   (en, pt-BR). Fix: dashboard `age()` took real time instead of `now` (test broke once the date passed).
+- **1.5.73 (Paulo: enrichment step 6b, Enrich & standardize authorities)**: `nexus_enrich/authority.py` matches
+  each 1XX/6XX/7XX heading with the library's Koha authorities (heading, then 4XX variants), then static.db
+  `auth_headings` ranked BN > Brazilian sources > LoC > rest (authority records before gathered headings);
+  subjects never take LCSH/LoC forms; several people with the name and no dates, or two Koha authorities → review;
+  mode fuzzy (≥ 0.92) applies close forms (preliminary), exact mode only proposes them. Fields with $9, name/title
+  ($t) and subdivided subjects are skipped. Jobs gain `kind`/`mode`; `auth_new` keeps one new authority per heading
+  (MARC21 authority: 1XX, 4XX, 010/024, 670, 008/33 d + 667 when preliminary); records get `$9 nexus-new:ID`,
+  replaced by the real authid at Apply. Apply: re-export Koha authorities (`auth-resolve`), stage_file.pl
+  --authorities + commit_file.pl per batch, then the records as in step 5. Revert: records first, then the
+  authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
+  screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
+  authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
 - **1.5.70 (Paulo: enrichment step 4, installer and monthly updates)**: `python -m nexus_gateway update`
   finds the newest `nexus-enrich-YYYY.MM.db.zst` (GitHub releases `enrich-YYYY.MM`, mirror `latest.txt`
   via `NEXUS_GATEWAY_MIRROR`), checks size and SHA-256, decompresses, checks the DB and swaps it over

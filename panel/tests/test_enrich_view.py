@@ -89,3 +89,49 @@ def test_jobs_report_diff_apply_and_revert():
 
     import asyncio
     asyncio.run(main())
+
+
+def test_authority_screen_lists_its_own_jobs_and_applies():
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.views.enrich import auth_summary_text
+    from textual.widgets import RadioButton
+
+    text = auth_summary_text({"report": {"records": 9, "changed": 4, "headings": {"read": 12, "koha": 3, "new": 2},
+                                         "new_authorities": 2, "preliminary": 1, "new_by_source": {"bn": 2}}})
+    assert "Headings 12: linked to Koha 3 · to new authorities 2" in text and "bn 2" in text
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 60)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("h")
+            view = app.screen.query_one("#view-enrich-auth")
+            jobs = view.query_one("#e-table", DataTable)
+            await _until(pilot, lambda: jobs.row_count == 1)
+            assert jobs.get_row("3")[3] == "Report ready"
+            summary = view.query_one("#e-summary", Static)
+            await _until(pilot, lambda: "Job 3 ·" in str(summary.render()))
+            text = str(summary.render())
+            assert "linked to Koha 806 · to new authorities 512 · forms standardised 388" in text
+            assert "New authority records 214 (preliminary 170)" in text and "bn 96" in text
+            changes = view.query_one("#e-changes", DataTable)
+            assert changes.row_count == 3 and changes.get_row("101:enriched")[1:4] == ["Changed", "1", "2"]
+            await view._show_diff(3, "101")
+            diff = view.query_one("#e-diff", Static).render()
+            assert "- 100 1_ $a Saramago, José" in str(diff)
+            assert any("red" in str(span.style) for span in diff.spans)
+            assert view.query_one("#e-apply", Button).disabled is False
+            view.query_one("#e-apply", Button).press()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen) and app.screen.query("#yes"))
+            assert "214 new authority record(s)" in app.screen._question and app.screen._danger
+            app.screen.query_one("#yes", Button).press()
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen) and app.screen.query("#ok"))
+            assert "214 new authority record(s), 655 record(s) linked" in app.screen._body
+            app.screen.query_one("#ok", Button).press()
+            await _until(pilot, lambda: not isinstance(app.screen, MessageScreen))
+            # A new job in fuzzy mode: the mode goes to the task.
+            view.query_one("#e-mode-fuzzy", RadioButton).value = True
+            assert view.mode() == "fuzzy" and view.start_task("1-5") == ("enrich-auth-add", ["1-5", "fuzzy"])
+
+    import asyncio
+    asyncio.run(main())

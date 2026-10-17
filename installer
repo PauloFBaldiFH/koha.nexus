@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.72"
+PANEL_VERSION=" 1.5.73"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28933,9 +28933,15 @@ enrich_ready() {
     [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_jobs/worker.py" ] || enrich_install
 }
 
-# enrich_job_add SCOPE: a new job ("all", or "101, 102, 500-550"): Koha's
-# records exported (no items, throttled), then the worker started.
+# enrich_job_add SCOPE [KIND [MODE]]: a new job ("all", or "101, 102,
+# 500-550"): Koha's records exported (no items, throttled), then the worker
+# started. KIND auth ("Enrich & standardize authorities") also exports
+# Koha's authorities, which the worker matches first; MODE exact or fuzzy.
 enrich_job_add() {
+    local kind="${2:-bib}" mode="${3:-exact}" title
+    [[ "$kind" =~ ^(bib|auth)$ ]] && [[ "$mode" =~ ^(exact|fuzzy)$ ]] || return 2
+    title=$(t "Enrich bibliographic data")
+    [ "$kind" = auth ] && title=$(t "Enrich & standardize authorities")
     require_database || return 1
     enrich_ready || return 1
     if [ ! -s "$ENRICH_STATE/static.db" ]; then
@@ -28945,7 +28951,7 @@ enrich_job_add() {
     fi
     local log out id dir args=() n
     log=$(tools_log enrichment-job)
-    if ! out=$(jobs_py add --scope "${1:-all}" 2>>"$log"); then
+    if ! out=$(jobs_py add --scope "${1:-all}" --kind "$kind" --mode "$mode" 2>>"$log"); then
         kei_result job invalid-scope
         msg_error "" "$(t 'Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550.')" 10 76
         return 1
@@ -28972,16 +28978,30 @@ enrich_job_add() {
     if [ "${n:-0}" = 0 ]; then
         jobs_py fail "$id" --error "no record in this scope" >>"$log" 2>&1
         kei_result job empty
-        msg_info "$(t "Enrich bibliographic data")" "$(t "No record in this scope. Nothing was changed.")" 9 70
+        msg_info "$title" "$(t "No record in this scope. Nothing was changed.")" 9 70
         return 1
     fi
     enrich_own "$dir/export.xml"
+    if [ "$kind" = auth ]; then
+        : > "$dir/authorities.xml"
+        if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml; then
+            jobs_py fail "$id" --error "export_records.pl (authorities) failed (see $log)" >>"$log" 2>&1
+            kei_result job failed
+            msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')" 10 76
+            return 1
+        fi
+        enrich_own "$dir/authorities.xml"
+    fi
     jobs_py exported "$id" >>"$log" 2>&1 || { kei_result job failed; return 1; }
     systemctl start --no-block "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
     log "enrichment: job $id queued (${n} records)"
     kei_result job "$id"
     kei_result records "$n"
-    msg_info "$(t "Enrich bibliographic data")" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+    if [ "$kind" = auth ]; then
+        msg_info "$title" "$(t 'Job ${id}: the headings of ${n} record(s) are being compared with your authorities and the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+    else
+        msg_info "$title" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+    fi
 }
 
 # enrich_job_apply ID: the explicit Apply: verified safety backup, then the
@@ -28994,7 +29014,7 @@ enrich_job_apply() {
 }
 
 _enrich_job_apply_run() {
-    local id="$1" dir="$ENRICH_STATE/jobs/$1" log chunks matcher c n file batch bad res total=0 failed=0
+    local id="$1" dir="$ENRICH_STATE/jobs/$1" log chunks matcher c n file batch bad res kind total=0 failed=0
     log=$(tools_log enrichment-apply)
     if ! chunks=$(jobs_py chunks "$id" 2>>"$log"); then
         kei_result apply not-ready
@@ -29014,6 +29034,14 @@ _enrich_job_apply_run() {
     tools_safety_backup ENRICH || { kei_result apply backup-failed; return 1; }
     kei_result backup "$TOOLS_PRE"
     display_explanation "Applying the changes..."
+    kind=$(jobs_py kind "$id" 2>>"$log")
+    ENRICH_AUTH_CREATED=0
+    if [ "$kind" = auth ]; then
+        _enrich_auth_apply "$id" "$dir" "$log" || failed=1
+        kei_result authorities "$ENRICH_AUTH_CREATED"
+        chunks=""
+        [ "$failed" = 0 ] && chunks=$(jobs_py chunks "$id" --kind bib 2>>"$log")
+    fi
     for c in $chunks; do
         jobs_py chunk-ids "$id" "$c" > "$dir/ids-$c.txt" 2>>"$log"
         enrich_005 "$dir/ids-$c.txt" > "$dir/current.tsv"
@@ -29061,7 +29089,59 @@ _enrich_job_apply_run() {
         return 1
     fi
     kei_result apply done
+    if [ "$kind" = auth ]; then
+        local created="$ENRICH_AUTH_CREATED"
+        msg_ok "$(t '✅ Job ${id} applied: ${created} new authority record(s), ${total} record(s) linked and standardised.\n\nRecords edited in Koha after the report were left as they are. Revert undoes the job.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+        return 0
+    fi
     msg_ok "$(t '✅ Job ${id} applied: ${total} record(s) enriched.\n\nRecords edited in Koha after the report were left as they are. Revert undoes the job.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+}
+
+# _enrich_auth_apply ID DIR LOG: an authority job's new authorities, before
+# its records: Koha's authorities exported again (one Koha gained since the
+# report is linked instead of created), then each batch staged as
+# authorities (no matching: all new) and committed; the authid Koha gives
+# each one goes into the records' $9 (chunk-file).
+_enrich_auth_apply() {
+    local id="$1" dir="$2" log="$3" c n file batch res
+    : > "$dir/koha-authorities.xml"
+    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/koha-authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml; then
+        rm -f "$dir/koha-authorities.xml"
+        return 1
+    fi
+    enrich_own "$dir/koha-authorities.xml"
+    n=$(jobs_py auth-resolve "$id" --koha "$dir/koha-authorities.xml" 2>>"$log")
+    printf 'job %s: %s authority record(s) already in Koha since the report\n' "$id" "${n:-0}" >> "$log"
+    rm -f "$dir/koha-authorities.xml"
+    for c in $(jobs_py chunks "$id" --kind auth 2>>"$log"); do
+        n=$(jobs_py auth-file "$id" "$c" --out "$dir/auth-$c.xml" 2>>"$log") || return 1
+        if [ "${n:-0}" = 0 ]; then
+            jobs_py auth-committed "$id" "$c" --staged /dev/null >>"$log" 2>&1
+            rm -f "$dir/auth-$c.xml"
+            continue
+        fi
+        file=$(tools_copy "$dir/auth-$c.xml" "enrich-$id-auth-$c.xml") || return 1
+        KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" stage_file.pl --authorities --file "$file" --format MARCXML \
+            --encoding UTF-8 --comment "koha.nexus authorities job ${id} batch ${c}"
+        batch=$(tools_num "$log" "Batch number assigned:")
+        if [ "${batch:-0}" = 0 ]; then
+            jobs_py chunk-failed "$id" "$c" --note "stage_file.pl --authorities failed" >>"$log" 2>&1
+            return 1
+        fi
+        if ! KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" commit_file.pl --batch-number "$batch"; then
+            jobs_py chunk-failed "$id" "$c" --note "commit_file.pl failed (batch ${batch})" >>"$log" 2>&1
+            return 1
+        fi
+        run_sql "SELECT ir.record_sequence, IFNULL(ia.matched_authid, ''), ir.status FROM ${DB_NAME}.import_records ir JOIN ${DB_NAME}.import_auths ia ON ia.import_record_id = ir.import_record_id WHERE ir.import_batch_id = ${batch} ORDER BY ir.record_sequence;" > "$dir/staged.tsv"
+        enrich_own "$dir/staged.tsv"
+        res=$(jobs_py auth-committed "$id" "$c" --batch "$batch" --staged "$dir/staged.tsv" 2>>"$log")
+        printf 'authority batch %s (job %s part %s): %s\n' "$batch" "$id" "$c" "$res" >> "$log"
+        res=$(printf '%s' "$res" | sed -n 's/.*"created": *\([0-9]*\).*/\1/p')
+        ENRICH_AUTH_CREATED=$((ENRICH_AUTH_CREATED + ${res:-0}))
+        rm -f "$dir/auth-$c.xml" "$dir/staged.tsv"
+        enrich_wait_index
+    done
+    return 0
 }
 
 # enrich_job_revert ID [--all]: commit_file.pl --revert on the job's
@@ -29076,7 +29156,7 @@ enrich_job_revert() {
 }
 
 _enrich_job_revert_run() {
-    local id="$1" dir="$ENRICH_STATE/jobs/$1" log plan c batch keep all=() n=0 kept=0 failed=0
+    local id="$1" dir="$ENRICH_STATE/jobs/$1" log plan aplan="" kind c batch keep ids all=() n=0 kept=0 failed=0 auths=0
     [ "${2:-}" = "--all" ] && all=(--all)
     log=$(tools_log enrichment-revert)
     jobs_py applied-ids "$id" > "$dir/applied.txt" 2>>"$log"
@@ -29084,7 +29164,9 @@ _enrich_job_revert_run() {
     enrich_own "$dir/current.tsv"
     plan=$(jobs_py revert-plan "$id" --current "$dir/current.tsv" "${all[@]}" 2>>"$log")
     rm -f "$dir/applied.txt" "$dir/current.tsv"
-    if [ -z "$plan" ]; then
+    kind=$(jobs_py kind "$id" 2>>"$log")
+    [ -z "$plan" ] && [ "$kind" = auth ] && aplan=$(jobs_py auth-revert-plan "$id" 2>>"$log")
+    if [ -z "$plan$aplan" ]; then
         kei_result revert nothing
         msg_info "$(t "Revert")" "$(t 'Job ${id}: nothing applied to revert.')" 9 70
         return 0
@@ -29105,6 +29187,29 @@ _enrich_job_revert_run() {
         jobs_py reverted "$id" "$c" --kept "$keep" >>"$log" 2>&1
         enrich_wait_index
     done <<< "$plan"
+    # An authority job's new authorities, once its records are back: one a
+    # catalogue record still links to (a record kept above, or linked by a
+    # librarian since) is kept.
+    if [ "$failed" = 0 ] && [ "$kind" = auth ]; then
+        [ -n "$aplan" ] || aplan=$(jobs_py auth-revert-plan "$id" 2>>"$log")
+        while IFS=$'\t' read -r c batch ids; do
+            [[ "$c" =~ ^[0-9]+$ ]] || continue
+            keep=""
+            if [[ "$ids" =~ ^[0-9,]+$ ]] && [[ "$batch" =~ ^[1-9][0-9]*$ ]]; then
+                keep=$(run_sql "SELECT ia.matched_authid FROM ${DB_NAME}.import_auths ia JOIN ${DB_NAME}.import_records ir ON ir.import_record_id = ia.import_record_id WHERE ir.import_batch_id = ${batch} AND ia.matched_authid IN (${ids}) AND EXISTS (SELECT 1 FROM ${DB_NAME}.biblio_metadata m WHERE m.metadata LIKE CONCAT('%<subfield code=\"9\">', ia.matched_authid, '</subfield>%'));" | paste -sd, -)
+                if [[ "$keep" =~ ^[0-9,]+$ ]]; then
+                    run_sql "UPDATE ${DB_NAME}.import_records ir JOIN ${DB_NAME}.import_auths ia ON ia.import_record_id = ir.import_record_id SET ir.status = 'reverted' WHERE ir.import_batch_id = ${batch} AND ia.matched_authid IN (${keep});"
+                    kept=$((kept + $(printf '%s' "$keep" | tr ',' '\n' | grep -c .)))
+                fi
+                if ! KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" commit_file.pl --revert --batch-number "$batch"; then
+                    failed=1; break
+                fi
+                auths=$((auths + $(tools_num "$log" "Number of records reverted:")))
+            fi
+            jobs_py auth-reverted "$id" "$c" --kept "$keep" >>"$log" 2>&1
+        done <<< "$aplan"
+        kei_result authorities "$auths"
+    fi
     log "enrichment: job $id reverted ${n} record(s), kept ${kept} (failed=${failed})"
     kei_result reverted "$n"
     kei_result kept "$kept"
@@ -29115,6 +29220,10 @@ _enrich_job_revert_run() {
         return 1
     fi
     kei_result revert done
+    if [ "$kind" = auth ]; then
+        msg_ok "$(t '✅ Job ${id} reverted: ${n} record(s) have their previous version back and ${auths} new authority record(s) were removed.\nKept because they were edited or linked after Apply: ${kept}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+        return 0
+    fi
     msg_ok "$(t '✅ Job ${id} reverted: ${n} record(s) have their previous version back.\nKept because they were edited after Apply: ${kept}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
 }
 
@@ -31215,6 +31324,7 @@ kei_task() {
         enrich-update)   enrich_update "${1:-}" ;;
         enrich-status)   enrich_status ;;
         enrich-job-add)  enrich_job_add "${1:-all}" ;;
+        enrich-auth-add) enrich_job_add "${1:-all}" auth "${2:-exact}" ;;
         enrich-jobs)     enrich_jobs ;;
         enrich-job-show) [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2; kei_result job "$(jobs_py show "$1" 2>/dev/null || echo '{}')" ;;
         enrich-job-diff)

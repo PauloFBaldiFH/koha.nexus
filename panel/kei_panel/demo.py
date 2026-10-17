@@ -40,13 +40,16 @@ _INSTALL = [line for n, stage, steps in _STAGES
             for line in [f"@@stage [{n}] {stage}\tThis might take a few minutes. Please keep this window open."]
             + [x for step in steps for x in (f"@@step {step}", f"@@done 0 {step}")]]
 
-# The enrichment jobs screen (views/enrich.py): one job with its report,
-# one still being compared.
+# The enrichment jobs screens (views/enrich.py): one bibliographic job with
+# its report, one still being compared, and an authority job (3).
 _ENRICH_JOBS = [
+    {"id": 3, "created": "2026-10-17 16:20:00", "updated": "2026-10-17 16:41:02", "scope": "all", "state": "ready",
+     "total": 1240, "done": 1240, "release": "nexus-enrich-2026.10", "error": "", "kind": "auth", "mode": "exact"},
     {"id": 2, "created": "2026-10-17 14:02:11", "updated": "2026-10-17 14:05:40", "scope": "500-550",
-     "state": "matching", "total": 51, "done": 20, "release": "nexus-enrich-2026.10", "error": ""},
+     "state": "matching", "total": 51, "done": 20, "release": "nexus-enrich-2026.10", "error": "", "kind": "bib",
+     "mode": ""},
     {"id": 1, "created": "2026-10-17 09:12:03", "updated": "2026-10-17 09:40:55", "scope": "all", "state": "ready",
-     "total": 1240, "done": 1240, "release": "nexus-enrich-2026.10", "error": ""},
+     "total": 1240, "done": 1240, "release": "nexus-enrich-2026.10", "error": "", "kind": "bib", "mode": ""},
 ]
 _ENRICH_REPORT = {"job": 1, "scope": "all", "release": "nexus-enrich-2026.10", "records": 1240, "enriched": 412,
                   "unchanged": 301, "review": 37, "no_match": 488, "errors": 2,
@@ -54,7 +57,7 @@ _ENRICH_REPORT = {"job": 1, "scope": "all", "release": "nexus-enrich-2026.10", "
                   "fields_added": 1288, "fields_by_class": {"M0": 1104, "M1": 96, "W": 88},
                   "fields_by_group": {"subjects": 702, "082": 318, "300": 140, "520": 128},
                   "fields_by_source": {"unesp": 540, "ufpr": 401, "unb": 221, "loc": 126}, "koha_batches": 1}
-_ENRICH_SHOW = dict(_ENRICH_JOBS[1], dir="/var/lib/koha-nexus-enrich/jobs/1", report=_ENRICH_REPORT,
+_ENRICH_SHOW = dict(_ENRICH_JOBS[2], dir="/var/lib/koha-nexus-enrich/jobs/1", report=_ENRICH_REPORT,
                     report_html="/var/lib/koha-nexus-enrich/jobs/1/report.html",
                     chunks=[{"job_id": 1, "chunk": 1, "records": 412, "state": "pending"}],
                     changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
@@ -68,6 +71,36 @@ _ENRICH_DIFF = ["# job 1, biblionumber 101: enriched", "  LDR    00000nam a22000
                 "  245 10 $a Ensaio sobre a cegueira", "+ 082 04 $8 2\\p $a 869.3",
                 "+ 650 _4 $8 1\\p $a Cegueira", "+ 650 _4 $8 1\\p $a Romance português",
                 "+ 883 0_ $8 1\\p $a nexus_enrich M0 $c 0.97 $d 20261017 $q unesp $w 33012"]
+
+_AUTH_REPORT = {"kind": "auth", "mode": "exact", "job": 3, "scope": "all", "release": "nexus-enrich-2026.10",
+                "records": 1240, "changed": 655, "unchanged": 540, "review": 45, "errors": 0,
+                "headings": {"read": 2310, "linked_before": 120, "koha": 806, "new": 512, "review": 61,
+                             "no_match": 650, "skipped": 161, "standardized": 388, "fuzzy": 0},
+                "new_authorities": 214, "preliminary": 170, "new_by_source": {"bn": 96, "ufpr": 51, "loc": 44,
+                                                                              "unesp": 23},
+                "koha_batches": 3}
+_AUTH_SHOW = dict(_ENRICH_JOBS[0], dir="/var/lib/koha-nexus-enrich/jobs/3", report=_AUTH_REPORT,
+                  report_html="/var/lib/koha-nexus-enrich/jobs/3/report.html",
+                  changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
+                            "m0": 0, "m1": 2, "w": 1, "r": 0, "added": 2},
+                           {"biblionumber": 117, "status": "enriched", "title": "Vidas secas",
+                            "m0": 1, "m1": 0, "w": 1, "r": 0, "added": 1},
+                           {"biblionumber": 230, "status": "review", "title": "Memórias póstumas de Brás Cubas",
+                            "m0": 0, "m1": 0, "w": 0, "r": 1, "added": 0}],
+                  new_authorities=[{"id": 1, "heading": "Saramago, José, 1922-2010", "source": "bn",
+                                    "preliminary": 1, "state": "pending", "authid": None}])
+_AUTH_DIFF = ["# job 3, biblionumber 101: enriched", "  LDR    00000nam a2200000 a 4500",
+              "- 100 1_ $a Saramago, José", "+ 100 1_ $a Saramago, José, $d 1922-2010 $9 nexus-new:1",
+              "  245 10 $a Ensaio sobre a cegueira", "- 650 _4 $a Cegueira", "+ 650 _4 $a Cegueira $9 nexus-new:2"]
+# Answers that depend on the first argument (the job): the authority job.
+_BY_ARG: dict[tuple[str, str], list[str]] = {
+    ("enrich-job-show", "3"): ["@@result job=" + json.dumps(_AUTH_SHOW, ensure_ascii=False)],
+    ("enrich-job-diff", "3"): ["@@result line=" + line for line in _AUTH_DIFF],
+    ("enrich-job-apply", "3"): ["@@result backup=/var/backups/koha_sql/PRE-ENRICH_2026-10-17_17h00.sql.gz",
+                                "@@result authorities=214", "@@result applied=655", "@@result apply=done",
+                                "@@msg ok OK\t✅ Job 3 applied: 214 new authority record(s), 655 record(s) "
+                                "linked and standardised."],
+}
 
 _SCRIPTS: dict[str, list[str]] = {
     "ollama-install": ["@@step Installing Ollama", "@@done 0 Installing Ollama",
@@ -257,6 +290,11 @@ _SCRIPTS: dict[str, list[str]] = {
                          "@@msg ok OK\t✅ Job {0} applied: 412 record(s) enriched."],
     "enrich-job-revert": ["@@result reverted=412", "@@result kept=0", "@@result revert=done",
                           "@@msg ok OK\t✅ Job {0} reverted: 412 record(s) have their previous version back."],
+    "enrich-auth-add": ["@@result job=4", "@@result records=1240",
+                        "@@msg info Enrich & standardize authorities\tJob 4: the headings of 1240 record(s) are "
+                        "being compared with your authorities and the enrichment database, slowly and in the "
+                        "background.\n\nNothing is written to the catalogue until you review the report and "
+                        "choose Apply."],
     "enrich-job-cancel": [],
     "enrich-pause": [],
     "z3950-server-status": ["@@result daemon=running", "@@result port=2100", "@@result network=off"],
@@ -387,7 +425,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         lines = [ln.replace("{tmp}", _demo_tmp()) for ln in _RUN.get(args[0] if args else "", _RUN_DEFAULT)]
         args = ()
     else:
-        lines = _SCRIPTS.get(name)
+        lines = _BY_ARG.get((name, args[0] if args else ""), _SCRIPTS.get(name))
     if lines is None:
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2

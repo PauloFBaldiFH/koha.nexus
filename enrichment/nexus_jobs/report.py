@@ -17,6 +17,7 @@ from __future__ import annotations
 import html
 import json
 from collections import Counter
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from nexus_enrich import marc
@@ -38,18 +39,17 @@ def record_lines(rec: marc.Record) -> list[str]:
 
 
 def diff_lines(before: marc.Record, after: marc.Record) -> list[tuple[str, str]]:
-    """(mark, line) for every line of AFTER: "+" for a line BEFORE does not
-    have (the engine only adds), " " otherwise; then "-" for any line of
-    BEFORE missing from AFTER (never expected: a safety net)."""
-    have = Counter(record_lines(before))
-    out = []
-    for line in record_lines(after):
-        if have[line] > 0:
-            have[line] -= 1
-            out.append((" ", line))
+    """(mark, line) of the two records in order: " " for a line both have,
+    "-" for a line only BEFORE has, "+" for a line only AFTER has, a
+    replaced field showing its old line just above its new one."""
+    a, b = record_lines(before), record_lines(after)
+    out: list[tuple[str, str]] = []
+    for op, i1, i2, j1, j2 in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "equal":
+            out += [(" ", line) for line in a[i1:i2]]
         else:
-            out.append(("+", line))
-    out += [("-", line) for line, n in have.items() for _ in range(n)]
+            out += [("-", line) for line in a[i1:i2]]
+            out += [("+", line) for line in b[j1:j2]]
     return out
 
 
@@ -70,8 +70,39 @@ def text_diff(store: Store, job_id: int, biblionumber: int) -> str:
     return out
 
 
+def auth_summary(store: Store, job_id: int) -> dict:
+    """An authority job's counts: records, then headings by what happens
+    to them, the new authorities and where their forms come from."""
+    job = store.job(job_id)
+    counts = store.counts(job_id)
+    actions: Counter = Counter()
+    by_source: Counter = Counter()
+    standardized = fuzzy = 0
+    for row in store.conn.execute("SELECT detail FROM items WHERE job_id = ? AND status != 'error'", (job_id,)):
+        for h in json.loads(row[0]).get("headings", []):
+            actions[h["action"]] += 1
+            standardized += bool(h.get("standardized"))
+            fuzzy += bool(h.get("fuzzy")) and h["action"] in ("koha", "new")
+    new = store.new_authorities(job_id)
+    for a in new:
+        by_source[a["source"] or "?"] += 1
+    return {
+        "kind": "auth", "mode": job.mode or "exact", "job": job_id, "scope": job.scope, "release": job.release,
+        "records": job.done, "changed": counts["enriched"], "unchanged": counts["unchanged"],
+        "review": counts["review"], "errors": counts["error"],
+        "headings": {"read": sum(actions.values()), "linked_before": actions["linked"], "koha": actions["koha"],
+                     "new": actions["new"], "review": actions["review"], "no_match": actions["none"],
+                     "skipped": actions["skipped"], "standardized": standardized, "fuzzy": fuzzy},
+        "new_authorities": len(new), "preliminary": sum(1 for a in new if a["preliminary"]),
+        "new_by_source": dict(by_source.most_common()),
+        "koha_batches": len(store.chunks(job_id)),
+    }
+
+
 def summary(store: Store, job_id: int) -> dict:
     job = store.job(job_id)
+    if job.kind == "auth":
+        return auth_summary(store, job_id)
     counts = store.counts(job_id)
     by_group: Counter = Counter()
     by_source: Counter = Counter()
@@ -134,8 +165,81 @@ def _table(title: str, data: dict) -> str:
     return f"<h2>{html.escape(title)}</h2><table>{rows}</table>"
 
 
+def _head(title: str) -> str:
+    return (f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            f"<title>{html.escape(title)}</title><style>{CSS}</style></head><body><main>")
+
+
+def write_auth(store: Store, job_id: int, out_dir: Path) -> dict:
+    s = auth_summary(store, job_id)
+    (out_dir / "report.json").write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+    with open(out_dir / "report.tsv", "w", encoding="utf-8") as tsv:
+        tsv.write("biblionumber\ttag\taction\tbefore\tafter\tsource\tnote\ttitle\n")
+        for item in store.items(job_id, "enriched", "review"):
+            for h in detail(item).get("headings", []):
+                if h["action"] not in ("koha", "new", "review"):
+                    continue
+                note = h.get("reason", "") or (f"authority {h['authid']}" if h.get("authid") else
+                                               f"new authority {h.get('new', '')}")
+                tsv.write("\t".join(x.replace("\t", " ") for x in (
+                    str(item["biblionumber"] or ""), h["tag"], h["action"], h["before"], h.get("after", ""),
+                    h.get("source", ""), note, item["title"])) + "\n")
+    with open(out_dir / "authorities.tsv", "w", encoding="utf-8") as tsv:
+        tsv.write("id\tkind\theading\tsource\tpreliminary\tfuzzy\n")
+        for a in store.new_authorities(job_id):
+            tsv.write(f"{a['id']}\t{a['kind']}\t{a['heading']}\t{a['source']}\t{a['preliminary']}\t{a['fuzzy']}\n")
+
+    h = s["headings"]
+    cards = [("Records read", s["records"]), ("Records changed", s["changed"]), ("Review", s["review"]),
+             ("Headings read", h["read"]), ("Already linked", h["linked_before"]),
+             ("Linked to Koha authorities", h["koha"]), ("Linked to new authorities", h["new"]),
+             ("Standardised forms", h["standardized"]), ("Headings to review", h["review"]),
+             ("No match", h["no_match"]), ("New authorities", s["new_authorities"]),
+             ("Koha batches", s["koha_batches"])]
+    parts = [_head("Authority report"), f"<h1>Authority job {job_id}: staged report</h1>",
+             f"<p class=\"muted\">Scope: {html.escape(s['scope'])}. Mode: {html.escape(s['mode'])}. "
+             f"Database: {html.escape(s['release'] or '?')}. Nothing has been written to Koha. Apply makes a "
+             f"safety backup first, creates the new authorities, then links the records; Revert undoes both.</p>",
+             '<div class="grid">' + "".join(f'<div class="card"><b>{v}</b><span class="muted">{html.escape(k)}'
+                                            f'</span></div>' for k, v in cards) + "</div>",
+             _table("New authorities by source", s["new_by_source"])]
+    new = store.new_authorities(job_id)
+    parts.append(f"<h2>New authorities ({len(new)})</h2><p class=\"muted\">Preliminary records (008/33 d, "
+                 f"with a 667 note) come from headings gathered from catalogue records or from a close form.</p>")
+    for i, a in enumerate(new):
+        if i >= HTML_LIMIT:
+            parts.append(f"<p class=\"muted\">… {len(new) - HTML_LIMIT} more in authorities.tsv.</p>")
+            break
+        rec = unpack(a["record"])
+        tag = '<span class="tag">preliminary</span>' if a["preliminary"] else ""
+        parts.append(f"<details><summary>{html.escape(a['heading'])} · {html.escape(a['source'] or '?')}{tag}"
+                     f"</summary>{_pre([(' ', line) for line in record_lines(rec)]) if rec else ''}</details>")
+    parts.append(f"<h2>Records changed ({s['changed']})</h2>")
+    for i, item in enumerate(store.items(job_id, "enriched")):
+        if i >= HTML_LIMIT:
+            parts.append(f"<p class=\"muted\">… {s['changed'] - HTML_LIMIT} more in report.tsv.</p>")
+            break
+        before, after = unpack(item["before"]), unpack(item["after"])
+        parts.append(f"<details><summary>{item['biblionumber']} · {html.escape(item['title'])} "
+                     f"({item['m0'] + item['m1']} linked, {item['w']} standardised)</summary>"
+                     f"{_pre(diff_lines(before, after))}</details>")
+    parts.append(f"<h2>Review ({h['review']})</h2><p class=\"muted\">Nothing in this list is applied.</p><table>")
+    n = 0
+    for item in store.items(job_id, "enriched", "review"):
+        for r in detail(item).get("review", []):
+            n += 1
+            if n <= HTML_LIMIT:
+                parts.append(f"<tr><td>{item['biblionumber']}</td><td>{html.escape(r)}</td></tr>")
+    parts.append("</table></main></body></html>")
+    (out_dir / "report.html").write_text("".join(parts), encoding="utf-8")
+    return s
+
+
 def write(store: Store, job_id: int, out_dir: Path) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
+    if store.job(job_id).kind == "auth":
+        return write_auth(store, job_id, out_dir)
     s = summary(store, job_id)
     (out_dir / "report.json").write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
     with open(out_dir / "report.tsv", "w", encoding="utf-8") as tsv:
@@ -149,9 +253,7 @@ def write(store: Store, job_id: int, out_dir: Path) -> dict:
                 " ".join(a["tag"] for a in adds), item["title"].replace("\t", " "),
                 " | ".join(info.get("review", [])).replace("\t", " ")]) + "\n")
 
-    parts = [f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-             f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-             f"<title>Enrichment report</title><style>{CSS}</style></head><body><main>",
+    parts = [_head("Enrichment report"),
              f"<h1>Enrichment job {job_id}: staged report</h1>",
              f"<p class=\"muted\">Scope: {html.escape(s['scope'])}. Database: {html.escape(s['release'] or '?')}. "
              f"Nothing has been written to Koha. Apply makes a safety backup first and can be reverted.</p>",

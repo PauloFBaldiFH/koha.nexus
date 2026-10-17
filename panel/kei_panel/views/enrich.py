@@ -27,7 +27,7 @@ from pathlib import Path
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, DataTable, Input, Label, ProgressBar, Static
+from textual.widgets import Button, DataTable, Input, Label, ProgressBar, RadioButton, RadioSet, Static
 
 from ..i18n import t
 from ..screens.dialogs import ConfirmScreen
@@ -82,6 +82,30 @@ def summary_text(job: dict) -> str:
     return "\n".join(lines)
 
 
+def auth_summary_text(job: dict) -> str:
+    rep = job.get("report") or {}
+    if not rep:
+        return summary_text(job)
+    h = rep.get("headings", {})
+    lines = [
+        t("Records read ${n} · Changed ${c} · Unchanged ${u} · Review ${r} · Errors ${x}",
+          n=rep.get("records", 0), c=rep.get("changed", 0), u=rep.get("unchanged", 0), r=rep.get("review", 0),
+          x=rep.get("errors", 0)),
+        t("Headings ${n}: linked to Koha ${k} · to new authorities ${new} · forms standardised ${s} · "
+          "review ${r} · no match ${m} · already linked ${l}",
+          n=h.get("read", 0), k=h.get("koha", 0), new=h.get("new", 0), s=h.get("standardized", 0),
+          r=h.get("review", 0), m=h.get("no_match", 0), l=h.get("linked_before", 0)),
+        t("New authority records ${n} (preliminary ${p}) · Koha batches ${b}", n=rep.get("new_authorities", 0),
+          p=rep.get("preliminary", 0), b=rep.get("koha_batches", 0)),
+    ]
+    sources = rep.get("new_by_source") or {}
+    if sources:
+        lines.append(t("Sources: ${list}", list=", ".join(f"{k} {v}" for k, v in list(sources.items())[:8])))
+    if rep.get("release"):
+        lines.append(t("Enrichment database: ${name}", name=rep["release"]))
+    return "\n".join(lines)
+
+
 def diff_text(lines: list[str]) -> Text:
     out = Text()
     for line in lines:
@@ -102,6 +126,42 @@ def classes(row: dict) -> str:
 
 class EnrichView(SectionView):
     loaded = False
+    KIND = "bib"            # the jobs this screen lists (nexus_jobs' job kind)
+
+    # -- what differs between the bibliographic and the authority screen --
+    def intro(self) -> str:
+        return t("Adds what your records lack (subjects, classification, notes, extent) from the "
+                 "koha.nexus enrichment database. Nothing reaches the catalogue until you read the "
+                 "report and choose Apply; Apply makes a safety backup first and can be reverted.")
+
+    def compose_options(self) -> ComposeResult:
+        yield from ()
+
+    def start_task(self, scope: str) -> tuple[str, list[str]]:
+        return "enrich-job-add", [scope]
+
+    def start_title(self) -> str:
+        return t("Enrich bibliographic data")
+
+    def summary(self, job: dict) -> str:
+        return summary_text(job)
+
+    def apply_question(self, rep: dict, job_id: int) -> str:
+        return t("Write the ${n} enriched record(s) of job ${id} into the catalogue? A verified safety backup "
+                 "is made first, then Koha's staged import adds the fields, at most 500 records at a time. "
+                 "Records edited after the report are left as they are. Revert undoes it.",
+                 n=rep.get("enriched", 0), id=job_id)
+
+    def revert_question(self, job_id: int) -> str:
+        return t("Undo job ${id}? A verified safety backup is made first, then each Koha batch is reverted: "
+                 "the records get their previous version back. Records edited in Koha after Apply are kept.",
+                 id=job_id)
+
+    def change_columns(self) -> tuple[str, str]:
+        return t("Class"), t("Fields")
+
+    def change_cells(self, c: dict) -> tuple[str, str]:
+        return classes(c), str(c.get("added", 0))
 
     def __init__(self, section):
         super().__init__(section)
@@ -116,16 +176,14 @@ class EnrichView(SectionView):
         with Horizontal(classes="view-head"):
             yield from self.heading()
             yield Button(t("Reload"), id="e-reload", classes="small")
-        yield Static(t("Adds what your records lack (subjects, classification, notes, extent) from the "
-                       "koha.nexus enrichment database. Nothing reaches the catalogue until you read the "
-                       "report and choose Apply; Apply makes a safety backup first and can be reverted."),
-                     classes="view-prompt", markup=False)
+        yield Static(self.intro(), classes="view-prompt", markup=False)
         with Vertical(id="e-new", classes="hub-box"):
             yield Static(t("Which records: all, or biblionumbers such as 101, 102, 500-550."),
                          classes="ai-note", markup=False)
             with Horizontal(classes="quick-actions"):
                 yield Input(placeholder="all", id="e-scope")
                 yield Button(t("Start"), id="e-start", classes="small", variant="primary")
+            yield from self.compose_options()
         with Vertical(id="e-worker", classes="hub-box"):
             yield Label(t("Not checked yet."), id="e-worker-state")
             yield ProgressBar(total=None, show_eta=False, id="e-progress")
@@ -150,8 +208,9 @@ class EnrichView(SectionView):
             changes = DataTable(id="e-changes", zebra_stripes=True, cursor_type="row", classes="hub-table")
             changes.add_column(t("Biblionumber"), key="bn")
             changes.add_column(t("Result"), key="status")
-            changes.add_column(t("Class"), key="cls")
-            changes.add_column(t("Fields"), key="added")
+            col_cls, col_added = self.change_columns()
+            changes.add_column(col_cls, key="cls")
+            changes.add_column(col_added, key="added")
             changes.add_column(t("Title"), key="title")
             yield changes
             yield Static("", id="e-diff", classes="e-diff")
@@ -196,7 +255,8 @@ class EnrichView(SectionView):
             self.query_one("#e-worker-state", Label).update(t("The enrichment service is not installed yet."))
             return
         try:
-            self.jobs = json.loads(out.get("jobs") or "[]", strict=False)
+            self.jobs = [j for j in json.loads(out.get("jobs") or "[]", strict=False)
+                         if (j.get("kind") or "bib") == self.KIND]
             self.worker = json.loads(out.get("worker") or "{}", strict=False)
         except ValueError:
             self.jobs, self.worker = [], {}
@@ -265,8 +325,9 @@ class EnrichView(SectionView):
         state = job.get("state", "")
         head = t("Job ${id} · ${scope} · ${state}", id=job.get("id", "?"), scope=job.get("scope", ""),
                  state=state_text(state))
-        self.query_one("#e-summary", Static).update(head + "\n" + summary_text(job))
-        enriched = int((job.get("report") or {}).get("enriched", 0))
+        self.query_one("#e-summary", Static).update(head + "\n" + self.summary(job))
+        rep = job.get("report") or {}
+        enriched = int(rep.get("enriched", rep.get("changed", 0)))
         self.query_one("#e-open", Button).disabled = not job.get("report_html")
         self.query_one("#e-apply", Button).disabled = not (state in ("ready", "applying", "partly-applied")
                                                            and enriched > 0)
@@ -278,8 +339,9 @@ class EnrichView(SectionView):
         changes.clear()
         for c in job.get("changes", []):
             changes.add_row(str(c.get("biblionumber") or ""),
+                            t("Changed") if c.get("status") == "enriched" and self.KIND == "auth" else
                             t("Enriched") if c.get("status") == "enriched" else t("Review"),
-                            classes(c), str(c.get("added", 0)), c.get("title", ""),
+                            *self.change_cells(c), c.get("title", ""),
                             key=f"{c.get('biblionumber')}:{c.get('status')}")
         self.query_one("#e-diff", Static).update("")
 
@@ -339,8 +401,9 @@ class EnrichView(SectionView):
             self.app.notify(t("Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550."),
                             severity="warning", timeout=6)
             return
-        title = t("Enrich bibliographic data")
-        result = await run_task(self.app, title, "enrich-job-add", scope)
+        title = self.start_title()
+        task, args = self.start_task(scope)
+        result = await run_task(self.app, title, task, *args)
         if not failed(result) and result.value.get("job", "").isdigit():
             self.job_id = int(result.value.get("job"))
             self.job = {}
@@ -371,10 +434,7 @@ class EnrichView(SectionView):
         if job_id is None:
             return
         title = t("Apply")
-        question = t("Write the ${n} enriched record(s) of job ${id} into the catalogue? A verified safety backup "
-                     "is made first, then Koha's staged import adds the fields, at most 500 records at a time. "
-                     "Records edited after the report are left as they are. Revert undoes it.",
-                     n=rep.get("enriched", 0), id=job_id)
+        question = self.apply_question(rep, job_id)
         if not await self.app.push_screen_wait(ConfirmScreen(title, question, danger=True)):
             return
         result = await run_task(self.app, title, "enrich-job-apply", str(job_id), cancellable=False)
@@ -388,9 +448,7 @@ class EnrichView(SectionView):
         if job_id is None:
             return
         title = t("Revert")
-        question = t("Undo job ${id}? A verified safety backup is made first, then each Koha batch is reverted: "
-                     "the records get their previous version back. Records edited in Koha after Apply are kept.",
-                     id=job_id)
+        question = self.revert_question(job_id)
         if not await self.app.push_screen_wait(ConfirmScreen(title, question, danger=True)):
             return
         result = await run_task(self.app, title, "enrich-job-revert", str(job_id), cancellable=False)
@@ -428,3 +486,55 @@ class EnrichView(SectionView):
         if not open_url(where):
             self.app.copy_to_clipboard(where, quiet=True)
         self.app.notify(t("Report saved in Downloads: ${file}", file=target.name), timeout=6)
+
+
+class AuthEnrichView(EnrichView):
+    """"Enrich & standardize authorities": the same jobs screen for
+    authority jobs (`enrich-auth-add SCOPE MODE`). Each name and subject
+    heading is matched with Koha's own authorities, then the enrichment
+    database (Biblioteca Nacional first, then the other Brazilian sources,
+    then the Library of Congress); Apply creates the new authorities, then
+    links the records ($9) and puts their headings in the authorised form."""
+
+    KIND = "auth"
+
+    def intro(self) -> str:
+        return t("Links the names and subjects of your records to authority records: your own Koha authorities "
+                 "first, then the koha.nexus enrichment database (Biblioteca Nacional first, then Brazilian "
+                 "catalogues, then the Library of Congress). Headings get the authorised form; missing "
+                 "authorities are created. Nothing reaches the catalogue until you read the report and choose "
+                 "Apply; Apply makes a safety backup first and can be reverted.")
+
+    def compose_options(self) -> ComposeResult:
+        with RadioSet(id="e-mode"):
+            yield RadioButton(t("Exact forms only"), value=True, id="e-mode-exact")
+            yield RadioButton(t("Also close forms (a typo; new authorities marked preliminary)"), id="e-mode-fuzzy")
+
+    def mode(self) -> str:
+        return "fuzzy" if self.query_one("#e-mode-fuzzy", RadioButton).value else "exact"
+
+    def start_task(self, scope: str) -> tuple[str, list[str]]:
+        return "enrich-auth-add", [scope, self.mode()]
+
+    def start_title(self) -> str:
+        return t("Enrich & standardize authorities")
+
+    def summary(self, job: dict) -> str:
+        return auth_summary_text(job)
+
+    def change_columns(self) -> tuple[str, str]:
+        return t("Standardised"), t("Linked")
+
+    def change_cells(self, c: dict) -> tuple[str, str]:
+        return str(c.get("w", 0)), str(c.get("added", 0))
+
+    def apply_question(self, rep: dict, job_id: int) -> str:
+        return t("Apply job ${id}? A verified safety backup is made first. Then ${a} new authority record(s) are "
+                 "created and ${n} record(s) are linked to their authorities through Koha's staged import, at most "
+                 "500 at a time. Records edited after the report are left as they are. Revert undoes it.",
+                 id=job_id, a=rep.get("new_authorities", 0), n=rep.get("changed", 0))
+
+    def revert_question(self, job_id: int) -> str:
+        return t("Undo job ${id}? A verified safety backup is made first. The records get their previous version "
+                 "back, then the authority records the job created are removed, except those a record still "
+                 "links to. Records edited in Koha after Apply are kept.", id=job_id)
