@@ -1,9 +1,12 @@
-"""python -m enrich_build {build | release | verify | inspect}
+"""python -m enrich_build {build | release | publish | verify | inspect}
 
     build SOURCES.json [--out static.db] [--report report.json] [--sample N]
                       read every source's dumps and write static.db
     release static.db [--month YYYY.MM] [--dir DIR]
                       write nexus-enrich-YYYY.MM.db.zst and its .sha256
+    publish ASSET.db.zst [--repo OWNER/NAME]
+                      upload it and its .sha256 to the release enrich-YYYY.MM
+                      (GITHUB_TOKEN), write latest.txt for the mirror
     verify ASSET.db.zst [--sha256 HASH]
                       check the hash, decompress, run SQLite's integrity check
     inspect static.db print the build date, counts and sources
@@ -16,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 from datetime import date
@@ -34,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("db", type=Path)
     r.add_argument("--month", default=date.today().strftime("%Y.%m"))
     r.add_argument("--dir", type=Path)
+    p = sub.add_parser("publish")
+    p.add_argument("asset", type=Path)
+    p.add_argument("--repo", default="PauloFBaldiFH/koha.nexus")
     v = sub.add_parser("verify")
     v.add_argument("asset", type=Path)
     v.add_argument("--sha256")
@@ -55,6 +62,14 @@ def main(argv: list[str] | None = None) -> int:
         out_dir = args.dir or args.db.resolve().parent
         asset, sums = compress(args.db, out_dir / asset_name(args.month))
         print(json.dumps({"asset": str(asset), "bytes": asset.stat().st_size, "sha256": str(sums)}))
+        return 0
+    if args.cmd == "publish":
+        from .publish import GitHub, PublishError, publish
+        try:
+            print(json.dumps(publish(args.asset, GitHub(os.environ.get("GITHUB_TOKEN", ""), args.repo))))
+        except PublishError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         return 0
     if args.cmd == "verify":
         from .release import verify

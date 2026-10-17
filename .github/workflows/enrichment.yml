@@ -8,10 +8,12 @@ on:
     paths:
       - "enrichment/**"
       - ".github/workflows/enrichment.yml"
+      - "panel/kei_panel/data/z3950_targets.json"
   pull_request:
     paths:
       - "enrichment/**"
       - ".github/workflows/enrichment.yml"
+      - "panel/kei_panel/data/z3950_targets.json"
 
 permissions:
   contents: read

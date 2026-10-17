@@ -70,8 +70,17 @@ python -m enrich_build release static.db --month 2026.11     # nexus-enrich-2026
 python -m enrich_build verify nexus-enrich-2026.11.db.zst     # hash, decompress, integrity check
 ```
 
-Upload the `.db.zst` and `.sha256` to the month's GitHub Release (R2 as
-mirror). The asset is compressed at level 19 without `--long`, so a client
+Then publish it (a token with `contents: write` on the repository, from the
+environment, never in a file):
+
+```sh
+GITHUB_TOKEN=... python -m enrich_build publish nexus-enrich-2026.11.db.zst
+```
+
+This creates the release `enrich-2026.11` (not marked latest, so the panel's
+self-update is not affected), uploads the asset and its `.sha256`, and writes
+`latest.txt` next to them. For the R2 mirror copy all three files to the
+bucket root, e.g. `rclone copy nexus-enrich-2026.11.db.zst* latest.txt r2:BUCKET/`. The asset is compressed at level 19 without `--long`, so a client
 decompresses it with a window of a few MB.
 
 What the builder does:
@@ -122,6 +131,47 @@ So that a harvested source lands on its Koha row, its `static.db` id should be
 the target id: `fonte` slugs already match most (`ufpr`, `unb`, `fundacentro`,
 `bn-portugal`, `porbase`); for others use the build's `source_map` or the
 target's `static` list.
+
+## Monthly updates on a library's computer
+
+```sh
+python -m nexus_gateway update --check     # what is installed, what is published
+python -m nexus_gateway update             # download, verify, swap in
+python -m nexus_gateway update --force     # install the newest even if it is the same month
+```
+
+- The newest month is taken from the GitHub releases (an asset
+  `nexus-enrich-YYYY.MM.db.zst` with its `.sha256`) and, if
+  `NEXUS_GATEWAY_MIRROR` is set, from the mirror's `latest.txt`; GitHub wins
+  a tie, the mirror covers GitHub being down.
+- The download goes to a `.part` file, its size and SHA-256 must match, then it
+  is decompressed next to `static.db`, checked (`quick_check`, schema version,
+  at least one record) and moved over `static.db` with one `os.replace`. The
+  running gateway notices the new file on its next search; a search already
+  running finishes on the old one. A failure leaves the old `static.db`.
+- The downloaded `.zst` is deleted afterwards; `static.release` records the
+  installed month and hash.
+
+The installer (`config.sh enrich-install`, also run at the end of a Koha
+install) puts the sources in `/usr/local/lib/koha-easy-installer/enrichment`
+with their own venv and creates:
+
+| Unit | What |
+|---|---|
+| `koha-nexus-sru` | the gateway on 127.0.0.1:5000 (user `nexus-enrich`, MemoryMax 192M) |
+| `koha-nexus-enrich-update` | `update` as a oneshot at the lowest priority (Nice 19, idle I/O, 25% CPU, MemoryMax 256M) |
+| `koha-nexus-enrich-update.timer` | 20 min after boot, then weekly with up to 6 h random delay |
+
+Data is in `/var/lib/koha-nexus-enrich`, settings in
+`/etc/koha-nexus-enrich/gateway.env` (`NEXUS_GATEWAY_MIRROR`, logins). The
+install retires the old Zeus and Pergamum bridges (`koha-zeus-sru`,
+`koha-pergamum-sru`, ports 5000 and 5006) and runs `koha-sql` on Koha's
+database. Panel tasks: `enrich-install`, `enrich-update [--force]`,
+`enrich-status`.
+
+On Windows, `.wslconfig` gets `[experimental] autoMemoryReclaim=gradual`, so
+the memory WSL used for the decompression goes back to Windows instead of
+staying with the VM.
 
 ## The engine
 

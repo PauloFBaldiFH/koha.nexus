@@ -34,20 +34,20 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 75
-    # The four headings, in Paulo's order, each opening with his first id; the authority files last.
+    assert len(targets) == 77
+    # The four headings, in Paulo's order, sru/_union first; the authority files last.
     assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized", "authorities"]
     firsts = {t.region: t.db for t in reversed(targets)}
-    assert firsts == {"national": "sru/bn", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
+    assert firsts == {"national": "sru/_union", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
                       "specialized": "sru/all", "authorities": "NAF"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
-    # Every bibliographic one goes through the koha.nexus SRU gateway.
+    # Every bibliographic one goes through the local gateway (enrichment/nexus_gateway).
     biblio = [t for t in targets if t.recordtype == "biblio"]
-    assert len(biblio) == 72
+    assert len(biblio) == 74
     assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in biblio} == {
-        ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
+        ("127.0.0.1", 5000, "sru", "MARC21", "utf8")}
     assert all(t.db.startswith("sru/") and not t.login for t in biblio)
 
 
@@ -520,9 +520,9 @@ def test_koha_ranks_follow_latency():
 def test_curated_brazil_list_and_the_gateway():
     br = [t.db for t in z.load_curated() if t.region == "br_universities"]
     assert br == ["sru/" + i for i in "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs "
-                                     "uff utfpr".split()]
+                                     "uff utfpr unb".split()]
     ticked = {t.db for t in z.load_curated() if t.preselect}
-    assert ticked == {"sru/bn", "sru/senado", "sru/usp", "sru/ufsc"}
+    assert ticked == {"sru/_union"}
     rede = next(t for t in z.load_curated() if t.db == "sru/all")
     assert (rede.region, rede.sru_options) == ("specialized", "sru=get,sru_version=1.1")
 
@@ -533,7 +533,7 @@ def test_add_file_and_sql_carry_the_sru_settings():
     dnb = z.make_target({"name": "DNB", "host": "https://services.dnb.de/sru/dnb"})
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in
             z.add_file_text([zeus, utfpr, dnb], {}).splitlines()]
-    assert (rows[0]["host"], rows[0]["port"], rows[0]["db"]) == ("sru.koha.nexus", "443", "sru/bn")
+    assert (rows[0]["host"], rows[0]["port"], rows[0]["db"]) == ("127.0.0.1", "5000", "sru/_union")
     assert (rows[0]["kind"], rows[0]["sru_options"]) == ("sru", "sru=get,sru_version=1.1")
     assert rows[0]["sru_fields"].startswith("title=dc.title,isbn=dc.isbn")
     assert (rows[1]["kind"], rows[1]["sru_fields"], rows[1]["sru_options"]) == ("zed", "", "")
@@ -664,7 +664,8 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
 
 
 def test_curated_list_has_no_raw_address():
-    # The gateway's older addresses (the VPS's public and private IPs) never come back.
+    # The VPS gateway's addresses (public and private IPs) never come back; the
+    # catalogues are on the local gateway, the BN authority file still on the VPS one.
     hosts = {t.host for t in z.load_curated()}
-    assert hosts == {"sru.koha.nexus", "lx2.loc.gov"}
-    assert not any(re.fullmatch(r"[\d.]+", h) for h in hosts)
+    assert hosts == {"127.0.0.1", "sru.koha.nexus", "lx2.loc.gov"}
+    assert not any(re.fullmatch(r"[\d.]+", h) for h in hosts - {"127.0.0.1"})

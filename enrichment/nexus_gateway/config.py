@@ -27,6 +27,8 @@ class Settings:
     live_grace: float = 30.0          # how long a late answer may still arrive
     learned_days: int = 30            # a learned answer older than this is searched again
     max_records: int = 50
+    releases_api: str = ""            # default: the repository's GitHub Releases
+    mirror: str = ""                  # e.g. the R2 bucket's public URL
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -36,4 +38,5 @@ class Settings:
                    targets=Path(_env("TARGETS", str(PACKAGE_TARGETS))),
                    live=_env("LIVE", "1") not in ("0", "no", "false", "off"),
                    live_timeout=float(_env("LIVE_TIMEOUT", "6")), live_grace=float(_env("LIVE_GRACE", "30")),
-                   learned_days=int(_env("LEARNED_DAYS", "30")), max_records=int(_env("MAX_RECORDS", "50")))
+                   learned_days=int(_env("LEARNED_DAYS", "30")), max_records=int(_env("MAX_RECORDS", "50")),
+                   releases_api=_env("RELEASES_API", ""), mirror=_env("MIRROR", ""))

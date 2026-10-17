@@ -295,14 +295,6 @@
    "status": "missing"
   },
   {
-   "id": "unb",
-   "name": "Universidade de Brasília (UnB)",
-   "group": "br_universities",
-   "kind": "missing",
-   "status": "missing",
-   "note": "Records harvested into static.db (fonte \"Universidade de Brasília (UnB)\"); no live address."
-  },
-  {
    "id": "ufrgs",
    "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
    "group": "br_universities",
@@ -335,6 +327,14 @@
    "encoding": "utf8",
    "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet.",
    "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list)"
+  },
+  {
+   "id": "unb",
+   "name": "Universidade de Brasília (UnB)",
+   "group": "br_universities",
+   "kind": "missing",
+   "status": "missing",
+   "note": "Records harvested into static.db (fonte \"Universidade de Brasília (UnB)\"); no live address."
   },
   {
    "id": "harvard",

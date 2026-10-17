@@ -1,7 +1,10 @@
-"""python -m nexus_gateway serve | koha-sql | check
+"""python -m nexus_gateway serve | update | koha-sql | panel-list | check
 
     serve       run the SRU server (settings: NEXUS_GATEWAY_* variables)
+    update      download the newest static.db release and swap it in
+                (--check: only say whether one is available; --force: again)
     koha-sql    print the SQL that points Koha's rows at this gateway
+    panel-list  print the koha.nexus panel's list of these rows
     check       load targets.json and static.db, print what would be served
 """
 
@@ -12,7 +15,7 @@ import json
 import logging
 import sys
 
-from . import koha_sql
+from . import koha_sql, update
 from .config import Settings
 from .engine import Engine, Static
 from .learned import Learned
@@ -36,8 +39,26 @@ def main(argv: list[str] | None = None) -> int:
     sql.add_argument("--host", default="127.0.0.1")
     sql.add_argument("--port", type=int, default=5000)
     sub.add_parser("check")
+    up = sub.add_parser("update")
+    up.add_argument("--force", action="store_true")
+    up.add_argument("--check", action="store_true")
+    pl = sub.add_parser("panel-list")
+    pl.add_argument("--authorities", help="the panel list whose authority rows to keep")
     args = ap.parse_args(argv)
     settings = Settings.from_env()
+
+    if args.cmd == "update":
+        try:
+            result = update.update(settings.static_db, api=settings.releases_api, mirror=settings.mirror,
+                                   force=args.force, check=args.check)
+        except (update.UpdateError, OSError) as exc:
+            print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+            return 1
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    if args.cmd == "panel-list":
+        sys.stdout.write(koha_sql.panel_list(load(settings.targets), args.authorities))
+        return 0
 
     if args.cmd == "koha-sql":
         sys.stdout.write(koha_sql.render(load(settings.targets), args.host, args.port))

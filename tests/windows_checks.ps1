@@ -258,6 +258,21 @@ foreach ($k in 'Open Dashboard', 'Open User Folder', 'Restart Services', 'More o
 $ptReason = 'O Koha est' + [char]0xE1 + ' salvando o banco de dados e finalizando os servi' + [char]0xE7 + 'os com seguran' + [char]0xE7 + 'a...'
 Check 'pt: the shutdown reason in Paulo''s words' ((T 'Koha is saving the database and stopping its services safely...') -eq $ptReason) (T 'Koha is saving the database and stopping its services safely...')
 
+# .wslconfig: Koha's keys are added, the user's own values are kept
+# (autoMemoryReclaim=gradual on every build; mirrored networking and
+# hostAddressLoopback from build 22621).
+foreach ($fn in $ramAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Merge-KohaWslConfig' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$cfg = Merge-KohaWslConfig -Text '' -Build 19045
+Check 'wslconfig: autoMemoryReclaim on Windows 10' ($cfg -match '(?m)^\[experimental\]\r?\nautoMemoryReclaim=gradual\r?$' -and $cfg -notmatch 'mirrored') $cfg
+$cfg = Merge-KohaWslConfig -Text '' -Build 22631
+Check 'wslconfig: Windows 11 keys' ($cfg -match 'networkingMode=mirrored' -and $cfg -match 'autoMemoryReclaim=gradual' -and $cfg -match 'hostAddressLoopback=true') $cfg
+$mine = "[wsl2]`r`nmemory=6GB`r`n`r`n[experimental]`r`nautoMemoryReclaim=dropcache`r`n"
+$cfg = Merge-KohaWslConfig -Text $mine -Build 19045
+Check 'wslconfig: the user''s autoMemoryReclaim is kept' ($cfg -match 'autoMemoryReclaim=dropcache' -and $cfg -notmatch 'gradual' -and $cfg -match 'memory=6GB' -and $cfg -match 'vmIdleTimeout=-1') $cfg
+Check 'wslconfig: a second merge changes nothing' ((Merge-KohaWslConfig -Text $cfg -Build 19045) -eq $cfg)
+
 # Store installer (windows\setup): its PowerShell parses, and every exit
 # code the script sets is a different value.
 foreach ($f in Get-ChildItem (Join-Path $repo 'windows\setup') -Filter '*.ps1') {
