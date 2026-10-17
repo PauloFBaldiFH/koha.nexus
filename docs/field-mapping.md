@@ -5,9 +5,10 @@ An optional step of the Magic Import Tool: before anything goes to Koha's
 holds, with sample values, and send each one to another MARC 21 destination
 or leave it out. Skipping the step is the direct import, unchanged.
 
-Status (1.5.82): the engine side is done and tested (`kei_import/fieldmap.py`,
-the `fields` command and `build --fieldmap`). The panel screen below is a
-proposal, not built yet.
+Status (1.5.82): engine (`kei_import/fieldmap.py`, the `fields` command and
+`build --fieldmap`) and panel screen (`panel/kei_panel/screens/fieldmap.py`)
+are built and tested. The classic whiptail panel imports as before (no
+mapping step there).
 
 ## Where it sits in the import
 
@@ -148,12 +149,13 @@ memory than a record. MARC-8 files are converted to UTF-8 with yaz first.
 - `mapping`: the mapping of the last build, so a second look starts from it.
   The streams are always those of the direct import.
 
-## Panel screen (proposal)
+## Panel screen
 
-A new native screen, `MagicFieldMapScreen`, opened from the magic import
-task through a new `@@fieldmap PATH` prompt (PATH = `fields.json`); it
-answers with the path of the saved `fieldmap.json`, or nothing when the
-librarian skips.
+`FieldMapScreen`, opened from the magic import task through the
+`@@fieldmap TITLE<TAB>FIELDS<TAB>OUT<TAB>ENGINE` prompt (the engine's
+`fields.json`, the `fieldmap.json` to write, the engine folder for the live
+preview); it answers "ok" once a mapping with changes is written, "cancel"
+when the librarian skips or changed nothing.
 
 ```
 ┌ 🪄 Magic Import Tool · Edit field mapping ─────────────────────────────┐
@@ -182,15 +184,19 @@ librarian skips.
   existing styling): source with how many sample records have it, the first
   sample value (all three on hover or in the row's detail line), and the
   destination.
-- Destination picker: a `Select` with "Keep as it is" first, Paulo's list
-  (100$a, 245$a, 245$b, 260$b, 264$b, 260$c, 264$c, 082$a, 650$a, 952$p,
-  952$y), "Other: type TAG$subfield..." (an `Input` validated as you type)
-  and "[Do not import this field]".
+- Destination picker (for the row under the cursor): a `Select` with "Keep
+  as it is" first, Paulo's list (100$a, 245$a, 245$b, 260$b, 264$b, 260$c,
+  264$c, 082$a, 650$a, 952$p, 952$y), "Other: type TAG$subfield..." (an
+  `Input`, checked with the engine's own rules on Enter) and "[Do not import
+  this field]".
 - Record preview: the first 1-3 sample records after the mapping, redrawn
   at every change (in-process `FieldMap.apply`, no engine call), changed
-  lines highlighted; a "before" toggle shows the record as in the file.
+  lines marked with ▸; "As in the file" toggles the record before the
+  mapping. Without the engine module (an old engine) the screen still maps,
+  without the preview.
 - Several streams or tables: a selector at the top; one mapping holds all.
 - Apply writes only the rows that differ from the proposal, then the task
   rebuilds and shows the new preview; Reset goes back to the proposal.
-- New strings go to the 22 lang caches by hand (pt: "Editar Campos",
-  "Não importar este campo", ...), as with every panel string.
+- New strings are in `lang/pt.cache` (pt: "Editar Campos", "[Não importar
+  este campo]", ...); the other languages show English for now.
+- Demo mode (`--demo`) walks through the screen with a sample ISIS file.

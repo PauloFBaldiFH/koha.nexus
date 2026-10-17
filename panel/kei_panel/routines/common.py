@@ -130,6 +130,10 @@ def asker(app, danger: tuple[str, ...] = ()):
             return str(picked) if picked else None
         if kind == "edit":
             return await app.push_screen_wait(EditScreen(title, extra, note=text))
+        if kind == "fieldmap":
+            from ..screens.fieldmap import FieldMapScreen
+            fields, target, engine = extra
+            return await app.push_screen_wait(FieldMapScreen(title, fields, target, engine))
         if kind == "say":
             await app.push_screen_wait(MessageScreen(title if title and title != "OK" else t("OK"), text,
                                                      kind=extra if extra in ("ok", "info", "error") else "info"))

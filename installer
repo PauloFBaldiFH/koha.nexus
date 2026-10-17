@@ -25294,6 +25294,40 @@ magic_pick_one() {
     tools_pick "$(t "🪄  Magic Import Tool")" "$1" "$2"
 }
 
+# Edit & Map Fields needs the panel's mapping screen: the classic panel
+# imports as it is.
+magic_can_map() { [ -n "${KEI_TASK:-}" ] && [ "${KEI_TASK_INTERACTIVE:-}" = "1" ]; }
+ui_fieldmap() { return 1; }
+
+# magic_map_fields LOG BUILD-OPTIONS...: the fields of the first records
+# (engine "fields"), the panel's mapping screen, then the build again with
+# the mapping (docs/field-mapping.md). 0 when a build ran (its counts and
+# preview are the ones to show), 1 when the import goes on as it was.
+magic_map_fields() {
+    local log="$1" rc=0
+    shift
+    display_explanation "Reading the fields of the first records..."
+    magic_engine "$log" fields || rc=$?
+    if [ "$rc" != 0 ] || [ ! -s "$MAGIC_WORK/fields.json" ]; then
+        msg_error "" "$(t 'The fields could not be read: the import goes on as it is.\n\nLog: ${log}')" 10 74
+        return 1
+    fi
+    rm -f "$MAGIC_WORK/fieldmap.json"
+    ui_fieldmap "$(t "Edit field mapping")" "$MAGIC_WORK/fields.json" "$MAGIC_WORK/fieldmap.json" "$MAGIC_ENGINE" || return 1
+    [ -s "$MAGIC_WORK/fieldmap.json" ] || return 1
+    chown "${INSTANCE}-koha:" "$MAGIC_WORK/fieldmap.json" 2>/dev/null || true
+    chmod 600 "$MAGIC_WORK/fieldmap.json"
+    cp -f "$MAGIC_WORK/fieldmap.json" "${log%.log}-fieldmap.json" 2>/dev/null || true
+    display_explanation "Building the records again with your mapping (nothing is written to Koha yet)..."
+    rc=0
+    magic_engine "$log" build "$@" --fieldmap "$MAGIC_WORK/fieldmap.json" || rc=$?
+    [ "$rc" = 0 ] && return 0
+    msg_error "" "$(t 'The records could not be built with this mapping: the import goes on as it is.\n\nLog: ${log}')" 10 74
+    display_explanation "Building the records, items and patrons (nothing is written to Koha yet)..."
+    magic_engine "$log" build "$@" || return 1
+    return 0
+}
+
 lt_magic_import() {
     require_database || return 0
     local src rc=0
@@ -25421,6 +25455,17 @@ _lt_magic_run() {
     if [ "$rc" = 3 ] || [ $((recs + pats + loans + holds)) -eq 0 ]; then
         msg_info "$title" "$(t 'Nothing could be built from it: the preview just shown says why.\nNothing was changed.\n\nLog: ${log}')" 11 76
         return 0
+    fi
+    # Edit & Map Fields (the panel only): fields and columns may go elsewhere
+    # first; No is the direct import, untouched.
+    if [ "${recs:-0}" -gt 0 ] && magic_can_map \
+        && prompt_yes_no "$title" "$(t 'Edit the field mapping before importing?\n\nYou can send a field or column to another MARC field, or leave it out, and see the records change as you go.\nNo = import as it is.')" 13 76 defaultno \
+        && magic_map_fields "$log" "${args[@]}"; then
+        recs=$(tools_num "$log" "Total records:"); items=$(tools_num "$log" "Total items:"); pats=$(tools_num "$log" "Total patrons:")
+        loans=$(tools_num "$log" "Total loans:"); holds=$(tools_num "$log" "Total holds:")
+        casing=$(tools_num "$log" "Casing fixes:"); encfix=$(tools_num "$log" "Encoding fixes:"); anom=$(tools_num "$log" "Anomalies:")
+        [ -f "$MAGIC_WORK/out/preview.txt" ] && cat "$MAGIC_WORK/out/preview.txt" >> "$log"
+        [ -f "$MAGIC_WORK/out/preview.txt" ] && ui_textbox "$(t "Preview (dry run)")" "$MAGIC_WORK/out/preview.txt"
     fi
     # The review gate: what was corrected and what to check, above the counts.
     gate=$(t 'Casing fixed: ${casing}  ·  Encoding fixed: ${encfix}  ·  Anomalies to check: ${anom}')
@@ -31577,6 +31622,13 @@ kei_task_ui() {
     kei_edit() {
         kei_live || return 1
         kei_emit edit "${1}"$'\t'"${2}"$'\t'"${3:-}"
+        kei_answer
+    }
+    # Edit & Map Fields: "@@fieldmap TITLE<TAB>FIELDS<TAB>OUT<TAB>ENGINE"; the
+    # panel writes the mapping to OUT and answers "ok", or "cancel" (as it is).
+    ui_fieldmap() {
+        kei_live || return 1
+        kei_emit fieldmap "${1}"$'\t'"${2}"$'\t'"${3}"$'\t'"${4}"
         kei_answer
     }
     # A link to open while a tool waits for it (an authorization): shown in

@@ -45,10 +45,12 @@ _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
 # (mode "file"|"dir", start folder, extensions), answer a path or None;
 # "edit": extra is the file's path (text is a note), answer True once saved;
 # "say": a box to close (extra is its kind: ok, info, error); "view": a long
-# text to read.
+# text to read; "fieldmap": the Magic Import's field mapping, extra is (the
+# engine's fields.json, the mapping file to write, the engine folder),
+# answer True once a mapping with changes was written.
 Asker = Callable[["TaskOutcome", str, str, str, object], Awaitable[object]]
 
-_PROMPTS = ("@@ask ", "@@choose ", "@@input ", "@@say ", "@@view ", "@@check ", "@@file ", "@@edit ")
+_PROMPTS = ("@@ask ", "@@choose ", "@@input ", "@@say ", "@@view ", "@@check ", "@@file ", "@@edit ", "@@fieldmap ")
 
 # Output is read in chunks, not with readline(): a program that prints a long
 # run of bytes with no newline (MARC21 records end in 0x1D, not "\n") made
@@ -124,6 +126,10 @@ async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
     if tag == "edit":
         title, path, note = (parts + ["", "", ""])[:3]
         saved = await ask(out, "edit", title, unescape(note), path)
+        return "ok" if saved else "cancel"
+    if tag == "fieldmap":
+        title, fields, target, engine = (parts + ["", "", "", ""])[:4]
+        saved = await ask(out, "fieldmap", title, "", (fields, target, engine))
         return "ok" if saved else "cancel"
     title, text, default = (parts + ["", "", ""])[:3]
     if tag == "choose":
@@ -241,6 +247,8 @@ class TaskOutcome:
             log(f"[{rest.split(chr(9))[0]}] ?")
         elif tag in ("file", "edit"):
             log(f"[{(rest.split(chr(9)) + [''])[1]}] ?")
+        elif tag == "fieldmap":
+            log(f"[{rest.split(chr(9))[0]}] ?")
         elif tag == "cancel":
             # The routine waits for something outside (an authorization):
             # the loader may be cancelled meanwhile.
