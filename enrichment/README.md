@@ -161,6 +161,7 @@ with their own venv and creates:
 | `koha-nexus-sru` | the gateway on 127.0.0.1:5000 (user `nexus-enrich`, MemoryMax 192M) |
 | `koha-nexus-enrich-update` | `update` as a oneshot at the lowest priority (Nice 19, idle I/O, 25% CPU, MemoryMax 256M) |
 | `koha-nexus-enrich-update.timer` | 20 min after boot, then weekly with up to 6 h random delay |
+| `koha-nexus-enrich` | the batch worker for enrichment jobs (below); exits when no job waits |
 
 Data is in `/var/lib/koha-nexus-enrich`, settings in
 `/etc/koha-nexus-enrich/gateway.env` (`NEXUS_GATEWAY_MIRROR`, logins). The
@@ -172,6 +173,50 @@ database. Panel tasks: `enrich-install`, `enrich-update [--force]`,
 On Windows, `.wslconfig` gets `[experimental] autoMemoryReclaim=gradual`, so
 the memory WSL used for the decompression goes back to Windows instead of
 staying with the VM.
+
+## Enrichment jobs (worker, staged report, Apply, Revert)
+
+```sh
+config.sh --task enrich-job-add "101, 102, 500-550"   # or "all"; exports, queues, starts the worker
+config.sh --task enrich-jobs                          # jobs and the worker's status (JSON)
+config.sh --task enrich-job-show 3                    # counts, report path, Koha batches
+config.sh --task enrich-job-diff 3 101                # one record, before/after
+config.sh --task enrich-job-apply 3                   # the explicit Apply
+config.sh --task enrich-job-revert 3 [--all]          # undo it
+config.sh --task enrich-pause on|off                  # hold the worker between batches
+```
+
+1. **Export** (installer, as root): `export_records.pl --format=xml
+   --dont_export_items` for the scope, under `systemd-run -p CPUQuota=25%`
+   with nice 19 and idle I/O, into `jobs/ID/export.xml` in the state folder.
+2. **Match** (`koha-nexus-enrich`, `python -m nexus_jobs worker`): 20
+   records, then a 1.5 s sleep; each record is matched against `static.db`
+   with `nexus_enrich` and its result kept in `jobs.db` (checkpoint after
+   every batch, so a shutdown resumes where it stopped). It waits while a
+   `pause` file exists or while the load average is above the number of
+   CPUs. The unit has `CPUQuota=25%`, `MemoryMax=256M`, idle I/O, no network
+   (`PrivateNetwork=yes`), a read-only system and no access to Koha.
+3. **Staged report** (`jobs/ID/report.html`, `.json`, `.tsv`): records
+   read, enriched / unchanged / review / no match, records with M0, M1, W
+   and R candidates, fields added by class, group and source; each changed
+   record before/after with the added lines marked; the review list with
+   the local record and the candidate side by side. Nothing has reached
+   Koha.
+4. **Apply** (only when asked): a verified `PRE-ENRICH` backup, then
+   batches of at most 500 records through Koha's staged import:
+   `stage_file.pl --match NEXUSBIB --no-create --item-action ignore`
+   (matcher `NEXUSBIB`: index `local-number` on 999 $c, created once), a
+   check that each staged record matched its own biblionumber (any other
+   match is set to `error`, which `commit_file.pl` skips), `commit_file.pl`,
+   then a wait for Koha's index queue. A record whose 005 changed since the
+   report is left out, never overwritten. Items are never touched.
+5. **Revert**: a `PRE-UNDO-ENRICH` backup, then `commit_file.pl --revert`
+   per batch, newest first. A record edited in Koha after Apply (its 005
+   changed) is kept, by marking its import record `reverted` (which the
+   revert skips), unless `--all`.
+
+Pointer-only matches (sources shipped without the full record) are counted
+in the report but not fetched yet.
 
 ## The engine
 

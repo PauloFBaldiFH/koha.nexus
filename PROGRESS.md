@@ -418,6 +418,16 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.71 (Paulo: enrichment step 5, worker and job flow)**: `enrichment/nexus_jobs` (jobs.db, worker,
+  report, Apply/Revert bookkeeping). Tasks `enrich-job-add SCOPE` (export_records.pl xml, no items, throttled),
+  `enrich-jobs`, `enrich-job-show/diff`, `enrich-job-apply` (PRE-ENRICH backup, ≤500 per Koha batch:
+  stage_file.pl --match NEXUSBIB [local-number = 999$c] --no-create --item-action ignore, wrong matches set to
+  error, commit_file.pl, index-queue wait; 005 changed since report = left out), `enrich-job-revert [--all]`
+  (commit_file.pl --revert, records edited after Apply kept by marking them reverted), `enrich-job-cancel`,
+  `enrich-pause`. Unit `koha-nexus-enrich` (CPUQuota 25%, MemoryMax 256M, PrivateNetwork, no Koha access).
+  Report: jobs/ID/report.html/.json/.tsv with M0/M1/W/R and before/after diffs. Tests: enrichment/tests/test_jobs.py,
+  tests/enrichment_jobs.bats (Koha stand-in tests/data/koha_import_mock.py). Not run on a real Koha yet; no panel
+  screen yet (tasks only); pointer-only matches not fetched.
 - **1.5.70 (Paulo: enrichment step 4, installer and monthly updates)**: `python -m nexus_gateway update`
   finds the newest `nexus-enrich-YYYY.MM.db.zst` (GitHub releases `enrich-YYYY.MM`, mirror `latest.txt`
   via `NEXUS_GATEWAY_MIRROR`), checks size and SHA-256, decompresses, checks the DB and swaps it over

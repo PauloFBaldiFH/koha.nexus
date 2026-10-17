@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.70"
+PANEL_VERSION=" 1.5.71"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10215,8 +10215,21 @@ koha_exec() {
     done
     printf '$ %s %s\n' "$label" "${*:2}" >> "$log"
     log "tools: $label ${*:2}"
+    # KOHA_THROTTLE (a command prefix, see throttle_cmd) runs it at the
+    # lowest priority, e.g. the enrichment's export and batches.
     ( cd "${TOOLS_WORK:-/tmp}" 2>/dev/null || cd /tmp || exit 1
-      koha_ctl /usr/sbin/koha-shell "$INSTANCE" -c "$cmd" ) >> "${KOHA_EXEC_OUT:-$log}" 2>> "$log" </dev/null
+      # shellcheck disable=SC2086
+      koha_ctl ${KOHA_THROTTLE:-} /usr/sbin/koha-shell "$INSTANCE" -c "$cmd" ) >> "${KOHA_EXEC_OUT:-$log}" 2>> "$log" </dev/null
+}
+
+# Prefix that runs a command with a quarter of one CPU at most, at the
+# lowest CPU and disk priority (what keeps vmmem quiet on Windows).
+throttle_cmd() {
+    if [ -d /run/systemd/system ] && command -v systemd-run >/dev/null 2>&1; then
+        printf '%s' "systemd-run --scope --quiet --collect -p CPUQuota=25% nice -n 19 ionice -c 3"
+    else
+        printf '%s' "nice -n 19 ionice -c 3"
+    fi
 }
 
 # koha_sql_run LOG FILE: runs an SQL file with Koha's own database account
@@ -28570,13 +28583,18 @@ ENRICH_USER="nexus-enrich"
 GATEWAY_UNIT="koha-nexus-sru"
 GATEWAY_PORT=5000
 ENRICH_UPDATE_UNIT="koha-nexus-enrich-update"
+ENRICH_WORKER_UNIT="koha-nexus-enrich"
+# The user python -m nexus_jobs runs as, so its files stay the service's
+# (the tests set it empty: run as the caller).
+ENRICH_RUNAS="${ENRICH_RUNAS-$ENRICH_USER}"
 # The retired bridges, removed by enrich_install.
 RETIRED_BRIDGE_DIR="/usr/local/lib/koha-easy-installer/sru-bridge"
 RETIRED_BRIDGE_UNITS="koha-zeus-sru koha-pergamum-sru"
 
 # 0 when $1 holds the gateway's sources.
 enrich_src_ok() {
-    [ -f "$1/nexus_gateway/__main__.py" ] && [ -f "$1/nexus_enrich/static.py" ] && [ -f "$1/requirements.txt" ]
+    [ -f "$1/nexus_gateway/__main__.py" ] && [ -f "$1/nexus_enrich/static.py" ] && [ -f "$1/nexus_jobs/worker.py" ] \
+        && [ -f "$1/requirements.txt" ]
 }
 
 # 0 when something answers on 127.0.0.1:PORT (default: the gateway's).
@@ -28655,8 +28673,8 @@ enrich_install() {
     command -v python3 >/dev/null 2>&1 || apt_install python3 >>"$log" 2>&1
     python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv >>"$log" 2>&1
     mkdir -p "$ENRICH_DIR"
-    rm -rf "$ENRICH_DIR/nexus_enrich" "$ENRICH_DIR/nexus_gateway"
-    cp -r "$src/nexus_enrich" "$src/nexus_gateway" "$src/requirements.txt" "$ENRICH_DIR/" \
+    rm -rf "$ENRICH_DIR/nexus_enrich" "$ENRICH_DIR/nexus_gateway" "$ENRICH_DIR/nexus_jobs"
+    cp -r "$src/nexus_enrich" "$src/nexus_gateway" "$src/nexus_jobs" "$src/requirements.txt" "$ENRICH_DIR/" \
         || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
     [ -n "$tmp" ] && rm -rf "$tmp"
     find "$ENRICH_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
@@ -28725,6 +28743,49 @@ CPUQuota=25%
 MemoryMax=256M
 TimeoutStartSec=3h
 UNIT
+    # The batch worker: no network, no access to Koha (it reads the records
+    # the installer exported into the state folder), a quarter of a CPU.
+    # Enabled so that a job interrupted by a shutdown resumes at boot; it
+    # exits when no job is waiting.
+    cat > "/etc/systemd/system/${ENRICH_WORKER_UNIT}.service" <<UNIT
+[Unit]
+Description=koha.nexus enrichment worker (jobs.db: exported records matched against static.db)
+
+[Service]
+Type=simple
+User=${ENRICH_USER}
+Group=${ENRICH_USER}
+WorkingDirectory=${ENRICH_DIR}
+Environment=NEXUS_JOBS_STATE=${ENRICH_STATE}
+Environment=NEXUS_GATEWAY_STATIC_DB=${ENRICH_STATE}/static.db
+StateDirectory=koha-nexus-enrich
+StateDirectoryMode=0750
+ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_jobs worker
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=25%
+CPUWeight=1
+IOWeight=10
+MemoryHigh=200M
+MemoryMax=256M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
     cat > "/etc/systemd/system/${ENRICH_UPDATE_UNIT}.timer" <<UNIT
 [Unit]
 Description=Weekly check for a new koha.nexus enrichment database
@@ -28739,7 +28800,7 @@ Persistent=true
 WantedBy=timers.target
 UNIT
     systemctl daemon-reload >>"$log" 2>&1
-    systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
+    systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
     systemctl restart "$GATEWAY_UNIT" >>"$log" 2>&1
     systemctl start "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
     local i up=0
@@ -28791,6 +28852,277 @@ enrich_status() {
     next=$(systemctl show "${ENRICH_UPDATE_UNIT}.timer" -p NextElapseUSecRealtime --value 2>/dev/null)
     kei_result next_check "${next:-}"
     return 0
+}
+
+# ----------------------------------------------------------------------
+# Enrichment jobs (design 2.5): Koha's records are exported (as root,
+# throttled) into the state folder; the worker unit matches them against
+# static.db and writes a staged report; nothing reaches Koha until
+# enrich-job-apply, which makes a verified safety backup and then imports
+# at most 500 records at a time through Koha's own staged import
+# (stage_file.pl matching on 999 $c, commit_file.pl), so every batch can be
+# undone by enrich-job-revert (commit_file.pl --revert).
+# ----------------------------------------------------------------------
+ENRICH_MATCHER="NEXUSBIB"
+
+# jobs_py ARGS: python -m nexus_jobs as the service user.
+jobs_py() {
+    local run=()
+    [ -n "$ENRICH_RUNAS" ] && [ "$(id -u)" = 0 ] && run=(runuser -u "$ENRICH_RUNAS" --)
+    ( cd "$ENRICH_DIR" 2>/dev/null || cd /
+      "${run[@]}" env NEXUS_JOBS_STATE="$ENRICH_STATE" NEXUS_GATEWAY_STATIC_DB="$ENRICH_STATE/static.db" \
+          "$ENRICH_DIR/.venv/bin/python" -m nexus_jobs "$@" )
+}
+
+# A file root wrote in a job's folder, handed to the service user.
+enrich_own() {
+    [ -n "$ENRICH_RUNAS" ] && chown "$ENRICH_RUNAS:" "$@" 2>/dev/null
+    chmod 640 "$@" 2>/dev/null
+    return 0
+}
+
+# enrich_005 FILE: biblionumber<TAB>005 of the biblionumbers listed in FILE
+# (one per line), as Koha has them now.
+enrich_005() {
+    local ids
+    ids=$(grep -E '^[0-9]+$' "$1" | paste -sd, -)
+    [ -n "$ids" ] || return 0
+    run_sql "SELECT biblionumber, ExtractValue(metadata, '//controlfield[@tag=\"005\"]') FROM ${DB_NAME}.biblio_metadata WHERE format = 'marcxml' AND biblionumber IN (${ids});"
+}
+
+# Koha matcher NEXUSBIB: an incoming record matches the catalogue record
+# whose biblionumber is its own 999 $c (search index local-number).
+# Prints its id; created once.
+enrich_matcher() {
+    local id
+    id=$(run_sql "SELECT matcher_id FROM ${DB_NAME}.marc_matchers WHERE code = '${ENRICH_MATCHER}' AND record_type = 'biblio' ORDER BY matcher_id LIMIT 1;")
+    if [ -z "$id" ]; then
+        mysql "$DB_NAME" -e "START TRANSACTION;
+INSERT INTO marc_matchers (code, description, record_type, threshold)
+  VALUES ('${ENRICH_MATCHER}', 'koha.nexus enrichment: the same record (999\$c)', 'biblio', 1000);
+SET @m = LAST_INSERT_ID();
+INSERT INTO matchpoints (matcher_id, search_index, score) VALUES (@m, 'local-number', 1000);
+SET @p = LAST_INSERT_ID();
+INSERT INTO matcher_matchpoints (matcher_id, matchpoint_id) VALUES (@m, @p);
+INSERT INTO matchpoint_components (matchpoint_id, sequence, tag, subfields, \`offset\`, length) VALUES (@p, 1, '999', 'c', 0, 0);
+INSERT INTO matchpoint_component_norms (matchpoint_component_id, sequence, norm_routine) VALUES (LAST_INSERT_ID(), 1, '');
+COMMIT;" >/dev/null 2>&1 || return 1
+        id=$(run_sql "SELECT matcher_id FROM ${DB_NAME}.marc_matchers WHERE code = '${ENRICH_MATCHER}' AND record_type = 'biblio' ORDER BY matcher_id LIMIT 1;")
+    fi
+    [[ "$id" =~ ^[0-9]+$ ]] && printf '%s' "$id"
+}
+
+# Waits (at most 20 minutes) until Koha's search index has caught up with
+# the records just written, so the next batch never piles onto it.
+enrich_wait_index() {
+    local i n
+    for i in $(seq 1 120); do
+        if [ "$(get_search_engine)" = "Elasticsearch" ]; then
+            n=$(get_pending_es_jobs)
+        else
+            n=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.zebraqueue WHERE done = 0;")
+        fi
+        [ "${n:-0}" -le 0 ] 2>/dev/null && return 0
+        sleep "${ENRICH_INDEX_WAIT:-10}"
+    done
+    log "enrichment: the index queue still holds ${n} record(s); going on"
+    return 0
+}
+
+enrich_ready() {
+    [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_jobs/worker.py" ] || enrich_install
+}
+
+# enrich_job_add SCOPE: a new job ("all", or "101, 102, 500-550"): Koha's
+# records exported (no items, throttled), then the worker started.
+enrich_job_add() {
+    require_database || return 1
+    enrich_ready || return 1
+    if [ ! -s "$ENRICH_STATE/static.db" ]; then
+        kei_result job no-static-db
+        msg_error "" "$(t "The enrichment database is not installed yet. Run the update first (it downloads it in the background).")" 10 76
+        return 1
+    fi
+    local log out id dir args=() n
+    log=$(tools_log enrichment-job)
+    if ! out=$(jobs_py add --scope "${1:-all}" 2>>"$log"); then
+        kei_result job invalid-scope
+        msg_error "" "$(t 'Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550.')" 10 76
+        return 1
+    fi
+    id=$(printf '%s' "$out" | sed -n 's/.*"job": *\([0-9][0-9]*\).*/\1/p')
+    dir="$ENRICH_STATE/jobs/$id"
+    [ -n "$id" ] && [ -d "$dir" ] || { kei_result job failed; return 1; }
+    tools_workdir || return 1
+    args=(--record-type=bibs --format=xml --dont_export_items)
+    if [ -s "$dir/ids.txt" ]; then
+        args+=("--id_list_file=$(tools_copy "$dir/ids.txt" "enrich-$id-ids.txt")")
+    fi
+    : > "$dir/export.xml"
+    display_explanation "Exporting the records (at low priority)..."
+    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/export.xml" koha_tool "$log" export_records.pl "${args[@]}"; then
+        jobs_py fail "$id" --error "export_records.pl failed (see $log)" >>"$log" 2>&1
+        find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+        kei_result job failed
+        msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')" 10 76
+        return 1
+    fi
+    find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+    n=$(grep -o '<record[ >]' "$dir/export.xml" 2>/dev/null | wc -l)
+    if [ "${n:-0}" = 0 ]; then
+        jobs_py fail "$id" --error "no record in this scope" >>"$log" 2>&1
+        kei_result job empty
+        msg_info "$(t "Enrich bibliographic data")" "$(t "No record in this scope. Nothing was changed.")" 9 70
+        return 1
+    fi
+    enrich_own "$dir/export.xml"
+    jobs_py exported "$id" >>"$log" 2>&1 || { kei_result job failed; return 1; }
+    systemctl start --no-block "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
+    log "enrichment: job $id queued (${n} records)"
+    kei_result job "$id"
+    kei_result records "$n"
+    msg_info "$(t "Enrich bibliographic data")" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+}
+
+# enrich_job_apply ID: the explicit Apply: verified safety backup, then the
+# job's batches through Koha's staged import, one at a time, throttled.
+enrich_job_apply() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2
+    require_database || return 1
+    enrich_ready || return 1
+    tools_locked _enrich_job_apply_run "$1"
+}
+
+_enrich_job_apply_run() {
+    local id="$1" dir="$ENRICH_STATE/jobs/$1" log chunks matcher c n file batch bad res total=0 failed=0
+    log=$(tools_log enrichment-apply)
+    if ! chunks=$(jobs_py chunks "$id" 2>>"$log"); then
+        kei_result apply not-ready
+        msg_error "" "$(t 'Job ${id} has no staged report to apply.')" 9 70
+        return 1
+    fi
+    if [ -z "$chunks" ]; then
+        kei_result apply nothing
+        msg_info "$(t "Apply")" "$(t 'Job ${id}: nothing left to apply.')" 9 70
+        return 0
+    fi
+    if ! matcher=$(enrich_matcher); then
+        kei_result apply no-matcher
+        msg_error "" "$(t "Koha's record matching rule could not be created. Nothing was changed.")" 9 76
+        return 1
+    fi
+    tools_safety_backup ENRICH || { kei_result apply backup-failed; return 1; }
+    kei_result backup "$TOOLS_PRE"
+    display_explanation "Applying the changes..."
+    for c in $chunks; do
+        jobs_py chunk-ids "$id" "$c" > "$dir/ids-$c.txt" 2>>"$log"
+        enrich_005 "$dir/ids-$c.txt" > "$dir/current.tsv"
+        enrich_own "$dir/current.tsv"
+        n=$(jobs_py chunk-file "$id" "$c" --current "$dir/current.tsv" --out "$dir/chunk-$c.xml" 2>>"$log") || { failed=1; break; }
+        if [ "${n:-0}" = 0 ]; then
+            jobs_py committed "$id" "$c" --after /dev/null >>"$log" 2>&1
+            rm -f "$dir/chunk-$c.xml" "$dir/ids-$c.txt"
+            continue
+        fi
+        file=$(tools_copy "$dir/chunk-$c.xml" "enrich-$id-$c.xml") || { failed=1; break; }
+        KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" stage_file.pl --file "$file" --format MARCXML --encoding UTF-8 \
+            --match "$matcher" --no-create --item-action ignore --comment "koha.nexus enrichment job ${id} batch ${c}"
+        batch=$(tools_num "$log" "Batch number assigned:")
+        if [ "${batch:-0}" = 0 ]; then
+            jobs_py chunk-failed "$id" "$c" --note "stage_file.pl failed" >>"$log" 2>&1
+            failed=1; break
+        fi
+        run_sql "SELECT ir.record_sequence, ir.import_record_id, IFNULL(ib.matched_biblionumber, ''), ir.overlay_status FROM ${DB_NAME}.import_records ir JOIN ${DB_NAME}.import_biblios ib ON ib.import_record_id = ir.import_record_id WHERE ir.import_batch_id = ${batch} ORDER BY ir.record_sequence;" > "$dir/staged.tsv"
+        enrich_own "$dir/staged.tsv"
+        bad=$(jobs_py check-matches "$id" "$c" --batch "$batch" --staged "$dir/staged.tsv" 2>>"$log" | paste -sd, -)
+        if [[ "$bad" =~ ^[0-9,]+$ ]]; then
+            # commit_file.pl skips a record whose status is error.
+            run_sql "UPDATE ${DB_NAME}.import_records SET status = 'error' WHERE import_batch_id = ${batch} AND import_record_id IN (${bad});"
+        fi
+        if ! KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" commit_file.pl --batch-number "$batch"; then
+            jobs_py chunk-failed "$id" "$c" --note "commit_file.pl failed (batch ${batch})" >>"$log" 2>&1
+            failed=1; break
+        fi
+        enrich_005 "$dir/ids-$c.txt" > "$dir/after.tsv"
+        enrich_own "$dir/after.tsv"
+        res=$(jobs_py committed "$id" "$c" --after "$dir/after.tsv" 2>>"$log")
+        printf 'batch %s (job %s part %s): %s\n' "$batch" "$id" "$c" "$res" >> "$log"
+        res=$(printf '%s' "$res" | sed -n 's/.*"applied": *\([0-9]*\).*/\1/p')
+        total=$((total + ${res:-0}))
+        rm -f "$dir/chunk-$c.xml" "$dir/ids-$c.txt" "$dir/current.tsv" "$dir/staged.tsv" "$dir/after.tsv"
+        enrich_wait_index
+    done
+    log "enrichment: job $id applied ${total} record(s) (failed=${failed})"
+    kei_result applied "$total"
+    if [ "$failed" = 1 ]; then
+        kei_result apply failed
+        ui_textbox "$(t "Apply")" "$log"
+        msg_error "" "$(t 'Part of the job could not be applied (${total} record(s) were). Apply it again to continue, or Revert it. Safety backup: ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    kei_result apply done
+    msg_ok "$(t '✅ Job ${id} applied: ${total} record(s) enriched.\n\nRecords edited in Koha after the report were left as they are. Revert undoes the job.\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+}
+
+# enrich_job_revert ID [--all]: commit_file.pl --revert on the job's
+# batches, newest first. A record edited in Koha after Apply is kept
+# (its import record is marked reverted, which the revert skips) unless
+# --all.
+enrich_job_revert() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2
+    require_database || return 1
+    enrich_ready || return 1
+    tools_locked _enrich_job_revert_run "$1" "${2:-}"
+}
+
+_enrich_job_revert_run() {
+    local id="$1" dir="$ENRICH_STATE/jobs/$1" log plan c batch keep all=() n=0 kept=0 failed=0
+    [ "${2:-}" = "--all" ] && all=(--all)
+    log=$(tools_log enrichment-revert)
+    jobs_py applied-ids "$id" > "$dir/applied.txt" 2>>"$log"
+    enrich_005 "$dir/applied.txt" > "$dir/current.tsv"
+    enrich_own "$dir/current.tsv"
+    plan=$(jobs_py revert-plan "$id" --current "$dir/current.tsv" "${all[@]}" 2>>"$log")
+    rm -f "$dir/applied.txt" "$dir/current.tsv"
+    if [ -z "$plan" ]; then
+        kei_result revert nothing
+        msg_info "$(t "Revert")" "$(t 'Job ${id}: nothing applied to revert.')" 9 70
+        return 0
+    fi
+    tools_safety_backup UNDO-ENRICH || { kei_result revert backup-failed; return 1; }
+    kei_result backup "$TOOLS_PRE"
+    display_explanation "Applying the changes..."
+    while IFS=$'\t' read -r c batch keep; do
+        [[ "$batch" =~ ^[0-9]+$ ]] || continue
+        if [[ "$keep" =~ ^[0-9,]+$ ]]; then
+            run_sql "UPDATE ${DB_NAME}.import_records ir JOIN ${DB_NAME}.import_biblios ib ON ib.import_record_id = ir.import_record_id SET ir.status = 'reverted' WHERE ir.import_batch_id = ${batch} AND ib.matched_biblionumber IN (${keep});"
+            kept=$((kept + $(printf '%s' "$keep" | tr ',' '\n' | grep -c .)))
+        fi
+        if ! KOHA_THROTTLE=$(throttle_cmd) koha_tool "$log" commit_file.pl --revert --batch-number "$batch"; then
+            failed=1; break
+        fi
+        n=$((n + $(tools_num "$log" "Number of records reverted:")))
+        jobs_py reverted "$id" "$c" --kept "$keep" >>"$log" 2>&1
+        enrich_wait_index
+    done <<< "$plan"
+    log "enrichment: job $id reverted ${n} record(s), kept ${kept} (failed=${failed})"
+    kei_result reverted "$n"
+    kei_result kept "$kept"
+    if [ "$failed" = 1 ]; then
+        kei_result revert failed
+        ui_textbox "$(t "Revert")" "$log"
+        msg_error "" "$(t 'The operation failed. The safety backup can bring the database back (Restore database): ${TOOLS_PRE}\n\nLog: ${log}')" 12 76
+        return 1
+    fi
+    kei_result revert done
+    msg_ok "$(t '✅ Job ${id} reverted: ${n} record(s) have their previous version back.\nKept because they were edited after Apply: ${kept}\n\nSafety backup: ${TOOLS_PRE}\nLog: ${log}')" 14 76
+}
+
+# enrich_jobs: the jobs (JSON) and the worker's status, for the panel.
+enrich_jobs() {
+    enrich_ready >/dev/null 2>&1 || { kei_result jobs "[]"; return 0; }
+    kei_result jobs "$(jobs_py list 2>/dev/null || echo '[]')"
+    kei_result worker "$(jobs_py status 2>/dev/null || echo '{}')"
 }
 
 # z3950_add FILE [sync]: put the panel's targets in z3950servers (an upsert:
@@ -30882,6 +31214,14 @@ kei_task() {
         enrich-install|sru-bridge|pergamum-bridge) enrich_install ;;
         enrich-update)   enrich_update "${1:-}" ;;
         enrich-status)   enrich_status ;;
+        enrich-job-add)  enrich_job_add "${1:-all}" ;;
+        enrich-jobs)     enrich_jobs ;;
+        enrich-job-show) [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2; kei_result job "$(jobs_py show "$1" 2>/dev/null || echo '{}')" ;;
+        enrich-job-diff) [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[0-9]+$ ]] || return 2; jobs_py diff "$1" "$2" ;;
+        enrich-job-apply) enrich_job_apply "${1:-}" ;;
+        enrich-job-revert) enrich_job_revert "${1:-}" "${2:-}" ;;
+        enrich-job-cancel) [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2; jobs_py cancel "$1" ;;
+        enrich-pause)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; jobs_py pause "$1" ;;
         z3950-server-status) z3950_server_status ;;
         z3950-daemon)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; z3950_daemon "$1" ;;
         catalog-network)
