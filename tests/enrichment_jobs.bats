@@ -246,6 +246,25 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     [[ "$output" == *"nice -n 19 ionice -c 3"* ]]
 }
 
+@test "enrichment: systemd-run --scope only when systemd grants it (WSL2 may refuse), an empty export is a failure" {
+    # The installer sets its own PATH: systemd-run is a function here.
+    mkdir -p "$W/sd/system"
+    cp "$W/extra.sh" "$W/extra-sd.sh"
+    printf 'systemd-run() { echo "Failed to start transient scope unit: Access denied" >&2; return 1; }\n' >> "$W/extra-sd.sh"
+    run env KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
+    [ "$output" = "nice -n 19 ionice -c 3" ]
+    printf 'systemd-run() { return 0; }\n' >> "$W/extra-sd.sh"
+    run env KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
+    [ "$output" = "systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% nice -n 19 ionice -c 3" ]
+    # An export that never ran (empty file) is a failure, not an empty scope.
+    printf 'koha_tool() { echo "$1 skipped" >> "%s/calls"; return 0; }\n' "$W" >> "$W/extra.sh"
+    p enrich_job_add "all"
+    [ "$status" -ne 0 ]
+    grep -q "^job=failed$" "$W/results"
+    ! grep -q "^job=empty$" "$W/results"
+    grep -q "Koha could not export the records" "$KEI_S/dialogs.log"
+}
+
 bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | grep -o '<subfield code="9">[0-9]*</subfield>' | sed 's/.*">\([0-9]*\)<.*/\1/' | paste -sd, -; }
 
 @test "authority job: new authorities created before the records, linked by \$9; Revert keeps one still in use" {

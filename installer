@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.75"
+PANEL_VERSION=" 1.5.76"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10224,9 +10224,14 @@ koha_exec() {
 
 # Prefix that runs a command with a quarter of one CPU at most, at the
 # lowest CPU and disk priority (what keeps vmmem quiet on Windows).
+# systemd-run --scope is tried first with a no-op (a few milliseconds):
+# under WSL2 it can be refused (polkit: "Failed to start transient scope
+# unit: Access denied"), and the real command would then never run; without
+# it, nice and ionice alone.
 throttle_cmd() {
-    if [ -d /run/systemd/system ] && command -v systemd-run >/dev/null 2>&1; then
-        printf '%s' "systemd-run --scope --quiet --collect -p CPUQuota=25% nice -n 19 ionice -c 3"
+    if systemd_is_pid1 && command -v systemd-run >/dev/null 2>&1 \
+        && systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% true >/dev/null 2>&1; then
+        printf '%s' "systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% nice -n 19 ionice -c 3"
     else
         printf '%s' "nice -n 19 ionice -c 3"
     fi
@@ -28992,7 +28997,9 @@ enrich_job_add() {
     fi
     : > "$dir/export.xml"
     display_explanation "Exporting the records (at low priority)..."
-    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/export.xml" koha_tool "$log" export_records.pl "${args[@]}"; then
+    # An empty file (not even <collection>) means the export never ran.
+    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/export.xml" koha_tool "$log" export_records.pl "${args[@]}" \
+        || [ ! -s "$dir/export.xml" ]; then
         jobs_py fail "$id" --error "export_records.pl failed (see $log)" >>"$log" 2>&1
         find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
         kei_result job failed
@@ -29010,7 +29017,8 @@ enrich_job_add() {
     enrich_own "$dir/export.xml"
     if [ "$kind" = auth ]; then
         : > "$dir/authorities.xml"
-        if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml; then
+        if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml \
+            || [ ! -s "$dir/authorities.xml" ]; then
             jobs_py fail "$id" --error "export_records.pl (authorities) failed (see $log)" >>"$log" 2>&1
             kei_result job failed
             msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')" 10 76
@@ -29131,7 +29139,8 @@ _enrich_job_apply_run() {
 _enrich_auth_apply() {
     local id="$1" dir="$2" log="$3" c n file batch res
     : > "$dir/koha-authorities.xml"
-    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/koha-authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml; then
+    if ! KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$dir/koha-authorities.xml" koha_tool "$log" export_records.pl --record-type=auths --format=xml \
+        || [ ! -s "$dir/koha-authorities.xml" ]; then
         rm -f "$dir/koha-authorities.xml"
         return 1
     fi

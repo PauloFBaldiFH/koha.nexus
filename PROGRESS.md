@@ -448,6 +448,12 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.76 (Paulo: enrichment export never ran under WSL2)**: `throttle_cmd` tries `systemd-run --scope
+  --no-ask-password -p CPUQuota=25% true` first and uses the scope only when systemd grants it; under WSL2 polkit
+  refused it ("Failed to start transient scope unit: Access denied", no pkttyagent), so export_records.pl never
+  ran and the job said "No record in this scope". Without it: `nice -n 19 ionice -c 3`. The dir check now uses
+  `systemd_is_pid1` (KEI_SYSTEMD_RUNDIR). An export file left empty (not even `<collection>`) is a failed export
+  (bib, authorities, Apply's authority re-export), not an empty scope.
 - **1.5.75 (Paulo: fresh WSL install findings)**: `enrich_install` creates an empty static.db (`python -m
   nexus_gateway init-db`: schema, meta schema + empty, 0644, never over an existing file) before the gateway starts,
   so the gateway, Koha's rows and the panel work before the first download; the first download now starts when
