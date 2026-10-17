@@ -31629,7 +31629,8 @@ kei_task_ui() {
     ui_fieldmap() {
         kei_live || return 1
         kei_emit fieldmap "${1}"$'\t'"${2}"$'\t'"${3}"$'\t'"${4}"
-        kei_answer
+        kei_reply || REPLY="cancel"
+        [ "$REPLY" = "ok" ]
     }
     # A link to open while a tool waits for it (an authorization): shown in
     # the loader, which may then be cancelled ("@@cancel on").
