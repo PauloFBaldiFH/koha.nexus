@@ -1,0 +1,36 @@
+# enrichment/: the static.db builder (enrich_build) and the match & merge
+# engine (nexus_enrich). Unit tests on small dumps the tests write; no
+# network.
+name: enrichment
+
+on:
+  push:
+    paths:
+      - "enrichment/**"
+      - ".github/workflows/enrichment.yml"
+  pull_request:
+    paths:
+      - "enrichment/**"
+      - ".github/workflows/enrichment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Debian 12's Python and Debian 13's.
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: enrichment
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest tests -v
