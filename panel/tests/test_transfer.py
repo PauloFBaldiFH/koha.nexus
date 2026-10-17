@@ -62,6 +62,40 @@ def test_dropped_paths(text, path):
     assert transfer.dropped_path(text) == path
 
 
+def test_dropped_windows_paths_go_through_wslpath_under_wsl(monkeypatch):
+    """wslpath knows where WSL mounts the drives (wsl.conf root=/ gives /c/...)."""
+    calls = []
+
+    def fake_run(argv, **kw):
+        calls.append(argv)
+        return namedtuple("R", "returncode stdout")(0, "/c/Users/Ana/My Backup (2).sql.gz\n")
+    monkeypatch.setattr(transfer, "_is_wsl", lambda: True)
+    monkeypatch.setattr(transfer.shutil, "which", lambda name: "/usr/bin/wslpath")
+    monkeypatch.setattr(transfer.subprocess, "run", fake_run)
+    got = transfer.dropped_path("'C:\\Users\\Ana\\My Backup (2).sql.gz'\r\n")
+    assert got == "/c/Users/Ana/My Backup (2).sql.gz"
+    assert calls == [["wslpath", "-u", "C:\\Users\\Ana\\My Backup (2).sql.gz"]]
+
+
+def test_a_failing_wslpath_falls_back_to_mnt(monkeypatch):
+    monkeypatch.setattr(transfer, "_is_wsl", lambda: True)
+    monkeypatch.setattr(transfer.shutil, "which", lambda name: "/usr/bin/wslpath")
+    monkeypatch.setattr(transfer.subprocess, "run",
+                        lambda argv, **kw: namedtuple("R", "returncode stdout")(1, ""))
+    assert transfer.dropped_path('"D:\\backups\\k.sql"') == "/mnt/d/backups/k.sql"
+
+
+def test_drops_are_blocked_only_in_an_elevated_wsl_window(monkeypatch):
+    monkeypatch.setattr(transfer, "_is_wsl", lambda: True)
+    monkeypatch.setenv("KEI_WIN_ELEVATED", "1")
+    assert transfer.drops_blocked()
+    monkeypatch.setenv("KEI_WIN_ELEVATED", "0")
+    assert not transfer.drops_blocked()
+    monkeypatch.setenv("KEI_WIN_ELEVATED", "1")
+    monkeypatch.setattr(transfer, "_is_wsl", lambda: False)
+    assert not transfer.drops_blocked()
+
+
 def test_copy_reports_progress_and_speed(tmp_path):
     src = tmp_path / "b.sql.gz"
     src.write_bytes(b"x" * (3 * transfer.CHUNK + 10))

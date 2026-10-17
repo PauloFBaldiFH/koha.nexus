@@ -50,7 +50,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Input, Label, Static
 
 from ..i18n import t
-from ..transfer import dropped_path, looks_like_path, where
+from ..transfer import dropped_path, drops_blocked, looks_like_path, where
 from .dialogs import CopyValues, MessageScreen
 
 BACKUP_SUFFIXES = (".sql", ".sql.gz", ".gz", ".sql.bz2", ".sql.xz", ".sql.zst", ".backup", ".bkp", ".dump",
@@ -204,7 +204,13 @@ class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
                         yield Button(t("Up"), id="up", classes="picker-go")
                         if self._can_open_folders:
                             yield Button(t("📂 Open file manager"), id="open-folder")
-                    if self.accepts_drops:
+                    if self.accepts_drops and drops_blocked():
+                        yield Static(t("📥 This window runs as administrator, so Windows does not let files be "
+                                       "dragged into it. Paste the path instead (in Explorer: Shift + right-click "
+                                       "the file > Copy as path, then right-click here), or close this window and "
+                                       "open Koha from its icon to drag files."),
+                                     id="picker-drop", markup=False)
+                    elif self.accepts_drops:
                         yield Static(t("📥 Drop the file here, or paste its path.") if self._suffixes is None
                                      else t("📥 Drop a .sql, .sql.gz, .sql.xz or .sql.zst file here, or paste its path."),
                                      id="picker-drop", markup=False)

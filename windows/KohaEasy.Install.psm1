@@ -690,21 +690,28 @@ function Show-KohaStartProblem {
 # koha-window runs it, so a process the panel left holding the terminal
 # cannot keep wsl.exe (and this installer) waiting after Exit.
 # The console is switched to UTF-8, and the panel is told whether this is
-# Windows Terminal (emoji) or the classic console (plain symbols), through
-# WSLENV, the list of variables WSL passes into Linux.
+# Windows Terminal (emoji) or the classic console (plain symbols), and
+# whether this window runs as administrator (KEI_WIN_ELEVATED: Windows
+# refuses files dragged from Explorer into it, so the panel says to paste
+# the path instead), through WSLENV, the list of variables WSL passes into
+# Linux.
 function Invoke-KohaPanel {
     $a = '-d {0} -u root --cd {1} -- {2} bash ./installer' -f (Get-KohaConfig).Distro, $script:DistroDir, (Get-KohaConfig).WindowPath
-    $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS }
+    $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS; KEI_WIN_ELEVATED = $env:KEI_WIN_ELEVATED }
     $enc = $null
     try { $enc = [Console]::OutputEncoding; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
     try {
         $env:KEI_PLAIN_GLYPHS = Get-KohaGlyphMode
         $env:WSLENV = Add-KohaWslEnv -Current $env:WSLENV -Name 'KEI_PLAIN_GLYPHS'
+        $env:KEI_WIN_ELEVATED = '0'
+        if (Test-KohaAdmin) { $env:KEI_WIN_ELEVATED = '1' }
+        $env:WSLENV = Add-KohaWslEnv -Current $env:WSLENV -Name 'KEI_WIN_ELEVATED'
         $p = Start-Process -FilePath 'wsl.exe' -ArgumentList $a -NoNewWindow -Wait -PassThru
         return [int]$p.ExitCode
     } finally {
         $env:WSLENV = $saved.WSLENV
         $env:KEI_PLAIN_GLYPHS = $saved.KEI_PLAIN_GLYPHS
+        $env:KEI_WIN_ELEVATED = $saved.KEI_WIN_ELEVATED
         if ($null -ne $enc) { try { [Console]::OutputEncoding = $enc } catch { } }
     }
 }

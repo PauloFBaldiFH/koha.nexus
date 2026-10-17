@@ -97,12 +97,32 @@ def dropped_path(text: str) -> str:
         return _tidy("/" + m.group(1).replace("\\", "/"))
     m = _WINDOWS_PATH.match(line)
     if m:
-        return _tidy(f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/"))
+        return _tidy(_wslpath(line) or f"/mnt/{m.group(1).lower()}/" + m.group(2).replace("\\", "/"))
     # Linux terminals escape spaces, parentheses and quotes with a backslash.
     line = re.sub(r"\\(.)", r"\1", line)
     if line.startswith("~"):
         line = os.path.expanduser(line)
     return _tidy(line)
+
+
+def _wslpath(win: str) -> str:
+    """C:\\... as WSL mounts it (wslpath -u), "" outside WSL or when wslpath
+    fails: /etc/wsl.conf may mount the drives somewhere else than /mnt."""
+    if not _is_wsl() or not shutil.which("wslpath"):
+        return ""
+    try:
+        out = subprocess.run(["wslpath", "-u", win], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    path = out.stdout.strip()
+    return path if out.returncode == 0 and path.startswith("/") else ""
+
+
+def drops_blocked() -> bool:
+    """Under WSL, whether the window runs as administrator (the Windows
+    installer passes KEI_WIN_ELEVATED=1): Windows does not let files be
+    dragged from Explorer into an elevated window, so a drop never arrives."""
+    return os.environ.get("KEI_WIN_ELEVATED") == "1" and _is_wsl()
 
 
 def _tidy(path: str) -> str:
