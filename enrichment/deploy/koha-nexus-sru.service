@@ -1,0 +1,43 @@
+# systemd unit for the koha.nexus local gateway: the SRU server Koha's
+# Z39.50/SRU search talks to (rows sru/_union and sru/<id> on 127.0.0.1:5000).
+#   cp koha-nexus-sru.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now koha-nexus-sru
+# It answers from static.db (replaced monthly, reopened on its own), then
+# live Z39.50/SRU within 6 s; late answers land in learned.db.
+[Unit]
+Description=koha.nexus local gateway (SRU on 127.0.0.1:5000: static.db + live Z39.50/SRU)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus-enrich
+Group=nexus-enrich
+WorkingDirectory=/opt/koha-nexus-enrich
+# Z39.50/SRU logins: NEXUS_GATEWAY_LOGIN_<ID>=user:password, never in targets.json.
+EnvironmentFile=-/etc/koha-nexus-enrich/gateway.env
+Environment=NEXUS_GATEWAY_HOST=127.0.0.1
+Environment=NEXUS_GATEWAY_PORT=5000
+Environment=NEXUS_GATEWAY_STATIC_DB=/var/lib/koha-nexus-enrich/static.db
+Environment=NEXUS_GATEWAY_LEARNED_DB=/var/lib/koha-nexus-enrich/learned.db
+ExecStart=/opt/koha-nexus-enrich/.venv/bin/python -m nexus_gateway serve
+Restart=always
+RestartSec=5
+# Always on but small: Koha's searches wait on it, so no CPU quota; memory capped.
+MemoryHigh=128M
+MemoryMax=192M
+StateDirectory=koha-nexus-enrich
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
