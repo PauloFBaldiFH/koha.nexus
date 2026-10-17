@@ -29,7 +29,8 @@ $script:Cfg = @{
     StartWaitS  = 180
     StopWaitS   = 60
     BootGraceS  = 45
-    StopScript  = '/usr/local/sbin/koha-easy-stop'
+    StopScript  = '/usr/local/bin/koha-graceful-shutdown.sh'
+    SessionStopS = 20
     DiskWarnGB  = 10
     DiskCritGB  = 5
     StaleBackupH = 36
@@ -125,6 +126,7 @@ $script:StateDefaults = [ordered]@{
     trayPromoted         = $false
     trayTipShown         = $false
     poweredOffAt         = 0
+    shutdownWatcher      = 'on'
     netLaunch            = ''
 }
 
@@ -839,7 +841,7 @@ function Get-KohaWscriptPath {
 # tray and what the shortcuts and the tray menu run. The scheduled tasks'
 # Run and UpdatePortProxy, and the commands the installer waits on, are
 # left alone.
-$script:HiddenCommands = @('Launch', 'Window', 'Tray', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'ExportReport', 'ExportDiagnostics', 'CheckDisk')
+$script:HiddenCommands = @('Launch', 'Window', 'Tray', 'Watcher', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'ExportReport', 'ExportDiagnostics', 'CheckDisk')
 
 # Pure: whether KohaEasy.ps1 should start itself again the hidden way and
 # end, which closes the console it was given. That console comes from a
@@ -1287,7 +1289,10 @@ function Start-Koha {
 # session anyway, and the whole WSL virtual machine stops with Debian's
 # virtual disk (ext4.vhdx) closed, instead of being stopped by Windows.
 function Stop-KohaForSessionEnd {
-    param([scriptblock]$RunDetached = { param($CommandLine, $TimeoutMs) [KohaSessionWindow]::RunDetached($CommandLine, $TimeoutMs) })
+    param(
+        [scriptblock]$RunDetached = { param($CommandLine, $TimeoutMs) [KohaSessionWindow]::RunDetached($CommandLine, $TimeoutMs) },
+        [int]$TimeoutSeconds = $script:Cfg.SessionStopS
+    )
     $wsl = [System.IO.Path]::Combine([string]$env:SystemRoot, 'System32', 'wsl.exe')
     $state = Get-KohaState
     $off = [int64]$state.poweredOffAt
@@ -1297,16 +1302,16 @@ function Stop-KohaForSessionEnd {
     }
     if ($state.stopScriptHash -eq (Get-KohaStopScriptHash)) {
         Write-KohaLog 'Windows is ending the session: stopping Koha cleanly'
-        $cmd = '"{0}" -d {1} -u root -- timeout -k 5 {2} sh {3}' -f $wsl, $script:Cfg.Distro, $script:Cfg.StopWaitS, $script:Cfg.StopScript
+        $cmd = '"{0}" -d {1} -u root -- timeout -k 3 {2} sh {3}' -f $wsl, $script:Cfg.Distro, $TimeoutSeconds, $script:Cfg.StopScript
         $clock = [System.Diagnostics.Stopwatch]::StartNew()
-        $code = [int](& $RunDetached $cmd (([int]$script:Cfg.StopWaitS + 10) * 1000))
+        $code = [int](& $RunDetached $cmd (($TimeoutSeconds + 5) * 1000))
         # A wsl.exe that failed at once (it could not run without a console)
         # stopped nothing: the usual stop below still can.
         $quick = ($code -gt 0 -and $clock.Elapsed.TotalSeconds -lt 2)
         if ($code -ne -2 -and -not $quick) {
             $how = 'clean'
             if ($code -ne 0) { $how = 'forced' }
-            & $RunDetached ('"{0}" --shutdown' -f $wsl) 30000 | Out-Null
+            & $RunDetached ('"{0}" --shutdown' -f $wsl) 10000 | Out-Null
             Write-KohaLog ('session end: {0} stopped: {1} (exit {2})' -f $script:Cfg.Distro, $how, $code)
             return $how
         }
@@ -1378,50 +1383,20 @@ function Invoke-KohaPowerOff {
     Start-Process -FilePath $exe -ArgumentList $a -WindowStyle Hidden
 }
 
-# What Debian runs before WSL stops it: Koha's services in the order a
-# clean shutdown uses (the web first, then the queue and the cache, then
-# MariaDB), Plack, Zebra and the workers of each instance even when the
-# panel started them outside koha-common, then "koha-stop-guard stop",
-# which records the clean stop the next boot looks for. Exit 0 only when
-# everything stopped and the guard recorded it.
-$script:GracefulStopScript = @'
-if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then sync; exit 0; fi
-rc=0
-# "@step N": how far the stop got, for the progress the Windows side shows.
-stop_units() {
-  units=""
-  for s in "$@"; do systemctl cat "$s.service" >/dev/null 2>&1 && units="$units $s.service"; done
-  [ -n "$units" ] || return 0
-  systemctl stop $units || { echo "did not stop:$units"; rc=1; }
-}
-echo "@step 1"
-stop_units apache2 koha-common
-for i in $(koha-list 2>/dev/null); do
-  for t in koha-plack koha-worker koha-indexer koha-es-indexer koha-zebra; do
-    command -v "$t" >/dev/null 2>&1 && "$t" --stop "$i" >/dev/null 2>&1
-  done
-done
-echo "@step 2"
-stop_units rabbitmq-server memcached elasticsearch
-echo "@step 3"
-stop_units mariadb
-echo "@step 4"
-sync
-if [ -x /usr/local/sbin/koha-stop-guard ]; then
-  /usr/local/sbin/koha-stop-guard stop || { echo "not marked clean (see /var/log/koha-easy-install/stop-guard.log)"; rc=1; }
-else
-  echo "no clean-stop guard in this Debian yet"
-fi
-exit $rc
-'@
+# What Debian runs before WSL stops it: koha-graceful-shutdown.sh, next to
+# these scripts (Koha's services in the order a clean shutdown uses, then
+# sync and the clean-stop guard; the file says how). Read once, without
+# Windows line ends, so the hash below is the same on every PC. Exit 0 only
+# when everything stopped and the guard recorded it.
+$script:GracefulStopScript = ([System.IO.File]::ReadAllText([System.IO.Path]::Combine($PSScriptRoot, 'koha-graceful-shutdown.sh')) -replace "`r", '')
 
 # The stop script as a file in Debian ($Cfg.StopScript), for the end of a
-# Windows session. Written while Debian runs, again whenever the script
-# changes; state.json stopScriptHash records the version written.
+# Windows session. Written while Debian runs, again whenever the script or
+# its place changes; state.json stopScriptHash records the version written.
 function Get-KohaStopScriptHash {
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes(($script:GracefulStopScript -replace "`r", '')))
+        $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($script:Cfg.StopScript + "`n" + $script:GracefulStopScript))
         return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
     } finally { $sha.Dispose() }
 }
@@ -1432,6 +1407,8 @@ function Update-KohaStopScript {
     if (-not (Test-KohaDistroRunning)) { return 'not_running' }
     $r = Invoke-KohaLinuxScript -Script ($script:WindowScriptInstall.Replace('__PATH__', $script:Cfg.StopScript)) -InputText $script:GracefulStopScript
     if ($r.ExitCode -ne 0) { Write-KohaLog ('stop script not written: ' + $r.Output); return 'failed' }
+    # Its place before 1.5.69.
+    Invoke-KohaLinuxScript -Script 'rm -f /usr/local/sbin/koha-easy-stop' | Out-Null
     Set-KohaState @{ stopScriptHash = $hash } | Out-Null
     Write-KohaLog ('stop script written to ' + $script:Cfg.StopScript)
     return 'written'
@@ -1536,9 +1513,12 @@ function Invoke-KohaRunHeld {
     }
     # While Koha runs, the Koha icon comes back within a minute if it
     # crashed or was ended (at most 5 times, so a broken tray cannot loop).
+    # The shutdown watcher the same way.
     $trayRestarts = 0
+    $watcherRestarts = 0
     while (-not $proc.WaitForExit($WatchMs)) {
         if ($trayRestarts -lt 5 -and (Get-KohaState).desired -eq 'running' -and (Repair-KohaTray) -eq 'restarted') { $trayRestarts++ }
+        if ($watcherRestarts -lt 5 -and (Repair-KohaWatcher) -eq 'restarted') { $watcherRestarts++ }
     }
     if ((Get-KohaState).desired -ne 'running') { return 0 }
     Write-KohaLog "keep-alive: the WSL holder ended (exit $($proc.ExitCode)); the task will restart it"
@@ -2906,12 +2886,16 @@ function Test-KohaTrayAtSignIn {
 #     Koha tasks, when someone deleted them;
 #   - the tray, when it is not running;
 #   - Koha, when Debian is not running (the window shows it starting).
-# Returns what it did: signin, tasks, tray, start.
+# Returns what it did: signin, watcher-signin, watcher, tasks, tray, start.
 function Invoke-KohaLaunch {
     $did = New-Object System.Collections.ArrayList
     try {
         if (-not (Test-KohaTrayAtSignIn)) { Set-KohaTrayAtSignIn -Enabled $true; [void]$did.Add('signin') }
     } catch { Write-KohaLog ('Koha icon: sign-in entry not written: ' + $_.Exception.Message) }
+    try {
+        if ((Test-KohaWatcherWanted) -and -not (Test-KohaWatcherAtSignIn)) { Set-KohaWatcherAtSignIn -Enabled $true; [void]$did.Add('watcher-signin') }
+        if ((Repair-KohaWatcher) -eq 'restarted') { [void]$did.Add('watcher') }
+    } catch { Write-KohaLog ('Koha icon: shutdown watcher not set up: ' + $_.Exception.Message) }
     try {
         if ((Repair-KohaTasks) -eq 'registered') { [void]$did.Add('tasks') }
     } catch { Write-KohaLog ('Koha icon: tasks not registered again: ' + $_.Exception.Message) }
@@ -2938,6 +2922,98 @@ function Set-KohaTrayAtSignIn {
     } else {
         Remove-ItemProperty -Path $key -Name 'KohaEasyTray' -ErrorAction SilentlyContinue
     }
+}
+
+# ----------------------------------------------------------------------
+# Shutdown watcher at sign-in (HKCU Run: no administrator rights)
+# ----------------------------------------------------------------------
+# KohaEasy.Watcher.ps1: Koha's clean stop when Windows shuts down, restarts
+# or signs out, in its own hidden process, so it works with the tray closed.
+# Its own Run entry, started the same hidden way as the tray. state.json
+# shutdownWatcher = off (KohaEasy.ps1 DisableShutdownWatcher) keeps it out:
+# the tray then stops Koha at the end of the session, as before 1.5.69.
+function Get-KohaWatcherRunName { return 'KohaEasyShutdownWatcher' }
+function Get-KohaWatcherMutexName { return 'Local\KohaEasyShutdownWatcher' }
+
+# Pure: how long the watcher waits for the stop before it releases the
+# block reason: the script's own limit, the kill after it and the wait on
+# wsl.exe (Stop-KohaForSessionEnd), then "wsl --shutdown".
+function Get-KohaSessionStopDeadline {
+    param([int]$StopSeconds = $script:Cfg.SessionStopS)
+    return ($StopSeconds + 5 + 10 + 2)
+}
+
+function Test-KohaWatcherWanted { return ([string](Get-KohaState).shutdownWatcher -ne 'off') }
+
+function Test-KohaWatcherAtSignIn {
+    param([string]$Key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run')
+    try {
+        $v = (Get-ItemProperty -Path $Key -Name (Get-KohaWatcherRunName) -ErrorAction Stop).(Get-KohaWatcherRunName)
+        return [bool]$v
+    } catch { return $false }
+}
+
+function Set-KohaWatcherAtSignIn {
+    param([bool]$Enabled = $true, [string]$Key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run')
+    if ($Enabled) {
+        $l = Get-KohaHiddenLaunch -Arguments 'Watcher'
+        $cmd = '"{0}" {1}' -f $l.Target, $l.Arguments
+        New-ItemProperty -Path $Key -Name (Get-KohaWatcherRunName) -Value $cmd -PropertyType String -Force -ErrorAction Stop | Out-Null
+    } else {
+        Remove-ItemProperty -Path $Key -Name (Get-KohaWatcherRunName) -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-KohaWatcherRunning {
+    # The watcher holds this mutex while it runs (KohaEasy.Watcher.ps1).
+    $m = $null
+    try {
+        if ([System.Threading.Mutex]::TryOpenExisting((Get-KohaWatcherMutexName), [ref]$m)) { $m.Dispose(); return $true }
+    } catch { }
+    return $false
+}
+
+function Stop-KohaWatcher {
+    try {
+        Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
+            Where-Object { ([string]$_.CommandLine) -match 'KohaEasy\.ps1"?\s+Watcher' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    } catch { }
+}
+
+# The installer (every run) and EnableShutdownWatcher: the Run entry with
+# this PC's hidden launch, and the watcher of this version running (one of
+# an older version is ended first). Returns on, or off when it was turned
+# off (then the entry is removed and nothing runs).
+function Install-KohaShutdownWatcher {
+    param([switch]$Restart)
+    if (-not (Test-KohaWatcherWanted)) {
+        Set-KohaWatcherAtSignIn -Enabled $false
+        Stop-KohaWatcher
+        return 'off'
+    }
+    Set-KohaWatcherAtSignIn -Enabled $true
+    if ($Restart) { Stop-KohaWatcher; Start-Sleep -Milliseconds 500 }
+    if (-not (Test-KohaWatcherRunning)) { Start-KohaHidden 'Watcher' }
+    Write-KohaLog 'shutdown watcher registered at sign-in and started'
+    return 'on'
+}
+
+function Uninstall-KohaShutdownWatcher {
+    Set-KohaState @{ shutdownWatcher = 'off' } | Out-Null
+    Set-KohaWatcherAtSignIn -Enabled $false
+    Stop-KohaWatcher
+    Write-KohaLog 'shutdown watcher turned off; the tray stops Koha at the end of the session'
+}
+
+# The keep-alive task's watch, as for the tray: while Koha runs the watcher
+# comes back within a minute if it crashed or was ended.
+function Repair-KohaWatcher {
+    if (-not (Test-KohaWatcherWanted)) { return 'off' }
+    if (Test-KohaWatcherRunning) { return 'running' }
+    Write-KohaLog 'keep-alive: the shutdown watcher was not running; starting it again'
+    Start-KohaHidden 'Watcher'
+    return 'restarted'
 }
 
 # The tray is the PowerShell running "KohaEasy.ps1 Tray" (whatever started it:

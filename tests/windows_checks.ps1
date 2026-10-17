@@ -164,11 +164,99 @@ $old = ('{{"koha_installed":true,"backup":{{"last_epoch":{0},"log_epoch":0,"last
 $r = Get-KohaNotifications -Previous 'running' -Status ([pscustomobject]@{ State = 'running'; Linux = $old }) -Disk $null -State $state -Now $now
 Check 'events: a panel without events still works' (@($r.Notifications).Count -eq 0)
 
+# The shutdown watcher's window (KohaEasy.Watcher.cs), sent the messages
+# Windows sends at the end of a session. Nothing is shut down: SendMessage
+# calls the window directly, and the stop is a stand-in.
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -ReferencedAssemblies System.Windows.Forms -Path (Join-Path $repo 'windows\KohaEasy.Watcher.cs')
+$reason = 'Koha is saving the database and stopping its services safely...'
+$w = New-Object KohaShutdownWatcher $reason
+$ends = New-Object System.Collections.ArrayList
+$w.add_SessionEnding({ [void]$ends.Add($w.QueryReason()) })
+$QES = [KohaShutdownWatcher]::WM_QUERYENDSESSION; $ES = [KohaShutdownWatcher]::WM_ENDSESSION
+Check 'watcher: a hidden window' ($w.Handle -ne [IntPtr]::Zero)
+Check 'watcher: Koha stopped, the query is answered TRUE' (($w.Send($QES, $false)) -eq 1)
+Check 'watcher: Koha stopped, no reason held' (-not $w.Blocking -and $w.QueryReason() -eq '') $w.QueryReason()
+[void]$w.Send($ES, $true)
+Check 'watcher: Koha stopped, no stop at the end of the session' ($ends.Count -eq 0) ($ends.Count)
+$w.Armed = $true
+Check 'watcher: Koha running, the reason is held' ($w.Blocking -and $w.QueryReason() -eq $reason) $w.QueryReason()
+Check 'watcher: Koha running, the query is still answered TRUE' (($w.Send($QES, $false)) -eq 1)
+[void]$w.Send($ES, $false)
+Check 'watcher: a cancelled shutdown releases the reason, no stop' (-not $w.Blocking -and $ends.Count -eq 0)
+[void]$w.Send($QES, $false)
+Check 'watcher: the query sets the reason again' ($w.Blocking -and $w.QueryReason() -eq $reason)
+[void]$w.Send($ES, $true)
+Check 'watcher: the session ends: the stop runs while the reason is held' ($ends.Count -eq 1 -and $ends[0] -eq $reason) ($ends -join '|')
+Check 'watcher: then the reason is released' (-not $w.Blocking -and $w.QueryReason() -eq '')
+$w2 = New-Object KohaShutdownWatcher $reason
+$w2.add_SessionEnding({ throw 'stop failed' })
+$w2.Armed = $true
+[void]$w2.Send($ES, $true)
+Check 'watcher: a failed stop still releases the reason' (-not $w2.Blocking)
+$w2.Dispose(); $w.Dispose()
+$cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
+Check 'watcher: detached run returns the exit code' ([KohaShutdownWatcher]::RunDetached(('"{0}" /c exit 3' -f $cmd), 10000) -eq 3)
+Check 'watcher: detached run past its time is -1' ([KohaShutdownWatcher]::RunDetached(('"{0}" /c ping -n 4 127.0.0.1 >nul' -f $cmd), 300) -eq -1)
+Check 'watcher: a program that cannot start is -2' ([KohaShutdownWatcher]::RunDetached('"C:\no\such.exe"', 1000) -eq -2)
+
+# The stop at the end of the session: the script in Debian through a wsl.exe
+# with no console, 20 s, then "wsl --shutdown". No WSL here: the runs are
+# recorded and answered by a stand-in.
+$cfgK = Get-KohaConfig
+Check 'stop script: /usr/local/bin/koha-graceful-shutdown.sh, 20 s' ($cfgK.StopScript -eq '/usr/local/bin/koha-graceful-shutdown.sh' -and $cfgK.SessionStopS -eq 20)
+$file = ([IO.File]::ReadAllText((Join-Path $repo 'windows\koha-graceful-shutdown.sh')) -replace "`r", '')
+$stopText = & (Get-Module KohaEasy.Core) { $script:GracefulStopScript }
+Check 'stop script: read from koha-graceful-shutdown.sh' ($stopText -eq $file -and $stopText -match 'stop_units mariadb')
+$h1 = Get-KohaStopScriptHash
+Set-KohaConfig @{ StopScript = '/usr/local/sbin/koha-easy-stop' }
+Check 'stop script: written again when its place changes' ((Get-KohaStopScriptHash) -ne $h1)
+Set-KohaConfig @{ StopScript = '/usr/local/bin/koha-graceful-shutdown.sh' }
+Set-KohaState @{ stopScriptHash = $h1; poweredOffAt = 0 } | Out-Null
+$runs = New-Object System.Collections.ArrayList
+$how = Stop-KohaForSessionEnd -RunDetached { param($c, $t) [void]$runs.Add(('{0} @{1}' -f $c, $t)); 0 }
+Check 'session end: clean' ($how -eq 'clean') $how
+Check 'session end: the script, 20 s (+3 s kill)' ($runs[0] -eq ('"{0}" -d koha -u root -- timeout -k 3 20 sh /usr/local/bin/koha-graceful-shutdown.sh @25000' -f $wsl)) $runs[0]
+Check 'session end: then all of WSL, 10 s' ($runs.Count -eq 2 -and $runs[1] -eq ('"{0}" --shutdown @10000' -f $wsl)) ($runs -join ' | ')
+$runs.Clear()
+$how = Stop-KohaForSessionEnd -RunDetached { param($c, $t) [void]$runs.Add($c); -1 }
+Check 'session end: past its time is forced, WSL still shut down' ($how -eq 'forced' -and $runs.Count -eq 2) ("$how " + ($runs -join ' | '))
+$runs.Clear()
+Set-KohaState @{ poweredOffAt = (Get-UnixTime) } | Out-Null
+$how = Stop-KohaForSessionEnd -RunDetached { param($c, $t) [void]$runs.Add($c); 0 }
+Check 'session end: after "Shut down the PC safely" nothing runs' ($how -eq 'not_running' -and $runs.Count -eq 0) ("$how " + ($runs -join ' | '))
+Set-KohaState @{ poweredOffAt = 0 } | Out-Null
+Check 'watcher: releases the block within 37 s' ((Get-KohaSessionStopDeadline) -eq 37) (Get-KohaSessionStopDeadline)
+
+# The watcher at sign-in: its own Run entry, the hidden launch, removed
+# again. A test key, not the real Run key.
+$key = 'HKCU:\Software\KohaChecks-' + [guid]::NewGuid().ToString('N')
+New-Item -Path $key -Force | Out-Null
+try {
+    Set-KohaWatcherAtSignIn -Enabled $true -Key $key
+    $v = (Get-ItemProperty -Path $key -Name 'KohaEasyShutdownWatcher').KohaEasyShutdownWatcher
+    Check 'watcher: Run entry with the hidden launch' ($v -match '\sWatcher -Hidden$') $v
+    Check 'watcher: Run entry found' (Test-KohaWatcherAtSignIn -Key $key)
+    Set-KohaWatcherAtSignIn -Enabled $false -Key $key
+    Check 'watcher: Run entry removed' (-not (Test-KohaWatcherAtSignIn -Key $key))
+} finally { Remove-Item -Path $key -Recurse -Force -ErrorAction SilentlyContinue }
+Check 'watcher: wanted unless turned off' (Test-KohaWatcherWanted)
+Set-KohaState @{ shutdownWatcher = 'off' } | Out-Null
+Check 'watcher: turned off' (-not (Test-KohaWatcherWanted) -and (Repair-KohaWatcher) -eq 'off')
+Set-KohaState @{ shutdownWatcher = 'on' } | Out-Null
+Check 'watcher: not running here' (-not (Test-KohaWatcherRunning))
+Check 'watcher: never shows a console' (-not (Test-KohaRelaunchHidden -Command 'Watcher' -Hidden $true) -and (Test-KohaRelaunchHidden -Command 'Watcher' -Hidden $false -Target 'C:\Koha\bin\koha.nexus.exe'))
+$trayText = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
+Check 'tray: leaves the end of the session to the watcher' (([regex]::Matches($trayText, 'Test-KohaWatcherRunning')).Count -eq 2)
+
 # Portuguese texts for the tray's new items.
 Import-KeiLanguage -LangDir (Join-Path $repo 'lang') -Culture 'pt-BR'
-foreach ($k in 'Open Dashboard', 'Open User Folder', 'Restart Services', 'More options', 'Exit') {
+foreach ($k in 'Open Dashboard', 'Open User Folder', 'Restart Services', 'More options', 'Exit', 'Koha is saving the database and stopping its services safely...') {
     Check ('pt: ' + $k) ((T $k) -ne $k) (T $k)
 }
+# (This file is ASCII with no BOM: the accents are written as [char].)
+$ptReason = 'O Koha est' + [char]0xE1 + ' salvando o banco de dados e finalizando os servi' + [char]0xE7 + 'os com seguran' + [char]0xE7 + 'a...'
+Check 'pt: the shutdown reason in Paulo''s words' ((T 'Koha is saving the database and stopping its services safely...') -eq $ptReason) (T 'Koha is saving the database and stopping its services safely...')
 
 # Store installer (windows\setup): its PowerShell parses, and every exit
 # code the script sets is a different value.

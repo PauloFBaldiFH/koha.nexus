@@ -19,8 +19,10 @@
 #   * notifications: service events, nightly backups, disk space, the
 #     repair after an unclean stop, and the end (or failure) of long tasks
 #     run in the control panel: backups, restores, reindexing
-#   * Windows shutdown, restart or sign-out while Koha runs: Koha is stopped
-#     cleanly first, with "Koha is saving..." on Windows' shutdown screen
+#   * Windows shutdown, restart or sign-out while Koha runs: the shutdown
+#     watcher (KohaEasy.Watcher.ps1) stops Koha cleanly first; only when it
+#     is not running does the tray, with "Koha is saving..." on Windows'
+#     shutdown screen
 # Checks run in a background runspace so the menu never freezes.
 # Windows PowerShell 5.1. Loaded by KohaEasy.ps1 (modules already imported).
 
@@ -169,7 +171,7 @@ public class KohaSessionWindow : Form {
 }
 $session = New-Object KohaSessionWindow
 if (-not [KohaSessionWindow]::ShutDownFirst()) { Write-KohaLog 'tray: the shutdown order could not be set' }
-$blockReason = T 'Koha is saving the catalog before Windows shuts down...'
+$blockReason = T 'Koha is saving the database and stopping its services safely...'
 
 $tray = New-Object System.Windows.Forms.NotifyIcon
 $tray.Icon = $icons.stopped
@@ -312,7 +314,9 @@ function Update-Menu {
     $miStop.Enabled = $on
     $miRestart.Enabled = $on
     $miReindex.Enabled = $on
-    if ($on) { $session.Block($blockReason) } else { $session.Unblock() }
+    # The shutdown watcher (KohaEasy.Watcher.ps1) holds its own reason and
+    # does the stop while it runs; the tray only stands in for it.
+    if ($on -and -not (Test-KohaWatcherRunning)) { $session.Block($blockReason) } else { $session.Unblock() }
     $miStaff.Enabled = ($s -eq 'running')
     $miOpac.Enabled = ($s -eq 'running')
     $st = Get-KohaState
@@ -379,13 +383,14 @@ $firstRun.Start()
 $session.add_SessionEnding({
         $timer.Stop()
         if (-not $session.Blocking) { Write-KohaLog 'tray: Windows is ending the session; Koha is not running, nothing to stop'; return }
+        if (Test-KohaWatcherRunning) { Write-KohaLog 'tray: Windows is ending the session; the shutdown watcher stops Koha'; $session.Unblock(); return }
         $rs = [runspacefactory]::CreateRunspace($iss)
         $rs.Open()
         $ps = [powershell]::Create()
         $ps.Runspace = $rs
         [void]$ps.AddScript({ Stop-KohaForSessionEnd })
         $h = $ps.BeginInvoke()
-        $deadline = (Get-Date).AddSeconds([int]$cfg.StopWaitS + 15)
+        $deadline = (Get-Date).AddSeconds((Get-KohaSessionStopDeadline))
         while (-not $h.IsCompleted -and (Get-Date) -lt $deadline) {
             [System.Windows.Forms.Application]::DoEvents()
             Start-Sleep -Milliseconds 100

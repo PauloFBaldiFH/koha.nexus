@@ -418,6 +418,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.69 (Paulo: Windows shutdown watcher)**: `KohaEasy.ps1 Watcher` (`windows/KohaEasy.Watcher.ps1` +
+  `KohaEasy.Watcher.cs`), its own HKCU Run entry `KohaEasyShutdownWatcher`, so the clean stop at the end of
+  a Windows session no longer depends on the tray being open. A hidden top-level window (not HWND_MESSAGE:
+  no broadcasts there) holds the block reason while Koha runs, answers WM_QUERYENDSESSION TRUE, and on
+  WM_ENDSESSION runs `/usr/local/bin/koha-graceful-shutdown.sh` (was `/usr/local/sbin/koha-easy-stop`, now a
+  file in `windows/`, read by Core) through a console-less wsl.exe, 20 s (`SessionStopS`), then
+  `wsl --shutdown`, then releases the reason (37 s at most). The tray stands in only when the watcher is not
+  running. Installer registers and starts it after the tray on every run; keep-alive restarts it; Koha icon
+  puts back the entry; `EnableShutdownWatcher` / `DisableShutdownWatcher`; uninstall removes it. Script
+  also stops the long_tasks worker queue and, without systemd, MariaDB via `mariadb-admin shutdown`.
+  Docs: `docs/windows-shutdown-watcher.md`. Not run on a real Windows shutdown.
 - **1.5.68 (Paulo: authority servers in the panel, true upsert, sync button)**: the panel's catalogue
   (`panel/kei_panel/data/z3950_targets.json`) carries the three authority files under a fifth heading
   "Authority files" (`recordtype: authority`, a fixed `rank` and `timeout`): LoC NAF and SAF
