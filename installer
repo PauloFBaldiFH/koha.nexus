@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.81"
+PANEL_VERSION=" 1.5.82"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -22503,7 +22503,7 @@ import re
 from collections import Counter, OrderedDict
 from datetime import date
 
-from . import marc
+from . import fieldmap, marc
 from . import rules as R
 
 LOST = {"extraviado", "perdido", "furtado", "roubado", "lost"}
@@ -22817,6 +22817,17 @@ class Grouper:
             else:
                 entry = R.invert_name(o)
                 rec.add("700", "1" if "," in entry else "0", " ", ("a", entry))
+        # Columns mapped to a field the engine does not build (Edit & Map Fields):
+        # one field per row and tag, the same field from two rows once.
+        made = OrderedDict()
+        for r in rows:
+            row_fields = OrderedDict()
+            for tag, code, value in r.v.get("_marc", []):
+                if tag != "952":
+                    row_fields.setdefault(tag, []).append((code, value, None, None))
+            for tag, subs in row_fields.items():
+                made.setdefault((tag, tuple((c, R.norm_key(v)) for c, v, _, _ in subs)), (tag, subs))
+        fieldmap.FieldMap.place(rec, list(made.values()))
         items = [item for r in rows for item in self._items(r, klass, cutter, all_codes, used)]
         # The record's item type (942 $c) is the one most of its copies have.
         kinds = Counter(sf[1] for item in items for sf in item.subfields if sf[0] == "y" and sf[1])
@@ -22862,6 +22873,9 @@ class Grouper:
                 s.append(("7", "1"))
             if notes:
                 s.append(("x", "; ".join(notes)))
+            for tag, code, value in v.get("_marc", []):
+                if tag == "952" and not any(c == code and x for c, x in s):
+                    s.append((code, value))
             out.append(marc.Field("952", " ", " ", s))
             self.stats["items"] += 1
         return out
@@ -23061,6 +23075,8 @@ class Questions:
         with open(os.path.join(out_dir, key + ".tsv"), "w", encoding="utf-8") as fh:
             fh.write("entity\t%s\n" % entity)
             for c in columns:
+                if c.status == "mapped":
+                    continue        # the field mapping is for this import only
                 fh.write("column\t%d\t%s\t%s\n" % (c.index, flat(c.header, 60), c.role or "-"))
         return key
 KEIPY
@@ -23196,12 +23212,13 @@ KEIPY
 Nothing here writes to Koha's database; the panel commits every stream with
 its own preview, confirmation and verified backup."""
 import hashlib
+import json
 import os
 import sys
 from collections import Counter, OrderedDict
 from datetime import date
 
-from . import bridge, classify, detect, group, holdings, intake, marc, patrons, tables
+from . import bridge, classify, detect, fieldmap, group, holdings, intake, marc, patrons, tables
 from . import rules as R
 from .questions import Questions, flat, qid
 
@@ -23225,6 +23242,7 @@ class TablePlan:
         self.evidence = evidence
         self.how = how              # detected | answered | profile
         self.asked = False
+        self.custom = {}            # column index -> (tag, code): the field mapping's own destinations
 
 
 class MarcPlan:
@@ -23252,6 +23270,7 @@ class Analysis:
         self.intake = None
         self.isbn_answer = "apart"
         self.koha = {}              # branch | itemtype | location -> {normalised code or name: code}
+        self.fieldmap = fieldmap.FieldMap()
 
 
 # ---------------------------------------------------------------- analyse
@@ -23306,10 +23325,15 @@ def plan_table(a, member, table):
         if ans:
             fixed[c.index] = "" if ans == "ignore" else ans
             plan.asked = True
+    # The operator's field mapping (Edit & Map Fields) has the last word.
+    mapped, plan.custom = a.fieldmap.column_plan(table.headers)
+    fixed.update(mapped)
     asked = classify.assign_roles(cols, plan.entity, fixed)
     for c in cols:
         if c.index in fixed and profile and c.index in profile["roles"] and q.answers.get(ids[c.index]) is None:
             c.status = "profile"
+        if c.index in mapped:
+            c.status = "mapped"
     classify.name_guard(cols, plan.entity)
     for c in asked:
         opts = [r for r, s in c.candidates if s >= classify.ASK][:4]
@@ -23353,6 +23377,7 @@ def analyse(opts):
     a.koha = {"branch": _load_map(getattr(opts, "branches", None)), "itemtype": _load_map(getattr(opts, "itypes", None)),
               "location": _load_map(getattr(opts, "locations", None))}
     a.questions = Questions(opts.answers, opts.profiles)
+    a.fieldmap = fieldmap.FieldMap.load(getattr(opts, "fieldmap", None))
     a.intake = intake.Intake(opts.work)
     a.intake.add(opts.src)
     for m in a.intake.members:
@@ -23397,6 +23422,9 @@ def _row_values(plan, row):
             v.setdefault(c.role, []).append(row[c.index])
         elif c.role not in v:
             v[c.role] = row[c.index]
+    for i, (tag, code) in plan.custom.items():
+        if i < len(row) and row[i]:
+            v.setdefault("_marc", []).append((tag, code, row[i]))
     return v
 
 
@@ -23406,7 +23434,7 @@ def _feed(grouper, plan):
         v = _row_values(plan, row)
         if not v:
             continue
-        bib = {k: x for k, x in v.items() if classify.ROLES[k][0] == "bib"}
+        bib = {k: x for k, x in v.items() if k == "_marc" or classify.ROLES[k][0] == "bib"}
         if bib:
             grouper.add(bib, first_line + n, plan.table.name, [])
 
@@ -23507,8 +23535,11 @@ def _columns_text(plan):
     lines = []
     for c in plan.columns:
         if c.role:
-            how = {"accepted": "%.2f" % c.score, "answered": "your answer", "profile": "saved answer"}.get(c.status, "%.2f" % c.score)
+            how = {"accepted": "%.2f" % c.score, "answered": "your answer", "profile": "saved answer",
+                   "mapped": "your mapping"}.get(c.status, "%.2f" % c.score)
             lines.append("  %-30s -> %s (%s)" % (flat(c.header, 30), c.role, how))
+        elif c.index in plan.custom:
+            lines.append("  %-30s -> %s (your mapping)" % (flat(c.header, 30), fieldmap.ref_text(plan.custom[c.index])))
         else:
             lines.append("  %-30s -> - (left out)" % flat(c.header, 30))
     return lines
@@ -23589,7 +23620,7 @@ def build(opts):
                     first_line = 2 if t.header_row else 1
                     for i, row in enumerate(t.data()):
                         v = {k: (x if isinstance(x, str) else "; ".join(x)) for k, x in _row_values(p, row).items()
-                             if classify.ROLES[k][0] == "pat"}
+                             if k != "_marc" and classify.ROLES[k][0] == "pat"}
                         if v:
                             pats.add(v, first_line + i, t.name, p.entity == "patrons", has_card)
             if p.asked or p.how == "answered":
@@ -23748,6 +23779,11 @@ def build(opts):
             totals["failed"] += 1
         preview.append("")
 
+    # The direct import's streams, read by "fields"; then the operator's mapping.
+    _write_manifest(os.path.join(out_dir, "manifest-direct.tsv"), manifest)
+    if a.fieldmap.marc_rules:
+        manifest = _apply_fieldmap(a.fieldmap, manifest, out_dir, opts, preview, totals, log)
+
     # The summary the operator reads first (ROADMAP subject 2: the review gate).
     gs, ps = grouper.stats, pats.stats
     rows_read = sum(len(p.table.data()) for p in a.tables if p.entity in ("biblio", "patrons", "mixed", "koha_patrons"))
@@ -23777,9 +23813,7 @@ def build(opts):
     summary += ["  %s: %d" % (k, v) for k, v in anomalies.items() if v]
     preview[2:2] = summary + [""]
 
-    with open(os.path.join(out_dir, "manifest.tsv"), "w", encoding="utf-8") as fh:
-        for row in manifest:
-            fh.write("\t".join(str(x).replace("\t", " ") for x in row) + "\n")
+    _write_manifest(os.path.join(out_dir, "manifest.tsv"), manifest)
     with open(os.path.join(out_dir, "preview.txt"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(preview).rstrip() + "\n")
     print("Streams: %d" % len(manifest), file=log)
@@ -23794,6 +23828,85 @@ def build(opts):
     print("Encoding fixes: %d" % (sum(legacy.values()) + repaired), file=log)
     print("Anomalies: %d" % sum(anomalies.values()), file=log)
     return 0 if manifest else 3
+
+
+def _write_manifest(path, manifest):
+    with open(path, "w", encoding="utf-8") as fh:
+        for row in manifest:
+            fh.write("\t".join(str(x).replace("\t", " ") for x in row) + "\n")
+
+
+def _read_manifest(path):
+    with open(path, encoding="utf-8") as fh:
+        return [line.rstrip("\n").split("\t") for line in fh if line.strip()]
+
+
+def _apply_fieldmap(fmap, manifest, out_dir, opts, preview, totals, log):
+    """Edit & Map Fields: each stream of records rewritten with the operator's
+    mapping (MARCXML, UTF-8, one record in memory at a time) before
+    stage_file.pl reads it. Returns the new manifest."""
+    defaults = {"branch": opts.branch, "itype": opts.itype}
+    lines = ["== Your field mapping (Edit & Map Fields)"]
+    lines += ["  %s -> %s" % (r.source, fieldmap.ref_text(r.to)) for r in fmap.rules if r.kind == "marc"]
+    out = []
+    for n, row in enumerate(manifest, 1):
+        kind, fmt, enc, path = row[:4]
+        if kind != "biblio":
+            out.append(row)
+            continue
+        src = path
+        if enc == "MARC-8":
+            src = os.path.join(out_dir, "mapped-%d-utf8.mrc" % n)
+            if not bridge.to_utf8_iso(path, fmt, enc, src, log, opts.yaz):
+                lines.append("%s: the character conversion failed, imported without the mapping." % row[7])
+                out.append(row)
+                continue
+            fmt, enc = "ISO2709", "UTF-8"
+        dst = os.path.join(out_dir, "mapped-%d.xml" % n)
+        st = fieldmap.transform(src, fmt, enc, dst, fmap, defaults)
+        lines.append("%s: %d record(s); values moved: %d; left out: %d; kept in place (destination already set): %d"
+                     % (row[7], st["records"], st["moved"], st["dropped"], st["conflicts"]))
+        lines.extend("  " + e for e in st.get("examples", []))
+        totals["items"] += st["items"] - int(row[5])
+        out.append(("biblio", "MARCXML", "UTF-8", dst, st["records"], st["items"]) + tuple(row[6:]))
+    preview.extend(lines + [""])
+    return out
+
+
+def fields(opts):
+    """Edit & Map Fields: what each stream of records (those of the direct
+    import, as build listed them) and each table holds, from a sample, with
+    the destination proposed for each, in work/fields.json for the panel."""
+    a = analyse(opts)
+    if a.questions.open:
+        print("Open questions: %d (answer them first)" % len(a.questions.open))
+        return 6
+    man = os.path.join(opts.work, "out", "manifest-direct.tsv")
+    if not os.path.exists(man):
+        print("Run build first: the fields are read from the files it makes.")
+        return 2
+    streams = []
+    for n, row in enumerate(_read_manifest(man), 1):
+        kind, fmt, enc, path, nrec = row[:5]
+        if kind != "biblio":
+            continue
+        if enc == "MARC-8":
+            utf8 = os.path.join(opts.work, "out", "fields-%d-utf8.mrc" % n)
+            if not bridge.to_utf8_iso(path, fmt, enc, utf8, sys.stdout, opts.yaz):
+                continue
+            path, fmt, enc = utf8, "ISO2709", "UTF-8"
+        streams.append(fieldmap.stream_entry(row[7], path, fmt, enc, int(nrec), opts.sample))
+    columns = [dict(e, table=p.table.name) for p in a.tables if p.entity in ("biblio", "mixed")
+               for e in fieldmap.column_fields(p.table.headers, p.columns, p.custom)]
+    obj = {"version": fieldmap.VERSION, "sample": opts.sample,
+           "targets": [{"to": t, "label": label} for t, label in fieldmap.TARGETS],
+           "streams": streams, "columns": columns, "mapping": a.fieldmap.to_obj()}
+    with open(os.path.join(opts.work, "fields.json"), "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, ensure_ascii=False, indent=1)
+    print("Streams: %d" % len(streams))
+    print("Fields: %d" % sum(len(x["fields"]) for x in streams))
+    print("Columns: %d" % len(columns))
+    return 0 if streams or columns else 3
 KEIPY
     cat > "$d/kei_import/authorities.py" <<'KEIPY'
 """Smart authority matching: the variant forms of one person's name in the
@@ -24264,9 +24377,421 @@ def run(src, work, uses_file=None, threshold=THRESHOLD, out=None):
     print_report(groups, len(names), threshold, out)
     return 0 if groups else 3
 KEIPY
+    cat > "$d/kei_import/fieldmap.py" <<'KEIPY'
+"""Edit & Map Fields: the operator's own field mapping, applied before Koha's
+stage_file.pl sees the records (spec: docs/field-mapping.md).
+
+  {"version": 1,
+   "mappings": [{"from": "090$a", "to": "082$a"},
+                {"from": "Tombo", "to": "952$p", "kind": "column"},
+                {"from": "500$a", "to": "ignore"}]}
+
+"from" is a MARC subfield (TAG$c), a whole MARC field (TAG) or a column
+header of a spreadsheet ("kind": "column"; a "from" that is not a MARC
+reference is a column too). "to" is TAG$c, TAG (only from a whole field)
+or "ignore". Whatever no rule names passes through as it is, so no mapping,
+or an empty one, is the direct import unchanged.
+
+Pure standard library: the panel imports it as well, for the live preview."""
+import json
+import re
+from collections import Counter, OrderedDict
+
+from . import marc
+
+VERSION = 1
+SAMPLE = 10         # records read from each stream to find its fields
+PREVIEW = 3         # records shown before and after the mapping
+IGNORE = "ignore"
+
+# The destinations offered first, in this order; any other TAG$c is typed.
+TARGETS = [
+    ("100$a", "Personal name (author)"),
+    ("245$a", "Title"),
+    ("245$b", "Remainder of title (subtitle)"),
+    ("260$b", "Publisher (260)"),
+    ("264$b", "Publisher (264)"),
+    ("260$c", "Date of publication (260)"),
+    ("264$c", "Date of publication (264)"),
+    ("082$a", "Dewey class (DDC)"),
+    ("650$a", "Topical subject"),
+    ("952$p", "Barcode / accession number of the item"),
+    ("952$y", "Koha item type"),
+]
+
+# The engine's spreadsheet roles and the subfield each becomes in the records
+# it builds: a column mapped to one of these subfields takes that role, with
+# all the engine's rules (inverted names, 245 $c, 008, one 952 per copy...).
+ROLE_TARGET = {
+    "isbn": "020$a", "issn": "022$a", "cdu": "080$a", "cdd": "082$a", "author": "100$a",
+    "title": "245$a", "subtitle": "245$b", "edition": "250$a", "place": "260$a",
+    "publisher": "260$b", "year": "260$c", "pages": "300$a", "series": "490$a",
+    "notes": "500$a", "subjects": "650$a", "coauthors": "700$a", "acqdate": "952$d",
+    "price": "952$g", "volume": "952$h", "tombo": "952$i", "callnumber": "952$o",
+    "barcode": "952$p", "copy": "952$t", "itemtype": "952$y",
+}
+TARGET_ROLE = {v: k for k, v in ROLE_TARGET.items()}
+
+# Indicators of a field the mapping creates (blank when not listed).
+INDICATORS = {"082": "04", "100": "1 ", "245": "10", "264": " 1", "650": " 4", "700": "1 "}
+# Fields a record has once: a subfield moved there joins the field already in
+# the record instead of opening a second one.
+SINGLE = {"100", "110", "111", "130", "240", "245", "250", "260", "300", "942"}
+
+_TAG = re.compile(r"^[0-9A-Za-z]{3}$")
+_CODE = re.compile(r"^[0-9a-z]$")
+
+
+class FieldMapError(ValueError):
+    pass
+
+
+def parse_ref(text):
+    """"245$a" -> ("245", "a"); "949" -> ("949", None); None when the text is
+    not a MARC reference (a column header)."""
+    t = (text or "").strip()
+    tag, sep, code = t.partition("$")
+    if not _TAG.match(tag) or (sep and not _CODE.match(code)):
+        return None
+    if sep and tag < "010":
+        return None             # control fields have no subfields
+    return tag, (code if sep else None)
+
+
+def parse_target(text):
+    t = (text or "").strip()
+    if t.lower() in (IGNORE, "", "drop", "none"):
+        return IGNORE
+    ref = parse_ref(t)
+    if ref is None:
+        raise FieldMapError("not a MARC destination: %r (use TAG$subfield, TAG or ignore)" % text)
+    return ref
+
+
+def ref_text(ref):
+    if ref == IGNORE:
+        return IGNORE
+    return ref[0] if ref[1] is None else "%s$%s" % ref
+
+
+class Rule:
+    __slots__ = ("source", "kind", "src", "to")
+
+    def __init__(self, source, to, kind=None):
+        self.source = (source or "").strip()
+        if not self.source:
+            raise FieldMapError("a mapping without \"from\"")
+        self.src = parse_ref(self.source) if kind != "column" else None
+        if self.src is None and kind != "column" and re.match(r"^\d{3}\$", self.source):
+            raise FieldMapError("%s: not a MARC subfield (control fields 001-009 have none)" % self.source)
+        self.kind = "marc" if self.src else "column"
+        self.to = parse_target(to)
+        if self.kind == "marc" and self.to != IGNORE:
+            whole_from, whole_to = self.src[1] is None, self.to[1] is None
+            if whole_from != whole_to and not (whole_from and self.src[0] < "010"):
+                raise FieldMapError("%s -> %s: a whole field goes to a whole field, a subfield to a subfield"
+                                    % (self.source, ref_text(self.to)))
+        if self.kind == "column" and self.to != IGNORE and self.to[1] is None:
+            raise FieldMapError("column %r: the destination needs a subfield (TAG$c)" % self.source)
+
+
+class FieldMap:
+    def __init__(self, rules=()):
+        self.rules = list(rules)
+        self.whole = {}             # tag -> tag | IGNORE
+        self.subs = {}              # (tag, code) -> (tag, code) | IGNORE
+        self.columns = OrderedDict()  # header -> (tag, code) | IGNORE
+        for r in self.rules:
+            if r.kind == "column":
+                self.columns[r.source] = r.to
+            elif r.src[1] is None:
+                self.whole[r.src[0]] = r.to
+            else:
+                self.subs[r.src] = r.to
+        # A rule to the same place changes nothing: left out, so an identity
+        # mapping is the direct import.
+        self.whole = {k: v for k, v in self.whole.items() if v == IGNORE or v != (k, None)}
+        self.subs = {k: v for k, v in self.subs.items() if v != k}
+
+    @classmethod
+    def from_obj(cls, obj):
+        if not isinstance(obj, dict) or not isinstance(obj.get("mappings", []), list):
+            raise FieldMapError("expected {\"mappings\": [{\"from\": ..., \"to\": ...}]}")
+        if obj.get("version", VERSION) != VERSION:
+            raise FieldMapError("mapping version %r is not supported (this engine reads %d)" % (obj.get("version"), VERSION))
+        rules = []
+        for m in obj.get("mappings", []):
+            if not isinstance(m, dict):
+                raise FieldMapError("each mapping is an object with \"from\" and \"to\"")
+            rules.append(Rule(str(m.get("from", "")), m.get("to"), m.get("kind")))
+        return cls(rules)
+
+    @classmethod
+    def load(cls, path):
+        if not path:
+            return cls()
+        try:
+            with open(path, encoding="utf-8") as fh:
+                obj = json.load(fh)
+        except (OSError, ValueError) as e:
+            raise FieldMapError("cannot read the field mapping %s: %s" % (path, e))
+        return cls.from_obj(obj)
+
+    def to_obj(self):
+        return {"version": VERSION, "mappings": [
+            dict({"from": r.source, "to": ref_text(r.to)}, **({"kind": "column"} if r.kind == "column" else {}))
+            for r in self.rules]}
+
+    @property
+    def marc_rules(self):
+        return bool(self.whole or self.subs)
+
+    def __bool__(self):
+        return bool(self.marc_rules or self.columns)
+
+    # ------------------------------------------------------------ columns
+
+    def column_plan(self, headers):
+        """For a table: ({index: role or ""}, {index: (tag, code)}). A column
+        mapped to a subfield the engine builds takes that role; ignore leaves
+        it out; any other subfield is carried as it is (custom)."""
+        fixed, custom = {}, {}
+        for i, h in enumerate(headers):
+            to = self.columns.get((h or "").strip())
+            if to is None:
+                continue
+            if to == IGNORE:
+                fixed[i] = ""
+            elif ref_text(to) in TARGET_ROLE:
+                fixed[i] = TARGET_ROLE[ref_text(to)]
+            else:
+                fixed[i] = ""
+                custom[i] = to
+        return fixed, custom
+
+    # ------------------------------------------------------------ records
+
+    def apply(self, rec, stats=None, defaults=None):
+        """A new Record with the MARC rules applied (rec is not changed).
+        stats counts moved, dropped, conflicts; conflicts lists examples.
+        defaults: {"branch", "itype"} for the 952 fields the mapping makes."""
+        stats = stats if stats is not None else Counter()
+        if not self.marc_rules:
+            return rec
+        out = marc.Record(rec.leader)
+        made = []                   # (tag, [(code, value, origin field, origin code)]) in order
+        for f in rec.fields:
+            if f.is_control():
+                to = self.whole.get(f.tag)
+                if to == IGNORE:
+                    stats["dropped"] += 1
+                elif to is None:
+                    out.fields.append(f)
+                elif to[0] < "010":
+                    out.control(to[0], f.value)
+                    stats["moved"] += 1
+                else:
+                    made.append((to[0], [(to[1] or "a", f.value, None, None)]))
+                    stats["moved"] += 1
+                continue
+            to = self.whole.get(f.tag)
+            if to == IGNORE:
+                stats["dropped"] += 1
+                continue
+            tag = f.tag if to is None else to[0]
+            if to is not None:
+                stats["moved"] += 1
+            keep, moved = [], OrderedDict()
+            for c, v in f.subfields:
+                t = self.subs.get((f.tag, c))
+                if t is None:
+                    keep.append((c, v))
+                elif t == IGNORE:
+                    stats["dropped"] += 1
+                elif t[0] == tag:
+                    keep.append((t[1], v))
+                    stats["moved"] += 1
+                else:
+                    moved.setdefault(t[0], []).append((t[1], v, f, c))
+                    stats["moved"] += 1
+            if keep:
+                out.fields.append(marc.Field(tag, f.ind1, f.ind2, keep))
+                if tag == "952" and f.tag != "952":
+                    self._item_defaults(out.fields[-1], defaults or {})
+            made.extend(moved.items())
+        self.place(out, made, stats, defaults)
+        out.sort()
+        return out
+
+    @classmethod
+    def place(cls, out, made, stats=None, defaults=None):
+        """Adds the fields made by a mapping to the Record out: a field a
+        record has once takes the subfields in, any other opens a new field.
+        made = [(tag, [(code, value, origin field or None, origin code)])]."""
+        stats = stats if stats is not None else Counter()
+        new952 = []
+        for tag, subs in made:
+            if tag < "010":
+                if any(x.tag == tag for x in out.fields):
+                    cls._conflict(out, stats, tag, subs)
+                else:
+                    out.control(tag, subs[0][1])
+                continue
+            there = next((x for x in out.fields if x.tag == tag), None) if tag in SINGLE else None
+            if there is None:
+                ind = INDICATORS.get(tag, "  ")
+                there = marc.Field(tag, ind[0], ind[1], [])
+                out.fields.append(there)
+                if tag == "952":
+                    new952.append(there)
+            for code, value, origin, ocode in subs:
+                if there.get(code):
+                    cls._conflict(out, stats, tag, [(code, value, origin, ocode)])
+                else:
+                    there.subfields.append((code, value))
+        out.fields = [x for x in out.fields if x.is_control() or x.subfields]
+        for item in new952:
+            cls._item_defaults(item, defaults or {})
+
+    @staticmethod
+    def _conflict(out, stats, tag, subs):
+        """The destination already has that subfield: the value stays where it
+        was, in its own field (a column's in a 500 note), so nothing is lost
+        and nothing is overwritten."""
+        for code, value, origin, ocode in subs:
+            stats["conflicts"] += 1
+            if len(stats.setdefault("examples", [])) < 6:
+                stats["examples"].append("%s$%s already set, kept in %s: %s"
+                                         % (tag, code, origin.tag if origin else "its field", value[:50]))
+            if origin is not None:
+                out.fields.append(marc.Field(origin.tag, origin.ind1, origin.ind2, [(ocode, value)]))
+            else:
+                out.fields.append(marc.Field("500", " ", " ", [("a", "%s$%s: %s" % (tag, code, value))]))
+
+    @staticmethod
+    def _item_defaults(item, d):
+        """A 952 the mapping made needs the library and item type Koha asks
+        for: the ones chosen for the import, unless the mapping gave them."""
+        for code, value in (("a", d.get("branch")), ("b", d.get("branch")), ("y", d.get("itype"))):
+            if value and not item.get(code):
+                item.subfields.append((code, value))
+
+
+# ---------------------------------------------------------------- streams
+
+PY_ENCODING = {"UTF-8": "utf-8", "ISO_8859-1": "latin-1"}
+
+
+def read_records(path, fmt, encoding="UTF-8", limit=None):
+    """Records of an ISO 2709 or MARCXML stream, one at a time. MARC-8 is not
+    decoded here (the engine converts it to UTF-8 with yaz first)."""
+    if fmt == "MARCXML":
+        with open(path, "rb") as fh:
+            for r in marc.marcxml_records(fh, limit):
+                yield r
+        return
+    enc = PY_ENCODING.get(encoding, "latin-1")
+    with open(path, "rb") as fh:
+        for leader, fields in marc.iso2709_records(fh, limit):
+            yield marc.iso_to_record(leader, fields, enc)
+
+
+def transform(src, fmt, encoding, dst, fmap, defaults=None):
+    """Writes the mapped records of src to dst (MARCXML, UTF-8), one record in
+    memory at a time. Returns the counts for the preview."""
+    stats = Counter()
+
+    def mapped():
+        for r in read_records(src, fmt, encoding):
+            stats["records"] += 1
+            r = fmap.apply(r, stats, defaults)
+            if len(r.leader) >= 10:
+                r.leader = r.leader[:9] + "a" + r.leader[10:]
+            stats["items"] += r.count("952")
+            yield r
+
+    marc.write_marcxml(mapped(), dst)
+    return stats
+
+
+# ---------------------------------------------------------------- detection
+
+def record_obj(rec):
+    """A Record as JSON (fields.json, the panel's live preview)."""
+    return {"leader": rec.leader, "fields": [
+        [f.tag, f.value] if f.is_control() else [f.tag, f.ind1 + f.ind2, [[c, v] for c, v in f.subfields]]
+        for f in rec.fields]}
+
+
+def record_from_obj(obj):
+    rec = marc.Record(obj.get("leader", ""))
+    for f in obj.get("fields", []):
+        if len(f) == 2:
+            rec.control(f[0], f[1])
+        else:
+            ind = (f[1] + "  ")[:2]
+            rec.fields.append(marc.Field(f[0], ind[0], ind[1], [tuple(s) for s in f[2]]))
+    return rec
+
+
+def marc_fields(records):
+    """Each TAG$c (TAG for control fields) of the sample: in how many records,
+    and up to three different values."""
+    seen = OrderedDict()
+    for r in records:
+        here = set()
+        for f in r.fields:
+            pairs = [(f.tag, f.value)] if f.is_control() else [("%s$%s" % (f.tag, c), v) for c, v in f.subfields]
+            for key, v in pairs:
+                e = seen.setdefault(key, {"from": key, "kind": "marc", "count": 0, "samples": []})
+                if key not in here:
+                    e["count"] += 1
+                    here.add(key)
+                v = (v or "").strip()
+                if v and v not in e["samples"] and len(e["samples"]) < 3:
+                    e["samples"].append(v[:80])
+    out = sorted(seen.values(), key=lambda e: (e["from"][:3], e["from"]))
+    for e in out:
+        e["to"] = e["from"]
+    return out
+
+
+def column_fields(headers, columns, custom=None):
+    """The columns of a table: header, sample values and where they go now:
+    the subfield of the role the engine gave it ("" for a role no single
+    subfield stands for, such as quantity), a mapped subfield, or ignore."""
+    out = []
+    for c in columns:
+        h = headers[c.index] if c.index < len(headers) else c.header
+        if custom and c.index in custom:
+            to = ref_text(custom[c.index])
+        else:
+            to = ROLE_TARGET.get(c.role, "") if c.role else IGNORE
+        out.append({"from": h, "kind": "column", "role": c.role or "",
+                    "samples": [v[:80] for v in c.values[:3]], "to": to})
+    return out
+
+
+def stream_entry(name, path, fmt, encoding, total, sample=SAMPLE):
+    recs = list(read_records(path, fmt, encoding, sample))
+    return {"name": name, "kind": "marc", "format": fmt, "encoding": encoding, "records_total": total,
+            "fields": marc_fields(recs), "records": [record_obj(r) for r in recs]}
+
+
+def preview_lines(records, fmap, n=PREVIEW, defaults=None):
+    """Before and after, for the first n records of a sample."""
+    out = []
+    for i, r in enumerate(records[:n], 1):
+        out.append("--- Record %d, as in the file" % i)
+        out.append(r.formatted())
+        out.append("--- Record %d, as Koha will get it" % i)
+        out.append(fmap.apply(r, Counter(), defaults).formatted())
+        out.append("")
+    return out
+KEIPY
     cat > "$d/kei_import/__main__.py" <<'KEIPY'
 """Command line (the panel runs it as the Koha instance user, through
-koha-shell): kei_import_run.py analyse|build|authorities [options]
+koha-shell): kei_import_run.py analyse|build|fields|authorities [options]
 
 Exit codes: 0 done, 2 usage, 3 nothing importable (authorities: no variant
 forms found), 4 the file cannot be read, 6 questions still open, 7 a Debian
@@ -24276,12 +24801,12 @@ import os
 import sys
 import traceback
 
-from . import authorities, engine, intake
+from . import authorities, engine, fieldmap, intake
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="kei_import")
-    p.add_argument("command", choices=("analyse", "build", "authorities"))
+    p.add_argument("command", choices=("analyse", "build", "fields", "authorities"))
     p.add_argument("--in", dest="src", required=True)
     p.add_argument("--work", required=True)
     p.add_argument("--answers")
@@ -24298,6 +24823,8 @@ def main(argv=None):
     p.add_argument("--yaz", default="yaz-marcdump")
     p.add_argument("--uses")
     p.add_argument("--threshold", type=float, default=authorities.THRESHOLD)
+    p.add_argument("--fieldmap", help="Edit & Map Fields: the operator's mapping (JSON); none = the direct import")
+    p.add_argument("--sample", type=int, default=fieldmap.SAMPLE, help="fields: records read from each stream")
     opts = p.parse_args(argv)
     if not os.path.exists(opts.src):
         print("Cannot read %s" % opts.src)
@@ -24316,7 +24843,12 @@ def main(argv=None):
             if not a.koha_backups and not any(True for _ in a.tables) and not a.marcs and not a.readers and not a.needs:
                 return 3
             return 0
+        if opts.command == "fields":
+            return engine.fields(opts)
         return engine.build(opts)
+    except fieldmap.FieldMapError as e:
+        print("The field mapping cannot be used: %s" % e)
+        return 2
     except intake.IntakeError as e:
         print("The file cannot be unpacked safely: %s" % e)
         return 4
