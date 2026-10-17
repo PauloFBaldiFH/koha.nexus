@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.77"
+PANEL_VERSION=" 1.5.78"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10263,12 +10263,13 @@ koha_exec() {
 
 # Prefix that runs a command with a quarter of one CPU at most, at the
 # lowest CPU and disk priority (what keeps vmmem quiet on Windows).
-# systemd-run --scope is tried first with a no-op (a few milliseconds):
-# under WSL2 it can be refused (polkit: "Failed to start transient scope
-# unit: Access denied"), and the real command would then never run; without
-# it, nice and ionice alone.
+# Never under WSL: there polkit refuses transient scopes in the context
+# the Koha scripts run in ("Failed to start transient scope unit: Access
+# denied") even when a probe as root succeeds, and the command never runs.
+# Elsewhere systemd-run --scope is tried first with a no-op (a few
+# milliseconds); without it, nice and ionice alone.
 throttle_cmd() {
-    if systemd_is_pid1 && command -v systemd-run >/dev/null 2>&1 \
+    if ! is_wsl && systemd_is_pid1 && command -v systemd-run >/dev/null 2>&1 \
         && systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% true >/dev/null 2>&1; then
         printf '%s' "systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% nice -n 19 ionice -c 3"
     else

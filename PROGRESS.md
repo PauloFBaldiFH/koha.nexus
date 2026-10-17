@@ -448,6 +448,8 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.78 (Paulo: WSL2 export still refused)**: the 1.5.76 probe passed as root but the export's scope was still
+  refused under WSL2; `throttle_cmd` now never uses `systemd-run --scope` when `is_wsl` (nice + ionice only).
 - **1.5.77 (Paulo: WSL2 credentials showed http://0:80, drops right after install did nothing)**: `get_server_ip`
   reads the word after `src` in `ip -4 route get 1.1.1.1`, not the 7th word (WSL2 mirrored mode prints
   `1.1.1.1 dev eth0 src X uid 0`, so the 7th word was the uid `0`), then falls back to WIN_LAN_IP, the first usable

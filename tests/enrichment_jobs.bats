@@ -256,6 +256,9 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     printf 'systemd-run() { return 0; }\n' >> "$W/extra-sd.sh"
     run env KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
     [ "$output" = "systemd-run --scope --quiet --collect --no-ask-password -p CPUQuota=25% nice -n 19 ionice -c 3" ]
+    # WSL: never, even when the probe would pass.
+    run env KEI_PLATFORM_OVERRIDE=wsl2 KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
+    [ "$output" = "nice -n 19 ionice -c 3" ]
     # An export that never ran (empty file) is a failure, not an empty scope.
     printf 'koha_tool() { echo "$1 skipped" >> "%s/calls"; return 0; }\n' "$W" >> "$W/extra.sh"
     p enrich_job_add "all"
