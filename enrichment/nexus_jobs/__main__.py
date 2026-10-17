@@ -31,6 +31,8 @@ from . import apply, report, scope
 from .store import Store
 from .worker import Settings, run
 
+SHOW_CHANGES = 200
+
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m nexus_jobs", description=__doc__.split("\n")[0])
@@ -149,6 +151,13 @@ def _jobs(args, store: Store, settings: Settings) -> int:
             out["report"] = json.loads(rep.read_text(encoding="utf-8"))
             out["report_html"] = str(rep.with_suffix(".html"))
         out["chunks"] = [dict(c) for c in store.chunks(job.id)]
+        # The records a person reviews first (the panel's list): changed
+        # ones, then the review list, at most SHOW_CHANGES.
+        out["changes"] = [
+            {"biblionumber": r["biblionumber"], "status": r["status"], "title": r["title"], "m0": r["m0"],
+             "m1": r["m1"], "w": r["w"], "r": r["r"],
+             "added": len(json.loads(r["detail"] or "{}").get("additions", []))}
+            for status in ("enriched", "review") for r in store.items(job.id, status, limit=SHOW_CHANGES)]
         print(json.dumps(out, ensure_ascii=False))
         return 0
     if cmd == "diff":

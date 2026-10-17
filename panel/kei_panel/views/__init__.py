@@ -5,6 +5,7 @@ from .backup import BackupView
 from .base import SectionView
 from .crons import CronView
 from .dashboard import DashboardView
+from .enrich import EnrichView
 from .database import DatabaseView
 from .hub import HubView
 from .opac import OpacView
@@ -18,11 +19,12 @@ VIEWS = {
     "database": DatabaseView,
     "ai": AIView,
     "z3950": Z3950View,
+    "enrich": EnrichView,
     "opac": OpacView,
     "hub": HubView,
     "crons": CronView,
     "vpn": VpnView,
 }
 
-__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "OpacView",
+__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OpacView",
            "HubView", "CronView", "VpnView"]

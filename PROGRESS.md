@@ -428,6 +428,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   Report: jobs/ID/report.html/.json/.tsv with M0/M1/W/R and before/after diffs. Tests: enrichment/tests/test_jobs.py,
   tests/enrichment_jobs.bats (Koha stand-in tests/data/koha_import_mock.py). Not run on a real Koha yet; no panel
   screen yet (tasks only); pointer-only matches not fetched.
+- **1.5.72 (Paulo: enrichment step 6, bibliographic panel screen)**: Library tools > **Enrich bibliographic
+  catalog** (key e, `views/enrich.py`). Scope box (all, or 101, 102, 500-550) → `enrich-job-add`; worker box with
+  progress bar, paused/busy state, Pause/Resume; jobs table refreshed every 4 s while a job moves; staged report
+  summary (records, enriched, review, M0/M1/W/R, fields by source), changed records list (`show` now carries
+  `changes`, ≤200 enriched + ≤200 review) and the picked record's before/after (`enrich-job-diff` emits
+  `kei_result line`, added lines in green). Open report copies report.html to Downloads and opens it. Apply and
+  Revert ask first (danger) and run uncancellable; Cancel job for jobs not applied. Manual page `sec-enrich`
+  (en, pt-BR). Fix: dashboard `age()` took real time instead of `now` (test broke once the date passed).
 - **1.5.70 (Paulo: enrichment step 4, installer and monthly updates)**: `python -m nexus_gateway update`
   finds the newest `nexus-enrich-YYYY.MM.db.zst` (GitHub releases `enrich-YYYY.MM`, mirror `latest.txt`
   via `NEXUS_GATEWAY_MIRROR`), checks size and SHA-256, decompresses, checks the DB and swaps it over

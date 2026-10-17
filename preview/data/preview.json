@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.69",
+ "panel_version": "1.5.72",
  "languages": [
   {
    "code": "en",
@@ -556,6 +556,22 @@
    "single": ""
   },
   {
+   "id": "enrich",
+   "item": "sec-enrich",
+   "label": "✨  Enrich bibliographic catalog",
+   "title": "✨  Enrich bibliographic catalog",
+   "prompt": "",
+   "icon": "",
+   "key": "e",
+   "view": "enrich",
+   "sidebar": false,
+   "parent": "library",
+   "entries": [],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
    "id": "library",
    "item": "sec-library",
    "label": "📚  Library tools",
@@ -567,6 +583,7 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "sec-enrich",
     "marc-undo",
     "authority-sync",
     "authority-match",
@@ -1156,6 +1173,16 @@
    "label": "🔧  Koha settings & parameters",
    "description": "Choose a parameter:",
    "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "sec-enrich": {
+   "id": "sec-enrich",
+   "type": "section",
+   "section": "enrich",
+   "label": "✨  Enrich bibliographic catalog",
+   "description": "",
+   "kind": "view",
    "status": "available",
    "media": []
   },
@@ -5427,6 +5454,31 @@
    "ja": null,
    "ko": null
   },
+  "✨  Enrich bibliographic catalog": {
+   "en": "✨  Enrich bibliographic catalog",
+   "pt-BR": "✨  Enriquecer catálogo bibliográfico",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "📚  Library tools": {
    "en": "📚  Library tools",
    "pt-BR": "📚  Ferramentas da biblioteca",
@@ -7504,7 +7556,7 @@
   },
   "Result": {
    "en": "Result",
-   "pt-BR": null,
+   "pt-BR": "Resultado",
    "es": null,
    "fr": null,
    "it": null,
@@ -14671,6 +14723,57 @@
     ]
    }
   },
+  "sec-enrich": {
+   "en": {
+    "summary": "Adds what your bibliographic records lack (subjects, classification, notes, extent) from the koha.nexus enrichment database, with a staged report to read before anything reaches the catalogue.",
+    "overview": [
+     "A job compares the chosen records with the enrichment database in the background, on at most a quarter of one CPU, and pauses by itself when the machine is busy. Nothing is written to Koha while it compares.",
+     "When it ends, the job's **Staged report** shows how many records would be enriched, which need review (M0, M1, W and R classes) and, for each changed record, its before/after: the lines to add in green.",
+     "**Apply** makes a verified safety backup, then writes the fields through Koha's own staged import, at most 500 records per batch. Records edited after the report are left as they are. **Revert** puts the previous version of each record back."
+    ],
+    "steps": [
+     "Type the scope: `all`, or biblionumbers such as `101, 102, 500-550`, and press **Start**.",
+     "Follow the progress in the **Worker** box; **Pause** stops it after the current batch, **Resume** goes on.",
+     "Pick the job in **Jobs** and read its report; select a record in the list to see its before/after.",
+     "Press **Open report** for the full report in the browser (saved in Downloads).",
+     "Press **Apply** to write the enriched records, or **Cancel job** to drop it. **Revert** undoes an applied job."
+    ],
+    "tips": [
+     "Start with a small range of record numbers to see the kind of fields added before running the whole catalogue.",
+     "Look at the records marked Review first: they are the ones where the match was less certain."
+    ],
+    "warnings": [
+     "Apply changes the catalogue. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
+    ],
+    "related": [
+     "sec-library",
+     "authority-sync",
+     "magic-import"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Acrescenta o que falta nos seus registros bibliográficos (assuntos, classificação, notas, extensão) a partir da base de enriquecimento do koha.nexus, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
+    "overview": [
+     "Uma tarefa compara os registros escolhidos com a base de enriquecimento em segundo plano, usando no máximo um quarto de uma CPU, e pausa sozinha quando a máquina está ocupada. Nada é gravado no Koha durante a comparação.",
+     "Ao terminar, o **Relatório preparado** da tarefa mostra quantos registros seriam enriquecidos, quais precisam de revisão (classes M0, M1, W e R) e, para cada registro alterado, o antes/depois: as linhas a acrescentar em verde.",
+     "**Aplicar** faz um backup de segurança verificado e depois grava os campos pela importação em lote do próprio Koha, no máximo 500 registros por lote. Registros editados depois do relatório ficam como estão. **Reverter** devolve a versão anterior de cada registro."
+    ],
+    "steps": [
+     "Digite o escopo: `all` (todos), ou números de registro como `101, 102, 500-550`, e pressione **Iniciar**.",
+     "Acompanhe o progresso no quadro **Processo**; **Pausar** para depois do lote atual, **Retomar** continua.",
+     "Escolha a tarefa em **Tarefas** e leia o relatório; selecione um registro na lista para ver o antes/depois.",
+     "Pressione **Abrir relatório** para ver o relatório completo no navegador (salvo em Downloads).",
+     "Pressione **Aplicar** para gravar os registros enriquecidos, ou **Cancelar tarefa** para descartá-la. **Reverter** desfaz uma tarefa aplicada."
+    ],
+    "tips": [
+     "Comece com uma faixa pequena de números de registro para ver o tipo de campo acrescentado antes de rodar o catálogo inteiro.",
+     "Veja primeiro os registros marcados como Revisar: neles a correspondência foi menos certa."
+    ],
+    "warnings": [
+     "Aplicar altera o catálogo. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
+    ]
+   }
+  },
   "marc-undo": {
    "en": {
     "summary": "Removes the records and items of an imported MARC batch with Koha's own revert, after a preview and a verified backup.",
@@ -17642,167 +17745,167 @@
  },
  "coverage": {
   "en": {
-   "manual": 109,
-   "manual_total": 109,
+   "manual": 110,
+   "manual_total": 110,
    "manual_outdated": [],
-   "strings": 377,
-   "strings_total": 377
+   "strings": 378,
+   "strings_total": 378
   },
   "pt-BR": {
-   "manual": 109,
-   "manual_total": 109,
+   "manual": 110,
+   "manual_total": 110,
    "manual_outdated": [
     "install"
    ],
-   "strings": 368,
-   "strings_total": 377
+   "strings": 370,
+   "strings_total": 378
   },
   "es": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 264,
-   "strings_total": 377
+   "strings_total": 378
   },
   "fr": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 377
+   "strings_total": 378
   },
   "it": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 377
+   "strings_total": 378
   },
   "de": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 377
+   "strings_total": 378
   },
   "nl": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "sv": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "pl": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "cs": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "ru": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "uk": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "tr": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "tl": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "id": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "ar": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "fa": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "hi": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "bn": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "vi": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "zh": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "ja": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   },
   "ko": {
    "manual": 0,
-   "manual_total": 109,
+   "manual_total": 110,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 377
+   "strings_total": 378
   }
  }
 }
