@@ -277,18 +277,30 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     # WSL: never, even when the probe would pass.
     run env KEI_PLATFORM_OVERRIDE=wsl2 KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
     [ "$output" = "nice -n 19 ionice -c 3" ]
-    # Nothing at low priority: the export runs once more plainly and the job goes on.
+    # koha_tool exports nothing (WSL2): the export runs once more straight
+    # through koha-shell, its output redirected into the file, and the job goes on.
     cp "$W/extra.sh" "$W/extra-plain.sh"
-    cat >> "$W/extra.sh" <<'SH'
-_kt_real=$(declare -f koha_tool | sed 1d)
-eval "koha_tool_real() $_kt_real"
-koha_tool() { [ -n "${KOHA_THROTTLE:-}" ] && { echo "ionice: ioprio_set failed" >> "$1"; return 1; }; koha_tool_real "$@"; }
+    mkdir -p "$W/kbin"
+    : > "$W/kbin/export_records.pl"
+    cat > "$W/koha-shell" <<SH
+#!/bin/bash
+echo "koha-shell \$*" >> "$W/calls"
+eval "set -- \$3"
+name=\$(basename "\$1"); shift
+exec python3 "$KEI_REPO/tests/data/koha_import_mock.py" "$DB" "\$name" "\$@"
+SH
+    chmod +x "$W/koha-shell"
+    cat >> "$W/extra.sh" <<SH
+KOHA_BIN="$W/kbin"
+KOHA_SHELL_BIN="$W/koha-shell"
+koha_tool() { echo "ionice: ioprio_set failed" >> "\$1"; return 1; }
 SH
     p enrich_job_add "1-2"
     [ "$status" -eq 0 ]
     grep -q "^job=1$" "$W/results"
-    grep -q "^export_records.pl \[\] --record-type=bibs --format=xml --dont_export_items --id_list_file=" "$W/calls"
-    grep -q "running it again without the priority prefix" "$W/logs/"*
+    grep -q "^koha-shell library -c \"$W/kbin/export_records.pl\" \"--record-type=bibs\" \"--format=xml\" \"--dont_export_items\" \"--id_list_file=" "$W/calls"
+    grep -q "running it again straight through koha-shell" "$W/logs/"*
+    [ "$(grep -c '<record' "$W/state/jobs/1/export.xml")" -ge 1 ]
     # An export that never ran (empty file) is a failure, not an empty scope,
     # and the dialog quotes the last message.
     : > "$W/results"

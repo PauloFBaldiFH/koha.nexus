@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.80"
+PANEL_VERSION=" 1.5.81"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29192,19 +29192,27 @@ _enrich_job_apply_run() {
 # enrich_export LOG FILE ARGS...: export_records.pl ARGS into FILE. FILE is
 # opened by this (root) shell, never by the instance user, so its owner and
 # mode do not matter (koha_exec). The export runs at low priority first; if
-# FILE comes back empty, it runs once more plainly, as the MARC21 backup
-# runs it (koha-shell, no priority prefix, from /tmp), so a prefix the system
-# refuses cannot leave a job without its records. Fails while FILE is empty.
+# FILE comes back empty, it runs once more straight through koha-shell, as
+# the MARC21 backup runs it: no koha_exec subshell, no priority prefix, the
+# standard output redirected into FILE by this shell. Under WSL2 the
+# koha_exec path can leave FILE empty on both tries while this one exports
+# (Paulo, 11,488 records). Fails while FILE is empty.
 enrich_export() {
-    local log="$1" out="$2"
+    local log="$1" out="$2" path cmd a q
     shift 2
     : > "$out"
     if KOHA_THROTTLE=$(throttle_cmd) KOHA_EXEC_OUT="$out" koha_tool "$log" export_records.pl "$@" && [ -s "$out" ]; then
         return 0
     fi
-    printf 'export_records.pl: nothing exported at low priority, running it again without the priority prefix\n' >> "$log"
+    path=$(koha_script export_records.pl) || return 1
+    cmd=$(kq "$path")
+    for a in "$@"; do
+        q=$(kq "$a") || { printf 'refused argument: %s\n' "$a" >> "$log"; return 2; }
+        cmd+=" $q"
+    done
+    printf 'export_records.pl: nothing exported at low priority, running it again straight through koha-shell\n$ %s\n' "$cmd" >> "$log"
     : > "$out"
-    TOOLS_WORK=/tmp KOHA_EXEC_OUT="$out" koha_tool "$log" export_records.pl "$@" && [ -s "$out" ]
+    "${KOHA_SHELL_BIN:-/usr/sbin/koha-shell}" "$INSTANCE" -c "$cmd" > "$out" 2>> "$log" && [ -s "$out" ]
 }
 
 # enrich_export_why LOG: the last message line in LOG (no record dump), for
