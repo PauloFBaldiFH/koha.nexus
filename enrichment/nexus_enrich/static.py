@@ -24,6 +24,7 @@ Written by enrich_build, read here (read-only). One SQLite file:
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,6 +87,45 @@ CREATE VIRTUAL TABLE IF NOT EXISTS auth_fts USING fts5(
 );
 """
 
+
+
+def create_empty(path: Path | str) -> bool:
+    """An empty static.db (the schema, no records) where there is none, so
+    the gateway and the panel work before the first download; the update
+    replaces it like any older release. False when PATH already exists."""
+    path = Path(path)
+    if path.exists():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    part = path.with_name(path.name + ".empty.part")
+    part.unlink(missing_ok=True)
+    conn = sqlite3.connect(part)
+    try:
+        conn.executescript(SCHEMA)
+        conn.executemany("INSERT OR REPLACE INTO meta VALUES (?, ?)", (("schema", SCHEMA_VERSION), ("empty", "1")))
+        conn.commit()
+    finally:
+        conn.close()
+    os.chmod(part, 0o644)
+    if path.exists():                     # the download got there first
+        part.unlink()
+        return False
+    os.replace(part, path)
+    return True
+
+
+def record_count(path: Path | str) -> int:
+    """Versions in a static.db; -1 when it is missing or unreadable."""
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return -1
+    try:
+        return conn.execute("SELECT COUNT(*) FROM versions").fetchone()[0]
+    except sqlite3.Error:
+        return -1
+    finally:
+        conn.close()
 
 @dataclass
 class Pointer:

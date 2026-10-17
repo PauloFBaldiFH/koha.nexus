@@ -38,8 +38,8 @@ from pathlib import Path
 
 from nexus_enrich.static import SCHEMA_VERSION
 
-REPO = "PauloFBaldiFH/koha.nexus"
-API = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
+from .config import RELEASES_API as API
+
 ASSET = re.compile(r"^nexus-enrich-(\d{4})\.(\d{2})\.db\.zst$")
 CHUNK = 1 << 20
 USER_AGENT = "koha.nexus-gateway"
@@ -198,6 +198,7 @@ def swap_in(asset: Path, target: Path) -> dict:
             dst.flush()
             os.fsync(dst.fileno())
         stats = check_db(part)
+        os.chmod(part, 0o644)                # the gateway and the worker read it
         os.replace(part, target)
     except zstandard.ZstdError as exc:
         part.unlink(missing_ok=True)
@@ -232,7 +233,9 @@ def update(static_db: Path, *, api: str = API, mirror: str = "", force: bool = F
     state = static_db.with_name("static.release")
     rel, errors = find(api, mirror, timeout)
     if rel is None:
-        raise UpdateError("no release found" + (f" ({'; '.join(errors)})" if errors else ""))
+        raise UpdateError(
+            f"no release found: {api} lists no published release (drafts and pre-releases are not read) "
+            "holding nexus-enrich-YYYY.MM.db.zst and its .sha256" + (f" ({'; '.join(errors)})" if errors else ""))
     have = installed(state)
     out = {"release": rel.name, "origin": rel.origin, "installed": have.get("name", "")}
     if have.get("name") == rel.name and static_db.exists() and not force:
@@ -260,5 +263,6 @@ def update(static_db: Path, *, api: str = API, mirror: str = "", force: bool = F
               "installed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     tmp = state.with_name(state.name + ".part")
     tmp.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o644)
     os.replace(tmp, state)
     return {**out, **stats, "status": "updated", "installed": rel.name}

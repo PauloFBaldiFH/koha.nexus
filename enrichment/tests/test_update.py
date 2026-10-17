@@ -188,3 +188,34 @@ def test_cli_update(site, assets, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("NEXUS_GATEWAY_RELEASES_API", site.base + "/gone")
     assert main(["update", "--check"]) == 1
     assert json.loads(capsys.readouterr().out)["status"] == "failed"
+
+
+def test_nothing_found_says_where_it_looked(site, tmp_path):
+    site.files["/releases"] = json.dumps([{"tag_name": "", "draft": True, "assets": []}]).encode()
+    with pytest.raises(update.UpdateError, match="drafts and pre-releases are not read"):
+        update.update(tmp_path / "static.db", api=site.base + "/releases")
+    from nexus_gateway.config import RELEASES_API, Settings
+    assert Settings().releases_api == Settings.from_env().releases_api == RELEASES_API == update.API
+    assert "/repos/PauloFBaldiFH/koha.nexus/releases" in RELEASES_API
+
+
+def test_the_empty_static_db_then_the_first_download(site, assets, tmp_path, monkeypatch, capsys):
+    from nexus_enrich.static import create_empty, record_count
+    from nexus_gateway.__main__ import main
+    target = tmp_path / "fresh" / "static.db"
+    monkeypatch.setenv("NEXUS_GATEWAY_STATIC_DB", str(target))
+    assert main(["init-db"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"status": "created", "records": 0}
+    assert (target.stat().st_mode & 0o777) == 0o644 and record_count(target) == 0
+    assert main(["init-db"]) == 0 and json.loads(capsys.readouterr().out)["status"] == "present"
+    assert not create_empty(target)
+    # The gateway answers from it (nothing), authority search too.
+    eng = Engine(Static(target), None, {})
+    assert eng.search("_union", cql.parse("autor"), 1, 5).total == 0
+    assert eng.search("_union-aut", cql.parse("autor"), 1, 5).total == 0
+    # It is no release: the first update replaces it, readable by everyone.
+    site.publish(*assets["2026.10"], "2026.10")
+    assert update.update(target, api=site.base + "/releases")["status"] == "updated"
+    assert record_count(target) == 2 and (target.stat().st_mode & 0o777) == 0o644
+    assert (target.with_name("static.release").stat().st_mode & 0o777) == 0o644
+    assert record_count(tmp_path / "missing.db") == -1
