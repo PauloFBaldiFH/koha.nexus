@@ -49,7 +49,7 @@ function Invoke-KohaEasyDiagnose {
     try { Say ('  execution policy: ' + ((Get-ExecutionPolicy -List | ForEach-Object { '{0}={1}' -f $_.Scope, $_.ExecutionPolicy }) -join ', ')) } catch { Show-Err $_ }
 
     Head ('Files in ' + $bin)
-    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Hidden.js', 'koha.nexus.exe', 'koha.ico', 'koha-logo.png') {
+    foreach ($f in 'KohaEasy.ps1', 'KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.Lang.psm1', 'KohaEasy.Tray.ps1', 'KohaEasy.Watcher.ps1', 'KohaEasy.Watcher.cs', 'koha-graceful-shutdown.sh', 'KohaEasy.Hidden.js', 'koha.nexus.exe', 'koha.ico', 'koha-logo.png') {
         $p = Join-Path $bin $f
         if (Test-Path -LiteralPath $p) { Say ('  ok      {0} ({1:yyyy-MM-dd HH:mm})' -f $f, (Get-Item -LiteralPath $p).LastWriteTime) } else { Say ('  missing {0}' -f $f) 'Yellow' }
     }
@@ -152,6 +152,14 @@ function Invoke-KohaEasyDiagnose {
                 $run = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'KohaEasyTray' -ErrorAction SilentlyContinue).KohaEasyTray
                 if ($run) { Say '  Run entry written again' 'Green' } else { Say '  Run entry could not be written (see the error above)' 'Red' }
             }
+        } catch { Show-Err $_ }
+        try {
+            $w = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'KohaEasyShutdownWatcher' -ErrorAction SilentlyContinue).KohaEasyShutdownWatcher
+            Say ('  Run entry KohaEasyShutdownWatcher: {0}' -f $(if ($w) { $w } else { '(missing)' }))
+            $m = $null
+            $on = [System.Threading.Mutex]::TryOpenExisting('Local\KohaEasyShutdownWatcher', [ref]$m)
+            if ($m) { $m.Dispose() }
+            Say ('  shutdown watcher running: {0}' -f $on)
         } catch { Show-Err $_ }
         try {
             $tasks = @(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -like 'Koha - *' }) + @(Get-ScheduledTask -TaskPath '\KohaEasy\' -ErrorAction SilentlyContinue)

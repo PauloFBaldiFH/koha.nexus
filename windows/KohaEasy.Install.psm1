@@ -920,6 +920,7 @@ function Install-Koha {
             # keep-alive task are started with it.
             Invoke-KohaSafeStep { Start-KohaTrayChecked }
         }
+        Invoke-KohaSafeStep { Install-KohaShutdownWatcherStep }
         Write-KohaStep (T 'Opening Koha to the other computers of the library network (Windows asks for permission once)...')
         $lan = $true
         if (-not $NonInteractive) { $lan = Enable-KohaLanAccess }
@@ -963,6 +964,7 @@ function Install-Koha {
             Stop-KohaDebianGracefully -SetStopped | Out-Null
         }
         Invoke-KohaSafeStep { Start-KohaTrayChecked }
+        Invoke-KohaSafeStep { Install-KohaShutdownWatcherStep -Restart }
         Write-KohaStep (T 'Starting Koha (up to 3 minutes)...')
         if ((Start-Koha -Trigger user -Wait) -eq 'ready') {
             $ready = $true
@@ -1166,6 +1168,27 @@ function Start-KohaTrayChecked {
         Write-KohaLog ('the tray is not running after every hidden launch; last tray error: {0}' -f $why) 'install'
         Write-KohaStep (T 'The Koha icon did not start. Open Koha - Status icon in the Start menu (folder Koha).') 'warn'
         if ($why) { Write-KohaStep ((T 'The tray stopped with this error: {0}') -f $why) 'warn' }
+    }
+}
+
+# The shutdown watcher (KohaEasy.Watcher.ps1): its own sign-in entry, after
+# the tray settled how Koha's tools start on this PC, and running now; on a
+# repair run the watcher of an older version is started again. Checked on
+# its mutex, as the tray is.
+function Install-KohaShutdownWatcherStep {
+    param([switch]$Restart)
+    $r = Install-KohaShutdownWatcher -Restart:$Restart
+    if ($r -eq 'off') {
+        Write-KohaStep (T 'The shutdown watcher is off (KohaEasy.ps1 EnableShutdownWatcher turns it on). The Koha icon stops Koha cleanly while it runs.') 'warn'
+        return
+    }
+    for ($i = 0; $i -lt 10 -and -not (Test-KohaWatcherRunning); $i++) { Start-Sleep -Milliseconds 500 }
+    if (Test-KohaWatcherRunning) {
+        Write-KohaStep (T 'Shutdown watcher on: when Windows shuts down or restarts, Koha saves the database and stops cleanly first.') 'ok'
+    } else {
+        $why = Get-KohaLastFailure 'Watcher'
+        Write-KohaLog ('the shutdown watcher is not running after its start; last error: {0}' -f $why) 'install'
+        Write-KohaStep (T 'The shutdown watcher did not start; it starts at the next sign-in. The Koha icon stops Koha cleanly meanwhile.') 'warn'
     }
 }
 

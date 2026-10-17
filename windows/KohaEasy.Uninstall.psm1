@@ -101,6 +101,7 @@ function Remove-KohaShortcutFiles {
 function Remove-KohaRegistryEntries {
     param([bool]$AppsEntry = $true)
     Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'KohaEasyTray' -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'KohaEasyShutdownWatcher' -ErrorAction SilentlyContinue
     Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' -Name 'KohaEasyInstall' -ErrorAction SilentlyContinue
     if ($AppsEntry) { Remove-Item -Path (Get-KohaUninstallKey) -Recurse -Force -ErrorAction SilentlyContinue }
 }

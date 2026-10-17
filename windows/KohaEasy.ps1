@@ -18,12 +18,15 @@
     KohaEasy.ps1 Open                          starts Koha if needed, opens the staff interface
     KohaEasy.ps1 Run                           action of the "Keep Koha running" task
     KohaEasy.ps1 Tray                          notification-area icon (starts at sign-in)
+    KohaEasy.ps1 Watcher                       shutdown watcher (starts at sign-in, no window): Koha's clean stop when Windows shuts down, restarts or signs out
+    KohaEasy.ps1 EnableShutdownWatcher         registers the watcher at sign-in (HKCU Run) and starts it; the installer does this on every run
+    KohaEasy.ps1 DisableShutdownWatcher        removes the watcher's sign-in entry and ends it; the tray then does the stop
     KohaEasy.ps1 ExportReport                  diagnostico_koha.txt for support on the desktop
     KohaEasy.ps1 ExportDiagnostics             .zip for support on the desktop
     KohaEasy.ps1 CheckDisk                     free space around the virtual disk
     KohaEasy.ps1 CompactDisk                   give unused space back to Windows (admin)
     KohaEasy.ps1 SetAutostart -Mode logon|manual
-    KohaEasy.ps1 RegisterTasks [-Mode logon|manual]   koha.nexus.exe, tasks, tray at sign-in and shortcuts
+    KohaEasy.ps1 RegisterTasks [-Mode logon|manual]   koha.nexus.exe, tasks, tray and shutdown watcher at sign-in, and shortcuts
     KohaEasy.ps1 Install                       the whole installation (windows\install.ps1 starts it)
     KohaEasy.ps1 CreateShortcuts               Start menu "Koha" and desktop, with koha.ico
     KohaEasy.ps1 SetupNetwork                  firewall and port forwarding for the library network (admin)
@@ -37,7 +40,7 @@
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install', 'Uninstall', 'UninstallAdmin')]
+    [ValidateSet('Launch', 'Window', 'Panel', 'Terminal', 'UserFolder', 'Open', 'Start', 'Stop', 'Restart', 'SafeShutdown', 'RestartServices', 'RebuildIndex', 'Status', 'Run', 'Tray', 'Watcher', 'EnableShutdownWatcher', 'DisableShutdownWatcher', 'ExportReport', 'ExportDiagnostics', 'CheckDisk', 'CompactDisk', 'SetAutostart', 'RegisterTasks', 'CreateShortcuts', 'SetupNetwork', 'UpdatePortProxy', 'Install', 'Uninstall', 'UninstallAdmin')]
     [string]$Command = 'Status',
     [ValidateSet('user', 'logon')][string]$Trigger = 'user',
     [ValidateSet('logon', 'manual')][string]$Mode,
@@ -229,6 +232,16 @@ switch ($Command) {
     }
     'Run' { exit (Invoke-KohaRun) }
     'Tray' { & (Join-Path $PSScriptRoot 'KohaEasy.Tray.ps1') }
+    'Watcher' { & (Join-Path $PSScriptRoot 'KohaEasy.Watcher.ps1') }
+    'EnableShutdownWatcher' {
+        Set-KohaState @{ shutdownWatcher = 'on' } | Out-Null
+        Install-KohaShutdownWatcher -Restart | Out-Null
+        if (-not $Quiet) { (T 'The shutdown watcher is on: when Windows shuts down, restarts or signs out, Koha is stopped cleanly first.') }
+    }
+    'DisableShutdownWatcher' {
+        Uninstall-KohaShutdownWatcher
+        if (-not $Quiet) { (T 'The shutdown watcher is off. The Koha icon still stops Koha cleanly while it runs.') }
+    }
     'ExportDiagnostics' {
         if (-not $Quiet) { Show-KohaNotification -Title 'Koha' -Text (T 'Collecting diagnostics... This can take a minute.') | Out-Null }
         $zip = Export-KohaDiagnostics
@@ -276,6 +289,7 @@ switch ($Command) {
         Install-KohaLauncher | Out-Null
         if ($Mode) { Register-KohaTasks -Autostart $Mode } else { Register-KohaTasks }
         Set-KohaTrayAtSignIn -Enabled $true
+        if (Test-KohaWatcherWanted) { Set-KohaWatcherAtSignIn -Enabled $true }
         New-KohaShortcuts | Out-Null
         Set-KohaDistroIcon | Out-Null
     }
