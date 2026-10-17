@@ -223,3 +223,47 @@ def test_network_address_falls_back_to_the_default(monkeypatch, tmp_path):
     assert z3950.network_url() == "https://x.example.org:8443/sru"
     monkeypatch.setenv("KEI_CATALOG_NETWORK_URL", "javascript:alert(1)")
     assert z3950.network_url() == z3950.NETWORK_URL
+
+
+def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("z")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-z3950")
+            assert str(view.query_one("#z-update").label) == "Update server settings"
+            seen, tasks, notes = {}, [], []
+            real = z3950.write_add_file
+
+            def spy(targets, ranks):
+                path = real(targets, ranks)
+                seen["text"] = path.read_text()
+                return path
+            monkeypatch.setattr(z3950, "write_add_file", spy)
+            task = app.bridge.task
+
+            async def spy_task(name, *args, **kw):
+                tasks.append(name)
+                return await task(name, *args, **kw)
+            monkeypatch.setattr(app.bridge, "task", spy_task)
+            monkeypatch.setattr(app, "notify", lambda msg, **kw: notes.append(str(msg)))
+            # Nothing ticked: the button still takes the whole list.
+            view.selected.clear()
+            await pilot.click("#z-update")
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            await pilot.click("#yes")
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert "z3950-sync" in tasks
+            lines = seen["text"].splitlines()
+            assert len(lines) == len(z3950.load_curated())
+            assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
+                       for line in lines)
+            assert "Added: 3" in app.screen._body and "Updated: 5" in app.screen._body
+            assert "Servers added: 3 · updated: 5" in notes
+
+    asyncio.run(main())

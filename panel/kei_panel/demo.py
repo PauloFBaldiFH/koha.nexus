@@ -219,6 +219,9 @@ _SCRIPTS: dict[str, list[str]] = {
     "z3950-add": ["@@result added=2", "@@result existing=1", "@@result invalid=0",
                   "@@msg ok OK\tZ39.50/SRU servers added to Koha: 2\\nAlready in Koha: 1\\n\\nThey are in "
                   "Administration > Z39.50/SRU servers, checked for the cataloguing searches."],
+    "z3950-sync": ["@@result added=3", "@@result updated=5", "@@result unchecked=1", "@@result invalid=0",
+                   "@@msg ok OK\tZ39.50/SRU server settings updated.\\nAdded: 3\\nUpdated: 5\\n\\n"
+                   "Old Biblioteca Nacional addresses unticked: 1"],
     "opac-theme-get": ["@@result amazon=0"],
     "opac-theme-sync": ["@@result amazon=0", "@@result block_OpacUserCSS=no", "@@result block_OpacUserJS=no",
                         "@@result block_IntranetUserCSS=no", "@@result block_IntranetUserJS=no",

@@ -418,6 +418,20 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   rule was not copied as is: its `!important`s fight the transparent wrapper rule and the textures,
   `#intranetmainuserblock` is already a `.page-section` on the home page (no `.main` there) and
   `.main-content` is not in Koha's staff templates.
+- **1.5.68 (Paulo: authority servers in the panel, true upsert, sync button)**: the panel's catalogue
+  (`panel/kei_panel/data/z3950_targets.json`) carries the three authority files under a fifth heading
+  "Authority files" (`recordtype: authority`, a fixed `rank` and `timeout`): LoC NAF and SAF
+  (lx2.loc.gov:210, USMARC, timeout 10, ranks 1 and 2) and BIBLIOTECA NACIONAL (AUTORIDADES)
+  (sru.koha.nexus:443/sru/bn-aut, SRU, MARC21, timeout 30, rank 3, Koha's authority SRU fields). `Target`
+  gains `recordtype`, `timeout` and `rank`; the z3950-add file a 14th column (recordtype); the SQL export
+  matches rows of the target's own record type and writes `https://` for SRU on 443; a Koha SQL dump's
+  authority rows are read. `z3950_upsert_sql` counts `@kei_added` and `@kei_updated` (rows whose settings
+  changed), and gains mode `sync`. New button "Update server settings" ("Atualizar dados dos servidores")
+  sends the whole catalogue to `--task z3950-sync`: every row Koha has is refreshed (by address, else by
+  name, within its record type; tick and rank kept), only the missing authority files are inserted, and
+  rows on the BN's dead Z39.50 hosts (`Z3950_DEAD_HOSTS`: 200.20.12.18, 162.214.168.248) are unticked,
+  never deleted (also by `z3950_seed_authorities`). The result says how many were added and updated.
+  `z3950-list` now returns authority rows too (5th column recordtype).
 - **1.5.67 (Paulo: BN authority database)**: `z3950_seed_authorities` also upserts
   `BIBLIOTECA NACIONAL (AUTORIDADES)`: https://sru.koha.nexus:443, db `sru/bn-aut`, SRU, MARC21, utf8,
   timeout 30, rank 3, recordtype authority, SRU fields mapped from Koha's authority search form

@@ -34,19 +34,62 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 72
-    # The four headings, in Paulo's order, each opening with his first id.
-    assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized"]
+    assert len(targets) == 75
+    # The four headings, in Paulo's order, each opening with his first id; the authority files last.
+    assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized", "authorities"]
     firsts = {t.region: t.db for t in reversed(targets)}
     assert firsts == {"national": "sru/bn", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
-                      "specialized": "sru/all"}
+                      "specialized": "sru/all", "authorities": "NAF"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
-    # Every one goes through the koha.nexus SRU gateway.
-    assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in targets} == {
+    # Every bibliographic one goes through the koha.nexus SRU gateway.
+    biblio = [t for t in targets if t.recordtype == "biblio"]
+    assert len(biblio) == 72
+    assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in biblio} == {
         ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
-    assert all(t.db.startswith("sru/") and not t.login for t in targets)
+    assert all(t.db.startswith("sru/") and not t.login for t in biblio)
+
+
+AUTH_FIELDS = ("nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,"
+               "authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice")
+
+
+def test_curated_list_has_the_three_authority_files():
+    auth = [t for t in z.load_curated() if t.recordtype == "authority"]
+    got = [(t.name, t.host, t.port, t.db, t.kind, t.syntax, t.encoding, t.timeout, t.rank, t.region, t.preselect)
+           for t in auth]
+    assert got == [
+        ("BIBLIOTECA DOS NOMES DO CONGRESSO", "lx2.loc.gov", 210, "NAF", "zed", "USMARC", "utf8", 10, 1,
+         "authorities", False),
+        ("BIBLIOTECA DOS ASSUNTOS DO CONGRESSO", "lx2.loc.gov", 210, "SAF", "zed", "USMARC", "utf8", 10, 2,
+         "authorities", False),
+        ("BIBLIOTECA NACIONAL (AUTORIDADES)", "sru.koha.nexus", 443, "sru/bn-aut", "sru", "MARC21", "utf8", 30, 3,
+         "authorities", False)]
+    bn = auth[2]
+    assert (bn.sru_options, bn.sru_fields) == ("sru=get,sru_version=1.1", AUTH_FIELDS)
+    assert (auth[0].sru_fields, auth[0].sru_options) == ("", "")
+
+
+def test_authority_files_reach_the_add_file_and_the_sql():
+    auth = [t for t in z.load_curated() if t.recordtype == "authority"]
+    rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in z.add_file_text(auth, {}).splitlines()]
+    assert [(r["db"], r["rank"], r["timeout"], r["recordtype"]) for r in rows] == [
+        ("NAF", "1", "10", "authority"), ("SAF", "2", "10", "authority"), ("sru/bn-aut", "3", "30", "authority")]
+    assert rows[2]["sru_fields"] == AUTH_FIELDS
+    # A fixed rank beats the speed ranking.
+    assert [z.koha_ranks(auth, z.History())[t.key] for t in auth] == [1, 2, 3]
+    sql = z.to_koha_sql(auth)
+    assert "recordtype = 'authority' AND FIND_IN_SET" in sql and "'biblio'" not in sql
+    assert "host = 'https://sru.koha.nexus', port = 443, db = 'sru/bn-aut'" in sql
+    assert "timeout = 30" in sql and "timeout = 10" in sql
+    # Read back (a Koha SQL dump keeps authority rows now), the targets are the same.
+    back = z.parse_koha_sql(sql)
+    assert [(t.key, t.recordtype, t.timeout, t.region) for t in back] == [
+        (t.key, "authority", t.timeout, "authorities") for t in auth]
+    # JSON keeps the record type of an authority file only.
+    data = json.loads(z.to_json(auth + [z.make_target({"host": "z.example.org"})]))
+    assert [t.get("recordtype") for t in data["targets"]] == ["authority"] * 3 + [None]
 
 
 def test_curated_file_carries_no_login():
@@ -120,8 +163,9 @@ def test_koha_sql_dump_with_and_without_columns():
             "'LOC AUTH',0,0,'USMARC',0,'zed','utf8','authority',NULL,NULL,NULL,NULL);\n"
             "INSERT INTO z3950servers (host, port, db, userid, password, servername, syntax) VALUES "
             "('z3950.bnf.fr', 2211, 'TOUT-ANA1-UTF8', 'reader', 'example', 'BnF l\\'officielle', 'UNIMARC');")
-    loc, bnf = z.parse_koha_sql(dump)
-    assert (loc.name, loc.db) == ("LIBRARY OF CONGRESS", "LCDB")
+    loc, naf, bnf = z.parse_koha_sql(dump)
+    assert (loc.name, loc.db, loc.recordtype) == ("LIBRARY OF CONGRESS", "LCDB", "biblio")
+    assert (naf.name, naf.db, naf.recordtype, naf.region) == ("LOC AUTH", "NAF", "authority", "authorities")
     assert (bnf.name, bnf.user, bnf.password, bnf.syntax) == ("BnF l'officielle", "reader", "example", "UNIMARC")
 
 
@@ -622,5 +666,5 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
 def test_curated_list_has_no_raw_address():
     # The gateway's older addresses (the VPS's public and private IPs) never come back.
     hosts = {t.host for t in z.load_curated()}
-    assert hosts == {"sru.koha.nexus"}
+    assert hosts == {"sru.koha.nexus", "lx2.loc.gov"}
     assert not any(re.fullmatch(r"[\d.]+", h) for h in hosts)
