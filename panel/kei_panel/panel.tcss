@@ -365,6 +365,16 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen {
 .dialog-editor { height: 1fr; min-height: 10; }
 .dialog-buttons { height: auto; min-height: 4; align-horizontal: right; padding-top: 1; }
 .dialog-buttons Button { margin-left: 2; min-width: 12; height: 3; }
+/* Edit & Map Fields (screens/fieldmap.py) */
+.fieldmap #fm-table { height: 1fr; min-height: 5; }
+.fieldmap #fm-edit { height: auto; margin-top: 1; }
+.fieldmap #fm-dest { width: 1fr; }
+.fieldmap #fm-custom { width: 14; margin-left: 1; }
+.fieldmap #fm-preview-bar { height: auto; margin-top: 1; }
+.fieldmap #fm-preview-title { width: 1fr; padding-top: 1; text-style: bold; }
+.fieldmap #fm-preview-bar Button { min-width: 5; margin-left: 1; }
+.fieldmap #fm-preview { height: 9; overflow-y: auto; }
+.fieldmap #fm-count { width: 1fr; padding-top: 1; color: $text-muted; }
 
 /* ---- narrow terminals (80 columns over SSH) ----------------------- */
 .-narrow .status-grid, .-narrow .card-grid { grid-size: 2; }

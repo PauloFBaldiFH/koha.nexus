@@ -372,6 +372,9 @@ _RUN: dict[str, list[str]] = {
         "@@step Reading the file", "@@done 0 Reading the file",
         "@@preview Preview (dry run)\t== Summary\\nRows read from tables: 124\\nBooks: 120 record(s), 131 item(s)"
         "\\nPatrons: 0\\nCasing fixed (text typed in capitals): 37\\nAnomalies to check: 2",
+        "~@@ask 🪄  Magic Import Tool\tEdit the field mapping before importing?\\n\\nYou can send a field or column to "
+        "another MARC field, or leave it out, and see the records change as you go.\\nNo = import as it is.",
+        "~@@fieldmap Edit field mapping\t{tmp}/fields.json\t{tmp}/fieldmap.json\t{tmp}/kei",
         "@@ask 🪄  Magic Import Tool\tCasing fixed: 37  ·  Encoding fixed: 1  ·  Anomalies to check: 2"
         "\\n\\nReady to import:\\n  Records: 120\\n  Items: 131\\n\\nGo on?",
         "@@say ok OK\t120 records imported."],
@@ -432,6 +435,9 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("tool-install", "info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
     for line in lines:
+        # "~": an optional step, whose "no" or cancel goes on (the field mapping).
+        optional = line.startswith("~")
+        line = line.lstrip("~")
         # KEI_TASK_ANSWER=no: the routine stops at its question, as in bash.
         if env.get("KEI_TASK_ANSWER") == "no" and out.asks:
             break
@@ -439,7 +445,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         # Interactive: a "no" or a cancel ends the routine (its usual `|| return 0`).
         from .bridge import _PROMPTS, answer_prompt
         if ask and line.startswith(_PROMPTS):
-            if await answer_prompt(out, line, ask) in ("no", "cancel"):
+            if await answer_prompt(out, line, ask) in ("no", "cancel") and not optional:
                 break
         if pause:
             await asyncio.sleep(pause)
@@ -455,4 +461,45 @@ def _demo_tmp() -> str:
     tasks = folder / "koha_tasks"
     if not tasks.exists():
         tasks.write_text("PATH=/usr/sbin:/usr/bin:/sbin:/bin\n0 23 * * * root /root/backup_sql.sh\n")
+    _demo_fields(folder)
     return str(folder)
+
+
+def _demo_fields(folder) -> None:
+    """The Magic Import's field mapping in the demo: a fields.json like the
+    engine's, and the engine's fieldmap module (from the installer next to
+    this panel, when there is one) for the live preview."""
+    import json
+    import re
+    from pathlib import Path
+    fields = folder / "fields.json"
+    if not fields.exists():
+        def rec(n, author, klass, tombo, subject):
+            return {"leader": "00000nam a22000007a 4500", "fields": [
+                ["001", f"ISIS-{n}"], ["090", "  ", [["a", klass]]], ["245", "10", [["a", f"Livro {n}"]]],
+                ["500", "  ", [["a", author]]], ["595", "  ", [["a", tombo], ["b", "LIV"]]],
+                ["690", "  ", [["a", subject]]]]}
+        records = [rec(1, "AUSTEN, JANE", "823.91", "T-0042", "Romance inglês"),
+                   rec(2, "ASSIS, MACHADO DE", "869.3", "T-0043", "Literatura brasileira"),
+                   rec(3, "ALENCAR, JOSE DE", "869.3", "T-0044", "Indianismo")]
+        samples = {"001": ["ISIS-1", "ISIS-2", "ISIS-3"], "090$a": ["823.91", "869.3"],
+                   "245$a": ["Livro 1", "Livro 2", "Livro 3"], "500$a": ["AUSTEN, JANE", "ASSIS, MACHADO DE", "ALENCAR, JOSE DE"],
+                   "595$a": ["T-0042", "T-0043", "T-0044"], "595$b": ["LIV"],
+                   "690$a": ["Romance inglês", "Literatura brasileira", "Indianismo"]}
+        targets = [["100$a", "Personal name (author)"], ["245$a", "Title"], ["245$b", "Remainder of title (subtitle)"],
+                   ["260$b", "Publisher (260)"], ["264$b", "Publisher (264)"], ["260$c", "Date of publication (260)"],
+                   ["264$c", "Date of publication (264)"], ["082$a", "Dewey class (DDC)"], ["650$a", "Topical subject"],
+                   ["952$p", "Barcode / accession number of the item"], ["952$y", "Koha item type"]]
+        fields.write_text(json.dumps({
+            "version": 1, "sample": 10, "targets": [{"to": a, "label": b} for a, b in targets],
+            "streams": [{"name": "acervo-isis.iso", "kind": "marc", "format": "ISO2709", "encoding": "UTF-8",
+                         "records_total": 11488, "records": records,
+                         "fields": [{"from": k, "kind": "marc", "count": 3, "samples": v, "to": k} for k, v in samples.items()]}],
+            "columns": [], "mapping": {"version": 1, "mappings": []}}, ensure_ascii=False), encoding="utf-8")
+    engine = folder / "kei" / "kei_import"
+    installer = Path(__file__).resolve().parents[2] / "installer"
+    if not (engine / "fieldmap.py").exists() and installer.exists():
+        text = installer.read_text(encoding="utf-8")
+        engine.mkdir(parents=True, exist_ok=True)
+        for m in re.finditer(r'cat > "\$d/kei_import/(__init__|marc|fieldmap)\.py" <<\'KEIPY\'\n(.*?)\nKEIPY\n', text, re.S):
+            (engine / f"{m.group(1)}.py").write_text(m.group(2) + "\n", encoding="utf-8")
