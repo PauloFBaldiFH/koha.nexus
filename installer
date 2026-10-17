@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.69"
+PANEL_VERSION=" 1.5.70"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -5523,6 +5523,7 @@ function_install_koha() {
     tui_run "$(t "Restarting Koha services")" ensure_koha_services
     tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
     z3950_seed_authorities >/dev/null 2>&1 || log "z3950: the Library of Congress authority targets were not seeded"
+    tui_run "$(t "Starting the local catalogue gateway")" enrich_install || true
     tui_run "$(t "Cleaning temporary files")" install_task_cleanup
     restore_apt_timers
     tui_run "$(t "Checking that everything works")" install_task_check
@@ -28548,27 +28549,39 @@ z3950_seed_authorities() {
 }
 
 # ----------------------------------------------------------------------
-# The SRU bridges (sru-bridge/ in the repository): Koha's "Catálogo Zeus"
-# target is 127.0.0.1:5000/sru and its "Catálogo Rede Pergamum" target is
-# 127.0.0.1:5006/sru, each answered by a small service. Both share one
-# directory under KEI_LIB_DIR and one venv, and each runs as its own systemd
-# unit (koha-zeus-sru, koha-pergamum-sru), enabled at boot and restarted on
-# failure.
+# The koha.nexus local gateway (enrichment/ in the repository): the SRU
+# server Koha's Z39.50/SRU search talks to, on 127.0.0.1:5000. Rows
+# sru/_union (every catalogue, the only one ticked) and sru/<id>. It answers
+# from static.db, the monthly database downloaded from GitHub Releases, and,
+# when static.db has nothing, from the Z39.50/SRU catalogues live (6 s).
+#   koha-nexus-sru                      the gateway (always on)
+#   koha-nexus-enrich-update.service    download, SHA-256 check, atomic swap
+#                                       of static.db (nice 19, idle I/O, 25 %
+#                                       CPU, 256 MB), run by
+#   koha-nexus-enrich-update.timer      weekly, and once after installation
+# It replaces the Zeus and Pergamum SRU bridges (they scraped those
+# catalogues from this machine; their records now come in static.db), so
+# installing it stops and removes them, and moves Koha's rows (also the ones
+# on the VPS gateway, sru.koha.nexus) to it.
 # ----------------------------------------------------------------------
-SRU_BRIDGE_DIR="/usr/local/lib/koha-easy-installer/sru-bridge"
-SRU_BRIDGE_UNIT="koha-zeus-sru"
-SRU_BRIDGE_PORT=5000
-PERGAMUM_BRIDGE_UNIT="koha-pergamum-sru"
-PERGAMUM_BRIDGE_PORT=5006
+ENRICH_DIR="/usr/local/lib/koha-easy-installer/enrichment"
+ENRICH_STATE="/var/lib/koha-nexus-enrich"
+ENRICH_USER="nexus-enrich"
+GATEWAY_UNIT="koha-nexus-sru"
+GATEWAY_PORT=5000
+ENRICH_UPDATE_UNIT="koha-nexus-enrich-update"
+# The retired bridges, removed by enrich_install.
+RETIRED_BRIDGE_DIR="/usr/local/lib/koha-easy-installer/sru-bridge"
+RETIRED_BRIDGE_UNITS="koha-zeus-sru koha-pergamum-sru"
 
-# 0 when $1 holds the bridges' sources.
-sru_bridge_src_ok() {
-    [ -f "$1/zeus_sru/app.py" ] && [ -f "$1/pergamum_sru/app.py" ] && [ -f "$1/requirements.txt" ]
+# 0 when $1 holds the gateway's sources.
+enrich_src_ok() {
+    [ -f "$1/nexus_gateway/__main__.py" ] && [ -f "$1/nexus_enrich/static.py" ] && [ -f "$1/requirements.txt" ]
 }
 
-# 0 when something answers on 127.0.0.1:PORT (default: the Zeus bridge's).
-sru_bridge_listening() {
-    local port="${1:-$SRU_BRIDGE_PORT}"
+# 0 when something answers on 127.0.0.1:PORT (default: the gateway's).
+gateway_listening() {
+    local port="${1:-$GATEWAY_PORT}"
     if command -v ss >/dev/null 2>&1; then
         ss -ltn "sport = :${port}" 2>/dev/null | grep -q LISTEN
     else
@@ -28576,23 +28589,40 @@ sru_bridge_listening() {
     fi
 }
 
-# Koha's row for the bridge, as tested on a live server: SRU, syntax MARC21
-# (the bridge answers MARCXML; USMARC makes Koha expect ISO 2709 and show
-# nothing), GET requests, 15 s timeout. An older Zeus row (same name, or
-# 127.0.0.1:5000) is updated in place, keeping its tick and rank, and the
-# UFSC Z39.50 server, which does not answer, is unticked. Only once Koha's
-# database exists; quiet otherwise.
-SRU_BRIDGE_NAME="Catálogo Zeus (UFSC bridge, SRU)"
-sru_bridge_register() {
+# The gateway's python, with the NEXUS_GATEWAY_* settings the units use.
+gateway_py() {
+    NEXUS_GATEWAY_STATIC_DB="$ENRICH_STATE/static.db" NEXUS_GATEWAY_LEARNED_DB="$ENRICH_STATE/learned.db" \
+        "$ENRICH_DIR/.venv/bin/python" -m nexus_gateway "$@"
+}
+
+# Stops and removes the Zeus and Pergamum bridges (their port 5000 is the
+# gateway's now).
+enrich_retire_bridges() {
+    local u changed=0
+    for u in $RETIRED_BRIDGE_UNITS; do
+        if [ -f "/etc/systemd/system/${u}.service" ]; then
+            systemctl disable --now "$u" >/dev/null 2>&1
+            rm -f "/etc/systemd/system/${u}.service"
+            changed=1
+            log "enrichment: retired bridge ${u} removed"
+        fi
+    done
+    [ -d "$RETIRED_BRIDGE_DIR" ] && rm -rf "$RETIRED_BRIDGE_DIR"
+    [ "$changed" = 1 ] && systemctl daemon-reload >/dev/null 2>&1
+    return 0
+}
+
+# Koha's rows for the gateway (python -m nexus_gateway koha-sql): sru/_union
+# ticked, one unticked row per catalogue, the VPS gateway's and the retired
+# bridges' rows moved or removed. Only once Koha's database exists.
+enrich_register() {
     is_koha_installed 2>/dev/null || return 0
     mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
-    if { z3950_row 127.0.0.1 "$SRU_BRIDGE_PORT" sru "$SRU_BRIDGE_NAME" 1 1 MARC21 utf8 15 sru \
-             'title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice' 'sru=get,sru_version=1.1' '' '' \
-             | z3950_upsert_sql named
-         echo "UPDATE z3950servers SET checked = 0 WHERE host LIKE '%z3950.ufsc.br%';"
-       } | mysql --default-character-set=utf8mb4 "$DB_NAME"
-    then
-        log "sru-bridge: Koha's Zeus target set (SRU, MARC21); z3950.ufsc.br unticked"
+    [ -x "$ENRICH_DIR/.venv/bin/python" ] || return 1
+    local log
+    log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
+    if gateway_py koha-sql 2>>"$log" | mysql --default-character-set=utf8mb4 "$DB_NAME" 2>>"$log"; then
+        log "enrichment: Koha's rows point at the local gateway (sru/_union ticked)"
         kei_result koha-target set
     else
         kei_result koha-target failed
@@ -28600,118 +28630,167 @@ sru_bridge_register() {
     fi
 }
 
-# Koha's row for the Pergamum bridge: the same settings as Zeus's (SRU,
-# MARC21, utf8, GET, 15 s). z3950servers has no unique key but its id, so
-# an older row (same name, or 127.0.0.1:5006) is found and updated by
-# z3950_upsert_sql rather than by ON DUPLICATE KEY. $1 is "checked" for a
-# new row (1 when chosen in the panel); an older row keeps its own.
-PERGAMUM_BRIDGE_NAME="Catálogo Rede Pergamum (CRP bridge, SRU)"
-pergamum_bridge_register() {
-    is_koha_installed 2>/dev/null || return 0
-    mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
-    local checked="${1:-0}"
-    [[ "$checked" =~ ^[01]$ ]] || checked=0
-    if z3950_row 127.0.0.1 "$PERGAMUM_BRIDGE_PORT" sru "$PERGAMUM_BRIDGE_NAME" "$checked" 1 MARC21 utf8 15 sru \
-           'title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice' 'sru=get,sru_version=1.1' '' '' \
-         | z3950_upsert_sql named | mysql --default-character-set=utf8mb4 "$DB_NAME"
-    then
-        log "pergamum-bridge: Koha's Rede Pergamum target set (SRU, MARC21)"
-        kei_result koha-target set
-    else
-        kei_result koha-target failed
-        return 1
-    fi
-}
-
-# sru_bridge_install [zeus|pergamum]: sources (next to this script, else
-# from GitHub), the shared venv, that bridge's unit, start, check.
-sru_bridge_install() {
-    local which="${1:-zeus}" unit port module env desc
-    case "$which" in
-        zeus)     unit="$SRU_BRIDGE_UNIT"; port="$SRU_BRIDGE_PORT"; module=zeus_sru; env=ZEUS_SRU
-                  desc="Zeus SRU bridge for Koha (127.0.0.1:${SRU_BRIDGE_PORT}/sru -> Catálogo Zeus, UFSC)" ;;
-        pergamum) unit="$PERGAMUM_BRIDGE_UNIT"; port="$PERGAMUM_BRIDGE_PORT"; module=pergamum_sru; env=PERGAMUM_SRU
-                  desc="Pergamum SRU bridge for Koha (127.0.0.1:${PERGAMUM_BRIDGE_PORT}/sru -> Rede Pergamum, PUCPR/CRP)" ;;
-        *)        return 2 ;;
-    esac
+# enrich_install: sources (next to this script, else from GitHub), its venv,
+# the service user, the units, start, check; then Koha's rows, and the first
+# static.db download in the background when there is none yet.
+enrich_install() {
     local src="" tmp="" log cert=""
-    log=$(tools_log sru-bridge 2>/dev/null || echo "${LOG_DIR:-/tmp}/sru-bridge.log")
-    if [ -n "${_SCRIPT_DIR:-}" ] && sru_bridge_src_ok "${_SCRIPT_DIR}/sru-bridge"; then
-        src="${_SCRIPT_DIR}/sru-bridge"
+    log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
+    if [ -n "${_SCRIPT_DIR:-}" ] && enrich_src_ok "${_SCRIPT_DIR}/enrichment"; then
+        src="${_SCRIPT_DIR}/enrichment"
     else
-        tmp=$(mktemp -d /tmp/koha_tmp_sru.XXXXXX) || return 1
+        tmp=$(mktemp -d /tmp/koha_tmp_enrich.XXXXXX) || return 1
         if curl -fsSL --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 120 "$KEI_PANEL_TARBALL_URL" \
-             | tar -xz -C "$tmp" --wildcards '*/sru-bridge/*' 2>>"$log" \
-           && sru_bridge_src_ok "$(echo "$tmp"/*/sru-bridge)"; then
-            src="$(echo "$tmp"/*/sru-bridge)"
+             | tar -xz -C "$tmp" --wildcards '*/enrichment/*' 2>>"$log" \
+           && enrich_src_ok "$(echo "$tmp"/*/enrichment)"; then
+            src="$(echo "$tmp"/*/enrichment)"
         fi
     fi
     if [ -z "$src" ]; then
         [ -n "$tmp" ] && rm -rf "$tmp"
-        printf 'sru-bridge: sources not found (no internet?)\n' >> "$log"
-        kei_result bridge "no-sources"
+        printf 'enrichment: sources not found (no internet?)\n' >> "$log"
+        kei_result gateway "no-sources"
         return 1
     fi
     command -v python3 >/dev/null 2>&1 || apt_install python3 >>"$log" 2>&1
     python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv >>"$log" 2>&1
-    mkdir -p "$SRU_BRIDGE_DIR"
-    rm -rf "$SRU_BRIDGE_DIR/zeus_sru" "$SRU_BRIDGE_DIR/pergamum_sru"
-    cp -r "$src/zeus_sru" "$src/pergamum_sru" "$src/requirements.txt" "$SRU_BRIDGE_DIR/" \
+    mkdir -p "$ENRICH_DIR"
+    rm -rf "$ENRICH_DIR/nexus_enrich" "$ENRICH_DIR/nexus_gateway"
+    cp -r "$src/nexus_enrich" "$src/nexus_gateway" "$src/requirements.txt" "$ENRICH_DIR/" \
         || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
     [ -n "$tmp" ] && rm -rf "$tmp"
-    find "$SRU_BRIDGE_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
+    find "$ENRICH_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
     [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
-    if ! cmp -s "$SRU_BRIDGE_DIR/requirements.txt" "$SRU_BRIDGE_DIR/.venv/.requirements" 2>/dev/null; then
-        rm -rf "$SRU_BRIDGE_DIR/.venv"
-        if ! python3 -m venv "$SRU_BRIDGE_DIR/.venv" >>"$log" 2>&1 \
-           || ! PIP_CERT="${PIP_CERT:-$cert}" "$SRU_BRIDGE_DIR/.venv/bin/python" -m pip install --quiet \
-                  --disable-pip-version-check --retries 2 --timeout 20 -r "$SRU_BRIDGE_DIR/requirements.txt" >>"$log" 2>&1; then
-            rm -rf "$SRU_BRIDGE_DIR/.venv"
-            kei_result bridge "no-venv"
+    if ! cmp -s "$ENRICH_DIR/requirements.txt" "$ENRICH_DIR/.venv/.requirements" 2>/dev/null; then
+        rm -rf "$ENRICH_DIR/.venv"
+        if ! python3 -m venv "$ENRICH_DIR/.venv" >>"$log" 2>&1 \
+           || ! PIP_CERT="${PIP_CERT:-$cert}" "$ENRICH_DIR/.venv/bin/python" -m pip install --quiet \
+                  --disable-pip-version-check --retries 2 --timeout 20 -r "$ENRICH_DIR/requirements.txt" >>"$log" 2>&1; then
+            rm -rf "$ENRICH_DIR/.venv"
+            kei_result gateway "no-venv"
             return 1
         fi
-        cp -f "$SRU_BRIDGE_DIR/requirements.txt" "$SRU_BRIDGE_DIR/.venv/.requirements"
+        cp -f "$ENRICH_DIR/requirements.txt" "$ENRICH_DIR/.venv/.requirements"
     fi
-    cat > "/etc/systemd/system/${unit}.service" <<UNIT
+    id -u "$ENRICH_USER" >/dev/null 2>&1 \
+        || useradd --system --home-dir "$ENRICH_STATE" --no-create-home --shell /usr/sbin/nologin "$ENRICH_USER" >>"$log" 2>&1
+    enrich_retire_bridges
+    local common="User=${ENRICH_USER}
+Group=${ENRICH_USER}
+WorkingDirectory=${ENRICH_DIR}
+EnvironmentFile=-/etc/koha-nexus-enrich/gateway.env
+Environment=NEXUS_GATEWAY_STATIC_DB=${ENRICH_STATE}/static.db
+Environment=NEXUS_GATEWAY_LEARNED_DB=${ENRICH_STATE}/learned.db
+StateDirectory=koha-nexus-enrich
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX"
+    cat > "/etc/systemd/system/${GATEWAY_UNIT}.service" <<UNIT
 [Unit]
-Description=${desc}
+Description=koha.nexus local gateway (SRU on 127.0.0.1:${GATEWAY_PORT}: static.db + live Z39.50/SRU)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-DynamicUser=yes
-WorkingDirectory=${SRU_BRIDGE_DIR}
-Environment=${env}_HOST=127.0.0.1
-Environment=${env}_PORT=${port}
-ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m ${module}
+${common}
+Environment=NEXUS_GATEWAY_HOST=127.0.0.1
+Environment=NEXUS_GATEWAY_PORT=${GATEWAY_PORT}
+ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_gateway serve
 Restart=always
 RestartSec=5
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-PrivateTmp=yes
+MemoryHigh=128M
+MemoryMax=192M
 
 [Install]
 WantedBy=multi-user.target
 UNIT
+    cat > "/etc/systemd/system/${ENRICH_UPDATE_UNIT}.service" <<UNIT
+[Unit]
+Description=koha.nexus enrichment database update (static.db from GitHub Releases)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+${common}
+ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_gateway update
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=25%
+MemoryMax=256M
+TimeoutStartSec=3h
+UNIT
+    cat > "/etc/systemd/system/${ENRICH_UPDATE_UNIT}.timer" <<UNIT
+[Unit]
+Description=Weekly check for a new koha.nexus enrichment database
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=7d
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
     systemctl daemon-reload >>"$log" 2>&1
-    systemctl enable "$unit" >>"$log" 2>&1
-    systemctl restart "$unit" >>"$log" 2>&1
-    # The other bridge runs the code just replaced: it restarts too.
-    local other
-    for other in "$SRU_BRIDGE_UNIT" "$PERGAMUM_BRIDGE_UNIT"; do
-        [ "$other" != "$unit" ] && systemctl is-active --quiet "$other" 2>/dev/null \
-            && systemctl restart "$other" >>"$log" 2>&1
-    done
-    local i
+    systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
+    systemctl restart "$GATEWAY_UNIT" >>"$log" 2>&1
+    systemctl start "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
+    local i up=0
     for i in 1 2 3 4 5 6 7 8 9 10; do
-        sru_bridge_listening "$port" && { log "sru-bridge: ${unit} listening on 127.0.0.1:${port}"; kei_result bridge running; return 0; }
+        gateway_listening && { up=1; break; }
         sleep 1
     done
-    systemctl status "$unit" --no-pager >>"$log" 2>&1
-    kei_result bridge "not-listening"
-    return 1
+    if [ "$up" != 1 ]; then
+        systemctl status "$GATEWAY_UNIT" --no-pager >>"$log" 2>&1
+        kei_result gateway "not-listening"
+        return 1
+    fi
+    log "enrichment: ${GATEWAY_UNIT} listening on 127.0.0.1:${GATEWAY_PORT}"
+    kei_result gateway running
+    enrich_register || log "enrichment: Koha's rows were not changed (see ${log})"
+    # The first static.db: downloaded in the background, throttled.
+    [ -s "$ENRICH_STATE/static.db" ] || systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >>"$log" 2>&1
+    return 0
+}
+
+# enrich_update [--force]: the update service now, waiting for it (it
+# runs with its throttles); then what is installed.
+enrich_update() {
+    [ -f "/etc/systemd/system/${ENRICH_UPDATE_UNIT}.service" ] || { enrich_install || return 1; }
+    local log rc=0
+    log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
+    if [ "${1:-}" = "--force" ]; then
+        rm -f "$ENRICH_STATE/static.release"
+    fi
+    systemctl start "${ENRICH_UPDATE_UNIT}.service" >>"$log" 2>&1 || rc=1
+    journalctl -u "${ENRICH_UPDATE_UNIT}.service" -n 1 -o cat --no-pager 2>/dev/null >> "$log"
+    enrich_status
+    return "$rc"
+}
+
+# enrich_status: gateway running, static.db release, next check.
+enrich_status() {
+    local rel="" next=""
+    if systemctl is-active --quiet "$GATEWAY_UNIT" 2>/dev/null && gateway_listening; then
+        kei_result gateway running
+    elif [ -f "/etc/systemd/system/${GATEWAY_UNIT}.service" ]; then
+        kei_result gateway stopped
+    else
+        kei_result gateway not-installed
+    fi
+    [ -s "$ENRICH_STATE/static.release" ] \
+        && rel=$(sed -n 's/.*"name": *"\([^"]*\)".*/\1/p' "$ENRICH_STATE/static.release" | head -n 1)
+    kei_result release "${rel:-none}"
+    next=$(systemctl show "${ENRICH_UPDATE_UNIT}.timer" -p NextElapseUSecRealtime --value 2>/dev/null)
+    kei_result next_check "${next:-}"
+    return 0
 }
 
 # z3950_add FILE [sync]: put the panel's targets in z3950servers (an upsert:
@@ -28723,7 +28802,7 @@ UNIT
 z3950_add() {
     local file="$1" mode="${2:-add}" log sql out err host port db syntax enc name rank timeout kind user pass sru sruopt rtype rows=""
     local -a secrets=()
-    local valid=0 invalid=0 n updated unchecked wants_bridge=0 wants_pergamum=0
+    local valid=0 invalid=0 n updated unchecked wants_gateway=0
     require_database || { rm -f -- "$file"; return 1; }
     if [ ! -f "$file" ]; then
         msg_error "" "$(t "The list of servers to add was not found.")"
@@ -28747,8 +28826,7 @@ z3950_add() {
         fi
         [ "$rtype" = authority ] || rtype=biblio
         [ -n "$pass" ] && secrets+=("$pass")
-        [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$SRU_BRIDGE_PORT" ] && wants_bridge=1
-        [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$PERGAMUM_BRIDGE_PORT" ] && wants_pergamum=1
+        [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$GATEWAY_PORT" ] && wants_gateway=1
         # SRU settings belong to SRU targets only.
         [ "$kind" = sru ] || { sru=""; sruopt=""; }
         # Koha talks HTTPS to an SRU server only when its host starts with
@@ -28797,19 +28875,9 @@ z3950_add() {
         msg_ok "$(t "Z39.50/SRU server settings updated.\nAdded: \${n}\nUpdated: \${updated}\n\nOld Biblioteca Nacional addresses unticked: \${unchecked}")"
         return 0
     fi
-    # The Zeus target needs its bridge running on this server.
-    if [ "${wants_bridge:-0}" = 1 ]; then
-        if ! sru_bridge_listening; then
-            sru_bridge_install || log "z3950: the Zeus SRU bridge could not be started (see logs)"
-        fi
-        sru_bridge_register
-    fi
-    # So does the Rede Pergamum one.
-    if [ "${wants_pergamum:-0}" = 1 ]; then
-        if ! sru_bridge_listening "$PERGAMUM_BRIDGE_PORT"; then
-            sru_bridge_install pergamum || log "z3950: the Pergamum SRU bridge could not be started (see logs)"
-        fi
-        pergamum_bridge_register 1
+    # The local gateway's rows need it running on this server.
+    if [ "${wants_gateway:-0}" = 1 ] && ! gateway_listening; then
+        enrich_install || log "z3950: the local gateway could not be started (see logs)"
     fi
     local existing=$((valid - n))
     kei_result added "$n"
@@ -30811,8 +30879,9 @@ kei_task() {
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
         z3950-sync)      [ -n "${1:-}" ] || return 2; z3950_add "$1" sync ;;
         z3950-seed)      z3950_seed_authorities ;;
-        sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
-        pergamum-bridge) sru_bridge_install pergamum; local prc=$?; pergamum_bridge_register; return "$prc" ;;
+        enrich-install|sru-bridge|pergamum-bridge) enrich_install ;;
+        enrich-update)   enrich_update "${1:-}" ;;
+        enrich-status)   enrich_status ;;
         z3950-server-status) z3950_server_status ;;
         z3950-daemon)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; z3950_daemon "$1" ;;
         catalog-network)

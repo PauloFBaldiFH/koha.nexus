@@ -2090,40 +2090,40 @@
      ],
      "rows": [
       [
-       "Fundação Biblioteca Nacional (BN)",
+       "KOHA.NEXUS (TODOS OS CATÁLOGOS)",
        "In Koha",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/bn"
+       "127.0.0.1:5000/sru/_union"
+      ],
+      [
+       "Fundação Biblioteca Nacional (BN)",
+       "Not scanned yet",
+       "SRU · MARC21",
+       "127.0.0.1:5000/sru/bn"
       ],
       [
        "Fundacentro, Biblioteca",
        "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/fundacentro"
+       "127.0.0.1:5000/sru/fundacentro"
       ],
       [
        "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
-       "In Koha",
+       "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/senado"
+       "127.0.0.1:5000/sru/senado"
       ],
       [
        "Senado Federal (FOLIO)",
        "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/senado-folio"
+       "127.0.0.1:5000/sru/senado-folio"
       ],
       [
        "Biblioteca Nacional de Portugal (BNP)",
        "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/bn-portugal"
-      ],
-      [
-       "PORBASE, Portugal",
-       "Not scanned yet",
-       "SRU · MARC21",
-       "sru.koha.nexus:443/sru/porbase"
+       "127.0.0.1:5000/sru/bn-portugal"
       ]
      ]
     }
@@ -2151,9 +2151,9 @@
      "rows": [
       [
        "Universidade Federal de Santa Catarina (UFSC)",
-       "In Koha",
+       "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/ufsc"
+       "127.0.0.1:5000/sru/ufsc"
       ]
      ]
     }
@@ -2183,7 +2183,7 @@
        "Rede Pergamum",
        "Not scanned yet",
        "SRU · MARC21",
-       "sru.koha.nexus:443/sru/all"
+       "127.0.0.1:5000/sru/all"
       ]
      ]
     }

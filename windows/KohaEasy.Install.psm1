@@ -279,16 +279,18 @@ function Get-KohaWslConf {
 
 # Pure: adds the keys Koha needs to the user's .wslconfig without changing
 # anything the user already set. vmIdleTimeout=-1 keeps WSL running while
-# Koha waits for readers. On Windows 11 22H2+ (build 22621): networking
-# mirrored, so other PCs of the library reach Koha by this PC's address,
-# and [experimental] hostAddressLoopback, so this PC reaches Koha by that
-# address too (the library network test goes that way).
+# Koha waits for readers. [experimental] autoMemoryReclaim=gradual gives
+# Windows back the memory Linux only holds as cache (the monthly catalogue
+# database and the enrichment jobs fill it). On Windows 11 22H2+ (build
+# 22621): networking mirrored, so other PCs of the library reach Koha by
+# this PC's address, and [experimental] hostAddressLoopback, so this PC
+# reaches Koha by that address too (the library network test goes that way).
 function Merge-KohaWslConfig {
     param([AllowEmptyString()][string]$Text, [int]$Build)
-    $want = [ordered]@{ wsl2 = [ordered]@{ vmIdleTimeout = '-1' } }
+    $want = [ordered]@{ wsl2 = [ordered]@{ vmIdleTimeout = '-1' }; experimental = [ordered]@{ autoMemoryReclaim = 'gradual' } }
     if ($Build -ge 22621) {
         $want.wsl2['networkingMode'] = 'mirrored'
-        $want['experimental'] = [ordered]@{ hostAddressLoopback = 'true' }
+        $want.experimental['hostAddressLoopback'] = 'true'
     }
     $lines = New-Object System.Collections.ArrayList
     if ($Text) { foreach ($l in ($Text -split "`r?`n")) { [void]$lines.Add($l) } }

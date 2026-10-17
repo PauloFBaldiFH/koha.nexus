@@ -32,9 +32,9 @@ kei_result() { printf 'RESULT %s=%s\n' "\$1" "\$2" >> "$W/results"; }
 require_database() { return 0; }
 is_koha_installed() { return 0; }
 TOOLS_LOG_DIR="$W/logs"
-# The Zeus bridge: not running, and its install only noted.
-sru_bridge_listening() { return 1; }
-sru_bridge_install() { echo "called \${1:-}" >> "$W/bridge"; }
+# The local gateway: not running, and its install only noted.
+gateway_listening() { return 1; }
+enrich_install() { echo "called" >> "$W/bridge"; }
 SH
     ( umask 077
       printf '%s\t' lx2.loc.gov 210 LCDB USMARC utf8 'Library of Congress' 3 0 zed '' '' ''; printf '\n'
@@ -62,18 +62,18 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT servername, checked, \`rank\` FROM z3950servers WHERE host = 'z3950.bnf.fr'")" = "$(printf "BnF l'officielle\t1\t1")" ]
     # An SRU server on 443 speaks HTTPS: Koha needs https:// in the host for that.
     [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = 'https://services.dnb.de'")" = "$(printf 'sru\t443\tsru/dnb\ttitle=dc.title')" ]
-    # The Zeus bridge gets its SRU fields and options; a Z39.50 server gets none.
-    # ...and then the bridge's own row replaced it: MARC21, GET, 15 s.
-    [ "$(zsql "SELECT servertype, port, db, syntax, timeout, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\tMARC21\t15\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
+    # An SRU row gets its SRU fields; a Z39.50 server gets none. A row on the
+    # local gateway (127.0.0.1:5000) asks for the gateway, whose install moves
+    # Koha's rows to it (enrich_register, tested below).
+    [ "$(zsql "SELECT servertype, port, db, sru_fields FROM z3950servers WHERE host = '127.0.0.1'")" = "$(printf 'sru\t5000\tsru\ttitle=dc.title,isbn=dc.isbn')" ]
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = '127.0.0.1'")" = "1" ]
-    # The UFSC Z39.50 server does not answer: kept, but unticked.
-    [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-'), checked FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t\t0')" ]
-    # The Zeus row asked for its bridge to be installed and started.
-    [ "$(cat "$W/bridge")" = "called " ]
+    [ "$(zsql "SELECT servertype, IFNULL(sru_fields,'-'), IFNULL(sru_options,'-') FROM z3950servers WHERE host = 'z3950.ufsc.br'")" = "$(printf 'zed\t\t')" ]
+    # The gateway's row asked for the gateway to be installed and started.
+    [ "$(cat "$W/bridge")" = "called" ]
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
     grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
-    [ "$(cat "$W/results")" = "$(printf 'RESULT koha-target=set\nRESULT added=4\nRESULT existing=1\nRESULT updated=1\nRESULT invalid=2')" ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT added=4\nRESULT existing=1\nRESULT updated=1\nRESULT invalid=2')" ]
     grep -q "Already in Koha: 1" "$KEI_S/dialogs.log"
     # The password is in no log, and no SQL file is left behind.
     ! grep -rq "w0rd" "$W/logs" /var/log/koha-easy-install 2>/dev/null
@@ -126,20 +126,6 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/m2.tsv"
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
-}
-
-@test "sru-bridge: registering again updates the Zeus row in place, keeping its tick and rank" {
-    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype, sru_options)
-          VALUES ('127.0.0.1', 5000, 'zeus', 'Catálogo Zeus (UFSC bridge, SRU)', 0, 4, 'USMARC', 'utf8', 0, 'sru', 'biblio', 'sru_version=1.2'),
-                 ('127.0.0.1', 5000, 'sru', 'Zeus, by hand', 1, 2, 'USMARC', 'utf8', 0, 'sru', 'biblio', NULL)"
-    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" sru_bridge_register
-    [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE port = 5000")" = "1" ]
-    [ "$(zsql "SELECT servername, db, syntax, timeout, sru_options, checked, \`rank\` FROM z3950servers WHERE port = 5000")" = \
-      "$(printf 'Catálogo Zeus (UFSC bridge, SRU)\tsru\tMARC21\t15\tsru=get,sru_version=1.1\t0\t4')" ]
-    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
-    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" sru_bridge_register
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
@@ -279,9 +265,9 @@ print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
     echo "$output"; cat "$W/results"
     [ "$status" -eq 0 ]
     [ ! -e "$W/all.tsv" ]
-    # Found by name, moved to the gateway, tick and rank kept.
+    # Found by name, moved to the local gateway, tick and rank kept.
     [ "$(zsql "SELECT host, port, syntax, encoding, timeout, sru_options, checked, \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = \
-      "$(printf 'https://sru.koha.nexus\t443\tMARC21\tutf8\t0\tsru=get,sru_version=1.1\t0\t7')" ]
+      "$(printf '127.0.0.1\t5000\tMARC21\tutf8\t15\tsru=get,sru_version=1.1\t0\t7')" ]
     [ "$(zsql "SELECT sru_fields FROM z3950servers WHERE db = 'sru/bn'")" = \
       "title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice" ]
     # No catalogue server Koha did not have was added: still 2 biblio rows (LoC LCDB and BN).
@@ -318,35 +304,53 @@ print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
     [ "$(zsql "SELECT host, db FROM z3950servers WHERE recordtype = 'biblio' AND servername LIKE 'BIBLIOTECA NACIONAL%'")" = "$(printf 'lx2.loc.gov\tSAF')" ]
 }
 
-@test "z3950-add: no bridge install without a Zeus row" {
+@test "z3950-add: no gateway install without a row on it" {
     ( printf '%s\t' z3950.ufsc.br 210 Default USMARC utf8 UFSC 1 0 zed '' '' '' ''; printf '\n' ) > "$W/u.tsv"
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/u.tsv"
     [ "$status" -eq 0 ]
     [ ! -e "$W/bridge" ]
 }
 
-@test "sru-bridge: the panel tasks exist and the unit starts the bridge on boot" {
-    grep -q '^        sru-bridge)' "$KEI_REPO/installer"
-    grep -q '^        pergamum-bridge)' "$KEI_REPO/installer"
-    grep -q 'WantedBy=multi-user.target' "$KEI_REPO/installer"
-    grep -q 'ExecStart=${SRU_BRIDGE_DIR}/.venv/bin/python -m ${module}' "$KEI_REPO/installer"
+@test "enrichment: the panel tasks exist, the units start on boot and the bridges are retired" {
+    grep -q '^        enrich-install|sru-bridge|pergamum-bridge) enrich_install ;;' "$KEI_REPO/installer"
+    grep -q '^        enrich-update)' "$KEI_REPO/installer"
+    grep -q 'ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_gateway serve' "$KEI_REPO/installer"
+    grep -q 'ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_gateway update' "$KEI_REPO/installer"
+    grep -q '^CPUQuota=25%$' "$KEI_REPO/installer"
+    grep -q '^RETIRED_BRIDGE_UNITS="koha-zeus-sru koha-pergamum-sru"$' "$KEI_REPO/installer"
+    ! grep -q 'sru_bridge_install' "$KEI_REPO/installer"
 }
 
-@test "z3950-add: the Rede Pergamum row installs its bridge and gets the bridge's settings, once" {
-    ( printf '%s\t' 127.0.0.1 5006 sru USMARC utf8 'Pergamum' 0 0 sru '' '' 'title=dc.title' ''; printf '\n' ) > "$W/p.tsv"
-    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/p.tsv"
-    echo "$output"; cat "$KEI_S/dialogs.log"
+@test "enrichment: Koha's rows move to the local gateway, sru/_union the only one ticked, re-runnable" {
+    # The gateway's real koha-sql, through a stand-in venv python.
+    mkdir -p "$W/enrich/.venv/bin"
+    printf '#!/bin/sh\nPYTHONPATH=%s exec python3 "$@"\n' "$KEI_REPO/enrichment" > "$W/enrich/.venv/bin/python"
+    chmod +x "$W/enrich/.venv/bin/python"
+    echo "ENRICH_DIR=$W/enrich" >> "$W/extra.sh"
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype)
+          VALUES ('https://sru.koha.nexus', 443, 'sru/bn', 'BN', 1, 1, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('https://sru.koha.nexus', 443, 'sru/usp', 'USP', 1, 2, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('10.0.0.60', 5001, 'pergamum', 'Rede', 0, 3, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('127.0.0.1', 5000, 'sru', 'Catálogo Zeus (UFSC bridge, SRU)', 1, 4, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('127.0.0.1', 5006, 'sru', 'Catálogo Rede Pergamum (CRP bridge, SRU)', 1, 5, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('https://sru.koha.nexus', 443, 'sru/bn-aut', 'BN AUT', 1, 3, 'MARC21', 'utf8', 'sru', 'authority')"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_register
+    echo "$output"; cat "$W/logs/"* 2>/dev/null || true
     [ "$status" -eq 0 ]
-    [ "$(cat "$W/bridge")" = "called pergamum" ]
-    [ "$(zsql "SELECT servername, servertype, port, db, syntax, encoding, timeout, checked, sru_fields, sru_options FROM z3950servers WHERE host = '127.0.0.1'")" = \
-      "$(printf 'Catálogo Rede Pergamum (CRP bridge, SRU)\tsru\t5006\tsru\tMARC21\tutf8\t15\t1\ttitle=dc.title,isbn=dc.isbn,srchany=cql.serverChoice\tsru=get,sru_version=1.1')" ]
-    # Again (the task, as from config.sh): still one row, still ticked (the
-    # librarian's choice is kept); Zeus's row untouched.
-    mysql "$DB" -e "INSERT INTO z3950servers (host, port, db, servername, servertype) VALUES ('127.0.0.1', 5000, 'sru', 'Zeus', 'sru')"
-    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" pergamum_bridge_register
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND host = '127.0.0.1' AND port = 5000 AND db LIKE 'sru/%'")" = "74" ]
+    [ "$(zsql "SELECT db FROM z3950servers WHERE host = '127.0.0.1' AND checked = 1")" = "sru/_union" ]
+    # The VPS rows moved (BN keeps its rank), the bridges' rows are gone.
+    [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND (host LIKE '%sru.koha.nexus' OR host = '10.0.0.60' OR port = 5006 OR db = 'sru')")" = "0" ]
+    [ "$(zsql "SELECT db FROM z3950servers WHERE db = 'sru/all'")" = "sru/all" ]
+    # The librarian's other servers and the authority rows are untouched.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov'")" = "2" ]
+    [ "$(zsql "SELECT host, checked FROM z3950servers WHERE db = 'sru/bn-aut'")" = "$(printf 'https://sru.koha.nexus\t1')" ]
+    grep -q "koha-target=set" "$W/results"
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_register
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*), MIN(checked) FROM z3950servers WHERE port = 5006")" = "$(printf '1\t1')" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE port = 5000")" = "1" ]
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
 # ---------------------------------------------------------------------

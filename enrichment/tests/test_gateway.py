@@ -366,3 +366,21 @@ def test_koha_sql():
     assert "host = 'https://sru.koha.nexus'" not in sql.split("-- 2.")[1]
     assert sql.strip().endswith("COMMIT;")
     assert koha_sql.q("O'Brien") == "'O''Brien'"
+
+
+def test_koha_sql_removes_the_retired_bridges():
+    sql = koha_sql.render(load(TARGETS))
+    zero = sql.split("-- 0.")[1].split("-- 1.")[0]
+    assert "port = 5000 AND IFNULL(db, '') IN ('', 'sru', '/sru')" in zero
+    assert "port = 5006" in zero and "recordtype = 'biblio'" in zero
+
+
+def test_panel_list_is_generated_from_targets_json():
+    # The panel's curated list must be python -m nexus_gateway panel-list's output.
+    current = koha_sql.PANEL_LIST.read_text(encoding="utf-8")
+    assert koha_sql.panel_list(load(TARGETS)) == current
+    data = json.loads(current)
+    biblio = [t for t in data["targets"] if t.get("recordtype") != "authority"]
+    assert biblio[0]["db"] == "sru/_union" and [t["db"] for t in biblio if t["preselect"]] == ["sru/_union"]
+    assert {(t["host"], t["port"]) for t in biblio} == {("127.0.0.1", 5000)}
+    assert [t["db"] for t in data["targets"] if t.get("recordtype") == "authority"] == ["NAF", "SAF", "sru/bn-aut"]

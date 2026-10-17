@@ -36,13 +36,13 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             assert table.row_count == len(curated) + len(z3950.REGIONS)
             assert table.get_row("region:national")[1] == "[b]\\[1] National libraries and official bodies[/b]"
             assert table.get_row("region:specialized")[1] == "[b]\\[4] Specialized and union catalogues[/b]"
-            # Koha's own list was read: its LoC row (https://sru.koha.nexus) is marked.
+            # Koha's own list was read: its LoC row (127.0.0.1:5000) is marked.
             loc = next(t for t in curated if t.db == "sru/loc")
             await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
 
-            # BN, Senado, USP and UFSC come ticked; untick them before the groups.
+            # Only sru/_union comes ticked; untick it before the groups.
             ticked = {t.key for t in curated if t.preselect}
-            assert view.selected == ticked and len(ticked) == 4
+            assert view.selected == ticked and len(ticked) == 1
             for key in ticked:
                 view.toggle(key)
             assert view.selected == set()
