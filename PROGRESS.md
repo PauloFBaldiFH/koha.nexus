@@ -448,6 +448,17 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.74 (Paulo: authority search row for cataloguing)**: the local gateway answers `/sru/_union-aut` from
+  static.db `auth_headings` (`nexus_gateway/authorities.py`): Koha's authority search fields reach it through the
+  row's SRU fields (authorpersonal=bath.personalName, authorcorp=bath.corporateName,
+  authormeetingcon=bath.conferenceName, subject/subjectsubdiv=dc.subject, title/uniformtitle=bath.uniformTitle,
+  nameany/authorany=bath.name, srchany=cql.serverChoice); each clause matches heading and 4XX words of those kinds,
+  and/or/not combine. Ranked like the authority jobs (exact heading, BN > Brazilian > LoC > rest, established before
+  preliminary, most used); subjects never LCSH. Records are MARC21 authorities built by
+  `authority.authority_record` (670 source + release, 008/33 d + 667 when preliminary). `koha-sql` step 6 upserts
+  one row KOHA.NEXUS (AUTORIDADES), recordtype authority, 127.0.0.1:5000 `sru/_union-aut`, ticked when added, tick
+  and rank left to the librarian; the panel list carries it first among the authority files. Koha's own authorities
+  are searched by Koha itself; LoC and BN rows untouched. Not tried against a live Koha authority search yet.
 - **1.5.70 (Paulo: enrichment step 4, installer and monthly updates)**: `python -m nexus_gateway update`
   finds the newest `nexus-enrich-YYYY.MM.db.zst` (GitHub releases `enrich-YYYY.MM`, mirror `latest.txt`
   via `NEXUS_GATEWAY_MIRROR`), checks size and SHA-256, decompresses, checks the DB and swaps it over

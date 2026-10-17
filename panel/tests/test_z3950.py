@@ -34,12 +34,12 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 77
+    assert len(targets) == 78
     # The four headings, in Paulo's order, sru/_union first; the authority files last.
     assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized", "authorities"]
     firsts = {t.region: t.db for t in reversed(targets)}
     assert firsts == {"national": "sru/_union", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
-                      "specialized": "sru/all", "authorities": "NAF"}
+                      "specialized": "sru/all", "authorities": "sru/_union-aut"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
@@ -59,6 +59,9 @@ def test_curated_list_has_the_three_authority_files():
     auth = [t for t in z.load_curated() if t.recordtype == "authority"]
     got = [(t.name, t.host, t.port, t.db, t.kind, t.syntax, t.encoding, t.timeout, t.rank, t.region, t.preselect)
            for t in auth]
+    assert got.pop(0) == ("KOHA.NEXUS (AUTORIDADES)", "127.0.0.1", 5000, "sru/_union-aut", "sru", "MARC21", "utf8",
+                          15, 0, "authorities", False)
+    auth.pop(0)
     assert got == [
         ("BIBLIOTECA DOS NOMES DO CONGRESSO", "lx2.loc.gov", 210, "NAF", "zed", "USMARC", "utf8", 10, 1,
          "authorities", False),
@@ -72,7 +75,7 @@ def test_curated_list_has_the_three_authority_files():
 
 
 def test_authority_files_reach_the_add_file_and_the_sql():
-    auth = [t for t in z.load_curated() if t.recordtype == "authority"]
+    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.host != "127.0.0.1"]
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in z.add_file_text(auth, {}).splitlines()]
     assert [(r["db"], r["rank"], r["timeout"], r["recordtype"]) for r in rows] == [
         ("NAF", "1", "10", "authority"), ("SAF", "2", "10", "authority"), ("sru/bn-aut", "3", "30", "authority")]

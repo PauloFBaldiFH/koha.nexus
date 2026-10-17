@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.73",
+ "panel_version": "1.5.74",
  "languages": [
   {
    "code": "en",
@@ -14844,7 +14844,8 @@
     ],
     "tips": [
      "Run **Find duplicate authors** first if your own authorities have duplicates: every heading that fits two Koha authorities goes to review.",
-     "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module."
+     "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module.",
+     "While cataloguing by hand, the same headings are searchable from Koha: in a name or subject field's authority search, **Z39.50/SRU** lists the row **KOHA.NEXUS (AUTORIDADES)** (BN first, then the Brazilian catalogues, then the Library of Congress; subjects never from LCSH). Importing one creates the authority in Koha."
     ],
     "warnings": [
      "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
@@ -14872,7 +14873,8 @@
     ],
     "tips": [
      "Rode antes **Encontrar autores duplicados** se as suas autoridades têm duplicatas: todo cabeçalho que serve a duas autoridades do Koha vai para revisão.",
-     "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha."
+     "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha.",
+     "Na catalogação manual os mesmos cabeçalhos podem ser buscados pelo Koha: na busca de autoridades de um campo de nome ou assunto, **Z39.50/SRU** mostra a linha **KOHA.NEXUS (AUTORIDADES)** (BN primeiro, depois os catálogos brasileiros, depois a Library of Congress; assuntos nunca da LCSH). Importar um cria a autoridade no Koha."
     ],
     "warnings": [
      "Aplicar altera o catálogo e acrescenta registros de autoridade. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."

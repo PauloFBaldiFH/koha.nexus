@@ -39,6 +39,7 @@ MARC21_SYNTAXES = ("USMARC", "MARC21")
 DEFAULT_INDEXES = {"isbn": "bath.isbn", "title": "dc.title", "author": "dc.creator",
                    "keywords": "cql.serverChoice"}
 UNION = "_union"
+AUTH_UNION = "_union-aut"       # the authority headings, for Koha's authority search
 _ID = re.compile(r"[a-z0-9][a-z0-9_\-]*")
 
 

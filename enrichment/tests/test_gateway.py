@@ -360,7 +360,7 @@ def test_targets_file():
 def test_koha_sql():
     table = load(TARGETS)
     sql = koha_sql.render(table)
-    assert sql.count("INSERT INTO z3950servers") == len(table) + 1
+    assert sql.count("INSERT INTO z3950servers") == len(table) + 2       # sru/_union and sru/_union-aut
     assert "'sru/_union', 'KOHA.NEXUS (TODOS OS CATÁLOGOS)', 1, 0" in sql
     assert "SET checked = IF(db = 'sru/_union', 1, 0)" in sql
     assert "host = 'https://sru.koha.nexus'" not in sql.split("-- 2.")[1]
@@ -383,4 +383,4 @@ def test_panel_list_is_generated_from_targets_json():
     biblio = [t for t in data["targets"] if t.get("recordtype") != "authority"]
     assert biblio[0]["db"] == "sru/_union" and [t["db"] for t in biblio if t["preselect"]] == ["sru/_union"]
     assert {(t["host"], t["port"]) for t in biblio} == {("127.0.0.1", 5000)}
-    assert [t["db"] for t in data["targets"] if t.get("recordtype") == "authority"] == ["NAF", "SAF", "sru/bn-aut"]
+    assert [t["db"] for t in data["targets"] if t.get("recordtype") == "authority"] == ["sru/_union-aut", "NAF", "SAF", "sru/bn-aut"]
