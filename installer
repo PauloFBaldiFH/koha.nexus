@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.73"
+PANEL_VERSION=" 1.5.74"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28632,7 +28632,8 @@ enrich_retire_bridges() {
 
 # Koha's rows for the gateway (python -m nexus_gateway koha-sql): sru/_union
 # ticked, one unticked row per catalogue, the VPS gateway's and the retired
-# bridges' rows moved or removed. Only once Koha's database exists.
+# bridges' rows moved or removed, and the authority row sru/_union-aut for
+# the authority search in cataloguing. Only once Koha's database exists.
 enrich_register() {
     is_koha_installed 2>/dev/null || return 0
     mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0

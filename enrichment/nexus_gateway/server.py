@@ -1,12 +1,14 @@
 """The HTTP side: SRU 1.1 / 1.2 on /sru/{database}, and /health.
 
     GET|POST /sru/_union    every source (the one Koha row ticked by default)
+    GET|POST /sru/_union-aut  authority headings, for Koha's authority search
     GET|POST /sru/<id>      one catalogue of targets.json, or one static.db source
     GET|POST /sru           the same as /sru/_union
     GET      /health        {"status": "ok", "static": {...}, ...}
 
 Koha's rows (Administration > Z39.50/SRU servers): SRU, host 127.0.0.1,
-port 5000, database sru/<id>, syntax MARC21, encoding utf8.
+port 5000, database sru/<id>, syntax MARC21, encoding utf8; sru/_union-aut
+is a row of record type authority.
 
 Standard library only (ThreadingHTTPServer): the service stays small on a
 WSL machine, and it only ever listens on 127.0.0.1.
@@ -24,11 +26,13 @@ from nexus_enrich import marc
 from . import __version__, cql, sru
 from .config import Settings
 from .engine import Engine, UnknownDatabase
+from .targets import AUTH_UNION
 
 log = logging.getLogger("nexus_gateway")
 XML = "text/xml; charset=utf-8"
 MAX_FORM = 64_000
 TITLE = "koha.nexus (static.db + catálogos Z39.50/SRU)"
+AUTH_TITLE = "koha.nexus (autoridades: BN, catálogos brasileiros, LoC)"
 
 
 def answer(engine: Engine, settings: Settings, database: str, p: dict[str, str]) -> bytes:
@@ -47,7 +51,8 @@ def answer(engine: Engine, settings: Settings, database: str, p: dict[str, str])
         return fail(sru.UNKNOWN_DATABASE, database, f"no catalogue named {database!r}")
     if operation == "explain":
         return sru.explain_response(settings.host, settings.port, f"sru/{database or '_union'}",
-                                    settings.max_records, TITLE, version)
+                                    settings.max_records,
+                                    AUTH_TITLE if database.strip("/").lower() == AUTH_UNION else TITLE, version)
     if operation != "searchRetrieve":
         return fail(sru.UNSUPPORTED_OPERATION, operation, f"unsupported operation {operation}")
     query = p.get("query", "")

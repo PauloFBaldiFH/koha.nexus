@@ -2652,7 +2652,8 @@
    ],
    "tips": [
     "Run **Find duplicate authors** first if your own authorities have duplicates: every heading that fits two Koha authorities goes to review.",
-    "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module."
+    "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module.",
+    "While cataloguing by hand, the same headings are searchable from Koha: in a name or subject field's authority search, **Z39.50/SRU** lists the row **KOHA.NEXUS (AUTORIDADES)** (BN first, then the Brazilian catalogues, then the Library of Congress; subjects never from LCSH). Importing one creates the authority in Koha."
    ],
    "warnings": [
     "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."

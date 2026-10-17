@@ -17,9 +17,13 @@ gateway's), so the librarian's other servers are never changed:
   4. each target's name and settings are refreshed (rank kept), and a
      missing one is added;
   5. sru/_union is the only ticked row of the gateway: it searches every
-     catalogue at once, and Koha waits for the slowest ticked row.
+     catalogue at once, and Koha waits for the slowest ticked row;
+  6. the authority row sru/_union-aut (record type authority) for Koha's
+     authority search in cataloguing: added ticked, then refreshed, its
+     tick and rank left to the librarian.
 
-Authority rows (recordtype authority) are left alone.
+Other authority rows (the Library of Congress, the Biblioteca Nacional)
+are left alone.
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .targets import GROUPS, UNION, Target
+from .targets import AUTH_UNION, GROUPS, UNION, Target
 
 # The panel's curated list (written by panel_list()); in a checkout only.
 PANEL_LIST = Path(__file__).resolve().parents[2] / "panel" / "kei_panel" / "data" / "z3950_targets.json"
@@ -43,6 +47,13 @@ SRU_OPTIONS = "sru=get,sru_version=1.1"
 SRU_FIELDS = ("title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,"
               "srchany=cql.serverChoice")
 UNION_NAME = "KOHA.NEXUS (TODOS OS CATÁLOGOS)"
+# Koha's authority search form (cataloguing) through the row's SRU search
+# fields; authorities.py reads these indexes.
+AUTH_SRU_FIELDS = ("nameany=bath.name,authorany=bath.name,authorpersonal=bath.personalName,"
+                   "authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,subject=dc.subject,"
+                   "subjectsubdiv=dc.subject,title=bath.uniformTitle,uniformtitle=bath.uniformTitle,"
+                   "srchany=cql.serverChoice")
+AUTH_NAME = "KOHA.NEXUS (AUTORIDADES)"
 # Ids of the 2026-10-11 list that the 2026-10-15 list renamed.
 RENAMED = {
     "uw_madison": "wisconsin", "psu": "pennstate", "utoronto": "toronto", "bcl": "castilla-leon",
@@ -58,15 +69,16 @@ def q(value) -> str:
     return "'" + str(value).replace("\\", "\\\\").replace("'", "''") + "'"
 
 
-def _upsert(mine: str, host: str, port: int, db: str, name: str, checked: int, rank: int) -> list[str]:
+def _upsert(mine: str, host: str, port: int, db: str, name: str, checked: int, rank: int,
+            recordtype: str = "biblio", fields: str = SRU_FIELDS) -> list[str]:
     return [
         f"UPDATE z3950servers SET servername = {q(name)}, syntax = {q(SYNTAX)}, encoding = {q(ENCODING)}, "
-        f"timeout = {TIMEOUT}, sru_options = {q(SRU_OPTIONS)}, sru_fields = {q(SRU_FIELDS)} "
+        f"timeout = {TIMEOUT}, sru_options = {q(SRU_OPTIONS)}, sru_fields = {q(fields)} "
         f"WHERE {mine} AND db = {q(db)};",
         "INSERT INTO z3950servers (host, port, db, servername, checked, `rank`, syntax, encoding, timeout, "
         "servertype, recordtype, sru_options, sru_fields, add_xslt) "
         f"SELECT {q(host)}, {port}, {q(db)}, {q(name)}, {checked}, {rank}, {q(SYNTAX)}, {q(ENCODING)}, {TIMEOUT}, "
-        f"'sru', 'biblio', {q(SRU_OPTIONS)}, {q(SRU_FIELDS)}, '' "
+        f"'sru', {q(recordtype)}, {q(SRU_OPTIONS)}, {q(fields)}, '' "
         f"FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM z3950servers WHERE {mine} AND db = {q(db)});",
     ]
 
@@ -123,18 +135,28 @@ def render(table: dict[str, Target], host: str = "127.0.0.1", port: int = 5000) 
         out += _upsert(mine, host, port, "sru/" + t.id, t.name, 0, rank)
     out += ["", "-- 5. sru/_union is the gateway's only ticked row.",
             f"UPDATE z3950servers SET checked = IF(db = {q('sru/' + UNION)}, 1, 0) WHERE {mine} AND db LIKE 'sru/%';",
-            "", "COMMIT;", ""]
+            "", "-- 6. Authority headings, for Koha's authority search in cataloguing (one row)."]
+    auth = f"recordtype = 'authority' AND servertype = 'sru' AND host = {q(host)} AND port = {port}"
+    out += ["DELETE a FROM z3950servers a JOIN z3950servers b",
+            "    ON a.db = b.db AND a.host = b.host AND a.port = b.port AND a.recordtype = b.recordtype",
+            "   AND a.servertype = b.servertype AND a.id > b.id",
+            f" WHERE a.recordtype = 'authority' AND a.servertype = 'sru' AND a.host = {q(host)} AND a.port = {port}"
+            f" AND a.db = {q('sru/' + AUTH_UNION)};"]
+    out += _upsert(auth, host, port, "sru/" + AUTH_UNION, AUTH_NAME, 1, 0, "authority", AUTH_SRU_FIELDS)
+    out += ["", "COMMIT;", ""]
     return "\n".join(out)
 
 
 def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, host: str = "127.0.0.1",
                port: int = 5000, updated: str = "") -> str:
     """The koha.nexus panel's curated list: sru/_union (the one preselected)
-    and one row per target, on this gateway; the authority files of the
-    current list (KEEP_FROM, default the checkout's) are kept as they are."""
+    and one row per target, on this gateway; then sru/_union-aut, the
+    gateway's authority headings, and the other authority files of the
+    current list (KEEP_FROM, default the checkout's), kept as they are."""
     keep_path = Path(keep_from) if keep_from else PANEL_LIST
     old = json.loads(keep_path.read_text(encoding="utf-8")) if keep_path.exists() else {}
-    authorities = [t for t in old.get("targets", []) if t.get("recordtype") == "authority"]
+    authorities = [t for t in old.get("targets", []) if t.get("recordtype") == "authority"
+                   and t.get("db") != "sru/" + AUTH_UNION]
 
     def row(db: str, name: str, region: str, preselect: bool, verified: bool, notes: str) -> dict:
         return {"name": name, "host": host, "port": port, "db": db, "kind": "sru", "syntax": SYNTAX,
@@ -148,11 +170,20 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
         how = ("static.db, then live " + t.kind.upper()) if t.live else "static.db only"
         items.append(row("sru/" + t.id, t.name, t.group, False, t.status == "verified",
                          f"Status: {t.status}; answers from {how}." + (f" {t.note}" if t.note else "")))
+    own_auth = {"name": AUTH_NAME, "host": host, "port": port, "db": "sru/" + AUTH_UNION, "kind": "sru",
+                "syntax": SYNTAX, "encoding": ENCODING, "schema": "marcxml", "sru_fields": AUTH_SRU_FIELDS,
+                "sru_options": SRU_OPTIONS, "recordtype": "authority", "timeout": TIMEOUT,
+                "region": "authorities", "country": "BR", "verified": True,
+                "source": "koha.nexus local gateway (enrichment/nexus_gateway/authorities.py)",
+                "notes": ("Authority headings of static.db (Biblioteca Nacional first, then the Brazilian catalogues, "
+                          "then the Library of Congress; subjects never from LCSH), as MARC21 authority records, "
+                          "for Koha's authority search in cataloguing.")}
     data = {"schema": 1, "updated": updated or old.get("updated", ""),
             "about": ("koha.nexus local gateway targets, generated by python -m nexus_gateway panel-list from "
                       "enrichment/nexus_gateway/targets.json: every one is 127.0.0.1:5000/sru/<id>, answered from "
                       "static.db and, for Z39.50/SRU catalogues, live. sru/_union searches them all and is the "
                       "only one preselected. The last ones are authority files (recordtype authority) for Koha's "
-                      "authority search, kept from the previous list."),
-            "targets": items + authorities}
+                      "authority search: sru/_union-aut on this gateway, then the others kept from the previous "
+                      "list."),
+            "targets": items + [own_auth] + authorities}
     return json.dumps(data, ensure_ascii=False, indent=1) + "\n"

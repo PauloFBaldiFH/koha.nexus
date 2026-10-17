@@ -18,7 +18,7 @@ ISSN numbers), title, author, or keywords (anything else, and bare terms).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field as _field
 from typing import Union
 
 ISBN_INDEXES = {"isbn", "issn", "identifier", "number", "standardidentifier", "stdid", "isn"}
@@ -42,6 +42,7 @@ class Clause:
     field: str          # isbn | title | author | keywords | all
     relation: str       # = == any all adj exact <> ...
     term: str
+    index: str = _field(default="", compare=False)   # as sent (bath.personalName), for authority searches
 
 
 @dataclass(frozen=True)
@@ -139,7 +140,7 @@ class _Parser:
             term_kind, term = self.take()
             if term_kind not in ("word", "quoted"):
                 raise CQLError(f"a search term was expected after {index}{relation}")
-            return Clause(field_of(index), relation, term.strip())
+            return Clause(field_of(index), relation, term.strip(), index)
         self.take()
         return Clause("keywords", "=", value.strip())
 

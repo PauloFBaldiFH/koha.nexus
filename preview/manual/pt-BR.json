@@ -2257,7 +2257,8 @@
    ],
    "tips": [
     "Rode antes **Encontrar autores duplicados** se as suas autoridades têm duplicatas: todo cabeçalho que serve a duas autoridades do Koha vai para revisão.",
-    "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha."
+    "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha.",
+    "Na catalogação manual os mesmos cabeçalhos podem ser buscados pelo Koha: na busca de autoridades de um campo de nome ou assunto, **Z39.50/SRU** mostra a linha **KOHA.NEXUS (AUTORIDADES)** (BN primeiro, depois os catálogos brasileiros, depois a Library of Congress; assuntos nunca da LCSH). Importar um cria a autoridade no Koha."
    ],
    "warnings": [
     "Aplicar altera o catálogo e acrescenta registros de autoridade. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."

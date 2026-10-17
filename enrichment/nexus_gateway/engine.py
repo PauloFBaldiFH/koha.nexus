@@ -1,6 +1,9 @@
 """One SRU search: static.db first, then live targets through learned.db.
 
     database "_union"   every source in static.db; live: every native target
+    database "_union-aut"
+                        the authority headings of static.db (authorities.py),
+                        MARC21 authority records; never live
     database "<id>"     a target of targets.json: its static.db sources
                         (the target's "static" ids); live: that target, if
                         it is native
@@ -19,6 +22,7 @@ Koha's own items and authority ids, wrong in any other catalogue.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -30,8 +34,9 @@ from nexus_enrich import marc, normalize
 from nexus_enrich.static import StaticDB
 
 from . import cql
+from .authorities import AuthoritySearch
 from .learned import Learned
-from .targets import UNION, Target
+from .targets import AUTH_UNION, UNION, Target
 
 LEAF_CAP = 5000          # versions one clause may match before the rest are ignored
 CHUNK = 900              # SQLite's bound-parameter budget, with room to spare
@@ -180,6 +185,24 @@ class Static:
                     continue
         return len(rows), records
 
+    def authorities(self, node: cql.Node, start: int, maximum: int) -> tuple[int, list[marc.Record]]:
+        db = self.db()
+        if db is None:
+            return 0, []
+        return AuthoritySearch(db.conn, self.release(db)).search(node, start, maximum)
+
+    def release(self, db: StaticDB) -> str:
+        """The release static.db came from (static.release, written by the
+        update next to it), else the day it was built."""
+        try:
+            name = json.loads((self.path.parent / "static.release").read_text(encoding="utf-8")).get("name", "")
+        except (OSError, ValueError, AttributeError):
+            name = ""
+        if name:
+            return name
+        built = db.meta("built")
+        return (built.decode() if isinstance(built, bytes) else (built or ""))[:10]
+
     def has_source(self, sid: str) -> bool:
         db = self.db()
         return db is not None and sid in db.sources
@@ -236,6 +259,8 @@ class Engine:
         database = database.strip("/").lower()
         if database in ("", UNION):
             return None, [t for t in self.targets.values() if t.live]
+        if database == AUTH_UNION:
+            return None, []
         t = self.targets.get(database)
         if t is not None:
             return set(t.static), [t] if t.live else []
@@ -245,6 +270,9 @@ class Engine:
 
     def search(self, database: str, node: cql.Node, start: int, maximum: int) -> Result:
         sources, live = self.resolve(database)
+        if database.strip("/").lower() == AUTH_UNION:
+            total, records = self.static.authorities(node, start, maximum)
+            return Result(total, [clean(r) for r in records], "static" if total else "none")
         total, records = self.static.search(node, sources, start, maximum)
         if total:
             return Result(total, [clean(r) for r in records], "static")
