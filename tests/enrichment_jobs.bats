@@ -183,7 +183,7 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     [[ "$show" == *'"state": "reverted"'* ]]
 }
 
-@test "enrichment job: a bad scope, an empty scope and a missing database change nothing" {
+@test "enrichment job: a bad scope and an empty scope change nothing; a missing database is created empty" {
     p enrich_job_add "abc"
     [ "$status" -ne 0 ]
     grep -q "^job=invalid-scope$" "$W/results"
@@ -192,13 +192,14 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     grep -q "^job=empty$" "$W/results"
     rm "$W/state/static.db"
     p enrich_job_add "all"
-    [ "$status" -ne 0 ]
-    grep -q "^job=no-static-db$" "$W/results"
+    [ "$status" -eq 0 ]
+    grep -q "^static-db=empty$" "$W/results"
+    [ -s "$W/state/static.db" ]
     grep -q "systemctl start --no-block koha-nexus-enrich-update.service" "$W/calls"
     ! grep -q "stage_file\|commit_file" "$W/calls" 2>/dev/null
 }
 
-@test "enrichment: a fresh install gets an empty static.db; a job waits for the download" {
+@test "enrichment: a fresh install gets an empty static.db; gateway_py from any folder; a job runs while it downloads" {
     rm "$W/state/static.db"
     p enrich_empty_db
     [ "$status" -eq 0 ]
@@ -210,12 +211,29 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     p enrich_empty_db
     p enrich_records
     [ "${lines[0]}" = 1 ]
+    # The venv finds the packages from any working directory (no
+    # PYTHONPATH here, as on a real install).
+    mkdir -p "$W/plain/.venv/bin"
+    cp -r "$KEI_REPO/enrichment/nexus_enrich" "$KEI_REPO/enrichment/nexus_gateway" "$W/plain/"
+    printf '#!/bin/sh\nexec python3 "$@"\n' > "$W/plain/.venv/bin/python"
+    chmod +x "$W/plain/.venv/bin/python"
+    printf 'ENRICH_DIR="%s/plain"\n' "$W" > "$W/extra-plain.sh"
+    cat "$W/extra.sh" "$W/extra-plain.sh" > "$W/extra-cwd.sh"
+    run env -C / KEI_EXTRA="$W/extra-cwd.sh" bash "$PANEL" enrich_records
+    [ "${lines[0]}" = 1 ]
+    # Only the empty one: the download starts and the job still runs.
     rm "$W/state/static.db"
     p enrich_empty_db
-    p enrich_job_add "all"
-    [ "$status" -ne 0 ]
-    grep -q "^job=no-static-db$" "$W/results"
+    p enrich_job_add "1-2"
+    [ "$status" -eq 0 ]
+    grep -q "^static-db=empty$" "$W/results"
+    grep -q "^job=1$" "$W/results"
+    grep -q "systemctl start --no-block koha-nexus-enrich-update.service" "$W/calls"
     grep -q "has not been downloaded yet" "$KEI_S/dialogs.log"
+    worker
+    show=$("$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show 1)
+    echo "$show"
+    [[ "$show" == *'"state": "ready"'* ]]
 }
 
 @test "enrichment job: a failed commit stops Apply and leaves the rest for a second Apply" {

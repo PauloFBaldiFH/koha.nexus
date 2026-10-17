@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.79"
+PANEL_VERSION=" 1.5.80"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28663,8 +28663,9 @@ gateway_listening() {
 
 # The gateway's python, with the NEXUS_GATEWAY_* settings the units use.
 gateway_py() {
-    NEXUS_GATEWAY_STATIC_DB="$ENRICH_STATE/static.db" NEXUS_GATEWAY_LEARNED_DB="$ENRICH_STATE/learned.db" \
-        "$ENRICH_DIR/.venv/bin/python" -m nexus_gateway "$@"
+    ( cd "$ENRICH_DIR" 2>/dev/null || cd /
+      NEXUS_GATEWAY_STATIC_DB="$ENRICH_STATE/static.db" NEXUS_GATEWAY_LEARNED_DB="$ENRICH_STATE/learned.db" \
+          "$ENRICH_DIR/.venv/bin/python" -m nexus_gateway "$@" )
 }
 
 # Stops and removes the Zeus and Pergamum bridges (their port 5000 is the
@@ -28745,6 +28746,10 @@ enrich_install() {
         fi
         cp -f "$ENRICH_DIR/requirements.txt" "$ENRICH_DIR/.venv/.requirements"
     fi
+    # The packages are plain folders in ENRICH_DIR: a .pth makes the venv
+    # find them from any working directory, not only from ENRICH_DIR.
+    "$ENRICH_DIR/.venv/bin/python" -c 'import sys, sysconfig; open(sysconfig.get_paths()["purelib"] + "/koha-nexus.pth", "w").write(sys.argv[1] + "\n")' \
+        "$ENRICH_DIR" >>"$log" 2>&1
     id -u "$ENRICH_USER" >/dev/null 2>&1 \
         || useradd --system --home-dir "$ENRICH_STATE" --no-create-home --shell /usr/sbin/nologin "$ENRICH_USER" >>"$log" 2>&1
     enrich_retire_bridges
@@ -29022,14 +29027,16 @@ enrich_job_add() {
     [ "$kind" = auth ] && title=$(t "Enrich & standardize authorities")
     require_database || return 1
     enrich_ready || return 1
+    local log out id dir args=() n why nodb=""
+    enrich_empty_db >/dev/null 2>&1
     if [ "$(enrich_records)" = 0 ]; then
-        # Not downloaded yet (or only the empty one): the download starts now.
-        kei_result job no-static-db
+        # Not downloaded yet (only the empty one from the install): its
+        # download starts now, and the job still runs, with what Koha and
+        # the empty database have (a fresh install can try the workflow).
+        nodb=$(t '\n\nThe enrichment database has not been downloaded yet, so this report finds little or nothing. Its download has started in the background: run the job again once it is done.')
+        kei_result static-db empty
         systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >/dev/null 2>&1
-        msg_info "$title" "$(t "The enrichment database has not been downloaded yet. Its download has started in the background: start the job again once it is done.")" 10 76
-        return 1
     fi
-    local log out id dir args=() n why
     log=$(tools_log enrichment-job)
     if ! out=$(jobs_py add --scope "${1:-all}" --kind "$kind" --mode "$mode" 2>>"$log"); then
         kei_result job invalid-scope
@@ -29083,9 +29090,9 @@ $why}" 12 76
     kei_result job "$id"
     kei_result records "$n"
     if [ "$kind" = auth ]; then
-        msg_info "$title" "$(t 'Job ${id}: the headings of ${n} record(s) are being compared with your authorities and the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+        msg_info "$title" "$(t 'Job ${id}: the headings of ${n} record(s) are being compared with your authorities and the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')${nodb}" 15 76
     else
-        msg_info "$title" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 12 76
+        msg_info "$title" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')${nodb}" 15 76
     fi
 }
 
