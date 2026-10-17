@@ -3,14 +3,14 @@
 ## Zeus SRU bridge
 
 A small FastAPI service that lets Koha copy-catalogue from **Catálogo Zeus**
-(BU/UFSC, `https://catalogo.bu.ufsc.br/zbib/`) as if it were an ordinary
+(BU/UFSC, `https://catalogo.bu.ufsc.br/zeus/`) as if it were an ordinary
 SRU 1.1 server. Most Brazilian university catalogues block Z39.50 (port 210)
 at the border, but Zeus searches them over HTTP and puts each full ISO 2709
 record in the result page as a `rawRecord` field. This service reads those
 records and hands them to Koha as MARCXML.
 
 ```
-Koha ──SRU 1.1 GET──▶ 127.0.0.1:5000/sru ──HTTPS, 15 targets a request──▶ Zeus
+Koha ──SRU 1.1 GET──▶ 127.0.0.1:5000/sru ──HTTPS, targets[0]──▶ Zeus
      ◀─searchRetrieveResponse (MARCXML)──              ◀─HTML with rawRecord─
 ```
 
@@ -27,9 +27,12 @@ Koha ──SRU 1.1 GET──▶ 127.0.0.1:5000/sru ──HTTPS, 15 targets a req
    anything else with `searchType=4` (title). A bare term that looks like an
    ISBN is searched as one. Zeus takes a single search string, so when Koha
    sends several clauses the ISBN wins, then the title.
-3. The 16 targets (0, 1, 3, 5–14, 16–18) are split into groups of at most 15
-   and all groups are fetched at once with `httpx`. One group failing still
-   returns the others' records; all failing returns SRU diagnostic 1.
+3. Only Zeus target 0 is asked by default: tested on a live server, it
+   answers in under a second while the other federated targets often hang
+   until the request times out. `ZEUS_SRU_TARGETS` adds others; they are
+   split into groups of at most 15 (Zeus's limit) fetched at once with
+   `httpx`. One group failing still returns the others' records; all failing
+   returns SRU diagnostic 1.
 4. Every `rawRecord` in the pages is URL-decoded to ISO 2709 bytes and read
    with `pymarc` (MARC-8 records are converted to UTF-8). A record whose
    directory offsets don't match its bytes is rebuilt from its fields rather
@@ -74,7 +77,7 @@ Keep it on 127.0.0.1: it is meant for the Koha server only.
 | Database | `sru` |
 | Record syntax | MARC21/USMARC |
 | Encoding | utf8 |
-| Timeout | 60 (Zeus can be slow) |
+| Timeout | 15 |
 | SRU search fields | `title=dc.title,isbn=dc.isbn,srchany=cql.serverChoice` |
 
 ## Settings
@@ -84,10 +87,10 @@ All optional, read from the environment:
 | Variable | Default | |
 |---|---|---|
 | `ZEUS_SRU_HOST` / `ZEUS_SRU_PORT` | `127.0.0.1` / `5000` | where to listen |
-| `ZEUS_SRU_BASE_URL` | `https://catalogo.bu.ufsc.br/zbib/` | |
-| `ZEUS_SRU_TARGETS` | `0,1,3,5,6,7,8,9,10,11,12,13,14,16,17,18` | Zeus target ids |
+| `ZEUS_SRU_BASE_URL` | `https://catalogo.bu.ufsc.br/zeus/` | |
+| `ZEUS_SRU_TARGETS` | `0` | Zeus target ids, comma-separated |
 | `ZEUS_SRU_CHUNK_SIZE` | `15` | capped at 15, Zeus's limit |
-| `ZEUS_SRU_TIMEOUT` | `30` | seconds per Zeus request |
+| `ZEUS_SRU_TIMEOUT` | `15` | seconds per Zeus request |
 | `ZEUS_SRU_CACHE_TTL` / `ZEUS_SRU_CACHE_SIZE` | `600` / `256` | `0` turns the cache off |
 | `ZEUS_SRU_MAX_RECORDS` | `50` | ceiling on `maximumRecords` |
 | `ZEUS_SRU_WORKERS` | `1` | uvicorn workers (each has its own cache) |
@@ -155,7 +158,7 @@ By hand: `.venv/bin/python -m pergamum_sru`, or
 |---|---|---|
 | `PERGAMUM_SRU_HOST` / `PERGAMUM_SRU_PORT` | `127.0.0.1` / `5006` | where to listen |
 | `PERGAMUM_SRU_BASE_URL` | the CRP `pesquisa.php` above | |
-| `PERGAMUM_SRU_TIMEOUT` | `12` | seconds per Pergamum request |
+| `PERGAMUM_SRU_TIMEOUT` | `30` | seconds per Pergamum request (the search spans every campus) |
 | `PERGAMUM_SRU_PAGE_SIZE` | `50` | ids asked of Pergamum per search |
 | `PERGAMUM_SRU_CONCURRENCY` | `5` | records fetched at once |
 | `PERGAMUM_SRU_CACHE_TTL` / `PERGAMUM_SRU_CACHE_SIZE` | `600` / `512` | `0` turns the cache off |
@@ -178,7 +181,7 @@ is meant for the central server (the project's Oracle VPS), so Koha servers
 need nothing installed: each catalogue is an ordinary SRU row in Koha.
 
 ```
-Koha ──SRU 1.1──▶ <vps>:5000/sru/{id} ──▶ Zeus | Pergamum | Z39.50 | SRU
+Koha ──SRU 1.1──▶ https://sru.koha.nexus:443/sru/{id} ──▶ Zeus | Pergamum | Z39.50 | SRU
 ```
 
 Each entry of `targets.json` has an `id`, a `name` and a `kind`:
@@ -191,13 +194,118 @@ Each entry of `targets.json` has an `id`, a `name` and a `kind`:
 | `sru` | another SRU server | `url`; optional `version`, `schema`, `indexes` |
 | `missing` | nothing yet | a search answers SRU diagnostic 1, "no catalogue address configured yet" |
 
-The 48 entries are the list of 2026-10-11. Only five have an address the
-repository already recorded: `ufsc` (Zeus target 0, tested live), `pergamum`,
-and `bl`, `sbn_it`, `swb_de` (Z39.50 addresses from the panel's curated list,
-not verified there; SWB is part of K10plus today). The other 43 are `missing`:
-fill each with its catalogue's published Z39.50 or SRU address and restart the
-service. UNIMARC servers are refused when the file is loaded, because Koha's
-rows say MARC21 and the gateway does not convert.
+Each entry has a `group`, the heading it is listed under (Koha's rows and
+the koha.nexus panel follow the same order): 1 `national` (Bibliotecas
+Nacionais e Órgãos Oficiais), 2 `br_universities` (Universidades Brasileiras),
+3 `intl_universities` (Universidades Internacionais), 4 `specialized`
+(Especializados e Catálogos Coletivos).
+
+Each entry also has a `status`: `verified` (searched live, MARC came back),
+`untested` (an address nobody has searched through the gateway yet), `broken`
+(its address does not answer) or `missing` (no address yet; kind `missing`).
+This list replaces the old `STATUS_ALVOS.md`. Fill a `missing` entry with its
+catalogue's published Z39.50 or SRU address and restart the service; never
+guess one. UNIMARC servers are refused when the file is loaded, because
+Koha's rows say MARC21 and the gateway does not convert. Discarded and not
+listed: DNB (its SRU gives only RDF/XML, not MARC21) and Cambridge
+(`44CAM_INST` is not a valid Alma institution).
+
+<!-- targets:begin (generated by python -m sru_gateway.status_table --write) -->
+19 verified, 6 untested, 2 broken, 45 missing (72 in all).
+
+| id | Catalogue | Group | Status | Kind | Address | Note |
+|---|---|---|---|---|---|---|
+| `bn` | Fundação Biblioteca Nacional (BN) | 1 | verified | zeus | Zeus `targets[0]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `senado` | Rede Virtual de Bibliotecas (RVBI), Senado Federal | 1 | verified | zeus | Zeus `targets[2]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `loc` | Library of Congress, EUA | 1 | verified | z3950 | `lx2.loc.gov:210/LCDB` |  |
+| `usp` | Universidade de São Paulo (USP) | 2 | verified | zeus | Zeus `targets[4]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `unicamp` | Universidade Estadual de Campinas (UNICAMP) | 2 | verified | zeus | Zeus `targets[6]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `uerj` | Universidade do Estado do Rio de Janeiro (UERJ) | 2 | verified | zeus | Zeus `targets[5]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufg` | Universidade Federal de Goiás (UFG) | 2 | verified | zeus | Zeus `targets[8]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufmg` | Universidade Federal de Minas Gerais (UFMG) | 2 | verified | zeus | Zeus `targets[9]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufpe` | Universidade Federal de Pernambuco (UFPE) | 2 | verified | zeus | Zeus `targets[10]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufsc` | Universidade Federal de Santa Catarina (UFSC) | 2 | verified | zeus | Zeus `targets[11]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufscar` | Universidade Federal de São Carlos (UFSCar) | 2 | verified | zeus | Zeus `targets[12]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufu` | Universidade Federal de Uberlândia (UFU) | 2 | verified | zeus | Zeus `targets[14]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `ufrgs` | Universidade Federal do Rio Grande do Sul (UFRGS) | 2 | verified | zeus | Zeus `targets[16]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `uff` | Universidade Federal Fluminense (UFF) | 2 | verified | zeus | Zeus `targets[17]` | target_index to confirm with sru_gateway.zeus_labels. |
+| `yale` | Yale University, EUA | 3 | verified | sru | `https://yale.alma.exlibrisgroup.com/view/sru/01YALE_INST` | Alma SRU, native MARCXML. |
+| `mit` | Massachusetts Institute of Technology (MIT), EUA | 3 | verified | sru | `https://mit.alma.exlibrisgroup.com/view/sru/01MIT_INST` | Alma SRU, native MARCXML. |
+| `upenn` | University of Pennsylvania (UPenn), EUA | 3 | verified | sru | `https://upenn.alma.exlibrisgroup.com/view/sru/01UPENN_INST` | Alma SRU, native MARCXML. |
+| `oxford` | University of Oxford, Reino Unido | 3 | verified | sru | `https://oxford.alma.exlibrisgroup.com/view/sru/44OXF_INST` | Alma SRU, native MARCXML. |
+| `all` | Rede Pergamum | 4 | verified | pergamum | Rede Pergamum (CRP) | Dedicated Python backend (pergamum_sru). |
+| `suecia` | LIBRIS, Suécia | 1 | untested | z3950 | `z3950.libris.kb.se:210/libr` | Z39.50 address from the panel's curated list; not searched through the gateway yet. |
+| `unifesp` | Universidade Federal de São Paulo (UNIFESP) | 2 | untested | z3950 | `z3950.unifesp.br:210/Default` | Z39.50 address from the panel's curated list; not searched through the gateway yet. |
+| `utfpr` | Universidade Tecnológica Federal do Paraná (UTFPR) | 2 | untested | z3950 | `z3950.utfpr.edu.br:210/Default` | Z39.50 address from the panel's curated list; not searched through the gateway yet. |
+| `harvard` | Harvard University, EUA | 3 | untested | sru | `https://harvard-primo.hosted.exlibrisgroup.com/view/sru/01HVD_INST` | Listed as pending parameters in the 2026-10-11 status list; this Primo address has not been searched through the gateway. |
+| `italia` | Servizio Bibliotecario Nazionale, Itália | 4 | untested | z3950 | `opac.sbn.it:3950/nopac` | Port open from the VPS; no search tried yet. |
+| `swb-alemanha` | SWB-Online-Katalog, Alemanha | 4 | untested | z3950 | `z3950.k10plus.de:210/opac-de-627` | Port open from the VPS; no search tried yet. SWB is part of K10plus today. |
+| `bl` | British Library, UK | 1 | broken | z3950 | `z3950cat.bl.uk:9909/BLAC` | Port 9909 refused; needs a current SRU or Z39.50 address. |
+| `nlm` | National Library of Medicine, EUA | 4 | broken | z3950 | `locatorplus.nlm.nih.gov:7090/voyager` | LocatorPlus (Voyager) was retired when NLM moved to Alma; needs the Alma SRU address. |
+| `fundacentro` | Fundacentro, Biblioteca | 1 | missing | missing |  |  |
+| `senado-folio` | Senado Federal (FOLIO) | 1 | missing | missing |  |  |
+| `bn-portugal` | Biblioteca Nacional de Portugal (BNP) | 1 | missing | missing |  |  |
+| `porbase` | PORBASE, Portugal | 1 | missing | missing |  |  |
+| `bne` | Biblioteca Nacional de España, Espanha | 1 | missing | missing |  |  |
+| `argentina` | Biblioteca Nacional da Argentina | 1 | missing | missing |  |  |
+| `colombia` | Red Distrital de Bibliotecas Públicas (BibloRed), Colômbia | 1 | missing | missing |  |  |
+| `polonia` | National Library of Poland, Polônia | 1 | missing | missing |  |  |
+| `suica` | Swiss Library Service Platform, Suíça | 1 | missing | missing |  |  |
+| `tchequia` | National Library of the Czech Republic, Tchéquia | 1 | missing | missing |  |  |
+| `grecia` | Grécia | 1 | missing | missing |  |  |
+| `russia-state` | Russian State Library, Rússia | 1 | missing | missing |  |  |
+| `bashkir-russia` | Bashkir State University, Rússia | 1 | missing | missing |  |  |
+| `africa-do-sul` | Monash South Africa, África do Sul | 1 | missing | missing |  |  |
+| `taiwan` | Taiwan | 1 | missing | missing |  |  |
+| `nysl` | New York State Library (NYSL), EUA | 1 | missing | missing |  |  |
+| `unesp` | Universidade Estadual Paulista (UNESP) | 2 | missing | missing |  |  |
+| `ufpr` | Universidade Federal do Paraná (UFPR) | 2 | missing | missing |  |  |
+| `wisconsin` | University of Wisconsin-Madison, EUA | 3 | missing | missing |  |  |
+| `pennstate` | Penn State University, EUA | 3 | missing | missing |  |  |
+| `tufts` | Tufts University Libraries, EUA | 3 | missing | missing |  |  |
+| `fsu` | Florida State University, EUA | 3 | missing | missing |  |  |
+| `suno` | Southern University at New Orleans (SUNO), EUA | 3 | missing | missing |  |  |
+| `ubc` | University of British Columbia, Canadá | 3 | missing | missing |  |  |
+| `toronto` | University of Toronto, Canadá | 3 | missing | missing |  |  |
+| `sfu` | Simon Fraser University, Canadá | 3 | missing | missing |  |  |
+| `trent` | Trent University Library & Archives, Canadá | 3 | missing | missing |  |  |
+| `memorial` | Memorial University of Newfoundland, Canadá | 3 | missing | missing |  |  |
+| `coimbra` | Universidade de Coimbra, Portugal | 3 | missing | missing |  |  |
+| `porto` | Universidade do Porto, Portugal | 3 | missing | missing |  |  |
+| `barcelona` | Aladí: Barcelona Municipal Libraries Network, Espanha | 3 | missing | missing |  |  |
+| `gent-belgica` | Ghent University (UGent), Bélgica | 3 | missing | missing |  |  |
+| `tuhh-alemanha` | Hamburg University of Technology (TUHH), Alemanha | 3 | missing | missing |  |  |
+| `macau` | Macau | 3 | missing | missing |  |  |
+| `buap-mexico` | Benemérita Universidad Autónoma de Puebla (BUAP), México | 3 | missing | missing |  |  |
+| `pucp-peru` | Pontificia Universidad Católica del Perú, Peru | 3 | missing | missing |  |  |
+| `upc-peru` | Universidad Peruana de Ciencias Aplicadas, Peru | 3 | missing | missing |  |  |
+| `art-chicago` | Art Institute of Chicago, EUA | 4 | missing | missing |  |  |
+| `nga` | National Gallery of Art (NGA), EUA | 4 | missing | missing |  |  |
+| `castilla-leon` | Biblioteca de Castilla y León, Espanha | 4 | missing | missing |  |  |
+| `bizkaia` | Biblioteca Foral de Bizkaia, Espanha | 4 | missing | missing |  |  |
+| `abes-franca` | Agence Bibliographique de l'Enseignement Supérieur, França | 4 | missing | missing |  |  |
+| `kobv-alemanha` | KOBV Berlin-Brandenburg, Alemanha | 4 | missing | missing |  |  |
+| `christchurch` | Christchurch City Libraries, Nova Zelândia | 4 | missing | missing |  |  |
+| `hong-kong` | Joint University Librarians Advisory Committee, Hong Kong | 4 | missing | missing |  |  |
+<!-- targets:end -->
+
+The table is generated from `targets.json`
+(`python -m sru_gateway.status_table --write`); the tests fail when it falls
+behind the file.
+
+**Zeus target numbers.** A `zeus` entry asks Zeus for its own `targets[n]`
+(`target_index`). The numbers come from the 2026-10-11 status list and are
+still to be confirmed against Zeus's search page, which labels each target.
+On a machine that reaches Zeus:
+
+```sh
+.venv/bin/python -m sru_gateway.zeus_labels               # fetches the page
+.venv/bin/python -m sru_gateway.zeus_labels --page zeus.html   # a page saved from a browser
+```
+
+It prints each `zeus` entry next to the label Zeus shows for its number and
+exits 1 when one does not match. `tests/fixtures/zeus_search_form.html` is a
+stand-in, not the live page.
 
 How a search goes: Koha's CQL is read like the other bridges read it (ISBN,
 then title, then author, else any field). A Z39.50 target gets one session per
@@ -205,13 +313,34 @@ request with Bib-1 use 7, 4, 1003 or 1016 and a Present of the page Koha asked
 for (Koha's first call, `maximumRecords=0`, only searches). An SRU target is
 asked `<index>="<term>"` with its own index names (default `bath.isbn`,
 `dc.title`, `dc.creator`, `cql.serverChoice`); its records, prefixed or
-string-packed, go back as MARC21/slim. An unknown id answers diagnostic 235.
-A path with two slashes (`//sru/bn`, what Koha asks for when the database is
-written `/sru/bn`) is read as `/sru/bn`.
+string-packed, go back as MARC21/slim. One dynamic route, `/sru/{id}`, serves
+every id in `targets.json`; `/sru/{id}/` (trailing slash) and `//sru/{id}`
+(what Koha asks for when the database is written `/sru/bn`) are read as
+`/sru/{id}`.
+
+Every answer is SRU XML with HTTP 200, errors included, because YAZ (Koha's
+ZOOM client) reports FastAPI's JSON `{"detail":"Not Found"}` as "wrong
+protocol". An unknown id answers diagnostic 235 (details: the id) under
+explain and searchRetrieve alike; an id with no address yet answers
+diagnostic 1; any other path answers an explainResponse with diagnostic 235.
+
+**Is this the gateway that is deployed?** `GET /openapi.json` on this
+gateway lists `/health`, `/sru` and `/sru/{database}`, and `GET /health`
+shows `"version": "1.2.0"` or later with 72 targets. An `openapi.json` that
+lists `/sru/ufsc` (or any other single id) comes from some other program,
+not from this repository: stop it and run `deploy/sru-gateway.service`.
 
 Run it: `.venv/bin/python -m sru_gateway` (127.0.0.1:5000), or on the VPS
 [`deploy/sru-gateway.service`](deploy/sru-gateway.service), which listens on
-0.0.0.0:5000. `GET /health` lists the configured and missing ids.
+0.0.0.0:5000 until `sru.koha.nexus` is served through the same Cloudflare
+Tunnel as `catalog.koha.nexus`; port 5000 is then closed in the firewall.
+`GET /health` lists the configured and missing ids.
+
+**Ports.** 5000: this gateway (central server) or the Zeus bridge (a Koha
+server, `koha-zeus-sru`). 5006: the Pergamum bridge (a Koha server,
+`koha-pergamum-sru`). 8088: the Catalog Network (`catalog-network/`). The
+central server runs only the gateway, which embeds the Zeus and Pergamum
+clients; nothing listens on 5001 or 5002.
 
 | Variable | Default | |
 |---|---|---|
@@ -221,8 +350,57 @@ Run it: `.venv/bin/python -m sru_gateway` (127.0.0.1:5000), or on the VPS
 | `SRU_GATEWAY_MAX_RECORDS` | `50` | ceiling on `maximumRecords` |
 | `SRU_GATEWAY_LOGIN_<ID>` | | `user:password` for a catalogue that needs a login |
 
-Koha's row for a catalogue: host the VPS address, port `5000`, database
-`sru/<id>`, SRU, MARC21, utf8, `sru=get,sru_version=1.1`, SRU search fields
+**Koha's rows.** Every catalogue is one SRU row: host
+`https://sru.koha.nexus` (Koha speaks HTTPS only when the host starts with
+`https://`), port 443, database `sru/<id>`, syntax MARC21 (an SRU server sends
+MARCXML; USMARC makes Koha show no record), encoding utf8,
+`sru=get,sru_version=1.1`, SRU search fields
 `title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice`.
+[`deploy/koha-z3950servers.sql`](deploy/koha-z3950servers.sql) writes them all,
+in the four groups' order:
+
+```sh
+sudo koha-mysql INSTANCE < deploy/koha-z3950servers.sql
+```
+
+It touches only the gateway's rows: rows on its older addresses
+(137.131.205.31:5000, the VPS's private 10.0.0.60 on any port, 5001 included)
+move to sru.koha.nexus:443 with the database `sru/<id>` (also when it was
+written `/sru/<id>` or a bare `<id>`), renamed
+ids follow, ids no longer served are removed, the rest are refreshed keeping
+"checked" and rank. Running it again changes nothing. It and the panel's list
+(`panel/kei_panel/data/z3950_targets.json`) are generated from `targets.json`
+by `python -m sru_gateway.koha_sql --write`; the tests fail when either falls
+behind.
+
 Its tests (`tests/test_gateway.py`) use a fake Z39.50 server and mocked SRU
 answers; none of the remote catalogues was reached from the tests.
+
+### Authority databases (`/sru/bn-aut`)
+
+Koha's authority search (rows with record type "authority") needs MARC21
+authority records, which a catalogue such as the BN's does not serve. The
+`authorities` list of `targets.json` adds one database per such source:
+`{"id": "bn-aut", "name": "BIBLIOTECA NACIONAL (AUTORIDADES)", "from": "bn"}`.
+`/sru/bn-aut` searches the `bn` catalogue (whatever its kind) by author, then
+turns the main entry of each record found into an authority record
+([`sru_gateway/authority.py`](sru_gateway/authority.py)):
+
+| | |
+|---|---|
+| Leader | `00000nz  a2200000n  4500` |
+| `040` | `$a BR-RjBN $b por` |
+| `100` / `110` | the heading's `$a` and `$d` (`$b` too for a 110), bibliographic end punctuation removed |
+| `670` | `$a Acervo Fundação Biblioteca Nacional (Pergamum)` |
+
+Nothing else of the bibliographic record is kept (no 245, 260, 300, 020).
+The same heading found on several records is answered once, and only
+headings holding every word of the search are answered. Records found with
+no 100 or 110 answer SRU diagnostic 1 instead of an empty authority record.
+Koha's row: host `https://sru.koha.nexus`, port 443, database `sru/bn-aut`,
+record type authority, SRU, MARC21, utf8, SRU search fields
+`nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice`
+(the names of Koha's authority search form). `deploy/koha-z3950servers.sql`
+writes it too, and the koha.nexus installer seeds it beside the Library of
+Congress name and subject files. Tests: `tests/test_authority.py`, with
+stand-in Zeus pages.

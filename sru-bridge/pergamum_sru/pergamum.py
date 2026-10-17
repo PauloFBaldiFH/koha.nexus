@@ -34,6 +34,15 @@ def search_type(query: ZeusQuery) -> str:
     return {ISBN: "ISBN", AUTHOR: "AUTOR"}.get(query.search_type, "TITULO")
 
 
+def sanitize_term(term: str, kind: str) -> str:
+    """The term without quotes and outer spaces; an ISBN keeps only its
+    digits and X (Pergamum finds nothing for 978-85-...)."""
+    t = term.strip().strip('"').strip("'").strip()
+    if kind == "ISBN":
+        return re.sub(r"[^\dX]", "", t.upper())
+    return t
+
+
 def search_params(term: str, kind: str, page_size: int) -> list[tuple[str, str]]:
     args = ["0", term, kind, "obra", str(page_size), "", "", "", "-1"]
     return [("rs", "ajax_resultados"), ("rst", ""), ("rsrnd", "1234567890")] + \
@@ -49,7 +58,10 @@ def parse_results(page: str) -> tuple[int, list[str]]:
     """The count Pergamum reports (0 when absent) and the acervo ids, in order."""
     m = _COUNT_RE.search(page)
     count = int(m.group(1).replace(".", "")) if m else 0
-    return count, list(dict.fromkeys(_ID_RE.findall(page)))
+    ids = list(dict.fromkeys(_ID_RE.findall(page)))
+    if not count and ids:
+        count = len(ids)
+    return count, ids
 
 
 def extract_marc(page: str) -> str | None:
@@ -58,8 +70,7 @@ def extract_marc(page: str) -> str | None:
 
 
 def decode(resp: httpx.Response) -> str:
-    """The page as text: the declared charset, else UTF-8, else Latin-1
-    (what requests, which the first version of this bridge used, falls back to)."""
+    """The page as text: the declared charset, else UTF-8, else Latin-1."""
     if resp.charset_encoding:
         return resp.text
     try:
@@ -99,30 +110,48 @@ class PergamumClient:
         self._searches = _TTLCache(settings.cache_ttl, settings.cache_size)
         self._records = _TTLCache(settings.cache_ttl, settings.cache_size)
         self._gate = asyncio.Semaphore(settings.concurrency)
+        self._has_session = False
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    async def _ensure_session(self) -> None:
+        """Pergamum's Sajax calls need the PHPSESSID cookie its search page
+        sets, so the page is opened once before the first call."""
+        if not self._has_session:
+            try:
+                await self._client.get(self.settings.base_url)
+                self._has_session = True
+            except httpx.HTTPError as e:
+                log.warning("Pergamum: the search page did not open (no session cookie): %r", e)
+
     async def _get(self, params: list[tuple[str, str]]) -> str:
+        await self._ensure_session()
         resp = await self._client.get(self.settings.base_url, params=params)
+        # A search with no hits answers HTTP 500 with a valid Sajax body
+        # ("+:..."): that is an empty result, not an error.
+        if resp.status_code == 500:
+            body = decode(resp)
+            if body.startswith("+:"):
+                return body
         resp.raise_for_status()
         return decode(resp)
 
     async def ids(self, query: ZeusQuery) -> list[str]:
-        """The acervo ids of a search, first page only (page_size of them)."""
         kind = search_type(query)
-        key = (kind, query.term)
+        clean_term = sanitize_term(query.term, kind)
+        key = (kind, clean_term)
         cached = self._searches.get(key)
         if cached is not None:
             return cached
         started = time.monotonic()
         try:
-            page = await self._get(search_params(query.term, kind, self.settings.page_size))
+            page = await self._get(search_params(clean_term, kind, self.settings.page_size))
         except httpx.HTTPError as exc:
             raise PergamumUnavailable(repr(exc)) from exc
         count, ids = parse_results(page)
         log.info("Pergamum %s %r: %d reported, %d ids in %.2fs",
-                 kind, query.term, count, len(ids), time.monotonic() - started)
+                 kind, clean_term, count, len(ids), time.monotonic() - started)
         self._searches.put(key, ids)
         return ids
 
@@ -144,7 +173,6 @@ class PergamumClient:
         return block
 
     async def records(self, ids: list[str]) -> list[str]:
-        """The MARC text of each id, in order; the ones that fail are left out."""
         blocks = await asyncio.gather(*(self.marc_text(i) for i in ids))
         return [b for b in blocks if b]
 

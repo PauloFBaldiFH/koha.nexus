@@ -8,6 +8,24 @@ Each entry has an id (the part after /sru/), a name and a kind:
   sru       an SRU server: url, version, schema, indexes
   missing   no address known yet: searches answer an SRU diagnostic saying so
 
+Each entry also has a status, what is known about it today:
+
+  verified  searched live and returned MARC records
+  untested  has an address that nobody has searched through the gateway yet
+  broken    has an address that does not answer (kept until a new one is found)
+  missing   no address known yet (kind "missing")
+
+and a group, the heading it is listed under (in the koha.nexus panel too):
+
+  national           [1] National libraries and official bodies
+  br_universities    [2] Brazilian universities (federal and state)
+  intl_universities  [3] International universities
+  specialized        [4] Specialised and union catalogues
+
+An "authorities" list beside "targets" holds the authority databases: each
+has an id, a name and "from", the id of the catalogue whose bibliographic
+records it reads its headings from (see sru_gateway/authority.py).
+
 A login never goes in the file: SRU_GATEWAY_LOGIN_<ID>=user:password (id in
 capitals) supplies one from the environment.
 """
@@ -21,6 +39,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 KINDS = ("zeus", "pergamum", "z3950", "sru", "missing")
+STATUSES = ("verified", "untested", "broken", "missing")
+GROUPS = {
+    "national": "Bibliotecas Nacionais e Órgãos Oficiais",
+    "br_universities": "Universidades Brasileiras (Rede Federal e Estaduais)",
+    "intl_universities": "Universidades Internacionais",
+    "specialized": "Especializados e Catálogos Coletivos",
+}
 MARC21_SYNTAXES = ("USMARC", "MARC21")
 DEFAULT_INDEXES = {"isbn": "bath.isbn", "title": "dc.title", "author": "dc.creator",
                    "any": "cql.serverChoice"}
@@ -36,6 +61,7 @@ class Target:
     id: str
     name: str
     kind: str
+    group: str = "specialized"
     host: str = ""
     port: int = 0
     db: str = ""
@@ -47,13 +73,18 @@ class Target:
     indexes: dict = field(default_factory=dict)
     user: str = ""
     password: str = ""
-    verified: bool = False
+    status: str = "untested"
+    note: str = ""
     source: str = ""
     target_index: int = 0
 
     @property
     def configured(self) -> bool:
         return self.kind != "missing"
+
+    @property
+    def verified(self) -> bool:
+        return self.status == "verified"
 
     def index(self, kind: str) -> str:
         return {**DEFAULT_INDEXES, **self.indexes}.get(kind, DEFAULT_INDEXES["any"])
@@ -74,15 +105,23 @@ def make_target(raw: dict) -> Target:
         raise TargetError(f"{tid}: unknown kind {kind!r}")
     t = Target(
         id=tid, name=str(raw.get("name") or tid), kind=kind,
+        group=str(raw.get("group") or "specialized").strip().lower(),
         host=str(raw.get("host", "")).strip(), port=int(raw.get("port") or 0),
         db=str(raw.get("db", "")).strip(), syntax=str(raw.get("syntax", "USMARC")).strip().upper(),
         encoding=str(raw.get("encoding", "utf8")).strip().lower(),
         url=str(raw.get("url", "")).strip(), version=str(raw.get("version", "1.1")).strip(),
         schema=str(raw.get("schema", "marcxml")).strip(), indexes=dict(raw.get("indexes") or {}),
-        verified=bool(raw.get("verified")), source=str(raw.get("source", "")),
+        status=str(raw.get("status") or ("missing" if kind == "missing" else "untested")).strip().lower(),
+        note=str(raw.get("note", "")), source=str(raw.get("source", "")),
         target_index=int(raw.get("target_index") or 0),
         **dict(zip(("user", "password"), _login(tid))),
     )
+    if t.group not in GROUPS:
+        raise TargetError(f"{tid}: unknown group {t.group!r}")
+    if t.status not in STATUSES:
+        raise TargetError(f"{tid}: unknown status {t.status!r}")
+    if (t.status == "missing") != (kind == "missing"):
+        raise TargetError(f"{tid}: status missing goes with kind missing, and only with it")
     if kind == "z3950":
         if not (t.host and t.port and t.db):
             raise TargetError(f"{tid}: a z3950 target needs host, port and db")
@@ -92,6 +131,30 @@ def make_target(raw: dict) -> Target:
     if kind == "sru" and not re.match(r"https?://", t.url):
         raise TargetError(f"{tid}: an sru target needs an http(s) url")
     return t
+
+
+@dataclass(frozen=True)
+class Authority:
+    """An authority database: name headings taken from another catalogue."""
+    id: str
+    name: str
+    source: str     # the targets.json id it reads
+
+
+def load_authorities(path: Path, table: dict[str, Target]) -> dict[str, Authority]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    out: dict[str, Authority] = {}
+    for raw in data.get("authorities", []):
+        aid = str(raw.get("id", "")).strip().lower()
+        if not _ID.fullmatch(aid):
+            raise TargetError(f"bad authority id {raw.get('id')!r}")
+        if aid in out or aid in table:
+            raise TargetError(f"{aid}: listed twice")
+        src = str(raw.get("from", "")).strip().lower()
+        if src not in table or not table[src].configured:
+            raise TargetError(f"{aid}: \"from\" must name a catalogue with an address, not {src!r}")
+        out[aid] = Authority(aid, str(raw.get("name") or aid), src)
+    return out
 
 
 def load(path: Path) -> dict[str, Target]:
