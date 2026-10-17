@@ -175,25 +175,30 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
 }
 
-@test "z3950-seed: the Library of Congress authority targets, kept as the librarian left them, re-runnable" {
+@test "z3950-seed: the Library of Congress and BN authority targets, kept as the librarian left them, re-runnable" {
     # NAF is already there (setup), unticked, with its own name and rank.
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority'")" = "2" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority'")" = "3" ]
     [ "$(zsql "SELECT servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'NAF'")" = \
       "$(printf 'LOC AUTHORITIES\t0\t0\tUSMARC\tutf8\t10\tzed')" ]
     [ "$(zsql "SELECT host, port, servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'SAF'")" = \
       "$(printf 'lx2.loc.gov\t210\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\tUSMARC\tutf8\t10\tzed')" ]
+    # The BN authority database on the SRU gateway (authority records built from the BN catalogue).
+    [ "$(zsql "SELECT host, port, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, sru_options FROM z3950servers WHERE recordtype = 'authority' AND db = 'sru/bn-aut'")" = \
+      "$(printf 'https://sru.koha.nexus\t443\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\tMARC21\tutf8\t30\tsru\tsru=get,sru_version=1.1')" ]
+    [ "$(zsql "SELECT sru_fields FROM z3950servers WHERE db = 'sru/bn-aut'")" = \
+      "nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice" ]
     # The catalogue (biblio) rows are untouched.
     [ "$(zsql "SELECT COUNT(*), MAX(timeout) FROM z3950servers WHERE recordtype = 'biblio'")" = "$(printf '1\t0')" ]
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
-    # On a Koha without them: both inserted, ticked, NAF first.
+    # On a Koha without them: all three inserted, ticked, NAF first.
     zsql "DELETE FROM z3950servers WHERE recordtype = 'authority'"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$(zsql "SELECT db, servername, checked, \`rank\` FROM z3950servers WHERE recordtype = 'authority' ORDER BY \`rank\`")" = \
-      "$(printf 'NAF\tBIBLIOTECA DOS NOMES DO CONGRESSO\t1\t1\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2')" ]
+      "$(printf 'NAF\tBIBLIOTECA DOS NOMES DO CONGRESSO\t1\t1\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3')" ]
 }
 
 @test "Catalog Network SQL: an older row is updated in place, keeping its tick and rank, re-runnable" {
