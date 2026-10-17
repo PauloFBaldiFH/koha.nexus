@@ -259,13 +259,28 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     # WSL: never, even when the probe would pass.
     run env KEI_PLATFORM_OVERRIDE=wsl2 KEI_SYSTEMD_RUNDIR="$W/sd/system" KEI_EXTRA="$W/extra-sd.sh" bash "$PANEL" throttle_cmd
     [ "$output" = "nice -n 19 ionice -c 3" ]
-    # An export that never ran (empty file) is a failure, not an empty scope.
-    printf 'koha_tool() { echo "$1 skipped" >> "%s/calls"; return 0; }\n' "$W" >> "$W/extra.sh"
-    p enrich_job_add "all"
+    # Nothing at low priority: the export runs once more plainly and the job goes on.
+    cp "$W/extra.sh" "$W/extra-plain.sh"
+    cat >> "$W/extra.sh" <<'SH'
+_kt_real=$(declare -f koha_tool | sed 1d)
+eval "koha_tool_real() $_kt_real"
+koha_tool() { [ -n "${KOHA_THROTTLE:-}" ] && { echo "ionice: ioprio_set failed" >> "$1"; return 1; }; koha_tool_real "$@"; }
+SH
+    p enrich_job_add "1-2"
+    [ "$status" -eq 0 ]
+    grep -q "^job=1$" "$W/results"
+    grep -q "^export_records.pl \[\] --record-type=bibs --format=xml --dont_export_items --id_list_file=" "$W/calls"
+    grep -q "running it again without the priority prefix" "$W/logs/"*
+    # An export that never ran (empty file) is a failure, not an empty scope,
+    # and the dialog quotes the last message.
+    : > "$W/results"
+    printf 'koha_tool() { echo "export_records.pl: Cannot connect to the database" >> "$1"; return 0; }\n' >> "$W/extra-plain.sh"
+    run env KEI_EXTRA="$W/extra-plain.sh" bash "$PANEL" enrich_job_add "all"
     [ "$status" -ne 0 ]
     grep -q "^job=failed$" "$W/results"
     ! grep -q "^job=empty$" "$W/results"
     grep -q "Koha could not export the records" "$KEI_S/dialogs.log"
+    grep -q "Cannot connect to the database" "$KEI_S/dialogs.log"
 }
 
 bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | grep -o '<subfield code="9">[0-9]*</subfield>' | sed 's/.*">\([0-9]*\)<.*/\1/' | paste -sd, -; }

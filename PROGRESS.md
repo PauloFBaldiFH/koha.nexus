@@ -448,6 +448,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.79 (Paulo: export.xml still empty)**: the three enrichment exports (records, authorities, Koha's authorities at Apply) go through `enrich_export`. When the low-priority run leaves the file empty, it runs once more plainly, as the MARC21 backup does (koha-shell, no priority prefix, from /tmp). The failure dialog and the job's error quote the last message line of the log. No `chmod 666`: the file is opened by the root shell (`koha_exec`), so its mode never limited the instance user.
 - **1.5.78 (Paulo: WSL2 export still refused)**: the 1.5.76 probe passed as root but the export's scope was still
   refused under WSL2; `throttle_cmd` now never uses `systemd-run --scope` when `is_wsl` (nice + ionice only).
 - **1.5.77 (Paulo: WSL2 credentials showed http://0:80, drops right after install did nothing)**: `get_server_ip`
