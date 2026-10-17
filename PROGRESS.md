@@ -448,6 +448,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.77 (Paulo: WSL2 credentials showed http://0:80, drops right after install did nothing)**: `get_server_ip`
+  reads the word after `src` in `ip -4 route get 1.1.1.1`, not the 7th word (WSL2 mirrored mode prints
+  `1.1.1.1 dev eth0 src X uid 0`, so the 7th word was the uid `0`), then falls back to WIN_LAN_IP, the first usable
+  address of `hostname -I` / `ip -4 addr` (`lan_ip_usable`: no 0.x, 127.x, 169.254.x, multicast) and 127.0.0.1.
+  Drops: the panel the Windows installer opens runs in the elevated installer window, and Windows refuses drags
+  from Explorer into an elevated window; `Invoke-KohaPanel` passes `KEI_WIN_ELEVATED` (WSLENV) and the file picker
+  then says to paste the path (Copy as path) or open Koha from its icon. Drive paths go through `wslpath -u` when
+  it works (wsl.conf may mount drives outside /mnt), panel and `clean_path` alike; `flush_tty_input` drops keys
+  left waiting before the classic pickers and Enter prompts. Elevation and the real drop not tested on Windows.
 - **1.5.76 (Paulo: enrichment export never ran under WSL2)**: `throttle_cmd` tries `systemd-run --scope
   --no-ask-password -p CPUQuota=25% true` first and uses the scope only when systemd grants it; under WSL2 polkit
   refused it ("Failed to start transient scope unit: Access denied", no pkttyagent), so export_records.pl never

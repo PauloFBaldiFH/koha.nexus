@@ -175,3 +175,15 @@ def test_no_file_manager_button_over_ssh_or_on_a_server(tmp_path, monkeypatch):
         seen["n"] = len(app.screen.query("#open-folder"))
     _run(tmp_path, steps)
     assert seen["n"] == 0
+
+
+def test_an_elevated_window_says_to_paste_the_path(tmp_path, monkeypatch):
+    """Windows refuses drags from Explorer into a window run as administrator
+    (the panel the Windows installer opens): the hint says what works."""
+    monkeypatch.setattr(files, "drops_blocked", lambda: True)
+    seen = {}
+
+    async def steps(app, pilot):
+        seen["text"] = str(app.screen.query_one("#picker-drop").render())
+    _run(tmp_path, steps)
+    assert "administrator" in seen["text"] and "Copy as path" in seen["text"]

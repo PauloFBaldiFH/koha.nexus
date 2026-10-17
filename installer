@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.76"
+PANEL_VERSION=" 1.5.77"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -1486,8 +1486,18 @@ prompt_yes_no() {
 
 # Progress line printed on the terminal (the text is translated here).
 display_explanation() { printf '   %s›%s %s\n' "${TUI_CYN:-}" "${TUI_RST:-}" "$(t "$1")"; }
-pause_terminal() { read -r -p "$(t "Press [ENTER] to return to menu...")"; }
-pause_terminal_continue() { read -r -p "   $(t "Press [ENTER] to continue...")"; }
+# flush_tty_input: keys typed (or a path dropped) while a long step was
+# printing wait in the terminal; the next prompt or menu would read them as
+# its answer (an Enter that skips it, an Esc that cancels the file picker).
+# They are thrown away first. Only on a terminal: a pipe keeps its input.
+flush_tty_input() {
+    [ -t 0 ] || return 0
+    local _junk
+    while IFS= read -r -s -t 0.05 -n 4096 _junk 2>/dev/null; do :; done
+    return 0
+}
+pause_terminal() { flush_tty_input; read -r -p "$(t "Press [ENTER] to return to menu...")"; }
+pause_terminal_continue() { flush_tty_input; read -r -p "   $(t "Press [ENTER] to continue...")"; }
 
 # ======================================================================
 # TERMINAL LOOK (installation screens)
@@ -1859,12 +1869,40 @@ tui_celebrate() {
 
 tui_init
 
+# get_server_ip: the address other computers of the network use for this
+# one. Read from the word after "src" in the route to the internet, never
+# from a fixed column: the 7th word is the address only on a route with a
+# gateway; WSL2 in mirrored mode gives "1.1.1.1 dev eth0 src X uid 0" (the
+# 7th word is "0": http://0:80 and ssh user@0 on the credentials screen)
+# or adds "table 127". Then the address
+# Windows reported (windows.conf, WSL), the first usable one of hostname -I
+# or ip -4 addr, and 127.0.0.1 last.
 get_server_ip() {
-    local ip
-    ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
-    [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    local ip="" a
+    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit } }')
+    lan_ip_usable "$ip" || ip="${WIN_LAN_IP:-}"
+    if ! lan_ip_usable "$ip"; then
+        ip=""
+        for a in $(hostname -I 2>/dev/null) $(ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }'); do
+            lan_ip_usable "$a" && { ip=$a; break; }
+        done
+    fi
     [ -z "$ip" ] && ip="127.0.0.1"
     printf '%s' "$ip"
+}
+
+# lan_ip_usable TEXT: 0 for a dotted IPv4 address another machine could
+# use: not 0.x, 127.x, 169.254.x (link-local) nor a broadcast or multicast.
+lan_ip_usable() {
+    local IFS=. o
+    local -a p
+    [[ "${1:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
+    read -r -a p <<< "$1"
+    for o in "${p[@]}"; do [ "$((10#$o))" -le 255 ] || return 1; done
+    case "$((10#${p[0]}))" in 0|127) return 1 ;; esac
+    [ "$((10#${p[0]}))" -ge 224 ] && return 1
+    [ "$((10#${p[0]}))" -eq 169 ] && [ "$((10#${p[1]}))" -eq 254 ] && return 1
+    return 0
 }
 
 # ip_is_private IP: 0 for an address the internet cannot reach: RFC 1918
@@ -2959,6 +2997,7 @@ select_file() {
         fexpr=("${fexpr[@]:1}")
     fi
     current=$(picker_start_dir "${1:-}")
+    flush_tty_input
     while true; do
         items=()
         [ "$current" != "/" ] && items+=(".." "$(t "[Back]")")
@@ -5670,7 +5709,7 @@ EOF
     echo "----------------------------------------------------------------------"
     echo "$(t "[LINUX] Find IP and Username:")"
     cat << 'EOF'
-echo "IP: $(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}') | User: $(whoami)"
+echo "IP: $(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src"){print $(i+1); exit}}') | User: $(whoami)"
 EOF
     echo ""
     echo "$(t "[macOS] Find IP and Username:")"
@@ -24346,6 +24385,7 @@ magic_pick() {
         return
     fi
     items+=("other" "$(t "Another file (file explorer)")")
+    flush_tty_input
     choice=$(ui_menu "$(t "🪄  Magic Import Tool")" "$(t "Don't question it, just drop here what you want to import.\n\nWaiting in \${shown}:")" "${items[@]}") || return 1
     if [ "$choice" = "other" ]; then
         select_file "$REAL_HOME" "*" "$prompt" "$(t "File")"
@@ -24362,7 +24402,7 @@ magic_pick() {
 # blanks or parentheses ("BKP_BIBLIOTECA (2).backup") stays as it is: every
 # command quotes it.
 clean_path() {
-    local p="$1" q
+    local p="$1" q w
     p=${p%%$'\n'*}; p=${p//$'\r'/}
     p="${p#"${p%%[![:space:]]*}"}"; p="${p%"${p##*[![:space:]]}"}"
     [[ "$p" == "& "[\'\"]* ]] && p=${p#& }
@@ -24381,7 +24421,15 @@ clean_path() {
     if [[ "$p" =~ ^[\\/]{2}wsl(\.localhost|\$)[\\/][^\\/]+[\\/](.*)$ ]]; then
         p="/${BASH_REMATCH[2]//\\//}"
     elif [[ "$p" =~ ^([A-Za-z]):[\\/](.*)$ ]]; then
-        p="/mnt/${BASH_REMATCH[1],,}/${BASH_REMATCH[2]//\\//}"
+        # wslpath knows where WSL mounts the drives (/etc/wsl.conf may say
+        # another root than /mnt); without it, /mnt/c/...
+        w=""
+        command -v wslpath >/dev/null 2>&1 && w=$(wslpath -u "$p" 2>/dev/null)
+        if [[ "$w" == /* ]]; then
+            p=$w
+        else
+            p="/mnt/${BASH_REMATCH[1],,}/${BASH_REMATCH[2]//\\//}"
+        fi
     fi
     printf '%s' "$p"
 }
