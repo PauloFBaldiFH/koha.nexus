@@ -81,10 +81,10 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             view.login()
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))
             app.screen.query_one("#value").value = "librarian"
-            await pilot.click("#ok")
+            await _press(pilot, app, "ok")
             await _until(pilot, lambda: isinstance(app.screen, InputScreen) and app.screen._password)
             app.screen.query_one("#value").value = "s3cret-pw"
-            await pilot.click("#ok")
+            await _press(pilot, app, "ok")
             await _until(pilot, lambda: (tmp_path / z3950.LOCAL_FILE).exists())
             saved = (tmp_path / z3950.LOCAL_FILE)
             assert saved.stat().st_mode & 0o777 == 0o600 and "s3cret-pw" in saved.read_text()
@@ -129,7 +129,7 @@ def test_import_and_export(tmp_path, monkeypatch):
             view.import_list()
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))
             app.screen.query_one("#value").value = str(src)
-            await pilot.click("#ok")
+            await _press(pilot, app, "ok")
             key = "z.consortium.example.br:2100/acervo"
             await _until(pilot, lambda: key in [k.value for k in table.rows])
             assert table.get_row(key)[1] == "My consortium *"
@@ -140,7 +140,7 @@ def test_import_and_export(tmp_path, monkeypatch):
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))
             out = tmp_path / "out.sql"
             app.screen.query_one("#value").value = str(out)
-            await pilot.click("#ok")
+            await _press(pilot, app, "ok")
             await _until(pilot, out.exists)
             assert "z.consortium.example.br" in out.read_text() and "lx2.loc.gov" not in out.read_text()
 
