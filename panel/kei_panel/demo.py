@@ -4,6 +4,7 @@ lines the installer prints, fed through the real parser."""
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
@@ -38,6 +39,35 @@ _STAGES = [("1/7", "Preparing the system", ["Checking the package manager", "Set
 _INSTALL = [line for n, stage, steps in _STAGES
             for line in [f"@@stage [{n}] {stage}\tThis might take a few minutes. Please keep this window open."]
             + [x for step in steps for x in (f"@@step {step}", f"@@done 0 {step}")]]
+
+# The enrichment jobs screen (views/enrich.py): one job with its report,
+# one still being compared.
+_ENRICH_JOBS = [
+    {"id": 2, "created": "2026-10-17 14:02:11", "updated": "2026-10-17 14:05:40", "scope": "500-550",
+     "state": "matching", "total": 51, "done": 20, "release": "nexus-enrich-2026.10", "error": ""},
+    {"id": 1, "created": "2026-10-17 09:12:03", "updated": "2026-10-17 09:40:55", "scope": "all", "state": "ready",
+     "total": 1240, "done": 1240, "release": "nexus-enrich-2026.10", "error": ""},
+]
+_ENRICH_REPORT = {"job": 1, "scope": "all", "release": "nexus-enrich-2026.10", "records": 1240, "enriched": 412,
+                  "unchanged": 301, "review": 37, "no_match": 488, "errors": 2,
+                  "records_with": {"M0": 356, "M1": 41, "W": 77, "R": 37}, "pointer_only": 12,
+                  "fields_added": 1288, "fields_by_class": {"M0": 1104, "M1": 96, "W": 88},
+                  "fields_by_group": {"subjects": 702, "082": 318, "300": 140, "520": 128},
+                  "fields_by_source": {"unesp": 540, "ufpr": 401, "unb": 221, "loc": 126}, "koha_batches": 1}
+_ENRICH_SHOW = dict(_ENRICH_JOBS[1], dir="/var/lib/koha-nexus-enrich/jobs/1", report=_ENRICH_REPORT,
+                    report_html="/var/lib/koha-nexus-enrich/jobs/1/report.html",
+                    chunks=[{"job_id": 1, "chunk": 1, "records": 412, "state": "pending"}],
+                    changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
+                              "m0": 3, "m1": 0, "w": 0, "r": 0, "added": 3},
+                             {"biblionumber": 117, "status": "enriched", "title": "Vidas secas",
+                              "m0": 0, "m1": 0, "w": 2, "r": 0, "added": 2},
+                             {"biblionumber": 230, "status": "review", "title": "Memórias póstumas de Brás Cubas",
+                              "m0": 0, "m1": 0, "w": 0, "r": 2, "added": 0}])
+_ENRICH_DIFF = ["# job 1, biblionumber 101: enriched", "  LDR    00000nam a2200000 a 4500",
+                "  020 __ $a 9788535902778", "  100 1_ $a Saramago, José",
+                "  245 10 $a Ensaio sobre a cegueira", "+ 082 04 $8 2\\p $a 869.3",
+                "+ 650 _4 $8 1\\p $a Cegueira", "+ 650 _4 $8 1\\p $a Romance português",
+                "+ 883 0_ $8 1\\p $a nexus_enrich M0 $c 0.97 $d 20261017 $q unesp $w 33012"]
 
 _SCRIPTS: dict[str, list[str]] = {
     "ollama-install": ["@@step Installing Ollama", "@@done 0 Installing Ollama",
@@ -213,6 +243,22 @@ _SCRIPTS: dict[str, list[str]] = {
     "cloud-remote": ["@@note Testing the real cloud upload...",
                      "@@msg ok OK\tCloud enabled and tested successfully."],
     "z3950-list": ["@@result row=127.0.0.1\t5000\tsru/loc\tLibrary of Congress, EUA"],
+    "enrich-jobs": ["@@result jobs=" + json.dumps(_ENRICH_JOBS, ensure_ascii=False),
+                    "@@result worker=" + json.dumps({"job": 2, "state": "matching", "total": 51, "done": 20,
+                                                      "paused": False, "pause_file": False})],
+    "enrich-job-show": ["@@result job=" + json.dumps(_ENRICH_SHOW, ensure_ascii=False).replace('"id": 1,', '"id": {0},')],
+    "enrich-job-diff": ["@@result line=" + line for line in _ENRICH_DIFF],
+    "enrich-job-add": ["@@result job=3", "@@result records=1240",
+                       "@@msg info Enrich bibliographic data\tJob 3: 1240 record(s) are being compared with the "
+                       "enrichment database, slowly and in the background.\n\nNothing is written to the "
+                       "catalogue until you review the report and choose Apply."],
+    "enrich-job-apply": ["@@result backup=/var/backups/koha_sql/PRE-ENRICH_2026-10-17_15h00.sql.gz",
+                         "@@result applied=412", "@@result apply=done",
+                         "@@msg ok OK\t✅ Job {0} applied: 412 record(s) enriched."],
+    "enrich-job-revert": ["@@result reverted=412", "@@result kept=0", "@@result revert=done",
+                          "@@msg ok OK\t✅ Job {0} reverted: 412 record(s) have their previous version back."],
+    "enrich-job-cancel": [],
+    "enrich-pause": [],
     "z3950-server-status": ["@@result daemon=running", "@@result port=2100", "@@result network=off"],
     "z3950-daemon": ["@@msg ok OK\tThis catalogue's Z39.50/SRU server: {0}."],
     "catalog-network": ["@@msg ok OK\tThe koha.nexus network: {0}."],

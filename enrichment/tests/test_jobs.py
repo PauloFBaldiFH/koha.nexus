@@ -218,6 +218,10 @@ def test_cli(static_db, tmp_path, capsys, monkeypatch):
     assert cli.main(base + ["show", str(out["job"])]) == 0
     shown = json.loads(capsys.readouterr().out)
     assert shown["state"] == "ready" and shown["report"]["records"] == 3 and shown["report_html"].endswith(".html")
+    # The panel's list: enriched records first, each with its classes and fields added.
+    changed = {c["biblionumber"]: c for c in shown["changes"]}
+    assert shown["changes"][0]["status"] == "enriched" and changed[101]["added"] >= 1
+    assert set(changed[101]) == {"biblionumber", "status", "title", "m0", "m1", "w", "r", "added"}
     assert cli.main(base + ["diff", str(out["job"]), "101"]) == 0
     assert "+ 650" in capsys.readouterr().out
     assert cli.main(base + ["pause", "on"]) == 0 and (state / "pause").exists()

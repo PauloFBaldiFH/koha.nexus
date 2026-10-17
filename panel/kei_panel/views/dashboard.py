@@ -33,10 +33,10 @@ def human_bytes(n: int | None) -> str:
     return str(n)
 
 
-def age(epoch: int | None) -> str:
+def age(epoch: int | None, now: float | None = None) -> str:
     if not epoch:
         return "-"
-    secs = max(0, int(time.time()) - int(epoch))
+    secs = max(0, int(time.time() if now is None else now) - int(epoch))
     if secs < 3600:
         return f"{secs // 60} min"
     if secs < 86400:
@@ -63,7 +63,7 @@ def backup_card(b: dict | None, now: float | None = None) -> tuple[str, str, str
         return t("None yet"), t("No backup on this server yet"), "warn"
     now = time.time() if now is None else now
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
-    note = t("${age} ago", age=age(epoch)) + f" · {b.get('last_file') or '-'}"
+    note = t("${age} ago", age=age(epoch, now)) + f" · {b.get('last_file') or '-'}"
     fresh = now - epoch < BACKUP_FRESH_SECS
     return when, note, "ok" if fresh and b.get("last_result") != "failed" else "warn"
 

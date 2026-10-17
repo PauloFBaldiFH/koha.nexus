@@ -2607,6 +2607,33 @@
    "related": [
     "sec-opac"
    ]
+  },
+  "sec-enrich": {
+   "summary": "Adds what your bibliographic records lack (subjects, classification, notes, extent) from the koha.nexus enrichment database, with a staged report to read before anything reaches the catalogue.",
+   "overview": [
+    "A job compares the chosen records with the enrichment database in the background, on at most a quarter of one CPU, and pauses by itself when the machine is busy. Nothing is written to Koha while it compares.",
+    "When it ends, the job's **Staged report** shows how many records would be enriched, which need review (M0, M1, W and R classes) and, for each changed record, its before/after: the lines to add in green.",
+    "**Apply** makes a verified safety backup, then writes the fields through Koha's own staged import, at most 500 records per batch. Records edited after the report are left as they are. **Revert** puts the previous version of each record back."
+   ],
+   "steps": [
+    "Type the scope: `all`, or biblionumbers such as `101, 102, 500-550`, and press **Start**.",
+    "Follow the progress in the **Worker** box; **Pause** stops it after the current batch, **Resume** goes on.",
+    "Pick the job in **Jobs** and read its report; select a record in the list to see its before/after.",
+    "Press **Open report** for the full report in the browser (saved in Downloads).",
+    "Press **Apply** to write the enriched records, or **Cancel job** to drop it. **Revert** undoes an applied job."
+   ],
+   "tips": [
+    "Start with a small range of record numbers to see the kind of fields added before running the whole catalogue.",
+    "Look at the records marked Review first: they are the ones where the match was less certain."
+   ],
+   "warnings": [
+    "Apply changes the catalogue. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
+   ],
+   "related": [
+    "sec-library",
+    "authority-sync",
+    "magic-import"
+   ]
   }
  }
 }

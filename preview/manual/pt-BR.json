@@ -2212,6 +2212,33 @@
     "sec-opac"
    ],
    "_en": "063008b7e7"
+  },
+  "sec-enrich": {
+   "summary": "Acrescenta o que falta nos seus registros bibliográficos (assuntos, classificação, notas, extensão) a partir da base de enriquecimento do koha.nexus, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
+   "overview": [
+    "Uma tarefa compara os registros escolhidos com a base de enriquecimento em segundo plano, usando no máximo um quarto de uma CPU, e pausa sozinha quando a máquina está ocupada. Nada é gravado no Koha durante a comparação.",
+    "Ao terminar, o **Relatório preparado** da tarefa mostra quantos registros seriam enriquecidos, quais precisam de revisão (classes M0, M1, W e R) e, para cada registro alterado, o antes/depois: as linhas a acrescentar em verde.",
+    "**Aplicar** faz um backup de segurança verificado e depois grava os campos pela importação em lote do próprio Koha, no máximo 500 registros por lote. Registros editados depois do relatório ficam como estão. **Reverter** devolve a versão anterior de cada registro."
+   ],
+   "steps": [
+    "Digite o escopo: `all` (todos), ou números de registro como `101, 102, 500-550`, e pressione **Iniciar**.",
+    "Acompanhe o progresso no quadro **Processo**; **Pausar** para depois do lote atual, **Retomar** continua.",
+    "Escolha a tarefa em **Tarefas** e leia o relatório; selecione um registro na lista para ver o antes/depois.",
+    "Pressione **Abrir relatório** para ver o relatório completo no navegador (salvo em Downloads).",
+    "Pressione **Aplicar** para gravar os registros enriquecidos, ou **Cancelar tarefa** para descartá-la. **Reverter** desfaz uma tarefa aplicada."
+   ],
+   "tips": [
+    "Comece com uma faixa pequena de números de registro para ver o tipo de campo acrescentado antes de rodar o catálogo inteiro.",
+    "Veja primeiro os registros marcados como Revisar: neles a correspondência foi menos certa."
+   ],
+   "warnings": [
+    "Aplicar altera o catálogo. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
+   ],
+   "related": [
+    "sec-library",
+    "authority-sync",
+    "magic-import"
+   ]
   }
  }
 }

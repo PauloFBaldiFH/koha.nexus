@@ -626,3 +626,21 @@ App.-plain #picker-drop {
 .opac-box TextArea.o-credits-text {
     height: 14;
 }
+
+/* ---- Enrich bibliographic catalog (views/enrich.py) ----------------- */
+#e-scope {
+    width: 1fr;
+    max-width: 60;
+}
+#e-progress {
+    margin: 1 0;
+}
+#e-summary {
+    margin-bottom: 1;
+}
+.e-diff {
+    height: auto;
+    margin: 1 0;
+    padding: 0 1;
+    background: $boost;
+}
