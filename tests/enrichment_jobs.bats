@@ -194,7 +194,28 @@ worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker 
     p enrich_job_add "all"
     [ "$status" -ne 0 ]
     grep -q "^job=no-static-db$" "$W/results"
+    grep -q "systemctl start --no-block koha-nexus-enrich-update.service" "$W/calls"
     ! grep -q "stage_file\|commit_file" "$W/calls" 2>/dev/null
+}
+
+@test "enrichment: a fresh install gets an empty static.db; a job waits for the download" {
+    rm "$W/state/static.db"
+    p enrich_empty_db
+    [ "$status" -eq 0 ]
+    [ -s "$W/state/static.db" ]
+    [ "$(PYTHONPATH="$KEI_REPO/enrichment" python3 -c 'import sys; from nexus_enrich.static import record_count; print(record_count(sys.argv[1]))' "$W/state/static.db")" = 0 ]
+    p enrich_empty_db                                   # never over a database already there
+    [ "$status" -eq 0 ]
+    cp "$BATS_FILE_TMPDIR/static.db" "$W/state/static.db"
+    p enrich_empty_db
+    p enrich_records
+    [ "${lines[0]}" = 1 ]
+    rm "$W/state/static.db"
+    p enrich_empty_db
+    p enrich_job_add "all"
+    [ "$status" -ne 0 ]
+    grep -q "^job=no-static-db$" "$W/results"
+    grep -q "has not been downloaded yet" "$KEI_S/dialogs.log"
 }
 
 @test "enrichment job: a failed commit stops Apply and leaves the rest for a second Apply" {

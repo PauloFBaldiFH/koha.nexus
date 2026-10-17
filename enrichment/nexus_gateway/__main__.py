@@ -1,8 +1,10 @@
-"""python -m nexus_gateway serve | update | koha-sql | panel-list | check
+"""python -m nexus_gateway serve | update | init-db | koha-sql | panel-list | check
 
     serve       run the SRU server (settings: NEXUS_GATEWAY_* variables)
     update      download the newest static.db release and swap it in
                 (--check: only say whether one is available; --force: again)
+    init-db     create an empty static.db where there is none (before the
+                first download), print its record count
     koha-sql    print the SQL that points Koha's rows at this gateway
     panel-list  print the koha.nexus panel's list of these rows
     check       load targets.json and static.db, print what would be served
@@ -13,7 +15,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sqlite3
 import sys
+
+from nexus_enrich.static import create_empty, record_count
 
 from . import koha_sql, update
 from .config import Settings
@@ -39,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     sql.add_argument("--host", default="127.0.0.1")
     sql.add_argument("--port", type=int, default=5000)
     sub.add_parser("check")
+    sub.add_parser("init-db")
     up = sub.add_parser("update")
     up.add_argument("--force", action="store_true")
     up.add_argument("--check", action="store_true")
@@ -55,6 +61,15 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
             return 1
         print(json.dumps(result, ensure_ascii=False))
+        return 0
+    if args.cmd == "init-db":
+        try:
+            created = create_empty(settings.static_db)
+        except (OSError, sqlite3.Error) as exc:
+            print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False))
+            return 1
+        print(json.dumps({"status": "created" if created else "present",
+                          "records": max(record_count(settings.static_db), 0)}))
         return 0
     if args.cmd == "panel-list":
         sys.stdout.write(koha_sql.panel_list(load(settings.targets), args.authorities))

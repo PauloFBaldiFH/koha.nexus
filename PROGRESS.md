@@ -448,6 +448,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   authority batches; an authority a record still links to is kept. Task `enrich-auth-add SCOPE MODE`, panel
   screen Library tools > Enrich & standardize authorities (key h, `AuthEnrichView`), report.html with new
   authorities and heading diffs (diff now shows replaced lines). Manual `sec-enrich-auth`. Not run on a real Koha.
+- **1.5.75 (Paulo: fresh WSL install findings)**: `enrich_install` creates an empty static.db (`python -m
+  nexus_gateway init-db`: schema, meta schema + empty, 0644, never over an existing file) before the gateway starts,
+  so the gateway, Koha's rows and the panel work before the first download; the first download now starts when
+  `static.release` is missing (the empty file is no release). Starting a job on an empty database says the download
+  has started (and starts the update unit) instead of the old error. `releases_api` defaults to the repository's
+  GitHub Releases (`config.RELEASES_API`, also `update.API`); "no release found" now names the URL and that drafts and
+  pre-releases are not read. update chmods static.db and static.release 0644. Cause of Paulo's "no release found":
+  the uploaded enrichment release was still a **draft** (untagged), invisible to the API; publish it as tag
+  `enrich-2026.10` with `nexus-enrich-2026.10.db.zst` + `.sha256`.
 - **1.5.74 (Paulo: authority search row for cataloguing)**: the local gateway answers `/sru/_union-aut` from
   static.db `auth_headings` (`nexus_gateway/authorities.py`): Koha's authority search fields reach it through the
   row's SRU fields (authorpersonal=bath.personalName, authorcorp=bath.corporateName,

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.74"
+PANEL_VERSION=" 1.5.75"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28802,6 +28802,7 @@ WantedBy=timers.target
 UNIT
     systemctl daemon-reload >>"$log" 2>&1
     systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
+    enrich_empty_db >>"$log" 2>&1 || log "enrichment: the empty static.db was not created (see ${log})"
     systemctl restart "$GATEWAY_UNIT" >>"$log" 2>&1
     systemctl start "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
     local i up=0
@@ -28817,9 +28818,31 @@ UNIT
     log "enrichment: ${GATEWAY_UNIT} listening on 127.0.0.1:${GATEWAY_PORT}"
     kei_result gateway running
     enrich_register || log "enrichment: Koha's rows were not changed (see ${log})"
-    # The first static.db: downloaded in the background, throttled.
-    [ -s "$ENRICH_STATE/static.db" ] || systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >>"$log" 2>&1
+    # The first static.db: downloaded in the background, throttled (until
+    # then the empty one answers).
+    [ -s "$ENRICH_STATE/static.release" ] || systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >>"$log" 2>&1
     return 0
+}
+
+# enrich_empty_db: an empty static.db (the schema, no records) where there
+# is none, so the gateway, Koha's rows and the panel's screens work before
+# the first download, which replaces it.
+enrich_empty_db() {
+    [ -e "$ENRICH_STATE/static.db" ] && return 0
+    mkdir -p "$ENRICH_STATE" || return 1
+    gateway_py init-db || return 1
+    if [ -n "$ENRICH_RUNAS" ]; then
+        chown "$ENRICH_RUNAS:$ENRICH_RUNAS" "$ENRICH_STATE" "$ENRICH_STATE/static.db" 2>/dev/null
+        chmod 0750 "$ENRICH_STATE" 2>/dev/null
+    fi
+    return 0
+}
+
+# enrich_records: how many records static.db holds (0 for the empty one).
+enrich_records() {
+    local n
+    n=$(gateway_py init-db 2>/dev/null | sed -n 's/.*"records": *\([0-9][0-9]*\).*/\1/p')
+    printf '%s\n' "${n:-0}"
 }
 
 # enrich_update [--force]: the update service now, waiting for it (it
@@ -28945,9 +28968,11 @@ enrich_job_add() {
     [ "$kind" = auth ] && title=$(t "Enrich & standardize authorities")
     require_database || return 1
     enrich_ready || return 1
-    if [ ! -s "$ENRICH_STATE/static.db" ]; then
+    if [ "$(enrich_records)" = 0 ]; then
+        # Not downloaded yet (or only the empty one): the download starts now.
         kei_result job no-static-db
-        msg_error "" "$(t "The enrichment database is not installed yet. Run the update first (it downloads it in the background).")" 10 76
+        systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >/dev/null 2>&1
+        msg_info "$title" "$(t "The enrichment database has not been downloaded yet. Its download has started in the background: start the job again once it is done.")" 10 76
         return 1
     fi
     local log out id dir args=() n
