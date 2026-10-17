@@ -11,8 +11,12 @@ The list (z3950.py) is grouped by region; the librarian ticks servers
 (space, or a click on a region to tick all of it), scans them behind the
 Pac-Man loader (a real search that must return a MARC record, latency in
 ms) and adds the chosen ones to Koha's z3950servers with
-`config.sh --task z3950-add`, ranked by speed. Logins typed here stay in
-the panel's private config file and the temporary list the task deletes.
+`config.sh --task z3950-add`, ranked by speed (a server Koha already has
+gets the new settings and keeps its tick and rank). "Update server
+settings" sends the whole list to `config.sh --task z3950-sync`: every row
+Koha has is refreshed, the authority files are added when missing. Logins
+typed here stay in the panel's private config file and the temporary list
+the task deletes.
 """
 
 from __future__ import annotations
@@ -91,6 +95,8 @@ class Z3950View(SectionView):
             yield Button(t("Import"), id="z-import", classes="small")
             yield Button(t("Export"), id="z-export", classes="small")
             yield Button(t("Show hidden"), id="z-hidden", classes="small")
+        with Horizontal(classes="quick-actions"):
+            yield Button(t("Update server settings"), id="z-update", classes="small", variant="warning")
         yield Label("", id="z-summary", classes="view-prompt")
         table = DataTable(id="z-table", zebra_stripes=True, cursor_type="row")
         table.add_column(" ", key="tick")
@@ -328,7 +334,8 @@ class Z3950View(SectionView):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {"z-scan": self.scan, "z-add": self.add, "z-login": self.login, "z-hide": self.hide,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
-                   "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data}
+                   "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
+                   "z-update": self.update_servers}
         if event.button.id in actions:
             event.stop()
             actions[event.button.id]()
@@ -395,7 +402,7 @@ class Z3950View(SectionView):
         lines = [f"{ranks[tg.key]:>2}. {tg.describe()}" for tg in sorted(picked, key=lambda x: ranks[x.key])]
         missing = [tg.name for tg in picked if tg.login and not tg.user]
         question = t("Add these ${n} servers to Koha's Z39.50/SRU servers, checked for the cataloguing "
-                     "searches? Servers Koha already has are kept as they are.", n=len(picked))
+                     "searches? Servers Koha already has get these settings and keep their tick and rank.", n=len(picked))
         if missing:
             question += "\n\n" + t("These need a login you have not typed yet: ${names}", names=", ".join(missing))
         if not await self.app.push_screen_wait(ConfirmScreen(title, question, preview="\n".join(lines),
@@ -406,6 +413,33 @@ class Z3950View(SectionView):
             result = await run_task(self.app, title, "z3950-add", str(path))
         finally:
             path.unlink(missing_ok=True)
+        await show_done(self.app, title, result)
+        await self._load_koha()
+
+    def update_servers(self) -> None:
+        self.app.run_worker(self._update_servers(), group="routine", exclusive=True, exit_on_error=False)
+
+    async def _update_servers(self) -> None:
+        """Every server Koha has gets the list's settings (host, port,
+        database, format, timeout, SRU fields), keeping its tick and rank;
+        the authority files are added when missing."""
+        from ..routines.common import failed, run_task, show_done
+        title = t("Update server settings")
+        question = t("Update the settings of the Z39.50/SRU servers Koha already has (address, port, database, "
+                     "format, timeout, SRU fields) from this list? Their tick and rank are kept. The authority "
+                     "files (Library of Congress names and subjects, Biblioteca Nacional) are added when "
+                     "missing, and the Biblioteca Nacional's old Z39.50 addresses are unticked.")
+        if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
+            return
+        path = z3950.write_add_file(self.targets, {})
+        try:
+            result = await run_task(self.app, title, "z3950-sync", str(path))
+        finally:
+            path.unlink(missing_ok=True)
+        if not failed(result):
+            out = result.value
+            self.app.notify(t("Servers added: ${added} · updated: ${updated}", added=out.get("added", "0"),
+                              updated=out.get("updated", "0")), timeout=10)
         await show_done(self.app, title, result)
         await self._load_koha()
 

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.67"
+PANEL_VERSION=" 1.5.68"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -28407,21 +28407,24 @@ lt_aia_changes() {
 # The panel's "Z39.50 / SRU servers" screen (panel/kei_panel/z3950.py)
 # keeps the list of public catalogues, scans them (port, then a real search
 # that must return a valid MARC record) and ranks them by speed. Here only
-# Koha's side of it: the targets already in z3950servers (z3950-list), and
+# Koha's side of it: the targets already in z3950servers (z3950-list), the
+# refresh of all of them from the panel's list (z3950-sync FILE), and
 # the insert of the ones the librarian chose (z3950-add FILE). FILE is a
 # private (0600) tab-separated file written by the panel, one target per
 # line: host, port, db, syntax, encoding, name, rank, timeout, servertype,
-# user, password, sru_fields, sru_options (the last two only for SRU
+# user, password, sru_fields, sru_options, recordtype (biblio when empty;
+# authority for the authority files; sru_fields and sru_options only for SRU
 # targets, e.g. the local Zeus bridge). It may hold logins: it is deleted as soon as
 # it is read, and no password goes to a log or to the screen.
 # ======================================================================
 Z3950_SYNTAXES=" USMARC MARC21 UNIMARC NORMARC DANMARC "
 Z3950_ENCODINGS=" utf8 MARC-8 ISO_5426 ISO_6937 ISO_8859-1 EUC-KR "
 
-# z3950_rows: the catalogue targets of Koha (host, port, db, name), first rank first.
+# z3950_rows: the targets of Koha (host, port, db, name, recordtype): the catalogue
+# ones first, then the authority ones, first rank first.
 z3950_rows() {
-    run_sql "SELECT host, port, IFNULL(db,''), servername FROM ${DB_NAME}.z3950servers
-             WHERE recordtype = 'biblio' ORDER BY \`rank\`, servername;"
+    run_sql "SELECT host, port, IFNULL(db,''), servername, recordtype FROM ${DB_NAME}.z3950servers
+             ORDER BY recordtype = 'authority', \`rank\`, servername;"
 }
 
 # z3950_valid HOST PORT DB SYNTAX ENCODING KIND RANK TIMEOUT: 0 when Koha can take it.
@@ -28446,8 +28449,12 @@ z3950_valid() {
 # the connection settings (host, port, db, syntax, encoding, timeout,
 # servertype, sru_fields, sru_options; the login only when one is given)
 # and keeps the librarian's checked and rank; otherwise it is inserted
-# with the target's checked and rank.
+# with the target's checked and rank. @kei_added and @kei_updated count
+# the rows inserted and the rows whose settings changed.
 #   add    the panel's list: the row keeps its name.
+#   sync   as add, but of the targets Koha does not have only the
+#          authority ones are inserted (the panel's "Update server
+#          settings": every row Koha has is refreshed, none is added).
 #   named  a row koha.nexus owns (a bridge, the Catalog Network): the
 #          address is host and port, whatever the database; the row takes
 #          the name, and any other row with that name or address goes.
@@ -28481,15 +28488,20 @@ z3950_upsert_sql() {
             "$i" "$i" "${Y[i]}" "$free" "${N[i]}"
         printf "$claim" "$i"
     done
+    printf "SET @kei_added := 0, @kei_updated := 0;\n"
     for ((i = 0; i < n; i++)); do
         printf "UPDATE z3950servers SET host = %s, port = %s, db = %s, syntax = %s, encoding = %s, timeout = %s, servertype = %s, sru_fields = %s, sru_options = %s, userid = IF(%s = '', userid, %s), password = IF(%s = '', password, %s)%s WHERE id = @kei_t%s;\n" \
             "${H[i]}" "${P[i]}" "${D[i]}" "${S[i]}" "${E[i]}" "${T[i]}" "${K[i]}" "${F[i]}" "${O[i]}" \
             "${U[i]}" "${U[i]}" "${U[i]}" "${W[i]}" "$([ "$mode" = named ] && printf ', servername = %s' "${N[i]}")" "$i"
+        printf "SET @kei_updated := @kei_updated + GREATEST(ROW_COUNT(), 0);\n"
         [ "$mode" = named ] && printf "DELETE FROM z3950servers WHERE recordtype = %s AND id <> IFNULL(@kei_t%s, 0) AND (servername = %s OR (host = %s AND port = %s));\n" \
             "${Y[i]}" "$i" "${N[i]}" "${H[i]}" "${P[i]}"
+        # sync refreshes the rows Koha has; of the missing ones it adds only authority targets.
+        [ "$mode" = sync ] && [ "${Y[i]}" != "'authority'" ] && continue
         printf "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, \`rank\`, syntax, timeout, servertype, encoding, recordtype, sru_fields, sru_options, add_xslt) SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '' FROM DUAL WHERE @kei_t%s IS NULL AND NOT EXISTS (SELECT 1 FROM z3950servers WHERE recordtype = %s AND host = %s AND port = %s AND IFNULL(db,'') = %s);\n" \
             "${H[i]}" "${P[i]}" "${D[i]}" "${U[i]}" "${W[i]}" "${N[i]}" "${C[i]}" "${R[i]}" "${S[i]}" "${T[i]}" \
             "${K[i]}" "${E[i]}" "${Y[i]}" "${F[i]}" "${O[i]}" "$i" "${Y[i]}" "${H[i]}" "${P[i]}" "${D[i]}"
+        printf "SET @kei_added := @kei_added + GREATEST(ROW_COUNT(), 0);\n"
     done
 }
 
@@ -28504,15 +28516,35 @@ z3950_row() { local IFS=$'\x1f'; printf '%s\n' "$*"; }
 # again, it updates their connection settings and keeps the librarian's
 # tick, rank and name. Only once Koha's database exists; quiet otherwise.
 Z3950_AUTH_SRU_FIELDS='nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice'
+# The Biblioteca Nacional's old Z39.50 addresses, which no longer answer
+# (each search waited for Koha's 30 s timeout): their rows are unticked,
+# never deleted. A row there named BIBLIOTECA NACIONAL (AUTORIDADES) has
+# already been moved to the gateway by the upsert (same name).
+Z3950_DEAD_HOSTS="200.20.12.18 162.214.168.248"
+
+# z3950_auth_rows: the authority targets, as z3950_upsert_sql's input.
+z3950_auth_rows() {
+    z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 1 USMARC utf8 10 zed '' '' '' '' authority
+    z3950_row lx2.loc.gov 210 SAF 'BIBLIOTECA DOS ASSUNTOS DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
+    z3950_row https://sru.koha.nexus 443 sru/bn-aut 'BIBLIOTECA NACIONAL (AUTORIDADES)' 1 3 MARC21 utf8 30 sru \
+        "$Z3950_AUTH_SRU_FIELDS" 'sru=get,sru_version=1.1' '' '' authority
+}
+
+# z3950_dead_sql: untick the rows on Z3950_DEAD_HOSTS (with or without a
+# scheme); @kei_unchecked counts them.
+z3950_dead_sql() {
+    local h list=""
+    for h in $Z3950_DEAD_HOSTS; do
+        list+="${list:+, }'$h', 'http://$h', 'https://$h', 'z3950://$h'"
+    done
+    printf "UPDATE z3950servers SET checked = 0 WHERE checked <> 0 AND host IN (%s);\n" "$list"
+    printf "SET @kei_unchecked := GREATEST(ROW_COUNT(), 0);\n"
+}
+
 z3950_seed_authorities() {
     is_koha_installed 2>/dev/null || return 0
     mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
-    {
-        z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 1 USMARC utf8 10 zed '' '' '' '' authority
-        z3950_row lx2.loc.gov 210 SAF 'BIBLIOTECA DOS ASSUNTOS DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
-        z3950_row https://sru.koha.nexus 443 sru/bn-aut 'BIBLIOTECA NACIONAL (AUTORIDADES)' 1 3 MARC21 utf8 30 sru \
-            "$Z3950_AUTH_SRU_FIELDS" 'sru=get,sru_version=1.1' '' '' authority
-    } | z3950_upsert_sql add | mysql --default-character-set=utf8mb4 "$DB_NAME"
+    { z3950_auth_rows | z3950_upsert_sql add; z3950_dead_sql; } | mysql --default-character-set=utf8mb4 "$DB_NAME"
 }
 
 # ----------------------------------------------------------------------
@@ -28682,10 +28714,16 @@ UNIT
     return 1
 }
 
+# z3950_add FILE [sync]: put the panel's targets in z3950servers (an upsert:
+# a row Koha has is updated in place, keeping its tick and rank). With sync
+# (the panel's "Update server settings" button) FILE is the panel's whole
+# catalogue: every row Koha already has gets the catalogue's settings, the
+# authority targets are added when missing, nothing else is added, and the
+# Biblioteca Nacional's dead Z39.50 rows are unticked.
 z3950_add() {
-    local file="$1" log sql before after err host port db syntax enc name rank timeout kind user pass sru sruopt rows=""
+    local file="$1" mode="${2:-add}" log sql out err host port db syntax enc name rank timeout kind user pass sru sruopt rtype rows=""
     local -a secrets=()
-    local valid=0 invalid=0 n wants_bridge=0 wants_pergamum=0
+    local valid=0 invalid=0 n updated unchecked wants_bridge=0 wants_pergamum=0
     require_database || { rm -f -- "$file"; return 1; }
     if [ ! -f "$file" ]; then
         msg_error "" "$(t "The list of servers to add was not found.")"
@@ -28695,16 +28733,19 @@ z3950_add() {
     log=$(tools_log z3950)
     sql="$TOOLS_WORK/z3950-add.sql"
     ( umask 077; : > "$sql" )
+    # The authority targets go first, so their settings win over a stale copy in the file.
+    [ "$mode" = sync ] && rows=$(z3950_auth_rows)$'\n'
     local line
     while IFS= read -r line || [ -n "$line" ]; do
         # Tabs are IFS white space (empty fields would merge): split on US.
-        IFS=$'\x1f' read -r host port db syntax enc name rank timeout kind user pass sru sruopt <<< "${line//$'\t'/$'\x1f'}"
+        IFS=$'\x1f' read -r host port db syntax enc name rank timeout kind user pass sru sruopt rtype <<< "${line//$'\t'/$'\x1f'}"
         [ -n "$host" ] || continue
         if ! z3950_valid "$host" "$port" "$db" "$syntax" "$enc" "$kind" "${rank:-0}" "${timeout:-0}"; then
             invalid=$((invalid + 1))
             printf 'skipped (invalid): %s:%s/%s\n' "$host" "$port" "$db" >> "$log"
             continue
         fi
+        [ "$rtype" = authority ] || rtype=biblio
         [ -n "$pass" ] && secrets+=("$pass")
         [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$SRU_BRIDGE_PORT" ] && wants_bridge=1
         [ "$kind" = sru ] && [ "$host" = 127.0.0.1 ] && [ "$port" = "$PERGAMUM_BRIDGE_PORT" ] && wants_pergamum=1
@@ -28714,31 +28755,48 @@ z3950_add() {
         # https:// (the koha.nexus gateway, sru.koha.nexus:443, among them).
         [ "$kind" = sru ] && [ "$port" = 443 ] && host="https://${host}"
         valid=$((valid + 1))
-        printf '%s:%s/%s %s (rank %s)\n' "$host" "$port" "$db" "$syntax" "${rank:-0}" >> "$log"
+        printf '%s:%s/%s %s %s (rank %s)\n' "$host" "$port" "$db" "$syntax" "$rtype" "${rank:-0}" >> "$log"
         rows+=$(z3950_row "$host" "$port" "$db" "${name:-$host}" 1 "${rank:-0}" "$syntax" "$enc" "${timeout:-0}" \
-                    "$kind" "$sru" "$sruopt" "$user" "$pass")$'\n'
+                    "$kind" "$sru" "$sruopt" "$user" "$pass" "$rtype")$'\n'
     done < "$file"
     rm -f -- "$file"
-    # Targets already in Koha are updated (connection settings), keeping
-    # the librarian's tick and rank; the others are inserted.
-    printf '%s' "$rows" | z3950_upsert_sql add >> "$sql"
-    if [ "$valid" -eq 0 ]; then
+    if [ "$valid" -eq 0 ] && [ "$mode" != sync ]; then
         rm -f -- "$sql"
         msg_error "" "$(t "None of the chosen servers has a valid address (host, port, database, syntax).")"
         return 1
     fi
-    before=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio';")
-    if ! err=$(mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" 2>&1); then
+    # Targets already in Koha are updated (connection settings), keeping
+    # the librarian's tick and rank; the others are inserted.
+    printf '%s' "$rows" | z3950_upsert_sql "$mode" >> "$sql"
+    if [ "$mode" = sync ]; then
+        z3950_dead_sql >> "$sql"
+    else
+        printf 'SET @kei_unchecked := 0;\n' >> "$sql"
+    fi
+    printf 'SELECT @kei_added, @kei_updated, @kei_unchecked;\n' >> "$sql"
+    if ! out=$(mysql -N -B --default-character-set=utf8mb4 "$DB_NAME" < "$sql" 2>&1); then
         rm -f -- "$sql"
         # An SQL error quotes the statement: the passwords are masked first.
+        err=$out
         for n in "${secrets[@]}"; do err=${err//"$n"/***}; done
         printf '%s\n' "$err" >> "$log"
         msg_error "" "$(t "Koha's database did not take the servers. Log: \${log}")"
         return 1
     fi
     rm -f -- "$sql"
-    after=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio';")
-    n=$(( ${after:-0} - ${before:-0} ))
+    read -r n updated unchecked <<< "$(printf '%s\n' "$out" | tail -n 1)"
+    [[ "$n" =~ ^[0-9]+$ ]] || n=0
+    [[ "$updated" =~ ^[0-9]+$ ]] || updated=0
+    [[ "$unchecked" =~ ^[0-9]+$ ]] || unchecked=0
+    if [ "$mode" = sync ]; then
+        kei_result added "$n"
+        kei_result updated "$updated"
+        kei_result unchecked "$unchecked"
+        kei_result invalid "$invalid"
+        log "z3950: sync: ${n} target(s) added, ${updated} updated, ${unchecked} dead row(s) unticked, ${invalid} invalid"
+        msg_ok "$(t "Z39.50/SRU server settings updated.\nAdded: \${n}\nUpdated: \${updated}\n\nOld Biblioteca Nacional addresses unticked: \${unchecked}")"
+        return 0
+    fi
     # The Zeus target needs its bridge running on this server.
     if [ "${wants_bridge:-0}" = 1 ]; then
         if ! sru_bridge_listening; then
@@ -28753,11 +28811,12 @@ z3950_add() {
         fi
         pergamum_bridge_register 1
     fi
-    kei_result added "$n"
-    kei_result existing "$((valid - n))"
-    kei_result invalid "$invalid"
-    log "z3950: ${n} target(s) added, $((valid - n)) already there, ${invalid} invalid"
     local existing=$((valid - n))
+    kei_result added "$n"
+    kei_result existing "$existing"
+    kei_result updated "$updated"
+    kei_result invalid "$invalid"
+    log "z3950: ${n} target(s) added, ${existing} already there (${updated} updated), ${invalid} invalid"
     msg_ok "$(t "Z39.50/SRU servers added to Koha: \${n}\nAlready in Koha: \${existing}\n\nThey are in Administration > Z39.50/SRU servers, checked for the cataloguing searches.")"
 }
 
@@ -30750,6 +30809,7 @@ kei_task() {
             done < <(z3950_rows)
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
+        z3950-sync)      [ -n "${1:-}" ] || return 2; z3950_add "$1" sync ;;
         z3950-seed)      z3950_seed_authorities ;;
         sru-bridge)      sru_bridge_install; local brc=$?; sru_bridge_register; return "$brc" ;;
         pergamum-bridge) sru_bridge_install pergamum; local prc=$?; pergamum_bridge_register; return "$prc" ;;

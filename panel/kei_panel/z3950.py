@@ -49,14 +49,17 @@ COMMUNITY_URL = ("https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/mai
 LOCAL_FILE = "z3950-targets.json"     # the person's imports and logins
 HISTORY_FILE = "z3950-history.json"   # scan results and the blacklist
 
-# The four headings of the list, in order (the groups of the koha.nexus SRU
-# gateway's targets.json; the screen numbers them [1] to [4]).
+# The headings of the list, in order (the four groups of the koha.nexus SRU
+# gateway's targets.json, then the authority files; the screen numbers them
+# [1] to [5]).
 REGIONS = {
     "national": "National libraries and official bodies",
     "br_universities": "Brazilian universities (federal and state)",
     "intl_universities": "International universities",
     "specialized": "Specialized and union catalogues",
+    "authorities": "Authority files (authority search)",
 }
+RECORDTYPES = ("biblio", "authority")
 SYNTAXES = ("USMARC", "MARC21", "UNIMARC", "NORMARC", "DANMARC")
 ENCODINGS = ("utf8", "MARC-8", "ISO_5426", "ISO_6937", "ISO_8859-1", "EUC-KR")
 ALT_PORTS = (210, 2100, 2210)
@@ -123,6 +126,9 @@ class Target:
     source: str = ""
     notes: str = ""
     verified: bool = False       # taken from the library's own published page
+    recordtype: str = "biblio"   # biblio, or authority (Koha's authority search)
+    timeout: int = 0             # Koha's timeout in seconds (0: Koha's default)
+    rank: int = 0                # a fixed Koha rank (0: by speed in the last scan)
     origin: str = "curated"      # curated, community, imported, custom
 
     @property
@@ -141,6 +147,8 @@ class Target:
     def to_dict(self, passwords: bool = False) -> dict:
         d = {k: v for k, v in asdict(self).items() if v not in ("", False) or k in ("name", "host", "port")}
         d.pop("origin", None)
+        if d.get("recordtype") == "biblio":
+            d.pop("recordtype")
         if not passwords:
             d.pop("password", None)
         return d
@@ -168,6 +176,9 @@ _ALIASES = {
     "login": ("login", "needs_login", "auth"),
     "login_env": ("login_env",),
     "verified": ("verified",),
+    "recordtype": ("recordtype", "record_type"),
+    "timeout": ("timeout",),
+    "rank": ("rank",),
 }
 _FIELD_OF = {alias: f for f, aliases in _ALIASES.items() for alias in aliases}
 
@@ -239,6 +250,10 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
     if region not in REGIONS:
         region = next((k for k, v in REGIONS.items() if v.lower() == region), "") or guess_region(country, host)
     user, password = str(d.get("user", "")), str(d.get("password", ""))
+    recordtype = str(d.get("recordtype", "")).strip().lower()
+    recordtype = recordtype if recordtype in RECORDTYPES else "biblio"
+    if recordtype == "authority" and "region" not in d:
+        region = "authorities"
     login_env = str(d.get("login_env", "")).strip().upper()
     if not _LOGIN_ENV.match(login_env):
         login_env = ""               # a list from elsewhere must not read any other variable
@@ -257,7 +272,8 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
         sru_options=str(d.get("sru_options", "")) if kind == "sru" else "",
         preselect=_truthy(d.get("preselect")),
         source=str(d.get("source", "")), notes=str(d.get("notes", "")),
-        verified=_truthy(d.get("verified")), origin=origin)
+        verified=_truthy(d.get("verified")), recordtype=recordtype, timeout=_small_int(d.get("timeout")),
+        rank=_small_int(d.get("rank")), origin=origin)
 
 
 _LOGIN_ENV = re.compile(r"^KEI_Z3950_[A-Z0-9_]{1,40}$")
@@ -265,6 +281,15 @@ _LOGIN_ENV = re.compile(r"^KEI_Z3950_[A-Z0-9_]{1,40}$")
 
 def _truthy(v) -> bool:
     return v is True or str(v).strip().lower() in _BOOL
+
+
+def _small_int(v) -> int:
+    """A timeout or rank as Koha takes it (0 to 9999), 0 when it is not one."""
+    try:
+        n = int(str(v).strip())
+    except ValueError:
+        return 0
+    return n if 0 <= n <= 9999 else 0
 
 
 def merge(*lists: list[Target]) -> list[Target]:
@@ -380,8 +405,8 @@ def _sql_values(s: str) -> list[list]:
 
 def parse_koha_sql(text: str, origin: str = "imported") -> list[Target]:
     """INSERT INTO z3950servers ... statements of a mysqldump or of Koha's
-    own sample SQL (with or without a column list). Authority targets are
-    skipped."""
+    own sample SQL (with or without a column list), authority targets
+    included."""
     out: list[Target] = []
     pat = re.compile(r"INSERT\s+(?:IGNORE\s+)?INTO\s+`?z3950servers`?\s*(\(([^)]*)\))?\s*(VALUES|SELECT)\s*",
                      re.I)
@@ -394,13 +419,13 @@ def parse_koha_sql(text: str, origin: str = "imported") -> list[Target]:
             rest = "(" + rest[:end.start() if end else len(rest)] + ")"
         for values in _sql_values(rest):
             row = dict(zip(cols, values))
-            if str(row.get("recordtype") or "biblio").lower() == "authority":
-                continue
             t = make_target({
                 "name": row.get("servername"), "host": row.get("host"), "port": row.get("port"),
                 "db": row.get("db"), "syntax": row.get("syntax"), "encoding": row.get("encoding"),
                 "kind": row.get("servertype"), "user": row.get("userid"),
-                "password": row.get("password")}, origin)
+                "password": row.get("password"), "recordtype": row.get("recordtype"),
+                "timeout": row.get("timeout"), "sru_fields": row.get("sru_fields"),
+                "sru_options": row.get("sru_options")}, origin)
             if t:
                 out.append(t)
     return out
@@ -510,7 +535,7 @@ def to_json(targets: list[Target], passwords: bool = False) -> str:
 
 
 CSV_COLUMNS = ("name", "host", "port", "db", "kind", "syntax", "encoding", "region", "country", "user",
-               "schema", "source", "notes")
+               "schema", "source", "notes", "recordtype", "timeout")
 
 
 def to_csv(targets: list[Target], passwords: bool = False) -> str:
@@ -531,36 +556,48 @@ def to_koha_sql(targets: list[Target], ranks: dict[str, int] | None = None, pass
     """SQL another Koha can load, again and again (as config.sh's
     z3950_upsert_sql): a target already there (same host, port and
     database, else the same name) gets the connection settings and keeps
-    its tick and rank; the others are inserted."""
+    its tick and rank; the others are inserted. A target matches only
+    rows of its own record type (biblio or authority). An SRU target on
+    port 443 is written with https:// in front of the host, as Koha needs
+    it to speak HTTPS (and as config.sh writes it)."""
     lines = ["-- Z39.50/SRU targets exported by koha.nexus", "SET @kei_claimed := '';"]
-    free = "recordtype = 'biblio' AND FIND_IN_SET(id, @kei_claimed) = 0"
+    free = "recordtype = {rt} AND FIND_IN_SET(id, @kei_claimed) = 0"
     claim = "SET @kei_claimed := CONCAT_WS(',', NULLIF(@kei_claimed, ''), @kei_t{i});"
     for i, t in enumerate(targets):
-        lines.append(f"SET @kei_t{i} := (SELECT id FROM z3950servers WHERE {free} AND host = {_q(t.host)} "
-                     f"AND port = {int(t.port)} AND IFNULL(db,'') = {_q(t.db)} ORDER BY id LIMIT 1);")
+        lines.append(f"SET @kei_t{i} := (SELECT id FROM z3950servers WHERE {free.format(rt=_q(t.recordtype))} "
+                     f"AND host = {_q(koha_host(t))} AND port = {int(t.port)} AND IFNULL(db,'') = {_q(t.db)} "
+                     "ORDER BY id LIMIT 1);")
         lines.append(claim.format(i=i))
     for i, t in enumerate(targets):
-        lines.append(f"SET @kei_t{i} := IFNULL(@kei_t{i}, (SELECT id FROM z3950servers WHERE {free} "
-                     f"AND servername = {_q(t.name)} ORDER BY id LIMIT 1));")
+        lines.append(f"SET @kei_t{i} := IFNULL(@kei_t{i}, (SELECT id FROM z3950servers WHERE "
+                     f"{free.format(rt=_q(t.recordtype))} AND servername = {_q(t.name)} ORDER BY id LIMIT 1));")
         lines.append(claim.format(i=i))
     for i, t in enumerate(targets, 1):
-        rank = (ranks or {}).get(t.key, i)
+        rank = t.rank or (ranks or {}).get(t.key, i)
         pw = t.password if passwords else ""
+        host, rt = _q(koha_host(t)), _q(t.recordtype)
         user, sru, opts = _q(t.user), _q(sru_fields(t)), _q(t.sru_options if t.kind == "sru" else "")
         lines.append(
-            f"UPDATE z3950servers SET host = {_q(t.host)}, port = {int(t.port)}, db = {_q(t.db)}, "
-            f"syntax = {_q(t.syntax)}, encoding = {_q(t.encoding)}, timeout = 0, servertype = {_q(t.kind)}, "
-            f"sru_fields = {sru}, sru_options = {opts}, userid = IF({user} = '', userid, {user}), "
+            f"UPDATE z3950servers SET host = {host}, port = {int(t.port)}, db = {_q(t.db)}, "
+            f"syntax = {_q(t.syntax)}, encoding = {_q(t.encoding)}, timeout = {int(t.timeout)}, "
+            f"servertype = {_q(t.kind)}, sru_fields = {sru}, sru_options = {opts}, "
+            f"userid = IF({user} = '', userid, {user}), "
             f"password = IF({_q(pw)} = '', password, {_q(pw)}) WHERE id = @kei_t{i - 1};")
         lines.append(
             "INSERT INTO z3950servers (host, port, db, userid, password, servername, checked, `rank`, syntax, "
             "timeout, servertype, encoding, recordtype, sru_fields, sru_options) SELECT "
-            f"{_q(t.host)}, {int(t.port)}, {_q(t.db)}, {user}, {_q(pw)}, {_q(t.name)}, 1, {int(rank)}, "
-            f"{_q(t.syntax)}, 0, {_q(t.kind)}, {_q(t.encoding)}, 'biblio', {sru}, {opts} "
+            f"{host}, {int(t.port)}, {_q(t.db)}, {user}, {_q(pw)}, {_q(t.name)}, 1, {int(rank)}, "
+            f"{_q(t.syntax)}, {int(t.timeout)}, {_q(t.kind)}, {_q(t.encoding)}, {rt}, {sru}, {opts} "
             f"FROM DUAL WHERE @kei_t{i - 1} IS NULL AND NOT EXISTS "
-            f"(SELECT 1 FROM z3950servers WHERE host = {_q(t.host)} AND port = {int(t.port)} "
-            f"AND IFNULL(db,'') = {_q(t.db)} AND recordtype = 'biblio');")
+            f"(SELECT 1 FROM z3950servers WHERE host = {host} AND port = {int(t.port)} "
+            f"AND IFNULL(db,'') = {_q(t.db)} AND recordtype = {rt});")
     return "\n".join(lines) + "\n"
+
+
+def koha_host(t: Target) -> str:
+    """The host as Koha's z3950servers keeps it: https:// in front for an
+    SRU server on port 443."""
+    return f"https://{t.host}" if t.kind == "sru" and t.port == 443 else t.host
 
 
 def write_export(path: Path, targets: list[Target], passwords: bool = False) -> None:
@@ -572,7 +609,7 @@ def write_export(path: Path, targets: list[Target], passwords: bool = False) -> 
 
 # The file config.sh --task z3950-add reads: one line per target.
 ADD_FIELDS = ("host", "port", "db", "syntax", "encoding", "name", "rank", "timeout", "kind", "user", "password",
-              "sru_fields", "sru_options")
+              "sru_fields", "sru_options", "recordtype")
 DEFAULT_SRU_FIELDS = "title=dc.title,isbn=bath.isbn,author=dc.creator"
 
 
@@ -591,9 +628,9 @@ def add_file_text(targets: list[Target], ranks: dict[str, int]) -> str:
     lines = []
     for t in targets:
         row = {"host": t.host, "port": t.port, "db": t.db, "syntax": t.syntax, "encoding": t.encoding,
-               "name": t.name, "rank": ranks.get(t.key, 0), "timeout": 0, "kind": t.kind, "user": t.user,
-               "password": t.password, "sru_fields": sru_fields(t),
-               "sru_options": t.sru_options if t.kind == "sru" else ""}
+               "name": t.name, "rank": t.rank or ranks.get(t.key, 0), "timeout": t.timeout, "kind": t.kind,
+               "user": t.user, "password": t.password, "sru_fields": sru_fields(t),
+               "sru_options": t.sru_options if t.kind == "sru" else "", "recordtype": t.recordtype}
         lines.append("\t".join(_cell(row[f]) for f in ADD_FIELDS))
     return "\n".join(lines) + "\n"
 
@@ -1214,10 +1251,11 @@ def rank(results: list[ScanResult]) -> list[ScanResult]:
 
 def koha_ranks(targets: list[Target], history: History) -> dict[str, int]:
     """Koha's display rank (1 = first) for targets about to be added: the
-    fastest working one first, never-scanned ones after them."""
+    fastest working one first, never-scanned ones after them; a target
+    with a fixed rank (the authority files) keeps it."""
     def score(t: Target):
         h = history.get(t.key)
         status = h.get("status", "")
         known = STATUS_ORDER.index(status) if status in STATUS_ORDER else len(STATUS_ORDER)
         return (known, h.get("query_ms") or 10**9, t.name.lower())
-    return {t.key: i for i, t in enumerate(sorted(targets, key=score), 1)}
+    return {t.key: t.rank or i for i, t in enumerate(sorted(targets, key=score), 1)}

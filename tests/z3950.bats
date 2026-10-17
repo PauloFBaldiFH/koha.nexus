@@ -73,7 +73,7 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     # The invalid ones were refused, nothing of them reached the database.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Bad%'")" = "0" ]
     grep -q "OK .*added to Koha: 4" "$KEI_S/dialogs.log"
-    [ "$(cat "$W/results")" = "$(printf 'RESULT koha-target=set\nRESULT added=4\nRESULT existing=1\nRESULT invalid=2')" ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT koha-target=set\nRESULT added=4\nRESULT existing=1\nRESULT updated=1\nRESULT invalid=2')" ]
     grep -q "Already in Koha: 1" "$KEI_S/dialogs.log"
     # The password is in no log, and no SQL file is left behind.
     ! grep -rq "w0rd" "$W/logs" /var/log/koha-easy-install 2>/dev/null
@@ -226,22 +226,96 @@ print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
     mysql --default-character-set=utf8mb4 "$DB" < "$W/export.sql"
     [ "$(zsql "SELECT servername, syntax, checked, \`rank\` FROM z3950servers WHERE host = 'lx2.loc.gov' AND recordtype = 'biblio'")" = \
       "$(printf 'LIBRARY OF CONGRESS\tMARC21\t0\t8')" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'services.dnb.de'")" = "1" ]
+    # An SRU server on 443 is written as config.sh writes it: https:// in the host.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'https://services.dnb.de'")" = "1" ]
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
     mysql --default-character-set=utf8mb4 "$DB" < "$W/export.sql"
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
 }
 
-@test "z3950-list: Koha's catalogue targets, no authority ones" {
+@test "z3950-list: Koha's targets, the catalogue ones first, then the authority ones" {
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-list bash "$PANEL" z3950_rows
     [ "$status" -eq 0 ]
-    [ "$output" = "$(printf 'lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS')" ]
+    [ "$output" = "$(printf 'lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS\tbiblio\nlx2.loc.gov\t210\tNAF\tLOC AUTHORITIES\tauthority')" ]
 }
 
 @test "z3950: the panel knows the tasks" {
     grep -q '^        z3950-list)' "$KEI_REPO/installer"
     grep -q '^        z3950-add) ' "$KEI_REPO/installer"
     grep -q '^        z3950-seed) ' "$KEI_REPO/installer"
+    grep -q '^        z3950-sync) ' "$KEI_REPO/installer"
+}
+
+@test "z3950-seed: the Biblioteca Nacional's dead Z39.50 rows are unticked; one of the same name moves in place" {
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype)
+          VALUES ('162.214.168.248', 210, 'BNAUT', 'BIBLIOTECA NACIONAL (AUTORIDADES)', 1, 5, 'USMARC', 'utf8', 30, 'zed', 'authority'),
+                 ('200.20.12.18', 210, 'AUT', 'Biblioteca Nacional autoridades (antigo)', 1, 4, 'USMARC', 'utf8', 30, 'zed', 'authority')"
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
+    [ "$status" -eq 0 ]
+    # Same name and record type: moved to the gateway in place, keeping its tick and rank.
+    [ "$(zsql "SELECT host, port, db, servertype, syntax, timeout, checked, \`rank\` FROM z3950servers WHERE servername = 'BIBLIOTECA NACIONAL (AUTORIDADES)'")" = \
+      "$(printf 'https://sru.koha.nexus\t443\tsru/bn-aut\tsru\tMARC21\t30\t1\t5')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE db = 'sru/bn-aut'")" = "1" ]
+    # Another name on a dead address: kept, unticked (no more 30 s waits).
+    [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE host = '200.20.12.18'")" = "$(printf '0\t4')" ]
+}
+
+# The panel's whole catalogue, as write_add_file writes it (host ... sru_options recordtype).
+catalogue_tsv() {
+    PYTHONPATH="$BATS_TEST_DIRNAME/../panel" python3 -c '
+from kei_panel import z3950
+print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
+}
+
+@test "z3950-sync: refreshes every row Koha has, adds only the missing authority files, counts both" {
+    # A gateway row with old settings, the librarian's tick and rank; a stale BN authority row with SRU fields missing.
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype, sru_fields, sru_options)
+          VALUES ('http://137.131.205.31', 5000, 'sru/bn', 'Fundação Biblioteca Nacional (BN)', 0, 7, 'USMARC', 'MARC-8', 5, 'sru', 'biblio', 'title=dc.title', ''),
+                 ('162.214.168.248', 210, 'BNAUT', 'BN antiga', 1, 9, 'USMARC', 'utf8', 30, 'zed', 'authority', NULL, NULL)"
+    catalogue_tsv > "$W/all.tsv"
+    [ "$(wc -l < "$W/all.tsv")" -ge 75 ]
+    cp "$W/all.tsv" "$W/all2.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/all.tsv" sync
+    echo "$output"; cat "$W/results"
+    [ "$status" -eq 0 ]
+    [ ! -e "$W/all.tsv" ]
+    # Found by name, moved to the gateway, tick and rank kept.
+    [ "$(zsql "SELECT host, port, syntax, encoding, timeout, sru_options, checked, \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = \
+      "$(printf 'https://sru.koha.nexus\t443\tMARC21\tutf8\t0\tsru=get,sru_version=1.1\t0\t7')" ]
+    [ "$(zsql "SELECT sru_fields FROM z3950servers WHERE db = 'sru/bn'")" = \
+      "title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice" ]
+    # No catalogue server Koha did not have was added: still 2 biblio rows (LoC LCDB and BN).
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio'")" = "2" ]
+    # The authority files: NAF updated (tick and rank kept), SAF and BN added; the dead BN row unticked.
+    [ "$(zsql "SELECT db, servername, checked, \`rank\`, timeout FROM z3950servers WHERE recordtype = 'authority' AND host <> '162.214.168.248' ORDER BY db")" = \
+      "$(printf 'NAF\tLOC AUTHORITIES\t0\t0\t10\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\t10\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\t30')" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE host = '162.214.168.248'")" = "0" ]
+    # BN and NAF updated (LCDB is not in the list: left as it is).
+    [ "$(cat "$W/results")" = "$(printf 'RESULT added=2\nRESULT updated=2\nRESULT unchecked=1\nRESULT invalid=0')" ]
+    grep -q "OK .*settings updated.*Added: 2.*Updated: 2" "$KEI_S/dialogs.log"
+    # Again: nothing to add, nothing to change.
+    rm -f "$W/results"
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/all2.tsv" sync
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT added=0\nRESULT updated=0\nRESULT unchecked=0\nRESULT invalid=0')" ]
+    # No bridge was installed for it.
+    [ ! -e "$W/bridge" ]
+}
+
+@test "z3950-add: an authority target matches only authority rows, by address or name, and gets its SRU fields" {
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype)
+          VALUES ('162.214.168.248', 210, 'BNAUT', 'BIBLIOTECA NACIONAL (AUTORIDADES)', 0, 6, 'USMARC', 'utf8', 30, 'zed', 'authority'),
+                 ('lx2.loc.gov', 210, 'SAF', 'BIBLIOTECA NACIONAL (AUTORIDADES)', 1, 1, 'USMARC', 'utf8', 0, 'zed', 'biblio')"
+    ( printf '%s\t' sru.koha.nexus 443 sru/bn-aut MARC21 utf8 'BIBLIOTECA NACIONAL (AUTORIDADES)' 3 30 sru '' '' \
+          'nameany=dc.creator,srchany=cql.serverChoice' 'sru=get,sru_version=1.1' authority; printf '\n' ) > "$W/a.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_add "$W/a.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT host, port, db, servertype, syntax, sru_fields, sru_options, checked, \`rank\` FROM z3950servers WHERE recordtype = 'authority' AND servername LIKE 'BIBLIOTECA NACIONAL%'")" = \
+      "$(printf 'https://sru.koha.nexus\t443\tsru/bn-aut\tsru\tMARC21\tnameany=dc.creator,srchany=cql.serverChoice\tsru=get,sru_version=1.1\t0\t6')" ]
+    # The biblio row of the same name is not touched.
+    [ "$(zsql "SELECT host, db FROM z3950servers WHERE recordtype = 'biblio' AND servername LIKE 'BIBLIOTECA NACIONAL%'")" = "$(printf 'lx2.loc.gov\tSAF')" ]
 }
 
 @test "z3950-add: no bridge install without a Zeus row" {
@@ -379,4 +453,20 @@ SH
     grep -q '^        z3950-server-status)' "$KEI_REPO/installer"
     grep -q '^        z3950-daemon) ' "$KEI_REPO/installer"
     grep -q '^        catalog-network)' "$KEI_REPO/installer"
+}
+
+@test "docs/sql/koha-authority-servers.sql: what the installer seeds, loads in Koha, re-runnable" {
+    SQL="$BATS_TEST_DIRNAME/../docs/sql/koha-authority-servers.sql"
+    gen="$( { bash "$PANEL" z3950_auth_rows | bash "$PANEL" z3950_upsert_sql add; bash "$PANEL" z3950_dead_sql; } 2>/dev/null)"
+    [ "$(grep -v -e '^--' -e '^SET NAMES' -e '^SELECT @kei_added' "$SQL")" = "$gen" ]
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, timeout, servertype, recordtype)
+          VALUES ('200.20.12.18', 210, 'AUT', 'BN velha', 1, 4, 'USMARC', 'utf8', 30, 'zed', 'authority')"
+    mysql --default-character-set=utf8mb4 "$DB" < "$SQL" > /dev/null
+    # Again: nothing added, changed or unticked.
+    run bash -c "mysql -N --default-character-set=utf8mb4 '$DB' < '$SQL'"
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority' AND checked = 1")" = "2" ]
+    [ "$(zsql "SELECT db FROM z3950servers WHERE recordtype = 'authority' AND checked = 1 ORDER BY db")" = "$(printf 'SAF\nsru/bn-aut')" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE host = '200.20.12.18'")" = "0" ]
+    [ "$output" = "$(printf '0\t0\t0')" ]
 }

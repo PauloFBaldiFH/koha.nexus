@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "updated": "2026-10-15",
- "about": "koha.nexus SRU gateway targets, generated from sru-bridge/sru_gateway/targets.json by python -m sru_gateway.koha_sql --write: every one is sru.koha.nexus:443/sru/<id>. verified=true: searched live through the gateway. The panel's scan on your server tells which ones answer today.",
+ "updated": "2026-10-17",
+ "about": "koha.nexus SRU gateway targets, generated from sru-bridge/sru_gateway/targets.json by python -m sru_gateway.koha_sql --write: every one is sru.koha.nexus:443/sru/<id>. verified=true: searched live through the gateway. The panel's scan on your server tells which ones answer today. The last three are authority files (recordtype authority) for Koha's authority search: the Library of Congress name and subject files and the Biblioteca Nacional's authorities on the gateway (sru/bn-aut).",
  "targets": [
   {
    "name": "Fundação Biblioteca Nacional (BN)",
@@ -1226,6 +1226,60 @@
    "verified": false,
    "source": "koha.nexus SRU gateway (sru-bridge/sru_gateway/targets.json)",
    "notes": "Gateway status: missing."
+  },
+  {
+   "name": "BIBLIOTECA DOS NOMES DO CONGRESSO",
+   "host": "lx2.loc.gov",
+   "port": 210,
+   "db": "NAF",
+   "kind": "zed",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "recordtype": "authority",
+   "timeout": 10,
+   "rank": 1,
+   "region": "authorities",
+   "country": "US",
+   "verified": true,
+   "source": "Library of Congress Z39.50 (lx2.loc.gov:210)",
+   "notes": "Library of Congress name authority file, for Koha's authority search."
+  },
+  {
+   "name": "BIBLIOTECA DOS ASSUNTOS DO CONGRESSO",
+   "host": "lx2.loc.gov",
+   "port": 210,
+   "db": "SAF",
+   "kind": "zed",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "recordtype": "authority",
+   "timeout": 10,
+   "rank": 2,
+   "region": "authorities",
+   "country": "US",
+   "verified": true,
+   "source": "Library of Congress Z39.50 (lx2.loc.gov:210)",
+   "notes": "Library of Congress subject authority file, for Koha's authority search."
+  },
+  {
+   "name": "BIBLIOTECA NACIONAL (AUTORIDADES)",
+   "host": "sru.koha.nexus",
+   "port": 443,
+   "db": "sru/bn-aut",
+   "kind": "sru",
+   "syntax": "MARC21",
+   "encoding": "utf8",
+   "schema": "marcxml",
+   "sru_fields": "nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,srchany=cql.serverChoice",
+   "sru_options": "sru=get,sru_version=1.1",
+   "recordtype": "authority",
+   "timeout": 30,
+   "rank": 3,
+   "region": "authorities",
+   "country": "BR",
+   "verified": true,
+   "source": "koha.nexus SRU gateway (sru/bn-aut)",
+   "notes": "Authority records built from the Fundação Biblioteca Nacional catalogue's headings. Replaces the old BN Z39.50 addresses (200.20.12.18, 162.214.168.248)."
   }
  ]
 }
