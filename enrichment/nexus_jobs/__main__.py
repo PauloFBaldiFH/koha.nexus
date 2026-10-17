@@ -1,7 +1,8 @@
 """python -m nexus_jobs [--state DIR] COMMAND
 
 Jobs (the panel's tasks call these through the installer):
-    add --scope "all" | "101, 102, 500-550"     new job; prints its id and folder
+    add --scope "all" | "101, 102, 500-550" [--kind auth --mode exact|fuzzy]
+                                    new job; prints its id and folder
     exported ID                     Koha's records are in jobs/ID/export.xml
     fail ID --error TEXT
     cancel ID
@@ -15,6 +16,10 @@ Apply and Revert bookkeeping (installer only):
     check-matches ID N --batch B --staged FILE
     committed ID N --after TSV | chunk-failed ID N --note TEXT
     applied-ids ID | revert-plan ID --current TSV [--all] | reverted ID N [--kept LIST]
+    kind ID | chunks ID --kind auth|bib
+    auth-resolve ID --koha XML | auth-file ID N --out FILE
+    auth-committed ID N [--batch B] --staged TSV
+    auth-revert-plan ID | auth-reverted ID N [--kept LIST]
 
 State folder: --state, else NEXUS_JOBS_STATE, else /var/lib/koha-nexus-enrich.
 """
@@ -26,6 +31,8 @@ import json
 import os
 import sys
 from pathlib import Path
+
+from nexus_enrich.authority import KohaIndex
 
 from . import apply, report, scope
 from .store import Store
@@ -41,8 +48,16 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("add")
     a.add_argument("--scope", default="all")
-    for name in ("exported", "cancel", "show", "chunks", "applied-ids"):
+    a.add_argument("--kind", choices=("bib", "auth"), default="bib")
+    a.add_argument("--mode", choices=("exact", "fuzzy"), default="exact")
+    for name in ("exported", "cancel", "show", "applied-ids", "kind", "auth-revert-plan"):
         sub.add_parser(name).add_argument("job", type=int)
+    ch = sub.add_parser("chunks")
+    ch.add_argument("job", type=int)
+    ch.add_argument("--kind", choices=("bib", "auth"), default="")
+    ar = sub.add_parser("auth-resolve")
+    ar.add_argument("job", type=int)
+    ar.add_argument("--koha", type=Path, required=True)
     f = sub.add_parser("fail")
     f.add_argument("job", type=int)
     f.add_argument("--error", default="")
@@ -56,13 +71,19 @@ def main(argv: list[str] | None = None) -> int:
     w = sub.add_parser("worker")
     w.add_argument("--once", action="store_true")
     w.add_argument("--pause", type=float, default=float(os.environ.get("NEXUS_JOBS_PAUSE", "1.5")))
-    for name in ("chunk-ids", "chunk-file", "check-matches", "committed", "chunk-failed", "reverted"):
+    for name in ("chunk-ids", "chunk-file", "check-matches", "committed", "chunk-failed", "reverted",
+                 "auth-file", "auth-committed", "auth-reverted"):
         c = sub.add_parser(name)
         c.add_argument("job", type=int)
         c.add_argument("chunk", type=int)
         if name == "chunk-file":
             c.add_argument("--current", required=True)
             c.add_argument("--out", type=Path, required=True)
+        elif name == "auth-file":
+            c.add_argument("--out", type=Path, required=True)
+        elif name == "auth-committed":
+            c.add_argument("--batch", type=int, default=0)
+            c.add_argument("--staged", type=Path, required=True)
         elif name == "check-matches":
             c.add_argument("--batch", type=int, required=True)
             c.add_argument("--staged", type=Path, required=True)
@@ -70,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
             c.add_argument("--after", required=True)
         elif name == "chunk-failed":
             c.add_argument("--note", default="")
-        elif name == "reverted":
+        elif name in ("reverted", "auth-reverted"):
             c.add_argument("--kept", default="")
     r = sub.add_parser("revert-plan")
     r.add_argument("job", type=int)
@@ -113,7 +134,7 @@ def _jobs(args, store: Store, settings: Settings) -> int:
     cmd = args.cmd
     if cmd == "add":
         ranges = scope.parse(args.scope)
-        job = store.add(scope.text(ranges))
+        job = store.add(scope.text(ranges), args.kind, args.mode if args.kind == "auth" else "")
         folder = settings.job_dir(job.id)
         folder.mkdir(parents=True, exist_ok=True)
         ids = ""
@@ -153,11 +174,16 @@ def _jobs(args, store: Store, settings: Settings) -> int:
         out["chunks"] = [dict(c) for c in store.chunks(job.id)]
         # The records a person reviews first (the panel's list): changed
         # ones, then the review list, at most SHOW_CHANGES.
+        auth = job.kind == "auth"
         out["changes"] = [
             {"biblionumber": r["biblionumber"], "status": r["status"], "title": r["title"], "m0": r["m0"],
              "m1": r["m1"], "w": r["w"], "r": r["r"],
-             "added": len(json.loads(r["detail"] or "{}").get("additions", []))}
+             "added": r["m0"] + r["m1"] if auth else len(json.loads(r["detail"] or "{}").get("additions", []))}
             for status in ("enriched", "review") for r in store.items(job.id, status, limit=SHOW_CHANGES)]
+        if auth:
+            out["new_authorities"] = [{"id": a["id"], "heading": a["heading"], "source": a["source"],
+                                       "preliminary": a["preliminary"], "state": a["state"], "authid": a["authid"]}
+                                      for a in store.new_authorities(job.id)[:SHOW_CHANGES]]
         print(json.dumps(out, ensure_ascii=False))
         return 0
     if cmd == "diff":
@@ -167,7 +193,27 @@ def _jobs(args, store: Store, settings: Settings) -> int:
         if job.state not in ("ready", "applying", "partly-applied"):
             print(f"job {job.id} is {job.state}: nothing to apply", file=sys.stderr)
             return 1
-        print("\n".join(str(n) for n in apply.pending_chunks(store, job.id)))
+        print("\n".join(str(n) for n in apply.pending_chunks(store, job.id, args.kind)))
+        return 0
+    if cmd == "kind":
+        print(job.kind)
+        return 0
+    if cmd == "auth-resolve":
+        print(apply.resolve_new(store, job.id, KohaIndex.from_file(args.koha)))
+        return 0
+    if cmd == "auth-file":
+        print(apply.auth_file(store, job.id, args.chunk, args.out))
+        return 0
+    if cmd == "auth-committed":
+        text = args.staged.read_text(encoding="utf-8", errors="replace") if args.staged.is_file() else ""
+        print(json.dumps(apply.auth_committed(store, job.id, args.chunk, args.batch or None, text)))
+        return 0
+    if cmd == "auth-revert-plan":
+        for chunk, batch, ids in apply.auth_revert_plan(store, job.id):
+            print(f"{chunk}\t{batch}\t{','.join(str(n) for n in ids)}")
+        return 0
+    if cmd == "auth-reverted":
+        apply.auth_reverted(store, job.id, args.chunk, [int(x) for x in args.kept.split(",") if x.strip().isdigit()])
         return 0
     if cmd == "chunk-ids":
         print("\n".join(str(n) for n in apply.chunk_ids(store, job.id, args.chunk)))

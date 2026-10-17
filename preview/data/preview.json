@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.72",
+ "panel_version": "1.5.73",
  "languages": [
   {
    "code": "en",
@@ -572,6 +572,22 @@
    "single": ""
   },
   {
+   "id": "enrich-auth",
+   "item": "sec-enrich-auth",
+   "label": "📇  Enrich & standardize authorities",
+   "title": "📇  Enrich & standardize authorities",
+   "prompt": "",
+   "icon": "",
+   "key": "h",
+   "view": "enrich-auth",
+   "sidebar": false,
+   "parent": "library",
+   "entries": [],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
    "id": "library",
    "item": "sec-library",
    "label": "📚  Library tools",
@@ -584,6 +600,7 @@
    "parent": "",
    "entries": [
     "sec-enrich",
+    "sec-enrich-auth",
     "marc-undo",
     "authority-sync",
     "authority-match",
@@ -1181,6 +1198,16 @@
    "type": "section",
    "section": "enrich",
    "label": "✨  Enrich bibliographic catalog",
+   "description": "",
+   "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "sec-enrich-auth": {
+   "id": "sec-enrich-auth",
+   "type": "section",
+   "section": "enrich-auth",
+   "label": "📇  Enrich & standardize authorities",
    "description": "",
    "kind": "view",
    "status": "available",
@@ -5457,6 +5484,31 @@
   "✨  Enrich bibliographic catalog": {
    "en": "✨  Enrich bibliographic catalog",
    "pt-BR": "✨  Enriquecer catálogo bibliográfico",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📇  Enrich & standardize authorities": {
+   "en": "📇  Enrich & standardize authorities",
+   "pt-BR": "📇  Enriquecer e padronizar autoridades",
    "es": null,
    "fr": null,
    "it": null,
@@ -14774,6 +14826,59 @@
     ]
    }
   },
+  "sec-enrich-auth": {
+   "en": {
+    "summary": "Links the names and subjects of your bibliographic records to authority records, puts each heading in its authorised form and creates the authorities that are missing, with a staged report to read before anything reaches the catalogue.",
+    "overview": [
+     "Each heading (100/110/111/130, 600/610/611/630/650/651/655, 700/710/711/730) is matched first with your own Koha authorities, by the authorised heading and then by its variants (4XX). Only when Koha has none does it look in the koha.nexus enrichment database: Biblioteca Nacional first, then the other Brazilian catalogues, then the Library of Congress.",
+     "Subjects never take LCSH or Library of Congress forms: they are English, and a Portuguese catalogue keeps Portuguese subjects. A heading that already has `$9`, a name/title entry and a subject with subdivisions are left alone.",
+     "When several people share a name and the record gives no dates, or two authorities fit, the heading goes to **Review** and nothing is changed. With **Also close forms**, a heading one typo away from a known one is linked too, and any authority created from it is marked preliminary.",
+     "**Apply** makes a verified safety backup, re-reads Koha's authorities (one added since the report is linked instead of created), creates the new authority records through Koha's staged import, then links the records (`$9`) in batches of at most 500. **Revert** gives the records their previous version back and removes the authorities the job created, except those a record still links to."
+    ],
+    "steps": [
+     "Type the scope: `all`, or biblionumbers such as `101, 102, 500-550`; choose **Exact forms only** or **Also close forms**, and press **Start**.",
+     "Follow the progress in the **Worker** box; **Pause** stops it after the current batch, **Resume** goes on.",
+     "Pick the job in **Jobs** and read the counts: headings linked to Koha, to new authorities, forms standardised, review.",
+     "Select a record in the list to see its headings before and after; press **Open report** for the full report with every new authority record.",
+     "Press **Apply** to write it, or **Cancel job** to drop it. **Revert** undoes an applied job."
+    ],
+    "tips": [
+     "Run **Find duplicate authors** first if your own authorities have duplicates: every heading that fits two Koha authorities goes to review.",
+     "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module."
+    ],
+    "warnings": [
+     "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
+    ],
+    "related": [
+     "sec-enrich",
+     "authority-sync",
+     "authority-match"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Liga os nomes e assuntos dos seus registros bibliográficos a registros de autoridade, põe cada cabeçalho na forma autorizada e cria as autoridades que faltam, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
+    "overview": [
+     "Cada cabeçalho (100/110/111/130, 600/610/611/630/650/651/655, 700/710/711/730) é comparado primeiro com as autoridades do seu Koha, pelo cabeçalho autorizado e depois pelas variantes (4XX). Só quando o Koha não tem nenhuma ele procura na base de enriquecimento do koha.nexus: Biblioteca Nacional primeiro, depois os outros catálogos brasileiros, depois a Library of Congress.",
+     "Assuntos nunca recebem formas LCSH ou da Library of Congress: estão em inglês, e um catálogo em português mantém assuntos em português. Um cabeçalho que já tem `$9`, uma entrada nome/título e um assunto com subdivisões ficam como estão.",
+     "Quando várias pessoas têm o mesmo nome e o registro não traz datas, ou duas autoridades servem, o cabeçalho vai para **Revisar** e nada é alterado. Com **Também formas parecidas**, um cabeçalho a um erro de digitação de outro conhecido também é ligado, e a autoridade criada a partir dele fica marcada como preliminar.",
+     "**Aplicar** faz um backup de segurança verificado, lê de novo as autoridades do Koha (uma acrescentada depois do relatório é ligada em vez de criada), cria os registros de autoridade novos pela importação em lote do Koha e depois liga os registros (`$9`) em lotes de no máximo 500. **Reverter** devolve a versão anterior dos registros e remove as autoridades criadas pela tarefa, exceto as que algum registro ainda usa."
+    ],
+    "steps": [
+     "Digite o escopo: `all` (todos), ou números de registro como `101, 102, 500-550`; escolha **Só formas exatas** ou **Também formas parecidas** e pressione **Iniciar**.",
+     "Acompanhe o progresso no quadro **Processo**; **Pausar** para depois do lote atual, **Retomar** continua.",
+     "Escolha a tarefa em **Tarefas** e leia as contagens: cabeçalhos ligados ao Koha, a autoridades novas, formas padronizadas, revisar.",
+     "Selecione um registro na lista para ver os cabeçalhos antes e depois; pressione **Abrir relatório** para o relatório completo com cada autoridade nova.",
+     "Pressione **Aplicar** para gravar, ou **Cancelar tarefa** para descartar. **Reverter** desfaz uma tarefa aplicada."
+    ],
+    "tips": [
+     "Rode antes **Encontrar autores duplicados** se as suas autoridades têm duplicatas: todo cabeçalho que serve a duas autoridades do Koha vai para revisão.",
+     "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha."
+    ],
+    "warnings": [
+     "Aplicar altera o catálogo e acrescenta registros de autoridade. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
+    ]
+   }
+  },
   "marc-undo": {
    "en": {
     "summary": "Removes the records and items of an imported MARC batch with Koha's own revert, after a preview and a verified backup.",
@@ -17745,167 +17850,167 @@
  },
  "coverage": {
   "en": {
-   "manual": 110,
-   "manual_total": 110,
+   "manual": 111,
+   "manual_total": 111,
    "manual_outdated": [],
-   "strings": 378,
-   "strings_total": 378
+   "strings": 379,
+   "strings_total": 379
   },
   "pt-BR": {
-   "manual": 110,
-   "manual_total": 110,
+   "manual": 111,
+   "manual_total": 111,
    "manual_outdated": [
     "install"
    ],
-   "strings": 370,
-   "strings_total": 378
+   "strings": 371,
+   "strings_total": 379
   },
   "es": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 264,
-   "strings_total": 378
+   "strings_total": 379
   },
   "fr": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 378
+   "strings_total": 379
   },
   "it": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 378
+   "strings_total": 379
   },
   "de": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 378
+   "strings_total": 379
   },
   "nl": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "sv": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "pl": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "cs": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "ru": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "uk": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "tr": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "tl": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "id": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "ar": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "fa": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "hi": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "bn": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "vi": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "zh": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "ja": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   },
   "ko": {
    "manual": 0,
-   "manual_total": 110,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 378
+   "strings_total": 379
   }
  }
 }

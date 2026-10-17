@@ -2239,6 +2239,34 @@
     "authority-sync",
     "magic-import"
    ]
+  },
+  "sec-enrich-auth": {
+   "summary": "Liga os nomes e assuntos dos seus registros bibliográficos a registros de autoridade, põe cada cabeçalho na forma autorizada e cria as autoridades que faltam, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
+   "overview": [
+    "Cada cabeçalho (100/110/111/130, 600/610/611/630/650/651/655, 700/710/711/730) é comparado primeiro com as autoridades do seu Koha, pelo cabeçalho autorizado e depois pelas variantes (4XX). Só quando o Koha não tem nenhuma ele procura na base de enriquecimento do koha.nexus: Biblioteca Nacional primeiro, depois os outros catálogos brasileiros, depois a Library of Congress.",
+    "Assuntos nunca recebem formas LCSH ou da Library of Congress: estão em inglês, e um catálogo em português mantém assuntos em português. Um cabeçalho que já tem `$9`, uma entrada nome/título e um assunto com subdivisões ficam como estão.",
+    "Quando várias pessoas têm o mesmo nome e o registro não traz datas, ou duas autoridades servem, o cabeçalho vai para **Revisar** e nada é alterado. Com **Também formas parecidas**, um cabeçalho a um erro de digitação de outro conhecido também é ligado, e a autoridade criada a partir dele fica marcada como preliminar.",
+    "**Aplicar** faz um backup de segurança verificado, lê de novo as autoridades do Koha (uma acrescentada depois do relatório é ligada em vez de criada), cria os registros de autoridade novos pela importação em lote do Koha e depois liga os registros (`$9`) em lotes de no máximo 500. **Reverter** devolve a versão anterior dos registros e remove as autoridades criadas pela tarefa, exceto as que algum registro ainda usa."
+   ],
+   "steps": [
+    "Digite o escopo: `all` (todos), ou números de registro como `101, 102, 500-550`; escolha **Só formas exatas** ou **Também formas parecidas** e pressione **Iniciar**.",
+    "Acompanhe o progresso no quadro **Processo**; **Pausar** para depois do lote atual, **Retomar** continua.",
+    "Escolha a tarefa em **Tarefas** e leia as contagens: cabeçalhos ligados ao Koha, a autoridades novas, formas padronizadas, revisar.",
+    "Selecione um registro na lista para ver os cabeçalhos antes e depois; pressione **Abrir relatório** para o relatório completo com cada autoridade nova.",
+    "Pressione **Aplicar** para gravar, ou **Cancelar tarefa** para descartar. **Reverter** desfaz uma tarefa aplicada."
+   ],
+   "tips": [
+    "Rode antes **Encontrar autores duplicados** se as suas autoridades têm duplicatas: todo cabeçalho que serve a duas autoridades do Koha vai para revisão.",
+    "Autoridades novas feitas de cabeçalhos colhidos em outros catálogos levam 008/33 `d` e uma nota 667: revise-as no módulo de autoridades do Koha."
+   ],
+   "warnings": [
+    "Aplicar altera o catálogo e acrescenta registros de autoridade. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
+   ],
+   "related": [
+    "sec-enrich",
+    "authority-sync",
+    "authority-match"
+   ]
   }
  }
 }

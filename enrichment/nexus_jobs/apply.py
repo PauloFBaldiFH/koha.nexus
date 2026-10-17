@@ -16,6 +16,14 @@ Apply, per chunk of at most 500 records:
 Revert, per applied chunk, newest first: revert_plan() lists the records a
 librarian edited after Apply; they are kept (their import record is marked
 reverted, which commit_file.pl --revert skips) unless --all is given.
+
+An authority job first creates its new authorities, in their own batches
+(stage_file.pl --authorities, no matching): resolve_new() drops those Koha
+has gained since the report (the records link to Koha's), auth_file()
+writes the rest, auth_committed() keeps the authid Koha gave each. Then the
+records go in as above, chunk_file() putting each authid in place of its
+$9 nexus-new:ID. Revert undoes the records first, then the authorities;
+an authority a catalogue record still links to is kept.
 """
 
 from __future__ import annotations
@@ -23,7 +31,7 @@ from __future__ import annotations
 from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
-from nexus_enrich import marc
+from nexus_enrich import authority, marc
 
 from .store import Store, now, unpack
 
@@ -62,8 +70,29 @@ def chunk_ids(store: Store, job_id: int, chunk: int) -> list[int]:
         (job_id, chunk))]
 
 
-def pending_chunks(store: Store, job_id: int) -> list[int]:
-    return [r["chunk"] for r in store.chunks(job_id) if r["state"] in ("pending", "failed")]
+def pending_chunks(store: Store, job_id: int, kind: str = "") -> list[int]:
+    return [r["chunk"] for r in store.chunks(job_id) if r["state"] in ("pending", "failed")
+            and (not kind or r["kind"] == kind)]
+
+
+def link_new(store: Store, job_id: int, rec: marc.Record) -> marc.Record:
+    """$9 nexus-new:ID -> the authid Koha gave that authority (dropped when
+    it has none: the heading stays, unlinked)."""
+    ids = {r["id"]: r["authid"] for r in store.new_authorities(job_id) if r["authid"]}
+    for f in rec.fields:
+        if f.is_control or not any(c == "9" and v.startswith(authority.NEW_PREFIX) for c, v in f.subfields):
+            continue
+        subs = []
+        for c, v in f.subfields:
+            if c == "9" and v.startswith(authority.NEW_PREFIX):
+                nid = v[len(authority.NEW_PREFIX):]
+                authid = ids.get(int(nid)) if nid.isdigit() else None
+                if authid:
+                    subs.append(("9", str(authid)))
+                continue
+            subs.append((c, v))
+        f.subfields = subs
+    return rec
 
 
 def chunk_file(store: Store, job_id: int, chunk: int, current: dict[int, str], out: Path) -> list[int]:
@@ -82,7 +111,7 @@ def chunk_file(store: Store, job_id: int, chunk: int, current: dict[int, str], o
             elif current[bn] != item["f005"]:
                 rows.append((bn, "skipped-changed", current[bn]))
             else:
-                fh.write(record_xml(unpack(item["after"])))
+                fh.write(record_xml(link_new(store, job_id, unpack(item["after"]))))
                 rows.append((bn, "staged", item["f005"]))
                 manifest.append(bn)
         fh.write("</collection>\n")
@@ -164,7 +193,7 @@ def revert_plan(store: Store, job_id: int, current: dict[int, str], everything: 
     first. Kept: edited after Apply (005 changed) or deleted since."""
     out = []
     for c in reversed(store.chunks(job_id)):
-        if c["state"] != "applied" or not c["batch"]:
+        if c["state"] != "applied" or not c["batch"] or c["kind"] != "bib":
             continue
         keep = []
         if not everything:
@@ -184,6 +213,88 @@ def reverted(store: Store, job_id: int, chunk: int, kept: list[int]) -> None:
             store.conn.execute("UPDATE applied SET state = ? WHERE job_id = ? AND chunk = ? AND biblionumber = ?",
                                ("kept" if r["biblionumber"] in keep else "reverted", job_id, chunk,
                                 r["biblionumber"]))
+    store.set_chunk(job_id, chunk, state="reverted")
+    states = [c["state"] for c in store.chunks(job_id)]
+    store.set(job_id, state="reverted" if "applied" not in states else "partly-applied")
+
+
+# ----------------------------------------------------------------------
+# Authority jobs: the new authorities
+# ----------------------------------------------------------------------
+def resolve_new(store: Store, job_id: int, koha: authority.KohaIndex) -> int:
+    """New authorities Koha already has now (added since the report): the
+    records link to Koha's instead. Returns how many."""
+    n = 0
+    for a in store.new_authorities(job_id):
+        if a["state"] not in ("pending", "failed", "staged"):
+            continue
+        found = koha.exact(a["kind"], a["key"], a["dates"])
+        if len({x.authid for x in found}) == 1:
+            store.set_new_authority(job_id, a["id"], state="exists", authid=found[0].authid)
+            n += 1
+    return n
+
+
+def auth_file(store: Store, job_id: int, chunk: int, out: Path) -> int:
+    """The batch file of one authority chunk; returns how many records."""
+    n = 0
+    with open(out, "w", encoding="utf-8") as fh:
+        fh.write('<?xml version="1.0" encoding="UTF-8"?>\n<collection xmlns="http://www.loc.gov/MARC21/slim">\n')
+        for a in store.new_authorities(job_id, chunk):
+            if a["state"] in ("pending", "failed", "staged"):
+                fh.write(record_xml(unpack(a["record"])))
+                store.set_new_authority(job_id, a["id"], state="staged")
+                n += 1
+        fh.write("</collection>\n")
+    store.set_chunk(job_id, chunk, staged=n, note="")
+    store.set(job_id, state="applying")
+    return n
+
+
+def auth_committed(store: Store, job_id: int, chunk: int, batch: int | None, staged_rows: str) -> dict:
+    """staged_rows: record_sequence<TAB>matched_authid<TAB>status per record
+    of the committed batch (record_sequence follows the file's order)."""
+    staged = [a for a in store.new_authorities(job_id, chunk) if a["state"] == "staged"]
+    got: dict[int, tuple[str, str]] = {}
+    for line in staged_rows.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and parts[0].strip().isdigit():
+            got[int(parts[0])] = (parts[1].strip(), parts[2].strip())
+    created = failed_n = 0
+    for pos, a in enumerate(staged, start=1):
+        authid, status = got.get(pos, ("", ""))
+        if authid.isdigit() and status == "imported":
+            store.set_new_authority(job_id, a["id"], state="created", authid=int(authid))
+            created += 1
+        else:
+            store.set_new_authority(job_id, a["id"], state="failed")
+            failed_n += 1
+    store.set_chunk(job_id, chunk, state="applied", applied=now(), **({"batch": batch} if batch else {}))
+    _settle(store, job_id)
+    return {"created": created, "failed": failed_n,
+            "existing": sum(1 for a in store.new_authorities(job_id, chunk) if a["state"] == "exists")}
+
+
+def auth_revert_plan(store: Store, job_id: int) -> list[tuple[int, int, list[int]]]:
+    """(chunk, Koha batch, authids created) per applied authority chunk,
+    newest first, once no record chunk is still applied."""
+    if any(c["kind"] == "bib" and c["state"] == "applied" for c in store.chunks(job_id)):
+        return []
+    out = []
+    for c in reversed(store.chunks(job_id)):
+        if c["kind"] == "auth" and c["state"] == "applied":
+            ids = [a["authid"] for a in store.new_authorities(job_id, c["chunk"]) if a["state"] == "created"]
+            out.append((c["chunk"], c["batch"] or 0, ids))
+    if out:
+        store.set(job_id, state="reverting")
+    return out
+
+
+def auth_reverted(store: Store, job_id: int, chunk: int, kept: list[int]) -> None:
+    keep = set(kept)
+    for a in store.new_authorities(job_id, chunk):
+        if a["state"] == "created":
+            store.set_new_authority(job_id, a["id"], state="kept" if a["authid"] in keep else "reverted")
     store.set_chunk(job_id, chunk, state="reverted")
     states = [c["state"] for c in store.chunks(job_id)]
     store.set(job_id, state="reverted" if "applied" not in states else "partly-applied")

@@ -7,7 +7,11 @@ C4::ImportBatch:
 - commit_file.pl: replace overlay (marcxml_old keeps the record), 005 set to
   now, records whose status is error are skipped;
 - commit_file.pl --revert: marcxml_old put back, records whose status is
-  error or reverted skipped.
+  error or reverted skipped;
+- authorities (export_records.pl --record-type=auths, stage_file.pl
+  --authorities): staged without matching (no_match), committed as new
+  rows of auth_header with 001 = authid and import_auths.matched_authid
+  set; a revert deletes them (DelAuthority), skipping error and reverted.
 
     koha_import_mock.py DB SCRIPT [ARGS...]
 """
@@ -46,7 +50,66 @@ def opt(name: str) -> str | None:
     return None
 
 
-if NAME == "export_records.pl":
+def with_001(xml: str, authid: str) -> str:
+    rec = ET.fromstring(xml)
+    for cf in rec.findall(f"{M}controlfield[@tag='001']"):
+        rec.remove(cf)
+    cf = ET.Element(f"{M}controlfield", tag="001")
+    cf.text = authid
+    pos = 1 if rec.find(f"{M}leader") is not None else 0
+    rec.insert(pos, cf)
+    return ET.tostring(rec, encoding="unicode")
+
+
+AUTH_BATCH = NAME == "commit_file.pl" and sql(
+    f"SELECT record_type FROM import_batches WHERE import_batch_id = {opt('batch-number')}")[0][0] == "auth"
+
+if NAME == "export_records.pl" and "--record-type=auths" in ARGS:
+    print('<?xml version="1.0" encoding="UTF-8"?>\n<collection xmlns="http://www.loc.gov/MARC21/slim">')
+    for (xml,) in sql("SELECT marcxml FROM auth_header ORDER BY authid"):
+        print(xml)
+    print("</collection>")
+
+elif NAME == "stage_file.pl" and "--authorities" in ARGS:
+    root = ET.parse(opt("file")).getroot()
+    sql(f"INSERT INTO import_batches (import_status, record_type, comments) VALUES ('staged', 'auth', "
+        f"{q(opt('comment') or '')})")
+    batch = sql("SELECT MAX(import_batch_id) FROM import_batches")[0][0]
+    records = root.findall(f"{M}record")
+    for seq, rec in enumerate(records, 1):
+        sql(f"INSERT INTO import_records (import_batch_id, record_sequence, marcxml, overlay_status) VALUES "
+            f"({batch}, {seq}, {q(ET.tostring(rec, encoding='unicode'))}, 'no_match'); "
+            f"INSERT INTO import_auths VALUES (LAST_INSERT_ID(), NULL);")
+    print(f"MARC record staging report\nNumber of valid records:    {len(records)}\n"
+          f"Number of records matched:  0\n\nBatch number assigned:  {batch}\n")
+
+elif AUTH_BATCH:
+    batch = opt("batch-number")
+    rows = sql(f"SELECT ir.import_record_id, ir.marcxml, ir.status, IFNULL(ia.matched_authid, '') FROM import_records ir "
+               f"JOIN import_auths ia ON ia.import_record_id = ir.import_record_id WHERE import_batch_id = {batch}")
+    n = 0
+    if "--revert" in ARGS:
+        for rid, _, status, authid in rows:
+            if status in ("error", "reverted"):
+                continue
+            sql(f"DELETE FROM auth_header WHERE authid = {authid}; "
+                f"UPDATE import_records SET status = 'reverted' WHERE import_record_id = {rid}")
+            n += 1
+        sql(f"UPDATE import_batches SET import_status = 'reverted' WHERE import_batch_id = {batch}")
+        print(f"Number of records deleted:       {n}\nNumber of records reverted:      {n}\nNumber of errors:                0")
+    else:
+        for rid, xml, status, _ in rows:
+            if status == "error":
+                continue
+            authid = sql(f"INSERT INTO auth_header (marcxml) VALUES ('<record/>'); SELECT LAST_INSERT_ID()")[0][0]
+            sql(f"UPDATE auth_header SET marcxml = {q(with_001(xml, authid))} WHERE authid = {authid}; "
+                f"UPDATE import_auths SET matched_authid = {authid} WHERE import_record_id = {rid}; "
+                f"UPDATE import_records SET status = 'imported' WHERE import_record_id = {rid}")
+            n += 1
+        sql(f"UPDATE import_batches SET import_status = 'imported' WHERE import_batch_id = {batch}")
+        print(f"Number of new records added:     {n}\nNumber of records replaced:      0")
+
+elif NAME == "export_records.pl":
     wanted = None
     if opt("id_list_file"):
         wanted = {line.strip() for line in open(opt("id_list_file")) if line.strip()}

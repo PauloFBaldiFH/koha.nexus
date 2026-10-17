@@ -2634,6 +2634,34 @@
     "authority-sync",
     "magic-import"
    ]
+  },
+  "sec-enrich-auth": {
+   "summary": "Links the names and subjects of your bibliographic records to authority records, puts each heading in its authorised form and creates the authorities that are missing, with a staged report to read before anything reaches the catalogue.",
+   "overview": [
+    "Each heading (100/110/111/130, 600/610/611/630/650/651/655, 700/710/711/730) is matched first with your own Koha authorities, by the authorised heading and then by its variants (4XX). Only when Koha has none does it look in the koha.nexus enrichment database: Biblioteca Nacional first, then the other Brazilian catalogues, then the Library of Congress.",
+    "Subjects never take LCSH or Library of Congress forms: they are English, and a Portuguese catalogue keeps Portuguese subjects. A heading that already has `$9`, a name/title entry and a subject with subdivisions are left alone.",
+    "When several people share a name and the record gives no dates, or two authorities fit, the heading goes to **Review** and nothing is changed. With **Also close forms**, a heading one typo away from a known one is linked too, and any authority created from it is marked preliminary.",
+    "**Apply** makes a verified safety backup, re-reads Koha's authorities (one added since the report is linked instead of created), creates the new authority records through Koha's staged import, then links the records (`$9`) in batches of at most 500. **Revert** gives the records their previous version back and removes the authorities the job created, except those a record still links to."
+   ],
+   "steps": [
+    "Type the scope: `all`, or biblionumbers such as `101, 102, 500-550`; choose **Exact forms only** or **Also close forms**, and press **Start**.",
+    "Follow the progress in the **Worker** box; **Pause** stops it after the current batch, **Resume** goes on.",
+    "Pick the job in **Jobs** and read the counts: headings linked to Koha, to new authorities, forms standardised, review.",
+    "Select a record in the list to see its headings before and after; press **Open report** for the full report with every new authority record.",
+    "Press **Apply** to write it, or **Cancel job** to drop it. **Revert** undoes an applied job."
+   ],
+   "tips": [
+    "Run **Find duplicate authors** first if your own authorities have duplicates: every heading that fits two Koha authorities goes to review.",
+    "New authorities built from headings gathered from other catalogues carry 008/33 `d` and a 667 note: review them in Koha's authority module."
+   ],
+   "warnings": [
+    "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
+   ],
+   "related": [
+    "sec-enrich",
+    "authority-sync",
+    "authority-match"
+   ]
   }
  }
 }

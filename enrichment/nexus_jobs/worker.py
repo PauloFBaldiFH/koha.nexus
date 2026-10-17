@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nexus_enrich import marc
+from nexus_enrich import authority, marc
 from nexus_enrich.merge import Policy, enrich
 from nexus_enrich.static import StaticDB
 
@@ -118,6 +118,70 @@ def match_one(db: StaticDB, rec: marc.Record, policy: Policy) -> dict:
     return row
 
 
+class AuthMatcher:
+    """The headings of one record against Koha's authorities (exported with
+    the job) and static.db's headings. Item columns for an authority job:
+    m0 links to Koha authorities, m1 links to new authorities, w headings
+    put in the authorised form, r headings sent to review."""
+
+    def __init__(self, store: Store, job: Job, db: StaticDB, koha: authority.KohaIndex, release: str):
+        self.store, self.job, self.koha, self.release = store, job, koha, release
+        self.static = authority.StaticHeadings(db.conn)
+        self.mode = job.mode or "exact"
+
+    def _new(self, m: authority.Match) -> int:
+        kind, key, dates = authority.new_key(m)
+        row = m.static
+        preliminary = bool(m.fuzzy) or row is None or bool(row.preliminary)
+        src = self.static.sources.get(row.source) if row is not None else None
+        rec = authority.authority_record(kind, m.form, row, preliminary, self.release,
+                                         src["name"] if src is not None else "")
+        main = rec.first(authority.AUTH_TAG[kind])
+        return self.store.new_authority(self.job.id, kind, key, dates, main.text(), row.source if row else "",
+                                        preliminary, m.fuzzy, pack(rec))
+
+    def __call__(self, rec: marc.Record) -> dict:
+        row = {"biblionumber": biblionumber(rec), "f005": rec.control("005"), "title": title(rec),
+               "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0, "before": None, "after": None, "other": None}
+        after = rec.copy()
+        found, review = [], []
+        for i, f in enumerate(after.fields):
+            if authority.kind_of(f) is None:
+                continue
+            m = authority.match_field(f, self.koha, self.static, self.mode)
+            entry = {"tag": f.tag, "before": report.field_text(f), "action": m.action, "reason": m.reason}
+            if m.static is not None:
+                entry["source"] = m.static.source
+            if m.fuzzy:
+                entry["fuzzy"] = round(m.fuzzy, 3)
+            if m.action == "koha":
+                after.fields[i] = authority.rewrite(f, m, str(m.authid))
+                entry["authid"] = m.authid
+                row["m0"] += 1
+            elif m.action == "new":
+                nid = self._new(m)
+                after.fields[i] = authority.rewrite(f, m, f"{authority.NEW_PREFIX}{nid}")
+                entry["new"] = nid
+                row["m1"] += 1
+            elif m.action == "review":
+                row["r"] += 1
+                review.append(f"{f.tag} {m.heading.heading if m.heading else ''}: {m.reason}")
+            if m.action in ("koha", "new"):
+                entry["after"] = report.field_text(after.fields[i])
+                if m.standardized:
+                    row["w"] += 1
+                    entry["standardized"] = True
+            found.append(entry)
+        changed = row["m0"] + row["m1"]
+        row["status"] = "enriched" if changed else "review" if review else "unchanged"
+        row["detail"] = json.dumps({"headings": found, "review": review}, ensure_ascii=False)
+        if changed:
+            row["before"], row["after"] = pack(rec), pack(after)
+        elif review:
+            row["before"] = pack(rec)
+        return row
+
+
 def count_records(path: Path) -> int:
     n = 0
     with open(path, "rb") as fh:
@@ -146,6 +210,12 @@ def process(store: Store, job: Job, settings: Settings, sleep=time.sleep) -> str
         if job.state == "exported":
             store.set(job.id, state="matching", total=count_records(export), release=release)
         job = store.job(job.id)
+        if job.kind == "auth":
+            koha = authority.KohaIndex.from_file(settings.job_dir(job.id) / "authorities.xml")
+            matcher = AuthMatcher(store, job, db, koha, job.release)
+        else:
+            def matcher(rec):
+                return match_one(db, rec, settings.policy)
         done = job.done
         pending: list[dict] = []
         status = dict(job=job.id, state="matching", total=job.total)
@@ -186,7 +256,7 @@ def process(store: Store, job: Job, settings: Settings, sleep=time.sleep) -> str
                 if seq <= done:
                     continue
                 try:
-                    row = match_one(db, rec, settings.policy)
+                    row = matcher(rec)
                 except Exception as exc:          # one bad record never stops the job
                     row = {"biblionumber": biblionumber(rec), "f005": rec.control("005"), "title": title(rec),
                            "status": "error", "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0,

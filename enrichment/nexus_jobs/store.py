@@ -70,7 +70,31 @@ CREATE TABLE IF NOT EXISTS applied (
     f005 TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (job_id, chunk, biblionumber)
 );
+-- Authority jobs: one row per authority to create at Apply (one per
+-- heading for the whole job). The bibliographic records link to it by a
+-- placeholder $9 nexus-new:ID until Koha gives it an authid.
+CREATE TABLE IF NOT EXISTS auth_new (
+    job_id INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    key TEXT NOT NULL,
+    dates TEXT NOT NULL DEFAULT '',
+    heading TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    preliminary INTEGER NOT NULL DEFAULT 1,
+    fuzzy REAL NOT NULL DEFAULT 0,
+    record BLOB,
+    chunk INTEGER,
+    state TEXT NOT NULL DEFAULT 'pending',   -- pending, exists, staged, created, failed, kept, reverted
+    authid INTEGER,
+    PRIMARY KEY (job_id, id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS auth_new_key ON auth_new (job_id, kind, key, dates);
 """
+
+# Columns added after the first release of jobs.db.
+_ADDED = (("jobs", "kind", "TEXT NOT NULL DEFAULT 'bib'"), ("jobs", "mode", "TEXT NOT NULL DEFAULT ''"),
+          ("chunks", "kind", "TEXT NOT NULL DEFAULT 'bib'"))
 
 OPEN_STATES = ("queued", "exported", "matching")
 
@@ -100,6 +124,8 @@ class Job:
     done: int
     release: str
     error: str
+    kind: str = "bib"          # bib: enrich bibliographic records; auth: authorities
+    mode: str = ""             # auth: exact or fuzzy
 
     def as_dict(self) -> dict:
         return dict(self.__dict__)
@@ -114,15 +140,18 @@ class Store:
         self.conn.execute("PRAGMA synchronous = NORMAL")
         self.conn.execute("PRAGMA cache_size = -8000")
         self.conn.executescript(SCHEMA)
+        for table, column, decl in _ADDED:
+            if column not in {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
     def close(self) -> None:
         self.conn.close()
 
     # -- jobs ------------------------------------------------------------
-    def add(self, scope: str) -> Job:
+    def add(self, scope: str, kind: str = "bib", mode: str = "") -> Job:
         t = now()
-        cur = self.conn.execute("INSERT INTO jobs (created, updated, scope, state) VALUES (?, ?, ?, 'queued')",
-                                (t, t, scope))
+        cur = self.conn.execute("INSERT INTO jobs (created, updated, scope, state, kind, mode) "
+                                "VALUES (?, ?, ?, 'queued', ?, ?)", (t, t, scope, kind, mode))
         return self.job(cur.lastrowid)
 
     def job(self, job_id: int) -> Job:
@@ -189,13 +218,23 @@ class Store:
 
     # -- chunks ----------------------------------------------------------
     def make_chunks(self, job_id: int, size: int = 500) -> int:
-        """Enriched records in groups of at most SIZE (one Koha batch each)."""
+        """Enriched records in groups of at most SIZE (one Koha batch each);
+        for an authority job, the new authorities first, in their own
+        batches (the records link to them)."""
         self.conn.execute("BEGIN")
         try:
             self.conn.execute("DELETE FROM chunks WHERE job_id = ?", (job_id,))
+            n = 0
+            ids = [r[0] for r in self.conn.execute("SELECT id FROM auth_new WHERE job_id = ? ORDER BY id", (job_id,))]
+            for i in range(0, len(ids), size):
+                n += 1
+                part = ids[i:i + size]
+                self.conn.executemany("UPDATE auth_new SET chunk = ? WHERE job_id = ? AND id = ?",
+                                      [(n, job_id, a) for a in part])
+                self.conn.execute("INSERT INTO chunks (job_id, chunk, records, kind) VALUES (?, ?, ?, 'auth')",
+                                  (job_id, n, len(part)))
             seqs = [r[0] for r in self.conn.execute(
                 "SELECT seq FROM items WHERE job_id = ? AND status = 'enriched' ORDER BY seq", (job_id,))]
-            n = 0
             for i in range(0, len(seqs), size):
                 n += 1
                 part = seqs[i:i + size]
@@ -234,6 +273,33 @@ class Store:
                                      (job_id,)).fetchall()
         return self.conn.execute("SELECT * FROM applied WHERE job_id = ? AND chunk = ? ORDER BY biblionumber",
                                  (job_id, chunk)).fetchall()
+
+
+    # -- new authorities (authority jobs) ---------------------------------
+    def new_authority(self, job_id: int, kind: str, key: str, dates: str, heading: str, source: str,
+                      preliminary: bool, fuzzy: float, record: bytes | None) -> int:
+        """The id of the job's new authority for this heading, created on
+        first use (a record matched again after a restart gets the same id)."""
+        row = self.conn.execute("SELECT id FROM auth_new WHERE job_id = ? AND kind = ? AND key = ? AND dates = ?",
+                                (job_id, kind, key, dates)).fetchone()
+        if row is not None:
+            return row[0]
+        nid = self.conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM auth_new WHERE job_id = ?",
+                                (job_id,)).fetchone()[0]
+        self.conn.execute("INSERT INTO auth_new (job_id, id, kind, key, dates, heading, source, preliminary, fuzzy, "
+                          "record) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                          (job_id, nid, kind, key, dates, heading, source, int(preliminary), fuzzy, record))
+        return nid
+
+    def new_authorities(self, job_id: int, chunk: int | None = None) -> list[sqlite3.Row]:
+        if chunk is None:
+            return self.conn.execute("SELECT * FROM auth_new WHERE job_id = ? ORDER BY id", (job_id,)).fetchall()
+        return self.conn.execute("SELECT * FROM auth_new WHERE job_id = ? AND chunk = ? ORDER BY id",
+                                 (job_id, chunk)).fetchall()
+
+    def set_new_authority(self, job_id: int, nid: int, **values) -> None:
+        cols = ", ".join(f"{k} = ?" for k in values)
+        self.conn.execute(f"UPDATE auth_new SET {cols} WHERE job_id = ? AND id = ?", (*values.values(), job_id, nid))
 
 
 def detail(item: sqlite3.Row) -> dict:
