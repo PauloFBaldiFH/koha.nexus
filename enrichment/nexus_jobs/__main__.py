@@ -1,0 +1,196 @@
+"""python -m nexus_jobs [--state DIR] COMMAND
+
+Jobs (the panel's tasks call these through the installer):
+    add --scope "all" | "101, 102, 500-550"     new job; prints its id and folder
+    exported ID                     Koha's records are in jobs/ID/export.xml
+    fail ID --error TEXT
+    cancel ID
+    list | show ID | status | diff ID BIBLIONUMBER
+    pause on|off                    stop or resume the worker between batches
+    worker [--once]                 match every job waiting (the unit runs this)
+
+Apply and Revert bookkeeping (installer only):
+    chunks ID | chunk-ids ID N
+    chunk-file ID N --current TSV --out FILE
+    check-matches ID N --batch B --staged FILE
+    committed ID N --after TSV | chunk-failed ID N --note TEXT
+    applied-ids ID | revert-plan ID --current TSV [--all] | reverted ID N [--kept LIST]
+
+State folder: --state, else NEXUS_JOBS_STATE, else /var/lib/koha-nexus-enrich.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from . import apply, report, scope
+from .store import Store
+from .worker import Settings, run
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m nexus_jobs", description=__doc__.split("\n")[0])
+    ap.add_argument("--state", type=Path,
+                    default=Path(os.environ.get("NEXUS_JOBS_STATE", "/var/lib/koha-nexus-enrich")))
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    a = sub.add_parser("add")
+    a.add_argument("--scope", default="all")
+    for name in ("exported", "cancel", "show", "chunks", "applied-ids"):
+        sub.add_parser(name).add_argument("job", type=int)
+    f = sub.add_parser("fail")
+    f.add_argument("job", type=int)
+    f.add_argument("--error", default="")
+    sub.add_parser("list")
+    sub.add_parser("status")
+    p = sub.add_parser("pause")
+    p.add_argument("value", choices=("on", "off"))
+    d = sub.add_parser("diff")
+    d.add_argument("job", type=int)
+    d.add_argument("biblionumber", type=int)
+    w = sub.add_parser("worker")
+    w.add_argument("--once", action="store_true")
+    w.add_argument("--pause", type=float, default=float(os.environ.get("NEXUS_JOBS_PAUSE", "1.5")))
+    for name in ("chunk-ids", "chunk-file", "check-matches", "committed", "chunk-failed", "reverted"):
+        c = sub.add_parser(name)
+        c.add_argument("job", type=int)
+        c.add_argument("chunk", type=int)
+        if name == "chunk-file":
+            c.add_argument("--current", required=True)
+            c.add_argument("--out", type=Path, required=True)
+        elif name == "check-matches":
+            c.add_argument("--batch", type=int, required=True)
+            c.add_argument("--staged", type=Path, required=True)
+        elif name == "committed":
+            c.add_argument("--after", required=True)
+        elif name == "chunk-failed":
+            c.add_argument("--note", default="")
+        elif name == "reverted":
+            c.add_argument("--kept", default="")
+    r = sub.add_parser("revert-plan")
+    r.add_argument("job", type=int)
+    r.add_argument("--current", required=True)
+    r.add_argument("--all", action="store_true")
+    args = ap.parse_args(argv)
+
+    static = Path(os.environ.get("NEXUS_GATEWAY_STATIC_DB", str(args.state / "static.db")))
+    settings = Settings(args.state, static)
+    if args.cmd == "worker":
+        settings.pause = args.pause
+        run(settings, once=args.once)
+        return 0
+    if args.cmd == "pause":
+        if args.value == "on":
+            settings.pause_file.touch()
+        else:
+            settings.pause_file.unlink(missing_ok=True)
+        return 0
+    if args.cmd == "status":
+        try:
+            status = json.loads(settings.status_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            status = {"state": "idle"}
+        status["pause_file"] = settings.pause_file.exists()
+        print(json.dumps(status, ensure_ascii=False))
+        return 0
+
+    store = Store(settings.jobs_db)
+    try:
+        return _jobs(args, store, settings)
+    except (KeyError, scope.ScopeError) as exc:
+        print(str(exc).strip("'\""), file=sys.stderr)
+        return 1
+    finally:
+        store.close()
+
+
+def _jobs(args, store: Store, settings: Settings) -> int:
+    cmd = args.cmd
+    if cmd == "add":
+        ranges = scope.parse(args.scope)
+        job = store.add(scope.text(ranges))
+        folder = settings.job_dir(job.id)
+        folder.mkdir(parents=True, exist_ok=True)
+        ids = ""
+        if ranges is not None:
+            ids = str(folder / "ids.txt")
+            with open(ids, "w", encoding="ascii") as fh:
+                for n in scope.ids(ranges):
+                    fh.write(f"{n}\n")
+        print(json.dumps({"job": job.id, "dir": str(folder), "scope": job.scope, "ids": ids}))
+        return 0
+    if cmd == "list":
+        print(json.dumps([j.as_dict() for j in store.jobs()], ensure_ascii=False))
+        return 0
+    job = store.job(args.job)
+    if cmd == "exported":
+        if job.state != "queued":
+            print(f"job {job.id} is {job.state}", file=sys.stderr)
+            return 1
+        store.set(job.id, state="exported")
+        return 0
+    if cmd == "fail":
+        store.set(job.id, state="failed", error=args.error[:500])
+        return 0
+    if cmd == "cancel":
+        if job.state not in ("queued", "exported", "matching", "ready"):
+            print(f"job {job.id} is {job.state}: only a job not yet applied can be cancelled", file=sys.stderr)
+            return 1
+        store.set(job.id, state="cancelled")
+        return 0
+    if cmd == "show":
+        out = job.as_dict()
+        out["dir"] = str(settings.job_dir(job.id))
+        rep = settings.job_dir(job.id) / "report.json"
+        if rep.is_file():
+            out["report"] = json.loads(rep.read_text(encoding="utf-8"))
+            out["report_html"] = str(rep.with_suffix(".html"))
+        out["chunks"] = [dict(c) for c in store.chunks(job.id)]
+        print(json.dumps(out, ensure_ascii=False))
+        return 0
+    if cmd == "diff":
+        sys.stdout.write(report.text_diff(store, job.id, args.biblionumber))
+        return 0
+    if cmd == "chunks":
+        if job.state not in ("ready", "applying", "partly-applied"):
+            print(f"job {job.id} is {job.state}: nothing to apply", file=sys.stderr)
+            return 1
+        print("\n".join(str(n) for n in apply.pending_chunks(store, job.id)))
+        return 0
+    if cmd == "chunk-ids":
+        print("\n".join(str(n) for n in apply.chunk_ids(store, job.id, args.chunk)))
+        return 0
+    if cmd == "chunk-file":
+        manifest = apply.chunk_file(store, job.id, args.chunk, apply.read_tsv(args.current), args.out)
+        print(len(manifest))
+        return 0
+    if cmd == "check-matches":
+        bad = apply.check_matches(store, job.id, args.chunk, args.batch,
+                                  args.staged.read_text(encoding="utf-8", errors="replace"))
+        print("\n".join(str(n) for n in bad))
+        return 0
+    if cmd == "committed":
+        print(json.dumps(apply.committed(store, job.id, args.chunk, apply.read_tsv(args.after))))
+        return 0
+    if cmd == "chunk-failed":
+        apply.failed(store, job.id, args.chunk, args.note)
+        return 0
+    if cmd == "applied-ids":
+        print("\n".join(str(n) for n in apply.applied_ids(store, job.id)))
+        return 0
+    if cmd == "revert-plan":
+        for chunk, batch, keep in apply.revert_plan(store, job.id, apply.read_tsv(args.current), args.all):
+            print(f"{chunk}\t{batch}\t{','.join(str(n) for n in keep)}")
+        return 0
+    if cmd == "reverted":
+        kept = [int(x) for x in args.kept.split(",") if x.strip().isdigit()]
+        apply.reverted(store, job.id, args.chunk, kept)
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
