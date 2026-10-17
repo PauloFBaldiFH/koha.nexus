@@ -524,6 +524,12 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   gateway (VPS) / Zeus (Koha server), 5006 Pergamum, 8088 catalog network. Gateway 1.1.0: zeus
   entries share one Zeus HTTP client (Zeus's Referer); `python -m sru_gateway.zeus_labels` reads
   Zeus's search page to check each `target_index`. CI: `.github/workflows/sru-services.yml`.
+- **Enrichment, step 3 (no panel version)**: `enrichment/nexus_gateway`, the local SRU server on
+  127.0.0.1:5000 that replaces the VPS gateway for Koha: `/sru/_union` and `/sru/<id>` (the 72 ids of
+  the VPS gateway's `targets.json`, plus `unb`) answer from `static.db`, and on a miss from the native
+  Z39.50/SRU targets live within 6 s; late answers go to `learned.db`. `python -m nexus_gateway
+  koha-sql` repoints the rows with `sru/_union` the only ticked one. Not installed by the installer
+  yet (step 4), so no row points at it yet. Unit: `enrichment/deploy/koha-nexus-sru.service`.
 - **Enrichment, steps 1-2 (no panel version)**: the offline-first design (`design.md` revision 3,
   approved 2026-10-17 in `/mnt/project-files/enrichment-design/`): no search or enrichment backend on
   the VPS, a monthly `nexus-enrich-YYYY.MM.db.zst` on GitHub Releases, no HTML scraping on libraries'

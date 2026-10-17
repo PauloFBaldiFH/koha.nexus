@@ -1,6 +1,6 @@
 # koha.nexus enrichment
 
-Two packages for the offline-first enrichment design
+Three packages for the offline-first enrichment design
 (`design.md`, revision 3, approved 2026-10-17):
 
 - **`enrich_build`** builds `static.db`, the prebuilt database every library
@@ -10,10 +10,13 @@ Two packages for the offline-first enrichment design
   records against a local one (M0 / M1 / W / R) and adds, never replaces, the
   fields the local record lacks. Pure Python, standard library only (reading
   `static.db` needs `zstandard`).
+- **`nexus_gateway`** is the local SRU server Koha searches
+  (`127.0.0.1:5000`, `/sru/_union` and `/sru/<id>`): `static.db` first, then
+  live Z39.50/SRU within 6 s, late answers kept in `learned.db`.
 
-Not here yet: the local gateway (`/sru/_union` on 127.0.0.1:5000), the
-throttled worker, the panel screens and Magic Import options. Those are the
-next steps of the design.
+Not here yet: installing the gateway and downloading `static.db` (installer),
+the throttled worker, the panel screens and Magic Import options. Those are
+the next steps of the design.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
@@ -83,6 +86,42 @@ What the builder does:
   into established headings with their 4XX variants, LCCN and URI, and gathers
   the headings of bibliographic records as preliminary entries with an
   occurrence count.
+
+## The local gateway
+
+```sh
+NEXUS_GATEWAY_STATIC_DB=static.db NEXUS_GATEWAY_LEARNED_DB=learned.db python -m nexus_gateway serve
+python -m nexus_gateway check                       # targets and static.db as the gateway sees them
+python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
+```
+
+| Database | Answers from |
+|---|---|
+| `sru/_union` | every source in `static.db`; on a miss, every native target live |
+| `sru/<id>` (a target in `nexus_gateway/targets.json`) | its `static.db` sources (`static`, default its id); on a miss, the target live if it is `z3950` or `sru` |
+| `sru/<source>` (a `static.db` source with no target) | `static.db` only |
+
+- A search answers from `static.db` whenever it has a record (the whole CQL
+  query: ISBN/ISSN, title, author, keywords, and/or/not).
+- Only when it has none are the native targets asked (Z39.50 or SRU, never
+  scraping; `broken` targets are skipped), with one clause of the query (the
+  ISBN, else the title, author or keywords). The reply waits 6 s
+  (`NEXUS_GATEWAY_LIVE_TIMEOUT`); slower targets run on for 30 s and their
+  answer goes to `learned.db`, which answers the same search for 30 days (an
+  error for 10 minutes).
+- Records go out without 9XX fields and `$9` subfields (the source Koha's
+  items and authority ids).
+- `static.db` is reopened by itself when the file is replaced.
+- `koha-sql` moves the VPS gateway's rows (`sru.koha.nexus`, …) to
+  `127.0.0.1:5000`, adds `sru/_union` and leaves it as the gateway's only
+  ticked row. Authority rows are not touched.
+- Logins: `NEXUS_GATEWAY_LOGIN_<ID>=user:password` in the unit's environment
+  file, never in `targets.json`. The unit is `deploy/koha-nexus-sru.service`.
+
+So that a harvested source lands on its Koha row, its `static.db` id should be
+the target id: `fonte` slugs already match most (`ufpr`, `unb`, `fundacentro`,
+`bn-portugal`, `porbase`); for others use the build's `source_map` or the
+target's `static` list.
 
 ## The engine
 
