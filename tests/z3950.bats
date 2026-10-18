@@ -246,11 +246,11 @@ print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
     [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE host = '200.20.12.18'")" = "$(printf '0\t4')" ]
 }
 
-# The panel's whole catalogue, as write_add_file writes it (host ... sru_options recordtype).
+# The panel's catalogue as "Update server settings" sends it (host ... sru_options recordtype).
 catalogue_tsv() {
     PYTHONPATH="$BATS_TEST_DIRNAME/../panel" python3 -c '
 from kei_panel import z3950
-print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
+print(z3950.add_file_text(z3950.sync_targets(z3950.load_curated(), set()), {}), end="")'
 }
 
 @test "z3950-sync: refreshes every row Koha has, adds only the missing authority files, counts both" {
@@ -265,20 +265,20 @@ print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
     echo "$output"; cat "$W/results"
     [ "$status" -eq 0 ]
     [ ! -e "$W/all.tsv" ]
-    # Found by name, moved to the local gateway, tick and rank kept.
+    # Found by name, moved to the gateway on the Cloudflare tunnel, tick and rank kept.
     [ "$(zsql "SELECT host, port, syntax, encoding, timeout, sru_options, checked, \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = \
-      "$(printf '127.0.0.1\t5000\tMARC21\tutf8\t15\tsru=get,sru_version=1.1\t0\t7')" ]
+      "$(printf 'https://sru.koha.nexus\t443\tMARC21\tutf8\t15\tsru=get,sru_version=1.1\t0\t7')" ]
     [ "$(zsql "SELECT sru_fields FROM z3950servers WHERE db = 'sru/bn'")" = \
       "title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice" ]
     # No catalogue server Koha did not have was added: still 2 biblio rows (LoC LCDB and BN).
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio'")" = "2" ]
-    # The authority files: NAF updated (tick and rank kept), SAF and BN added; the dead BN row unticked.
+    # The authority files: NAF updated (tick and rank kept), SAF, BN and the gateway's headings added; the dead BN row unticked.
     [ "$(zsql "SELECT db, servername, checked, \`rank\`, timeout FROM z3950servers WHERE recordtype = 'authority' AND host <> '162.214.168.248' ORDER BY db")" = \
-      "$(printf 'NAF\tLOC AUTHORITIES\t0\t0\t10\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\t10\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\t30')" ]
+      "$(printf 'NAF\tLOC AUTHORITIES\t0\t0\t10\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\t10\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\t30\nsru/_union-aut\tKOHA.NEXUS (AUTORIDADES)\t1\t0\t15')" ]
     [ "$(zsql "SELECT checked FROM z3950servers WHERE host = '162.214.168.248'")" = "0" ]
-    # BN and NAF updated (LCDB is not in the list: left as it is).
-    [ "$(cat "$W/results")" = "$(printf 'RESULT added=2\nRESULT updated=2\nRESULT unchecked=1\nRESULT invalid=0')" ]
-    grep -q "OK .*settings updated.*Added: 2.*Updated: 2" "$KEI_S/dialogs.log"
+    # BN, NAF and LCDB (a direct server in the list) updated.
+    [ "$(cat "$W/results")" = "$(printf 'RESULT added=3\nRESULT updated=3\nRESULT unchecked=1\nRESULT invalid=0')" ]
+    grep -q "OK .*settings updated.*Added: 3.*Updated: 3" "$KEI_S/dialogs.log"
     # Again: nothing to add, nothing to change.
     rm -f "$W/results"
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
@@ -321,15 +321,17 @@ print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
     ! grep -q 'sru_bridge_install' "$KEI_REPO/installer"
 }
 
-@test "enrichment: Koha's rows move to the local gateway, sru/_union the only one ticked, re-runnable" {
+@test "enrichment: Koha's rows go to sru.koha.nexus:443, sru/_union the only one ticked, re-runnable" {
     # The gateway's real koha-sql, through a stand-in venv python.
     mkdir -p "$W/enrich/.venv/bin"
     printf '#!/bin/sh\nPYTHONPATH=%s exec python3 "$@"\n' "$KEI_REPO/enrichment" > "$W/enrich/.venv/bin/python"
     chmod +x "$W/enrich/.venv/bin/python"
     echo "ENRICH_DIR=$W/enrich" >> "$W/extra.sh"
     zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype)
-          VALUES ('https://sru.koha.nexus', 443, 'sru/bn', 'BN', 1, 1, 'MARC21', 'utf8', 'sru', 'biblio'),
-                 ('https://sru.koha.nexus', 443, 'sru/usp', 'USP', 1, 2, 'MARC21', 'utf8', 'sru', 'biblio'),
+          VALUES ('http://137.131.205.31', 5000, 'sru/bn', 'BN', 1, 1, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('127.0.0.1', 5000, 'sru/usp', 'USP', 1, 2, 'MARC21', 'utf8', 'sru', 'biblio'),
+                 ('127.0.0.1', 5000, 'sru/_union-aut', 'KOHA.NEXUS (AUTORIDADES)', 1, 6, 'MARC21', 'utf8', 'sru', 'authority'),
+                 ('127.0.0.1', 8088, 'sru', 'Rede koha.nexus', 1, 7, 'MARC21', 'utf8', 'sru', 'biblio'),
                  ('10.0.0.60', 5001, 'pergamum', 'Rede', 0, 3, 'MARC21', 'utf8', 'sru', 'biblio'),
                  ('127.0.0.1', 5000, 'sru', 'Catálogo Zeus (UFSC bridge, SRU)', 1, 4, 'MARC21', 'utf8', 'sru', 'biblio'),
                  ('127.0.0.1', 5006, 'sru', 'Catálogo Rede Pergamum (CRP bridge, SRU)', 1, 5, 'MARC21', 'utf8', 'sru', 'biblio'),
@@ -337,11 +339,15 @@ print(z3950.add_file_text(z3950.load_curated(), {}), end="")'
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_register
     echo "$output"; cat "$W/logs/"* 2>/dev/null || true
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND host = '127.0.0.1' AND port = 5000 AND db LIKE 'sru/%'")" = "74" ]
-    [ "$(zsql "SELECT db FROM z3950servers WHERE host = '127.0.0.1' AND checked = 1")" = "sru/_union" ]
-    # The VPS rows moved (BN keeps its rank), the bridges' rows are gone.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND host = 'https://sru.koha.nexus' AND port = 443 AND db LIKE 'sru/%'")" = "74" ]
+    [ "$(zsql "SELECT db FROM z3950servers WHERE host = 'https://sru.koha.nexus' AND recordtype = 'biblio' AND checked = 1")" = "sru/_union" ]
+    # The local gateway's and the VPS IP's rows moved (keeping their rank), the bridges' rows are gone.
     [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND (host LIKE '%sru.koha.nexus' OR host = '10.0.0.60' OR port = 5006 OR db = 'sru')")" = "0" ]
+    [ "$(zsql "SELECT host, port, \`rank\` FROM z3950servers WHERE db = 'sru/usp'")" = "$(printf 'https://sru.koha.nexus\t443\t2')" ]
+    [ "$(zsql "SELECT host, port, \`rank\` FROM z3950servers WHERE db = 'sru/_union-aut'")" = "$(printf 'https://sru.koha.nexus\t443\t6')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND (host IN ('10.0.0.60', 'http://137.131.205.31') OR (host = '127.0.0.1' AND port IN (5000, 5006)) OR db = 'sru')")" = "1" ]
+    # The Catalog Network row (127.0.0.1:8088) is not the gateway's: left alone.
+    [ "$(zsql "SELECT port FROM z3950servers WHERE servername = 'Rede koha.nexus'")" = "8088" ]
     [ "$(zsql "SELECT db FROM z3950servers WHERE db = 'sru/all'")" = "sru/all" ]
     # The librarian's other servers and the authority rows are untouched.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov'")" = "2" ]

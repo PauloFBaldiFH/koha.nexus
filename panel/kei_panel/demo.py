@@ -275,7 +275,7 @@ _SCRIPTS: dict[str, list[str]] = {
     ],
     "cloud-remote": ["@@note Testing the real cloud upload...",
                      "@@msg ok OK\tCloud enabled and tested successfully."],
-    "z3950-list": ["@@result row=127.0.0.1\t5000\tsru/loc\tLibrary of Congress, EUA"],
+    "z3950-list": ["@@result row=https://sru.koha.nexus\t443\tsru/loc\tLibrary of Congress, EUA"],
     "enrich-jobs": ["@@result jobs=" + json.dumps(_ENRICH_JOBS, ensure_ascii=False),
                     "@@result worker=" + json.dumps({"job": 2, "state": "matching", "total": 51, "done": 20,
                                                       "paused": False, "pause_file": False})],
