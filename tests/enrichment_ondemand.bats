@@ -192,6 +192,39 @@ jshow() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show "$1
     [ "$status" -eq 2 ]
 }
 
+@test "on demand: a typed query's record imported as new, never over a record Koha has, undone as a MARC import" {
+    p enrich_od_add --isbn 9788535902778
+    od_service
+    : > "$W/results"
+    p enrich_od_import 1 1 1                              # Koha has this ISBN: ignored, nothing added
+    [ "$status" -eq 0 ]
+    grep -q "^import=exists$" "$W/results" && grep -q "^biblionumber=1$" "$W/results"
+    grep -q -- "^stage_file.pl \[\] --file .* --format MARCXML --encoding UTF-8 --match 1 --no-replace --comment koha.nexus on-demand job 1: new record$" "$W/calls"
+    [ "$(zsql "SELECT COUNT(*) FROM biblio_metadata")" = 5 ] && [ ! -e "$W/state/jobs/1/imported-1-1" ]
+    zsql "DELETE FROM biblio_metadata"
+    : > "$W/results"
+    p enrich_od_import 1 1 1
+    [ "$status" -eq 0 ]
+    grep -q "^import=done$" "$W/results" && grep -q "^biblionumber=1$" "$W/results"
+    ! grep -q "^backup " "$W/calls"
+    new=$(zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = 1")
+    [[ "$new" == *'tag="883"'* ]] && [[ "$new" == *'z3950:ufpr'* ]] && [[ "$new" == *'Cegueira'* ]]
+    [ "$(cat "$W/state/jobs/1/imported-1-1")" = 1 ]
+    [[ "$(jshow 1)" == *'"imported": 1'* ]]
+    : > "$W/results"
+    p enrich_od_import 1 1 1                              # twice: refused, still one record
+    grep -q "^import=already$" "$W/results"
+    [ "$(zsql "SELECT COUNT(*) FROM biblio_metadata WHERE biblionumber = 1")" = 1 ]
+    p enrich_od_import 1 1 9
+    [ "$status" -ne 0 ]
+    grep -q "^import=not-found$" "$W/results"
+    p enrich_od_import 1 x 1
+    [ "$status" -eq 2 ]
+    batch=$(zsql "SELECT MAX(import_batch_id) FROM import_batches")
+    p _lt_marc_undo_run "$batch"
+    [ "$(zsql "SELECT COUNT(*) FROM biblio_metadata WHERE biblionumber = 1")" = 0 ]
+}
+
 @test "on demand: Search more servers, a chosen donor, server health" {
     p enrich_od_add "1"
     od_service
@@ -239,7 +272,7 @@ jshow() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show "$1
     ! printf '%s\n' "$unit" | grep -q "PrivateNetwork=yes"
     grep -q 'cp -f "$src/../panel/kei_panel/data/${ENRICH_DIRECT_LIST}" "$ENRICH_DIR/${ENRICH_DIRECT_LIST}"' "$KEI_REPO/installer"
     grep -q "\"\*/panel/kei_panel/data/\${ENRICH_DIRECT_LIST}\"" "$KEI_REPO/installer"
-    for task in enrich-od-add enrich-od-status enrich-od-more enrich-od-donor z3950-health z3950-health-reset; do
+    for task in enrich-od-add enrich-od-status enrich-od-more enrich-od-donor enrich-od-import z3950-health z3950-health-reset; do
         grep -q "^        ${task})" "$KEI_REPO/installer"
     done
     # An install from before on-demand: enrich_od_ready installs what is missing.

@@ -6,6 +6,11 @@ Middle, the koha.nexus Catalog Network: the switch puts the shared
 catalogue's SRU address in Koha's z3950servers or takes it out
 (`--task catalog-network on URL|off`). Both read `--task z3950-server-status`.
 
+Then the direct servers on-demand enrichment asks (`--task z3950-health`):
+the ones whose breaker is open, or that failed in the last 7 days, with the
+last error; Reset forgets a server's breaker (`--task z3950-health-reset
+ID`, or --all) so the next search asks it again.
+
 Bottom, public catalogues for copy cataloguing, scanned and ranked.
 The list (z3950.py) is grouped by region; the librarian ticks servers
 (space, or a click on a region to tick all of it), scans them behind the
@@ -78,6 +83,18 @@ class Z3950View(SectionView):
                 yield Label(z3950.NETWORK_NAME, classes="z-switch-name")
                 yield Label(t("Not checked yet."), id="z-net-state", classes="z-switch-state")
             yield Static("", id="z-net-note", classes="ai-note", markup=False)
+        with Vertical(id="z-health", classes="hub-box z-wide"):
+            yield Label(t("Not checked yet."), id="z-health-state")
+            health = DataTable(id="z-health-table", zebra_stripes=True, cursor_type="row", classes="hub-table")
+            health.add_column(t("Server"), key="id")
+            health.add_column(t("State"), key="state")
+            health.add_column(t("OK (7 days)"), key="ok")
+            health.add_column(t("Failed (7 days)"), key="fail")
+            health.add_column(t("Last error"), key="error")
+            yield health
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("Reset"), id="z-health-reset", classes="small", disabled=True)
+                yield Button(t("Reset all"), id="z-health-reset-all", classes="small", disabled=True)
         with Vertical(id="z-outbound", classes="hub-box z-wide"):
             yield from self.compose_outbound()
 
@@ -111,6 +128,7 @@ class Z3950View(SectionView):
         self.query_one("#z-inbound").border_title = t("This catalogue's Z39.50 / SRU server (inbound)")
         self.query_one("#z-network").border_title = t("Community network")
         self.query_one("#z-outbound").border_title = t("Catalogues to copy records from (outbound)")
+        self.query_one("#z-health").border_title = t("Direct servers for on-demand enrichment")
         self.query_one("#z-net-note", Static).update(
             t("The shared catalogue of the koha.nexus libraries. Turning it on adds it to Koha's Z39.50/SRU "
               "servers, checked for the cataloguing searches; off takes it out.")
@@ -126,9 +144,11 @@ class Z3950View(SectionView):
             self.draw()
             self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
             self.load_server()
+            self.load_health()
 
     def refresh_data(self) -> None:
         self.load_server()
+        self.load_health()
         self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
 
     # ------------------------------------------------------------------
@@ -337,10 +357,66 @@ class Z3950View(SectionView):
         actions = {"z-scan": self.scan, "z-add": self.add, "z-login": self.login, "z-hide": self.hide,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
                    "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
-                   "z-update": self.update_servers}
+                   "z-update": self.update_servers, "z-health-reset": self.reset_health,
+                   "z-health-reset-all": self.reset_all_health}
         if event.button.id in actions:
             event.stop()
             actions[event.button.id]()
+
+    # ------------------------------------------------------------------
+    # Direct servers' health (on-demand enrichment)
+    # ------------------------------------------------------------------
+    def load_health(self) -> None:
+        self.run_worker(self._load_health(), exclusive=True, group="z3950-health", exit_on_error=False)
+
+    async def _load_health(self) -> None:
+        import json
+        try:
+            out = await self.app.bridge.task("z3950-health")
+            rows = json.loads(out.get("health") or "[]", strict=False) if out.ok else []
+        except Exception:     # noqa: BLE001 (no installer, or not installed yet: an empty list)
+            rows = []
+        self.draw_health(rows if isinstance(rows, list) else [])
+
+    def draw_health(self, rows: list[dict]) -> None:
+        table = self.query_one("#z-health-table", DataTable)
+        table.clear()
+        trouble = [r for r in rows if r.get("state") != "ok" or r.get("fail_7d")]
+        for r in trouble:
+            table.add_row(r.get("id", ""), health_state(r.get("state", "")), str(r.get("ok_7d", 0)),
+                          str(r.get("fail_7d", 0)), (r.get("last_error") or "")[:80], key=r.get("id", "") + "|" + r.get("key", ""))
+        if not rows:
+            text = t("On-demand enrichment is not installed yet, or has not asked any server.")
+        elif not trouble:
+            text = t("All ${n} direct server address(es) answered or were not asked yet.", n=len(rows))
+        else:
+            text = t("${n} of ${total} direct server address(es) failed lately or are paused:", n=len(trouble),
+                     total=len(rows))
+        self.query_one("#z-health-state", Label).update(text)
+        self.query_one("#z-health-reset", Button).disabled = not trouble
+        self.query_one("#z-health-reset-all", Button).disabled = not trouble
+
+    def reset_health(self) -> None:
+        table = self.query_one("#z-health-table", DataTable)
+        if not table.row_count:
+            return
+        key = table.coordinate_to_cell_key((max(table.cursor_row, 0), 0)).row_key.value or ""
+        self.run_worker(self._reset_health(key.split("|")[0]), exclusive=True, group="z3950-health",
+                        exit_on_error=False)
+
+    def reset_all_health(self) -> None:
+        self.run_worker(self._reset_health("--all"), exclusive=True, group="z3950-health", exit_on_error=False)
+
+    async def _reset_health(self, server: str) -> None:
+        if not server:
+            return
+        try:
+            out = await self.app.bridge.task("z3950-health-reset", server)
+            n = out.get("reset") or "0"
+        except Exception:     # noqa: BLE001
+            n = "0"
+        self.app.notify(t("${n} server address(es) will be asked again on the next search.", n=n), timeout=5)
+        await self._load_health()
 
     def toggle_hidden(self) -> None:
         self.show_hidden = not self.show_hidden
@@ -574,6 +650,12 @@ class Z3950View(SectionView):
             self.app.notify(str(e), severity="error")
             return
         self.app.notify(t("Saved: ${file}", file=path))
+
+
+def health_state(state: str) -> str:
+    """A direct server's breaker state (nexus_ondemand.health), for the person."""
+    return {"ok": t("Working"), "down": t("Paused after failures"), "half-open": t("Asked again on the next search"),
+            "misconfigured": t("Wrong settings (not asked)")}.get(state, state)
 
 
 def _source_problem(value: str) -> str:

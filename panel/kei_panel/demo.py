@@ -43,6 +43,12 @@ _INSTALL = [line for n, stage, steps in _STAGES
 # The enrichment jobs screens (views/enrich.py): one bibliographic job with
 # its report, one still being compared, and an authority job (3).
 _ENRICH_JOBS = [
+    {"id": 6, "created": "2026-10-18 10:05:00", "updated": "2026-10-18 10:05:21", "scope": "query", "state": "ready",
+     "total": 1, "done": 1, "release": "", "error": "", "kind": "bib", "mode": "", "origin": "ondemand",
+     "query": '{"isbn": "9788535911664", "title": "O evangelho segundo Jesus Cristo"}', "rounds": 1},
+    {"id": 5, "created": "2026-10-18 09:58:00", "updated": "2026-10-18 09:58:40", "scope": "101, 117",
+     "state": "ready", "total": 2, "done": 2, "release": "", "error": "", "kind": "bib", "mode": "",
+     "origin": "ondemand", "query": "", "rounds": 1},
     {"id": 3, "created": "2026-10-17 16:20:00", "updated": "2026-10-17 16:41:02", "scope": "all", "state": "ready",
      "total": 1240, "done": 1240, "release": "nexus-enrich-2026.10", "error": "", "kind": "auth", "mode": "exact"},
     {"id": 2, "created": "2026-10-17 14:02:11", "updated": "2026-10-17 14:05:40", "scope": "500-550",
@@ -57,7 +63,7 @@ _ENRICH_REPORT = {"job": 1, "scope": "all", "release": "nexus-enrich-2026.10", "
                   "fields_added": 1288, "fields_by_class": {"M0": 1104, "M1": 96, "W": 88},
                   "fields_by_group": {"subjects": 702, "082": 318, "300": 140, "520": 128},
                   "fields_by_source": {"unesp": 540, "ufpr": 401, "unb": 221, "loc": 126}, "koha_batches": 1}
-_ENRICH_SHOW = dict(_ENRICH_JOBS[2], dir="/var/lib/koha-nexus-enrich/jobs/1", report=_ENRICH_REPORT,
+_ENRICH_SHOW = dict(_ENRICH_JOBS[4], dir="/var/lib/koha-nexus-enrich/jobs/1", report=_ENRICH_REPORT,
                     report_html="/var/lib/koha-nexus-enrich/jobs/1/report.html",
                     chunks=[{"job_id": 1, "chunk": 1, "records": 412, "state": "pending"}],
                     changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
@@ -79,7 +85,7 @@ _AUTH_REPORT = {"kind": "auth", "mode": "exact", "job": 3, "scope": "all", "rele
                 "new_authorities": 214, "preliminary": 170, "new_by_source": {"bn": 96, "ufpr": 51, "loc": 44,
                                                                               "unesp": 23},
                 "koha_batches": 3}
-_AUTH_SHOW = dict(_ENRICH_JOBS[0], dir="/var/lib/koha-nexus-enrich/jobs/3", report=_AUTH_REPORT,
+_AUTH_SHOW = dict(_ENRICH_JOBS[2], dir="/var/lib/koha-nexus-enrich/jobs/3", report=_AUTH_REPORT,
                   report_html="/var/lib/koha-nexus-enrich/jobs/3/report.html",
                   changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
                             "m0": 0, "m1": 2, "w": 1, "r": 0, "added": 2},
@@ -92,8 +98,70 @@ _AUTH_SHOW = dict(_ENRICH_JOBS[0], dir="/var/lib/koha-nexus-enrich/jobs/3", repo
 _AUTH_DIFF = ["# job 3, biblionumber 101: enriched", "  LDR    00000nam a2200000 a 4500",
               "- 100 1_ $a Saramago, José", "+ 100 1_ $a Saramago, José, $d 1922-2010 $9 nexus-new:1",
               "  245 10 $a Ensaio sobre a cegueira", "- 650 _4 $a Cegueira", "+ 650 _4 $a Cegueira $9 nexus-new:2"]
+# The on-demand screen (views/ondemand.py): job 5 (two records, enriched by
+# direct Z39.50 servers) and job 6 (a typed book, two records found).
+_OD_ATTEMPTS = [
+    {"seq": 1, "round": 1, "wave": 1, "target": "ufpr", "address": "z3950.ufpr.br:210/biblios", "outcome": "found",
+     "category": "", "detail": "", "step": "isbn", "hits": 1, "records": 1, "ms": 412},
+    {"seq": 1, "round": 1, "wave": 1, "target": "usp", "address": "dedalus.usp.br:9991/usp01", "outcome": "none",
+     "category": "", "detail": "", "step": "isbn", "hits": 0, "records": 0, "ms": 690},
+    {"seq": 1, "round": 1, "wave": 1, "target": "bne", "address": "catalogo.bne.es:2200/unicorn",
+     "outcome": "error", "category": "timeout", "detail": "no answer in 15 s", "step": "isbn", "hits": 0,
+     "records": 0, "ms": 15000},
+]
+_OD_SHOW = dict(_ENRICH_JOBS[1], dir="/var/lib/koha-nexus-enrich/jobs/5",
+                report={"job": 5, "scope": "101, 117", "records": 2, "enriched": 2, "unchanged": 0, "review": 0,
+                        "no_match": 0, "errors": 0, "records_with": {"M0": 2, "M1": 0, "W": 0, "R": 0},
+                        "fields_added": 5, "fields_by_source": {"z3950:ufpr": 3, "z3950:unb": 2}, "koha_batches": 1},
+                report_html="/var/lib/koha-nexus-enrich/jobs/5/report.html", chunks=[], attempts=_OD_ATTEMPTS,
+                found=[], choices={"101": {"subjects": "z3950:ufpr"}},
+                donors={"101": [{"source": "z3950:ufpr", "remote_id": "88213", "cls": "M0", "score": 0.97,
+                                 "reasons": []},
+                                {"source": "z3950:unb", "remote_id": "5521", "cls": "M0", "score": 0.93,
+                                 "reasons": []}],
+                        "117": [{"source": "z3950:unb", "remote_id": "7710", "cls": "M0", "score": 0.95,
+                                 "reasons": []}]},
+                changes=[{"biblionumber": 101, "status": "enriched", "title": "Ensaio sobre a cegueira",
+                          "m0": 3, "m1": 0, "w": 0, "r": 0, "added": 3},
+                         {"biblionumber": 117, "status": "enriched", "title": "Vidas secas",
+                          "m0": 2, "m1": 0, "w": 0, "r": 0, "added": 2}])
+_OD_QUERY_SHOW = dict(_ENRICH_JOBS[0], dir="/var/lib/koha-nexus-enrich/jobs/6",
+                      report={"job": 6, "scope": "query", "records": 1, "enriched": 0, "no_match": 0},
+                      report_html="/var/lib/koha-nexus-enrich/jobs/6/report.html", chunks=[], changes=[],
+                      attempts=_OD_ATTEMPTS, donors={}, choices={},
+                      found=[{"seq": 1, "query": {"isbn": "9788535911664"}, "found": [
+                          {"source": "z3950:ufpr", "remote_id": "90311", "title": "O evangelho segundo Jesus Cristo",
+                           "isbn": "9788535911664"},
+                          {"source": "z3950:unb", "remote_id": "6620", "title": "O evangelho segundo Jesus Cristo : "
+                           "romance", "isbn": "9788535911664", "imported": 1302}]}])
+_OD_STATUS = {"job": 5, "state": "matching", "round": 1, "total": 2, "done": 1,
+              "record": {"seq": 2, "biblionumber": 117, "title": "Vidas secas"}, "found": 1, "network": [],
+              "servers": {"ufpr": {"name": "Universidade Federal do Paraná", "country": "BR", "state": "1 record(s)",
+                                   "ms": 412, "hits": 1},
+                          "usp": {"name": "Universidade de São Paulo (Dedalus)", "country": "BR",
+                                  "state": "no record", "ms": 690, "hits": 0},
+                          "bne": {"name": "Biblioteca Nacional de España", "country": "ES",
+                                  "state": "down: timeout: no answer in 15 s", "ms": 15000, "hits": 0},
+                          "unb": {"name": "Universidade de Brasília", "country": "BR", "state": "searching",
+                                  "ms": 0, "hits": 0}}}
+_Z_HEALTH = [
+    {"id": "bne", "key": "catalogo.bne.es:2200/unicorn", "state": "down", "level": 2, "open_until": 0,
+     "last_error": "timeout: no answer in 15 s", "last_error_at": 0, "last_ok_at": 0, "latency_ms": 0,
+     "ok_7d": 0, "fail_7d": 4},
+    {"id": "ufpr", "key": "z3950.ufpr.br:210/biblios", "state": "ok", "level": 0, "open_until": 0,
+     "last_error": "", "last_error_at": 0, "last_ok_at": 0, "latency_ms": 410, "ok_7d": 12, "fail_7d": 0},
+    {"id": "old", "key": "z3950.old.example:210/db", "state": "down", "level": 0, "open_until": 0,
+     "last_error": "dns: name not found", "last_error_at": 0, "last_ok_at": 0, "latency_ms": 0,
+     "ok_7d": 0, "fail_7d": 1},
+]
+
 # Answers that depend on the first argument (the job): the authority job.
 _BY_ARG: dict[tuple[str, str], list[str]] = {
+    ("enrich-job-show", "5"): ["@@result job=" + json.dumps(_OD_SHOW, ensure_ascii=False)],
+    ("enrich-job-show", "6"): ["@@result job=" + json.dumps(_OD_QUERY_SHOW, ensure_ascii=False)],
+    ("enrich-job-apply", "5"): ["@@result backup=/var/lib/koha-nexus-enrich/jobs/5/snapshot-apply-2026-10-18.xml",
+                                "@@result applied=2", "@@result apply=done",
+                                "@@msg ok OK\t✅ Job 5 applied: 2 record(s) enriched."],
     ("enrich-job-show", "3"): ["@@result job=" + json.dumps(_AUTH_SHOW, ensure_ascii=False)],
     ("enrich-job-diff", "3"): ["@@result line=" + line for line in _AUTH_DIFF],
     ("enrich-job-apply", "3"): ["@@result backup=/var/backups/koha_sql/PRE-ENRICH_2026-10-17_17h00.sql.gz",
@@ -296,6 +364,16 @@ _SCRIPTS: dict[str, list[str]] = {
                         "background.\n\nNothing is written to the catalogue until you review the report and "
                         "choose Apply."],
     "enrich-job-cancel": [],
+    "enrich-od-status": ["@@result status=" + json.dumps(_OD_STATUS, ensure_ascii=False)],
+    "enrich-od-add": ["@@result job=7"],
+    "enrich-od-more": ["@@result job={0}", "@@result round=2"],
+    "enrich-od-donor": ["@@result job={0}", "@@result round=1"],
+    "enrich-od-import": ["@@result batch=88", "@@result import=done", "@@result biblionumber=1303",
+                         "@@msg ok OK\t✅ Imported as a new record (biblionumber 1303, batch 88).\n\nO evangelho "
+                         "segundo Jesus Cristo\n\nIt is indexed automatically in a few minutes. To take it out "
+                         "again: Library tools > Undo a MARC import."],
+    "z3950-health": ["@@result health=" + json.dumps(_Z_HEALTH, ensure_ascii=False)],
+    "z3950-health-reset": ["@@result reset=1"],
     "enrich-pause": [],
     "z3950-server-status": ["@@result daemon=running", "@@result port=2100", "@@result network=off"],
     "z3950-daemon": ["@@msg ok OK\tThis catalogue's Z39.50/SRU server: {0}."],

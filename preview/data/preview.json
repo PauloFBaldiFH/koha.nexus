@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.89",
+ "panel_version": "1.5.90",
  "languages": [
   {
    "code": "en",
@@ -588,6 +588,22 @@
    "single": ""
   },
   {
+   "id": "ondemand",
+   "item": "sec-ondemand",
+   "label": "⚡  On-demand enrichment",
+   "title": "⚡  On-demand enrichment",
+   "prompt": "",
+   "icon": "",
+   "key": "n",
+   "view": "ondemand",
+   "sidebar": false,
+   "parent": "library",
+   "entries": [],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
    "id": "library",
    "item": "sec-library",
    "label": "📚  Library tools",
@@ -601,6 +617,7 @@
    "entries": [
     "sec-enrich",
     "sec-enrich-auth",
+    "sec-ondemand",
     "marc-undo",
     "authority-sync",
     "authority-match",
@@ -1208,6 +1225,16 @@
    "type": "section",
    "section": "enrich-auth",
    "label": "📇  Enrich & standardize authorities",
+   "description": "",
+   "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "sec-ondemand": {
+   "id": "sec-ondemand",
+   "type": "section",
+   "section": "ondemand",
+   "label": "⚡  On-demand enrichment",
    "description": "",
    "kind": "view",
    "status": "available",
@@ -5509,6 +5536,31 @@
   "📇  Enrich & standardize authorities": {
    "en": "📇  Enrich & standardize authorities",
    "pt-BR": "📇  Enriquecer e padronizar autoridades",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "⚡  On-demand enrichment": {
+   "en": "⚡  On-demand enrichment",
+   "pt-BR": "⚡  Enriquecimento sob demanda",
    "es": null,
    "fr": null,
    "it": null,
@@ -14881,6 +14933,61 @@
     ]
    }
   },
+  "sec-ondemand": {
+   "en": {
+    "summary": "Searches public catalogues now, over direct Z39.50 connections only, for up to 50 of your records or for a book you type, with the same staged report as the background jobs and an import as a new record for a typed book.",
+    "overview": [
+     "Only the direct Z39.50 servers of the panel's list are asked, never the koha.nexus gateways (sru.koha.nexus, catalog.koha.nexus). The servers go in small waves, at most two of one institution at a time, and each server's limits are kept; a server that keeps failing is paused and shown in the Z39.50 screen.",
+     "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record exactly as in **Enrich bibliographic catalog**, and the koha.nexus enrichment database is used after them when nothing fits.",
+     "**Apply** saves a copy of those records as Koha has them (not a full backup: at most 50 records), then writes the fields through Koha's staged import. **Revert** gives the records their previous version back.",
+     "For a typed book, the best record of each server is listed. **Import as new record** adds it to the catalogue through Koha's staged import, without the other library's local fields (9XX) and with an 883 saying where it came from; when Koha already has a record with that ISBN, nothing is added."
+    ],
+    "steps": [
+     "Type up to 50 biblionumbers (such as `101, 102, 500-510`) and press **Search**; or type an ISBN or a title (the author and the year help) and press **Find**.",
+     "Follow the servers in the **Servers** box: each one's state (searching, records found, no record, down) and time.",
+     "Pick the job in **Jobs** and read the report; select a record to see its fields before and after.",
+     "Not enough? **Search more servers** asks the servers not asked yet. **Choose donor** picks the server whose record gives a group of fields (subjects, Dewey, notes...), merged again without asking the network.",
+     "Press **Apply** to write the records, or, for a typed book, pick a record and press **Import as new record**."
+    ],
+    "tips": [
+     "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
+     "For hundreds or thousands of records, use **Enrich bibliographic catalog**: it runs in the background from the enrichment database, without asking the servers.",
+     "An imported record is taken out again with **Undo a MARC import** (Library tools)."
+    ],
+    "warnings": [
+     "Apply and Import change the catalogue. Both ask first; Revert and Undo a MARC import undo them."
+    ],
+    "related": [
+     "sec-enrich",
+     "sec-z3950",
+     "marc-undo"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Pesquisa catálogos públicos agora, só por conexões Z39.50 diretas, para até 50 dos seus registros ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
+    "overview": [
+     "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50.",
+     "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro exatamente como em **Enriquecer catálogo bibliográfico**, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
+     "**Aplicar** salva uma cópia desses registros como estão no Koha (não um backup completo: no máximo 50 registros) e grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
+     "Para um livro digitado, aparece o melhor registro de cada servidor. **Importar como registro novo** o acrescenta ao catálogo pela importação preparada do Koha, sem os campos locais da outra biblioteca (9XX) e com um 883 dizendo de onde veio; se o Koha já tem um registro com esse ISBN, nada é acrescentado."
+    ],
+    "steps": [
+     "Digite até 50 biblionumbers (como `101, 102, 500-510`) e pressione **Pesquisar**; ou digite um ISBN ou um título (o autor e o ano ajudam) e pressione **Encontrar**.",
+     "Acompanhe os servidores no quadro **Servidores**: o estado de cada um (pesquisando, registros encontrados, nenhum registro, fora do ar) e o tempo.",
+     "Escolha o trabalho em **Trabalhos** e leia o relatório; selecione um registro para ver os campos antes e depois.",
+     "Não bastou? **Pesquisar mais servidores** consulta os que ainda não foram consultados. **Escolher doador** define o servidor cujo registro fornece um grupo de campos (assuntos, CDD, notas...), mesclado de novo sem consultar a rede.",
+     "Pressione **Aplicar** para gravar os registros ou, para um livro digitado, escolha um registro e pressione **Importar como registro novo**."
+    ],
+    "tips": [
+     "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
+     "Para centenas ou milhares de registros, use **Enriquecer catálogo bibliográfico**: ele roda em segundo plano a partir da base de enriquecimento, sem consultar os servidores.",
+     "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
+    ],
+    "warnings": [
+     "Aplicar e Importar alteram o catálogo. Os dois perguntam antes; Reverter e Desfazer uma importação MARC os desfazem."
+    ]
+   }
+  },
   "marc-undo": {
    "en": {
     "summary": "Removes the records and items of an imported MARC batch with Koha's own revert, after a preview and a verified backup.",
@@ -17852,167 +17959,167 @@
  },
  "coverage": {
   "en": {
-   "manual": 111,
-   "manual_total": 111,
+   "manual": 112,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 379,
-   "strings_total": 379
+   "strings": 380,
+   "strings_total": 380
   },
   "pt-BR": {
-   "manual": 111,
-   "manual_total": 111,
+   "manual": 112,
+   "manual_total": 112,
    "manual_outdated": [
     "install"
    ],
-   "strings": 371,
-   "strings_total": 379
+   "strings": 372,
+   "strings_total": 380
   },
   "es": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 264,
-   "strings_total": 379
+   "strings_total": 380
   },
   "fr": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 379
+   "strings_total": 380
   },
   "it": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 379
+   "strings_total": 380
   },
   "de": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 259,
-   "strings_total": 379
+   "strings_total": 380
   },
   "nl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "sv": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "pl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "cs": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "ru": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "uk": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "tr": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "tl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "id": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "ar": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "fa": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "hi": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "bn": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "vi": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "zh": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "ja": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   },
   "ko": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
    "strings": 101,
-   "strings_total": 379
+   "strings_total": 380
   }
  }
 }

@@ -5,6 +5,8 @@
     once           JOB: that job only, now (for a test from a terminal)
     status         ondemand-status.json: the job being searched, each
                    server's state
+    import-file    JOB SEQ N --out FILE: record N found for a typed query, as
+                   MARCXML for Koha's staged import (a new record)
 
     targets        the direct servers on-demand may ask, and those skipped
                    or unusable, with the reason (--json)
@@ -21,8 +23,10 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 
 from nexus_gateway.z3950 import Z3950Error
+from nexus_jobs.store import Store
 
 from . import service
 from . import targets as targets_mod
@@ -47,6 +51,11 @@ def main(argv: list[str] | None = None) -> int:
     sv.add_argument("--idle", type=float, default=service.IDLE)
     sub.add_parser("once").add_argument("job", type=int)
     sub.add_parser("status")
+    imp = sub.add_parser("import-file")
+    imp.add_argument("job", type=int)
+    imp.add_argument("seq", type=int)
+    imp.add_argument("n", type=int)
+    imp.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
     settings = Settings.from_env()
 
@@ -57,6 +66,17 @@ def main(argv: list[str] | None = None) -> int:
             svc.idle = args.idle
         n = asyncio.run(service.serve(svc, settings, once=args.job if args.cmd == "once" else None))
         print(json.dumps({"jobs": n}))
+        return 0
+    if args.cmd == "import-file":
+        svc = service.Settings.from_env()
+        store = Store(svc.jobs_db)
+        try:
+            print(json.dumps(service.import_file(svc, store, args.job, args.seq, args.n, args.out), ensure_ascii=False))
+        except (KeyError, service.JobError) as exc:
+            print(str(exc).strip("'\""), file=sys.stderr)
+            return 1
+        finally:
+            store.close()
         return 0
     if args.cmd == "status":
         try:

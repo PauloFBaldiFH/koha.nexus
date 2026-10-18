@@ -216,6 +216,20 @@ def _jobs(args, store: Store, settings: Settings) -> int:
                                for a in store.attempts(job.id)]
             out["found"] = [{"seq": r["seq"], **json.loads(r["detail"] or "{}")}
                             for r in store.items(job.id, "found", "no-match") if r["biblionumber"] is None]
+            # Records already imported as new (the installer leaves imported-SEQ-N with the biblionumber).
+            for q in out["found"]:
+                for i, f in enumerate(q.get("found", []), 1):
+                    mark = settings.job_dir(job.id) / f"imported-{q['seq']}-{i}"
+                    if mark.is_file():
+                        v = mark.read_text(encoding="utf-8").strip()
+                        f["imported"] = int(v) if v.isdigit() else 0
+            # Each record's donors (for "Choose donor"): every server's best record, best first.
+            out["donors"] = {str(r["biblionumber"]): json.loads(r["detail"] or "{}").get("candidates", [])
+                             for r in store.items(job.id) if r["biblionumber"] is not None}
+            out["choices"] = {}
+            for b, grp, src in store.conn.execute(
+                    "SELECT biblionumber, grp, source FROM od_choices WHERE job_id = ?", (job.id,)):
+                out["choices"].setdefault(str(b), {})[grp] = src
         # The records a person reviews first (the panel's list): changed
         # ones, then the review list, at most SHOW_CHANGES.
         auth = job.kind == "auth"
