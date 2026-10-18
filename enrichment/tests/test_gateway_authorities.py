@@ -147,5 +147,5 @@ def test_koha_row_and_panel_list():
     assert "authorpersonal=bath.personalName" in six and "subject=dc.subject" in six
     assert "SET checked" not in six                                  # the librarian's tick is kept
     data = json.loads(koha_sql.PANEL_LIST.read_text(encoding="utf-8"))
-    auth = [t for t in data["targets"] if t.get("recordtype") == "authority"]
-    assert auth[0]["db"] == "sru/_union-aut" and auth[0]["sru_fields"] == koha_sql.AUTH_SRU_FIELDS
+    own = [t for t in data["targets"] if t.get("db") == "sru/_union-aut"]
+    assert len(own) == 1 and own[0]["recordtype"] == "authority" and own[0]["sru_fields"] == koha_sql.AUTH_SRU_FIELDS

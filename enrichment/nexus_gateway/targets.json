@@ -1,12 +1,13 @@
 {
  "schema": 1,
- "updated": "2026-10-17",
+ "updated": "2026-10-18",
  "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus, pergamum and missing ones answer from static.db only, since clients never scrape. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address).",
  "targets": [
   {
    "id": "bn",
    "name": "Fundação Biblioteca Nacional (BN)",
    "group": "national",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 0,
@@ -17,6 +18,7 @@
    "id": "fundacentro",
    "name": "Fundacentro, Biblioteca",
    "group": "national",
+   "country": "BR",
    "kind": "missing",
    "status": "missing"
   },
@@ -24,6 +26,7 @@
    "id": "senado",
    "name": "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
    "group": "national",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 2,
@@ -34,6 +37,7 @@
    "id": "senado-folio",
    "name": "Senado Federal (FOLIO)",
    "group": "national",
+   "country": "BR",
    "kind": "missing",
    "status": "missing"
   },
@@ -41,6 +45,7 @@
    "id": "bn-portugal",
    "name": "Biblioteca Nacional de Portugal (BNP)",
    "group": "national",
+   "country": "PT",
    "kind": "missing",
    "status": "missing"
   },
@@ -48,6 +53,7 @@
    "id": "porbase",
    "name": "PORBASE, Portugal",
    "group": "national",
+   "country": "PT",
    "kind": "missing",
    "status": "missing"
   },
@@ -55,6 +61,7 @@
    "id": "bne",
    "name": "Biblioteca Nacional de España, Espanha",
    "group": "national",
+   "country": "ES",
    "kind": "missing",
    "status": "missing"
   },
@@ -62,6 +69,7 @@
    "id": "bl",
    "name": "British Library, UK",
    "group": "national",
+   "country": "GB",
    "kind": "z3950",
    "status": "broken",
    "host": "z3950cat.bl.uk",
@@ -76,6 +84,7 @@
    "id": "loc",
    "name": "Library of Congress, EUA",
    "group": "national",
+   "country": "US",
    "kind": "z3950",
    "status": "verified",
    "host": "lx2.loc.gov",
@@ -89,6 +98,7 @@
    "id": "argentina",
    "name": "Biblioteca Nacional da Argentina",
    "group": "national",
+   "country": "AR",
    "kind": "missing",
    "status": "missing"
   },
@@ -96,6 +106,7 @@
    "id": "colombia",
    "name": "Red Distrital de Bibliotecas Públicas (BibloRed), Colômbia",
    "group": "national",
+   "country": "CO",
    "kind": "missing",
    "status": "missing"
   },
@@ -103,6 +114,7 @@
    "id": "polonia",
    "name": "National Library of Poland, Polônia",
    "group": "national",
+   "country": "PL",
    "kind": "missing",
    "status": "missing"
   },
@@ -110,6 +122,7 @@
    "id": "suica",
    "name": "Swiss Library Service Platform, Suíça",
    "group": "national",
+   "country": "CH",
    "kind": "missing",
    "status": "missing"
   },
@@ -117,6 +130,7 @@
    "id": "suecia",
    "name": "LIBRIS, Suécia",
    "group": "national",
+   "country": "SE",
    "kind": "z3950",
    "status": "untested",
    "host": "z3950.libris.kb.se",
@@ -131,6 +145,7 @@
    "id": "tchequia",
    "name": "National Library of the Czech Republic, Tchéquia",
    "group": "national",
+   "country": "CZ",
    "kind": "missing",
    "status": "missing"
   },
@@ -138,6 +153,7 @@
    "id": "grecia",
    "name": "Grécia",
    "group": "national",
+   "country": "GR",
    "kind": "missing",
    "status": "missing"
   },
@@ -145,6 +161,7 @@
    "id": "russia-state",
    "name": "Russian State Library, Rússia",
    "group": "national",
+   "country": "RU",
    "kind": "missing",
    "status": "missing"
   },
@@ -152,6 +169,7 @@
    "id": "bashkir-russia",
    "name": "Bashkir State University, Rússia",
    "group": "national",
+   "country": "RU",
    "kind": "missing",
    "status": "missing"
   },
@@ -159,6 +177,7 @@
    "id": "africa-do-sul",
    "name": "Monash South Africa, África do Sul",
    "group": "national",
+   "country": "ZA",
    "kind": "missing",
    "status": "missing"
   },
@@ -166,6 +185,7 @@
    "id": "taiwan",
    "name": "Taiwan",
    "group": "national",
+   "country": "TW",
    "kind": "missing",
    "status": "missing"
   },
@@ -173,6 +193,7 @@
    "id": "nysl",
    "name": "New York State Library (NYSL), EUA",
    "group": "national",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -180,6 +201,7 @@
    "id": "usp",
    "name": "Universidade de São Paulo (USP)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 4,
@@ -190,6 +212,7 @@
    "id": "unicamp",
    "name": "Universidade Estadual de Campinas (UNICAMP)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 6,
@@ -200,6 +223,7 @@
    "id": "unesp",
    "name": "Universidade Estadual Paulista (UNESP)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "missing",
    "status": "missing"
   },
@@ -207,6 +231,7 @@
    "id": "uerj",
    "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 5,
@@ -217,6 +242,7 @@
    "id": "ufg",
    "name": "Universidade Federal de Goiás (UFG)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 8,
@@ -227,6 +253,7 @@
    "id": "ufmg",
    "name": "Universidade Federal de Minas Gerais (UFMG)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 9,
@@ -237,6 +264,7 @@
    "id": "ufpe",
    "name": "Universidade Federal de Pernambuco (UFPE)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 10,
@@ -247,6 +275,7 @@
    "id": "ufsc",
    "name": "Universidade Federal de Santa Catarina (UFSC)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "source": "sru-bridge/zeus_sru: Catálogo Zeus target 0, tested live on 2026-10-09",
@@ -257,6 +286,7 @@
    "id": "ufscar",
    "name": "Universidade Federal de São Carlos (UFSCar)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 12,
@@ -267,6 +297,7 @@
    "id": "unifesp",
    "name": "Universidade Federal de São Paulo (UNIFESP)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "z3950",
    "status": "untested",
    "host": "z3950.unifesp.br",
@@ -281,6 +312,7 @@
    "id": "ufu",
    "name": "Universidade Federal de Uberlândia (UFU)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 14,
@@ -291,6 +323,7 @@
    "id": "ufpr",
    "name": "Universidade Federal do Paraná (UFPR)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "missing",
    "status": "missing"
   },
@@ -298,6 +331,7 @@
    "id": "ufrgs",
    "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 16,
@@ -308,6 +342,7 @@
    "id": "uff",
    "name": "Universidade Federal Fluminense (UFF)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "zeus",
    "status": "verified",
    "target_index": 17,
@@ -318,20 +353,22 @@
    "id": "utfpr",
    "name": "Universidade Tecnológica Federal do Paraná (UTFPR)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "z3950",
    "status": "untested",
    "host": "z3950.utfpr.edu.br",
    "port": 210,
-   "db": "Default",
+   "db": "biblioteca",
    "syntax": "USMARC",
    "encoding": "utf8",
-   "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet.",
+   "note": "Z39.50 address from the panel's curated list; not searched through the gateway yet. Database biblioteca per Paulo's validated direct list of 2026-10-18 (was Default).",
    "source": "panel/kei_panel/data/z3950_targets.json (koha.nexus panel's curated list)"
   },
   {
    "id": "unb",
    "name": "Universidade de Brasília (UnB)",
    "group": "br_universities",
+   "country": "BR",
    "kind": "missing",
    "status": "missing",
    "note": "Records harvested into static.db (fonte \"Universidade de Brasília (UnB)\"); no live address."
@@ -340,6 +377,7 @@
    "id": "harvard",
    "name": "Harvard University, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "sru",
    "status": "untested",
    "url": "https://harvard-primo.hosted.exlibrisgroup.com/view/sru/01HVD_INST",
@@ -352,6 +390,7 @@
    "id": "yale",
    "name": "Yale University, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "sru",
    "status": "verified",
    "url": "https://yale.alma.exlibrisgroup.com/view/sru/01YALE_INST",
@@ -370,6 +409,7 @@
    "id": "mit",
    "name": "Massachusetts Institute of Technology (MIT), EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "sru",
    "status": "verified",
    "url": "https://mit.alma.exlibrisgroup.com/view/sru/01MIT_INST",
@@ -388,6 +428,7 @@
    "id": "wisconsin",
    "name": "University of Wisconsin-Madison, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -395,6 +436,7 @@
    "id": "pennstate",
    "name": "Penn State University, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -402,6 +444,7 @@
    "id": "upenn",
    "name": "University of Pennsylvania (UPenn), EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "sru",
    "status": "verified",
    "url": "https://upenn.alma.exlibrisgroup.com/view/sru/01UPENN_INST",
@@ -420,6 +463,7 @@
    "id": "tufts",
    "name": "Tufts University Libraries, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -427,6 +471,7 @@
    "id": "fsu",
    "name": "Florida State University, EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -434,6 +479,7 @@
    "id": "suno",
    "name": "Southern University at New Orleans (SUNO), EUA",
    "group": "intl_universities",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -441,6 +487,7 @@
    "id": "ubc",
    "name": "University of British Columbia, Canadá",
    "group": "intl_universities",
+   "country": "CA",
    "kind": "missing",
    "status": "missing"
   },
@@ -448,6 +495,7 @@
    "id": "toronto",
    "name": "University of Toronto, Canadá",
    "group": "intl_universities",
+   "country": "CA",
    "kind": "missing",
    "status": "missing"
   },
@@ -455,6 +503,7 @@
    "id": "sfu",
    "name": "Simon Fraser University, Canadá",
    "group": "intl_universities",
+   "country": "CA",
    "kind": "missing",
    "status": "missing"
   },
@@ -462,6 +511,7 @@
    "id": "trent",
    "name": "Trent University Library & Archives, Canadá",
    "group": "intl_universities",
+   "country": "CA",
    "kind": "missing",
    "status": "missing"
   },
@@ -469,6 +519,7 @@
    "id": "memorial",
    "name": "Memorial University of Newfoundland, Canadá",
    "group": "intl_universities",
+   "country": "CA",
    "kind": "missing",
    "status": "missing"
   },
@@ -476,6 +527,7 @@
    "id": "oxford",
    "name": "University of Oxford, Reino Unido",
    "group": "intl_universities",
+   "country": "GB",
    "kind": "sru",
    "status": "verified",
    "url": "https://oxford.alma.exlibrisgroup.com/view/sru/44OXF_INST",
@@ -494,6 +546,7 @@
    "id": "coimbra",
    "name": "Universidade de Coimbra, Portugal",
    "group": "intl_universities",
+   "country": "PT",
    "kind": "missing",
    "status": "missing"
   },
@@ -501,6 +554,7 @@
    "id": "porto",
    "name": "Universidade do Porto, Portugal",
    "group": "intl_universities",
+   "country": "PT",
    "kind": "missing",
    "status": "missing"
   },
@@ -508,6 +562,7 @@
    "id": "barcelona",
    "name": "Aladí: Barcelona Municipal Libraries Network, Espanha",
    "group": "intl_universities",
+   "country": "ES",
    "kind": "missing",
    "status": "missing"
   },
@@ -515,6 +570,7 @@
    "id": "gent-belgica",
    "name": "Ghent University (UGent), Bélgica",
    "group": "intl_universities",
+   "country": "BE",
    "kind": "missing",
    "status": "missing"
   },
@@ -522,6 +578,7 @@
    "id": "tuhh-alemanha",
    "name": "Hamburg University of Technology (TUHH), Alemanha",
    "group": "intl_universities",
+   "country": "DE",
    "kind": "missing",
    "status": "missing"
   },
@@ -529,6 +586,7 @@
    "id": "macau",
    "name": "Macau",
    "group": "intl_universities",
+   "country": "MO",
    "kind": "missing",
    "status": "missing"
   },
@@ -536,6 +594,7 @@
    "id": "buap-mexico",
    "name": "Benemérita Universidad Autónoma de Puebla (BUAP), México",
    "group": "intl_universities",
+   "country": "MX",
    "kind": "missing",
    "status": "missing"
   },
@@ -543,6 +602,7 @@
    "id": "pucp-peru",
    "name": "Pontificia Universidad Católica del Perú, Peru",
    "group": "intl_universities",
+   "country": "PE",
    "kind": "missing",
    "status": "missing"
   },
@@ -550,6 +610,7 @@
    "id": "upc-peru",
    "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
    "group": "intl_universities",
+   "country": "PE",
    "kind": "missing",
    "status": "missing"
   },
@@ -557,6 +618,7 @@
    "id": "all",
    "name": "Rede Pergamum",
    "group": "specialized",
+   "country": "BR",
    "kind": "pergamum",
    "status": "verified",
    "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live",
@@ -566,6 +628,7 @@
    "id": "nlm",
    "name": "National Library of Medicine, EUA",
    "group": "specialized",
+   "country": "US",
    "kind": "z3950",
    "status": "broken",
    "host": "locatorplus.nlm.nih.gov",
@@ -580,6 +643,7 @@
    "id": "art-chicago",
    "name": "Art Institute of Chicago, EUA",
    "group": "specialized",
+   "country": "US",
    "kind": "missing",
    "status": "missing"
   },
@@ -587,6 +651,7 @@
    "id": "nga",
    "name": "National Gallery of Art (NGA), EUA",
    "group": "specialized",
+   "country": "US",
    "kind": "missing",
    "status": "missing",
    "static": [
@@ -598,6 +663,7 @@
    "id": "castilla-leon",
    "name": "Biblioteca de Castilla y León, Espanha",
    "group": "specialized",
+   "country": "ES",
    "kind": "missing",
    "status": "missing"
   },
@@ -605,6 +671,7 @@
    "id": "bizkaia",
    "name": "Biblioteca Foral de Bizkaia, Espanha",
    "group": "specialized",
+   "country": "ES",
    "kind": "missing",
    "status": "missing"
   },
@@ -612,6 +679,7 @@
    "id": "italia",
    "name": "Servizio Bibliotecario Nazionale, Itália",
    "group": "specialized",
+   "country": "IT",
    "kind": "z3950",
    "status": "untested",
    "host": "opac.sbn.it",
@@ -626,6 +694,7 @@
    "id": "abes-franca",
    "name": "Agence Bibliographique de l'Enseignement Supérieur, França",
    "group": "specialized",
+   "country": "FR",
    "kind": "missing",
    "status": "missing"
   },
@@ -633,6 +702,7 @@
    "id": "kobv-alemanha",
    "name": "KOBV Berlin-Brandenburg, Alemanha",
    "group": "specialized",
+   "country": "DE",
    "kind": "missing",
    "status": "missing"
   },
@@ -640,6 +710,7 @@
    "id": "swb-alemanha",
    "name": "SWB-Online-Katalog, Alemanha",
    "group": "specialized",
+   "country": "DE",
    "kind": "z3950",
    "status": "untested",
    "host": "z3950.k10plus.de",
@@ -654,6 +725,7 @@
    "id": "christchurch",
    "name": "Christchurch City Libraries, Nova Zelândia",
    "group": "specialized",
+   "country": "NZ",
    "kind": "missing",
    "status": "missing"
   },
@@ -661,6 +733,7 @@
    "id": "hong-kong",
    "name": "Joint University Librarians Advisory Committee, Hong Kong",
    "group": "specialized",
+   "country": "HK",
    "kind": "missing",
    "status": "missing"
   }

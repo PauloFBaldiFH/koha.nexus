@@ -35,6 +35,10 @@ from .targets import AUTH_UNION, GROUPS, UNION, Target
 
 # The panel's curated list (written by panel_list()); in a checkout only.
 PANEL_LIST = Path(__file__).resolve().parents[2] / "panel" / "kei_panel" / "data" / "z3950_targets.json"
+# The direct Z39.50 servers, the panel's primary targets (read by panel_list()).
+DIRECT_LIST = PANEL_LIST.with_name("z3950_direct.json")
+DIRECT_SOURCE = "koha.nexus direct Z39.50 servers (panel/kei_panel/data/z3950_direct.json)"
+FALLBACK_RANK = 500          # Koha rank of the first gateway row: after every direct server
 PERGAMUM_BRIDGE_PORT = 5006
 
 OLD_IPS = ("137.131.205.31", "10.0.0.60")
@@ -147,43 +151,87 @@ def render(table: dict[str, Target], host: str = "127.0.0.1", port: int = 5000) 
     return "\n".join(out)
 
 
+def flag(country: str) -> str:
+    """The flag emoji of an ISO 3166 code; the globe for none (several
+    countries, or a catalogue of catalogues)."""
+    cc = (country or "").upper()
+    return "".join(chr(0x1F1E6 + ord(c) - 65) for c in cc) if len(cc) == 2 and cc.isalpha() else "\U0001F310"
+
+
+def _direct_rows(path: Path) -> tuple[list[dict], dict[str, str]]:
+    """The panel rows of the direct Z39.50 servers (DIRECT_LIST): Koha
+    syntax USMARC for MARC21 over Z39.50, the login only by its .env name;
+    and the gateway ids they cover (their "sru_fallback"), with their name."""
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    out, covered = [], {}
+    for s in data.get("servers", []):
+        row = {"name": s["name"], "host": s["host"], "port": s["port"], "db": s["db"], "kind": "zed",
+               "syntax": "UNIMARC" if s.get("syntax") == "UNIMARC" else "USMARC",
+               "encoding": s.get("encoding", "utf8"), "region": s["category"], "country": s.get("country", ""),
+               "flag": s.get("flag") or flag(s.get("country", "")), "priority": "primary",
+               "preselect": bool(s.get("preselect")), "verified": True,
+               "source": DIRECT_SOURCE, "notes": s.get("notes", "")}
+        if s.get("recordtype") == "authority":
+            row["recordtype"] = "authority"
+        if s.get("login_env"):
+            row["login_env"] = s["login_env"]
+            row["login"] = True
+        if s.get("sru_fallback"):
+            covered[s["sru_fallback"]] = s["name"]
+        out.append(row)
+    return out, covered
+
+
 def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, host: str = "127.0.0.1",
-               port: int = 5000, updated: str = "") -> str:
-    """The koha.nexus panel's curated list: sru/_union (the one preselected)
-    and one row per target, on this gateway; then sru/_union-aut, the
-    gateway's authority headings, and the other authority files of the
-    current list (KEEP_FROM, default the checkout's), kept as they are."""
+               port: int = 5000, updated: str = "", direct: str | Path | None = None) -> str:
+    """The koha.nexus panel's curated list. First the direct Z39.50 servers
+    (DIRECT, default the checkout's z3950_direct.json), the primary targets,
+    by region, then the authority files: the other authority files of the
+    current list (KEEP_FROM, default the checkout's), kept as they are, the
+    direct ones and sru/_union-aut. Last, the fallback: sru/_union and
+    one row per gateway target, never preselected and ranked after every
+    direct server (FALLBACK_RANK on), for the libraries and regions no
+    direct server covers."""
     keep_path = Path(keep_from) if keep_from else PANEL_LIST
     old = json.loads(keep_path.read_text(encoding="utf-8")) if keep_path.exists() else {}
     authorities = [t for t in old.get("targets", []) if t.get("recordtype") == "authority"
-                   and t.get("db") != "sru/" + AUTH_UNION]
+                   and t.get("db") != "sru/" + AUTH_UNION and t.get("source") != DIRECT_SOURCE]
+    rows, covered = _direct_rows(Path(direct) if direct else DIRECT_LIST)
+    rank = iter(range(FALLBACK_RANK, 10000))
 
-    def row(db: str, name: str, region: str, preselect: bool, verified: bool, notes: str) -> dict:
+    def row(db: str, name: str, region: str, verified: bool, notes: str, country: str = "") -> dict:
         return {"name": name, "host": host, "port": port, "db": db, "kind": "sru", "syntax": SYNTAX,
                 "encoding": ENCODING, "schema": "marcxml", "sru_fields": SRU_FIELDS, "sru_options": SRU_OPTIONS,
-                "timeout": TIMEOUT, "region": region, "preselect": preselect, "verified": verified,
+                "timeout": TIMEOUT, "rank": next(rank), "region": region, "country": country,
+                "flag": flag(country), "priority": "fallback", "preselect": False, "verified": verified,
                 "source": "koha.nexus local gateway (enrichment/nexus_gateway/targets.json)", "notes": notes}
 
-    items = [row("sru/" + UNION, UNION_NAME, "national", True, True,
-                 "Every catalogue at once: static.db, then the Z39.50/SRU catalogues live. The only row ticked.")]
+    fallback = [row("sru/" + UNION, UNION_NAME, "sru_national", True,
+                    "Fallback: every gateway catalogue at once (static.db, then the Z39.50/SRU catalogues live).")]
     for t in table.values():
         how = ("static.db, then live " + t.kind.upper()) if t.live else "static.db only"
-        items.append(row("sru/" + t.id, t.name, t.group, False, t.status == "verified",
-                         f"Status: {t.status}; answers from {how}." + (f" {t.note}" if t.note else "")))
+        cover = f" Fallback: the direct Z39.50 row {covered[t.id]} covers this library." if t.id in covered else ""
+        fallback.append(row("sru/" + t.id, t.name, "sru_" + t.group, t.status == "verified",
+                            f"Status: {t.status}; answers from {how}." + (f" {t.note}" if t.note else "") + cover,
+                            t.country))
     own_auth = {"name": AUTH_NAME, "host": host, "port": port, "db": "sru/" + AUTH_UNION, "kind": "sru",
                 "syntax": SYNTAX, "encoding": ENCODING, "schema": "marcxml", "sru_fields": AUTH_SRU_FIELDS,
                 "sru_options": SRU_OPTIONS, "recordtype": "authority", "timeout": TIMEOUT,
-                "region": "authorities", "country": "BR", "verified": True,
+                "region": "authorities", "country": "BR", "flag": flag(""), "verified": True,
                 "source": "koha.nexus local gateway (enrichment/nexus_gateway/authorities.py)",
                 "notes": ("Authority headings of static.db (Biblioteca Nacional first, then the Brazilian catalogues, "
                           "then the Library of Congress; subjects never from LCSH), as MARC21 authority records, "
                           "for Koha's authority search in cataloguing.")}
+    for t in authorities:
+        t.setdefault("flag", flag(t.get("country") or ("US" if t.get("host") == "lx2.loc.gov" else "")))
+    biblio = [r for r in rows if r.get("recordtype") != "authority"]
+    direct_auth = [r for r in rows if r.get("recordtype") == "authority"]
     data = {"schema": 1, "updated": updated or old.get("updated", ""),
-            "about": ("koha.nexus local gateway targets, generated by python -m nexus_gateway panel-list from "
-                      "enrichment/nexus_gateway/targets.json: every one is 127.0.0.1:5000/sru/<id>, answered from "
-                      "static.db and, for Z39.50/SRU catalogues, live. sru/_union searches them all and is the "
-                      "only one preselected. The last ones are authority files (recordtype authority) for Koha's "
-                      "authority search: sru/_union-aut on this gateway, then the others kept from the previous "
-                      "list."),
-            "targets": items + [own_auth] + authorities}
+            "about": ("koha.nexus panel targets, generated by python -m nexus_gateway panel-list. First the direct "
+                      "Z39.50 servers of panel/kei_panel/data/z3950_direct.json, the primary targets, by region; "
+                      "then the authority files (recordtype authority) for Koha's authority search; last the "
+                      "fallback, the koha.nexus local gateway (127.0.0.1:5000/sru/<id>, from "
+                      "enrichment/nexus_gateway/targets.json), for libraries and regions no direct server covers: "
+                      "never preselected and ranked after every direct server."),
+            "targets": biblio + authorities + direct_auth + [own_auth] + fallback}
     return json.dumps(data, ensure_ascii=False, indent=1) + "\n"

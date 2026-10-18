@@ -49,15 +49,34 @@ COMMUNITY_URL = ("https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/mai
 LOCAL_FILE = "z3950-targets.json"     # the person's imports and logins
 HISTORY_FILE = "z3950-history.json"   # scan results and the blacklist
 
-# The headings of the list, in order (the four groups of the koha.nexus SRU
-# gateway's targets.json, then the authority files; the screen numbers them
-# [1] to [5]).
+# The headings of the list, in order: the direct Z39.50 servers, the primary
+# targets, by region (data/z3950_direct.json); the authority files; then the
+# fallback, the koha.nexus SRU gateway's four groups, for the libraries and
+# regions no direct server covers (the screen numbers them [1] to [11]).
 REGIONS = {
-    "national": "National libraries and official bodies",
-    "br_universities": "Brazilian universities (federal and state)",
-    "intl_universities": "International universities",
-    "specialized": "Specialized and union catalogues",
+    "brazil": "Brazil",
+    "north_america": "North America",
+    "europe": "Europe",
+    "latin_america": "Latin America",
+    "asia_oceania": "Asia / Oceania",
+    "other": "Other servers",
     "authorities": "Authority files (authority search)",
+    "sru_national": "SRU fallback: national libraries and official bodies",
+    "sru_br_universities": "SRU fallback: Brazilian universities",
+    "sru_intl_universities": "SRU fallback: international universities",
+    "sru_specialized": "SRU fallback: specialized and union catalogues",
+}
+# Regions of countries (ISO 3166) and top-level domains, for imported servers.
+_COUNTRY_REGION = {
+    "brazil": ("BR",),
+    "north_america": ("US", "CA", "EDU", "GOV", "MIL"),
+    "latin_america": ("AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX", "NI", "PA", "PE", "PR",
+                      "PY", "SV", "UY", "VE"),
+    "europe": ("AD", "AL", "AT", "BA", "BE", "BG", "BY", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "EU", "FI", "FO",
+               "FR", "GB", "UK", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU", "LV", "MC", "MD", "ME", "MK",
+               "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SI", "SK", "SM", "UA", "VA"),
+    "asia_oceania": ("AE", "AU", "BD", "CN", "HK", "ID", "IL", "IN", "IR", "JO", "JP", "KR", "KZ", "LB", "MO", "MY",
+                     "NZ", "PH", "PK", "QA", "SA", "SG", "TH", "TR", "TW", "VN"),
 }
 RECORDTYPES = ("biblio", "authority")
 SYNTAXES = ("USMARC", "MARC21", "UNIMARC", "NORMARC", "DANMARC")
@@ -113,8 +132,9 @@ class Target:
     kind: str = "zed"            # zed (Z39.50) or sru, Koha's servertype
     syntax: str = "USMARC"
     encoding: str = "utf8"
-    region: str = "specialized"
+    region: str = "other"
     country: str = ""
+    flag: str = ""               # the country's flag emoji, or 🌐 for a network of several countries
     login: bool = False          # the server needs a user and password
     user: str = ""
     password: str = field(default="", repr=False)
@@ -165,6 +185,7 @@ _ALIASES = {
     "encoding": ("encoding", "charset", "codificacao"),
     "region": ("region", "regiao", "group"),
     "country": ("country", "pais"),
+    "flag": ("flag", "bandeira"),
     "user": ("user", "userid", "username", "login_user", "usuario"),
     "password": ("password", "pass", "senha"),
     "schema": ("schema", "recordschema"),
@@ -200,19 +221,21 @@ def normalize_kind(s: str) -> str:
 
 
 def guess_region(country: str, host: str) -> str:
-    """The heading of a server someone imported: Brazilian ones with the
-    Brazilian universities, other universities with the international
-    ones, national and government catalogues first, the rest last."""
-    c = (country or "").upper()
+    """The heading of a server someone imported, by its country, else by
+    its host's top-level domain (.edu and .gov are North American)."""
     h = host.lower()
-    tld = h.rsplit(".", 1)[-1] if "." in h else ""
-    if c == "BR" or tld == "br":
-        return "br_universities"
-    if re.search(r"(^|[.-])(univ|uni|ac|edu)([.-]|$)|university|\.edu\b|\.ac\.", h) or tld == "edu":
-        return "intl_universities"
-    if tld == "gov" or ".gov." in h or re.search(r"(^|[.-])(bn|bne|bnf|dnb|nla|ndl|loc|nl)([.-]|$)", h):
-        return "national"
-    return "specialized"
+    tld = h.rsplit(".", 1)[-1].upper() if "." in h and not h.replace(".", "").isdigit() else ""
+    for code in ((country or "").upper(), tld):
+        for region, codes in _COUNTRY_REGION.items():
+            if code and code in codes:
+                return region
+    return "other"
+
+
+def flag_of(country: str) -> str:
+    """The flag emoji of an ISO 3166 code, "" when there is none."""
+    cc = (country or "").upper()
+    return "".join(chr(0x1F1E6 + ord(c) - 65) for c in cc) if len(cc) == 2 and cc.isalpha() else ""
 
 
 def make_target(raw: dict, origin: str = "imported") -> Target | None:
@@ -266,6 +289,7 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
         syntax=("MARC21" if kind == "sru" and str(d.get("syntax", "")).strip().upper() == "MARC21"
                 else normalize_syntax(str(d.get("syntax", "")))),
         encoding=str(d.get("encoding") or "utf8"), region=region, country=country,
+        flag=str(d.get("flag", ""))[:8] or flag_of(country),
         login=_truthy(d.get("login")) or bool(user), user=user, password=password, login_env=login_env,
         schema=str(d.get("schema", "")),
         sru_fields=str(d.get("sru_fields", "")) if kind == "sru" else "",
@@ -633,6 +657,19 @@ def add_file_text(targets: list[Target], ranks: dict[str, int]) -> str:
                "sru_options": t.sru_options if t.kind == "sru" else "", "recordtype": t.recordtype}
         lines.append("\t".join(_cell(row[f]) for f in ADD_FIELDS))
     return "\n".join(lines) + "\n"
+
+
+# The source of the direct Z39.50 servers in data/z3950_targets.json.
+DIRECT_SOURCE = "koha.nexus direct Z39.50 servers (panel/kei_panel/data/z3950_direct.json)"
+
+
+def sync_targets(targets: list[Target], in_koha: set[str]) -> list[Target]:
+    """The list "Update server settings" sends to z3950-sync, which adds
+    missing authority files: the direct authority servers only go to Koha
+    when the librarian adds them, so the sync leaves out the ones Koha
+    does not have yet."""
+    return [t for t in targets if not (t.recordtype == "authority" and t.source == DIRECT_SOURCE
+                                       and t.key not in in_koha)]
 
 
 def write_add_file(targets: list[Target], ranks: dict[str, int]) -> Path:

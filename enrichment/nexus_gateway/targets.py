@@ -12,7 +12,7 @@ Each entry has an id (the part after /sru/), a name, a group and a kind:
 
 "static" lists the static.db source ids that belong to the target (default:
 its own id), so a harvest whose "fonte" gave another id still lands on the
-right row. Only z3950 and sru targets whose status is not "broken" are
+right row. "country" is the ISO 3166 code the panel shows as a flag. Only z3950 and sru targets whose status is not "broken" are
 searched live.
 
 A login never goes in the file: NEXUS_GATEWAY_LOGIN_<ID>=user:password (id
@@ -53,6 +53,7 @@ class Target:
     name: str
     kind: str
     group: str = "specialized"
+    country: str = ""
     host: str = ""
     port: int = 0
     db: str = ""
@@ -96,6 +97,7 @@ def make_target(raw: dict) -> Target:
     t = Target(
         id=tid, name=str(raw.get("name") or tid), kind=kind,
         group=str(raw.get("group") or "specialized").strip().lower(),
+        country=str(raw.get("country", "")).strip().upper()[:2],
         host=str(raw.get("host", "")).strip(), port=int(raw.get("port") or 0),
         db=str(raw.get("db", "")).strip(), syntax=str(raw.get("syntax", "USMARC")).strip().upper(),
         encoding=str(raw.get("encoding", "utf8")).strip().lower(),

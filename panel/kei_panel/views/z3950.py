@@ -295,7 +295,8 @@ class Z3950View(SectionView):
             text = t("Not scanned yet")
         if tg.key in self.in_koha:
             text = f"{t('In Koha')} · {text}"
-        name = tg.name + (" 🔒" if tg.login and not tg.user else "") + ("" if tg.verified else " *")
+        name = ((tg.flag + " ") if tg.flag else "") + tg.name + (" 🔒" if tg.login and not tg.user else "") \
+            + ("" if tg.verified else " *")
         kind = "SRU" if tg.kind == "sru" else "Z39.50"
         ms = h.get("query_ms") if status in ("ok", "empty") else h.get("connect_ms")
         return ("☑" if tg.key in self.selected else "☐", name, text, "" if ms is None else str(ms),
@@ -431,7 +432,7 @@ class Z3950View(SectionView):
                      "missing, and the Biblioteca Nacional's old Z39.50 addresses are unticked.")
         if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
             return
-        path = z3950.write_add_file(self.targets, {})
+        path = z3950.write_add_file(z3950.sync_targets(self.targets, self.in_koha), {})
         try:
             result = await run_task(self.app, title, "z3950-sync", str(path))
         finally:
