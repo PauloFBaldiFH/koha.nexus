@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.93",
+ "panel_version": "1.5.94",
  "languages": [
   {
    "code": "en",
@@ -562,7 +562,7 @@
    "title": "✨  Enrich bibliographic catalog",
    "prompt": "",
    "icon": "",
-   "key": "e",
+   "key": "",
    "view": "enrich",
    "sidebar": false,
    "parent": "library",
@@ -615,7 +615,6 @@
    "sidebar": true,
    "parent": "",
    "entries": [
-    "sec-enrich",
     "sec-enrich-auth",
     "sec-ondemand",
     "marc-undo",
@@ -1217,7 +1216,7 @@
    "label": "✨  Enrich bibliographic catalog",
    "description": "",
    "kind": "view",
-   "status": "available",
+   "status": "hidden",
    "media": []
   },
   "sec-enrich-auth": {
@@ -14827,57 +14826,6 @@
     ]
    }
   },
-  "sec-enrich": {
-   "en": {
-    "summary": "Adds what your bibliographic records lack (subjects, classification, notes, extent) from the koha.nexus enrichment database, with a staged report to read before anything reaches the catalogue.",
-    "overview": [
-     "A job compares the chosen records with the enrichment database in the background, on at most a quarter of one CPU, and pauses by itself when the machine is busy. Nothing is written to Koha while it compares.",
-     "When it ends, the job's **Staged report** shows how many records would be enriched, which need review (M0, M1, W and R classes) and, for each changed record, its before/after: the lines to add in green.",
-     "**Apply** makes a verified safety backup, then writes the fields through Koha's own staged import, at most 500 records per batch. Records edited after the report are left as they are. **Revert** puts the previous version of each record back."
-    ],
-    "steps": [
-     "Type the scope: `all`, or biblionumbers such as `101, 102, 500-550`, and press **Start**.",
-     "Follow the progress in the **Worker** box; **Pause** stops it after the current batch, **Resume** goes on.",
-     "Pick the job in **Jobs** and read its report; select a record in the list to see its before/after.",
-     "Press **Open report** for the full report in the browser (saved in Downloads).",
-     "Press **Apply** to write the enriched records, or **Cancel job** to drop it. **Revert** undoes an applied job."
-    ],
-    "tips": [
-     "Start with a small range of record numbers to see the kind of fields added before running the whole catalogue.",
-     "Look at the records marked Review first: they are the ones where the match was less certain."
-    ],
-    "warnings": [
-     "Apply changes the catalogue. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
-    ],
-    "related": [
-     "sec-library",
-     "authority-sync",
-     "magic-import"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Acrescenta o que falta nos seus registros bibliográficos (assuntos, classificação, notas, extensão) a partir da base de enriquecimento do koha.nexus, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
-    "overview": [
-     "Uma tarefa compara os registros escolhidos com a base de enriquecimento em segundo plano, usando no máximo um quarto de uma CPU, e pausa sozinha quando a máquina está ocupada. Nada é gravado no Koha durante a comparação.",
-     "Ao terminar, o **Relatório preparado** da tarefa mostra quantos registros seriam enriquecidos, quais precisam de revisão (classes M0, M1, W e R) e, para cada registro alterado, o antes/depois: as linhas a acrescentar em verde.",
-     "**Aplicar** faz um backup de segurança verificado e depois grava os campos pela importação em lote do próprio Koha, no máximo 500 registros por lote. Registros editados depois do relatório ficam como estão. **Reverter** devolve a versão anterior de cada registro."
-    ],
-    "steps": [
-     "Digite o escopo: `all` (todos), ou números de registro como `101, 102, 500-550`, e pressione **Iniciar**.",
-     "Acompanhe o progresso no quadro **Processo**; **Pausar** para depois do lote atual, **Retomar** continua.",
-     "Escolha a tarefa em **Tarefas** e leia o relatório; selecione um registro na lista para ver o antes/depois.",
-     "Pressione **Abrir relatório** para ver o relatório completo no navegador (salvo em Downloads).",
-     "Pressione **Aplicar** para gravar os registros enriquecidos, ou **Cancelar tarefa** para descartá-la. **Reverter** desfaz uma tarefa aplicada."
-    ],
-    "tips": [
-     "Comece com uma faixa pequena de números de registro para ver o tipo de campo acrescentado antes de rodar o catálogo inteiro.",
-     "Veja primeiro os registros marcados como Revisar: neles a correspondência foi menos certa."
-    ],
-    "warnings": [
-     "Aplicar altera o catálogo. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
-    ]
-   }
-  },
   "sec-enrich-auth": {
    "en": {
     "summary": "Links the names and subjects of your bibliographic records to authority records, puts each heading in its authorised form and creates the authorities that are missing, with a staged report to read before anything reaches the catalogue.",
@@ -14903,7 +14851,6 @@
      "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
     ],
     "related": [
-     "sec-enrich",
      "authority-sync",
      "authority-match"
     ]
@@ -14938,7 +14885,7 @@
     "summary": "Searches public catalogues over direct Z39.50 connections only, for your records (all of them, or any you list) or for a book you type, with the same staged report as the background jobs and an import as a new record for a typed book.",
     "overview": [
      "Only the direct Z39.50 servers of the panel's list are asked, never the koha.nexus gateways (sru.koha.nexus, catalog.koha.nexus). The servers go in small waves, at most two of one institution at a time, and each server's limits are kept; a server that keeps failing is paused and shown in the Z39.50 screen.",
-     "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record exactly as in **Enrich bibliographic catalog**, and the koha.nexus enrichment database is used after them when nothing fits.",
+     "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record by the same rules the earlier batch enrichment used, and the koha.nexus enrichment database is used after them when nothing fits.",
      "**Apply** saves a copy of those records as Koha has them when the job has 50 records or fewer, and a verified full backup when it has more; then it writes the fields through Koha's staged import. **Revert** gives the records their previous version back.",
      "For a typed book, the best record of each server is listed. **Import as new record** adds it to the catalogue through Koha's staged import, without the other library's local fields (9XX) and with an 883 saying where it came from; when Koha already has a record with that ISBN, nothing is added."
     ],
@@ -14951,14 +14898,13 @@
     ],
     "tips": [
      "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
-     "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
+     "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on.",
      "An imported record is taken out again with **Undo a MARC import** (Library tools)."
     ],
     "warnings": [
      "Apply and Import change the catalogue. Both ask first; Revert and Undo a MARC import undo them."
     ],
     "related": [
-     "sec-enrich",
      "sec-z3950",
      "marc-undo"
     ]
@@ -14967,7 +14913,7 @@
     "summary": "Pesquisa catálogos públicos só por conexões Z39.50 diretas, para os seus registros (todos, ou os que você listar) ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
     "overview": [
      "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50.",
-     "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro exatamente como em **Enriquecer catálogo bibliográfico**, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
+     "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro pelas mesmas regras que o antigo enriquecimento em lote usava, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
      "**Aplicar** salva uma cópia desses registros como estão no Koha quando o trabalho tem até 50 registros, e um backup completo verificado quando tem mais; depois grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
      "Para um livro digitado, aparece o melhor registro de cada servidor. **Importar como registro novo** o acrescenta ao catálogo pela importação preparada do Koha, sem os campos locais da outra biblioteca (9XX) e com um 883 dizendo de onde veio; se o Koha já tem um registro com esse ISBN, nada é acrescentado."
     ],
@@ -14980,7 +14926,7 @@
     ],
     "tips": [
      "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-     "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
+     "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado.",
      "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
     ],
     "warnings": [
@@ -17959,15 +17905,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 112,
-   "manual_total": 112,
+   "manual": 111,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 380,
    "strings_total": 380
   },
   "pt-BR": {
-   "manual": 112,
-   "manual_total": 112,
+   "manual": 111,
+   "manual_total": 111,
    "manual_outdated": [
     "install"
    ],
@@ -17976,147 +17922,147 @@
   },
   "es": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 264,
    "strings_total": 380
   },
   "fr": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
    "strings_total": 380
   },
   "it": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
    "strings_total": 380
   },
   "de": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 259,
    "strings_total": 380
   },
   "nl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "sv": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "pl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "cs": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "ru": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "uk": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "tr": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "tl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "id": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "ar": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "fa": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "hi": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "bn": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "vi": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "zh": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "ja": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380
   },
   "ko": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 111,
    "manual_outdated": [],
    "strings": 101,
    "strings_total": 380

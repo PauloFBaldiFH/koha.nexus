@@ -108,7 +108,8 @@ def test_batch_screen_leaves_on_demand_jobs_out():
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 60)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("e")
+            app.screen.action_show("enrich")              # retired from the menus: opened directly
+            await pilot.pause(0.2)
             jobs = app.screen.query_one("#view-enrich").query_one("#e-table", DataTable)
             await _until(pilot, lambda: jobs.row_count == 2)
             assert {jobs.get_row_at(i)[0] for i in range(2)} == {"1", "2"}

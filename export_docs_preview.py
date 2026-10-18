@@ -438,7 +438,7 @@ class Builder:
 
     # -- menus ----------------------------------------------------------
     def sections(self) -> tuple[list[dict], dict[str, dict]]:
-        sections, items = [], {}
+        sections, items, retired = [], {}, set()
         for s in self.menus.SECTIONS:
             sec = {"id": s.id, "item": f"sec-{s.id}", "label": self.key(s.label), "title": self.key(s.title),
                    "prompt": self.key(s.prompt), "icon": s.icon, "key": s.key, "view": s.view,
@@ -446,6 +446,9 @@ class Builder:
                    "media": media_for(s.id, f"sec-{s.id}")}
             for e in s.entries:
                 eid = e.action if e.kind != "view" else f"sec-{e.action}"
+                if e.kind == "view" and e.hidden:
+                    retired.add(eid)                  # a screen no card opens (the batch enrichment)
+                    continue
                 sec["entries"].append(eid)
                 if e.kind == "view" or eid in items:
                     continue
@@ -463,6 +466,8 @@ class Builder:
                                       "kind": "view" if s.view != "section" else "menu",
                                       "status": "available", "media": sec["media"]}
             sections.append(sec)
+        for eid in retired & items.keys():
+            items[eid]["status"] = "hidden"
         return sections, items
 
     # -- screens --------------------------------------------------------
