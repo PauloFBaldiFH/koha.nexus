@@ -35,6 +35,7 @@ TOOLS_LOG_DIR="$W/logs"
 # The local gateway: not running, and its install only noted.
 gateway_listening() { return 1; }
 enrich_install() { echo "called" >> "$W/bridge"; }
+CATALOG_NETWORK_OFF="$W/catalog-network.off"
 SH
     ( umask 077
       printf '%s\t' lx2.loc.gov 210 LCDB USMARC utf8 'Library of Congress' 3 0 zed '' '' ''; printf '\n'
@@ -321,7 +322,7 @@ print(z3950.add_file_text(z3950.sync_targets(z3950.load_curated(), set()), {}), 
     ! grep -q 'sru_bridge_install' "$KEI_REPO/installer"
 }
 
-@test "enrichment: Koha's rows go to sru.koha.nexus:443, sru/_union the only one ticked, re-runnable" {
+@test "enrichment: Koha's rows go to sru.koha.nexus:443, sru/_union and sru/all ticked, the shared catalogue added, re-runnable" {
     # The gateway's real koha-sql, through a stand-in venv python.
     mkdir -p "$W/enrich/.venv/bin"
     printf '#!/bin/sh\nPYTHONPATH=%s exec python3 "$@"\n' "$KEI_REPO/enrichment" > "$W/enrich/.venv/bin/python"
@@ -340,14 +341,19 @@ print(z3950.add_file_text(z3950.sync_targets(z3950.load_curated(), set()), {}), 
     echo "$output"; cat "$W/logs/"* 2>/dev/null || true
     [ "$status" -eq 0 ]
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND host = 'https://sru.koha.nexus' AND port = 443 AND db LIKE 'sru/%'")" = "74" ]
-    [ "$(zsql "SELECT db FROM z3950servers WHERE host = 'https://sru.koha.nexus' AND recordtype = 'biblio' AND checked = 1")" = "sru/_union" ]
+    # sru/_union and Rede Pergamum (sru/all) are the gateway's ticked rows.
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'https://sru.koha.nexus' AND recordtype = 'biblio' AND checked = 1")" = "2" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'https://sru.koha.nexus' AND recordtype = 'biblio' AND checked = 1 AND db IN ('sru/_union', 'sru/all')")" = "2" ]
     # The local gateway's and the VPS IP's rows moved (keeping their rank), the bridges' rows are gone.
     [ "$(zsql "SELECT \`rank\` FROM z3950servers WHERE db = 'sru/bn'")" = "1" ]
     [ "$(zsql "SELECT host, port, \`rank\` FROM z3950servers WHERE db = 'sru/usp'")" = "$(printf 'https://sru.koha.nexus\t443\t2')" ]
     [ "$(zsql "SELECT host, port, \`rank\` FROM z3950servers WHERE db = 'sru/_union-aut'")" = "$(printf 'https://sru.koha.nexus\t443\t6')" ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND (host IN ('10.0.0.60', 'http://137.131.205.31') OR (host = '127.0.0.1' AND port IN (5000, 5006)) OR db = 'sru')")" = "1" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio' AND (host IN ('10.0.0.60', 'http://137.131.205.31') OR (host = '127.0.0.1' AND port IN (5000, 5006)) OR db = 'sru') AND host <> 'https://catalog.koha.nexus'")" = "1" ]
     # The Catalog Network row (127.0.0.1:8088) is not the gateway's: left alone.
     [ "$(zsql "SELECT port FROM z3950servers WHERE servername = 'Rede koha.nexus'")" = "8088" ]
+    # The shared catalogue's own row is added, ticked, as the panel's switch adds it.
+    [ "$(zsql "SELECT host, port, db, checked FROM z3950servers WHERE servername = 'Rede koha.nexus (Catalogação Compartilhada)'")" = \
+      "$(printf 'https://catalog.koha.nexus\t443\tsru\t1')" ]
     [ "$(zsql "SELECT db FROM z3950servers WHERE db = 'sru/all'")" = "sru/all" ]
     # The librarian's other servers and the authority rows are untouched.
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE host = 'lx2.loc.gov'")" = "2" ]
@@ -357,6 +363,21 @@ print(z3950.add_file_text(z3950.sync_targets(z3950.load_curated(), set()), {}), 
     run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_register
     [ "$status" -eq 0 ]
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+}
+
+@test "enrich_register: the shared catalogue turned off in the panel is not added back" {
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network on "https://catalog.koha.nexus/sru"
+    [ "$status" -eq 0 ] && [ ! -e "$W/catalog-network.off" ]
+    run env KEI_EXTRA="$W/extra.sh" KEI_TASK=catalog-network bash "$PANEL" catalog_network off
+    [ "$status" -eq 0 ] && [ -e "$W/catalog-network.off" ]
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" catalog_network_auto
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = "0" ]
+    rm -f "$W/catalog-network.off"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" catalog_network_auto
+    [ "$status" -eq 0 ]
+    [ "$(zsql "SELECT host, port, db, checked FROM z3950servers WHERE servername LIKE 'Rede koha.nexus%'")" = \
+      "$(printf 'https://catalog.koha.nexus\t443\tsru\t1')" ]
 }
 
 # ---------------------------------------------------------------------

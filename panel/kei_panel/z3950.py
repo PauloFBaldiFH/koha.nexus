@@ -49,11 +49,13 @@ COMMUNITY_URL = ("https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/mai
 LOCAL_FILE = "z3950-targets.json"     # the person's imports and logins
 HISTORY_FILE = "z3950-history.json"   # scan results and the blacklist
 
-# The headings of the list, in order: the direct Z39.50 servers, the primary
+# The headings of the list, in order: the koha.nexus servers (the shared
+# catalogue and Rede Pergamum on the gateway), preselected; the direct Z39.50 servers, the primary
 # targets, by region (data/z3950_direct.json); the authority files; then the
 # fallback, the koha.nexus SRU gateway's four groups, for the libraries and
-# regions no direct server covers (the screen numbers them [1] to [11]).
+# regions no direct server covers (the screen numbers them [1] to [12]).
 REGIONS = {
+    "koha_nexus": "koha.nexus servers",
     "brazil": "Brazil",
     "north_america": "North America",
     "europe": "Europe",

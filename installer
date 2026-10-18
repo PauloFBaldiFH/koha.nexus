@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.87"
+PANEL_VERSION=" 1.5.88"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29585,7 +29585,9 @@ enrich_retire_bridges() {
 # Cloudflare tunnel https://sru.koha.nexus:443: sru/_union ticked, one
 # unticked row per catalogue, the rows on older addresses (127.0.0.1:5000,
 # the VPS's IPs) moved and the retired bridges' rows removed, and the authority row sru/_union-aut for
-# the authority search in cataloguing. Only once Koha's database exists.
+# the authority search in cataloguing; sru/all (Rede Pergamum) ticked too.
+# Then the koha.nexus network's row (catalog_network_auto). Only once
+# Koha's database exists.
 enrich_register() {
     is_koha_installed 2>/dev/null || return 0
     mysql -e "USE ${DB_NAME};" >/dev/null 2>&1 || return 0
@@ -29593,8 +29595,9 @@ enrich_register() {
     local log
     log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
     if gateway_py koha-sql 2>>"$log" | mysql --default-character-set=utf8mb4 "$DB_NAME" 2>>"$log"; then
-        log "enrichment: Koha's rows point at the gateway on https://sru.koha.nexus:443 (sru/_union ticked)"
+        log "enrichment: Koha's rows point at the gateway on https://sru.koha.nexus:443 (sru/_union and sru/all ticked)"
         kei_result koha-target set
+        catalog_network_auto || log "enrichment: the koha.nexus network row was not added"
     else
         kei_result koha-target failed
         return 1
@@ -30363,6 +30366,9 @@ z3950_add() {
 #                                or take it out
 # ----------------------------------------------------------------------
 CATALOG_NETWORK_NAME="Rede koha.nexus (Catalogação Compartilhada)"
+CATALOG_NETWORK_URL="${KEI_CATALOG_NETWORK_URL:-https://catalog.koha.nexus/sru}"
+# Written by "catalog-network off": the install and updates no longer add it.
+CATALOG_NETWORK_OFF="${CONF_DIR}/catalog-network.off"
 CATALOG_NETWORK_FIELDS="title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,srchany=cql.serverChoice"
 
 z3950_daemon_dir() { echo "${KEI_Z3950_DIR:-/etc/koha/sites/${INSTANCE}/z3950}"; }
@@ -30462,6 +30468,7 @@ catalog_network() {
             msg_error "" "$(t "Koha's database did not take the koha.nexus network.")"
             return 1
         fi
+        rm -f "$CATALOG_NETWORK_OFF"
         log "z3950: koha.nexus network on (${CN_HOST}:${CN_PORT}/${CN_DB})"
         kei_result network on
         kei_result network_url "${CN_HOST}:${CN_PORT}/${CN_DB}"
@@ -30472,9 +30479,23 @@ catalog_network() {
         msg_error "" "$(t "Koha's database did not take the koha.nexus network.")"
         return 1
     fi
+    mkdir -p "$CONF_DIR" && : > "$CATALOG_NETWORK_OFF"
     log "z3950: koha.nexus network off"
     kei_result network off
     msg_ok "$(t "The koha.nexus network is no longer searched by Koha's cataloguing.")"
+}
+
+# The shared catalogue's row, added (ticked) at install and on updates when
+# Koha lacks it, unless the librarian turned the network off; quiet.
+catalog_network_auto() {
+    [ -f "$CATALOG_NETWORK_OFF" ] && return 0
+    [ -n "$(run_sql "SELECT id FROM ${DB_NAME}.z3950servers WHERE recordtype = 'biblio'
+                     AND servername = $(sql_quote "$CATALOG_NETWORK_NAME") LIMIT 1;" 2>/dev/null)" ] && return 0
+    catalog_network_parse "$CATALOG_NETWORK_URL" || return 1
+    z3950_row "$CN_HOST" "$CN_PORT" "$CN_DB" "$CATALOG_NETWORK_NAME" 1 1 MARC21 utf8 15 sru \
+        "$CATALOG_NETWORK_FIELDS" 'sru=get,sru_version=1.1' '' '' \
+      | z3950_upsert_sql named | mysql --default-character-set=utf8mb4 "$DB_NAME" || return 1
+    log "z3950: koha.nexus network added (${CN_HOST}:${CN_PORT}/${CN_DB})"
 }
 
 z3950_server_status() {

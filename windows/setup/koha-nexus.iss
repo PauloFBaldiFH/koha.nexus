@@ -13,7 +13,7 @@
 ; Plain Inno exit codes that it may still return are not in this table.
 
 #define AppName "Koha.Nexus"
-#define AppVersion "1.5.87"
+#define AppVersion "1.5.88"
 #define AppPublisher "Paulo F. Baldi FH"
 #define AppExe "KohaEasy.ps1"
 

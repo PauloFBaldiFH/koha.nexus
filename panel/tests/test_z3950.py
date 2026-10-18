@@ -34,17 +34,17 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 249
-    # The direct Z39.50 servers by region, the authority files, then the
+    assert len(targets) == 250
+    # The koha.nexus servers (shared catalogue, Rede Pergamum), the direct Z39.50 servers by region, the authority files, then the
     # koha.nexus SRU gateway's four groups as the fallback.
-    assert list(z.REGIONS) == ["brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
+    assert list(z.REGIONS) == ["koha_nexus", "brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
                                "authorities", "sru_national", "sru_br_universities", "sru_intl_universities",
                                "sru_specialized"]
     firsts = {t.region: t.db for t in reversed(targets)}
-    assert firsts == {"brazil": "biblioteca", "north_america": "LCDB", "europe": "libr", "latin_america": "56PUC_INST",
+    assert firsts == {"koha_nexus": "sru", "brazil": "biblioteca", "north_america": "LCDB", "europe": "libr", "latin_america": "56PUC_INST",
                       "asia_oceania": "INNOPAC", "authorities": "NAF", "sru_national": "sru/_union",
                       "sru_br_universities": "sru/usp", "sru_intl_universities": "sru/harvard",
-                      "sru_specialized": "sru/all"}
+                      "sru_specialized": "sru/nlm"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
@@ -54,11 +54,14 @@ def test_curated_list_loads_and_covers_every_region():
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
     # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
-    assert len(fallback) == 74
+    assert len(fallback) == 73
+    own = [t for t in targets if t.region == "koha_nexus"]
+    assert [(t.host, t.port, t.db, t.preselect) for t in own] == [
+        ("catalog.koha.nexus", 443, "sru", True), ("sru.koha.nexus", 443, "sru/all", True)]
     assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in fallback} == {
         ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
     assert all(t.db.startswith("sru/") and not t.login and not t.preselect for t in fallback)
-    assert [t.rank for t in fallback] == list(range(500, 574))
+    assert [t.rank for t in fallback] == list(range(500, 573))
 
 
 def test_curated_flags():
@@ -563,10 +566,10 @@ def test_curated_brazil_list_and_the_gateway():
                                      "uff utfpr unb".split()]
     # Ticked when the screen opens: four direct Brazilian servers and the Library of Congress, no SRU row.
     ticked = {t.key for t in z.load_curated() if t.preselect}
-    assert ticked == {"z3950.utfpr.edu.br:210/biblioteca", "z3950.ufsc.br:210/Default",
+    assert ticked == {"catalog.koha.nexus:443/sru", "sru.koha.nexus:443/sru/all", "z3950.utfpr.edu.br:210/biblioteca", "z3950.ufsc.br:210/Default",
                       "z3950.unifesp.br:210/Default", "lx2.loc.gov:210/LCDB"}
     rede = next(t for t in z.load_curated() if t.db == "sru/all")
-    assert (rede.region, rede.sru_options) == ("sru_specialized", "sru=get,sru_version=1.1")
+    assert (rede.region, rede.sru_options, rede.preselect) == ("koha_nexus", "sru=get,sru_version=1.1", True)
 
 
 def test_add_file_and_sql_carry_the_sru_settings():
