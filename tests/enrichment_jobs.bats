@@ -110,6 +110,7 @@ ENRICH_INDEX_WAIT=0
 systemctl() { echo "systemctl \$*" >> "$W/calls"; }
 display_explanation() { :; }
 ui_textbox() { :; }
+enrich_od_ready() { echo "enrich_od_ready" >> "$W/calls"; }
 tools_safety_backup() { TOOLS_PRE="$W/PRE-\$1.sql"; : > "\$TOOLS_PRE"; echo "backup \$1" >> "$W/calls"; }
 # Koha's scripts: the stand-in, with the throttle prefix recorded.
 koha_tool() {
@@ -126,6 +127,21 @@ p() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat "$
 f005() { zsql "SELECT ExtractValue(metadata, '//controlfield[@tag=\"005\"]') FROM biblio_metadata WHERE biblionumber = $1"; }
 has650() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | grep -o 'tag="650"' | wc -l; }
 worker() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" worker --pause 0; }
+# An authority job is the on-demand service's: here once, with static.db and
+# no authority server to ask.
+od_auth() {
+    PYTHONPATH="$KEI_REPO/enrichment" python3 - "$W/state" <<'PY'
+import asyncio, sys
+from pathlib import Path
+from nexus_ondemand import service
+from nexus_ondemand.config import Settings as Config
+from nexus_ondemand.targets import Catalog
+state = Path(sys.argv[1])
+settings = service.Settings(state, state / "static.db", state / "learned.db", idle=0, poll=0.01)
+config = Config(health_db=state / "health.db", static=True)
+print(asyncio.run(service.serve(settings, config, catalog=Catalog({}, [], "sha"))))
+PY
+}
 
 @test "enrichment job: export, staged report, Apply in Koha batches, Revert keeps later edits" {
     p enrich_job_add "1-5"
@@ -322,7 +338,9 @@ bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | g
     grep -q "^job=1$" "$W/results"
     grep -q "^export_records.pl \[throttled\] --record-type=auths --format=xml$" "$W/calls"
     [ -f "$W/state/jobs/1/authorities.xml" ]
-    worker
+    grep -q "systemctl start --no-block koha-nexus-ondemand$" "$W/calls"
+    ! grep -q "systemctl start --no-block koha-nexus-enrich$" "$W/calls"
+    od_auth
     [ -z "$(bib9 1)" ]
     show=$("$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show 1)
     echo "$show"
@@ -355,7 +373,7 @@ bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | g
 
 @test "authority job: an authority Koha gained after the report is linked, not created; Revert removes what it made" {
     p enrich_job_add "1" auth exact
-    worker
+    od_auth
     zsql "INSERT INTO auth_header (authid, marcxml) VALUES (500, '<record xmlns=\"http://www.loc.gov/MARC21/slim\"><leader>00000nz  a2200000n  4500</leader><controlfield tag=\"001\">500</controlfield><datafield tag=\"100\" ind1=\"1\" ind2=\" \"><subfield code=\"a\">Saramago, José</subfield></datafield></record>')"
     : > "$W/results"
     p enrich_job_apply 1
@@ -371,7 +389,7 @@ bib9() { zsql "SELECT metadata FROM biblio_metadata WHERE biblionumber = $1" | g
     # A second job creates the authority itself; reverting it removes it.
     zsql "DELETE FROM auth_header"
     p enrich_job_add "1" auth exact
-    worker
+    od_auth
     p enrich_job_apply 2
     [ "$(zsql "SELECT COUNT(*) FROM auth_header")" = 1 ]
     : > "$W/results"

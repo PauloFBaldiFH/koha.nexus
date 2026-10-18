@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.94"
+PANEL_VERSION=" 1.5.95"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -30009,7 +30009,10 @@ ondemand_py() {
 # enrich_job_add SCOPE [KIND [MODE]]: a new job ("all", or "101, 102,
 # 500-550"): Koha's records exported (no items, throttled), then the worker
 # started. KIND auth ("Enrich & standardize authorities") also exports
-# Koha's authorities, which the worker matches first; MODE exact or fuzzy.
+# Koha's authorities and is an on-demand job: the koha-nexus-ondemand unit
+# matches the headings with Koha's authorities and static.db, then asks
+# the direct authority servers for the rest, several records at once, at
+# each server's pace; MODE exact or fuzzy.
 enrich_job_add() {
     local kind="${2:-bib}" mode="${3:-exact}" title
     [[ "$kind" =~ ^(bib|auth)$ ]] && [[ "$mode" =~ ^(exact|fuzzy)$ ]] || return 2
@@ -30017,9 +30020,15 @@ enrich_job_add() {
     [ "$kind" = auth ] && title=$(t "Enrich & standardize authorities")
     require_database || return 1
     enrich_ready || return 1
-    local log out id dir args=() n why nodb=""
+    local log out id dir args=() n why nodb="" origin=batch unit="$ENRICH_WORKER_UNIT"
+    if [ "$kind" = auth ]; then
+        enrich_od_ready || return 1
+        origin=ondemand unit="$ENRICH_ONDEMAND_UNIT"
+    fi
     enrich_empty_db >/dev/null 2>&1
-    if [ "$(enrich_records)" = 0 ]; then
+    if [ "$(enrich_records)" = 0 ] && [ "$kind" = auth ]; then
+        systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >/dev/null 2>&1   # the servers answer meanwhile
+    elif [ "$(enrich_records)" = 0 ]; then
         # Not downloaded yet (only the empty one from the install): its
         # download starts now, and the job still runs, with what Koha and
         # the empty database have (a fresh install can try the workflow).
@@ -30028,7 +30037,7 @@ enrich_job_add() {
         systemctl start --no-block "${ENRICH_UPDATE_UNIT}.service" >/dev/null 2>&1
     fi
     log=$(tools_log enrichment-job)
-    if ! out=$(jobs_py add --scope "${1:-all}" --kind "$kind" --mode "$mode" 2>>"$log"); then
+    if ! out=$(jobs_py add --origin "$origin" --scope "${1:-all}" --kind "$kind" --mode "$mode" 2>>"$log"); then
         kei_result job invalid-scope
         msg_error "" "$(t 'Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550.')" 10 76
         return 1
@@ -30075,12 +30084,12 @@ $why}" 12 76
         enrich_own "$dir/authorities.xml"
     fi
     jobs_py exported "$id" >>"$log" 2>&1 || { kei_result job failed; return 1; }
-    systemctl start --no-block "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
+    systemctl start --no-block "$unit" >>"$log" 2>&1
     log "enrichment: job $id queued (${n} records)"
     kei_result job "$id"
     kei_result records "$n"
     if [ "$kind" = auth ]; then
-        msg_info "$title" "$(t 'Job ${id}: the headings of ${n} record(s) are being compared with your authorities and the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')${nodb}" 15 76
+        msg_info "$title" "$(t 'Job ${id}: the headings of ${n} record(s) are being compared with your authorities and the enrichment database, and the ones still missing are searched on the authority servers, in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')" 15 76
     else
         msg_info "$title" "$(t 'Job ${id}: ${n} record(s) are being compared with the enrichment database, slowly and in the background.\n\nNothing is written to the catalogue until you review the report and choose Apply.')${nodb}" 15 76
     fi
@@ -30114,7 +30123,8 @@ _enrich_job_apply_run() {
         return 1
     fi
     : > "$dir/snapshot-ids.txt"
-    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ]; then
+    # (an authority job also creates authorities: always the full backup)
+    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ] && [ "$(jobs_py kind "$id" 2>>"$log")" = bib ]; then
         for c in $chunks; do jobs_py chunk-ids "$id" "$c" 2>>"$log"; done > "$dir/snapshot-ids.txt"
     fi
     if enrich_od_small "$dir/snapshot-ids.txt"; then
@@ -30296,7 +30306,7 @@ _enrich_job_revert_run() {
         msg_info "$(t "Revert")" "$(t 'Job ${id}: nothing applied to revert.')" 9 70
         return 0
     fi
-    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ] && enrich_od_small "$dir/applied.txt"; then
+    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ] && [ "$kind" = bib ] && enrich_od_small "$dir/applied.txt"; then
         enrich_snapshot "$id" "$dir/applied.txt" "$log" revert || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }
     else
         tools_safety_backup UNDO-ENRICH || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }

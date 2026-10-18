@@ -60,7 +60,7 @@ from nexus_jobs.apply import record_xml
 from nexus_jobs.store import Job, Store
 from nexus_jobs.worker import biblionumber, count_records, item_row, title
 
-from . import plan, targets
+from . import authorities, plan, targets
 from .config import Settings as Config
 from .dispatch import Dispatcher, Result, static_candidates
 from .health import Health
@@ -252,7 +252,7 @@ class Gate:
     def down(res: Result) -> bool:
         """RES says this machine's network is down: it blocked the lookups
         or port 1921 (dispatch's network-wide rule) and no server answered."""
-        return bool(res.network) and not any(a.outcome in ("found", "none") for a in res.attempts)
+        return res.down
 
     def hold(self) -> None:
         now = self.clock()
@@ -451,6 +451,27 @@ async def _one(store: Store, job: Job, settings: Settings, dispatcher: Dispatche
     return seq, row
 
 
+async def _auth_one(store: Store, job: Job, aj, status: Status, gate: Gate, seq: int,
+                    rec: marc.Record) -> tuple[int, dict | None]:
+    """An authority job's record SEQ (authorities.AuthJob); as _one."""
+    status.record(seq, rec, "")
+    try:
+        row, attempts = await aj.row(rec, seq, gate, lambda: store.job(job.id).state == "matching")
+        if row is None:
+            return seq, None
+        if attempts:
+            store.add_attempts(job.id, seq, job.rounds, attempts)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:                         # one bad record never stops the job
+        log.exception("job %s record %s", job.id, seq)
+        row = _error_row(rec, exc)
+    finally:
+        status.forget(seq)
+    row.update(job_id=job.id, seq=seq)
+    return seq, row
+
+
 async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status,
                   gate: Gate | None = None) -> str:
     """Search, keep and merge every record of JOB, PARALLEL at a time;
@@ -470,6 +491,19 @@ async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispat
     job = store.job(job.id)
     status.job(job, total, start)
     gate = gate or Gate(settings.outage_wait, settings.outage_max, status)
+    aj = None
+    if job.kind == "auth":                           # names and subjects: authorities.py
+        aj = authorities.AuthJob(store, job, settings.job_dir(job.id), settings.static_db, dispatcher.settings.static,
+                                 dispatcher, dispatcher.catalog)
+    try:
+        return await _run(store, job, settings, dispatcher, status, gate, aj, total, start)
+    finally:
+        if aj is not None:
+            aj.close()
+
+
+async def _run(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status, gate: Gate, aj,
+               total: int, start: int) -> str:
     lanes = max(1, settings.parallel)
     running: set[asyncio.Task] = set()
     rows: dict[int, dict] = {}
@@ -529,7 +563,9 @@ async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispat
         if state != "matching":
             await stop()
             return state                             # cancelled from the panel
-        running.add(asyncio.ensure_future(_one(store, job, settings, dispatcher, status, gate, seq, rec, query)))
+        one = (_auth_one(store, job, aj, status, gate, seq, rec) if aj is not None
+               else _one(store, job, settings, dispatcher, status, gate, seq, rec, query))
+        running.add(asyncio.ensure_future(one))
     while running:
         await settle(settings.pause_poll)
         if still() != "matching":
