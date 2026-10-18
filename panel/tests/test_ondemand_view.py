@@ -9,7 +9,7 @@ from textual.widgets import Button, DataTable, Input, Label, Static
 
 from kei_panel.env import PanelEnv
 from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
-from kei_panel.views.ondemand import attempts_text, query_label, server_state
+from kei_panel.views.ondemand import attempts_text, eta_text, query_label, server_state, speed_text
 from kei_panel.views.z3950 import health_state
 
 
@@ -30,6 +30,10 @@ def test_helpers():
         {"target": "c", "outcome": "error", "records": 0}]})
     assert text == "Round 2 · servers asked 3 · with records 1 · down or skipped 1"
     assert health_state("down") == "Paused after failures" and health_state("odd") == "odd"
+    assert eta_text(720) == "12 min" and eta_text(30) == "1 min" and eta_text(40000) == "11 h 6 min"
+    assert speed_text({"inflight": 1, "per_hour": 0}) == ""
+    assert speed_text({"inflight": 4, "per_hour": 300, "eta_s": 3600}) == \
+        "4 records at once · 300 per hour · about 1 h 0 min left"
 
 
 def test_on_demand_screen():
@@ -49,7 +53,8 @@ def test_on_demand_screen():
             await _until(pilot, lambda: servers.row_count == 4)
             assert servers.get_row("ufpr")[2:] == ["1 record(s)", "412"]
             assert servers.get_row("bne")[2] == "Down: timeout: no answer in 15 s"
-            assert "record 2 of 2: Vidas secas" in str(view.query_one("#e-worker-state", Label).render())
+            state = str(view.query_one("#e-worker-state", Label).render())
+            assert "record 2 of 2: Vidas secas · 2 records at once · 240 per hour · about 1 h 15 min left" in state
 
             # The typed book: the records found, one already imported.
             summary = view.query_one("#e-summary", Static)

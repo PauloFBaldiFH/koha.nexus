@@ -454,3 +454,67 @@ def test_no_steps_no_network(health, clock):
     res = asyncio.run(dispatcher([tgt("s")], net, health, clock).run(local(), []))
     assert net.opened == [] and res.servers == 0
 
+
+
+# ----------------------------------------------------------------------
+# Many records at once: spreading, adaptive timeouts, pace
+# ----------------------------------------------------------------------
+
+def test_a_busy_server_moves_back_behind_idle_ones(health, clock):
+    targets = [tgt(f"s{i}") for i in range(8)]
+    d = dispatcher(targets, FakeNet(), health, clock)
+    busy = {"s0.example.org": 1.0, "s1.example.org": 3.0}
+    d.limiter.load = lambda a: busy.get(a.host, 0.0)
+    order = [t.id for t in d._spread(targets)]
+    assert order == ["s2", "s3", "s4", "s5", "s6", "s7", "s0", "s1"]    # a wave back per session ahead
+    d.settings.spread = False
+    assert d._spread(targets) == targets
+
+
+def test_two_records_at_once_ask_different_servers_first(health, clock):
+    targets = [tgt(f"s{i}") for i in range(4)]
+    net = FakeNet(**{f"s{i}_example_org": Server([donor()], delay=0.05) for i in range(4)})
+    d = dispatcher(targets, net, health, clock, wave=2, per_wave_provider=2)
+
+    async def both():
+        first = asyncio.ensure_future(d.run(local(), plan.for_record(local()), tag=1))
+        await asyncio.sleep(0.01)                                   # the first record's sessions are open
+        second = await d.run(local(), plan.for_record(local()), tag=2)
+        return await first, second
+    a, b = asyncio.run(both())
+    assert a.asked == ["s0", "s1"] and b.asked == ["s2", "s3"]
+    assert a.stopped_early and b.stopped_early
+
+
+def test_a_server_that_answers_fast_is_not_waited_on_long(health, clock):
+    for _ in range(5):
+        health.record_success("s0.example.org:210/b", 500)
+    for _ in range(4):
+        health.record_success("s1.example.org:210/b", 500)          # not often enough yet
+    health.record_success("s2.example.org:210/b", 9000)
+    for _ in range(4):
+        health.record_success("s2.example.org:210/b", 9000)
+    net = FakeNet(s0_example_org=Server(), s1_example_org=Server(), s2_example_org=Server())
+    run(dispatcher([tgt("s0"), tgt("s1"), tgt("s2")], net, health, clock))
+    totals = dict(net.opened)
+    assert totals["s0.example.org"] == 6.0                          # 4 x 0.5 s, at least 6 s
+    assert totals["s1.example.org"] == 15 and totals["s2.example.org"] == 15   # the default: 4 x 9 s is more
+
+
+def test_answers_and_timeouts_set_each_hosts_pace(health, clock):
+    net = FakeNet(s0_example_org=Server([donor(rich=False)]), s1_example_org=Server(connect="timeout"),
+                  s2_example_org=Server(connect="refused"))
+    d = dispatcher([tgt("s0"), tgt("s1"), tgt("s2")], net, health, clock)
+    run(d)
+    pace = d.limiter.pacer
+    assert pace.factor("s0.example.org:210") == 1.0 and "s0.example.org:210" in pace.usual
+    assert pace.factor("s1.example.org:210") == 0.5                 # a timeout: slower
+    assert pace.factor("s2.example.org:210") == 1.0                 # a refused connection is the breaker's
+
+
+def test_every_event_carries_the_records_number(health, clock):
+    events = []
+    d = dispatcher([tgt("s0")], FakeNet(s0_example_org=Server([donor()])), health, clock)
+    d.on_event = events.append
+    run(d, tag=7)
+    assert events and {e["seq"] for e in events} == {7}

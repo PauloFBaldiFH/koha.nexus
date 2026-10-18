@@ -2681,7 +2681,7 @@
    ],
    "tips": [
     "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
-    "A large job (the whole catalogue) takes hours, one record after another; leave the computer on. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
+    "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
     "An imported record is taken out again with **Undo a MARC import** (Library tools)."
    ],
    "warnings": [

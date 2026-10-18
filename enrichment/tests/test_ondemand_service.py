@@ -311,3 +311,95 @@ def test_show_lists_each_records_donors_and_choices(env, capsys):
     assert {c["source"] for c in shown["donors"]["7"]} == {"z3950:a", "z3950:b"}
     assert shown["choices"] == {"7": {"subjects": "z3950:b"}}
     assert shown["found"] == []
+
+
+# ----------------------------------------------------------------------
+# Big jobs: records at once, saved in order, the network going away
+# ----------------------------------------------------------------------
+
+def test_records_are_searched_at_once_and_saved_in_order(env):
+    settings, config = env
+    settings.parallel = 4
+    # Twelve servers, each slow: several records are in flight, each on idle servers.
+    net = FakeNet(**{f"s{i:02d}_example_org": Server([donor("Junto")], delay=0.05) for i in range(12)})
+    cat = catalog(*[tgt(f"s{i:02d}") for i in range(12)])
+    job_id = ondemand_job(settings, [mine(n) for n in range(1, 9)])
+    status = service.Status(settings.status_file, cat, every=0)
+    widest, done_seen = [], []
+    original = status.saved
+
+    def saved(done, n=1):
+        done_seen.append(done)
+        original(done, n)
+    status.saved = saved
+    orig_record = status.record
+
+    def record(seq, rec, label):
+        orig_record(seq, rec, label)
+        widest.append(len(status.flight))
+    status.record = record
+    dispatcher, health = service.build(settings, config, cat, status.event, net)
+    store = Store(settings.jobs_db)
+    try:
+        assert asyncio.run(service.process(store, store.job(job_id), settings, dispatcher, status)) == "ready"
+        rows = store.conn.execute("SELECT seq, biblionumber, status FROM items WHERE job_id = ? ORDER BY rowid",
+                                  (job_id,)).fetchall()
+    finally:
+        store.close()
+        health.close()
+    assert max(widest) == 4                                          # four records in flight at once
+    assert [tuple(r) for r in rows] == [(n, n, "enriched") for n in range(1, 9)]   # saved in the job's order
+    assert done_seen == sorted(done_seen) and done_seen[-1] == 8
+    assert json.loads(settings.status_file.read_text())["per_hour"] > 0
+
+
+def test_the_job_waits_for_the_network_instead_of_finding_nothing(env):
+    settings, config = env
+    settings.parallel = 2
+    settings.outage_wait = 0.05
+    servers = {f"s{i}_example_org": Server([donor("Volta")] if i == 0 else [], connect="dns") for i in range(6)}
+    net = FakeNet(**servers)
+    cat = catalog(*[tgt(f"s{i}") for i in range(6)])
+    job_id = ondemand_job(settings, [mine(1), mine(2)])
+    outages = []
+
+    async def run():
+        task = asyncio.ensure_future(service.serve(settings, config, catalog=cat, opener=net))
+        while not outages:
+            await asyncio.sleep(0.01)
+            if settings.status_file.is_file():
+                data = json.loads(settings.status_file.read_text())
+                if data.get("outage"):
+                    outages.append(data["outage"])
+        assert job_of(settings, job_id).done == 0                    # nothing saved as "not found"
+        for s in net.servers.values():
+            s.connect = ""                                           # the internet is back
+        await task
+    asyncio.run(run())
+    assert job_of(settings, job_id).state == "ready"
+    assert item(settings, job_id, 1)["status"] == "enriched" and item(settings, job_id, 2)["status"] == "enriched"
+    store = Store(settings.jobs_db)
+    try:
+        kept = {a["outcome"] for a in store.attempts(job_id)}
+    finally:
+        store.close()
+    assert "error" not in kept                                       # the failed tries were not kept
+
+
+def test_parallel_setting_from_the_environment():
+    assert service.parallel_from(None) == service.PARALLEL and service.parallel_from("x") == service.PARALLEL
+    assert service.parallel_from("1") == 1 and service.parallel_from(" 6 ") == 6
+    assert service.parallel_from("0") == 1 and service.parallel_from("99") == service.PARALLEL_MAX
+    assert service.Settings.from_env({"KEI_ONDEMAND_PARALLEL": "2"}).parallel == 2
+
+
+def test_a_round_with_no_server_left_finishes(env):
+    settings, config = env
+    net = FakeNet(s_example_org=Server([]))
+    job_id = ondemand_job(settings, [mine()])
+    serve(settings, config, net, catalog(tgt("s")))
+    store = Store(settings.jobs_db)
+    store.set(job_id, state="exported", rounds=2)                    # Search more servers: none left
+    store.close()
+    assert serve(settings, config, net, catalog(tgt("s"))) == 1
+    assert job_of(settings, job_id).state == "ready"

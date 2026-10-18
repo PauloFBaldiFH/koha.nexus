@@ -2286,7 +2286,7 @@
    ],
    "tips": [
     "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-    "Um trabalho grande (o catálogo inteiro) leva horas, um registro depois do outro; deixe o computador ligado. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
+    "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
     "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
    ],
    "warnings": [

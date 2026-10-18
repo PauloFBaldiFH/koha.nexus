@@ -136,6 +136,7 @@ _OD_QUERY_SHOW = dict(_ENRICH_JOBS[0], dir="/var/lib/koha-nexus-enrich/jobs/6",
                            "romance", "isbn": "9788535911664", "imported": 1302}]}])
 _OD_STATUS = {"job": 5, "state": "matching", "round": 1, "total": 2, "done": 1,
               "record": {"seq": 2, "biblionumber": 117, "title": "Vidas secas"}, "found": 1, "network": [],
+              "inflight": 2, "per_hour": 240, "eta_s": 4500,
               "servers": {"ufpr": {"name": "Universidade Federal do Paraná", "country": "BR", "state": "1 record(s)",
                                    "ms": 412, "hits": 1},
                           "usp": {"name": "Universidade de São Paulo (Dedalus)", "country": "BR",
