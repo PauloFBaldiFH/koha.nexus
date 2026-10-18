@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.91"
+PANEL_VERSION=" 1.5.92"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29642,6 +29642,7 @@ enrich_install() {
         || printf 'enrichment: %s not found next to the sources\n' "$ENRICH_DIRECT_LIST" >> "$log"
     [ -n "$tmp" ] && rm -rf "$tmp"
     find "$ENRICH_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
+    printf '%s\n' "${PANEL_VERSION// /}" > "$ENRICH_DIR/.version"
     [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
     if ! cmp -s "$ENRICH_DIR/requirements.txt" "$ENRICH_DIR/.venv/.requirements" 2>/dev/null; then
         rm -rf "$ENRICH_DIR/.venv"
@@ -29822,6 +29823,8 @@ UNIT
     systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" "$ENRICH_WORKER_UNIT" "$ENRICH_ONDEMAND_UNIT" >>"$log" 2>&1
     enrich_empty_db >>"$log" 2>&1 || log "enrichment: the empty static.db was not created (see ${log})"
     systemctl restart "$GATEWAY_UNIT" >>"$log" 2>&1
+    # A worker or on-demand service already running loads the new code; each goes on from its last record.
+    systemctl try-restart "$ENRICH_WORKER_UNIT" "$ENRICH_ONDEMAND_UNIT" >>"$log" 2>&1
     systemctl start "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
     local i up=0
     for i in 1 2 3 4 5 6 7 8 9 10; do
@@ -29971,15 +29974,24 @@ enrich_wait_index() {
     return 0
 }
 
+# 0 when the packages in ENRICH_DIR came with this version of the panel.
+# The panel updates itself, but ENRICH_DIR keeps the copy enrich_install
+# made: without this, an update left the old engine running behind the new
+# screens (Paulo, 1.5.91: "on demand needs biblionumbers (at most 50)").
+enrich_current() {
+    [ "$(cat "$ENRICH_DIR/.version" 2>/dev/null)" = "${PANEL_VERSION// /}" ]
+}
+
 enrich_ready() {
-    [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_jobs/worker.py" ] || enrich_install
+    [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_jobs/worker.py" ] && enrich_current \
+        || enrich_install
 }
 
 # The same, with on-demand: its package, the direct list and its unit (an
 # install from before on-demand gets them now).
 enrich_od_ready() {
     [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_ondemand/service.py" ] \
-        && [ -s "$ENRICH_DIR/${ENRICH_DIRECT_LIST}" ] \
+        && [ -s "$ENRICH_DIR/${ENRICH_DIRECT_LIST}" ] && enrich_current \
         && [ -f "/etc/systemd/system/${ENRICH_ONDEMAND_UNIT}.service" ] || enrich_install
 }
 

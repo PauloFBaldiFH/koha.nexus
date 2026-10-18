@@ -95,6 +95,7 @@ SQL
     printf '#!/bin/sh\nPYTHONPATH=%s exec python3 "$@"\n' "$KEI_REPO/enrichment" > "$W/enrich/.venv/bin/python"
     chmod +x "$W/enrich/.venv/bin/python"
     ln -s "$KEI_REPO/enrichment/nexus_jobs" "$W/enrich/nexus_jobs"
+    sed -n 's/^PANEL_VERSION=" *\([^"]*\)"/\1/p' "$KEI_REPO/installer" > "$W/enrich/.version"
     cp "$BATS_FILE_TMPDIR/static.db" "$W/state/static.db"
     cat > "$W/extra.sh" <<SH
 SYS_LANG=en
