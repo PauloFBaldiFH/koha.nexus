@@ -176,13 +176,48 @@ def test_a_typed_query_keeps_its_records_to_import(env):
     assert found[0]["source"] == "z3950:s" and found[0]["isbn"] == ISBN
 
 
-def test_too_many_records_or_no_export_fail_the_job(env):
+def test_any_number_of_records_runs_and_a_missing_export_fails(env):
     settings, config = env
-    many = ondemand_job(settings, [mine(n) for n in range(1, 52)])
+    net = FakeNet(s_example_org=Server([donor("Muitos")]))
+    many = ondemand_job(settings, [mine(n) for n in range(1, 121)])      # no cap: the whole catalogue may come
     missing = ondemand_job(settings)
-    serve(settings, config, FakeNet(), catalog(tgt("s")))
-    assert job_of(settings, many).state == "failed" and "more than 50" in job_of(settings, many).error
+    serve(settings, config, net, catalog(tgt("s")))
+    job = job_of(settings, many)
+    assert job.state == "ready" and job.total == job.done == 120
+    assert item(settings, many, 120)["status"] == "enriched" and item(settings, many, 120)["biblionumber"] == 120
     assert job_of(settings, missing).state == "failed" and "export.xml" in job_of(settings, missing).error
+
+
+def test_a_job_stopped_half_way_goes_on_from_its_last_record(env):
+    settings, config = env
+    net = FakeNet(s_example_org=Server([donor("Retomado")]))
+    job_id = ondemand_job(settings, [mine(n) for n in range(1, 11)])
+    store = Store(settings.jobs_db)
+    store.set(job_id, state="matching", total=10, done=6)              # the machine shut down after record 6
+    store.close()
+    serve(settings, config, net, catalog(tgt("s")))
+    assert job_of(settings, job_id).state == "ready"
+    store = Store(settings.jobs_db)
+    asked = sorted({a["seq"] for a in store.attempts(job_id)})
+    store.close()
+    assert asked == [7, 8, 9, 10]
+
+
+def test_the_pause_file_holds_the_job_between_records(env):
+    settings, config = env
+    settings.pause_poll = 0.01
+    net = FakeNet(s_example_org=Server([donor("X")]))
+    job_id = ondemand_job(settings, [mine(1), mine(2)])
+    (settings.state / "pause").write_text("")
+
+    async def run():
+        task = asyncio.ensure_future(service.serve(settings, config, catalog=catalog(tgt("s")), opener=net))
+        await asyncio.sleep(0.3)
+        held = job_of(settings, job_id).done
+        (settings.state / "pause").unlink()
+        await task
+        return held
+    assert asyncio.run(run()) == 0 and job_of(settings, job_id).state == "ready"
 
 
 def test_the_worker_and_the_service_never_take_each_others_jobs(env):
@@ -211,8 +246,11 @@ def test_jobs_cli_on_demand(env, capsys):
     out = json.loads(capsys.readouterr().out)
     assert Path(out["ids"]).read_text().split() == ["101", "102"]
     assert cli.main(base + ["origin", str(out["job"])]) == 0 and capsys.readouterr().out.strip() == "ondemand"
-    assert cli.main(base + ["add", "--origin", "ondemand", "--scope", "all"]) == 1
-    assert cli.main(base + ["add", "--origin", "ondemand", "--scope", "1-51"]) == 1
+    assert cli.main(base + ["add", "--origin", "ondemand", "--scope", "all"]) == 0
+    assert json.loads(capsys.readouterr().out)["ids"] == ""                    # all: the whole catalogue
+    assert cli.main(base + ["add", "--origin", "ondemand", "--scope", "1-5000"]) == 0
+    capsys.readouterr()
+    assert cli.main(base + ["add", "--origin", "ondemand", "--scope", "abc"]) == 1
     assert cli.main(base + ["add", "--origin", "ondemand", "--author", "x"]) == 1
     assert cli.main(base + ["add", "--origin", "ondemand", "--isbn", " 978 ", "--title", ""]) == 0
     q = json.loads(capsys.readouterr().out)

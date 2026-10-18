@@ -2270,15 +2270,15 @@
    ]
   },
   "sec-ondemand": {
-   "summary": "Pesquisa catálogos públicos agora, só por conexões Z39.50 diretas, para até 50 dos seus registros ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
+   "summary": "Pesquisa catálogos públicos só por conexões Z39.50 diretas, para os seus registros (todos, ou os que você listar) ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
    "overview": [
     "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50.",
     "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro exatamente como em **Enriquecer catálogo bibliográfico**, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
-    "**Aplicar** salva uma cópia desses registros como estão no Koha (não um backup completo: no máximo 50 registros) e grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
+    "**Aplicar** salva uma cópia desses registros como estão no Koha quando o trabalho tem até 50 registros, e um backup completo verificado quando tem mais; depois grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
     "Para um livro digitado, aparece o melhor registro de cada servidor. **Importar como registro novo** o acrescenta ao catálogo pela importação preparada do Koha, sem os campos locais da outra biblioteca (9XX) e com um 883 dizendo de onde veio; se o Koha já tem um registro com esse ISBN, nada é acrescentado."
    ],
    "steps": [
-    "Digite até 50 biblionumbers (como `101, 102, 500-510`) e pressione **Pesquisar**; ou digite um ISBN ou um título (o autor e o ano ajudam) e pressione **Encontrar**.",
+    "Digite `all` ou quaisquer biblionumbers (como `101, 102, 500-510`) e pressione **Pesquisar**; ou digite um ISBN ou um título (o autor e o ano ajudam) e pressione **Encontrar**.",
     "Acompanhe os servidores no quadro **Servidores**: o estado de cada um (pesquisando, registros encontrados, nenhum registro, fora do ar) e o tempo.",
     "Escolha o trabalho em **Trabalhos** e leia o relatório; selecione um registro para ver os campos antes e depois.",
     "Não bastou? **Pesquisar mais servidores** consulta os que ainda não foram consultados. **Escolher doador** define o servidor cujo registro fornece um grupo de campos (assuntos, CDD, notas...), mesclado de novo sem consultar a rede.",
@@ -2286,7 +2286,7 @@
    ],
    "tips": [
     "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-    "Para centenas ou milhares de registros, use **Enriquecer catálogo bibliográfico**: ele roda em segundo plano a partir da base de enriquecimento, sem consultar os servidores.",
+    "Um trabalho grande (o catálogo inteiro) leva horas, um registro depois do outro; deixe o computador ligado. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
     "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
    ],
    "warnings": [

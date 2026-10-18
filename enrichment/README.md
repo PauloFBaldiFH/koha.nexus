@@ -223,7 +223,7 @@ in the report but not fetched yet.
 ## On-demand enrichment (direct Z39.50 servers, now)
 
 ```sh
-config.sh --task enrich-od-add "101, 102"             # at most 50 records; exports, queues, starts the service
+config.sh --task enrich-od-add "101, 102"             # any number, or all; exports, queues, starts the service
 config.sh --task enrich-od-add --isbn 9788535902778   # or --title T [--author A] [--year Y]: records to import as new
 config.sh --task enrich-od-status 7                   # the service's progress (per server) and job 7
 config.sh --task enrich-od-more 7                     # "Search more servers": the next ones, never the same
@@ -245,6 +245,14 @@ record with the batch rules, and writes the same report. It has network
 but no access to Koha, no port, `CPUQuota=25%`, `MemoryMax=160M`, and exits
 after 5 idle minutes. `python -m nexus_ondemand once ID` runs one job from
 a terminal.
+
+There is no record limit: `all` exports the whole catalogue, and the service
+reads export.xml one record at a time (memory stays flat), so a large job
+runs for hours. A job the service left half way (a shutdown) goes on after
+its last finished record; the unit restarts after a crash; the `pause` file
+(the tray's or the batch screen's Pause) holds it between records. Apply and
+Revert save a copy of the records for a job of up to 50
+(`ENRICH_OD_SNAPSHOT_MAX`), and the verified full backup above that.
 
 A typed query's records are imported one at a time: `python -m
 nexus_ondemand import-file JOB SEQ N --out FILE` writes the Nth record found
