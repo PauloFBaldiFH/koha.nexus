@@ -133,6 +133,7 @@ class EnrichView(SectionView):
     loaded = False
     KIND = "bib"            # the jobs this screen lists (nexus_jobs' job kind)
     ORIGIN = "batch"        # and their origin (batch, or ondemand: views/ondemand.py)
+    ORIGINS: tuple[str, ...] = ()   # several origins (the authority screen); empty: ORIGIN
     DEFAULT_SCOPE = "all"   # an empty scope box
 
     # -- what differs between the bibliographic and the authority screen --
@@ -286,7 +287,7 @@ class EnrichView(SectionView):
             return
         try:
             self.jobs = [j for j in json.loads(out.get("jobs") or "[]", strict=False)
-                         if (j.get("kind") or "bib") == self.KIND and (j.get("origin") or "batch") == self.ORIGIN]
+                         if (j.get("kind") or "bib") == self.KIND and (j.get("origin") or "batch") in (self.ORIGINS or (self.ORIGIN,))]
             self.worker = json.loads(out.get("worker") or "{}", strict=False)
         except ValueError:
             self.jobs, self.worker = [], {}
@@ -333,6 +334,8 @@ class EnrichView(SectionView):
                 why = t("pause button") if w.get("why") == "pause file" else t("the machine is busy")
                 text = t("◐ Paused (${why}) at ${done} of ${total} records", why=why, done=w.get("done", 0),
                          total=w.get("total", 0))
+            elif w.get("outage"):              # the on-demand service (authority jobs)
+                text = t("◌ No internet connection: the job waits and asks again at ${time}.", time=w["outage"])
             bar.update(total=max(int(w.get("total") or 0), 1), progress=int(w.get("done") or 0))
         else:
             text = t("○ Idle: no job is being compared.")
@@ -529,17 +532,37 @@ class AuthEnrichView(EnrichView):
     authority jobs (`enrich-auth-add SCOPE MODE`). Each name and subject
     heading is matched with Koha's own authorities, then the enrichment
     database (Biblioteca Nacional first, then the other Brazilian sources,
-    then the Library of Congress); Apply creates the new authorities, then
-    links the records ($9) and puts their headings in the authorised form."""
+    then the Library of Congress), then the direct authority servers of the
+    on-demand service (koha-nexus-ondemand: several records at once, each
+    server at its own pace; subjects only from Brazilian servers); Apply
+    creates the new authorities, then links the records ($9) and puts
+    their headings in the authorised form. Jobs made before 1.5.95 (the
+    batch worker's) stay listed."""
 
     KIND = "auth"
+    ORIGINS = ("ondemand", "batch")
 
     def intro(self) -> str:
         return t("Links the names and subjects of your records to authority records: your own Koha authorities "
-                 "first, then the koha.nexus enrichment database (Biblioteca Nacional first, then Brazilian "
-                 "catalogues, then the Library of Congress). Headings get the authorised form; missing "
-                 "authorities are created. Nothing reaches the catalogue until you read the report and choose "
-                 "Apply; Apply makes a safety backup first and can be reverted.")
+                 "first, then the koha.nexus enrichment database, then the authority servers searched directly "
+                 "in the background (Brazilian ones first; subjects only from Brazilian servers). Headings get "
+                 "the authorised form; missing authorities are created. Nothing reaches the catalogue until you "
+                 "read the report and choose Apply; Apply makes a safety backup first and can be reverted.")
+
+    async def fetch_worker(self, worker: dict) -> dict:
+        """The on-demand service's state while it matches one of these jobs, else the batch worker's."""
+        out = await self._call("enrich-od-status")
+        try:
+            status = json.loads(out.get("status") or "{}", strict=False) if out is not None and out.ok else {}
+        except ValueError:
+            status = {}
+        if status.get("state") != "matching" or status.get("job") not in {j["id"] for j in self.jobs}:
+            return worker
+        status = dict(status)
+        status["pause_file"] = bool(worker.get("pause_file"))
+        if status.get("paused"):
+            status["why"] = "pause file"
+        return status
 
     def compose_options(self) -> ComposeResult:
         with RadioSet(id="e-mode"):

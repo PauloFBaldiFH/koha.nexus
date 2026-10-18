@@ -1,5 +1,6 @@
 """The "Enrich bibliographic catalog" screen, driven headless in demo mode."""
 
+import json
 import time
 
 from conftest import INSTALLER
@@ -136,3 +137,33 @@ def test_authority_screen_lists_its_own_jobs_and_applies():
 
     import asyncio
     asyncio.run(main())
+
+
+def test_authority_screen_shows_the_on_demand_service_on_its_jobs():
+    from kei_panel.views.enrich import AuthEnrichView
+
+    class Out:
+        ok = True
+
+        def __init__(self, status):
+            self.status = status
+
+        def get(self, key, default=None):
+            return json.dumps(self.status) if key == "status" else default
+
+    view = AuthEnrichView.__new__(AuthEnrichView)
+    view.jobs = [{"id": 8, "kind": "auth", "origin": "ondemand"}]
+    worker = {"state": "idle", "pause_file": True}
+
+    async def check(status):
+        async def call(name, *args):
+            assert name == "enrich-od-status"
+            return Out(status)
+        view._call = call
+        return await view.fetch_worker(worker)
+
+    import asyncio
+    got = asyncio.run(check({"job": 8, "state": "matching", "done": 3, "total": 9, "paused": True}))
+    assert got["done"] == 3 and got["pause_file"] is True and got["why"] == "pause file"
+    assert asyncio.run(check({"job": 5, "state": "matching"})) is worker      # a bibliographic job's
+    assert asyncio.run(check({"state": "idle"})) is worker

@@ -129,6 +129,12 @@ class Result:
     static_used: bool = False
     network: list[str] = field(default_factory=list)    # "dns", "port 1921": what this machine's network blocks
 
+    @property
+    def down(self) -> bool:
+        """This machine's network was down: it blocked the lookups or port
+        1921 (the network-wide rule) and no server answered."""
+        return bool(self.network) and not any(a.outcome in ("found", "none") for a in self.attempts)
+
     def candidates(self) -> list[Candidate]:
         """For nexus_enrich.merge: one Candidate per record found."""
         return [Candidate(f.record, f.source, f.remote_id or f.record.control("001"), f.weight, f.brazilian)
@@ -163,6 +169,7 @@ class _Request:
     def __init__(self, local: marc.Record | None):
         self.local = local
         self.tag = None                               # the job's record number, in every event
+        self.accept = None                            # an authority search's own "enough"
         self.keys = cl.Keys.of(local) if local is not None else None
         self.result = Result()
         self.deferred: list[tuple[str, Outcome, Address, str]] = []   # held back: maybe our own network
@@ -198,18 +205,25 @@ class Dispatcher:
     # one record ---------------------------------------------------------
 
     async def run(self, local: marc.Record | None, steps: list[Step], *, only=None,
-                  max_servers: int | None = None, exclude=(), tag=None) -> Result:
+                  max_servers: int | None = None, exclude=(), tag=None, recordtype: str = "biblio",
+                  context: marc.Record | None = None, accept=None) -> Result:
         """Ask the servers for LOCAL (None: a typed query) with STEPS. The
         targets in EXCLUDE (an earlier run's Result.asked) are passed over:
         "Search more servers" asks the next ones. TAG (the record's number
-        in its job) goes into every event as "seq"."""
+        in its job) goes into every event as "seq".
+
+        For an authority heading: RECORDTYPE "authority" (the authority
+        servers only), CONTEXT the bibliographic record (its language
+        orders the servers), ACCEPT(found) True when the records found so
+        far are enough to stop."""
         req = _Request(local)
         req.tag = tag
+        req.accept = accept
         res = req.result
         if not steps:
             return res
-        ranked, res.skipped = select.rank(self.catalog.targets.values(), local, only=only, health=self.health,
-                                          limiter=self.limiter)
+        ranked, res.skipped = select.rank(self.catalog.targets.values(), context if context is not None else local,
+                                          recordtype=recordtype, only=only, health=self.health, limiter=self.limiter)
         exclude = set(exclude)
         queue = self._spread([t for t in ranked if t.id not in exclude])[:max_servers or self.settings.max_servers]
         pending: set[asyncio.Task] = set()
@@ -231,7 +245,7 @@ class Dispatcher:
             if still:
                 await asyncio.gather(*still, return_exceptions=True)
         self._settle(req)
-        if self.settings.static and self.static is not None and not self._has(req, cl.M0):
+        if self.settings.static and self.static is not None and local is not None and not self._has(req, cl.M0):
             self._static(req)
         self._emit(req, type="done", found=len(res.found), servers=res.servers, stopped_early=res.stopped_early,
                    network=res.network)
@@ -285,6 +299,8 @@ class Dispatcher:
 
     def _good_enough(self, req: _Request) -> bool:
         found = req.result.found
+        if req.accept is not None:
+            return bool(req.accept(found))
         if req.local is None:
             return bool(found)                       # a typed query: the first wave with records
         m0 = [f for f in found if f.cls == cl.M0]

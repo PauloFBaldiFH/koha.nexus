@@ -128,31 +128,43 @@ class AuthMatcher:
     m0 links to Koha authorities, m1 links to new authorities, w headings
     put in the authorised form, r headings sent to review."""
 
-    def __init__(self, store: Store, job: Job, db: StaticDB, koha: authority.KohaIndex, release: str):
+    def __init__(self, store: Store, job: Job, static: authority.StaticHeadings | None, koha: authority.KohaIndex,
+                 release: str):
         self.store, self.job, self.koha, self.release = store, job, koha, release
-        self.static = authority.StaticHeadings(db.conn)
+        self.static = static
         self.mode = job.mode or "exact"
+
+    def source_name(self, source: str) -> str:
+        """The name of a heading's source, for the new authority's 670."""
+        src = self.static.sources.get(source) if self.static is not None else None
+        return src["name"] if src is not None else ""
+
+    def match(self, f: marc.Field) -> authority.Match:
+        return authority.match_field(f, self.koha, self.static, self.mode)
 
     def _new(self, m: authority.Match) -> int:
         kind, key, dates = authority.new_key(m)
         row = m.static
         preliminary = bool(m.fuzzy) or row is None or bool(row.preliminary)
-        src = self.static.sources.get(row.source) if row is not None else None
         rec = authority.authority_record(kind, m.form, row, preliminary, self.release,
-                                         src["name"] if src is not None else "")
+                                         self.source_name(row.source) if row is not None else "")
         main = rec.first(authority.AUTH_TAG[kind])
         return self.store.new_authority(self.job.id, kind, key, dates, main.text(), row.source if row else "",
                                         preliminary, m.fuzzy, pack(rec))
 
     def __call__(self, rec: marc.Record) -> dict:
+        return self.row(rec, {i: self.match(f) for i, f in enumerate(rec.fields) if authority.kind_of(f) is not None})
+
+    def row(self, rec: marc.Record, matches: dict) -> dict:
+        """The item row of REC from MATCHES ({field index: Match})."""
         row = {"biblionumber": biblionumber(rec), "f005": rec.control("005"), "title": title(rec),
                "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0, "before": None, "after": None, "other": None}
         after = rec.copy()
         found, review = [], []
         for i, f in enumerate(after.fields):
-            if authority.kind_of(f) is None:
+            if i not in matches:
                 continue
-            m = authority.match_field(f, self.koha, self.static, self.mode)
+            m = matches[i]
             entry = {"tag": f.tag, "before": report.field_text(f), "action": m.action, "reason": m.reason}
             if m.static is not None:
                 entry["source"] = m.static.source
@@ -216,7 +228,7 @@ def process(store: Store, job: Job, settings: Settings, sleep=time.sleep) -> str
         job = store.job(job.id)
         if job.kind == "auth":
             koha = authority.KohaIndex.from_file(settings.job_dir(job.id) / "authorities.xml")
-            matcher = AuthMatcher(store, job, db, koha, job.release)
+            matcher = AuthMatcher(store, job, authority.StaticHeadings(db.conn), koha, job.release)
         else:
             def matcher(rec):
                 return match_one(db, rec, settings.policy)

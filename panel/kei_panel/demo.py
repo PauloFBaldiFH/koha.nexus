@@ -361,9 +361,9 @@ _SCRIPTS: dict[str, list[str]] = {
                           "@@msg ok OK\t✅ Job {0} reverted: 412 record(s) have their previous version back."],
     "enrich-auth-add": ["@@result job=4", "@@result records=1240",
                         "@@msg info Enrich & standardize authorities\tJob 4: the headings of 1240 record(s) are "
-                        "being compared with your authorities and the enrichment database, slowly and in the "
-                        "background.\n\nNothing is written to the catalogue until you review the report and "
-                        "choose Apply."],
+                        "being compared with your authorities and the enrichment database, and the ones still "
+                        "missing are searched on the authority servers, in the background.\n\nNothing is written "
+                        "to the catalogue until you review the report and choose Apply."],
     "enrich-job-cancel": [],
     "enrich-od-status": ["@@result status=" + json.dumps(_OD_STATUS, ensure_ascii=False)],
     "enrich-od-add": ["@@result job=7"],
