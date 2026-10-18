@@ -336,6 +336,9 @@ class EnrichView(SectionView):
                          total=w.get("total", 0))
             elif w.get("outage"):              # the on-demand service (authority jobs)
                 text = t("◌ No internet connection: the job waits and asks again at ${time}.", time=w["outage"])
+            elif w.get("quota"):
+                text = t("◌ The servers for these records have used today's searches: the job waits and goes "
+                         "on at ${time}.", time=w["quota"])
             bar.update(total=max(int(w.get("total") or 0), 1), progress=int(w.get("done") or 0))
         else:
             text = t("○ Idle: no job is being compared.")

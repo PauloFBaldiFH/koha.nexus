@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.95",
+ "panel_version": "1.5.96",
  "languages": [
   {
    "code": "en",
@@ -14884,7 +14884,7 @@
    "en": {
     "summary": "Searches public catalogues over direct Z39.50 connections only, for your records (all of them, or any you list) or for a book you type, with the same staged report as the background jobs and an import as a new record for a typed book.",
     "overview": [
-     "Only the direct Z39.50 servers of the panel's list are asked, never the koha.nexus gateways (sru.koha.nexus, catalog.koha.nexus). The servers go in small waves, at most two of one institution at a time, and each server's limits are kept; a server that keeps failing is paused and shown in the Z39.50 screen.",
+     "Only the direct Z39.50 servers of the panel's list are asked, never the koha.nexus gateways (sru.koha.nexus, catalog.koha.nexus). The servers go in small waves, at most two of one institution at a time, and each server's limits are kept; a server that keeps failing is paused and shown in the Z39.50 screen. Each server also takes a limited number of searches a day; when every server of a record's own country (its language's) has used today's, the job waits and goes on just after midnight, so the records after it are searched as well as the ones before. The list of servers says how many were passed over for the record on screen and why.",
      "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record by the same rules the earlier batch enrichment used, and the koha.nexus enrichment database is used after them when nothing fits.",
      "**Apply** saves a copy of those records as Koha has them when the job has 50 records or fewer, and a verified full backup when it has more; then it writes the fields through Koha's staged import. **Revert** gives the records their previous version back.",
      "For a typed book, the best record of each server is listed. **Import as new record** adds it to the catalogue through Koha's staged import, without the other library's local fields (9XX) and with an 883 saying where it came from; when Koha already has a record with that ISBN, nothing is added."
@@ -14912,7 +14912,7 @@
    "pt-BR": {
     "summary": "Pesquisa catálogos públicos só por conexões Z39.50 diretas, para os seus registros (todos, ou os que você listar) ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
     "overview": [
-     "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50.",
+     "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50. Cada servidor também aceita um número limitado de buscas por dia; quando todos os servidores do país de um registro (o da sua língua) já usaram as de hoje, a tarefa espera e continua logo depois da meia-noite, para que os registros seguintes sejam buscados tão bem quanto os anteriores. A lista de servidores diz quantos foram deixados de lado para o registro na tela, e por quê.",
      "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro pelas mesmas regras que o antigo enriquecimento em lote usava, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
      "**Aplicar** salva uma cópia desses registros como estão no Koha quando o trabalho tem até 50 registros, e um backup completo verificado quando tem mais; depois grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
      "Para um livro digitado, aparece o melhor registro de cada servidor. **Importar como registro novo** o acrescenta ao catálogo pela importação preparada do Koha, sem os campos locais da outra biblioteca (9XX) e com um 883 dizendo de onde veio; se o Koha já tem um registro com esse ISBN, nada é acrescentado."

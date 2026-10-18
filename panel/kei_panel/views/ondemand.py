@@ -112,7 +112,7 @@ class OnDemandView(EnrichView):
     def __init__(self, section):
         super().__init__(section)
         self.picked_bn: str = ""
-        self.servers_seen: dict = {}
+        self.servers_seen: tuple = ()
 
     def intro(self) -> str:
         return t("Searches public catalogues over direct Z39.50 connections only, for your records (all of them, or "
@@ -241,6 +241,9 @@ class OnDemandView(EnrichView):
                            total=w.get("total", 0)))
         elif w.get("state") == "matching" and w.get("outage"):
             label.update(t("◌ No internet connection: the job waits and asks again at ${time}.", time=w["outage"]))
+        elif w.get("state") == "matching" and w.get("quota"):
+            label.update(t("◌ The servers for these records have used today's searches: the job waits and goes "
+                           "on at ${time}.", time=w["quota"]))
         elif w.get("state") == "matching":
             rec = w.get("record") or {}
             line = t("● Job ${job}, round ${round}: record ${n} of ${total}: ${title}", job=w.get("job", "?"),
@@ -253,15 +256,23 @@ class OnDemandView(EnrichView):
             label.update(t("○ Idle: the service starts when you search and stops after 5 idle minutes."))
             bar.update(total=1, progress=1 if self.jobs else 0)
         servers = w.get("servers") or {}
-        if not servers or servers == self.servers_seen:
+        seen = (servers, w.get("capped"), w.get("cooling"))
+        if not servers or seen == self.servers_seen:
             return                       # idle: the last search's servers stay on screen
-        self.servers_seen = servers
+        self.servers_seen = seen
         table = self.query_one("#od-servers", DataTable)
         table.clear()
         for tid, s in servers.items():
             ms = int(s.get("ms") or 0)
             table.add_row(s.get("name", tid), s.get("country", ""), server_state(s.get("state", "")),
                           str(ms) if ms else "–", key=tid)
+        # The servers passed over for this record are not in the list: say how many and why.
+        if w.get("capped"):
+            table.add_row(t("${n} other server(s)", n=w["capped"]), "", t("today's limit reached"), "–",
+                          key="_capped")
+        if w.get("cooling"):
+            table.add_row(t("${n} other server(s)", n=w["cooling"]), "", t("cooling down after errors"), "–",
+                          key="_cooling")
 
     def draw_job(self, redraw_changes: bool = True) -> None:
         super().draw_job(redraw_changes)
