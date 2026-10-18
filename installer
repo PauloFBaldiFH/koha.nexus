@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.82"
+PANEL_VERSION=" 1.5.83"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -23896,11 +23896,13 @@ def fields(opts):
                 continue
             path, fmt, enc = utf8, "ISO2709", "UTF-8"
         streams.append(fieldmap.stream_entry(row[7], path, fmt, enc, int(nrec), opts.sample))
-    columns = [dict(e, table=p.table.name) for p in a.tables if p.entity in ("biblio", "mixed")
+    books = [p for p in a.tables if p.entity in ("biblio", "mixed")]
+    columns = [dict(e, table=p.table.name) for p in books
                for e in fieldmap.column_fields(p.table.headers, p.columns, p.custom)]
+    tables_out = [fieldmap.table_entry(p.table.name, p.table.headers, p.table.data(), opts.sample) for p in books]
     obj = {"version": fieldmap.VERSION, "sample": opts.sample,
            "targets": [{"to": t, "label": label} for t, label in fieldmap.TARGETS],
-           "streams": streams, "columns": columns, "mapping": a.fieldmap.to_obj()}
+           "streams": streams, "columns": columns, "tables": tables_out, "mapping": a.fieldmap.to_obj()}
     with open(os.path.join(opts.work, "fields.json"), "w", encoding="utf-8") as fh:
         json.dump(obj, fh, ensure_ascii=False, indent=1)
     print("Streams: %d" % len(streams))
@@ -24770,6 +24772,19 @@ def column_fields(headers, columns, custom=None):
         out.append({"from": h, "kind": "column", "role": c.role or "",
                     "samples": [v[:80] for v in c.values[:3]], "to": to})
     return out
+
+
+def table_entry(name, headers, data, sample=SAMPLE):
+    """The first rows of a table, cell by cell under its headers (the panel's
+    data grid): every row as long as the headers, values cut at 200."""
+    rows = []
+    for r in data:
+        if not any(r):
+            continue
+        rows.append([(r[i] if i < len(r) else "")[:200] for i in range(len(headers))])
+        if len(rows) >= sample:
+            break
+    return {"name": name, "kind": "table", "headers": list(headers), "rows_total": len(data), "rows": rows}
 
 
 def stream_entry(name, path, fmt, encoding, total, sample=SAMPLE):

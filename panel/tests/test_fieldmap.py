@@ -268,6 +268,20 @@ def test_spreadsheet_columns(engine, tmp_path):
         assert "Lixo" not in f.read_text(encoding="utf-8")
     p = run(d, "fields", "--in", str(src), "--work", str(work), "--answers", str(answers), "--fieldmap", str(fm))
     assert p.returncode == 0, p.stdout + p.stderr
-    cols = {c["from"]: c for c in json.loads((work / "fields.json").read_text(encoding="utf-8"))["columns"]}
+    obj = json.loads((work / "fields.json").read_text(encoding="utf-8"))
+    cols = {c["from"]: c for c in obj["columns"]}
     assert cols["Estante"]["to"] == "952$z" and cols["Lixo"]["to"] == "ignore" and cols["Observacao"]["to"] == "100$a"
     assert cols["Registro"]["samples"][:2] == ["T-1", "T-2"]
+    # The panel's grid: the table's first rows, cell by cell under its headers.
+    table = obj["tables"][0]
+    assert table["name"] == "acervo.csv" and table["headers"] == ["Titulo", "Observacao", "Registro", "Estante", "Lixo"]
+    assert table["rows_total"] == 3 and table["rows"][2] == ["Iracema", "ALENCAR, JOSE DE", "T-3", "E4", "zz"]
+
+
+def test_table_entry_sample(engine):
+    """At most `sample` rows, blank rows skipped, short rows padded, long values cut."""
+    _, fieldmap, _ = engine
+    data = [["", ""], ["a"]] + [["x%d" % i, "y" * 300] for i in range(20)]
+    out = fieldmap.table_entry("t.csv", ["A", "B"], data, 10)
+    assert out["rows_total"] == 22 and len(out["rows"]) == 10
+    assert out["rows"][0] == ["a", ""] and len(out["rows"][1][1]) == 200

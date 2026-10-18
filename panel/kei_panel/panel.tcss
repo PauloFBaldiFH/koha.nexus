@@ -294,7 +294,7 @@ LoadingScreen {
 
 /* ---- dialogs ------------------------------------------------------- */
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
-TextScreen, ChecklistScreen, CredentialsScreen, EditScreen {
+TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -365,15 +365,42 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen {
 .dialog-editor { height: 1fr; min-height: 10; }
 .dialog-buttons { height: auto; min-height: 4; align-horizontal: right; padding-top: 1; }
 .dialog-buttons Button { margin-left: 2; min-width: 12; height: 3; }
-/* Edit & Map Fields (screens/fieldmap.py) */
-.fieldmap #fm-table { height: 1fr; min-height: 5; }
-.fieldmap #fm-edit { height: auto; margin-top: 1; }
+/* Edit & Map Fields (screens/fieldmap.py): grid on top, cards below */
+.dialog.fieldmap { width: 96%; max-width: 220; height: 94%; max-height: 100%; }
+.fieldmap #fm-head { height: 3; }
+.fieldmap #fm-group, .fieldmap #fm-group-label { width: 1fr; }
+.fieldmap #fm-group-label { padding-top: 1; color: $text-muted; }
+.fieldmap #fm-show { width: 28; margin-left: 1; }
+.fieldmap .fm-step { min-width: 5; margin-left: 1; }
+.fieldmap #fm-example { width: auto; min-width: 16; padding-top: 1; text-align: center; text-style: bold; }
+.fieldmap #fm-grid { height: auto; max-height: 50%; min-height: 6; border: round $panel-lighten-2;
+                     border-title-align: left; border-title-style: bold; }
+.fieldmap #fm-grid:focus { border: round $accent; }
+.fieldmap #fm-tabs { height: auto; margin-top: 1; }
+.fieldmap .fm-tab { height: 1; min-width: 14; margin-right: 1; border: none; }
+.fieldmap .fm-tab.-active { background: $accent; color: $text; text-style: bold; }
+.fieldmap #fm-bottom { height: 1fr; min-height: 8; margin-top: 1; }
+.fieldmap #fm-left { width: 3fr; height: 1fr; }
+.fieldmap #fm-preview-card { width: 2fr; height: 1fr; margin-left: 2; }
+.fieldmap.-stacked #fm-left, .fieldmap.-stacked #fm-preview-card { width: 1fr; margin-left: 0; }
+.dialog.fieldmap.-stacked { width: 100%; height: 100%; padding: 0 1; }
+.fieldmap.-stacked .dialog-title { padding-bottom: 0; }
+.fieldmap.-stacked #fm-tabs { margin-top: 0; }
+.fieldmap.-stacked #fm-bottom { margin-top: 0; min-height: 5; }
+.fieldmap.-stacked #fm-cell { margin-top: 0; }
+.fieldmap.-stacked #fm-foot { min-height: 3; padding-top: 0; }
+.fieldmap.-stacked #fm-grid { min-height: 5; }
+.fieldmap .fm-card { border: round $panel-lighten-2; border-title-align: left; border-title-style: bold;
+                     padding: 0 1; }
+.fieldmap .fm-card:focus-within { border: round $accent; }
+.fieldmap #fm-map { height: auto; }
+.fieldmap #fm-cell { height: 1fr; margin-top: 1; overflow-y: auto; }
+.fieldmap #fm-edit { height: auto; }
 .fieldmap #fm-dest { width: 1fr; }
 .fieldmap #fm-custom { width: 14; margin-left: 1; }
-.fieldmap #fm-preview-bar { height: auto; margin-top: 1; }
-.fieldmap #fm-preview-title { width: 1fr; padding-top: 1; text-style: bold; }
-.fieldmap #fm-preview-bar Button { min-width: 5; margin-left: 1; }
-.fieldmap #fm-preview { height: 9; overflow-y: auto; }
+.fieldmap #fm-preview { height: 1fr; overflow-y: auto; }
+.fieldmap #fm-before { margin-top: 1; }
+.fieldmap #fm-foot { border-top: solid $panel-lighten-2; }
 .fieldmap #fm-count { width: 1fr; padding-top: 1; color: $text-muted; }
 
 /* ---- narrow terminals (80 columns over SSH) ----------------------- */
