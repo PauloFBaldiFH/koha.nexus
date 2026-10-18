@@ -295,7 +295,8 @@ class Z3950View(SectionView):
             text = t("Not scanned yet")
         if tg.key in self.in_koha:
             text = f"{t('In Koha')} · {text}"
-        name = ((tg.flag + " ") if tg.flag else "") + tg.name + (" 🔒" if tg.login and not tg.user else "") \
+        badge = z3950.badge(tg)
+        name = ((badge + " ") if badge else "") + tg.name + (" 🔒" if tg.login and not tg.user else "") \
             + ("" if tg.verified else " *")
         kind = "SRU" if tg.kind == "sru" else "Z39.50"
         ms = h.get("query_ms") if status in ("ok", "empty") else h.get("connect_ms")
