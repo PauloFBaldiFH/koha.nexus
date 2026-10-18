@@ -2144,40 +2144,40 @@
      ],
      "rows": [
       [
-       "KOHA.NEXUS (TODOS OS CATÁLOGOS)",
+       "UTFPR (Universidade Tecnológica Federal do Paraná)",
        "In Koha",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/_union"
+       "Z39.50 · USMARC",
+       "z3950.utfpr.edu.br:210/biblioteca"
       ],
       [
-       "Fundação Biblioteca Nacional (BN)",
-       "Not scanned yet",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/bn"
+       "UFSC (Universidade Federal de Santa Catarina)",
+       "In Koha",
+       "Z39.50 · USMARC",
+       "z3950.ufsc.br:210/Default"
       ],
       [
-       "Fundacentro, Biblioteca",
-       "Not scanned yet",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/fundacentro"
+       "UNIFESP (Universidade Federal de São Paulo)",
+       "In Koha",
+       "Z39.50 · USMARC",
+       "z3950.unifesp.br:210/Default"
       ],
       [
-       "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
+       "UNESP (Universidade Estadual Paulista)",
        "Not scanned yet",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/senado"
+       "Z39.50 · USMARC",
+       "unesp.alma.exlibrisgroup.com:1921/55UNESP_INST"
       ],
       [
-       "Senado Federal (FOLIO)",
+       "USP (Universidade de São Paulo) — Alma",
        "Not scanned yet",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/senado-folio"
+       "Z39.50 · USMARC",
+       "na01.alma.exlibrisgroup.com:1921/55USP_INST"
       ],
       [
-       "Biblioteca Nacional de Portugal (BNP)",
+       "FGV (Fundação Getulio Vargas)",
        "Not scanned yet",
-       "SRU · MARC21",
-       "127.0.0.1:5000/sru/bn-portugal"
+       "Z39.50 · USMARC",
+       "na01.alma.exlibrisgroup.com:1921/55FGV_INST"
       ]
      ]
     }

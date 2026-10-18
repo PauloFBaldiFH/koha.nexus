@@ -380,7 +380,23 @@ def test_panel_list_is_generated_from_targets_json():
     current = koha_sql.PANEL_LIST.read_text(encoding="utf-8")
     assert koha_sql.panel_list(load(TARGETS)) == current
     data = json.loads(current)
-    biblio = [t for t in data["targets"] if t.get("recordtype") != "authority"]
-    assert biblio[0]["db"] == "sru/_union" and [t["db"] for t in biblio if t["preselect"]] == ["sru/_union"]
-    assert {(t["host"], t["port"]) for t in biblio} == {("127.0.0.1", 5000)}
-    assert [t["db"] for t in data["targets"] if t.get("recordtype") == "authority"] == ["sru/_union-aut", "NAF", "SAF", "sru/bn-aut"]
+    rows = data["targets"]
+    # First the direct Z39.50 servers (the primary targets), straight to the libraries.
+    direct = [t for t in rows if t["source"] == koha_sql.DIRECT_SOURCE]
+    direct_biblio = [t for t in direct if t.get("recordtype") != "authority"]
+    assert rows[:len(direct_biblio)] == direct_biblio and len(direct) - len(direct_biblio) == 16
+    assert {t["kind"] for t in direct} == {"zed"} and all(t["priority"] == "primary" for t in direct)
+    assert rows[0]["db"] == "biblioteca" and rows[0]["host"] == "z3950.utfpr.edu.br"
+    # Then the authority files, then the gateway rows: the fallback, never ticked, ranked after the direct servers.
+    assert [t["db"] for t in rows if t.get("recordtype") == "authority" and t["source"] != koha_sql.DIRECT_SOURCE] \
+        == ["NAF", "SAF", "sru/bn-aut", "sru/_union-aut"]
+    fallback = [t for t in rows if t.get("priority") == "fallback"]
+    assert fallback[0]["db"] == "sru/_union" and rows[-len(fallback):] == fallback
+    assert {(t["host"], t["port"]) for t in fallback} == {("127.0.0.1", 5000)}
+    assert not any(t["preselect"] for t in fallback)
+    assert [t["rank"] for t in fallback] == list(range(koha_sql.FALLBACK_RANK, koha_sql.FALLBACK_RANK + len(fallback)))
+    assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default", "Default", "LCDB"]
+    # A gateway row a direct server covers says so; the flags come from the countries.
+    utfpr = next(t for t in fallback if t["db"] == "sru/utfpr")
+    assert "direct Z39.50 row UTFPR" in utfpr["notes"] and utfpr["flag"] == "🇧🇷"
+    assert fallback[0]["flag"] == "🌐" and koha_sql.flag("gb") == "🇬🇧"

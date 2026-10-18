@@ -34,21 +34,54 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 78
-    # The four headings, in Paulo's order, sru/_union first; the authority files last.
-    assert list(z.REGIONS) == ["national", "br_universities", "intl_universities", "specialized", "authorities"]
+    assert len(targets) == 249
+    # The direct Z39.50 servers by region, the authority files, then the
+    # koha.nexus SRU gateway's four groups as the fallback.
+    assert list(z.REGIONS) == ["brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
+                               "authorities", "sru_national", "sru_br_universities", "sru_intl_universities",
+                               "sru_specialized"]
     firsts = {t.region: t.db for t in reversed(targets)}
-    assert firsts == {"national": "sru/_union", "br_universities": "sru/usp", "intl_universities": "sru/harvard",
-                      "specialized": "sru/all", "authorities": "sru/_union-aut"}
+    assert firsts == {"brazil": "biblioteca", "north_america": "LCDB", "europe": "libr", "latin_america": "56PUC_INST",
+                      "asia_oceania": "INNOPAC", "authorities": "NAF", "sru_national": "sru/_union",
+                      "sru_br_universities": "sru/usp", "sru_intl_universities": "sru/harvard",
+                      "sru_specialized": "sru/all"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
     keys = [t.key for t in targets]
     assert len(keys) == len(set(keys))
-    # Every bibliographic one goes through the local gateway (enrichment/nexus_gateway).
-    biblio = [t for t in targets if t.recordtype == "biblio"]
-    assert len(biblio) == 74
-    assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in biblio} == {
+    # The primary targets are Z39.50, straight to the library.
+    direct = [t for t in targets if t.source == z.DIRECT_SOURCE]
+    assert len(direct) == 171 and {t.kind for t in direct} == {"zed"}
+    assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
+    # The fallback goes through the local gateway (enrichment/nexus_gateway), ranked after every direct server.
+    fallback = [t for t in targets if t.region.startswith("sru_")]
+    assert len(fallback) == 74
+    assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in fallback} == {
         ("127.0.0.1", 5000, "sru", "MARC21", "utf8")}
-    assert all(t.db.startswith("sru/") and not t.login for t in biblio)
+    assert all(t.db.startswith("sru/") and not t.login and not t.preselect for t in fallback)
+    assert [t.rank for t in fallback] == list(range(500, 574))
+
+
+def test_curated_flags():
+    by_db = {t.db: t for t in z.load_curated()}
+    assert (by_db["biblioteca"].flag, by_db["LCDB"].flag, by_db["TOUT-UTF8"].flag) == ("🇧🇷", "🇺🇸", "🇫🇷")
+    # The gateway's union rows search catalogues of many countries.
+    assert by_db["sru/_union"].flag == by_db["sru/_union-aut"].flag == "🌐"
+    assert z.make_target({"host": "z.example.org", "country": "pt"}).flag == "🇵🇹"
+    assert z.make_target({"host": "z.example.org"}).flag == ""
+
+
+def test_direct_logins_come_from_the_environment():
+    logins = {t.db: t.login_env for t in z.load_curated() if t.login_env}
+    assert logins == {"rvbi": "KEI_Z3950_SENADO_FOLIO", "TOUT-UTF8": "KEI_Z3950_BNF", "AUT-UTF8": "KEI_Z3950_BNF"}
+
+
+def test_sync_leaves_out_direct_authority_files_koha_lacks():
+    targets = z.load_curated()
+    gnd = next(t for t in targets if t.db == "gnd")
+    sent = z.sync_targets(targets, set())
+    assert gnd not in sent and next(t for t in targets if t.db == "NAF") in sent
+    assert len(sent) == len(targets) - 16
+    assert gnd in z.sync_targets(targets, {gnd.key})
 
 
 AUTH_FIELDS = ("nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.personalName,"
@@ -56,12 +89,12 @@ AUTH_FIELDS = ("nameany=dc.creator,authorany=dc.creator,authorpersonal=bath.pers
 
 
 def test_curated_list_has_the_three_authority_files():
-    auth = [t for t in z.load_curated() if t.recordtype == "authority"]
+    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.source != z.DIRECT_SOURCE]
     got = [(t.name, t.host, t.port, t.db, t.kind, t.syntax, t.encoding, t.timeout, t.rank, t.region, t.preselect)
            for t in auth]
-    assert got.pop(0) == ("KOHA.NEXUS (AUTORIDADES)", "127.0.0.1", 5000, "sru/_union-aut", "sru", "MARC21", "utf8",
-                          15, 0, "authorities", False)
-    auth.pop(0)
+    assert got.pop() == ("KOHA.NEXUS (AUTORIDADES)", "127.0.0.1", 5000, "sru/_union-aut", "sru", "MARC21", "utf8",
+                         15, 0, "authorities", False)
+    auth.pop()
     assert got == [
         ("BIBLIOTECA DOS NOMES DO CONGRESSO", "lx2.loc.gov", 210, "NAF", "zed", "USMARC", "utf8", 10, 1,
          "authorities", False),
@@ -75,7 +108,8 @@ def test_curated_list_has_the_three_authority_files():
 
 
 def test_authority_files_reach_the_add_file_and_the_sql():
-    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.host != "127.0.0.1"]
+    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.host != "127.0.0.1"
+            and t.source != z.DIRECT_SOURCE]
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in z.add_file_text(auth, {}).splitlines()]
     assert [(r["db"], r["rank"], r["timeout"], r["recordtype"]) for r in rows] == [
         ("NAF", "1", "10", "authority"), ("SAF", "2", "10", "authority"), ("sru/bn-aut", "3", "30", "authority")]
@@ -133,7 +167,7 @@ def test_make_target_aliases_and_urls():
     assert (t.name, t.host, t.port, t.db, t.syntax, t.kind) == ("Lib", "z.example.org", 2100, "books",
                                                                  "UNIMARC", "zed")
     s = z.make_target({"host": "https://sru.example.de/opac-1", "name": "SRU"})
-    assert (s.kind, s.port, s.db, s.region) == ("sru", 443, "opac-1", "specialized")
+    assert (s.kind, s.port, s.db, s.region) == ("sru", 443, "opac-1", "europe")
     assert z.make_target({"name": "no host"}) is None
     assert z.make_target({"host": "localhost"}) is None
     assert z.make_target({"host": "a.example.org", "port": "99999"}) is None
@@ -143,20 +177,20 @@ def test_csv_with_semicolons_and_header_aliases():
     text = "Nome;Servidor;Porta;Base;Formato\nBiblioteca X;z3950.x.br;210;acervo;MARC21\n;;;;\n"
     [t] = z.parse_csv(text)
     assert (t.name, t.host, t.port, t.db, t.syntax, t.region) == ("Biblioteca X", "z3950.x.br", 210, "acervo",
-                                                                   "USMARC", "br_universities")
+                                                                   "USMARC", "brazil")
 
 
 def test_csv_without_header():
     [t] = z.parse_csv("Some Library,z.example.edu,7090,Voyager\n")
     assert (t.name, t.host, t.port, t.db, t.region) == ("Some Library", "z.example.edu", 7090, "Voyager",
-                                                         "intl_universities")
+                                                         "north_america")
 
 
 def test_yaml_registry():
     text = "targets:\n  - name: \"Test\"\n    host: z.example.jp\n    port: 210\n    database: OPAC\n" \
            "  - name: Other\n    host: sru.example.org\n    port: 80\n    type: sru\n    db: sru\n"
     a, b = z.parse_yaml(text)
-    assert (a.name, a.host, a.db, a.region) == ("Test", "z.example.jp", "OPAC", "specialized")
+    assert (a.name, a.host, a.db, a.region) == ("Test", "z.example.jp", "OPAC", "asia_oceania")
     assert b.kind == "sru"
 
 
@@ -521,17 +555,19 @@ def test_koha_ranks_follow_latency():
 
 
 def test_curated_brazil_list_and_the_gateway():
-    br = [t.db for t in z.load_curated() if t.region == "br_universities"]
+    br = [t.db for t in z.load_curated() if t.region == "sru_br_universities"]
     assert br == ["sru/" + i for i in "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs "
                                      "uff utfpr unb".split()]
-    ticked = {t.db for t in z.load_curated() if t.preselect}
-    assert ticked == {"sru/_union"}
+    # Ticked when the screen opens: four direct Brazilian servers and the Library of Congress, no SRU row.
+    ticked = {t.key for t in z.load_curated() if t.preselect}
+    assert ticked == {"z3950.utfpr.edu.br:210/biblioteca", "z3950.ufsc.br:210/Default",
+                      "z3950.unifesp.br:210/Default", "lx2.loc.gov:210/LCDB"}
     rede = next(t for t in z.load_curated() if t.db == "sru/all")
-    assert (rede.region, rede.sru_options) == ("specialized", "sru=get,sru_version=1.1")
+    assert (rede.region, rede.sru_options) == ("sru_specialized", "sru=get,sru_version=1.1")
 
 
 def test_add_file_and_sql_carry_the_sru_settings():
-    zeus = next(t for t in z.load_curated() if t.preselect)
+    zeus = next(t for t in z.load_curated() if t.db == "sru/_union")
     utfpr = z.make_target({"name": "UTFPR", "host": "z3950.utfpr.edu.br", "port": 210, "db": "Default"})
     dnb = z.make_target({"name": "DNB", "host": "https://services.dnb.de/sru/dnb"})
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in
@@ -667,8 +703,9 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
 
 
 def test_curated_list_has_no_raw_address():
-    # The VPS gateway's addresses (public and private IPs) never come back; the
-    # catalogues are on the local gateway, the BN authority file still on the VPS one.
+    # The VPS gateway's addresses (public and private IPs) never come back: the
+    # gateway catalogues are local, the BN authority file still on the VPS one.
+    # The one raw address is the RNP server in Rio, which has no host name.
     hosts = {t.host for t in z.load_curated()}
-    assert hosts == {"127.0.0.1", "sru.koha.nexus", "lx2.loc.gov"}
-    assert not any(re.fullmatch(r"[\d.]+", h) for h in hosts - {"127.0.0.1"})
+    assert {"127.0.0.1", "sru.koha.nexus", "lx2.loc.gov"} <= hosts
+    assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"127.0.0.1", "200.19.73.127"}
