@@ -127,6 +127,8 @@ def classes(row: dict) -> str:
 class EnrichView(SectionView):
     loaded = False
     KIND = "bib"            # the jobs this screen lists (nexus_jobs' job kind)
+    ORIGIN = "batch"        # and their origin (batch, or ondemand: views/ondemand.py)
+    DEFAULT_SCOPE = "all"   # an empty scope box
 
     # -- what differs between the bibliographic and the authority screen --
     def intro(self) -> str:
@@ -160,6 +162,15 @@ class EnrichView(SectionView):
     def change_columns(self) -> tuple[str, str]:
         return t("Class"), t("Fields")
 
+    def scope_problem(self, scope: str) -> str:
+        """Why SCOPE cannot start a job ("" when it can)."""
+        if valid_scope(scope):
+            return ""
+        return t("Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550.")
+
+    def scope_label(self, job: dict) -> str:
+        return job.get("scope", "")
+
     def change_cells(self, c: dict) -> tuple[str, str]:
         return classes(c), str(c.get("added", 0))
 
@@ -178,18 +189,9 @@ class EnrichView(SectionView):
             yield Button(t("Reload"), id="e-reload", classes="small")
         yield Static(self.intro(), classes="view-prompt", markup=False)
         with Vertical(id="e-new", classes="hub-box"):
-            yield Static(t("Which records: all, or biblionumbers such as 101, 102, 500-550."),
-                         classes="ai-note", markup=False)
-            with Horizontal(classes="quick-actions"):
-                yield Input(placeholder="all", id="e-scope")
-                yield Button(t("Start"), id="e-start", classes="small", variant="primary")
-            yield from self.compose_options()
+            yield from self.compose_new()
         with Vertical(id="e-worker", classes="hub-box"):
-            yield Label(t("Not checked yet."), id="e-worker-state")
-            yield ProgressBar(total=None, show_eta=False, id="e-progress")
-            with Horizontal(classes="quick-actions"):
-                yield Button(t("Pause"), id="e-pause", classes="small")
-                yield Button(t("Resume"), id="e-resume", classes="small")
+            yield from self.compose_worker()
         with Vertical(id="e-jobs", classes="hub-box z-wide"):
             table = DataTable(id="e-table", zebra_stripes=True, cursor_type="row", classes="hub-table")
             table.add_column(t("Job"), key="id")
@@ -205,6 +207,7 @@ class EnrichView(SectionView):
                 yield Button(t("Apply"), id="e-apply", classes="small", variant="success", disabled=True)
                 yield Button(t("Revert"), id="e-revert", classes="small", variant="warning", disabled=True)
                 yield Button(t("Cancel job"), id="e-cancel", classes="small", disabled=True)
+                yield from self.compose_report_buttons()
             changes = DataTable(id="e-changes", zebra_stripes=True, cursor_type="row", classes="hub-table")
             changes.add_column(t("Biblionumber"), key="bn")
             changes.add_column(t("Result"), key="status")
@@ -214,6 +217,28 @@ class EnrichView(SectionView):
             changes.add_column(t("Title"), key="title")
             yield changes
             yield Static("", id="e-diff", classes="e-diff")
+            yield from self.compose_report_extra()
+
+    def compose_new(self) -> ComposeResult:
+        yield Static(t("Which records: all, or biblionumbers such as 101, 102, 500-550."),
+                     classes="ai-note", markup=False)
+        with Horizontal(classes="quick-actions"):
+            yield Input(placeholder="all", id="e-scope")
+            yield Button(t("Start"), id="e-start", classes="small", variant="primary")
+        yield from self.compose_options()
+
+    def compose_worker(self) -> ComposeResult:
+        yield Label(t("Not checked yet."), id="e-worker-state")
+        yield ProgressBar(total=None, show_eta=False, id="e-progress")
+        with Horizontal(classes="quick-actions"):
+            yield Button(t("Pause"), id="e-pause", classes="small")
+            yield Button(t("Resume"), id="e-resume", classes="small")
+
+    def compose_report_buttons(self) -> ComposeResult:
+        yield from ()
+
+    def compose_report_extra(self) -> ComposeResult:
+        yield from ()
 
     def on_mount(self) -> None:
         self.query_one("#e-new").border_title = t("New job")
@@ -256,10 +281,11 @@ class EnrichView(SectionView):
             return
         try:
             self.jobs = [j for j in json.loads(out.get("jobs") or "[]", strict=False)
-                         if (j.get("kind") or "bib") == self.KIND]
+                         if (j.get("kind") or "bib") == self.KIND and (j.get("origin") or "batch") == self.ORIGIN]
             self.worker = json.loads(out.get("worker") or "{}", strict=False)
         except ValueError:
             self.jobs, self.worker = [], {}
+        self.worker = await self.fetch_worker(self.worker)
         self.draw_worker()
         self.draw_jobs()
         if self.job_id is None and self.jobs:
@@ -283,6 +309,10 @@ class EnrichView(SectionView):
         self.job = job
         self.draw_job(redraw_changes=changed or not self.query_one("#e-changes", DataTable).row_count)
 
+    async def fetch_worker(self, worker: dict) -> dict:
+        """The background state this screen shows (the batch worker's)."""
+        return worker
+
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
@@ -305,8 +335,9 @@ class EnrichView(SectionView):
                 text += " " + t("(paused: new jobs wait until you resume)")
             bar.update(total=1, progress=1 if self.jobs else 0)
         label.update(text)
-        self.query_one("#e-pause", Button).disabled = bool(w.get("pause_file"))
-        self.query_one("#e-resume", Button).disabled = not w.get("pause_file")
+        for bid, off in (("#e-pause", bool(w.get("pause_file"))), ("#e-resume", not w.get("pause_file"))):
+            for b in self.query(bid):
+                b.disabled = off
 
     def draw_jobs(self) -> None:
         table = self.query_one("#e-table", DataTable)
@@ -315,7 +346,7 @@ class EnrichView(SectionView):
         for j in self.jobs:
             total, done = int(j.get("total") or 0), int(j.get("done") or 0)
             progress = f"{done}/{total}" if total else "–"
-            table.add_row(str(j["id"]), j.get("created", "")[:16], j.get("scope", ""), state_text(j.get("state", "")),
+            table.add_row(str(j["id"]), j.get("created", "")[:16], self.scope_label(j), state_text(j.get("state", "")),
                           progress, key=str(j["id"]))
         if self.jobs:
             table.move_cursor(row=min(max(row, 0), len(self.jobs) - 1))
@@ -323,7 +354,7 @@ class EnrichView(SectionView):
     def draw_job(self, redraw_changes: bool = True) -> None:
         job = self.job
         state = job.get("state", "")
-        head = t("Job ${id} · ${scope} · ${state}", id=job.get("id", "?"), scope=job.get("scope", ""),
+        head = t("Job ${id} · ${scope} · ${state}", id=job.get("id", "?"), scope=self.scope_label(job),
                  state=state_text(state))
         self.query_one("#e-summary", Static).update(head + "\n" + self.summary(job))
         rep = job.get("report") or {}
@@ -396,10 +427,10 @@ class EnrichView(SectionView):
     # ------------------------------------------------------------------
     async def _start(self) -> None:
         from ..routines.common import failed, run_task, show_done
-        scope = self.query_one("#e-scope", Input).value.strip() or "all"
-        if not valid_scope(scope):
-            self.app.notify(t("Not a valid scope: use all, or biblionumbers such as 101, 102, 500-550."),
-                            severity="warning", timeout=6)
+        scope = self.query_one("#e-scope", Input).value.strip() or self.DEFAULT_SCOPE
+        problem = self.scope_problem(scope)
+        if problem:
+            self.app.notify(problem, severity="warning", timeout=6)
             return
         title = self.start_title()
         task, args = self.start_task(scope)

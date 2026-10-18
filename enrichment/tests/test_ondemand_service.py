@@ -225,3 +225,51 @@ def test_jobs_cli_on_demand(env, capsys):
     assert cli.main(base + ["add", "--scope", "1"]) == 0
     batch = json.loads(capsys.readouterr().out)["job"]
     assert cli.main(base + ["donor", str(batch), "1", "subjects", "z3950:x"]) == 1
+
+
+def test_a_typed_querys_record_as_a_new_record(env, tmp_path, capsys):
+    settings, config = env
+    rec = donor("X")
+    rec.add_field(Field("952", " ", " ", [("a", "LOCAL")]))
+    rec.add_field(Field("999", " ", " ", [("c", "55")]))
+    net = FakeNet(s_example_org=Server([rec]))
+    job_id = ondemand_job(settings, query={"isbn": ISBN})
+    serve(settings, config, net, catalog(tgt("s")))
+    out = tmp_path / "new.xml"
+    store = Store(settings.jobs_db)
+    try:
+        info = service.import_file(settings, store, job_id, 1, 1, out)
+        with pytest.raises(service.JobError):
+            service.import_file(settings, store, job_id, 1, 2, out)
+        batch = store.add("1", origin="ondemand")
+        with pytest.raises(service.JobError):
+            service.import_file(settings, store, batch.id, 1, 1, out)
+    finally:
+        store.close()
+    assert info["source"] == "z3950:s" and info["title"].startswith("O cortiço")
+    from nexus_enrich import marc
+    with open(out, "rb") as fh:
+        (new,) = list(marc.iter_xml(fh))
+    assert not [f for f in new.fields if f.tag.startswith("9")]       # the donor's local fields stay out
+    prov = new.first("883")
+    assert prov.get("a") == "koha.nexus on-demand" and prov.get("q") == "z3950:s"
+    assert [f.get("a") for f in new.get_fields("650")] == ["X"]
+    # show: an imported record is marked with its biblionumber
+    (settings.job_dir(job_id) / "imported-1-1").write_text("42\n")
+    assert cli.main(["--state", str(settings.state), "show", str(job_id)]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["found"][0]["found"][0]["imported"] == 42 and shown["donors"] == {}
+
+
+def test_show_lists_each_records_donors_and_choices(env, capsys):
+    settings, config = env
+    net = FakeNet(a_example_org=Server([donor("A")]), b_example_org=Server([donor("B")]))
+    job_id = ondemand_job(settings, [mine()])
+    serve(settings, config, net, catalog(tgt("a"), tgt("b")))
+    assert cli.main(["--state", str(settings.state), "donor", str(job_id), "7", "subjects", "z3950:b"]) == 0
+    capsys.readouterr()
+    assert cli.main(["--state", str(settings.state), "show", str(job_id)]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert {c["source"] for c in shown["donors"]["7"]} == {"z3950:a", "z3950:b"}
+    assert shown["choices"] == {"7": {"subjects": "z3950:b"}}
+    assert shown["found"] == []

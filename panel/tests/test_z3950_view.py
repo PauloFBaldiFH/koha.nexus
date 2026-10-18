@@ -260,6 +260,8 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             monkeypatch.setattr(app, "notify", lambda msg, **kw: notes.append(str(msg)))
             # Nothing ticked: the button still takes the whole list.
             view.selected.clear()
+            view.query_one("#z-update").scroll_visible(animate=False)
+            await pilot.pause(0.1)
             await pilot.click("#z-update")
             await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
             await pilot.click("#yes")

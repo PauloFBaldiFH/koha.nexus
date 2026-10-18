@@ -29,14 +29,17 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from nexus_enrich import marc
+from nexus_enrich.marc import Field
 from nexus_enrich.merge import Candidate, Policy, enrich, rank
 from nexus_gateway.learned import Learned
 from nexus_jobs import report
+from nexus_jobs.apply import record_xml
 from nexus_jobs.store import Job, Store
 from nexus_jobs.worker import biblionumber, item_row, title
 
@@ -198,6 +201,31 @@ def best_per_source(local: marc.Record, cands: list[Candidate]) -> list[Candidat
             seen.add(s.candidate.source)
             out.append(s.candidate)
     return out
+
+
+LOCAL_TAGS = re.compile(r"^9")          # 9XX: the donor's own local data (Koha's 942/952/999...)
+
+
+def import_file(settings: Settings, store: Store, job_id: int, seq: int, n: int, out: Path) -> dict:
+    """The Nth record found for a typed query (as `show` lists them, from
+    1) as MARCXML for Koha's staged import, as a new record: the donor's
+    local 9XX fields left out, an 883 saying where it came from."""
+    job = store.job(job_id)
+    if job.origin != "ondemand" or not job.query:
+        raise JobError(f"job {job_id} is not an on-demand query")
+    cands = load_found(settings, job_id, seq)
+    if not 1 <= n <= len(cands):
+        raise JobError(f"job {job_id} has no record {n} for query {seq}")
+    c = cands[n - 1]
+    rec = c.record.copy()
+    rec.fields = [f for f in rec.fields if not LOCAL_TAGS.match(f.tag)]
+    prov = [("a", "koha.nexus on-demand"), ("d", time.strftime("%Y%m%d")), ("q", c.source)]
+    if c.remote_id:
+        prov.append(("w", c.remote_id))
+    rec.add_field(Field("883", "0", " ", prov))
+    out.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<collection xmlns="http://www.loc.gov/MARC21/slim">\n'
+                   + record_xml(rec) + "</collection>\n", encoding="utf-8")
+    return {"file": str(out), "source": c.source, "remote_id": c.remote_id, "title": title(rec)}
 
 
 # ----------------------------------------------------------------------

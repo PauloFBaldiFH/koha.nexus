@@ -229,6 +229,7 @@ config.sh --task enrich-od-status 7                   # the service's progress (
 config.sh --task enrich-od-more 7                     # "Search more servers": the next ones, never the same
 config.sh --task enrich-od-donor 7 101 subjects z3950:loc   # the donor of a field group (merged again, no network)
 config.sh --task enrich-job-apply 7                   # the batch Apply, with a copy of the records, not a full backup
+config.sh --task enrich-od-import 8 1 2               # job 8's typed query, its 2nd record found: imported as new
 config.sh --task z3950-health                         # each direct server's breaker state (JSON)
 config.sh --task z3950-health-reset loc               # or --all
 ```
@@ -244,6 +245,17 @@ record with the batch rules, and writes the same report. It has network
 but no access to Koha, no port, `CPUQuota=25%`, `MemoryMax=160M`, and exits
 after 5 idle minutes. `python -m nexus_ondemand once ID` runs one job from
 a terminal.
+
+A typed query's records are imported one at a time: `python -m
+nexus_ondemand import-file JOB SEQ N --out FILE` writes the Nth record found
+(as `show` lists them) as MARCXML without the donor's 9XX fields and with an
+`883 0_ $a koha.nexus on-demand $q SOURCE $w ID`; the installer stages it
+with the ISBN matcher and `--no-replace` (a record Koha already has is
+ignored, never overlaid), commits it, and leaves `jobs/ID/imported-SEQ-N`
+with the new biblionumber. Library tools > Undo a MARC import takes it out.
+The panel's "On-demand enrichment" screen (Library tools, key `n`) drives
+all of this; the Z39.50 screen lists the direct servers whose breaker is
+open or that failed in the last 7 days, with Reset.
 
 ## The engine
 

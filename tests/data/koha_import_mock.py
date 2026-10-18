@@ -3,11 +3,14 @@ in tests/enrichment_jobs.bats, on the test database, following
 C4::ImportBatch:
 - stage_file.pl --match: each record matches the biblio whose biblionumber
   is its 999 $c (a mismatch can be forced: MOCK_MISMATCH_FILE lines BN=OTHER),
-  overlay_status auto_match, record_sequence from 1;
+  overlay_status auto_match, record_sequence from 1; a record with no
+  999 $c (an import as new) matches the biblio with the same 020 $a, if
+  any: with --no-replace it is ignored (status ignored), else no match;
 - commit_file.pl: replace overlay (marcxml_old keeps the record), 005 set to
-  now, records whose status is error are skipped;
-- commit_file.pl --revert: marcxml_old put back, records whose status is
-  error or reverted skipped;
+  now, records whose status is error or ignored are skipped; a no_match
+  record is added as a new biblio (next biblionumber, 999 $c $d set);
+- commit_file.pl --revert: marcxml_old put back (a new record deleted),
+  records whose status is error, ignored or reverted skipped;
 - authorities (export_records.pl --record-type=auths, stage_file.pl
   --authorities): staged without matching (no_match), committed as new
   rows of auth_header with 001 = authid and import_auths.matched_authid
@@ -48,6 +51,21 @@ def opt(name: str) -> str | None:
         if a.startswith(f"--{name}="):
             return a.split("=", 1)[1]
     return None
+
+
+def isbns(rec) -> set[str]:
+    return {re.sub(r"[^0-9Xx]", "", (sf.text or "").split(" ")[0])
+            for df in rec.findall(f"{M}datafield[@tag='020']") for sf in df.findall(f"{M}subfield[@code='a']")} - {""}
+
+
+def with_999(xml: str, bn: str) -> str:
+    rec = ET.fromstring(xml)
+    for df in rec.findall(f"{M}datafield[@tag='999']"):
+        rec.remove(df)
+    df = ET.SubElement(rec, f"{M}datafield", tag="999", ind1=" ", ind2=" ")
+    for code in "cd":
+        ET.SubElement(df, f"{M}subfield", code=code).text = bn
+    return ET.tostring(rec, encoding="unicode")
 
 
 def with_001(xml: str, authid: str) -> str:
@@ -131,42 +149,71 @@ elif NAME == "stage_file.pl":
                 a, b = line.strip().split("=")
                 mismatch[a] = b
     records = root.findall(f"{M}record")
+    matched = 0
     for seq, rec in enumerate(records, 1):
         bn = ""
         for df in rec.findall(f"{M}datafield[@tag='999']"):
             for sf in df.findall(f"{M}subfield[@code='c']"):
                 bn = sf.text
         bn = mismatch.get(bn, bn)
+        overlay, status = "auto_match", "staged"
+        if not bn:
+            mine = isbns(rec)
+            bn = next((b for b, x in sql("SELECT biblionumber, metadata FROM biblio_metadata ORDER BY biblionumber")
+                       if mine & isbns(ET.fromstring(x))), "")
+            if bn and "--no-replace" in ARGS:
+                status = "ignored"
+            elif not bn:
+                overlay, bn = "no_match", "NULL"
+        else:
+            matched += 1
+        if status == "ignored":
+            matched += 1
         xml = ET.tostring(rec, encoding="unicode")
-        sql(f"INSERT INTO import_records (import_batch_id, record_sequence, marcxml, overlay_status) VALUES "
-            f"({batch}, {seq}, {q(xml)}, 'auto_match'); INSERT INTO import_biblios VALUES (LAST_INSERT_ID(), {bn});")
+        sql(f"INSERT INTO import_records (import_batch_id, record_sequence, marcxml, overlay_status, status) VALUES "
+            f"({batch}, {seq}, {q(xml)}, '{overlay}', '{status}'); INSERT INTO import_biblios VALUES (LAST_INSERT_ID(), {bn});")
     print(f"MARC record staging report\nNumber of valid records:    {len(records)}\n"
-          f"Number of records matched:  {len(records)}\n\nBatch number assigned:  {batch}\n")
+          f"Number of records matched:  {matched}\n\nBatch number assigned:  {batch}\n")
 
 elif NAME == "commit_file.pl":
     batch = opt("batch-number")
     if "--revert" in ARGS:
         n = 0
-        for rid, bn, old, status in sql(
-                f"SELECT ir.import_record_id, ib.matched_biblionumber, ir.marcxml_old, ir.status FROM import_records ir "
+        deleted = 0
+        for rid, bn, old, status, overlay in sql(
+                f"SELECT ir.import_record_id, ib.matched_biblionumber, IFNULL(ir.marcxml_old, ''), ir.status, "
+                f"ir.overlay_status FROM import_records ir "
                 f"JOIN import_biblios ib ON ib.import_record_id = ir.import_record_id WHERE import_batch_id = {batch}"):
-            if status in ("error", "reverted"):
+            if status in ("error", "ignored", "reverted"):
                 continue
-            sql(f"UPDATE biblio_metadata SET metadata = {q(old)} WHERE biblionumber = {bn}; "
-                f"UPDATE import_records SET status = 'reverted' WHERE import_record_id = {rid}")
-            n += 1
+            if overlay == "no_match":
+                sql(f"DELETE FROM biblio_metadata WHERE biblionumber = {bn}")
+                deleted += 1
+            else:
+                sql(f"UPDATE biblio_metadata SET metadata = {q(old)} WHERE biblionumber = {bn}")
+                n += 1
+            sql(f"UPDATE import_records SET status = 'reverted' WHERE import_record_id = {rid}")
         sql(f"UPDATE import_batches SET import_status = 'reverted' WHERE import_batch_id = {batch}")
-        print(f"Number of records deleted:       0\nNumber of records reverted:      {n}\nNumber of errors:                0")
+        print(f"Number of records deleted:       {deleted}\nNumber of records reverted:      {n}\nNumber of errors:                0")
     else:
         if os.environ.get("MOCK_FAIL_COMMIT") and os.path.exists(os.environ["MOCK_FAIL_COMMIT"]):
             os.remove(os.environ["MOCK_FAIL_COMMIT"])
             sys.exit("commit_file.pl: simulated failure")
         stamp = time.strftime("%Y%m%d%H%M%S.0")
-        n = 0
-        for rid, bn, xml, status in sql(
-                f"SELECT ir.import_record_id, ib.matched_biblionumber, ir.marcxml, ir.status FROM import_records ir "
+        n = added = 0
+        for rid, bn, xml, status, overlay in sql(
+                f"SELECT ir.import_record_id, IFNULL(ib.matched_biblionumber, ''), ir.marcxml, ir.status, ir.overlay_status "
+                f"FROM import_records ir "
                 f"JOIN import_biblios ib ON ib.import_record_id = ir.import_record_id WHERE import_batch_id = {batch}"):
-            if status == "error":
+            if status in ("error", "ignored"):
+                continue
+            if overlay == "no_match":
+                bn = str(int(sql("SELECT IFNULL(MAX(biblionumber), 0) FROM biblio_metadata")[0][0]) + 1)
+                sql(f"INSERT INTO biblio_metadata (biblionumber, format, `schema`, metadata) VALUES "
+                    f"({bn}, 'marcxml', 'MARC21', {q(with_999(xml, bn))}); "
+                    f"UPDATE import_biblios SET matched_biblionumber = {bn} WHERE import_record_id = {rid}; "
+                    f"UPDATE import_records SET status = 'imported' WHERE import_record_id = {rid}")
+                added += 1
                 continue
             old = sql(f"SELECT metadata FROM biblio_metadata WHERE biblionumber = {bn}")[0][0]
             new = re.sub(r'(<controlfield tag="005">)[^<]*', r"\g<1>" + stamp, xml)
@@ -174,4 +221,4 @@ elif NAME == "commit_file.pl":
                 f"UPDATE biblio_metadata SET metadata = {q(new)} WHERE biblionumber = {bn}")
             n += 1
         sql(f"UPDATE import_batches SET import_status = 'imported' WHERE import_batch_id = {batch}")
-        print(f"Number of new records added:     0\nNumber of records replaced:      {n}")
+        print(f"Number of new records added:     {added}\nNumber of records replaced:      {n}")

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.89"
+PANEL_VERSION=" 1.5.90"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -30450,6 +30450,72 @@ enrich_od_again() {
     kei_result round "$(printf '%s' "$out" | sed -n 's/.*"round": *\([0-9][0-9]*\).*/\1/p')"
 }
 
+# enrich_od_import ID SEQ N: the Nth record a typed query found, imported as
+# a new record through Koha's staged import (ISBN rule, never overlaying a
+# record Koha already has), so Library tools > Undo a MARC import takes it
+# out again. Nothing in Koha changes but the one new record: no backup.
+enrich_od_import() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "${3:-}" =~ ^[0-9]+$ ]] || return 2
+    require_database || return 1
+    enrich_od_ready || return 1
+    tools_locked _enrich_od_import_run "$1" "$2" "$3"
+}
+
+_enrich_od_import_run() {
+    local id="$1" seq="$2" n="$3" dir="$ENRICH_STATE/jobs/$1" log out file matcher batch added bn title
+    log=$(tools_log enrichment-import)
+    if [ -e "$dir/imported-$seq-$n" ]; then
+        bn=$(cat "$dir/imported-$seq-$n" 2>/dev/null)
+        kei_result import already
+        kei_result biblionumber "${bn:-0}"
+        msg_info "$(t "Import as new record")" "$(t 'This record was already imported (biblionumber ${bn}).')" 9 70
+        return 0
+    fi
+    if ! out=$(ondemand_py import-file "$id" "$seq" "$n" --out "$dir/import-$seq-$n.xml" 2>>"$log"); then
+        kei_result import not-found
+        msg_error "" "$(t 'Job ${id} has no such record to import.')" 9 70
+        return 1
+    fi
+    title=$(printf '%s' "$out" | sed -n 's/.*"title": *"\([^"]*\)".*/\1/p')
+    file=$(tools_copy "$dir/import-$seq-$n.xml" "enrich-$id-import-$seq-$n.xml") || { kei_result import failed; return 1; }
+    # A matcher id that does not exist selects stage_file.pl's built-in rule (ISBN + title).
+    matcher=$(run_sql "SELECT COALESCE((SELECT matcher_id FROM ${DB_NAME}.marc_matchers WHERE code='ISBN' AND record_type='biblio' ORDER BY matcher_id LIMIT 1), (SELECT COALESCE(MAX(matcher_id), 0) + 1 FROM ${DB_NAME}.marc_matchers));")
+    [[ "$matcher" =~ ^[0-9]+$ ]] || matcher=1
+    display_explanation "Applying the changes..."
+    koha_tool "$log" stage_file.pl --file "$file" --format MARCXML --encoding UTF-8 --match "$matcher" --no-replace \
+        --comment "koha.nexus on-demand job ${id}: new record"
+    batch=$(tools_num "$log" "Batch number assigned:")
+    if [ "${batch:-0}" = 0 ]; then
+        kei_result import failed
+        ui_textbox "$(t "Import as new record")" "$log"
+        msg_error "" "$(t 'Koha could not complete the request. Nothing was changed.\n\nLog: ${log}')" 11 76
+        return 1
+    fi
+    if ! koha_tool "$log" commit_file.pl --batch-number "$batch"; then
+        kei_result import failed
+        ui_textbox "$(t "Import as new record")" "$log"
+        msg_error "" "$(t 'The operation failed. The staged batch ${batch} stays in Koha (Cataloging > Manage staged records).\n\nLog: ${log}')" 11 76
+        return 1
+    fi
+    added=$(tools_num "$log" "Number of new records added:")
+    kei_result batch "$batch"
+    if [ "${added:-0}" = 0 ]; then
+        bn=$(run_sql "SELECT IFNULL(MAX(ib.matched_biblionumber), 0) FROM ${DB_NAME}.import_biblios ib JOIN ${DB_NAME}.import_records ir ON ir.import_record_id = ib.import_record_id WHERE ir.import_batch_id = ${batch};")
+        kei_result import exists
+        kei_result biblionumber "${bn:-0}"
+        log "enrichment: on-demand job $id record $seq/$n not imported, Koha has it (biblionumber ${bn})"
+        msg_info "$(t "Import as new record")" "$(t 'Koha already has this record (same ISBN, biblionumber ${bn}). Nothing was added.')" 10 74
+        return 0
+    fi
+    bn=$(run_sql "SELECT IFNULL(MAX(ib.matched_biblionumber), 0) FROM ${DB_NAME}.import_biblios ib JOIN ${DB_NAME}.import_records ir ON ir.import_record_id = ib.import_record_id WHERE ir.import_batch_id = ${batch} AND ir.status = 'imported';")
+    printf '%s\n' "${bn:-0}" > "$dir/imported-$seq-$n"
+    enrich_own "$dir/imported-$seq-$n"
+    log "enrichment: on-demand job $id record $seq/$n imported as biblionumber ${bn} (batch ${batch})"
+    kei_result import done
+    kei_result biblionumber "${bn:-0}"
+    msg_ok "$(t '✅ Imported as a new record (biblionumber ${bn}, batch ${batch}).\n\n${title}\n\nIt is indexed automatically in a few minutes. To take it out again: Library tools > Undo a MARC import.\nLog: ${log}')" 14 76
+}
+
 # z3950_health [ID|--all reset]: each direct server's breaker state, last
 # error and 7-day counts; or forget the breaker of one server (or all).
 z3950_health() {
@@ -32618,6 +32684,7 @@ kei_task() {
         enrich-od-status) enrich_od_status "${1:-}" ;;
         enrich-od-more)  enrich_od_again "${1:-}" more ;;
         enrich-od-donor) enrich_od_again "${1:-}" donor "${2:-}" "${3:-}" "${4:-}" ;;
+        enrich-od-import) enrich_od_import "${1:-}" "${2:-}" "${3:-}" ;;
         z3950-health)    z3950_health ;;
         z3950-health-reset) [ -n "${1:-}" ] || return 2; z3950_health reset "$1" ;;
         z3950-server-status) z3950_server_status ;;
