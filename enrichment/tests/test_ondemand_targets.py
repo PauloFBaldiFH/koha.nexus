@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 
 import pytest
 
@@ -186,10 +187,24 @@ def test_lookup_failures_are_dns_errors():
     async def slow(host, port):
         await asyncio.sleep(5)
 
-    for policy in (Policy(resolver=missing), Policy(resolver=slow, dns_timeout=0.1), Policy(resolver=resolver())):
+    for policy in (Policy(resolver=missing), Policy(resolver=slow, dns_timeout=0.1)):
         with pytest.raises(Z3950Error) as info:
             resolve(policy, "nowhere.example.org")
         assert info.value.kind == "dns"
+
+
+@pytest.mark.parametrize("errno, kind", [(socket.EAI_NONAME, "dns-missing"), (-5, "dns-missing"),
+                                         (socket.EAI_AGAIN, "dns"), (socket.EAI_FAIL, "dns")])
+def test_a_name_that_does_not_exist_is_told_apart_from_a_failed_lookup(errno, kind):
+    async def lookup(host, port):
+        raise socket.gaierror(errno, "lookup")
+
+    with pytest.raises(Z3950Error) as info:
+        resolve(Policy(resolver=lookup), "redes.ufsm.br")
+    assert info.value.kind == kind and info.value.phase == "connect"
+    with pytest.raises(Z3950Error) as info:
+        resolve(Policy(resolver=resolver()), "redes.ufsm.br")          # no address at all
+    assert info.value.kind == "dns-missing"
 
 
 def test_allowed_networks_only_lift_the_address_check():

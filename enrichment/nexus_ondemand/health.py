@@ -15,6 +15,9 @@ Breaker rules (plan section 6.2):
   open it for 5 min x 2^level; it is half-open after that: one real
   request may try it, success closes it, failure reopens it a level up
   (at most 24 h).
+- A name that does not exist any more (the lookup says so, as opposed
+  to a lookup that failed) opens it for 24 h at once: no request waits on
+  a dead host again that day.
 - A ban-like signal (the server closed for resources, cost or security;
   two resets at Init in 10 minutes; a refused connection on a host that
   answered earlier the same day) opens it for 24 h and halves the rate
@@ -77,7 +80,8 @@ CREATE TABLE IF NOT EXISTS meta (name TEXT PRIMARY KEY, value TEXT NOT NULL);
 class Outcome:
     """What one failure means for the server.
 
-    category: transient, down, misconfigured, capability, bad_data, policy or ban."""
+    category: transient, down, gone, misconfigured, capability, bad_data,
+    policy or ban."""
     category: str
     kind: str = ""
     phase: str = ""
@@ -96,6 +100,8 @@ def classify(exc: BaseException) -> Outcome:
     detail = str(exc) or type(exc).__name__
     if kind == "policy":
         return Outcome("policy", kind, phase, detail)
+    if kind == "dns-missing":
+        return Outcome("gone", kind, phase, detail)
     if kind in ("dns", "refused"):
         return Outcome("down", kind, phase, detail)
     if kind == "init-refused":
@@ -217,6 +223,11 @@ class Health:
                 pass
             elif outcome.category == "misconfigured":
                 row["state"] = "misconfigured"
+            elif outcome.category == "gone":
+                # The name no longer exists (a decommissioned or intranet
+                # host): fail fast for a day, then one probe a day.
+                row.update(state="open", open_until=now + max(BAN_SECONDS, OPEN_BASE * 2 ** row["level"]),
+                           consecutive=0)
             elif ban:
                 row.update(state="open", open_until=now + BAN_SECONDS, consecutive=0)
                 if host_key:
