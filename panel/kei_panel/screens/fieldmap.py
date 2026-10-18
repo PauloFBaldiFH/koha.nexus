@@ -1,11 +1,18 @@
-"""Edit & Map Fields (Magic Import, docs/field-mapping.md), laid out like
-MarcEdit's data snapshot: a grid of the sample records (one row per record,
-one column per field or spreadsheet column) with each column's destination
-in its header, the mapping of the selected column, the selected cell in
-full with its warnings, and the record Koha will get from the selected row.
-The row under the cursor is the example ("Exemplo N de 10") everywhere.
+"""Edit & Map Fields (Magic Import, docs/field-mapping.md), laid out after
+the librarians' own sketch (exemplo ferramenta de importação.xlsx):
 
-The preview runs the engine's own kei_import/fieldmap.py, imported from the
+  - on top, a grid of the sample: one row per record, one column per field
+    or spreadsheet column, headed "campo N · 245$a" over where it goes; a
+    bar under it is dragged (or Ctrl+Up/Down) to make the grid taller;
+  - below, "Selecionar campo" and "Função" (keep, a field from the list, a
+    custom TAG$subfield typed by hand, a fixed text for every record, or
+    leave out), and beside them the Library of Congress link and "Mais
+    opções": join copies of the same book, recase capitals, safe spelling
+    repair (tidy.py in the engine);
+  - the record Koha will get opens from "Record preview".
+
+The row under the cursor is the example ("Example N of 10") everywhere. The
+preview runs the engine's own kei_import/fieldmap.py, imported from the
 engine folder the routine names, so the screen and the import never
 disagree; without it the screen still maps."""
 
@@ -15,24 +22,26 @@ import importlib
 import json
 import re
 import sys
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 
 from rich.text import Text
-from textual import on
+from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Input, Label, Select, Static
+from textual.widgets import Button, Checkbox, DataTable, Input, Label, Select, Static
 
+from .. import marc21
 from ..i18n import t
 
-KEEP, OTHER, IGNORE = "keep", "other", "ignore"
-SHOW_ALL, SHOW_CHANGED, SHOW_PROBLEMS = "all", "changed", "problems"
+KEEP, OTHER, FIXED, IGNORE = "keep", "other", "fixed", "ignore"
+NEW_FIXED = "+fixed"
+OPTIONS = ("group", "case", "clean")
 _REF = re.compile(r"^[0-9A-Za-z]{3}(\$[0-9a-z])?$")
-CELL = 16                       # width of a grid column
-WIDE = 140                      # side by side from this width; stacked below
-_MOJIBAKE = re.compile("[ÃÂ][\u0080-¿\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u2013-\u2122]|â€|�")
+CELL = 20                       # width of a grid column
+WIDE = 140                      # mapping and options side by side from this width
+_MOJIBAKE = re.compile("[ÃÂ][\u0080-¿ŒœŠšŸŽžƒˆ˜–-™]|â€|�")
 _ISBN = re.compile(r"^(97[89][- ]?)?\d{1,5}[- ]?\d{1,7}[- ]?\d{1,7}[- ]?[\dXx]$")
 
 
@@ -53,7 +62,7 @@ def load_engine(engine_dir: str):
 
 
 def warnings(value: str, source: str = "") -> list[str]:
-    """What looks dirty in one value (the cell inspector and the grid tint)."""
+    """What looks dirty in one value (the cell line and the grid tint)."""
     out = []
     if value != value.strip():
         out.append(t("spaces at the start or end"))
@@ -70,20 +79,33 @@ def warnings(value: str, source: str = "") -> list[str]:
     return out
 
 
+def ref_label(ref: str) -> str:
+    """"245$a - Title" (translated), or the reference alone."""
+    name = marc21.label(ref)
+    return f"{ref} - {t(name)}" if name else ref
+
+
 class Row:
-    """One source field (TAG$c, or TAG for a control field) or column; a
-    grid column. The name stays from the mapping's point of view."""
+    """One source field (TAG$c, or TAG for a control field), spreadsheet
+    column or fixed text: a grid column. `to` is where it goes (its
+    proposal when unchanged); `text` a fixed text written in every record
+    in place of its values."""
 
     def __init__(self, key: tuple[str, str], source: str, kind: str, proposal: str,
                  count: int = 0, total: int = 0, table: str = ""):
         self.key = key
         self.source = source
-        self.kind = kind                # marc | column
+        self.kind = kind                # marc | column | fixed
         self.proposal = proposal        # where it goes with no mapping
         self.to = proposal
+        self.text = ""
         self.count = count
         self.total = total
         self.table = table
+
+    @property
+    def changed(self) -> bool:
+        return self.to != self.proposal or bool(self.text)
 
 
 class Group:
@@ -120,6 +142,88 @@ def read_fields(path: str) -> dict:
         return json.load(fh)
 
 
+class Splitter(Static):
+    """The bar under the grid: dragged up or down, it makes the grid
+    shorter or taller (the sketch's "barra para deslizar")."""
+
+    def __init__(self, **kw):
+        super().__init__(t("━━━  ↕ drag to resize the grid (Ctrl+↑ / Ctrl+↓)  ━━━"), **kw)
+        self._start: tuple[int, int] | None = None
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        self._start = (event.screen_y, self.screen.grid_height)
+        self.capture_mouse()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self._start is not None:
+            y, h = self._start
+            self.screen.resize_grid(h + event.screen_y - y)
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        self._start = None
+        self.release_mouse()
+
+
+class RecordPreviewScreen(ModalScreen[None]):
+    """The record Koha will get from the example under the grid's cursor,
+    after the mapping and the chosen cleanings ("As in the file" toggles
+    the record before them)."""
+
+    BINDINGS = [Binding("escape", "close", t("Close")),
+                Binding("left_square_bracket", "example(-1)", t("Previous example")),
+                Binding("right_square_bracket", "example(1)", t("Next example"))]
+
+    def __init__(self, owner: "FieldMapScreen"):
+        super().__init__()
+        self.owner = owner
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog fieldmap-preview"):
+            yield Label("", id="fmp-title", classes="dialog-title", markup=False)
+            with VerticalScroll(id="fmp-scroll"):
+                yield Static("", id="fmp-record")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button("◀", id="fmp-prev", classes="fm-step")
+                yield Button("▶", id="fmp-next", classes="fm-step")
+                yield Button(t("As in the file"), id="fmp-before")
+                yield Button(t("Close"), id="fmp-close", variant="primary")
+
+    def on_mount(self) -> None:
+        self._draw()
+
+    def _draw(self) -> None:
+        o = self.owner
+        n = len(o.group.cells)
+        title = t("Koha preview · example ${i} of ${n}", i=o.record + 1 if n else 0, n=n)
+        if o.before:
+            title += "  ·  " + t("as in the file")
+        self.query_one("#fmp-title", Label).update(title)
+        self.query_one("#fmp-record", Static).update(o.preview_text())
+        self.query_one("#fmp-before").display = bool(o.group.records)
+
+    def action_example(self, step: int) -> None:
+        self.owner.action_example(step)
+        self._draw()
+
+    @on(Button.Pressed, "#fmp-prev")
+    def _prev(self) -> None:
+        self.action_example(-1)
+
+    @on(Button.Pressed, "#fmp-next")
+    def _next(self) -> None:
+        self.action_example(1)
+
+    @on(Button.Pressed, "#fmp-before")
+    def _before(self) -> None:
+        self.owner.before = not self.owner.before
+        self._draw()
+
+    @on(Button.Pressed, "#fmp-close")
+    def action_close(self) -> None:
+        self.owner.before = False
+        self.dismiss(None)
+
+
 class FieldMapScreen(ModalScreen[bool]):
     """Answers True when it wrote a mapping with changes to out_path; False
     when the librarian skipped (or changed nothing): the import goes on as
@@ -128,7 +232,9 @@ class FieldMapScreen(ModalScreen[bool]):
     BINDINGS = [Binding("escape", "skip", t("Skip: import as it is")), Binding("ctrl+s", "apply", t("Apply")),
                 Binding("left_square_bracket", "example(-1)", t("Previous example")),
                 Binding("right_square_bracket", "example(1)", t("Next example")),
-                Binding("p", "pane", t("Mapping / Preview"), show=False)]
+                Binding("ctrl+up", "grow(-2)", t("Smaller grid"), show=False),
+                Binding("ctrl+down", "grow(2)", t("Taller grid"), show=False),
+                Binding("p", "preview", t("Record preview"), show=False)]
 
     def __init__(self, title: str, fields_path: str, out_path: str, engine_dir: str = ""):
         super().__init__()
@@ -137,14 +243,15 @@ class FieldMapScreen(ModalScreen[bool]):
         self.fm = load_engine(engine_dir)
         self.rows: OrderedDict[tuple[str, str], Row] = OrderedDict()
         self.groups: list[Group] = []
+        self.fixed: list[tuple[str, str]] = []      # keys of the fixed-text columns
+        self.options = {k: False for k in OPTIONS}
         self._build()
         self._apply_saved(self.data.get("mapping") or {})
         self.group = self.groups[0] if self.groups else Group("", "", [], [])
-        self.show = SHOW_ALL
         self.record = 0
         self.field: tuple[str, str] | None = None
         self.before = False
-        self.pane = "map"               # stacked layout: map | preview
+        self.grid_height = 0            # set on mount, then by the splitter
         self._shown: list[tuple[str, str]] = []
 
     # ------------------------------------------------------------ data
@@ -208,30 +315,66 @@ class FieldMapScreen(ModalScreen[bool]):
     def _apply_saved(self, mapping: dict) -> None:
         """The mapping of the last build: a second look starts from it."""
         for m in mapping.get("mappings", []):
-            key = ("column" if m.get("kind") == "column" else "marc", m.get("from", ""))
+            src = m.get("from", "")
+            if src.startswith("=") and m.get("kind") != "column":
+                self._new_fixed(src[1:].strip(), m.get("to", ""))
+                continue
+            key = ("column" if m.get("kind") == "column" else "marc", src)
             if key not in self.rows and key[0] == "marc" and ("column", key[1]) in self.rows:
                 key = ("column", key[1])
             if key in self.rows:
                 self.rows[key].to = m.get("to", "") or IGNORE
+        for k, v in (mapping.get("options") or {}).items():
+            if k in self.options:
+                self.options[k] = bool(v)
+
+    def _new_fixed(self, text: str = "", to: str = "") -> tuple[str, str]:
+        n = max((int(k[1]) for k in self.fixed), default=0) + 1
+        key = ("fixed", str(n))
+        row = Row(key, t("fixed text ${n}", n=n), "fixed", IGNORE)
+        row.to, row.text = to or IGNORE, text
+        self.rows[key] = row
+        self.fixed.append(key)
+        return key
+
+    def _remove_fixed(self, key: tuple[str, str]) -> None:
+        self.fixed.remove(key)
+        del self.rows[key]
+        self.field = None
+        self._fill_grid()
 
     def changed(self) -> list[Row]:
-        return [r for r in self.rows.values() if r.to != r.proposal]
+        return [r for r in self.rows.values() if r.changed and (r.kind != "fixed" or (r.text and r.to != IGNORE))]
 
     def mapping(self) -> dict:
         out = []
         for r in self.changed():
-            m = {"from": r.source, "to": r.to}
-            if r.kind == "column":
-                m["kind"] = "column"
-            out.append(m)
-        return {"version": 1, "mappings": out}
+            kind = {"kind": "column"} if r.kind == "column" else {}
+            if r.kind == "fixed":
+                out.append({"from": "=" + r.text, "to": r.to})
+            elif r.text:
+                out.append(dict({"from": r.source, "to": IGNORE}, **kind))
+                out.append({"from": "=" + r.text, "to": r.to})
+            else:
+                out.append(dict({"from": r.source, "to": r.to}, **kind))
+        obj = {"version": 1, "mappings": out}
+        on_ = {k: True for k, v in self.options.items() if v}
+        if on_:
+            obj["options"] = on_
+        return obj
 
     def check(self, row: Row, to: str) -> str:
         """"" when row can go to `to`, else why not."""
-        if to == IGNORE:
+        if to == IGNORE and not (row.kind == "fixed" or row.text):
             return ""
-        if not _REF.match(to):
+        if to != IGNORE and not _REF.match(to):
             return t("Type a MARC destination as ${ref}, for example ${example}.", ref="TAG$subfield", example="590$a")
+        if row.kind == "fixed" or row.text:
+            if to == IGNORE:
+                return t("Type the field the text goes to, for example ${example}.", example="942$c")
+            if "$" not in to and to >= "010":
+                return t("A fixed text needs a subfield: ${ref}.", ref="TAG$subfield")
+            return ""
         if self.fm:
             try:
                 self.fm.Rule(row.source, to, "column" if row.kind == "column" else None)
@@ -241,27 +384,35 @@ class FieldMapScreen(ModalScreen[bool]):
             return t("A column needs a subfield: ${ref}.", ref="TAG$subfield")
         return ""
 
-    def values(self, key: tuple[str, str], record: int | None = None) -> list[str]:
-        g = self.group
-        i = g.keys.index(key)
-        r = self.record if record is None else record
-        return g.cells[r][i] if r < len(g.cells) else []
+    def keys(self) -> list[tuple[str, str]]:
+        """The grid's columns: the group's fields, then the fixed texts."""
+        return list(self.group.keys) + self.fixed
 
-    def problems(self, key: tuple[str, str]) -> int:
-        """Sample values of a column that are missing or look dirty."""
-        i = self.group.keys.index(key)
-        return sum(1 for row in self.group.cells
-                   if not row[i] or any(warnings(v, key[1]) for v in row[i]))
+    def number(self, key: tuple[str, str]) -> int:
+        """The column's place in the grid, from 1."""
+        return self.keys().index(key) + 1
+
+    def campo(self, key: tuple[str, str]) -> str:
+        """"campo 2": how the sketch names a column."""
+        return t("field ${n}", n=self.number(key))
+
+    def values(self, key: tuple[str, str], record: int | None = None) -> list[str]:
+        row = self.rows[key]
+        if row.kind == "fixed":
+            return [row.text] if row.text else []
+        g = self.group
+        r = self.record if record is None else record
+        return g.cells[r][g.keys.index(key)] if r < len(g.cells) else []
+
+    def dest_text(self, row: Row) -> str:
+        """Where a column goes, in words."""
+        if row.to == IGNORE:
+            return t("left out")
+        if row.to == KEEP:
+            return t("as the engine reads it")
+        return ref_label(row.to)
 
     # ------------------------------------------------------------ screen
-
-    def _targets(self) -> list[tuple[str, str]]:
-        opts = [(t("Keep as it is"), KEEP)]
-        for x in self.data.get("targets", []):
-            opts.append((f"{x['to']}  {t(x['label'])}", x["to"]))
-        opts.append((t("Other: type ${ref}...", ref="TAG$subfield"), OTHER))
-        opts.append((t("[Do not import this field]"), IGNORE))
-        return opts
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog fieldmap"):
@@ -272,40 +423,53 @@ class FieldMapScreen(ModalScreen[bool]):
                                  allow_blank=False, id="fm-group")
                 else:
                     yield Label(self.group.label, id="fm-group-label", markup=False)
-                yield Select([(t("Show: all"), SHOW_ALL), (t("Show: changed"), SHOW_CHANGED),
-                              (t("Show: with problems"), SHOW_PROBLEMS)],
-                             value=SHOW_ALL, allow_blank=False, id="fm-show")
                 yield Button("◀", id="fm-prev", classes="fm-step")
                 yield Label("", id="fm-example", markup=False)
                 yield Button("▶", id="fm-next", classes="fm-step")
-            grid = DataTable(id="fm-grid", cursor_type="cell", fixed_columns=1, header_height=2,
-                             zebra_stripes=True)
-            grid.border_title = t("Sample data")
-            yield grid
-            with Horizontal(id="fm-tabs"):
-                yield Button(t("Mapping"), id="fm-tab-map", classes="fm-tab -active")
-                yield Button(t("Preview"), id="fm-tab-preview", classes="fm-tab")
-            with Horizontal(id="fm-bottom"):
-                with Vertical(id="fm-left"):
+            yield DataTable(id="fm-grid", cursor_type="cell", fixed_columns=1, header_height=2, zebra_stripes=True)
+            yield Splitter(id="fm-split")
+            yield Label("", id="fm-cell", markup=False)
+            with VerticalScroll(id="fm-bottom"):
+                with Horizontal(id="fm-cards"):
                     with Vertical(id="fm-map", classes="fm-card"):
-                        with Horizontal(id="fm-edit"):
-                            yield Select(self._targets(), value=KEEP, allow_blank=False, id="fm-dest")
-                            yield Input(placeholder="590$a", id="fm-custom", max_length=6)
+                        with Horizontal(classes="fm-line"):
+                            yield Label(t("Select field"), classes="fm-key")
+                            yield Select([], allow_blank=True, id="fm-field")
+                        with Horizontal(classes="fm-line"):
+                            yield Label(t("Function"), classes="fm-key")
+                            yield Select([], allow_blank=True, id="fm-dest")
+                        with Horizontal(classes="fm-line", id="fm-inputs"):
+                            yield Label("", classes="fm-key")
+                            yield Input(placeholder="820$a", id="fm-custom", max_length=6)
+                            yield Input(placeholder=t("text for every record"), id="fm-text")
                         yield Label("", id="fm-error", classes="dialog-error", markup=False)
-                    with Vertical(id="fm-cell", classes="fm-card"):
-                        yield Static("", id="fm-inspect")
-                with Vertical(id="fm-preview-card", classes="fm-card"):
-                    yield Static("", id="fm-preview")
-                    yield Button(t("As in the file"), id="fm-before", classes="fm-step")
+                    with Vertical(id="fm-more", classes="fm-card"):
+                        yield Label(t("Want to know the fields better?"), id="fm-loc-q")
+                        with Horizontal(id="fm-loc-bar"):
+                            yield Button(t("MARC 21 (Library of Congress) ↗"), id="fm-loc", classes="fm-link")
+                            yield Button("", id="fm-loc-tag", classes="fm-link")
+                        yield Checkbox(t("Join copies of the same book"), self.options["group"], id="fm-opt-group")
+                        yield Label(t("Author + title + publisher/year, tolerant of typos; ISBN when there is one."),
+                                    classes="fm-hint")
+                        yield Checkbox(t("Fix capitals and small letters"), self.options["case"], id="fm-opt-case")
+                        yield Label(t("Only text typed all in capitals; names and acronyms stay right."),
+                                    classes="fm-hint")
+                        yield Checkbox(t("Safe spelling repair"), self.options["clean"], id="fm-opt-clean")
+                        yield Label(t("Broken accents, extra spaces, OCR slips; no word is guessed."),
+                                    classes="fm-hint")
+                        yield Static("", id="fm-opt-note")
             with Horizontal(classes="dialog-buttons", id="fm-foot"):
                 yield Label("", id="fm-count", markup=False)
+                yield Button(t("Record preview"), id="fm-show-preview")
                 yield Button(t("Reset"), id="fm-reset")
                 yield Button(t("Skip: import as it is"), id="fm-skip")
                 yield Button(t("Apply"), id="fm-apply", variant="primary")
 
     def on_mount(self) -> None:
-        self.query_one("#fm-custom", Input).display = False
+        self.query_one("#fm-map").border_title = t("Mapping")
+        self.query_one("#fm-more").border_title = t("More options")
         self._error("")
+        self.grid_height = min(len(self.group.cells) + 5, max(self.app.size.height * 2 // 5, 7))
         self._layout()
         self._fill_grid()
         self.query_one("#fm-grid", DataTable).focus()
@@ -314,137 +478,191 @@ class FieldMapScreen(ModalScreen[bool]):
         self._layout()
 
     def _layout(self) -> None:
-        """Side by side on a wide terminal; below WIDE the bottom half is
-        two tabs (Mapping, Preview), switched with p."""
-        stacked = self.app.size.width < WIDE
-        self.query_one(".fieldmap").set_class(stacked, "-stacked")
-        grid, bottom = self.query_one("#fm-grid"), self.query_one("#fm-bottom")
-        if stacked:                     # fr heights overflow a full-screen dialog here: share the rows by hand
-            room = max(self.app.size.height - 13, 10)   # borders, title, header, tabs, buttons
-            grid.styles.height = min((room + 1) // 2, len(self.group.cells) + 4)
-            bottom.styles.height = room - grid.styles.height.value
-        else:
-            grid.styles.height = bottom.styles.height = None
-        self.query_one("#fm-tabs").display = stacked
-        self.query_one("#fm-left").display = not stacked or self.pane == "map"
-        self.query_one("#fm-preview-card").display = not stacked or self.pane == "preview"
-        self.query_one("#fm-tab-map").set_class(self.pane == "map", "-active")
-        self.query_one("#fm-tab-preview").set_class(self.pane == "preview", "-active")
+        """Mapping and options side by side on a wide terminal, one under the
+        other below WIDE; the grid as tall as the splitter left it."""
+        self.query_one(".fieldmap").set_class(self.app.size.width < WIDE, "-stacked")
+        self.resize_grid(self.grid_height)
 
-    # ------------------------------------------------------------ the grid
+    def resize_grid(self, height: int) -> None:
+        most = max(self.app.size.height - 16, 6)   # title, header, splitter, a card and the buttons stay
+        self.grid_height = max(5, min(height, most, len(self.group.cells) + 5 if self.group.cells else 5))
+        self.query_one("#fm-grid").styles.height = self.grid_height
 
-    def _header(self, row: Row) -> Text:
-        head = Text(row.source[:CELL], style="bold")
-        head.append("\n")
-        if row.to == IGNORE:
-            head.append("✕ " + t("left out"), style="bold red")
-        elif row.to != row.proposal:
-            head.append(f"→ {row.to}", style="bold reverse")
-        elif row.kind == "column" and row.to == KEEP:
-            head.append("= " + t("as the engine reads it"), style="dim")
-        else:
-            head.append(f"= {row.to}", style="dim")
-        return head
-
-    @staticmethod
-    def _cell(vals: list[str], source: str) -> Text:
-        if not vals:
-            return Text("·", style="dim")
-        first = vals[0].replace("\n", " ")
-        more = f" ×{len(vals)}" if len(vals) > 1 else ""
-        room = CELL - len(more)
-        shown = first if len(first) <= room else first[:room - 1] + "…"
-        dirty = any(warnings(v, source) for v in vals)
-        cell = Text(shown, style="yellow" if dirty else "")
-        if more:
-            cell.append(more, style="dim")
-        return cell
-
-    def _visible(self) -> list[tuple[str, str]]:
-        keys = self.group.keys
-        if self.show == SHOW_CHANGED:
-            return [k for k in keys if self.rows[k].to != self.rows[k].proposal]
-        if self.show == SHOW_PROBLEMS:
-            return [k for k in keys if self.problems(k)]
-        return list(keys)
-
-    def _fill_grid(self) -> None:
-        grid = self.query_one("#fm-grid", DataTable)
-        col = grid.cursor_column
-        grid.clear(columns=True)
-        self._shown = self._visible()
-        grid.add_column(Text("#\n", style="bold"), width=3, key="#")
-        for k in self._shown:
-            grid.add_column(self._header(self.rows[k]), width=CELL, key="\t".join(k))
-        for r, row in enumerate(self.group.cells):
-            values = dict(zip(self.group.keys, row))
-            grid.add_row(Text(str(r + 1), style="bold"), *[self._cell(values[k], k[1]) for k in self._shown],
-                         key=str(r))
-        if self.field in self._shown:
-            col = self._shown.index(self.field) + 1
-        if self._shown and self.group.cells:
-            grid.move_cursor(row=min(self.record, len(self.group.cells) - 1),
-                             column=min(max(col, 1), len(self._shown)))
-        else:
-            self.field = None
-        self._sync()
-
-    def _sync(self) -> None:
-        """Everything that follows the cursor: the example, the mapping card,
-        the inspector, the preview and the counts."""
-        n = len(self.group.cells)
-        self.query_one("#fm-example", Label).update(
-            t("Example ${i} of ${n}", i=self.record + 1 if n else 0, n=n))
-        self._sync_editor()
-        self._inspect()
-        self._refresh()
-
-    def _sync_editor(self) -> None:
-        row = self.rows.get(self.field) if self.field else None
-        card = self.query_one("#fm-map")
-        card.border_title = t("Mapping of ${field}", field=row.source) if row else t("Mapping")
-        dest, custom = self.query_one("#fm-dest", Select), self.query_one("#fm-custom", Input)
-        dest.disabled = row is None
-        value = self._dest_value(row)
-        dest.value, custom.display = value, value == OTHER
-        if value == OTHER:
-            custom.value = row.to
-        self._error("")
+    def action_grow(self, step: int) -> None:
+        self.resize_grid(self.grid_height + step)
 
     def _error(self, text: str) -> None:
         box = self.query_one("#fm-error", Label)
         box.update(text)
         box.display = bool(text)
 
-    def _dest_value(self, row: Row | None) -> str:
-        """The picker's value for a column's destination."""
-        if row is None or row.to == row.proposal:
-            return KEEP
-        return row.to if row.to in {v for _, v in self._targets()} else OTHER
+    # ------------------------------------------------------------ the grid
 
-    def _inspect(self) -> None:
-        card, box = self.query_one("#fm-cell"), self.query_one("#fm-inspect", Static)
+    def _header(self, key: tuple[str, str]) -> Text:
+        row = self.rows[key]
+        head = Text(self.campo(key), style="bold")
+        if row.kind != "fixed":
+            head.append(" · " + row.source[:CELL - 10], style="bold")
+        head.append("\n")
+        if row.text:
+            head.append("✎ " + (row.to if row.to != IGNORE else "?"), style="bold reverse")
+        elif row.to == IGNORE:
+            head.append("✕ " + t("left out"), style="bold red")
+        elif row.changed:
+            head.append(f"→ {row.to}", style="bold reverse")
+        else:
+            name = marc21.label(row.to) if row.to != KEEP else ""
+            head.append("= " + (t(name) if name else self.dest_text(row)), style="dim")
+        return head
+
+    def _cell(self, key: tuple[str, str], record: int) -> Text:
+        row = self.rows[key]
+        if row.text:
+            return Text(row.text[:CELL - 1], style="italic")
+        vals = self.values(key, record)
+        if not vals:
+            return Text("·", style="dim")
+        first = vals[0].replace("\n", " ")
+        more = f" ×{len(vals)}" if len(vals) > 1 else ""
+        room = CELL - len(more)
+        shown = first if len(first) <= room else first[:room - 1] + "…"
+        dirty = any(warnings(v, row.source) for v in vals)
+        style = "strike dim" if row.to == IGNORE else ("yellow" if dirty else "")
+        cell = Text(shown, style=style)
+        if more:
+            cell.append(more, style="dim")
+        return cell
+
+    def _fill_grid(self) -> None:
+        grid = self.query_one("#fm-grid", DataTable)
+        col = grid.cursor_column
+        grid.clear(columns=True)
+        self._shown = self.keys()
+        grid.add_column(Text("#\n", style="bold"), width=3, key="#")
+        for k in self._shown:
+            grid.add_column(self._header(k), width=CELL, key="\t".join(k))
+        for r in range(len(self.group.cells)):
+            grid.add_row(Text(str(r + 1), style="bold"), *[self._cell(k, r) for k in self._shown], key=str(r))
+        if self.field in self._shown:
+            col = self._shown.index(self.field) + 1
+        if self._shown and self.group.cells:
+            grid.move_cursor(row=min(self.record, len(self.group.cells) - 1),
+                             column=min(max(col, 1), len(self._shown)))
+        if self.field not in self._shown:
+            self.field = self._shown[0] if self._shown else None
+        self._field_options()
+        self._sync()
+
+    def _field_options(self) -> None:
+        """Selecionar campo: every column of the grid, then a new fixed text."""
+        opts = []
+        for k in self._shown:
+            row = self.rows[k]
+            name = row.source if row.kind != "fixed" else t("fixed text")
+            opts.append((f"{self.campo(k)} ({name})", "\t".join(k)))
+        opts.append((t("+ New fixed text for every record"), NEW_FIXED))
+        sel = self.query_one("#fm-field", Select)
+        sel.set_options(opts)
+        if self.field:
+            sel.value = "\t".join(self.field)
+
+    def _sync(self) -> None:
+        """Everything that follows the cursor: the example, the cell line, the
+        mapping card, the LoC link and the counts."""
+        n = len(self.group.cells)
+        self.query_one("#fm-example", Label).update(
+            t("Example ${i} of ${n}", i=self.record + 1 if n else 0, n=n))
+        field = self.query_one("#fm-field", Select)
+        if self.field and field.value != "\t".join(self.field):
+            field.value = "\t".join(self.field)
+        self._sync_editor()
+        self._cell_line()
+        self._refresh()
+
+    def _dest_options(self, row: Row) -> list[tuple[str, str]]:
+        """Função for a column: keep it, a custom TAG$subfield, a fixed text,
+        leave it out, Paulo's list, then the fields of the other columns."""
+        if row.kind == "fixed":
+            opts = [(t("Custom field (type it, e.g. ${ref})", ref="820$a"), OTHER),
+                    (t("[Remove this fixed text]"), IGNORE)]
+        else:
+            what = self.dest_text(row) if row.proposal != KEEP else row.source
+            keep = f"{self.campo(row.key)} ({what}) {t('(keep)')}"
+            opts = [(keep, KEEP), (t("Custom field (type it, e.g. ${ref})", ref="820$a"), OTHER),
+                    (t("Fixed text for every record"), FIXED), (t("[Do not import this field]"), IGNORE)]
+        seen = {v for _, v in opts}
+        for x in self.data.get("targets", []):
+            if x["to"] not in seen:
+                opts.append((f"{x['to']} - {t(x['label'])}", x["to"]))
+                seen.add(x["to"])
+        for k in self.group.keys:
+            other = self.rows[k]
+            to = other.proposal
+            if k != row.key and to not in seen and _REF.match(to or ""):
+                opts.append((f"{self.campo(k)} ({ref_label(to)})", to))
+                seen.add(to)
+        return opts
+
+    def _dest_value(self, row: Row | None) -> str:
+        """The Função picker's value for a column."""
+        if row is None:
+            return KEEP
+        if row.kind == "fixed":
+            return row.to if row.to in {v for _, v in self._dest_options(row)} else OTHER
+        if row.text:
+            return FIXED
+        if row.to == row.proposal:
+            return KEEP
+        return row.to if row.to in {v for _, v in self._dest_options(row)} else OTHER
+
+    def _sync_editor(self) -> None:
+        row = self.rows.get(self.field) if self.field else None
+        card = self.query_one("#fm-map")
+        card.border_title = t("Mapping of ${field}", field=self.campo(row.key)) if row else t("Mapping")
+        dest = self.query_one("#fm-dest", Select)
+        custom, text = self.query_one("#fm-custom", Input), self.query_one("#fm-text", Input)
+        dest.disabled = row is None
+        if row is not None:
+            dest.set_options(self._dest_options(row))
+            value = self._dest_value(row)
+            dest.value = value
+            fixed = row.kind == "fixed" or value == FIXED
+            custom.display = value == OTHER or fixed
+            text.display = fixed
+            custom.value = row.to if _REF.match(row.to or "") and (value == OTHER or fixed) else ""
+            if fixed and not custom.value and _REF.match(row.proposal or ""):
+                custom.value = row.proposal
+            text.value = row.text
+        else:
+            custom.display = text.display = False
+        self.query_one("#fm-inputs").display = custom.display or text.display
+        tag = row.to if row and _REF.match(row.to or "") else (row.source if row and row.kind == "marc" else "")
+        link = self.query_one("#fm-loc-tag", Button)
+        link.display = bool(tag) and marc21.loc_url(tag) != marc21.LOC
+        link.label = t("Field ${tag} ↗", tag=tag.partition("$")[0])
+        self._error("")
+
+    def _cell_line(self) -> None:
+        box = self.query_one("#fm-cell", Label)
         if not self.field:
-            card.border_title = t("Selected value")
             box.update(t("Pick a cell of the grid."))
             return
         row = self.rows[self.field]
-        card.border_title = t("Selected value · ${field} · example ${i}", field=row.source, i=self.record + 1)
         vals = self.values(self.field)
-        text = Text()
+        head = t("${field} · example ${i}", field=self.campo(self.field), i=self.record + 1)
         if not vals:
-            text.append(t("This example does not have this field."), style="dim")
-        for v in vals:
-            text.append(v + "\n")
-            found = warnings(v, row.source)
-            facts = t("${n} character(s)", n=len(v))
-            text.append(facts, style="dim")
-            if found:
-                text.append("  ⚠ " + ", ".join(found), style="yellow")
-            text.append("\n")
-        if row.total:
-            text.append(t("In ${n} of ${k} sample records.", n=row.count, k=row.total), style="dim")
-        box.update(text)
+            box.update(Text(head + ": " + t("This example does not have this field."), style="dim"))
+            return
+        v = vals[0]
+        line = Text(head + ": ", style="bold")
+        line.append(v.replace("\n", " "))
+        line.append("  · " + t("${n} character(s)", n=len(v)), style="dim")
+        if len(vals) > 1:
+            line.append(f"  · ×{len(vals)}", style="dim")
+        found = warnings(v, row.source)
+        if found:
+            line.append("  ⚠ " + ", ".join(found), style="yellow")
+        box.update(line)
 
     def _refresh(self) -> None:
         n = self.changed()
@@ -452,62 +670,88 @@ class FieldMapScreen(ModalScreen[bool]):
         dirty = sum(1 for row in self.group.cells for vals in row for v in vals if warnings(v))
         self.query_one("#fm-count", Label).update(
             t("${n} change(s) · ${k} left out · ${w} warning(s)", n=len(n) - dropped, k=dropped, w=dirty))
-        self._draw_preview()
+        self._option_note()
 
-    def _draw_preview(self) -> None:
-        card, box = self.query_one("#fm-preview-card"), self.query_one("#fm-preview", Static)
-        n = len(self.group.cells)
-        card.border_title = t("Koha preview · example ${i} of ${n}", i=self.record + 1 if n else 0, n=n)
-        before = self.query_one("#fm-before", Button)
-        before.display = bool(self.group.records)
+    def _option_note(self) -> None:
+        """What the chosen options do to the sample."""
+        box = self.query_one("#fm-opt-note", Static)
+        if not any(self.options.values()):
+            box.update("")
+            return
+        if not self.group.records:
+            box.update(Text(t("Applied to the records built from this file when importing."), style="dim"))
+            return
+        parts = []
+        try:
+            fmap = self.fm.FieldMap.from_obj(self.mapping())
+            stats = Counter()
+            done = [fmap.apply(r, stats) for r in self.group.records]
+            if self.options["clean"]:
+                parts.append(t("${n} value(s) repaired", n=stats["cleaned"]))
+            if self.options["case"]:
+                parts.append(t("${n} value(s) recased", n=stats["recased"]))
+            if self.options["group"]:
+                pairs = sys.modules["kei_import.tidy"].group_sample(done) if "kei_import.tidy" in sys.modules else []
+                parts.append(t("${n} record(s) join another", n=len(pairs)) if pairs else
+                             t("no copies to join in the sample"))
+        except Exception:  # noqa: BLE001 - an engine without the options
+            box.update(Text(t("The preview needs the engine of this panel version; the mapping still works."),
+                            style="dim"))
+            return
+        box.update(Text(t("In the sample: ${what}.", what=" · ".join(parts)), style="dim"))
+
+    def preview_text(self) -> Text:
+        """The example as Koha will get it (▸ marks what changed)."""
         if not self.group.records:
             if self.group.gid.startswith("t"):
-                box.update(self._table_preview())
-            else:
-                box.update(t("The preview needs the engine of this panel version; the mapping still works."))
-            return
+                return self._table_preview()
+            return Text(t("The preview needs the engine of this panel version; the mapping still works."))
         src = self.group.records[min(self.record, len(self.group.records) - 1)]
         old = src.formatted().splitlines()
         if self.before:
-            card.border_title += "  ·  " + t("as in the file")
-            box.update(Text("\n".join(old)))
-            return
+            return Text("\n".join(old))
         try:
             after = self.fm.FieldMap.from_obj(self.mapping()).apply(src).formatted().splitlines()
         except self.fm.FieldMapError as e:
-            box.update(Text(str(e)))
-            return
+            return Text(str(e))
         seen = set(old)
         text = Text()
         for line in after:
             text.append(("▸ " if line not in seen else "  ") + line + "\n", style="bold" if line not in seen else "")
-        box.update(text)
+        return text
 
     def _table_preview(self) -> Text:
         """A spreadsheet row and where each value goes (the engine builds the
         record itself, with its own rules)."""
         text = Text()
-        for k in self.group.keys:
+        for k in self.keys():
             row = self.rows[k]
             vals = self.values(k)
             if not vals:
                 continue
-            to = t("left out") if row.to == IGNORE else (t("as the engine reads it") if row.to == KEEP else row.to)
-            text.append(f"{row.source[:20]:<20} → {to:<10} ", style="bold" if row.to != row.proposal else "")
+            to = self.dest_text(row).split(" - ")[0]
+            text.append(f"{row.source[:20]:<20} → {to:<10} ", style="bold" if row.changed else "")
             text.append(vals[0][:60] + "\n", style="strike dim" if row.to == IGNORE else "")
         return text
 
     # ------------------------------------------------------------ changes
 
-    def _set(self, to: str) -> None:
+    def _set(self, to: str, text: str | None = None) -> None:
         row = self.rows.get(self.field) if self.field else None
         if row is None:
             return
-        why = self.check(row, to) if to != row.proposal else ""
+        fixed = text is not None
+        why = self.check(row, to) if (to != row.proposal or fixed) else ""
+        if fixed and not text.strip() and row.kind != "fixed":
+            why = t("Type the text to write in every record.")
         self._error(why)
         if why:
             return
         row.to = to
+        if fixed:
+            row.text = text.strip()
+        elif row.kind != "fixed":
+            row.text = ""
         self._fill_grid()
 
     # ------------------------------------------------------------ events
@@ -522,44 +766,90 @@ class FieldMapScreen(ModalScreen[bool]):
 
     @on(DataTable.CellSelected, "#fm-grid")
     def _chosen(self) -> None:
-        """Enter on a cell: on to its destination."""
+        """Enter on a cell: on to its function."""
         if self.field:
-            self.pane = "map"
-            self._layout()
             self.query_one("#fm-dest", Select).focus()
 
     @on(Select.Changed, "#fm-group")
     def _group_changed(self, event: Select.Changed) -> None:
         self.group = next(g for g in self.groups if g.gid == event.value)
         self.record, self.field = 0, None
+        self.resize_grid(self.grid_height)
         self._fill_grid()
 
-    @on(Select.Changed, "#fm-show")
-    def _show_changed(self, event: Select.Changed) -> None:
-        self.show = str(event.value)
-        self._fill_grid()
+    @on(Select.Changed, "#fm-field")
+    def _field_changed(self, event: Select.Changed) -> None:
+        value = event.value
+        if not isinstance(value, str) or (self.field and value == "\t".join(self.field)):
+            return                      # the picker following the cursor
+        if value == NEW_FIXED:
+            self.field = self._new_fixed()
+            self._fill_grid()
+            self.query_one("#fm-custom", Input).focus()
+            return
+        key = tuple(str(value).split("\t", 1))
+        if key in self._shown:
+            self.field = key
+            self.query_one("#fm-grid", DataTable).move_cursor(column=self._shown.index(key) + 1)
+            self._sync()
 
     @on(Select.Changed, "#fm-dest")
     def _dest_changed(self, event: Select.Changed) -> None:
         row = self.rows.get(self.field) if self.field else None
-        if event.value == self._dest_value(row):
+        if row is None or not isinstance(event.value, str) or event.value == self._dest_value(row):
             return                      # the picker following the cursor, not a choice
-        custom = self.query_one("#fm-custom", Input)
-        if event.value == OTHER:
+        custom, text = self.query_one("#fm-custom", Input), self.query_one("#fm-text", Input)
+        if event.value in (OTHER, FIXED):
             custom.display = True
-            custom.focus()
+            text.display = event.value == FIXED or row.kind == "fixed"
+            self.query_one("#fm-inputs").display = True
+            if not custom.value and _REF.match(row.proposal or ""):
+                custom.value = row.proposal
+            (text if event.value == FIXED and custom.value else custom).focus()
             return
-        custom.display = False
-        if row is not None:
-            self._set(row.proposal if event.value == KEEP else str(event.value))
+        if row.kind == "fixed":
+            if event.value == IGNORE:
+                self._remove_fixed(row.key)
+            else:
+                self._set(str(event.value), row.text)
+            return
+        self._set(row.proposal if event.value == KEEP else str(event.value))
 
     @on(Input.Submitted, "#fm-custom")
-    def _custom_typed(self, event: Input.Submitted) -> None:
-        value = event.value.strip()
-        if value:
-            self._set(value)
-            if not str(self.query_one("#fm-error", Label).render()):
-                self.query_one("#fm-grid", DataTable).focus()
+    @on(Input.Submitted, "#fm-text")
+    def _typed(self, event: Input.Submitted) -> None:
+        row = self.rows.get(self.field) if self.field else None
+        if row is None:
+            return
+        custom = self.query_one("#fm-custom", Input).value.strip()
+        text = self.query_one("#fm-text", Input)
+        if text.display:
+            if event.input.id == "fm-custom" and not text.value.strip():
+                text.focus()
+                return
+            self._set(custom or IGNORE, text.value)
+        elif custom:
+            self._set(custom)
+        if not self.query_one("#fm-error", Label).display:
+            self.query_one("#fm-grid", DataTable).focus()
+
+    @on(Checkbox.Changed)
+    def _option(self, event: Checkbox.Changed) -> None:
+        name = (event.checkbox.id or "").removeprefix("fm-opt-")
+        if name in self.options:
+            self.options[name] = event.value
+            self._refresh()
+
+    @on(Button.Pressed, "#fm-loc")
+    def _loc(self) -> None:
+        self.app.open_url(marc21.LOC)
+
+    @on(Button.Pressed, "#fm-loc-tag")
+    def _loc_tag(self) -> None:
+        row = self.rows.get(self.field) if self.field else None
+        if row:
+            tag = row.to if _REF.match(row.to or "") else row.source
+            self.app.open_url(marc21.loc_url(tag))
 
     @on(Button.Pressed, "#fm-prev")
     def _prev(self) -> None:
@@ -578,31 +868,23 @@ class FieldMapScreen(ModalScreen[bool]):
         grid.move_cursor(row=self.record, column=max(grid.cursor_column, 1 if self._shown else 0))
         self._sync()
 
-    @on(Button.Pressed, "#fm-tab-map")
-    def _tab_map(self) -> None:
-        self.pane = "map"
-        self._layout()
-
-    @on(Button.Pressed, "#fm-tab-preview")
-    def _tab_preview(self) -> None:
-        self.pane = "preview"
-        self._layout()
-
-    def action_pane(self) -> None:
+    @on(Button.Pressed, "#fm-show-preview")
+    def action_preview(self) -> None:
         if isinstance(self.focused, Input):
             return
-        self.pane = "preview" if self.pane == "map" else "map"
-        self._layout()
-
-    @on(Button.Pressed, "#fm-before")
-    def _toggle_before(self) -> None:
-        self.before = not self.before
-        self._draw_preview()
+        self.app.push_screen(RecordPreviewScreen(self))
 
     @on(Button.Pressed, "#fm-reset")
     def _reset(self) -> None:
+        for k in self.fixed:
+            del self.rows[k]
+        self.fixed = []
         for r in self.rows.values():
-            r.to = r.proposal
+            r.to, r.text = r.proposal, ""
+        for k in self.options:
+            self.options[k] = False
+            self.query_one(f"#fm-opt-{k}", Checkbox).value = False
+        self.field = None
         self._fill_grid()
 
     @on(Button.Pressed, "#fm-skip")
@@ -611,12 +893,13 @@ class FieldMapScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#fm-apply")
     def action_apply(self) -> None:
-        if not self.changed():
+        obj = self.mapping()
+        if not obj["mappings"] and not obj.get("options"):
             self.dismiss(False)
             return
         try:
             with open(self._out, "w", encoding="utf-8") as fh:
-                json.dump(self.mapping(), fh, ensure_ascii=False, indent=1)
+                json.dump(obj, fh, ensure_ascii=False, indent=1)
                 fh.write("\n")
         except OSError as exc:
             self._error(f"{self._out}: {exc.strerror}")

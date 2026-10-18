@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.83"
+PANEL_VERSION=" 1.5.84"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -23848,6 +23848,9 @@ def _apply_fieldmap(fmap, manifest, out_dir, opts, preview, totals, log):
     defaults = {"branch": opts.branch, "itype": opts.itype}
     lines = ["== Your field mapping (Edit & Map Fields)"]
     lines += ["  %s -> %s" % (r.source, fieldmap.ref_text(r.to)) for r in fmap.rules if r.kind == "marc"]
+    lines += ["  fixed text \"%s\" -> %s" % (text, fieldmap.ref_text(to)) for text, to in fmap.fixed]
+    names = {"clean": "safe spelling repair", "case": "capitals recased", "group": "copies of the same book joined"}
+    lines += ["  option: %s" % names[k] for k in fmap.options]
     out = []
     for n, row in enumerate(manifest, 1):
         kind, fmt, enc, path = row[:4]
@@ -23866,8 +23869,13 @@ def _apply_fieldmap(fmap, manifest, out_dir, opts, preview, totals, log):
         st = fieldmap.transform(src, fmt, enc, dst, fmap, defaults)
         lines.append("%s: %d record(s); values moved: %d; left out: %d; kept in place (destination already set): %d"
                      % (row[7], st["records"], st["moved"], st["dropped"], st["conflicts"]))
+        extras = [("fixed texts written", "fixed"), ("values cleaned", "cleaned"), ("values recased", "recased"),
+                  ("records joined to another of the same book", "grouped")]
+        if any(st[k] for _, k in extras):
+            lines.append("  " + "; ".join("%s: %d" % (label, st[k]) for label, k in extras if st[k]))
         lines.extend("  " + e for e in st.get("examples", []))
         totals["items"] += st["items"] - int(row[5])
+        totals["records"] += st["records"] - st["records_read"]
         out.append(("biblio", "MARCXML", "UTF-8", dst, st["records"], st["items"]) + tuple(row[6:]))
     preview.extend(lines + [""])
     return out
@@ -24379,6 +24387,222 @@ def run(src, work, uses_file=None, threshold=THRESHOLD, out=None):
     print_report(groups, len(names), threshold, out)
     return 0 if groups else 3
 KEIPY
+    cat > "$d/kei_import/tidy.py" <<'KEIPY'
+"""Mais opções of Edit & Map Fields (docs/field-mapping.md): three opt-in
+cleanings of the records, all rule-based, so they never invent a word.
+
+  clean   safe spelling repair: double-encoded accents ("JosÃ©"), control
+          characters, repeated or edge spaces, and one OCR slip inside a word
+          (a 0 or 1 between letters: "Hist0ria", "Sa1vador")
+  case    text typed in capitals written as a catalogue writes it: names,
+          places and publishers in title case, titles, notes and subjects in
+          sentence case, keeping acronyms, Roman numerals and proper nouns
+  group   records of the same book joined into one, their items (952) kept:
+          title, author, publisher and year compared with Levenshtein
+          distance, so a missing or wrong ISBN doesn't split a work
+
+Pure standard library: the panel imports it for the live preview."""
+import re
+import unicodedata
+
+from . import rules as R
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
+_SPACES = re.compile(r"[  ]{2,}")
+_TOKEN = re.compile(r"\S+")
+_OCR = re.compile(r"(?<=[^\W\d_]{2})([01])(?=[^\W\d_]{2})")
+# Coded fields (numbers, call numbers, item data): spaces and control
+# characters only, no OCR guess.
+_CODED = {"856", "942", "952", "999"}
+
+# Fields recased when typed in capitals: tag -> {subfield: mode} ("*" = any).
+_NAMES = {"a": "title", "b": "title", "c": "title", "q": "title"}
+CASING = {"100": _NAMES, "110": _NAMES, "111": _NAMES, "600": _NAMES, "610": _NAMES, "611": _NAMES,
+          "700": _NAMES, "710": _NAMES, "711": _NAMES, "800": _NAMES, "810": _NAMES,
+          "245": {"a": "sentence", "b": "sentence", "n": "sentence", "p": "sentence", "c": "title"},
+          "246": {"a": "sentence", "b": "sentence"}, "250": {"a": "sentence"},
+          "260": {"a": "title", "b": "title"}, "264": {"a": "title", "b": "title"},
+          "490": {"a": "title"}, "830": {"a": "title"}, "651": {"*": "title"},
+          "650": {"*": "sentence"}, "655": {"*": "sentence"}}
+for _t in ("500", "502", "504", "505", "520", "521", "530", "586"):
+    CASING[_t] = {"a": "sentence"}
+_NAME_TAGS = ("100", "110", "111", "600", "610", "611", "651", "700", "710", "711")
+
+FUZZY_TITLE = 0.9   # title similarity that makes two records one work
+FUZZY_PUB = 0.8     # publisher similarity, when both have one
+# Words that don't tell publishers apart ("Editora Ática" = "Ática").
+_PUBLISHER_WORDS = {"editora", "ed", "edicoes", "livraria", "grafica", "distribuidora", "ltda", "sa", "s", "a",
+                    "cia", "companhia", "publishers", "publishing", "press", "books", "editorial", "editions", "verlag"}
+
+
+def _ocr(token):
+    """One 0 or 1 standing between letters in a word with no other digit."""
+    if sum(c.isdigit() for c in token) != 1:
+        return token
+
+    def fix(m):
+        before, after = token[m.start() - 1], token[m.end()]
+        upper = before.isupper() and after.isupper()
+        if m.group(1) == "0":
+            return "O" if upper else "o"
+        if upper:
+            return "I"
+        return "l" if before.islower() and after.islower() else "1"
+    return _OCR.sub(fix, token)
+
+
+def clean_value(value, coded=False):
+    v = R.repair_mojibake(value)
+    v = unicodedata.normalize("NFC", v)
+    v = _CONTROL.sub(" ", v)
+    v = _SPACES.sub(" ", v).strip()
+    if not coded:
+        v = _TOKEN.sub(lambda m: _ocr(m.group(0)), v)
+    return v
+
+
+def clean_record(rec, stats=None):
+    """Data fields of rec cleaned in place; counts each changed value."""
+    for f in rec.fields:
+        if f.is_control():
+            continue
+        coded = f.tag < "100" or f.tag in _CODED
+        subs = []
+        for c, v in f.subfields:
+            new = clean_value(v, coded)
+            if new != v and stats is not None:
+                stats["cleaned"] += 1
+            if new:
+                subs.append((c, new))
+        f.subfields = subs
+    rec.fields = [f for f in rec.fields if f.is_control() or f.subfields]
+    return rec
+
+
+def _proper_words(rec):
+    """Words of the record's names and places (after recasing), lower case
+    without accents: a sentence-case title keeps them capitalised."""
+    out = set()
+    for f in rec.fields:
+        if f.tag in _NAME_TAGS:
+            for _, v in f.subfields:
+                for w in R._WORD_RE.findall(v):
+                    if len(w) > 2 and w[:1].isupper() and w.lower() not in R._SMALL:
+                        out.add(R.strip_accents(w.lower()))
+    return out
+
+
+def case_record(rec, stats=None):
+    """Values typed in capitals recased in place (rules.smart_case); counts
+    each change."""
+    done = []
+    for f in rec.fields:
+        modes = CASING.get(f.tag)
+        if not modes or f.is_control():
+            continue
+        subs = []
+        for c, v in f.subfields:
+            mode = modes.get(c) or modes.get("*")
+            new = R.smart_case(v, mode) if mode else v
+            if new != v:
+                done.append((f, len(subs), mode))
+                if stats is not None:
+                    stats["recased"] += 1
+            subs.append((c, new))
+        f.subfields = subs
+    names = _proper_words(rec)
+    if names:
+        for f, i, mode in done:
+            if mode != "sentence":
+                continue
+            c, v = f.subfields[i]
+            v = R._WORD_RE.sub(lambda m: m.group(0)[:1].upper() + m.group(0)[1:]
+                               if R.strip_accents(m.group(0).lower()) in names else m.group(0), v)
+            f.subfields[i] = (c, v)
+    return rec
+
+
+# ---------------------------------------------------------------- grouping
+
+def _first(rec, tags, code):
+    for f in rec.fields:
+        if f.tag in tags and not f.is_control():
+            v = f.get(code)
+            if v:
+                return v
+    return ""
+
+
+class Work:
+    """What decides that two records are the same book."""
+    __slots__ = ("title", "author", "publisher", "year", "isbns", "numbers", "edition")
+
+    def __init__(self, rec):
+        t = rec_title = " ".join(v for f in rec.fields if f.tag == "245" for c, v in f.subfields if c in "anp")
+        self.title = R.norm_key(t)
+        name = R.norm_key(_first(rec, ("100", "110", "111", "700", "710"), "a"))
+        self.author = name.split()[0] if name else ""
+        self.publisher = " ".join(w for w in R.norm_key(_first(rec, ("260", "264"), "b")).split()
+                                  if w not in _PUBLISHER_WORDS)
+        self.year = R.year_of(_first(rec, ("260", "264"), "c")) or ""
+        self.isbns = {R.isbn13(R.isbn_clean(v)) for f in rec.fields if f.tag == "020" for c, v in f.subfields
+                      if c == "a"} - {""}
+        self.numbers = tuple(w for w in R.norm_header(rec_title).split() if w.isdigit() or R.is_roman(w))
+        self.edition = R.norm_key(_first(rec, ("250",), "a"))
+
+    @property
+    def block(self):
+        return (self.author, self.title[:4])
+
+    def same(self, other):
+        if not self.title or self.numbers != other.numbers:
+            return False
+        if self.isbns and other.isbns and not self.isbns & other.isbns:
+            return False
+        if self.edition != other.edition or (self.year and other.year and self.year != other.year):
+            return False
+        if self.publisher and other.publisher and R.similar(self.publisher, other.publisher) < FUZZY_PUB:
+            return False
+        return R.similar(self.title, other.title) >= FUZZY_TITLE
+
+
+class Grouping:
+    """Records numbered in reading order; each one either opens a work or
+    joins the first record of the same work (canon)."""
+
+    def __init__(self):
+        self.blocks = {}
+        self.canon = {}             # record number -> number of the record it joins
+
+    def add(self, n, rec):
+        w = Work(rec)
+        if not w.title:
+            return n
+        here = self.blocks.setdefault(w.block, [])
+        for m, other in here:
+            if w.same(other):
+                self.canon[n] = m
+                return m
+        here.append((n, w))
+        return n
+
+
+def absorb(into, rec):
+    """The copies (952) and the ISBNs of rec added to the record it joins."""
+    have = {v for f in into.fields if f.tag == "020" for c, v in f.subfields if c == "a"}
+    for f in rec.fields:
+        if f.tag == "952" or (f.tag == "020" and f.get("a") and f.get("a") not in have):
+            into.fields.append(f)
+    into.sort()
+
+
+def group_sample(records):
+    """[(n, m)]: record n of the sample joins record m (0-based)."""
+    g = Grouping()
+    for n, r in enumerate(records):
+        g.add(n, r)
+    return sorted(g.canon.items())
+KEIPY
     cat > "$d/kei_import/fieldmap.py" <<'KEIPY'
 """Edit & Map Fields: the operator's own field mapping, applied before Koha's
 stage_file.pl sees the records (spec: docs/field-mapping.md).
@@ -24386,25 +24610,30 @@ stage_file.pl sees the records (spec: docs/field-mapping.md).
   {"version": 1,
    "mappings": [{"from": "090$a", "to": "082$a"},
                 {"from": "Tombo", "to": "952$p", "kind": "column"},
-                {"from": "500$a", "to": "ignore"}]}
+                {"from": "500$a", "to": "ignore"},
+                {"from": "=BK", "to": "942$c"}],
+   "options": {"clean": true, "case": true, "group": true}}
 
-"from" is a MARC subfield (TAG$c), a whole MARC field (TAG) or a column
+"from" is a MARC subfield (TAG$c), a whole MARC field (TAG), a column
 header of a spreadsheet ("kind": "column"; a "from" that is not a MARC
-reference is a column too). "to" is TAG$c, TAG (only from a whole field)
-or "ignore". Whatever no rule names passes through as it is, so no mapping,
-or an empty one, is the direct import unchanged.
+reference is a column too) or, after "=", a fixed text written in every
+record. "to" is TAG$c, TAG (only from a whole field) or "ignore". The
+options are the cleanings of tidy.py ("Mais opções"), all off by default.
+Whatever no rule names passes through as it is, so no mapping, or an empty
+one, is the direct import unchanged.
 
 Pure standard library: the panel imports it as well, for the live preview."""
 import json
 import re
 from collections import Counter, OrderedDict
 
-from . import marc
+from . import marc, tidy
 
 VERSION = 1
 SAMPLE = 10         # records read from each stream to find its fields
 PREVIEW = 3         # records shown before and after the mapping
 IGNORE = "ignore"
+OPTIONS = ("clean", "case", "group")
 
 # The destinations offered first, in this order; any other TAG$c is typed.
 TARGETS = [
@@ -24477,12 +24706,21 @@ def ref_text(ref):
 
 
 class Rule:
-    __slots__ = ("source", "kind", "src", "to")
+    __slots__ = ("source", "kind", "src", "to", "text")
 
     def __init__(self, source, to, kind=None):
         self.source = (source or "").strip()
         if not self.source:
             raise FieldMapError("a mapping without \"from\"")
+        self.text = ""
+        if self.source.startswith("=") and kind != "column":
+            self.kind, self.src, self.text = "fixed", None, self.source[1:].strip()
+            self.to = parse_target(to)
+            if not self.text:
+                raise FieldMapError("a fixed text without text (write it after \"=\")")
+            if self.to == IGNORE or (self.to[1] is None and self.to[0] >= "010"):
+                raise FieldMapError("fixed text %r: the destination needs a subfield (TAG$c)" % self.text)
+            return
         self.src = parse_ref(self.source) if kind != "column" else None
         if self.src is None and kind != "column" and re.match(r"^\d{3}\$", self.source):
             raise FieldMapError("%s: not a MARC subfield (control fields 001-009 have none)" % self.source)
@@ -24498,13 +24736,17 @@ class Rule:
 
 
 class FieldMap:
-    def __init__(self, rules=()):
+    def __init__(self, rules=(), options=None):
         self.rules = list(rules)
+        self.options = {k: True for k in OPTIONS if (options or {}).get(k)}
         self.whole = {}             # tag -> tag | IGNORE
         self.subs = {}              # (tag, code) -> (tag, code) | IGNORE
         self.columns = OrderedDict()  # header -> (tag, code) | IGNORE
+        self.fixed = []             # (text, (tag, code))
         for r in self.rules:
-            if r.kind == "column":
+            if r.kind == "fixed":
+                self.fixed.append((r.text, r.to))
+            elif r.kind == "column":
                 self.columns[r.source] = r.to
             elif r.src[1] is None:
                 self.whole[r.src[0]] = r.to
@@ -24526,7 +24768,10 @@ class FieldMap:
             if not isinstance(m, dict):
                 raise FieldMapError("each mapping is an object with \"from\" and \"to\"")
             rules.append(Rule(str(m.get("from", "")), m.get("to"), m.get("kind")))
-        return cls(rules)
+        options = obj.get("options") or {}
+        if not isinstance(options, dict):
+            raise FieldMapError("\"options\" is an object, such as {\"clean\": true}")
+        return cls(rules, options)
 
     @classmethod
     def load(cls, path):
@@ -24540,13 +24785,18 @@ class FieldMap:
         return cls.from_obj(obj)
 
     def to_obj(self):
-        return {"version": VERSION, "mappings": [
+        obj = {"version": VERSION, "mappings": [
             dict({"from": r.source, "to": ref_text(r.to)}, **({"kind": "column"} if r.kind == "column" else {}))
             for r in self.rules]}
+        if self.options:
+            obj["options"] = dict(self.options)
+        return obj
 
     @property
     def marc_rules(self):
-        return bool(self.whole or self.subs)
+        """Something to do on the records themselves (every biblio stream,
+        spreadsheets' too, is rewritten): moves, fixed texts, cleanings."""
+        return bool(self.whole or self.subs or self.fixed or self.options)
 
     def __bool__(self):
         return bool(self.marc_rules or self.columns)
@@ -24580,6 +24830,15 @@ class FieldMap:
         stats = stats if stats is not None else Counter()
         if not self.marc_rules:
             return rec
+        out = self._move(rec, stats, defaults)
+        self._write_fixed(out, stats)
+        if self.options.get("clean"):
+            tidy.clean_record(out, stats)
+        if self.options.get("case"):
+            tidy.case_record(out, stats)
+        return out
+
+    def _move(self, rec, stats, defaults):
         out = marc.Record(rec.leader)
         made = []                   # (tag, [(code, value, origin field, origin code)]) in order
         for f in rec.fields:
@@ -24624,6 +24883,31 @@ class FieldMap:
         self.place(out, made, stats, defaults)
         out.sort()
         return out
+
+    def _write_fixed(self, out, stats):
+        """Fixed texts: in the field the record already has (in every copy, for
+        952), or in a new field. A subfield the record already holds is kept:
+        a fixed text fills, it never overwrites."""
+        for text, (tag, code) in self.fixed:
+            if code is None:
+                if not any(f.tag == tag for f in out.fields):
+                    out.control(tag, text)
+                    stats["fixed"] += 1
+                continue
+            fields = [f for f in out.fields if f.tag == tag]
+            if tag != "952":
+                fields = fields[:1]
+            elif not fields:
+                continue            # a fixed text doesn't make a copy
+            if not fields:
+                ind = INDICATORS.get(tag, "  ")
+                fields = [marc.Field(tag, ind[0], ind[1], [])]
+                out.fields.append(fields[0])
+            for f in fields:
+                if not f.get(code):
+                    f.subfields.append((code, text))
+                    stats["fixed"] += 1
+        out.sort()
 
     @classmethod
     def place(cls, out, made, stats=None, defaults=None):
@@ -24700,13 +24984,32 @@ def read_records(path, fmt, encoding="UTF-8", limit=None):
 
 def transform(src, fmt, encoding, dst, fmap, defaults=None):
     """Writes the mapped records of src to dst (MARCXML, UTF-8), one record in
-    memory at a time. Returns the counts for the preview."""
+    memory at a time. Returns the counts for the preview.
+
+    Grouping ("group") reads the stream three times, still one record at a
+    time: the works of every record, the copies of the records that join
+    another, then the records written with the copies they gained."""
     stats = Counter()
+    canon, extra = {}, {}
+    if fmap.options.get("group"):
+        g = tidy.Grouping()
+        for n, r in enumerate(read_records(src, fmt, encoding)):
+            g.add(n, fmap.apply(r, Counter(), defaults))
+        canon = g.canon
+        for n, r in enumerate(read_records(src, fmt, encoding)):
+            if n in canon:
+                extra.setdefault(canon[n], []).append(fmap.apply(r, Counter(), defaults))
 
     def mapped():
-        for r in read_records(src, fmt, encoding):
+        for n, r in enumerate(read_records(src, fmt, encoding)):
+            stats["records_read"] += 1
+            if n in canon:
+                stats["grouped"] += 1
+                continue
             stats["records"] += 1
             r = fmap.apply(r, stats, defaults)
+            for other in extra.pop(n, []):
+                tidy.absorb(r, other)
             if len(r.leader) >= 10:
                 r.leader = r.leader[:9] + "a" + r.leader[10:]
             stats["items"] += r.count("952")

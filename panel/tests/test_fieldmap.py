@@ -285,3 +285,124 @@ def test_table_entry_sample(engine):
     out = fieldmap.table_entry("t.csv", ["A", "B"], data, 10)
     assert out["rows_total"] == 22 and len(out["rows"]) == 10
     assert out["rows"][0] == ["a", ""] and len(out["rows"][1][1]) == 200
+
+
+# ---------------------------------------------------------------- fixed texts and Mais opções (tidy.py)
+
+def test_fixed_texts_fill_never_overwrite(engine):
+    _, F, marc = engine
+    fm = F.FieldMap.from_obj({"mappings": [{"from": "=BK", "to": "942$c"}, {"from": "=Doação", "to": "952$e"},
+                                           {"from": "=BR-SP", "to": "040$a"}, {"from": "=X", "to": "245$a"}]})
+    assert fm.marc_rules and fm.to_obj()["mappings"][0] == {"from": "=BK", "to": "942$c"}
+    r = record(marc, ("245", "10", [("a", "Emma")]), ("952", "  ", [("p", "1")]), ("952", "  ", [("p", "2"), ("e", "Compra")]))
+    out = lines(fm.apply(r))
+    assert "040    $a BR-SP" in out and "942    $c BK" in out and "245 10 $a Emma" in out
+    assert "952    $p 1 $e Doação" in out and "952    $p 2 $e Compra" in out
+    # A fixed text doesn't make a copy where there is none.
+    assert not any(x.startswith("952") for x in lines(fm.apply(record(marc, ("245", "10", [("a", "Emma")])))))
+
+
+@pytest.mark.parametrize("bad", [{"from": "=", "to": "942$c"}, {"from": "=BK", "to": "942"}, {"from": "=BK", "to": "ignore"}])
+def test_bad_fixed_texts(engine, bad):
+    _, F, _ = engine
+    with pytest.raises(F.FieldMapError):
+        F.FieldMap.from_obj({"mappings": [bad]})
+
+
+def test_options_round_trip_and_off_by_default(engine):
+    _, F, marc = engine
+    assert not F.FieldMap.from_obj({"mappings": [], "options": {"clean": False}}).marc_rules
+    fm = F.FieldMap.from_obj({"mappings": [], "options": {"clean": True, "group": 1, "other": True}})
+    assert fm.to_obj() == {"version": 1, "mappings": [], "options": {"clean": True, "group": True}}
+    with pytest.raises(F.FieldMapError):
+        F.FieldMap.from_obj({"mappings": [], "options": ["clean"]})
+
+
+def test_safe_cleaning(engine):
+    d, F, marc = engine
+    tidy = sys.modules["kei_import.tidy"]
+    assert tidy.clean_value("  JosÃ© de  Alencar ") == "José de Alencar"
+    assert tidy.clean_value("Hist0ria do Brasi1") == "Historia do Brasi1"     # 1 at the end of a word: left alone
+    assert tidy.clean_value("Sa1vador") == "Salvador" and tidy.clean_value("HIST0RIA") == "HISTORIA"
+    assert tidy.clean_value("B869.3") == "B869.3" and tidy.clean_value("v.10") == "v.10" and tidy.clean_value("MP3s") == "MP3s"
+    assert tidy.clean_value("São Paulo :") == "São Paulo :"                    # ISBD spacing kept
+    assert tidy.clean_value("A0B0C", coded=True) == "A0B0C"
+    fm = F.FieldMap.from_obj({"mappings": [], "options": {"clean": True}})
+    r = record(marc, ("245", "10", [("a", "Mem\x07orias  ")]), ("952", "  ", [("p", "AB01CD")]))
+    out = lines(fm.apply(r))
+    assert "245 10 $a Mem orias" in out and "952    $p AB01CD" in out
+    assert lines(r)[0] == "245 10 $a Mem\x07orias  "                          # the record itself untouched
+
+
+def test_case_normalisation(engine):
+    _, F, marc = engine
+    fm = F.FieldMap.from_obj({"mappings": [], "options": {"case": True}})
+    r = record(marc, ("100", "1 ", [("a", "ASSIS, MACHADO DE")]),
+               ("245", "10", [("a", "MEMORIAS POSTUMAS DE BRAS CUBAS E MACHADO :"), ("b", "ROMANCE DO SECULO XIX /"),
+                              ("c", "MACHADO DE ASSIS")]),
+               ("260", "  ", [("a", "SAO PAULO :"), ("b", "EDITORA ATICA,")]),
+               ("650", " 4", [("a", "LITERATURA BRASILEIRA"), ("x", "HISTORIA E CRITICA")]),
+               ("020", "  ", [("a", "ISBN 85-08")]), ("500", "  ", [("a", "Already fine.")]))
+    stats = Counter()
+    out = lines(fm.apply(r, stats))
+    assert "100 1  $a Assis, Machado de" in out
+    assert "245 10 $a Memorias postumas de bras cubas e Machado : $b Romance do seculo XIX / $c Machado de Assis" in out
+    assert "260    $a Sao Paulo : $b Editora Atica," in out
+    assert "650  4 $a Literatura brasileira $x Historia e critica" in out
+    assert "020    $a ISBN 85-08" in out and "500    $a Already fine." in out and stats["recased"] == 8
+
+
+def test_grouping_joins_copies(engine, tmp_path):
+    _, F, marc = engine
+    tidy = sys.modules["kei_import.tidy"]
+
+    def book(title, author, pub, year, barcode, isbn=None, ed=None):
+        fields = [("100", "1 ", [("a", author)]), ("245", "10", [("a", title)]),
+                  ("260", "  ", [("b", pub), ("c", year)]), ("952", "  ", [("p", barcode)])]
+        if isbn:
+            fields.append(("020", "  ", [("a", isbn)]))
+        if ed:
+            fields.append(("250", "  ", [("a", ed)]))
+        return record(marc, *fields)
+    recs = [book("Dom Casmurro", "Assis, Machado de", "Ática", "1995", "T-1", "8508048270"),
+            book("Dom Casmuro", "ASSIS, Machado", "Atica", "1995", "T-2"),                  # typo, no ISBN: joins
+            book("O Dom Casmurro.", "Assis, M.", "Editora Ática", "1995", "T-3", "978-85-08-04827-4"),
+            book("Dom Casmurro", "Assis, Machado de", "Ática", "2001", "T-4"),             # another year
+            book("Dom Casmurro v. 2", "Assis, Machado de", "Ática", "1995", "T-5"),        # another volume
+            book("Dom Casmurro", "Assis, Machado de", "Ática", "1995", "T-6", "9788535902778"),  # another ISBN
+            book("Dom Casmurro", "Assis, Machado de", "Ática", "1995", "T-7", ed="2. ed.")]
+    assert tidy.group_sample(recs) == [(1, 0), (2, 0)]
+    src, dst = tmp_path / "in.xml", tmp_path / "out.xml"
+    marc.write_marcxml(recs, str(src))
+    fm = F.FieldMap.from_obj({"mappings": [], "options": {"group": True}})
+    st = F.transform(str(src), "MARCXML", "UTF-8", str(dst), fm)
+    out = read_out(dst)
+    assert st["records"] == 5 and st["grouped"] == 2 and st["records_read"] == 7 and st["items"] == 7
+    first = out[0]
+    assert sorted(dict(s)["p"] for t, s in first if t == "952") == ["T-1", "T-2", "T-3"]
+    assert [s for t, s in first if t == "020"] == [[("a", "8508048270")], [("a", "978-85-08-04827-4")]]
+
+
+def test_build_with_options_and_fixed_text(engine, tmp_path):
+    d, _, marc = engine
+    src = tmp_path / "isis.xml"
+    recs = []
+    for i, title in enumerate(["DOM CASMURRO", "DOM CASMURO", "IRACEMA"], 1):
+        recs.append(record(marc, ("100", "1 ", [("a", "ASSIS, MACHADO DE" if i < 3 else "ALENCAR, JOSE DE")]),
+                           ("245", "10", [("a", title)]), ("952", "  ", [("p", "T-%d" % i)])))
+    marc.write_marcxml(recs, str(src))
+    fm = tmp_path / "map.json"
+    fm.write_text(json.dumps({"mappings": [{"from": "=BK", "to": "942$c"}],
+                              "options": {"group": True, "case": True, "clean": True}}))
+    work = tmp_path / "work"
+    work.mkdir()
+    p = run(d, "build", "--in", str(src), "--work", str(work), "--branch", "CPL", "--itype", "BK", "--fieldmap", str(fm))
+    assert p.returncode == 0, p.stdout + p.stderr
+    preview = (work / "out" / "preview.txt").read_text(encoding="utf-8")
+    assert 'fixed text "BK" -> 942$c' in preview and "copies of the same book joined" in preview
+    assert "records joined to another of the same book: 1" in preview and "Books: 2 record(s), 3 item(s)" in preview
+    ((kind, fmt, enc, path, n, items, *_),) = manifest(work)
+    assert (fmt, n, items) == ("MARCXML", "2", "3")
+    out = read_out(path)
+    assert ("245", [("a", "Dom casmurro")]) in out[0] and ("942", [("c", "BK")]) in out[0]
+    assert sorted(dict(s)["p"] for t, s in out[0] if t == "952") == ["T-1", "T-2"]
