@@ -74,6 +74,7 @@ SQL
     chmod +x "$W/enrich/.venv/bin/python"
     ln -s "$KEI_REPO/enrichment/nexus_jobs" "$W/enrich/nexus_jobs"
     ln -s "$KEI_REPO/enrichment/nexus_ondemand" "$W/enrich/nexus_ondemand"
+    sed -n 's/^PANEL_VERSION=" *\([^"]*\)"/\1/p' "$KEI_REPO/installer" > "$W/enrich/.version"
     cp "$KEI_REPO/panel/kei_panel/data/z3950_direct.json" "$W/enrich/z3950_direct.json"
     cat > "$W/extra.sh" <<SH
 SYS_LANG=en
@@ -300,4 +301,20 @@ jshow() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show "$1
     echo "enrich_install() { echo enrich_install >> \"$W/calls\"; }" >> "$W/extra-ready.sh"
     run env KEI_EXTRA="$W/extra-ready.sh" bash "$PANEL" enrich_od_ready
     grep -q "^enrich_install$" "$W/calls"
+}
+
+@test "a panel update reinstalls the engine copied for an older version" {
+    echo "enrich_install() { echo enrich_install >> \"$W/calls\"; }" >> "$W/extra.sh"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_ready
+    ! grep -q "^enrich_install$" "$W/calls" 2>/dev/null
+    echo "1.5.90" > "$W/enrich/.version"
+    grep -v '^enrich_od_ready()' "$W/extra.sh" > "$W/extra-ready.sh"
+    run env KEI_EXTRA="$W/extra-ready.sh" bash "$PANEL" enrich_od_ready
+    grep -q "^enrich_install$" "$W/calls"
+    : > "$W/calls"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" enrich_ready
+    grep -q "^enrich_install$" "$W/calls"
+    # The install stamps the version and restarts the units on their last record.
+    grep -q 'printf .%s\\n. "${PANEL_VERSION// /}" > "$ENRICH_DIR/.version"' "$KEI_REPO/installer"
+    grep -q 'systemctl try-restart "$ENRICH_WORKER_UNIT" "$ENRICH_ONDEMAND_UNIT"' "$KEI_REPO/installer"
 }
