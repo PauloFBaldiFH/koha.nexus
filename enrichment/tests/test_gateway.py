@@ -362,7 +362,7 @@ def test_koha_sql():
     sql = koha_sql.render(table)
     assert sql.count("INSERT INTO z3950servers") == len(table) + 2       # sru/_union and sru/_union-aut
     assert "'sru/_union', 'KOHA.NEXUS (TODOS OS CATÁLOGOS)', 1, 0" in sql
-    assert "SET checked = IF(db = 'sru/_union', 1, 0)" in sql
+    assert "SET checked = IF(db IN ('sru/_union', 'sru/all'), 1, 0)" in sql      # Rede Pergamum ticked too
     # Koha's rows are on the Cloudflare tunnel; after step 1 nothing points at the local gateway.
     assert "host = 'https://sru.koha.nexus' AND port = 443" in sql
     assert "host = '127.0.0.1'" not in sql.split("-- 2.")[1].split("-- 6.")[0]
@@ -384,7 +384,12 @@ def test_panel_list_is_generated_from_targets_json():
     assert koha_sql.panel_list(load(TARGETS)) == current
     data = json.loads(current)
     rows = data["targets"]
-    # First the direct Z39.50 servers (the primary targets), straight to the libraries.
+    # First the koha.nexus servers: the shared catalogue and Rede Pergamum on the gateway, preselected.
+    assert [(t["host"], t["db"], t["region"], t["rank"], t["preselect"]) for t in rows[:2]] == [
+        ("catalog.koha.nexus", "sru", "koha_nexus", 1, True), ("sru.koha.nexus", "sru/all", "koha_nexus", 2, True)]
+    assert rows[0]["name"] == "Rede koha.nexus (Catalogação Compartilhada)"
+    rows = rows[2:]
+    # Then the direct Z39.50 servers (the primary targets), straight to the libraries.
     direct = [t for t in rows if t["source"] == koha_sql.DIRECT_SOURCE]
     direct_biblio = [t for t in direct if t.get("recordtype") != "authority"]
     assert rows[:len(direct_biblio)] == direct_biblio and len(direct) - len(direct_biblio) == 16

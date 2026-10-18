@@ -35,29 +35,29 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             curated = z3950.load_curated()
             regions = {t.region for t in curated}
             assert table.row_count == len(curated) + len(regions) and "other" not in regions
-            assert table.get_row("region:brazil")[1] == "[b]\\[1] Brazil[/b]"
+            assert table.get_row("region:brazil")[1] == "[b]\\[2] Brazil[/b]"
             assert table.get_row("region:sru_specialized")[1] == \
-                "[b]\\[11] SRU fallback: specialized and union catalogues[/b]"
+                "[b]\\[12] SRU fallback: specialized and union catalogues[/b]"
             utfpr = next(t for t in curated if t.db == "biblioteca")
             assert table.get_row(utfpr.key)[1] == "BR UTFPR (Universidade Tecnológica Federal do Paraná)"
             # Koha's own list was read: its LoC row (https://sru.koha.nexus:443) is marked.
             loc = next(t for t in curated if t.db == "sru/loc")
             await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
 
-            # Four direct Brazilian servers and the Library of Congress come ticked; untick them before the groups.
+            # The koha.nexus servers, three direct Brazilian servers and the Library of Congress come ticked; untick them before the groups.
             ticked = {t.key for t in curated if t.preselect}
-            assert view.selected == ticked and len(ticked) == 4
+            assert view.selected == ticked and len(ticked) == 6
             for key in ticked:
                 view.toggle(key)
             assert view.selected == set()
 
             # A group ticks all of it; space on a server unticks one.
-            view.toggle("region:sru_specialized")
-            group = [t for t in curated if t.region == "sru_specialized"]
+            view.toggle("region:sru_national")
+            group = [t for t in curated if t.region == "sru_national"]
             assert view.selected == {t.key for t in group}
             view.toggle(group[0].key)
             assert len(view.selected) == len(group) - 1
-            view.toggle("region:sru_specialized")
+            view.toggle("region:sru_national")
             assert len(view.selected) == len(group)
 
             view.scan()
@@ -66,7 +66,7 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
             history = json.loads((tmp_path / z3950.HISTORY_FILE).read_text())
             assert set(history) - {z3950.RULES_KEY} == {t.key for t in group}
-            rede = next(t for t in group if t.db == "sru/all")
+            rede = next(t for t in group if t.db == "sru/bn")
             assert history[rede.key]["status"] == "ok"
             assert "Working" in table.get_row(rede.key)[2] and table.get_row(rede.key)[3]
 
@@ -80,7 +80,7 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             view.toggle_hidden()
 
             # A login: typed in the panel, kept privately, never shown.
-            bl = next(t for t in group if t.db == "sru/nlm")
+            bl = next(t for t in group if t.db == "sru/bl")
             table.move_cursor(row=table.get_row_index(bl.key))
             view.login()
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))
@@ -108,7 +108,7 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             preview = app.screen._preview
             # The gateway rows keep their fallback rank, after every direct server.
             assert int(preview.splitlines()[0].split(".")[0]) >= 500 and "s3cret-pw" not in preview
-            await pilot.click("#yes")
+            await _press(pilot, app, "yes")
             await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
             assert "added to Koha: 2" in app.screen._body
             assert not seen["path"].exists()                     # the list with the login is gone

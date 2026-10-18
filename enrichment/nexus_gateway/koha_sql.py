@@ -19,8 +19,10 @@ librarian's other servers are never changed:
   3. ids no longer served are removed;
   4. each target's name and settings are refreshed (rank kept), and a
      missing one is added;
-  5. sru/_union is the only ticked row of the gateway: it searches every
-     catalogue at once, and Koha waits for the slowest ticked row;
+  5. sru/_union and sru/all (Rede Pergamum, served by the gateway on
+     Paulo's server) are the gateway's only ticked rows: sru/_union
+     searches every catalogue at once, and Koha waits for the slowest
+     ticked row;
   6. the authority row sru/_union-aut (record type authority) for Koha's
      authority search in cataloguing: moved from an older address, added
      ticked, then refreshed, its tick and rank left to the librarian.
@@ -59,6 +61,16 @@ SRU_OPTIONS = "sru=get,sru_version=1.1"
 SRU_FIELDS = ("title=dc.title,isbn=dc.isbn,author=dc.creator,issn=dc.issn,subject=dc.subject,"
               "srchany=cql.serverChoice")
 UNION_NAME = "KOHA.NEXUS (TODOS OS CATÁLOGOS)"
+# Gateway ids that are primary targets, not fallback: Rede Pergamum, which
+# the gateway on Paulo's server answers (Paulo, 2026-10-18). Ticked in Koha
+# and preselected in the panel, in the "koha.nexus" heading.
+PRIMARY_IDS = ("all",)
+# The koha.nexus Catalog Network, the shared catalogue (catalog-network/),
+# behind its own tunnel hostname; the installer's catalog-network task puts
+# it in Koha.
+CATALOG_HOST = "catalog.koha.nexus"
+CATALOG_DB = "sru"
+CATALOG_NAME = "Rede koha.nexus (Catalogação Compartilhada)"
 # Koha's authority search form (cataloguing) through the row's SRU search
 # fields; authorities.py reads these indexes.
 AUTH_SRU_FIELDS = ("nameany=bath.name,authorany=bath.name,authorpersonal=bath.personalName,"
@@ -147,8 +159,9 @@ def render(table: dict[str, Target], host: str = KOHA_HOST, port: int = GATEWAY_
             group = t.group
             out += ["", f"-- [{list(GROUPS).index(group) + 1}] {GROUPS[group]}"]
         out += _upsert(mine, host, port, "sru/" + t.id, t.name, 0, rank)
-    out += ["", "-- 5. sru/_union is the gateway's only ticked row.",
-            f"UPDATE z3950servers SET checked = IF(db = {q('sru/' + UNION)}, 1, 0) WHERE {mine} AND db LIKE 'sru/%';",
+    ticked = ", ".join(q("sru/" + i) for i in (UNION, *PRIMARY_IDS))
+    out += ["", "-- 5. sru/_union and the primary catalogues (Rede Pergamum) are the gateway's only ticked rows.",
+            f"UPDATE z3950servers SET checked = IF(db IN ({ticked}), 1, 0) WHERE {mine} AND db LIKE 'sru/%';",
             "", "-- 6. Authority headings, for Koha's authority search in cataloguing (one row)."]
     auth = f"recordtype = 'authority' AND servertype = 'sru' AND host = {q(host)} AND port = {port}"
     out += [f"UPDATE z3950servers SET host = {q(host)}, port = {port}"
@@ -211,16 +224,36 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
     rows, covered = _direct_rows(Path(direct) if direct else DIRECT_LIST)
     rank = iter(range(FALLBACK_RANK, 10000))
 
-    def row(db: str, name: str, region: str, verified: bool, notes: str, country: str = "") -> dict:
+    def row(db: str, name: str, region: str, verified: bool, notes: str, country: str = "",
+            at: int = 0) -> dict:
         return {"name": name, "host": host, "port": port, "db": db, "kind": "sru", "syntax": SYNTAX,
                 "encoding": ENCODING, "schema": "marcxml", "sru_fields": SRU_FIELDS, "sru_options": SRU_OPTIONS,
-                "timeout": TIMEOUT, "rank": next(rank), "region": region, "country": country,
+                "timeout": TIMEOUT, "rank": at or next(rank), "region": region, "country": country,
                 "flag": flag(country), "priority": "fallback", "preselect": False, "verified": verified,
                 "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)", "notes": notes}
 
+    # The koha.nexus servers, first and preselected: the shared catalogue
+    # and the gateway's primary catalogues (Rede Pergamum).
+    own = [{"name": CATALOG_NAME, "host": CATALOG_HOST, "port": port, "db": CATALOG_DB, "kind": "sru",
+            "syntax": SYNTAX, "encoding": ENCODING, "schema": "marcxml", "sru_fields": SRU_FIELDS,
+            "sru_options": SRU_OPTIONS, "timeout": TIMEOUT, "rank": 1, "region": "koha_nexus", "country": "BR",
+            "flag": flag("BR"), "priority": "primary", "preselect": True, "verified": True,
+            "source": "koha.nexus Catalog Network (catalog-network/)",
+            "notes": ("The shared catalogue of the koha.nexus libraries (catalog.koha.nexus). The panel's "
+                      "Community network switch adds or removes the same row.")}]
+    for i in PRIMARY_IDS:
+        if i in table:
+            t = table[i]
+            r = row("sru/" + i, t.name, "koha_nexus", True,
+                    "On the koha.nexus gateway (sru.koha.nexus)." + (f" {t.note}" if t.note else ""), t.country,
+                    len(own) + 1)
+            r.update(priority="primary", preselect=True)
+            own.append(r)
     fallback = [row("sru/" + UNION, UNION_NAME, "sru_national", True,
                     "Fallback: every gateway catalogue at once (static.db, then the Z39.50/SRU catalogues live).")]
     for t in table.values():
+        if t.id in PRIMARY_IDS:
+            continue
         how = ("static.db, then live " + t.kind.upper()) if t.live else "static.db only"
         cover = f" Fallback: the direct Z39.50 row {covered[t.id]} covers this library." if t.id in covered else ""
         fallback.append(row("sru/" + t.id, t.name, "sru_" + t.group, t.status == "verified",
@@ -239,11 +272,13 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
     biblio = [r for r in rows if r.get("recordtype") != "authority"]
     direct_auth = [r for r in rows if r.get("recordtype") == "authority"]
     data = {"schema": 1, "updated": updated or old.get("updated", ""),
-            "about": ("koha.nexus panel targets, generated by python -m nexus_gateway panel-list. First the direct "
+            "about": ("koha.nexus panel targets, generated by python -m nexus_gateway panel-list. First the "
+                      "koha.nexus servers (the shared catalogue catalog.koha.nexus and Rede Pergamum on the "
+                      "gateway), preselected; then the direct "
                       "Z39.50 servers of panel/kei_panel/data/z3950_direct.json, the primary targets, by region; "
                       "then the authority files (recordtype authority) for Koha's authority search; last the "
                       "fallback, the koha.nexus gateway behind the Cloudflare tunnel (sru.koha.nexus:443/sru/<id>, from "
                       "enrichment/nexus_gateway/targets.json), for libraries and regions no direct server covers: "
                       "never preselected and ranked after every direct server."),
-            "targets": biblio + authorities + direct_auth + [own_auth] + fallback}
+            "targets": own + biblio + authorities + direct_auth + [own_auth] + fallback}
     return json.dumps(data, ensure_ascii=False, indent=1) + "\n"

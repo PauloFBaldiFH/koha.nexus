@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.87",
+ "panel_version": "1.5.88",
  "languages": [
   {
    "code": "en",
@@ -2144,6 +2144,18 @@
      ],
      "rows": [
       [
+       "Rede koha.nexus (Catalogação Compartilhada)",
+       "In Koha",
+       "SRU · MARC21",
+       "catalog.koha.nexus:443/sru"
+      ],
+      [
+       "Rede Pergamum",
+       "In Koha",
+       "SRU · MARC21",
+       "sru.koha.nexus:443/sru/all"
+      ],
+      [
        "UTFPR (Universidade Tecnológica Federal do Paraná)",
        "In Koha",
        "Z39.50 · USMARC",
@@ -2166,18 +2178,6 @@
        "Not scanned yet",
        "Z39.50 · USMARC",
        "unesp.alma.exlibrisgroup.com:1921/55UNESP_INST"
-      ],
-      [
-       "USP (Universidade de São Paulo) — Alma",
-       "Not scanned yet",
-       "Z39.50 · USMARC",
-       "na01.alma.exlibrisgroup.com:1921/55USP_INST"
-      ],
-      [
-       "FGV (Fundação Getulio Vargas)",
-       "Not scanned yet",
-       "Z39.50 · USMARC",
-       "na01.alma.exlibrisgroup.com:1921/55FGV_INST"
       ]
      ]
     }
@@ -2235,7 +2235,7 @@
      "rows": [
       [
        "Rede Pergamum",
-       "Not scanned yet",
+       "In Koha",
        "SRU · MARC21",
        "sru.koha.nexus:443/sru/all"
       ]
