@@ -2,8 +2,8 @@
 koha-nexus-ondemand service (enrichment/nexus_ondemand, installer section
 "On-demand enrichment").
 
-The same jobs screen as "Enrich bibliographic catalog" (views/enrich.py),
-for on-demand jobs only, searched now over direct Z39.50 servers (never the
+The jobs screen of the retired batch "Enrich bibliographic catalog"
+(views/enrich.py, no longer opened from the menus), for on-demand jobs only, searched now over direct Z39.50 servers (never the
 koha.nexus gateways):
 - all the records, or any biblionumbers (`enrich-od-add SCOPE`: a large
   job runs for hours in the background, record after record, and goes on

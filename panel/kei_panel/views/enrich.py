@@ -1,6 +1,11 @@
 """EnrichView: "Enrich bibliographic catalog", the panel side of the
 enrichment jobs (enrichment/nexus_jobs, installer section "Enrichment jobs").
 
+Retired from the menus in 1.5.94: On-demand enrichment (views/ondemand.py,
+a subclass of this view) is the one bibliographic enrichment screen. This
+view stays registered (VIEWS["enrich"]) and its tasks stay in the
+installer, but no key, card or sidebar row opens it.
+
 Top, a new job: the scope ("all", or biblionumbers such as 101, 102,
 500-550) goes to `config.sh --task enrich-job-add`, which exports the
 records at low priority and starts the worker. Then the worker's state

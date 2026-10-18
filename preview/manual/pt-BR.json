@@ -2264,7 +2264,6 @@
     "Aplicar altera o catálogo e acrescenta registros de autoridade. Sempre pergunta antes e faz um backup de segurança, e Reverter desfaz, mas leia o relatório antes de pressionar."
    ],
    "related": [
-    "sec-enrich",
     "authority-sync",
     "authority-match"
    ]
@@ -2273,7 +2272,7 @@
    "summary": "Pesquisa catálogos públicos só por conexões Z39.50 diretas, para os seus registros (todos, ou os que você listar) ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
    "overview": [
     "Só os servidores Z39.50 diretos da lista do painel são consultados, nunca os gateways do koha.nexus (sru.koha.nexus, catalog.koha.nexus). Os servidores vão em pequenas levas, no máximo dois da mesma instituição por vez, e os limites de cada servidor são respeitados; um servidor que falha seguidamente é pausado e aparece na tela Z39.50.",
-    "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro exatamente como em **Enriquecer catálogo bibliográfico**, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
+    "Um registro é procurado primeiro pelo ISBN, depois por título, autor e ano. O que os servidores devolvem é comparado com o seu registro pelas mesmas regras que o antigo enriquecimento em lote usava, e a base de enriquecimento do koha.nexus é usada depois deles quando nada serve.",
     "**Aplicar** salva uma cópia desses registros como estão no Koha quando o trabalho tem até 50 registros, e um backup completo verificado quando tem mais; depois grava os campos pela importação preparada do Koha. **Reverter** devolve aos registros a versão anterior.",
     "Para um livro digitado, aparece o melhor registro de cada servidor. **Importar como registro novo** o acrescenta ao catálogo pela importação preparada do Koha, sem os campos locais da outra biblioteca (9XX) e com um 883 dizendo de onde veio; se o Koha já tem um registro com esse ISBN, nada é acrescentado."
    ],
@@ -2286,14 +2285,13 @@
    ],
    "tips": [
     "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-    "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
+    "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado.",
     "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
    ],
    "warnings": [
     "Aplicar e Importar alteram o catálogo. Os dois perguntam antes; Reverter e Desfazer uma importação MARC os desfazem."
    ],
    "related": [
-    "sec-enrich",
     "sec-z3950",
     "marc-undo"
    ]

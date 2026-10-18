@@ -2659,7 +2659,6 @@
     "Apply changes the catalogue and adds authority records. It always asks first and makes a safety backup, and Revert undoes it, but read the report before you press it."
    ],
    "related": [
-    "sec-enrich",
     "authority-sync",
     "authority-match"
    ]
@@ -2668,7 +2667,7 @@
    "summary": "Searches public catalogues over direct Z39.50 connections only, for your records (all of them, or any you list) or for a book you type, with the same staged report as the background jobs and an import as a new record for a typed book.",
    "overview": [
     "Only the direct Z39.50 servers of the panel's list are asked, never the koha.nexus gateways (sru.koha.nexus, catalog.koha.nexus). The servers go in small waves, at most two of one institution at a time, and each server's limits are kept; a server that keeps failing is paused and shown in the Z39.50 screen.",
-    "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record exactly as in **Enrich bibliographic catalog**, and the koha.nexus enrichment database is used after them when nothing fits.",
+    "A record is searched by its ISBN first, then by title, author and year. What the servers return is compared with your record by the same rules the earlier batch enrichment used, and the koha.nexus enrichment database is used after them when nothing fits.",
     "**Apply** saves a copy of those records as Koha has them when the job has 50 records or fewer, and a verified full backup when it has more; then it writes the fields through Koha's staged import. **Revert** gives the records their previous version back.",
     "For a typed book, the best record of each server is listed. **Import as new record** adds it to the catalogue through Koha's staged import, without the other library's local fields (9XX) and with an 883 saying where it came from; when Koha already has a record with that ISBN, nothing is added."
    ],
@@ -2681,14 +2680,13 @@
    ],
    "tips": [
     "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
-    "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
+    "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on.",
     "An imported record is taken out again with **Undo a MARC import** (Library tools)."
    ],
    "warnings": [
     "Apply and Import change the catalogue. Both ask first; Revert and Undo a MARC import undo them."
    ],
    "related": [
-    "sec-enrich",
     "sec-z3950",
     "marc-undo"
    ]

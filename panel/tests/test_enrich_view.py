@@ -42,7 +42,8 @@ def test_jobs_report_diff_apply_and_revert():
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 60)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("e")
+            app.screen.action_show("enrich")              # retired from the menus: opened directly
+            await pilot.pause(0.2)
             view = app.screen.query_one("#view-enrich")
             jobs = view.query_one("#e-table", DataTable)
             await _until(pilot, lambda: jobs.row_count == 2)
