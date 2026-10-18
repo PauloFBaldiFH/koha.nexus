@@ -6,6 +6,9 @@
                                  after the direct servers (default 0, off)
     KEI_ONDEMAND_STATIC          0: do not fall back on the local static.db
                                  (default 1, on; a file read, no network)
+
+The service's own (service.Settings.from_env):
+    KEI_ONDEMAND_PARALLEL        records searched at once, 1 to 8 (default 4)
 """
 
 from __future__ import annotations

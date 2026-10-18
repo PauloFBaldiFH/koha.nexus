@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.92",
+ "panel_version": "1.5.93",
  "languages": [
   {
    "code": "en",
@@ -14951,7 +14951,7 @@
     ],
     "tips": [
      "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
-     "A large job (the whole catalogue) takes hours, one record after another; leave the computer on. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
+     "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on. **Enrich bibliographic catalog** is the faster choice when the enrichment database is enough: it asks no server.",
      "An imported record is taken out again with **Undo a MARC import** (Library tools)."
     ],
     "warnings": [
@@ -14980,7 +14980,7 @@
     ],
     "tips": [
      "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-     "Um trabalho grande (o catálogo inteiro) leva horas, um registro depois do outro; deixe o computador ligado. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
+     "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado. **Enriquecer catálogo bibliográfico** é a opção mais rápida quando a base de enriquecimento basta: ele não consulta nenhum servidor.",
      "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
     ],
     "warnings": [

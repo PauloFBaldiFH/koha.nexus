@@ -10,7 +10,9 @@ koha.nexus gateways):
   after a restart), or a book typed by ISBN,
   title, author and year (`enrich-od-add --isbn X --title T ...`);
 - while the service searches, each server it asks for the current record,
-  with its state and time (`enrich-od-status`), refreshed every few seconds;
+  with its state and time (`enrich-od-status`), refreshed every few seconds,
+  how many records it searches at once, its speed and the time left, and
+  a note while it waits for the internet to come back;
 - the staged report, changes, diff, Apply and Revert of the batch screen
   (Apply saves a copy of those records instead of a full backup);
 - "Search more servers" (`enrich-od-more`: a new round, the servers already
@@ -50,6 +52,25 @@ def group_label(group: str) -> str:
         "300": t("Physical description (300)"),
         "024": t("Other identifiers (024)"),
     }.get(group, group)
+
+
+def eta_text(seconds) -> str:
+    """Seconds left, for the person: "3 h 20 min", "12 min"."""
+    s = int(seconds or 0)
+    h, m = s // 3600, (s % 3600) // 60
+    return t("${h} h ${m} min", h=h, m=m) if h else t("${m} min", m=max(1, m))
+
+
+def speed_text(w: dict) -> str:
+    """Records at once, per hour and time left, from the service's status."""
+    parts = []
+    if int(w.get("inflight") or 0) > 1:
+        parts.append(t("${n} records at once", n=int(w["inflight"])))
+    if w.get("per_hour"):
+        parts.append(t("${n} per hour", n=int(w["per_hour"])))
+    if w.get("eta_s"):
+        parts.append(t("about ${time} left", time=eta_text(w["eta_s"])))
+    return " · ".join(parts)
 
 
 def server_state(state: str) -> str:
@@ -218,11 +239,15 @@ class OnDemandView(EnrichView):
         if w.get("state") == "matching" and w.get("paused"):
             label.update(t("◐ Paused at record ${n} of ${total}: Resume goes on.", n=int(w.get("done") or 0),
                            total=w.get("total", 0)))
+        elif w.get("state") == "matching" and w.get("outage"):
+            label.update(t("◌ No internet connection: the job waits and asks again at ${time}.", time=w["outage"]))
         elif w.get("state") == "matching":
             rec = w.get("record") or {}
-            label.update(t("● Job ${job}, round ${round}: record ${n} of ${total}: ${title}", job=w.get("job", "?"),
-                           round=w.get("round", 1), n=min(int(w.get("done") or 0) + 1, int(w.get("total") or 1)),
-                           total=w.get("total", 0), title=rec.get("title", "")))
+            line = t("● Job ${job}, round ${round}: record ${n} of ${total}: ${title}", job=w.get("job", "?"),
+                     round=w.get("round", 1), n=min(int(w.get("done") or 0) + 1, int(w.get("total") or 1)),
+                     total=w.get("total", 0), title=rec.get("title", ""))
+            speed = speed_text(w)
+            label.update(f"{line} · {speed}" if speed else line)
             bar.update(total=max(int(w.get("total") or 0), 1), progress=int(w.get("done") or 0))
         else:
             label.update(t("○ Idle: the service starts when you search and stops after 5 idle minutes."))

@@ -19,9 +19,23 @@ Then the job is "ready" with the same report, chunks, Apply and Revert as
 a batch job. A typed query (no local record) keeps its records as
 candidates to import as new; nothing is merged.
 
+Big jobs (a whole catalogue) are what this is built for:
+- PARALLEL records (default 4, KEI_ONDEMAND_PARALLEL 1-8) are searched at
+  once; their rows are saved in the job's order, so "done" is always a
+  run of finished records and a stop loses nothing. The limiter still
+  holds every host to one session and its pace, and the dispatcher sends
+  each record to the idle servers first, so more records at once means
+  more servers busy, never one server asked harder;
+- the merge runs in a thread, off the loop the searches wait on;
+- when this machine's own network is down (no name lookup works and no
+  server answered), the record is not saved as "nothing found": the job
+  waits (30 s, doubling to 10 min) and asks again, so a night with the
+  internet gone costs time, not thousands of empty results;
+- ondemand-status.json is written at most once a second, with the records
+  in flight, records per hour and the time left.
+
 A job stopped half way (the machine shut down) goes on from its last
-record when the service starts again. Progress goes to
-ondemand-status.json after every server event. The unit
+saved record when the service starts again. The unit
 needs no port: requests come in through jobs.db. It exits after IDLE
 seconds with nothing to do (the installer starts it for each request).
 """
@@ -50,12 +64,17 @@ from . import plan, targets
 from .config import Settings as Config
 from .dispatch import Dispatcher, Result, static_candidates
 from .health import Health
-from .limits import Limiter
+from .limits import Limiter, Limits
 
 log = logging.getLogger("nexus_ondemand.service")
 
 IDLE = 300.0
 POLL = 2.0
+PARALLEL = 4
+PARALLEL_MAX = 8
+OUTAGE_WAIT = 30.0
+OUTAGE_MAX = 600.0
+RATE_WINDOW = 50                  # records the speed (and time left) is measured over
 
 
 class JobError(Exception):
@@ -71,6 +90,10 @@ class Settings:
     poll: float = POLL
     pause_poll: float = 10.0
     chunk: int = 500
+    parallel: int = PARALLEL
+    outage_wait: float = OUTAGE_WAIT
+    outage_max: float = OUTAGE_MAX
+    status_every: float = 1.0
 
     @property
     def jobs_db(self) -> Path:
@@ -88,7 +111,18 @@ class Settings:
         state = Path(env.get("NEXUS_JOBS_STATE") or "/var/lib/koha-nexus-enrich")
         learned = env.get("NEXUS_GATEWAY_LEARNED_DB")
         return cls(state, Path(env.get("NEXUS_GATEWAY_STATIC_DB") or state / "static.db"),
-                   Path(learned) if learned else state / "learned.db")
+                   Path(learned) if learned else state / "learned.db",
+                   parallel=parallel_from(env.get("KEI_ONDEMAND_PARALLEL")))
+
+
+def parallel_from(value) -> int:
+    """KEI_ONDEMAND_PARALLEL: records at once, 1 to PARALLEL_MAX (PARALLEL
+    when unset or unreadable)."""
+    try:
+        n = int(str(value).strip())
+    except (TypeError, ValueError):
+        return PARALLEL
+    return min(PARALLEL_MAX, max(1, n))
 
 
 # ----------------------------------------------------------------------
@@ -96,15 +130,21 @@ class Settings:
 # ----------------------------------------------------------------------
 
 class Status:
-    """ondemand-status.json: the job, the record being searched, and each
-    server's state for it (waiting, searching, n record(s), no record,
-    down / skipped: why)."""
+    """ondemand-status.json: the job, the records in flight, and for the
+    oldest of them (the next to be saved) each server's state (waiting,
+    searching, n record(s), no record, down / skipped: why); records per
+    hour and the seconds left; "outage" while this machine's network is
+    down. Written at most every EVERY seconds, except on a change of state."""
 
-    def __init__(self, path: Path, catalog: targets.Catalog):
-        self.path, self.catalog = path, catalog
+    def __init__(self, path: Path, catalog: targets.Catalog, every: float = 1.0, clock=time.monotonic):
+        self.path, self.catalog, self.every, self.clock = path, catalog, every, clock
         self.data: dict = {"state": "idle"}
+        self.flight: dict = {}                       # seq -> {"record", "servers", "found"}
+        self.finished: list[float] = []              # when the last records were saved
+        self._last = float("-inf")
 
     def write(self) -> None:
+        self._last = self.clock()
         self.data["time"] = time.strftime("%Y-%m-%d %H:%M:%S")
         tmp = self.path.with_suffix(".part")
         try:
@@ -113,19 +153,56 @@ class Status:
         except OSError as exc:                      # progress is a convenience: never stop a search on it
             log.warning("status not written: %s", exc)
 
+    def touch(self) -> None:
+        """write(), unless the last one was under EVERY seconds ago."""
+        if self.clock() - self._last >= self.every:
+            self.write()
+
     def job(self, job: Job, total: int, done: int, state: str = "matching") -> None:
+        self.flight, self.finished = {}, []
         self.data = {"job": job.id, "state": state, "round": job.rounds, "total": total, "done": done,
-                     "record": None, "servers": {}, "found": 0, "network": []}
+                     "record": None, "servers": {}, "found": 0, "network": [], "inflight": 0,
+                     "per_hour": 0, "eta_s": None}
         self.write()
+
+    def _show(self) -> None:
+        """The oldest record in flight is the one on screen."""
+        self.data["inflight"] = len(self.flight)
+        if self.flight:
+            shown = self.flight[min(self.flight)]
+            self.data.update(record=shown["record"], servers=shown["servers"], found=shown["found"])
 
     def record(self, seq: int, rec: marc.Record | None, label: str) -> None:
-        self.data.update(record={"seq": seq, "biblionumber": biblionumber(rec) if rec is not None else None,
-                                 "title": title(rec) if rec is not None else label},
-                         servers={}, found=0)
+        self.flight[seq] = {"record": {"seq": seq, "biblionumber": biblionumber(rec) if rec is not None else None,
+                                       "title": title(rec) if rec is not None else label},
+                            "servers": {}, "found": 0}
+        self._show()
+        self.touch()
+
+    def forget(self, seq: int) -> None:
+        """SEQ's search is over (saved, or to be asked again)."""
+        self.flight.pop(seq, None)
+        self._show()
+
+    def saved(self, done: int, n: int = 1) -> None:
+        """Records up to DONE are saved (N of them now)."""
+        now = self.clock()
+        self.finished = (self.finished + [now] * n)[-RATE_WINDOW:]
+        self.data["done"] = done
+        if len(self.finished) >= 2 and self.finished[-1] > self.finished[0]:
+            per_s = (len(self.finished) - 1) / (self.finished[-1] - self.finished[0])
+            self.data["per_hour"] = round(per_s * 3600)
+            self.data["eta_s"] = round(max(0, int(self.data.get("total") or 0) - done) / per_s)
+        self.touch()
+
+    def outage(self, until: float | None) -> None:
+        """This machine's network is down: the job waits until UNTIL (epoch
+        seconds), or None again."""
+        self.data["outage"] = time.strftime("%H:%M:%S", time.localtime(until)) if until else None
         self.write()
 
-    def _server(self, tid: str) -> dict:
-        servers = self.data.setdefault("servers", {})
+    def _server(self, rec: dict, tid: str) -> dict:
+        servers = rec["servers"]
         if tid not in servers:
             t = self.catalog.targets.get(tid)
             servers[tid] = {"name": t.name if t else tid, "country": t.country if t else "", "state": "waiting",
@@ -134,25 +211,70 @@ class Status:
 
     def event(self, ev: dict) -> None:
         kind = ev.get("type")
+        if kind == "done":
+            self.data["network"] = sorted(set(self.data.get("network", [])) | set(ev.get("network") or []))
+        seq = ev.get("seq")
+        rec = self.flight.get(seq) or (self.flight[min(self.flight)] if self.flight else None)
+        if rec is None:
+            self.touch()
+            return
         if kind == "wave":
             for tid in ev["targets"]:
-                self._server(tid)["state"] = "searching"
+                self._server(rec, tid)["state"] = "searching"
         elif kind == "attempt":
-            s = self._server(ev["target"])
+            s = self._server(rec, ev["target"])
             outcome = ev["outcome"]
             s.update(ms=ev["ms"], hits=ev["hits"], address=ev["address"])
             if outcome in ("found", "cached") and ev["records"]:
                 s["state"] = f"{ev['records']} record(s)"
-                self.data["found"] = self.data.get("found", 0) + ev["records"]
+                rec["found"] += ev["records"]
             elif outcome in ("found", "none", "cached"):
                 s["state"] = "no record"
             elif s["state"] in ("waiting", "searching") or outcome == "error":
                 s["state"] = f"{'down' if outcome == 'error' else 'skipped'}: {ev['detail']}"[:200]
         elif kind == "static":
-            self.data["found"] = self.data.get("found", 0) + ev["found"]
-        elif kind == "done":
-            self.data["network"] = sorted(set(self.data.get("network", [])) | set(ev.get("network") or []))
-        self.write()
+            rec["found"] += ev["found"]
+        self._show()
+        self.touch()
+
+
+class Gate:
+    """Holds every record while this machine's network is down: hold()
+    after a search that only shows that, open() after one that reached a
+    server. The wait doubles from WAIT to MAX while it lasts."""
+
+    def __init__(self, wait: float, most: float, status: Status, clock=time.time, sleep=asyncio.sleep):
+        self.base, self.most, self.status = wait, most, status
+        self.clock, self.sleep = clock, sleep
+        self.wait_s, self.until = wait, 0.0
+
+    @staticmethod
+    def down(res: Result) -> bool:
+        """RES says this machine's network is down: it blocked the lookups
+        or port 1921 (dispatch's network-wide rule) and no server answered."""
+        return bool(res.network) and not any(a.outcome in ("found", "none") for a in res.attempts)
+
+    def hold(self) -> None:
+        now = self.clock()
+        if now >= self.until:                        # the first record to see it sets the wait
+            self.until = now + self.wait_s
+            self.wait_s = min(self.most, self.wait_s * 2)
+            log.warning("the network looks down: waiting until %s", time.strftime("%H:%M:%S",
+                                                                                  time.localtime(self.until)))
+            self.status.outage(self.until)
+
+    def open(self) -> None:
+        if self.until or self.wait_s != self.base:
+            self.wait_s, self.until = self.base, 0.0
+            self.status.outage(None)
+
+    async def passed(self, still) -> bool:
+        """Wait while held; False when STILL() says the job stopped meanwhile."""
+        while self.clock() < self.until:
+            if not still():
+                return False
+            await self.sleep(min(5.0, self.until - self.clock()))
+        return still()
 
 
 # ----------------------------------------------------------------------
@@ -280,12 +402,63 @@ def _query_row(query: dict, cands: list[Candidate]) -> dict:
             "detail": json.dumps({"query": query, "found": found}, ensure_ascii=False)}
 
 
-async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status) -> str:
-    """Search, keep and merge every record of JOB; returns its state when
-    it stopped. A job found "matching" (the service stopped half way) goes
-    on after its last finished record; one "exported" (new, Search more
-    servers or a new donor) goes through all of them, asking the servers
-    only for records not asked in this round."""
+def _error_row(rec: marc.Record | None, exc: BaseException) -> dict:
+    return {"biblionumber": biblionumber(rec) if rec is not None else None,
+            "f005": rec.control("005") if rec is not None else "", "title": title(rec) if rec else "",
+            "status": "error", "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0,
+            "detail": json.dumps({"error": f"{type(exc).__name__}: {exc}"[:300]}), "before": None,
+            "after": None, "other": None}
+
+
+def _merged_row(rec: marc.Record, cands: list[Candidate], donors: dict) -> dict:
+    """The batch worker's item row for REC (CPU only: run in a thread)."""
+    return item_row(rec, enrich(rec, best_per_source(rec, cands), Policy(donors=donors)))
+
+
+async def _one(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status, gate: Gate,
+               seq: int, rec: marc.Record | None, query: dict) -> tuple[int, dict | None]:
+    """Search, keep and merge record SEQ; (SEQ, its row), or (SEQ, None)
+    when the job stopped while it waited for the network."""
+    status.record(seq, rec, query.get("title") or query.get("isbn") or "")
+    try:
+        asked = bool(store.attempts(job.id, seq, job.rounds))
+        while not asked:                             # (a round with no server left to ask records nothing)
+            if not await gate.passed(lambda: store.job(job.id).state == "matching"):
+                return seq, None
+            res = await dispatcher.run(rec, _steps(rec, query), exclude=store.asked(job.id, seq), tag=seq)
+            if Gate.down(res):
+                gate.hold()                          # not "nothing found": asked again when it is back
+                continue
+            gate.open()
+            store.add_attempts(job.id, seq, job.rounds, res.attempts)
+            save_found(settings, job.id, seq, job.rounds, res)
+            asked = True
+        cands = load_found(settings, job.id, seq)
+        if rec is None:
+            row = _query_row(query, cands)
+        else:
+            bib = biblionumber(rec)
+            donors = store.choices(job.id, bib) if bib is not None else {}
+            row = await asyncio.to_thread(_merged_row, rec, cands, donors)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:                         # one bad record never stops the job
+        log.exception("job %s record %s", job.id, seq)
+        row = _error_row(rec, exc)
+    finally:
+        status.forget(seq)
+    row.update(job_id=job.id, seq=seq)
+    return seq, row
+
+
+async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status,
+                  gate: Gate | None = None) -> str:
+    """Search, keep and merge every record of JOB, PARALLEL at a time;
+    returns its state when it stopped. A job found "matching" (the service
+    stopped half way) goes on after its last saved record; one "exported"
+    (new, Search more servers or a new donor) goes through all of them,
+    asking the servers only for records not asked in this round. Rows are
+    saved in order: "done" never passes a record still being searched."""
     job = store.job(job.id)
     try:
         total = _count(settings, job)
@@ -296,45 +469,79 @@ async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispat
     store.set(job.id, state="matching", total=total, done=start)
     job = store.job(job.id)
     status.job(job, total, start)
+    gate = gate or Gate(settings.outage_wait, settings.outage_max, status)
+    lanes = max(1, settings.parallel)
+    running: set[asyncio.Task] = set()
+    rows: dict[int, dict] = {}
+    saved = start
+    held = False                                     # a record let go while it waited for the network
+
+    def still() -> str:
+        return store.job(job.id).state
+
+    async def settle(timeout: float | None) -> None:
+        """Wait for a record (at most TIMEOUT), then save the run of finished ones."""
+        nonlocal running, saved, held
+        if not running:
+            return
+        done, running = await asyncio.wait(running, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            seq, row = task.result()
+            if row is None:
+                held = True
+            else:
+                rows[seq] = row
+        batch = []
+        while saved + 1 in rows:
+            saved += 1
+            batch.append(rows.pop(saved))
+        if batch:
+            store.put_items(batch)
+            store.set(job.id, done=saved)
+            status.saved(saved, len(batch))
+
+    async def stop() -> None:
+        for task in running:
+            task.cancel()
+        await asyncio.gather(*running, return_exceptions=True)
+        status.write()
+
     for seq, (rec, query) in enumerate(_records(settings, job), 1):
         if seq <= start:
             continue
-        while (settings.state / "pause").exists() and store.job(job.id).state == "matching":
-            status.data["paused"] = True             # the tray's or the panel's Pause: wait between records
+        while True:
+            while len(running) >= lanes:
+                await settle(settings.pause_poll)
+                if still() != "matching":
+                    break
+            if still() != "matching":
+                break
+            if not (settings.state / "pause").exists():
+                break
+            status.data["paused"] = True             # the tray's or the panel's Pause: no new record starts
             status.write()
-            await asyncio.sleep(settings.pause_poll)
-        status.data["paused"] = False
-        if store.job(job.id).state != "matching":
-            return store.job(job.id).state           # cancelled from the panel
-        status.record(seq, rec, query.get("title") or query.get("isbn") or "")
-        try:
-            if not store.attempts(job.id, seq, job.rounds):
-                res = await dispatcher.run(rec, _steps(rec, query), exclude=store.asked(job.id, seq))
-                store.add_attempts(job.id, seq, job.rounds, res.attempts)
-                save_found(settings, job.id, seq, job.rounds, res)
-            cands = load_found(settings, job.id, seq)
-            if rec is None:
-                row = _query_row(query, cands)
+            if running:
+                await settle(settings.pause_poll)
             else:
-                bib = biblionumber(rec)
-                donors = store.choices(job.id, bib) if bib is not None else {}
-                row = item_row(rec, enrich(rec, best_per_source(rec, cands), Policy(donors=donors)))
-        except Exception as exc:                     # one bad record never stops the job
-            log.exception("job %s record %s", job.id, seq)
-            row = {"biblionumber": biblionumber(rec) if rec is not None else None,
-                   "f005": rec.control("005") if rec is not None else "", "title": title(rec) if rec else "",
-                   "status": "error", "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0,
-                   "detail": json.dumps({"error": f"{type(exc).__name__}: {exc}"[:300]}), "before": None,
-                   "after": None, "other": None}
-        row.update(job_id=job.id, seq=seq)
-        store.put_items([row])
-        store.set(job.id, done=seq)
-        status.data["done"] = seq
-        status.write()
+                await asyncio.sleep(settings.pause_poll)
+        status.data["paused"] = False
+        state = still()
+        if state != "matching":
+            await stop()
+            return state                             # cancelled from the panel
+        running.add(asyncio.ensure_future(_one(store, job, settings, dispatcher, status, gate, seq, rec, query)))
+    while running:
+        await settle(settings.pause_poll)
+        if still() != "matching":
+            state = still()
+            await stop()
+            return state
+    if held:                                         # the job stopped while a record waited for the network
+        return still()
     store.make_chunks(job.id, settings.chunk)
     report.write(store, job.id, settings.job_dir(job.id))
     store.set(job.id, state="ready", total=total, done=total)
-    status.data.update(state="ready", record=None)
+    status.data.update(state="ready", record=None, inflight=0, eta_s=0)
     status.write()
     return "ready"
 
@@ -353,7 +560,9 @@ def build(settings: Settings, config: Config, catalog: targets.Catalog | None = 
         learned = Learned(settings.learned_db)
     static = static_candidates(settings.static_db) if config.static else None
     kw = {"opener": opener} if opener is not None else {}
-    d = Dispatcher(catalog, health, Limiter(store=health), learned=learned, static=static, on_event=on_event, **kw)
+    limits = Limits(service=max(Limits().service, 3 * max(1, settings.parallel)))
+    d = Dispatcher(catalog, health, Limiter(limits, store=health), learned=learned, static=static,
+                   on_event=on_event, **kw)
     d.settings.static = config.static
     return d, health
 
@@ -363,7 +572,7 @@ async def serve(settings: Settings, config: Config, *, once: int | None = None, 
     """Run every waiting on-demand job (only job ONCE when given); wait for
     more until IDLE seconds pass with none. Returns how many ran."""
     catalog = catalog or targets.load(config.direct_list)
-    status = Status(settings.status_file, catalog)
+    status = Status(settings.status_file, catalog, settings.status_every)
     dispatcher, health = build(settings, config, catalog, status.event, opener)
     store = Store(settings.jobs_db)
     n = 0

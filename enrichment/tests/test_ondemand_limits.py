@@ -173,3 +173,57 @@ def test_a_ban_halves_the_rate_used_by_the_limiter(tmp_path):
     starts = sorted(s for _, s, _ in log)
     assert starts[2] - starts[1] == pytest.approx(4.0)  # 0.25/s instead of 0.5/s
     store.close()
+
+
+def test_the_pace_drops_on_timeouts_and_slow_answers_and_comes_back():
+    from nexus_ondemand.limits import Pacer
+    p = Pacer()
+    assert p.observe("h", 400, True) == 1.0 and p.usual["h"] == 400
+    assert p.observe("h", None, False) == 0.5                       # a timeout: half the pace
+    assert p.observe("h", 3000, True) == 0.25                       # 7.5 times slower than usual, over 2 s
+    assert p.usual["h"] == 400                                      # a slow answer is not the new usual
+    assert p.observe("h", 1500, True) == pytest.approx(0.35)        # slower, but under 2 s: back a step
+    for _ in range(10):
+        p.observe("h", 400, True)
+    assert p.factor("h") == 1.0
+    for _ in range(6):
+        p.observe("h", None, False)
+    assert p.factor("h") == Pacer.FLOOR and p.factor("other") == 1.0
+
+
+def test_a_slow_host_is_asked_more_slowly():
+    t = FakeTime()
+    lim = limiter(t, host=Limit(1, 1.0, 1, 500))
+
+    async def go():
+        for _ in range(3):
+            async with lim.slot(OTHER):
+                pass
+    asyncio.run(go())
+    assert t.slept == [1.0, 1.0]
+    lim.observe(OTHER, None, False)                                 # it timed out: half the pace
+    t.slept.clear()
+    asyncio.run(go())
+    assert t.slept == [2.0, 2.0, 2.0]
+
+
+def test_load_counts_open_and_queued_sessions_and_the_bucket():
+    t = FakeTime()
+    lim = limiter(t, host=Limit(1, 0.5, 1, 500))
+    assert lim.load(OTHER) == 0
+
+    async def go():
+        async with lim.slot(OTHER):
+            assert lim.load(OTHER) == 1                             # one open: a new one waits behind it
+            waiter = asyncio.ensure_future(_take(lim))
+            await asyncio.sleep(0)
+            assert lim.load(OTHER) == 2                             # and one queued
+            assert lim.load(DNB) == 0                               # another host is idle
+        await waiter
+        assert lim.load(OTHER) == pytest.approx(1.0)                # the bucket: 2 s at 0.5/s = one session
+    asyncio.run(go())
+
+
+async def _take(lim):
+    async with lim.slot(OTHER):
+        pass

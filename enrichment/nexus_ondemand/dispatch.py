@@ -18,6 +18,14 @@ One record:
 - after the servers, when no M0 was found, the local static.db (a file
   read, no network) when the library has it on.
 
+Several records may be searched at once (service.py), so a request
+looks at how busy each server is (Limiter.load) before cutting its waves:
+a server already busy with other records moves back a wave (behind the
+idle servers ranked next), instead of queueing for it. The time
+a server may take is cut to a few times what it usually takes once it has
+answered often enough (a host that answers in 1 s is not waited on for
+15 s when it hangs), and each answer feeds the host's pace (limits.Pacer).
+
 Failures go to health.db (health.py), except those that say more about
 this machine's network than about the servers: when 5 or more servers of
 one request fail the same way (no name lookup works, or every port-1921
@@ -33,8 +41,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from nexus_enrich import classify as cl
 from nexus_enrich import marc
@@ -58,6 +67,10 @@ PRESENT_MAX = 10              # LoC refuses more in one Present (diagnostic 13)
 TOO_BROAD = 50
 GOOD = 6                      # completeness of an M0 donor that ends the search
 NETWORK_WIDE = 5              # failures of one kind in one request that point at our own network
+ADAPT_MIN_OK = 5             # answers in 7 days before a server's own timeout is used
+ADAPT_FACTOR = 4.0            # its timeout: this many times its usual time...
+ADAPT_FLOOR = 6.0             # ...but never under this many seconds
+PACE_ERRORS = ("timeout", "reset", "closed")   # the failures that say "slow down"
 DEFAULT_TIMEOUTS = Timeouts(connect=4, init=6, search=10, present=12, close=2, total=15)
 PROVIDER_TIMEOUTS = {"loc": Timeouts(connect=4, init=6, search=10, present=12, close=2, total=12)}
 
@@ -72,6 +85,8 @@ class Settings:
     timeouts: Timeouts = DEFAULT_TIMEOUTS
     provider_timeouts: dict = field(default_factory=lambda: dict(PROVIDER_TIMEOUTS))
     static: bool = True
+    spread: bool = True           # ask idle servers before busy ones of nearly the same rank
+    adaptive_timeouts: bool = True
 
     def timeouts_for(self, address: Address) -> Timeouts:
         return self.provider_timeouts.get(address.provider, self.timeouts)
@@ -147,6 +162,7 @@ class _Request:
 
     def __init__(self, local: marc.Record | None):
         self.local = local
+        self.tag = None                               # the job's record number, in every event
         self.keys = cl.Keys.of(local) if local is not None else None
         self.result = Result()
         self.deferred: list[tuple[str, Outcome, Address, str]] = []   # held back: maybe our own network
@@ -170,7 +186,9 @@ class Dispatcher:
         self.on_event = on_event
         self._inflight: dict[tuple, asyncio.Future] = {}
 
-    def _emit(self, **event) -> None:
+    def _emit(self, req: _Request | None = None, **event) -> None:
+        if req is not None and req.tag is not None:
+            event["seq"] = req.tag
         if self.on_event is not None:
             try:
                 self.on_event(event)
@@ -180,21 +198,23 @@ class Dispatcher:
     # one record ---------------------------------------------------------
 
     async def run(self, local: marc.Record | None, steps: list[Step], *, only=None,
-                  max_servers: int | None = None, exclude=()) -> Result:
+                  max_servers: int | None = None, exclude=(), tag=None) -> Result:
         """Ask the servers for LOCAL (None: a typed query) with STEPS. The
         targets in EXCLUDE (an earlier run's Result.asked) are passed over:
-        "Search more servers" asks the next ones."""
+        "Search more servers" asks the next ones. TAG (the record's number
+        in its job) goes into every event as "seq"."""
         req = _Request(local)
+        req.tag = tag
         res = req.result
         if not steps:
             return res
         ranked, res.skipped = select.rank(self.catalog.targets.values(), local, only=only, health=self.health,
                                           limiter=self.limiter)
         exclude = set(exclude)
-        queue = [t for t in ranked if t.id not in exclude][:max_servers or self.settings.max_servers]
+        queue = self._spread([t for t in ranked if t.id not in exclude])[:max_servers or self.settings.max_servers]
         pending: set[asyncio.Task] = set()
         for n, wave in enumerate(select.waves(queue, self.settings.wave, self.settings.per_wave_provider), 1):
-            self._emit(type="wave", wave=n, targets=[t.id for t in wave])
+            self._emit(req, type="wave", wave=n, targets=[t.id for t in wave])
             tasks = {asyncio.ensure_future(self._target(req, t, steps, n)) for t in wave}
             res.servers += len(wave)
             res.asked += [t.id for t in wave]
@@ -213,9 +233,52 @@ class Dispatcher:
         self._settle(req)
         if self.settings.static and self.static is not None and not self._has(req, cl.M0):
             self._static(req)
-        self._emit(type="done", found=len(res.found), servers=res.servers, stopped_early=res.stopped_early,
+        self._emit(req, type="done", found=len(res.found), servers=res.servers, stopped_early=res.stopped_early,
                    network=res.network)
         return res
+
+    def _spread(self, queue: list[Target]) -> list[Target]:
+        """QUEUE with each busy server moved back a wave per session ahead
+        of it (at most two waves): it comes after that many idle servers
+        that ranked below it, when it should be free again. The next
+        records ask the idle servers; the busy ones still come when needed."""
+        load = getattr(self.limiter, "load", None)
+        if not self.settings.spread or load is None:
+            return queue
+        wave = max(1, self.settings.wave)
+        out: list[Target] = []
+        held: list[tuple[int, int, Target]] = []          # (idle servers to let past first, rank, target)
+        idle = 0
+        for i, t in enumerate(queue):
+            ahead = load(t.address)
+            if ahead > 0:
+                held.append((idle + min(2 * wave, wave * math.ceil(ahead)), i, t))
+                continue
+            out.append(t)
+            idle += 1
+            ready = [h for h in held if h[0] <= idle]
+            out += [t for _, _, t in ready]
+            held = [h for h in held if h[0] > idle]
+        return out + [t for _, _, t in sorted(held)]
+
+    def _timeouts(self, addr: Address) -> Timeouts:
+        """The provider's timeouts, cut to ADAPT_FACTOR times the server's
+        usual time once it answered ADAPT_MIN_OK times this week."""
+        base = self.settings.timeouts_for(addr)
+        if not self.settings.adaptive_timeouts or self.health is None:
+            return base
+        s = self.health.summary(addr.key)
+        if s["ok_7d"] < ADAPT_MIN_OK or not s["latency_ms"]:
+            return base
+        total = max(ADAPT_FLOOR, s["latency_ms"] / 1000 * ADAPT_FACTOR)
+        if total >= base.total:
+            return base
+        return replace(base, total=total, search=min(base.search, total), present=min(base.present, total))
+
+    def _pace(self, addr: Address, ms: float | None, ok: bool) -> None:
+        observe = getattr(self.limiter, "observe", None)
+        if observe is not None:
+            observe(addr, ms, ok)
 
     def _has(self, req: _Request, cls: str) -> bool:
         return any(f.cls == cls for f in req.result.found)
@@ -240,7 +303,7 @@ class Dispatcher:
             self._add(req, Found(f"static:{c.source}", c.record, "static", weight=c.weight, brazilian=c.brazilian,
                                  remote_id=c.remote_id))
         req.result.static_used = True
-        self._emit(type="static", found=len(cands))
+        self._emit(req, type="static", found=len(cands))
 
     def _add(self, req: _Request, f: Found) -> None:
         if req.keys is not None:
@@ -277,6 +340,10 @@ class Dispatcher:
                 outcome = classify(exc)
                 attempt.outcome, attempt.category, attempt.detail = "error", outcome.category, str(exc)
                 attempt.ms = int((self.clock() - started) * 1000)
+                if exc.kind in PACE_ERRORS:
+                    self._pace(addr, attempt.ms, False)
+                elif exc.phase != "connect":
+                    self._pace(addr, None, True)          # it answered, with a refusal
                 self._failure(req, addr, outcome, exc)
                 self._record(req, attempt)
                 continue                              # the same catalogue at its next address
@@ -288,6 +355,7 @@ class Dispatcher:
             attempt.step, attempt.hits, attempt.records = step, hits, len(records)
             attempt.outcome = "cached" if cached else ("found" if records else "none")
             if not cached:
+                self._pace(addr, attempt.ms, True)
                 req.dns_ok = True
                 req.port1921_ok |= addr.port == 1921
                 if self.health is not None:
@@ -303,7 +371,7 @@ class Dispatcher:
 
     def _record(self, req: _Request, a: Attempt) -> None:
         req.result.attempts.append(a)
-        self._emit(type="attempt", target=a.target, address=a.address, outcome=a.outcome, detail=a.detail,
+        self._emit(req, type="attempt", target=a.target, address=a.address, outcome=a.outcome, detail=a.detail,
                    step=a.step, hits=a.hits, records=a.records, ms=a.ms, wave=a.wave)
 
     def _failure(self, req: _Request, addr: Address, outcome: Outcome, exc: Z3950Error) -> None:
@@ -375,7 +443,7 @@ class Dispatcher:
                         continue
                 if session is None:
                     await stack.enter_async_context(self.limiter.slot(addr))
-                    session = await self.opener(t, addr, self.policy, self.settings.timeouts_for(addr))
+                    session = await self.opener(t, addr, self.policy, self._timeouts(addr))
                     stack.push_async_callback(session.close)
                 records, total = await self._step(session, t, addr, step)
                 if self.learned is not None:
