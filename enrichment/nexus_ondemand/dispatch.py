@@ -141,6 +141,13 @@ class Result:
                 for f in self.found]
 
 
+def next_midnight(now: float) -> float:
+    """The next local midnight after NOW (when the daily caps start again), plus a minute."""
+    t = time.localtime(now)
+    today = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+    return time.mktime(time.localtime(today + 25 * 3600)[:3] + (0, 1, 0, 0, 0, -1))
+
+
 def _weight(t: Target) -> float:
     return 0.9 if select.is_national(t) else 0.7 if t.preselect else 0.5
 
@@ -202,6 +209,27 @@ class Dispatcher:
             except Exception:                         # a broken listener never stops a search
                 log.exception("on_event failed")
 
+    # the daily caps -------------------------------------------------------
+
+    def quota_until(self, rec: marc.Record | None, *, recordtype: str = "biblio", only=None,
+                    now: float | None = None) -> float | None:
+        """The next local midnight when every server of REC's own countries
+        (its language's; any server for a record with none) is over its
+        daily cap; else None. A server down or misconfigured is not over a
+        cap: that is the breakers' business, not a reason to wait a day."""
+        countries, _ = select.Context.of(rec).preference()
+        _, skipped = select.rank(self.catalog.targets.values(), rec, recordtype=recordtype, only=only,
+                                 health=self.health, limiter=self.limiter)
+        why = dict(skipped)
+        mine = [t for t in self.catalog.targets.values()
+                if t.recordtype == recordtype and not t.unusable and (not countries or t.country in countries)
+                and (only is None or t.id in only or t.category in only)]
+        if not mine or any(t.id not in why for t in mine):
+            return None
+        if not any("daily limit" in why[t.id] for t in mine):
+            return None
+        return next_midnight(time.time() if now is None else now)
+
     # one record ---------------------------------------------------------
 
     async def run(self, local: marc.Record | None, steps: list[Step], *, only=None,
@@ -224,6 +252,7 @@ class Dispatcher:
             return res
         ranked, res.skipped = select.rank(self.catalog.targets.values(), context if context is not None else local,
                                           recordtype=recordtype, only=only, health=self.health, limiter=self.limiter)
+        self._emit(req, type="skipped", targets=[[tid, why] for tid, why in res.skipped])
         exclude = set(exclude)
         queue = self._spread([t for t in ranked if t.id not in exclude])[:max_servers or self.settings.max_servers]
         pending: set[asyncio.Task] = set()

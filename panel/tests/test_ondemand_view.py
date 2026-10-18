@@ -50,11 +50,18 @@ def test_on_demand_screen():
             assert jobs.get_row("6")[2] == "9788535911664 / O evangelho segundo Jesus Cristo"
             # The live servers of the record being searched.
             servers = view.query_one("#od-servers", DataTable)
-            await _until(pilot, lambda: servers.row_count == 4)
+            await _until(pilot, lambda: servers.row_count == 6)
             assert servers.get_row("ufpr")[2:] == ["1 record(s)", "412"]
+            assert servers.get_row("_capped")[0::2] == ["14 other server(s)", "today's limit reached"]
+            assert servers.get_row("_cooling")[2] == "cooling down after errors"
             assert servers.get_row("bne")[2] == "Down: timeout: no answer in 15 s"
             state = str(view.query_one("#e-worker-state", Label).render())
             assert "record 2 of 2: Vidas secas · 2 records at once · 240 per hour · about 1 h 15 min left" in state
+            view.worker = {**view.worker, "quota": "00:01"}
+            view.draw_worker()
+            assert "used today's searches: the job waits and goes on at 00:01" in str(
+                view.query_one("#e-worker-state", Label).render())
+            view.worker = {k: v for k, v in view.worker.items() if k != "quota"}
 
             # The typed book: the records found, one already imported.
             summary = view.query_one("#e-summary", Static)

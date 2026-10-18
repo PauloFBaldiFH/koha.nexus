@@ -129,6 +129,10 @@ class Searcher:
         self._flight: dict[tuple, asyncio.Future] = {}
         self.brazil = [t.id for t in catalog.targets.values() if t.recordtype == "authority" and t.country == "BR"]
 
+    def quota_until(self, context: marc.Record) -> float | None:
+        """Dispatcher.quota_until for the authority servers."""
+        return self.dispatcher.quota_until(context, recordtype="authority")
+
     async def search(self, h: Heading, context: marc.Record, seq: int | None = None) -> tuple[list, bool, Result | None]:
         """(rows, down, the search's Result). DOWN: this machine's network
         was down, so the empty answer means nothing (not kept). The Result
@@ -241,6 +245,8 @@ class AuthJob:
         attempts: list = []
         while todo:
             if not await gate.passed(still):
+                return None, []
+            if not await gate.quota(self.searcher.quota_until(rec), still):
                 return None, []
             got = await asyncio.gather(*(self.searcher.search(matches[i].heading, rec, seq) for i in todo))
             if any(down for _, down, _ in got):

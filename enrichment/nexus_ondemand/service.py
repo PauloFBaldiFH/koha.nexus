@@ -201,6 +201,14 @@ class Status:
         self.data["outage"] = time.strftime("%H:%M:%S", time.localtime(until)) if until else None
         self.write()
 
+    def quota(self, until: float | None) -> None:
+        """The record's own servers are all over their daily cap: the job
+        waits until UNTIL (epoch seconds, the next midnight), or None again."""
+        value = time.strftime("%H:%M", time.localtime(until)) if until else None
+        if self.data.get("quota") != value:
+            self.data["quota"] = value
+            self.write()
+
     def _server(self, rec: dict, tid: str) -> dict:
         servers = rec["servers"]
         if tid not in servers:
@@ -213,6 +221,10 @@ class Status:
         kind = ev.get("type")
         if kind == "done":
             self.data["network"] = sorted(set(self.data.get("network", [])) | set(ev.get("network") or []))
+        if kind == "skipped":                        # the servers passed over for the latest record
+            whys = [why for _, why in ev.get("targets") or []]
+            self.data["capped"] = sum("daily limit" in w for w in whys)
+            self.data["cooling"] = sum(w in ("down", "misconfigured") for w in whys)
         seq = ev.get("seq")
         rec = self.flight.get(seq) or (self.flight[min(self.flight)] if self.flight else None)
         if rec is None:
@@ -243,8 +255,9 @@ class Gate:
     after a search that only shows that, open() after one that reached a
     server. The wait doubles from WAIT to MAX while it lasts."""
 
-    def __init__(self, wait: float, most: float, status: Status, clock=time.time, sleep=asyncio.sleep):
-        self.base, self.most, self.status = wait, most, status
+    def __init__(self, wait: float, most: float, status: Status, clock=time.time, sleep=asyncio.sleep,
+                 poll: float = 5.0):
+        self.base, self.most, self.status, self.poll = wait, most, status, poll
         self.clock, self.sleep = clock, sleep
         self.wait_s, self.until = wait, 0.0
 
@@ -267,6 +280,23 @@ class Gate:
         if self.until or self.wait_s != self.base:
             self.wait_s, self.until = self.base, 0.0
             self.status.outage(None)
+
+    async def quota(self, until: float | None, still) -> bool:
+        """Wait until UNTIL (Dispatcher.quota_until: the record's own
+        servers have used today's searches); False when STILL() says the
+        job stopped meanwhile. Searching on with what is left would give
+        the records after this one fewer servers than the ones before."""
+        if until is None:
+            return True
+        log.warning("the daily search limits are reached: waiting until %s",
+                    time.strftime("%Y-%m-%d %H:%M", time.localtime(until)))
+        self.status.quota(until)
+        while self.clock() < until:
+            if not still():
+                return False
+            await self.sleep(min(self.poll, max(0.01, until - self.clock())))
+        self.status.quota(None)
+        return still()
 
     async def passed(self, still) -> bool:
         """Wait while held; False when STILL() says the job stopped meanwhile."""
@@ -425,6 +455,8 @@ async def _one(store: Store, job: Job, settings: Settings, dispatcher: Dispatche
         while not asked:                             # (a round with no server left to ask records nothing)
             if not await gate.passed(lambda: store.job(job.id).state == "matching"):
                 return seq, None
+            if not await gate.quota(dispatcher.quota_until(rec), lambda: store.job(job.id).state == "matching"):
+                return seq, None
             res = await dispatcher.run(rec, _steps(rec, query), exclude=store.asked(job.id, seq), tag=seq)
             if Gate.down(res):
                 gate.hold()                          # not "nothing found": asked again when it is back
@@ -490,7 +522,7 @@ async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispat
     store.set(job.id, state="matching", total=total, done=start)
     job = store.job(job.id)
     status.job(job, total, start)
-    gate = gate or Gate(settings.outage_wait, settings.outage_max, status)
+    gate = gate or Gate(settings.outage_wait, settings.outage_max, status, poll=max(settings.pause_poll, 0.01))
     aj = None
     if job.kind == "auth":                           # names and subjects: authorities.py
         aj = authorities.AuthJob(store, job, settings.job_dir(job.id), settings.static_db, dispatcher.settings.static,

@@ -403,3 +403,33 @@ def test_a_round_with_no_server_left_finishes(env):
     store.close()
     assert serve(settings, config, net, catalog(tgt("s"))) == 1
     assert job_of(settings, job_id).state == "ready"
+
+
+def test_the_job_waits_for_midnight_when_its_servers_used_todays_searches(env):
+    from nexus_ondemand.health import Health
+    settings, config = env
+    settings.pause_poll = 0.05
+    net = FakeNet(s_example_org=Server([donor("Volta")]))
+    cat = catalog(tgt("s"))
+    health = Health(config.health_db)
+    for _ in range(500):
+        health.add_daily(cat.targets["s"].address.host_key)
+    health.close()
+    job_id = ondemand_job(settings, [mine(1), mine(2)])
+    seen = []
+
+    async def run():
+        task = asyncio.ensure_future(service.serve(settings, config, catalog=cat, opener=net))
+        while not seen:
+            await asyncio.sleep(0.01)
+            if settings.status_file.is_file():
+                data = json.loads(settings.status_file.read_text())
+                if data.get("quota"):
+                    seen.append(data)
+        store = Store(settings.jobs_db)
+        store.set(job_id, state="cancelled")                        # Cancel while it waits
+        store.close()
+        await asyncio.wait_for(task, 5)
+    asyncio.run(run())
+    assert seen[0]["quota"] == "00:01" and net.searches == []
+    assert job_of(settings, job_id).done == 0                       # nothing saved as "not found"

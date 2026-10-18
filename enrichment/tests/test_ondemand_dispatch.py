@@ -446,7 +446,7 @@ def test_events_are_reported(health, clock):
     d = dispatcher([tgt("s")], net, health, clock)
     d.on_event = events.append
     run(d)
-    assert [e["type"] for e in events] == ["wave", "attempt", "done"]
+    assert [e["type"] for e in events] == ["skipped", "wave", "attempt", "done"]
 
 
 def test_no_steps_no_network(health, clock):
@@ -518,3 +518,33 @@ def test_every_event_carries_the_records_number(health, clock):
     d.on_event = events.append
     run(d, tag=7)
     assert events and {e["seq"] for e in events} == {7}
+
+
+
+def test_quota_waits_only_when_the_records_own_servers_are_all_over_their_cap(health, clock):
+    from nexus_ondemand.dispatch import next_midnight
+    br1, br2, us = tgt("br1"), tgt("br2"), tgt("us", country="US", category="north_america")
+    d = dispatcher([br1, br2, us], FakeNet(), health, clock)
+    rec = local()
+    rec.fields = [f for f in rec.fields if f.tag != "008"]
+    rec.add_field(Field("008", data="201017s1890    bl            000 0 por d"))
+    assert d.quota_until(rec) is None
+    for _ in range(500):
+        health.add_daily(br1.address.host_key)
+    assert d.quota_until(rec) is None                                # br2 still has searches today
+    for _ in range(500):
+        health.add_daily(br2.address.host_key)
+    assert d.quota_until(rec, now=1_000.0) == next_midnight(1_000.0)  # the Brazilian ones are used up
+    assert d.quota_until(None) is None                               # no language: the US server is left
+
+
+def test_skipped_servers_are_reported(health, clock):
+    events = []
+    br1, br2 = tgt("br1"), tgt("br2")
+    d = dispatcher([br1, br2], FakeNet(br1_example_org=Server(), br2_example_org=Server()), health, clock)
+    d.on_event = events.append
+    for _ in range(500):
+        health.add_daily(br1.address.host_key)
+    run(d)
+    skipped = next(e for e in events if e["type"] == "skipped")
+    assert [tid for tid, _ in skipped["targets"]] == ["br1"] and "daily limit" in skipped["targets"][0][1]

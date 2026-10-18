@@ -130,3 +130,30 @@ def test_found_headings_rules():
     assert found.exact("topical", "blindness") == []                 # no foreign subject
     assert [r.id for r in found.exact("personal", "saramago jose")] == [2]
     assert found.sources["z3950:br"]["name"] == "BR"
+
+
+def test_the_auth_job_waits_for_midnight_when_its_servers_used_todays_searches(env):
+    from nexus_ondemand.health import Health
+    settings, config = env
+    settings.pause_poll = 0.05
+    net = FakeNet(br_example_org=Server([SARAMAGO]))
+    cat = catalog(aut("br"))
+    health = Health(config.health_db)
+    for _ in range(500):
+        health.add_daily(cat.targets["br"].address.host_key)
+    health.close()
+    job_id = auth_job(settings, [local(701, [name("100", "Saramago, José")])])
+    seen = []
+
+    async def run():
+        task = asyncio.ensure_future(service.serve(settings, config, catalog=cat, opener=net))
+        while not seen:
+            await asyncio.sleep(0.01)
+            if settings.status_file.is_file() and json.loads(settings.status_file.read_text()).get("quota"):
+                seen.append(1)
+        store = Store(settings.jobs_db)
+        store.set(job_id, state="cancelled")
+        store.close()
+        await asyncio.wait_for(task, 5)
+    asyncio.run(run())
+    assert net.searches == [] and job_of(settings, job_id).done == 0
