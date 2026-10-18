@@ -238,6 +238,14 @@ def flag_of(country: str) -> str:
     return "".join(chr(0x1F1E6 + ord(c) - 65) for c in cc) if len(cc) == 2 and cc.isalpha() else ""
 
 
+def badge(t: "Target") -> str:
+    """What the screen shows before a server's name: its country code (BR,
+    US...), since terminals on Windows cannot draw flag emoji (they show the
+    two letters as broken glyphs); the globe, which they draw, for a server
+    of several countries."""
+    return t.flag if t.flag == "\U0001F310" else t.country
+
+
 def make_target(raw: dict, origin: str = "imported") -> Target | None:
     """A Target from a dict with any of the usual column names, or None when
     there is no host. A URL in host (sru://, http://host:port/db) is split."""

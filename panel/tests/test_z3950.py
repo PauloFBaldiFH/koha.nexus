@@ -68,6 +68,9 @@ def test_curated_flags():
     assert by_db["sru/_union"].flag == by_db["sru/_union-aut"].flag == "🌐"
     assert z.make_target({"host": "z.example.org", "country": "pt"}).flag == "🇵🇹"
     assert z.make_target({"host": "z.example.org"}).flag == ""
+    # The screen shows the country code (Windows terminals cannot draw flags), the globe for none.
+    assert (z.badge(by_db["biblioteca"]), z.badge(by_db["sru/_union"]), z.badge(by_db["sru/_union-aut"])) == (
+        "BR", "🌐", "🌐")
 
 
 def test_direct_logins_come_from_the_environment():
