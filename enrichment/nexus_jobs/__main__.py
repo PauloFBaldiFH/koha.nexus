@@ -4,8 +4,8 @@ Jobs (the panel's tasks call these through the installer):
     add --scope "all" | "101, 102, 500-550" [--kind auth --mode exact|fuzzy]
                                     new job; prints its id and folder
     add --origin ondemand --scope "101, 102" | --isbn X | --title T [--author A] [--year Y]
-                                    an on-demand job: at most 50 records, or a
-                                    typed query (its records are imported as new)
+                                    an on-demand job: "all" or any biblionumbers, or
+                                    a typed query (its records are imported as new)
     more ID                         on-demand: ask the next servers (a new round)
     donor ID BIBLIONUMBER GROUP [SOURCE]
                                     on-demand: the donor of a field group (none: the best)
@@ -46,9 +46,6 @@ from .store import Store
 from .worker import Settings, run
 
 SHOW_CHANGES = 200
-ONDEMAND_MAX = 50
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m nexus_jobs", description=__doc__.split("\n")[0])
     ap.add_argument("--state", type=Path,
@@ -147,19 +144,14 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _ondemand_scope(args) -> tuple:
-    """(ranges, typed query JSON) of an on-demand job: biblionumbers (at
-    most ONDEMAND_MAX), or a typed query."""
+    """(ranges, typed query JSON) of an on-demand job: biblionumbers (any
+    number; None for "all"), or a typed query."""
     q = {k: " ".join(getattr(args, k).split())[:300] for k in ("isbn", "title", "author", "year")}
     if any(q.values()):
         if not (q["isbn"] or q["title"]):
             raise scope.ScopeError("an on-demand query needs an ISBN or a title")
         return None, json.dumps({k: v for k, v in q.items() if v}, ensure_ascii=False)
-    ranges = scope.parse(args.scope)
-    if ranges is None:
-        raise scope.ScopeError("on demand needs biblionumbers (at most %d), or a query" % ONDEMAND_MAX)
-    if sum(b - a + 1 for a, b in ranges) > ONDEMAND_MAX:
-        raise scope.ScopeError(f"more than {ONDEMAND_MAX} records: use a background job")
-    return ranges, ""
+    return scope.parse(args.scope), ""
 
 
 def _jobs(args, store: Store, settings: Settings) -> int:

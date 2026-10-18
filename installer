@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.90"
+PANEL_VERSION=" 1.5.91"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29754,12 +29754,13 @@ SystemCallFilter=@system-service
 [Install]
 WantedBy=multi-user.target
 UNIT
-    # On demand: the direct Z39.50 servers for a few records, now. Network
+    # On demand: the direct Z39.50 servers, record after record. Network
     # (the policy refuses the koha.nexus endpoints and every local address
     # itself), no access to Koha (records come exported, as for the
     # worker), no port (jobs.db in, ondemand-status.json out). Started for
     # each request, it exits after 5 idle minutes; enabled so a request cut
-    # by a shutdown goes on at boot. Logins (KEI_Z3950_*) from the panel's .env.
+    # by a shutdown goes on at boot from its last record, and restarted after
+    # a crash (a whole catalogue takes hours). Logins (KEI_Z3950_*) from the panel's .env.
     cat > "/etc/systemd/system/${ENRICH_ONDEMAND_UNIT}.service" <<UNIT
 [Unit]
 Description=koha.nexus on-demand enrichment (direct Z39.50 servers only; exits when idle)
@@ -29780,6 +29781,8 @@ Environment=NEXUS_ONDEMAND_HEALTH_DB=${ENRICH_STATE}/health.db
 StateDirectory=koha-nexus-enrich
 StateDirectoryMode=0750
 ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_ondemand serve
+Restart=on-failure
+RestartSec=60
 Nice=10
 IOSchedulingClass=idle
 CPUQuota=25%
@@ -30098,14 +30101,17 @@ _enrich_job_apply_run() {
         msg_error "" "$(t "Koha's record matching rule could not be created. Nothing was changed.")" 9 76
         return 1
     fi
+    : > "$dir/snapshot-ids.txt"
     if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ]; then
-        # On demand (at most 50 records): a copy of those records, not a full backup.
         for c in $chunks; do jobs_py chunk-ids "$id" "$c" 2>>"$log"; done > "$dir/snapshot-ids.txt"
-        enrich_snapshot "$id" "$dir/snapshot-ids.txt" "$log" apply || { rm -f "$dir/snapshot-ids.txt"; kei_result apply backup-failed; return 1; }
-        rm -f "$dir/snapshot-ids.txt"
-    else
-        tools_safety_backup ENRICH || { kei_result apply backup-failed; return 1; }
     fi
+    if enrich_od_small "$dir/snapshot-ids.txt"; then
+        # A small on-demand job: a copy of those records, not a full backup.
+        enrich_snapshot "$id" "$dir/snapshot-ids.txt" "$log" apply || { rm -f "$dir/snapshot-ids.txt"; kei_result apply backup-failed; return 1; }
+    else
+        tools_safety_backup ENRICH || { rm -f "$dir/snapshot-ids.txt"; kei_result apply backup-failed; return 1; }
+    fi
+    rm -f "$dir/snapshot-ids.txt"
     kei_result backup "$TOOLS_PRE"
     display_explanation "Applying the changes..."
     kind=$(jobs_py kind "$id" 2>>"$log")
@@ -30278,7 +30284,7 @@ _enrich_job_revert_run() {
         msg_info "$(t "Revert")" "$(t 'Job ${id}: nothing applied to revert.')" 9 70
         return 0
     fi
-    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ]; then
+    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ] && enrich_od_small "$dir/applied.txt"; then
         enrich_snapshot "$id" "$dir/applied.txt" "$log" revert || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }
     else
         tools_safety_backup UNDO-ENRICH || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }
@@ -30347,18 +30353,19 @@ enrich_jobs() {
 }
 
 # ----------------------------------------------------------------------
-# On-demand enrichment (plan 2026-10-18, sections 2 and 7.2): a few records
-# (at most 50) or a typed query, now, from the direct Z39.50 servers only
+# On-demand enrichment (plan 2026-10-18, sections 2 and 7.2): any number of
+# records (all of them too: hours, in the background) or a typed query, from
+# the direct Z39.50 servers only
 # (z3950_direct.json; never sru.koha.nexus, catalog.koha.nexus or a local
 # address). The records are exported as for a batch job; the
 # koha-nexus-ondemand unit asks the servers, keeps what they found and
 # writes the same staged report; Apply and Revert are the batch ones, with
-# a snapshot of the records instead of a full backup.
+# a snapshot of the records instead of a full backup for a small job.
 # ----------------------------------------------------------------------
 
 # enrich_od_add SCOPE | --isbn X | --title T [--author A] [--year Y]
 enrich_od_add() {
-    local log out id dir n why a args=()
+    local log out id dir n why a scoped="" export_args=() args=()
     case "${1:-}" in
         --isbn|--title|--author|--year)
             while [ $# -gt 0 ]; do
@@ -30369,14 +30376,14 @@ enrich_od_add() {
             done ;;
         "") return 2 ;;
         *)  require_database || return 1
-            args=(--scope "$1") ;;
+            args=(--scope "$1"); scoped=1 ;;
     esac
     enrich_od_ready || return 1
     log=$(tools_log enrichment-ondemand)
     if ! out=$(jobs_py add --origin ondemand "${args[@]}" 2>>"$log"); then
         why=$(tail -n 1 "$log" | cut -c1-200)
         kei_result job invalid-scope
-        msg_error "" "$(t 'Not a valid request: up to 50 biblionumbers (such as 101, 102, 500-510), or an ISBN, or a title.')${why:+
+        msg_error "" "$(t 'Not a valid request: all, biblionumbers (such as 101, 102, 500-510), an ISBN, or a title.')${why:+
 
 $why}" 11 76
         return 1
@@ -30384,10 +30391,16 @@ $why}" 11 76
     id=$(printf '%s' "$out" | sed -n 's/.*"job": *\([0-9][0-9]*\).*/\1/p')
     dir="$ENRICH_STATE/jobs/$id"
     [ -n "$id" ] && [ -d "$dir" ] || { kei_result job failed; return 1; }
-    if [ -s "$dir/ids.txt" ]; then
+    if [ -n "$scoped" ]; then
+        # Biblionumbers, or all (no list: the whole catalogue, hours of searching in the background).
         tools_workdir || return 1
-        a=$(tools_copy "$dir/ids.txt" "enrich-$id-ids.txt") || return 1
-        if ! enrich_export "$log" "$dir/export.xml" --record-type=bibs --format=xml --dont_export_items "--id_list_file=$a"; then
+        export_args=(--record-type=bibs --format=xml --dont_export_items)
+        if [ -s "$dir/ids.txt" ]; then
+            a=$(tools_copy "$dir/ids.txt" "enrich-$id-ids.txt") || return 1
+            export_args+=("--id_list_file=$a")
+        fi
+        display_explanation "Exporting the records (at low priority)..."
+        if ! enrich_export "$log" "$dir/export.xml" "${export_args[@]}"; then
             why=$(enrich_export_why "$log")
             jobs_py fail "$id" --error "export_records.pl failed${why:+: $why} (see $log)" >>"$log" 2>&1
             find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
@@ -30528,10 +30541,20 @@ z3950_health() {
     kei_result health "$(ondemand_py health --json 2>/dev/null | tr -d '\n' || echo '[]')"
 }
 
+# enrich_od_small IDS: true when the list has 1 to ENRICH_OD_SNAPSHOT_MAX
+# biblionumbers. A small on-demand job saves a copy of its records instead
+# of a full backup (Paulo's decision 5); a larger one (up to the whole
+# catalogue) gets the verified full backup, as a batch job does.
+enrich_od_small() {
+    local n
+    n=$(grep -c '[0-9]' "$1" 2>/dev/null)
+    [ "${n:-0}" -ge 1 ] && [ "$n" -le "${ENRICH_OD_SNAPSHOT_MAX:-50}" ]
+}
+
 # enrich_snapshot ID IDS LOG LABEL: the on-demand job's records as Koha has
 # them now (MARCXML, no items) in the job's folder, in place of a full
-# backup (at most 50 records; Revert restores them through Koha's import
-# batches, this file is a second copy). Sets TOOLS_PRE to it.
+# backup (a small job, enrich_od_small; Revert restores them through Koha's
+# import batches, this file is a second copy). Sets TOOLS_PRE to it.
 enrich_snapshot() {
     local id="$1" ids="$2" log="$3" label="$4" out a
     TOOLS_PRE=""

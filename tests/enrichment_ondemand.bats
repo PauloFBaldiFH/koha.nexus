@@ -178,7 +178,7 @@ jshow() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show "$1
     show=$(jshow 1)
     echo "$show"
     [[ "$show" == *'"scope": "query"'* ]] && [[ "$show" == *'"source": "z3950:ufpr"'* ]]
-    for bad in "all" "1-60" "abc"; do
+    for bad in "abc" "1-x"; do
         : > "$W/results"
         p enrich_od_add "$bad"
         [ "$status" -ne 0 ]
@@ -190,6 +190,26 @@ jshow() { "$W/enrich/.venv/bin/python" -m nexus_jobs --state "$W/state" show "$1
     [ "$status" -eq 2 ]
     p enrich_od_add
     [ "$status" -eq 2 ]
+}
+
+@test "on demand: all, or any number of records: the whole catalogue exported, a full backup when it is large" {
+    p enrich_od_add all
+    [ "$status" -eq 0 ]
+    grep -q "^job=1$" "$W/results" && grep -q "^records=5$" "$W/results"
+    grep -q "^export_records.pl \[throttled\] --record-type=bibs --format=xml --dont_export_items$" "$W/calls"
+    [ "$(grep -c '<record' "$W/state/jobs/1/export.xml")" = 5 ]
+    od_service
+    show=$(jshow 1)
+    [[ "$show" == *'"state": "ready"'* ]] && [[ "$show" == *'"scope": "all"'* ]] && [[ "$show" == *'"total": 5'* ]]
+    # More records than a copy is made for: Apply and Revert make the verified full backup.
+    echo "ENRICH_OD_SNAPSHOT_MAX=2" >> "$W/extra.sh"
+    p enrich_job_apply 1
+    [ "$status" -eq 0 ]
+    grep -q "^backup ENRICH$" "$W/calls"
+    ! ls "$W/state/jobs/1"/snapshot-apply-*.xml
+    p enrich_job_revert 1
+    [ "$status" -eq 0 ]
+    grep -q "^backup UNDO-ENRICH$" "$W/calls"
 }
 
 @test "on demand: a typed query's record imported as new, never over a record Koha has, undone as a MARC import" {

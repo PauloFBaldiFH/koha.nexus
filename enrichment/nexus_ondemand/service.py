@@ -1,8 +1,9 @@
 """The on-demand service (plan section 2): the koha-nexus-ondemand unit.
 
 It takes the on-demand jobs of jobs.db (origin "ondemand"; the batch
-worker never takes them, nor this service a batch job), at most 50
-records each, or one typed query, and for each record:
+worker never takes them, nor this service a batch job), any number of
+records (the whole catalogue too: it takes hours, record after record,
+read from export.xml as it goes), or one typed query, and for each record:
 
 1. asks the direct servers (dispatch.py) unless this round was already
    asked: a job is asked again only by "Search more servers" (a new
@@ -18,7 +19,9 @@ Then the job is "ready" with the same report, chunks, Apply and Revert as
 a batch job. A typed query (no local record) keeps its records as
 candidates to import as new; nothing is merged.
 
-Progress goes to ondemand-status.json after every server event. The unit
+A job stopped half way (the machine shut down) goes on from its last
+record when the service starts again. Progress goes to
+ondemand-status.json after every server event. The unit
 needs no port: requests come in through jobs.db. It exits after IDLE
 seconds with nothing to do (the installer starts it for each request).
 """
@@ -41,7 +44,7 @@ from nexus_gateway.learned import Learned
 from nexus_jobs import report
 from nexus_jobs.apply import record_xml
 from nexus_jobs.store import Job, Store
-from nexus_jobs.worker import biblionumber, item_row, title
+from nexus_jobs.worker import biblionumber, count_records, item_row, title
 
 from . import plan, targets
 from .config import Settings as Config
@@ -51,13 +54,12 @@ from .limits import Limiter
 
 log = logging.getLogger("nexus_ondemand.service")
 
-MAX_RECORDS = 50
 IDLE = 300.0
 POLL = 2.0
 
 
 class JobError(Exception):
-    """The job cannot run (its records are missing or too many)."""
+    """The job cannot run (its records are missing or unreadable)."""
 
 
 @dataclass
@@ -67,7 +69,7 @@ class Settings:
     learned_db: Path | None = None
     idle: float = IDLE
     poll: float = POLL
-    max_records: int = MAX_RECORDS
+    pause_poll: float = 10.0
     chunk: int = 500
 
     @property
@@ -232,24 +234,30 @@ def import_file(settings: Settings, store: Store, job_id: int, seq: int, n: int,
 # One job
 # ----------------------------------------------------------------------
 
-def _records(settings: Settings, job: Job) -> list[tuple[marc.Record | None, dict]]:
-    """[(record, typed query)]: the exported records, or one typed query."""
+def _count(settings: Settings, job: Job) -> int:
+    """How many records the job has (1 for a typed query)."""
     if job.query:
         try:
-            query = json.loads(job.query)
+            json.loads(job.query)
         except ValueError as exc:
             raise JobError(f"the typed query is not readable: {exc}") from exc
-        return [(None, query)]
+        return 1
     export = settings.job_dir(job.id) / "export.xml"
     if not export.is_file():
         raise JobError("export.xml is missing")
-    out = []
-    with open(export, "rb") as fh:
+    return count_records(export)
+
+
+def _records(settings: Settings, job: Job):
+    """(record, typed query) one at a time: the exported records, read as
+    they are searched (a whole catalogue never sits in memory), or the
+    typed query."""
+    if job.query:
+        yield None, json.loads(job.query)
+        return
+    with open(settings.job_dir(job.id) / "export.xml", "rb") as fh:
         for rec in marc.iter_xml(fh):
-            out.append((rec, {}))
-            if len(out) > settings.max_records:
-                raise JobError(f"more than {settings.max_records} records: use a background job")
-    return out
+            yield rec, {}
 
 
 def _steps(rec: marc.Record | None, query: dict) -> list[plan.Step]:
@@ -273,17 +281,29 @@ def _query_row(query: dict, cands: list[Candidate]) -> dict:
 
 
 async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispatcher, status: Status) -> str:
-    """Search, keep and merge every record of JOB; returns its state when it stopped."""
+    """Search, keep and merge every record of JOB; returns its state when
+    it stopped. A job found "matching" (the service stopped half way) goes
+    on after its last finished record; one "exported" (new, Search more
+    servers or a new donor) goes through all of them, asking the servers
+    only for records not asked in this round."""
     job = store.job(job.id)
     try:
-        records = _records(settings, job)
-    except JobError as exc:
-        store.set(job.id, state="failed", error=str(exc))
+        total = _count(settings, job)
+    except (JobError, OSError, marc.RecordError, ValueError) as exc:
+        store.set(job.id, state="failed", error=str(exc)[:500])
         return "failed"
-    store.set(job.id, state="matching", total=len(records), done=0)
+    start = job.done if job.state == "matching" else 0
+    store.set(job.id, state="matching", total=total, done=start)
     job = store.job(job.id)
-    status.job(job, len(records), 0)
-    for seq, (rec, query) in enumerate(records, 1):
+    status.job(job, total, start)
+    for seq, (rec, query) in enumerate(_records(settings, job), 1):
+        if seq <= start:
+            continue
+        while (settings.state / "pause").exists() and store.job(job.id).state == "matching":
+            status.data["paused"] = True             # the tray's or the panel's Pause: wait between records
+            status.write()
+            await asyncio.sleep(settings.pause_poll)
+        status.data["paused"] = False
         if store.job(job.id).state != "matching":
             return store.job(job.id).state           # cancelled from the panel
         status.record(seq, rec, query.get("title") or query.get("isbn") or "")
@@ -313,7 +333,7 @@ async def process(store: Store, job: Job, settings: Settings, dispatcher: Dispat
         status.write()
     store.make_chunks(job.id, settings.chunk)
     report.write(store, job.id, settings.job_dir(job.id))
-    store.set(job.id, state="ready", total=len(records), done=len(records))
+    store.set(job.id, state="ready", total=total, done=total)
     status.data.update(state="ready", record=None)
     status.write()
     return "ready"

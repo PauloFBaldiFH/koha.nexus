@@ -9,7 +9,7 @@ from textual.widgets import Button, DataTable, Input, Label, Static
 
 from kei_panel.env import PanelEnv
 from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
-from kei_panel.views.ondemand import attempts_text, count_scope, query_label, server_state
+from kei_panel.views.ondemand import attempts_text, query_label, server_state
 from kei_panel.views.z3950 import health_state
 
 
@@ -21,7 +21,6 @@ async def _until(pilot, cond, wait=8.0):
 
 
 def test_helpers():
-    assert count_scope("101, 102 500-510") == 13 and count_scope("1 - 50") == 50 and count_scope("7") == 1
     assert server_state("3 record(s)") == "3 record(s)" and server_state("no record") == "No record"
     assert server_state("down: timeout: no answer") == "Down: timeout: no answer"
     assert server_state("skipped: limit") == "Skipped: limit" and server_state("searching") == "Searching…"
@@ -84,9 +83,10 @@ def test_on_demand_screen():
             await _until(pilot, lambda: not isinstance(app.screen, ChoiceScreen))
 
             # Requests the service would refuse are refused here first.
-            for scope in ("all", "1-60", "abc"):
+            for scope in ("abc", "1-x"):
                 assert view.scope_problem(scope)
-            assert view.scope_problem("101, 117") == ""
+            for scope in ("all", "1-60000", "101, 117"):                  # no cap: any number, or all
+                assert view.scope_problem(scope) == ""
             view.query_one("#od-year", Input).value = "95"
             view.query_one("#od-title", Input).value = "Vidas secas"
             assert view.query_args() == "The year has four digits, such as 1995."

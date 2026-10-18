@@ -5,7 +5,9 @@ koha-nexus-ondemand service (enrichment/nexus_ondemand, installer section
 The same jobs screen as "Enrich bibliographic catalog" (views/enrich.py),
 for on-demand jobs only, searched now over direct Z39.50 servers (never the
 koha.nexus gateways):
-- up to 50 biblionumbers (`enrich-od-add SCOPE`), or a book typed by ISBN,
+- all the records, or any biblionumbers (`enrich-od-add SCOPE`: a large
+  job runs for hours in the background, record after record, and goes on
+  after a restart), or a book typed by ISBN,
   title, author and year (`enrich-od-add --isbn X --title T ...`);
 - while the service searches, each server it asks for the current record,
   with its state and time (`enrich-od-status`), refreshed every few seconds;
@@ -32,9 +34,9 @@ from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen
 from .enrich import EnrichView, summary_text, valid_scope
 
-MAX_RECORDS = 50
 YEAR = re.compile(r"^\d{4}$")
 # The field groups a donor can be chosen for (nexus_enrich.merge.GROUPS).
+SNAPSHOT_MAX = 50       # up to this many records, a copy of them instead of a full backup
 GROUPS = ("subjects", "082", "080", "505", "520", "300", "024")
 
 
@@ -48,17 +50,6 @@ def group_label(group: str) -> str:
         "300": t("Physical description (300)"),
         "024": t("Other identifiers (024)"),
     }.get(group, group)
-
-
-def count_scope(scope: str) -> int:
-    """How many biblionumbers a scope such as "101, 102, 500-510" names."""
-    n = 0
-    for part in re.split(r"[\s,;]+", re.sub(r"\s*-\s*", "-", scope.strip())):
-        if not part:
-            continue
-        a, _, b = part.partition("-")
-        n += abs(int(b) - int(a)) + 1 if b else 1
-    return n
 
 
 def server_state(state: str) -> str:
@@ -95,7 +86,7 @@ def attempts_text(job: dict) -> str:
 
 class OnDemandView(EnrichView):
     ORIGIN = "ondemand"
-    DEFAULT_SCOPE = ""
+    DEFAULT_SCOPE = "all"
 
     def __init__(self, section):
         super().__init__(section)
@@ -103,15 +94,16 @@ class OnDemandView(EnrichView):
         self.servers_seen: dict = {}
 
     def intro(self) -> str:
-        return t("Searches public catalogues now, over direct Z39.50 connections only, for up to 50 of your records "
-                 "or for a book you type. Nothing reaches the catalogue until you read the report and choose Apply "
-                 "(a copy of those records is saved first) or Import as new record.")
+        return t("Searches public catalogues over direct Z39.50 connections only, for your records (all of them, or "
+                 "the ones you list) or for a book you type. A large job runs for hours in the background and goes "
+                 "on after a restart. Nothing reaches the catalogue until you read the report and choose Apply or "
+                 "Import as new record.")
 
     def compose_new(self) -> ComposeResult:
-        yield Static(t("Your records: up to 50 biblionumbers, such as 101, 102, 500-510."),
+        yield Static(t("Your records: all, or biblionumbers such as 101, 102, 500-510."),
                      classes="ai-note", markup=False)
         with Horizontal(classes="quick-actions"):
-            yield Input(placeholder="101, 102", id="e-scope")
+            yield Input(placeholder="all", id="e-scope")
             yield Button(t("Search"), id="e-start", classes="small", variant="primary")
         yield Static(t("Or a book to find and import as a new record: its ISBN, or its title (the author and the "
                        "year help)."), classes="ai-note", markup=False)
@@ -131,6 +123,9 @@ class OnDemandView(EnrichView):
         table.add_column(t("State"), key="state")
         table.add_column("ms", key="ms")
         yield table
+        with Horizontal(classes="quick-actions"):
+            yield Button(t("Pause"), id="e-pause", classes="small")
+            yield Button(t("Resume"), id="e-resume", classes="small")
 
     def compose_report_buttons(self) -> ComposeResult:
         yield Button(t("Search more servers"), id="od-more", classes="small", disabled=True)
@@ -155,11 +150,9 @@ class OnDemandView(EnrichView):
 
     # -- what differs from the batch screen ---------------------------------
     def scope_problem(self, scope: str) -> str:
-        if not scope or scope.lower() in ("all", "*") or not valid_scope(scope):
-            return t("Not a valid request: up to 50 biblionumbers (such as 101, 102, 500-510), or an ISBN, or a title.")
-        if count_scope(scope) > MAX_RECORDS:
-            return t("More than 50 records: use Enrich bibliographic catalog (a background job) for them.")
-        return ""
+        if valid_scope(scope):
+            return ""
+        return t("Not a valid request: all, biblionumbers (such as 101, 102, 500-510), an ISBN, or a title.")
 
     def start_task(self, scope: str) -> tuple[str, list[str]]:
         return "enrich-od-add", [scope]
@@ -185,30 +178,47 @@ class OnDemandView(EnrichView):
         more = attempts_text(job)
         return text + ("\n" + more if more else "")
 
+    def small(self) -> bool:
+        """A small job saves a copy of its records instead of a full backup
+        (the installer's enrich_od_small)."""
+        return 0 < int((self.job.get("report") or {}).get("enriched", 0)) <= SNAPSHOT_MAX
+
     def apply_question(self, rep: dict, job_id: int) -> str:
+        if not self.small():
+            return super().apply_question(rep, job_id)
         return t("Write the ${n} enriched record(s) of job ${id} into the catalogue? A copy of these records is "
                  "saved first (not a full backup), then Koha's staged import adds the fields. Records edited after "
                  "the report are left as they are. Revert undoes it.", n=rep.get("enriched", 0), id=job_id)
 
     def revert_question(self, job_id: int) -> str:
+        if not self.small():
+            return super().revert_question(job_id)
         return t("Undo job ${id}? A copy of the records as they are now is saved first, then the records get their "
                  "previous version back. Records edited in Koha after Apply are kept.", id=job_id)
 
     async def fetch_worker(self, worker: dict) -> dict:
+        """The service's state, with the shared pause file (the batch worker's status says it)."""
         out = await self._call("enrich-od-status")
-        if out is None or not out.ok:
-            return {"state": "idle"}
-        try:
-            return json.loads(out.get("status") or "{}", strict=False) or {"state": "idle"}
-        except ValueError:
-            return {"state": "idle"}
+        status: dict = {"state": "idle"}
+        if out is not None and out.ok:
+            try:
+                status = json.loads(out.get("status") or "{}", strict=False) or status
+            except ValueError:
+                pass
+        status["pause_file"] = bool(worker.get("pause_file"))
+        return status
 
     # -- drawing -------------------------------------------------------------
     def draw_worker(self) -> None:
         w = self.worker
         label = self.query_one("#e-worker-state", Label)
         bar = self.query_one("#e-progress", ProgressBar)
-        if w.get("state") == "matching":
+        self.query_one("#e-pause", Button).disabled = bool(w.get("pause_file"))
+        self.query_one("#e-resume", Button).disabled = not w.get("pause_file")
+        if w.get("state") == "matching" and w.get("paused"):
+            label.update(t("◐ Paused at record ${n} of ${total}: Resume goes on.", n=int(w.get("done") or 0),
+                           total=w.get("total", 0)))
+        elif w.get("state") == "matching":
             rec = w.get("record") or {}
             label.update(t("● Job ${job}, round ${round}: record ${n} of ${total}: ${title}", job=w.get("job", "?"),
                            round=w.get("round", 1), n=min(int(w.get("done") or 0) + 1, int(w.get("total") or 1)),
@@ -299,7 +309,7 @@ class OnDemandView(EnrichView):
         self.reload()
 
     async def _start(self) -> None:
-        scope = self.query_one("#e-scope", Input).value.strip()
+        scope = self.query_one("#e-scope", Input).value.strip() or self.DEFAULT_SCOPE
         problem = self.scope_problem(scope)
         if problem:
             self.app.notify(problem, severity="warning", timeout=6)
