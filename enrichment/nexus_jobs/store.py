@@ -90,11 +90,39 @@ CREATE TABLE IF NOT EXISTS auth_new (
     PRIMARY KEY (job_id, id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS auth_new_key ON auth_new (job_id, kind, key, dates);
+-- On-demand jobs (origin ondemand): what each direct server did for each
+-- record, per round ("Search more servers" adds a round).
+CREATE TABLE IF NOT EXISTS od_attempts (
+    job_id INTEGER NOT NULL,
+    seq INTEGER NOT NULL,                    -- the record's place in export.xml (1 for a typed query)
+    round INTEGER NOT NULL,
+    wave INTEGER NOT NULL,
+    target TEXT NOT NULL,
+    address TEXT NOT NULL,
+    outcome TEXT NOT NULL,                   -- found, none, error, skipped, cached
+    category TEXT NOT NULL DEFAULT '',       -- health category of an error
+    detail TEXT NOT NULL DEFAULT '',
+    step TEXT NOT NULL DEFAULT '',
+    hits INTEGER NOT NULL DEFAULT 0,
+    records INTEGER NOT NULL DEFAULT 0,
+    ms INTEGER NOT NULL DEFAULT 0,
+    at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS od_attempts_job ON od_attempts (job_id, seq, round);
+-- The librarian's choice of donor for one field group of one record.
+CREATE TABLE IF NOT EXISTS od_choices (
+    job_id INTEGER NOT NULL,
+    biblionumber INTEGER NOT NULL,
+    grp TEXT NOT NULL,
+    source TEXT NOT NULL,
+    PRIMARY KEY (job_id, biblionumber, grp)
+);
 """
 
 # Columns added after the first release of jobs.db.
 _ADDED = (("jobs", "kind", "TEXT NOT NULL DEFAULT 'bib'"), ("jobs", "mode", "TEXT NOT NULL DEFAULT ''"),
-          ("chunks", "kind", "TEXT NOT NULL DEFAULT 'bib'"))
+          ("chunks", "kind", "TEXT NOT NULL DEFAULT 'bib'"), ("jobs", "origin", "TEXT NOT NULL DEFAULT 'batch'"),
+          ("jobs", "query", "TEXT NOT NULL DEFAULT ''"), ("jobs", "rounds", "INTEGER NOT NULL DEFAULT 1"))
 
 OPEN_STATES = ("queued", "exported", "matching")
 
@@ -126,6 +154,9 @@ class Job:
     error: str
     kind: str = "bib"          # bib: enrich bibliographic records; auth: authorities
     mode: str = ""             # auth: exact or fuzzy
+    origin: str = "batch"      # batch: the worker (static.db); ondemand: the direct Z39.50 servers, now
+    query: str = ""            # ondemand with no local record: the typed query (JSON)
+    rounds: int = 1            # ondemand: the server rounds asked for ("Search more servers" adds one)
 
     def as_dict(self) -> dict:
         return dict(self.__dict__)
@@ -148,10 +179,10 @@ class Store:
         self.conn.close()
 
     # -- jobs ------------------------------------------------------------
-    def add(self, scope: str, kind: str = "bib", mode: str = "") -> Job:
+    def add(self, scope: str, kind: str = "bib", mode: str = "", origin: str = "batch", query: str = "") -> Job:
         t = now()
-        cur = self.conn.execute("INSERT INTO jobs (created, updated, scope, state, kind, mode) "
-                                "VALUES (?, ?, ?, 'queued', ?, ?)", (t, t, scope, kind, mode))
+        cur = self.conn.execute("INSERT INTO jobs (created, updated, scope, state, kind, mode, origin, query) "
+                                "VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)", (t, t, scope, kind, mode, origin, query))
         return self.job(cur.lastrowid)
 
     def job(self, job_id: int) -> Job:
@@ -163,9 +194,11 @@ class Store:
     def jobs(self) -> list[Job]:
         return [Job(**dict(r)) for r in self.conn.execute("SELECT * FROM jobs ORDER BY id DESC")]
 
-    def next_job(self) -> Job | None:
-        row = self.conn.execute("SELECT * FROM jobs WHERE state IN ('exported', 'matching') ORDER BY id LIMIT 1"
-                                ).fetchone()
+    def next_job(self, origin: str = "batch") -> Job | None:
+        """The oldest job waiting for the batch worker (or, with origin
+        ondemand, for the on-demand service): each runs only its own."""
+        row = self.conn.execute("SELECT * FROM jobs WHERE state IN ('exported', 'matching') AND origin = ? "
+                                "ORDER BY id LIMIT 1", (origin,)).fetchone()
         return Job(**dict(row)) if row else None
 
     def set(self, job_id: int, **values) -> None:
@@ -300,6 +333,44 @@ class Store:
     def set_new_authority(self, job_id: int, nid: int, **values) -> None:
         cols = ", ".join(f"{k} = ?" for k in values)
         self.conn.execute(f"UPDATE auth_new SET {cols} WHERE job_id = ? AND id = ?", (*values.values(), job_id, nid))
+
+
+    # -- on-demand ---------------------------------------------------------
+    def add_attempts(self, job_id: int, seq: int, rnd: int, attempts) -> None:
+        t = now()
+        self.conn.executemany(
+            "INSERT INTO od_attempts (job_id, seq, round, wave, target, address, outcome, category, detail, step, "
+            "hits, records, ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(job_id, seq, rnd, a.wave, a.target, a.address, a.outcome, a.category, a.detail[:300], a.step,
+              a.hits, a.records, a.ms, t) for a in attempts])
+
+    def attempts(self, job_id: int, seq: int | None = None, rnd: int | None = None) -> list[sqlite3.Row]:
+        sql, args = "SELECT * FROM od_attempts WHERE job_id = ?", [job_id]
+        if seq is not None:
+            sql += " AND seq = ?"
+            args.append(seq)
+        if rnd is not None:
+            sql += " AND round = ?"
+            args.append(rnd)
+        return self.conn.execute(sql + " ORDER BY rowid", args).fetchall()
+
+    def asked(self, job_id: int, seq: int) -> set[str]:
+        """The servers asked for this record in any round (skipped ones were not)."""
+        return {r[0] for r in self.conn.execute(
+            "SELECT DISTINCT target FROM od_attempts WHERE job_id = ? AND seq = ? AND outcome != 'skipped'",
+            (job_id, seq))}
+
+    def set_choice(self, job_id: int, biblionumber: int, group: str, source: str) -> None:
+        if source:
+            self.conn.execute("INSERT OR REPLACE INTO od_choices (job_id, biblionumber, grp, source) VALUES (?, ?, ?, ?)",
+                              (job_id, biblionumber, group, source))
+        else:
+            self.conn.execute("DELETE FROM od_choices WHERE job_id = ? AND biblionumber = ? AND grp = ?",
+                              (job_id, biblionumber, group))
+
+    def choices(self, job_id: int, biblionumber: int) -> dict[str, str]:
+        return {r[0]: r[1] for r in self.conn.execute(
+            "SELECT grp, source FROM od_choices WHERE job_id = ? AND biblionumber = ?", (job_id, biblionumber))}
 
 
 def detail(item: sqlite3.Row) -> dict:

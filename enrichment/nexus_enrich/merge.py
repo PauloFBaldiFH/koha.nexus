@@ -72,6 +72,7 @@ class Policy:
     subjects: str = "fill-empty"   # or "union": add headings not already present
     today: str = ""                # YYYYMMDD for 883 $d; default: today
     agency: str = "nexus_enrich"
+    donors: dict = field(default_factory=dict)   # group -> source the librarian chose (on-demand)
 
 
 @dataclass
@@ -235,7 +236,10 @@ def enrich(local: Record, candidates: list[Candidate], policy: Policy | None = N
     stamp = policy.today or date.today().strftime("%Y%m%d")
     link = _next_link(out)
     for group, tags, classes in GROUPS:
-        for donor in usable:
+        chosen = policy.donors.get(group)
+        # A chosen donor goes first for its group; the class rules still apply to it.
+        order = sorted(usable, key=lambda s: s.candidate.source != chosen) if chosen else usable
+        for donor in order:
             cls = donor.match.cls
             if cls not in classes:
                 continue

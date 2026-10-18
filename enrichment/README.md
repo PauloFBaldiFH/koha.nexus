@@ -220,6 +220,31 @@ config.sh --task enrich-pause on|off                  # hold the worker between 
 Pointer-only matches (sources shipped without the full record) are counted
 in the report but not fetched yet.
 
+## On-demand enrichment (direct Z39.50 servers, now)
+
+```sh
+config.sh --task enrich-od-add "101, 102"             # at most 50 records; exports, queues, starts the service
+config.sh --task enrich-od-add --isbn 9788535902778   # or --title T [--author A] [--year Y]: records to import as new
+config.sh --task enrich-od-status 7                   # the service's progress (per server) and job 7
+config.sh --task enrich-od-more 7                     # "Search more servers": the next ones, never the same
+config.sh --task enrich-od-donor 7 101 subjects z3950:loc   # the donor of a field group (merged again, no network)
+config.sh --task enrich-job-apply 7                   # the batch Apply, with a copy of the records, not a full backup
+config.sh --task z3950-health                         # each direct server's breaker state (JSON)
+config.sh --task z3950-health-reset loc               # or --all
+```
+
+The `koha-nexus-ondemand` unit (`python -m nexus_ondemand serve`) asks only
+the direct servers of `panel/kei_panel/data/z3950_direct.json`, which
+`enrich_install` copies next to the packages; the policy refuses
+`sru.koha.nexus`, `catalog.koha.nexus` and every local address whatever
+the list says. It takes the jobs of origin `ondemand` (the batch worker
+never does), keeps what each server did in `jobs.db` (`od_attempts`) and
+the records found in `jobs/ID/candidates/`, merges each server's best
+record with the batch rules, and writes the same report. It has network
+but no access to Koha, no port, `CPUQuota=25%`, `MemoryMax=160M`, and exits
+after 5 idle minutes. `python -m nexus_ondemand once ID` runs one job from
+a terminal.
+
 ## The engine
 
 ```python

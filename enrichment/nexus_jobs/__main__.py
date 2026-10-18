@@ -3,6 +3,12 @@
 Jobs (the panel's tasks call these through the installer):
     add --scope "all" | "101, 102, 500-550" [--kind auth --mode exact|fuzzy]
                                     new job; prints its id and folder
+    add --origin ondemand --scope "101, 102" | --isbn X | --title T [--author A] [--year Y]
+                                    an on-demand job: at most 50 records, or a
+                                    typed query (its records are imported as new)
+    more ID                         on-demand: ask the next servers (a new round)
+    donor ID BIBLIONUMBER GROUP [SOURCE]
+                                    on-demand: the donor of a field group (none: the best)
     exported ID                     Koha's records are in jobs/ID/export.xml
     fail ID --error TEXT
     cancel ID
@@ -33,12 +39,14 @@ import sys
 from pathlib import Path
 
 from nexus_enrich.authority import KohaIndex
+from nexus_enrich.merge import GROUPS
 
 from . import apply, report, scope
 from .store import Store
 from .worker import Settings, run
 
 SHOW_CHANGES = 200
+ONDEMAND_MAX = 50
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,7 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--scope", default="all")
     a.add_argument("--kind", choices=("bib", "auth"), default="bib")
     a.add_argument("--mode", choices=("exact", "fuzzy"), default="exact")
-    for name in ("exported", "cancel", "show", "applied-ids", "kind", "auth-revert-plan"):
+    a.add_argument("--origin", choices=("batch", "ondemand"), default="batch")
+    for name in ("isbn", "title", "author", "year"):
+        a.add_argument(f"--{name}", default="")
+    for name in ("exported", "cancel", "show", "applied-ids", "kind", "auth-revert-plan", "more", "origin"):
         sub.add_parser(name).add_argument("job", type=int)
     ch = sub.add_parser("chunks")
     ch.add_argument("job", type=int)
@@ -93,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
             c.add_argument("--note", default="")
         elif name in ("reverted", "auth-reverted"):
             c.add_argument("--kept", default="")
+    dn = sub.add_parser("donor")
+    dn.add_argument("job", type=int)
+    dn.add_argument("biblionumber", type=int)
+    dn.add_argument("group", choices=[g[0] for g in GROUPS])
+    dn.add_argument("source", nargs="?", default="")
     r = sub.add_parser("revert-plan")
     r.add_argument("job", type=int)
     r.add_argument("--current", required=True)
@@ -130,11 +146,32 @@ def main(argv: list[str] | None = None) -> int:
         store.close()
 
 
+def _ondemand_scope(args) -> tuple:
+    """(ranges, typed query JSON) of an on-demand job: biblionumbers (at
+    most ONDEMAND_MAX), or a typed query."""
+    q = {k: " ".join(getattr(args, k).split())[:300] for k in ("isbn", "title", "author", "year")}
+    if any(q.values()):
+        if not (q["isbn"] or q["title"]):
+            raise scope.ScopeError("an on-demand query needs an ISBN or a title")
+        return None, json.dumps({k: v for k, v in q.items() if v}, ensure_ascii=False)
+    ranges = scope.parse(args.scope)
+    if ranges is None:
+        raise scope.ScopeError("on demand needs biblionumbers (at most %d), or a query" % ONDEMAND_MAX)
+    if sum(b - a + 1 for a, b in ranges) > ONDEMAND_MAX:
+        raise scope.ScopeError(f"more than {ONDEMAND_MAX} records: use a background job")
+    return ranges, ""
+
+
 def _jobs(args, store: Store, settings: Settings) -> int:
     cmd = args.cmd
     if cmd == "add":
-        ranges = scope.parse(args.scope)
-        job = store.add(scope.text(ranges), args.kind, args.mode if args.kind == "auth" else "")
+        query = ""
+        if args.origin == "ondemand":
+            ranges, query = _ondemand_scope(args)
+        else:
+            ranges = scope.parse(args.scope)
+        job = store.add(scope.text(ranges) if not query else "query", args.kind,
+                        args.mode if args.kind == "auth" else "", args.origin, query)
         folder = settings.job_dir(job.id)
         folder.mkdir(parents=True, exist_ok=True)
         ids = ""
@@ -172,6 +209,13 @@ def _jobs(args, store: Store, settings: Settings) -> int:
             out["report"] = json.loads(rep.read_text(encoding="utf-8"))
             out["report_html"] = str(rep.with_suffix(".html"))
         out["chunks"] = [dict(c) for c in store.chunks(job.id)]
+        if job.origin == "ondemand":
+            # What each server did, every round; a typed query's records.
+            out["attempts"] = [{k: a[k] for k in ("seq", "round", "wave", "target", "address", "outcome",
+                                                  "category", "detail", "step", "hits", "records", "ms")}
+                               for a in store.attempts(job.id)]
+            out["found"] = [{"seq": r["seq"], **json.loads(r["detail"] or "{}")}
+                            for r in store.items(job.id, "found", "no-match") if r["biblionumber"] is None]
         # The records a person reviews first (the panel's list): changed
         # ones, then the review list, at most SHOW_CHANGES.
         auth = job.kind == "auth"
@@ -197,6 +241,21 @@ def _jobs(args, store: Store, settings: Settings) -> int:
         return 0
     if cmd == "kind":
         print(job.kind)
+        return 0
+    if cmd == "origin":
+        print(job.origin)
+        return 0
+    if cmd in ("more", "donor"):
+        if job.origin != "ondemand" or job.state not in ("ready", "failed"):
+            print(f"job {job.id} is {job.state}: only an on-demand report not yet applied can search again",
+                  file=sys.stderr)
+            return 1
+        if cmd == "more":
+            store.set(job.id, state="exported", rounds=job.rounds + 1, error="")
+        else:
+            store.set_choice(job.id, args.biblionumber, args.group, args.source)
+            store.set(job.id, state="exported", error="")     # merged again, no network
+        print(json.dumps({"job": job.id, "round": store.job(job.id).rounds}))
         return 0
     if cmd == "auth-resolve":
         print(apply.resolve_new(store, job.id, KohaIndex.from_file(args.koha)))

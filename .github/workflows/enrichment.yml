@@ -9,11 +9,13 @@ on:
       - "enrichment/**"
       - ".github/workflows/enrichment.yml"
       - "panel/kei_panel/data/z3950_targets.json"
+      - "panel/kei_panel/data/z3950_direct.json"
   pull_request:
     paths:
       - "enrichment/**"
       - ".github/workflows/enrichment.yml"
       - "panel/kei_panel/data/z3950_targets.json"
+      - "panel/kei_panel/data/z3950_direct.json"
 
 permissions:
   contents: read
