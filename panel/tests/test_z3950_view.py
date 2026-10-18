@@ -40,7 +40,7 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
                 "[b]\\[11] SRU fallback: specialized and union catalogues[/b]"
             utfpr = next(t for t in curated if t.db == "biblioteca")
             assert table.get_row(utfpr.key)[1] == "BR UTFPR (Universidade Tecnológica Federal do Paraná)"
-            # Koha's own list was read: its LoC row (127.0.0.1:5000) is marked.
+            # Koha's own list was read: its LoC row (https://sru.koha.nexus:443) is marked.
             loc = next(t for t in curated if t.db == "sru/loc")
             await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
 

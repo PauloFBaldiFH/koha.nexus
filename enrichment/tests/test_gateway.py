@@ -363,7 +363,10 @@ def test_koha_sql():
     assert sql.count("INSERT INTO z3950servers") == len(table) + 2       # sru/_union and sru/_union-aut
     assert "'sru/_union', 'KOHA.NEXUS (TODOS OS CATÁLOGOS)', 1, 0" in sql
     assert "SET checked = IF(db = 'sru/_union', 1, 0)" in sql
-    assert "host = 'https://sru.koha.nexus'" not in sql.split("-- 2.")[1]
+    # Koha's rows are on the Cloudflare tunnel; after step 1 nothing points at the local gateway.
+    assert "host = 'https://sru.koha.nexus' AND port = 443" in sql
+    assert "host = '127.0.0.1'" not in sql.split("-- 2.")[1].split("-- 6.")[0]
+    assert "UPDATE z3950servers SET host = 'https://sru.koha.nexus', port = 443 WHERE recordtype = 'authority'" in sql
     assert sql.strip().endswith("COMMIT;")
     assert koha_sql.q("O'Brien") == "'O''Brien'"
 
@@ -392,7 +395,7 @@ def test_panel_list_is_generated_from_targets_json():
         == ["NAF", "SAF", "sru/bn-aut", "sru/_union-aut"]
     fallback = [t for t in rows if t.get("priority") == "fallback"]
     assert fallback[0]["db"] == "sru/_union" and rows[-len(fallback):] == fallback
-    assert {(t["host"], t["port"]) for t in fallback} == {("127.0.0.1", 5000)}
+    assert {(t["host"], t["port"]) for t in fallback} == {("sru.koha.nexus", 443)}
     assert not any(t["preselect"] for t in fallback)
     assert [t["rank"] for t in fallback] == list(range(koha_sql.FALLBACK_RANK, koha_sql.FALLBACK_RANK + len(fallback)))
     assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default", "Default", "LCDB"]

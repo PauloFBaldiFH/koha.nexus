@@ -121,9 +121,11 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
 - Records go out without 9XX fields and `$9` subfields (the source Koha's
   items and authority ids).
 - `static.db` is reopened by itself when the file is replaced.
-- `koha-sql` moves the VPS gateway's rows (`sru.koha.nexus`, …) to
-  `127.0.0.1:5000`, adds `sru/_union` and leaves it as the gateway's only
-  ticked row. Authority rows are not touched.
+- `koha-sql` points Koha's rows at the gateway behind the Cloudflare tunnel,
+  `https://sru.koha.nexus` port 443: rows on older addresses (`127.0.0.1:5000`,
+  the VPS's IPs) move there; it adds `sru/_union` and leaves it as the
+  gateway's only ticked row. Of the authority rows only `sru/_union-aut` is
+  touched.
 - Logins: `NEXUS_GATEWAY_LOGIN_<ID>=user:password` in the unit's environment
   file, never in `targets.json`. The unit is `deploy/koha-nexus-sru.service`.
 

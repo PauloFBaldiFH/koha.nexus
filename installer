@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.86"
+PANEL_VERSION=" 1.5.87"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29523,8 +29523,9 @@ z3950_seed_authorities() {
 #   koha-nexus-enrich-update.timer      weekly, and once after installation
 # It replaces the Zeus and Pergamum SRU bridges (they scraped those
 # catalogues from this machine; their records now come in static.db), so
-# installing it stops and removes them, and moves Koha's rows (also the ones
-# on the VPS gateway, sru.koha.nexus) to it.
+# installing it stops and removes them. Koha's rows go to the gateway behind
+# the Cloudflare tunnel, https://sru.koha.nexus:443 (the local one's rows on
+# 127.0.0.1:5000 move there).
 # ----------------------------------------------------------------------
 ENRICH_DIR="/usr/local/lib/koha-easy-installer/enrichment"
 ENRICH_STATE="/var/lib/koha-nexus-enrich"
@@ -29580,9 +29581,10 @@ enrich_retire_bridges() {
     return 0
 }
 
-# Koha's rows for the gateway (python -m nexus_gateway koha-sql): sru/_union
-# ticked, one unticked row per catalogue, the VPS gateway's and the retired
-# bridges' rows moved or removed, and the authority row sru/_union-aut for
+# Koha's rows for the gateway (python -m nexus_gateway koha-sql), on the
+# Cloudflare tunnel https://sru.koha.nexus:443: sru/_union ticked, one
+# unticked row per catalogue, the rows on older addresses (127.0.0.1:5000,
+# the VPS's IPs) moved and the retired bridges' rows removed, and the authority row sru/_union-aut for
 # the authority search in cataloguing. Only once Koha's database exists.
 enrich_register() {
     is_koha_installed 2>/dev/null || return 0
@@ -29591,7 +29593,7 @@ enrich_register() {
     local log
     log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
     if gateway_py koha-sql 2>>"$log" | mysql --default-character-set=utf8mb4 "$DB_NAME" 2>>"$log"; then
-        log "enrichment: Koha's rows point at the local gateway (sru/_union ticked)"
+        log "enrichment: Koha's rows point at the gateway on https://sru.koha.nexus:443 (sru/_union ticked)"
         kei_result koha-target set
     else
         kei_result koha-target failed

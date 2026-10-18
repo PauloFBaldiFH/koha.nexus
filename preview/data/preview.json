@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.84",
+ "panel_version": "1.5.87",
  "languages": [
   {
    "code": "en",
@@ -2207,7 +2207,7 @@
        "Universidade Federal de Santa Catarina (UFSC)",
        "Not scanned yet",
        "SRU · MARC21",
-       "127.0.0.1:5000/sru/ufsc"
+       "sru.koha.nexus:443/sru/ufsc"
       ]
      ]
     }
@@ -2237,7 +2237,7 @@
        "Rede Pergamum",
        "Not scanned yet",
        "SRU · MARC21",
-       "127.0.0.1:5000/sru/all"
+       "sru.koha.nexus:443/sru/all"
       ]
      ]
     }

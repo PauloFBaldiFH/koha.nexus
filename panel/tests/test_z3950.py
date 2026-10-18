@@ -52,11 +52,11 @@ def test_curated_list_loads_and_covers_every_region():
     direct = [t for t in targets if t.source == z.DIRECT_SOURCE]
     assert len(direct) == 171 and {t.kind for t in direct} == {"zed"}
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
-    # The fallback goes through the local gateway (enrichment/nexus_gateway), ranked after every direct server.
+    # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
     assert len(fallback) == 74
     assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in fallback} == {
-        ("127.0.0.1", 5000, "sru", "MARC21", "utf8")}
+        ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
     assert all(t.db.startswith("sru/") and not t.login and not t.preselect for t in fallback)
     assert [t.rank for t in fallback] == list(range(500, 574))
 
@@ -95,7 +95,7 @@ def test_curated_list_has_the_three_authority_files():
     auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.source != z.DIRECT_SOURCE]
     got = [(t.name, t.host, t.port, t.db, t.kind, t.syntax, t.encoding, t.timeout, t.rank, t.region, t.preselect)
            for t in auth]
-    assert got.pop() == ("KOHA.NEXUS (AUTORIDADES)", "127.0.0.1", 5000, "sru/_union-aut", "sru", "MARC21", "utf8",
+    assert got.pop() == ("KOHA.NEXUS (AUTORIDADES)", "sru.koha.nexus", 443, "sru/_union-aut", "sru", "MARC21", "utf8",
                          15, 0, "authorities", False)
     auth.pop()
     assert got == [
@@ -111,7 +111,7 @@ def test_curated_list_has_the_three_authority_files():
 
 
 def test_authority_files_reach_the_add_file_and_the_sql():
-    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.host != "127.0.0.1"
+    auth = [t for t in z.load_curated() if t.recordtype == "authority" and t.db != "sru/_union-aut"
             and t.source != z.DIRECT_SOURCE]
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in z.add_file_text(auth, {}).splitlines()]
     assert [(r["db"], r["rank"], r["timeout"], r["recordtype"]) for r in rows] == [
@@ -575,7 +575,7 @@ def test_add_file_and_sql_carry_the_sru_settings():
     dnb = z.make_target({"name": "DNB", "host": "https://services.dnb.de/sru/dnb"})
     rows = [dict(zip(z.ADD_FIELDS, line.split("\t"))) for line in
             z.add_file_text([zeus, utfpr, dnb], {}).splitlines()]
-    assert (rows[0]["host"], rows[0]["port"], rows[0]["db"]) == ("127.0.0.1", "5000", "sru/_union")
+    assert (rows[0]["host"], rows[0]["port"], rows[0]["db"]) == ("sru.koha.nexus", "443", "sru/_union")
     assert (rows[0]["kind"], rows[0]["sru_options"]) == ("sru", "sru=get,sru_version=1.1")
     assert rows[0]["sru_fields"].startswith("title=dc.title,isbn=dc.isbn")
     assert (rows[1]["kind"], rows[1]["sru_fields"], rows[1]["sru_options"]) == ("zed", "", "")
@@ -707,8 +707,8 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
 
 def test_curated_list_has_no_raw_address():
     # The VPS gateway's addresses (public and private IPs) never come back: the
-    # gateway catalogues are local, the BN authority file still on the VPS one.
+    # gateway rows go through the Cloudflare tunnel (sru.koha.nexus:443).
     # The one raw address is the RNP server in Rio, which has no host name.
     hosts = {t.host for t in z.load_curated()}
-    assert {"127.0.0.1", "sru.koha.nexus", "lx2.loc.gov"} <= hosts
-    assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"127.0.0.1", "200.19.73.127"}
+    assert {"sru.koha.nexus", "lx2.loc.gov"} <= hosts
+    assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"200.19.73.127"}
