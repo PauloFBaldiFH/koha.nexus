@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.88"
+PANEL_VERSION=" 1.5.89"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29534,6 +29534,11 @@ GATEWAY_UNIT="koha-nexus-sru"
 GATEWAY_PORT=5000
 ENRICH_UPDATE_UNIT="koha-nexus-enrich-update"
 ENRICH_WORKER_UNIT="koha-nexus-enrich"
+# On-demand enrichment (plan 2026-10-18): asks the direct Z39.50 servers of
+# panel/kei_panel/data/z3950_direct.json, shipped next to the packages.
+ENRICH_ONDEMAND_UNIT="koha-nexus-ondemand"
+ENRICH_DIRECT_LIST="z3950_direct.json"
+KEI_ENV_FILE_PATH="${KEI_ENV_FILE:-/etc/koha-easy-install/.env}"
 # The user python -m nexus_jobs runs as, so its files stay the service's
 # (the tests set it empty: run as the caller).
 ENRICH_RUNAS="${ENRICH_RUNAS-$ENRICH_USER}"
@@ -29544,7 +29549,7 @@ RETIRED_BRIDGE_UNITS="koha-zeus-sru koha-pergamum-sru"
 # 0 when $1 holds the gateway's sources.
 enrich_src_ok() {
     [ -f "$1/nexus_gateway/__main__.py" ] && [ -f "$1/nexus_enrich/static.py" ] && [ -f "$1/nexus_jobs/worker.py" ] \
-        && [ -f "$1/requirements.txt" ]
+        && [ -f "$1/nexus_ondemand/service.py" ] && [ -f "$1/requirements.txt" ]
 }
 
 # 0 when something answers on 127.0.0.1:PORT (default: the gateway's).
@@ -29615,7 +29620,7 @@ enrich_install() {
     else
         tmp=$(mktemp -d /tmp/koha_tmp_enrich.XXXXXX) || return 1
         if curl -fsSL --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 120 "$KEI_PANEL_TARBALL_URL" \
-             | tar -xz -C "$tmp" --wildcards '*/enrichment/*' 2>>"$log" \
+             | tar -xz -C "$tmp" --wildcards '*/enrichment/*' "*/panel/kei_panel/data/${ENRICH_DIRECT_LIST}" 2>>"$log" \
            && enrich_src_ok "$(echo "$tmp"/*/enrichment)"; then
             src="$(echo "$tmp"/*/enrichment)"
         fi
@@ -29629,9 +29634,12 @@ enrich_install() {
     command -v python3 >/dev/null 2>&1 || apt_install python3 >>"$log" 2>&1
     python3 -c 'import ensurepip, venv' >/dev/null 2>&1 || apt_install python3-venv >>"$log" 2>&1
     mkdir -p "$ENRICH_DIR"
-    rm -rf "$ENRICH_DIR/nexus_enrich" "$ENRICH_DIR/nexus_gateway" "$ENRICH_DIR/nexus_jobs"
-    cp -r "$src/nexus_enrich" "$src/nexus_gateway" "$src/nexus_jobs" "$src/requirements.txt" "$ENRICH_DIR/" \
-        || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
+    rm -rf "$ENRICH_DIR/nexus_enrich" "$ENRICH_DIR/nexus_gateway" "$ENRICH_DIR/nexus_jobs" "$ENRICH_DIR/nexus_ondemand"
+    cp -r "$src/nexus_enrich" "$src/nexus_gateway" "$src/nexus_jobs" "$src/nexus_ondemand" "$src/requirements.txt" \
+        "$ENRICH_DIR/" || { [ -n "$tmp" ] && rm -rf "$tmp"; return 1; }
+    # The direct server list on-demand asks (the only servers it may contact).
+    cp -f "$src/../panel/kei_panel/data/${ENRICH_DIRECT_LIST}" "$ENRICH_DIR/${ENRICH_DIRECT_LIST}" 2>>"$log" \
+        || printf 'enrichment: %s not found next to the sources\n' "$ENRICH_DIRECT_LIST" >> "$log"
     [ -n "$tmp" ] && rm -rf "$tmp"
     find "$ENRICH_DIR" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
     [ -z "${PIP_CERT:-}" ] && [ -s /etc/ssl/certs/ca-certificates.crt ] && cert=/etc/ssl/certs/ca-certificates.crt
@@ -29746,6 +29754,54 @@ SystemCallFilter=@system-service
 [Install]
 WantedBy=multi-user.target
 UNIT
+    # On demand: the direct Z39.50 servers for a few records, now. Network
+    # (the policy refuses the koha.nexus endpoints and every local address
+    # itself), no access to Koha (records come exported, as for the
+    # worker), no port (jobs.db in, ondemand-status.json out). Started for
+    # each request, it exits after 5 idle minutes; enabled so a request cut
+    # by a shutdown goes on at boot. Logins (KEI_Z3950_*) from the panel's .env.
+    cat > "/etc/systemd/system/${ENRICH_ONDEMAND_UNIT}.service" <<UNIT
+[Unit]
+Description=koha.nexus on-demand enrichment (direct Z39.50 servers only; exits when idle)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${ENRICH_USER}
+Group=${ENRICH_USER}
+WorkingDirectory=${ENRICH_DIR}
+EnvironmentFile=-${KEI_ENV_FILE_PATH}
+Environment=NEXUS_JOBS_STATE=${ENRICH_STATE}
+Environment=NEXUS_GATEWAY_STATIC_DB=${ENRICH_STATE}/static.db
+Environment=NEXUS_GATEWAY_LEARNED_DB=${ENRICH_STATE}/learned.db
+Environment=NEXUS_ONDEMAND_DIRECT_LIST=${ENRICH_DIR}/${ENRICH_DIRECT_LIST}
+Environment=NEXUS_ONDEMAND_HEALTH_DB=${ENRICH_STATE}/health.db
+StateDirectory=koha-nexus-enrich
+StateDirectoryMode=0750
+ExecStart=${ENRICH_DIR}/.venv/bin/python -m nexus_ondemand serve
+Nice=10
+IOSchedulingClass=idle
+CPUQuota=25%
+MemoryHigh=128M
+MemoryMax=160M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
     cat > "/etc/systemd/system/${ENRICH_UPDATE_UNIT}.timer" <<UNIT
 [Unit]
 Description=Weekly check for a new koha.nexus enrichment database
@@ -29760,7 +29816,7 @@ Persistent=true
 WantedBy=timers.target
 UNIT
     systemctl daemon-reload >>"$log" 2>&1
-    systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" "$ENRICH_WORKER_UNIT" >>"$log" 2>&1
+    systemctl enable "$GATEWAY_UNIT" "${ENRICH_UPDATE_UNIT}.timer" "$ENRICH_WORKER_UNIT" "$ENRICH_ONDEMAND_UNIT" >>"$log" 2>&1
     enrich_empty_db >>"$log" 2>&1 || log "enrichment: the empty static.db was not created (see ${log})"
     systemctl restart "$GATEWAY_UNIT" >>"$log" 2>&1
     systemctl start "${ENRICH_UPDATE_UNIT}.timer" >>"$log" 2>&1
@@ -29916,6 +29972,25 @@ enrich_ready() {
     [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_jobs/worker.py" ] || enrich_install
 }
 
+# The same, with on-demand: its package, the direct list and its unit (an
+# install from before on-demand gets them now).
+enrich_od_ready() {
+    [ -x "$ENRICH_DIR/.venv/bin/python" ] && [ -f "$ENRICH_DIR/nexus_ondemand/service.py" ] \
+        && [ -s "$ENRICH_DIR/${ENRICH_DIRECT_LIST}" ] \
+        && [ -f "/etc/systemd/system/${ENRICH_ONDEMAND_UNIT}.service" ] || enrich_install
+}
+
+# ondemand_py ARGS: python -m nexus_ondemand as the service user, with the unit's settings.
+ondemand_py() {
+    local run=()
+    [ -n "$ENRICH_RUNAS" ] && [ "$(id -u)" = 0 ] && run=(runuser -u "$ENRICH_RUNAS" --)
+    ( cd "$ENRICH_DIR" 2>/dev/null || cd /
+      "${run[@]}" env NEXUS_JOBS_STATE="$ENRICH_STATE" NEXUS_GATEWAY_STATIC_DB="$ENRICH_STATE/static.db" \
+          NEXUS_GATEWAY_LEARNED_DB="$ENRICH_STATE/learned.db" \
+          NEXUS_ONDEMAND_DIRECT_LIST="$ENRICH_DIR/${ENRICH_DIRECT_LIST}" NEXUS_ONDEMAND_HEALTH_DB="$ENRICH_STATE/health.db" \
+          "$ENRICH_DIR/.venv/bin/python" -m nexus_ondemand "$@" )
+}
+
 # enrich_job_add SCOPE [KIND [MODE]]: a new job ("all", or "101, 102,
 # 500-550"): Koha's records exported (no items, throttled), then the worker
 # started. KIND auth ("Enrich & standardize authorities") also exports
@@ -30023,7 +30098,14 @@ _enrich_job_apply_run() {
         msg_error "" "$(t "Koha's record matching rule could not be created. Nothing was changed.")" 9 76
         return 1
     fi
-    tools_safety_backup ENRICH || { kei_result apply backup-failed; return 1; }
+    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ]; then
+        # On demand (at most 50 records): a copy of those records, not a full backup.
+        for c in $chunks; do jobs_py chunk-ids "$id" "$c" 2>>"$log"; done > "$dir/snapshot-ids.txt"
+        enrich_snapshot "$id" "$dir/snapshot-ids.txt" "$log" apply || { rm -f "$dir/snapshot-ids.txt"; kei_result apply backup-failed; return 1; }
+        rm -f "$dir/snapshot-ids.txt"
+    else
+        tools_safety_backup ENRICH || { kei_result apply backup-failed; return 1; }
+    fi
     kei_result backup "$TOOLS_PRE"
     display_explanation "Applying the changes..."
     kind=$(jobs_py kind "$id" 2>>"$log")
@@ -30187,15 +30269,21 @@ _enrich_job_revert_run() {
     enrich_005 "$dir/applied.txt" > "$dir/current.tsv"
     enrich_own "$dir/current.tsv"
     plan=$(jobs_py revert-plan "$id" --current "$dir/current.tsv" "${all[@]}" 2>>"$log")
-    rm -f "$dir/applied.txt" "$dir/current.tsv"
+    rm -f "$dir/current.tsv"
     kind=$(jobs_py kind "$id" 2>>"$log")
     [ -z "$plan" ] && [ "$kind" = auth ] && aplan=$(jobs_py auth-revert-plan "$id" 2>>"$log")
     if [ -z "$plan$aplan" ]; then
+        rm -f "$dir/applied.txt"
         kei_result revert nothing
         msg_info "$(t "Revert")" "$(t 'Job ${id}: nothing applied to revert.')" 9 70
         return 0
     fi
-    tools_safety_backup UNDO-ENRICH || { kei_result revert backup-failed; return 1; }
+    if [ "$(jobs_py origin "$id" 2>>"$log")" = ondemand ]; then
+        enrich_snapshot "$id" "$dir/applied.txt" "$log" revert || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }
+    else
+        tools_safety_backup UNDO-ENRICH || { rm -f "$dir/applied.txt"; kei_result revert backup-failed; return 1; }
+    fi
+    rm -f "$dir/applied.txt"
     kei_result backup "$TOOLS_PRE"
     display_explanation "Applying the changes..."
     while IFS=$'\t' read -r c batch keep; do
@@ -30256,6 +30344,146 @@ enrich_jobs() {
     enrich_ready >/dev/null 2>&1 || { kei_result jobs "[]"; return 0; }
     kei_result jobs "$(jobs_py list 2>/dev/null || echo '[]')"
     kei_result worker "$(jobs_py status 2>/dev/null || echo '{}')"
+}
+
+# ----------------------------------------------------------------------
+# On-demand enrichment (plan 2026-10-18, sections 2 and 7.2): a few records
+# (at most 50) or a typed query, now, from the direct Z39.50 servers only
+# (z3950_direct.json; never sru.koha.nexus, catalog.koha.nexus or a local
+# address). The records are exported as for a batch job; the
+# koha-nexus-ondemand unit asks the servers, keeps what they found and
+# writes the same staged report; Apply and Revert are the batch ones, with
+# a snapshot of the records instead of a full backup.
+# ----------------------------------------------------------------------
+
+# enrich_od_add SCOPE | --isbn X | --title T [--author A] [--year Y]
+enrich_od_add() {
+    local log out id dir n why a args=()
+    case "${1:-}" in
+        --isbn|--title|--author|--year)
+            while [ $# -gt 0 ]; do
+                case "$1" in
+                    --isbn|--title|--author|--year) [ $# -ge 2 ] || return 2; args+=("$1" "$2"); shift 2 ;;
+                    *) return 2 ;;
+                esac
+            done ;;
+        "") return 2 ;;
+        *)  require_database || return 1
+            args=(--scope "$1") ;;
+    esac
+    enrich_od_ready || return 1
+    log=$(tools_log enrichment-ondemand)
+    if ! out=$(jobs_py add --origin ondemand "${args[@]}" 2>>"$log"); then
+        why=$(tail -n 1 "$log" | cut -c1-200)
+        kei_result job invalid-scope
+        msg_error "" "$(t 'Not a valid request: up to 50 biblionumbers (such as 101, 102, 500-510), or an ISBN, or a title.')${why:+
+
+$why}" 11 76
+        return 1
+    fi
+    id=$(printf '%s' "$out" | sed -n 's/.*"job": *\([0-9][0-9]*\).*/\1/p')
+    dir="$ENRICH_STATE/jobs/$id"
+    [ -n "$id" ] && [ -d "$dir" ] || { kei_result job failed; return 1; }
+    if [ -s "$dir/ids.txt" ]; then
+        tools_workdir || return 1
+        a=$(tools_copy "$dir/ids.txt" "enrich-$id-ids.txt") || return 1
+        if ! enrich_export "$log" "$dir/export.xml" --record-type=bibs --format=xml --dont_export_items "--id_list_file=$a"; then
+            why=$(enrich_export_why "$log")
+            jobs_py fail "$id" --error "export_records.pl failed${why:+: $why} (see $log)" >>"$log" 2>&1
+            find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+            kei_result job failed
+            msg_error "" "$(t 'Koha could not export the records. Nothing was changed.\n\nLog: ${log}')${why:+
+
+$why}" 12 76
+            return 1
+        fi
+        find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+        n=$(grep -o '<record[ >]' "$dir/export.xml" 2>/dev/null | wc -l)
+        if [ "${n:-0}" = 0 ]; then
+            jobs_py fail "$id" --error "no record in this scope" >>"$log" 2>&1
+            kei_result job empty
+            msg_info "$(t "Enrich bibliographic data")" "$(t "No record in this scope. Nothing was changed.")" 9 70
+            return 1
+        fi
+        enrich_own "$dir/export.xml"
+        kei_result records "$n"
+    fi
+    jobs_py exported "$id" >>"$log" 2>&1 || { kei_result job failed; return 1; }
+    systemctl start --no-block "$ENRICH_ONDEMAND_UNIT" >>"$log" 2>&1
+    log "enrichment: on-demand job $id queued"
+    kei_result job "$id"
+}
+
+# enrich_od_status [ID]: the service's progress, and the job (report,
+# per-server attempts) when ID is given.
+enrich_od_status() {
+    enrich_od_ready >/dev/null 2>&1 || { kei_result status '{"state": "idle"}'; return 0; }
+    kei_result status "$(ondemand_py status 2>/dev/null || echo '{"state": "idle"}')"
+    if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+        kei_result job "$(jobs_py show "$1" 2>/dev/null || echo '{}')"
+    fi
+    return 0
+}
+
+# enrich_od_again ID more | ID donor BIBLIONUMBER GROUP [SOURCE]: "Search
+# more servers" (a new round, the servers already asked passed over), or the
+# librarian's donor for a field group (merged again, no network).
+enrich_od_again() {
+    [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2
+    local id="$1" what="${2:-}" log out
+    shift 2
+    case "$what" in
+        more)  ;;
+        donor) [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[0-9a-z]+$ ]] || return 2
+               [ -z "${3:-}" ] || [[ "$3" =~ ^[A-Za-z0-9:._-]+$ ]] || return 2 ;;
+        *)     return 2 ;;
+    esac
+    enrich_od_ready || return 1
+    log=$(tools_log enrichment-ondemand)
+    if ! out=$(jobs_py "$what" "$id" "$@" 2>>"$log"); then
+        kei_result job not-ready
+        msg_error "" "$(t 'Job ${id} is not an on-demand report waiting for review.')" 9 70
+        return 1
+    fi
+    systemctl start --no-block "$ENRICH_ONDEMAND_UNIT" >>"$log" 2>&1
+    kei_result job "$id"
+    kei_result round "$(printf '%s' "$out" | sed -n 's/.*"round": *\([0-9][0-9]*\).*/\1/p')"
+}
+
+# z3950_health [ID|--all reset]: each direct server's breaker state, last
+# error and 7-day counts; or forget the breaker of one server (or all).
+z3950_health() {
+    enrich_od_ready >/dev/null 2>&1 || { kei_result health "[]"; return 0; }
+    if [ "${1:-}" = reset ]; then
+        [ "${2:-}" = --all ] || [[ "${2:-}" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || return 2
+        kei_result reset "$(ondemand_py health-reset "$2" 2>/dev/null | sed -n 's/.*"reset": *\([0-9]*\).*/\1/p')"
+        return 0
+    fi
+    kei_result health "$(ondemand_py health --json 2>/dev/null | tr -d '\n' || echo '[]')"
+}
+
+# enrich_snapshot ID IDS LOG LABEL: the on-demand job's records as Koha has
+# them now (MARCXML, no items) in the job's folder, in place of a full
+# backup (at most 50 records; Revert restores them through Koha's import
+# batches, this file is a second copy). Sets TOOLS_PRE to it.
+enrich_snapshot() {
+    local id="$1" ids="$2" log="$3" label="$4" out a
+    TOOLS_PRE=""
+    out="$ENRICH_STATE/jobs/$id/snapshot-${label}-$(date +%Y-%m-%d_%Hh%M%S).xml"
+    tools_workdir || return 1
+    a=$(tools_copy "$ids" "enrich-$id-snapshot.txt") || return 1
+    if ! enrich_export "$log" "$out" --record-type=bibs --format=xml --dont_export_items "--id_list_file=$a" \
+       || ! grep -q '<record[ >]' "$out"; then
+        find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+        rm -f "$out"
+        msg_error "$(t "Safety backup failed")" "$(t 'The copy of the records could not be saved. Nothing was changed.\n\nLog: ${log}')" 11 76
+        return 1
+    fi
+    find "$TOOLS_WORK" -mindepth 1 -delete 2>/dev/null
+    enrich_own "$out"
+    TOOLS_PRE="$out"
+    log "enrichment: snapshot of job ${id}'s records: ${out}"
+    return 0
 }
 
 # z3950_add FILE [sync]: put the panel's targets in z3950servers (an upsert:
@@ -32386,6 +32614,12 @@ kei_task() {
         enrich-job-revert) enrich_job_revert "${1:-}" "${2:-}" ;;
         enrich-job-cancel) [[ "${1:-}" =~ ^[0-9]+$ ]] || return 2; jobs_py cancel "$1" ;;
         enrich-pause)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; jobs_py pause "$1" ;;
+        enrich-od-add)   enrich_od_add "$@" ;;
+        enrich-od-status) enrich_od_status "${1:-}" ;;
+        enrich-od-more)  enrich_od_again "${1:-}" more ;;
+        enrich-od-donor) enrich_od_again "${1:-}" donor "${2:-}" "${3:-}" "${4:-}" ;;
+        z3950-health)    z3950_health ;;
+        z3950-health-reset) [ -n "${1:-}" ] || return 2; z3950_health reset "$1" ;;
         z3950-server-status) z3950_server_status ;;
         z3950-daemon)    [ "${1:-}" = on ] || [ "${1:-}" = off ] || return 2; z3950_daemon "$1" ;;
         catalog-network)

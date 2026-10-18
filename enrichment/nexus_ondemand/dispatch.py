@@ -99,6 +99,8 @@ class Found:
     cls: str | None = None        # M0 / M1 / W / R against the local record
     completeness: int = 0
     weight: float = 0.5
+    brazilian: bool = False       # a Brazilian source (merge's subject rule)
+    remote_id: str = ""           # the record's id there (001 when it has one)
 
 
 @dataclass
@@ -114,15 +116,8 @@ class Result:
 
     def candidates(self) -> list[Candidate]:
         """For nexus_enrich.merge: one Candidate per record found."""
-        out = []
-        for f in self.found:
-            rid = f.record.control("001")
-            out.append(Candidate(f.record, f.source, rid, f.weight,
-                                 brazilian=f.source.startswith("z3950:") and f.source in _BRAZILIAN))
-        return out
-
-
-_BRAZILIAN: set[str] = set()
+        return [Candidate(f.record, f.source, f.remote_id or f.record.control("001"), f.weight, f.brazilian)
+                for f in self.found]
 
 
 def _weight(t: Target) -> float:
@@ -174,7 +169,6 @@ class Dispatcher:
         self.clock = clock
         self.on_event = on_event
         self._inflight: dict[tuple, asyncio.Future] = {}
-        _BRAZILIAN.update(f"z3950:{t.id}" for t in catalog.targets.values() if t.country == "BR")
 
     def _emit(self, **event) -> None:
         if self.on_event is not None:
@@ -243,7 +237,8 @@ class Dispatcher:
             log.warning("static lookup failed: %s", exc)
             return
         for c in cands:
-            self._add(req, Found(f"static:{c.source}", c.record, "static", weight=c.weight))
+            self._add(req, Found(f"static:{c.source}", c.record, "static", weight=c.weight, brazilian=c.brazilian,
+                                 remote_id=c.remote_id))
         req.result.static_used = True
         self._emit(type="static", found=len(cands))
 
@@ -302,7 +297,7 @@ class Dispatcher:
             elif self.health is not None:
                 self.health.release(addr.key)
             for rec in records:
-                self._add(req, Found(f"z3950:{t.id}", rec, step, weight=_weight(t)))
+                self._add(req, Found(f"z3950:{t.id}", rec, step, weight=_weight(t), brazilian=t.country == "BR"))
             self._record(req, attempt)
             return
 

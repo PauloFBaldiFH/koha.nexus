@@ -86,11 +86,15 @@ def _busy(settings: Settings) -> bool:
 
 def match_one(db: StaticDB, rec: marc.Record, policy: Policy) -> dict:
     """The item row of one record (without job_id and seq)."""
-    row = {"biblionumber": biblionumber(rec), "f005": rec.control("005"), "title": title(rec),
-           "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": 0, "before": None, "after": None, "other": None}
     cands, pointers = db.candidates_for(rec)
-    row["pointers"] = len(pointers)
-    res = enrich(rec, cands, policy)
+    return item_row(rec, enrich(rec, cands, policy), pointers)
+
+
+def item_row(rec: marc.Record, res, pointers=()) -> dict:
+    """The item row of one record and its merge result (without job_id and seq)."""
+    row = {"biblionumber": biblionumber(rec), "f005": rec.control("005"), "title": title(rec),
+           "m0": 0, "m1": 0, "w": 0, "r": 0, "pointers": len(pointers), "before": None, "after": None,
+           "other": None}
     counts = res.counts
     row.update(status=res.status, m0=counts["M0"], m1=counts["M1"], w=counts["W"],
                r=sum(1 for s in res.candidates if s.match.cls == "R"))

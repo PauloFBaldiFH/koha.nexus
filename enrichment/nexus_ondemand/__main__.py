@@ -1,4 +1,10 @@
-"""python -m nexus_ondemand targets | health | health-reset | check
+"""python -m nexus_ondemand serve | once JOB | status | targets | health | health-reset | check
+
+    serve          the koha-nexus-ondemand unit: every on-demand job of
+                   jobs.db, then exit after 5 idle minutes
+    once           JOB: that job only, now (for a test from a terminal)
+    status         ondemand-status.json: the job being searched, each
+                   server's state
 
     targets        the direct servers on-demand may ask, and those skipped
                    or unusable, with the reason (--json)
@@ -13,10 +19,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 
 from nexus_gateway.z3950 import Z3950Error
 
+from . import service
 from . import targets as targets_mod
 from .config import Settings
 from .health import Health
@@ -35,8 +43,28 @@ def main(argv: list[str] | None = None) -> int:
     ck.add_argument("host")
     ck.add_argument("port", type=int)
     ck.add_argument("db", nargs="?", default="")
+    sv = sub.add_parser("serve")
+    sv.add_argument("--idle", type=float, default=service.IDLE)
+    sub.add_parser("once").add_argument("job", type=int)
+    sub.add_parser("status")
     args = ap.parse_args(argv)
     settings = Settings.from_env()
+
+    if args.cmd in ("serve", "once"):
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+        svc = service.Settings.from_env()
+        if args.cmd == "serve":
+            svc.idle = args.idle
+        n = asyncio.run(service.serve(svc, settings, once=args.job if args.cmd == "once" else None))
+        print(json.dumps({"jobs": n}))
+        return 0
+    if args.cmd == "status":
+        try:
+            status = json.loads(service.Settings.from_env().status_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            status = {"state": "idle"}
+        print(json.dumps(status, ensure_ascii=False))
+        return 0
 
     if args.cmd == "check":
         try:
