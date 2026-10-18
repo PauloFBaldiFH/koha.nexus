@@ -40,6 +40,10 @@ CLOUDFLARE = (
 )
 _CLOUDFLARE = tuple(ipaddress.ip_network(n) for n in CLOUDFLARE)
 _VPS = tuple(ipaddress.ip_address(a) for a in VPS_ADDRESSES)
+# getaddrinfo errors that mean the name has no address at all (EAI_NONAME,
+# EAI_NODATA, EAI_ADDRFAMILY on Linux), as opposed to a lookup that failed.
+GONE_ERRNOS = frozenset({socket.EAI_NONAME, getattr(socket, "EAI_NODATA", -5),
+                         getattr(socket, "EAI_ADDRFAMILY", -9)})
 
 
 class PolicyError(Z3950Error):
@@ -126,10 +130,15 @@ class Policy:
             addresses = await asyncio.wait_for(self._lookup(host, port), self.dns_timeout)
         except asyncio.TimeoutError as exc:
             raise Z3950Error(f"{host}: no address in {self.dns_timeout:g}s", phase="connect", kind="dns") from exc
-        except (socket.gaierror, OSError, UnicodeError) as exc:
+        except socket.gaierror as exc:
+            # The name does not exist (or has no address): the host is gone,
+            # not slow. Anything else (EAI_AGAIN...) may be our own DNS.
+            kind = "dns-missing" if exc.errno in GONE_ERRNOS else "dns"
+            raise Z3950Error(f"{host}: name not found ({exc})", phase="connect", kind=kind) from exc
+        except (OSError, UnicodeError) as exc:
             raise Z3950Error(f"{host}: name not found ({exc})", phase="connect", kind="dns") from exc
         if not addresses:
-            raise Z3950Error(f"{host}: name not found", phase="connect", kind="dns")
+            raise Z3950Error(f"{host}: name not found", phase="connect", kind="dns-missing")
         for a in addresses:
             reason = address_refusal(ipaddress.ip_address(a.split("%")[0]), self._allowed)
             if reason:
