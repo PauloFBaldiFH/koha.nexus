@@ -134,6 +134,8 @@ memory than a record. MARC-8 files are converted to UTF-8 with yaz first.
               "records": [{"leader": "...", "fields": [["001", "7"], ["245", "10", [["a", "Emma"]]]]}]}],
  "columns": [{"table": "acervo.csv", "from": "Tombo", "kind": "column", "role": "tombo",
               "samples": ["T-1", "T-2"], "to": "952$i"}],
+ "tables": [{"name": "acervo.csv", "kind": "table", "headers": ["Titulo", "Tombo"], "rows_total": 3200,
+             "rows": [["Dom Casmurro", "T-1"], ["Iracema", "T-2"]]}],
  "mapping": {"version": 1, "mappings": []}}
 ```
 
@@ -143,7 +145,12 @@ memory than a record. MARC-8 files are converted to UTF-8 with yaz first.
 - `columns`: each column of a table holding books, with the subfield of the
   role the engine gave it (`""` for a role no single subfield stands for,
   such as quantity), the mapped subfield, or `ignore`.
-- `records`: the sample records, for the live preview: the panel imports
+- `tables`: the first rows (up to `sample`, blank rows skipped) of each
+  table holding books, every row as long as the headers and each value cut
+  at 200 characters: the rows of the panel's grid. An engine older than
+  1.5.83 sends no `tables`; the panel then builds a three-row grid from the
+  columns' samples.
+- `records`: the sample records, for the grid and the live preview: the panel imports
   `kei_import/fieldmap.py` (standard library only) and runs
   `FieldMap.apply` on them at every change, without calling the engine.
 - `mapping`: the mapping of the last build, so a second look starts from it.
@@ -157,46 +164,62 @@ memory than a record. MARC-8 files are converted to UTF-8 with yaz first.
 preview); it answers "ok" once a mapping with changes is written, "cancel"
 when the librarian skips or changed nothing.
 
+Laid out like MarcEdit's data snapshot (1.5.83): a grid of the sample, one
+row per record and one column per field or spreadsheet column.
+
 ```
-┌ 🪄 Magic Import Tool · Edit field mapping ─────────────────────────────┐
-│ isis.iso · 11,488 records · sample of 10                    [stream ▾] │
-├──────────────┬──────────────────────────┬──────────────────────────────┤
-│ Source       │ Sample value             │ Koha destination             │
-│ 090$a   10/10│ 823.91                   │ 082$a DDC classification   ▾ │
-│ 500$a    9/10│ AUSTEN, JANE             │ 100$a Personal name        ▾ │
-│ 595$a   10/10│ T-0042                   │ 952$p Barcode / accession  ▾ │
-│ 999$c   10/10│ 1                        │ [Do not import this field] ▾ │
-├──────────────┴──────────────────────────┴──────────────────────────────┤
-│ Record preview  ◀ 1 / 3 ▶                                              │
-│ 082 04 $a 823.91                                                       │
-│ 100 1  $a AUSTEN, JANE                                                 │
-│ 245 10 $a Orgulho e preconceito                                        │
-│ 952    $p T-0042 $a CPL $b CPL $y BK                                   │
-├────────────────────────────────────────────────────────────────────────┤
-│ 3 changes · 1 left out          [Reset] [Skip: import as it is] [Apply]│
-└────────────────────────────────────────────────────────────────────────┘
+┌ Edit field mapping ──────────────────────────────────────────────────────────────────┐
+│ isis.iso · 11,488 record(s) · sample of 10        [Show: all ▾]   ◀ Example 3 of 10 ▶ │
+│ ╭ Sample data ─────────────────────────────────────────────────────────────────────╮ │
+│ │ #  │ 090$a    │ 245$a          │ 260$b          │ 500$a                         │ │
+│ │    │ = 090$a  │ = 245$a        │ → 264$b        │ ✕ left out                    │ │
+│ │ 1  │ 869.3    │ Livro 1        │ Ã‰dition Edi… │ AUTOR 1 DA SILVA              │ │
+│ │ 3  │ 869.3    │ Livro 3        │ Editora        │ ·                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────╯ │
+│ ╭ Mapping of 260$b ───────────────────╮  ╭ Koha preview · example 3 of 10 ─────────╮ │
+│ │ [ 264$b  Publisher (264)         ▾ ] │  │ 245 10 $a Livro 3                       │ │
+│ ╰──────────────────────────────────────╯  │ ▸ 264    $b Editora                     │ │
+│ ╭ Selected value · 260$b · example 3 ─╮  │                                         │ │
+│ │ Editora                              │  │ [As in the file]                        │ │
+│ │ 7 character(s)                       │  ╰─────────────────────────────────────────╯ │
+│ ╰──────────────────────────────────────╯                                             │
+│ 1 change(s) · 1 left out · 5 warning(s)          [Reset] [Skip: import as it is] [Apply] │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - When it opens: after the build's preview, the magic import asks one
   question, "Edit the field mapping before importing?", default **No**;
   No (or Esc) is today's import, untouched.
-- Table: one row per source field or column (`DataTable`, the panel's
-  existing styling): source with how many sample records have it, the first
-  sample value (all three on hover or in the row's detail line), and the
-  destination.
-- Destination picker (for the row under the cursor): a `Select` with "Keep
-  as it is" first, Paulo's list (100$a, 245$a, 245$b, 260$b, 264$b, 260$c,
-  264$c, 082$a, 650$a, 952$p, 952$y), "Other: type TAG$subfield..." (an
-  `Input`, checked with the engine's own rules on Enter) and "[Do not import
-  this field]".
-- Record preview: the first 1-3 sample records after the mapping, redrawn
-  at every change (in-process `FieldMap.apply`, no engine call), changed
-  lines marked with ▸; "As in the file" toggles the record before the
-  mapping. Without the engine module (an old engine) the screen still maps,
-  without the preview.
+- Grid (`DataTable`, cell cursor, record number column frozen): each column
+  is 16 characters wide; its two-line header is the source and its
+  destination (`= kept` dim, `→ changed` bold, `✕ left out` red). Empty cells
+  show `·`, repeated fields `×N`, values that look dirty are yellow.
+- The cursor's row is the example everywhere ("Example N of 10", `[` and
+  `]` or ◀ ▶); its column is the field the mapping card edits. Enter on a
+  cell moves to its destination.
+- Show: all / changed / with problems (missing in a sample record, or a
+  warning) hides the columns you don't need.
+- Mapping card: a `Select` with "Keep as it is" first, Paulo's list (100$a,
+  245$a, 245$b, 260$b, 264$b, 260$c, 264$c, 082$a, 650$a, 952$p, 952$y),
+  "Other: type TAG$subfield..." (an `Input`, checked with the engine's own
+  rules on Enter) and "[Do not import this field]".
+- Cell inspector: the selected value in full, every occurrence, its length
+  and warnings (spaces at the start or end, all in capitals, broken accents,
+  looks like an ISBN outside 020/022, control characters), and in how many
+  sample records the field appears. Plain Python checks, no engine call.
+- Koha preview: the example after the mapping, redrawn at every change
+  (in-process `FieldMap.apply`, no engine call), changed lines marked with
+  ▸; "As in the file" toggles the record before the mapping. A spreadsheet
+  row shows each value and where it goes (the engine builds that record
+  with its own rules). Without the engine module (an old engine) the screen
+  still maps, without the MARC preview.
+- Layout: from 140 columns the mapping card and inspector sit left of the
+  preview; on a narrower terminal (an 80x24 console) the bottom half is two
+  tabs, Mapping and Preview, switched with `p`.
 - Several streams or tables: a selector at the top; one mapping holds all.
-- Apply writes only the rows that differ from the proposal, then the task
+- Apply writes only the columns that differ from the proposal, then the task
   rebuilds and shows the new preview; Reset goes back to the proposal.
+- Next (step 3): indicators, split on `;` and fixed fields.
 - New strings are in `lang/pt.cache` (pt: "Editar Campos", "[Não importar
   este campo]", ...); the other languages show English for now.
 - Demo mode (`--demo`) walks through the screen with a sample ISIS file.

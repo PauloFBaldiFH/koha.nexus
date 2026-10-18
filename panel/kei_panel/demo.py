@@ -475,17 +475,25 @@ def _demo_fields(folder) -> None:
     fields = folder / "fields.json"
     if not fields.exists():
         def rec(n, author, klass, tombo, subject):
-            return {"leader": "00000nam a22000007a 4500", "fields": [
-                ["001", f"ISIS-{n}"], ["090", "  ", [["a", klass]]], ["245", "10", [["a", f"Livro {n}"]]],
-                ["500", "  ", [["a", author]]], ["595", "  ", [["a", tombo], ["b", "LIV"]]],
-                ["690", "  ", [["a", subject]]]]}
-        records = [rec(1, "AUSTEN, JANE", "823.91", "T-0042", "Romance inglês"),
-                   rec(2, "ASSIS, MACHADO DE", "869.3", "T-0043", "Literatura brasileira"),
-                   rec(3, "ALENCAR, JOSE DE", "869.3", "T-0044", "Indianismo")]
-        samples = {"001": ["ISIS-1", "ISIS-2", "ISIS-3"], "090$a": ["823.91", "869.3"],
-                   "245$a": ["Livro 1", "Livro 2", "Livro 3"], "500$a": ["AUSTEN, JANE", "ASSIS, MACHADO DE", "ALENCAR, JOSE DE"],
-                   "595$a": ["T-0042", "T-0043", "T-0044"], "595$b": ["LIV"],
-                   "690$a": ["Romance inglês", "Literatura brasileira", "Indianismo"]}
+            fields = [["001", f"ISIS-{n}"], ["090", "  ", [["a", klass]]], ["245", "10", [["a", f"Livro {n}"]]]]
+            if author:
+                fields.append(["500", "  ", [["a", author]]])
+            fields += [["595", "  ", [["a", tombo], ["b", "LIV"]]], ["690", "  ", [["a", subject]]]]
+            return {"leader": "00000nam a22000007a 4500", "fields": fields}
+        rows = [("AUSTEN, JANE", "823.91", "Romance inglês"), ("ASSIS, MACHADO DE", "869.3", "Literatura brasileira"),
+                ("ALENCAR, JOSE DE", "869.3", "Indianismo"), ("", "028.5", "Literatura infantil"),
+                ("Rosa, João Guimarães ", "869.3", "Sertão"), ("LISPECTOR, CLARICE", "869.3", "Ficção"),
+                ("Queiroz, Rachel de", "869.3", "Seca"), ("", "981", "HistÃ³ria do Brasil"),
+                ("AMADO, JORGE", "869.3", "Bahia"), ("Meireles, Cecília", "869.1", "Poesia")]
+        records = [rec(n, a, k, f"T-{41 + n:04d}", sub) for n, (a, k, sub) in enumerate(rows, 1)]
+        samples: dict = {}
+        for r in records:
+            for f in r["fields"]:
+                if len(f) == 2:
+                    samples.setdefault(f[0], []).append(f[1])
+                else:
+                    for code, value in f[2]:
+                        samples.setdefault(f"{f[0]}${code}", []).append(value)
         targets = [["100$a", "Personal name (author)"], ["245$a", "Title"], ["245$b", "Remainder of title (subtitle)"],
                    ["260$b", "Publisher (260)"], ["264$b", "Publisher (264)"], ["260$c", "Date of publication (260)"],
                    ["264$c", "Date of publication (264)"], ["082$a", "Dewey class (DDC)"], ["650$a", "Topical subject"],
@@ -494,8 +502,9 @@ def _demo_fields(folder) -> None:
             "version": 1, "sample": 10, "targets": [{"to": a, "label": b} for a, b in targets],
             "streams": [{"name": "acervo-isis.iso", "kind": "marc", "format": "ISO2709", "encoding": "UTF-8",
                          "records_total": 11488, "records": records,
-                         "fields": [{"from": k, "kind": "marc", "count": 3, "samples": v, "to": k} for k, v in samples.items()]}],
-            "columns": [], "mapping": {"version": 1, "mappings": []}}, ensure_ascii=False), encoding="utf-8")
+                         "fields": [{"from": k, "kind": "marc", "count": len(v), "samples": list(dict.fromkeys(v))[:3], "to": k}
+                                    for k, v in sorted(samples.items())]}],
+            "columns": [], "tables": [], "mapping": {"version": 1, "mappings": []}}, ensure_ascii=False), encoding="utf-8")
     engine = folder / "kei" / "kei_import"
     installer = Path(__file__).resolve().parents[2] / "installer"
     if not (engine / "fieldmap.py").exists() and installer.exists():
