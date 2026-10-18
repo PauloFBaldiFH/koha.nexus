@@ -1,8 +1,9 @@
-"""Edit & Map Fields in the panel (screens/fieldmap.py): the data grid over
-the engine's real fields.json (rows = sample records, columns = fields), the
-cell inspector, the live preview of the row under the cursor, the layouts,
-the mapping it writes, the @@fieldmap prompt and the demo's magic import
-walking through it."""
+"""Edit & Map Fields in the panel (screens/fieldmap.py), as in the librarians'
+sketch: the data grid over the engine's real fields.json (rows = sample
+records, columns = fields), the splitter, Selecionar campo + Função (custom
+field, fixed text, leave out), Mais opções and the LoC links, the record
+preview, the mapping it writes, the @@fieldmap prompt and the demo's magic
+import walking through it."""
 
 import asyncio
 import importlib
@@ -16,11 +17,11 @@ import pytest
 from conftest import INSTALLER
 from test_routines import _app, _wait_for
 from textual.app import App
-from textual.widgets import Input, Label, Select, Static
+from textual.widgets import Checkbox, Input, Label, Select, Static
 
 from kei_panel.bridge import TaskOutcome, answer_prompt
 from kei_panel.screens.dialogs import ConfirmScreen
-from kei_panel.screens.fieldmap import IGNORE, KEEP, OTHER, FieldMapScreen, warnings
+from kei_panel.screens.fieldmap import FIXED, IGNORE, KEEP, NEW_FIXED, OTHER, FieldMapScreen, RecordPreviewScreen, warnings
 from kei_panel.screens.files import PathPickerScreen
 
 
@@ -81,11 +82,11 @@ def drive(screen, steps, size=(160, 50)):
 
 
 def preview(screen):
-    return str(screen.query_one("#fm-preview", Static).render())
+    return str(screen.preview_text())
 
 
 def inspect(screen):
-    return str(screen.query_one("#fm-inspect", Static).render())
+    return str(screen.query_one("#fm-cell", Label).render())
 
 
 async def goto(screen, pilot, source, record=None):
@@ -122,7 +123,7 @@ def test_grid_cells_inspector_and_skip(fields, tmp_path):
     assert size == (5, 4)                       # 5 records; # + 090$a 245$a 500$a
     assert screen.rows[("marc", "500$a")].proposal == "500$a" and screen.rows[("marc", "500$a")].count == 4
     assert "does not have this field" in missing[0] and missing[1] == 3
-    assert "AUTOR 2" in cell[0] and "all in capitals" in cell[0] and "In 4 of 5" in cell[0]
+    assert "AUTOR 2" in cell[0] and "all in capitals" in cell[0] and "field 3 · example 2" in cell[0]
     assert cell[1] == "Example 2 of 5"
     assert "500    $a AUTOR 2" in shown
 
@@ -148,9 +149,9 @@ def test_mapping_preview_and_apply(fields, tmp_path):
         second = preview(screen)
         header = str(screen.query_one("#fm-grid").columns[next(iter(
             k for k in screen.query_one("#fm-grid").columns if k.value == "marc\t500$a"))].label)
-        screen.query_one("#fm-before").press()
-        await pilot.pause()
+        screen.before = True
         before = preview(screen)
+        screen.before = False
         screen.query_one("#fm-apply").press()
         return after, count, second, before, header
     result, (after, count, second, before, header) = drive(screen, steps)
@@ -257,7 +258,7 @@ def test_demo_magic_import_offers_the_mapping():
     assert "field mapping" in question and "500$a" in rows and "Ready to import" in gate
 
 
-def test_stepper_filter_and_problems(fields, tmp_path):
+def test_stepper_and_select_field(fields, tmp_path):
     d, path = fields
     screen = FieldMapScreen("Edit field mapping", str(path), str(tmp_path / "m.json"), str(d))
 
@@ -267,49 +268,127 @@ def test_stepper_filter_and_problems(fields, tmp_path):
         stepped = screen.record, screen.query_one("#fm-grid").cursor_coordinate.row, preview(screen)
         await pilot.press("left_square_bracket", "left_square_bracket", "left_square_bracket")
         wrapped = screen.record
-        await pick(screen, pilot, "090$a", "082$a")
-        screen.query_one("#fm-show", Select).value = "changed"
+        field = screen.query_one("#fm-field", Select)
+        followed = field.value
+        field.value = "marc\t500$a"            # Selecionar campo moves the grid's cursor
         await pilot.pause()
-        changed = [k[1] for k in screen._shown]
-        screen.query_one("#fm-show", Select).value = "problems"
-        await pilot.pause()
-        problems = [k[1] for k in screen._shown]
-        return stepped, wrapped, changed, problems
-    _, (stepped, wrapped, changed, problems) = drive(screen, steps)
+        column = screen.query_one("#fm-grid").cursor_coordinate.column, screen.field
+        labels = [str(x[0]) for x in field._options if isinstance(x[1], str)]
+        dest = [str(x[0]) for x in screen.query_one("#fm-dest", Select)._options if isinstance(x[1], str)]
+        return stepped, wrapped, followed, column, labels, dest
+    _, (stepped, wrapped, followed, column, labels, dest) = drive(screen, steps)
     assert stepped[:2] == (2, 2) and "Livro 3" in stepped[2] and wrapped == 4
-    assert changed == ["090$a"]
-    assert problems == ["500$a"]                # in capitals, and missing in record 4
+    assert followed == "marc\t245$a" and column == (3, ("marc", "500$a"))
+    assert labels[:3] == ["field 1 (090$a)", "field 2 (245$a)", "field 3 (500$a)"]
+    assert labels[-1].startswith("+ ")
+    assert dest[0] == "field 3 (500$a - General note) (keep)" and "Custom field (type it, e.g. 820$a)" in dest
+    assert "Fixed text for every record" in dest and "100$a - Personal name (author)" in dest
+    assert "field 1 (090$a - Local call number)" in dest
 
 
-def test_narrow_terminal_uses_tabs(fields, tmp_path):
+def test_fixed_text_for_a_column_and_a_new_one(fields, tmp_path):
+    d, path = fields
+    target = tmp_path / "m.json"
+    screen = FieldMapScreen("Edit field mapping", str(path), str(target), str(d))
+
+    async def steps(screen, pilot):
+        await pick(screen, pilot, "090$a", FIXED)
+        custom, text = screen.query_one("#fm-custom", Input), screen.query_one("#fm-text", Input)
+        shown = custom.display, text.display, custom.value
+        text.value = "869.3 B"
+        await text.action_submit()
+        await pilot.pause()
+        cell = str(screen.query_one("#fm-grid").get_cell_at((0, 1)))
+        screen.query_one("#fm-field", Select).value = NEW_FIXED
+        await pilot.pause()
+        new = screen.field, len(screen.query_one("#fm-grid").columns)
+        custom.value = "942$c"
+        text.value = "BK"
+        await custom.action_submit()
+        await pilot.pause()
+        after = preview(screen)
+        screen.query_one("#fm-apply").press()
+        return shown, cell, new, after
+    result, (shown, cell, new, after) = drive(screen, steps)
+    assert shown == (True, True, "090$a") and cell == "869.3 B"
+    assert new == (("fixed", "1"), 5)
+    assert "▸ 942    $c BK" in after and "▸ 090    $a 869.3 B" in after
+    assert result is True and json.loads(target.read_text())["mappings"] == [
+        {"from": "090$a", "to": "ignore"}, {"from": "=869.3 B", "to": "090$a"}, {"from": "=BK", "to": "942$c"}]
+
+
+def test_more_options_and_loc_links(fields, tmp_path, monkeypatch):
+    d, path = fields
+    target = tmp_path / "m.json"
+    screen = FieldMapScreen("Edit field mapping", str(path), str(target), str(d))
+    opened = []
+
+    async def steps(screen, pilot):
+        monkeypatch.setattr(screen.app, "open_url", lambda url, new_tab=True: opened.append(url))
+        await goto(screen, pilot, "245$a")
+        tag = str(screen.query_one("#fm-loc-tag").label)
+        screen.query_one("#fm-loc-tag").press()
+        screen.query_one("#fm-loc").press()
+        screen.query_one("#fm-opt-case", Checkbox).value = True
+        screen.query_one("#fm-opt-group", Checkbox).value = True
+        await pilot.pause()
+        note = str(screen.query_one("#fm-opt-note", Static).render())
+        shown = preview(screen)
+        screen.query_one("#fm-apply").press()
+        return tag, note, shown
+    result, (tag, note, shown) = drive(screen, steps)
+    assert tag == "Field 245 ↗" and opened == ["https://www.loc.gov/marc/bibliographic/bd245.html",
+                                                "https://www.loc.gov/marc/bibliographic/"]
+    assert "4 value(s) recased" in note and "no copies to join" in note
+    assert "▸ 500    $a Autor 1" in shown
+    assert result is True and json.loads(target.read_text()) == {
+        "version": 1, "mappings": [], "options": {"group": True, "case": True}}
+
+
+def test_narrow_terminal_stacks_and_splitter_resizes(fields, tmp_path):
     d, path = fields
     screen = FieldMapScreen("Edit field mapping", str(path), str(tmp_path / "m.json"), str(d))
 
     async def steps(screen, pilot):
-        dialog = screen.query_one(".fieldmap")
-        first = (dialog.has_class("-stacked"), screen.query_one("#fm-left").display,
-                 screen.query_one("#fm-preview-card").display)
-        await pilot.press("p")
-        second = (screen.query_one("#fm-left").display, screen.query_one("#fm-preview-card").display)
+        stacked = screen.query_one(".fieldmap").has_class("-stacked")
+        grid = screen.query_one("#fm-grid")
+        first = grid.region.height
+        await pilot.press("ctrl+up")
+        smaller = grid.region.height
+        split = screen.query_one("#fm-split")
+        await pilot.mouse_down(split)
+        await pilot.hover(split, offset=(2, 3))
+        await pilot.mouse_up(split, offset=(2, 3))
+        await pilot.pause()
+        dragged = screen.grid_height
         await goto(screen, pilot, "500$a")
-        await pilot.press("enter")              # Enter on a cell: on to its destination
-        third = screen.pane, isinstance(screen.focused, Select)
+        await pilot.press("enter")              # Enter on a cell: on to its function
+        focus = screen.focused.id if screen.focused else None
         fits = screen.query_one("#fm-foot").region.bottom <= screen.size.height
-        return first, second, third, fits
-    _, (first, second, third, fits) = drive(screen, steps, size=(80, 24))
-    assert first == (True, True, False) and second == (False, True)
-    assert third == ("map", True) and fits
+        return stacked, first, smaller, dragged, focus, fits
+    _, (stacked, first, smaller, dragged, focus, fits) = drive(screen, steps, size=(100, 36))
+    assert stacked and smaller == first - 2 and dragged > smaller and focus == "fm-dest" and fits
 
 
-def test_wide_terminal_side_by_side(fields, tmp_path):
+def test_wide_terminal_side_by_side_and_preview_screen(fields, tmp_path):
     d, path = fields
     screen = FieldMapScreen("Edit field mapping", str(path), str(tmp_path / "m.json"), str(d))
 
     async def steps(screen, pilot):
-        return (screen.query_one(".fieldmap").has_class("-stacked"), screen.query_one("#fm-tabs").display,
-                screen.query_one("#fm-left").region.y == screen.query_one("#fm-preview-card").region.y)
+        side = (screen.query_one(".fieldmap").has_class("-stacked"),
+                screen.query_one("#fm-map").region.y == screen.query_one("#fm-more").region.y)
+        await pilot.press("p")
+        await pilot.pause()
+        top = pilot.app.screen
+        shown = isinstance(top, RecordPreviewScreen) and "Livro 1" in str(top.query_one("#fmp-record").render())
+        await pilot.press("right_square_bracket")
+        await pilot.pause()
+        stepped = screen.record, "Livro 2" in str(top.query_one("#fmp-record").render())
+        await pilot.press("escape")
+        await pilot.pause()
+        return side, shown, stepped, pilot.app.screen is screen
     _, out = drive(screen, steps)
-    assert out == (False, False, True)
+    assert out == ((False, True), True, (1, True), True)
 
 
 def test_spreadsheet_grid(tmp_path):

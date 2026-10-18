@@ -294,7 +294,7 @@ LoadingScreen {
 
 /* ---- dialogs ------------------------------------------------------- */
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
-TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen {
+TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -365,43 +365,47 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen {
 .dialog-editor { height: 1fr; min-height: 10; }
 .dialog-buttons { height: auto; min-height: 4; align-horizontal: right; padding-top: 1; }
 .dialog-buttons Button { margin-left: 2; min-width: 12; height: 3; }
-/* Edit & Map Fields (screens/fieldmap.py): grid on top, cards below */
+/* Edit & Map Fields (screens/fieldmap.py): grid, splitter, mapping + more options */
 .dialog.fieldmap { width: 96%; max-width: 220; height: 94%; max-height: 100%; }
+.dialog.fieldmap.-stacked { width: 100%; height: 100%; padding: 0 1; }
+.fieldmap.-stacked .dialog-title { padding-bottom: 0; }
 .fieldmap #fm-head { height: 3; }
 .fieldmap #fm-group, .fieldmap #fm-group-label { width: 1fr; }
 .fieldmap #fm-group-label { padding-top: 1; color: $text-muted; }
-.fieldmap #fm-show { width: 28; margin-left: 1; }
 .fieldmap .fm-step { min-width: 5; margin-left: 1; }
 .fieldmap #fm-example { width: auto; min-width: 16; padding-top: 1; text-align: center; text-style: bold; }
-.fieldmap #fm-grid { height: auto; max-height: 50%; min-height: 6; border: round $panel-lighten-2;
-                     border-title-align: left; border-title-style: bold; }
+.fieldmap #fm-grid { min-height: 5; border: round $panel-lighten-2; }
 .fieldmap #fm-grid:focus { border: round $accent; }
-.fieldmap #fm-tabs { height: auto; margin-top: 1; }
-.fieldmap .fm-tab { height: 1; min-width: 14; margin-right: 1; border: none; }
-.fieldmap .fm-tab.-active { background: $accent; color: $text; text-style: bold; }
-.fieldmap #fm-bottom { height: 1fr; min-height: 8; margin-top: 1; }
-.fieldmap #fm-left { width: 3fr; height: 1fr; }
-.fieldmap #fm-preview-card { width: 2fr; height: 1fr; margin-left: 2; }
-.fieldmap.-stacked #fm-left, .fieldmap.-stacked #fm-preview-card { width: 1fr; margin-left: 0; }
-.dialog.fieldmap.-stacked { width: 100%; height: 100%; padding: 0 1; }
-.fieldmap.-stacked .dialog-title { padding-bottom: 0; }
-.fieldmap.-stacked #fm-tabs { margin-top: 0; }
-.fieldmap.-stacked #fm-bottom { margin-top: 0; min-height: 5; }
-.fieldmap.-stacked #fm-cell { margin-top: 0; }
-.fieldmap.-stacked #fm-foot { min-height: 3; padding-top: 0; }
-.fieldmap.-stacked #fm-grid { min-height: 5; }
+.fieldmap #fm-split { height: 1; width: 1fr; text-align: center; color: $text-muted; background: $boost; }
+.fieldmap #fm-split:hover { color: $accent; background: $accent 20%; }
+.fieldmap #fm-cell { height: 1; width: 1fr; margin-top: 1; text-wrap: nowrap; text-overflow: ellipsis; }
+.fieldmap #fm-bottom { height: 1fr; min-height: 6; margin-top: 1; }
+.fieldmap #fm-cards { height: auto; }
+.fieldmap #fm-map { width: 3fr; height: auto; }
+.fieldmap #fm-more { width: 2fr; height: auto; margin-left: 2; }
+.fieldmap.-stacked #fm-cards { layout: vertical; }
+.fieldmap.-stacked #fm-map, .fieldmap.-stacked #fm-more { width: 1fr; margin-left: 0; }
+.fieldmap.-stacked #fm-more { margin-top: 1; }
 .fieldmap .fm-card { border: round $panel-lighten-2; border-title-align: left; border-title-style: bold;
                      padding: 0 1; }
 .fieldmap .fm-card:focus-within { border: round $accent; }
-.fieldmap #fm-map { height: auto; }
-.fieldmap #fm-cell { height: 1fr; margin-top: 1; overflow-y: auto; }
-.fieldmap #fm-edit { height: auto; }
-.fieldmap #fm-dest { width: 1fr; }
-.fieldmap #fm-custom { width: 14; margin-left: 1; }
-.fieldmap #fm-preview { height: 1fr; overflow-y: auto; }
-.fieldmap #fm-before { margin-top: 1; }
+.fieldmap .fm-line { height: auto; }
+.fieldmap .fm-key { width: 18; padding-top: 1; color: $text-muted; }
+.fieldmap #fm-field, .fieldmap #fm-dest { width: 1fr; }
+.fieldmap #fm-field > SelectCurrent, .fieldmap #fm-dest > SelectCurrent { background: $warning 15%; }
+.fieldmap #fm-custom { width: 14; }
+.fieldmap #fm-text { width: 1fr; margin-left: 1; }
+.fieldmap #fm-loc-q { color: $text-muted; }
+.fieldmap #fm-loc-bar { height: auto; }
+.fieldmap .fm-link { height: 1; min-width: 10; margin-right: 2; border: none; background: $boost; color: $accent; text-style: underline; }
+.fieldmap #fm-more Checkbox { width: 1fr; height: 1; border: none; padding: 0; margin-top: 1; background: transparent; }
+.fieldmap .fm-hint { color: $text-muted; padding-left: 4; width: 1fr; }
+.fieldmap #fm-opt-note { padding: 0 1 1 1; }
 .fieldmap #fm-foot { border-top: solid $panel-lighten-2; }
+.fieldmap.-stacked #fm-foot { min-height: 3; padding-top: 0; }
 .fieldmap #fm-count { width: 1fr; padding-top: 1; color: $text-muted; }
+.dialog.fieldmap-preview { width: 90; max-width: 95%; height: 80%; }
+.fieldmap-preview #fmp-scroll { height: 1fr; background: $boost; padding: 0 1; }
 
 /* ---- narrow terminals (80 columns over SSH) ----------------------- */
 .-narrow .status-grid, .-narrow .card-grid { grid-size: 2; }

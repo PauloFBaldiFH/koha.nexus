@@ -507,8 +507,8 @@ def _demo_fields(folder) -> None:
             "columns": [], "tables": [], "mapping": {"version": 1, "mappings": []}}, ensure_ascii=False), encoding="utf-8")
     engine = folder / "kei" / "kei_import"
     installer = Path(__file__).resolve().parents[2] / "installer"
-    if not (engine / "fieldmap.py").exists() and installer.exists():
+    if not (engine / "tidy.py").exists() and installer.exists():
         text = installer.read_text(encoding="utf-8")
         engine.mkdir(parents=True, exist_ok=True)
-        for m in re.finditer(r'cat > "\$d/kei_import/(__init__|marc|fieldmap)\.py" <<\'KEIPY\'\n(.*?)\nKEIPY\n', text, re.S):
+        for m in re.finditer(r'cat > "\$d/kei_import/(__init__|marc|rules|tidy|fieldmap)\.py" <<\'KEIPY\'\n(.*?)\nKEIPY\n', text, re.S):
             (engine / f"{m.group(1)}.py").write_text(m.group(2) + "\n", encoding="utf-8")

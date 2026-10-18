@@ -5,7 +5,7 @@ An optional step of the Magic Import Tool: before anything goes to Koha's
 holds, with sample values, and send each one to another MARC 21 destination
 or leave it out. Skipping the step is the direct import, unchanged.
 
-Status (1.5.82): engine (`kei_import/fieldmap.py`, the `fields` command and
+Status (1.5.84): engine (`kei_import/fieldmap.py`, the `fields` command and
 `build --fieldmap`) and panel screen (`panel/kei_panel/screens/fieldmap.py`)
 are built and tested. The classic whiptail panel imports as before (no
 mapping step there).
@@ -45,8 +45,10 @@ Nothing in these steps writes to Koha's database.
    {"from": "949$a",  "to": "952$p"},
    {"from": "Tombo",  "to": "952$p", "kind": "column"},
    {"from": "Obs",    "to": "ignore", "kind": "column"},
-   {"from": "999",    "to": "ignore"}
- ]}
+   {"from": "999",    "to": "ignore"},
+   {"from": "=BK",    "to": "942$c"}
+ ],
+ "options": {"group": true, "case": true, "clean": true}}
 ```
 
 | `from` | `to` | Effect |
@@ -56,6 +58,7 @@ Nothing in these steps writes to Koha's database.
 | `001`-`009` | `TAG` or `TAG$c` | A control field's value goes to another control field, or into a subfield (`001` → `035$a`). |
 | column header | `TAG$c` | A spreadsheet column goes to that subfield (see "Spreadsheets"). |
 | any | `ignore` | Left out of the import. |
+| `=text` | `TAG$c` | Fixed text written in every record (see "Fixed texts"). |
 
 - `version` is optional (1). `kind: "column"` marks a column header that
   could pass for a tag (a column called `100`); any `from` that is not
@@ -116,6 +119,29 @@ this import only; the saved column profiles never remember it.
 The columns' rules apply when the records are built, the `TAG$c` rules to
 the records afterwards, so a table can use both.
 
+### Fixed texts
+
+`{"from": "=BK", "to": "942$c"}` writes "BK" in every record: into the
+field the record already has (into every copy, for 952), or into a new
+field with the usual indicators. A fixed text fills, it never overwrites: a
+record that already holds that subfield keeps its own value. A 952 fixed
+text never makes a copy where there is none. The panel's "Fixed text for
+every record" on a column writes `{"from": column, "to": "ignore"}` plus the
+fixed text to the column's field, so the column's values are replaced.
+
+### Mais opções (`options`, kei_import/tidy.py)
+
+All off by default, rule-based, the same code in the preview and the import:
+
+| Option | What it does |
+|---|---|
+| `clean` | Safe spelling repair: double-encoded accents (`JosÃ©` → `José`), control characters, repeated and edge spaces (ISBD spacing such as ` :` stays), and one OCR slip inside a word: a `0` or `1` between two letters on each side, in a word with no other digit (`Hist0ria`, `Sa1vador`). Coded fields (0XX, 856, 942, 952, 999) get only the spaces and control characters. No dictionary, so no word is guessed. |
+| `case` | Text typed all in capitals (90% of at least four letters) written as a catalogue writes it, with the engine's `rules.smart_case`: names (1XX, 600-611, 7XX, 800), places and publishers (260/264), series in title case with lowercase particles; titles (245 `$a$b$n$p`), editions, notes and subjects in sentence case, keeping acronyms, Roman numerals, known places and the words of the record's own names ("MEMORIAS DE MACHADO DE ASSIS" → "Memorias de Machado de Assis" when 100 is Assis, Machado de). Accents missing from the file are not restored. |
+| `group` | Records of the same book joined into one, their copies (952) and extra ISBNs kept: same first author's surname, title similarity ≥ 0.9 (Levenshtein), publisher similarity ≥ 0.8 when both have one ("Editora Ática" = "Ática"), same year when both have one, same edition and volume numbers, and no two different valid ISBNs. The stream is read three times, one record at a time. |
+
+Spreadsheets already get recasing and grouping when the engine builds
+their records; the options also run on those records afterwards.
+
 ### Streams and memory
 
 Each stream is read and written one record at a time (ISO 2709 or MARCXML
@@ -161,65 +187,61 @@ memory than a record. MARC-8 files are converted to UTF-8 with yaz first.
 `FieldMapScreen`, opened from the magic import task through the
 `@@fieldmap TITLE<TAB>FIELDS<TAB>OUT<TAB>ENGINE` prompt (the engine's
 `fields.json`, the `fieldmap.json` to write, the engine folder for the live
-preview); it answers "ok" once a mapping with changes is written, "cancel"
-when the librarian skips or changed nothing.
+preview); it answers "ok" once a mapping with changes (or options) is
+written, "cancel" when the librarian skips or changed nothing.
 
-Laid out like MarcEdit's data snapshot (1.5.83): a grid of the sample, one
-row per record and one column per field or spreadsheet column.
+Laid out after the librarians' sketch `exemplo ferramenta de importação.xlsx`
+(1.5.84):
 
 ```
-┌ Edit field mapping ──────────────────────────────────────────────────────────────────┐
-│ isis.iso · 11,488 record(s) · sample of 10        [Show: all ▾]   ◀ Example 3 of 10 ▶ │
-│ ╭ Sample data ─────────────────────────────────────────────────────────────────────╮ │
-│ │ #  │ 090$a    │ 245$a          │ 260$b          │ 500$a                         │ │
-│ │    │ = 090$a  │ = 245$a        │ → 264$b        │ ✕ left out                    │ │
-│ │ 1  │ 869.3    │ Livro 1        │ Ã‰dition Edi… │ AUTOR 1 DA SILVA              │ │
-│ │ 3  │ 869.3    │ Livro 3        │ Editora        │ ·                             │ │
+┌ Editar mapeamento de campos ─────────────────────────────────────────────────────────┐
+│ acervo.iso · 11.488 registro(s) · amostra de 10                  ◀ Exemplo 4 de 10 ▶ │
+│ ╭──────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ #  campo 1 · 001     campo 2 · 020$a    campo 5 · 245$a       campo 6 · 260$a    │ │
+│ │    = Número de contr = ISBN             = Título              = Local de publ…   │ │
+│ │ 1  8898              9788576658085 (b…  O colecionador de l…  São Paulo:         │ │
+│ │ 4  10812             8585517085         VOCE E A CONSTITUIC…  SAO PAULO :        │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────╯ │
-│ ╭ Mapping of 260$b ───────────────────╮  ╭ Koha preview · example 3 of 10 ─────────╮ │
-│ │ [ 264$b  Publisher (264)         ▾ ] │  │ 245 10 $a Livro 3                       │ │
-│ ╰──────────────────────────────────────╯  │ ▸ 264    $b Editora                     │ │
-│ ╭ Selected value · 260$b · example 3 ─╮  │                                         │ │
-│ │ Editora                              │  │ [As in the file]                        │ │
-│ │ 7 character(s)                       │  ╰─────────────────────────────────────────╯ │
-│ ╰──────────────────────────────────────╯                                             │
-│ 1 change(s) · 1 left out · 5 warning(s)          [Reset] [Skip: import as it is] [Apply] │
+│ ━━━  ↕ arraste para aumentar ou diminuir a tabela (Ctrl+↑ / Ctrl+↓)  ━━━              │
+│ campo 5 · exemplo 4: VOCE E A CONSTITUICAO :  · 23 caractere(s)  ⚠ tudo em maiúsculas │
+│ ╭ Mapeamento de campo 5 ──────────────────╮ ╭ Mais opções ──────────────────────────╮ │
+│ │ Selecionar campo [campo 5 (245$a)     ▾]│ │ Deseja conhecer melhor os campos?     │ │
+│ │ Função [campo 5 (245$a - Título) (manter)▾]│ MARC 21 (Library of Congress) ↗  Campo 245 ↗ │
+│ │          [820$a] [texto p/ todos]       │ │ [X] Junção inteligente de exemplares  │ │
+│ ╰─────────────────────────────────────────╯ │ [X] Correção de maiúsculas/minúsculas │ │
+│                                             │ [ ] Correção ortográfica inteligente  │ │
+│                                             │ Na amostra: 3 valor(es) ... · 1 juntado │
+│                                             ╰───────────────────────────────────────╯ │
+│ 0 mudança(s) · 0 de fora · 6 aviso(s)   [Prévia do registro] [Restaurar] [Pular] [Aplicar] │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- When it opens: after the build's preview, the magic import asks one
-  question, "Edit the field mapping before importing?", default **No**;
-  No (or Esc) is today's import, untouched.
-- Grid (`DataTable`, cell cursor, record number column frozen): each column
-  is 16 characters wide; its two-line header is the source and its
-  destination (`= kept` dim, `→ changed` bold, `✕ left out` red). Empty cells
-  show `·`, repeated fields `×N`, values that look dirty are yellow.
-- The cursor's row is the example everywhere ("Example N of 10", `[` and
-  `]` or ◀ ▶); its column is the field the mapping card edits. Enter on a
-  cell moves to its destination.
-- Show: all / changed / with problems (missing in a sample record, or a
-  warning) hides the columns you don't need.
-- Mapping card: a `Select` with "Keep as it is" first, Paulo's list (100$a,
-  245$a, 245$b, 260$b, 264$b, 260$c, 264$c, 082$a, 650$a, 952$p, 952$y),
-  "Other: type TAG$subfield..." (an `Input`, checked with the engine's own
-  rules on Enter) and "[Do not import this field]".
-- Cell inspector: the selected value in full, every occurrence, its length
-  and warnings (spaces at the start or end, all in capitals, broken accents,
-  looks like an ISBN outside 020/022, control characters), and in how many
-  sample records the field appears. Plain Python checks, no engine call.
-- Koha preview: the example after the mapping, redrawn at every change
-  (in-process `FieldMap.apply`, no engine call), changed lines marked with
-  ▸; "As in the file" toggles the record before the mapping. A spreadsheet
-  row shows each value and where it goes (the engine builds that record
-  with its own rules). Without the engine module (an old engine) the screen
-  still maps, without the MARC preview.
-- Layout: from 140 columns the mapping card and inspector sit left of the
-  preview; on a narrower terminal (an 80x24 console) the bottom half is two
-  tabs, Mapping and Preview, switched with `p`.
-- Several streams or tables: a selector at the top; one mapping holds all.
-- Apply writes only the columns that differ from the proposal, then the task
-  rebuilds and shows the new preview; Reset goes back to the proposal.
-- Next (step 3): indicators, split on `;` and fixed fields.
-- New strings are in `lang/pt.cache` (pt: "Editar Campos", "[Não importar
-  este campo]", ...); the other languages show English for now.
+- Grid (`DataTable`, cell cursor, record number frozen, 20 characters per
+  column): headers "campo N · source" over the destination (`= name` dim,
+  `→ TAG$c` changed, `✕` left out, `✎` fixed text). Empty cells `·`,
+  repeated fields `×N`, dirty values yellow, left-out values struck through.
+- Splitter under the grid: drag it with the mouse, or Ctrl+Up / Ctrl+Down.
+- The cursor row is the example ("Exemplo N de 10", `[` `]`, ◀ ▶); one line
+  under the grid shows the selected value in full with its length and
+  warnings (edge spaces, all capitals, broken accents, ISBN-like values,
+  control characters).
+- Selecionar campo: every column ("campo N (source)"), then "+ Novo texto
+  fixo para todos os registros" (a column of its own for a field the file
+  doesn't have, such as `942$c = BK`). It follows the grid's cursor and
+  moves it.
+- Função: "campo N (... ) (manter)", "Campo personalizado" (any TAG$subfield
+  typed by hand, checked with the engine's rules), "Texto fixo para todos
+  os registros" (field + text), "[Não importar este campo]", Paulo's list
+  with names, then the fields of the other columns. Enter on a grid cell
+  jumps here.
+- Mais opções: the LoC MARC 21 page and the page of the selected tag
+  (`bd245.html`; 9XX and Koha's fields open the index) through the panel's
+  browser opener (the address is also copied), and the three options with
+  what they do to the sample.
+- Record preview (button or `p`): the example after the mapping and the
+  options, ▸ on changed lines, "Como no arquivo" for the record before,
+  ◀ ▶ to step. A spreadsheet row shows each value and where it goes.
+- Below 140 columns the two cards stack and scroll; the grid keeps the
+  height the splitter gave it.
+- New strings are in `lang/pt.cache`; field names in `kei_panel/marc21.py`.
 - Demo mode (`--demo`) walks through the screen with a sample ISIS file.
