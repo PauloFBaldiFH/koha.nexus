@@ -461,25 +461,11 @@ function ConvertFrom-KohaSecureString {
 # log, and after a Windows restart it is asked again.
 function Read-KohaLinuxAccount {
     param([string]$Default = (ConvertTo-KohaLinuxUserName $env:USERNAME))
-    Write-Host ''
-    Write-KohaStep (T 'First, choose a user name and password for Debian, the Linux system that runs Koha on this PC. You will use them to open Debian and to run commands with sudo. They are not the login of the Koha staff interface.')
-    while ($true) {
-        $u = Read-Host ((T 'Debian user name [{0}]') -f $Default)
-        if ([string]::IsNullOrWhiteSpace($u)) { $u = $Default }
-        $u = $u.Trim()
-        $why = Test-KohaLinuxUserName $u
-        if (-not $why) { break }
-        Write-KohaStep $why 'warn'
-    }
-    while ($true) {
-        $p1 = ConvertFrom-KohaSecureString (Read-Host -AsSecureString (T 'Password (at least 8 characters)'))
-        $why = Test-KohaLinuxPassword $p1
-        if ($why) { Write-KohaStep $why 'warn'; continue }
-        $p2 = ConvertFrom-KohaSecureString (Read-Host -AsSecureString (T 'Type the password again'))
-        if ($p1 -cne $p2) { Write-KohaStep (T 'The passwords do not match. Try again.') 'warn'; continue }
-        break
-    }
-    return [pscustomobject]@{ User = $u; Password = $p1 }
+    if (-not $Default) { $Default = 'biblioteca' }
+    
+    # Define utilizador padrão e senha aleatória interna provisória sem pedir no terminal
+    $autoPassword = [System.Guid]::NewGuid().ToString('N').Substring(0, 12)
+    return [pscustomobject]@{ User = $Default; Password = $autoPassword }
 }
 
 # Creates the user (or sets the password of one already there) with sudo
