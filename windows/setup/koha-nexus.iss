@@ -107,8 +107,6 @@ end;
 
 procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
 begin
-  // Cancel is only reachable on the progress page, where no confirmation
-  // box is wanted: exit with the cancelled code at once.
   Confirm := False;
   ExitProcess(ExitCancelled);
 end;
@@ -121,27 +119,25 @@ begin
   if CurStep <> ssPostInstall then
     Exit;
 
-  // Payload check (SHA-256 of installer) and network reachability.
-  // Prints nothing; its exit code is one of the constants above, or 1 for a
-  // script error, which maps to ExitInstallFailure.
-  Params := '-NoProfile -ExecutionPolicy Bypass -File "' +
+  // 1. Verificacao de integridade e conexao
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     ExpandConstant('{app}\setup\KohaNexus.Preflight.ps1') + '" -AppDir "' +
     ExpandConstant('{app}') + '"';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
     Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     ExitProcess(ExitInstallFailure);
+
   if ResultCode = ExitPackageRejected then ExitProcess(ExitPackageRejected);
   if ResultCode = ExitNetwork then ExitProcess(ExitNetwork);
   if ResultCode <> 0 then ExitProcess(ExitInstallFailure);
 
-  // The install itself: the same entry point as the PowerShell one-liner.
+  // 2. Criar tarefas e atalhos com saida imediata garantida
   SetEnvironmentVariableW('KOHAEASY_SOURCE', ExpandConstant('{app}'));
-  Params := '-NoProfile -ExecutionPolicy Bypass -File "' +
-    ExpandConstant('{app}\windows\{#AppExe}') + '" Install';
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{app}\windows\{#AppExe}') + '" RegisterTasks -Quiet';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
     Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     ExitProcess(ExitInstallFailure);
-  // KohaEasy.ps1 returns 0 on success and 1 on any step failure (the user
-  // runs the installer again to continue from that step).
+
   if ResultCode <> 0 then ExitProcess(ExitInstallFailure);
 end;
