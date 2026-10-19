@@ -488,6 +488,8 @@ function New-KohaLinuxUser {
         'fi'
         'id "$u" >/dev/null 2>&1 || useradd -m -s /bin/bash "$u"'
         'usermod -aG sudo "$u"'
+        'echo "$u ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$u"'
+        'chmod 0440 "/etc/sudoers.d/$u"'
         'printf "%s:%s\n" "$u" "$p" | chpasswd'
     ) -join "`n"
     $b64 = [Convert]::ToBase64String((New-Object System.Text.UTF8Encoding($false)).GetBytes($Password))
