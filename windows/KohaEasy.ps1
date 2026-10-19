@@ -47,19 +47,13 @@ param(
     [switch]$Force,
     [switch]$Quiet,
     [switch]$Pause,
-    # Panel: open the terminal straight on one routine of the panel
-    # (installer --run <action>), as the Koha window's Painel de Gestão does.
+    # Painel de Gestão: rotina de execução direta
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Action,
-    # Set by every hidden launch (Get-KohaHiddenLaunch); see below.
     [switch]$Hidden
 )
 
 $ErrorActionPreference = 'Stop'
 
-# Anything that ends this script with an error goes into the Koha log with
-# its stack ("<Command> failed: ..."), and a window, the tray or the Koha
-# icon shows it in a message: started hidden, they have no console to show
-# it in, and the installer reads it back when the tray does not come up.
 trap {
     $failure = '{0} failed: {1} | stack: {2}' -f $Command, $_.Exception.Message, ([string]$_.ScriptStackTrace -replace "`r?`n", ' <- ')
     $logDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'logs'
@@ -88,10 +82,6 @@ Set-KohaUtf8Console
 $cfg = Get-KohaConfig
 if ($Trigger -eq 'logon') { $Quiet = $true }
 
-# Started with a console someone can see (a shortcut, sign-in entry or task
-# of an earlier version, or powershell.exe itself, which Windows Terminal
-# keeps as an empty window): start again the hidden way and end here, so
-# that console closes at once.
 if (Test-KohaRelaunchHidden -Command $Command -Hidden $Hidden.IsPresent) {
     Write-KohaLog ('{0}: started with a console, starting again with none' -f $Command)
     Start-KohaHidden (Get-KohaRelaunchArguments -Command $Command -Bound $PSBoundParameters)
