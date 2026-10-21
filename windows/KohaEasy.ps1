@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     koha.nexus for Windows: shortcuts, scheduled tasks and tray.
 .DESCRIPTION
