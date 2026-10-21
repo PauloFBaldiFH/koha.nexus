@@ -69,10 +69,11 @@ function Get-KohaPreflight {
     $add = { param($ok, $level, $text) [void]$rows.Add([pscustomobject]@{ Ok = $ok; Level = $(if ($ok) { 'ok' } else { $level }); Text = $text }) }
     & $add ($Facts.Build -ge 19041) 'error' ((T 'Windows 10 version 2004 (build 19041) or later, or Windows 11. This PC: build {0}.') -f $Facts.Build)
     & $add ([bool]$Facts.Is64) 'error' (T 'A 64-bit Windows.')
-    if ($Facts.MemGB -lt 4) {
-        & $add $false 'error' ((T 'At least 4 GB of memory (8 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
+    # Windows reports usable RAM: allow 0.5 GB reserved by hardware.
+    if ($Facts.MemGB -lt 7.5) {
+        & $add $false 'error' ((T 'At least 8 GB of memory (12 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
     } else {
-        & $add ($Facts.MemGB -ge 8) 'warn' ((T 'At least 4 GB of memory (8 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
+        & $add ($Facts.MemGB -ge 11.5) 'warn' ((T 'At least 8 GB of memory (12 GB recommended). This PC: {0} GB.') -f $Facts.MemGB)
     }
     if ($Facts.FreeGB -lt 10) {
         & $add $false 'error' ((T 'At least 10 GB free on drive C: (20 GB recommended). Free now: {0} GB.') -f $Facts.FreeGB)
@@ -276,16 +277,20 @@ function Get-KohaWslConf {
 
 # Pure: adds the keys Koha needs to the user's .wslconfig without changing
 # anything the user already set. vmIdleTimeout=-1 keeps WSL running while
-# Koha waits for readers. On Windows 11 22H2+ (build 22621): networking
+# Koha waits for readers. Gradual memory reclaim returns unused RAM to
+# Windows on every supported build. On Windows 11 22H2+ (build 22621): networking
 # mirrored, so other PCs of the library reach Koha by this PC's address,
 # and [experimental] hostAddressLoopback, so this PC reaches Koha by that
 # address too (the library network test goes that way).
 function Merge-KohaWslConfig {
     param([AllowEmptyString()][string]$Text, [int]$Build)
-    $want = [ordered]@{ wsl2 = [ordered]@{ vmIdleTimeout = '-1' } }
+    $want = [ordered]@{
+        wsl2 = [ordered]@{ vmIdleTimeout = '-1' }
+        experimental = [ordered]@{ autoMemoryReclaim = 'gradual' }
+    }
     if ($Build -ge 22621) {
         $want.wsl2['networkingMode'] = 'mirrored'
-        $want['experimental'] = [ordered]@{ hostAddressLoopback = 'true' }
+        $want.experimental['hostAddressLoopback'] = 'true'
     }
     $lines = New-Object System.Collections.ArrayList
     if ($Text) { foreach ($l in ($Text -split "`r?`n")) { [void]$lines.Add($l) } }
