@@ -114,6 +114,25 @@ function Invoke-Start {
 switch ($Command) {
     'Launch' {
         if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
+        if ($env:KOHA_MSIX_PANEL_SETUP -eq '1') {
+            # The first terminal called koha.nexus.exe Launch -Hidden after
+            # preparing the Debian environment. Open exactly one panel window.
+            # The wrapper retains the post-panel Windows setup after Exit.
+            $wrapper = Join-Path $PSScriptRoot 'KohaMsixPanel.ps1'
+            if (-not (Test-Path -LiteralPath $wrapper -PathType Leaf)) {
+                throw ('Koha MSIX panel wrapper not found: ' + $wrapper)
+            }
+            $powerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            $quotedWrapper = '"' + $wrapper + '"'
+            $psArguments = '-NoProfile -ExecutionPolicy Bypass -NoExit -File {0} -Distro "{1}" -LinuxDir "/root/koha-easy-installer" -WindowScript "{2}"' -f $quotedWrapper, $cfg.Distro, $cfg.WindowPath
+            $wt = Get-Command 'wt.exe' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($wt) {
+                Start-Process -FilePath $wt.Source -ArgumentList ('-w new --title "Koha.Nexus" powershell.exe ' + $psArguments) -ErrorAction Stop | Out-Null
+            } else {
+                Start-Process -FilePath $powerShellExe -ArgumentList $psArguments -ErrorAction Stop | Out-Null
+            }
+            break
+        }
         Invoke-KohaLaunch | Out-Null
         Open-KohaPanel
     }

@@ -461,11 +461,6 @@ function ConvertFrom-KohaSecureString {
 # log, and after a Windows restart it is asked again.
 function Read-KohaLinuxAccount {
     param([string]$Default = (ConvertTo-KohaLinuxUserName $env:USERNAME))
-    if (-not $Default) { $Default = 'biblioteca' }
-    return [pscustomobject]@{ User = $Default; Password = 'kohanexuspassword123' }
-}
-function Read-KohaLinuxAccount_Disabled {
-    param([string]$Default = (ConvertTo-KohaLinuxUserName $env:USERNAME))
     Write-Host ''
     Write-KohaStep (T 'First, choose a user name and password for Debian, the Linux system that runs Koha on this PC. You will use them to open Debian and to run commands with sudo. They are not the login of the Koha staff interface.')
     while ($true) {
@@ -697,20 +692,65 @@ function Show-KohaStartProblem {
 # The console is switched to UTF-8, and the panel is told whether this is
 # Windows Terminal (emoji) or the classic console (plain symbols), through
 # WSLENV, the list of variables WSL passes into Linux.
+# MSIX v17: all panel dependencies are prepared and verified in the FIRST
+# (setup) terminal. Only then is the definitive terminal started at the
+# language selection screen. Never install the Koha server in this stage.
+function Initialize-KohaPanelDependencies {
+    $dependencyScript = @(
+        'set -eu'
+        'missing=""'
+        'for spec in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux zstd:zstd; do'
+        '  cmd="${spec%%:*}"'
+        '  pkg="${spec#*:}"'
+        '  if ! command -v "$cmd" >/dev/null 2>&1; then missing="$missing $pkg"; fi'
+        'done'
+        'if [ -n "$missing" ]; then'
+        '  export DEBIAN_FRONTEND=noninteractive'
+        '  apt-get update -qq'
+        '  apt-get -o DPkg::Lock::Timeout=300 install -y -qq --no-install-recommends $missing'
+        'fi'
+        'for cmd in whiptail dialog curl xmllint unzip gpg wget fuser ss flock zstd; do'
+        '  if ! command -v "$cmd" >/dev/null 2>&1; then echo "Missing dependency: $cmd"; exit 17; fi'
+        'done'
+        'echo KOHA_MSIX_PANEL_DEPS_READY'
+    ) -join "`n"
+    Write-KohaStep 'Preparando dependencias do painel no Debian (instalando as que faltam)...'
+    $result = Invoke-KohaLinuxScript -Script $dependencyScript
+    if ($result.ExitCode -ne 0 -or ([string]$result.Output) -notmatch 'KOHA_MSIX_PANEL_DEPS_READY') {
+        Write-KohaLog ('Panel dependency preparation failed (exit {0}): {1}' -f $result.ExitCode, ([string]$result.Output).Trim()) 'install'
+        throw ('Falha ao preparar as dependencias do painel no Debian. Saida: ' + ([string]$result.Output).Trim())
+    }
+    Write-KohaStep 'Dependencias do painel prontas. Abrindo a selecao de idioma no segundo terminal...' 'ok'
+    return $true
+}
+
 function Invoke-KohaPanel {
-    $distro = (Get-KohaConfig).Distro
-    $dir = $script:DistroDir
-    $winScript = (Get-KohaConfig).WindowPath
-    $panelArgs = "-d $distro -u root --cd $dir -- $winScript bash ./installer"
-    $wt = Get-Command "wt.exe" -ErrorAction SilentlyContinue
-    if ($wt) {
-        Start-Process wt.exe -ArgumentList "-w new --title `"Koha Nexus`" wsl.exe $panelArgs"
-    } else {
-        Start-Process powershell.exe -ArgumentList "-NoExit -Command `"`$OutputEncoding = [System.Text.UTF8Encoding]::new(); chcp 65001; wsl.exe $panelArgs`""
+    # Download and verify dependencies while this FIRST terminal is active.
+    # The second terminal must start with the language selection, not with APT.
+    if (-not (Initialize-KohaPanelDependencies)) {
+        throw 'As dependencias do painel ainda nao estao prontas.'
+    }
+    $launcher = Join-Path (Get-KohaPath Bin) 'koha.nexus.exe'
+    if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+        throw ('Koha launcher not found: ' + $launcher)
+    }
+    $previous = $env:KOHA_MSIX_PANEL_SETUP
+    try {
+        # Keep the proven v16 handoff. This opens a separate terminal with
+        # the Linux panel and avoids starting a non-installed Koha service.
+        $env:KOHA_MSIX_PANEL_SETUP = '1'
+        $process = Start-Process -FilePath $launcher -ArgumentList 'Launch -Hidden' -WorkingDirectory (Get-KohaPath Bin) -PassThru -ErrorAction Stop
+        if ($null -eq $process) { throw 'The definitive Koha launcher did not start.' }
+    }
+    finally {
+        if ($null -eq $previous) {
+            Remove-Item Env:KOHA_MSIX_PANEL_SETUP -ErrorAction SilentlyContinue
+        } else {
+            $env:KOHA_MSIX_PANEL_SETUP = $previous
+        }
     }
     return 0
-}
-function Invoke-KohaPanel_Old {
+}function Invoke-KohaPanel_Old {
     $a = '-d {0} -u root --cd {1} -- {2} bash ./installer' -f (Get-KohaConfig).Distro, $script:DistroDir, (Get-KohaConfig).WindowPath
     $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS }
     $enc = $null
@@ -771,6 +811,18 @@ function Install-Koha {
     $state = Get-KohaState
     $phase = [string]$state['phase']
     if (-not $phase -or $script:Phases -notcontains $phase) { $phase = 'checks' }
+    if ($env:KOHA_MSIX_FINALIZE -eq '1') {
+        # The Debian panel owns Koha/database setup. A silent gate only prevents
+        # marking Windows setup complete when the user closes the panel early.
+        if (-not (Test-KohaInstalledInDistro)) {
+            Write-KohaLog 'MSIX post-panel continuation skipped: panel did not report complete Koha installation.' 'install'
+            return 0
+        }
+        Set-KohaState @{ phase = 'windows' } | Out-Null
+        $state = Get-KohaState
+        $phase = 'windows'
+        Write-KohaLog 'MSIX post-panel continuation: Koha ready; continuing with Windows integration.' 'install'
+    }
     Write-Host ''
     Write-Host (T 'koha.nexus for Windows') -ForegroundColor Green
     Write-Host ''
@@ -790,7 +842,7 @@ function Install-Koha {
     # The Debian user comes first, before WSL, Debian or any package is
     # installed. An install made before this question existed is asked too.
     $account = $Account
-    if ($null -eq $account -and $phase -ne 'done' -and -not [string]$state['linuxUser'] -and -not $NonInteractive) {
+    if ($null -eq $account -and -not $NonInteractive -and (($phase -ne 'done' -and -not [string]$state['linuxUser']) -or $env:KOHA_MSIX_FIRST_RUN -eq '1')) {
         $account = Read-KohaLinuxAccount
     }
 
@@ -827,7 +879,7 @@ function Install-Koha {
     # (a new version, the koha-panel launcher), and an install of Koha that
     # stopped half-way sends the flow back to the Koha step.
     $wasDone = ($phase -eq 'done')
-    if (Test-KohaPhaseDone 'koha' $phase) {
+    if ((Test-KohaPhaseDone 'koha' $phase) -and $env:KOHA_MSIX_FINALIZE -ne '1') {
         Copy-KohaPanelIntoDistro
         if (-not (Test-KohaInstalledInDistro)) {
             Write-KohaStep (T 'Koha was not installed all the way. The control panel opens again to finish it.') 'warn'
@@ -910,12 +962,9 @@ function Install-Koha {
             Write-KohaStep (T 'The Koha control panel opens now. Choose your language, then 1 - Install Koha server. When it finishes, leave the panel with Exit.')
             # Read-Host (T 'Press Enter to continue') | Out-Null
             Invoke-KohaPanel | Out-Null
-            Write-KohaStep (T 'Back in the Windows installer. Checking the installation...')
-            if (-not (Test-KohaInstalledInDistro)) {
-                Write-KohaStep (T 'Koha was not installed. Run the installer again to continue from here.') 'error'
-                Show-KohaInstalledCheck
-                return 1
-            }
+            # MSIX: panel runs independently. The first terminal only prepares Windows/WSL/Debian.
+            # The panel wrapper runs the deferred Windows integration phase after the user exits.
+            return 0
         }
         Write-KohaStep (T 'Koha is installed.') 'ok'
         Set-KohaState @{ phase = 'windows' } | Out-Null; $phase = 'windows'
