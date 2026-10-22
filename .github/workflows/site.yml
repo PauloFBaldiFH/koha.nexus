@@ -1,0 +1,53 @@
+name: Website languages
+
+on:
+  push:
+    paths:
+      - "export_docs_preview.py"
+      - "export_site.py"
+      - "i18n_common.py"
+      - "site/**"
+      - "preview/**"
+      - "index.html"
+      - "*/index.html"
+      - "lang/**"
+      - "panel/kei_panel/**"
+      - "panel/tests/test_docs_preview.py"
+      - "panel/tests/test_site_languages.py"
+      - "panel/tests/conftest.py"
+      - "installer"
+      - ".github/workflows/site.yml"
+  pull_request:
+    paths:
+      - "export_docs_preview.py"
+      - "export_site.py"
+      - "i18n_common.py"
+      - "site/**"
+      - "preview/**"
+      - "index.html"
+      - "*/index.html"
+      - "lang/**"
+      - "panel/kei_panel/**"
+      - "panel/tests/test_docs_preview.py"
+      - "panel/tests/test_site_languages.py"
+      - "panel/tests/conftest.py"
+      - "installer"
+      - ".github/workflows/site.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest
+      - run: python -m pytest -q panel/tests/test_docs_preview.py panel/tests/test_site_languages.py
+      - run: node --check site/assets/home.js && node --check preview/assets/preview.js

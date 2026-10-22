@@ -252,3 +252,8 @@ a { color: var(--green); }
   .kp-focus { animation: none; }
   .kp-term-main { scroll-behavior: auto; }
 }
+
+/* Static links work without JavaScript; the select is an additional shortcut. */
+.kp-language-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; padding: 10px 20px; border-bottom: 1px solid var(--line); font-size: .8rem; }
+.kp-language-links a { text-decoration: none; }
+.kp-language-links a[aria-current="page"] { font-weight: 800; color: var(--text); }

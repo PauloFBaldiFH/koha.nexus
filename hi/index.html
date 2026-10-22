@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="hi" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" data-i18n-meta="page_description" content="Koha.Nexus Debian, Ubuntu और WSL के माध्यम से Windows पर Koha पुस्तकालय स्थापित और प्रबंधित करने का निःशुल्क सहायक है।">
+  <meta name="theme-color" content="#08110d">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <link rel="shortcut icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title data-i18n="page_title">Koha.Nexus: सरल पुस्तकालय प्रबंधन</title>
+
+  <link rel="stylesheet" href="../site/assets/home.css">
+<link rel="alternate" hreflang="en" href="https://koha.nexus/">
+<link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/pt/">
+<link rel="alternate" hreflang="es" href="https://koha.nexus/es/">
+<link rel="alternate" hreflang="fr" href="https://koha.nexus/fr/">
+<link rel="alternate" hreflang="it" href="https://koha.nexus/it/">
+<link rel="alternate" hreflang="de" href="https://koha.nexus/de/">
+<link rel="alternate" hreflang="nl" href="https://koha.nexus/nl/">
+<link rel="alternate" hreflang="sv" href="https://koha.nexus/sv/">
+<link rel="alternate" hreflang="pl" href="https://koha.nexus/pl/">
+<link rel="alternate" hreflang="cs" href="https://koha.nexus/cs/">
+<link rel="alternate" hreflang="ru" href="https://koha.nexus/ru/">
+<link rel="alternate" hreflang="uk" href="https://koha.nexus/uk/">
+<link rel="alternate" hreflang="tr" href="https://koha.nexus/tr/">
+<link rel="alternate" hreflang="tl" href="https://koha.nexus/tl/">
+<link rel="alternate" hreflang="id" href="https://koha.nexus/id/">
+<link rel="alternate" hreflang="ar" href="https://koha.nexus/ar/">
+<link rel="alternate" hreflang="fa" href="https://koha.nexus/fa/">
+<link rel="alternate" hreflang="hi" href="https://koha.nexus/hi/">
+<link rel="alternate" hreflang="bn" href="https://koha.nexus/bn/">
+<link rel="alternate" hreflang="vi" href="https://koha.nexus/vi/">
+<link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/zh/">
+<link rel="alternate" hreflang="ja" href="https://koha.nexus/ja/">
+<link rel="alternate" hreflang="ko" href="https://koha.nexus/ko/">
+<link rel="alternate" hreflang="x-default" href="https://koha.nexus/">
+</head>
+
+<body data-language="hi">
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#home" aria-label="koha.nexus">
+        koha.nexus
+      </a>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menu" aria-controls="main-nav" aria-expanded="false">☰</button>
+      <nav id="main-nav" data-i18n-aria="main_navigation" aria-label="मुख्य नेविगेशन">
+        <a href="#features" data-i18n="nav_features">सुविधाएँ</a>
+        <a href="#panel" data-i18n="nav_panel">पैनल</a>
+        <a href="preview/" data-i18n="nav_manual">मैनुअल</a>
+        <a href="#installation" data-i18n="nav_install">स्थापना</a>
+        <a href="#windows" data-i18n="nav_win">Windows</a>
+        <a href="#tools" data-i18n="nav_tools">उपकरण</a>
+        <a href="#security" data-i18n="nav_security">सुरक्षा</a>
+        <a href="#network" data-i18n="nav_net">नेटवर्क</a>
+        <a href="#contact" data-i18n="nav_contact">संपर्क</a>
+        <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- SELETOR DE IDIOMAS COM BOTÕES PEQUENOS -->
+  <section class="lang-section">
+    <div class="container">
+      <nav class="language-links" data-language-links><a data-language="en" lang="en" hreflang="en" href="../index.html">English</a><a data-language="pt" lang="pt-BR" hreflang="pt-BR" href="../pt/index.html">Português (Brasil)</a><a data-language="es" lang="es" hreflang="es" href="../es/index.html">Español</a><a data-language="fr" lang="fr" hreflang="fr" href="../fr/index.html">Français</a><a data-language="it" lang="it" hreflang="it" href="../it/index.html">Italiano</a><a data-language="de" lang="de" hreflang="de" href="../de/index.html">Deutsch</a><a data-language="nl" lang="nl" hreflang="nl" href="../nl/index.html">Nederlands</a><a data-language="sv" lang="sv" hreflang="sv" href="../sv/index.html">Svenska</a><a data-language="pl" lang="pl" hreflang="pl" href="../pl/index.html">Polski</a><a data-language="cs" lang="cs" hreflang="cs" href="../cs/index.html">Čeština</a><a data-language="ru" lang="ru" hreflang="ru" href="../ru/index.html">Русский</a><a data-language="uk" lang="uk" hreflang="uk" href="../uk/index.html">Українська</a><a data-language="tr" lang="tr" hreflang="tr" href="../tr/index.html">Türkçe</a><a data-language="tl" lang="tl" hreflang="tl" href="../tl/index.html">Tagalog (Filipino)</a><a data-language="id" lang="id" hreflang="id" href="../id/index.html">Bahasa Indonesia</a><a data-language="ar" lang="ar" hreflang="ar" href="../ar/index.html">العربية</a><a data-language="fa" lang="fa" hreflang="fa" href="../fa/index.html">فارسی</a><a data-language="hi" lang="hi" hreflang="hi" href="index.html" aria-current="page">Hindi</a><a data-language="bn" lang="bn" hreflang="bn" href="../bn/index.html">Bangla (Bengali)</a><a data-language="vi" lang="vi" hreflang="vi" href="../vi/index.html">Tiếng Việt</a><a data-language="zh" lang="zh-Hans" hreflang="zh-Hans" href="../zh/index.html">中文 (简体)</a><a data-language="ja" lang="ja" hreflang="ja" href="../ja/index.html">日本語</a><a data-language="ko" lang="ko" hreflang="ko" href="../ko/index.html">한국어</a></nav>
+    </div>
+  </section>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-bg"></div><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow" data-i18n="hero_eye">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
+          <img class="hero-logo" src="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/koha-logo.png" alt="koha.nexus" width="420" height="74">
+          <h1 data-i18n="hero_h1">सर्वश्रेष्ठ मुफ्त लाइब्रेरी सिस्टम, <span class='accent'>अब बिना परेशानी के।</span></h1>
+          <p data-i18n="hero_p"><strong>koha.nexus</strong> Koha के लिए एक स्मार्ट और मुफ्त सहायक है।</p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#installation" data-i18n="hero_btn1">स्थापना शुरू करें →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener" data-i18n="hero_btn2">GitHub पर देखें</a>
+            <a class="btn btn-secondary" href="../README.md" data-i18n="hero_btn3">README पढ़ें</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><strong data-i18n="stat1_t">22 भाषाएं</strong><span data-i18n="stat1_d">डैशबोर्ड और पैकेज</span></div>
+            <div class="stat"><strong data-i18n="stat2_t">2 सिस्टम</strong><span data-i18n="stat2_d">Linux या Windows</span></div>
+            <div class="stat"><strong data-i18n="stat3_t">25+ सुविधाएँ</strong><span data-i18n="stat3_d">प्रबंधन और उपकरण</span></div>
+            <div class="stat"><strong data-i18n="stat4_t">GPL-3.0+</strong><span data-i18n="stat4_d">मुफ्त सॉफ्टवेयर</span></div>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Installation terminal">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">installation — terminal</span>
+          </div>
+          <pre><span class="tl" style="--d:0"><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer</span><span class="tl" style="--d:1"><span class="prompt">$</span> sudo bash installer</span><span class="tl" style="--d:2">&nbsp;</span><span class="tl" style="--d:3"><span class="muted">KOHA.NEXUS</span></span><span class="tl" style="--d:4"><span class="prompt">✓</span> <span data-i18n="term_validating">सर्वर सत्यापित कर रहा है...</span></span><span class="tl" style="--d:5"><span class="prompt">✓</span> <span data-i18n="term_installing">Koha स्थापित हो रहा है...</span></span><span class="tl" style="--d:6"><span class="prompt">✓</span> <span data-i18n="term_configuring">डेटाबेस कॉन्फ़िगर कर रहा है...</span></span><span class="tl" style="--d:7"><span class="prompt">✓</span> <span data-i18n="term_preparing">बैकअप तैयार कर रहा है...</span></span><span class="tl" style="--d:8"><span class="prompt">✓</span> <span data-i18n="term_access">एक्सेस कॉन्फ़िगर कर रहा है...</span></span><span class="tl" style="--d:9">&nbsp;</span><span class="tl" style="--d:10"><span class="prompt">→</span> <span data-i18n="term_ready">डैशबोर्ड तैयार:</span> <strong>sudo config.sh</strong><span class="caret"></span></span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="feat_kick">सब कुछ एक जगह</div>
+          <h2 data-i18n="feat_h2">लाइब्रेरी प्रबंधन के लिए डैशबोर्ड।</h2>
+          <p data-i18n="feat_p">स्थापना से लेकर बैकअप और सुरक्षा तक।</p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <h3 data-i18n="f1_t">निर्देशित स्थापना</h3>
+            <p data-i18n="f1_d">Koha, Apache, MariaDB का स्वचालित सेटअप।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            </div>
+            <h3 data-i18n="f2_t">बैकअप हब</h3>
+            <p data-i18n="f2_d">SQL और MARC21 बैकअप।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="f3_t">सुरक्षित पुनर्स्थापना</h3>
+            <p data-i18n="f3_d">बैकअप का पहले परीक्षण किया जाता है।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </div>
+            <h3 data-i18n="f4_t">खोज और अनुक्रमण</h3>
+            <p data-i18n="f4_d">Zebra या Elasticsearch 7.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+            </div>
+            <h3 data-i18n="f5_t">वेब प्रकाशन</h3>
+            <p data-i18n="f5_d">Cloudflare Tunnel और Certbot.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h3 data-i18n="f6_t">सुरक्षा</h3>
+            <p data-i18n="f6_d">Fail2ban और UFW फ़ायरवॉल।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            </div>
+            <h3 data-i18n="f7_t">लाइब्रेरी उपकरण</h3>
+            <p data-i18n="f7_d">डेटा आयात और SQL रिपोर्ट।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="f8_t">WhatsApp और Telegram</h3>
+            <p data-i18n="f8_d">Koha सूचनाएं।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            </div>
+            <h3 data-i18n="f9_t">कैटलॉगिंग सहायता</h3>
+            <p data-i18n="f9_d">DDC और Cutter कैलकुलेटर।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+            </div>
+            <h3 data-i18n="f10_t">Windows + WSL 2</h3>
+            <p data-i18n="f10_d">स्थानीय Windows PC पर Koha चलाएं।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            </div>
+            <h3 data-i18n="f11_t">स्वत: अद्यतन</h3>
+            <p data-i18n="f11_d">GitHub से सुरक्षित अपडेट।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"></path></svg>
+            </div>
+            <h3><span data-i18n="f12_t">Z39.50 / SRU सर्वर</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f12_d">वास्तविक खोज से जाँची गई चुनी हुई सार्वजनिक सूचियाँ: केवल वैध MARC रिकॉर्ड लौटाने वाले सर्वर Koha में जुड़ते हैं, सबसे तेज़ पहले।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"></path></svg>
+            </div>
+            <h3><span data-i18n="f13_t">OPAC का रूप</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f13_d">बनावट, गोल कोने, वॉलपेपर, लोगो, हल्का/गहरा स्विच और नई पुस्तकों का कैरोसेल, पहले backup बनाकर Koha में लिखे जाते हैं।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+            </div>
+            <h3><span data-i18n="f14_t">संदेश और प्रणालियों के बीच संवाद</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f14_d">ईमेल, SMS, SIP2 स्वचालित निर्गमन और Z39.50 एक स्क्रीन पर, सही Koha पृष्ठ के लिंक और विन्यास लिखने वाले SIP2 फ़ॉर्म सहित।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h3><span data-i18n="f15_t">समय-सारणी और cron कार्य</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f15_d">हर स्वचालित कार्य चालू या बंद करें और आवृत्ति व समय चुनें। हाथ से लिखी पंक्तियाँ रखी जाती हैं।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"></path><circle cx="16.5" cy="7.5" r=".5"></circle></svg>
+            </div>
+            <h3><span data-i18n="f16_t">WireGuard VPN</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f16_d">कर्मचारी फ़ोन के QR से कहीं भी कर्मचारी इंटरफ़ेस और SSH तक पहुँचते हैं। केवल पुस्तकालय के पते VPN से गुजरते हैं।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </div>
+            <h3><span data-i18n="f17_t">निःशुल्क पता</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f17_d">डोमेन खरीदे या Cloudflare खाता खोले बिना koha.nexus पर सार्वजनिक सूची का पता, QR या लिंक से साझा करने योग्य। अभी परीक्षण में है।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="10" x="3" y="11" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" x2="8" y1="16" y2="16"></line><line x1="16" x2="16" y1="16" y2="16"></line></svg>
+            </div>
+            <h3><span data-i18n="f18_t">AI सहायक</span><span class="badge-new" data-i18n="badge_new">नया</span></h3>
+            <p data-i18n="f18_d">पुस्तकालयाध्यक्ष सामान्य भाषा में पुस्तकों, सदस्यों और ऋण के बारे में पूछते हैं। हर बदलाव एक प्रस्ताव है, जो केवल स्वीकृत करें और चलाएँ के बाद लागू होता है।</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="panel">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="p_kick">नया नियंत्रण पैनल</div>
+          <h2 data-i18n="p_h2">हर काम के लिए एक स्क्रीन, माउस और कीबोर्ड के साथ।</h2>
+          <p data-i18n="p_p"><code>sudo config.sh</code> चलाएँ, पैनल पूरी स्क्रीन पर खुलेगा: लाइव डैशबोर्ड, क्लिक करने योग्य कार्ड, शॉर्टकट और कमांड पैलेट (<kbd>ctrl+p</kbd>)। ये पैनल के वास्तविक स्क्रीनशॉट हैं।</p>
+        </div>
+
+        <div class="showcase">
+          <div class="tabs" role="tablist" data-i18n-aria="panel_screens" aria-label="पैनल स्क्रीन">
+            <button class="tab" type="button" role="tab" id="tab-dashboard" aria-controls="panel-stage" aria-selected="true" tabindex="0" data-shot="dashboard"><span class="ti" aria-hidden="true">🎛️</span><span data-i18n="pt_dashboard">नियंत्रण डैशबोर्ड</span><span class="k" aria-hidden="true">d</span></button>
+            <button class="tab" type="button" role="tab" id="tab-hub" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="hub"><span class="ti" aria-hidden="true">📨</span><span data-i18n="pt_hub">संदेश और प्रणालियों के बीच संवाद</span><span class="k" aria-hidden="true">m</span></button>
+            <button class="tab" type="button" role="tab" id="tab-z3950" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="z3950"><span class="ti" aria-hidden="true">📡</span><span data-i18n="pt_z3950">Z39.50 / SRU सर्वर</span><span class="k" aria-hidden="true">z</span></button>
+            <button class="tab" type="button" role="tab" id="tab-opac" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="opac"><span class="ti" aria-hidden="true">🎨</span><span data-i18n="pt_opac">OPAC का रूप</span><span class="k" aria-hidden="true">o</span></button>
+            <button class="tab" type="button" role="tab" id="tab-vpn" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="vpn"><span class="ti" aria-hidden="true">🛡️</span><span data-i18n="pt_vpn">WireGuard VPN</span><span class="k" aria-hidden="true">v</span></button>
+            <button class="tab" type="button" role="tab" id="tab-crons" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="crons"><span class="ti" aria-hidden="true">⏰</span><span data-i18n="pt_crons">समय-सारणी और cron कार्य</span><span class="k" aria-hidden="true">s</span></button>
+            <button class="tab" type="button" role="tab" id="tab-ai" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="ai"><span class="ti" aria-hidden="true">🤖</span><span data-i18n="pt_ai">AI</span><span class="k" aria-hidden="true">a</span></button>
+            <button class="tab" type="button" role="tab" id="tab-backup" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="backup"><span class="ti" aria-hidden="true">💾</span><span data-i18n="pt_backup">Backup केंद्र</span><span class="k" aria-hidden="true">b</span></button>
+          </div>
+          <div class="stage" id="panel-stage" role="tabpanel">
+            <a class="shot" id="shot" href="preview/#dashboard">
+              <img id="shot-img" src="../docs/images/panel/dashboard.webp" alt="Control Dashboard" width="1400" height="924" loading="lazy" decoding="async">
+              <span class="shot-badge"><span class="shot-badge-dot" aria-hidden="true"></span><span data-i18n="p_explore">इंटरैक्टिव मैनुअल में देखें</span><span class="shot-badge-arrow" aria-hidden="true">→</span></span>
+            </a>
+            <div class="stage-text">
+              <div>
+                <div class="pane" data-pane="dashboard"><h3 data-i18n="pt_dashboard">नियंत्रण डैशबोर्ड</h3><p data-i18n="pd_dashboard">Koha की स्थिति, पिछला backup, खाली डिस्क और सूची तथा कर्मचारी इंटरफ़ेस के सभी पते (यह कंप्यूटर, स्थानीय नेटवर्क और इंटरनेट), हर पते के साथ खोलने और कॉपी करने के बटन।</p></div>
+                <div class="pane" data-pane="hub" hidden><h3 data-i18n="pt_hub">संदेश और प्रणालियों के बीच संवाद</h3><p data-i18n="pd_hub">ईमेल, WhatsApp और Telegram, SMS, SIP2 और Z39.50 एक स्क्रीन पर। लिंक सही Koha कर्मचारी पृष्ठ खोलते हैं, Gmail निर्देश SMTP फ़ॉर्म में मदद करते हैं और SIP2 फ़ॉर्म स्वचालित निर्गमन मशीन के लिए <code>SIPconfig.xml</code> लिखता है।</p></div>
+                <div class="pane" data-pane="z3950" hidden><h3 data-i18n="pt_z3950">Z39.50 / SRU सर्वर</h3><p data-i18n="pd_z3950">क्षेत्रवार सार्वजनिक सूचियाँ और सामुदायिक सूची। स्कैन हर सर्वर पर वास्तविक खोज करता है और केवल वैध MARC रिकॉर्ड लौटाने वाले सर्वर गति के क्रम में रखता है।</p></div>
+                <div class="pane" data-pane="opac" hidden><h3 data-i18n="pt_opac">OPAC का रूप</h3><p data-i18n="pd_opac">एक क्लिक में सार्वजनिक सूची का रूप: धुंधला काँच या ब्रश किया धातु, गोल कोने, वॉलपेपर, लोगो, हल्का/गहरा स्विच और वास्तविक आवरणों वाला नई पुस्तकों का कैरोसेल। पहले backup बनता है।</p></div>
+                <div class="pane" data-pane="vpn" hidden><h3 data-i18n="pt_vpn">WireGuard VPN</h3><p data-i18n="pd_vpn">कर्मचारियों का निजी WireGuard नेटवर्क: फ़ोन या लैपटॉप जोड़ें, QR स्कैन करें और कहीं से भी कर्मचारी इंटरफ़ेस व SSH उपयोग करें। केवल विभाजित टनल: डिवाइस का अपना इंटरनेट नहीं बदलता।</p></div>
+                <div class="pane" data-pane="crons" hidden><h3 data-i18n="pt_crons">समय-सारणी और cron कार्य</h3><p data-i18n="pd_crons">टेक्स्ट संपादक के बजाय हर निर्धारित कार्य का स्विच, आवृत्ति और समय। हाथ से लिखी पंक्तियाँ रखी जाती हैं और पुरानी फ़ाइल पहले सहेजी जाती है।</p></div>
+                <div class="pane" data-pane="ai" hidden><h3 data-i18n="pt_ai">AI</h3><p data-i18n="pd_ai">आवरण और शीर्षक पृष्ठ की तस्वीरों से AI सूचीकरण और Koha कर्मचारी मुखपृष्ठ का सहायक, जो सामान्य भाषा में उत्तर देता है तथा केवल <strong>स्वीकृत करें और चलाएँ</strong> के बाद डेटा बदलता है।</p></div>
+                <div class="pane" data-pane="backup" hidden><h3 data-i18n="pt_backup">Backup केंद्र</h3><p data-i18n="pd_backup">डेटाबेस बहाली अब केवल यहाँ है, MARC21 निर्यात और backup प्रक्रियाओं के पास: मुख्य मेनू में अलग Restore database विकल्प नहीं है। नवीनतम backup इस कंप्यूटर पर डाउनलोड करें, backup से डेटाबेस बहाल करें (पहले परीक्षण और वर्तमान डेटाबेस की सुरक्षा प्रति), एक बटन से MARC21 निर्यात करें, अस्थायी डेटाबेस में backup जाँचें और चरणबद्ध तरीके से Google Drive, OneDrive, MEGA या S3 पर कॉपी करें।</p></div>
+              </div>
+            </div>
+            <div class="stage-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="installation">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="inst_kick">यहां से शुरू करें</div>
+          <h2 data-i18n="inst_h2">कुछ कमांड्स के साथ Linux स्थापना।</h2>
+          <p data-i18n="inst_p">परियोजना amd64 या arm64 पर Debian 11/12/13 या Ubuntu 22.04/24.04 के लिए है; Windows पर WSL 2 से भी चल सकती है।</p>
+        </div>
+
+        <div class="install-grid">
+          <div class="card">
+            <h3 data-i18n="inst_b1_t">प्रत्यक्ष इंस्टॉलर</h3>
+            <p data-i18n="inst_b1_d">वर्तमान इंस्टॉलर स्क्रिप्ट डाउनलोड कर व्यवस्थापक अधिकारों से चलाएँ।</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer">कॉपी</button>
+              </div>
+              <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_b2_t">क्लोन रिपॉजिटरी</h3>
+            <p data-i18n="inst_b2_d">ऑफ़लाइन काम के लिए अनुवाद फ़ाइलें स्क्रिप्ट के साथ रख सकते हैं।</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer">कॉपी</button>
+              </div>
+              <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="inst_r_t">न्यूनतम आवश्यकताएं</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_r1">Debian 11/12/13 या Ubuntu 22.04/24.04, 64-bit</li>
+              <li data-i18n="inst_r2">4 GB RAM; 8 GB या अधिक अनुशंसित</li>
+              <li data-i18n="inst_r3">5 GB खाली स्थान; 10 GB या अधिक अनुशंसित</li>
+              <li data-i18n="inst_r4">root या sudo अधिकार वाला उपयोगकर्ता</li>
+              <li data-i18n="inst_r5">Koha रिपॉजिटरी के लिए इंटरनेट</li>
+              <li data-i18n="inst_r6">पोर्ट 80 और 8080 उपलब्ध</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_a_t">स्थापना के बाद</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_a1">कर्मचारी इंटरफ़ेस खोलें: <code>http://SERVER-IP:8080</code></li>
+              <li data-i18n="inst_a2">Koha Web Installer पूरा करें</li>
+              <li data-i18n="inst_a3">डैशबोर्ड से सुपर लाइब्रेरियन बनाएँ</li>
+              <li data-i18n="inst_a4">सार्वजनिक सूची: <code>http://SERVER-IP:80</code></li>
+              <li data-i18n="inst_a5">डैशबोर्ड फिर खोलें: <code>sudo config.sh</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section windows" id="windows">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="win_kick">Windows 10 / 11</div>
+          <h2 data-i18n="win_h2">PC पर पूर्ण Koha वातावरण।</h2>
+          <p data-i18n="win_p">Windows में Koha चलाएं।</p>
+        </div>
+
+        <div class="download-banner">
+          <div class="download-content">
+            <div class="download-icon">
+              <svg viewbox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <div>
+              <div class="download-kicker" data-i18n="win_d_k">विंडोज़ इंस्टॉलर</div>
+              <h3 data-i18n="win_d_t">एक कमांड से Koha स्थापित करें।</h3>
+              <p data-i18n="win_d_p">PowerShell को <strong>व्यवस्थापक (Administrator) के रूप में</strong> खोलें, यह कमांड पेस्ट करें और Enter दबाएँ।</p>
+            </div>
+          </div>
+          <div class="codebox">
+            <div class="codebox-head">
+              <span>PowerShell</span>
+              <button class="copy" data-i18n="btn_copy" data-copy="irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">कॉपी</button>
+            </div>
+            <pre>irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
+          </div>
+        </div>
+
+        <div class="windows-card">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <h3 data-i18n="win_b_t">स्थापना</h3>
+            <p data-i18n="win_b_p">Start पर राइट-क्लिक करें, <em>Terminal (Admin)</em> चुनें और <strong>Yes</strong> पर क्लिक करें। ऊपर की कमांड पेस्ट करें और Enter दबाएँ।</p>
+            <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.</div>
+            <div class="callout" style="margin-top:14px">
+              <strong data-i18n="win_c2_t"><strong>वर्चुअलाइजेशन कैसे सक्षम करें:</strong></strong>
+              <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)" data-i18n="win_c2_p1">BIOS सेटिंग्स दर्ज करें।</p>
+              <ul style="margin:0 0 8px;padding-left:18px;font-size:0.88rem;color:var(--muted);line-height:1.6">
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> — ASUS, Gigabyte, MSI, ASRock, Acer</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Esc</kbd> — HP / Compaq</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F12</kbd> — Dell</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F1</kbd>, <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Enter</kbd> — Lenovo</li>
+              </ul>
+              <p style="margin:0 0 6px;font-size:0.88rem;color:var(--muted)" data-i18n="win_c2_p2">Intel VT-x या AMD SVM सक्षम करें।</p>
+              <p style="margin:6px 0 0;font-size:0.83rem;color:var(--muted);border-top:1px solid var(--line);padding-top:6px" data-i18n="win_c2_p3">या Windows उन्नत स्टार्टअप का उपयोग करें।</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div><h3 data-i18n="w_t1_t">सिस्टम चेक</h3><p data-i18n="w_t1_d">आपके PC का सत्यापन।</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div><h3 data-i18n="w_t2_t">Debian</h3><p data-i18n="w_t2_d">Linux स्थापना।</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div><h3 data-i18n="w_t3_t">Koha</h3><p data-i18n="w_t3_d">पैकेज डाउनलोड।</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div><h3 data-i18n="w_t4_t">नेटवर्क</h3><p data-i18n="w_t4_d">स्थानीय पहुंच।</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div><h3 data-i18n="w_t5_t">ऑपरेशन</h3><p data-i18n="w_t5_d">सुरक्षित शटडाउन।</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-3">
+          <div class="card"><h3 data-i18n="w_c1_t">सूचनाएं</h3><p data-i18n="w_c1_d">विंडोज़ अलर्ट।</p></div>
+          <div class="card"><h3 data-i18n="w_c2_t">निदान</h3><p data-i18n="w_c2_d">समर्थन के लिए लॉग।</p></div>
+          <div class="card"><h3 data-i18n="w_c3_t">शटडाउन</h3><p data-i18n="w_c3_d">Koha सुरक्षित रूप से बंद हो जाता है।</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="t_kick">उपकरण</div>
+          <h2 data-i18n="t_h2">संग्रह प्रबंधन।</h2>
+          <p data-i18n="t_p">डेटा बदलने से पहले स्वचालित सुरक्षा।</p>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287L12 3Z"></path></svg>
+            </div>
+            <h3 data-i18n="t1_t">Magic Import</h3>
+            <p data-i18n="t1_d">MARC और स्प्रेडशीट आयात करें।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            </div>
+            <h3 data-i18n="t2_t">आयात पूर्ववत करें</h3>
+            <p data-i18n="t2_d">आयात वापस लें।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><line x1="12" x2="12" y1="20" y2="10"></line><line x1="18" x2="18" y1="20" y2="4"></line><line x1="6" x2="6" y1="20" y2="14"></line></svg>
+            </div>
+            <h3 data-i18n="t3_t">SQL रिपोर्ट</h3>
+            <p data-i18n="t3_d">ऋण और बकाया।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 data-i18n="t4_t">श्रेणियां</h3>
+            <p data-i18n="t4_d">सदस्यों को स्थानांतरित करें।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="t5_t">गुणवत्ता</h3>
+            <p data-i18n="t5_d">कैटलॉग त्रुटियां जांचें।</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            </div>
+            <h3 data-i18n="t6_t">गोपनीयता</h3>
+            <p data-i18n="t6_d">पुराना डेटा हटाएं।</p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top:18px" data-i18n="t_c1"><strong>सुरक्षा:</strong> हमेशा बैकअप लिया गया।</div>
+      </div>
+    </section>
+
+    <!-- ESSA SEÇÃO INTEIRA SÓ VAI APARECER EM PORTUGUÊS POR CAUSA DA CLASSE .only-pt -->
+    <section class="section only-pt" id="brazil">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Brasil: localização</div>
+          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <p>
+            As funcionalidades de localização são opcionais: nada é ativado automaticamente durante a instalação ou por agendamento.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Validação de CPF</td>
+                <td>Auditoria de CPFs usando dígitos verificadores e identificação de números duplicados.</td>
+                <td>Leitura apenas</td>
+              </tr>
+              <tr>
+                <td>Etiquetas Pimaco</td>
+                <td>Modelos prontos para folhas A4 e Carta, incluindo lombada, código de barras e título.</td>
+                <td>PRE-ETIQUETAS</td>
+              </tr>
+              <tr>
+                <td>Ficha Catalográfica</td>
+                <td>Gera fichas no padrão nacional integradas diretamente na visualização do registro.</td>
+                <td>PRE-FICHA</td>
+              </tr>
+              <tr>
+                <td>Feriados Brasileiros</td>
+                <td>Feriados nacionais e datas móveis, com opção para inserir os municipais.</td>
+                <td>PRE-CALENDARIO</td>
+              </tr>
+              <tr>
+                <td>Relatórios de Censo</td>
+                <td>Indicadores baseados nos dados do Koha para MEC, INEP, IBGE e SNBP.</td>
+                <td>PRE-CENSO</td>
+              </tr>
+              <tr>
+                <td>ABNT NBR 6023:2018</td>
+                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
+                <td>Leitura apenas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Nota:</strong> Os dados do censo representam o que está registrado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="security">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="s_kick">सुरक्षा</div>
+          <h2 data-i18n="s_h2">पारदर्शी स्वचालन।</h2>
+          <p data-i18n="s_p">अनुसूचित कार्य।</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="s1_t">अनुसूची</h3>
+            <div class="table-wrap" style="margin-top:14px">
+              <table style="min-width:580px">
+                <thead><tr><th data-i18n="s1_th1">समय</th><th data-i18n="s1_th2">कार्य</th></tr></thead>
+                <tbody>
+                  <tr><td data-i18n="s1_r1_1">23:00</td><td data-i18n="s1_r1_2">SQL बैकअप</td></tr>
+                  <tr><td data-i18n="s1_r2_1">रविवार</td><td data-i18n="s1_r2_2">MARC21 निर्यात</td></tr>
+                  <tr><td data-i18n="s1_r3_1">01:30</td><td data-i18n="s1_r3_2">सफाई</td></tr>
+                  <tr><td data-i18n="s1_r4_1">05:00</td><td data-i18n="s1_r4_2">Plack पुनरारंभ</td></tr>
+                  <tr><td data-i18n="s1_r5_1">2 मिनट</td><td data-i18n="s1_r5_2">Zebra Indexer</td></tr>
+                  <tr><td data-i18n="s1_r6_1">5 मिनट</td><td data-i18n="s1_r6_2">Elasticsearch</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s2_t">महत्वपूर्ण फ़ाइलें</h3>
+            <ul class="feature-list">
+              <li data-i18n="s2_l1">पासवर्ड</li>
+              <li data-i18n="s2_l2">SQL बैकअप</li>
+              <li data-i18n="s2_l3">MARC बैकअप</li>
+              <li data-i18n="s2_l4">सेटिंग्स</li>
+              <li data-i18n="s2_l5">लॉग</li>
+              <li data-i18n="s2_l6">आयात फ़ोल्डर</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s3_t">स्थिति</h3>
+            <p data-i18n="s3_p">सर्वर स्वास्थ्य जांचें।</p>
+            <div class="chip-row">
+              <span class="chip" data-i18n="s3_c1">Health</span>
+              <span class="chip" data-i18n="s3_c2">Apache</span>
+              <span class="chip" data-i18n="s3_c3">MariaDB</span>
+              <span class="chip" data-i18n="s3_c4">Koha</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s4_t">पावर रिकवरी</h3>
+            <p data-i18n="s4_p">स्वचालित मरम्मत।</p>
+          </div>
+        </div>
+
+        <div class="callout danger" style="margin-top:18px" data-i18n="s_c1"><strong>अनइंस्टॉल करने से डेटा नष्ट हो जाता है।</strong></div>
+      </div>
+    </section>
+
+    <section class="section" id="network">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="n_kick">नेटवर्क</div>
+          <h2 data-i18n="n_h2">पुस्तकालय</h2>
+          <p data-i18n="n_p">हमारे भागीदार पुस्तकालय।</p>
+          <span class="live-pill" data-i18n="n_live">koha.nexus नेटवर्क की ताज़ा सूची</span>
+        </div>
+
+        <div class="grid-3" id="libraries-grid">
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0;" data-i18n="n_load">लोड हो रहा है...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="contribute">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="c_kick">ओपन सोर्स</div>
+          <h2 data-i18n="c_h2">मुफ्त उपयोग।</h2>
+          <p data-i18n="c_p">स्वतंत्र रूप से संशोधित करें।</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="c1_t">परीक्षण</h3>
+            <p data-i18n="c1_p">सिस्टम सत्यापन।</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="c2_t">अनुवाद</h3>
+            <p data-i18n="c2_p">22 भाषाओं का समर्थन।</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="c3_t">सत्यापन</h3>
+            <p data-i18n="c3_p">SHA-256 सुरक्षा।</p>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="card">
+          <h3 data-i18n="c_lic_t">लाइसेंस</h3>
+          <p data-i18n="c_lic_p">GNU GPLv3.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="container contact-grid">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="ct_kick">संपर्क</div>
+          <h2 data-i18n="ct_h2">परियोजना से संपर्क करें।</h2>
+          <p data-i18n="ct_p">प्रश्न, सुझाव, नेटवर्क से जुड़ना चाहने वाला पुस्तकालय या जोड़ने योग्य Z39.50 सर्वर: यहाँ लिखें, उत्तर ईमेल पर मिलेगा।</p>
+        </div>
+
+        <form class="card contact-form" id="contact-form" action="https://formspree.io/f/mkjorqwp" method="POST" novalidate>
+          <label class="field">
+            <span data-i18n="ct_name">नाम / संस्था</span>
+            <input type="text" name="name" required maxlength="200" autocomplete="organization" data-i18n-ph="ct_name_ph" placeholder="आपका या पुस्तकालय का नाम">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_email">ईमेल</span>
+            <input type="email" name="email" required maxlength="200" autocomplete="email" data-i18n-ph="ct_email_ph" placeholder="you@library.org">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_msg">संदेश, सुझाव या समस्या की रिपोर्ट</span>
+            <textarea name="message" required rows="6" maxlength="5000" data-i18n-ph="ct_msg_ph" placeholder="सुझाव, रचनात्मक आलोचना, समस्या की रिपोर्ट, नया पुस्तकालय सर्वर या Koha.Nexus से जुड़ा प्रश्न भेजें..."></textarea>
+          </label>
+          <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="contact-actions">
+            <button class="btn btn-primary" type="submit" id="contact-send" data-i18n="ct_send">संदेश भेजें</button>
+            <span class="contact-note" data-i18n="ct_note">आपके ईमेल का उपयोग केवल इस संदेश के उत्तर के लिए होगा।</span>
+          </div>
+          <div class="contact-status" id="contact-status" role="status" aria-live="polite" hidden></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#home" aria-label="koha.nexus">
+            koha.nexus
+          </a>
+          <p style="margin-top:14px;max-width:560px" data-i18n="foot_p1">Koha सहायक।</p>
+          <p data-i18n="foot_p2"><strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong> द्वारा विकसित।</p>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_proj">प्रोजेक्ट</h4>
+          <div class="mini-links">
+            <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
+            <a href="LICENSE" data-i18n="c_lic_t">लाइसेंस</a>
+            <a href="../README.md">README</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_links">लिंक</h4>
+          <div class="mini-links">
+            <a href="#features" data-i18n="nav_features">सुविधाएँ</a>
+            <a href="#panel" data-i18n="nav_panel">पैनल</a>
+            <a href="preview/" data-i18n="nav_manual">मैनुअल</a>
+            <a href="#installation" data-i18n="nav_install">स्थापना</a>
+            <a href="#windows" data-i18n="nav_win">Windows</a>
+            <a href="#tools" data-i18n="nav_tools">उपकरण</a>
+            <a href="#contact" data-i18n="nav_contact">संपर्क</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span data-i18n="foot_c1">© 2026 koha.nexus</span>
+        <span data-i18n="foot_c2">Koha समुदाय।</span>
+      </div>
+    </div>
+  </footer>
+
+
+
+  <button class="to-top" id="to-top" type="button" data-i18n-aria="back_to_top" aria-label="ऊपर जाएँ">↑</button>
+
+
+  <script id="site-messages" type="application/json">{"ct_sending": "भेजा जा रहा है…", "ct_ok": "संदेश भेज दिया गया! संपर्क करने के लिए धन्यवाद।", "ct_err": "अभी संदेश नहीं भेज सके। फ़ील्ड जाँचें और कुछ देर बाद फिर प्रयास करें।", "network_empty": "अभी कोई सार्वजनिक पुस्तकालय सूचीबद्ध नहीं है।", "network_error": "अभी पुस्तकालय नेटवर्क लोड नहीं हो सका।"}</script>
+  <script src="../site/assets/home.js" defer></script>
+</body>
+</html>
