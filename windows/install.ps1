@@ -368,7 +368,12 @@ if (-not $kohaVirtOk) {
         if ($code -eq -1) { }
         elseif ($code -eq 3) { Write-Host 'Restart Windows now. The installation continues after you sign in again.' -ForegroundColor Yellow }
         elseif ($code -ne 0) { Write-Host ('The installation stopped (code {0}). Run the same command again to continue. Log: {1}\logs' -f $code, $env:KOHAEASY_ROOT) -ForegroundColor Red }
+        # Run as a file (the MSIX bootstrap does), the exit code says what
+        # happened: 3 = restart Windows, other codes = stopped. Under
+        # "irm | iex" exit would close the window, so it only stops.
+        if ($PSCommandPath -and $code -gt 0) { exit $code }
     } catch {
         Write-Host ('[X] ' + $_.Exception.Message) -ForegroundColor Red
+        if ($PSCommandPath) { exit 1 }
     }
 }
