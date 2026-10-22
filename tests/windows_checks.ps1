@@ -319,6 +319,30 @@ Check 'msix: signer is the published .cer' ($signer.Thumbprint -eq $cer.Thumbpri
 Check 'msix: instalar_msix.ps1 knows the signer' ($pinned -match ("'" + $signer.Thumbprint + "'")) $signer.Thumbprint
 Check 'msix: manifest Publisher is the signer subject' ($identity.Publisher -eq $signer.Subject) ('{0} / {1}' -f $identity.Publisher, $signer.Subject)
 
+# No foreach variable named like a parameter of its own script or
+# function: PowerShell ignores case, so "foreach ($store in ...)" in
+# compilar_msix.ps1 wrote over [switch]$Store and -Store stopped with
+# "cannot convert PSCustomObject to SwitchParameter".
+$scripts = @(Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') +
+    @(Get-ChildItem (Join-Path $repo 'windows\msix') -Filter '*.ps1') +
+    @(Get-ChildItem (Join-Path $repo 'windows\setup') -Filter '*.ps1')
+foreach ($f in $scripts) {
+    $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+    $clashes = @()
+    foreach ($loop in $fileAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.ForEachStatementAst] }, $true)) {
+        $owner = $loop.Parent
+        while ($owner -and -not ($owner -is [System.Management.Automation.Language.ScriptBlockAst])) { $owner = $owner.Parent }
+        $params = @()
+        if ($owner.ParamBlock) { $params += $owner.ParamBlock.Parameters }
+        if ($owner.Parent -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $owner.Parent.Parameters) { $params += $owner.Parent.Parameters }
+        $name = $loop.Variable.VariablePath.UserPath
+        foreach ($p in $params) {
+            if ($p.Name.VariablePath.UserPath -ieq $name) { $clashes += ('{0}: ${1} / param ${2}' -f $loop.Extent.StartLineNumber, $name, $p.Name.VariablePath.UserPath) }
+        }
+    }
+    Check ('no foreach variable named like a parameter: ' + $f.Name) ($clashes.Count -eq 0) ($clashes -join '; ')
+}
+
 # MSIX for the Store (compilar_msix.ps1 -Store): store-identity.json is
 # either still empty or holds a valid Partner Center identity, and the
 # payload revision moves with the package version (a rebuild under the same

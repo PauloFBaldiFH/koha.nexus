@@ -203,41 +203,46 @@ try {
         }
     }
 
-    # Localiza o certificado de assinatura pela identidade Publisher exata.
-    # O certificado informado pelo diagnóstico estava em LocalMachine\My.
-    $certificateCandidates = @()
-    $certificateStores = @(
-        [pscustomobject]@{ Path = 'Cert:\LocalMachine\My'; Scope = 'LocalMachine' },
-        [pscustomobject]@{ Path = 'Cert:\CurrentUser\My'; Scope = 'CurrentUser' }
-    )
+    if ($Store) {
+        # A Store descarta qualquer assinatura e assina o pacote ela mesma:
+        # nenhum certificado local é procurado.
+        Write-Host 'Modo Store: o pacote sai sem assinatura; a Microsoft Store assina.' -ForegroundColor Gray
+    } else {
+        # Localiza o certificado de assinatura pela identidade Publisher exata.
+        # O certificado informado pelo diagnóstico estava em LocalMachine\My.
+        # (Nenhuma variável aqui pode se chamar $store: o PowerShell não
+        # diferencia maiúsculas e ela sobrescreveria o parâmetro -Store.)
+        $certificateCandidates = @()
+        $certificateStores = @(
+            [pscustomobject]@{ Path = 'Cert:\LocalMachine\My'; Scope = 'LocalMachine' },
+            [pscustomobject]@{ Path = 'Cert:\CurrentUser\My'; Scope = 'CurrentUser' }
+        )
 
-    foreach ($store in $certificateStores) {
-        $storeCertificates = Get-ChildItem -Path $store.Path -ErrorAction SilentlyContinue
-        foreach ($certificate in $storeCertificates) {
-            if (
-                $certificate.Subject -eq $packagePublisher -and
-                $certificate.HasPrivateKey -and
-                $certificate.NotBefore -le (Get-Date) -and
-                $certificate.NotAfter -gt (Get-Date)
-            ) {
-                $certificateCandidates += [pscustomobject]@{
-                    Certificate = $certificate
-                    Scope       = $store.Scope
+        foreach ($certificateStoreInfo in $certificateStores) {
+            $storeCertificates = Get-ChildItem -Path $certificateStoreInfo.Path -ErrorAction SilentlyContinue
+            foreach ($certificate in $storeCertificates) {
+                if (
+                    $certificate.Subject -eq $packagePublisher -and
+                    $certificate.HasPrivateKey -and
+                    $certificate.NotBefore -le (Get-Date) -and
+                    $certificate.NotAfter -gt (Get-Date)
+                ) {
+                    $certificateCandidates += [pscustomobject]@{
+                        Certificate = $certificate
+                        Scope       = $certificateStoreInfo.Scope
+                    }
                 }
             }
         }
-    }
 
-    $certificateRecord = $certificateCandidates |
-        Sort-Object { $_.Certificate.NotAfter } -Descending |
-        Select-Object -First 1
+        $certificateRecord = $certificateCandidates |
+            Sort-Object { $_.Certificate.NotAfter } -Descending |
+            Select-Object -First 1
 
-    if ($Store) {
-        # A Store descarta qualquer assinatura e assina o pacote ela mesma.
-        Write-Host 'Modo Store: o pacote sai sem assinatura; a Microsoft Store assina.' -ForegroundColor Gray
-    } elseif (-not $certificateRecord) {
-        throw "Não encontrei certificado válido com chave privada e Subject '$packagePublisher' nos repositórios My do usuário ou do computador."
-    } else {
+        if (-not $certificateRecord) {
+            throw "Não encontrei certificado válido com chave privada e Subject '$packagePublisher' nos repositórios My do usuário ou do computador."
+        }
+
         $signingCertificate = $certificateRecord.Certificate
         $certificateScope = $certificateRecord.Scope
 
