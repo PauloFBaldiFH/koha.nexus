@@ -12,14 +12,22 @@ on:
   push:
     paths:
       - "windows/**"
-      - "lang/pt.cache"
+      - "installer"
+      - "installer.sha256"
+      - ".gitattributes"
+      - "panel/**"
+      - "lang/**"
       - "tests/windows_checks.ps1"
       - "tests/koha_window_test.sh"
       - ".github/workflows/windows-tools.yml"
   pull_request:
     paths:
       - "windows/**"
-      - "lang/pt.cache"
+      - "installer"
+      - "installer.sha256"
+      - ".gitattributes"
+      - "panel/**"
+      - "lang/**"
       - "tests/windows_checks.ps1"
       - "tests/koha_window_test.sh"
       - ".github/workflows/windows-tools.yml"

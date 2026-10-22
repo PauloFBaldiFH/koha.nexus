@@ -1,0 +1,11 @@
+# Files that run or are read inside Debian keep LF on every checkout. Git
+# for Windows (core.autocrlf=true) otherwise writes them with CRLF:
+# installer then no longer matches installer.sha256, and the MSIX built
+# from that checkout stops at "The installer file is damaged".
+installer        text eol=lf
+installer.sha256 text eol=lf
+lang/**          text eol=lf
+panel/**         text eol=lf
+*.sh             text eol=lf
+*.bats           text eol=lf
+*.py             text eol=lf

@@ -30,10 +30,10 @@ $logoImagePath = Join-Path $scriptRoot 'KohaNexusLogo.png'
 
 # Versão solicitada originalmente. Precisa ser maior que qualquer versão
 # anterior que ainda esteja instalada se o pacote for atualizado sem remoção.
-$targetVersion = '1.0.26.0'
+$targetVersion = '1.0.27.0'
 # Revision interna do payload: força a atualização de instalações incompletas
 # feitas por builds anteriores, sem precisar alterar a versão pública do MSIX.
-$payloadRevision = '1.0.26.0-msix-v18'
+$payloadRevision = '1.0.27.0-msix-v19'
 $packageName = 'KohaNexus'
 $packagePublisher = 'CN=PauloFBaldiFH'
 $publisherDisplayName = 'PauloFBaldiFH'
@@ -131,6 +131,47 @@ function Get-KohaStoreIdentity {
     return $identity
 }
 
+# installer, installer.sha256, lang\ e panel\ rodam ou são lidos dentro do
+# Debian e precisam chegar com LF. O Git para Windows com core.autocrlf
+# grava CRLF: o installer deixa de bater com installer.sha256 e o
+# windows\install.ps1 recusa a instalação ("The installer file is
+# damaged"). Devolve a lista do que está errado; vazia quando está tudo
+# certo. Usada pelo compilador sobre o repositório e sobre a carga, e por
+# tests\windows_checks.ps1.
+function Test-KohaMsixPayloadText {
+    param([Parameter(Mandatory = $true)][string]$Root)
+    $problems = New-Object System.Collections.Generic.List[string]
+    $installerFile = Join-Path $Root 'installer'
+    $hashFile = Join-Path $Root 'installer.sha256'
+    if (-not (Test-Path -LiteralPath $installerFile -PathType Leaf) -or -not (Test-Path -LiteralPath $hashFile -PathType Leaf)) {
+        $problems.Add('installer ou installer.sha256 ausente')
+        return $problems.ToArray()
+    }
+    $expected = ((Get-Content -LiteralPath $hashFile -TotalCount 1) -split '\s+')[0].ToUpperInvariant()
+    $actual = (Get-FileHash -LiteralPath $installerFile -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($expected -ne $actual) {
+        $problems.Add(('installer: SHA-256 {0} não bate com installer.sha256 ({1})' -f $actual, $expected))
+    }
+    $files = @(Get-Item -LiteralPath $installerFile, $hashFile)
+    foreach ($dirName in 'lang', 'panel') {
+        $dirPath = Join-Path $Root $dirName
+        if (Test-Path -LiteralPath $dirPath -PathType Container) {
+            $files += @(Get-ChildItem -LiteralPath $dirPath -Recurse -File -Force | Where-Object { $_.FullName -notmatch '[\\/]__pycache__[\\/]' })
+        }
+    }
+    $withCr = @(foreach ($file in $files) {
+        if ([Array]::IndexOf([IO.File]::ReadAllBytes($file.FullName), [byte]13) -ge 0) {
+            $file.FullName.Substring($Root.Length).TrimStart('\', '/')
+        }
+    })
+    if ($withCr.Count -gt 0) {
+        $more = ''
+        if ($withCr.Count -gt 8) { $more = ' e mais {0}' -f ($withCr.Count - 8) }
+        $problems.Add(('com CRLF em vez de LF: {0}{1}' -f (@($withCr | Select-Object -First 8) -join ', '), $more))
+    }
+    return $problems.ToArray()
+}
+
 # O que o bootstrap do MSIX usa dos fontes de windows\ (sem alterá-los):
 # devolve a lista do que falta; vazia quando está tudo certo. Usada pelo
 # compilador sobre a cópia da carga e por tests\windows_checks.ps1 sobre o
@@ -217,6 +258,17 @@ try {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
             throw "Arquivo obrigatório não encontrado: $requiredFile"
         }
+    }
+
+    # O installer precisa bater com installer.sha256 e chegar ao Debian com
+    # LF; um checkout com CRLF geraria um MSIX que para na instalação.
+    $payloadTextProblems = @(Test-KohaMsixPayloadText -Root $repoDir)
+    if ($payloadTextProblems.Count -gt 0) {
+        throw ('A cópia local do repositório não serve para o MSIX. Nada será empacotado:' + [Environment]::NewLine +
+            ($payloadTextProblems -join [Environment]::NewLine) + [Environment]::NewLine +
+            'Com o .gitattributes atual (git pull), regrave esses arquivos com LF na raiz do repositório:' + [Environment]::NewLine +
+            '  Remove-Item installer, installer.sha256; Remove-Item lang, panel -Recurse -Force' + [Environment]::NewLine +
+            '  git checkout -- installer installer.sha256 lang panel')
     }
 
     # O modo Store não assina: só o MakeAppx é necessário.
@@ -420,6 +472,10 @@ try {
     Copy-Item -LiteralPath $installer -Destination $payloadDir -Force
     Copy-Item -LiteralPath $installerHash -Destination $payloadDir -Force
     Copy-Item -LiteralPath $panelDir -Destination $payloadDir -Recurse -Force
+    $payloadTextProblems = @(Test-KohaMsixPayloadText -Root $payloadDir)
+    if ($payloadTextProblems.Count -gt 0) {
+        throw ('A carga do MSIX não confere com installer.sha256. Nada será empacotado:' + [Environment]::NewLine + ($payloadTextProblems -join [Environment]::NewLine))
+    }
 
     # Entry point do MSIX chama este bootstrap, não "KohaEasy.ps1 Launch".
     # O comando Launch mostra corretamente "Koha is not installed" fora do

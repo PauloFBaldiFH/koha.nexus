@@ -384,6 +384,28 @@ try {
 } finally {
     Remove-Item -LiteralPath $badCopy -Recurse -Force
 }
+# The installer, its hash, lang\ and panel\ go into Debian and must keep
+# LF: Git for Windows (core.autocrlf, also on this CI runner) wrote the
+# installer with CRLF, it no longer matched installer.sha256 and the MSIX
+# stopped at "The installer file is damaged". .gitattributes keeps them LF;
+# the build refuses a checkout without it. Runs on this runner's checkout,
+# and on a copy whose installer has CRLF, which must fail.
+foreach ($fn in $builderAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Test-KohaMsixPayloadText' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$textProblems = @(Test-KohaMsixPayloadText -Root $repo)
+Check 'msix: installer matches installer.sha256, payload text is LF' ($textProblems.Count -eq 0) ($textProblems -join '; ')
+$crlfCopy = Join-Path ([IO.Path]::GetTempPath()) ('koha-msix-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $crlfCopy | Out-Null
+try {
+    Copy-Item -LiteralPath (Join-Path $repo 'installer.sha256') -Destination $crlfCopy
+    $lf = [IO.File]::ReadAllText((Join-Path $repo 'installer'))
+    [IO.File]::WriteAllText((Join-Path $crlfCopy 'installer'), $lf.Replace("`n", "`r`n"))
+    $crlfProblems = @(Test-KohaMsixPayloadText -Root $crlfCopy) -join ';'
+    Check 'msix: an installer with CRLF stops the build' ($crlfProblems -match 'installer.sha256' -and $crlfProblems -match 'CRLF') $crlfProblems
+} finally {
+    Remove-Item -LiteralPath $crlfCopy -Recurse -Force
+}
 $builderText = Get-Content -LiteralPath $builder -Raw
 $rewrites = [regex]::Matches($builderText, 'WriteAllText\(\$(coreModulePath|installModulePath|mainWindowsPath|panelWrapperPath|iconFixScriptPath|windowsInstallerPath)\b')
 Check 'msix: the build rewrites no file of windows\' ($rewrites.Count -eq 0) (($rewrites | ForEach-Object { $_.Value }) -join '; ')
