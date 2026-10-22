@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" data-i18n-meta="page_description" content="Koha.Nexus est un assistant gratuit pour installer et gérer des bibliothèques Koha sous Debian, Ubuntu et Windows avec WSL.">
+  <meta name="theme-color" content="#08110d">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <link rel="shortcut icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title data-i18n="page_title">Koha.Nexus : gestion simplifiée des bibliothèques</title>
+
+  <link rel="stylesheet" href="../site/assets/home.css">
+<link rel="alternate" hreflang="en" href="https://koha.nexus/">
+<link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/pt/">
+<link rel="alternate" hreflang="es" href="https://koha.nexus/es/">
+<link rel="alternate" hreflang="fr" href="https://koha.nexus/fr/">
+<link rel="alternate" hreflang="it" href="https://koha.nexus/it/">
+<link rel="alternate" hreflang="de" href="https://koha.nexus/de/">
+<link rel="alternate" hreflang="nl" href="https://koha.nexus/nl/">
+<link rel="alternate" hreflang="sv" href="https://koha.nexus/sv/">
+<link rel="alternate" hreflang="pl" href="https://koha.nexus/pl/">
+<link rel="alternate" hreflang="cs" href="https://koha.nexus/cs/">
+<link rel="alternate" hreflang="ru" href="https://koha.nexus/ru/">
+<link rel="alternate" hreflang="uk" href="https://koha.nexus/uk/">
+<link rel="alternate" hreflang="tr" href="https://koha.nexus/tr/">
+<link rel="alternate" hreflang="tl" href="https://koha.nexus/tl/">
+<link rel="alternate" hreflang="id" href="https://koha.nexus/id/">
+<link rel="alternate" hreflang="ar" href="https://koha.nexus/ar/">
+<link rel="alternate" hreflang="fa" href="https://koha.nexus/fa/">
+<link rel="alternate" hreflang="hi" href="https://koha.nexus/hi/">
+<link rel="alternate" hreflang="bn" href="https://koha.nexus/bn/">
+<link rel="alternate" hreflang="vi" href="https://koha.nexus/vi/">
+<link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/zh/">
+<link rel="alternate" hreflang="ja" href="https://koha.nexus/ja/">
+<link rel="alternate" hreflang="ko" href="https://koha.nexus/ko/">
+<link rel="alternate" hreflang="x-default" href="https://koha.nexus/">
+</head>
+
+<body data-language="fr">
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#home" aria-label="koha.nexus">
+        koha.nexus
+      </a>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menu" aria-controls="main-nav" aria-expanded="false">☰</button>
+      <nav id="main-nav" data-i18n-aria="main_navigation" aria-label="Navigation principale">
+        <a href="#features" data-i18n="nav_features">Fonctionnalités</a>
+        <a href="#panel" data-i18n="nav_panel">Panneau</a>
+        <a href="preview/" data-i18n="nav_manual">Manuel</a>
+        <a href="#installation" data-i18n="nav_install">Installation</a>
+        <a href="#windows" data-i18n="nav_win">Windows</a>
+        <a href="#tools" data-i18n="nav_tools">Outils</a>
+        <a href="#security" data-i18n="nav_security">Sécurité</a>
+        <a href="#network" data-i18n="nav_net">Réseau</a>
+        <a href="#contact" data-i18n="nav_contact">Contact</a>
+        <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- SELETOR DE IDIOMAS COM BOTÕES PEQUENOS -->
+  <section class="lang-section">
+    <div class="container">
+      <nav class="language-links" data-language-links><a data-language="en" lang="en" hreflang="en" href="../index.html">English</a><a data-language="pt" lang="pt-BR" hreflang="pt-BR" href="../pt/index.html">Português (Brasil)</a><a data-language="es" lang="es" hreflang="es" href="../es/index.html">Español</a><a data-language="fr" lang="fr" hreflang="fr" href="index.html" aria-current="page">Français</a><a data-language="it" lang="it" hreflang="it" href="../it/index.html">Italiano</a><a data-language="de" lang="de" hreflang="de" href="../de/index.html">Deutsch</a><a data-language="nl" lang="nl" hreflang="nl" href="../nl/index.html">Nederlands</a><a data-language="sv" lang="sv" hreflang="sv" href="../sv/index.html">Svenska</a><a data-language="pl" lang="pl" hreflang="pl" href="../pl/index.html">Polski</a><a data-language="cs" lang="cs" hreflang="cs" href="../cs/index.html">Čeština</a><a data-language="ru" lang="ru" hreflang="ru" href="../ru/index.html">Русский</a><a data-language="uk" lang="uk" hreflang="uk" href="../uk/index.html">Українська</a><a data-language="tr" lang="tr" hreflang="tr" href="../tr/index.html">Türkçe</a><a data-language="tl" lang="tl" hreflang="tl" href="../tl/index.html">Tagalog (Filipino)</a><a data-language="id" lang="id" hreflang="id" href="../id/index.html">Bahasa Indonesia</a><a data-language="ar" lang="ar" hreflang="ar" href="../ar/index.html">العربية</a><a data-language="fa" lang="fa" hreflang="fa" href="../fa/index.html">فارسی</a><a data-language="hi" lang="hi" hreflang="hi" href="../hi/index.html">Hindi</a><a data-language="bn" lang="bn" hreflang="bn" href="../bn/index.html">Bangla (Bengali)</a><a data-language="vi" lang="vi" hreflang="vi" href="../vi/index.html">Tiếng Việt</a><a data-language="zh" lang="zh-Hans" hreflang="zh-Hans" href="../zh/index.html">中文 (简体)</a><a data-language="ja" lang="ja" hreflang="ja" href="../ja/index.html">日本語</a><a data-language="ko" lang="ko" hreflang="ko" href="../ko/index.html">한국어</a></nav>
+    </div>
+  </section>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-bg"></div><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow" data-i18n="hero_eye">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
+          <img class="hero-logo" src="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/koha-logo.png" alt="koha.nexus" width="420" height="74">
+          <h1 data-i18n="hero_h1">Le meilleur système de bibliothèque, <span class='accent'>maintenant sans tracas.</span></h1>
+          <p data-i18n="hero_p"><strong>koha.nexus</strong> est un assistant intelligent, gratuit et facile à utiliser pour installer, configurer, maintenir et étendre le <strong>Koha Integrated Library System</strong> via un tableau de bord convivial.</p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#installation" data-i18n="hero_btn1">Démarrer l'installation →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener" data-i18n="hero_btn2">Voir sur GitHub</a>
+            <a class="btn btn-secondary" href="../README.md" data-i18n="hero_btn3">README Complet</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><strong data-i18n="stat1_t">22 langues</strong><span data-i18n="stat1_d">Tableau de bord et paquets Koha</span></div>
+            <div class="stat"><strong data-i18n="stat2_t">2 systèmes</strong><span data-i18n="stat2_d">Linux ou Windows via WSL 2</span></div>
+            <div class="stat"><strong data-i18n="stat3_t">25+ fonctions</strong><span data-i18n="stat3_d">Gestion, outils et ajustements</span></div>
+            <div class="stat"><strong data-i18n="stat4_t">GPL-3.0+</strong><span data-i18n="stat4_d">Logiciel libre et modifiable</span></div>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Installation terminal">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">installation — terminal</span>
+          </div>
+          <pre><span class="tl" style="--d:0"><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer</span><span class="tl" style="--d:1"><span class="prompt">$</span> sudo bash installer</span><span class="tl" style="--d:2">&nbsp;</span><span class="tl" style="--d:3"><span class="muted">KOHA.NEXUS</span></span><span class="tl" style="--d:4"><span class="prompt">✓</span> <span data-i18n="term_validating">Validation du serveur...</span></span><span class="tl" style="--d:5"><span class="prompt">✓</span> <span data-i18n="term_installing">Installation de Koha</span></span><span class="tl" style="--d:6"><span class="prompt">✓</span> <span data-i18n="term_configuring">Configuration de la base de données</span></span><span class="tl" style="--d:7"><span class="prompt">✓</span> <span data-i18n="term_preparing">Préparation des sauvegardes</span></span><span class="tl" style="--d:8"><span class="prompt">✓</span> <span data-i18n="term_access">Configuration des accès</span></span><span class="tl" style="--d:9">&nbsp;</span><span class="tl" style="--d:10"><span class="prompt">→</span> <span data-i18n="term_ready">Tableau de bord prêt:</span> <strong>sudo config.sh</strong><span class="caret"></span></span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="feat_kick">Tout en un seul endroit</div>
+          <h2 data-i18n="feat_h2">Un tableau de bord conçu pour ceux qui font fonctionner la bibliothèque.</h2>
+          <p data-i18n="feat_p">De l'installation initiale aux sauvegardes, indexation, sécurité, migration, catalogage et publication web, les fonctionnalités clés sont rassemblées dans un point de contrôle unique.</p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <h3 data-i18n="f1_t">Installation guidée</h3>
+            <p data-i18n="f1_d">Pré-validation du système, du disque, du réseau et des ports; installation et optimisation de Koha, MariaDB, Apache, Memcached et Plack, plus SWAP, NTP et fuseau horaire.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            </div>
+            <h3 data-i18n="f2_t">Centre de sauvegardes</h3>
+            <p data-i18n="f2_d">Sauvegardes SQL compressées, exports MARC21, test de restauration et copies dans le cloud sur Google Drive, OneDrive, MEGA ou S3, configurées pas à pas.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="f3_t">Restauration sécurisée</h3>
+            <p data-i18n="f3_d">Les sauvegardes sont validées et testées dans une base de données temporaire avant de remplacer le catalogue actuel.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </div>
+            <h3 data-i18n="f4_t">Recherche et indexation</h3>
+            <p data-i18n="f4_d">Basculement entre Zebra et Elasticsearch 7, chien de garde de l'indexeur, et outils pour la réparation et la reconstruction de l'index.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+            </div>
+            <h3 data-i18n="f5_t">Publication Web</h3>
+            <p data-i18n="f5_d">Cloudflare Tunnel sans besoin d'ouvrir des ports, Certbot pour SSL, et assistant Google Search Console.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h3 data-i18n="f6_t">Sécurité</h3>
+            <p data-i18n="f6_d">Fail2ban, pare-feu UFW, options de restriction d'accès au port 8080, et rotation du mot de passe de la base de données.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            </div>
+            <h3 data-i18n="f7_t">Outils de la bibliothèque</h3>
+            <p data-i18n="f7_d">Importation de données, rapports SQL, vérification de la qualité du catalogue, outils de confidentialité RGPD, roulement annuel des catégories, et plus.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="f8_t">WhatsApp & Telegram</h3>
+            <p data-i18n="f8_d">Envoi des avis Koha via les passerelles WhatsApp ou un bot Telegram, totalement facultatif.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            </div>
+            <h3 data-i18n="f9_t">Catalogage assisté</h3>
+            <p data-i18n="f9_d">PHA ou Cutter-Sanborn, CDD, calculateur Cutter, remplacement sécurisé des notices MARC, et aide par l'IA.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+            </div>
+            <h3 data-i18n="f10_t">Windows + WSL 2</h3>
+            <p data-i18n="f10_d">Exécutez Koha sur un seul PC Windows, avec des raccourcis de bureau, des notifications, une icône système et des outils de diagnostic.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            </div>
+            <h3 data-i18n="f11_t">Mise à jour automatique</h3>
+            <p data-i18n="f11_d">Mises à jour du tableau de bord directement depuis GitHub avec vérification SHA-256.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"></path></svg>
+            </div>
+            <h3><span data-i18n="f12_t">Serveurs Z39.50 / SRU</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f12_d">Des catalogues publics choisis et testés par une vraie recherche : seuls les serveurs qui renvoient des notices MARC valides entrent dans Koha, les plus rapides d'abord.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"></path></svg>
+            </div>
+            <h3><span data-i18n="f13_t">Apparence de l'OPAC</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f13_d">Textures, coins arrondis, fond d'écran, logo, bascule clair/sombre et carrousel de Nouveautés, écrits dans Koha après une sauvegarde.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+            </div>
+            <h3><span data-i18n="f14_t">Messagerie et interopérabilité</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f14_d">E-mail, SMS, automate SIP2 et Z39.50 sur un seul écran, avec des liens vers la page exacte de Koha et un formulaire SIP2 qui écrit la configuration.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h3><span data-i18n="f15_t">Planifications et tâches cron</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f15_d">Activez ou désactivez chaque tâche automatique et choisissez sa fréquence et son heure. Les lignes écrites à la main sont conservées.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"></path><circle cx="16.5" cy="7.5" r=".5"></circle></svg>
+            </div>
+            <h3><span data-i18n="f16_t">VPN WireGuard</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f16_d">Le personnel accède à l'interface professionnelle et à SSH de partout avec un QR code sur son téléphone. Seules les adresses de la bibliothèque passent par le VPN.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </div>
+            <h3><span data-i18n="f17_t">Adresse gratuite</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f17_d">Une adresse publique du catalogue sur koha.nexus sans acheter de domaine ni ouvrir de compte Cloudflare, partagée par QR code ou lien. Encore en test.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="10" x="3" y="11" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" x2="8" y1="16" y2="16"></line><line x1="16" x2="16" y1="16" y2="16"></line></svg>
+            </div>
+            <h3><span data-i18n="f18_t">Assistant IA</span><span class="badge-new" data-i18n="badge_new">Nouveau</span></h3>
+            <p data-i18n="f18_d">Les bibliothécaires posent leurs questions en langage simple sur les livres, les lecteurs et les prêts. Toute modification est une proposition exécutée seulement après Approuver et exécuter.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="panel">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="p_kick">Le nouveau panneau de contrôle</div>
+          <h2 data-i18n="p_h2">Un écran pour chaque tâche, à la souris et au clavier.</h2>
+          <p data-i18n="p_p">Lancez <code>sudo config.sh</code> et le panneau s'ouvre en plein écran : un tableau de bord en direct, des cartes cliquables, des raccourcis clavier et une palette de commandes (<kbd>ctrl+p</kbd>). Ce sont de vraies captures du panneau.</p>
+        </div>
+
+        <div class="showcase">
+          <div class="tabs" role="tablist" data-i18n-aria="panel_screens" aria-label="Écrans du panneau">
+            <button class="tab" type="button" role="tab" id="tab-dashboard" aria-controls="panel-stage" aria-selected="true" tabindex="0" data-shot="dashboard"><span class="ti" aria-hidden="true">🎛️</span><span data-i18n="pt_dashboard">Tableau de bord</span><span class="k" aria-hidden="true">d</span></button>
+            <button class="tab" type="button" role="tab" id="tab-hub" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="hub"><span class="ti" aria-hidden="true">📨</span><span data-i18n="pt_hub">Messagerie et interopérabilité</span><span class="k" aria-hidden="true">m</span></button>
+            <button class="tab" type="button" role="tab" id="tab-z3950" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="z3950"><span class="ti" aria-hidden="true">📡</span><span data-i18n="pt_z3950">Serveurs Z39.50 / SRU</span><span class="k" aria-hidden="true">z</span></button>
+            <button class="tab" type="button" role="tab" id="tab-opac" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="opac"><span class="ti" aria-hidden="true">🎨</span><span data-i18n="pt_opac">Apparence de l'OPAC</span><span class="k" aria-hidden="true">o</span></button>
+            <button class="tab" type="button" role="tab" id="tab-vpn" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="vpn"><span class="ti" aria-hidden="true">🛡️</span><span data-i18n="pt_vpn">VPN WireGuard</span><span class="k" aria-hidden="true">v</span></button>
+            <button class="tab" type="button" role="tab" id="tab-crons" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="crons"><span class="ti" aria-hidden="true">⏰</span><span data-i18n="pt_crons">Planifications et tâches cron</span><span class="k" aria-hidden="true">s</span></button>
+            <button class="tab" type="button" role="tab" id="tab-ai" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="ai"><span class="ti" aria-hidden="true">🤖</span><span data-i18n="pt_ai">IA</span><span class="k" aria-hidden="true">a</span></button>
+            <button class="tab" type="button" role="tab" id="tab-backup" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="backup"><span class="ti" aria-hidden="true">💾</span><span data-i18n="pt_backup">Centre de sauvegarde et restauration</span><span class="k" aria-hidden="true">b</span></button>
+          </div>
+          <div class="stage" id="panel-stage" role="tabpanel">
+            <a class="shot" id="shot" href="preview/#dashboard">
+              <img id="shot-img" src="../docs/images/panel/dashboard.webp" alt="Control Dashboard" width="1400" height="924" loading="lazy" decoding="async">
+              <span class="shot-badge"><span class="shot-badge-dot" aria-hidden="true"></span><span data-i18n="p_explore">Explorer dans le manuel interactif</span><span class="shot-badge-arrow" aria-hidden="true">→</span></span>
+            </a>
+            <div class="stage-text">
+              <div>
+                <div class="pane" data-pane="dashboard"><h3 data-i18n="pt_dashboard">Tableau de bord</h3><p data-i18n="pd_dashboard">L'état de Koha, la dernière sauvegarde, l'espace disque libre et toutes les adresses du catalogue et de l'interface professionnelle (cet ordinateur, le réseau local et Internet), chacune avec les boutons Ouvrir et Copier.</p></div>
+                <div class="pane" data-pane="hub" hidden><h3 data-i18n="pt_hub">Messagerie et interopérabilité</h3><p data-i18n="pd_hub">E-mail, WhatsApp et Telegram, SMS, SIP2 et Z39.50 sur un seul écran. Les liens ouvrent la page exacte de Koha, un aide-mémoire Gmail remplit le formulaire SMTP et un formulaire SIP2 écrit le <code>SIPconfig.xml</code> de l'automate de prêt.</p></div>
+                <div class="pane" data-pane="z3950" hidden><h3 data-i18n="pt_z3950">Serveurs Z39.50 / SRU</h3><p data-i18n="pd_z3950">Des catalogues publics par région et une liste communautaire. L'analyse lance une vraie recherche sur chaque serveur et ne garde que ceux qui renvoient une notice MARC valide, classés par rapidité.</p></div>
+                <div class="pane" data-pane="opac" hidden><h3 data-i18n="pt_opac">Apparence de l'OPAC</h3><p data-i18n="pd_opac">L'apparence du catalogue public en un clic : verre dépoli ou métal brossé, coins arrondis, fond d'écran, logo, bascule clair/sombre et un carrousel de Nouveautés avec de vraies couvertures. Une sauvegarde est faite d'abord.</p></div>
+                <div class="pane" data-pane="vpn" hidden><h3 data-i18n="pt_vpn">VPN WireGuard</h3><p data-i18n="pd_vpn">Un réseau privé WireGuard pour le personnel : ajoutez un téléphone ou un portable, scannez son QR code, et l'interface professionnelle et SSH fonctionnent de partout. Tunnel partagé uniquement : l'Internet de l'appareil ne change pas.</p></div>
+                <div class="pane" data-pane="crons" hidden><h3 data-i18n="pt_crons">Planifications et tâches cron</h3><p data-i18n="pd_crons">Chaque tâche planifiée avec un interrupteur, sa fréquence et son heure, au lieu d'un éditeur de texte. Les lignes écrites à la main sont conservées et l'ancien fichier est sauvegardé d'abord.</p></div>
+                <div class="pane" data-pane="ai" hidden><h3 data-i18n="pt_ai">IA</h3><p data-i18n="pd_ai">Le catalogage par IA à partir de photos de la couverture et de la page de titre, et un assistant sur l'accueil professionnel de Koha qui répond en langage simple et ne modifie les données qu'après <strong>Approuver et exécuter</strong>.</p></div>
+                <div class="pane" data-pane="backup" hidden><h3 data-i18n="pt_backup">Centre de sauvegarde et restauration</h3><p data-i18n="pd_backup">La restauration de la base de données se trouve désormais uniquement ici, à côté de l'export MARC21 et des routines de sauvegarde : le menu principal n'a plus d'option de restauration séparée. Téléchargez la dernière sauvegarde sur ce PC, restaurez la base de données depuis une sauvegarde (testée d'abord, avec une copie de sécurité de l'actuelle), exportez les notices MARC21 d'un clic, testez une sauvegarde dans une base temporaire et copiez-la sur Google Drive, OneDrive, MEGA ou S3, pas à pas.</p></div>
+              </div>
+            </div>
+            <div class="stage-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="installation">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="inst_kick">Commencez ici</div>
+          <h2 data-i18n="inst_h2">Installation Linux en quelques commandes.</h2>
+          <p data-i18n="inst_p">Le projet cible Debian 11/12/13 ou Ubuntu 22.04/24.04 sur amd64 ou arm64, et peut également fonctionner sur Windows via WSL 2.</p>
+        </div>
+
+        <div class="install-grid">
+          <div class="card">
+            <h3 data-i18n="inst_b1_t">Installateur direct</h3>
+            <p data-i18n="inst_b1_d">Téléchargez le script d'installation actuel et exécutez-le avec des privilèges administratifs.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer">Copier</button>
+              </div>
+              <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_b2_t">Cloner le dépôt</h3>
+            <p data-i18n="inst_b2_d">Vous pouvez également conserver les fichiers de traduction à côté du script pour travailler hors ligne.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer">Copier</button>
+              </div>
+              <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="inst_r_t">Exigences minimales</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_r1">Debian 11/12/13 ou Ubuntu 22.04/24.04, 64 bits</li>
+              <li data-i18n="inst_r2">4 Go de RAM; 8 Go ou plus recommandés</li>
+              <li data-i18n="inst_r3">5 Go d'espace libre; 10 Go ou plus recommandés</li>
+              <li data-i18n="inst_r4">root ou utilisateur avec privilèges sudo</li>
+              <li data-i18n="inst_r5">Accès Internet pour les dépôts Koha</li>
+              <li data-i18n="inst_r6">Ports 80 et 8080 disponibles</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_a_t">Après l'installation</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_a1">Ouvrez l'interface professionnelle à <code>http://IP-SERVEUR:8080</code></li>
+              <li data-i18n="inst_a2">Terminez l'installation Web de Koha</li>
+              <li data-i18n="inst_a3">Créez votre super bibliothécaire via le tableau de bord</li>
+              <li data-i18n="inst_a4">Le catalogue public est à <code>http://IP-SERVEUR:80</code></li>
+              <li data-i18n="inst_a5">Rouvrez le tableau de bord avec <code>sudo config.sh</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section windows" id="windows">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="win_kick">Windows 10 / 11</div>
+          <h2 data-i18n="win_h2">Un environnement Koha complet sur un seul PC, utilisant WSL 2.</h2>
+          <p data-i18n="win_p">L'édition Windows est conçue pour les petites bibliothèques et la formation, gardant les services Koha à l'intérieur de Debian sur WSL 2 tout en offrant des outils Windows natifs.</p>
+        </div>
+
+        <div class="download-banner">
+          <div class="download-content">
+            <div class="download-icon">
+              <svg viewbox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <div>
+              <div class="download-kicker" data-i18n="win_d_k">INSTALLATEUR WINDOWS</div>
+              <h3 data-i18n="win_d_t">Installez Koha en une seule commande.</h3>
+              <p data-i18n="win_d_p">Ouvrez PowerShell <strong>en tant qu'administrateur</strong>, collez cette commande et appuyez sur Entrée.</p>
+            </div>
+          </div>
+          <div class="codebox">
+            <div class="codebox-head">
+              <span>PowerShell</span>
+              <button class="copy" data-i18n="btn_copy" data-copy="irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Copier</button>
+            </div>
+            <pre>irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
+          </div>
+        </div>
+
+        <div class="windows-card">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <h3 data-i18n="win_b_t">Installation</h3>
+            <p data-i18n="win_b_p">Faites un clic droit sur le bouton Démarrer et choisissez <em>Terminal (administrateur)</em> ou <em>Windows PowerShell (admin)</em>, puis cliquez sur <strong>Oui</strong>. Collez la commande ci-dessus et appuyez sur Entrée.</p>
+            <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Utilisez votre propre compte Windows.</strong> Si Windows demande le mot de passe d'<em>une autre personne</em>, connectez-vous d'abord à un compte administrateur et lancez-le là : Debian, les raccourcis et l'étape de redémarrage sont créés pour le compte qui lance l'installateur.</div>
+            <div class="callout" style="margin-top:14px">
+              <strong data-i18n="win_c2_t"><strong>Comment activer la virtualisation dans le BIOS:</strong></strong>
+              <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)" data-i18n="win_c2_p1">Redémarrez votre PC et appuyez sur la touche de configuration dès que l'écran s'allume:</p>
+              <ul style="margin:0 0 8px;padding-left:18px;font-size:0.88rem;color:var(--muted);line-height:1.6">
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> — ASUS, Gigabyte, MSI, ASRock, Acer</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Esc</kbd> — HP / Compaq</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F12</kbd> — Dell</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F1</kbd>, <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Enter</kbd> — Lenovo</li>
+              </ul>
+              <p style="margin:0 0 6px;font-size:0.88rem;color:var(--muted)" data-i18n="win_c2_p2">Dans le BIOS, trouvez <strong>Intel Virtualization Technology (VT-x)</strong> ou <strong>AMD SVM / AMD-V</strong>, changez-le en <strong>Enabled</strong>, et appuyez sur <kbd>F10</kbd> pour enregistrer.</p>
+              <p style="margin:6px 0 0;font-size:0.83rem;color:var(--muted);border-top:1px solid var(--line);padding-top:6px" data-i18n="win_c2_p3"><em>Impossible d'accéder au BIOS via les touches ?</em> Sous Windows, allez dans <strong>Paramètres → Système → Récupération → Démarrage avancé (Redémarrer maintenant) → Dépannage → Options avancées → Paramètres du microprogramme UEFI</strong>.</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div><h3 data-i18n="w_t1_t">Vérification du système</h3><p data-i18n="w_t1_d">Vérifie la version Windows compatible, l'architecture 64 bits, la mémoire, l'espace et la virtualisation BIOS.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div><h3 data-i18n="w_t2_t">WSL 2 + Debian</h3><p data-i18n="w_t2_d">Installe WSL 2, prépare Debian, et configure l'utilisateur administratif et systemd.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div><h3 data-i18n="w_t3_t">Environnement Koha</h3><p data-i18n="w_t3_d">Installe Koha dans Debian et crée des raccourcis Windows, des tâches planifiées et des outils de contrôle.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div><h3 data-i18n="w_t4_t">Réseau de bibliothèque</h3><p data-i18n="w_t4_d">Configure l'accès pour les autres ordinateurs du réseau local et teste les ports 80 et 8080.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div><h3 data-i18n="w_t5_t">Fonctionnement</h3><p data-i18n="w_t5_d">Démarrer, Arrêter, Redémarrer, état, diagnostics, reconstruction d'index et arrêt sécurisé sont accessibles sans ouvrir une console.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-3">
+          <div class="card"><h3 data-i18n="w_c1_t">Notifications</h3><p data-i18n="w_c1_d">Les pannes, les restaurations, les sauvegardes, le manque d'espace disque déclenchent des alertes Windows natives.</p></div>
+          <div class="card"><h3 data-i18n="w_c2_t">Diagnostics en 1 clic</h3><p data-i18n="w_c2_d">Exporte les journaux et les informations utiles pour le support, en supprimant les mots de passe de manière sécurisée.</p></div>
+          <div class="card"><h3 data-i18n="w_c3_t">Arrêt sécurisé</h3><p data-i18n="w_c3_d">Koha est arrêté par étapes avant que WSL et Windows ne s'éteignent pour éviter la corruption de données.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="t_kick">Outils</div>
+          <h2 data-i18n="t_h2">Plus qu'installer Koha : prendre soin de la collection.</h2>
+          <p data-i18n="t_p">Les outils du tableau de bord utilisent les mécanismes de Koha et suivent un flux de protection strict avant que les données ne soient modifiées.</p>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287L12 3Z"></path></svg>
+            </div>
+            <h3 data-i18n="t1_t">Magic Import Tool</h3>
+            <p data-i18n="t1_d">Un point d'entrée unique pour les feuilles de calcul, fichiers MARC, collections, exemplaires, usagers et données de circulation.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            </div>
+            <h3 data-i18n="t2_t">Annuler l'importation MARC</h3>
+            <p data-i18n="t2_d">Permet d'annuler une importation par lots de manière contrôlée, préservant l'intégrité du catalogue.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><line x1="12" x2="12" y1="20" y2="10"></line><line x1="18" x2="18" y1="20" y2="4"></line><line x1="6" x2="6" y1="20" y2="14"></line></svg>
+            </div>
+            <h3 data-i18n="t3_t">Pack de Rapports SQL</h3>
+            <p data-i18n="t3_d">Rapports en lecture seule pour les prêts, les retards, les acquisitions, les codes-barres manquants et les articles perdus.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 data-i18n="t4_t">Roulement des catégories</h3>
+            <p data-i18n="t4_d">Déplace les usagers entre les catégories en utilisant des critères définis par la bibliothèque, avec une simulation avant exécution.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="t5_t">Qualité des données</h3>
+            <p data-i18n="t5_d">Exécute des vérifications d'incohérence du catalogue sans altérer les enregistrements réels.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            </div>
+            <h3 data-i18n="t6_t">Confidentialité et RGPD</h3>
+            <p data-i18n="t6_d">Anonymise les anciens historiques d'emprunt et supprime en toute sécurité les usagers expirés.</p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top:18px" data-i18n="t_c1"><strong>Protection par défaut:</strong> Les opérations qui altèrent les données suivent un verrouillage partagé avec sauvegardes, aperçus, confirmations et une copie <code>PRE-*</code>.</div>
+      </div>
+    </section>
+
+    <!-- ESSA SEÇÃO INTEIRA SÓ VAI APARECER EM PORTUGUÊS POR CAUSA DA CLASSE .only-pt -->
+    <section class="section only-pt" id="brazil">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Brasil: localização</div>
+          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <p>
+            As funcionalidades de localização são opcionais: nada é ativado automaticamente durante a instalação ou por agendamento.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Validação de CPF</td>
+                <td>Auditoria de CPFs usando dígitos verificadores e identificação de números duplicados.</td>
+                <td>Leitura apenas</td>
+              </tr>
+              <tr>
+                <td>Etiquetas Pimaco</td>
+                <td>Modelos prontos para folhas A4 e Carta, incluindo lombada, código de barras e título.</td>
+                <td>PRE-ETIQUETAS</td>
+              </tr>
+              <tr>
+                <td>Ficha Catalográfica</td>
+                <td>Gera fichas no padrão nacional integradas diretamente na visualização do registro.</td>
+                <td>PRE-FICHA</td>
+              </tr>
+              <tr>
+                <td>Feriados Brasileiros</td>
+                <td>Feriados nacionais e datas móveis, com opção para inserir os municipais.</td>
+                <td>PRE-CALENDARIO</td>
+              </tr>
+              <tr>
+                <td>Relatórios de Censo</td>
+                <td>Indicadores baseados nos dados do Koha para MEC, INEP, IBGE e SNBP.</td>
+                <td>PRE-CENSO</td>
+              </tr>
+              <tr>
+                <td>ABNT NBR 6023:2018</td>
+                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
+                <td>Leitura apenas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Nota:</strong> Os dados do censo representam o que está registrado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="security">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="s_kick">Opération & Sécurité</div>
+          <h2 data-i18n="s_h2">L'automatisation sans cacher ce qui se passe.</h2>
+          <p data-i18n="s_p">Le tableau de bord centralise les tâches récurrentes et met en évidence les points importants pour la maintenance, les diagnostics et la récupération.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="s1_t">Automatisation Standard</h3>
+            <div class="table-wrap" style="margin-top:14px">
+              <table style="min-width:580px">
+                <thead><tr><th data-i18n="s1_th1">Quand</th><th data-i18n="s1_th2">Tâche</th></tr></thead>
+                <tbody>
+                  <tr><td data-i18n="s1_r1_1">Quotidien 23:00</td><td data-i18n="s1_r1_2">Sauvegarde SQL compressée et upload cloud</td></tr>
+                  <tr><td data-i18n="s1_r2_1">Dimanche 03:00</td><td data-i18n="s1_r2_2">Export MARC21</td></tr>
+                  <tr><td data-i18n="s1_r3_1">Quotidien 01:30</td><td data-i18n="s1_r3_2">Nettoyage des sessions et file d'attente Zebra</td></tr>
+                  <tr><td data-i18n="s1_r4_1">Quotidien 05:00</td><td data-i18n="s1_r4_2">Redémarrage de Plack</td></tr>
+                  <tr><td data-i18n="s1_r5_1">Toutes les 2 min</td><td data-i18n="s1_r5_2">Chien de garde de l'indexeur Zebra</td></tr>
+                  <tr><td data-i18n="s1_r6_1">Toutes les 5 min</td><td data-i18n="s1_r6_2">Chien de garde Elasticsearch, si utilisé</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s2_t">Fichiers Importants</h3>
+            <ul class="feature-list">
+              <li data-i18n="s2_l1"><code>/root/koha_credentials.txt</code> — identifiants initiaux</li>
+              <li data-i18n="s2_l2"><code>/var/backups/koha_sql</code> — backups SQL</li>
+              <li data-i18n="s2_l3"><code>/var/backups/koha_marc</code> — backups MARC</li>
+              <li data-i18n="s2_l4"><code>/etc/koha-easy-install/</code> — paramètres du tableau de bord</li>
+              <li data-i18n="s2_l5"><code>/var/log/koha-easy-install/</code> — journaux de validation</li>
+              <li data-i18n="s2_l6"><code>~/importar</code> — dossier d'entrée pour le Magic Import Tool</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s3_t">Diagnostics</h3>
+            <p data-i18n="s3_p">Le tableau de bord rassemble l'état, les journaux Apache, la maintenance approfondie de la base de données et des rapports prêts à l'emploi.</p>
+            <div class="chip-row">
+              <span class="chip" data-i18n="s3_c1">bilan de santé</span>
+              <span class="chip" data-i18n="s3_c2">journaux Apache</span>
+              <span class="chip" data-i18n="s3_c3">MariaDB</span>
+              <span class="chip" data-i18n="s3_c4">journaux Koha</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s4_t">Panne de Courant</h3>
+            <p data-i18n="s4_p">Le projet inclut la vérification après un redémarrage anormal, crée une nouvelle sauvegarde et met à jour l'index si nécessaire. Sous Windows, la routine d'arrêt sécurisé tente d'arrêter Koha avec grâce.</p>
+          </div>
+        </div>
+
+        <div class="callout danger" style="margin-top:18px" data-i18n="s_c1"><strong>La désinstallation est destructrice:</strong> Le script <code>uninstall.sh</code> supprime définitivement Koha, les bases de données, les sauvegardes locales et les configurations. Sauvegardez vos données hors serveur.</div>
+      </div>
+    </section>
+
+    <section class="section" id="network">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="n_kick">Réseau Public</div>
+          <h2 data-i18n="n_h2">Bibliothèques utilisant koha.nexus</h2>
+          <p data-i18n="n_p">Explorez les catalogues publics maintenus par nos institutions partenaires. Les moteurs de recherche suivent ces liens pour découvrir et indexer automatiquement leurs collections.</p>
+          <span class="live-pill" data-i18n="n_live">Liste en direct du réseau koha.nexus</span>
+        </div>
+
+        <div class="grid-3" id="libraries-grid">
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0;" data-i18n="n_load">Récupération des catalogues sur le réseau koha.nexus...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="contribute">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="c_kick">Open Source</div>
+          <h2 data-i18n="c_h2">Construit pour être utilisé, étudié et amélioré.</h2>
+          <p data-i18n="c_p">Le projet inclut des tests, des traductions, des outils de collaboration et la vérification de la somme de contrôle de l'installateur pour les mises à jour.</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="c1_t">Tests</h3>
+            <p data-i18n="c1_p">Suite de tests Bats pour la sauvegarde/restauration, l'indexation, les outils de la bibliothèque, WSL et Windows.</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="c2_t">Traductions</h3>
+            <p data-i18n="c2_p">Dictionnaires versionnés par langue, validation de la couverture et rejet automatique des traductions sans variables.</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="c3_t">Vérification</h3>
+            <p data-i18n="c3_p">L'installateur utilise SHA-256 pour valider en toute sécurité ses propres mises à jour.</p>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="card">
+          <h3 data-i18n="c_lic_t">Licence</h3>
+          <p data-i18n="c_lic_p"><strong>Licence Publique Générale GNU v3.0 ou ultérieure (GPL-3.0-or-later).</strong> Le projet peut être utilisé, étudié, partagé et modifié. Les distributions modifiées doivent rester sous GPL et rendre le code source disponible.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="container contact-grid">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="ct_kick">Contact</div>
+          <h2 data-i18n="ct_h2">Écrivez au projet.</h2>
+          <p data-i18n="ct_p">Questions, idées, une bibliothèque qui veut rejoindre le réseau ou un serveur Z39.50 à ajouter à la liste : écrivez ici, la réponse arrivera dans votre boîte mail.</p>
+        </div>
+
+        <form class="card contact-form" id="contact-form" action="https://formspree.io/f/mkjorqwp" method="POST" novalidate>
+          <label class="field">
+            <span data-i18n="ct_name">Nom / Institution</span>
+            <input type="text" name="name" required maxlength="200" autocomplete="organization" data-i18n-ph="ct_name_ph" placeholder="Votre nom ou celui de la bibliothèque">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_email">E-mail</span>
+            <input type="email" name="email" required maxlength="200" autocomplete="email" data-i18n-ph="ct_email_ph" placeholder="vous@bibliotheque.org">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_msg">Message, suggestion ou signalement de problème</span>
+            <textarea name="message" required rows="6" maxlength="5000" data-i18n-ph="ct_msg_ph" placeholder="Envoyez votre suggestion, critique constructive, signalement de problème, proposition d&#x27;un nouveau serveur de bibliothèque ou question sur Koha-Nexus..."></textarea>
+          </label>
+          <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="contact-actions">
+            <button class="btn btn-primary" type="submit" id="contact-send" data-i18n="ct_send">Envoyer le message</button>
+            <span class="contact-note" data-i18n="ct_note">Votre e-mail ne sert qu'à répondre à ce message.</span>
+          </div>
+          <div class="contact-status" id="contact-status" role="status" aria-live="polite" hidden></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#home" aria-label="koha.nexus">
+            koha.nexus
+          </a>
+          <p style="margin-top:14px;max-width:560px" data-i18n="foot_p1">Un assistant intelligent, gratuit et facile à utiliser pour simplifier la gestion technique de Koha dans les bibliothèques.</p>
+          <p data-i18n="foot_p2">Développé avec dévouement par <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.</p>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_proj">Projet</h4>
+          <div class="mini-links">
+            <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
+            <a href="LICENSE" data-i18n="c_lic_t">Licence</a>
+            <a href="../README.md">README</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_links">Liens</h4>
+          <div class="mini-links">
+            <a href="#features" data-i18n="nav_features">Fonctionnalités</a>
+            <a href="#panel" data-i18n="nav_panel">Panneau</a>
+            <a href="preview/" data-i18n="nav_manual">Manuel</a>
+            <a href="#installation" data-i18n="nav_install">Installation</a>
+            <a href="#windows" data-i18n="nav_win">Windows</a>
+            <a href="#tools" data-i18n="nav_tools">Outils</a>
+            <a href="#contact" data-i18n="nav_contact">Contact</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span data-i18n="foot_c1">© 2026 koha.nexus • GPL-3.0-or-later</span>
+        <span data-i18n="foot_c2">Le nom et le logo Koha appartiennent à la Communauté Koha.</span>
+      </div>
+    </div>
+  </footer>
+
+
+
+  <button class="to-top" id="to-top" type="button" data-i18n-aria="back_to_top" aria-label="Retour en haut">↑</button>
+
+
+  <script id="site-messages" type="application/json">{"ct_sending": "Envoi…", "ct_ok": "Message envoyé ! Merci de nous avoir contactés.", "ct_err": "Le message n'a pas pu être envoyé. Vérifiez les champs et réessayez dans un instant.", "network_empty": "Aucune bibliothèque publique répertoriée actuellement.", "network_error": "Impossible de charger le réseau des bibliothèques pour le moment."}</script>
+  <script src="../site/assets/home.js" defer></script>
+</body>
+</html>

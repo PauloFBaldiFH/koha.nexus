@@ -7,9 +7,9 @@
  *   - the screenshot of the real panel, when there is one;
  *   - the manual of the chosen item.
  *
- * Language: ?lang= first, then the website's choice (localStorage koha_lang,
- * the same key index.html writes, "br" meaning pt-BR), then the browser.
- * Changing it here writes it back, so the site and the preview stay in step;
+ * Language comes from the static page path. Legacy ?lang= links navigate to
+ * that language's page. The language selector preserves the current section.
+ * Embedded legacy pages can still use the stored choice and browser language;
  * a page that embeds this one can also post {type: "koha-nexus:lang", lang}.
  * No framework and no build step.
  */
@@ -23,6 +23,10 @@
   var SRC = new URL(root.getAttribute("data-src") || "data/preview.json", HERE).href;
   var ASSET_BASE = new URL(root.getAttribute("data-asset-base") || "../", HERE).href;
   var STORE_KEY = "koha_lang";
+  var STATIC_LANGUAGE = root.getAttribute("data-static-language");
+  var staticMessages = document.getElementById("site-messages");
+  var STATIC_UI = staticMessages ? JSON.parse(staticMessages.textContent) : {};
+
 
   // English defaults of the page's own texts; preview/manual/<lang>.json "ui" overrides them.
   var UI = {
@@ -127,6 +131,7 @@
   }
 
   function ui(key) {
+    if (STATIC_UI[key]) return STATIC_UI[key];
     var row = data && data.ui[key];
     return (row && (row[lang] || row.en)) || UI[key] || key;
   }
@@ -188,20 +193,29 @@
     var q = new URLSearchParams(location.search).get("lang");
     var stored = null;
     try { stored = localStorage.getItem(STORE_KEY); } catch (e) { /* private mode */ }
-    return langFromCode(q) || langFromCode(stored) || langFromCode(navigator.language) || "en";
+    return langFromCode(q) || langFromCode(STATIC_LANGUAGE) || langFromCode(stored) || langFromCode(navigator.language) || "en";
   }
 
   function setLanguage(code, opts) {
     var next = langFromCode(code) || "en";
     var info = langInfo(next);
+    if (STATIC_LANGUAGE && next !== STATIC_LANGUAGE) {
+      var link = root.querySelector('[data-language="' + info.dict + '"]');
+      if (link) {
+        var destination = new URL(link.href);
+        destination.hash = location.hash;
+        location.assign(destination.href);
+        return;
+      }
+    }
     lang = next;
-    document.documentElement.lang = lang;
+    document.documentElement.lang = STATIC_LANGUAGE ? document.documentElement.lang : lang;
     document.documentElement.dir = info.dir || "ltr";
     els.lang.value = lang;
     if (!opts || opts.store !== false) {
       try { localStorage.setItem(STORE_KEY, info.site); } catch (e) { /* private mode */ }
       var url = new URL(location.href);
-      url.searchParams.set("lang", info.site);
+      if (!STATIC_LANGUAGE) url.searchParams.set("lang", info.site);
       history.replaceState(null, "", url);
     }
     translateChrome();
@@ -646,7 +660,7 @@
     });
     // The website changed its language in another tab, or an embedding page asks.
     window.addEventListener("storage", function (ev) {
-      if (ev.key === STORE_KEY && ev.newValue && langFromCode(ev.newValue) !== lang) setLanguage(ev.newValue, { store: false });
+      if (!STATIC_LANGUAGE && ev.key === STORE_KEY && ev.newValue && langFromCode(ev.newValue) !== lang) setLanguage(ev.newValue, { store: false });
     });
     window.addEventListener("message", function (ev) {
       var d = ev.data;
@@ -673,6 +687,6 @@
     .then(start)
     .catch(function (err) {
       els.doc.innerHTML = "";
-      els.doc.appendChild(h("p", { class: "kp-error", text: UI.load_error + " (" + SRC + ": " + err.message + ")" }));
+      els.doc.appendChild(h("p", { class: "kp-error", text: ui("load_error") + " (" + SRC + ": " + err.message + ")" }));
     });
 })();
