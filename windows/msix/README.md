@@ -1,6 +1,7 @@
 # Koha.Nexus — Empacotamento MSIX (Windows)
 
-Pasta de compilação do pacote MSIX **1.0.25.0**, baseada no compilador v17.
+Pasta de compilação do pacote MSIX **1.0.26.0** (payload `1.0.26.0-msix-v18`).
+A release publicada ainda é a 1.0.25.0.
 Ela fica separada do instalador Inno Setup (`windows/setup/koha-nexus.iss`).
 
 ## Arquivos
@@ -36,6 +37,41 @@ build-only; portanto execute somente numa máquina de testes adequada.
 Este arquivo é a versão de teste v17, não um instalador MSIX executado ou
 validado ponta a ponta nesta contribuição. Não adicione `dist/`, certificados
 privados, dumps do Koha, senhas ou logs ao Git.
+
+## Gerar o pacote para a Microsoft Store
+
+1. No Partner Center, abra o app > *Gerenciamento de produto* > *Identidade do
+   produto* e copie os três valores para `store-identity.json`:
+
+   ```json
+   {
+       "Name": "<Package/Identity/Name>",
+       "Publisher": "<Package/Identity/Publisher, o CN=... completo>",
+       "PublisherDisplayName": "<Package/Properties/PublisherDisplayName>"
+   }
+   ```
+
+   Esses valores são públicos (aparecem no manifesto de qualquer app da loja).
+2. Na raiz do repositório, atualizada (`git pull`):
+
+   ```powershell
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\msix\compilar_msix.ps1 -Store
+   ```
+
+   Sai `dist\KohaNexus-Store.msix`, **sem assinatura** e sem instalar nada: a
+   Store assina o pacote. Não precisa de certificado nem de administrador.
+3. Envie esse arquivo numa nova submissão. A versão (`$targetVersion`) precisa
+   ser maior que a do último pacote enviado; suba também `$payloadRevision`
+   (os testes conferem que os dois andam juntos).
+4. Nas *Notas para certificação*, explique que o app pede administrador
+   (UAC), instala o WSL 2 e o Debian, pode pedir para reiniciar o Windows e
+   precisa da virtualização ligada na BIOS. Justifique `runFullTrust`: é um
+   app de desktop que configura o WSL e abre o painel do Koha no terminal.
+
+Para testar no seu PC antes de enviar, rode o script **sem** `-Store` (pacote
+assinado com o seu certificado). O pacote de teste e o da Store têm
+identidades diferentes e aparecem como dois apps; desinstale o de teste antes
+de instalar pela Store.
 
 ## Instalar em outro computador ("Fornecedor: Desconhecido")
 

@@ -1,4 +1,7 @@
 ﻿#Requires -Version 5.1
+# -Store: gera o pacote para a Microsoft Store com a identidade de
+# windows\msix\store-identity.json, sem assinar e sem instalar (a Store assina).
+param([switch]$Store)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -27,12 +30,14 @@ $logoImagePath = Join-Path $scriptRoot 'KohaNexusLogo.png'
 
 # Versão solicitada originalmente. Precisa ser maior que qualquer versão
 # anterior que ainda esteja instalada se o pacote for atualizado sem remoção.
-$targetVersion = '1.0.25.0'
+$targetVersion = '1.0.26.0'
 # Revision interna do payload: força a atualização de instalações incompletas
 # feitas por builds anteriores, sem precisar alterar a versão pública do MSIX.
-$payloadRevision = '1.0.25.0-msix-v17'
+$payloadRevision = '1.0.26.0-msix-v18'
 $packageName = 'KohaNexus'
 $packagePublisher = 'CN=PauloFBaldiFH'
+$publisherDisplayName = 'PauloFBaldiFH'
+$storeIdentityPath = Join-Path $scriptRoot 'store-identity.json'
 $applicationId = 'KohaNexus'
 $entryExeName = 'KohaMsixEntry.exe'
 $buildSucceeded = $false
@@ -100,6 +105,32 @@ function New-LogoFromImagePng {
     }
 }
 
+# A identidade que o Partner Center reservou para o app (Gerenciamento de
+# produto > Identidade do produto). A Store recusa o pacote se Name, Publisher
+# ou PublisherDisplayName forem diferentes desses valores.
+function Get-KohaStoreIdentity {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Arquivo de identidade da Store não encontrado: $Path"
+    }
+    $data = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $identity = [pscustomobject]@{
+        Name                 = ([string]$data.Name).Trim()
+        Publisher            = ([string]$data.Publisher).Trim()
+        PublisherDisplayName = ([string]$data.PublisherDisplayName).Trim()
+    }
+    if (-not $identity.Name -or -not $identity.Publisher -or -not $identity.PublisherDisplayName) {
+        throw "Preencha Name, Publisher e PublisherDisplayName em $Path com os valores de Partner Center > Identidade do produto."
+    }
+    if ($identity.Name -notmatch '^[A-Za-z0-9.\-]{3,50}$') {
+        throw "Name inválido em ${Path}: '$($identity.Name)'."
+    }
+    if ($identity.Publisher -notmatch '^CN=\S') {
+        throw "Publisher inválido em ${Path}: deve começar com 'CN=', como no Partner Center."
+    }
+    return $identity
+}
+
 function Test-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
@@ -109,8 +140,17 @@ function Test-Administrator {
 try {
     Write-Host ''
     Write-Host '============================================================' -ForegroundColor Cyan
-    Write-Host ' KOHA.NEXUS - GERAR, ASSINAR E INSTALAR MSIX 1.0.25.0' -ForegroundColor Cyan
+    Write-Host (' KOHA.NEXUS - GERAR, ASSINAR E INSTALAR MSIX ' + $targetVersion) -ForegroundColor Cyan
     Write-Host '============================================================' -ForegroundColor Cyan
+
+    if ($Store) {
+        $storeIdentity = Get-KohaStoreIdentity -Path $storeIdentityPath
+        $packageName = $storeIdentity.Name
+        $packagePublisher = $storeIdentity.Publisher
+        $publisherDisplayName = $storeIdentity.PublisherDisplayName
+        $msixPath = Join-Path $distDir 'KohaNexus-Store.msix'
+        Write-Host ("Modo Store: {0} | {1} | {2}" -f $packageName, $packagePublisher, $publisherDisplayName) -ForegroundColor Cyan
+    }
 
     # --------------------------------------------------------
     # 1. VALIDAR CAMINHOS E FERRAMENTAS ANTES DE ALTERAR ARQUIVOS
@@ -189,16 +229,19 @@ try {
         Sort-Object { $_.Certificate.NotAfter } -Descending |
         Select-Object -First 1
 
-    if (-not $certificateRecord) {
+    if ($Store) {
+        # A Store descarta qualquer assinatura e assina o pacote ela mesma.
+        Write-Host 'Modo Store: o pacote sai sem assinatura; a Microsoft Store assina.' -ForegroundColor Gray
+    } elseif (-not $certificateRecord) {
         throw "Não encontrei certificado válido com chave privada e Subject '$packagePublisher' nos repositórios My do usuário ou do computador."
+    } else {
+        $signingCertificate = $certificateRecord.Certificate
+        $certificateScope = $certificateRecord.Scope
+
+        Write-Host "Certificado: $($signingCertificate.Subject)" -ForegroundColor Gray
+        Write-Host "Thumbprint: $($signingCertificate.Thumbprint)" -ForegroundColor Gray
+        Write-Host "Repositório: $certificateScope" -ForegroundColor Gray
     }
-
-    $signingCertificate = $certificateRecord.Certificate
-    $certificateScope = $certificateRecord.Scope
-
-    Write-Host "Certificado: $($signingCertificate.Subject)" -ForegroundColor Gray
-    Write-Host "Thumbprint: $($signingCertificate.Thumbprint)" -ForegroundColor Gray
-    Write-Host "Repositório: $certificateScope" -ForegroundColor Gray
 
     # --------------------------------------------------------
     # 2. RECRIAR PACKAGEROOT E MANTER A ESTRUTURA DA DISTRIBUIÇÃO
@@ -1249,10 +1292,10 @@ internal static class KohaMsixEntry
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
          IgnorableNamespaces="uap rescap">
-  <Identity Name="$packageName" Publisher="$packagePublisher" Version="$targetVersion" ProcessorArchitecture="x64" />
+  <Identity Name="$packageName" Publisher="$([Security.SecurityElement]::Escape($packagePublisher))" Version="$targetVersion" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Koha.Nexus</DisplayName>
-    <PublisherDisplayName>PauloFBaldiFH</PublisherDisplayName>
+    <PublisherDisplayName>$([Security.SecurityElement]::Escape($publisherDisplayName))</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
@@ -1342,6 +1385,20 @@ internal static class KohaMsixEntry
         throw 'O pacote gerado não contém um AppxManifest.xml legível após a verificação.'
     }
     Remove-Item -LiteralPath $validationDir -Recurse -Force
+
+    if ($Store) {
+        # Sem assinatura e sem instalação: o arquivo vai direto para uma nova
+        # submissão no Partner Center.
+        $buildSucceeded = $true
+        Write-Host ''
+        Write-Host '============================================================' -ForegroundColor Green
+        Write-Host ' MSIX PARA A MICROSOFT STORE GERADO (SEM ASSINATURA)' -ForegroundColor Green
+        Write-Host '============================================================' -ForegroundColor Green
+        Write-Host "Versão: $targetVersion"
+        Write-Host "Arquivo: $msixPath"
+        Write-Host 'Envie este arquivo numa nova submissão no Partner Center. Para testar no PC, rode o script sem -Store.' -ForegroundColor Gray
+        return
+    }
 
     # --------------------------------------------------------
     # 7. ASSINAR E CONFIAR NO CERTIFICADO LOCAL
