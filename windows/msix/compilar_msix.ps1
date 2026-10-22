@@ -168,7 +168,10 @@ try {
         }
     }
 
-    foreach ($toolPath in @($makeAppx, $signTool)) {
+    # O modo Store não assina: só o MakeAppx é necessário.
+    $requiredTools = @($makeAppx)
+    if (-not $Store) { $requiredTools += $signTool }
+    foreach ($toolPath in $requiredTools) {
         if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
             throw "Ferramenta do SDK não encontrada: $toolPath"
         }
@@ -1388,7 +1391,40 @@ internal static class KohaMsixEntry
 
     if ($Store) {
         # Sem assinatura e sem instalação: o arquivo vai direto para uma nova
-        # submissão no Partner Center.
+        # submissão no Partner Center. Confere o arquivo final: identidade,
+        # versão e arquitetura do manifesto, e nenhuma assinatura (nem a do
+        # certificado de desenvolvimento CN=PauloFBaldiFH).
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $storeZip = [System.IO.Compression.ZipFile]::OpenRead($msixPath)
+        try {
+            if ($null -ne $storeZip.GetEntry('AppxSignature.p7x')) {
+                throw 'O pacote da Store saiu assinado, mas o modo Store não deve assinar com o certificado local.'
+            }
+            foreach ($entryName in @('AppxManifest.xml', 'AppxBlockMap.xml', '[Content_Types].xml')) {
+                if ($null -eq $storeZip.GetEntry($entryName)) { throw "O pacote da Store não contém $entryName." }
+            }
+            $storeReader = New-Object System.IO.StreamReader($storeZip.GetEntry('AppxManifest.xml').Open())
+            try { [xml]$storeManifest = $storeReader.ReadToEnd() } finally { $storeReader.Dispose() }
+        } finally {
+            $storeZip.Dispose()
+        }
+        $storeIdentityNode = $storeManifest.Package.Identity
+        $checks = @(
+            @('Name', [string]$storeIdentityNode.Name, $packageName),
+            @('Publisher', [string]$storeIdentityNode.Publisher, $packagePublisher),
+            @('Version', [string]$storeIdentityNode.Version, $targetVersion),
+            @('ProcessorArchitecture', [string]$storeIdentityNode.ProcessorArchitecture, 'x64'),
+            @('PublisherDisplayName', [string]$storeManifest.Package.Properties.PublisherDisplayName, $publisherDisplayName)
+        )
+        foreach ($check in $checks) {
+            if ($check[1] -cne $check[2]) {
+                throw ("Manifesto do pacote da Store: {0} = '{1}', esperado '{2}'." -f $check[0], $check[1], $check[2])
+            }
+            Write-Host ("  {0}: {1}" -f $check[0], $check[1]) -ForegroundColor Gray
+        }
+        Write-Host '  Assinatura: nenhuma (a Store assina na publicação)' -ForegroundColor Gray
+        Write-Host ("  SHA-256: {0}" -f (Get-FileHash -LiteralPath $msixPath -Algorithm SHA256).Hash) -ForegroundColor Gray
+
         $buildSucceeded = $true
         Write-Host ''
         Write-Host '============================================================' -ForegroundColor Green
