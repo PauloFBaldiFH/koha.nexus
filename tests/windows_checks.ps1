@@ -319,5 +319,28 @@ Check 'msix: signer is the published .cer' ($signer.Thumbprint -eq $cer.Thumbpri
 Check 'msix: instalar_msix.ps1 knows the signer' ($pinned -match ("'" + $signer.Thumbprint + "'")) $signer.Thumbprint
 Check 'msix: manifest Publisher is the signer subject' ($identity.Publisher -eq $signer.Subject) ('{0} / {1}' -f $identity.Publisher, $signer.Subject)
 
+# MSIX for the Store (compilar_msix.ps1 -Store): store-identity.json is
+# either still empty or holds a valid Partner Center identity, and the
+# payload revision moves with the package version (a rebuild under the same
+# revision leaves old scripts in C:\Koha\bin).
+$builder = Join-Path $repo 'windows\msix\compilar_msix.ps1'
+$builderAst = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$null, [ref]$null)
+foreach ($fn in $builderAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Get-KohaStoreIdentity' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$storeJson = Join-Path $repo 'windows\msix\store-identity.json'
+$storeData = Get-Content -LiteralPath $storeJson -Raw | ConvertFrom-Json
+if (-not ($storeData.Name -or $storeData.Publisher -or $storeData.PublisherDisplayName)) {
+    Check 'store: identity not filled in yet' $true
+} else {
+    $storeError = ''
+    try { [void](Get-KohaStoreIdentity -Path $storeJson) } catch { $storeError = $_.Exception.Message }
+    Check 'store: store-identity.json is a valid identity' ($storeError -eq '') $storeError
+}
+$builderText = Get-Content -LiteralPath $builder -Raw
+$version = [regex]::Match($builderText, "(?m)^\`$targetVersion = '([^']+)'").Groups[1].Value
+$revision = [regex]::Match($builderText, "(?m)^\`$payloadRevision = '([^']+)'").Groups[1].Value
+Check 'msix: payload revision follows the version' ($version -and $revision.StartsWith($version + '-')) ('{0} / {1}' -f $version, $revision)
+
 if ($failed) { throw "$failed check(s) failed" }
 Write-Host 'all checks passed'
