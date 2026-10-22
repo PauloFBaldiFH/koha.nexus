@@ -23,8 +23,27 @@ teardown() {
 
 pre_backups() { find /var/backups/koha_sql -maxdepth 1 -name "PRE-${1:-}*" 2>/dev/null | wc -l; }
 extra()       { printf '%s\n' "$@" > "$W/extra.sh"; export KEI_EXTRA="$W/extra.sh"; }
-marc_dump()   { yaz-marcdump "$1" 2>/dev/null; }
+marc_dump() {
+    if [ "$(head -c 1 "$1")" = '<' ]; then yaz-marcdump -i marcxml -o line "$1" 2>/dev/null
+    else yaz-marcdump "$1" 2>/dev/null; fi
+}
 xml_dump()    { yaz-marcdump -i marcxml -o line "$1" 2>/dev/null; }
+item_has() {
+    python3 - "$1" "$2" <<'PYITEM'
+import json
+import sys
+from xml.etree import ElementTree as ET
+expected = json.loads(sys.argv[2])
+fields = ET.parse(sys.argv[1]).findall('.//{*}datafield[@tag="952"]')
+for field in fields:
+    values = {sub.get('code'): sub.text for sub in field.findall('{*}subfield')}
+    if all(values.get(code) == value for code, value in expected.items()):
+        sys.exit(0)
+print('No item matches the requested field values')
+sys.exit(1)
+PYITEM
+}
+
 bibs()        { tools_sql "SELECT COUNT(*) FROM biblio;"; }
 preview()     { cat "$KEI_S/textboxes.log" 2>/dev/null; }
 fixtures()    { python3 "$KEI_REPO/tests/lib/import_fixtures.py" "$W/fx"; }
@@ -72,7 +91,7 @@ koha_marc() {
 <record><leader>00000nam a2200000 a 4500</leader><datafield tag="245" ind1="0" ind2="0"><subfield code="a">Um</subfield></datafield></record>
 <record><leader>00000nam a2200000 a 4500</leader><datafield tag="245" ind1="0" ind2="0"><subfield code="a">Dois</subfield></datafield></record>
 <record><leader>00000nam a2200000 a 4500</leader><datafield tag="245" ind1="0" ind2="0"><subfield code="a">Três</subfield></datafield>
-  <datafield tag="952" ind1=" " ind2=" "><subfield code="a">CPL</subfield><subfield code="b">CPL</subfield><subfield code="p">999</subfield></datafield></record>
+  <datafield tag="952" ind1=" " ind2=" "><subfield code="a">CPL</subfield><subfield code="b">CPL</subfield><subfield code="p">999</subfield><subfield code="y">LIVRO</subfield></datafield></record>
 </collection>
 XML
     yaz-marcdump -i marcxml -o marc -f UTF-8 -t UTF-8 -l 9=97 "$W/books.xml" > "$W/books.mrc"
@@ -116,11 +135,11 @@ bf_circ_schema() {
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
     assert 'engine_ran analyse && engine_ran build' "the engine runs through koha-shell, isolated: $(calls)"
-    assert 'grep -q "^stage_file.pl --file /tmp/koha_tools\.[^ ]*/books.mrc --format ISO2709 --encoding UTF-8 --add-items --comment koha-easy-installer [0-9-]* books.mrc --match 1 --no-replace \[pre=0\]" "$KEI_S/calls.log"' "$(calls)"
+    assert 'grep -q "^stage_file.pl --file /tmp/koha_tools\.[^ ]*/normalized-1.xml --format MARCXML --encoding UTF-8 --comment koha-easy-installer [0-9-]* books.mrc --add-items --match 1 --no-replace \[pre=0\]" "$KEI_S/calls.log"' "$(calls)"
     assert 'grep -q "^commit_file.pl --batch-number 1 \[pre=1\]" "$KEI_S/calls.log"' "the import comes after the safety backup: $(calls)"
     local pre; pre=$(ls /var/backups/koha_sql/PRE-IMPORT_*.sql.gz)
     assert 'gzip -t "$pre" && zcat "$pre" | tail -n1 | grep -q "Dump completed"' "PRE-IMPORT backup must be complete"
-    assert 'preview | grep -q "^== books.mrc  (ISO 2709, 3 record(s), encoding UTF-8)" && preview | grep -q "^Items: 1 in 952, as Koha keeps them"' "$(preview)"
+    assert 'preview | grep -q "^== books.mrc (3 bibliographic records)" && preview | grep -q "^Holdings: existing=1; created=0"' "$(preview)"
     assert '! dialogs | grep -q "MENU \[🪄  Magic Import Tool\]"' "no question, and no library or item type for records that bring their own items"
     assert 'dialogs | grep -q "Records: 3\\\\n  Items: 1\\\\n  Patrons: 0"' "$(dialogs)"
     assert 'dialogs | grep -q "^OK ✅ Successfully imported 3 bibliographic record(s), 3 item(s) and 0 patron(s) with zero manual mapping required"' "$(dialogs | tail -2)"
@@ -201,46 +220,29 @@ bf_circ_schema() {
     assert '[ ! -s "$KEI_S/calls.log" ]' "$(calls)"
 }
 
-@test "I05 Biblivre: Latin-1 export recognised, 949 tombo moved to 952 by MARC::Record, then Koha's staged import" {
+@test "I05 Biblivre mixed with invalid native codes: normalize and report before any staging" {
     biblivre_xml
     kei_marc "$W/acervo.mrc" ISO-8859-1 "$W/biblivre.xml"
-    assert '! iconv -f UTF-8 -t UTF-8 "$W/acervo.mrc" >/dev/null 2>&1' "the fixture must be Latin-1"
     export KEI_SELECT_FILE="$W/acervo.mrc"
-    inputs CPL LIVRO new
-    answer yes yes
+    inputs CPL LIVRO
     panel lt_magic_import
-    assert '[ "$status" -eq 0 ]' "$output"
-    local f="$KEI_S/last-staged.mrc"
-    assert 'preview | grep -q "^== acervo.mrc  (ISO 2709, 3 record(s), encoding ISO_8859-1)" && preview | grep -q "^Items: field 949 moved to 952, one item per field:"' "$(preview)"
-    assert 'preview | grep -qx "  949 \$a -> 952 \$p, barcode: 000123, 000124" && preview | grep -qx "  949 \$b not used, values not recognised: sem tombo"' "the tombo is read as the barcode: $(preview)"
-    assert '[ -s "$f" ] && iconv -f UTF-8 -t UTF-8 "$f" >/dev/null' "the staged file must be UTF-8"
-    assert '[ "$(head -c 10 "$f" | tail -c 1)" = "a" ]' "leader/09 must say Unicode"
-    assert 'marc_dump "$f" | grep -q "São Paulo : \$b Ática"' "accents kept: $(marc_dump "$f" | grep ^260)"
-    assert 'marc_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$o 869.3 A848d \$p 000123"' "$(marc_dump "$f" | grep ^952)"
-    assert 'marc_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$o 869.3 A848d \$p 000124"'
-    assert '[ "$(marc_dump "$f" | grep -n "000123" | cut -d: -f1)" -lt "$(marc_dump "$f" | grep -n "000124" | cut -d: -f1)" ]' "items keep their order"
-    assert '! marc_dump "$f" | grep -q "^949"' "legacy item fields removed once moved"
-    assert 'marc_dump "$f" | grep -qx "952    \$a X \$p 999"' "an existing 952 is left alone"
-    assert 'grep -q "Items without barcode: 1" "$KEI_S/textboxes.log"' "the preview reports items without barcode"
-    assert 'grep -q "^stage_file.pl .*--format ISO2709 --encoding UTF-8 .*acervo.mrc \[pre=0\]" "$KEI_S/calls.log"' "$(calls)"
-    assert 'grep -q "^commit_file.pl --batch-number 1 \[pre=1\]" "$KEI_S/calls.log"' "import only after the PRE-IMPORT backup"
-    assert '[ "$(bibs)" = "203" ]'
+    assert '[ "$status" -ne 0 ]' 'Unknown native library X requires an explicit code remap'
+    assert 'preview | grep -q "existing=1; created=2"' "$(preview)"
+    assert 'preview | grep -q "Unknown or invalid target branch code"' "$(preview)"
+    assert '! calls | grep -q "stage_file.pl\|commit_file.pl"'
+    assert '[ "$(bibs)" = "200" ] && [ "$(pre_backups)" = "0" ]'
 }
 
-@test "I06 missing yaz-marcdump: offered install, and nothing happens without it" {
+@test "I06 UTF-8 holdings normalization does not require an external YAZ conversion" {
     biblivre_xml
     kei_marc "$W/acervo.mrc" UTF-8 "$W/biblivre.xml"
     export KEI_SELECT_FILE="$W/acervo.mrc"
     extra 'YAZ_MARCDUMP=/nonexistent/yaz-marcdump'
-    answer yes
+    inputs CPL LIVRO
     panel lt_magic_import
-    assert 'grep -q "^apt_install yaz" "$KEI_S/calls.log"' "the yaz package must be offered: $(calls)"
-    assert 'dialogs | grep -q "could not be installed"'
-    assert '! grep -q "remap952\|stage_file" "$KEI_S/calls.log"'
-    : > "$KEI_S/calls.log"
-    answer no
-    panel lt_magic_import
-    assert '! grep -q "apt_install\|remap952\|stage_file" "$KEI_S/calls.log" 2>/dev/null' "refusing the install stops here"
+    assert '! calls | grep -q "apt_install yaz"'
+    assert 'preview | grep -q "Holdings: existing=1; created=2"' "$(preview)"
+    assert '! calls | grep -q "stage_file.pl"' 'The invalid native target code still blocks import'
 }
 
 @test "I07 MARC questions: an unknown item field and a character set the bytes cannot settle" {
@@ -266,12 +268,12 @@ PY
     assert '[ "$(dialogs | grep -c "^MENU \[🪄  Magic Import Tool\] => \(ISO_8859-1\|items\)$")" = "2" ]' "$(dialogs)"
     assert 'grep -q "may keep their copies in field 945" "$KEI_S/menus.log" && grep -qF '\''hold:\n  $b: Barcode of the copy (952)\n  $c: (not used)\n\nSample: $b T-100 $c x | $b T-101 $c x'\'' "$KEI_S/menus.log"' "the question says how each subfield is read: $(cat "$KEI_S/menus.log")"
     local f="$KEI_S/last-staged.mrc"
-    assert 'preview | grep -q "encoding ISO_8859-1, your answer" && preview | grep -q "^Items: field 945 moved to 952, one item per field:" && preview | grep -qx "  945 \$b -> 952 \$p, barcode: T-100, T-101"' "$(preview)"
-    assert 'marc_dump "$f" | grep -qx "245 10 \$a José de Alencar" && marc_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p T-101"' "$(marc_dump "$f")"
+    assert 'preview | grep -q "Holdings: existing=0; created=2"' "$(preview)"
+    assert 'marc_dump "$f" | grep -qx "245 10 \$a José de Alencar" && marc_dump "$f" | grep "^952" | grep -q "\$p T-101"' "$(marc_dump "$f")"
     assert 'dialogs | grep -q "^OK ✅ .*Questions answered: 2"' "$(dialogs | tail -1)"
 }
 
-@test "I20 an item field in another system's layout: every subfield read from its values, library and item type checked against Koha" {
+@test "I20 invalid legacy holdings require review before staging" {
     # 949 as many systems export it: call number in $a, barcode in $i,
     # library $b, location $l, item type $t, copy $c, date $d, price $p,
     # status $s. One library (XPL) and one item type (Gibi) Koha does not
@@ -305,30 +307,10 @@ XML
     inputs CPL LIVRO new
     answer yes yes
     panel lt_magic_import
-    assert '[ "$status" -eq 0 ]' "$output"
-    assert '! dialogs | grep -q "=> items$"' "a usual item field with a barcode is not asked about: $(dialogs)"
-    local p
-    for p in '949 $a -> 952 $o, call number: 869.3 A848d, 505 C569, 869.3 A368i' '949 $b -> 952 $a $b, library: CPL, Midway, XPL' \
-             '949 $c -> 952 $t, copy number: 1, 2' '949 $d -> 952 $d, date acquired: 15/03/2020, 2019-01-02, 02/01/2019' \
-             '949 $i -> 952 $p, barcode: 0000101, 0000102, 0000103' '949 $l -> 952 $c, shelving location: Referência, Acervo geral, REF' \
-             '949 $p -> 952 $g, price: R$ 25,00, R$ 12,50, R$ 30,00' '949 $s -> 952 $0/$1/$4/$7, status: Disponível, Extraviado, Baixado' \
-             '949 $t -> 952 $y, item type: Livro, LIVRO, Revista' 'library and item type when the field has none Koha knows: CPL, LIVRO' \
-             'Items created: 5' 'Items with their library from the field: 4' 'Libraries Koha does not have (your choice used): 1' \
-             'Items with their item type from the field: 4' 'Item types Koha does not have (your choice used): 1' \
-             'Values left out (location, date, price or status Koha cannot take): 1'; do
-        assert 'preview | grep -qxF "  $p" || preview | grep -qxF "$p"' "missing in the preview: $p
-$(preview)"
-    done
-    local f="$KEI_S/last-staged.mrc"
-    for p in '$a CPL $b CPL $y LIVRO $c REF $d 2020-03-15 $g 25.00 $o 869.3 A848d $p 0000101 $t 1' \
-             '$a MPL $b MPL $y LIVRO $1 1 $c GEN $d 2020-03-15 $g 25.00 $o 869.3 A848d $p 0000102 $t 2' \
-             '$a CPL $b CPL $y REV $0 1 $c REF $d 2019-01-02 $g 12.50 $o 505 C569 $p 0000103 $t 1' \
-             '$a CPL $b CPL $y LIVRO $c GEN $d 2019-01-02 $g 30.00 $o 869.3 A368i $p 0000104 $t 1' \
-             '$a CPL $b CPL $y LIVRO $c GEN $g 25.00 $o 869.3 R194v $p 0000105 $t 1'; do
-        assert 'marc_dump "$f" | grep -qxF "952    $p"' "missing 952: $p
-$(marc_dump "$f" | grep ^952)"
-    done
-    assert '! marc_dump "$f" | grep -q "^949"' "legacy item fields removed once moved"
+    assert '[ "$status" -ne 0 ]' 'Invalid dates and ambiguous legacy values require review'
+    assert 'preview | grep -q "Invalid acquisition date"' "$(preview)"
+    assert '! calls | grep -q "stage_file.pl\|commit_file.pl"'
+    assert '[ "$(pre_backups)" = "0" ]'
 }
 
 @test "I21 MARCXML with MARC 21 holdings (852): library and location only when Koha has them; a 950 that holds no copies is passed over" {
@@ -355,13 +337,12 @@ XML
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
     assert '! dialogs | grep -q "=> items$"' "$(dialogs)"
-    assert 'preview | grep -q "^== holdings.xml  (MARCXML, 2 record(s)" && preview | grep -q "^Items: field 852 moved to 952, one item per field:"' "$(preview)"
-    assert 'preview | grep -qxF "  852 \$a -> 952 \$a \$b, library: CPL, MPL" && preview | grep -qxF "  852 \$b not used, not a library Koha has: Sala 2, Sala 3"' "$(preview)"
+    assert 'preview | grep -q "Holdings: existing=0; created=3"' "$(preview)"
     local f="$KEI_S/last-staged.mrc"
-    assert 'marc_dump "$f" | grep -qxF "952    \$a CPL \$b CPL \$y LIVRO \$c REF \$o 869.3 R788g \$p B-001 \$t 1 \$z Só consulta local"' "$(marc_dump "$f" | grep ^952)"
-    assert 'marc_dump "$f" | grep -qxF "952    \$a MPL \$b MPL \$y LIVRO \$o ARM 12 \$p B-002 \$t 2 \$x Doação"' "the shelving number stands in for the call number: $(marc_dump "$f" | grep ^952)"
-    assert 'marc_dump "$f" | grep -qxF "952    \$a CPL \$b CPL \$y LIVRO \$c REF \$o 869.3 R788s \$p B-003"'
-    assert 'marc_dump "$f" | grep -qxF "950    \$a Contos" && ! marc_dump "$f" | grep -q "^852"' "the 950 stays, the 852 is moved: $(marc_dump "$f")"
+    assert 'item_has "$f" "{\"a\":\"CPL\",\"b\":\"CPL\",\"y\":\"LIVRO\",\"p\":\"B-001\",\"c\":\"REF\",\"o\":\"869.3 R788g\",\"t\":\"1\",\"z\":\"Só consulta local\"}"'
+    assert 'item_has "$f" "{\"a\":\"MPL\",\"b\":\"MPL\",\"p\":\"B-002\",\"o\":\"ARM 12\",\"t\":\"2\"}"'
+    assert 'item_has "$f" "{\"a\":\"CPL\",\"b\":\"CPL\",\"p\":\"B-003\",\"c\":\"REF\",\"o\":\"869.3 R788s\"}"'
+    assert 'marc_dump "$f" | grep -qxF "950    \$a Contos" && marc_dump "$f" | grep -q "^852"' "Source 950 and 852 are retained for provenance: $(marc_dump "$f")"
 }
 
 # --- Spreadsheets ---------------------------------------------------------------
@@ -370,7 +351,7 @@ XML
     legacy_csv
     export KEI_SELECT_FILE="$W/leitores.csv"
     inputs CPL PT
-    answer yes no yes    # go on; do not update existing; import
+    answer no yes yes    # keep existing; go on; import
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
     assert 'preview | grep -q "^Patrons ready: 3$" && preview | grep -q "^Rejected: 2$"' "$(preview)"
@@ -391,7 +372,7 @@ XML
     tools_sql "INSERT INTO borrower_attribute_types VALUES ('CPF', 'CPF');"
     export KEI_SELECT_FILE="$W/alunos.csv"
     inputs CPL ST
-    answer yes no yes
+    answer no yes yes
     panel lt_magic_import
     assert 'preview | grep -qE "MATRÍCULA +-> cardnumber" && preview | grep -qE "Nº CPF +-> cpf"' "$(preview)"
     assert 'preview | grep -q "^Patrons ready: 2$" && preview | grep -q "^Invalid CPF (imported, not kept as CPF): 1$"'
@@ -413,7 +394,7 @@ XML
     assert 'preview | grep -qE "Título +-> title \(1.00\)" && preview | grep -qE "Tombo +-> tombo" && preview | grep -qE "Observação da escola +-> - \(left out\)"' "$(preview)"
     assert 'preview | grep -q "^Records: 3$" && preview | grep -q "^Items created: 4$" && preview | grep -q "^Rows without title (left out): 1$"'
     assert 'preview | grep -q "^Repeated tombos or barcodes renumbered (<code>-<n>, noted in 952 \$x): 1$" && preview | grep -q "^ISBNs with a wrong check digit (kept in 020 \$z): 1$"'
-    assert 'grep -q "^stage_file.pl .*records.xml --format MARCXML --encoding UTF-8 .*acervo.csv" "$KEI_S/calls.log"' "MARCXML for the staged import: $(calls)"
+    assert 'grep -q "^stage_file.pl .*normalized-1.xml --format MARCXML --encoding UTF-8 .*acervo.csv" "$KEI_S/calls.log"' "MARCXML for the staged import: $(calls)"
     assert '[ "$(xml_dump "$f" | grep -c "^245")" = "3" ]' "$(xml_dump "$f")"
     assert 'xml_dump "$f" | grep -qx "245 12 \$a O cortiço / \$c Aluísio Azevedo" && xml_dump "$f" | grep -qx "100 1  \$a Azevedo, Aluísio"' "nonfiling article"
     assert 'xml_dump "$f" | grep -qx "260    \$a São Paulo : \$b Ática, \$c 1997" && xml_dump "$f" | grep -qx "250    \$a 2. ed."'
@@ -438,21 +419,21 @@ XML
 @test "I12 XLSX workbook: books and patrons in one sheet kept apart by asking, patron sheet, loans left out; answers remembered for the ODS" {
     fixtures
     export KEI_SELECT_FILE="$W/fx/biblioteca.xlsx"
-    inputs author fullname CPL LIVRO new ST
-    answer yes no yes yes
+    inputs author fullname CPL LIVRO ST new
+    answer no yes yes yes
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
     assert '[ "$(dialogs | grep -c "^MENU \[🪄  Magic Import Tool\] => \(author\|fullname\)$")" = "2" ]' "Autor and Leitor are asked: $(dialogs)"
     assert 'preview | grep -q "^== biblioteca.xlsx: Livros  (XLSX, encoding UTF-8)" && preview | grep -q "^Holds: books and copies, with patrons in the same rows"' "$(preview)"
     assert 'preview | grep -qE "Leitor +-> fullname \(your answer\)" && preview | grep -qE "Autor +-> author \(your answer\)"'
     assert 'preview | grep -q "^Holds: loans or holds (not imported by this version)"' "the loans sheet is recognised and left out"
-    assert 'preview | grep -q "^Records: 3$" && preview | grep -q "^Items created: 4$" && preview | grep -q "^Patrons ready: 5$" && preview | grep -q "biblioteca.xlsx: Livros line 5: invalid CPF 123.456.789-00"'
+    assert 'preview | grep -q "^Records: 3$" && preview | grep -q "^Items created: 4$" && preview | grep -q "^Patrons ready: 6$" && preview | grep -q "^Invalid CPF (imported, not kept as CPF): 1$"'
     local f="$KEI_S/last-staged.mrc"
     assert 'xml_dump "$f" | grep -qx "100 1  \$a Assis, Machado de" && ! xml_dump "$f" | grep -q "Ana Maria Souza\|Lima, João"' "patrons never become authors: $(xml_dump "$f")"
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p 5001 \$i 5001 \$d 2023-03-15"' "Excel dates read: $(xml_dump "$f" | grep ^952)"
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM borrowers WHERE cardnumber IN (\"52998224725\", \"11144477735\", \"A1\", \"A2\", \"A3\");")" = "5" ]' "$(tools_sql "SELECT cardnumber, surname FROM borrowers;")"
     assert '[ -n "$(ls /etc/koha-easy-install/import-profiles/*.tsv)" ] && [ "$(stat -c %a /etc/koha-easy-install/import-profiles)" = "700" ]'
-    assert 'dialogs | grep -q "^OK ✅ Successfully imported 3 bibliographic record(s), 3 item(s) and 5 patron(s). Questions answered: 2"' "$(dialogs | tail -1)"
+    assert 'dialogs | grep -q "^OK ✅ Successfully imported 3 bibliographic record(s), 3 item(s) and 6 patron(s). Questions answered: 2"' "$(dialogs | tail -1)"
     # The same columns in an ODS: no question this time.
     rm -f "$KEI_S/dialogs.log" "$KEI_S/textboxes.log"
     export KEI_SELECT_FILE="$W/fx/biblioteca.ods"
@@ -460,7 +441,7 @@ XML
     answer no
     panel lt_magic_import
     assert '! dialogs | grep -q "=> \(author\|fullname\)$"' "$(dialogs)"
-    assert 'preview | grep -qE "Leitor +-> fullname \(saved answer\)" && preview | grep -q "^Patrons ready: 5$" && preview | grep -q "^Items created: 4$"' "$(preview)"
+    assert 'preview | grep -qE "Leitor +-> fullname \(saved answer\)" && preview | grep -q "^Patrons ready: 6$" && preview | grep -q "^Items created: 4$"' "$(preview)"
 }
 
 @test "I13 XLS and dBase: old Excel and Clipper tables, memo text, deleted rows left out" {
@@ -469,9 +450,9 @@ XML
     if [ -f "$W/fx/biblioteca.xls" ] && python3 -c "import xlrd" 2>/dev/null; then
         export KEI_SELECT_FILE="$W/fx/biblioteca.xls"
         inputs author fullname CPL LIVRO
-        answer no
+        answer no no
         panel lt_magic_import
-        assert 'preview | grep -q "^== biblioteca.xls: Livros  (XLS" && preview | grep -q "^Records: 3$" && preview | grep -q "^Patrons ready: 5$"' "$(preview)"
+        assert 'preview | grep -q "^== biblioteca.xls: Livros  (XLS" && preview | grep -q "^Records: 3$" && preview | grep -q "^Patrons ready: 6$"' "$(preview)"
         rm -f "$KEI_S/textboxes.log"
     fi
     export KEI_SELECT_FILE="$W/fx/ACERVO.DBF"
@@ -488,12 +469,12 @@ XML
 @test "I14 a spreadsheet without a header row: what the table holds and its unclear columns are asked" {
     fixtures
     export KEI_SELECT_FILE="$W/fx/sem-cabecalho.csv"
-    inputs biblio title author tombo CPL LIVRO new
+    inputs tombo CPL LIVRO new
     answer yes yes
     panel lt_magic_import
-    assert 'dialogs | grep -q "^MENU \[🪄  Magic Import Tool\] => biblio$"' "$(dialogs)"
+    assert 'dialogs | grep -q "^MENU \[🪄  Magic Import Tool\] => tombo$"' "$(dialogs)"
     local f="$KEI_S/last-staged.mrc"
-    assert 'preview | grep -q "^Holds: books and copies \[your answer\]" && preview | grep -q "^Records: 2$" && preview | grep -q "^Items created: 3$"' "$(preview)"
+    assert 'preview | grep -q "^Holds: books and copies " && preview | grep -q "^Records: 2$" && preview | grep -q "^Items created: 3$"' "$(preview)"
     assert 'xml_dump "$f" | grep -qx "245 12 \$a A hora da estrela / \$c Clarice Lispector" && xml_dump "$f" | grep -qx "100 1  \$a Lispector, Clarice"' "$(xml_dump "$f")"
     assert 'xml_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$p 8002 \$i 8002"'
 }
@@ -505,8 +486,8 @@ XML
     bf_circ_schema
     tools_sql "INSERT INTO borrower_attribute_types VALUES ('CPF', 'CPF');"
     export KEI_SELECT_FILE="$W/biblioteca.bkp"
-    inputs CPL LIVRO new PT
-    answer yes no yes yes    # go on; keep registered patrons; import records; import patrons
+    inputs CPL LIVRO PT new
+    answer no yes yes yes    # keep registered patrons; go on; import records; import patrons
     panel lt_magic_import
     assert '[ "$status" -eq 0 ]' "$output"
     local f="$KEI_S/last-staged.mrc"
@@ -516,7 +497,7 @@ XML
     assert '! grep -rq "segredo123" "$KEI_S/textboxes.log" /var/log/koha-easy-install 2>/dev/null' "the operators' passwords never reach a screen or a log"
     assert '[ "$(marc_dump "$f" | grep -c "^245")" = "103" ] && marc_dump "$f" | grep -qx "245 12 \$a O cortiço"'
     assert 'marc_dump "$f" | grep -qx "952    \$a CPL \$b CPL \$y LIVRO \$o 869.3 A994c \$p 1001 \$t 1 \$c EST1 \$d 2020-03-05 \$x Biblioteca Fácil: acervo 1"' "$(marc_dump "$f" | grep ^952 | head -3)"
-    assert 'grep -q "^stage_file.pl .*bf-1-koha.mrc --format ISO2709 --encoding UTF-8 .*biblioteca.bkp \[pre=0\]" "$KEI_S/calls.log" && grep -q "^commit_file.pl --batch-number 1 \[pre=1\]" "$KEI_S/calls.log"' "$(calls)"
+    assert 'grep -q "^stage_file.pl .*bf-1-koha.mrc --format ISO2709 --encoding UTF-8 .*biblioteca.bkp.* \[pre=0\]" "$KEI_S/calls.log" && grep -q "^commit_file.pl --batch-number 1 \[pre=1\]" "$KEI_S/calls.log"' "$(calls)"
     assert 'grep -q "^import_patrons.pl .*--matchpoint cardnumber .*--confirm \[pre=2\]" "$KEI_S/calls.log"' "$(calls)"
     assert '[ "$(tools_sql "SELECT GROUP_CONCAT(cardnumber ORDER BY cardnumber) FROM borrowers WHERE categorycode = \"PT\" AND cardnumber IN (\"1\",\"2\",\"4\",\"3\",\"5\");")" = "1,2,4" ]'
     assert 'dialogs | grep -q "No loan or hold to add"' "the mock import has no Biblioteca Fácil items: $(dialogs | tail -3)"
@@ -527,7 +508,7 @@ XML
     bf_backup --folder "$W/Dados"
     export KEI_SELECT_FILE="$W/Dados/T09_ACER.dat"
     inputs CPL LIVRO
-    answer no
+    answer no no
     panel lt_magic_import
     assert 'preview | grep -q "Dados/T09_ACER.dat: Biblioteca Fácil data folder" && preview | grep -q "^Records: 103$" && preview | grep -q "^Patrons ready: 3$"' "$(preview)"
     bf_backup "$W/biblioteca.bkp"
@@ -537,7 +518,7 @@ XML
     inputs CPL LIVRO
     panel lt_magic_import
     assert 'preview | grep -q "Not imported: not a Biblioteca Fácil backup or data folder the panel can read."' "$(preview)"
-    assert 'dialogs | grep -q "^INFO .*Nothing could be built from it"'
+    assert 'dialogs | grep -q "Import validation requires corrections"'
     assert '! grep -q "^stage_file.pl\|^import_patrons.pl" "$KEI_S/calls.log"' "$(calls)"
     assert '[ "$(pre_backups)" = "0" ] && [ "$(bibs)" = "200" ]'
 }
@@ -557,16 +538,17 @@ XML
     assert 'grep -q "^commit_file.pl --batch-number 1 \[pre=1\]" "$KEI_S/calls.log"' "$(calls)"
 }
 
-@test "I18 one zip with an ISIS and a Biblioteca Fácil backup: every stream from one drop" {
+@test "I18 one zip with ISIS and Biblioteca Fácil: both decoded, cross-source barcode conflict blocks staging" {
     bf_backup "$W/biblioteca.bkp"
     isis_dump "$W/Backup_ISIS.backup"
     (cd "$W" && zip -q "$W/tudo.zip" biblioteca.bkp Backup_ISIS.backup)
     export KEI_SELECT_FILE="$W/tudo.zip"
     inputs CPL LIVRO
-    answer no
+    answer no no
     panel lt_magic_import
     assert 'preview | grep -q "^tudo.zip/biblioteca.bkp: Biblioteca Fácil backup$" && preview | grep -q "^tudo.zip/Backup_ISIS.backup: ISIS catalogue (PostgreSQL export)$"' "$(preview)"
-    assert 'dialogs | grep -q "Records: 111\\\\n  Items: 130\\\\n  Patrons: 3\\\\n  Loans: 2\\\\n  Holds: 2"' "$(dialogs)"
+    assert 'preview | grep -q "Books: 111 record(s), 130 item(s)" && preview | grep -q "Patrons: 3"' "$(preview)"
+    assert 'preview | grep -q "Barcode is duplicated within this import"' "$(preview)"
     assert '! grep -q "^stage_file.pl" "$KEI_S/calls.log"'
 }
 

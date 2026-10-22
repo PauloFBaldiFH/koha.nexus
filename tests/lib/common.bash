@@ -216,7 +216,11 @@ assert_catalog_untouched() {
 kei_tools_catalog() {
     mysql "$DB" <<'SQL'
 ALTER TABLE borrowers ADD COLUMN email mediumtext, ADD COLUMN phone mediumtext, ADD COLUMN dateofbirth date,
-  ADD COLUMN dateenrolled date, ADD COLUMN dateexpiry date, ADD COLUMN privacy int(11) NOT NULL DEFAULT 1;
+  ADD COLUMN dateenrolled date, ADD COLUMN dateexpiry date, ADD COLUMN privacy int(11) NOT NULL DEFAULT 1,
+  ADD COLUMN address mediumtext, ADD COLUMN address2 mediumtext, ADD COLUMN city mediumtext,
+  ADD COLUMN state mediumtext, ADD COLUMN zipcode varchar(25), ADD COLUMN sex varchar(1),
+  ADD COLUMN mobile varchar(50), ADD COLUMN borrowernotes mediumtext,
+  ADD COLUMN sort2 varchar(80), ADD COLUMN debarred date, ADD COLUMN debarredcomment mediumtext;
 ALTER TABLE items ADD COLUMN itemcallnumber varchar(255), ADD COLUMN dateaccessioned date, ADD COLUMN issues smallint(6),
   ADD COLUMN itemlost tinyint(1) NOT NULL DEFAULT 0, ADD COLUMN itemlost_on datetime;
 ALTER TABLE items MODIFY homebranch varchar(10) NULL;
@@ -226,9 +230,10 @@ CREATE TABLE import_batches (import_batch_id int(11) NOT NULL AUTO_INCREMENT PRI
   batch_type enum('batch','z3950','webservice') NOT NULL DEFAULT 'batch', record_type enum('biblio','auth','holdings') NOT NULL DEFAULT 'biblio',
   file_name varchar(100), comments longtext);
 CREATE TABLE import_records (import_record_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, import_batch_id int(11) NOT NULL,
+  record_sequence int(11) NOT NULL DEFAULT 0, import_error mediumtext,
   status enum('error','staged','imported','reverted','items_reverted','ignored') NOT NULL DEFAULT 'staged');
 CREATE TABLE import_items (import_items_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, import_record_id int(11) NOT NULL,
-  itemnumber int(11), status enum('error','staged','imported','reverted','ignored') NOT NULL DEFAULT 'staged');
+  itemnumber int(11), import_error mediumtext, status enum('error','staged','imported','reverted','ignored') NOT NULL DEFAULT 'staged');
 CREATE TABLE marc_matchers (matcher_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, code varchar(10) NOT NULL DEFAULT '',
   description varchar(255) NOT NULL DEFAULT '', record_type varchar(10) NOT NULL DEFAULT 'biblio', threshold int(11) NOT NULL DEFAULT 0);
 CREATE TABLE saved_sql (id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11), date_created datetime, last_modified datetime,
@@ -245,6 +250,11 @@ CREATE TABLE statistics (datetime datetime, branch varchar(10), type varchar(16)
 CREATE TABLE authorised_values (id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, category varchar(32) NOT NULL DEFAULT '',
   authorised_value varchar(80) NOT NULL DEFAULT '', lib varchar(200));
 
+CREATE TABLE itemtypes (itemtype varchar(10) NOT NULL PRIMARY KEY, description longtext) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE auth_types (authtypecode varchar(10) NOT NULL PRIMARY KEY, authtypetext varchar(100), auth_tag_to_report char(3));
+CREATE TABLE auth_subfield_structure (authtypecode varchar(10) NOT NULL DEFAULT '', tagfield char(3) NOT NULL, tagsubfield char(1) NOT NULL, kohafield varchar(40));
+INSERT INTO auth_types VALUES ('PERSO_NAME','Personal name','100');
+INSERT INTO auth_subfield_structure VALUES ('','152','b','auth_header.authtypecode');
 INSERT INTO marc_matchers (code, description) VALUES ('ISBN', 'ISBN');
 INSERT INTO authorised_values (category, authorised_value, lib) VALUES ('LOST', '1', 'Lost');
 INSERT INTO branches VALUES ('MPL', 'Midway');
@@ -288,7 +298,7 @@ tools_sql() { mysql --default-character-set=utf8mb4 -Nse "$1" "$DB"; }
 # ---------------------------------------------------------------------
 kei_br_catalog() {
     mysql "$DB" <<'SQL'
-CREATE TABLE itemtypes (itemtype varchar(10) NOT NULL PRIMARY KEY, description longtext) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS itemtypes (itemtype varchar(10) NOT NULL PRIMARY KEY, description longtext) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT INTO itemtypes VALUES ('LIVRO', 'Livro'), ('REV', 'Revista');
 CREATE TABLE creator_templates (template_id int(4) NOT NULL AUTO_INCREMENT PRIMARY KEY, profile_id int(4) DEFAULT NULL,
   template_code char(100) NOT NULL DEFAULT 'DEFAULT TEMPLATE', template_desc char(100) NOT NULL DEFAULT 'Default description',

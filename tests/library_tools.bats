@@ -11,7 +11,7 @@ setup() {
     kei_reset_env
     kei_reset_live_catalog
     kei_tools_catalog
-    unset KEI_SELECT_FILE KEI_DEFAULT_ANSWER
+    unset KEI_SELECT_FILE KEI_DEFAULT_ANSWER KEI_EXTRA
     W="$BATS_TEST_TMPDIR"
 }
 
@@ -22,18 +22,43 @@ teardown() {
 
 pre_backups() { find /var/backups/koha_sql -maxdepth 1 -name "PRE-${1:-}*" 2>/dev/null | wc -l; }
 # ISO 2709 file with N minimal records (leader position 09 = "a": Unicode).
-marc_file()   { local i; for ((i = 0; i < $2; i++)); do printf '00026nam a2200025 a 4500\036\035'; done > "$1"; }
+marc_file() {
+    python3 - "$1" "$2" <<'PYMARC'
+import sys
+with open(sys.argv[1], 'wb') as target:
+    for number in range(int(sys.argv[2])):
+        data = b'10\x1faSynthetic title ' + str(number).encode() + b'\x1e'
+        directory = b'245' + b'%04d%05d' % (len(data), 0) + b'\x1e'
+        base = 24 + len(directory)
+        leader = b'%05dnam a22%05d a 4500' % (base + len(data) + 1, base)
+        target.write(leader + directory + data + b'\x1d')
+PYMARC
+}
 bibs()        { tools_sql "SELECT COUNT(*) FROM biblio;"; }
 
 # --- MARC undo (batches staged by the Magic Import Tool, tests/magic_import.bats) ---
 
-@test "L04 MARC undo: counts first, PRE-UNDO-IMPORT backup, then commit_file.pl --revert" {
+@test "L04 MARC undo: counts first, PRE-UNDO-IMPORT backup, then the Koha batch adapter" {
     marc_file "$W/books.mrc" 4
     export KEI_SELECT_FILE="$W/books.mrc"
     inputs "new"; answer yes yes
     panel lt_magic_import
     assert '[ "$(bibs)" = "204" ]'
     : > "$KEI_S/calls.log"
+    # This harness doubles Koha APIs. Keep the real adapter dispatch, quoting,
+    # backup and orchestration; its Perl API body has a separate actual-Koha
+    # smoke test, while this fixture uses the existing synthetic batch state.
+    cat > "$W/batch-api-double.sh" <<'SH'
+marc_write_authority_committer() {
+    cat > "$1" <<'PERL'
+use strict;
+use warnings;
+exec '/usr/share/koha/bin/commit_file.pl', @ARGV;
+die "Cannot start synthetic Koha batch API double: $!";
+PERL
+}
+SH
+    export KEI_EXTRA="$W/batch-api-double.sh"
     inputs "1"; answer yes
     panel lt_marc_undo
     assert 'dialogs | grep -q "PROMPT \[Undo a MARC import\] Batch 1: 4 record(s) and 4 item(s)"' "$(dialogs)"
