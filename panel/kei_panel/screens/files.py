@@ -40,7 +40,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
 
 from textual import events, on
 from textual.app import ComposeResult
@@ -173,7 +173,7 @@ class FilteredTree(DirectoryTree):
         return keep
 
 
-class PathPickerScreen(CopyValues, ModalScreen[Path | None]):
+class PathPickerScreen(CopyValues, ModalScreen[Optional[Path]]):
     BINDINGS = [Binding("escape", "cancel", t("Cancel")), Binding("backspace", "up", t("Up"), show=False)]
 
     def __init__(self, title: str, start: str | Path, mode: str = "dir",

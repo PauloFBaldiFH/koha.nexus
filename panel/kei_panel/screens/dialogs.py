@@ -4,6 +4,7 @@ task's result. Every routine screen is built from these."""
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from textual import on
 from textual.app import ComposeResult
@@ -189,7 +190,7 @@ class ResultScreen(FitsScreen, ModalScreen[None]):
         self.dismiss(None)
 
 
-class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
+class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[Optional[str]]):
     """One of a few options (the whiptail --menu of a routine)."""
 
     BINDINGS = [Binding("escape", "back", t("Back")), Binding("c", "copy", t("Copy"), show=False)]
@@ -227,7 +228,7 @@ class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class InputScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
+class InputScreen(FitsScreen, CopyValues, ModalScreen[Optional[str]]):
     """Instructions and one value to type or paste (a token, a name)."""
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
@@ -272,7 +273,7 @@ class InputScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
         self.dismiss(None)
 
 
-class MessageScreen(FitsScreen, CopyValues, ModalScreen[str | None]):
+class MessageScreen(FitsScreen, CopyValues, ModalScreen[Optional[str]]):
     """The end of a routine: what happened, its numbers, a command to copy
     (else the addresses and codes in its text) and, when it went wrong, the
     last lines of its output."""
@@ -418,7 +419,7 @@ class TextScreen(FitsScreen, CopyValues, ModalScreen[None]):
         self.dismiss(None)
 
 
-class ChecklistScreen(FitsScreen, ModalScreen[list[str] | None]):
+class ChecklistScreen(FitsScreen, ModalScreen[Optional[list[str]]]):
     """Several options to tick (the whiptail --checklist of a routine)."""
 
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]

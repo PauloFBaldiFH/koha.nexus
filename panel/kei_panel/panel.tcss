@@ -392,7 +392,7 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, Reco
 .fieldmap .fm-line { height: auto; }
 .fieldmap .fm-key { width: 18; padding-top: 1; color: $text-muted; }
 .fieldmap #fm-field, .fieldmap #fm-dest { width: 1fr; }
-.fieldmap #fm-field > SelectCurrent, .fieldmap #fm-dest > SelectCurrent { background: $warning 15%; }
+.fieldmap #fm-field > SelectCurrent, .fieldmap #fm-dest > SelectCurrent { background: #ADD8E6; color: #12334A; }
 .fieldmap #fm-custom { width: 14; }
 .fieldmap #fm-text { width: 1fr; margin-left: 1; }
 .fieldmap #fm-loc-q { color: $text-muted; }
@@ -406,6 +406,27 @@ TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, Reco
 .fieldmap #fm-count { width: 1fr; padding-top: 1; color: $text-muted; }
 .dialog.fieldmap-preview { width: 90; max-width: 95%; height: 80%; }
 .fieldmap-preview #fmp-scroll { height: 1fr; background: $boost; padding: 0 1; }
+
+/* Version 2 import review: every source keeps its own mode and opaque IDs. */
+.dialog.importmap { width: 98%; max-width: 220; height: 96%; max-height: 100%; padding: 0 1; }
+.importmap .im-line { height: auto; min-height: 3; }
+.importmap .im-line Input, .importmap .im-line Select { width: 1fr; }
+.importmap .im-key { width: auto; padding: 1; }
+.importmap #im-mode { width: 30; }
+.importmap #im-scroll { height: 1fr; }
+.importmap #im-grid { height: 12; min-height: 5; border: round $panel-lighten-2; }
+.importmap #im-reasons, .importmap #im-restricted { height: auto; color: $text-muted; }
+.importmap .im-section { height: auto; text-style: bold; margin-top: 1; }
+.importmap #im-sample { height: auto; min-height: 4; background: $boost; padding: 0 1; }
+.importmap #im-status { height: auto; color: $warning; }
+.importmap #im-group > SelectCurrent, .importmap #im-mode > SelectCurrent,
+.importmap #im-field > SelectCurrent, .importmap #im-dest > SelectCurrent { background: #ADD8E6; color: #12334A; }
+.fieldmap #fm-field > SelectOverlay, .fieldmap #fm-dest > SelectOverlay,
+.importmap #im-field > SelectOverlay, .importmap #im-dest > SelectOverlay { background: #DDF2FA; color: #12334A; }
+.fieldmap #fm-field > SelectOverlay > .option-list--option-highlighted,
+.fieldmap #fm-dest > SelectOverlay > .option-list--option-highlighted,
+.importmap #im-field > SelectOverlay > .option-list--option-highlighted,
+.importmap #im-dest > SelectOverlay > .option-list--option-highlighted { background: #87CEEB; color: #12334A; }
 
 /* ---- narrow terminals (80 columns over SSH) ----------------------- */
 .-narrow .status-grid, .-narrow .card-grid { grid-size: 2; }

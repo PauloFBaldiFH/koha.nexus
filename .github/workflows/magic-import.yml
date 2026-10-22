@@ -1,0 +1,72 @@
+# Synthetic import fixtures and the actual installer-generated Python engine.
+# The Bash job uses disposable Docker services and Koha command doubles.
+name: Magic Import
+
+on:
+  push:
+    paths:
+      - "installer"
+      - "panel/**"
+      - "tests/**"
+      - "lang/**"
+      - ".github/workflows/magic-import.yml"
+  pull_request:
+    paths:
+      - "installer"
+      - "panel/**"
+      - "tests/**"
+      - "lang/**"
+      - ".github/workflows/magic-import.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }}
+    # Keep Python 3.9 on a runner supported by actions/setup-python.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: panel/requirements.txt
+      - name: Install test dependencies
+        run: |
+          python -m pip install pytest -r panel/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zstd
+      - name: Check panel imports on this Python version
+        working-directory: panel
+        run: |
+          python - <<'PY'
+          from kei_panel.app import KohaPanelApp
+          from kei_panel.screens.files import PathPickerScreen
+          from kei_panel.screens.oauth import OAuthScreen
+          PY
+      - name: Validate engine, mappings and panel screens
+        working-directory: panel
+        run: |
+          python -m pytest -q \
+            tests/test_import_*_v2.py \
+            tests/test_import_legacy_contracts.py \
+            tests/test_magic_engine.py \
+            tests/test_fieldmap.py \
+            tests/test_fieldmap_screen.py \
+            tests/test_importmap_screen.py
+
+  bash:
+    name: Disposable MariaDB import checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run synthetic Bash import checks in Docker
+        run: bash tests/run.sh

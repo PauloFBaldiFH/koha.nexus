@@ -25,6 +25,9 @@ from kei_panel.screens.fieldmap import FIXED, IGNORE, KEEP, NEW_FIXED, OTHER, Fi
 from kei_panel.screens.files import PathPickerScreen
 
 
+pytestmark = pytest.mark.usefixtures("widget_event_loop")
+
+
 @pytest.fixture(scope="module")
 def fields(tmp_path_factory):
     """The engine (written out of the installer), a legacy MARCXML file, its
