@@ -236,7 +236,7 @@ The upgrade followed these gates in order:
 | 5. Patron and authority adapters | Wide fields, required/restricted destinations, password guards, profiles, authority structure and streams were checked. Passed. |
 | 6. UI and shared previews | Modes, opaque IDs, first-three preview parity, recurring profiles and explicit sensitive-field review were checked with Textual. Passed. |
 | 7. Failure boundaries | Python/CLI and MariaDB-backed Bats tests checked staging/commit errors, validation gates, quoted filenames, backups, authorities and truthful partial results. Passed. |
-| 8. Final regression and real Koha smoke | Import/UI regression: 288 Python tests and 46 Bash/MariaDB integration tests passed. Actual Koha 24.11.20.000 imports and reversals passed in a separate disposable database; see the scope below. The CI also runs the isolated Bash integration suite. |
+| 8. Final regression and real Koha smoke | Import/UI regression: 288 Python tests passed on each of Python 3.9.25 and 3.13.5; 46 Bash/MariaDB integration tests passed. Actual Koha 24.11.20.000 imports and reversals passed in a separate disposable database; see the scope below. The CI also runs the isolated Bash integration suite. |
 
 The real-Koha smoke used official 24.11.x source at
 `af0165219fddc27b8e76a2bba0c3f2375deaf529`, its database schema and MARC21

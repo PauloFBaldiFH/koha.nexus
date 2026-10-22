@@ -10,6 +10,8 @@ screen closes with it (cloud.Authorizer does the rclone part).
 
 from __future__ import annotations
 
+from typing import Optional
+
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -22,7 +24,7 @@ from ..i18n import t
 from .dialogs import FitsScreen
 
 
-class OAuthScreen(FitsScreen, ModalScreen[str | None]):
+class OAuthScreen(FitsScreen, ModalScreen[Optional[str]]):
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
 
     def __init__(self, title: str, service: str, authorizer: cloud.Authorizer):

@@ -19,6 +19,9 @@ from conftest import INSTALLER
 from kei_panel.screens.importmap import ImportMapScreen
 
 
+pytestmark = pytest.mark.usefixtures("widget_event_loop")
+
+
 @pytest.fixture(scope="module")
 def mapping_engine(tmp_path_factory):
     root = tmp_path_factory.mktemp("importmap-engine")

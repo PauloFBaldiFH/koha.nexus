@@ -43,6 +43,14 @@ jobs:
           python -m pip install pytest -r panel/requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends zstd
+      - name: Check panel imports on this Python version
+        working-directory: panel
+        run: |
+          python - <<'PY'
+          from kei_panel.app import KohaPanelApp
+          from kei_panel.screens.files import PathPickerScreen
+          from kei_panel.screens.oauth import OAuthScreen
+          PY
       - name: Validate engine, mappings and panel screens
         working-directory: panel
         run: |
