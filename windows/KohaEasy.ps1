@@ -264,14 +264,14 @@ switch ($Command) {
     'CheckDisk' {
         $linux =$null
         if (Test-KohaDistroRunning) { $linux = Get-KohaLinuxStatus }
-        $d = Get-KohaDiskHealth -Linux$linux
-        $text = (T 'Free on drive {0}: {1}. Koha virtual disk: {2}.') -f$d.Drive, (Format-KohaSize $d.HostFree), (Format-KohaSize$d.VhdxSize)
+        $d = Get-KohaDiskHealth -Linux $linux
+        $text = (T 'Free on drive {0}: {1}. Koha virtual disk: {2}.') -f $d.Drive, (Format-KohaSize $d.HostFree), (Format-KohaSize $d.VhdxSize)
         if ($d.Message) {$text += "`n`n" + $d.Message }
-        if ($Quiet) {$d; break }
+        if ($Quiet) { $d; break }
         if ($d.Reclaimable -gt 10GB) {
-            $q =$text + "`n`n" + ((T 'About {0} can be given back to Windows. Compact the disk now? Koha stops for a few minutes and Windows asks for administrator rights.') -f (Format-KohaSize $d.Reclaimable))
+            $q = $text + "`n`n" + ((T 'About {0} can be given back to Windows. Compact the disk now? Koha stops for a few minutes and Windows asks for administrator rights.') -f (Format-KohaSize $d.Reclaimable))
             if ((Show-Box $q 'YesNo') -eq 'Yes') {
-                $ps = Join-Path$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
                 Start-Process $ps -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "{0}" CompactDisk -Force' -f $PSCommandPath)
             }
         } else {
@@ -288,7 +288,7 @@ switch ($Command) {
     'SetAutostart' {
         if (-not $Mode) { throw 'SetAutostart needs -Mode logon or -Mode manual' }
         Set-KohaAutostart -Mode $Mode | Out-Null
-        if ($Mode -eq 'manual' -and (Test-KohaDistroRunning) -and -not$Quiet) {
+        if ($Mode -eq 'manual' -and (Test-KohaDistroRunning) -and -not $Quiet) {
             if ((Show-Box (T 'Koha will no longer start when you sign in to Windows. It is still running now: stop it now?') 'YesNo') -eq 'Yes') {
                 Stop-Koha | Out-Null
             }
@@ -297,7 +297,7 @@ switch ($Command) {
     }
     'RegisterTasks' {
         Install-KohaLauncher | Out-Null
-        if ($Mode) { Register-KohaTasks -Autostart$Mode } else { Register-KohaTasks }
+        if ($Mode) { Register-KohaTasks -Autostart $Mode } else { Register-KohaTasks }
         Set-KohaTrayAtSignIn -Enabled $true
         if (Test-KohaWatcherWanted) { Set-KohaWatcherAtSignIn -Enabled $true }
         New-KohaShortcuts | Out-Null
@@ -325,7 +325,7 @@ switch ($Command) {
     'Uninstall' {
         Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Uninstall.psm1') -Force
         $code = [int](@(Uninstall-Koha -Yes:$Force) | Select-Object -Last 1)
-        if (-not $Force -and -not$Quiet) {
+        if (-not $Force -and -not $Quiet) {
             Write-Host ''
             try { Read-Host (T 'Press Enter to close this window.') | Out-Null } catch { }
         }
@@ -345,7 +345,7 @@ switch ($Command) {
             Write-Host (T 'Run the installer again to continue from this step. The log is in C:\KohaEasy\logs.') -ForegroundColor Red
             $code = 1
         }
-        if ($Pause -and -not$Quiet) {
+        if ($Pause -and -not $Quiet) {
             Write-Host ''
             try { Read-Host (T 'Press Enter to close this window.') | Out-Null } catch { }
         }

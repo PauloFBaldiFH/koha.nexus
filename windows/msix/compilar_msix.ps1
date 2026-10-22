@@ -1353,23 +1353,37 @@ internal static class KohaMsixEntry
     if ($certificateScope -eq 'LocalMachine') {
         $signArguments += '/sm'
     }
-    $signArguments += $msixPath
+    # Carimbo de tempo: sem ele a assinatura deixa de valer quando o
+    # certificado vence (20/10/2027) e o Windows recusa instalar o pacote.
+    $timestampArguments = @('/tr', 'http://timestamp.digicert.com', '/td', 'SHA256')
 
-    & $signTool @signArguments
+    & $signTool @($signArguments + $timestampArguments + @($msixPath))
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'Assinatura com carimbo de tempo falhou (sem internet?); assinando sem carimbo.' -ForegroundColor Yellow
+        & $signTool @($signArguments + @($msixPath))
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "SignTool sign falhou com código $LASTEXITCODE. O MSIX não será instalado."
     }
 
-    # Confia no certificado público apenas para o usuário atual, quando ainda
-    # não estiver presente em TrustedPeople. A chave privada não é exportada.
-    $trustedPeoplePath = 'Cert:\CurrentUser\TrustedPeople'
+    # Parte pública do certificado ao lado do MSIX, para publicar na release
+    # junto com o pacote (windows\msix\instalar_msix.ps1 confia nela).
+    $publicCertPath = Join-Path $distDir 'KohaNexus-Publisher.cer'
+    [System.IO.File]::WriteAllBytes($publicCertPath, $signingCertificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+    Write-Host "Certificado público: $publicCertPath" -ForegroundColor Gray
+
+    # Confia no certificado público em Pessoas Confiáveis do COMPUTADOR: é
+    # esse repositório que o Windows consulta para instalar um MSIX (o do
+    # usuário atual não basta). A chave privada não é exportada.
+    $trustedPeoplePath = 'Cert:\LocalMachine\TrustedPeople'
     $trustedCertificate = Get-ChildItem -Path $trustedPeoplePath -ErrorAction SilentlyContinue |
         Where-Object { $_.Thumbprint -eq $signingCertificate.Thumbprint } |
         Select-Object -First 1
 
     if (-not $trustedCertificate) {
-        $publicCertPath = Join-Path $env:TEMP 'KohaNexus-Publisher.cer'
-        [System.IO.File]::WriteAllBytes($publicCertPath, $signingCertificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+        if (-not (Test-Administrator)) {
+            throw 'Execute este script como administrador: confiar no certificado exige Cert:\LocalMachine\TrustedPeople.'
+        }
         Import-Certificate -FilePath $publicCertPath -CertStoreLocation $trustedPeoplePath -ErrorAction Stop | Out-Null
     }
 
