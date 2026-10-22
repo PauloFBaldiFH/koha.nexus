@@ -89,7 +89,9 @@ def test_headless_dates_remain_review_choices(api, tmp_path):
     document, _ = review.draft(opts)
     dates = [column for column in document['columns'] if column['values'][0] in ('2000-01-02', '2024-01-01')]
     assert len(dates) == 2
-    assert all(column['to'] == 'ignore' for column in dates)
+    # A guess by range (an old date is a birth date), marked for review.
+    assert all(column['unsure'] for column in dates)
+    assert {column['to'] for column in dates} <= {'dateofbirth', 'dateenrolled', 'dateexpiry', 'date_renewed', 'ignore'}
     assert any(column['to'] == 'email' for column in document['columns'])
 
 
@@ -163,3 +165,47 @@ def test_preview_limits_records_to_three_and_reports_full_file_duplicates(api, t
     output = review.preview_document(document, document['mapping'])
     assert len(output['groups'][0]['records']) == 3
     assert any(issue.get('code') == 'duplicate' for issue in output['issues'])
+
+
+def test_headless_patron_dump_is_read_by_content(api, tmp_path):
+    review, _ = api
+    rows = ",".join(
+        "(%d,'%d','%s','%s','MAIN','%s','2025-03-%02d','2108-06-%02d','%s.%s')"
+        % (n, n, surname, first, cat, n, n, first.lower().replace(' ', ''), surname.lower())
+        for n, surname, first, cat in ((1, 'Silva', 'Ana Maria', 'COM'), (2, 'Souza', 'Joao Pedro', 'COM'),
+                                       (3, 'Lima', 'Carla Dias', 'EST'), (4, 'Costa', 'Rui Alves', 'COM')))
+    opts = options(tmp_path, 'leitores.sql', "INSERT INTO `borrowers` VALUES %s;" % rows)
+    document, _ = review.draft(opts)
+    assert document['tables'][0]['mode'] == 'patrons'
+    proposed = {column['values'][0]: column['proposals']['patrons'] for column in document['columns']}
+    assert proposed['Silva'] == 'surname' and proposed['Ana Maria'] == 'firstname'
+    assert proposed['MAIN'] == 'branchcode' and proposed['COM'] == 'categorycode'
+    assert proposed['2108-06-01'] == 'dateexpiry' and proposed['anamaria.silva'] == 'userid'
+
+
+def test_book_table_columns_read_against_each_other(api, tmp_path):
+    review, _ = api
+    source = tmp_path / 'acervo.csv'
+    lines = ["%d;%d;Uma obra qualquer numero %d /;Livros;Editora Um,;Sao Paulo :;Castro Alves" % (n % 3, 1000 + n, n)
+             for n in range(12)]
+    source.write_text("\n".join(lines) + "\n")
+    opts = options(tmp_path, 'acervo.csv', source.read_text())
+    opts.itypes = str(tmp_path / 'itemtypes.tsv')
+    Path(opts.itypes).write_text("BK\tLivros\n")
+    document, _ = review.draft(opts)
+    proposed = {column['values'][0]: column['proposals']['bibliographic'] for column in document['columns']}
+    assert proposed['1000'] == '952$p'          # distinct: the barcode
+    assert proposed['Livros'] == '952$y'        # this Koha's item type name
+    assert proposed['Castro Alves'] == '952$a'  # one name on every row: the library
+
+
+def test_marcxml_report_with_escaped_line_breaks(api, tmp_path):
+    review, _ = api
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\\n<record xmlns="http://www.loc.gov/MARC21/slim">\\n'
+           '  <leader>00000nam a2200000 a 4500</leader>\\n'
+           '  <datafield tag="245" ind1="1" ind2="0">\\n    <subfield code="a">Synthetic title</subfield>\\n'
+           '  </datafield>\\n</record>')
+    opts = options(tmp_path, 'report.sql', "1\tSynthetic title\t%s\n" % xml)
+    document, status = review.draft(opts)
+    assert status == 0
+    assert document['streams'] and document['streams'][0]['records_total'] == 1

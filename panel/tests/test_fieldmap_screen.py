@@ -282,11 +282,11 @@ def test_stepper_and_select_field(fields, tmp_path):
     _, (stepped, wrapped, followed, column, labels, dest) = drive(screen, steps)
     assert stepped[:2] == (2, 2) and "Livro 3" in stepped[2] and wrapped == 4
     assert followed == "marc\t245$a" and column == (3, ("marc", "500$a"))
-    assert labels[:3] == ["field 1 (090$a)", "field 2 (245$a)", "field 3 (500$a)"]
+    assert labels[:3] == ["field 1 · 090$a (Local call number)", "field 2 · 245$a (Title)", "field 3 · 500$a (General note)"]
     assert labels[-1].startswith("+ ")
-    assert dest[0] == "field 3 (500$a - General note) (keep)" and "Custom field (type it, e.g. 820$a)" in dest
-    assert "Fixed text for every record" in dest and "100$a - Personal name (author)" in dest
-    assert "field 1 (090$a - Local call number)" in dest
+    assert dest[0] == "field 3 · 500$a (General note) (keep)" and "Custom field (type it, e.g. 820$a)" in dest
+    assert "Fixed text for every record" in dest and "100$a (Personal name (author))" in dest
+    assert "field 1 · 090$a (Local call number)" in dest
 
 
 def test_fixed_text_for_a_column_and_a_new_one(fields, tmp_path):

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.97"
+PANEL_VERSION=" 1.5.98"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -20951,6 +20951,10 @@ def set_header(table, synonyms_hit):
     first = table.rows[0]
     named = sum(1 for c in first if c and synonyms_hit(c))
     looks_text = all(c and R.has_letters(c) and not R.iso_date(c) for c in first if c)
+    # A first row with numbers or dates in it is data ("1000;Editora Um,"),
+    # unless most of its cells are column names.
+    if not looks_text and named * 2 < len([c for c in first if c]):
+        named = 0
     if named or (looks_text and len(table.rows) > 1 and _types_differ(first, table.rows[1:21])):
         table.headers = [c or "(%s)" % _letters(i) for i, c in enumerate(first)]
         table.header_row = True
@@ -23827,6 +23831,12 @@ def _header_hit(c):
     return bool(classify.header_match(c))
 
 
+_TABLE_ENTITY = {name: 'patrons' for name in ('borrowers', 'patrons', 'usuarios', 'usuario', 'leitores', 'leitor',
+                                              'socios', 'alunos', 'clientes', 'pessoas', 'users')}
+_TABLE_ENTITY.update({name: 'biblio' for name in ('biblio', 'biblioitems', 'acervo', 'obras', 'titulos', 'livros',
+                                                  'catalogo', 'books', 'items', 'exemplares')})
+
+
 def plan_table(a, member, table):
     q = a.questions
     if table.headers is None:
@@ -23842,8 +23852,13 @@ def plan_table(a, member, table):
         entity, ev, how = profile["entity"], classify.evidence(cols), "profile"
     else:
         entity, ev = classify.table_entity(cols, table.headers if table.header_row else None)
-        if not any(c.header_roles for c in cols):
+        if not table.header_row or not any(c.header_roles for c in cols):
             entity = heuristics.infer_entity(sample) or entity
+        # A dump's table name (borrowers, leitores, acervo...) says what its
+        # rows are; the columns are still recognized by their content.
+        named = _TABLE_ENTITY.get(R.norm_header(getattr(table, 'sql_name', '') or ''))
+        if named and not table.header_row:
+            entity = named
     plan = TablePlan(member, table, cols, entity, ev, how)
     plan.id = 'table:' + qid(member.display, table.name)
     plan.mode = a.mode
@@ -23872,6 +23887,10 @@ def plan_table(a, member, table):
     if plan.entity not in ("biblio", "patrons", "mixed"):
         return
     allowed = classify.allowed_roles(plan.entity)
+    if plan.entity == 'patrons':
+        # Koha's own names for what the content shows (MAIN is a library,
+        # a second recent date is a renewal); borrowernumber is never a card.
+        allowed = allowed + ['branchcode', 'date_renewed', 'borrowernumber']
     fixed = {}
     if profile:
         fixed.update({i: r for i, r in profile["roles"].items() if i < len(cols) and (r == "" or r in allowed)})
@@ -23918,7 +23937,10 @@ def plan_table(a, member, table):
                 # The wide patron adapter uses official names directly;
                 # legacy role questions must not discard supported fields.
                 fixed.setdefault(column.index, column.header if column.header in allowed else '')
-    if not any(c.header_roles for c in cols) and plan.entity in ('biblio', 'patrons', 'mixed'):
+    # Letter headers (A), (B) of a headerless table are not names: the
+    # columns are recognized by their content alone.
+    headless = not table.header_row or not any(c.header_roles for c in cols)
+    if headless and plan.entity in ('biblio', 'patrons', 'mixed'):
         inferred = heuristics.infer_columns(sample, mode=plan.entity)
         asked = []
         for c, guess in zip(cols, inferred):
@@ -23926,6 +23948,7 @@ def plan_table(a, member, table):
                             for v in guess.candidates]
             c.candidates = [(v.role, v.score) for v in guess.candidates if v.role in allowed]
             c.features, c.reasons = guess.features, guess.reasons
+            c.suggested = guess.suggested if guess.suggested in allowed else None
             if c.index in fixed:
                 c.role, c.status = fixed[c.index] or None, 'answered'
             elif guess.role in allowed:
@@ -24045,7 +24068,12 @@ def analyse(opts):
                     table.rows = [(row + [''] * width)[:width] for row in table.rows]
                     if source_table.headers is not None:
                         table.headers = list(source_table.headers)
-                        table.header_row = False
+                    else:
+                        # An INSERT row is always data, never a header line:
+                        # the columns are told apart by their content.
+                        table.headers = ["(%s)" % tables._letters(i) for i in range(width)]
+                    table.header_row = False
+                    table.sql_name = source_table.name
                     plan_table(a, m, table)
         elif d.kind in ("isis", "bf_backup", "bf_folder"):
             a.readers.append(d)
@@ -26330,7 +26358,7 @@ def read_report(text):
         except ET.ParseError as error:
             # SQL already unescapes its literals. Decode another layer only
             # when the extracted document is demonstrably serialized text.
-            if '\\"' not in xml:
+            if not re.search(r'\\[nrt"\\]', xml):
                 raise error
             xml = re.sub(r'\\([nrt"\\])', lambda m: _SQL_ESCAPE[m.group(1)], xml)
             parsed = list(marc.marcxml_records(io.BytesIO(xml.encode("utf-8"))))
@@ -26640,6 +26668,7 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date as _date
 
 from . import rules as R
 
@@ -26659,6 +26688,7 @@ class ColumnInference:
     reasons: list = field(default_factory=list)
     features: dict = field(default_factory=dict)
     status: str = "review"
+    suggested: object = None    # the joint assignment's pick, kept when unsure
 
     @property
     def score(self):
@@ -26772,6 +26802,7 @@ def _base_scores(values, mode):
         # Recognize the data for review, without granting privileges or copying
         # authentication material automatically.
         scores["password"] = 0.99 * _fraction(values, lambda value: bool(re.match(r"\$2[aby]\$|\$argon2|\{(?:SHA|SSHA)\}", value)))
+        _patron_shapes(values, stats, scores)
     else:
         isbn = _mean(values, C.v_isbn)
         valid_isbn = _fraction(values, lambda value: any(ok for _, ok in R.isbn_list(value)))
@@ -26794,7 +26825,7 @@ def _base_scores(values, mode):
         scores["subtitle"] = min(_mean(values, C.v_text), 0.68)
         publisher = _fraction(values, lambda value: bool(re.search(r"(?i)\b(editora|ed\.|livraria|press|edi[cç][oõ]es|books|verlag)\b", value)))
         scores["publisher"] = max(0.96 * publisher, 0.67 * _mean(values, C.v_publisher))
-        cities = _fraction(values, lambda value: R.norm_header(value.rstrip(" :.,")) in R.CITIES)
+        cities = _fraction(values, lambda value: R.norm_header(re.split(r"[,;:\]]", value.strip("[ "))[0].rstrip(" .")) in R.CITIES)
         scores["place"] = max(0.96 * min(1.0, cities / 0.75) if cities >= 0.6 else 0.96 * cities,
                               0.68 * _mean(values, C.v_place))
         if cities >= 0.7:
@@ -26806,7 +26837,7 @@ def _base_scores(values, mode):
         scores["cdd"] = 0.91 * _mean(values, C.v_cdd)
         scores["cdu"] = min(_mean(values, C.v_cdu), 0.75)
         scores["edition"] = 0.95 * _fraction(values, lambda value: bool(re.search(r"(?i)\d\s*(?:\.?\s*ed|[ªº])", value)))
-        scores["pages"] = 0.96 * _fraction(values, lambda value: bool(re.search(r"(?i)\d\s*(?:p\.|pp\.|p[aá]ginas?|folhas?)\b", value)))
+        scores["pages"] = 0.96 * _fraction(values, lambda value: bool(re.search(r"(?i)\d\s*(?:p\.|pp\.|p[aá]ginas?\b|folhas?\b|f\.|v\.)", value)))
         scores["subjects"] = 0.90 * _fraction(values, lambda value: ";" in value or " -- " in value)
         scores["itemtype"] = min(_mean(values, C.v_short), 0.68)
         scores["language"] = 0.98 * _mean(values, C.v_language)
@@ -26817,6 +26848,66 @@ def _base_scores(values, mode):
             scores[role] = min(scores[role], 0.70)
         scores["acqdate"] = 0.93 * dates
     return scores
+
+
+def _patron_shapes(values, stats, scores):
+    """Shapes the generic patron scores miss: logins, single surnames,
+    library and category codes, and which date is which by its range."""
+    distinct = len(set(values))
+    login = _fraction(values, lambda value: bool(re.fullmatch(r"(?=[^a-z]*[a-z])[a-z0-9]+(?:[._-][a-z0-9]+)+", value)))
+    if login >= 0.7 and stats["unique_ratio"] >= 0.9:
+        scores["userid"] = max(scores.get("userid", 0), 0.95 * login)
+    single = _fraction(values, lambda value: bool(re.fullmatch(r"[A-ZÀ-Ý][a-zà-ÿ'-]+", value)))
+    if single >= 0.7 and R.norm_header(values[0]) not in R.CITIES:
+        scores["surname"] = max(scores.get("surname", 0), 0.9 * single)
+    code = _fraction(values, lambda value: bool(re.fullmatch(r"[A-Z][A-Z0-9_-]{0,9}", value)))
+    # A list of codes repeats (MAIN on every row); state abbreviations are not one.
+    if code >= 0.8 and distinct < len(values) and distinct <= max(3, len(values) // 5) \
+            and scores.get("state", 0) < 0.8:
+        scores["branchcode"] = 0.8 * code
+        scores["category"] = max(scores.get("category", 0), 0.8 * code)
+        for role in ("address2", "city", "userid", "surname", "firstname", "fullname"):
+            scores[role] = min(scores.get(role, 0), 0.3)
+    if distinct == 1 and not code and (len(values) >= 3 or values[0].islower()):
+        # The same word on every row (inherit, default) describes no patron.
+        for role in list(scores):
+            scores[role] = round(scores[role] * 0.3, 3)
+    dated = [_iso_day(value) for value in values]
+    dated = [day for day in dated if day]
+    if dated and len(dated) >= 0.8 * len(values):
+        today = _date.today()
+        timed = _fraction(values, lambda value: bool(re.search(r"\d:\d\d", value)))
+        future = sum(day > today for day in dated) / len(dated)
+        # Rarely exported; it must not win over the patron's own dates.
+        scores["password_expiration_date"] = 0.3
+        old = sum(day.year < today.year - 8 for day in dated) / len(dated)
+        recent = sum(today.year - 8 <= day.year and day <= today for day in dated) / len(dated)
+        if timed >= 0.8:     # a time of day: when the row was changed, not a patron date
+            for role in _DATE_ROLES:
+                scores[role] = min(scores.get(role, 0), 0.4)
+        elif future >= 0.8:
+            scores["dateexpiry"] = 0.92
+            scores["dateofbirth"] = scores["dateenrolled"] = scores["date_renewed"] = 0.3
+        elif old >= 0.7:
+            scores["dateofbirth"] = 0.92
+            scores["dateexpiry"] = scores["date_renewed"] = 0.3
+            scores["dateenrolled"] = 0.5
+        elif recent >= 0.8:
+            scores["dateenrolled"] = 0.9
+            scores["date_renewed"] = 0.86
+            scores["dateofbirth"] = 0.3
+            scores["dateexpiry"] = 0.4
+
+
+def _iso_day(value):
+    match = re.match(r"(\d{4})-(\d{2})-(\d{2})|(\d{2})/(\d{2})/(\d{4})", value.strip())
+    if not match:
+        return None
+    y, m, d = (match[1], match[2], match[3]) if match[1] else (match[6], match[5], match[4])
+    try:
+        return _date(int(y), int(m), int(d))
+    except ValueError:
+        return None
 
 
 def content_scores(values, mode):
@@ -26900,6 +26991,17 @@ def infer_columns(rows, headers=None, mode="patrons"):
             reasons[role] = parts
         scores.append(current)
         evidence.append(reasons)
+    if mode == "patrons":
+        _patron_context(rows, scores, features)
+    # A column repeating another one's values (borrowernumber and cardnumber
+    # in a Koha dump) adds nothing: only the first is proposed.
+    seen_values = {}
+    for index in range(width):
+        values = tuple(_values(rows, index))
+        if any(values) and values in seen_values:
+            scores[index] = {role: round(value * 0.3, 3) for role, value in scores[index].items()}
+            evidence[index] = {role: parts + ["Same values as another column"] for role, parts in evidence[index].items()}
+        seen_values.setdefault(values, index)
     roles = sorted(set().union(*(set(score) for score in scores))) if scores else []
     matrix = [[score.get(role, 0.0) for role in roles] for score in scores]
     chosen = _assignment(matrix)
@@ -26909,6 +27011,10 @@ def infer_columns(rows, headers=None, mode="patrons"):
                       for role, value in sorted(score.items(), key=lambda item: (-item[1], item[0]))
                       if value > 0]
         assigned = roles[chosen[index]] if chosen[index] is not None else None
+        # The one-to-one assignment can push a column to a weaker second
+        # meaning; that is offered only when it is nearly as good as its best.
+        top = max(score.values(), default=0)
+        suggested = assigned if assigned and score.get(assigned, 0) >= max(0.55, top - 0.05) else None
         header = headers[index] if index < len(headers) else None
         hints = C.header_match(header) if has_header(header) else {}
         if assigned:
@@ -26929,8 +27035,30 @@ def infer_columns(rows, headers=None, mode="patrons"):
         else:
             status = "accepted"
             reasons.append("Joint assignment has sufficient semantic and cross-column margins")
-        result.append(ColumnInference(index, assigned, candidates, reasons, features[index], status))
+        result.append(ColumnInference(index, assigned, candidates, reasons, features[index], status,
+                                      suggested if features[index]["nonempty"] else None))
     return result
+
+
+def _patron_context(rows, scores, features):
+    """What one column says about another: single surnames next to
+    multi-word names make those first names."""
+    # Two recent dates: the one that varies more is the registration, the
+    # other one the renewal.
+    enrolled = [i for i, score in enumerate(scores) if score.get("dateenrolled", 0) >= 0.85]
+    if len(enrolled) > 1:
+        keep = max(enrolled, key=lambda i: (features[i]["unique_ratio"], -i))
+        for index in enrolled:
+            if index != keep:
+                scores[index]["date_renewed"] = 0.9
+                scores[index]["dateenrolled"] = 0.6
+    surnames = [i for i, score in enumerate(scores) if score.get("surname", 0) >= 0.8]
+    if not surnames:
+        return
+    for index, score in enumerate(scores):
+        if index not in surnames and score.get("fullname", 0) >= 0.6:
+            score["firstname"] = max(score.get("firstname", 0), 0.86)
+            score["fullname"] = min(score["fullname"], 0.7)
 
 
 def infer_entity(rows, headers=None):
@@ -27282,7 +27410,10 @@ def normalize(record, options=None, registry=None):
             if callnumber:
                 proposal['o'] = callnumber
         if len(copies) > 1 and not proposal.get('t'):
-            _review(report, 'Unlinked 090 copy numbers; no occurrence-order pairing applied', field, values=sorted(copies))
+            # Which 090 copy number belongs to which copy is not recorded;
+            # the copies import without one and the librarian is told.
+            _review(report, 'Unlinked 090 copy numbers; no occurrence-order pairing applied', field,
+                    values=sorted(copies), severity='warning')
         barcode = proposal.get('p', '')
         if not barcode:
             if options.get('barcode_policy', 'review') != 'generate':
@@ -28036,13 +28167,17 @@ import json
 import os
 import re
 import tempfile
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from types import SimpleNamespace
 
 from . import authority_import, bridge, engine, fieldmap, mapping
+from . import rules as R
 from .questions import qid
 
 PREVIEW = 3
+SAMPLE = 10         # examples in the mapping screen's grid
+CODE_TARGETS = ('952$a', '952$b', '952$c', '952$y', '942$c')
+_CODE_COLUMNS = {'branchcode', 'categorycode', '952$a', '952$b', '952$c', '952$y', '942$c'}
 _HASH = re.compile(r'^(?:\$2[aby]\$|\$argon2|\{(?:SHA|SSHA)\})', re.I)
 _OPTIONS = ('src', 'work', 'answers', 'profiles', 'readers', 'branch', 'itype', 'branches', 'itypes',
             'locations', 'categories', 'category', 'update_patrons', 'patron_policy', 'cpf_attr', 'today', 'yaz', 'capabilities', 'existing_barcodes', 'mode')
@@ -28066,17 +28201,20 @@ def _safe_value(value, header=''):
 
 
 def _proposal(column, mode, capabilities):
+    # An uncertain column still gets its best guess: the screen marks it "?"
+    # and nothing is applied unless the librarian confirms the mapping.
     if mode == 'patrons':
-        if column.role == 'fullname' and column.status != 'asked':
+        role = column.role or getattr(column, 'suggested', None)
+        if role == 'fullname':
             return 'surname'
         fields = {name.casefold(): name for name in mapping.PATRON_FIELDS}
-        destination = fields.get(column.header.casefold()) or _ALIAS.get(column.role, column.role)
+        destination = fields.get(column.header.casefold()) or _ALIAS.get(role, role)
         if destination not in mapping.PATRON_FIELDS or destination in mapping.RESTRICTED_FIELDS:
             return 'ignore'
         supported = capabilities.get('patron_fields')
         if supported is not None and destination not in supported:
             return 'ignore'
-        return destination if column.status != 'asked' or column.header.casefold() in fields else 'ignore'
+        return destination
     if mode == 'authorities':
         # An authority heading cannot be guessed from an ordinary title or
         # name column. An official MARC reference is explicit metadata.
@@ -28089,9 +28227,15 @@ def _proposal(column, mode, capabilities):
             except mapping.MappingError:
                 pass
         return 'ignore'
-    if mode == 'bibliographic' and column.status != 'asked':
-        return fieldmap.ROLE_TARGET.get(column.role, 'ignore')
+    if mode == 'bibliographic':
+        return fieldmap.ROLE_TARGET.get(column.role or getattr(column, 'suggested', None) or _best_role(column), 'ignore')
     return 'ignore'
+
+
+def _best_role(column, least=0.6):
+    """The strongest candidate of a column the engine left undecided."""
+    found = [(score, role) for role, score in getattr(column, 'candidates', []) if role and score >= least]
+    return max(found)[1] if found else None
 
 
 def _targets(capabilities):
@@ -28126,8 +28270,10 @@ def draft(opts):
         table_modes[plan.id] = mode
         table_key = plan.table.name.removeprefix(plan.member.display).lstrip(': ')
         table_key = table_key or 'main'
-        sample = plan.table.data()[:PREVIEW]
+        data = plan.table.data()
+        sample = data[:SAMPLE]
         identities = []
+        first = len(columns)
         for column in plan.columns:
             identities.append(column.id)
             destination = _proposal(column, mode, analysis.capabilities)
@@ -28141,30 +28287,47 @@ def draft(opts):
                      'values': [_safe_value(row[column.index], column.header) if column.index < len(row) else '' for row in sample],
                      'mode': mode, 'to': destination, 'role': column.role,
                      'confidence': getattr(column, 'score', 0.0), 'status': getattr(column, 'status', 'unknown'),
+                     'unsure': getattr(column, 'status', '') == 'asked',
                      'candidates': candidates, 'reasons': getattr(column, 'reasons', []),
-                     'features': getattr(column, 'features', {})}
+                     'features': getattr(column, 'features', {}),
+                     # What each mode would do with it, for the screen's mode switch.
+                     'proposals': {other: _proposal(column, other, analysis.capabilities) for other in mapping.MODES}}
+            # Every distinct value of a short code column (library, category,
+            # item type) over the whole table, for the screen's "from/to" list.
+            if destination in _CODE_COLUMNS or any(entry['proposals'][m] in _CODE_COLUMNS for m in mapping.MODES):
+                entry['codes'] = _code_counts(row[column.index] if column.index < len(row) else '' for row in data)
             columns.append(entry)
             rule = {'source': column.id, 'to': destination, 'table': plan.id,
                     'mode': mode if mode != 'auto' else 'bibliographic'}
             if column.role == 'fullname' and mode == 'patrons' and destination == 'surname':
                 rule['transform'] = 'split_name'
             rules.append(rule)
+        if mode == 'bibliographic':
+            keys = {r['child_column'] for r in analysis.relationships
+                    if r.get('child_table') == plan.table.name.split(': ', 1)[-1] and r.get('coverage', 0) >= 0.8}
+            _book_context(columns[first:], rules[first:], plan, data, analysis.koha, keys)
         tables.append({'id': plan.id, 'name': plan.table.name, 'table_key': table_key, 'mode': mode,
                        'source': 'source:' + qid(plan.member.display),
                        'headers': list(plan.table.headers), 'columns': identities,
-                       'rows_total': len(plan.table.data()),
+                       'rows_total': len(data),
                        'rows': [[_safe_value(value, plan.table.headers[index] if index < len(plan.table.headers) else '')
                                  for index, value in enumerate(row)] for row in sample]})
     for plan in analysis.marcs:
         source_id = 'source:' + qid(plan.member.display)
         selected = analysis.spec.source_modes.get(source_id, analysis.mode) if analysis.spec else analysis.mode
-        grouped, counts = OrderedDict(), {}
+        grouped, counts, codes = OrderedDict(), {}, {}
         for record in _stream_records(plan, opts):
             mode = authority_import.record_mode(record) if selected == 'auto' else selected
             counts[mode] = counts.get(mode, 0) + 1
             records = grouped.setdefault(mode, [])
-            if len(records) < PREVIEW:
+            if len(records) < SAMPLE:
                 records.append(record)
+            found = codes.setdefault(mode, {})
+            for field in record.fields:
+                for code, value in ([] if field.is_control() else field.subfields):
+                    ref = field.tag + '$' + code
+                    if ref in CODE_TARGETS and value.strip():
+                        found.setdefault(ref, Counter())[value.strip()] += 1
         source_modes[source_id] = selected
         for mode, records in grouped.items():
             stream_id = source_id if len(grouped) == 1 else source_id + ':' + mode
@@ -28178,6 +28341,7 @@ def draft(opts):
                 rules.append({'source': identity, 'ref': ref, 'to': ref, 'stream': source_id, 'mode': mode})
             streams.append({'id': stream_id, 'source_id': source_id, 'name': plan.member.display,
                             'mode': mode, 'fields': fields, 'records_total': counts[mode],
+                            'codes': {ref: dict(found.most_common(40)) for ref, found in codes.get(mode, {}).items()},
                             'records': [fieldmap.record_obj(record) for record in records]})
     modes = [item['mode'] for item in tables + streams if item['mode'] != 'auto']
     default_mode = analysis.mode if analysis.mode != 'auto' else (modes[0] if modes and len(set(modes)) == 1 else 'bibliographic')
@@ -28195,7 +28359,7 @@ def draft(opts):
         proposed['mappings'].extend(rule for rule in saved['mappings'] if rule['source'] not in {r['source'] for r in rules})
     capabilities = {key: copy.deepcopy(value) for key, value in analysis.capabilities.items()
                     if key not in {'cardnumbers', 'userids', 'guarantor_ids', 'barcodes'}}
-    document = {'version': 2, 'sample': PREVIEW, 'mode': analysis.mode,
+    document = {'version': 2, 'sample': SAMPLE, 'mode': analysis.mode,
                 'targets_by_mode': _targets(analysis.capabilities), 'columns': columns,
                 'tables': tables, 'streams': streams, 'mapping': proposed,
                 'capabilities': capabilities, 'relationships': copy.deepcopy(analysis.relationships),
@@ -28209,6 +28373,108 @@ def draft(opts):
         json.dump(document, target, ensure_ascii=False, indent=1)
     os.chmod(path, 0o600)
     return document, 0 if columns or streams or analysis.readers else 3
+
+
+def _book_context(entries, rules, plan, data, koha, keys=()):
+    """What a book table's columns say about each other, over every row:
+    the distinct number column is the barcode, a short list of words is the
+    item type or library this Koha already has, a price with letters is a
+    class number, the word after the place of publication is the publisher."""
+    position = {id(entry): n for n, entry in enumerate(entries)}
+
+    def values(entry):
+        index = plan.columns[position[id(entry)]].index
+        return [str(row[index]).strip() for row in data if index < len(row) and str(row[index] or '').strip()]
+
+    def propose(entry, to):
+        entry['to'] = entry['proposals']['bibliographic'] = to
+        rules[position[id(entry)]]['to'] = to
+        if to in _CODE_COLUMNS:
+            entry['codes'] = _code_counts(values(entry))
+
+    def known(found, kind):
+        names = koha.get(kind) or {}
+        # Most rows carry a code this Koha has (GEN next to an unknown JV).
+        return bool(found) and sum(R.norm_header(v) in names for v in found) >= 0.5 * len(found)
+
+    numbers = [e for e in entries if e['to'] in ('952$p', '952$i')]
+    if len(numbers) > 1:
+        ratio = {id(e): len(set(values(e))) / max(1, len(values(e))) for e in numbers}
+        best = max(numbers, key=lambda e: ratio[id(e)])
+        if ratio[id(best)] == 1.0:
+            for e in numbers:
+                if e is not best and ratio[id(e)] < 1.0:
+                    propose(e, '952$i')
+            propose(best, '952$p')
+    places = any(e['to'] == '260$a' for e in entries)
+    shapes = (('300$c', r'^\d+\s*cm\b'), ('300$b', r'^(?:il|ilus|col|color)\b'),
+              ('952$e', r'^(?:compra|doa[cç][aã]o|permuta|dep[oó]sito legal)$'),
+              ('952$2', r'^(?:ddc|udc|lcc|cdu|cdd)$'), ('ignore', r'^(?:[A-Z]{1,3}_)*\d{3}_\d{6,}'))
+    dated, numbered = False, []
+    for e in entries:
+        found = values(e)
+        distinct = set(found)
+        if not found:
+            continue
+        column = plan.columns[position[id(e)]].index
+        if column in keys and e['unsure']:
+            propose(e, 'ignore')      # the link to the records, not a field
+            continue
+        if e['unsure'] and distinct <= {'0', '1'}:
+            propose(e, 'ignore')      # a yes/no flag with nothing to say
+            continue
+        if e['unsure'] and sum(bool(re.match(r'\d{4}-\d\d-\d\d', v)) for v in found) >= 0.8 * len(found):
+            # One acquisition date; the others (last seen, borrowed) stay out.
+            propose(e, '952$d' if not dated and e['to'] in ('952$d', '952$p', '952$i', '952$g') else 'ignore')
+            dated = True
+            continue
+        if e['unsure'] and e['to'] in ('952$p', '952$i', '952$g', '080$a', '082$a') and \
+                sum(bool(re.fullmatch(r'[A-Z]{0,3}\d+', v)) for v in found) >= 0.9 * len(found):
+            if len(distinct) == len(found):
+                numbered.append(e)
+                continue
+        shape = next((to for to, pattern in shapes
+                      if sum(bool(re.match(pattern, v, re.I)) for v in found) >= 0.5 * len(found)), None)
+        if shape and e['to'] != shape:
+            propose(e, shape)
+        elif known(distinct, 'itemtype') and e['to'] not in ('952$y', '942$c'):
+            propose(e, '952$y')
+        elif known(distinct, 'branch') and e['to'] not in ('952$a', '952$b'):
+            propose(e, '952$a')
+        elif known(distinct, 'location') and e['to'] != '952$c':
+            propose(e, '952$c')
+        elif not e['unsure'] or e['to'] in _CODE_COLUMNS:
+            continue
+        elif len(distinct) == 1 and len(found) >= 3 and found[0][:1].isupper():
+            # One name on every row: the library the copies belong to.
+            propose(e, '952$a')
+        elif 1 < len(distinct) <= max(6, len(found) // 8) and all(len(v) <= 30 and not v[:1].isdigit() for v in distinct):
+            propose(e, '952$y')
+        elif e['to'] == '952$g' and any(re.search(r'[A-Za-z]', v) for v in found):
+            propose(e, '082$a')
+        elif places and e['to'] != '260$b' and sum(v.endswith((',', ';')) for v in found) >= 0.7 * len(found):
+            propose(e, '260$b')
+    # Distinct numbers: an internal id never has letters, a barcode may.
+    if numbered:
+        best = next((e for e in numbered if any(not v.isdigit() for v in values(e))), numbered[0])
+        for e in numbered:
+            propose(e, '952$p' if e is best else 'ignore')
+    # A copy has one of each: a second library is the current one, the
+    # other repeats (permanent location, second date) stay out.
+    seen = set()
+    for e in entries:
+        if e['to'] == '952$a' and '952$a' in seen and '952$b' not in seen:
+            propose(e, '952$b')
+        elif e['to'] in ('952$b', '952$c', '952$d', '952$e', '952$o', '952$p', '952$y', '952$2') and e['to'] in seen:
+            propose(e, 'ignore')
+        seen.add(e['to'])
+
+
+def _code_counts(values, most=40):
+    """{value: rows} of a column that holds codes, or {} when it holds
+    free text (too many different values to be a list of codes)."""
+    found = Counter(str(value).strip() for value in values if value is not None and str(value).strip())
+    return dict(found.most_common(most)) if 0 < len(found) <= most else {}
 
 
 def _group_id(document, kind, name):
@@ -29177,7 +29443,14 @@ magic_map_fields() {
         msg_error "" "$(t 'The source fields could not be read. Review the log before importing.\n\nLog: ${logfile}')" 10 74
         return 2
     fi
-    ui_fieldmap "$(t "Edit field mapping")" "$MAGIC_WORK/fields.json" "$MAGIC_WORK/fieldmap.json" "$MAGIC_ENGINE" || return 1
+    ui_fieldmap "$(t "Edit field mapping")" "$MAGIC_WORK/fields.json" "$MAGIC_WORK/fieldmap.json" "$MAGIC_ENGINE" || rc=1
+    # Profiles saved on the mapping screen are kept for the next files from
+    # the same system, even when this import stops here.
+    if compgen -G "$MAGIC_WORK/profiles/mapping-*.json" >/dev/null; then
+        mkdir -p "$MAGIC_PROFILES" && chmod 700 "$MAGIC_PROFILES"
+        cp -f "$MAGIC_WORK/profiles"/mapping-*.json "$MAGIC_PROFILES/" 2>/dev/null && chmod 600 "$MAGIC_PROFILES"/mapping-*.json
+    fi
+    [ "$rc" -eq 0 ] || return 1
     [ -s "$MAGIC_WORK/fieldmap.json" ] || return 2
     chown "${INSTANCE}-koha:" "$MAGIC_WORK/fieldmap.json" 2>/dev/null || true
     chmod 600 "$MAGIC_WORK/fieldmap.json"
@@ -29247,7 +29520,7 @@ _lt_magic_run() {
         msg_error "" "$(t 'Koha could not complete the request. Nothing was changed.\n\nLog: ${log}')" 10 74
         return 1
     fi
-    [ -d "$MAGIC_PROFILES" ] && cp -f "$MAGIC_PROFILES"/*.tsv "$MAGIC_WORK/profiles/" 2>/dev/null
+    [ -d "$MAGIC_PROFILES" ] && cp -f "$MAGIC_PROFILES"/*.tsv "$MAGIC_PROFILES"/mapping-*.json "$MAGIC_WORK/profiles/" 2>/dev/null
     : > "$MAGIC_WORK/answers.tsv"
     if ! magic_target_snapshot "$log"; then
         ui_textbox "$title" "$log"

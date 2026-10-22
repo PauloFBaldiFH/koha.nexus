@@ -11,38 +11,45 @@ For formats, holdings rules, validation and recovery, see
 ## Operator workflow
 
 1. Open **Library tools > Magic Import Tool** and choose the source.
-2. Select a table or MARC stream. Check its **Import mode**:
-   **Automatic detection**, **Bibliographic**, **Patrons** or **Authorities**.
-   An override for a mixed MARC file applies to its source file; automatic
-   detection keeps its bibliographic and authority groups separate.
-3. Review each source field, proposed destination, confidence and reasons.
-   Field and function selectors use light blue; warnings remain separate.
-   **Leave out** excludes a field. **Custom destination** accepts a valid
-   destination name or MARC reference. **Fixed text** replaces that source
-   field's contribution with an entered literal value.
-4. Choose a transform when needed: **Split full name** maps a patron's full
-   name to `firstname` and `surname`; **Add a prefix** prepends literal text,
-   for example `CPF:` for `patron_attributes`. These are named functions,
-   never executable expressions.
-5. Fill missing branch, patron category or item type values. Enter explicit
-   code remaps when existing source codes must change. Defaults fill gaps;
-   they do not replace valid codes already present.
-6. For headless SQL, review proposed relationships and enter only confirmed
-   relationships. No candidate is selected automatically. Choose **Review
-   before importing** for missing barcodes, or explicitly request stable
-   migration barcodes.
-7. Inspect **Live preview · first 3 mapped records** and its validation flags.
-   Edits schedule a background preview using the same backend build as the
-   import. The preview displays three records; validation scans the complete
-   output, including duplicates beyond that sample.
-8. Apply the mapping. The tool analyses again, asks remaining questions,
-   then builds and validates every output stream. Koha's staging or patron
-   dry run, confirmation and verified backup still precede each write.
+2. The mapping screen opens in the MarcEdit-style layout: a horizontal grid
+   with one row per sample record (or table row) and one column per source
+   field. Each column header shows the source on the first line and its
+   destination on the second, always as code and plain name, for example
+   `245$a (Title)` or `surname (Surname)`. `=` means unchanged, `→` a new
+   destination, `?` a guess the tool is not sure about (shown in the warning
+   colour) and `✕` a field left out.
+3. The mode bar above the grid switches the selected table or MARC stream
+   between **Bibliographic**, **Patrons** and **Authorities**; the detected
+   mode is marked. Switching shows that mode's own proposal for every column.
+4. Click a column, then pick its destination in **Function**. The list is
+   grouped (MARC fields with their names; patron fields grouped as Koha's
+   patron form: identification, address, contact, library and category...).
+   Any other field can be typed by hand (`590$a`, `sort1`). **Fixed text**
+   adds a value every record or patron receives (`=BK` to `942$c`).
+5. Code columns (library, item type, shelving location, patron category)
+   open the **In the file → in this Koha** list: every distinct value found
+   in the whole file, with a selector of this Koha's own codes. A value
+   whose name matches a Koha code is paired automatically ("Livros" → `BK`);
+   a value this Koha does not have is marked "not in this Koha". Apply stops
+   with a clear message while such a value has no destination.
+6. On the right, **Values of this Koha** sets the default library, item type
+   and patron category (selectors filled from the instance) for rows that
+   have none, and what to do with copies without a barcode. **More options**
+   keeps the tidy tools: join copies of the same book in one record, fix
+   text typed in capitals, and safe spelling repair.
+7. Cells are checked as you go: red for errors (a repeated barcode or card
+   number, a required field empty), yellow for warnings (invalid ISBN or CPF
+   check digit, a value that is not a date). **Record preview** shows the
+   MARC record (or the patron card) the import builds; **Check the whole
+   file** runs the real build in the background and lists every error and
+   warning for the complete file before anything is imported.
+8. Apply the mapping. The tool analyses again, then builds and validates
+   every output stream. Koha's staging or patron dry run, confirmation and
+   verified backup still precede each write. **Skip** imports as detected.
 
-An invalid selected mapping stops the operation; it does not silently switch
-to an unmapped import. Skipping the mapper continues through the usual
-analysis and validation gates. The classic whiptail interface retains its
-existing questions and does not provide the new graphical mapper.
+An invalid mapping stops the operation; it does not silently switch to an
+unmapped import. The classic whiptail interface keeps its own questions and
+does not provide the graphical mapper.
 
 ## Patron and authority destinations
 
@@ -124,18 +131,18 @@ Only one parent relationship may be selected for a child table.
 
 ## Save and load profiles
 
-Enter a profile path and use **Save profile** or **Load profile**. Profiles
-contain mappings, logical table namespaces and statistical column signatures,
-not raw source samples. A different source filename or shuffled column order
-can therefore reuse a profile. Matching uses names and content distributions;
-it never copies the first column into the first saved destination.
+Under **Mapping profiles**, type a name and press **Save**; pick a saved
+profile and press **Use** to apply it to the next file from the same system.
+Profiles are kept in the panel's `import-profiles` folder as
+`mapping-<name>.json`, even when that import is not completed. They contain
+mappings, logical table namespaces and statistical column signatures, not
+raw source samples, so a different file name or shuffled column order can
+reuse a profile. Matching uses names and content distributions; it never
+copies the first column into the first saved destination.
 
-Loading reports ambiguous and missing fields. Ambiguous dates, competing
-identifiers or indistinguishable columns require review; they receive no
-guessed profile binding. Destination validation still runs after a profile
-is applied. Literal credentials and other restricted values are refused
-when saving a profile, including fixed assignments, defaults and remap
-tables. Keep library-specific profiles in a private location.
+Using a profile reports how many columns matched and how many are left to
+check by hand. Literal credentials and other restricted values are refused
+when saving a profile, including fixed assignments, defaults and remaps.
 
 ## Backend and panel protocol
 
@@ -153,9 +160,8 @@ mode-specific destinations, capabilities, relationship proposals and the
 current mapping. The preview calls `review.preview_document`, which builds
 in an isolated work directory and reads `out/validation.json`.
 
-The dispatch in `panel/kei_panel/routines/common.py` opens `ImportMapScreen`
-for document version 2 or later, and the existing `FieldMapScreen` for v1.
-Apply writes the mapping and answers the existing prompt; cancel/skip does
+`panel/kei_panel/routines/common.py` opens `FieldMapScreen` for every
+document; it reads version 1 and version 2 files. Apply writes the mapping and answers the existing prompt; cancel/skip does
 not write a new mapping. Samples and identity snapshots stay in the private
 work directory; retained decision/audit reports have mode `0600`.
 
