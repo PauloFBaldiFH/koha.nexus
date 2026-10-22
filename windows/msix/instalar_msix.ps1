@@ -32,7 +32,7 @@
 #>
 param(
     [string]$MsixPath = '',
-    [string]$ReleaseTag = 'windows-v1.0.25.0',
+    [string]$ReleaseTag = 'windows-v1.0.27.0',
     [switch]$NoLaunch
 )
 
@@ -41,6 +41,7 @@ param(
 # KohaNexus-Publisher.cer; the old one stays while its packages are in use.
 $KnownThumbprints = @(
     'F3B8345A573381F2E71B56A96F5EF3253B80A26C'   # CN=PauloFBaldiFH, 2026-10-20 to 2027-10-20
+    'B6721986CB46257290395751E429897B6A48FBBB'   # CN=PauloFBaldiFH, 2026-10-22 to 2029-10-22 (from 1.0.27.0; the F3B8 key was lost)
 )
 $ExpectedSubject = 'CN=PauloFBaldiFH'
 $PackageName = 'KohaNexus'
