@@ -41,6 +41,21 @@ try {
     Write-Host 'Choose the language and use the panel to install the Koha server and database.' -ForegroundColor Gray
     Write-Host ''
 
+    # What Invoke-KohaPanel tells the panel, through WSLENV: plain symbols
+    # outside Windows Terminal, and whether this window runs as administrator
+    # (Windows then refuses files dragged from Explorer, and the panel says to
+    # paste the path instead).
+    $env:KEI_PLAIN_GLYPHS = '1'
+    if ($env:WT_SESSION) { $env:KEI_PLAIN_GLYPHS = '0' }
+    $principal = New-Object Security.Principal.WindowsPrincipal ([Security.Principal.WindowsIdentity]::GetCurrent())
+    $env:KEI_WIN_ELEVATED = '0'
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { $env:KEI_WIN_ELEVATED = '1' }
+    $wslEnv = @(([string]$env:WSLENV) -split ':' | Where-Object { $_ })
+    foreach ($name in 'KEI_PLAIN_GLYPHS', 'KEI_WIN_ELEVATED') {
+        if (@($wslEnv | ForEach-Object { ($_ -split '/')[0] }) -notcontains $name) { $wslEnv += $name }
+    }
+    $env:WSLENV = $wslEnv -join ':'
+
     & $wslExe --distribution $Distro --user root --cd $LinuxDir -- $WindowScript bash ./installer
     $panelExit = $LASTEXITCODE
     Write-PanelLog ('Control panel exited with code {0}; beginning Windows post-setup.' -f $panelExit)

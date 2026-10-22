@@ -28,12 +28,54 @@ localização em `windows/msix`. O MSIX sai em `dist/KohaNexus.msix`.
 **Requisitos locais:** Windows + WSL 2, SDK (MakeAppx e SignTool nos caminhos
 esperados pelo compilador), compilador C# do .NET Framework e certificado de
 assinatura com `CN=PauloFBaldiFH` no repositório pessoal/de máquina esperado.
+O compilador confia nele em `Cert:\LocalMachine\TrustedPeople` e assina com
+carimbo de tempo (sem internet, assina sem carimbo e avisa).
 O compilador atual também **instala e abre** o aplicativo ao final, não é um
 build-only; portanto execute somente numa máquina de testes adequada.
 
 Este arquivo é a versão de teste v17, não um instalador MSIX executado ou
 validado ponta a ponta nesta contribuição. Não adicione `dist/`, certificados
 privados, dumps do Koha, senhas ou logs ao Git.
+
+## Instalar em outro computador ("Fornecedor: Desconhecido")
+
+O pacote é assinado com um certificado próprio (`CN=PauloFBaldiFH`,
+impressão digital `F3B8345A573381F2E71B56A96F5EF3253B80A26C`, válido até
+20/10/2027). Nenhum Windows confia nele de fábrica, então o Instalador de
+Aplicativos mostra **Fornecedor: Desconhecido** e recusa com "Não foi possível
+verificar o certificado de fornecedor deste pacote de aplicativo".
+
+Para instalar, abra o **PowerShell normal** (não precisa ser administrador) e rode:
+
+```powershell
+irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/msix/instalar_msix.ps1 | iex
+```
+
+O script baixa o MSIX da release `windows-v1.0.25.0`, confere que ele foi
+assinado por esse certificado (e por nenhum outro), coloca a parte pública do
+certificado em **Computador local > Pessoas Confiáveis** (um pedido de
+permissão do Windows, só na primeira vez em cada PC), instala o pacote e abre o
+Koha.Nexus. Com um `.msix` já baixado:
+`.\windows\msix\instalar_msix.ps1 -MsixPath C:\caminho\KohaNexus.msix`.
+
+Manual, sem script: clique duas vezes em `KohaNexus-Publisher.cer` >
+Instalar Certificado > **Máquina Local** > "Colocar todos os certificados no
+repositório a seguir" > **Pessoas Confiáveis**. Depois abra o `.msix` de novo.
+Não use "Autoridades de Certificação Raiz Confiáveis": não é necessário.
+
+**Ao trocar o certificado** (renovação ou outro PC de compilação), acrescente a
+nova impressão digital em `$KnownThumbprints` de `instalar_msix.ps1` e troque
+`KohaNexus-Publisher.cer` no mesmo commit. O `compilar_msix.ps1` grava esse
+`.cer` em `dist\` ao lado do MSIX; publique os dois na release. Os testes de
+`tests/windows_checks.ps1` conferem que o `.msix` versionado, o `.cer` e o
+script falam do mesmo certificado.
+
+Para que nenhum PC precise confiar no certificado à mão, o pacote precisa de
+uma assinatura que o Windows já reconheça: publicar pela Microsoft Store (a
+loja assina o pacote) ou assinar com um certificado de assinatura de código
+emitido por uma autoridade (por exemplo Azure Artifact Signing ou SignPath).
+Os dois caminhos dependem de uma conta em nome do Paulo e mudam o `Publisher`
+do manifesto para o nome que essa conta fornecer.
 
 ## Fluxo esperado da primeira execução
 

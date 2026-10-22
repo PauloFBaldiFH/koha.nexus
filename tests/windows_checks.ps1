@@ -284,5 +284,40 @@ $iss = Get-Content -LiteralPath (Join-Path $repo 'windows\setup\koha-nexus.iss')
 $codes = @([regex]::Matches($iss, '(?m)^\s*Exit\w+\s*=\s*(\d+);') | ForEach-Object { $_.Groups[1].Value })
 Check 'store: exit codes are distinct' ((@($codes | Select-Object -Unique)).Count -eq $codes.Count -and $codes.Count -eq 7) ($codes -join ',')
 
+# No parameter or command glued to a variable ("-Autostart$Mode",
+# "Join-Path$env:SystemRoot"): PowerShell reads them as one word, so the
+# value never arrives or the command is not found.
+foreach ($f in Get-ChildItem (Join-Path $repo 'windows') -Filter '*.ps*1') {
+    $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+    $glued = @($fileAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object {
+        foreach ($el in $_.CommandElements) { if ($el.Extent.Text -match '^-?[A-Za-z][\w-]*\$') { '{0}: {1}' -f $el.Extent.StartLineNumber, $el.Extent.Text } }
+    })
+    Check ('nothing glued to a variable: ' + $f.Name) ($glued.Count -eq 0) ($glued -join '; ')
+}
+
+# MSIX (windows\msix): its scripts parse; instalar_msix.ps1 runs through
+# irm | iex, so it stays ASCII with no BOM; it trusts exactly the
+# certificate that signed the published package, and the .cer next to it
+# is that same certificate.
+foreach ($f in Get-ChildItem (Join-Path $repo 'windows\msix') -Filter '*.ps1') {
+    $tokens = $null; $errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
+    Check ('parses: msix\' + $f.Name) (@($errors).Count -eq 0) ((@($errors) | ForEach-Object { $_.Message }) -join '; ')
+}
+$msixInstaller = Join-Path $repo 'windows\msix\instalar_msix.ps1'
+$bytes = [IO.File]::ReadAllBytes($msixInstaller)
+Check 'no BOM, ASCII only (irm | iex): msix\instalar_msix.ps1' (@($bytes | Where-Object { $_ -gt 0x7F }).Count -eq 0)
+$msixAst = [System.Management.Automation.Language.Parser]::ParseFile($msixInstaller, [ref]$null, [ref]$null)
+foreach ($fn in $msixAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -like 'Get-KohaMsix*' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$signer = Get-KohaMsixSigner -Path (Join-Path $repo 'windows\msix\KohaNexus.msix')
+$identity = Get-KohaMsixIdentity -Path (Join-Path $repo 'windows\msix\KohaNexus.msix')
+$cer = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList (Join-Path $repo 'windows\msix\KohaNexus-Publisher.cer')
+$pinned = Get-Content -Raw -LiteralPath $msixInstaller
+Check 'msix: signer is the published .cer' ($signer.Thumbprint -eq $cer.Thumbprint) ('{0} / {1}' -f $signer.Thumbprint, $cer.Thumbprint)
+Check 'msix: instalar_msix.ps1 knows the signer' ($pinned -match ("'" + $signer.Thumbprint + "'")) $signer.Thumbprint
+Check 'msix: manifest Publisher is the signer subject' ($identity.Publisher -eq $signer.Subject) ('{0} / {1}' -f $identity.Publisher, $signer.Subject)
+
 if ($failed) { throw "$failed check(s) failed" }
 Write-Host 'all checks passed'
