@@ -1,6 +1,6 @@
 # Koha.Nexus — Empacotamento MSIX (Windows)
 
-Pasta de compilação do pacote MSIX **1.0.26.0** (payload `1.0.26.0-msix-v18`).
+Pasta de compilação do pacote MSIX **1.0.27.0** (payload `1.0.27.0-msix-v19`).
 A release publicada ainda é a 1.0.25.0.
 Ela fica separada do instalador Inno Setup (`windows/setup/koha-nexus.iss`).
 
@@ -21,6 +21,16 @@ Abra **PowerShell 5.1 como administrador** na raiz do repositório:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\msix\compilar_msix.ps1
+```
+
+O `installer`, o `installer.sha256`, `lang\` e `panel\` vão para o Debian e
+precisam estar com LF. O `.gitattributes` garante isso em qualquer clone; se o
+compilador acusar CRLF ou SHA-256 diferente numa cópia antiga, regrave esses
+arquivos na raiz do repositório:
+
+```powershell
+Remove-Item installer, installer.sha256; Remove-Item lang, panel -Recurse -Force
+git checkout -- installer installer.sha256 lang panel
 ```
 
 O script resolve automaticamente o diretório raiz do Git a partir de sua
