@@ -44,7 +44,7 @@ python3 -m venv .venv
 cd panel
 ../.venv/bin/python -m pytest -q tests/test_import_*_v2.py \
   tests/test_import_legacy_contracts.py tests/test_magic_engine.py \
-  tests/test_fieldmap.py tests/test_fieldmap_screen.py tests/test_importmap_screen.py
+  tests/test_fieldmap.py tests/test_fieldmap_screen.py
 ```
 
 Install `zstd` to include compressed-format tests. The

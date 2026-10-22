@@ -213,7 +213,7 @@ same module bodies instead of testing a separate development copy.
 | `mapping.py`, `patrons.py`, `authority_import.py` | Versioned/scoped mappings, schema-aware patron rows and authority preparation. |
 | `normalizer.py`, `remap952.pl` | Native/legacy holdings, legal-deposit distinction, codes, barcodes and source-ID handling. |
 | `review.py`, `validation.py`, `engine.py` | Pre-build draft, shared previews, full-output validation and manifest construction. |
-| `screens/importmap.py`, `routines/common.py` | Version 2 review UI and existing prompt dispatch; the v1 screen remains available. |
+| `screens/fieldmap.py`, `koha_fields.py`, `routines/common.py` | The MarcEdit-style mapping screen (v1 and v2 files), patron/authority field names, prompt dispatch. |
 | Installer orchestration | Target snapshots, mandatory validation gate, backups, Koha loaders, exact errors and per-stream totals. |
 
 ## Synthetic fixtures and validation stages

@@ -64,8 +64,7 @@ jobs:
             tests/test_installer_sha256.py \
             tests/test_magic_engine.py \
             tests/test_fieldmap.py \
-            tests/test_fieldmap_screen.py \
-            tests/test_importmap_screen.py
+            tests/test_fieldmap_screen.py
 
   bash:
     name: Disposable MariaDB import checks
