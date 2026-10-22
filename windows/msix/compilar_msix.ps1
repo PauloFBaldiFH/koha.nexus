@@ -131,6 +131,57 @@ function Get-KohaStoreIdentity {
     return $identity
 }
 
+# O que o bootstrap do MSIX usa dos fontes de windows\ (sem alterá-los):
+# devolve a lista do que falta; vazia quando está tudo certo. Usada pelo
+# compilador sobre a cópia da carga e por tests\windows_checks.ps1 sobre o
+# repositório.
+function Test-KohaMsixSources {
+    param([Parameter(Mandatory = $true)][string]$WindowsDir)
+    $problems = New-Object System.Collections.Generic.List[string]
+    $texts = @{}
+    foreach ($fileName in @('KohaEasy.Core.psm1', 'KohaEasy.Install.psm1', 'KohaEasy.ps1', 'install.ps1', 'KohaMsixPanel.ps1', 'KohaMsixRefreshIcons.ps1', 'KohaEasy.Launcher.cs')) {
+        $filePath = Join-Path $WindowsDir $fileName
+        if (Test-Path -LiteralPath $filePath -PathType Leaf) {
+            $texts[$fileName] = [System.IO.File]::ReadAllText($filePath)
+        } else {
+            $texts[$fileName] = ''
+            $problems.Add("arquivo ausente: windows\$fileName")
+        }
+    }
+    $rules = @(
+        @('KohaEasy.Core.psm1', "(?m)^\s*StaffUrl\s*=\s*'http://localhost:8080/'", 'StaffUrl = http://localhost:8080/'),
+        @('KohaEasy.Core.psm1', '(?m)^\s*WebPorts\s*=\s*@\(80, 8080\)', 'WebPorts = @(80, 8080)'),
+        @('KohaEasy.Install.psm1', 'KOHA_MSIX_FIRST_RUN', 'conta Debian pedida de novo quando o Debian ainda não existe (KOHA_MSIX_FIRST_RUN)'),
+        @('KohaEasy.Install.psm1', 'KOHA_MSIX_FINALIZE', 'fase Windows depois do painel (KOHA_MSIX_FINALIZE)'),
+        @('KohaEasy.Install.psm1', '(?m)^function Initialize-KohaPanelDependencies\b', 'dependências do painel no primeiro terminal (Initialize-KohaPanelDependencies)'),
+        @('KohaEasy.Install.psm1', "'Launch -Hidden'", 'segundo terminal aberto por koha.nexus.exe Launch -Hidden'),
+        @('KohaEasy.ps1', "KOHA_MSIX_PANEL_SETUP", 'Launch abre KohaMsixPanel.ps1 (KOHA_MSIX_PANEL_SETUP)'),
+        @('KohaEasy.ps1', "'Panel'", 'comando Panel (o bootstrap abre o painel com ele)'),
+        @('install.ps1', 'KOHAEASY_SOURCE', 'install.ps1 lê KOHAEASY_SOURCE'),
+        @('install.ps1', 'KOHAEASY_NO_WT', 'install.ps1 respeita KOHAEASY_NO_WT'),
+        @('install.ps1', '(?m)^\s*if \(\$PSCommandPath -and \$code -gt 0\) \{ exit \$code \}', 'install.ps1 devolve o código do Install (3 = reiniciar) quando roda com -File'),
+        @('KohaMsixPanel.ps1', 'KOHA_MSIX_FINALIZE', 'KohaMsixPanel.ps1 roda a fase Windows depois do painel'),
+        @('KohaMsixRefreshIcons.ps1', 'KohaNexusDesktop\.ico', 'KohaMsixRefreshIcons.ps1 usa KohaNexusDesktop.ico')
+    )
+    foreach ($rule in $rules) {
+        if ($texts[$rule[0]] -notmatch $rule[1]) { $problems.Add(('windows\{0}: falta {1}' -f $rule[0], $rule[2])) }
+    }
+    # Segurança da conta Debian: uma única Read-KohaLinuxAccount, com senha
+    # lida por Read-Host -AsSecureString; nenhuma senha fixa nem versão
+    # desativada da função.
+    $installText = $texts['KohaEasy.Install.psm1']
+    if ($installText -match 'kohanexuspassword123') { $problems.Add('windows\KohaEasy.Install.psm1: senha fixa encontrada') }
+    if ($installText -match 'function Read-KohaLinuxAccount_Disabled\b') { $problems.Add('windows\KohaEasy.Install.psm1: Read-KohaLinuxAccount_Disabled ainda existe') }
+    $installAst = [System.Management.Automation.Language.Parser]::ParseInput($installText, [ref]$null, [ref]$null)
+    $accountFunctions = @($installAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Read-KohaLinuxAccount' }, $true))
+    if ($accountFunctions.Count -ne 1) {
+        $problems.Add(('windows\KohaEasy.Install.psm1: esperava uma função Read-KohaLinuxAccount; encontradas {0}' -f $accountFunctions.Count))
+    } elseif ($accountFunctions[0].Extent.Text -notmatch 'Read-Host\s+-AsSecureString') {
+        $problems.Add('windows\KohaEasy.Install.psm1: Read-KohaLinuxAccount não lê a senha com Read-Host -AsSecureString')
+    }
+    return $problems.ToArray()
+}
+
 function Test-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
@@ -294,426 +345,23 @@ try {
         Copy-Item -LiteralPath $item.FullName -Destination $payloadWindowsDir -Recurse -Force
     }
 
-    # Fixar a porta do staff em 8080 na COPIA do modulo Core (nao no repositorio).
+    # As adaptações do MSIX (staff na porta 8080, conta Debian pedida com
+    # Read-Host -AsSecureString, os dois terminais, KohaMsixPanel.ps1 e
+    # KohaMsixRefreshIcons.ps1) estão nos próprios fontes de windows\ desde
+    # o commit 543272d. O compilador não reescreve mais nenhum arquivo da
+    # carga: só confere que a cópia tem o que o bootstrap do MSIX usa, e
+    # para com a lista do que falta. tests\windows_checks.ps1 roda a mesma
+    # conferência sobre os arquivos do repositório.
     $coreModulePath = Join-Path $payloadWindowsDir 'KohaEasy.Core.psm1'
-    if (-not (Test-Path -LiteralPath $coreModulePath -PathType Leaf)) {
-        throw "Arquivo obrigatorio nao encontrado: $coreModulePath"
-    }
-    $coreText = [System.IO.File]::ReadAllText($coreModulePath)
-    $staffUrlPattern = '(?m)^(\s*StaffUrl\s*=\s*)''[^'']*'''
-    $webPortsPattern = '(?m)^(\s*WebPorts\s*=\s*)@\([^)]*\)'
-    if ([regex]::Matches($coreText, $staffUrlPattern).Count -ne 1 -or
-        [regex]::Matches($coreText, $webPortsPattern).Count -ne 1) {
-        throw 'StaffUrl/WebPorts nao encontrados de forma unica. Revisar modulo de origem.'
-    }
-    $coreText = [regex]::Replace($coreText, $staffUrlPattern, '${1}''http://localhost:8080/''')
-    $coreText = [regex]::Replace($coreText, $webPortsPattern, '${1}@(80, 8080)')
-    [System.IO.File]::WriteAllText($coreModulePath, $coreText, (New-Object System.Text.UTF8Encoding($true)))
-    Write-Host 'Staff Windows: localhost:8080; portas: 80 e 8080.' -ForegroundColor Gray
-
-    # Windows pode manter o icon antigo de um .lnk (e o EXE local pode
-    # permanecer da tentativa anterior). Guardar um ICO com nome exclusivo da
-    # revisao no diretorio do Koha e atualizar apenas atalhos do Koha.
-    $iconFixScriptPath = Join-Path $payloadWindowsDir 'KohaMsixRefreshIcons.ps1'
-    $iconFixScriptContent = @'
-$ErrorActionPreference = 'Stop'
-$root = 'C:\Koha'
-$bin = Join-Path $root 'bin'
-$sourceIcon = Join-Path $bin 'KohaNexusDesktop.ico'
-$versionedIcon = Join-Path $bin 'KohaNexus-icon-msix-v17.ico'
-if (-not (Test-Path -LiteralPath $sourceIcon -PathType Leaf)) {
-    throw ('Icone do Koha nao encontrado: ' + $sourceIcon)
-}
-Copy-Item -LiteralPath $sourceIcon -Destination $versionedIcon -Force -ErrorAction Stop
-$dirs = @(
-    [Environment]::GetFolderPath('Desktop'),
-    [Environment]::GetFolderPath('CommonDesktopDirectory'),
-    (Join-Path ([Environment]::GetFolderPath('Programs')) 'Koha')
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique
-$shell = New-Object -ComObject WScript.Shell
-$updated = 0
-foreach ($folder in $dirs) {
-    $links = Get-ChildItem -LiteralPath $folder -Filter '*.lnk' -File -ErrorAction SilentlyContinue
-    foreach ($link in $links) {
-        if ($folder -notlike '*\Koha' -and $link.BaseName -notmatch '(?i)^koha(\b|[ ._-])') { continue }
-        try {
-            $shortcut = $shell.CreateShortcut($link.FullName)
-            # Preserve target and arguments; update only icons for Koha shortcuts.
-            $shortcut.IconLocation = $versionedIcon + ',0'
-            $shortcut.Save()
-            $updated++
-        } catch {
-            Write-Warning ('Atalho nao atualizado: ' + $link.FullName + ' | ' + $_.Exception.Message)
-        }
-    }
-}
-# Invalidate file-icon cache/association view without deleting Explorer cache.
-try {
-    Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public static class KohaIconRefresh {
-    [DllImport("shell32.dll")]
-    public static extern void SHChangeNotify(uint wEventId, uint uFlags, IntPtr item1, IntPtr item2);
-}
-"@ -ErrorAction Stop
-    [KohaIconRefresh]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
-} catch { }
-Write-Host ('Atalhos Koha com icone atualizado: ' + $updated) -ForegroundColor Green
-'@
-    [System.IO.File]::WriteAllText($iconFixScriptPath, $iconFixScriptContent, (New-Object System.Text.UTF8Encoding($true)))
-
-    # --------------------------------------------------------
-    # 2. PATCHS PONTUAIS DO FLUXO MSIX (SEM ALTERAR install.ps1)
-    # --------------------------------------------------------
     $installModulePath = Join-Path $payloadWindowsDir 'KohaEasy.Install.psm1'
-    if (-not (Test-Path -LiteralPath $installModulePath -PathType Leaf)) {
-        throw "Modulo de instalacao nao encontrado: $installModulePath"
-    }
-
-    $installModuleText = [System.IO.File]::ReadAllText($installModulePath)
-    $installModuleText = $installModuleText -replace "`r`n?", "`n"
-
-    # SECURITY: replace the temporary hard-coded password function with the
-    # interactive SecureString prompt already present in the source module.
-    # The password remains in memory only; New-KohaLinuxUser sends it on stdin
-    # and the module never persists it to state.json or logs.
-    $accountFunctionStart = $installModuleText.IndexOf('function Read-KohaLinuxAccount {', [System.StringComparison]::Ordinal)
-    $accountDisabledStart = $installModuleText.IndexOf('function Read-KohaLinuxAccount_Disabled {', [System.StringComparison]::Ordinal)
-    $newLinuxUserStart = $installModuleText.IndexOf('function New-KohaLinuxUser {', [System.StringComparison]::Ordinal)
-    if ($accountFunctionStart -lt 0 -or $accountDisabledStart -le $accountFunctionStart -or $newLinuxUserStart -le $accountDisabledStart) {
-        throw 'Nao foi possivel localizar com seguranca as funcoes de credenciais Debian. Nada sera empacotado.'
-    }
-    $interactiveAccountFunction = $installModuleText.Substring($accountDisabledStart, $newLinuxUserStart - $accountDisabledStart)
-    $interactiveAccountFunction = $interactiveAccountFunction.Replace(
-        'function Read-KohaLinuxAccount_Disabled {',
-        'function Read-KohaLinuxAccount {'
-    )
-    if ($interactiveAccountFunction -notmatch 'Read-Host\s+-AsSecureString' -or $interactiveAccountFunction -notmatch 'passwords do not match|password.*match|senhas nao coincidem|nao correspondem') {
-        # The prompt is validated structurally below as well; do not silently fall back to a fixed password.
-        if ($interactiveAccountFunction -notmatch 'Read-Host\s+-AsSecureString') {
-            throw 'A rotina interativa de credenciais nao usa entrada protegida. Nada sera empacotado.'
-        }
-    }
-    $installModuleText = $installModuleText.Substring(0, $accountFunctionStart) +
-        $interactiveAccountFunction +
-        $installModuleText.Substring($newLinuxUserStart)
-    if ($installModuleText -match 'kohanexuspassword123') {
-        throw 'Foi encontrada uma senha fixa embutida no modulo Debian. Nada sera empacotado.'
-    }
-
-    # The second terminal owns the interactive Linux panel. After the user exits
-    # that panel, the same terminal runs a separate post-panel continuation for
-    # Windows shortcuts/tasks/network. The first preparation terminal does not
-    # wait for it and never checks Koha's database or koha-conf.xml.
-    $panelWrapperPath = Join-Path $payloadWindowsDir 'KohaMsixPanel.ps1'
-    $panelWrapperContent = @'
-param(
-    [Parameter(Mandatory = $true)][string]$Distro,
-    [Parameter(Mandatory = $true)][string]$LinuxDir,
-    [Parameter(Mandatory = $true)][string]$WindowScript
-)
-$ErrorActionPreference = 'Stop'
-$kohaRoot = 'C:\Koha'
-$kohaBin = Join-Path $kohaRoot 'bin'
-$mainScript = Join-Path $kohaBin 'KohaEasy.ps1'
-$logPath = Join-Path $kohaRoot 'logs\msix-bootstrap.log'
-$wslExe = Join-Path $env:SystemRoot 'System32\wsl.exe'
-$powerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-
-# The preparation stage sets this only to keep its own console in place. The
-# panel must use the normal Windows Terminal path, with UTF-8 output.
-Remove-Item Env:KOHAEASY_NO_WT -ErrorAction SilentlyContinue
-$env:KOHAEASY_ROOT = $kohaRoot
-try {
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
-    $chcp = Join-Path $env:SystemRoot 'System32\chcp.com'
-    if (Test-Path -LiteralPath $chcp -PathType Leaf) { & $chcp 65001 | Out-Null }
-    [Console]::InputEncoding = $utf8
-    [Console]::OutputEncoding = $utf8
-    $global:OutputEncoding = $utf8
-} catch { }
-
-function Write-PanelLog {
-    param([string]$Message)
-    try {
-        New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
-        Add-Content -LiteralPath $logPath -Encoding UTF8 -Value ('{0} | {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message)
-    } catch { }
-}
-
-$finalizerExit = 0
-try {
-    if (-not (Test-Path -LiteralPath $wslExe -PathType Leaf)) { throw 'wsl.exe was not found.' }
-    Write-PanelLog ('Panel terminal started; distro={0}; user={1}' -f $Distro, [Security.Principal.WindowsIdentity]::GetCurrent().Name)
-    Write-Host ''
-    Write-Host 'Koha.Nexus control panel' -ForegroundColor Green
-    Write-Host 'Choose the language and use the panel to install the Koha server and database.' -ForegroundColor Gray
-    Write-Host ''
-
-    & $wslExe --distribution $Distro --user root --cd $LinuxDir -- $WindowScript bash ./installer
-    $panelExit = $LASTEXITCODE
-    Write-PanelLog ('Control panel exited with code {0}; beginning Windows post-setup.' -f $panelExit)
-
-    # A separate PowerShell process runs the project's normal Windows setup
-    # phase after the panel closes. Its quiet readiness gate avoids changing
-    # installation state if the user exits the panel before finishing Koha.
-    if (Test-Path -LiteralPath $mainScript -PathType Leaf) {
-        $oldFinalize = $env:KOHA_MSIX_FINALIZE
-        $oldRoot = $env:KOHAEASY_ROOT
-        try {
-            $env:KOHA_MSIX_FINALIZE = '1'
-            $env:KOHAEASY_ROOT = $kohaRoot
-            $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install' -f $mainScript
-            Write-Host ''
-            Write-Host 'Finishing Windows shortcuts, background tasks and network setup...' -ForegroundColor Cyan
-            $process = Start-Process -FilePath $powerShellExe -ArgumentList $arguments -NoNewWindow -PassThru -Wait -ErrorAction Stop
-            $finalizerExit = [int]$process.ExitCode
-            Write-PanelLog ('Windows post-setup exited with code {0}.' -f $finalizerExit)
-            $iconFixer = Join-Path $kohaBin 'KohaMsixRefreshIcons.ps1'
-            if (Test-Path -LiteralPath $iconFixer -PathType Leaf) {
-                try { & $iconFixer } catch { Write-PanelLog ('Icon refresh warning: ' + $_.Exception.Message) }
-            }
-
-        }
-        finally {
-            if ($null -eq $oldFinalize) { Remove-Item Env:KOHA_MSIX_FINALIZE -ErrorAction SilentlyContinue } else { $env:KOHA_MSIX_FINALIZE = $oldFinalize }
-            if ($null -eq $oldRoot) { Remove-Item Env:KOHAEASY_ROOT -ErrorAction SilentlyContinue } else { $env:KOHAEASY_ROOT = $oldRoot }
-        }
-    }
-    else {
-        Write-PanelLog 'KohaEasy.ps1 not found; skipped Windows post-setup.'
-        Write-Host 'The Windows post-setup script was not found. Check C:\Koha\logs\msix-bootstrap.log.' -ForegroundColor Yellow
-        $finalizerExit = 2
-    }
-
-    Write-Host ''
-    Write-Host 'The panel has closed. If Koha server installation was not completed, open Koha.Nexus again to continue.' -ForegroundColor Gray
-    if ($finalizerExit -ne 0) {
-        Write-Host ('Windows post-setup ended with code {0}. See C:\Koha\logs\msix-bootstrap.log.' -f $finalizerExit) -ForegroundColor Yellow
-    }
-    Read-Host 'Press Enter to close this window' | Out-Null
-    exit $finalizerExit
-}
-catch {
-    $message = $_.Exception.Message
-    Write-PanelLog ('ERROR in panel wrapper: ' + $message)
-    Write-Host ''
-    Write-Host ('Panel wrapper error: ' + $message) -ForegroundColor Red
-    Write-Host 'See C:\Koha\logs\msix-bootstrap.log for details.' -ForegroundColor Yellow
-    Read-Host 'Press Enter to close this window' | Out-Null
-    exit 1
-}
-'@
-    [System.IO.File]::WriteAllText($panelWrapperPath, $panelWrapperContent, (New-Object System.Text.UTF8Encoding($true)))
-
-    # Replace only Invoke-KohaPanel, not its adjacent legacy function. It now
-    # launches the wrapper in Windows Terminal, or a regular PowerShell window
-    # if Windows Terminal is unavailable.
-    $panelPattern = '(?ms)^function Invoke-KohaPanel\s*\{.*?^\}\s*(?=function Invoke-KohaPanel_Old\s*\{)'
-    $panelMatches = [regex]::Matches($installModuleText, $panelPattern)
-    if ($panelMatches.Count -ne 1) {
-        throw "Esperava encontrar uma funcao Invoke-KohaPanel independente; encontrado: $($panelMatches.Count). Nada sera empacotado."
-    }
-    $panelFunctionReplacement = @'
-# MSIX v17: all panel dependencies are prepared and verified in the FIRST
-# (setup) terminal. Only then is the definitive terminal started at the
-# language selection screen. Never install the Koha server in this stage.
-function Initialize-KohaPanelDependencies {
-    $dependencyScript = @(
-        'set -eu'
-        'missing=""'
-        'for spec in whiptail:whiptail dialog:dialog curl:curl xmllint:libxml2-utils unzip:unzip gpg:gpg wget:wget fuser:psmisc ss:iproute2 flock:util-linux zstd:zstd; do'
-        '  cmd="${spec%%:*}"'
-        '  pkg="${spec#*:}"'
-        '  if ! command -v "$cmd" >/dev/null 2>&1; then missing="$missing $pkg"; fi'
-        'done'
-        'if [ -n "$missing" ]; then'
-        '  export DEBIAN_FRONTEND=noninteractive'
-        '  apt-get update -qq'
-        '  apt-get -o DPkg::Lock::Timeout=300 install -y -qq --no-install-recommends $missing'
-        'fi'
-        'for cmd in whiptail dialog curl xmllint unzip gpg wget fuser ss flock zstd; do'
-        '  if ! command -v "$cmd" >/dev/null 2>&1; then echo "Missing dependency: $cmd"; exit 17; fi'
-        'done'
-        'echo KOHA_MSIX_PANEL_DEPS_READY'
-    ) -join "`n"
-    Write-KohaStep 'Preparando dependencias do painel no Debian (instalando as que faltam)...'
-    $result = Invoke-KohaLinuxScript -Script $dependencyScript
-    if ($result.ExitCode -ne 0 -or ([string]$result.Output) -notmatch 'KOHA_MSIX_PANEL_DEPS_READY') {
-        Write-KohaLog ('Panel dependency preparation failed (exit {0}): {1}' -f $result.ExitCode, ([string]$result.Output).Trim()) 'install'
-        throw ('Falha ao preparar as dependencias do painel no Debian. Saida: ' + ([string]$result.Output).Trim())
-    }
-    Write-KohaStep 'Dependencias do painel prontas. Abrindo a selecao de idioma no segundo terminal...' 'ok'
-    return $true
-}
-
-function Invoke-KohaPanel {
-    # Download and verify dependencies while this FIRST terminal is active.
-    # The second terminal must start with the language selection, not with APT.
-    if (-not (Initialize-KohaPanelDependencies)) {
-        throw 'As dependencias do painel ainda nao estao prontas.'
-    }
-    $launcher = Join-Path (Get-KohaPath Bin) 'koha.nexus.exe'
-    if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
-        throw ('Koha launcher not found: ' + $launcher)
-    }
-    $previous = $env:KOHA_MSIX_PANEL_SETUP
-    try {
-        # Keep the proven v16 handoff. This opens a separate terminal with
-        # the Linux panel and avoids starting a non-installed Koha service.
-        $env:KOHA_MSIX_PANEL_SETUP = '1'
-        $process = Start-Process -FilePath $launcher -ArgumentList 'Launch -Hidden' -WorkingDirectory (Get-KohaPath Bin) -PassThru -ErrorAction Stop
-        if ($null -eq $process) { throw 'The definitive Koha launcher did not start.' }
-    }
-    finally {
-        if ($null -eq $previous) {
-            Remove-Item Env:KOHA_MSIX_PANEL_SETUP -ErrorAction SilentlyContinue
-        } else {
-            $env:KOHA_MSIX_PANEL_SETUP = $previous
-        }
-    }
-    return 0
-}
-'@
-    $panelMatch = $panelMatches[0]
-    $installModuleText = $installModuleText.Substring(0, $panelMatch.Index) +
-        $panelFunctionReplacement +
-        $installModuleText.Substring($panelMatch.Index + $panelMatch.Length)
-
-    # Patch only the Install-Koha function. Its initial invocation returns as
-    # soon as the panel is launched. The panel wrapper later calls Install again
-    # with KOHA_MSIX_FINALIZE=1 to execute only the Windows integration phase.
-    $installFunctionStart = $installModuleText.IndexOf('function Install-Koha {', [System.StringComparison]::Ordinal)
-    $installFunctionEnd = -1
-    if ($installFunctionStart -ge 0) {
-        $installFunctionEnd = $installModuleText.IndexOf('# Runs one step of the Windows side', $installFunctionStart, [System.StringComparison]::Ordinal)
-    }
-    if ($installFunctionStart -lt 0 -or $installFunctionEnd -lt 0) {
-        throw 'Nao foi possivel delimitar com seguranca a funcao Install-Koha. O original sera preservado e o MSIX nao sera gerado.'
-    }
-    $installFunctionText = $installModuleText.Substring($installFunctionStart, $installFunctionEnd - $installFunctionStart)
-
-    # O primeiro terminal pede usuario e senha quando a distro nao existe,
-    # mesmo se um state.json de tentativa anterior registrar um usuario.
-    $originalAccountCondition = "    if (`$null -eq `$account -and `$phase -ne 'done' -and -not [string]`$state['linuxUser'] -and -not `$NonInteractive) {"
-    $newAccountCondition = "    if (`$null -eq `$account -and -not `$NonInteractive -and ((`$phase -ne 'done' -and -not [string]`$state['linuxUser']) -or `$env:KOHA_MSIX_FIRST_RUN -eq '1')) {"
-    if ([regex]::Matches($installFunctionText, [regex]::Escape($originalAccountCondition)).Count -ne 1) {
-        throw 'Nao foi encontrada a condicao esperada para pedir credenciais Debian.'
-    }
-    $installFunctionText = $installFunctionText.Replace($originalAccountCondition, $newAccountCondition)
-    if ($installFunctionText -notmatch 'KOHA_MSIX_FIRST_RUN') {
-        throw 'Alteracao do prompt de usuario/senha Debian falhou.'
-    }
-
-    $phaseLine = "    if (-not `$phase -or `$script:Phases -notcontains `$phase) { `$phase = 'checks' }"
-    if ([regex]::Matches($installFunctionText, [regex]::Escape($phaseLine)).Count -ne 1) {
-        throw 'Nao foi possivel localizar a inicializacao de fase de Install-Koha. Nada sera empacotado.'
-    }
-    $finalizerPreamble = @'
-    if ($env:KOHA_MSIX_FINALIZE -eq '1') {
-        # The Debian panel owns Koha/database setup. A silent gate only prevents
-        # marking Windows setup complete when the user closes the panel early.
-        if (-not (Test-KohaInstalledInDistro)) {
-            Write-KohaLog 'MSIX post-panel continuation skipped: panel did not report complete Koha installation.' 'install'
-            return 0
-        }
-        Set-KohaState @{ phase = 'windows' } | Out-Null
-        $state = Get-KohaState
-        $phase = 'windows'
-        Write-KohaLog 'MSIX post-panel continuation: Koha ready; continuing with Windows integration.' 'install'
-    }
-'@
-    $installFunctionText = $installFunctionText.Replace($phaseLine, $phaseLine + "`n" + $finalizerPreamble.TrimEnd("`r", "`n"))
-
-    $kohaProbeCondition = "    if (Test-KohaPhaseDone 'koha' `$phase) {"
-    if ([regex]::Matches($installFunctionText, [regex]::Escape($kohaProbeCondition)).Count -ne 1) {
-        throw 'Nao foi possivel localizar a verificacao de fase koha para o caminho de finalizacao. Nada sera empacotado.'
-    }
-    $installFunctionText = $installFunctionText.Replace(
-        $kohaProbeCondition,
-        "    if ((Test-KohaPhaseDone 'koha' `$phase) -and `$env:KOHA_MSIX_FINALIZE -ne '1') {"
-    )
-
-    # After launching the second terminal, return immediately. The wrapper
-    # itself will run Install-Koha again only after the panel closes.
-    $panelCallPattern = '(?m)^[ \t]*Invoke-KohaPanel\s+\|\s+Out-Null[ \t]*$'
-    $panelCallMatches = [regex]::Matches($installFunctionText, $panelCallPattern)
-    if ($panelCallMatches.Count -ne 1) {
-        throw "Esperava uma unica chamada a Invoke-KohaPanel dentro de Install-Koha; encontrado: $($panelCallMatches.Count). Nada sera empacotado."
-    }
-    $panelCall = $panelCallMatches[0]
-    $panelCallLineEnd = $installFunctionText.IndexOf("`n", $panelCall.Index + $panelCall.Length)
-    if ($panelCallLineEnd -lt 0) { throw 'A chamada a Invoke-KohaPanel nao termina numa linha completa.' }
-    $installedMarker = "Write-KohaStep (T 'Koha is installed.') 'ok'"
-    $installedMarkerMatches = [regex]::Matches($installFunctionText, [regex]::Escape($installedMarker))
-    if ($installedMarkerMatches.Count -ne 1) {
-        throw "Esperava um marcador estavel apos a chamada do painel; encontrados: $($installedMarkerMatches.Count). Nada sera empacotado."
-    }
-    $installedMarkerIndex = $installFunctionText.IndexOf($installedMarker, $panelCallLineEnd + 1, [System.StringComparison]::Ordinal)
-    if ($installedMarkerIndex -lt 0) { throw 'O marcador apos o painel esta antes da chamada ao painel.' }
-    $installedLineStart = $installFunctionText.LastIndexOf("`n", $installedMarkerIndex) + 1
-    $postPanelLogicStart = $panelCallLineEnd + 1
-    $replacement = @'
-            # MSIX: panel runs independently. The first terminal only prepares Windows/WSL/Debian.
-            # The panel wrapper runs the deferred Windows integration phase after the user exits.
-            return 0
-        }
-'@
-    $installFunctionText = $installFunctionText.Substring(0, $postPanelLogicStart) +
-        $replacement.TrimEnd("`r", "`n") + "`n" +
-        $installFunctionText.Substring($installedLineStart)
-
-    $patchedModuleText = $installModuleText.Substring(0, $installFunctionStart) +
-        $installFunctionText +
-        $installModuleText.Substring($installFunctionEnd)
-    [System.IO.File]::WriteAllText($installModulePath, $patchedModuleText, (New-Object System.Text.UTF8Encoding($true)))
-
-    # Patch local and narrow: when the launcher was invoked by the FIRST-RUN
-    # handoff, open the SECOND terminal at the panel's language selection.
-    # For normal desktop/tray launches, keep the original Launch behavior.
     $mainWindowsPath = Join-Path $payloadWindowsDir 'KohaEasy.ps1'
-    $mainWindowsText = [System.IO.File]::ReadAllText($mainWindowsPath)
-    $launchAnchor = @'
-    'Launch' {
-        if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
-        Invoke-KohaLaunch | Out-Null
-        Open-KohaPanel
-'@
-    # Normaliza CRLF/LF no arquivo COPIADO para a busca nao falhar por quebras de linha.
-    $mainWindowsText = $mainWindowsText.Replace("`r`n", "`n")
-    if ($mainWindowsText.IndexOf($launchAnchor, [System.StringComparison]::Ordinal) -lt 0) {
-        throw 'Nao encontrei o comando Launch original para aplicar o desvio de primeira instalacao com seguranca.'
+    $panelWrapperPath = Join-Path $payloadWindowsDir 'KohaMsixPanel.ps1'
+    $iconFixScriptPath = Join-Path $payloadWindowsDir 'KohaMsixRefreshIcons.ps1'
+    $sourceProblems = @(Test-KohaMsixSources -WindowsDir $payloadWindowsDir)
+    if ($sourceProblems.Count -gt 0) {
+        throw ('Os fontes de windows\ não têm o que o MSIX usa. Nada será empacotado:' + [Environment]::NewLine + ($sourceProblems -join [Environment]::NewLine))
     }
-    $firstLaunchBranch = @'
-    'Launch' {
-        if (-not (Test-KohaDistroInstalled)) { Show-Box (Get-KohaStateText 'not_installed') 'OK' 'Warning' | Out-Null; break }
-        if ($env:KOHA_MSIX_PANEL_SETUP -eq '1') {
-            # The first terminal called koha.nexus.exe Launch -Hidden after
-            # preparing the Debian environment. Open exactly one panel window.
-            # The wrapper retains the post-panel Windows setup after Exit.
-            $wrapper = Join-Path $PSScriptRoot 'KohaMsixPanel.ps1'
-            if (-not (Test-Path -LiteralPath $wrapper -PathType Leaf)) {
-                throw ('Koha MSIX panel wrapper not found: ' + $wrapper)
-            }
-            $powerShellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-            $quotedWrapper = '"' + $wrapper + '"'
-            $psArguments = '-NoProfile -ExecutionPolicy Bypass -NoExit -File {0} -Distro "{1}" -LinuxDir "/root/koha-easy-installer" -WindowScript "{2}"' -f $quotedWrapper, $cfg.Distro, $cfg.WindowPath
-            $wt = Get-Command 'wt.exe' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($wt) {
-                Start-Process -FilePath $wt.Source -ArgumentList ('-w new --title "Koha.Nexus" powershell.exe ' + $psArguments) -ErrorAction Stop | Out-Null
-            } else {
-                Start-Process -FilePath $powerShellExe -ArgumentList $psArguments -ErrorAction Stop | Out-Null
-            }
-            break
-        }
-        Invoke-KohaLaunch | Out-Null
-        Open-KohaPanel
-'@
-    $mainWindowsText = $mainWindowsText.Replace($launchAnchor, $firstLaunchBranch)
-    [System.IO.File]::WriteAllText($mainWindowsPath, $mainWindowsText, (New-Object System.Text.UTF8Encoding($true)))
-    if ($mainWindowsText -notmatch 'KOHA_MSIX_PANEL_SETUP' -or $installModuleText -notmatch 'Launch -Hidden') { throw 'A transicao entre os dois terminais nao foi aplicada corretamente.' }
-    if ($patchedModuleText -notmatch 'function Initialize-KohaPanelDependencies' -or $patchedModuleText -notmatch 'KOHA_MSIX_PANEL_DEPS_READY' -or $patchedModuleText -notmatch 'if \(-not \(Initialize-KohaPanelDependencies\)\)') { throw 'Falha ao inserir a barreira de dependencias antes do segundo terminal.' }
+    Write-Host 'Fontes de windows\ conferidos: staff na porta 8080, conta Debian protegida, dois terminais.' -ForegroundColor Gray
 
     # Manter windows\install.ps1 original. O bootstrap define KOHAEASY_NO_WT=1
     # somente durante a preparacao inicial, impedindo uma janela extra para Install.

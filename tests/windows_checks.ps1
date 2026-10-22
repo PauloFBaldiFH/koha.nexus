@@ -361,7 +361,32 @@ if (-not ($storeData.Name -or $storeData.Publisher -or $storeData.PublisherDispl
     try { [void](Get-KohaStoreIdentity -Path $storeJson) } catch { $storeError = $_.Exception.Message }
     Check 'store: store-identity.json is a valid identity' ($storeError -eq '') $storeError
 }
+# The MSIX build copies windows\ as it is (the MSIX changes live in the
+# sources since 543272d) and only checks it with Test-KohaMsixSources: run
+# the same check on the real files here, so a change to them that breaks
+# the MSIX shows up in CI and not on the build PC. A copy with the old
+# hard-coded password or the disabled account function must fail it.
+foreach ($fn in $builderAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Test-KohaMsixSources' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$msixProblems = @(Test-KohaMsixSources -WindowsDir (Join-Path $repo 'windows'))
+Check 'msix: windows\ has what the MSIX bootstrap uses' ($msixProblems.Count -eq 0) ($msixProblems -join '; ')
+$badCopy = Join-Path ([IO.Path]::GetTempPath()) ('koha-msix-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $badCopy | Out-Null
+try {
+    Copy-Item -Path (Join-Path $repo 'windows\*') -Destination $badCopy -Recurse
+    $badModule = Join-Path $badCopy 'KohaEasy.Install.psm1'
+    $text = [IO.File]::ReadAllText($badModule)
+    $text = $text.Replace('function Read-KohaLinuxAccount {', "function Read-KohaLinuxAccount { return @{ User = 'koha'; Password = 'kohanexuspassword123' } }`nfunction Read-KohaLinuxAccount_Disabled {")
+    [IO.File]::WriteAllText($badModule, $text)
+    $badProblems = @(Test-KohaMsixSources -WindowsDir $badCopy)
+    Check 'msix: a fixed password or disabled account prompt stops the build' (($badProblems -join ';') -match 'senha fixa' -and ($badProblems -join ';') -match '_Disabled') ($badProblems -join '; ')
+} finally {
+    Remove-Item -LiteralPath $badCopy -Recurse -Force
+}
 $builderText = Get-Content -LiteralPath $builder -Raw
+$rewrites = [regex]::Matches($builderText, 'WriteAllText\(\$(coreModulePath|installModulePath|mainWindowsPath|panelWrapperPath|iconFixScriptPath|windowsInstallerPath)\b')
+Check 'msix: the build rewrites no file of windows\' ($rewrites.Count -eq 0) (($rewrites | ForEach-Object { $_.Value }) -join '; ')
 $version = [regex]::Match($builderText, "(?m)^\`$targetVersion = '([^']+)'").Groups[1].Value
 $revision = [regex]::Match($builderText, "(?m)^\`$payloadRevision = '([^']+)'").Groups[1].Value
 Check 'msix: payload revision follows the version' ($version -and $revision.StartsWith($version + '-')) ('{0} / {1}' -f $version, $revision)
