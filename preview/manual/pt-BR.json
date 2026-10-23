@@ -39,21 +39,19 @@
   "sec-dashboard": {
    "summary": "O Painel de Controle é a tela inicial do painel: num relance você vê se o Koha está funcionando, quando foi feito o último backup, quanto disco resta e em quais endereços o catálogo responde.",
    "overview": [
-    "O Painel de Controle abre quando você inicia o painel com `sudo config.sh` e está sempre a uma tecla de distância (**d**). Ele lê o estado do servidor pelo verbo de status, somente leitura, do instalador: abri-lo nunca altera nada.",
-    "A tela é organizada de cima para baixo: o estado geral do Koha com o último backup e o espaço livre em disco; os endereços do catálogo público (OPAC) e da intranet para cada forma de acesso; e os componentes (MariaDB, Apache, Memcached, Plack, o motor de busca) com a resposta HTTP dos dois sites.",
-    "Dois botões agem sobre o servidor: **Reiniciar Koha**, para reiniciar os serviços rapidamente, e **Exportar diagnóstico**, para gerar um pacote de suporte com todas as senhas removidas."
+    "Abra com `sudo config.sh` no Linux ou pelo ícone Koha no Windows. Na tela principal, **d** abre o Painel de Controle. A consulta de estado não executa a instalação.",
+    "Os cartões mostram estado geral, último backup e espaço livre; em seguida vêm os endereços e os componentes MariaDB, Apache, RabbitMQ, Memcached e Koha, com a resposta HTTP.",
+    "**Atualizar** consulta novamente. **Reiniciar Koha** e **Exportar diagnóstico** executam tarefas próprias; podem ficar indisponíveis quando o instalador não oferece a tarefa correspondente."
    ],
    "steps": [
-    "Abra o painel com `sudo config.sh` (ou pelo ícone **Koha** no Windows). O Painel de Controle é a primeira tela.",
-    "Leia a linha de cima: **Koha** deve dizer *Funcionando*, **Último backup** deve ter menos de um dia e **Disco livre** deve comportar pelo menos dois backups.",
-    "Confira **Endereços** para saber os links a passar aos leitores (OPAC) e à equipe (intranet, porta 8080).",
-    "Olhe o **Estado dos componentes**: todos os serviços devem estar ativos e os dois sites devem responder com HTTP 200.",
-    "Depois de corrigir algo, pressione **Atualizar** para ler o estado de novo."
+    "Abra o painel e leia os indicadores de estado, último backup e espaço.",
+    "Nos cartões de endereço, escolha o acesso deste computador, da rede local ou da internet conforme o local onde está o navegador.",
+    "Confira os componentes e a resposta HTTP. Uma resposta, isoladamente, não comprova a conclusão do assistente web nem a operação de todas as funções do Koha.",
+    "Depois de corrigir um problema, pressione **Atualizar**."
    ],
    "tips": [
-    "Faça do Painel de Controle a sua verificação da manhã: um cartão vermelho ou amarelo é mais fácil de resolver no dia em que aparece do que uma semana depois.",
-    "Se o último backup tiver mais de 24 horas, abra a Central de backups e restauração e gere um backup manual antes de qualquer outra coisa.",
-    "Mantenha pelo menos 15–20% do disco livre: o MariaDB, o índice de busca e os backups noturnos precisam de espaço para trabalhar."
+    "O indicador de backup usa uma referência de dois dias e o resultado da última execução noturna. Ele não substitui testar o arquivo.",
+    "Planeje reinícios de serviços considerando os usuários conectados."
    ],
    "_en": "61795aa2e3"
   },
@@ -162,27 +160,28 @@
    "_en": "5be686fb44"
   },
   "install": {
-   "summary": "Instala o Koha com MariaDB, Apache, Memcached e Plack neste servidor numa única execução guiada, com as verificações, os ajustes e os agendamentos de que uma biblioteca em produção precisa.",
+   "summary": "Instala o servidor Koha por um fluxo guiado com verificações iniciais e finais. Leia os avisos antes de autorizar cada etapa.",
    "overview": [
-    "A instalação primeiro verifica o servidor: sistema operacional (Debian 11/12/13 ou Ubuntu 22.04/24.04, amd64 ou arm64), disco livre, acesso de rede ao repositório do Koha e se as portas 80 e 8080 estão livres. Depois configura UTF-8 e o idioma, sincroniza o relógio (NTP), pergunta o fuso horário, cria 4 GB de swap, atualiza o sistema, adiciona os repositórios oficiais do Koha e instala os pacotes.",
-    "Ela mostra sete etapas numeradas, uma linha por tarefa com uma pequena barra de progresso do Pac-Man. A saída dos comandos vai para `/var/log/koha-easy-install/apt.log`, o arquivo a enviar ao suporte se alguma etapa falhar. No final, uma tela lista os endereços do catálogo e da intranet.",
-    "O backup noturno, a exportação MARC semanal, os vigias do índice e as tarefas de limpeza são agendados automaticamente em `/etc/cron.d/koha_tasks`."
+    "A pré-validação verifica sistema, programas, acesso ao repositório, espaço e portas 80 e 8080. São versões testadas Debian 11/12/13 e Ubuntu 22.04/24.04, em amd64 e arm64. Menos de 5 GB livres impede a instalação; de 5 GB até menos de 10 GB gera aviso.",
+    "RAM no Linux, a confirmar: o guia existente indica 4 GB para servidor dedicado, com 8 GB recomendados, mas install_precheck não aplica um corte numérico de RAM. No Windows, a verificação exige 8 GB, com 12 GB recomendados, e 10 GB livres, com 20 GB recomendados.",
+    "O fluxo pede o fuso horário e informa as etapas em andamento. No Windows, a preparação do WSL e a finalização da integração são etapas adicionais ao trabalho dentro do painel."
    ],
    "steps": [
-    "Prepare um servidor com pelo menos 4 GB de RAM (8 GB recomendados), 5 GB de disco livre (10 GB recomendados) e acesso à Internet.",
-    "Rode `sudo bash installer`, escolha o idioma do painel e abra **Instalar servidor Koha**.",
-    "Escolha o fuso horário quando for perguntado e deixe o instalador trabalhar: costuma levar de 10 a 30 minutos.",
-    "No final, anote o usuário e a senha do banco de dados: eles também ficam salvos em `/root/koha_credentials.txt`.",
-    "Abra a intranet em `http://IP-DO-SERVIDOR:8080`, entre com essas credenciais e conclua o **Instalador Web** do Koha.",
-    "De volta ao painel, crie a sua própria conta da equipe com **Criar superbibliotecário**."
+    "Abra o instalador conforme o guia de instalação, escolha o idioma e selecione **Instalar servidor Koha**.",
+    "Leia os erros e avisos. Se houver portas ocupadas, autorize a liberação somente se os serviços que as usam puderem ser interrompidos.",
+    "Confirme o início e aceite o fuso detectado ou escolha região e cidade.",
+    "Se aparecer uma instância existente, confira o destino: REINSTALL autoriza apagar o banco e a configuração. Não use reinstalação apenas para abrir o painel.",
+    "Aguarde sem fechar a janela; a tarefa é não cancelável. A tela estima de 10 a 30 minutos, sem garantia de duração.",
+    "Leia a validação final e o relatório oferecido se houver falhas. Use os endereços apresentados para concluir o assistente web do Koha quando ele for exibido.",
+    "No fluxo Windows/MSIX, saia normalmente do painel após concluir e aguarde a finalização Windows."
    ],
    "tips": [
-    "Use um servidor ou máquina virtual dedicado: o Koha, o MariaDB e o motor de busca preferem ter a máquina só para eles.",
-    "Instale numa conexão cabeada: um download interrompido é a causa mais comum de etapa com falha.",
-    "Depois do Instalador Web, rode uma vez a **Verificação completa do sistema** para confirmar que está tudo verde."
+    "Use o Painel de Controle para conferir serviços e endereços depois da instalação.",
+    "Não compartilhe dados privados da tela de resultado em documentos públicos."
    ],
    "warnings": [
-    "Rodar a instalação de novo num servidor que já tem o Koha oferece uma reinstalação que APAGA o banco de dados. Ela pede uma confirmação digitada (REINSTALL): faça um backup antes."
+    "A confirmação REINSTALL é destrutiva. Mantenha uma cópia recuperável dos dados antes de uma reinstalação.",
+    "Fechar o aplicativo MSIX antes de instalar o servidor Koha não conclui a preparação do ambiente."
    ],
    "_en": "dc7cd9ccb0"
   },
@@ -208,50 +207,50 @@
    "_en": "68e9c48f84"
   },
   "restore": {
-   "summary": "Substitui o banco do Koha por um backup, com segurança: o arquivo é verificado e testado antes num banco temporário, uma cópia de segurança verificada do catálogo atual é feita e, se algo falhar, o catálogo anterior volta sozinho.",
+   "summary": "Substitui o banco do Koha pelo backup escolhido, depois de verificações e teste em base temporária. Para um banco atual com tabelas, exige criar e validar uma cópia de segurança antes de substituí-lo.",
    "overview": [
-    "A restauração é aberta pela **Central de backups e restauração** (o botão **Restaurar base de dados** na linha de cima, ou o cartão dela); desde a 1.5.54 ela não tem mais uma opção própria no menu principal.",
-    "A restauração lê backups `.sql`, puros ou compactados com gzip, bzip2, xz ou zstd. A compressão é reconhecida pelo conteúdo do arquivo, não pelo nome, então um arquivo renomeado continua funcionando. Você pode escolher o arquivo no seletor do painel, arrastá-lo para a janela do painel ou, no WSL, escolher um arquivo do disco do Windows: ele é copiado para dentro antes.",
-    "Antes de qualquer mudança, o arquivo é verificado: a compressão é testada, ele precisa terminar com a linha de conclusão do mysqldump e precisa conter as tabelas do Koha. Depois é importado num banco temporário; um backup com menos de 50 tabelas, ou sem tabelas do Koha, é recusado e nada muda.",
-    "Só então o painel faz um **backup de segurança** do catálogo atual (`pre_restore_safety_backup_<data>` na pasta de backups, compactado como definido na Central de backups e restauração) e o valida. Sem essa cópia verificada, o catálogo atual nunca é apagado.",
-    "A importação em si não pode ser cortada ao meio: o CTRL+C fica desativado até ela terminar e uma conexão SSH perdida não a interrompe. O banco é recriado, importado, o esquema é atualizado para esta versão do Koha, o motor de busca é sincronizado e o catálogo é reindexado por completo. Se uma etapa falhar, a cópia de segurança é recolocada automaticamente."
+    "Abra o cartão **Restaurar base de dados** dentro da **Central de backups e restauração**. Não há um botão superior de restauração nem uma entrada própria no menu principal atual.",
+    "O fluxo aceita SQL simples e compressões suportadas. Para o procedimento básico, use .sql, .sql.gz, .sql.zst ou .sql.xz. A validação do conteúdo continua necessária.",
+    "Um arquivo do disco Windows pode ser copiado para o Linux antes do trabalho. Por SSH, transfira o arquivo ao servidor conforme a orientação da própria tela.",
+    "Antes de substituir o banco, o processo importa em uma base temporária e verifica as tabelas essenciais. Para o banco atual com tabelas, cria um backup de segurança verificado; um banco vazio pode dispensá-lo.",
+    "A execução é não cancelável. O processo recria e importa o banco, atualiza o esquema, sincroniza a busca, reconstrói os índices e reinicia os serviços. O reaproveitamento da aparência salva é tentado quando há estado de tema."
    ],
    "steps": [
-    "Abra **Restaurar base de dados** (pela lista principal ou pelo botão **Restaurar base de dados** da Central de backups e restauração).",
-    "Escolha o arquivo de backup, ou solte-o na janela do painel.",
-    "Leia as verificações: um arquivo que não parece um dump completo do Koha aparece como *Arquivo suspeito* e pergunta antes de continuar.",
-    "Confirme a restauração. A tela mostra o arquivo, o tamanho e o espaço livre em disco.",
-    "Aguarde as etapas terminarem: backup de segurança, recriação, importação, atualização do esquema, motor de busca e reindexação.",
-    "Leia o resultado: o motor de busca em uso, o número de tabelas e o caminho do backup de segurança."
+    "Abra a central e escolha o cartão **Restaurar base de dados**.",
+    "Selecione o arquivo correto no servidor ou no disco Windows acessível ao WSL.",
+    "Leia as verificações e investigue avisos de arquivo suspeito ou incompleto.",
+    "Confira o arquivo, o tamanho e o espaço na confirmação. Autorizar essa tela permite substituir o banco atual.",
+    "Aguarde sem fechar a janela.",
+    "Leia o resultado e preserve o caminho do backup de segurança informado. Confira depois o catálogo e as buscas."
    ],
    "tips": [
-    "Teste o backup antes com **Testar a integridade do último backup** quando ele vier de outro servidor ou for antigo.",
-    "Confira o disco livre antes de começar: a restauração precisa de espaço para o banco temporário e para a cópia de segurança.",
-    "Guarde o backup de segurança até conferir o catálogo restaurado: é o seu caminho de volta ao estado anterior à restauração.",
-    "A aparência do OPAC é regravada depois da restauração, para que as preferências antigas do backup não a apaguem."
+    "Use **Testar a integridade do último backup** para testar o arquivo sem substituir a produção.",
+    "Confira o espaço necessário apresentado pelo fluxo. Não estime apenas pelo tamanho compactado.",
+    "Mantenha a cópia de segurança e uma cópia fora do servidor até conferir o resultado."
    ],
    "warnings": [
-    "Uma restauração substitui todo o catálogo, os leitores e os empréstimos pelo conteúdo do backup: tudo o que foi feito depois daquele backup se perde, a menos que você guarde a cópia de segurança.",
-    "Não restaure um backup de uma versão bem mais nova do Koha num Koha mais antigo: atualize o servidor primeiro."
+    "A restauração substitui dados pelo estado do backup: alterações posteriores não estarão nesse arquivo.",
+    "Em falhas de recriação, importação ou atualização do esquema, o código pode tentar recuperar o banco anterior. Essa recuperação também pode falhar; leia a mensagem final.",
+    "Uma falha de indexação pode acontecer depois de o banco já ter sido restaurado. Não suponha que toda falha recoloca automaticamente o banco anterior."
    ],
    "_en": "5911426d59"
   },
   "backup-manual": {
    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
    "steps": [
-    "Abra a Central de backups e restauração e escolha **Gerar backup manual e baixar no computador**.",
-    "Escolha a pasta de destino: a pasta padrão de backups, um pen drive (normalmente em `/media` ou `/mnt`) ou outra pasta.",
-    "Aguarde o dump e a verificação.",
-    "Leia o resultado: nome e tamanho do arquivo e, em seguida, o comando para colar no PowerShell ou no Terminal do seu computador e salvá-lo na pasta Downloads."
+    "Abra **Gerar backup manual e baixar no computador** na central.",
+    "Confira a pasta no servidor e pressione **Salvar backup**.",
+    "Aguarde a geração e a verificação; confira arquivo e tamanho.",
+    "No WSL, use **Baixar na pasta Downloads** ou **Escolher pasta no Windows**. Em acesso remoto, execute no seu computador o comando de transferência mostrado.",
+    "Confira a cópia no destino e pressione **Concluir e sair**."
    ],
    "overview": [
-    "O backup usa a compressão escolhida em **Novos backups** (gzip, Zstandard ou XZ). Ele se recusa a começar enquanto outro backup ou uma restauração estiver rodando, para que dois trabalhos nunca gravem ao mesmo tempo.",
-    "Num desktop Linux ou no WSL, **Baixar Backup Recente**, na Central de backups e restauração, copia o arquivo mais novo direto para a sua pasta Downloads."
+    "A tela usa por padrão a subpasta backups da pasta do usuário identificado pelo painel. Você pode escolher outro destino gravável. A compressão é a escolhida na central.",
+    "O arquivo é gerado e verificado antes da cópia. A rotina compartilha a trava com outros backups e restaurações. Os botões de pasta Windows existem somente no WSL."
    ],
    "tips": [
-    "Faça um backup manual antes de qualquer mudança grande: uma atualização, uma importação em massa, uma troca de motor de busca.",
-    "Mantenha pelo menos uma cópia fora do servidor (um PC, um pen drive guardado em outro lugar, ou a nuvem): um backup no mesmo disco não sobrevive a uma falha do disco.",
-    "Dê às cópias que você guarda um nome com data e motivo, por exemplo `antes-da-atualizacao-2026-10.sql.zst`."
+    "Recomendação operacional: gere uma cópia atual antes de alterações importantes.",
+    "Mantenha uma cópia fora do servidor e teste o arquivo que pretende usar para recuperação."
    ],
    "_en": "2235ff5dc0"
   },
@@ -308,13 +307,13 @@
   "sec-backup": {
    "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
    "overview": [
-    "O banco do Koha é copiado toda noite às 23:00 (compactado, verificado e enviado para a nuvem quando ela está configurada), e os registros bibliográficos e de autoridade são exportados em MARC21 todo domingo. A Central de backups e restauração (tecla **b**) mostra como isso está indo e permite agir.",
-    "Desde a 1.5.54 a restauração do banco fica só aqui: o menu principal não tem mais a opção separada **Restaurar base de dados**, então a restauração, a exportação MARC21 e as rotinas de backup ficam todas nesta mesma tela (no painel e no menu clássico).",
-    "Primeiro vêm três cartões (**Último backup**, **Tamanho** e o **resultado** da última execução noturna), depois a caixa **Tipo de compressão dos backups** com a escolha da compressão e, por fim, as ações em cartões, o único lugar delas desde a 1.5.56: **Baixar Backup Recente**, **Gerar backup manual**, **Exportar registros MARC21 agora**, **Restaurar base de dados**, **Configurar backup na nuvem** e **Testar integridade do último backup**."
+    "A central reúne os cartões de operação de backup e restauração. A tecla **b** abre essa tela principal.",
+    "O instalador grava por padrão backup SQL diário às 23:00 e exportação MARC aos domingos às 03:00, no horário do servidor. Os agendamentos podem ter sido personalizados.",
+    "A data e o tamanho descrevem o arquivo mais recente encontrado; o resultado descreve a última execução noturna. São indicadores distintos. Depois do seletor de compressão ficam os cartões de download, backup manual, MARC21, restauração, nuvem e teste."
    ],
    "tips": [
-    "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma delas fora da biblioteca (o backup na nuvem cobre isso).",
-    "Um backup que nunca foi testado é uma esperança, não um backup: agende um teste de integridade mensal."
+    "Recomendação operacional: mantenha uma cópia fora do servidor e verifique se consegue recuperá-la.",
+    "Teste o arquivo em banco temporário antes de contar com ele para restauração."
    ],
    "_en": "aac9b45396"
   },
@@ -361,54 +360,51 @@
    "title": "Tipo de compressão dos backups",
    "summary": "Escolhe como os novos backups são compactados: gzip (abre em qualquer lugar), Zstandard (rápido e menor, para acervos grandes) ou XZ (o menor, lento para gerar, para guarda de longo prazo).",
    "overview": [
-    "A escolha é salva como `BACKUP_COMPRESSION` nas configurações de backup do painel e vale para o backup noturno, para os backups manuais e para as cópias de segurança feitas antes de uma alteração (uma restauração, uma atualização, uma ferramenta da biblioteca). O script noturno a lê toda noite, então o próximo backup já a usa.",
-    "A restauração não depende desta configuração: **Restaurar base de dados** reconhece `.sql`, `.sql.gz`, `.sql.zst` e `.sql.xz` pelo conteúdo. Backups antigos em outro formato continuam funcionando.",
-    "Se o programa da compressão escolhida (`zstd` ou `xz`) não estiver no servidor, os backups voltam para o gzip e a caixa avisa; escolher a compressão de novo instala o programa."
+    "A seleção em **Compressão** é salva ao mudar o valor e vale para novos backups noturnos, manuais e de segurança. Arquivos existentes não são recomprimidos.",
+    "A restauração reconhece os formatos suportados independentemente da compressão escolhida para os novos backups.",
+    "Se o programa da compressão não puder ser instalado, a tela informa o problema e os novos backups continuam com gzip."
    ],
    "options": [
     {
      "name": "Gzip (.sql.gz)",
-     "text": "O padrão. Qualquer sistema abre (7-Zip, WinRAR, qualquer Linux). Bom equilíbrio para acervos pequenos e médios."
+     "text": "A tela apresenta esta opção como de compatibilidade ampla."
     },
     {
      "name": "Zstandard (.sql.zst)",
-     "text": "Compacta e descompacta muito mais rápido que o gzip e gera arquivos menores. A melhor escolha para acervos grandes e para envios à nuvem. No Windows, abre com o 7-Zip ZS ou o PeaZip."
+     "text": "A tela apresenta esta opção como rápida e menor, voltada a catálogos grandes."
     },
     {
      "name": "XZ / LZMA (.sql.xz)",
-     "text": "Os menores arquivos, mas mais lento para gerar e mais pesado para a CPU. Bom para arquivos guardados por anos ou para conexões de envio lentas."
+     "text": "A tela apresenta esta opção como de arquivo menor, com geração mais lenta."
     }
    ],
    "steps": [
-    "Abra a Central de backups e restauração (tecla **b**).",
-    "Na caixa **Novos backups**, abra **Compressão** e escolha uma opção.",
-    "Aguarde *Salvando as configurações de backup*; um aviso confirma a nova escolha.",
-    "Na manhã seguinte, confira se o **Último backup** mostra a nova extensão."
+    "Abra a Central de backups e restauração pela tecla **b** na tela principal.",
+    "No seletor **Compressão**, escolha Gzip, Zstandard ou XZ / LZMA.",
+    "Aguarde a gravação das configurações e leia o resultado.",
+    "Confira no próximo backup o formato efetivamente usado."
    ],
    "tips": [
-    "Escolha Zstandard quando o backup do acervo passar de algumas centenas de MB ou quando você enviar para a nuvem toda noite.",
-    "Escolha XZ em servidores pequenos com tempo livre à noite e Internet lenta.",
-    "Mantenha o gzip quando os backups forem abertos por pessoas de fora da biblioteca, que talvez não tenham outras ferramentas."
+    "Escolha considerando o tempo de geração, o espaço e as ferramentas disponíveis para recuperar o arquivo."
    ],
    "_en": "7c9dda9d5a"
   },
   "backup-safety": {
    "title": "Backup de segurança antes da restauração",
-   "summary": "Antes que a restauração substitua o catálogo, o painel salva e valida uma cópia completa do banco atual. Sem ela, o catálogo atual nunca é apagado; e se a restauração falhar, essa cópia é recolocada automaticamente.",
+   "summary": "Antes de substituir um banco com tabelas, a restauração cria e valida um backup de segurança. Se essa criação falhar, não prossegue com a substituição. Um banco vazio pode dispensar a cópia.",
    "overview": [
-    "A cópia é gravada como `pre_restore_safety_backup_<data>_<hora>` na pasta de backups (`/var/backups/koha_sql`), com a compressão escolhida em **Novos backups**. Ela é gravada primeiro num arquivo `.part` e só é renomeada quando está completa, para que uma cópia pela metade nunca seja confundida com um backup.",
-    "Se a cópia não puder ser criada ou validada (por exemplo, por falta de espaço em disco), a restauração para com *Falha no backup de segurança* e nada muda. Um banco sem tabelas não tem o que salvar, e a tela avisa.",
-    "A tela de resultado da restauração mostra o caminho da cópia de segurança. Se depois o reparo do índice encontrar um banco vazio, ele também aponta para a cópia de segurança mais nova."
+    "O arquivo fica em `/var/backups/koha_sql`, com prefixo `pre_restore_safety_backup_` e a compressão selecionada. Ele é escrito como .part e promovido a arquivo final depois da verificação.",
+    "Se a restauração falhar em determinadas etapas, o código pode tentar repor essa cópia. A tentativa pode falhar; falhas posteriores na indexação também não significam retorno automático ao banco anterior."
    ],
    "steps": [
-    "Inicie **Restaurar base de dados** normalmente: a cópia de segurança é automática.",
-    "Acompanhe a etapa *Salvando um backup de segurança do banco de dados atual*.",
-    "No final, anote o caminho do **Backup de segurança** mostrado no resultado.",
-    "Para desfazer a restauração, rode **Restaurar base de dados** de novo e escolha esse arquivo."
+    "Abra **Restaurar base de dados** pela central e selecione o arquivo desejado.",
+    "Depois de autorizar a substituição, acompanhe a criação da cópia de segurança.",
+    "Preserve o caminho informado no resultado.",
+    "Se precisar usar essa cópia para recuperação, retorne ao cartão de restauração da central e avalie o estado do banco antes de confirmar."
    ],
    "tips": [
-    "Deixe livre pelo menos o dobro do tamanho de um backup antes de restaurar: uma parte para o banco temporário de teste, outra para a cópia de segurança.",
-    "Apague cópias de segurança antigas só depois de conferir o catálogo restaurado por alguns dias."
+    "Confira a estimativa de espaço do fluxo e mantenha espaço para o teste temporário e a cópia de segurança.",
+    "Não exclua a cópia antes de conferir o catálogo restaurado e as buscas."
    ],
    "_en": "b5819e5c76"
   },
