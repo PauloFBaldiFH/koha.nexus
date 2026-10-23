@@ -65,13 +65,37 @@ def models_endpoint(c: dict[str, str]) -> tuple[str, dict[str, str]]:
     return b + "/models", headers
 
 
+SECRET_HEADERS = ("authorization", "x-api-key", "x-goog-api-key", "api-key")
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    u = urllib.parse.urlsplit(url)
+    port = u.port or {"http": 80, "https": 443}.get(u.scheme.lower())
+    return u.scheme.lower(), (u.hostname or "").lower(), port
+
+
+class _KeepKeysHome(urllib.request.HTTPRedirectHandler):
+    """Follows redirects as urllib does, but a key header is only sent again
+    to the same scheme, host and port: never to another server, never from
+    HTTPS down to HTTP."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and _origin(newurl) != _origin(req.full_url):
+            for name in list(new.headers):
+                if name.lower() in SECRET_HEADERS:
+                    del new.headers[name]
+        return new
+
+
 def _open(req: urllib.request.Request, timeout: float):
     """urlopen, but never through an HTTP proxy for this machine or the local
-    network (a proxy set for apt would answer for Ollama instead)."""
+    network (a proxy set for apt would answer for Ollama instead), and never
+    with a key sent on to another server by a redirect."""
     host = urllib.parse.urlsplit(req.full_url).hostname or ""
     if aiconf.is_local_host(host):
-        return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout)
-    return urllib.request.urlopen(req, timeout=timeout)
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _KeepKeysHome()).open(req, timeout=timeout)
+    return urllib.request.build_opener(_KeepKeysHome()).open(req, timeout=timeout)
 
 
 def _reason(e: Exception) -> str:

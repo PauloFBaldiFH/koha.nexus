@@ -109,3 +109,60 @@ def test_ollama_keeps_only_the_chosen_models_in_memory(server):
     assert aiclient.ollama_keep_only(server, ["llama3", ""]) == ["qwen2.5vl:7b", "qwen2.5:3b"]
     assert aiclient.ollama_loaded(server) == ["llama3:latest"]
     assert aiclient.ollama_keep_only(server, []) == ["llama3:latest"] and LOADED == []
+
+
+SEEN: list[str | None] = []    # Authorization each server got
+
+
+class Seen(BaseHTTPRequestHandler):
+    target = ""                   # where /v1/models redirects ("" = answer it)
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        SEEN.append(self.headers.get("Authorization"))
+        if self.path == "/v1/models" and self.target:
+            self.send_response(302)
+            self.send_header("Location", self.target)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        body = json.dumps({"data": [{"id": "m"}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def _serve(handler):
+    httpd = HTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def test_key_is_not_sent_on_to_another_server():
+    other = _serve(type("Other", (Seen,), {"target": ""}))
+    first = _serve(type("First", (Seen,), {"target": f"http://127.0.0.1:{other.server_port}/v1/elsewhere"}))
+    try:
+        SEEN.clear()
+        conf = {"provider": "compatible", "url": f"http://127.0.0.1:{first.server_port}",
+                "model": "m", "token": SECRET}
+        assert aiclient.check_connection(conf).found
+        assert SEEN == [f"Bearer {SECRET}", None]
+    finally:
+        first.shutdown()
+        other.shutdown()
+
+
+def test_key_follows_a_redirect_on_the_same_server():
+    httpd = _serve(type("Same", (Seen,), {"target": "/v1/models-moved"}))
+    try:
+        SEEN.clear()
+        conf = {"provider": "compatible", "url": f"http://127.0.0.1:{httpd.server_port}",
+                "model": "m", "token": SECRET}
+        assert aiclient.check_connection(conf).found
+        assert SEEN == [f"Bearer {SECRET}", f"Bearer {SECRET}"]
+    finally:
+        httpd.shutdown()
