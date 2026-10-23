@@ -13435,20 +13435,19 @@
   },
   "magic-import": {
    "en": {
-    "summary": "One entry for every import: drop a file, a folder or an archive with records, copies, patrons, loans or holds, and the Magic Import Tool recognises the format, asks only what it cannot work out, shows a preview and imports with Koha's own tools after a verified backup.",
+    "summary": "Prepares bibliographic records, items, patrons and authorities through format detection, manual review, validation and confirmation before import.",
     "overview": [
-     "It reads spreadsheets (CSV/TSV in any separator and encoding, Excel `.xlsx`/`.xls`, LibreOffice `.ods`, dBase `.dbf`), MARC 21 (ISO 2709 `.mrc`/`.iso` and MARCXML), the database of Biblioteca Fácil, ISIS catalogues (PostgreSQL backups) and archives of them (`.zip`, `.tar`, `.gz`, `.bz2`, `.xz`). Formats are recognised by their bytes, never by the file name alone.",
-     "In a spreadsheet, each column is scored against every MARC 21 and patron field from its header and its values (ISBN and CPF check digits, dates, e-mails, call numbers). Rows of the same book become one record with one item per copy; people with a valid CPF, e-mail or card number become patrons; a loans sheet feeds both.",
-     "Copies kept in another system's item field (949, 950, 990, or MARC 21 holdings in 852) become Koha items (952), reading each subfield by its meaning, so exports of Biblivre, SophiA and Pergamum are understood.",
-     "A Koha backup is never imported: it replaces the whole catalogue, so the tool sends it to **Restore database**."
+     "The current reader recognises MARC21 ISO 2709, MARCXML and textual MARC, including .mrk, as well as spreadsheets, tables and recognised legacy exports. Recognition does not guarantee correct interpretation of every proprietary layout.",
+     "Check Bibliographic, Patrons and Authorities modes, each destination, target Koha codes and the record preview. Check the whole file prepares and validates the full input without importing it into Koha at that stage.",
+     "Native 952 items can have library and item type remapped. Local fields require item evidence: a legal deposit annotation is not automatically a local holding. Missing and colliding barcodes need review.",
+     "A full Koha database backup is redirected to restore, which replaces the database rather than adding records."
     ],
     "steps": [
-     "Put the files in the `importar` folder of your home (on Windows also `C:\\Koha\\Importar`), or keep them anywhere and use **Another file**.",
-     "Open **Magic Import Tool** (key **i**) and pick what to import.",
-     "Answer the questions, if any: a column the tool is not sure about is shown with sample values. Your answers are remembered for the next file with the same columns.",
-     "Read the preview carefully: what was found in each file, where each column goes, the counts, sample records and rejected lines with the reason.",
-     "Confirm each part (records, patrons, loans and holds). Each one gets its own verified `PRE-*` backup before it is written.",
-     "Read the summary, then search a few records and patrons in Koha to check them."
+     "Choose the input in Magic Import Tool with i. It must be accessible to the server running the panel.",
+     "Review mode, mapping, examples and defaults. Apply accepts the mapping and continues preparation; it is not the final write confirmation.",
+     "Check counts, rejections and outstanding questions about library, item type, category and patron updates.",
+     "Read the final preview and policy for existing records before confirming.",
+     "Check the summary and resulting data in Koha. Chapter 4 of the complete manual gives the detailed procedure."
     ],
     "tips": [
      "Start with a small sample of the file to see how the columns are read before importing everything.",
@@ -13457,8 +13456,9 @@
      "If a MARC import went wrong, use **Undo a MARC import** instead of deleting records by hand."
     ],
     "warnings": [
-     "What the tool cannot read is listed with what to do: MarcEdit `.mrk` text (save it as `.mrc`), a CDS/ISIS master file (export it from WinISIS as ISO 2709) or an SQL dump of another system.",
-     "Patron files contain personal data: delete them from the `importar` folder after the import."
+     "A later failure can leave earlier stages imported. Do not automatically repeat the complete batch.",
+     "Undo a MARC import is not a universal undo for patrons, loans and holds.",
+     "Exports and logs can contain personal data. Do not publish them."
     ],
     "related": [
      "marc-undo",
@@ -13492,7 +13492,8 @@
      "Uma falha posterior pode deixar dados das etapas anteriores importados. Não repita o lote completo automaticamente.",
      "Desfazer uma importação MARC não é uma reversão universal de leitores, empréstimos e reservas.",
      "Exportações e logs podem conter dados pessoais. Não os publique."
-    ]
+    ],
+    "outdated": true
    }
   },
   "sec-database": {
@@ -13720,7 +13721,7 @@
     "steps": [
      "Open **OPAC and Staff Appearance** (key **o**). Press **Sync current OPAC settings** to start from what is live.",
      "Adjust each box: material, pictures, dark mode, carousel, buttons, staff interface.",
-     "Press **Preview** to see what goes into Koha.",
+     "Use Preview to read the CSS, JavaScript and content to be written. This screen does not render the complete website.",
      "Press **Apply**: a database backup is taken and the look is written.",
      "Open the OPAC in a private window (or press CTRL+F5) to see the result."
     ],
@@ -13757,7 +13758,8 @@
     "tips": [
      "Mude uma coisa de cada vez e confira o OPAC no celular, além do computador.",
      "Escolha cores com bom contraste: leitores com baixa visão dependem disso."
-    ]
+    ],
+    "outdated": true
    }
   },
   "email": {
@@ -14903,12 +14905,12 @@
      "Press **Apply** to write the records, or, for a typed book, pick a record and press **Import as new record**."
     ],
     "tips": [
-     "The service starts when you search and stops after 5 idle minutes; it uses a quarter of one CPU.",
-     "A large job (the whole catalogue) takes hours; leave the computer on. It searches 4 records at once (`KEI_ONDEMAND_PARALLEL` in the panel's .env, 1 to 8), each on servers that are free, slows down for a server that answers slowly, and the screen shows the speed and the time left. When the internet goes away it waits and tries again instead of marking records as not found. It runs in the background, goes on from its last record after a restart, and waits while **Pause** is on.",
-     "An imported record is taken out again with **Undo a MARC import** (Library tools)."
+     "There is no general 50-record search limit; that number affects the application protection chosen for small jobs.",
+     "Large jobs can take hours and continue in the background. Monitor reports and server errors.",
+     "A record added as new can be handled by Undo a MARC import."
     ],
     "warnings": [
-     "Apply and Import change the catalogue. Both ask first; Revert and Undo a MARC import undo them."
+     "Apply and Import change the catalogue and request confirmation. Revert follows job rules and preserves records edited afterwards; it is not a full database restore."
     ],
     "related": [
      "sec-z3950",
@@ -17923,6 +17925,8 @@
     "backup-manual",
     "restore",
     "sec-backup",
+    "magic-import",
+    "sec-opac",
     "backup-compression",
     "backup-safety"
    ],
