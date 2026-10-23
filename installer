@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.101"
+PANEL_VERSION=" 1.5.102"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2956,9 +2956,14 @@ backup_set_codec() {
 # .sql.zst or .sql.xz) and checks the result (compression test, complete
 # mysqldump, minimum size). Removes the file and returns 1 on any failure.
 create_safety_backup() {
-    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec part="${1}.part"
+    local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec part="${1}.part" um
     case "$out" in *.zst) codec=zst ;; *.xz) codec=xz ;; *) codec=gz ;; esac
     mkdir -p "$(dirname "$out")" 2>/dev/null
+    # In the backup folder a copy is for root only (600), as the cron
+    # backups are: it holds every patron. A manual backup to a folder the
+    # operator chose keeps the usual mode, so they can still open it.
+    um=$(umask)
+    case "$out" in "${DIR_SQL%/}"/*|"${DIR_MARC%/}"/*) umask 077 ;; esac
     # Written as FILE.part and renamed once verified: a dump in progress or
     # cut short is never taken for the newest backup (sql_backup_list).
     if mysqldump --single-transaction --quick --routines --triggers \
@@ -2967,8 +2972,10 @@ create_safety_backup() {
        && [ "$(stat -c %s "$part" 2>/dev/null || echo 0)" -ge 10240 ] \
        && dump_is_complete "$part" \
        && mv -f -- "$part" "$out"; then
+        umask "$um"
         return 0
     fi
+    umask "$um"
     rm -f -- "$part" "$out"
     return 1
 }
@@ -21992,6 +21999,7 @@ single files (.gz, .bz2, .xz, .zst) are read through their decompressor and
 only written out when a reader needs a real file. Zstandard has no module in
 Python's standard library before 3.14: it is read through the zstd program."""
 import bz2
+import errno
 import gzip
 import lzma
 import os
@@ -22038,6 +22046,28 @@ class ZstdReader:
         self.close()
 
 
+MIN_FREE = 1 << 30          # a plain .gz/.bz2/.xz/.zst stops before the disk has less free
+
+
+def copy_keeping_room(src, dst, where, display):
+    """shutil.copyfileobj, but it stops with ENOSPC (as a full disk would)
+    before the volume of `where` drops under MIN_FREE: a small compressed
+    file can expand to fill the disk. No size cap, so a big backup that
+    fits is still unpacked."""
+    while True:
+        buf = src.read(1 << 20)
+        if not buf:
+            return
+        try:
+            free = shutil.disk_usage(where).free
+        except OSError:
+            free = None
+        if free is not None and free - len(buf) < MIN_FREE:
+            raise OSError(errno.ENOSPC, "%s: not enough free disk space to unpack it (less than %d GiB "
+                          "would be left)" % (display, MIN_FREE >> 30))
+        dst.write(buf)
+
+
 class Member:
     n_plain = 0
 
@@ -22069,8 +22099,16 @@ class Member:
             base = re.sub(r"\.(gz|bz2|xz|zst)$", "", base, flags=re.I)
             Member.n_plain += 1
             self._plain = os.path.join(work, "plain", "%d-%s" % (Member.n_plain, safe_name(base)))
-            with self.open() as src, open(self._plain, "wb") as dst:
-                shutil.copyfileobj(src, dst, 1 << 20)
+            try:
+                with self.open() as src, open(self._plain, "wb") as dst:
+                    copy_keeping_room(src, dst, work, self.display)
+            except BaseException:
+                try:
+                    os.remove(self._plain)
+                except OSError:
+                    pass
+                self._plain = None
+                raise
         return self._plain
 
 

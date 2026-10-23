@@ -114,6 +114,19 @@ EOF
     [ "$(grep -c '^BACKUP_COMPRESSION=' "$W/conf/backup.conf")" = "1" ]
 }
 
+@test "a safety backup in the backup folder is for root only; elsewhere it keeps the usual mode" {
+    codec_env
+    mkdir -p "$W/koha_sql" "$W/chosen"
+    run bash -c "source '$W/env.sh'; DIR_SQL='$W/koha_sql'; DIR_MARC='$W/koha_marc'; umask 022
+        create_safety_backup '$W/koha_sql/PRE-TEST.sql.gz' && stat -c %a '$W/koha_sql/PRE-TEST.sql.gz'
+        create_safety_backup '$W/chosen/manual.sql.gz' && stat -c %a '$W/chosen/manual.sql.gz'
+        umask"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "600" ]
+    [ "${lines[1]}" = "644" ]
+    [ "${lines[2]}" = "0022" ]
+}
+
 @test "an unknown compression is refused; a missing program falls back to gzip" {
     codec_env
     run bash -c "source '$W/env.sh'; backup_set_codec rar; echo rc=\$?"
