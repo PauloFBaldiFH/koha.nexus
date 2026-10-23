@@ -26,10 +26,11 @@ Este índice acompanha o manual completo de nove capítulos. Os textos descrevem
 - [Tiếng Việt](vi/README.md).
 - [中文（简体）](zh/README.md).
 - [日本語](ja/README.md).
+- [한국어](ko/README.md).
 
 ## Cobertura conferida no código
 
-A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. O quarto lote acrescenta hindi, bengali, vietnamita, chinês simplificado e japonês. Com os idiomas anteriores, são **22 manuais com nove capítulos**; resta somente coreano dessa lista.
+A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. Com a inclusão do coreano, todos os **23 idiomas têm os nove capítulos do manual**. Não há idioma pendente nesse conjunto de capítulos; os pontos a confirmar no código continuam indicados nos índices de cada idioma.
 
 | Código do painel | Idioma | Capítulos disponíveis |
 | --- | --- | --- |
@@ -55,12 +56,12 @@ A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 out
 | `vi` | Tiếng Việt | 9/9 |
 | `zh` | 中文 (简体) | 9/9 |
 | `ja` | 日本語 | 9/9 |
-| `ko` | 한국어 | Pendente |
+| `ko` | 한국어 | 9/9 |
 
 ## Escopo da tradução
 
 Os capítulos foram redigidos manualmente, com comandos, caminhos e rótulos exatos das ações preservados. Os nomes de ações aparecem em inglês como referência ao código; o painel pode exibi-los traduzidos. Nenhuma rotina do painel foi alterada.
 
-Este índice mede os nove capítulos em `docs/manual/`. Os guias curtos por cartão da prévia interativa em `preview/manual/` são um conjunto distinto. Neste lote, eles continuam com o aviso de inglês quando ainda não possuem tradução. Não se declara tradução integral desses guias por ter traduzido os nove capítulos.
+Este índice mede os nove capítulos em `docs/manual/`. Os guias curtos por cartão da prévia interativa em `preview/manual/` são um conjunto distinto. Esses guias continuam com o aviso de inglês quando ainda não possuem tradução. Não se declara tradução integral desses guias por ter traduzido os nove capítulos.
 
 Os horários operacionais documentados são os do servidor configurado. As verificações de código não equivalem a testes de instalação, restore ou migração em produção. Os pontos incertos permanecem nos índices de cada idioma.
