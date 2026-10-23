@@ -2147,6 +2147,21 @@
     },
     {
      "type": "button",
+     "label": "Select for search",
+     "primary": false
+    },
+    {
+     "type": "button",
+     "label": "Unselect for search",
+     "primary": false
+    },
+    {
+     "type": "button",
+     "label": "Unselect all",
+     "primary": false
+    },
+    {
+     "type": "button",
      "label": "Community list",
      "primary": false
     },
@@ -9144,6 +9159,81 @@
    "fr": "Masquer",
    "it": "Nascondi",
    "de": "Ausblenden",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Select for search": {
+   "en": "Select for search",
+   "pt-BR": "Selecionar",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Unselect for search": {
+   "en": "Unselect for search",
+   "pt-BR": "Desselecionar",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Unselect all": {
+   "en": "Unselect all",
+   "pt-BR": "Desmarcar todos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -16750,6 +16840,10 @@
       "text": "The tick is \"selected for the cataloguing search\". Adds the ticked servers Koha does not have (ranked by speed in the last test) and ticks or unticks the ones it has. An unticked server stays in Koha, only out of the search. A ticked server stays in the list even when it fails, so you can untick it."
      },
      {
+      "name": "Select for search / Unselect for search / Unselect all",
+      "text": "Select for search ticks the server under the cursor (on a region's heading, all of its servers) so Koha's cataloguing search comes with it ticked; Unselect for search takes the tick off; Unselect all clears every tick. The space bar or a click on a row does the same as Select / Unselect. Nothing changes in Koha until Save to Koha."
+     },
+     {
       "name": "At most 20 servers",
       "text": "Recommendation: tick at most 20 servers at once, since more can make the search unstable. Past 20 the note turns to the warning colour, but nothing is blocked."
      },
@@ -16801,6 +16895,10 @@
      {
       "name": "Salvar no Koha",
       "text": "A marca quer dizer \"selecionado para a pesquisa da catalogação\". Adiciona os servidores marcados que o Koha não tem (por ordem de velocidade no último teste) e marca ou desmarca os que ele já tem. Um servidor desmarcado continua no Koha, só fora da pesquisa. Um servidor marcado continua na lista mesmo se falhar, para você poder desmarcar."
+     },
+     {
+      "name": "Selecionar / Desselecionar / Desmarcar todos",
+      "text": "Selecionar marca o servidor do cursor (no título de uma região, todos os servidores dela) para que a pesquisa da catalogação do Koha já venha com ele marcado; Desselecionar tira a marca; Desmarcar todos tira todas as marcas. A barra de espaço ou um clique na linha fazem o mesmo. Nada muda no Koha até Salvar no Koha."
      },
      {
       "name": "No máximo 20 servidores",
@@ -17964,8 +18062,8 @@
    "manual": 111,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 381,
-   "strings_total": 381
+   "strings": 384,
+   "strings_total": 384
   },
   "pt-BR": {
    "manual": 111,
@@ -17984,155 +18082,155 @@
     "backup-safety",
     "ai-ollama"
    ],
-   "strings": 373,
-   "strings_total": 381
+   "strings": 376,
+   "strings_total": 384
   },
   "es": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 261,
-   "strings_total": 381
+   "strings_total": 384
   },
   "fr": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 256,
-   "strings_total": 381
+   "strings_total": 384
   },
   "it": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 256,
-   "strings_total": 381
+   "strings_total": 384
   },
   "de": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 256,
-   "strings_total": 381
+   "strings_total": 384
   },
   "nl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "sv": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "pl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "cs": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "ru": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "uk": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "tr": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "tl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "id": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "ar": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "fa": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "hi": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "bn": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "vi": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "zh": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "ja": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   },
   "ko": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 381
+   "strings_total": 384
   }
  }
 }

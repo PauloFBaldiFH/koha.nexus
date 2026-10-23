@@ -110,8 +110,9 @@ class Z3950View(SectionView):
     def compose_outbound(self) -> ComposeResult:
         yield Static(t("Public catalogues to copy records from. \"Show servers\" tests every server with a real "
                       "search and lists the ones that return a record; a backup server appears only when its "
-                      "main server returns none. Tick (space bar, or a region to tick it all) the servers for "
-                      "Koha's cataloguing search, then Save to Koha. * an address from an older list."),
+                      "main server returns none. Select for search (or the space bar; on a region, all of it) "
+                      "the servers Koha's cataloguing search comes with ticked, Unselect the others, then Save to "
+                      "Koha. * an address from an older list."),
                      classes="view-prompt", markup=False)
         with Horizontal(classes="quick-actions"):
             yield Button(t("Show servers"), id="z-scan", classes="small", variant="primary")
@@ -119,6 +120,10 @@ class Z3950View(SectionView):
             yield Button(t("Add server"), id="z-new", classes="small")
             yield Button(t("Login"), id="z-login", classes="small")
             yield Button(t("Hide"), id="z-hide", classes="small")
+        with Horizontal(classes="quick-actions"):
+            yield Button(t("Select for search"), id="z-tick", classes="small")
+            yield Button(t("Unselect for search"), id="z-untick", classes="small")
+            yield Button(t("Unselect all"), id="z-untick-all", classes="small")
         with Horizontal(classes="quick-actions"):
             yield Button(t("Community list"), id="z-sync", classes="small")
             yield Button(t("Import"), id="z-import", classes="small")
@@ -386,6 +391,27 @@ class Z3950View(SectionView):
     def action_toggle(self) -> None:
         self.toggle(self.cursor_key())
 
+    def set_ticks(self, on: bool, key: str | None = None) -> None:
+        """Select / Unselect: the server under the cursor, or all of its
+        region on a region's heading (Save to Koha writes it)."""
+        key = self.cursor_key() if key is None else key
+        if key.startswith("region:"):
+            keys = {tg.key for tg in self.visible() if tg.region == key[7:]}
+        elif self.by_key(key):
+            keys = {key}
+        else:
+            self.app.notify(t("Move the cursor to a server first."), severity="warning")
+            return
+        if on:
+            self.selected |= keys
+        else:
+            self.selected -= keys
+        self.draw()
+
+    def untick_all(self) -> None:
+        self.selected.clear()
+        self.draw()
+
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         event.stop()
         self.toggle(event.row_key.value or "")
@@ -398,7 +424,8 @@ class Z3950View(SectionView):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {"z-scan": self.scan, "z-add": self.add, "z-new": self.new_server, "z-login": self.login,
-                   "z-hide": self.hide,
+                   "z-hide": self.hide, "z-tick": lambda: self.set_ticks(True),
+                   "z-untick": lambda: self.set_ticks(False), "z-untick-all": self.untick_all,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
                    "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
                    "z-update": self.update_servers, "z-health-reset": self.reset_health,
