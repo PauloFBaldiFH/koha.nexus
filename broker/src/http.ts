@@ -28,6 +28,37 @@ export function errorResponse(e: HttpError): Response {
   return json({ error: e.message }, e.status, e.headers);
 }
 
+/**
+ * The request body, read chunk by chunk and refused (413) once it passes
+ * `max` bytes: a body sent without Content-Length is never held whole first.
+ */
+export async function readBodyLimited(request: Request, max: number): Promise<ArrayBuffer> {
+  const declared = request.headers.get("Content-Length");
+  if (declared !== null && !/^\d+$/.test(declared.trim())) throw new HttpError(400, "invalid Content-Length");
+  if (declared !== null && Number(declared) > max) throw new HttpError(413, "request body too large");
+  if (!request.body) return new ArrayBuffer(0);
+  const reader = request.body.getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      throw new HttpError(413, "request body too large");
+    }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out.buffer;
+}
+
 const MAX_BODY_BYTES = 16 * 1024;
 const dec = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
 
