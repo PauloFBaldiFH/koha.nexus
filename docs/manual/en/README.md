@@ -12,8 +12,11 @@ The English manual is delivered in batches of up to three chapters for review:
 4. [Magic Import](04-magic-import.md).
 5. [Enrichment and Z39.50/SRU](05-enrichment.md).
 6. [OPAC and staff appearance](06-appearance.md).
+7. [Local AI and assistance](07-local-ai.md).
+8. [Schedules, VPN, messaging and administration](08-administration.md).
+9. [Troubleshooting and logs](09-troubleshooting-logs.md).
 
-The final batch covers local AI, administration and troubleshooting.
+All nine English chapters are available for review in the three batches.
 
 Action names follow the English labels in the panel's source. The language of your installation may differ. Do not use the option numbers from an old menu to locate actions in the current panel.
 
@@ -31,3 +34,7 @@ Action names follow the English labels in the panel's source. The language of yo
 
 - **To confirm:** compatibility of specific export layouts without a sample and review of the result.
 - **To confirm:** availability and access conditions of external sources on the library network.
+
+- **To confirm:** local AI sizing for each hardware and processing choice.
+- **To confirm:** publication requirements for the library's domain, network and institutional policy.
+- **To confirm:** causes of specific failures without their complete message and relevant log.
