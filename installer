@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.103"
+PANEL_VERSION=" 1.5.104"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -24724,7 +24724,8 @@ def _prepare_authorities(analysis, manifest, out_dir, preview):
                 code = analysis.spec.defaults.get(reference) if analysis.spec else None
                 ready, issues = authority_import.prepare(record, analysis.capabilities, code)
                 analysis.review.extend({'kind': 'authority', 'source': row[7], 'row': number, **issue} for issue in issues)
-                yield ready
+                if not any(issue.get('skip') for issue in issues):
+                    yield ready
         marc.write_marcxml(prepared(), destination)
         output.append(tuple(row[:3]) + (destination,) + tuple(row[4:]))
         preview.append('Authorities: %s; headings and target authority types validated separately' % row[4])
@@ -27600,6 +27601,13 @@ def prepare(record, capabilities=None, type_code=None):
                                'message': 'Existing authority type differs from the reviewed target type'})
             elif not field.get(code):
                 field.subfields.append((code, type_code))
+    elif types and not conflicting and len(headings) == 1 and not any(
+            headings[0].tag in re.findall(r'\d{3}', str(entry.get('tag', ''))) for entry in types):
+        # No authority type of the target Koha takes this heading: the record
+        # is left out instead of blocking the whole file.
+        issues.append({'severity': 'warning', 'code': 'authority-type-missing', 'skip': True,
+                       'message': 'This Koha has no authority type for heading %s; record not imported '
+                                  '(create one in Administration > Authority types to import it)' % headings[0].tag})
     elif types and not conflicting:
         issues.append({'severity': 'error', 'code': 'authority-type-required',
                        'message': 'Select a target authority type for this heading'})
