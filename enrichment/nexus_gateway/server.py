@@ -129,7 +129,11 @@ def make_handler(engine: Engine, settings: Settings):
         do_HEAD = do_GET
 
         def do_POST(self):
-            length = int(self.headers.get("Content-Length") or 0)
+            declared = (self.headers.get("Content-Length") or "0").strip()
+            if not declared.isdigit():       # "-1" would read until the client hangs up
+                self.close_connection = True
+                return self._send(400, b"invalid Content-Length\n", "text/plain")
+            length = int(declared)
             if length > MAX_FORM:
                 return self._send(413, b"request too large\n", "text/plain")
             form = self.rfile.read(length).decode("utf-8", "replace")
