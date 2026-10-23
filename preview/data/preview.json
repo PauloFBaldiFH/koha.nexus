@@ -13639,22 +13639,25 @@
     ]
    },
    "pt-BR": {
-    "summary": "As duas ferramentas de IA numa só tela: a catalogação com IA (o MARC Replace rascunha um registro MARC a partir de fotos do livro) e o assistente de IA na página inicial da intranet, com um mesmo provedor e um modelo para cada uma.",
+    "summary": "Configura o provedor e as duas ferramentas de IA, com gerenciamento do Ollama no servidor. A catalogação por fotos e o assistente da equipe têm finalidades diferentes.",
     "overview": [
-     "A tela de IA (tecla **a**) é onde você escolhe o provedor (Ollama local, Google Gemini, OpenAI, Anthropic Claude ou um servidor compatível com OpenAI, como o LM Studio), digita a chave, testa, carrega a lista de modelos e escolhe um modelo para a catalogação (ele precisa ler imagens) e outro para o chat.",
-     "Uma caixa separada cuida do **Ollama neste servidor**: dá para verificá-lo, instalá-lo e baixar modelos mesmo quando o assistente usa um provedor na nuvem. A última caixa mostra o estado das duas ferramentas e as abre.",
-     "Nenhuma chave vem com o painel, e as chaves nunca aparecem de novo depois de salvas: só os quatro últimos caracteres."
+     "Para uso local, confira o Ollama, baixe uma opção disponível na lista, selecione Ollama local como provedor, teste e salve. A leitura de fotos exige capacidade de visão.",
+     "A IA local pode consumir muita CPU e memória e deixar o Koha lento. Instalado no disco não significa carregado em memória; Liberar memória descarrega sem apagar o download.",
+     "Configurar o provedor não instala automaticamente as ferramentas. Use os botões e cartões da tela para instalar ou abrir cada uma."
     ],
     "steps": [
-     "Escolha o provedor e digite a chave (provedores locais não precisam).",
-     "Pressione **Testar conexão** e depois **Carregar modelos**.",
-     "Escolha um modelo e pressione **Usar na catalogação** e/ou **Usar no chat**.",
-     "Pressione **Salvar**.",
-     "Instale as ferramentas pelos cartões: **Substituir um registro MARC** e **Assistente de IA na página inicial da equipe**."
+     "Abra IA pela tecla a e confira o estado do Ollama.",
+     "Instale e baixe o necessário pela própria tela, conforme os recursos do servidor.",
+     "Escolha as opções de chat e visão, teste a conexão e salve.",
+     "Instale ou abra a ferramenta desejada e revise toda proposta antes da gravação."
     ],
     "tips": [
      "Para manter os dados dos leitores dentro da biblioteca, use um provedor local (Ollama ou LM Studio).",
      "Dê ao chat um modelo leve e barato e à catalogação um modelo de visão: as necessidades são diferentes."
+    ],
+    "warnings": [
+     "Não há tempo de resposta garantido para todo hardware.",
+     "Um provedor remoto recebe os dados enviados para a solicitação. Confira o provedor e a URL salvos antes de usar dados da biblioteca."
     ]
    }
   },
@@ -14523,9 +14526,9 @@
      "O Apache grava os erros de cada site num log próprio: `intranet-error.log` para a intranet e `opac-error.log` para o catálogo público. Acompanhar o log enquanto você repete a ação que falha mostra o erro exato que o Koha gerou."
     ],
     "steps": [
-     "Escolha o log da intranet (intranet-error.log) ou do OPAC (opac-error.log).",
-     "Reproduza o problema no navegador e observe as linhas que aparecem.",
-     "Pressione CTRL+C para parar e voltar."
+     "Abra Auditoria de logs do Apache em tempo real na Central de diagnóstico e manutenção.",
+     "Escolha equipe/intranet ou OPAC.",
+     "Na tela Textual, use Pausar ou p para suspender a visualização e Voltar ou Esc para sair. O painel clássico usa Ctrl+C em seu acompanhamento."
     ],
     "tips": [
      "Anote a hora do erro: ajuda a achar o mesmo momento nos logs do próprio Koha (`plack-error.log`)."
@@ -16549,7 +16552,7 @@
    },
    "pt-BR": {
     "title": "Ollama neste servidor",
-    "summary": "Roda modelos de IA no próprio servidor da biblioteca com o Ollama: sem chave, sem custo por requisição e nada sai da máquina.",
+    "summary": "Gerencia o processamento local pelo Ollama: verificação, instalação, download e liberação de memória.",
     "steps": [
      "Pressione **Verificar o Ollama**; se ele não responder, pressione **Instalar o Ollama**.",
      "Escolha um modelo em **Modelo** e pressione **Baixar**.",
@@ -16557,25 +16560,24 @@
     ],
     "options": [
      {
-      "name": "Verificar o Ollama",
-      "text": "Pergunta ao Ollama local (`http://127.0.0.1:11434`) se ele está rodando e quais modelos tem."
+      "name": "Verificar e instalar",
+      "text": "Confira a resposta do Ollama. Se necessário, use Instalar o Ollama e aguarde o resultado."
      },
      {
-      "name": "Instalar o Ollama",
-      "text": "Instala o Ollama no servidor quando ele não está lá."
+      "name": "Modelo e baixar",
+      "text": "Escolha na lista da tela e baixe. A catalogação de fotos exige uma opção com visão; chat pode usar uma opção apenas de texto."
      },
      {
-      "name": "Modelos sugeridos",
-      "text": "`llama3.2:1b`, `qwen2.5:1.5b` e `llama3.2:3b` para chat rápido na CPU; `qwen2.5:3b` equilibrado e multiuso; `qwen2.5vl:7b` para visão e catalogação (CPU alta, lento em ARM)."
+      "name": "Usar no chat / Usar na catalogação",
+      "text": "Preenche os campos correspondentes. Confira Ollama local como provedor, teste e salve."
      },
      {
-      "name": "Baixar / Usar no chat / Usar na catalogação",
-      "text": "Baixa o modelo escolhido para o Ollama e o define para uma ferramenta. Um modelo só de texto não serve para a catalogação, que precisa de um modelo de visão."
+      "name": "Liberar memória",
+      "text": "Descarrega os modelos da RAM sem apagar os downloads. Eles podem ser carregados novamente quando solicitados."
      }
     ],
     "tips": [
-     "Sem GPU, prefira os modelos leves: um modelo de visão de 7B pode levar minutos por resposta na CPU.",
-     "Confira o disco livre antes de baixar: cada modelo ocupa de cerca de 1 GB a vários GB."
+     "CPU, RAM e disco precisam ser suficientes para a escolha local; o mínimo do Koha não garante desempenho de IA."
     ],
     "warnings": [
      "Modelos e ferramentas de IA locais são pesados: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware do servidor. A tela de IA avisa isso no topo."
