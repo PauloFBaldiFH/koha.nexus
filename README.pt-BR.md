@@ -2,6 +2,9 @@
   <a href="README.md">🇺🇸 English</a> &nbsp;|&nbsp; 🇧🇷 Português
 Manual do usuário em revisão: [instalação, primeiros passos e backup/restauração](docs/manual/pt-BR/README.md).
 
+Consulte [todos os idiomas disponíveis do manual](docs/manual/README.md).
+
+
 </p>
 
 <p align="center">

@@ -22,6 +22,9 @@ It was born from real-life experience facing technical barriers in collection ma
 
 Read the [complete user manual in English](docs/manual/en/README.md) for procedures checked against the current panel.
 
+See [all available user manual languages](docs/manual/README.md).
+
+
 ## Features
 
 - **One-step installation** of Koha, MariaDB, Apache, Memcached and Plack, with pre-validation of the server (OS, disk, network, busy ports), 4 GB SWAP, NTP and timezone selection.
