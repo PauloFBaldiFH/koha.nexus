@@ -1,5 +1,7 @@
 <p align="right">
   <a href="README.md">🇺🇸 English</a> &nbsp;|&nbsp; 🇧🇷 Português
+Manual do usuário em revisão: [instalação, primeiros passos e backup/restauração](docs/manual/pt-BR/README.md).
+
 </p>
 
 <p align="center">
