@@ -645,6 +645,8 @@ class Z3950View(SectionView):
                      "format, timeout, SRU fields) from this list? Their tick and rank are kept. The authority "
                      "files (Library of Congress names and subjects, Biblioteca Nacional) are added when "
                      "missing, and the Biblioteca Nacional's old Z39.50 addresses are unticked.")
+        # Not "Update" after Show servers: this one adds no catalogue server.
+        question += "\n\n" + add_hint()
         if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
             return
         path = z3950.write_add_file(z3950.sync_targets(self.targets, self.in_koha), {})
@@ -658,6 +660,7 @@ class Z3950View(SectionView):
                               updated=out.get("updated", "0")), timeout=10)
         await show_done(self.app, title, result)
         await self._load_koha()
+        self.app.notify(add_hint(), timeout=15)
 
     # ------------------------------------------------------------------
     # Login, hide
@@ -790,6 +793,12 @@ class Z3950View(SectionView):
             self.app.notify(str(e), severity="error")
             return
         self.app.notify(t("Saved: ${file}", file=path))
+
+
+def add_hint() -> str:
+    return t("This button only refreshes the servers Koha already has and adds the authority files. To add "
+             "catalogue servers: Show servers (it tests them), Select for search the ones you want, then "
+             "Save to Koha.")
 
 
 def health_state(state: str) -> str:

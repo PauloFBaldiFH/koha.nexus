@@ -364,6 +364,8 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             await pilot.pause(0.1)
             await pilot.click("#z-update")
             await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            # It says it adds no catalogue server, and how to add them.
+            assert "only refreshes the servers Koha already has" in app.screen._question
             await pilot.click("#yes")
             await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
             assert "z3950-sync" in tasks
@@ -374,5 +376,7 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
                        for line in lines)
             assert "Added: 3" in app.screen._body and "Updated: 5" in app.screen._body
             assert "Servers added: 3 · updated: 5" in notes
+            await _press(pilot, app, "ok")
+            await _until(pilot, lambda: any("Save to Koha" in n for n in notes))
 
     asyncio.run(main())
