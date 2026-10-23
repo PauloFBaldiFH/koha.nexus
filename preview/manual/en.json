@@ -887,6 +887,10 @@
      "text": "The tick is \"selected for the cataloguing search\". Adds the ticked servers Koha does not have (ranked by speed in the last test) and ticks or unticks the ones it has. An unticked server stays in Koha, only out of the search. A ticked server stays in the list even when it fails, so you can untick it."
     },
     {
+     "name": "Select for search / Unselect for search / Unselect all",
+     "text": "Select for search ticks the server under the cursor (on a region's heading, all of its servers) so Koha's cataloguing search comes with it ticked; Unselect for search takes the tick off; Unselect all clears every tick. The space bar or a click on a row does the same as Select / Unselect. Nothing changes in Koha until Save to Koha."
+    },
+    {
      "name": "At most 20 servers",
      "text": "Recommendation: tick at most 20 servers at once, since more can make the search unstable. Past 20 the note turns to the warning colour, but nothing is blocked."
     },

@@ -98,10 +98,26 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             view.toggle("region:europe")
             assert not limit.has_class("-over")
 
+            # Select / Unselect for search: the server under the cursor, or a whole region.
+            table.move_cursor(row=table.get_row_index("region:brazil"))
+            await _click(pilot, view, "z-tick")
+            brazil = {t.key for t in view.visible() if t.region == "brazil"}
+            assert brazil <= view.selected
+            await _click(pilot, view, "z-untick")
+            assert not brazil & view.selected
+            table.move_cursor(row=table.get_row_index(catalog.key))
+            await _click(pilot, view, "z-untick")
+            assert catalog.key not in view.selected
+            await _click(pilot, view, "z-tick")
+            assert catalog.key in view.selected
+            await _click(pilot, view, "z-untick-all")
+            assert view.selected == set()
+            view.selected = {catalog.key, loc.key}
+
             # Save to Koha: add UTFPR, tick UFSC (in Koha, unticked), untick LoC.
-            view.toggle(utfpr.key)
-            view.toggle(ufsc.key)
-            view.toggle(loc.key)
+            view.set_ticks(True, utfpr.key)
+            view.set_ticks(True, ufsc.key)
+            view.set_ticks(False, loc.key)
             assert ufsc.key in rows() and loc.key in rows()      # ticked or in Koha: still listed to untick
             seen, tasks = {}, []
             real_add, real_check = z3950.write_add_file, z3950.write_check_file
@@ -233,6 +249,12 @@ def test_import_and_export(tmp_path, monkeypatch):
             assert key in [k.value for k in table.rows]           # the community list keeps mine
 
     asyncio.run(main())
+
+
+async def _click(pilot, view, button_id):
+    """Press a button of the screen (it may be scrolled out of sight)."""
+    view.query_one(f"#{button_id}").press()
+    await pilot.pause(0.1)
 
 
 async def _press(pilot, app, button_id):

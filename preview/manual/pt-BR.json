@@ -740,6 +740,10 @@
      "text": "A marca quer dizer \"selecionado para a pesquisa da catalogação\". Adiciona os servidores marcados que o Koha não tem (por ordem de velocidade no último teste) e marca ou desmarca os que ele já tem. Um servidor desmarcado continua no Koha, só fora da pesquisa. Um servidor marcado continua na lista mesmo se falhar, para você poder desmarcar."
     },
     {
+     "name": "Selecionar / Desselecionar / Desmarcar todos",
+     "text": "Selecionar marca o servidor do cursor (no título de uma região, todos os servidores dela) para que a pesquisa da catalogação do Koha já venha com ele marcado; Desselecionar tira a marca; Desmarcar todos tira todas as marcas. A barra de espaço ou um clique na linha fazem o mesmo. Nada muda no Koha até Salvar no Koha."
+    },
+    {
      "name": "No máximo 20 servidores",
      "text": "Recomendação: marque no máximo 20 servidores de uma vez, porque mais que isso pode deixar a pesquisa instável. Passando de 20 o aviso fica na cor de alerta, mas nada é bloqueado."
     },
@@ -774,7 +778,7 @@
     "Um endereço marcado com * vem de uma lista antiga: o teste diz se ele ainda funciona.",
     "Exporte a sua lista testada e importe-a nos seus outros servidores Koha para ganhar tempo."
    ],
-   "_en": "53cb4cf41c"
+   "_en": "6cfdd557a3"
   },
   "z3950-zeus": {
    "title": "Catálogo Zeus pelo gateway do koha.nexus (UFSC)",
