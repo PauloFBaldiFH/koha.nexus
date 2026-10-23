@@ -13464,20 +13464,19 @@
     ]
    },
    "pt-BR": {
-    "summary": "Uma única entrada para todas as importações: solte um arquivo, uma pasta ou um compactado com registros, exemplares, leitores, empréstimos ou reservas, e a Ferramenta de Importação Mágica reconhece o formato, pergunta só o que não consegue deduzir, mostra uma prévia e importa com as ferramentas do próprio Koha depois de um backup verificado.",
+    "summary": "Prepara registros bibliográficos, exemplares, leitores e autoridades, com detecção de formato, revisão manual, validação e confirmação antes da importação.",
     "overview": [
-     "Ela lê planilhas (CSV/TSV com qualquer separador e codificação, Excel `.xlsx`/`.xls`, LibreOffice `.ods`, dBase `.dbf`), MARC 21 (ISO 2709 `.mrc`/`.iso` e MARCXML), o banco do Biblioteca Fácil, catálogos ISIS (backups PostgreSQL) e compactados com eles (`.zip`, `.tar`, `.gz`, `.bz2`, `.xz`). Os formatos são reconhecidos pelos bytes, nunca só pelo nome do arquivo.",
-     "Numa planilha, cada coluna recebe uma nota para cada campo MARC 21 e de leitor, pelo cabeçalho e pelos valores (dígitos verificadores de ISBN e CPF, datas, e-mails, números de chamada). Linhas do mesmo livro viram um registro com um exemplar por cópia; pessoas com CPF válido, e-mail ou número de carteirinha viram leitores; uma planilha de empréstimos alimenta os dois.",
-     "Exemplares guardados no campo de item de outro sistema (949, 950, 990, ou os dados de acervo MARC 21 em 852) viram itens do Koha (952), lendo cada subcampo pelo seu significado; assim, exportações do Biblivre, do SophiA e do Pergamum são entendidas.",
-     "Um backup do Koha nunca é importado: ele substitui todo o catálogo, por isso a ferramenta o encaminha para **Restaurar base de dados**."
+     "O leitor atual reconhece MARC21 ISO 2709, MARCXML e texto MARC, inclusive `.mrk`, além de planilhas, tabelas e exportações legadas reconhecidas. Isso não garante o reconhecimento correto de qualquer layout proprietário.",
+     "Na tela de mapeamento, confira os modos Bibliographic, Patrons e Authorities, o destino de cada campo, os códigos do Koha e a prévia. Check the whole file prepara e valida o arquivo completo sem gravar a importação no Koha.",
+     "Exemplares nativos 952 podem ter biblioteca e tipo remapeados. Campos locais precisam de evidência de exemplar: uma anotação de depósito legal não é automaticamente um item. Códigos de barras ausentes ou em colisão exigem revisão.",
+     "Um backup completo do Koha é encaminhado para restauração, que substitui a base, em vez de ser acrescentado como registros."
     ],
     "steps": [
-     "Coloque os arquivos na pasta `importar` da sua pasta pessoal (no Windows, também em `C:\\Koha\\Importar`), ou deixe-os em qualquer lugar e use **Another file** (Outro arquivo).",
-     "Abra a **Ferramenta de Importação Mágica** (tecla **i**) e escolha o que importar.",
-     "Responda às perguntas, se houver: uma coluna de que a ferramenta não tem certeza aparece com valores de exemplo. As respostas ficam guardadas para o próximo arquivo com as mesmas colunas.",
-     "Leia a prévia com atenção: o que foi encontrado em cada arquivo, para onde vai cada coluna, as contagens, registros de amostra e as linhas rejeitadas com o motivo.",
-     "Confirme cada parte (registros, leitores, empréstimos e reservas). Cada uma ganha o seu próprio backup `PRE-*` verificado antes de ser gravada.",
-     "Leia o resumo e depois pesquise alguns registros e leitores no Koha para conferir."
+     "Escolha a entrada na Ferramenta de Importação Mágica (tecla i). O arquivo precisa ser acessível ao servidor que executa o painel.",
+     "Revise o modo e o mapeamento, os exemplos e os valores padrão. Apply aceita o mapeamento e continua a preparação; não é a confirmação final de gravação.",
+     "Confira as contagens, as rejeições e as perguntas pendentes sobre biblioteca, tipo de item, categoria e atualização de leitores.",
+     "Leia a prévia final e a política para registros existentes antes de confirmar.",
+     "Confira o resumo e os dados no Koha. Consulte o capítulo 4 do manual completo para o procedimento detalhado."
     ],
     "tips": [
      "Comece com uma pequena amostra do arquivo para ver como as colunas são lidas antes de importar tudo.",
@@ -13486,8 +13485,9 @@
      "Se uma importação MARC deu errado, use **Desfazer uma importação MARC** em vez de apagar registros à mão."
     ],
     "warnings": [
-     "O que a ferramenta não consegue ler aparece listado com o que fazer: texto `.mrk` do MarcEdit (salve como `.mrc`), um arquivo mestre do CDS/ISIS (exporte do WinISIS em ISO 2709) ou um dump SQL de outro sistema.",
-     "Arquivos de leitores contêm dados pessoais: apague-os da pasta `importar` depois da importação."
+     "Uma falha posterior pode deixar dados das etapas anteriores importados. Não repita o lote completo automaticamente.",
+     "Desfazer uma importação MARC não é uma reversão universal de leitores, empréstimos e reservas.",
+     "Exportações e logs podem conter dados pessoais. Não os publique."
     ]
    }
   },
@@ -13743,7 +13743,7 @@
     "steps": [
      "Abra **Aparência do OPAC e STAFF** (tecla **o**). Pressione **Sincronizar configurações atuais do OPAC** para começar pelo que está no ar.",
      "Ajuste cada caixa: material, imagens, modo escuro, carrossel, botões, interface da equipe.",
-     "Pressione **Prévia** para ver o que vai para o Koha.",
+     "Pressione **Prévia** para ler o CSS, o JavaScript e o conteúdo que serão gravados. Essa tela não renderiza o site completo.",
      "Pressione **Aplicar**: um backup do banco é feito e a aparência é gravada.",
      "Abra o OPAC numa janela anônima (ou pressione CTRL+F5) para ver o resultado."
     ],
@@ -14924,12 +14924,12 @@
      "Pressione **Aplicar** para gravar os registros ou, para um livro digitado, escolha um registro e pressione **Importar como registro novo**."
     ],
     "tips": [
-     "O serviço começa quando você pesquisa e para depois de 5 minutos parado; ele usa um quarto de uma CPU.",
-     "Um trabalho grande (o catálogo inteiro) leva horas; deixe o computador ligado. Ele pesquisa 4 registros ao mesmo tempo (`KEI_ONDEMAND_PARALLEL` no .env do painel, de 1 a 8), cada um em servidores livres, desacelera para um servidor que responde devagar, e a tela mostra a velocidade e o tempo restante. Quando a internet cai, ele espera e tenta de novo em vez de marcar registros como não encontrados. Ele roda em segundo plano, continua do último registro depois de um reinício e espera enquanto **Pausar** estiver ligado.",
-     "Um registro importado sai de novo com **Desfazer uma importação MARC** (Ferramentas da biblioteca)."
+     "Não há um limite geral de 50 registros para pesquisa; esse número participa da escolha da proteção de aplicação para trabalhos pequenos.",
+     "Trabalhos grandes podem levar horas e continuar em segundo plano. Acompanhe o relatório e os erros dos servidores.",
+     "Um registro incluído como novo pode ser tratado pelo fluxo Desfazer uma importação MARC."
     ],
     "warnings": [
-     "Aplicar e Importar alteram o catálogo. Os dois perguntam antes; Reverter e Desfazer uma importação MARC os desfazem."
+     "Aplicar e Importar alteram o catálogo e pedem confirmação. Reverter segue as regras do trabalho e preserva registros editados depois da aplicação; não é um restore completo da base."
     ]
    }
   },
