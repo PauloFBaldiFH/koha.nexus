@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="tl" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" data-i18n-meta="page_description" content="Libreng katulong ang Koha.Nexus para mag-install at mamahala ng mga aklatang Koha sa Debian, Ubuntu at Windows gamit ang WSL.">
+  <meta name="theme-color" content="#08110d">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <link rel="shortcut icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title data-i18n="page_title">Koha.Nexus: pinasimpleng pamamahala ng aklatan</title>
+
+  <link rel="stylesheet" href="../../site/assets/home.css">
+<link rel="alternate" hreflang="en" href="https://koha.nexus/">
+<link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/">
+<link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/">
+<link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/">
+<link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/">
+<link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/">
+<link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/">
+<link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/">
+<link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/">
+<link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/">
+<link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/">
+<link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/">
+<link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/">
+<link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/">
+<link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/">
+<link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/">
+<link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/">
+<link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/">
+<link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/">
+<link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/">
+<link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/">
+<link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/">
+<link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/">
+<link rel="alternate" hreflang="x-default" href="https://koha.nexus/">
+</head>
+
+<body data-language="tl">
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#home" aria-label="koha.nexus">
+        koha.nexus
+      </a>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menu" aria-controls="main-nav" aria-expanded="false">☰</button>
+      <nav id="main-nav" data-i18n-aria="main_navigation" aria-label="Pangunahing nabigasyon">
+        <a href="#features" data-i18n="nav_features">Mga Tampok</a>
+        <a href="#panel" data-i18n="nav_panel">Panel</a>
+        <a href="preview/" data-i18n="nav_manual">Manwal</a>
+        <a href="#installation" data-i18n="nav_install">Pag-install</a>
+        <a href="#windows" data-i18n="nav_win">Windows</a>
+        <a href="#tools" data-i18n="nav_tools">Mga Kasangkapan</a>
+        <a href="#security" data-i18n="nav_security">Seguridad</a>
+        <a href="#network" data-i18n="nav_net">Network</a>
+        <a href="#contact" data-i18n="nav_contact">Makipag-ugnayan</a>
+        <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- SELETOR DE IDIOMAS COM BOTÕES PEQUENOS -->
+  <section class="lang-section">
+    <div class="container">
+      <nav class="language-links" data-language-links><a data-language="en" lang="en" hreflang="en" href="../../index.html">English</a><a data-language="pt" lang="pt-BR" hreflang="pt-BR" href="../pt/index.html">Português (Brasil)</a><a data-language="es" lang="es" hreflang="es" href="../es/index.html">Español</a><a data-language="fr" lang="fr" hreflang="fr" href="../fr/index.html">Français</a><a data-language="it" lang="it" hreflang="it" href="../it/index.html">Italiano</a><a data-language="de" lang="de" hreflang="de" href="../de/index.html">Deutsch</a><a data-language="nl" lang="nl" hreflang="nl" href="../nl/index.html">Nederlands</a><a data-language="sv" lang="sv" hreflang="sv" href="../sv/index.html">Svenska</a><a data-language="pl" lang="pl" hreflang="pl" href="../pl/index.html">Polski</a><a data-language="cs" lang="cs" hreflang="cs" href="../cs/index.html">Čeština</a><a data-language="ru" lang="ru" hreflang="ru" href="../ru/index.html">Русский</a><a data-language="uk" lang="uk" hreflang="uk" href="../uk/index.html">Українська</a><a data-language="tr" lang="tr" hreflang="tr" href="../tr/index.html">Türkçe</a><a data-language="tl" lang="tl" hreflang="tl" href="index.html" aria-current="page">Tagalog (Filipino)</a><a data-language="id" lang="id" hreflang="id" href="../id/index.html">Bahasa Indonesia</a><a data-language="ar" lang="ar" hreflang="ar" href="../ar/index.html">العربية</a><a data-language="fa" lang="fa" hreflang="fa" href="../fa/index.html">فارسی</a><a data-language="hi" lang="hi" hreflang="hi" href="../hi/index.html">Hindi</a><a data-language="bn" lang="bn" hreflang="bn" href="../bn/index.html">Bangla (Bengali)</a><a data-language="vi" lang="vi" hreflang="vi" href="../vi/index.html">Tiếng Việt</a><a data-language="zh" lang="zh-Hans" hreflang="zh-Hans" href="../zh/index.html">中文 (简体)</a><a data-language="ja" lang="ja" hreflang="ja" href="../ja/index.html">日本語</a><a data-language="ko" lang="ko" hreflang="ko" href="../ko/index.html">한국어</a></nav>
+    </div>
+  </section>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-bg"></div><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow" data-i18n="hero_eye">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
+          <img class="hero-logo" src="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/koha-logo.png" alt="koha.nexus" width="420" height="74">
+          <h1 data-i18n="hero_h1">Ang pinakamahusay na libreng sistema ng aklatan, <span class='accent'>ngayon nang walang abala.</span></h1>
+          <p data-i18n="hero_p">Ang <strong>koha.nexus</strong> ay isang matalino, libre, at madaling gamitin na katulong para sa <strong>Koha Integrated Library System</strong>.</p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#installation" data-i18n="hero_btn1">Simulan ang pag-install →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener" data-i18n="hero_btn2">Tingnan sa GitHub</a>
+            <a class="btn btn-secondary" href="../../README.md" data-i18n="hero_btn3">Buong README</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><strong data-i18n="stat1_t">22 na wika</strong><span data-i18n="stat1_d">Dashboard at mga pakete</span></div>
+            <div class="stat"><strong data-i18n="stat2_t">2 sistema</strong><span data-i18n="stat2_d">Linux o Windows (WSL 2)</span></div>
+            <div class="stat"><strong data-i18n="stat3_t">25+ tampok</strong><span data-i18n="stat3_d">Pamamahala at mga kasangkapan</span></div>
+            <div class="stat"><strong data-i18n="stat4_t">GPL-3.0+</strong><span data-i18n="stat4_d">Libreng Software</span></div>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Installation terminal">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">installation — terminal</span>
+          </div>
+          <pre><span class="tl" style="--d:0"><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer</span><span class="tl" style="--d:1"><span class="prompt">$</span> sudo bash installer</span><span class="tl" style="--d:2">&nbsp;</span><span class="tl" style="--d:3"><span class="muted">KOHA.NEXUS</span></span><span class="tl" style="--d:4"><span class="prompt">✓</span> <span data-i18n="term_validating">Bine-verify ang server...</span></span><span class="tl" style="--d:5"><span class="prompt">✓</span> <span data-i18n="term_installing">Ini-install ang Koha</span></span><span class="tl" style="--d:6"><span class="prompt">✓</span> <span data-i18n="term_configuring">Inaayos ang database</span></span><span class="tl" style="--d:7"><span class="prompt">✓</span> <span data-i18n="term_preparing">Naghahanda ng backups</span></span><span class="tl" style="--d:8"><span class="prompt">✓</span> <span data-i18n="term_access">Inaayos ang access</span></span><span class="tl" style="--d:9">&nbsp;</span><span class="tl" style="--d:10"><span class="prompt">→</span> <span data-i18n="term_ready">Handa na ang Dashboard:</span> <strong>sudo config.sh</strong><span class="caret"></span></span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="feat_kick">Lahat sa isang lugar</div>
+          <h2 data-i18n="feat_h2">Isang dashboard para sa pamamahala ng aklatan.</h2>
+          <p data-i18n="feat_p">Mula pag-install hanggang sa seguridad at pagpa-publish sa web.</p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <h3 data-i18n="f1_t">Ginabayang pag-install</h3>
+            <p data-i18n="f1_d">Pag-install ng Koha, Apache, MariaDB.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            </div>
+            <h3 data-i18n="f2_t">Backup Hub</h3>
+            <p data-i18n="f2_d">SQL at MARC21 exports.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="f3_t">Ligtas na pag-restore</h3>
+            <p data-i18n="f3_d">Sinusuri ang backup bago palitan ang database.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </div>
+            <h3 data-i18n="f4_t">Paghahanap at Indexing</h3>
+            <p data-i18n="f4_d">Zebra o Elasticsearch.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+            </div>
+            <h3 data-i18n="f5_t">Web Publishing</h3>
+            <p data-i18n="f5_d">Cloudflare Tunnel at Certbot.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h3 data-i18n="f6_t">Seguridad</h3>
+            <p data-i18n="f6_d">Fail2ban at UFW Firewall.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            </div>
+            <h3 data-i18n="f7_t">Mga Kasangkapan</h3>
+            <p data-i18n="f7_d">Pag-import ng datos at SQL reports.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="f8_t">Notipikasyon</h3>
+            <p data-i18n="f8_d">Telegram o WhatsApp.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            </div>
+            <h3 data-i18n="f9_t">Cataloging</h3>
+            <p data-i18n="f9_d">DDC at Cutter.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+            </div>
+            <h3 data-i18n="f10_t">Windows + WSL 2</h3>
+            <p data-i18n="f10_d">Koha sa isang PC.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            </div>
+            <h3 data-i18n="f11_t">Auto-update</h3>
+            <p data-i18n="f11_d">Direkta sa GitHub.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"></path></svg>
+            </div>
+            <h3><span data-i18n="f12_t">Mga Z39.50 / SRU server</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f12_d">Mga piling pampublikong katalogo na sinusuri sa tunay na paghahanap: mga server lamang na may wastong MARC record ang idinaragdag sa Koha, pinakamabilis muna.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"></path></svg>
+            </div>
+            <h3><span data-i18n="f13_t">Disenyo ng OPAC</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f13_d">Mga texture, bilog na sulok, wallpaper, logo, switch na maliwanag/madilim at carousel ng bagong dating, na isinusulat sa Koha matapos ang backup.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+            </div>
+            <h3><span data-i18n="f14_t">Pagmemensahe at ugnayan ng mga sistema</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f14_d">E-mail, SMS, pansariling paghiram sa SIP2 at Z39.50 sa isang screen, na may link sa tamang pahina ng Koha at SIP2 form na sumusulat ng configuration.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h3><span data-i18n="f15_t">Iskedyul at mga gawain sa cron</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f15_d">I-on o i-off ang bawat awtomatikong gawain at piliin ang dalas at oras. Pinananatili ang mga linyang mano-manong isinulat.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"></path><circle cx="16.5" cy="7.5" r=".5"></circle></svg>
+            </div>
+            <h3><span data-i18n="f16_t">WireGuard VPN</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f16_d">Naaabot ng kawani ang kanilang interface at SSH saanman gamit ang QR code para sa telepono. Mga address lamang ng aklatan ang dumaraan sa VPN.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </div>
+            <h3><span data-i18n="f17_t">Libreng address</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f17_d">Pampublikong address ng katalogo sa koha.nexus nang hindi bumibili ng domain o gumagawa ng Cloudflare account, na naibabahagi sa QR code o link. Sinusubukan pa.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="10" x="3" y="11" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" x2="8" y1="16" y2="16"></line><line x1="16" x2="16" y1="16" y2="16"></line></svg>
+            </div>
+            <h3><span data-i18n="f18_t">Katulong na AI</span><span class="badge-new" data-i18n="badge_new">Bago</span></h3>
+            <p data-i18n="f18_d">Nagtatanong ang mga librarian sa karaniwang wika tungkol sa aklat, mambabasa at hiram. Bawat pagbabago ay mungkahi lamang na tumatakbo matapos ang Aprubahan at Isagawa.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="panel">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="p_kick">Ang bagong control panel</div>
+          <h2 data-i18n="p_h2">Isang screen para sa bawat gawain, gamit ang mouse at keyboard.</h2>
+          <p data-i18n="p_p">Patakbuhin ang <code>sudo config.sh</code> upang buksan ang panel sa buong screen: kasalukuyang dashboard, mga card na napipindot, shortcut at command palette (<kbd>ctrl+p</kbd>). Ito ang tunay na mga larawan ng panel.</p>
+        </div>
+
+        <div class="showcase">
+          <div class="tabs" role="tablist" data-i18n-aria="panel_screens" aria-label="Mga screen ng panel">
+            <button class="tab" type="button" role="tab" id="tab-dashboard" aria-controls="panel-stage" aria-selected="true" tabindex="0" data-shot="dashboard"><span class="ti" aria-hidden="true">🎛️</span><span data-i18n="pt_dashboard">Dashboard ng kontrol</span><span class="k" aria-hidden="true">d</span></button>
+            <button class="tab" type="button" role="tab" id="tab-hub" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="hub"><span class="ti" aria-hidden="true">📨</span><span data-i18n="pt_hub">Pagmemensahe at ugnayan ng mga sistema</span><span class="k" aria-hidden="true">m</span></button>
+            <button class="tab" type="button" role="tab" id="tab-z3950" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="z3950"><span class="ti" aria-hidden="true">📡</span><span data-i18n="pt_z3950">Mga Z39.50 / SRU server</span><span class="k" aria-hidden="true">z</span></button>
+            <button class="tab" type="button" role="tab" id="tab-opac" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="opac"><span class="ti" aria-hidden="true">🎨</span><span data-i18n="pt_opac">Disenyo ng OPAC</span><span class="k" aria-hidden="true">o</span></button>
+            <button class="tab" type="button" role="tab" id="tab-vpn" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="vpn"><span class="ti" aria-hidden="true">🛡️</span><span data-i18n="pt_vpn">WireGuard VPN</span><span class="k" aria-hidden="true">v</span></button>
+            <button class="tab" type="button" role="tab" id="tab-crons" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="crons"><span class="ti" aria-hidden="true">⏰</span><span data-i18n="pt_crons">Iskedyul at mga gawain sa cron</span><span class="k" aria-hidden="true">s</span></button>
+            <button class="tab" type="button" role="tab" id="tab-ai" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="ai"><span class="ti" aria-hidden="true">🤖</span><span data-i18n="pt_ai">AI</span><span class="k" aria-hidden="true">a</span></button>
+            <button class="tab" type="button" role="tab" id="tab-backup" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="backup"><span class="ti" aria-hidden="true">💾</span><span data-i18n="pt_backup">Sentro ng backup</span><span class="k" aria-hidden="true">b</span></button>
+          </div>
+          <div class="stage" id="panel-stage" role="tabpanel">
+            <a class="shot" id="shot" href="preview/#dashboard">
+              <img id="shot-img" src="../../docs/images/panel/dashboard.webp" alt="Control Dashboard" width="1400" height="924" loading="lazy" decoding="async">
+              <span class="shot-badge"><span class="shot-badge-dot" aria-hidden="true"></span><span data-i18n="p_explore">Tuklasin sa interactive na manwal</span><span class="shot-badge-arrow" aria-hidden="true">→</span></span>
+            </a>
+            <div class="stage-text">
+              <div>
+                <div class="pane" data-pane="dashboard"><h3 data-i18n="pt_dashboard">Dashboard ng kontrol</h3><p data-i18n="pd_dashboard">Kalagayan ng Koha, pinakahuling backup, bakanteng espasyo at lahat ng address ng katalogo at interface ng kawani (computer na ito, lokal na network at internet), na bawat isa ay may Buksan at Kopyahin.</p></div>
+                <div class="pane" data-pane="hub" hidden><h3 data-i18n="pt_hub">Pagmemensahe at ugnayan ng mga sistema</h3><p data-i18n="pd_hub">E-mail, WhatsApp at Telegram, SMS, SIP2 at Z39.50 sa isang screen. Binubuksan ng mga link ang tamang pahina ng kawani sa Koha, tumutulong ang gabay Gmail sa SMTP form, at isinusulat ng SIP2 form ang <code>SIPconfig.xml</code> para sa makinang pansariling paghiram.</p></div>
+                <div class="pane" data-pane="z3950" hidden><h3 data-i18n="pt_z3950">Mga Z39.50 / SRU server</h3><p data-i18n="pd_z3950">Mga pampublikong katalogo ayon sa rehiyon at listahan ng komunidad. Nagsasagawa ang scan ng tunay na paghahanap sa bawat server at pinananatili lamang ang nagbabalik ng wastong MARC record, ayon sa bilis.</p></div>
+                <div class="pane" data-pane="opac" hidden><h3 data-i18n="pt_opac">Disenyo ng OPAC</h3><p data-i18n="pd_opac">Disenyo ng pampublikong katalogo sa isang pindot: malabong salamin o pinakinis na metal, bilog na sulok, wallpaper, logo, maliwanag/madilim na switch at carousel ng bagong dating na may tunay na pabalat. Gumagawa muna ng backup.</p></div>
+                <div class="pane" data-pane="vpn" hidden><h3 data-i18n="pt_vpn">WireGuard VPN</h3><p data-i18n="pd_vpn">Pribadong WireGuard network para sa kawani: magdagdag ng telepono o laptop, i-scan ang QR code at gamitin ang interface ng kawani at SSH saanman. Hiwalay na tunnel lamang: hindi binabago ang sariling internet ng aparato.</p></div>
+                <div class="pane" data-pane="crons" hidden><h3 data-i18n="pt_crons">Iskedyul at mga gawain sa cron</h3><p data-i18n="pd_crons">Bawat nakaiskedyul na gawain ay may switch, dalas at oras sa halip na text editor. Pinananatili ang mga linyang mano-manong isinulat at itinatago muna ang lumang file.</p></div>
+                <div class="pane" data-pane="ai" hidden><h3 data-i18n="pt_ai">AI</h3><p data-i18n="pd_ai">Pagkakatalogong AI mula sa larawan ng pabalat at pahina ng pamagat, at katulong sa pangunahing pahina ng kawani sa Koha na sumasagot sa karaniwang wika at nagbabago lamang ng datos matapos ang <strong>Aprubahan at Isagawa</strong>.</p></div>
+                <div class="pane" data-pane="backup" hidden><h3 data-i18n="pt_backup">Sentro ng backup</h3><p data-i18n="pd_backup">Nandito na lamang ang pagbabalik ng database, katabi ng MARC21 export at mga backup: wala nang hiwalay na Restore database sa pangunahing menu. I-download ang pinakabagong backup sa PC na ito, ibalik ang database mula sa backup (sinusuri muna at may pangkaligtasang kopya ng kasalukuyan), i-export ang MARC21 sa isang pindot, subukan ang backup sa pansamantalang database at kopyahin ito sa Google Drive, OneDrive, MEGA o S3 nang hakbang-hakbang.</p></div>
+              </div>
+            </div>
+            <div class="stage-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="installation">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="inst_kick">Magsimula rito</div>
+          <h2 data-i18n="inst_h2">Linux installation.</h2>
+          <p data-i18n="inst_p">Sinusuportahan ang Debian 11/12/13 o Ubuntu 22.04/24.04 sa amd64 o arm64, at maaari ring tumakbo sa Windows gamit ang WSL 2.</p>
+        </div>
+
+        <div class="install-grid">
+          <div class="card">
+            <h3 data-i18n="inst_b1_t">Direct installer</h3>
+            <p data-i18n="inst_b1_d">I-download ang kasalukuyang script ng installer at patakbuhin nang may karapatang administrador.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer">Kopyahin</button>
+              </div>
+              <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_b2_t">Clone</h3>
+            <p data-i18n="inst_b2_d">Maaari ring itabi ang mga file ng pagsasalin sa script para magtrabaho nang offline.</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer">Kopyahin</button>
+              </div>
+              <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="inst_r_t">Minimum Requirements</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_r1">Debian 11/12/13 o Ubuntu 22.04/24.04, 64-bit</li>
+              <li data-i18n="inst_r2">4 GB RAM; inirerekomenda ang 8 GB o higit pa</li>
+              <li data-i18n="inst_r3">5 GB bakanteng espasyo; inirerekomenda ang 10 GB o higit pa</li>
+              <li data-i18n="inst_r4">root o user na may karapatang sudo</li>
+              <li data-i18n="inst_r5">Internet para sa mga repository ng Koha</li>
+              <li data-i18n="inst_r6">Bakanteng port 80 at 8080</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_a_t">Pagkatapos ng install</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_a1">Buksan ang interface ng kawani sa <code>http://SERVER-IP:8080</code></li>
+              <li data-i18n="inst_a2">Kumpletuhin ang Koha Web Installer</li>
+              <li data-i18n="inst_a3">Gumawa ng super librarian sa dashboard</li>
+              <li data-i18n="inst_a4">Nasa <code>http://SERVER-IP:80</code> ang pampublikong katalogo</li>
+              <li data-i18n="inst_a5">Buksan muli ang dashboard gamit ang <code>sudo config.sh</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section windows" id="windows">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="win_kick">Windows 10 / 11</div>
+          <h2 data-i18n="win_h2">Koha sa Windows.</h2>
+          <p data-i18n="win_p">WSL 2 environment.</p>
+        </div>
+
+        <div class="download-banner">
+          <div class="download-content">
+            <div class="download-icon">
+              <svg viewbox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <div>
+              <div class="download-kicker" data-i18n="win_d_k">WINDOWS INSTALLER</div>
+              <h3 data-i18n="win_d_t">I-install ang Koha sa isang command.</h3>
+              <p data-i18n="win_d_p">Buksan ang PowerShell <strong>bilang Administrator</strong>, i-paste ang command na ito at pindutin ang Enter.</p>
+            </div>
+          </div>
+          <div class="codebox">
+            <div class="codebox-head">
+              <span>PowerShell</span>
+              <button class="copy" data-i18n="btn_copy" data-copy="irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">Kopyahin</button>
+            </div>
+            <pre>irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
+          </div>
+        </div>
+
+        <div class="windows-card">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <h3 data-i18n="win_b_t">Pag-install</h3>
+            <p data-i18n="win_b_p">I-right-click ang Start, piliin ang <em>Terminal (Admin)</em> at i-click ang <strong>Yes</strong>. I-paste ang command sa itaas at pindutin ang Enter.</p>
+            <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.</div>
+            <div class="callout" style="margin-top:14px">
+              <strong data-i18n="win_c2_t"><strong>Paano i-enable ang Virtualization:</strong></strong>
+              <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)" data-i18n="win_c2_p1">I-restart at pumunta sa BIOS:</p>
+              <ul style="margin:0 0 8px;padding-left:18px;font-size:0.88rem;color:var(--muted);line-height:1.6">
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> — ASUS, Gigabyte, MSI, ASRock, Acer</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Esc</kbd> — HP / Compaq</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F12</kbd> — Dell</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F1</kbd>, <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Enter</kbd> — Lenovo</li>
+              </ul>
+              <p style="margin:0 0 6px;font-size:0.88rem;color:var(--muted)" data-i18n="win_c2_p2">I-enable ang Intel VT-x o AMD SVM.</p>
+              <p style="margin:6px 0 0;font-size:0.83rem;color:var(--muted);border-top:1px solid var(--line);padding-top:6px" data-i18n="win_c2_p3">Gamitin ang Windows Advanced Startup.</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div><h3 data-i18n="w_t1_t">System Check</h3><p data-i18n="w_t1_d">WSL Support.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div><h3 data-i18n="w_t2_t">Debian</h3><p data-i18n="w_t2_d">Linux Environment.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div><h3 data-i18n="w_t3_t">Koha</h3><p data-i18n="w_t3_d">Packages.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div><h3 data-i18n="w_t4_t">Network</h3><p data-i18n="w_t4_d">Local IP.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div><h3 data-i18n="w_t5_t">Operation</h3><p data-i18n="w_t5_d">Services.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-3">
+          <div class="card"><h3 data-i18n="w_c1_t">Notipikasyon</h3><p data-i18n="w_c1_d">Alerto sa Windows.</p></div>
+          <div class="card"><h3 data-i18n="w_c2_t">Diagnostics</h3><p data-i18n="w_c2_d">Tech Support logs.</p></div>
+          <div class="card"><h3 data-i18n="w_c3_t">Ligtas na pagsara</h3><p data-i18n="w_c3_d">Shutdown process.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="t_kick">Kasangkapan</div>
+          <h2 data-i18n="t_h2">Pamamahala.</h2>
+          <p data-i18n="t_p">Gumagamit ng backup bago ang lahat.</p>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287L12 3Z"></path></svg>
+            </div>
+            <h3 data-i18n="t1_t">Magic Import</h3>
+            <p data-i18n="t1_d">Mag-import ng MARC.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            </div>
+            <h3 data-i18n="t2_t">Undo</h3>
+            <p data-i18n="t2_d">I-cancel ang import.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><line x1="12" x2="12" y1="20" y2="10"></line><line x1="18" x2="18" y1="20" y2="4"></line><line x1="6" x2="6" y1="20" y2="14"></line></svg>
+            </div>
+            <h3 data-i18n="t3_t">Reports</h3>
+            <p data-i18n="t3_d">SQL Queries.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 data-i18n="t4_t">Categories</h3>
+            <p data-i18n="t4_d">Update users.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="t5_t">Quality</h3>
+            <p data-i18n="t5_d">Check catalog.</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            </div>
+            <h3 data-i18n="t6_t">Privacy</h3>
+            <p data-i18n="t6_d">Delete old records.</p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top:18px" data-i18n="t_c1"><strong>Protektado:</strong></div>
+      </div>
+    </section>
+
+    <!-- ESSA SEÇÃO INTEIRA SÓ VAI APARECER EM PORTUGUÊS POR CAUSA DA CLASSE .only-pt -->
+    <section class="section only-pt" id="brazil">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Brasil: localização</div>
+          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <p>
+            As funcionalidades de localização são opcionais: nada é ativado automaticamente durante a instalação ou por agendamento.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Validação de CPF</td>
+                <td>Auditoria de CPFs usando dígitos verificadores e identificação de números duplicados.</td>
+                <td>Leitura apenas</td>
+              </tr>
+              <tr>
+                <td>Etiquetas Pimaco</td>
+                <td>Modelos prontos para folhas A4 e Carta, incluindo lombada, código de barras e título.</td>
+                <td>PRE-ETIQUETAS</td>
+              </tr>
+              <tr>
+                <td>Ficha Catalográfica</td>
+                <td>Gera fichas no padrão nacional integradas diretamente na visualização do registro.</td>
+                <td>PRE-FICHA</td>
+              </tr>
+              <tr>
+                <td>Feriados Brasileiros</td>
+                <td>Feriados nacionais e datas móveis, com opção para inserir os municipais.</td>
+                <td>PRE-CALENDARIO</td>
+              </tr>
+              <tr>
+                <td>Relatórios de Censo</td>
+                <td>Indicadores baseados nos dados do Koha para MEC, INEP, IBGE e SNBP.</td>
+                <td>PRE-CENSO</td>
+              </tr>
+              <tr>
+                <td>ABNT NBR 6023:2018</td>
+                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
+                <td>Leitura apenas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Nota:</strong> Os dados do censo representam o que está registrado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="security">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="s_kick">Seguridad</div>
+          <h2 data-i18n="s_h2">Automation.</h2>
+          <p data-i18n="s_p">Lahat ng naka-iskedyul.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="s1_t">Schedules</h3>
+            <div class="table-wrap" style="margin-top:14px">
+              <table style="min-width:580px">
+                <thead><tr><th data-i18n="s1_th1">Oras</th><th data-i18n="s1_th2">Gawain</th></tr></thead>
+                <tbody>
+                  <tr><td data-i18n="s1_r1_1">23:00</td><td data-i18n="s1_r1_2">SQL Backup</td></tr>
+                  <tr><td data-i18n="s1_r2_1">Lingo</td><td data-i18n="s1_r2_2">MARC21</td></tr>
+                  <tr><td data-i18n="s1_r3_1">01:30</td><td data-i18n="s1_r3_2">Cleanup</td></tr>
+                  <tr><td data-i18n="s1_r4_1">05:00</td><td data-i18n="s1_r4_2">Plack Restart</td></tr>
+                  <tr><td data-i18n="s1_r5_1">2 Min</td><td data-i18n="s1_r5_2">Zebra Indexer</td></tr>
+                  <tr><td data-i18n="s1_r6_1">5 Min</td><td data-i18n="s1_r6_2">Elasticsearch</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s2_t">Files</h3>
+            <ul class="feature-list">
+              <li data-i18n="s2_l1">Passwords</li>
+              <li data-i18n="s2_l2">SQL</li>
+              <li data-i18n="s2_l3">MARC</li>
+              <li data-i18n="s2_l4">Settings</li>
+              <li data-i18n="s2_l5">Logs</li>
+              <li data-i18n="s2_l6">Import folder</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s3_t">Status</h3>
+            <p data-i18n="s3_p">Monitor the server.</p>
+            <div class="chip-row">
+              <span class="chip" data-i18n="s3_c1">Health</span>
+              <span class="chip" data-i18n="s3_c2">Apache</span>
+              <span class="chip" data-i18n="s3_c3">MariaDB</span>
+              <span class="chip" data-i18n="s3_c4">Koha</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s4_t">Power</h3>
+            <p data-i18n="s4_p">Recovery.</p>
+          </div>
+        </div>
+
+        <div class="callout danger" style="margin-top:18px" data-i18n="s_c1"><strong>Pagbura ng Data:</strong> Mag-ingat.</div>
+      </div>
+    </section>
+
+    <section class="section" id="network">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="n_kick">Network</div>
+          <h2 data-i18n="n_h2">Mga Aklatan</h2>
+          <p data-i18n="n_p">Koha.nexus partners.</p>
+          <span class="live-pill" data-i18n="n_live">Kasalukuyang listahan mula sa koha.nexus network</span>
+        </div>
+
+        <div class="grid-3" id="libraries-grid">
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0;" data-i18n="n_load">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="contribute">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="c_kick">Open Source</div>
+          <h2 data-i18n="c_h2">Libreng Gamitin.</h2>
+          <p data-i18n="c_p">Tested and Translated.</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="c1_t">Tests</h3>
+            <p data-i18n="c1_p">Bats framework.</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="c2_t">Translations</h3>
+            <p data-i18n="c2_p">Iba't ibang wika.</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="c3_t">Verify</h3>
+            <p data-i18n="c3_p">SHA-256.</p>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="card">
+          <h3 data-i18n="c_lic_t">Lisensya</h3>
+          <p data-i18n="c_lic_p">GNU GPLv3.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="container contact-grid">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="ct_kick">Makipag-ugnayan</div>
+          <h2 data-i18n="ct_h2">Makipag-usap sa proyekto.</h2>
+          <p data-i18n="ct_p">Mga tanong, ideya, aklatang gustong sumali o Z39.50 server na dapat idagdag: sumulat dito at darating ang sagot sa iyong e-mail.</p>
+        </div>
+
+        <form class="card contact-form" id="contact-form" action="https://formspree.io/f/mkjorqwp" method="POST" novalidate>
+          <label class="field">
+            <span data-i18n="ct_name">Pangalan / Institusyon</span>
+            <input type="text" name="name" required maxlength="200" autocomplete="organization" data-i18n-ph="ct_name_ph" placeholder="Pangalan mo o pangalan ng aklatan">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_email">Email</span>
+            <input type="email" name="email" required maxlength="200" autocomplete="email" data-i18n-ph="ct_email_ph" placeholder="you@library.org">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_msg">Mensahe, mungkahi o ulat ng problema</span>
+            <textarea name="message" required rows="6" maxlength="5000" data-i18n-ph="ct_msg_ph" placeholder="Ipadala ang mungkahi, makabuluhang puna, ulat ng problema, bagong server ng aklatan o tanong tungkol sa Koha.Nexus..."></textarea>
+          </label>
+          <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="contact-actions">
+            <button class="btn btn-primary" type="submit" id="contact-send" data-i18n="ct_send">Ipadala ang mensahe</button>
+            <span class="contact-note" data-i18n="ct_note">Ginagamit lamang ang e-mail mo upang sagutin ang mensaheng ito.</span>
+          </div>
+          <div class="contact-status" id="contact-status" role="status" aria-live="polite" hidden></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#home" aria-label="koha.nexus">
+            koha.nexus
+          </a>
+          <p style="margin-top:14px;max-width:560px" data-i18n="foot_p1">Koha helper.</p>
+          <p data-i18n="foot_p2">Gawa ni <strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong>.</p>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_proj">Project</h4>
+          <div class="mini-links">
+            <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
+            <a href="LICENSE" data-i18n="c_lic_t">Lisensya</a>
+            <a href="../../README.md">README</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_links">Links</h4>
+          <div class="mini-links">
+            <a href="#features" data-i18n="nav_features">Mga Tampok</a>
+            <a href="#panel" data-i18n="nav_panel">Panel</a>
+            <a href="preview/" data-i18n="nav_manual">Manwal</a>
+            <a href="#installation" data-i18n="nav_install">Pag-install</a>
+            <a href="#windows" data-i18n="nav_win">Windows</a>
+            <a href="#tools" data-i18n="nav_tools">Mga Kasangkapan</a>
+            <a href="#contact" data-i18n="nav_contact">Makipag-ugnayan</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span data-i18n="foot_c1">© 2026 koha.nexus</span>
+        <span data-i18n="foot_c2">Koha Community.</span>
+      </div>
+    </div>
+  </footer>
+
+
+
+  <button class="to-top" id="to-top" type="button" data-i18n-aria="back_to_top" aria-label="Bumalik sa itaas">↑</button>
+
+
+  <script id="site-messages" type="application/json">{"ct_sending": "Ipinapadala…", "ct_ok": "Naipadala ang mensahe! Salamat sa pakikipag-ugnayan.", "ct_err": "Hindi maipadala ang mensahe ngayon. Suriin ang mga field at subukang muli mamaya.", "network_empty": "Walang pampublikong aklatang nakalista sa ngayon.", "network_error": "Hindi ma-load ang network ng mga aklatan sa ngayon."}</script>
+  <script src="../../site/assets/home.js" defer></script>
+</body>
+</html>

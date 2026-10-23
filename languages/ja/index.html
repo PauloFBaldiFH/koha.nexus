@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" data-i18n-meta="page_description" content="Koha.Nexus は Debian、Ubuntu、WSL を使う Windows で Koha 図書館を導入・管理する無料のアシスタントです。">
+  <meta name="theme-color" content="#08110d">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <link rel="shortcut icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title data-i18n="page_title">Koha.Nexus：図書館管理を簡単に</title>
+
+  <link rel="stylesheet" href="../../site/assets/home.css">
+<link rel="alternate" hreflang="en" href="https://koha.nexus/">
+<link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/">
+<link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/">
+<link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/">
+<link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/">
+<link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/">
+<link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/">
+<link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/">
+<link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/">
+<link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/">
+<link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/">
+<link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/">
+<link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/">
+<link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/">
+<link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/">
+<link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/">
+<link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/">
+<link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/">
+<link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/">
+<link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/">
+<link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/">
+<link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/">
+<link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/">
+<link rel="alternate" hreflang="x-default" href="https://koha.nexus/">
+</head>
+
+<body data-language="ja">
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#home" aria-label="koha.nexus">
+        koha.nexus
+      </a>
+      <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menu" aria-controls="main-nav" aria-expanded="false">☰</button>
+      <nav id="main-nav" data-i18n-aria="main_navigation" aria-label="メインナビゲーション">
+        <a href="#features" data-i18n="nav_features">機能</a>
+        <a href="#panel" data-i18n="nav_panel">パネル</a>
+        <a href="preview/" data-i18n="nav_manual">マニュアル</a>
+        <a href="#installation" data-i18n="nav_install">インストール</a>
+        <a href="#windows" data-i18n="nav_win">Windows</a>
+        <a href="#tools" data-i18n="nav_tools">ツール</a>
+        <a href="#security" data-i18n="nav_security">セキュリティ</a>
+        <a href="#network" data-i18n="nav_net">ネットワーク</a>
+        <a href="#contact" data-i18n="nav_contact">お問い合わせ</a>
+        <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- SELETOR DE IDIOMAS COM BOTÕES PEQUENOS -->
+  <section class="lang-section">
+    <div class="container">
+      <nav class="language-links" data-language-links><a data-language="en" lang="en" hreflang="en" href="../../index.html">English</a><a data-language="pt" lang="pt-BR" hreflang="pt-BR" href="../pt/index.html">Português (Brasil)</a><a data-language="es" lang="es" hreflang="es" href="../es/index.html">Español</a><a data-language="fr" lang="fr" hreflang="fr" href="../fr/index.html">Français</a><a data-language="it" lang="it" hreflang="it" href="../it/index.html">Italiano</a><a data-language="de" lang="de" hreflang="de" href="../de/index.html">Deutsch</a><a data-language="nl" lang="nl" hreflang="nl" href="../nl/index.html">Nederlands</a><a data-language="sv" lang="sv" hreflang="sv" href="../sv/index.html">Svenska</a><a data-language="pl" lang="pl" hreflang="pl" href="../pl/index.html">Polski</a><a data-language="cs" lang="cs" hreflang="cs" href="../cs/index.html">Čeština</a><a data-language="ru" lang="ru" hreflang="ru" href="../ru/index.html">Русский</a><a data-language="uk" lang="uk" hreflang="uk" href="../uk/index.html">Українська</a><a data-language="tr" lang="tr" hreflang="tr" href="../tr/index.html">Türkçe</a><a data-language="tl" lang="tl" hreflang="tl" href="../tl/index.html">Tagalog (Filipino)</a><a data-language="id" lang="id" hreflang="id" href="../id/index.html">Bahasa Indonesia</a><a data-language="ar" lang="ar" hreflang="ar" href="../ar/index.html">العربية</a><a data-language="fa" lang="fa" hreflang="fa" href="../fa/index.html">فارسی</a><a data-language="hi" lang="hi" hreflang="hi" href="../hi/index.html">Hindi</a><a data-language="bn" lang="bn" hreflang="bn" href="../bn/index.html">Bangla (Bengali)</a><a data-language="vi" lang="vi" hreflang="vi" href="../vi/index.html">Tiếng Việt</a><a data-language="zh" lang="zh-Hans" hreflang="zh-Hans" href="../zh/index.html">中文 (简体)</a><a data-language="ja" lang="ja" hreflang="ja" href="index.html" aria-current="page">日本語</a><a data-language="ko" lang="ko" hreflang="ko" href="../ko/index.html">한국어</a></nav>
+    </div>
+  </section>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-bg" aria-hidden="true"><div class="grid-bg"></div><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow" data-i18n="hero_eye">✦ Koha • Debian • Ubuntu • Windows 10/11</span>
+          <img class="hero-logo" src="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/koha-logo.png" alt="koha.nexus" width="420" height="74">
+          <h1 data-i18n="hero_h1">最高の無料図書館システム、<span class='accent'>もう手間はかかりません。</span></h1>
+          <p data-i18n="hero_p"><strong>koha.nexus</strong>は、<strong>Koha</strong>を管理するためのスマートで無料の使いやすいアシスタントです。</p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#installation" data-i18n="hero_btn1">インストールを開始 →</a>
+            <a class="btn btn-secondary" href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener" data-i18n="hero_btn2">GitHubで見る</a>
+            <a class="btn btn-secondary" href="../../README.md" data-i18n="hero_btn3">READMEを読む</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><strong data-i18n="stat1_t">22言語</strong><span data-i18n="stat1_d">ダッシュボードとパッケージ</span></div>
+            <div class="stat"><strong data-i18n="stat2_t">2システム</strong><span data-i18n="stat2_d">LinuxまたはWindows</span></div>
+            <div class="stat"><strong data-i18n="stat3_t">25+機能</strong><span data-i18n="stat3_d">管理とツール</span></div>
+            <div class="stat"><strong data-i18n="stat4_t">GPL-3.0+</strong><span data-i18n="stat4_d">フリーソフトウェア</span></div>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Installation terminal">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">installation — terminal</span>
+          </div>
+          <pre><span class="tl" style="--d:0"><span class="prompt">$</span> wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer</span><span class="tl" style="--d:1"><span class="prompt">$</span> sudo bash installer</span><span class="tl" style="--d:2">&nbsp;</span><span class="tl" style="--d:3"><span class="muted">KOHA.NEXUS</span></span><span class="tl" style="--d:4"><span class="prompt">✓</span> <span data-i18n="term_validating">サーバーを検証中...</span></span><span class="tl" style="--d:5"><span class="prompt">✓</span> <span data-i18n="term_installing">Kohaをインストール中...</span></span><span class="tl" style="--d:6"><span class="prompt">✓</span> <span data-i18n="term_configuring">データベースを設定中...</span></span><span class="tl" style="--d:7"><span class="prompt">✓</span> <span data-i18n="term_preparing">バックアップを準備中...</span></span><span class="tl" style="--d:8"><span class="prompt">✓</span> <span data-i18n="term_access">アクセスを設定中...</span></span><span class="tl" style="--d:9">&nbsp;</span><span class="tl" style="--d:10"><span class="prompt">→</span> <span data-i18n="term_ready">ダッシュボードの準備完了:</span> <strong>sudo config.sh</strong><span class="caret"></span></span></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="feat_kick">すべてを1か所で</div>
+          <h2 data-i18n="feat_h2">図書館を管理するためのダッシュボード。</h2>
+          <p data-i18n="feat_p">インストールからバックアップ、セキュリティ、Web公開まで。</p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </div>
+            <h3 data-i18n="f1_t">ガイド付きインストール</h3>
+            <p data-i18n="f1_d">Koha、Apache、MariaDBの自動セットアップ。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            </div>
+            <h3 data-i18n="f2_t">バックアップハブ</h3>
+            <p data-i18n="f2_d">SQLとMARC21のバックアップ。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="f3_t">安全な復元</h3>
+            <p data-i18n="f3_d">復元する前にバックアップをテストします。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </div>
+            <h3 data-i18n="f4_t">検索とインデックス</h3>
+            <p data-i18n="f4_d">ZebraまたはElasticsearch 7。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+            </div>
+            <h3 data-i18n="f5_t">Web公開</h3>
+            <p data-i18n="f5_d">Cloudflare TunnelとCertbot。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h3 data-i18n="f6_t">セキュリティ</h3>
+            <p data-i18n="f6_d">Fail2banとUFWファイアウォール。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            </div>
+            <h3 data-i18n="f7_t">図書館ツール</h3>
+            <p data-i18n="f7_d">データインポートとSQLレポート。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="f8_t">WhatsAppとTelegram</h3>
+            <p data-i18n="f8_d">Kohaの通知。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            </div>
+            <h3 data-i18n="f9_t">目録作成支援</h3>
+            <p data-i18n="f9_d">DDCとCutter計算機。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+            </div>
+            <h3 data-i18n="f10_t">Windows + WSL 2</h3>
+            <p data-i18n="f10_d">Windows PCでKohaを実行します。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            </div>
+            <h3 data-i18n="f11_t">自動更新</h3>
+            <p data-i18n="f11_d">GitHubからの安全な更新。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"></path><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"></path><circle cx="12" cy="12" r="2"></circle><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"></path><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"></path></svg>
+            </div>
+            <h3><span data-i18n="f12_t">Z39.50 / SRU サーバー</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f12_d">公開目録を選定し実際に検索して検証。有効な MARC レコードを返すサーバーだけを Koha に追加し、速い順に並べます。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"></path></svg>
+            </div>
+            <h3><span data-i18n="f13_t">OPAC の外観</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f13_d">テクスチャー、角丸、壁紙、ロゴ、ライト／ダーク切替、新着カルーセルを、backup 作成後に Koha に書き込みます。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+            </div>
+            <h3><span data-i18n="f14_t">メッセージと相互運用</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f14_d">メール、SMS、SIP2 自動貸出、Z39.50 をひとつの画面にまとめ、Koha の該当ページへのリンクと設定を書き込む SIP2 フォームを備えます。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h3><span data-i18n="f15_t">スケジュールと cron ジョブ</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f15_d">自動ジョブごとに有効・無効、頻度、時刻を選択します。手書きの行は保持します。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"></path><circle cx="16.5" cy="7.5" r=".5"></circle></svg>
+            </div>
+            <h3><span data-i18n="f16_t">WireGuard VPN</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f16_d">電話用 QR コードで職員画面と SSH にどこからでも接続できます。VPN を通るのは図書館のアドレスだけです。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </div>
+            <h3><span data-i18n="f17_t">無料アドレス</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f17_d">ドメイン購入や Cloudflare アカウントなしで、koha.nexus 上に公開目録のアドレスを取得し、QR コードやリンクで共有できます。現在テスト中です。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><rect width="18" height="10" x="3" y="11" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" x2="8" y1="16" y2="16"></line><line x1="16" x2="16" y1="16" y2="16"></line></svg>
+            </div>
+            <h3><span data-i18n="f18_t">AI アシスタント</span><span class="badge-new" data-i18n="badge_new">新機能</span></h3>
+            <p data-i18n="f18_d">司書が本、利用者、貸出について自然な言葉で質問できます。変更はすべて提案され、承認して実行した場合だけ動作します。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="panel">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="p_kick">新しいコントロールパネル</div>
+          <h2 data-i18n="p_h2">マウスとキーボードで、各作業をひとつの画面から。</h2>
+          <p data-i18n="p_p"><code>sudo config.sh</code> を実行すると全画面のパネルが開きます。リアルタイムのダッシュボード、クリックできるカード、ショートカット、コマンドパレット（<kbd>ctrl+p</kbd>）を備えています。以下は実際の画面です。</p>
+        </div>
+
+        <div class="showcase">
+          <div class="tabs" role="tablist" data-i18n-aria="panel_screens" aria-label="パネルの画面">
+            <button class="tab" type="button" role="tab" id="tab-dashboard" aria-controls="panel-stage" aria-selected="true" tabindex="0" data-shot="dashboard"><span class="ti" aria-hidden="true">🎛️</span><span data-i18n="pt_dashboard">管理ダッシュボード</span><span class="k" aria-hidden="true">d</span></button>
+            <button class="tab" type="button" role="tab" id="tab-hub" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="hub"><span class="ti" aria-hidden="true">📨</span><span data-i18n="pt_hub">メッセージと相互運用</span><span class="k" aria-hidden="true">m</span></button>
+            <button class="tab" type="button" role="tab" id="tab-z3950" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="z3950"><span class="ti" aria-hidden="true">📡</span><span data-i18n="pt_z3950">Z39.50 / SRU サーバー</span><span class="k" aria-hidden="true">z</span></button>
+            <button class="tab" type="button" role="tab" id="tab-opac" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="opac"><span class="ti" aria-hidden="true">🎨</span><span data-i18n="pt_opac">OPAC の外観</span><span class="k" aria-hidden="true">o</span></button>
+            <button class="tab" type="button" role="tab" id="tab-vpn" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="vpn"><span class="ti" aria-hidden="true">🛡️</span><span data-i18n="pt_vpn">WireGuard VPN</span><span class="k" aria-hidden="true">v</span></button>
+            <button class="tab" type="button" role="tab" id="tab-crons" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="crons"><span class="ti" aria-hidden="true">⏰</span><span data-i18n="pt_crons">スケジュールと cron ジョブ</span><span class="k" aria-hidden="true">s</span></button>
+            <button class="tab" type="button" role="tab" id="tab-ai" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="ai"><span class="ti" aria-hidden="true">🤖</span><span data-i18n="pt_ai">AI</span><span class="k" aria-hidden="true">a</span></button>
+            <button class="tab" type="button" role="tab" id="tab-backup" aria-controls="panel-stage" aria-selected="false" tabindex="-1" data-shot="backup"><span class="ti" aria-hidden="true">💾</span><span data-i18n="pt_backup">Backup センター</span><span class="k" aria-hidden="true">b</span></button>
+          </div>
+          <div class="stage" id="panel-stage" role="tabpanel">
+            <a class="shot" id="shot" href="preview/#dashboard">
+              <img id="shot-img" src="../../docs/images/panel/dashboard.webp" alt="Control Dashboard" width="1400" height="924" loading="lazy" decoding="async">
+              <span class="shot-badge"><span class="shot-badge-dot" aria-hidden="true"></span><span data-i18n="p_explore">インタラクティブマニュアルで見る</span><span class="shot-badge-arrow" aria-hidden="true">→</span></span>
+            </a>
+            <div class="stage-text">
+              <div>
+                <div class="pane" data-pane="dashboard"><h3 data-i18n="pt_dashboard">管理ダッシュボード</h3><p data-i18n="pd_dashboard">Koha の状態、最新の backup、空き容量、目録と職員画面の全アドレス（このパソコン、館内ネットワーク、インターネット）を表示し、それぞれ開く・コピーするボタンがあります。</p></div>
+                <div class="pane" data-pane="hub" hidden><h3 data-i18n="pt_hub">メッセージと相互運用</h3><p data-i18n="pd_hub">メール、WhatsApp と Telegram、SMS、SIP2、Z39.50 をひとつの画面で設定します。リンクは Koha の該当職員ページを開き、Gmail の手引きは SMTP 入力を助け、SIP2 フォームは自動貸出機用の <code>SIPconfig.xml</code> を書き込みます。</p></div>
+                <div class="pane" data-pane="z3950" hidden><h3 data-i18n="pt_z3950">Z39.50 / SRU サーバー</h3><p data-i18n="pd_z3950">地域別の公開目録とコミュニティ一覧。各サーバーで実際に検索し、有効な MARC レコードを返すものだけを速度順に残します。</p></div>
+                <div class="pane" data-pane="opac" hidden><h3 data-i18n="pt_opac">OPAC の外観</h3><p data-i18n="pd_opac">公開目録の外観をワンクリックで設定します。すりガラスやヘアライン金属、角丸、壁紙、ロゴ、ライト／ダーク切替、本物の書影付き新着カルーセル。最初に backup を作成します。</p></div>
+                <div class="pane" data-pane="vpn" hidden><h3 data-i18n="pt_vpn">WireGuard VPN</h3><p data-i18n="pd_vpn">職員専用の WireGuard ネットワーク。電話やノートパソコンを追加し QR コードを読めば、どこからでも職員画面と SSH が使えます。分割トンネルのみで、端末自身のインターネット接続は変えません。</p></div>
+                <div class="pane" data-pane="crons" hidden><h3 data-i18n="pt_crons">スケジュールと cron ジョブ</h3><p data-i18n="pd_crons">テキスト編集の代わりに、各定期ジョブをスイッチ・頻度・時刻で設定します。手書きの行を保持し、古いファイルを先に保存します。</p></div>
+                <div class="pane" data-pane="ai" hidden><h3 data-i18n="pt_ai">AI</h3><p data-i18n="pd_ai">表紙と標題紙の写真による AI 目録作成と、職員ホーム画面のアシスタント。自然な言葉で回答し、<strong>承認して実行</strong>した場合のみデータを変更します。</p></div>
+                <div class="pane" data-pane="backup" hidden><h3 data-i18n="pt_backup">Backup センター</h3><p data-i18n="pd_backup">データベースの復元は MARC21 エクスポートと backup 機能の横にまとめられ、メインメニューに独立した Restore database はありません。最新の backup をこのパソコンに保存し、backup から復元（先にテストし、現在の安全用コピーを作成）、MARC21 のワンボタン出力、一時データベースでの backup テスト、Google Drive・OneDrive・MEGA・S3 へのコピーを順に行えます。</p></div>
+              </div>
+            </div>
+            <div class="stage-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="installation">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="inst_kick">ここから開始</div>
+          <h2 data-i18n="inst_h2">いくつかのコマンドでLinuxをインストール。</h2>
+          <p data-i18n="inst_p">amd64 または arm64 の Debian 11/12/13 と Ubuntu 22.04/24.04 に対応し、Windows でも WSL 2 経由で動作します。</p>
+        </div>
+
+        <div class="install-grid">
+          <div class="card">
+            <h3 data-i18n="inst_b1_t">直接インストーラー</h3>
+            <p data-i18n="inst_b1_d">現在のインストールスクリプトをダウンロードし、管理者権限で実行します。</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer">コピー</button>
+              </div>
+              <pre>wget https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer
+sudo bash installer</pre>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_b2_t">リポジトリのクローン</h3>
+            <p data-i18n="inst_b2_d">翻訳ファイルをスクリプトと同じ場所に置けば、オフラインでも使えます。</p>
+            <div class="codebox" style="margin-top:16px">
+              <div class="codebox-head">
+                <span>bash</span>
+                <button class="copy" data-i18n="btn_copy" data-copy="git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer">コピー</button>
+              </div>
+              <pre>git clone https://github.com/PauloFBaldiFH/koha.nexus.git
+cd koha.nexus
+sudo bash installer</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="inst_r_t">最小要件</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_r1">Debian 11/12/13 または Ubuntu 22.04/24.04、64-bit</li>
+              <li data-i18n="inst_r2">RAM 4 GB。8 GB 以上を推奨</li>
+              <li data-i18n="inst_r3">空き容量 5 GB。10 GB 以上を推奨</li>
+              <li data-i18n="inst_r4">root、または sudo 権限のあるユーザー</li>
+              <li data-i18n="inst_r5">Koha リポジトリーに接続できるインターネット</li>
+              <li data-i18n="inst_r6">ポート 80 と 8080 が利用可能</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="inst_a_t">インストール後</h3>
+            <ul class="feature-list">
+              <li data-i18n="inst_a1">職員画面を <code>http://SERVER-IP:8080</code> で開く</li>
+              <li data-i18n="inst_a2">Koha Web Installer を完了する</li>
+              <li data-i18n="inst_a3">ダッシュボードからスーパー司書を作成する</li>
+              <li data-i18n="inst_a4">公開目録は <code>http://SERVER-IP:80</code></li>
+              <li data-i18n="inst_a5">いつでも <code>sudo config.sh</code> でダッシュボードを開く</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section windows" id="windows">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="win_kick">Windows 10 / 11</div>
+          <h2 data-i18n="win_h2">PC上の完全なKoha環境。</h2>
+          <p data-i18n="win_p">WindowsでKohaを実行します。</p>
+        </div>
+
+        <div class="download-banner">
+          <div class="download-content">
+            <div class="download-icon">
+              <svg viewbox="0 0 24 24" style="width:28px; height:28px; stroke:#061009; fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <div>
+              <div class="download-kicker" data-i18n="win_d_k">WINDOWS インストーラー</div>
+              <h3 data-i18n="win_d_t">コマンド1つでKohaをインストール。</h3>
+              <p data-i18n="win_d_p">PowerShell を<strong>管理者として</strong>開き、このコマンドを貼り付けて Enter を押します。</p>
+            </div>
+          </div>
+          <div class="codebox">
+            <div class="codebox-head">
+              <span>PowerShell</span>
+              <button class="copy" data-i18n="btn_copy" data-copy="irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex">コピー</button>
+            </div>
+            <pre>irm https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/main/windows/install.ps1 | iex</pre>
+          </div>
+        </div>
+
+        <div class="windows-card">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+            </div>
+            <h3 data-i18n="win_b_t">インストール</h3>
+            <p data-i18n="win_b_p">スタートを右クリックして <em>ターミナル (管理者)</em> を選び、<strong>はい</strong>をクリックします。上のコマンドを貼り付けて Enter を押します。</p>
+            <div class="callout callout-warn" style="margin-top:15px" data-i18n="win_admin"><strong>Use your own Windows account.</strong> If Windows asks for <em>another person's</em> password, sign in to an administrator account first and run it there: Debian, the shortcuts and the restart step are created for the account that runs the installer.</div>
+            <div class="callout" style="margin-top:14px">
+              <strong data-i18n="win_c2_t"><strong>仮想化を有効にする方法:</strong></strong>
+              <p style="margin:6px 0 8px;font-size:0.9rem;color:var(--muted)" data-i18n="win_c2_p1">BIOS設定に入ります。</p>
+              <ul style="margin:0 0 8px;padding-left:18px;font-size:0.88rem;color:var(--muted);line-height:1.6">
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Del</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> — ASUS, Gigabyte, MSI, ASRock, Acer</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F10</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Esc</kbd> — HP / Compaq</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F12</kbd> — Dell</li>
+                <li><kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F1</kbd>, <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">F2</kbd> ou <kbd style="background:rgba(255,255,255,.08);padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--text)">Enter</kbd> — Lenovo</li>
+              </ul>
+              <p style="margin:0 0 6px;font-size:0.88rem;color:var(--muted)" data-i18n="win_c2_p2">Intel VT-xまたはAMD SVMを有効にします。</p>
+              <p style="margin:6px 0 0;font-size:0.83rem;color:var(--muted);border-top:1px solid var(--line);padding-top:6px" data-i18n="win_c2_p3">またはWindowsの高度なスタートアップを使用します。</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div><h3 data-i18n="w_t1_t">システムチェック</h3><p data-i18n="w_t1_d">PCを検証します。</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div><h3 data-i18n="w_t2_t">Debian</h3><p data-i18n="w_t2_d">Linux環境。</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div><h3 data-i18n="w_t3_t">Koha</h3><p data-i18n="w_t3_d">パッケージをダウンロードします。</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div><h3 data-i18n="w_t4_t">ネットワーク</h3><p data-i18n="w_t4_d">ローカルアクセス。</p></div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div><h3 data-i18n="w_t5_t">操作</h3><p data-i18n="w_t5_d">安全なシャットダウン。</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="grid-3">
+          <div class="card"><h3 data-i18n="w_c1_t">通知</h3><p data-i18n="w_c1_d">Windowsアラート。</p></div>
+          <div class="card"><h3 data-i18n="w_c2_t">診断</h3><p data-i18n="w_c2_d">サポートログ。</p></div>
+          <div class="card"><h3 data-i18n="w_c3_t">シャットダウン</h3><p data-i18n="w_c3_d">Kohaは安全にシャットダウンします。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="t_kick">ツール</div>
+          <h2 data-i18n="t_h2">コレクションを管理する。</h2>
+          <p data-i18n="t_p">データを変更する前の自動保護。</p>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287L12 3Z"></path></svg>
+            </div>
+            <h3 data-i18n="t1_t">Magic Import</h3>
+            <p data-i18n="t1_d">MARCとスプレッドシートをインポート。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            </div>
+            <h3 data-i18n="t2_t">インポートを元に戻す</h3>
+            <p data-i18n="t2_d">インポートされたデータをロールバックします。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><line x1="12" x2="12" y1="20" y2="10"></line><line x1="18" x2="18" y1="20" y2="4"></line><line x1="6" x2="6" y1="20" y2="14"></line></svg>
+            </div>
+            <h3 data-i18n="t3_t">SQLレポート</h3>
+            <p data-i18n="t3_d">貸出と延滞。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 data-i18n="t4_t">カテゴリ</h3>
+            <p data-i18n="t4_d">メンバーを移動します。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="t5_t">品質</h3>
+            <p data-i18n="t5_d">カタログのエラーを確認します。</p>
+          </article>
+
+          <article class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            </div>
+            <h3 data-i18n="t6_t">プライバシー</h3>
+            <p data-i18n="t6_d">古いデータを削除します。</p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top:18px" data-i18n="t_c1"><strong>セキュリティ:</strong> 常にバックアップされます。</div>
+      </div>
+    </section>
+
+    <!-- ESSA SEÇÃO INTEIRA SÓ VAI APARECER EM PORTUGUÊS POR CAUSA DA CLASSE .only-pt -->
+    <section class="section only-pt" id="brazil">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker">Brasil: localização</div>
+          <h2>Recursos pensados para a rotina das bibliotecas brasileiras.</h2>
+          <p>
+            As funcionalidades de localização são opcionais: nada é ativado automaticamente durante a instalação ou por agendamento.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Recurso</th><th>O que oferece</th><th>Proteção</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Validação de CPF</td>
+                <td>Auditoria de CPFs usando dígitos verificadores e identificação de números duplicados.</td>
+                <td>Leitura apenas</td>
+              </tr>
+              <tr>
+                <td>Etiquetas Pimaco</td>
+                <td>Modelos prontos para folhas A4 e Carta, incluindo lombada, código de barras e título.</td>
+                <td>PRE-ETIQUETAS</td>
+              </tr>
+              <tr>
+                <td>Ficha Catalográfica</td>
+                <td>Gera fichas no padrão nacional integradas diretamente na visualização do registro.</td>
+                <td>PRE-FICHA</td>
+              </tr>
+              <tr>
+                <td>Feriados Brasileiros</td>
+                <td>Feriados nacionais e datas móveis, com opção para inserir os municipais.</td>
+                <td>PRE-CALENDARIO</td>
+              </tr>
+              <tr>
+                <td>Relatórios de Censo</td>
+                <td>Indicadores baseados nos dados do Koha para MEC, INEP, IBGE e SNBP.</td>
+                <td>PRE-CENSO</td>
+              </tr>
+              <tr>
+                <td>ABNT NBR 6023:2018</td>
+                <td>Geração de referências e bibliografias a partir dos registros MARC21 em HTML e texto.</td>
+                <td>Leitura apenas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:18px">
+          <strong>Nota:</strong> Os dados do censo representam o que está registrado no Koha. Recomenda-se sempre a conferência oficial antes da submissão dos formulários governamentais.
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="security">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="s_kick">セキュリティ</div>
+          <h2 data-i18n="s_h2">透明な自動化。</h2>
+          <p data-i18n="s_p">スケジュールされたタスク。</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 data-i18n="s1_t">スケジュール</h3>
+            <div class="table-wrap" style="margin-top:14px">
+              <table style="min-width:580px">
+                <thead><tr><th data-i18n="s1_th1">時間</th><th data-i18n="s1_th2">タスク</th></tr></thead>
+                <tbody>
+                  <tr><td data-i18n="s1_r1_1">23:00</td><td data-i18n="s1_r1_2">SQLバックアップ</td></tr>
+                  <tr><td data-i18n="s1_r2_1">日曜日</td><td data-i18n="s1_r2_2">MARC21エクスポート</td></tr>
+                  <tr><td data-i18n="s1_r3_1">01:30</td><td data-i18n="s1_r3_2">クリーンアップ</td></tr>
+                  <tr><td data-i18n="s1_r4_1">05:00</td><td data-i18n="s1_r4_2">Plackの再起動</td></tr>
+                  <tr><td data-i18n="s1_r5_1">2分</td><td data-i18n="s1_r5_2">Zebraインデクサー</td></tr>
+                  <tr><td data-i18n="s1_r6_1">5分</td><td data-i18n="s1_r6_2">Elasticsearch</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s2_t">重要なファイル</h3>
+            <ul class="feature-list">
+              <li data-i18n="s2_l1">パスワード</li>
+              <li data-i18n="s2_l2">SQLバックアップ</li>
+              <li data-i18n="s2_l3">MARCバックアップ</li>
+              <li data-i18n="s2_l4">設定</li>
+              <li data-i18n="s2_l5">ログ</li>
+              <li data-i18n="s2_l6">インポートフォルダー</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s3_t">ステータス</h3>
+            <p data-i18n="s3_p">サーバーの正常性を確認します。</p>
+            <div class="chip-row">
+              <span class="chip" data-i18n="s3_c1">Health</span>
+              <span class="chip" data-i18n="s3_c2">Apache</span>
+              <span class="chip" data-i18n="s3_c3">MariaDB</span>
+              <span class="chip" data-i18n="s3_c4">Koha</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 data-i18n="s4_t">電力復旧</h3>
+            <p data-i18n="s4_p">自動修復。</p>
+          </div>
+        </div>
+
+        <div class="callout danger" style="margin-top:18px" data-i18n="s_c1"><strong>アンインストールするとデータが削除されます。</strong></div>
+      </div>
+    </section>
+
+    <section class="section" id="network">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="n_kick">ネットワーク</div>
+          <h2 data-i18n="n_h2">図書館</h2>
+          <p data-i18n="n_p">パートナー図書館。</p>
+          <span class="live-pill" data-i18n="n_live">koha.nexus ネットワークの最新一覧</span>
+        </div>
+
+        <div class="grid-3" id="libraries-grid">
+          <div style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0;" data-i18n="n_load">読み込み中...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="contribute">
+      <div class="container">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="c_kick">オープンソース</div>
+          <h2 data-i18n="c_h2">無料で使用できます。</h2>
+          <p data-i18n="c_p">自由に変更できます。</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M10 2v7.31L2 20h20L14 9.31V2M8 2h8M10 14h4"></path></svg>
+            </div>
+            <h3 data-i18n="c1_t">テスト</h3>
+            <p data-i18n="c1_p">システム検証。</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+            </div>
+            <h3 data-i18n="c2_t">翻訳</h3>
+            <p data-i18n="c2_p">22言語をサポート。</p>
+          </div>
+          <div class="card">
+            <div class="icon">
+              <svg viewbox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            </div>
+            <h3 data-i18n="c3_t">検証</h3>
+            <p data-i18n="c3_p">SHA-256セキュリティ。</p>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="card">
+          <h3 data-i18n="c_lic_t">ライセンス</h3>
+          <p data-i18n="c_lic_p">GNU GPLv3.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="container contact-grid">
+        <div class="section-heading">
+          <div class="kicker" data-i18n="ct_kick">お問い合わせ</div>
+          <h2 data-i18n="ct_h2">プロジェクトへのお問い合わせ。</h2>
+          <p data-i18n="ct_p">質問、提案、ネットワークに参加したい図書館、追加すべき Z39.50 サーバーなど、こちらにご記入ください。メールで回答します。</p>
+        </div>
+
+        <form class="card contact-form" id="contact-form" action="https://formspree.io/f/mkjorqwp" method="POST" novalidate>
+          <label class="field">
+            <span data-i18n="ct_name">お名前 / 機関名</span>
+            <input type="text" name="name" required maxlength="200" autocomplete="organization" data-i18n-ph="ct_name_ph" placeholder="お名前または図書館名">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_email">メール</span>
+            <input type="email" name="email" required maxlength="200" autocomplete="email" data-i18n-ph="ct_email_ph" placeholder="you@library.org">
+          </label>
+          <label class="field">
+            <span data-i18n="ct_msg">メッセージ、提案、不具合報告</span>
+            <textarea name="message" required rows="6" maxlength="5000" data-i18n-ph="ct_msg_ph" placeholder="提案、建設的な意見、不具合報告、追加する図書館サーバー、Koha.Nexus に関する質問をお送りください..."></textarea>
+          </label>
+          <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="contact-actions">
+            <button class="btn btn-primary" type="submit" id="contact-send" data-i18n="ct_send">メッセージを送信</button>
+            <span class="contact-note" data-i18n="ct_note">メールアドレスはこのメッセージへの返信にのみ使用します。</span>
+          </div>
+          <div class="contact-status" id="contact-status" role="status" aria-live="polite" hidden></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#home" aria-label="koha.nexus">
+            koha.nexus
+          </a>
+          <p style="margin-top:14px;max-width:560px" data-i18n="foot_p1">Kohaアシスタント。</p>
+          <p data-i18n="foot_p2"><strong style='color:#d6e9dc'>Paulo F. Baldi FH</strong> によって開発されました。</p>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_proj">プロジェクト</h4>
+          <div class="mini-links">
+            <a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">GitHub</a>
+            <a href="LICENSE" data-i18n="c_lic_t">ライセンス</a>
+            <a href="../../README.md">README</a>
+          </div>
+        </div>
+
+        <div>
+          <h4 data-i18n="foot_links">リンク</h4>
+          <div class="mini-links">
+            <a href="#features" data-i18n="nav_features">機能</a>
+            <a href="#panel" data-i18n="nav_panel">パネル</a>
+            <a href="preview/" data-i18n="nav_manual">マニュアル</a>
+            <a href="#installation" data-i18n="nav_install">インストール</a>
+            <a href="#windows" data-i18n="nav_win">Windows</a>
+            <a href="#tools" data-i18n="nav_tools">ツール</a>
+            <a href="#contact" data-i18n="nav_contact">お問い合わせ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span data-i18n="foot_c1">© 2026 koha.nexus</span>
+        <span data-i18n="foot_c2">Kohaコミュニティ。</span>
+      </div>
+    </div>
+  </footer>
+
+
+
+  <button class="to-top" id="to-top" type="button" data-i18n-aria="back_to_top" aria-label="先頭に戻る">↑</button>
+
+
+  <script id="site-messages" type="application/json">{"ct_sending": "送信中…", "ct_ok": "送信しました。お問い合わせありがとうございます。", "ct_err": "現在送信できません。入力欄を確認し、しばらくしてから再試行してください。", "network_empty": "現在、公開図書館の登録はありません。", "network_error": "現在、図書館ネットワークを読み込めません。"}</script>
+  <script src="../../site/assets/home.js" defer></script>
+</body>
+</html>

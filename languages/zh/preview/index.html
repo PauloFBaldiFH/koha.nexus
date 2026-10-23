@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08110d">
+  <meta name="description" data-ui-meta="subtitle" content="逐一讲解控制面板的各个屏幕。">
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/windows/koha.ico">
+  <title data-ui="title">交互式预览和手册</title>
+  <link rel="stylesheet" href="../../../preview/assets/preview.css">
+<link rel="alternate" hreflang="en" href="https://koha.nexus/preview/">
+<link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/">
+<link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/">
+<link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/">
+<link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/">
+<link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/">
+<link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/">
+<link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/">
+<link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/">
+<link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/">
+<link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/">
+<link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/">
+<link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/">
+<link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/">
+<link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/">
+<link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/">
+<link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/">
+<link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/">
+<link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/">
+<link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/">
+<link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/">
+<link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/">
+<link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/">
+<link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/">
+</head>
+<body data-language="zh">
+  <!--
+    Interactive preview and manual of the koha.nexus panel.
+    Data: data/preview.json, written by export_docs_preview.py from the panel's
+    code and preview/manual/<language>.json. No build step: serve this folder
+    as it is. data-src and data-asset-base are resolved from this folder (the
+    one holding assets/), whatever the page's own URL; they can be absolute
+    URLs when the page is copied into another site.
+  -->
+  <div data-static-language="zh" data-site-home="../../../index.html" id="kp-app" class="kp" data-src="data/preview.json" data-asset-base="../">
+    <header class="kp-top">
+      <a class="kp-brand" href="../index.html" data-home data-ui-title="back_to_site" title="返回 koha.nexus">
+        <span class="kp-brand-dot" aria-hidden="true"></span>koha.nexus
+      </a>
+      <div class="kp-heading">
+        <h1 data-ui="title">交互式预览和手册</h1>
+        <p data-ui="subtitle">逐一讲解控制面板的各个屏幕。</p>
+      </div>
+      <div class="kp-tools">
+        <label class="kp-search">
+          <span class="kp-sr" data-ui="search">搜索</span>
+          <input id="kp-search" type="search" autocomplete="off" placeholder="搜索">
+        </label>
+        <label class="kp-lang">
+          <span class="kp-sr" data-ui="language">语言</span>
+          <select id="kp-lang" data-language-select><option value="en">English</option><option value="pt-BR">Português (Brasil)</option><option value="es">Español</option><option value="fr">Français</option><option value="it">Italiano</option><option value="de">Deutsch</option><option value="nl">Nederlands</option><option value="sv">Svenska</option><option value="pl">Polski</option><option value="cs">Čeština</option><option value="ru">Русский</option><option value="uk">Українська</option><option value="tr">Türkçe</option><option value="tl">Tagalog (Filipino)</option><option value="id">Bahasa Indonesia</option><option value="ar">العربية</option><option value="fa">فارسی</option><option value="hi">Hindi</option><option value="bn">Bangla (Bengali)</option><option value="vi">Tiếng Việt</option><option value="zh" selected>中文 (简体)</option><option value="ja">日本語</option><option value="ko">한국어</option></select>
+        </label>
+        <button id="kp-menu" class="kp-menu-btn" type="button" aria-controls="kp-nav" aria-expanded="false">
+          <span aria-hidden="true">☰</span><span class="kp-sr" data-ui="menu">菜单</span>
+        </button>
+      </div>
+    </header>
+    <nav class="kp-language-links" data-language-links aria-label="语言" data-ui-aria="language"><a data-language="en" lang="en" hreflang="en" href="../../../preview/index.html">English</a><a data-language="pt" lang="pt-BR" hreflang="pt-BR" href="../../pt/preview/index.html">Português (Brasil)</a><a data-language="es" lang="es" hreflang="es" href="../../es/preview/index.html">Español</a><a data-language="fr" lang="fr" hreflang="fr" href="../../fr/preview/index.html">Français</a><a data-language="it" lang="it" hreflang="it" href="../../it/preview/index.html">Italiano</a><a data-language="de" lang="de" hreflang="de" href="../../de/preview/index.html">Deutsch</a><a data-language="nl" lang="nl" hreflang="nl" href="../../nl/preview/index.html">Nederlands</a><a data-language="sv" lang="sv" hreflang="sv" href="../../sv/preview/index.html">Svenska</a><a data-language="pl" lang="pl" hreflang="pl" href="../../pl/preview/index.html">Polski</a><a data-language="cs" lang="cs" hreflang="cs" href="../../cs/preview/index.html">Čeština</a><a data-language="ru" lang="ru" hreflang="ru" href="../../ru/preview/index.html">Русский</a><a data-language="uk" lang="uk" hreflang="uk" href="../../uk/preview/index.html">Українська</a><a data-language="tr" lang="tr" hreflang="tr" href="../../tr/preview/index.html">Türkçe</a><a data-language="tl" lang="tl" hreflang="tl" href="../../tl/preview/index.html">Tagalog (Filipino)</a><a data-language="id" lang="id" hreflang="id" href="../../id/preview/index.html">Bahasa Indonesia</a><a data-language="ar" lang="ar" hreflang="ar" href="../../ar/preview/index.html">العربية</a><a data-language="fa" lang="fa" hreflang="fa" href="../../fa/preview/index.html">فارسی</a><a data-language="hi" lang="hi" hreflang="hi" href="../../hi/preview/index.html">Hindi</a><a data-language="bn" lang="bn" hreflang="bn" href="../../bn/preview/index.html">Bangla (Bengali)</a><a data-language="vi" lang="vi" hreflang="vi" href="../../vi/preview/index.html">Tiếng Việt</a><a data-language="zh" lang="zh-Hans" hreflang="zh-Hans" href="index.html" aria-current="page">中文 (简体)</a><a data-language="ja" lang="ja" hreflang="ja" href="../../ja/preview/index.html">日本語</a><a data-language="ko" lang="ko" hreflang="ko" href="../../ko/preview/index.html">한국어</a></nav>
+
+    <div class="kp-body">
+      <nav id="kp-nav" class="kp-nav" aria-label="屏幕" data-ui-aria="kind_section"></nav>
+
+      <main class="kp-main">
+        <section class="kp-stage" aria-label="交互式预览和手册" data-ui-aria="title">
+          <div class="kp-stage-tabs" role="tablist">
+            <button type="button" role="tab" id="kp-tab-mock" aria-selected="true" data-ui="mockup">模拟器</button>
+            <button type="button" role="tab" id="kp-tab-shot" aria-selected="false" data-ui="screenshot">屏幕截图</button>
+          </div>
+          <div id="kp-mock" class="kp-window" role="tabpanel" aria-labelledby="kp-tab-mock"></div>
+          <figure id="kp-shot" class="kp-shot" role="tabpanel" aria-labelledby="kp-tab-shot" hidden></figure>
+        </section>
+
+        <article id="kp-doc" class="kp-doc" aria-live="polite">
+          <p class="kp-loading" data-ui="loading">正在加载手册…</p>
+        </article>
+      </main>
+    </div>
+
+    <footer class="kp-foot">
+      <span id="kp-version"></span>
+      <span data-ui="footer">由 export_docs_preview.py 根据面板代码生成。</span>
+    </footer>
+  </div>
+
+  <script id="site-messages" type="application/json">{"title": "交互式预览和手册", "subtitle": "逐一讲解控制面板的各个屏幕。", "search": "搜索", "language": "语言", "menu": "菜单", "mockup": "模拟器", "screenshot": "屏幕截图", "loading": "正在加载手册…", "load_error": "无法加载手册。", "footer": "由 export_docs_preview.py 根据面板代码生成。", "version": "面板版本", "overview": "功能", "steps": "操作步骤", "options": "选项说明", "tips": "推荐做法", "warnings": "注意", "related": "相关内容", "where": "位置", "shortcut": "快捷键", "kind_section": "屏幕", "kind_entry": "卡片", "kind_feature": "屏幕区域", "pending": "待完成", "pending_note": "此部分为计划功能：尚未包含在已发布的面板中。", "untranslated": "此指南尚未翻译为当前语言：现以英语显示。", "outdated": "此指南的英文内容在翻译后有变化：译文可能尚未更新。", "no_manual": "此项目尚未编写指南。", "no_results": "无匹配结果。", "full_manual": "完整手册", "panel_only": "面板文本（指南为英语）", "exit": "退出", "back_to_site": "返回 koha.nexus", "screenshot_of": "实际面板"}</script>
+  <script src="../../../preview/assets/preview.js"></script>
+</body>
+</html>
