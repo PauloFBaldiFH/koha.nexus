@@ -2,7 +2,7 @@
 
 [Índice do manual](README.md) · [Anterior: enriquecimento](05-enriquecimento.md)
 
-Abra **Aparência do OPAC e da equipe**, pela barra lateral ou pela tecla **o**. A tela configura o catálogo público e a interface profissional, chamada staff ou intranet. Os dois lados têm configurações próprias.
+Abra **Aparência do OPAC e STAFF**, pela barra lateral ou pela tecla **o**. A tela configura o catálogo público e a interface profissional, chamada staff ou intranet. Os dois lados têm configurações próprias.
 
 ## Um procedimento seguro
 
