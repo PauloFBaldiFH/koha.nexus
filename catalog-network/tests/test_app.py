@@ -147,3 +147,21 @@ def test_tokens_file_is_read_again(tmp_path, catalog):
         os.utime(path, ns=(1, 1))
         r = c.post("/api/records/sync", content=b"<collection/>", headers=AUTH)
         assert r.status_code == 400          # past the token check
+
+
+def test_sru_post_body_limit(loaded):
+    big = "query=isbn%3D8535902775&version=1.1&x=" + "a" * 300_000
+    r = loaded.post("/sru", content=big, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert r.status_code == 413
+
+    def chunks():                     # no Content-Length: sent chunked
+        yield b"query=isbn%3D8535902775&x="
+        for _ in range(50):
+            yield b"a" * 10_000
+    r = loaded.post("/sru", content=chunks(), headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert r.status_code == 413
+
+    def small():
+        yield b"query=isbn%3D8535902775&version=1.1"
+    r = loaded.post("/sru", content=small(), headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert total(ET.fromstring(r.content)) == 1

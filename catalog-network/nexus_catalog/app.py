@@ -34,6 +34,11 @@ XML = "text/xml; charset=utf-8"
 SRU_PARAMS = ("operation", "version", "query", "startRecord", "maximumRecords", "recordPacking",
               "recordSchema", "sortKeys", "stylesheet", "resultSetTTL")
 MIN_TOKEN = 24
+MAX_SRU_BODY = 200_000     # bytes of one SRU POST; a real query is a few hundred
+
+
+class BodyTooLarge(Exception):
+    pass
 
 
 class Tokens:
@@ -92,11 +97,20 @@ class Tokens:
 async def read_params(request: Request) -> tuple[dict[str, str], bool]:
     """The SRU parameters of a GET, a form POST or a SOAP (SRW) POST, and
     whether the request came as SOAP (the answer then goes back as SOAP).
-    Body values win over the query string."""
+    Body values win over the query string. A body over MAX_SRU_BODY raises
+    BodyTooLarge before it is read whole, with or without Content-Length."""
     p: dict[str, str] = dict(request.query_params)
     if request.method != "POST":
         return p, False
-    body = (await request.body())[:200_000].decode("utf-8", "replace").strip()
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_SRU_BODY:
+        raise BodyTooLarge
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > MAX_SRU_BODY:
+            raise BodyTooLarge
+    body = raw.decode("utf-8", "replace").strip()
     if not body:
         return p, False
     if not body.startswith("<"):
@@ -156,7 +170,11 @@ def create_app(settings: Settings | None = None, catalog: Catalog | None = None)
     @app.api_route("/sru", methods=["GET", "POST"])
     @app.api_route("/sru/{database:path}", methods=["GET", "POST"])
     async def sru_endpoint(request: Request) -> Response:
-        p, soap = await read_params(request)
+        try:
+            p, soap = await read_params(request)
+        except BodyTooLarge:
+            return Response(f"request body larger than {MAX_SRU_BODY} bytes\n", status_code=413,
+                            media_type="text/plain")
         resp = await handle(request, p)
         if soap:
             resp = xml(sru.soap_wrap(resp.body))
