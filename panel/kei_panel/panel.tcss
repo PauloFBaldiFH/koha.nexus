@@ -548,6 +548,14 @@ App.-plain #picker-drop {
 .hub-box.z-wide {
     max-width: 100%;
 }
+/* The recommendation of at most 20 servers ticked: the theme's warning colour once passed. */
+#z-summary {
+    width: 1fr;
+}
+#z-limit.-over {
+    color: $warning;
+    text-style: bold;
+}
 
 /* ---- Messaging & interoperability (views/hub.py) ------------------- */
 #hub-tabs {

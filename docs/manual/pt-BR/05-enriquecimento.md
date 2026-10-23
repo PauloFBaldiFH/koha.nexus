@@ -42,7 +42,7 @@ Abra **Servidores Z39.50 / SRU**, pela barra lateral ou pela tecla **z**. Difere
 - O servidor deste Koha permite que outras bibliotecas consultem seu catálogo. Ligar ou desligar altera também a abertura da porta correspondente no firewall, segundo o fluxo do painel.
 - A rede comunitária configura uma fonte de catálogo compartilhado no Koha. Isso é distinto da lista de servidores diretos consultados pelo enriquecimento sob demanda.
 - O quadro de saúde mostra falhas dos servidores usados nas buscas diretas. **Reset** ou **Reset all** libera uma nova tentativa; não conserta o serviço remoto.
-- Os catálogos de saída servem à catalogação por cópia. Marque servidores com a barra de espaço, teste-os e use **Adicionar ao Koha** para registrar os selecionados que funcionam. O teste realiza uma busca real, não apenas uma conexão à porta.
+- Os catálogos de saída servem à catalogação por cópia. **Mostrar servidores** testa cada servidor com uma busca real (não apenas uma conexão à porta) e lista os que devolvem registro; um servidor de backup só aparece quando o principal não devolve nenhum. Marque com a barra de espaço os servidores da pesquisa da catalogação (recomendamos no máximo 20) e use **Salvar no Koha**. **Atualizar** testa de novo.
 
 O suporte a SRU nessa configuração não significa que toda pesquisa de enriquecimento use SRU. Não exponha o servidor de entrada apenas para consultar um catálogo externo: são direções de comunicação diferentes.
 

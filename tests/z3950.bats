@@ -223,7 +223,32 @@ print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
 @test "z3950-list: Koha's targets, the catalogue ones first, then the authority ones" {
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-list bash "$PANEL" z3950_rows
     [ "$status" -eq 0 ]
-    [ "$output" = "$(printf 'lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS\tbiblio\nlx2.loc.gov\t210\tNAF\tLOC AUTHORITIES\tauthority')" ]
+    [ "$output" = "$(printf 'lx2.loc.gov\t210\tLCDB\tLIBRARY OF CONGRESS\tbiblio\t1\nlx2.loc.gov\t210\tNAF\tLOC AUTHORITIES\tauthority\t0')" ]
+}
+
+@test "z3950-check: ticks and unticks rows Koha has for the search, https:// SRU rows too; adds and deletes nothing" {
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, \`rank\`, syntax, encoding, servertype, recordtype)
+          VALUES ('https://sru.koha.nexus', 443, 'sru/loc', 'LoC (gateway)', 0, 500, 'MARC21', 'utf8', 'sru', 'biblio')"
+    before=$(zsql "SELECT COUNT(*) FROM z3950servers")
+    ( umask 077
+      printf '%s\t' lx2.loc.gov 210 LCDB biblio 0; printf '\n'
+      printf '%s\t' lx2.loc.gov 210 NAF authority 1; printf '\n'
+      printf '%s\t' sru.koha.nexus 443 sru/loc biblio 1; printf '\n'
+      printf '%s\t' z3950.ufsc.br 210 Default biblio 1; printf '\n'
+      printf '%s\t' "x'; DROP TABLE z3950servers; --" 210 x biblio 1; printf '\n'
+      printf '%s\t' lx2.loc.gov 210 LCDB biblio 7; printf '\n'
+    ) > "$W/check.tsv"
+    run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" z3950_check "$W/check.tsv"
+    echo "$output"; cat "$KEI_S/dialogs.log"
+    [ "$status" -eq 0 ]
+    [ ! -e "$W/check.tsv" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers")" = "$before" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE db = 'LCDB'")" = "0" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE db = 'NAF'")" = "1" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE db = 'sru/loc'")" = "1" ]
+    [ "$(cat "$W/results")" = "$(printf 'RESULT ticked=2\nRESULT unticked=1\nRESULT missing=1\nRESULT invalid=2')" ]
+    grep -q "2 server(s) ticked, 1 unticked" "$KEI_S/dialogs.log"
+    grep -q "^        z3950-check) " "$KEI_REPO/installer"
 }
 
 @test "z3950: the panel knows the tasks" {

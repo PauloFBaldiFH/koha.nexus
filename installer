@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.99"
+PANEL_VERSION=" 1.5.100"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -33206,7 +33206,9 @@ lt_aia_changes() {
 # that must return a valid MARC record) and ranks them by speed. Here only
 # Koha's side of it: the targets already in z3950servers (z3950-list), the
 # refresh of all of them from the panel's list (z3950-sync FILE), and
-# the insert of the ones the librarian chose (z3950-add FILE). FILE is a
+# the insert of the ones the librarian chose (z3950-add FILE), and which of
+# them the cataloguing search asks (z3950-check FILE: host, port, db,
+# recordtype and 1 or 0 per line, Koha's checked). FILE is a
 # private (0600) tab-separated file written by the panel, one target per
 # line: host, port, db, syntax, encoding, name, rank, timeout, servertype,
 # user, password, sru_fields, sru_options, recordtype (biblio when empty;
@@ -33217,10 +33219,11 @@ lt_aia_changes() {
 Z3950_SYNTAXES=" USMARC MARC21 UNIMARC NORMARC DANMARC "
 Z3950_ENCODINGS=" utf8 MARC-8 ISO_5426 ISO_6937 ISO_8859-1 EUC-KR "
 
-# z3950_rows: the targets of Koha (host, port, db, name, recordtype): the catalogue
-# ones first, then the authority ones, first rank first.
+# z3950_rows: the targets of Koha (host, port, db, name, recordtype, checked:
+# 1 when the cataloguing search asks it): the catalogue ones first, then the
+# authority ones, first rank first.
 z3950_rows() {
-    run_sql "SELECT host, port, IFNULL(db,''), servername, recordtype FROM ${DB_NAME}.z3950servers
+    run_sql "SELECT host, port, IFNULL(db,''), servername, recordtype, IFNULL(checked,0) FROM ${DB_NAME}.z3950servers
              ORDER BY recordtype = 'authority', \`rank\`, servername;"
 }
 
@@ -34524,6 +34527,60 @@ z3950_add() {
     kei_result invalid "$invalid"
     log "z3950: ${n} target(s) added, ${existing} already there (${updated} updated), ${invalid} invalid"
     msg_ok "$(t "Z39.50/SRU servers added to Koha: \${n}\nAlready in Koha: \${existing}\n\nThey are in Administration > Z39.50/SRU servers, checked for the cataloguing searches.")"
+}
+
+# z3950_check FILE: tick (1) or untick (0) targets Koha has for the
+# cataloguing search (z3950servers.checked); nothing is added or deleted.
+# FILE (written by the panel, deleted here) has one target per line: host
+# (an SRU row on 443 has https:// in Koha, matched either way), port, db,
+# recordtype, 1|0.
+z3950_check() {
+    local file="$1" log sql out host port db rtype on where count invalid=0 ticked unticked missing
+    require_database || { rm -f -- "$file"; return 1; }
+    if [ ! -f "$file" ]; then
+        msg_error "" "$(t "The list of servers to add was not found.")"
+        return 1
+    fi
+    tools_workdir || { rm -f -- "$file"; return 1; }
+    log=$(tools_log z3950)
+    sql="$TOOLS_WORK/z3950-check.sql"
+    printf 'SET @kei_on := 0, @kei_off := 0, @kei_missing := 0;\n' > "$sql"
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        IFS=$'\x1f' read -r host port db rtype on <<< "${line//$'\t'/$'\x1f'}"
+        [ -n "$host" ] || continue
+        if ! z3950_valid "$host" "$port" "$db" USMARC utf8 zed 0 0 || [[ "$on" != [01] ]]; then
+            invalid=$((invalid + 1))
+            printf 'check skipped (invalid): %s:%s/%s\n' "$host" "$port" "$db" >> "$log"
+            continue
+        fi
+        [ "$rtype" = authority ] || rtype=biblio
+        where="recordtype = '${rtype}' AND host IN ($(sql_quote "$host"), $(sql_quote "https://$host"), $(sql_quote "http://$host")) AND port = ${port} AND IFNULL(db,'') = $(sql_quote "$db")"
+        count=$([ "$on" = 1 ] && echo @kei_on || echo @kei_off)
+        printf '%s\n' "SET @kei_found := (SELECT COUNT(*) > 0 FROM z3950servers WHERE ${where});" \
+            "UPDATE z3950servers SET checked = ${on} WHERE ${where};" \
+            "SET ${count} := ${count} + @kei_found, @kei_missing := @kei_missing + 1 - @kei_found;" >> "$sql"
+        printf 'check %s:%s/%s %s -> %s\n' "$host" "$port" "$db" "$rtype" "$on" >> "$log"
+    done < "$file"
+    rm -f -- "$file"
+    printf 'SELECT @kei_on, @kei_off, @kei_missing;\n' >> "$sql"
+    if ! out=$(mysql -N -B --default-character-set=utf8mb4 "$DB_NAME" < "$sql" 2>&1); then
+        rm -f -- "$sql"
+        printf '%s\n' "$out" >> "$log"
+        msg_error "" "$(t "Koha's database did not take the servers. Log: \${log}")"
+        return 1
+    fi
+    rm -f -- "$sql"
+    read -r ticked unticked missing <<< "$(printf '%s\n' "$out" | tail -n 1)"
+    [[ "$ticked" =~ ^[0-9]+$ ]] || ticked=0
+    [[ "$unticked" =~ ^[0-9]+$ ]] || unticked=0
+    [[ "$missing" =~ ^[0-9]+$ ]] || missing=0
+    kei_result ticked "$ticked"
+    kei_result unticked "$unticked"
+    kei_result missing "$missing"
+    kei_result invalid "$invalid"
+    log "z3950: cataloguing search: ${ticked} target(s) ticked, ${unticked} unticked, ${missing} not in Koha, ${invalid} invalid"
+    msg_ok "$(t "Koha's cataloguing search: \${ticked} server(s) ticked, \${unticked} unticked.")"
 }
 
 # ----------------------------------------------------------------------
@@ -36542,6 +36599,7 @@ kei_task() {
             return 0 ;;
         z3950-add)       [ -n "${1:-}" ] || return 2; z3950_add "$1" ;;
         z3950-sync)      [ -n "${1:-}" ] || return 2; z3950_add "$1" sync ;;
+        z3950-check)     [ -n "${1:-}" ] || return 2; z3950_check "$1" ;;
         z3950-seed)      z3950_seed_authorities ;;
         enrich-install|sru-bridge|pergamum-bridge) enrich_install ;;
         enrich-update)   enrich_update "${1:-}" ;;

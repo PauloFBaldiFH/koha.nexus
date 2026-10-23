@@ -183,12 +183,14 @@ def flag(country: str) -> str:
     return "".join(chr(0x1F1E6 + ord(c) - 65) for c in cc) if len(cc) == 2 and cc.isalpha() else "\U0001F310"
 
 
-def _direct_rows(path: Path) -> tuple[list[dict], dict[str, str]]:
+def _direct_rows(path: Path) -> tuple[list[dict], dict[str, str], dict[str, list[str]]]:
     """The panel rows of the direct Z39.50 servers (DIRECT_LIST): Koha
     syntax USMARC for MARC21 over Z39.50, the login only by its .env name;
-    and the gateway ids they cover (their "sru_fallback"), with their name."""
+    the gateway ids they cover (their "sru_fallback"), with their name; and
+    for each such id the panel keys (host:port/db) of the direct rows that
+    cover it, the servers its backup row stands in for."""
     data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    out, covered = [], {}
+    out, covered, keys = [], {}, {}
     for s in data.get("servers", []):
         row = {"name": s["name"], "host": s["host"], "port": s["port"], "db": s["db"], "kind": "zed",
                "syntax": "UNIMARC" if s.get("syntax") == "UNIMARC" else "USMARC",
@@ -203,8 +205,9 @@ def _direct_rows(path: Path) -> tuple[list[dict], dict[str, str]]:
             row["login"] = True
         if s.get("sru_fallback"):
             covered[s["sru_fallback"]] = s["name"]
+            keys.setdefault(s["sru_fallback"], []).append(f"{s['host'].lower()}:{s['port']}/{s['db']}")
         out.append(row)
-    return out, covered
+    return out, covered, keys
 
 
 def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, host: str = GATEWAY_HOST,
@@ -221,7 +224,7 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
     old = json.loads(keep_path.read_text(encoding="utf-8")) if keep_path.exists() else {}
     authorities = [t for t in old.get("targets", []) if t.get("recordtype") == "authority"
                    and t.get("db") != "sru/" + AUTH_UNION and t.get("source") != DIRECT_SOURCE]
-    rows, covered = _direct_rows(Path(direct) if direct else DIRECT_LIST)
+    rows, covered, backup_for = _direct_rows(Path(direct) if direct else DIRECT_LIST)
     rank = iter(range(FALLBACK_RANK, 10000))
 
     def row(db: str, name: str, region: str, verified: bool, notes: str, country: str = "",
@@ -259,6 +262,9 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
         fallback.append(row("sru/" + t.id, t.name, "sru_" + t.group, t.status == "verified",
                             f"Status: {t.status}; answers from {how}." + (f" {t.note}" if t.note else "") + cover,
                             t.country))
+        if t.id in backup_for:
+            # The panel shows this backup only when these direct servers return no record.
+            fallback[-1]["backup_for"] = backup_for[t.id]
     own_auth = {"name": AUTH_NAME, "host": host, "port": port, "db": "sru/" + AUTH_UNION, "kind": "sru",
                 "syntax": SYNTAX, "encoding": ENCODING, "schema": "marcxml", "sru_fields": AUTH_SRU_FIELDS,
                 "sru_options": SRU_OPTIONS, "recordtype": "authority", "timeout": TIMEOUT,

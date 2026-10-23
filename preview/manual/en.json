@@ -876,23 +876,31 @@
   },
   "z3950-outbound": {
    "title": "Catalogues to copy records from",
-   "summary": "A curated list of public catalogues by region (Brazil / Latin America, North America, Europe, Asia-Pacific, specialised), plus the community list and your own imports, scanned for real records and added to Koha ranked by speed.",
+   "summary": "A curated list of public catalogues by region, plus the community list and your own servers. Show servers tests them all with a real search and lists only the ones that return a record; you tick the ones Koha's cataloguing search asks.",
    "options": [
     {
-     "name": "Scan",
-     "text": "Tries each ticked server with a 3-second timeout on its listed port, then 210, 2100 and 2210; runs a real search and accepts it only when it returns a valid MARC record. The result shows how many worked and the fastest with its latency in ms."
+     "name": "Show servers / Update",
+     "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update, to test again; the last test is kept."
     },
     {
-     "name": "Add to Koha",
-     "text": "Adds the ticked servers to Koha's `z3950servers`, ranked by speed in the last scan. Servers Koha already has are kept as they are."
+     "name": "Save to Koha",
+     "text": "The tick is \"selected for the cataloguing search\". Adds the ticked servers Koha does not have (ranked by speed in the last test) and ticks or unticks the ones it has. An unticked server stays in Koha, only out of the search. A ticked server stays in the list even when it fails, so you can untick it."
+    },
+    {
+     "name": "At most 20 servers",
+     "text": "Recommendation: tick at most 20 servers at once, since more can make the search unstable. Past 20 the note turns to the warning colour, but nothing is blocked."
+    },
+    {
+     "name": "Add server",
+     "text": "Type a server's address (host:port/database, or an SRU address) and a name. It is tested at once and comes ticked."
     },
     {
      "name": "Login",
      "text": "User and password for subscription servers (OCLC and others). Kept only in the panel's private file and in Koha, never in a log."
     },
     {
-     "name": "Hide / Show hidden",
-     "text": "Hides servers you do not want to see. Servers that keep failing are hidden by themselves."
+     "name": "Hide / Show all",
+     "text": "Hide keeps a server out of the list and out of the tests. Show all lists every server with its last result; Only working goes back."
     },
     {
      "name": "Community list",
@@ -904,13 +912,13 @@
     }
    ],
    "steps": [
-    "Tick servers with the space bar, or tick a region to take all of it.",
-    "Press **Scan** and wait for the results.",
-    "Press **Add to Koha** and confirm.",
-    "Type the logins of subscription servers with **Login** if the panel asks."
+    "Press **Show servers** and wait: every server is tested with a real search, and the list shows the ones that return a record.",
+    "Tick (space bar, or a region) the servers Koha's cataloguing search should ask; untick the others. Keep it to 20 or fewer.",
+    "Press **Save to Koha** and confirm.",
+    "Press **Update** later to test again."
    ],
    "tips": [
-    "An address marked * comes from an older list: the scan tells whether it still works.",
+    "An address marked * comes from an older list: the test tells whether it still works.",
     "Export your tested list and import it on your other Koha servers to save time."
    ],
    "related": [

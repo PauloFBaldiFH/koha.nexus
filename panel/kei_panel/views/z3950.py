@@ -11,17 +11,21 @@ the ones whose breaker is open, or that failed in the last 7 days, with the
 last error; Reset forgets a server's breaker (`--task z3950-health-reset
 ID`, or --all) so the next search asks it again.
 
-Bottom, public catalogues for copy cataloguing, scanned and ranked.
-The list (z3950.py) is grouped by region; the librarian ticks servers
-(space, or a click on a region to tick all of it), scans them behind the
-Pac-Man loader (a real search that must return a MARC record, latency in
-ms) and adds the chosen ones to Koha's z3950servers with
-`config.sh --task z3950-add`, ranked by speed (a server Koha already has
-gets the new settings and keeps its tick and rank). "Update server
-settings" sends the whole list to `config.sh --task z3950-sync`: every row
-Koha has is refreshed, the authority files are added when missing. Logins
-typed here stay in the panel's private config file and the temporary list
-the task deletes.
+Bottom, public catalogues for copy cataloguing. "Show servers" tests the
+whole list (z3950.py) behind the Pac-Man loader, a real search that must
+return a MARC record, the backups (koha.nexus gateway rows) only for the
+servers that returned none; then it becomes "Update", to test again. The
+list, grouped by region, shows the servers that returned a record, a backup
+only when its main server did not, and the ticked ones. The tick is
+"selected for the cataloguing search" in Koha (Koha's checked): "Save to
+Koha" adds the ticked servers Koha lacks (`config.sh --task z3950-add`,
+ranked by speed) and ticks or unticks the ones it has
+(`--task z3950-check`); nothing is deleted. More than SEARCH_LIMIT (20)
+ticked is advised against, never refused. "Update server settings" sends
+the whole list to `config.sh --task z3950-sync`: every row Koha has is
+refreshed, the authority files are added when missing. Logins typed here
+stay in the panel's private config file and the temporary list the task
+deletes.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ import os
 import random
 import re
 import tempfile
+import time
 import urllib.request
 from dataclasses import replace
 from pathlib import Path
@@ -60,6 +65,10 @@ class Z3950View(SectionView):
         self.history = z3950.History()
         self.selected: set[str] = set()
         self.in_koha: set[str] = set()
+        # The servers Koha has ticked for the cataloguing search (checked = 1).
+        self.koha_checked: set[str] = set()
+        # The ticks follow Koha's once its list has been read (the first time).
+        self.ticks_from_koha = False
         self.show_hidden = False
         # This Koha's server and the network, as the last status said: the
         # switches are set from them, and a change that matches is no request.
@@ -99,21 +108,25 @@ class Z3950View(SectionView):
             yield from self.compose_outbound()
 
     def compose_outbound(self) -> ComposeResult:
-        yield Static(t("Public catalogues to copy records from. Tick servers with the space bar (or a region "
-                      "to tick it all), scan them, then add the working ones to Koha. * an address from an "
-                      "older list: the scan tells if it still works."), classes="view-prompt", markup=False)
+        yield Static(t("Public catalogues to copy records from. \"Show servers\" tests every server with a real "
+                      "search and lists the ones that return a record; a backup server appears only when its "
+                      "main server returns none. Tick (space bar, or a region to tick it all) the servers for "
+                      "Koha's cataloguing search, then Save to Koha. * an address from an older list."),
+                     classes="view-prompt", markup=False)
         with Horizontal(classes="quick-actions"):
-            yield Button(t("Scan"), id="z-scan", classes="small", variant="primary")
-            yield Button(t("Add to Koha"), id="z-add", classes="small", variant="success")
+            yield Button(t("Show servers"), id="z-scan", classes="small", variant="primary")
+            yield Button(t("Save to Koha"), id="z-add", classes="small", variant="success")
+            yield Button(t("Add server"), id="z-new", classes="small")
             yield Button(t("Login"), id="z-login", classes="small")
             yield Button(t("Hide"), id="z-hide", classes="small")
         with Horizontal(classes="quick-actions"):
             yield Button(t("Community list"), id="z-sync", classes="small")
             yield Button(t("Import"), id="z-import", classes="small")
             yield Button(t("Export"), id="z-export", classes="small")
-            yield Button(t("Show hidden"), id="z-hidden", classes="small")
+            yield Button(t("Show all"), id="z-hidden", classes="small")
         with Horizontal(classes="quick-actions"):
             yield Button(t("Update server settings"), id="z-update", classes="small", variant="warning")
+        yield Static("", id="z-limit", classes="ai-note", markup=False)
         yield Label("", id="z-summary", classes="view-prompt")
         table = DataTable(id="z-table", zebra_stripes=True, cursor_type="row")
         table.add_column(" ", key="tick")
@@ -140,7 +153,8 @@ class Z3950View(SectionView):
             if self.app.env.demo:
                 z3950.use_dir(demo_dir())
             self.reload()
-            self.selected.update(tg.key for tg in self.visible() if tg.preselect)
+            self.selected.update(tg.key for tg in self.targets if tg.preselect
+                                 and not self.history.get(tg.key).get("manual"))
             self.draw()
             self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
             self.load_server()
@@ -254,18 +268,27 @@ class Z3950View(SectionView):
             out = await self.app.bridge.task("z3950-list")
         except Exception:     # noqa: BLE001 (no installer, no database: the list still works)
             return
-        keys = set()
+        keys, checked = set(), set()
         for row in out.lists.get("row", []):
             parts = row.split("\t")
             if len(parts) >= 3 and parts[1].isdigit():
                 # An HTTPS SRU row's host carries https:// in Koha, not in the list.
                 host = re.sub(r"^https?://", "", parts[0].lower())
                 keys.add(f"{host}:{parts[1]}/{parts[2]}")
-        self.in_koha = keys
+                if len(parts) >= 6 and parts[5].strip() not in ("", "0"):
+                    checked.add(f"{host}:{parts[1]}/{parts[2]}")
+        self.in_koha, self.koha_checked = keys, checked
+        known = {tg.key for tg in self.targets}
+        if keys & known and not self.ticks_from_koha:
+            # The ticks say what Koha searches: its checked rows of the list.
+            self.ticks_from_koha = True
+            self.selected = checked & known
         self.draw()
 
     def visible(self) -> list[z3950.Target]:
-        return [tg for tg in self.targets if self.show_hidden or not self.history.blacklisted(tg.key)]
+        if self.show_hidden:
+            return list(self.targets)
+        return z3950.shown(self.targets, self.history, self.selected)
 
     def by_key(self, key: str) -> z3950.Target | None:
         return next((tg for tg in self.targets if tg.key == key), None)
@@ -289,14 +312,34 @@ class Z3950View(SectionView):
         if shown:
             table.move_cursor(row=min(row, table.row_count - 1))
         hidden = len(self.targets) - len(shown)
-        scanned = [self.history.get(tg.key) for tg in shown if self.history.get(tg.key).get("status")]
-        working = sum(h.get("status") == "ok" for h in scanned)
-        text = (f"{len(shown)} {t('servers')} · {len(self.selected)} {t('selected')} · "
-                f"{working}/{len(scanned)} {t('working in the last scan')}")
-        if hidden:
-            text += f" · {hidden} {t('hidden')}"
+        if not self.history.tested and not self.show_hidden:
+            text = t("Press Show servers to test the ${n} servers of the list and show the ones that work.",
+                     n=len(self.targets))
+            if shown:
+                text += " " + t("Ticked for the search: ${n}.", n=len(shown))
+        else:
+            working = sum(self.history.works(tg.key) for tg in self.targets)
+            text = t("${shown} servers shown · ${selected} ticked for the search · ${working} returned a record "
+                     "in the last test (${when})", shown=len(shown), selected=len(self.selected), working=working,
+                     when=_when(self.history.tested))
+            if hidden:
+                text += " · " + t("${n} hidden (no record, backup not needed, or hidden by hand)", n=hidden)
         self.query_one("#z-summary", Label).update(text)
-        self.query_one("#z-hidden", Button).label = t("Hide hidden") if self.show_hidden else t("Show hidden")
+        self.query_one("#z-hidden", Button).label = t("Only working") if self.show_hidden else t("Show all")
+        self.query_one("#z-scan", Button).label = t("Update") if self.history.tested else t("Show servers")
+        self.draw_limit()
+
+    def draw_limit(self) -> None:
+        """The recommendation of at most SEARCH_LIMIT servers, in the theme's
+        warning colour once it is passed (never a block)."""
+        n = z3950.most_ticked(self.targets, self.selected)
+        note = self.query_one("#z-limit", Static)
+        text = t("Recommendation: tick at most ${limit} servers for the search at once. More than that can make "
+                 "Koha's search unstable (slow, or some servers left without an answer).", limit=z3950.SEARCH_LIMIT)
+        if n > z3950.SEARCH_LIMIT:
+            text += " " + t("Now ${n} are ticked: it works, but untick some if the search becomes unstable.", n=n)
+        note.update(text)
+        note.set_class(n > z3950.SEARCH_LIMIT, "-over")
 
     def _order(self, tg: z3950.Target):
         h = self.history.get(tg.key)
@@ -307,8 +350,8 @@ class Z3950View(SectionView):
     def _cells(self, tg: z3950.Target) -> tuple:
         h = self.history.get(tg.key)
         status = h.get("status", "")
-        if self.history.blacklisted(tg.key):
-            text = t("Hidden (keeps failing)") if h.get("auto") else t("Hidden")
+        if h.get("manual"):
+            text = t("Hidden")
         elif status:
             text = f"{STATUS_MARK[status]} {t(z3950.STATUS_SHORT[status])}"
         else:
@@ -354,7 +397,8 @@ class Z3950View(SectionView):
         return picked or shown
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {"z-scan": self.scan, "z-add": self.add, "z-login": self.login, "z-hide": self.hide,
+        actions = {"z-scan": self.scan, "z-add": self.add, "z-new": self.new_server, "z-login": self.login,
+                   "z-hide": self.hide,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
                    "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
                    "z-update": self.update_servers, "z-health-reset": self.reset_health,
@@ -426,33 +470,55 @@ class Z3950View(SectionView):
     # The scan
     # ------------------------------------------------------------------
     def scan(self) -> None:
-        targets = self.chosen()
+        """Show servers / Update: every server of the list (but the ones
+        hidden by hand) is tested; then the backups of the servers that
+        returned no record."""
+        targets = [tg for tg in self.targets if not self.history.get(tg.key).get("manual")]
         if not targets:
             return
+        self._test(targets, whole=True)
+
+    def _test(self, targets: list[z3950.Target], whole: bool = False) -> None:
         demo = self.app.env.demo
+        main, backups = z3950.test_phases(targets)
+        # A backup's main server that is not tested now keeps its last result.
+        last = {tg.key: self.history.works(tg.key) for tg in self.targets}
 
         async def job(reporter: Reporter) -> list[z3950.ScanResult]:
-            done = [0]
+            done, total = [0], [len(main)]
 
             def each(tg: z3950.Target, res: z3950.ScanResult) -> None:
                 done[0] += 1
-                reporter.progress(done[0], len(targets))
+                reporter.progress(done[0], total[0])
                 reporter.status(f"{tg.name}: {t(z3950.STATUS_TEXT[res.status])}")
                 ms = f" {res.query_ms} ms" if res.query_ms is not None else ""
                 reporter.log(f"{res.status:8} {tg.host}:{res.port or tg.port}/{tg.db}{ms} {res.title or res.detail}")
-            reporter.status(t("Scanning ${n} servers", n=len(targets)))
-            if demo:
-                return await _demo_scan(targets, each)
-            return await z3950.scan(targets, on_result=each)
 
-        run_with_loader(self.app, t("Scanning Z39.50/SRU servers"), job, on_done=self._scanned)
+            async def run(group: list[z3950.Target]) -> list[z3950.ScanResult]:
+                if demo:
+                    return await _demo_scan(group, each)
+                return await z3950.scan(group, on_result=each)
+            reporter.status(t("Testing ${n} servers", n=len(main)))
+            results = await run(main)
+            works = dict(last, **{r.key: r.status == "ok" for r in results})
+            needed = [tg for tg in backups if z3950.backup_needed(tg, lambda k: works.get(k, False))]
+            if needed:
+                total[0] += len(needed)
+                reporter.status(t("Testing ${n} backup servers", n=len(needed)))
+                results += await run(needed)
+            return results
 
-    def _scanned(self, result: TaskResult) -> None:
+        run_with_loader(self.app, t("Testing Z39.50/SRU servers"), job,
+                        on_done=lambda result: self._scanned(result, whole))
+
+    def _scanned(self, result: TaskResult, whole: bool = False) -> None:
         if not result.ok:
-            self.app.task_failed(t("Scanning Z39.50/SRU servers"), result)
+            self.app.task_failed(t("Testing Z39.50/SRU servers"), result)
             return
         for res in result.value:
             self.history.record(res)
+        if whole:
+            self.history.mark_tested()
         self.history.save()
         ranked = z3950.rank(result.value)
         working = [r for r in ranked if r.status == "ok"]
@@ -467,32 +533,77 @@ class Z3950View(SectionView):
     # Into Koha
     # ------------------------------------------------------------------
     def add(self) -> None:
-        picked = [tg for tg in self.visible() if tg.key in self.selected]
-        if not picked:
-            self.app.notify(t("Tick the servers to add first (space bar)."), severity="warning")
+        """Save to Koha: the ticked servers Koha lacks are added (ticked for
+        the search), the ones it has are ticked or unticked to match."""
+        picked = [tg for tg in self.targets if tg.key in self.selected and tg.key not in self.in_koha]
+        changes = [(tg, tg.key in self.selected) for tg in self.targets if tg.key in self.in_koha
+                   and (tg.key in self.selected) != (tg.key in self.koha_checked)]
+        if not picked and not changes:
+            self.app.notify(t("Koha already searches exactly the ticked servers: nothing to save. Tick or untick "
+                              "servers with the space bar first."), severity="warning")
             return
-        self.app.run_worker(self._add(picked), group="routine", exclusive=True, exit_on_error=False)
+        self.app.run_worker(self._add(picked, changes), group="routine", exclusive=True, exit_on_error=False)
 
-    async def _add(self, picked: list[z3950.Target]) -> None:
-        from ..routines.common import run_task, show_done
-        title = t("Add Z39.50/SRU servers to Koha")
+    async def _add(self, picked: list[z3950.Target], changes: list[tuple[z3950.Target, bool]]) -> None:
+        from ..routines.common import failed, run_task, show_done
+        title = t("Save to Koha")
         ranks = z3950.koha_ranks(picked, self.history)
-        lines = [f"{ranks[tg.key]:>2}. {tg.describe()}" for tg in sorted(picked, key=lambda x: ranks[x.key])]
+        lines = [f"+ {ranks[tg.key]:>2}. {tg.describe()}" for tg in sorted(picked, key=lambda x: ranks[x.key])]
+        lines += [("☑ " if on else "☐ ") + tg.describe() for tg, on in changes]
+        question = t("Koha's cataloguing search will ask the ticked servers. Add ${add} new server(s) (+) and "
+                     "tick ${on} / untick ${off} of the ones Koha has (☑ / ☐)? Unticked servers stay in Koha, "
+                     "only out of the search.", add=len(picked), on=sum(on for _tg, on in changes),
+                     off=sum(not on for _tg, on in changes))
         missing = [tg.name for tg in picked if tg.login and not tg.user]
-        question = t("Add these ${n} servers to Koha's Z39.50/SRU servers, checked for the cataloguing "
-                     "searches? Servers Koha already has get these settings and keep their tick and rank.", n=len(picked))
         if missing:
             question += "\n\n" + t("These need a login you have not typed yet: ${names}", names=", ".join(missing))
+        n = z3950.most_ticked(self.targets, self.selected)
+        if n > z3950.SEARCH_LIMIT:
+            question += "\n\n" + t("${n} servers are ticked. We recommend at most ${limit} at once: the search "
+                                    "may become unstable. Save anyway?", n=n, limit=z3950.SEARCH_LIMIT)
         if not await self.app.push_screen_wait(ConfirmScreen(title, question, preview="\n".join(lines),
-                                                             preview_title=t("Rank by speed in the last scan"))):
+                                                             preview_title=t("Rank by speed in the last test"))):
             return
-        path = z3950.write_add_file(picked, ranks)
-        try:
-            result = await run_task(self.app, title, "z3950-add", str(path))
-        finally:
-            path.unlink(missing_ok=True)
+        result = None
+        if picked:
+            path = z3950.write_add_file(picked, ranks)
+            try:
+                result = await run_task(self.app, title, "z3950-add", str(path))
+            finally:
+                path.unlink(missing_ok=True)
+        if changes and (result is None or not failed(result)):
+            path = z3950.write_check_file(changes)
+            try:
+                result = await run_task(self.app, title, "z3950-check", str(path))
+            finally:
+                path.unlink(missing_ok=True)
         await show_done(self.app, title, result)
         await self._load_koha()
+
+    # ------------------------------------------------------------------
+    # A server typed by hand
+    # ------------------------------------------------------------------
+    def new_server(self) -> None:
+        self.app.run_worker(self._new_server(), group="z3950-new", exclusive=True, exit_on_error=False)
+
+    async def _new_server(self) -> None:
+        title = t("Add server")
+        address = await self.app.push_screen_wait(InputScreen(
+            title, t("The server's address as host:port/database (Z39.50), or its SRU address "
+                     "(https://host/path). It is tested now and comes ticked for the search."),
+            t("Address"), validate=_address_problem))
+        if not address:
+            return
+        name = await self.app.push_screen_wait(InputScreen(title, "", t("Name"), validate=lambda v: "",
+                                                           value=_address_target(address).host))
+        if name is None:
+            return
+        tg = replace(_address_target(address), name=name.strip()[:100] or _address_target(address).host)
+        self.targets = z3950.merge(self.targets, [tg])
+        self.history.set_manual(tg.key, False)
+        self.selected.add(tg.key)
+        self._save()
+        self._test([tg])
 
     def update_servers(self) -> None:
         self.app.run_worker(self._update_servers(), group="routine", exclusive=True, exit_on_error=False)
@@ -630,6 +741,8 @@ class Z3950View(SectionView):
             self.app.task_failed(t("Import Z39.50/SRU servers"), result)
             return
         self._merge(result.value)
+        # Tested at once: the list shows only the ones that return a record.
+        self._test([tg for tg in self.targets if tg.key in {n.key for n in result.value}])
 
     def export(self) -> None:
         self.app.run_worker(self._export(), group="z3950-export", exclusive=True, exit_on_error=False)
@@ -656,6 +769,21 @@ def health_state(state: str) -> str:
     """A direct server's breaker state (nexus_ondemand.health), for the person."""
     return {"ok": t("Working"), "down": t("Paused after failures"), "half-open": t("Asked again on the next search"),
             "misconfigured": t("Wrong settings (not asked)")}.get(state, state)
+
+
+def _address_target(value: str) -> z3950.Target | None:
+    """A server typed as host:port/database or an SRU address, or None."""
+    return z3950.make_target({"host": value.strip(), "name": ""}, "custom")
+
+
+def _address_problem(value: str) -> str:
+    if not value.strip():
+        return t("Cannot be empty.")
+    return "" if _address_target(value) else t("Not a server address (host:port/database).")
+
+
+def _when(stamp: int) -> str:
+    return time.strftime("%d/%m/%Y %H:%M", time.localtime(stamp)) if stamp else "-"
 
 
 def _source_problem(value: str) -> str:

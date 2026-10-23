@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.98",
+ "panel_version": "1.5.100",
  "languages": [
   {
    "code": "en",
@@ -2122,12 +2122,17 @@
    "controls": [
     {
      "type": "button",
-     "label": "Scan",
+     "label": "Show servers",
      "primary": true
     },
     {
      "type": "button",
-     "label": "Add to Koha",
+     "label": "Save to Koha",
+     "primary": false
+    },
+    {
+     "type": "button",
+     "label": "Add server",
      "primary": false
     },
     {
@@ -2157,7 +2162,7 @@
     },
     {
      "type": "button",
-     "label": "Show hidden",
+     "label": "Show all",
      "primary": false
     },
     {
@@ -9032,13 +9037,13 @@
    "ja": "koha.nexus の図書館による共有目録。有効にすると Koha の Z39.50/SRU サーバーに追加し、目録作業での検索用にチェックを入れます。無効にすると取り除きます。",
    "ko": "koha.nexus 도서관의 공유 목록. 켜면 Koha의 Z39.50/SRU 서버에 추가하고 목록 작업 검색용으로 선택합니다. 끄면 제거합니다."
   },
-  "Scan": {
-   "en": "Scan",
-   "pt-BR": "Testar",
-   "es": "Probar",
-   "fr": "Tester",
-   "it": "Prova",
-   "de": "Prüfen",
+  "Show servers": {
+   "en": "Show servers",
+   "pt-BR": "Mostrar servidores",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -9057,13 +9062,38 @@
    "ja": null,
    "ko": null
   },
-  "Add to Koha": {
-   "en": "Add to Koha",
-   "pt-BR": "Adicionar ao Koha",
-   "es": "Añadir a Koha",
-   "fr": "Ajouter à Koha",
-   "it": "Aggiungi a Koha",
-   "de": "Zu Koha hinzufügen",
+  "Save to Koha": {
+   "en": "Save to Koha",
+   "pt-BR": "Salvar no Koha",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Add server": {
+   "en": "Add server",
+   "pt-BR": "Adicionar servidor",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -9207,13 +9237,13 @@
    "ja": null,
    "ko": null
   },
-  "Show hidden": {
-   "en": "Show hidden",
-   "pt-BR": "Mostrar ocultos",
-   "es": "Mostrar ocultos",
-   "fr": "Afficher les masqués",
-   "it": "Mostra i nascosti",
-   "de": "Ausgeblendete zeigen",
+  "Show all": {
+   "en": "Show all",
+   "pt-BR": "Mostrar todos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -16703,29 +16733,37 @@
   "z3950-outbound": {
    "en": {
     "title": "Catalogues to copy records from",
-    "summary": "A curated list of public catalogues by region (Brazil / Latin America, North America, Europe, Asia-Pacific, specialised), plus the community list and your own imports, scanned for real records and added to Koha ranked by speed.",
+    "summary": "A curated list of public catalogues by region, plus the community list and your own servers. Show servers tests them all with a real search and lists only the ones that return a record; you tick the ones Koha's cataloguing search asks.",
     "steps": [
-     "Tick servers with the space bar, or tick a region to take all of it.",
-     "Press **Scan** and wait for the results.",
-     "Press **Add to Koha** and confirm.",
-     "Type the logins of subscription servers with **Login** if the panel asks."
+     "Press **Show servers** and wait: every server is tested with a real search, and the list shows the ones that return a record.",
+     "Tick (space bar, or a region) the servers Koha's cataloguing search should ask; untick the others. Keep it to 20 or fewer.",
+     "Press **Save to Koha** and confirm.",
+     "Press **Update** later to test again."
     ],
     "options": [
      {
-      "name": "Scan",
-      "text": "Tries each ticked server with a 3-second timeout on its listed port, then 210, 2100 and 2210; runs a real search and accepts it only when it returns a valid MARC record. The result shows how many worked and the fastest with its latency in ms."
+      "name": "Show servers / Update",
+      "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update, to test again; the last test is kept."
      },
      {
-      "name": "Add to Koha",
-      "text": "Adds the ticked servers to Koha's `z3950servers`, ranked by speed in the last scan. Servers Koha already has are kept as they are."
+      "name": "Save to Koha",
+      "text": "The tick is \"selected for the cataloguing search\". Adds the ticked servers Koha does not have (ranked by speed in the last test) and ticks or unticks the ones it has. An unticked server stays in Koha, only out of the search. A ticked server stays in the list even when it fails, so you can untick it."
+     },
+     {
+      "name": "At most 20 servers",
+      "text": "Recommendation: tick at most 20 servers at once, since more can make the search unstable. Past 20 the note turns to the warning colour, but nothing is blocked."
+     },
+     {
+      "name": "Add server",
+      "text": "Type a server's address (host:port/database, or an SRU address) and a name. It is tested at once and comes ticked."
      },
      {
       "name": "Login",
       "text": "User and password for subscription servers (OCLC and others). Kept only in the panel's private file and in Koha, never in a log."
      },
      {
-      "name": "Hide / Show hidden",
-      "text": "Hides servers you do not want to see. Servers that keep failing are hidden by themselves."
+      "name": "Hide / Show all",
+      "text": "Hide keeps a server out of the list and out of the tests. Show all lists every server with its last result; Only working goes back."
      },
      {
       "name": "Community list",
@@ -16737,7 +16775,7 @@
      }
     ],
     "tips": [
-     "An address marked * comes from an older list: the scan tells whether it still works.",
+     "An address marked * comes from an older list: the test tells whether it still works.",
      "Export your tested list and import it on your other Koha servers to save time."
     ],
     "related": [
@@ -16748,29 +16786,37 @@
    },
    "pt-BR": {
     "title": "Catálogos de onde copiar registros",
-    "summary": "Uma lista curada de catálogos públicos por região (Brasil / América Latina, América do Norte, Europa, Ásia-Pacífico, especializados), mais a lista da comunidade e as suas importações, testados com registros reais e adicionados ao Koha por ordem de velocidade.",
+    "summary": "Uma lista curada de catálogos públicos por região, mais a lista da comunidade e os seus servidores. Mostrar servidores testa todos com uma busca real e lista só os que devolvem registro; você marca os que a pesquisa da catalogação do Koha consulta.",
     "steps": [
-     "Marque servidores com a barra de espaço, ou marque uma região para levá-la inteira.",
-     "Pressione **Testar** e aguarde os resultados.",
-     "Pressione **Adicionar ao Koha** e confirme.",
-     "Digite os logins dos servidores por assinatura com **Login**, se o painel pedir."
+     "Pressione **Mostrar servidores** e aguarde: cada servidor é testado com uma busca real, e a lista mostra os que devolvem registro.",
+     "Marque (barra de espaço, ou uma região) os servidores que a pesquisa da catalogação do Koha deve consultar; desmarque os outros. Fique em 20 ou menos.",
+     "Pressione **Salvar no Koha** e confirme.",
+     "Pressione **Atualizar** depois para testar de novo."
     ],
     "options": [
      {
-      "name": "Testar",
-      "text": "Tenta cada servidor marcado com 3 segundos de limite na porta listada, depois 210, 2100 e 2210; faz uma busca real e só o aceita quando ele devolve um registro MARC válido. O resultado mostra quantos funcionaram e o mais rápido, com a latência em ms."
+      "name": "Mostrar servidores / Atualizar",
+      "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar, para testar de novo; o último teste fica guardado."
      },
      {
-      "name": "Adicionar ao Koha",
-      "text": "Adiciona os servidores marcados ao `z3950servers` do Koha, por ordem de velocidade no último teste. Os servidores que o Koha já tem ficam como estão."
+      "name": "Salvar no Koha",
+      "text": "A marca quer dizer \"selecionado para a pesquisa da catalogação\". Adiciona os servidores marcados que o Koha não tem (por ordem de velocidade no último teste) e marca ou desmarca os que ele já tem. Um servidor desmarcado continua no Koha, só fora da pesquisa. Um servidor marcado continua na lista mesmo se falhar, para você poder desmarcar."
+     },
+     {
+      "name": "No máximo 20 servidores",
+      "text": "Recomendação: marque no máximo 20 servidores de uma vez, porque mais que isso pode deixar a pesquisa instável. Passando de 20 o aviso fica na cor de alerta, mas nada é bloqueado."
+     },
+     {
+      "name": "Adicionar servidor",
+      "text": "Digite o endereço do servidor (host:porta/base, ou um endereço SRU) e um nome. Ele é testado na hora e já vem marcado."
      },
      {
       "name": "Login",
       "text": "Usuário e senha para servidores por assinatura (OCLC e outros). Guardados só no arquivo privado do painel e no Koha, nunca num log."
      },
      {
-      "name": "Ocultar / Mostrar ocultos",
-      "text": "Esconde servidores que você não quer ver. Servidores que falham repetidamente se escondem sozinhos."
+      "name": "Ocultar / Mostrar todos",
+      "text": "Ocultar tira um servidor da lista e dos testes. Mostrar todos lista todos os servidores com o último resultado; Só os que funcionam volta."
      },
      {
       "name": "Lista da comunidade",
@@ -17918,8 +17964,8 @@
    "manual": 111,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 380,
-   "strings_total": 380
+   "strings": 381,
+   "strings_total": 381
   },
   "pt-BR": {
    "manual": 111,
@@ -17938,155 +17984,155 @@
     "backup-safety",
     "ai-ollama"
    ],
-   "strings": 372,
-   "strings_total": 380
+   "strings": 373,
+   "strings_total": 381
   },
   "es": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 264,
-   "strings_total": 380
+   "strings": 261,
+   "strings_total": 381
   },
   "fr": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 259,
-   "strings_total": 380
+   "strings": 256,
+   "strings_total": 381
   },
   "it": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 259,
-   "strings_total": 380
+   "strings": 256,
+   "strings_total": 381
   },
   "de": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
-   "strings": 259,
-   "strings_total": 380
+   "strings": 256,
+   "strings_total": 381
   },
   "nl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "sv": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "pl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "cs": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "ru": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "uk": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "tr": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "tl": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "id": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "ar": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "fa": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "hi": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "bn": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "vi": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "zh": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "ja": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   },
   "ko": {
    "manual": 0,
    "manual_total": 111,
    "manual_outdated": [],
    "strings": 111,
-   "strings_total": 380
+   "strings_total": 381
   }
  }
 }

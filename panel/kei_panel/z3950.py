@@ -17,8 +17,10 @@ by region and adds the chosen ones to Koha's z3950servers table through
     Z39.50 with a small BER client of its own (Init, Search, Present), SRU
     with a searchRetrieve. A server counts as working only when the record
     is a valid MARC frame (ISO 2709) or MARCXML. Latency is kept in ms;
-  * a history of the scans: a host that fails 3 scans in a row, or that the
-    person blacklists, is hidden from the list.
+  * a history of the scans; the screen shows only what the last test of
+    the whole list ("Show servers") found working, the ticked servers, and
+    a backup (a koha.nexus gateway row) only when the server it stands in
+    for returned no record; a server the person hides stays hidden.
 
 A target's password is never printed, logged or exported by default:
 Target.password is left out of repr(), describe() and the SQL/CSV/JSON
@@ -89,6 +91,11 @@ QUERY_TIMEOUT = 8.0
 FAILS_TO_BLACKLIST = 3
 HISTORY_RULES = 2                     # bumped when the scan's idea of "working" changes
 RULES_KEY = "_rules"
+TESTED_KEY = "_tested"                # when "Show servers" last tested the whole list
+# The most servers we recommend ticked for one cataloguing search: Koha asks
+# them all at once, and more than this makes the search unstable. Only a
+# recommendation: the panel takes any number.
+SEARCH_LIMIT = 20
 # Words of titles every catalogue has: Don Quixote and The Little Prince.
 PROBE_TERMS = ("quixote", "quijote", "prince", "principe")
 # The koha.nexus Catalog Network (catalog-network/ in the repository): the
@@ -151,6 +158,8 @@ class Target:
     recordtype: str = "biblio"   # biblio, or authority (Koha's authority search)
     timeout: int = 0             # Koha's timeout in seconds (0: Koha's default)
     rank: int = 0                # a fixed Koha rank (0: by speed in the last scan)
+    backup: bool = False         # a fallback row (the koha.nexus SRU gateway): shown only when needed
+    backup_for: str = ""         # the keys (space-separated) of the servers this backup stands in for
     origin: str = "curated"      # curated, community, imported, custom
 
     @property
@@ -202,6 +211,8 @@ _ALIASES = {
     "recordtype": ("recordtype", "record_type"),
     "timeout": ("timeout",),
     "rank": ("rank",),
+    "backup": ("backup", "priority"),
+    "backup_for": ("backup_for",),
 }
 _FIELD_OF = {alias: f for f, aliases in _ALIASES.items() for alias in aliases}
 
@@ -287,6 +298,9 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
     recordtype = recordtype if recordtype in RECORDTYPES else "biblio"
     if recordtype == "authority" and "region" not in d:
         region = "authorities"
+    backup_for = d.get("backup_for", "")
+    if isinstance(backup_for, (list, tuple)):
+        backup_for = " ".join(str(k) for k in backup_for)
     login_env = str(d.get("login_env", "")).strip().upper()
     if not _LOGIN_ENV.match(login_env):
         login_env = ""               # a list from elsewhere must not read any other variable
@@ -307,7 +321,10 @@ def make_target(raw: dict, origin: str = "imported") -> Target | None:
         preselect=_truthy(d.get("preselect")),
         source=str(d.get("source", "")), notes=str(d.get("notes", "")),
         verified=_truthy(d.get("verified")), recordtype=recordtype, timeout=_small_int(d.get("timeout")),
-        rank=_small_int(d.get("rank")), origin=origin)
+        rank=_small_int(d.get("rank")),
+        # "priority": "fallback" in the curated list, "backup": true elsewhere.
+        backup=_truthy(d.get("backup")) or str(d.get("backup", "")).strip().lower() == "fallback",
+        backup_for=" ".join(str(backup_for).split()), origin=origin)
 
 
 _LOGIN_ENV = re.compile(r"^KEI_Z3950_[A-Z0-9_]{1,40}$")
@@ -682,6 +699,20 @@ def sync_targets(targets: list[Target], in_koha: set[str]) -> list[Target]:
                                        and t.key not in in_koha)]
 
 
+def check_file_text(changes: list[tuple[Target, bool]]) -> str:
+    """The file config.sh --task z3950-check reads: host, port, db,
+    recordtype and 1 or 0 (ticked for the cataloguing search or not)."""
+    return "".join("\t".join(_cell(v) for v in (t.host, t.port, t.db, t.recordtype, int(on))) + "\n"
+                   for t, on in changes)
+
+
+def write_check_file(changes: list[tuple[Target, bool]]) -> Path:
+    fd, name = tempfile.mkstemp(prefix="kei-z3950-check-", suffix=".tsv")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(check_file_text(changes))
+    return Path(name)
+
+
 def write_add_file(targets: list[Target], ranks: dict[str, int]) -> Path:
     """A private (0600) temporary file for z3950-add; it holds the logins,
     so config.sh deletes it as soon as it has read it."""
@@ -777,7 +808,21 @@ class History:
             self.data[RULES_KEY] = HISTORY_RULES
 
     def get(self, key: str) -> dict:
-        return self.data.get(key, {})
+        h = self.data.get(key, {})
+        return h if isinstance(h, dict) else {}
+
+    def works(self, key: str) -> bool:
+        """The server returned a valid MARC record in its last test."""
+        return self.get(key).get("status") == "ok"
+
+    @property
+    def tested(self) -> int:
+        """When the whole list was last tested (0: never)."""
+        v = self.data.get(TESTED_KEY)
+        return v if isinstance(v, int) else 0
+
+    def mark_tested(self) -> None:
+        self.data[TESTED_KEY] = int(time.time())
 
     def record(self, result: "ScanResult") -> None:
         h = self.data.setdefault(result.key, {})
@@ -1306,3 +1351,40 @@ def koha_ranks(targets: list[Target], history: History) -> dict[str, int]:
         known = STATUS_ORDER.index(status) if status in STATUS_ORDER else len(STATUS_ORDER)
         return (known, h.get("query_ms") or 10**9, t.name.lower())
     return {t.key: t.rank or i for i, t in enumerate(sorted(targets, key=score), 1)}
+
+
+# ----------------------------------------------------------------------
+# What "Show servers" tests and what the screen then shows
+# ----------------------------------------------------------------------
+def test_phases(targets: list[Target]) -> tuple[list[Target], list[Target]]:
+    """The servers tested first (every one but the backups) and the backups,
+    tested afterwards, only those backup_needed() asks for."""
+    return [t for t in targets if not t.backup], [t for t in targets if t.backup]
+
+
+def backup_needed(t: Target, works) -> bool:
+    """A backup stands in when none of the servers it covers returned a
+    record (works(key) says whether one did); one that covers no server of
+    the list is the only way to its catalogue, so it counts as needed."""
+    return not any(works(k) for k in t.backup_for.split())
+
+
+def shown(targets: list[Target], history: History, selected: set[str]) -> list[Target]:
+    """The servers of the screen: the ticked ones (so they can be unticked,
+    even when they fail), and the ones that returned a record in the last
+    test, a backup only when its main server did not. A server hidden by
+    hand stays hidden."""
+    out = []
+    for t in targets:
+        if history.get(t.key).get("manual"):
+            continue
+        if t.key in selected or (history.works(t.key) and (not t.backup or backup_needed(t, history.works))):
+            out.append(t)
+    return out
+
+
+def most_ticked(targets: list[Target], selected: set[str]) -> int:
+    """The most servers ticked for one search window (the catalogue search
+    or the authority search), to compare with SEARCH_LIMIT."""
+    ticked = [t for t in targets if t.key in selected]
+    return max(sum(t.recordtype == kind for t in ticked) for kind in RECORDTYPES) if ticked else 0

@@ -3139,7 +3139,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row Senado Federal — catálogo legado (Aleph SEN01) covers this library."
+   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row Senado Federal — catálogo legado (Aleph SEN01) covers this library.",
+   "backup_for": [
+    "biblioteca2.senado.gov.br:9991/SEN01"
+   ]
   },
   {
    "name": "Senado Federal (FOLIO)",
@@ -3161,7 +3164,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library.",
+   "backup_for": [
+    "z3950.folio.ebsco.com:2100/rvbi"
+   ]
   },
   {
    "name": "Biblioteca Nacional de Portugal (BNP)",
@@ -3183,7 +3189,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Biblioteca Nacional de Portugal (BNP) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Biblioteca Nacional de Portugal (BNP) covers this library.",
+   "backup_for": [
+    "z3950.catalogo.bnportugal.gov.pt:210/bn"
+   ]
   },
   {
    "name": "PORBASE, Portugal",
@@ -3205,7 +3214,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row PORBASE (Base Nacional de Dados Bibliográficos) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row PORBASE (Base Nacional de Dados Bibliográficos) covers this library.",
+   "backup_for": [
+    "z3950.porbase.bnportugal.gov.pt:210/porbase"
+   ]
   },
   {
    "name": "Biblioteca Nacional de España, Espanha",
@@ -3227,7 +3239,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Biblioteca Nacional de España (BNE) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Biblioteca Nacional de España (BNE) covers this library.",
+   "backup_for": [
+    "eu00.alma.exlibrisgroup.com:210/34BNE_INST"
+   ]
   },
   {
    "name": "British Library, UK",
@@ -3271,7 +3286,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Library of Congress covers this library."
+   "notes": "Status: verified; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Library of Congress covers this library.",
+   "backup_for": [
+    "lx2.loc.gov:210/LCDB"
+   ]
   },
   {
    "name": "Biblioteca Nacional da Argentina",
@@ -3359,7 +3377,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row SLSP (Swiss Library Service Platform) network zone covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row SLSP (Swiss Library Service Platform) network zone covers this library.",
+   "backup_for": [
+    "eu03.alma.exlibrisgroup.com:1921/41SLSP_NETWORK"
+   ]
   },
   {
    "name": "LIBRIS, Suécia",
@@ -3381,7 +3402,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Fallback: the direct Z39.50 row LIBRIS (Kungliga biblioteket) covers this library."
+   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Fallback: the direct Z39.50 row LIBRIS (Kungliga biblioteket) covers this library.",
+   "backup_for": [
+    "z3950.libris.kb.se:210/libr"
+   ]
   },
   {
    "name": "National Library of the Czech Republic, Tchéquia",
@@ -3403,7 +3427,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Národní knihovna České republiky (NKC) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Národní knihovna České republiky (NKC) covers this library.",
+   "backup_for": [
+    "aleph.nkp.cz:9991/NKC01"
+   ]
   },
   {
    "name": "Grécia",
@@ -3557,7 +3584,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row USP (Universidade de São Paulo) — Alma covers this library."
+   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row USP (Universidade de São Paulo) — Alma covers this library.",
+   "backup_for": [
+    "na01.alma.exlibrisgroup.com:1921/55USP_INST"
+   ]
   },
   {
    "name": "Universidade Estadual de Campinas (UNICAMP)",
@@ -3601,7 +3631,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row UNESP (Universidade Estadual Paulista) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row UNESP (Universidade Estadual Paulista) covers this library.",
+   "backup_for": [
+    "unesp.alma.exlibrisgroup.com:1921/55UNESP_INST"
+   ]
   },
   {
    "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
@@ -3711,7 +3744,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row UFSC (Universidade Federal de Santa Catarina) covers this library."
+   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row UFSC (Universidade Federal de Santa Catarina) covers this library.",
+   "backup_for": [
+    "z3950.ufsc.br:210/Default"
+   ]
   },
   {
    "name": "Universidade Federal de São Carlos (UFSCar)",
@@ -3755,7 +3791,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Fallback: the direct Z39.50 row UNIFESP (Universidade Federal de São Paulo) covers this library."
+   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Fallback: the direct Z39.50 row UNIFESP (Universidade Federal de São Paulo) covers this library.",
+   "backup_for": [
+    "z3950.unifesp.br:210/Default"
+   ]
   },
   {
    "name": "Universidade Federal de Uberlândia (UFU)",
@@ -3865,7 +3904,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Database biblioteca per Paulo's validated direct list of 2026-10-18 (was Default). Fallback: the direct Z39.50 row UTFPR (Universidade Tecnológica Federal do Paraná) covers this library."
+   "notes": "Status: untested; answers from static.db, then live Z3950. Z39.50 address from the panel's curated list; not searched through the gateway yet. Database biblioteca per Paulo's validated direct list of 2026-10-18 (was Default). Fallback: the direct Z39.50 row UTFPR (Universidade Tecnológica Federal do Paraná) covers this library.",
+   "backup_for": [
+    "z3950.utfpr.edu.br:210/biblioteca"
+   ]
   },
   {
    "name": "Universidade de Brasília (UnB)",
@@ -3931,7 +3973,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row Yale University (Voyager) covers this library."
+   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row Yale University (Voyager) covers this library.",
+   "backup_for": [
+    "z3950.library.yale.edu:7090/Voyager"
+   ]
   },
   {
    "name": "Massachusetts Institute of Technology (MIT), EUA",
@@ -3997,7 +4042,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Penn State University covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Penn State University covers this library.",
+   "backup_for": [
+    "zcat.libraries.psu.edu:2200/Unicorn"
+   ]
   },
   {
    "name": "University of Pennsylvania (UPenn), EUA",
@@ -4019,7 +4067,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row University of Pennsylvania (Penn) covers this library."
+   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row University of Pennsylvania (Penn) covers this library.",
+   "backup_for": [
+    "upenn.alma.exlibrisgroup.com:1921/01UPENN_INST"
+   ]
   },
   {
    "name": "Tufts University Libraries, EUA",
@@ -4041,7 +4092,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Tufts University covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Tufts University covers this library.",
+   "backup_for": [
+    "tufts.alma.exlibrisgroup.com:1921/01TUN_INST"
+   ]
   },
   {
    "name": "Florida State University, EUA",
@@ -4063,7 +4117,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Florida State University (FSU) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Florida State University (FSU) covers this library.",
+   "backup_for": [
+    "fsu.alma.exlibrisgroup.com:1921/01FALSC_FSU"
+   ]
   },
   {
    "name": "Southern University at New Orleans (SUNO), EUA",
@@ -4107,7 +4164,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of British Columbia covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of British Columbia covers this library.",
+   "backup_for": [
+    "ubc.alma.exlibrisgroup.com:1921/01UBC_INST"
+   ]
   },
   {
    "name": "University of Toronto, Canadá",
@@ -4129,7 +4189,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of Toronto covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of Toronto covers this library.",
+   "backup_for": [
+    "utoronto.alma.exlibrisgroup.com:1921/01UTON_INST"
+   ]
   },
   {
    "name": "Simon Fraser University, Canadá",
@@ -4151,7 +4214,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Simon Fraser University (SFU) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Simon Fraser University (SFU) covers this library.",
+   "backup_for": [
+    "sfu.alma.exlibrisgroup.com:1921/01SFU_INST"
+   ]
   },
   {
    "name": "Trent University Library & Archives, Canadá",
@@ -4217,7 +4283,10 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row University of Oxford (Bodleian Libraries) covers this library."
+   "notes": "Status: verified; answers from static.db, then live SRU. Alma SRU, native MARCXML. Fallback: the direct Z39.50 row University of Oxford (Bodleian Libraries) covers this library.",
+   "backup_for": [
+    "library.ox.ac.uk:210/44OXF_INST"
+   ]
   },
   {
    "name": "Universidade de Coimbra, Portugal",
@@ -4261,7 +4330,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Universidade do Porto covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Universidade do Porto covers this library.",
+   "backup_for": [
+    "eu00.alma.exlibrisgroup.com:1921/351UP_INST"
+   ]
   },
   {
    "name": "Aladí: Barcelona Municipal Libraries Network, Espanha",
@@ -4393,7 +4465,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Pontificia Universidad Católica del Perú (PUCP) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Pontificia Universidad Católica del Perú (PUCP) covers this library.",
+   "backup_for": [
+    "na01.alma.exlibrisgroup.com:1921/51PUCP_INST"
+   ]
   },
   {
    "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
@@ -4415,7 +4490,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Universidad Peruana de Ciencias Aplicadas (UPC) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Universidad Peruana de Ciencias Aplicadas (UPC) covers this library.",
+   "backup_for": [
+    "na01.alma.exlibrisgroup.com:1921/51UPC_INST"
+   ]
   },
   {
    "name": "National Library of Medicine, EUA",
@@ -4547,7 +4625,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Port open from the VPS; no search tried yet. Fallback: the direct Z39.50 row Servizio Bibliotecario Nazionale (SBN) covers this library."
+   "notes": "Status: untested; answers from static.db, then live Z3950. Port open from the VPS; no search tried yet. Fallback: the direct Z39.50 row Servizio Bibliotecario Nazionale (SBN) covers this library.",
+   "backup_for": [
+    "opac.sbn.it:3950/nopac"
+   ]
   },
   {
    "name": "Agence Bibliographique de l'Enseignement Supérieur, França",
@@ -4569,7 +4650,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row SUDOC (ABES, French union catalogue) covers this library."
+   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row SUDOC (ABES, French union catalogue) covers this library.",
+   "backup_for": [
+    "carmin.sudoc.abes.fr:10646/abes-z39-public"
+   ]
   },
   {
    "name": "KOBV Berlin-Brandenburg, Alemanha",
@@ -4613,7 +4697,10 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Port open from the VPS; no search tried yet. SWB is part of K10plus today. Fallback: the direct Z39.50 row K10plus (GBV/SWB) covers this library."
+   "notes": "Status: untested; answers from static.db, then live Z3950. Port open from the VPS; no search tried yet. SWB is part of K10plus today. Fallback: the direct Z39.50 row K10plus (GBV/SWB) covers this library.",
+   "backup_for": [
+    "z3950.k10plus.de:210/opac-de-627"
+   ]
   },
   {
    "name": "Christchurch City Libraries, Nova Zelândia",

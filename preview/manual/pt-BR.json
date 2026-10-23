@@ -729,23 +729,31 @@
   },
   "z3950-outbound": {
    "title": "Catálogos de onde copiar registros",
-   "summary": "Uma lista curada de catálogos públicos por região (Brasil / América Latina, América do Norte, Europa, Ásia-Pacífico, especializados), mais a lista da comunidade e as suas importações, testados com registros reais e adicionados ao Koha por ordem de velocidade.",
+   "summary": "Uma lista curada de catálogos públicos por região, mais a lista da comunidade e os seus servidores. Mostrar servidores testa todos com uma busca real e lista só os que devolvem registro; você marca os que a pesquisa da catalogação do Koha consulta.",
    "options": [
     {
-     "name": "Testar",
-     "text": "Tenta cada servidor marcado com 3 segundos de limite na porta listada, depois 210, 2100 e 2210; faz uma busca real e só o aceita quando ele devolve um registro MARC válido. O resultado mostra quantos funcionaram e o mais rápido, com a latência em ms."
+     "name": "Mostrar servidores / Atualizar",
+     "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar, para testar de novo; o último teste fica guardado."
     },
     {
-     "name": "Adicionar ao Koha",
-     "text": "Adiciona os servidores marcados ao `z3950servers` do Koha, por ordem de velocidade no último teste. Os servidores que o Koha já tem ficam como estão."
+     "name": "Salvar no Koha",
+     "text": "A marca quer dizer \"selecionado para a pesquisa da catalogação\". Adiciona os servidores marcados que o Koha não tem (por ordem de velocidade no último teste) e marca ou desmarca os que ele já tem. Um servidor desmarcado continua no Koha, só fora da pesquisa. Um servidor marcado continua na lista mesmo se falhar, para você poder desmarcar."
+    },
+    {
+     "name": "No máximo 20 servidores",
+     "text": "Recomendação: marque no máximo 20 servidores de uma vez, porque mais que isso pode deixar a pesquisa instável. Passando de 20 o aviso fica na cor de alerta, mas nada é bloqueado."
+    },
+    {
+     "name": "Adicionar servidor",
+     "text": "Digite o endereço do servidor (host:porta/base, ou um endereço SRU) e um nome. Ele é testado na hora e já vem marcado."
     },
     {
      "name": "Login",
      "text": "Usuário e senha para servidores por assinatura (OCLC e outros). Guardados só no arquivo privado do painel e no Koha, nunca num log."
     },
     {
-     "name": "Ocultar / Mostrar ocultos",
-     "text": "Esconde servidores que você não quer ver. Servidores que falham repetidamente se escondem sozinhos."
+     "name": "Ocultar / Mostrar todos",
+     "text": "Ocultar tira um servidor da lista e dos testes. Mostrar todos lista todos os servidores com o último resultado; Só os que funcionam volta."
     },
     {
      "name": "Lista da comunidade",
@@ -757,16 +765,16 @@
     }
    ],
    "steps": [
-    "Marque servidores com a barra de espaço, ou marque uma região para levá-la inteira.",
-    "Pressione **Testar** e aguarde os resultados.",
-    "Pressione **Adicionar ao Koha** e confirme.",
-    "Digite os logins dos servidores por assinatura com **Login**, se o painel pedir."
+    "Pressione **Mostrar servidores** e aguarde: cada servidor é testado com uma busca real, e a lista mostra os que devolvem registro.",
+    "Marque (barra de espaço, ou uma região) os servidores que a pesquisa da catalogação do Koha deve consultar; desmarque os outros. Fique em 20 ou menos.",
+    "Pressione **Salvar no Koha** e confirme.",
+    "Pressione **Atualizar** depois para testar de novo."
    ],
    "tips": [
     "Um endereço marcado com * vem de uma lista antiga: o teste diz se ele ainda funciona.",
     "Exporte a sua lista testada e importe-a nos seus outros servidores Koha para ganhar tempo."
    ],
-   "_en": "d62774a8b8"
+   "_en": "53cb4cf41c"
   },
   "z3950-zeus": {
    "title": "Catálogo Zeus pelo gateway do koha.nexus (UFSC)",
