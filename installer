@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.103"
+PANEL_VERSION=" 1.5.104"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -29623,6 +29623,15 @@ _lt_magic_run() {
     # 2) Where the copies and patrons go, then the files for Koha's tools.
     settings=" $(tools_output "$log" | sed -n 's/^Settings: //p') "
     MAGIC_BRANCH=""; MAGIC_ITYPE=""
+    # What the mapping screen already set is not asked again.
+    local mb="" mi="" mc=""
+    if [ -s "$MAGIC_WORK/fieldmap.json" ]; then
+        IFS=$'\t' read -r mb mi mc < <("$MAGIC_PY" -I -c 'import json,sys
+d=json.load(open(sys.argv[1])).get("defaults") or {}
+print("\t".join(str(d.get(a) or d.get(b) or "") for a, b in (("952$a", "branchcode"), ("952$y", "942$c"), ("categorycode", "categorycode"))))' "$MAGIC_WORK/fieldmap.json" 2>/dev/null)
+    fi
+    [ -n "$mb" ] && MAGIC_BRANCH=$mb && settings=${settings// branch / }
+    [ -n "$mi" ] && MAGIC_ITYPE=$mi && settings=${settings// itype / }
     if [[ "$settings" == *" branch "* ]]; then
         MAGIC_BRANCH=$(magic_pick_one "$(t "Library of the copies and patrons:")" "SELECT branchcode, branchname FROM ${DB_NAME}.branches ORDER BY branchname;") || return 0
     fi
@@ -29631,7 +29640,11 @@ _lt_magic_run() {
     fi
     # Patron defaults and the update decision must be known to validation.
     if [[ " $(tools_output "$log" | sed -n 's/^Will build: //p') " == *" patrons "* ]]; then
-        cat=$(magic_pick_one "$(t "Category for the lines without categorycode:")" "SELECT categorycode, description FROM ${DB_NAME}.categories ORDER BY description;") || return 0
+        if [ -n "$mc" ]; then
+            cat=$mc
+        else
+            cat=$(magic_pick_one "$(t "Category for the lines without categorycode:")" "SELECT categorycode, description FROM ${DB_NAME}.categories ORDER BY description;") || return 0
+        fi
         if [ "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.borrowers;")" -gt 1 ] 2>/dev/null; then
             prompt_yes_no "$(t "Import patrons")" "$(t 'Update the patrons that are already registered (same ${match})?\n\nNo = keep them as they are and import only the new ones.')" 11 72 defaultno && over="yes"
         fi
