@@ -552,6 +552,10 @@ App.-plain #picker-drop {
 #z-summary {
     width: 1fr;
 }
+#z-summary.-todo {
+    color: $warning;
+    text-style: bold;
+}
 #z-limit.-over {
     color: $warning;
     text-style: bold;

@@ -65,7 +65,8 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             assert view.selected == {catalog.key, loc.key}
             assert set(rows()) == {catalog.key, loc.key}
             assert str(view.query_one("#z-scan").label) == "Show servers"
-            assert "Press Show servers" in str(view.query_one("#z-summary").render())
+            assert "press the blue Show servers" in str(view.query_one("#z-summary").render())
+            assert view.query_one("#z-summary").has_class("-todo")
             assert "at most 20" in str(view.query_one("#z-limit").render())
             assert "In Koha" in table.get_row(loc.key)[2]
 
@@ -172,6 +173,43 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             saved = (tmp_path / z3950.LOCAL_FILE)
             assert saved.stat().st_mode & 0o777 == 0o600 and "s3cret-pw" in saved.read_text()
             assert all("s3cret-pw" not in str(c) for k in table.rows for c in table.get_row(k))
+
+    asyncio.run(main())
+
+
+def test_a_cancelled_test_keeps_what_it_found(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.views import z3950 as zview
+    real_scan = zview._demo_scan
+
+    async def slow_after_ten(targets, each):
+        out = []
+        for i, tg in enumerate(targets):
+            if i == 10:
+                await asyncio.sleep(60)          # the person gives up and cancels here
+            out += await real_scan([tg], each)
+        return out
+    monkeypatch.setattr(zview, "_demo_scan", slow_after_ten)
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        notes = []
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("z")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-z3950")
+            monkeypatch.setattr(app, "notify", lambda msg, **kw: notes.append(str(msg)))
+            view.scan()
+            await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
+            await pilot.pause(1.5)
+            app.screen.action_cancel()
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
+            await _until(pilot, lambda: any("Test stopped after 10 servers" in n for n in notes))
+            assert view.history.tested and str(view.query_one("#z-scan").label) == "Update"
+            assert sum(view.history.works(t.key) for t in view.targets) >= 8
+            assert not view.query_one("#z-summary").has_class("-todo")
 
     asyncio.run(main())
 
