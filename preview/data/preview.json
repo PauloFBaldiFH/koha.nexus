@@ -12947,16 +12947,16 @@
    "en": {
     "summary": "The Control Dashboard is the panel's home screen: one look tells you whether Koha is running, when the last backup was made, how much disk is left and at which addresses the catalogue answers.",
     "overview": [
-     "The dashboard opens when you start the panel with `sudo config.sh` and is always one key away (**d**). It reads the server's state through the installer's read-only status verb, so opening it never changes anything.",
-     "It is organised top to bottom: the overall state of Koha with the last backup and the free disk space, the addresses of the public catalogue (OPAC) and of the staff interface for each way of reaching them, and the components (MariaDB, Apache, Memcached, Plack, the search engine) with the HTTP answer of both sites.",
-     "Two buttons act on the server: **Restart Koha** for a quick service restart and **Export diagnostics** for a support package with every password removed."
+     "The dashboard opens with sudo config.sh and is available through d. Reading its status does not itself change the server.",
+     "It shows overall state, backup age, disk space, access addresses and components including MariaDB, Apache, RabbitMQ, Memcached and Koha, plus HTTP checks.",
+     "Restart Koha requests the service repair routine. Export diagnostics prepares a support package with redaction; review its contents before sharing."
     ],
     "steps": [
-     "Open the panel with `sudo config.sh` (or the **Koha** icon on Windows). The dashboard is the first screen.",
-     "Read the top row: **Koha** should say *Running*, **Last backup** should be less than a day old and **Disk free** should leave room for at least two backups.",
-     "Check **Addresses** to find the links to give to readers (OPAC) and to staff (staff interface, port 8080).",
-     "Look at **Components**: every service should be active and both sites should answer with HTTP 200.",
-     "Press **Refresh** after fixing something to read the state again."
+     "Open the panel and read the status cards.",
+     "Check the latest backup file and last nightly result separately: they can describe different runs.",
+     "Use the installation's address cards to open the OPAC and staff interface from the appropriate computer.",
+     "Read component and HTTP results. An HTTP response alone does not establish completion of the web installer or every library function.",
+     "Use Refresh after a correction."
     ],
     "tips": [
      "Make the dashboard your morning check: a red or yellow card is easier to fix the day it appears than a week later.",
@@ -12987,24 +12987,24 @@
     "tips": [
      "O indicador de backup usa uma referência de dois dias e o resultado da última execução noturna. Ele não substitui testar o arquivo.",
      "Planeje reinícios de serviços considerando os usuários conectados."
-    ]
+    ],
+    "outdated": true
    }
   },
   "install": {
    "en": {
-    "summary": "Installs Koha with MariaDB, Apache, Memcached and Plack on this server in one guided run, with the checks, tuning and schedules a production library needs.",
+    "summary": "Installs Koha and its server components through a guided flow with preflight checks, configuration and final validation.",
     "overview": [
-     "The installation first checks the server: operating system (Debian 11/12/13 or Ubuntu 22.04/24.04, amd64 or arm64), free disk, network access to the Koha repository and whether ports 80 and 8080 are free. It then sets up UTF-8 and the language, syncs the clock (NTP), asks for the timezone, creates 4 GB of swap, updates the system, adds the official Koha repositories and installs the packages.",
-     "It shows seven numbered steps, one line per task with a small Pac-Man progress bar. The commands' own output goes to `/var/log/koha-easy-install/apt.log`, the file to send to support if a step fails. At the end a screen lists the addresses of the catalogue and of the staff interface.",
-     "The nightly backup, the weekly MARC export, the index watchdogs and the clean-up jobs are scheduled automatically in `/etc/cron.d/koha_tasks`."
+     "The preflight checks the supported distribution, privileges, disk, network access and ports 80 and 8080. The installer then prepares packages, services, timezone and schedules.",
+     "Windows preparation runs Debian under WSL 2. PowerShell and MSIX entry points are documented in chapter 1 of the complete English manual. Installing the MSIX alone does not complete server installation.",
+     "The current panel runs installation stages and offers a validation report. Completion with warnings is not a guarantee that every service is healthy."
     ],
     "steps": [
-     "Prepare a server with at least 4 GB of RAM (8 GB recommended), 5 GB of free disk (10 GB recommended) and Internet access.",
-     "Run `sudo bash installer`, choose the panel language and open **Install Koha server**.",
-     "Choose the timezone when asked, then let the installer work: it usually takes 10 to 30 minutes.",
-     "At the end, note the database user and password: they are also saved in `/root/koha_credentials.txt`.",
-     "Open the staff interface at `http://SERVER-IP:8080`, log in with those credentials and complete Koha's **Web Installer**.",
-     "Back in the panel, create your own staff account with **Create super librarian**."
+     "Read the environment-specific requirements in the complete manual. The Linux guide recommends RAM values that its current preflight does not enforce numerically; Windows has separate RAM and disk checks.",
+     "Follow the documented installation entry point for your operating system and open Install Koha server.",
+     "Read the preflight, choose the timezone and confirm only after checking the target computer.",
+     "Wait without closing the window, then read the final validation and follow the staff interface instructions.",
+     "Complete Koha's web installer when shown, then prepare your library account through Create super librarian."
     ],
     "tips": [
      "Use a dedicated server or virtual machine: Koha, MariaDB and the search engine like to have the machine to themselves.",
@@ -13012,7 +13012,7 @@
      "After the Web Installer, run **Full system health check** once to confirm that everything is green."
     ],
     "warnings": [
-     "Running the installation again on a server that already has Koha offers a reinstallation that DELETES the database. It asks for a typed confirmation (REINSTALL): make a backup first."
+     "Reinstallation deletes the existing database and configuration and requires the exact word REINSTALL. Do not use it merely to open or update the panel."
     ],
     "related": [
      "credentials",
@@ -13139,14 +13139,15 @@
    "en": {
     "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
     "overview": [
-     "The backup uses the compression chosen in **New backups** (gzip, Zstandard or XZ). It refuses to start while another backup or a restore runs, so two jobs never write at the same time.",
-     "On a Linux desktop or under WSL, **Download latest backup** in the Backup center copies the newest file straight into your Downloads folder instead."
+     "The default destination is the backups subdirectory of the home directory identified by the panel, not necessarily the automatic SQL backup directory.",
+     "New manual backups use the selected compression. A shared lock prevents overlap with protected backup/restore operations."
     ],
     "steps": [
-     "Open the Backup center and choose **Generate manual backup and download to PC**.",
-     "Pick the destination folder: the default backups folder, a USB drive (usually under `/media` or `/mnt`) or another folder.",
-     "Wait for the dump and its verification.",
-     "Read the result: file name and size, then the command to paste in PowerShell or Terminal on your computer to save it in your Downloads folder."
+     "Open Generate manual backup and download to PC in Backup center.",
+     "Check the proposed server folder or choose a writable destination.",
+     "Use Save backup and wait for generation and verification.",
+     "Check the filename, size and path. Under WSL, use the Windows copy buttons; remotely, run the displayed transfer command on your own computer.",
+     "Check the received file and use Finish and exit."
     ],
     "tips": [
      "Make a manual backup before any big change: an update, a mass import, a change of search engine.",
@@ -13176,7 +13177,8 @@
     "tips": [
      "Recomendação operacional: gere uma cópia atual antes de alterações importantes.",
      "Mantenha uma cópia fora do servidor e teste o arquivo que pretende usar para recuperação."
-    ]
+    ],
+    "outdated": true
    }
   },
   "backup-marc": {
@@ -13222,31 +13224,31 @@
   },
   "restore": {
    "en": {
-    "summary": "Replaces Koha's database with a backup, safely: the file is checked and tested in a temporary database first, a verified safety copy of the current catalogue is made, and if anything fails the previous catalogue comes back by itself.",
+    "summary": "Replaces the current Koha database after checks and a temporary import test. A safety copy protects an existing database, but recovery after a failure is not guaranteed.",
     "overview": [
-     "Restore is opened from the **Backup center** (the **Restore database** button in its top row, or its card); since 1.5.54 it has no main-menu entry of its own.",
-     "Restore reads `.sql` backups, plain or compressed with gzip, bzip2, xz or zstd. The compression is recognised by the file's content, not by its name, so a renamed file still works. You can pick the file in the panel's file picker, drag it onto the panel window, or, under WSL, choose a file on the Windows disk: it is copied in first.",
-     "Before anything changes, the file is checked: its compression is tested, it must end with the mysqldump completion line and it must contain Koha's tables. Then it is imported into a temporary database; a backup with fewer than 50 tables or with Koha tables missing is refused and nothing changes.",
-     "Only then the panel makes a **safety backup** of the current catalogue (`pre_restore_safety_backup_<date>` in the backups folder, compressed as set in the Backup center) and validates it. Without that verified copy the current catalogue is never dropped.",
-     "The import itself cannot be cut in half: CTRL+C is disabled until it finishes and a lost SSH connection does not stop it. The database is recreated, imported, its schema upgraded to this Koha version, the search engine synchronised and the catalogue fully reindexed. If a step fails, the safety copy is put back automatically."
+     "Open Restore database from its card in Backup center. There is no top restore button or separate restore action in the current main menu.",
+     "The flow recognises supported SQL backups and checks content, compression, space and essential tables through a temporary import. An extension alone does not prove valid content.",
+     "When the current database has tables, the flow creates and validates a safety copy before replacement. An empty database can skip that copy.",
+     "It then recreates and imports the database, upgrades its schema, synchronises search, rebuilds indexes and restarts services. It attempts to reapply saved theme state when available.",
+     "Recovery of the previous database is attempted for certain failures, depending on stage and available safety copy. Recovery itself can fail. An indexing error may occur after database restoration has already completed."
     ],
     "steps": [
-     "Open **Restore database** (from the main list, or with the **Restore database** button of the Backup center).",
-     "Pick the backup file, or drop it onto the panel window.",
-     "Read the checks: a file that does not look like a complete Koha dump is flagged as *Suspicious file* and asks before going on.",
-     "Confirm the restore. The screen shows the file, its size and the free disk space.",
-     "Wait for the steps to finish: safety backup, recreate, import, schema upgrade, search engine and reindex.",
-     "Read the result: the search engine in use, the number of tables and the path of the safety backup."
+     "Open Restore database in Backup center.",
+     "Choose the file accessible to the server, following on-screen transfer guidance when needed.",
+     "Investigate warnings about suspicious or incomplete content.",
+     "Read the replacement confirmation carefully: the current database will be replaced.",
+     "After authorising, wait without closing the window; the panel marks this operation non-cancellable.",
+     "Read the full result and logs, then verify records, patrons and searches."
     ],
     "tips": [
-     "Test the backup first with **Test integrity of latest backup** when it comes from another server or is old.",
-     "Check the free disk before starting: the restore needs room for the temporary database and for the safety copy.",
-     "Keep the safety backup until you have checked the restored catalogue: it is your way back to the state before the restore.",
-     "Your OPAC look (OPAC appearance) is written back after the restore, so a backup's old preferences do not wipe it."
+     "Test an unfamiliar backup first with Test integrity of latest backup.",
+     "Allow space for the temporary database and safety copy.",
+     "Keep the safety copy until you have checked the restored catalogue.",
+     "Consult restore.log, restore-import.log and the indexing log identified by the error."
     ],
     "warnings": [
-     "A restore replaces the whole catalogue, patrons and loans with the content of the backup: everything done after the backup was made is lost unless you keep the safety copy.",
-     "Do not restore a backup of a much newer Koha version on an older Koha: update the server first."
+     "Restore replaces the database, including patrons and circulation. Changes since the selected backup are not in that backup.",
+     "Do not assume an error means the previous catalogue was recovered automatically. Check the failed stage and current database state."
     ],
     "related": [
      "backup-safety",
@@ -13281,7 +13283,8 @@
      "A restauração substitui dados pelo estado do backup: alterações posteriores não estarão nesse arquivo.",
      "Em falhas de recriação, importação ou atualização do esquema, o código pode tentar recuperar o banco anterior. Essa recuperação também pode falhar; leia a mensagem final.",
      "Uma falha de indexação pode acontecer depois de o banco já ter sido restaurado. Não suponha que toda falha recoloca automaticamente o banco anterior."
-    ]
+    ],
+    "outdated": true
    }
   },
   "backup-cloud": {
@@ -13396,11 +13399,11 @@
   },
   "sec-backup": {
    "en": {
-    "summary": "Everything about backups and restores on one screen: the state of the newest backup, the compression of new backups, one-click download, restore, the MARC21 export, manual and cloud backups and the integrity test.",
+    "summary": "Brings together backup status, compression and the cards for download, manual SQL backup, MARC export, restore, cloud upload and testing.",
     "overview": [
-     "Koha's database is backed up every night at 23:00 (compressed, verified, and sent to the cloud when it is set up), and the bibliographic and authority records are exported as MARC21 every Sunday. The Backup center (key **b**) shows how that is going and lets you act on it.",
-     "Restoring the database lives only here since 1.5.54: the main menu no longer has a separate **Restore database** entry, so restore, the MARC21 export and the backup routines are all reached from this one screen (in the panel and in the classic menu).",
-     "Three cards come first (**Last backup**, **Size**, **Result** of the last nightly run), then the **Backup compression type** box with the compression choice, then the actions as cards, the only place for them since 1.5.56: **Download latest backup**, **Generate manual backup**, **Export MARC21 records now**, **Restore database**, **Configure cloud backup** and **Test integrity of latest backup**."
+     "The newest backup and the last nightly result may refer to different runs. Read all three indicators.",
+     "SQL backups recover the database; MARC exports exchange bibliographic and authority records and do not replace a full SQL backup.",
+     "Restore database is available as a card in this centre. Compression is saved when selected and applies to new backups."
     ],
     "tips": [
      "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
@@ -13426,7 +13429,8 @@
     "tips": [
      "Recomendação operacional: mantenha uma cópia fora do servidor e verifique se consegue recuperá-la.",
      "Teste o arquivo em banco temporário antes de contar com ele para restauração."
-    ]
+    ],
+    "outdated": true
    }
   },
   "magic-import": {
@@ -16224,15 +16228,14 @@
     "title": "Backup compression type",
     "summary": "Chooses how new backups are compressed: gzip (opens anywhere), Zstandard (fast and smaller, for large catalogues) or XZ (smallest, slow to make, for long-term storage).",
     "overview": [
-     "The choice is saved as `BACKUP_COMPRESSION` in the panel's backup settings and is used by the nightly backup, by manual backups and by the safety copies made before a change (a restore, an update, a library tool). The nightly script reads it every night, so the next backup already uses it.",
-     "Restores do not care about this setting: **Restore database** recognises `.sql`, `.sql.gz`, `.sql.zst` and `.sql.xz` by their content. Old backups in another format keep working.",
-     "If the program for the chosen compression (`zstd` or `xz`) is missing on the server, the backups fall back to gzip and the box says so; choosing the compression again installs it."
+     "The choice applies to new nightly, manual and safety backups; it does not recompress existing files.",
+     "Restore recognises supported files independently of the current compression setting. If the required compressor is missing, the backup flow can use gzip and reports that condition."
     ],
     "steps": [
-     "Open the Backup center (key **b**).",
-     "In **New backups**, open **Compression** and pick an option.",
-     "Wait for *Saving the backup settings*; a notice confirms the new choice.",
-     "Check the next morning that **Last backup** shows the new extension."
+     "Open Backup center with b.",
+     "Choose Compression: gzip, Zstandard or XZ / LZMA.",
+     "Wait for the setting to save and read any missing-program or fallback notice.",
+     "Check the format actually used in the next backup."
     ],
     "options": [
      {
@@ -16290,17 +16293,18 @@
     ],
     "tips": [
      "Escolha considerando o tempo de geração, o espaço e as ferramentas disponíveis para recuperar o arquivo."
-    ]
+    ],
+    "outdated": true
    }
   },
   "backup-safety": {
    "en": {
     "title": "Safety backup before a restore",
-    "summary": "Before Restore database replaces the catalogue, the panel saves and validates a complete copy of the current database. Without it the current catalogue is never dropped, and if the restore fails that copy is put back automatically.",
+    "summary": "Before replacing a database with tables, restore creates and validates a safety copy. Empty databases can skip it; automatic rollback is not guaranteed for every failure.",
     "overview": [
-     "The copy is written as `pre_restore_safety_backup_<date>_<time>` in the backups folder (`/var/backups/koha_sql`), with the compression chosen in **New backups**. It is written to a `.part` file first and renamed only when complete, so a half-written copy is never mistaken for a backup.",
-     "If the copy cannot be created or validated (for example, not enough free disk), the restore stops with *Safety backup failed* and nothing changes. A database with no tables has nothing to save, and the screen says so.",
-     "The result screen of the restore shows the path of the safety copy. If the index repair later finds an empty database, it also points at the newest safety copy."
+     "The copy is written under /var/backups/koha_sql with the prefix pre_restore_safety_backup_, date, time and selected compression. A .part file is promoted only after checks.",
+     "If creating or validating the safety copy fails, a current database with tables is not replaced by that stage.",
+     "The restore result identifies the safety copy. Keep it until records and search have been checked."
     ],
     "steps": [
      "Start **Restore database** as usual: the safety copy is automatic.",
@@ -16309,8 +16313,8 @@
      "To undo the restore, run **Restore database** again and pick that file."
     ],
     "tips": [
-     "Leave free space of at least twice the size of a backup before a restore: one for the temporary test database, one for the safety copy.",
-     "Delete old safety copies only after you have checked the restored catalogue for a few days."
+     "Keep sufficient room for the temporary test database and safety copy.",
+     "If restore fails, inspect the stage and logs. A rollback attempt can also fail."
     ],
     "related": [
      "restore",
@@ -16334,7 +16338,8 @@
     "tips": [
      "Confira a estimativa de espaço do fluxo e mantenha espaço para o teste temporário e a cópia de segurança.",
      "Não exclua a cópia antes de conferir o catálogo restaurado e as buscas."
-    ]
+    ],
+    "outdated": true
    }
   },
   "db-tables": {
@@ -17913,7 +17918,13 @@
    "manual": 111,
    "manual_total": 111,
    "manual_outdated": [
-    "install"
+    "sec-dashboard",
+    "install",
+    "backup-manual",
+    "restore",
+    "sec-backup",
+    "backup-compression",
+    "backup-safety"
    ],
    "strings": 372,
    "strings_total": 380
