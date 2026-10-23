@@ -9,8 +9,11 @@ The English manual is delivered in batches of up to three chapters for review:
 1. [Installation on Windows, Debian and Ubuntu](01-installation.md).
 2. [Getting started and using the panel](02-panel.md).
 3. [Backup and restore](03-backup-restore.md).
+4. [Magic Import](04-magic-import.md).
+5. [Enrichment and Z39.50/SRU](05-enrichment.md).
+6. [OPAC and staff appearance](06-appearance.md).
 
-The next batches cover Magic Import, enrichment, appearance, local AI, administration and troubleshooting.
+The final batch covers local AI, administration and troubleshooting.
 
 Action names follow the English labels in the panel's source. The language of your installation may differ. Do not use the option numbers from an old menu to locate actions in the current panel.
 
@@ -25,3 +28,6 @@ Action names follow the English labels in the panel's source. The language of yo
 - **To confirm:** public availability and address of the Microsoft Store listing. Packaging support does not establish that a listing is available.
 - **To confirm:** the official RAM minimum for Debian/Ubuntu outside Windows. The installation guide recommends 4 GB for a dedicated server, with 8 GB recommended, but the current Linux preflight does not enforce that numerical threshold.
 - **To confirm:** end-to-end operation of the MSIX on Windows ARM64. The generated manifest declares x64; this manual does not promise ARM64 compatibility for that package.
+
+- **To confirm:** compatibility of specific export layouts without a sample and review of the result.
+- **To confirm:** availability and access conditions of external sources on the library network.
