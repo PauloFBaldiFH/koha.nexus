@@ -318,8 +318,8 @@ class Z3950View(SectionView):
             table.move_cursor(row=min(row, table.row_count - 1))
         hidden = len(self.targets) - len(shown)
         if not self.history.tested and not self.show_hidden:
-            text = t("Press Show servers to test the ${n} servers of the list and show the ones that work.",
-                     n=len(self.targets))
+            text = t("Not tested yet: press the blue Show servers button to test the ${n} servers of the list "
+                     "(a few minutes) and list the ones that work.", n=len(self.targets))
             if shown:
                 text += " " + t("Ticked for the search: ${n}.", n=len(shown))
         else:
@@ -329,7 +329,10 @@ class Z3950View(SectionView):
                      when=_when(self.history.tested))
             if hidden:
                 text += " · " + t("${n} hidden (no record, backup not needed, or hidden by hand)", n=hidden)
-        self.query_one("#z-summary", Label).update(text)
+        summary = self.query_one("#z-summary", Label)
+        summary.update(text)
+        # Never tested: the way to the list stands out.
+        summary.set_class(not self.history.tested and not self.show_hidden, "-todo")
         self.query_one("#z-hidden", Button).label = t("Only working") if self.show_hidden else t("Show all")
         self.query_one("#z-scan", Button).label = t("Update") if self.history.tested else t("Show servers")
         self.draw_limit()
@@ -510,11 +513,15 @@ class Z3950View(SectionView):
         main, backups = z3950.test_phases(targets)
         # A backup's main server that is not tested now keeps its last result.
         last = {tg.key: self.history.works(tg.key) for tg in self.targets}
+        # Every answer as it comes: a test cancelled or broken halfway still
+        # shows what it found.
+        got: list[z3950.ScanResult] = []
 
         async def job(reporter: Reporter) -> list[z3950.ScanResult]:
             done, total = [0], [len(main)]
 
             def each(tg: z3950.Target, res: z3950.ScanResult) -> None:
+                got.append(res)
                 done[0] += 1
                 reporter.progress(done[0], total[0])
                 reporter.status(f"{tg.name}: {t(z3950.STATUS_TEXT[res.status])}")
@@ -536,11 +543,23 @@ class Z3950View(SectionView):
             return results
 
         run_with_loader(self.app, t("Testing Z39.50/SRU servers"), job,
-                        on_done=lambda result: self._scanned(result, whole))
+                        on_done=lambda result: self._scanned(result, whole, got))
 
-    def _scanned(self, result: TaskResult, whole: bool = False) -> None:
+    def _scanned(self, result: TaskResult, whole: bool = False,
+                 got: list[z3950.ScanResult] | None = None) -> None:
         if not result.ok:
             self.app.task_failed(t("Testing Z39.50/SRU servers"), result)
+            if got:
+                # The servers that answered before the stop are kept and listed.
+                for res in got:
+                    self.history.record(res)
+                if whole:
+                    self.history.mark_tested()
+                self.history.save()
+                self.draw()
+                self.app.notify(t("Test stopped after ${n} servers: the list shows the ones that already returned "
+                                  "a record. Press Update to test them all again.", n=len(got)),
+                                severity="warning", timeout=12)
             return
         for res in result.value:
             self.history.record(res)
@@ -554,7 +573,10 @@ class Z3950View(SectionView):
         msg = t("${ok} of ${n} servers returned a valid MARC record.", ok=len(working), n=len(ranked))
         if best:
             msg += " " + t("Fastest: ${name} (${ms} ms).", name=best.name, ms=working[0].query_ms)
-        self.app.notify(msg, severity="information" if working else "warning", timeout=8)
+        if not working:
+            msg += " " + t("This computer may have no way out to the servers' ports (210, 2100, 2210 and others): "
+                           "check its internet connection and firewall, then press Update.")
+        self.app.notify(msg, severity="information" if working else "warning", timeout=15 if not working else 8)
 
     # ------------------------------------------------------------------
     # Into Koha
