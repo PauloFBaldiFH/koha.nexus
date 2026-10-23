@@ -26,7 +26,7 @@ import {
 import { audit, cfApi, provisioner } from "./db";
 import type { Env, JobRow, ProvisionMessage } from "./env";
 import { now } from "./env";
-import { HttpError, errorResponse, json } from "./http";
+import { HttpError, errorResponse, json, readBodyLimited } from "./http";
 import { MAX_ATTEMPTS, reconcile } from "./provision-steps";
 import type { StepOutcome } from "./provisioner";
 import { staffGate, staffSlugFromHost } from "./staff-auth";
@@ -91,10 +91,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (!m) continue;
     pathMatched = true;
     if (r.method !== request.method && !(r.method === "GET" && request.method === "HEAD")) continue;
-    const len = Number(request.headers.get("Content-Length") ?? "0");
-    if (len > MAX_REQUEST_BYTES) throw new HttpError(413, "request body too large");
-    const body = await request.arrayBuffer();
-    if (body.byteLength > MAX_REQUEST_BYTES) throw new HttpError(413, "request body too large");
+    const body = await readBodyLimited(request, MAX_REQUEST_BYTES);
     return r.handler(request, env, body, m.slice(1), url);
   }
   if (pathMatched) throw new HttpError(405, "method not allowed");
