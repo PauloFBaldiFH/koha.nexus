@@ -24,8 +24,8 @@ PLACEHOLDER = re.compile(r'\$\{[^{}]+\}|\{(?:\d+|[A-Za-z_]\w*)(?:![rsa])?(?::[^{
 
 
 def languages():
-    """Folder names follow the existing dictionary codes, not legacy query aliases."""
-    return [{**lang, 'folder': '' if lang['dict'] == 'en' else lang['dict'],
+    """Translated pages live under languages/ using the existing dictionary codes."""
+    return [{**lang, 'folder': '' if lang['dict'] == 'en' else posixpath.join('languages', lang['dict']),
              'html': {'pt': 'pt-BR', 'zh': 'zh-Hans'}.get(lang['dict'], lang['dict'])}
             for lang in panel_languages()]
 

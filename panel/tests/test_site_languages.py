@@ -46,7 +46,11 @@ def test_languages_come_from_existing_panel_dictionaries():
     assert {l['dict'] for l in langs} == {'en'} | {p.stem for p in (REPO / 'lang').glob('*.cache')}
     assert len(langs) == 23
     assert langs[0]['dict'] == 'en' and langs[0]['folder'] == ''
-    assert next(l for l in langs if l['dict'] == 'pt')['folder'] == 'pt'
+    assert next(l for l in langs if l['dict'] == 'pt')['folder'] == 'languages/pt'
+    for lang in langs:
+        if lang['dict'] != 'en':
+            assert lang['folder'] == 'languages/' + lang['dict']
+            assert not (REPO / lang['dict']).exists(), 'obsolete root language directory'
 
 
 @pytest.mark.parametrize('kind', ['home', 'preview'])
