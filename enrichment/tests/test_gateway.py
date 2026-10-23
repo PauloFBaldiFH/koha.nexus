@@ -5,6 +5,7 @@ Koha SQL."""
 import asyncio
 import json
 import shutil
+import socket
 import threading
 import time
 import urllib.request
@@ -344,6 +345,15 @@ def test_http_post_form(http):
     with urllib.request.urlopen(req, timeout=5) as resp:
         root = ET.fromstring(resp.read())
     assert root.find(f"{ZS}numberOfRecords").text == "1"
+
+
+def test_http_post_bad_length_is_refused(http):
+    host, port = http.rsplit("/", 1)[1].split(":")
+    for bad in ("-1", "abc"):
+        with socket.create_connection((host, int(port)), timeout=5) as s:
+            s.sendall(f"POST /sru/unb HTTP/1.1\r\nHost: x\r\nContent-Length: {bad}\r\n\r\nquery=vidas".encode())
+            got = s.recv(64)
+            assert got.split(b" ")[1] == b"400", (bad, got)
 
 
 # ----------------------------------------------------------------------
