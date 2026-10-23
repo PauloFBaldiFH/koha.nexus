@@ -21,10 +21,15 @@ Este índice acompanha o manual completo de nove capítulos. Os textos descrevem
 - [Bahasa Indonesia](id/README.md).
 - [العربية](ar/README.md).
 - [فارسی](fa/README.md).
+- [हिन्दी](hi/README.md).
+- [বাংলা](bn/README.md).
+- [Tiếng Việt](vi/README.md).
+- [中文（简体）](zh/README.md).
+- [日本語](ja/README.md).
 
 ## Cobertura conferida no código
 
-A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. O terceiro lote acrescenta turco, tagalo, indonésio, árabe e persa. Com os idiomas anteriores, são **17 manuais com nove capítulos**; restam 6 idiomas dessa lista.
+A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. O quarto lote acrescenta hindi, bengali, vietnamita, chinês simplificado e japonês. Com os idiomas anteriores, são **22 manuais com nove capítulos**; resta somente coreano dessa lista.
 
 | Código do painel | Idioma | Capítulos disponíveis |
 | --- | --- | --- |
@@ -45,11 +50,11 @@ A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 out
 | `id` | Bahasa Indonesia | 9/9 |
 | `ar` | العربية | 9/9 |
 | `fa` | فارسی | 9/9 |
-| `hi` | Hindi | Pendente |
-| `bn` | Bangla (Bengali) | Pendente |
-| `vi` | Tiếng Việt | Pendente |
-| `zh` | 中文 (简体) | Pendente |
-| `ja` | 日本語 | Pendente |
+| `hi` | Hindi | 9/9 |
+| `bn` | Bangla (Bengali) | 9/9 |
+| `vi` | Tiếng Việt | 9/9 |
+| `zh` | 中文 (简体) | 9/9 |
+| `ja` | 日本語 | 9/9 |
 | `ko` | 한국어 | Pendente |
 
 ## Escopo da tradução
