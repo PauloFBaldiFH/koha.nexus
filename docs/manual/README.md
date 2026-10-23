@@ -16,10 +16,15 @@ Este índice acompanha o manual completo de nove capítulos. Os textos descrevem
 - [Čeština](cs/README.md).
 - [Русский](ru/README.md).
 - [Українська](uk/README.md).
+- [Türkçe](tr/README.md).
+- [Tagalog (Filipino)](tl/README.md).
+- [Bahasa Indonesia](id/README.md).
+- [العربية](ar/README.md).
+- [فارسی](fa/README.md).
 
 ## Cobertura conferida no código
 
-A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. O segundo lote acrescenta sueco, polonês, tcheco, russo e ucraniano. Com os idiomas anteriores, são **12 manuais com nove capítulos**; restam 11 idiomas dessa lista.
+A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 outros idiomas**. O terceiro lote acrescenta turco, tagalo, indonésio, árabe e persa. Com os idiomas anteriores, são **17 manuais com nove capítulos**; restam 6 idiomas dessa lista.
 
 | Código do painel | Idioma | Capítulos disponíveis |
 | --- | --- | --- |
@@ -35,11 +40,11 @@ A lista `PANEL_LANG_ITEMS` do instalador contém **23 opções: inglês e 22 out
 | `cs` | Čeština | 9/9 |
 | `ru` | Русский | 9/9 |
 | `uk` | Українська | 9/9 |
-| `tr` | Türkçe | Pendente |
-| `tl` | Tagalog (Filipino) | Pendente |
-| `id` | Bahasa Indonesia | Pendente |
-| `ar` | العربية | Pendente |
-| `fa` | فارسی | Pendente |
+| `tr` | Türkçe | 9/9 |
+| `tl` | Tagalog (Filipino) | 9/9 |
+| `id` | Bahasa Indonesia | 9/9 |
+| `ar` | العربية | 9/9 |
+| `fa` | فارسی | 9/9 |
 | `hi` | Hindi | Pendente |
 | `bn` | Bangla (Bengali) | Pendente |
 | `vi` | Tiếng Việt | Pendente |
