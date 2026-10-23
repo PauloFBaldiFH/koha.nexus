@@ -308,29 +308,6 @@ def test_download_latest_saves_in_downloads(tmp_path, monkeypatch):
     assert any("koha_daily.sql.gz" in n for n in notes)
 
 
-def test_download_over_ssh_shows_the_scp_command(tmp_path, monkeypatch):
-    from kei_panel.routines import backup
-    src = tmp_path / "koha_daily.sql.gz"
-    src.write_bytes(b"y")
-
-    async def facts(_app):
-        return {"newest": str(src), "real_user": "ana", "server_ip": "192.0.2.10"}
-
-    monkeypatch.setattr(backup, "facts", facts)
-    monkeypatch.setattr(transfer, "where", lambda: "ssh")
-
-    async def main():
-        a = app()
-        async with a.run_test(size=(120, 40)) as pilot:
-            a.run_native("backup-download")
-            for _ in range(40):
-                await pilot.pause(0.1)
-                if isinstance(a.screen, MessageScreen):
-                    break
-            return a.screen._command
-    assert asyncio.run(main()) == f"scp ana@192.0.2.10:{src} Downloads/"
-
-
 def test_compressed_backups_are_backup_names(tmp_path):
     for name in ("k.sql", "k.sql.gz", "k.sql.bz2", "k.sql.xz", "k.sql.zst"):
         assert transfer.is_backup_name(name)

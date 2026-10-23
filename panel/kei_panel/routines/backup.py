@@ -9,7 +9,8 @@
                  that copies the .tar.gz to the Downloads folder
   test_backup    which backup (newest, or another file) -> trial import ->
                  tables, records, patrons
-  restore        how to send a file + file picker (a file can be dropped on
+  restore        over SSH: from the browser (webtransfer) or a file here;
+                 how to send a file + file picker (a file can be dropped on
                  it) -> a file on the Windows disk is copied in first ->
                  file check -> the questions about a suspicious file ->
                  REPLACE confirmation -> the restore (cannot be cancelled
@@ -18,7 +19,8 @@
                  the newest backup copied to the Downloads folder of this
                  PC (WSL: Windows; a Linux desktop), with size, speed and
                  time left, then shown selected in Explorer (WSL) or its
-                 folder opened (desktop); over SSH, the scp command instead
+                 folder opened (desktop); over SSH, a page the browser of
+                 the person's computer saves it from (webtransfer)
   cloud_backup   Google Drive with a token from another PC, or authorized on
                  this server (both untouched); or another service step by
                  step (cloud_provider): OneDrive with a sign-in link to copy
@@ -42,6 +44,7 @@ from ..screens.files import PathPickerScreen
 from ..screens.loading import LoadingScreen
 from ..screens.oauth import OAuthScreen
 from ..screens.save_backup import SaveBackupScreen
+from ..screens.web_transfer import WebTransferScreen, browser_server
 from .common import facts, failed, last_message, run_task, show_failure, tx
 
 DOWNLOAD_LABEL = "📥 Download latest backup"
@@ -98,9 +101,9 @@ async def marc_backup(app) -> None:
     if out.get("cloud") == "yes":
         details.append((t("Cloud"), t("sent")))
     steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
-    # On WSL or a Linux desktop the Downloads folder is reachable from here:
-    # one button copies the package there, no scp needed.
-    here = transfer.where() in ("wsl", "desktop")
+    # On WSL or a Linux desktop one button copies the package to Downloads;
+    # over SSH the same button offers it through the browser. No scp needed.
+    here = transfer.where() in ("wsl", "desktop", "ssh", "server")
     choice = await app.push_screen_wait(MessageScreen(
         t("MARC21 RECORDS EXPORTED"), "", details=details, command=out.get("scp"),
         command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
@@ -173,6 +176,20 @@ def transfer_help(info) -> str:
 async def restore(app, file: str | None = None) -> None:
     info = await facts(app)
     title = t("📥  Restore database")
+    if not file and transfer.where() in ("ssh", "server"):
+        # The person's computer is elsewhere: the file can come through
+        # their browser (webtransfer), or be one already on this server.
+        choice = await app.push_screen_wait(ChoiceScreen(title, t(
+            "This panel runs on another computer (SSH). Where is the backup?"), [
+            ("browser", t("🌐 On my computer: send it through the browser")),
+            ("server", t("🗄  Already on this server: choose the file"))]))
+        if choice is None:
+            return
+        if choice == "browser":
+            received = await receive_from_browser(app, info, title)
+            if received is None:
+                return
+            file = str(received)
     if not file:
         picked = await app.push_screen_wait(PathPickerScreen(
             title, info.get("real_home", "/root"), mode="file", shortcuts=_places(info),
@@ -195,6 +212,13 @@ async def restore(app, file: str | None = None) -> None:
     finally:
         if staged is not None:
             staged.unlink(missing_ok=True)
+
+
+async def receive_from_browser(app, info, title: str) -> Path | None:
+    """A backup sent from the person's computer through the browser, checked
+    (size and SHA-256); None when the screen was closed first."""
+    return await app.push_screen_wait(WebTransferScreen(
+        title, browser_server(info, "upload"), user=info.get("real_user", "root")))
 
 
 async def _copy_in(app, title: str, src: Path, backups: Path) -> Path | None:
@@ -291,8 +315,13 @@ async def download_file(app, src: Path, title: str, info: dict | None = None) ->
     saved = result.value
     if saved is None:
         # SSH or a server without a desktop: the Downloads folder is on
-        # another computer, which fetches the file itself.
+        # another computer, which fetches the file through its browser
+        # (webtransfer). The scp command is left for a WSL or a desktop
+        # whose Downloads folder was not found.
         user, ip = info.get("real_user", "root"), info.get("server_ip")
+        if place in ("ssh", "server"):
+            await app.push_screen_wait(WebTransferScreen(title, browser_server(info, "download", src), user=user))
+            return
         await app.push_screen_wait(MessageScreen(
             title, t("This panel runs on another computer (SSH): download the backup with the command below, "
                      "on your computer."),

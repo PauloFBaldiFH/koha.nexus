@@ -78,7 +78,9 @@ Sources: [screens/save_backup.py](../../../panel/kei_panel/screens/save_backup.p
 
 ## 3.5 Download the newest backup
 
-Open **Download latest backup**. Under WSL or on a Linux desktop, the flow tries to copy the file to the corresponding computer's Downloads folder. Over SSH, if that folder is not accessible to the server, the screen provides a command to run on your own computer.
+Open **Download latest backup**. Under WSL or on a Linux desktop, the flow tries to copy the file to the corresponding computer's Downloads folder. Over SSH (a VPS or remote server) the panel opens a temporary HTTPS page on the server, port 8765: open the address it shows in your own computer's browser and the backup is saved in your Downloads folder. The browser warns about the certificate, which the server creates for that transfer only; the panel shows its fingerprint. If the provider's firewall keeps the port closed, use the `ssh -L` command shown on the same screen. The page stops when the screen is closed.
+
+To restore over SSH, choose **On my computer: send it through the browser** (or drop the file on the terminal): the file is sent through the same kind of page, checked by size and SHA-256, saved in `~/backups/received` and only then restored.
 
 This action downloads an existing file; it does not generate a new backup. If no file is found, the panel reports that. Generate a manual backup when you need a current copy before an operation.
 
