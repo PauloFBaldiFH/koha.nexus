@@ -2,13 +2,16 @@
 
 Este manual explica como operar o instalador e o painel do Koha.Nexus. Os procedimentos foram conferidos no código do repositório, na revisão `c9d9fa5`. Ele não substitui o manual do próprio Koha para catalogação, circulação e administração bibliotecária.
 
-Este primeiro lote reúne três seções para revisão:
+O manual é entregue em lotes de até três seções para revisão:
 
 1. [Instalação no Windows, Debian e Ubuntu](01-instalacao.md).
 2. [Primeiros passos e uso do painel](02-painel.md).
 3. [Backup e restauração](03-backup-restauracao.md).
+4. [Importação mágica](04-importacao-magica.md).
+5. [Enriquecimento e Z39.50/SRU](05-enriquecimento.md).
+6. [Aparência do OPAC e da equipe](06-aparencia.md).
 
-As seções de importação mágica, enriquecimento, aparência, IA local, administração e solução de problemas serão entregues nos próximos lotes. A versão em inglês será preparada depois da aprovação do texto em português.
+As seções de IA local, administração e solução de problemas serão entregues no próximo lote. A versão em inglês será preparada depois da aprovação do texto em português.
 
 Os nomes das ações abaixo seguem o português brasileiro dos dicionários do painel. Algumas mensagens podem aparecer em inglês conforme a versão instalada e a cobertura das traduções. Não use os números de opção de um menu antigo como referência para localizar ações no painel atual.
 
