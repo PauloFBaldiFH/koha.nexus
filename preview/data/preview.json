@@ -13618,22 +13618,25 @@
   },
   "sec-ai": {
    "en": {
-    "summary": "Both AI tools on one screen: AI cataloguing (MARC Replace drafts a MARC record from photos of a book) and the AI assistant on the staff home page, sharing one provider, each with its own model.",
+    "summary": "Configures the provider and two AI tools, with Ollama management on the server. Photo cataloguing and the staff assistant serve different purposes.",
     "overview": [
-     "The AI screen (key **a**) is where you choose the provider (local Ollama, Google Gemini, OpenAI, Anthropic Claude or an OpenAI-compatible server such as LM Studio), type its key, test it, load the list of models and pick one model for cataloguing (it must read images) and one for the chat.",
-     "A separate box manages **Ollama on this server**: it can be checked, installed and fed with models even when the assistant uses a cloud provider. The last box shows the state of the two tools and opens them.",
-     "No key ships with the panel, and keys are never shown again once saved: only their last four characters."
+     "For local use, check Ollama, download an option from the list, select Local Ollama as provider, test and save. Reading photos requires vision capability.",
+     "Local AI can consume substantial CPU and RAM and slow Koha down. Installed on disk differs from loaded into memory; Free memory unloads without deleting downloads.",
+     "Provider configuration does not automatically install the tools. Use the screen buttons and cards to install or open each tool."
     ],
     "steps": [
-     "Choose the provider and type its key (local providers need none).",
-     "Press **Test connection**, then **Load models**.",
-     "Pick a model and press **Use for cataloguing** and/or **Use for chat**.",
-     "Press **Save**.",
-     "Install the tools from the cards: **Replace a MARC record** and **AI assistant on the staff home page**."
+     "Open AI with a and check Ollama status.",
+     "Install and download through the screen according to server resources.",
+     "Select chat and vision options, test the connection and save.",
+     "Install or open the required tool and review every proposal before writing."
     ],
     "tips": [
      "To keep patron data inside the library, use a local provider (Ollama or LM Studio).",
      "Give the chat a light, cheap model and the cataloguing a vision model: they have different needs."
+    ],
+    "warnings": [
+     "No response time is guaranteed for every hardware configuration.",
+     "Remote providers receive request data. Check the saved provider and URL before using library data."
     ],
     "related": [
      "ai-provider",
@@ -13663,7 +13666,8 @@
     "warnings": [
      "Não há tempo de resposta garantido para todo hardware.",
      "Um provedor remoto recebe os dados enviados para a solicitação. Confira o provedor e a URL salvos antes de usar dados da biblioteca."
-    ]
+    ],
+    "outdated": true
    }
   },
   "sec-z3950": {
@@ -14514,9 +14518,9 @@
      "Apache writes the errors of each site in its own log: `intranet-error.log` for the staff interface and `opac-error.log` for the public catalogue. Following the log while you repeat the action that fails shows the exact error Koha raised."
     ],
     "steps": [
-     "Choose the staff (intranet-error.log) or the OPAC (opac-error.log) log.",
-     "Reproduce the problem in the browser and watch the lines that appear.",
-     "Press CTRL+C to stop and go back."
+     "Open Real-time Apache log auditing under Diagnostics & maintenance center.",
+     "Choose staff/intranet or OPAC.",
+     "In Textual, use Pause or p to suspend display updates and Back or Esc to leave. The classic panel uses Ctrl+C for its monitoring flow."
     ],
     "tips": [
      "Note the time of the error: it helps to find the same moment in Koha's own logs (`plack-error.log`)."
@@ -14538,7 +14542,8 @@
     ],
     "tips": [
      "Anote a hora do erro: ajuda a achar o mesmo momento nos logs do próprio Koha (`plack-error.log`)."
-    ]
+    ],
+    "outdated": true
    }
   },
   "db-maintenance": {
@@ -16520,7 +16525,7 @@
   "ai-ollama": {
    "en": {
     "title": "Ollama on this server",
-    "summary": "Runs AI models on the library's own server with Ollama: no key, no cost per request and nothing leaves the machine.",
+    "summary": "Manages local processing through Ollama: checks, installation, downloads and memory release.",
     "steps": [
      "Press **Check Ollama**; if it is not answering, press **Install Ollama**.",
      "Choose a preset in **Model** and press **Download**.",
@@ -16528,25 +16533,24 @@
     ],
     "options": [
      {
-      "name": "Check Ollama",
-      "text": "Asks the local Ollama (`http://127.0.0.1:11434`) whether it runs and which models it has."
+      "name": "Check and install",
+      "text": "Check Ollama responsiveness. If necessary, use Install Ollama and wait for the result."
      },
      {
-      "name": "Install Ollama",
-      "text": "Installs Ollama on the server when it is missing."
+      "name": "Model and Download",
+      "text": "Choose from the on-screen list and download. Photo cataloguing needs vision capability; chat can use text-only processing."
      },
      {
-      "name": "Model presets",
-      "text": "`llama3.2:1b`, `qwen2.5:1.5b` and `llama3.2:3b` for fast chat on a CPU; `qwen2.5:3b` balanced and multipurpose; `qwen2.5vl:7b` for vision and cataloguing (high CPU, slow on ARM)."
+      "name": "Use for chat / Use for cataloguing",
+      "text": "Fills the corresponding fields. Check Local Ollama as provider, test and save."
      },
      {
-      "name": "Download / Use for chat / Use for cataloguing",
-      "text": "Downloads the chosen model into Ollama and sets it for a tool. A text-only model cannot be used for cataloguing, which needs a vision model."
+      "name": "Free memory",
+      "text": "Unloads models from RAM without deleting downloads. They can load again when requested."
      }
     ],
     "tips": [
-     "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU.",
-     "Check the free disk before downloading: models take from about 1 GB to several GB each."
+     "CPU, RAM and disk must suit the local choice; Koha minimum requirements do not guarantee AI performance."
     ],
     "warnings": [
      "Local AI models and tools are heavy: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on the server's hardware. The AI screen says so at the top."
@@ -16588,7 +16592,8 @@
     ],
     "warnings": [
      "Modelos e ferramentas de IA locais são pesados: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware do servidor. A tela de IA avisa isso no topo."
-    ]
+    ],
+    "outdated": true
    }
   },
   "ai-tools": {
@@ -17926,9 +17931,12 @@
     "restore",
     "sec-backup",
     "magic-import",
+    "sec-ai",
     "sec-opac",
+    "apache-log",
     "backup-compression",
-    "backup-safety"
+    "backup-safety",
+    "ai-ollama"
    ],
    "strings": 372,
    "strings_total": 380
