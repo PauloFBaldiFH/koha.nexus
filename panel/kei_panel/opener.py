@@ -9,7 +9,8 @@ panel, and as root it would start a desktop browser as root. Instead:
             default browser (wslview only where no explorer.exe is found)
   Windows   os.startfile (the panel run by a Windows Python)
   desktop   xdg-open as the person who ran sudo, when a display is there
-  SSH       nothing here: the browser is on the other computer
+  SSH       nothing here: the browser is on the other computer (also
+            under sudo, which drops SSH_CONNECTION: an sshd above the panel)
 Anything that cannot open a browser returns False and the caller copies the
 address instead (OSC 52 lands on the person's own clipboard, also over SSH).
 
@@ -38,8 +39,33 @@ _BINFMT = Path("/proc/sys/fs/binfmt_misc")
 _INTEROP_RULE = ":WSLInterop:M::MZ::/init:PF"
 
 
-def over_ssh() -> bool:
-    return bool(os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"))
+def over_ssh(environ: dict[str, str] | None = None, proc: Path = Path("/proc")) -> bool:
+    """Whether the panel runs in an SSH session. sudo without -E (and su)
+    drop SSH_CONNECTION and SSH_TTY, so the processes above the panel are
+    looked at too: an sshd among them is an SSH session."""
+    environ = os.environ if environ is None else environ
+    if environ.get("SSH_CONNECTION") or environ.get("SSH_TTY"):
+        return True
+    return _sshd_above(os.getpid(), proc)
+
+
+def _sshd_above(pid: int, proc: Path = Path("/proc")) -> bool:
+    for _ in range(64):
+        if pid <= 1:
+            return False
+        try:
+            stat = (proc / str(pid) / "stat").read_text()
+        except OSError:
+            return False
+        # pid (comm) state ppid ...: comm may hold blanks and parentheses.
+        comm = stat[stat.find("(") + 1:stat.rfind(")")]
+        if comm.startswith("sshd"):
+            return True
+        try:
+            pid = int(stat[stat.rfind(")") + 1:].split()[1])
+        except (IndexError, ValueError):
+            return False
+    return False
 
 
 def opener_command(url: str, wsl: bool | None = None, ssh: bool | None = None,

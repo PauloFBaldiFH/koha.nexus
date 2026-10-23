@@ -18,6 +18,8 @@ app's loop, so the screen keeps answering while it runs. The copies to the
 Windows side are thread workers (copy_file, powershell.exe), which report
 to the screen through call_from_thread. The Windows buttons exist only
 under WSL2 (save_backup.is_wsl); elsewhere they are not shown at all.
+Over SSH "Download in the browser" offers the file on a page of this server
+(screens/web_transfer), for the browser of the person's computer.
 """
 
 from __future__ import annotations
@@ -89,6 +91,10 @@ class SaveBackupScreen(FitsScreen, ModalScreen[None]):
         self._user = info.get("real_user") or "root"
         self._host = save_backup.scp_host(info.get("server_ip"))
         self._wsl = save_backup.is_wsl()
+        # Over SSH (or a server with no desktop) the person's computer is
+        # elsewhere: its browser fetches the file (screens/web_transfer).
+        self._browser = not self._wsl and transfer.where() in ("ssh", "server")
+        self._info = info
         self._file: Path | None = None
         self._scp = ""
         self._busy = False      # saving, or copying to Windows: nothing closes the screen
@@ -123,6 +129,8 @@ class SaveBackupScreen(FitsScreen, ModalScreen[None]):
                 if self._wsl:
                     yield Button(t("📥 Save to Windows Downloads"), id="win-downloads", variant="success")
                     yield Button(t("📁 Choose folder in Windows"), id="win-pick")
+                if self._browser:
+                    yield Button(t("🌐 Download in the browser"), id="web-download", variant="success")
                 yield Button(t("Finish and exit"), id="done", variant="primary")
 
     def on_mount(self) -> None:
@@ -250,6 +258,14 @@ class SaveBackupScreen(FitsScreen, ModalScreen[None]):
         self.app.notify(text, severity=severity, timeout=8)
 
     # --- the end ----------------------------------------------------------
+    @on(Button.Pressed, "#web-download")
+    def _web_download(self) -> None:
+        from .web_transfer import WebTransferScreen, browser_server
+        if self._file is None or not self._file.is_file():
+            return
+        self.app.push_screen(WebTransferScreen(t("Save database backup"), browser_server(
+            self._info, "download", self._file), user=self._user))
+
     @on(Button.Pressed, "#copy-scp")
     def _copy_scp(self) -> None:
         self.app.copy_to_clipboard(self._scp)

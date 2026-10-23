@@ -80,7 +80,9 @@ Fontes: [screens/save_backup.py](../../../panel/kei_panel/screens/save_backup.py
 
 ## 3.5 Baixar o backup mais recente
 
-Abra **Baixar Backup Recente**. Em WSL ou em desktop Linux, o fluxo tenta copiar o arquivo para a pasta Downloads do computador correspondente. Por SSH, quando essa pasta não é acessível ao servidor, a tela mostra o comando para executar no seu computador.
+Abra **Baixar Backup Recente**. Em WSL ou em desktop Linux, o fluxo tenta copiar o arquivo para a pasta Downloads do computador correspondente. Por SSH (VPS ou servidor remoto), o painel abre uma página HTTPS temporária no servidor, na porta 8765: abra o endereço mostrado no navegador do seu computador e o backup é salvo na sua pasta Downloads. O navegador avisa sobre o certificado, que o servidor cria só para essa transferência; o painel mostra a impressão digital dele. Se o firewall do provedor mantiver a porta fechada, use o comando `ssh -L` mostrado na mesma tela. A página para quando a tela é fechada.
+
+Para restaurar por SSH, escolha **No meu computador: enviar pelo navegador** (ou solte o arquivo no terminal): o arquivo vai pelo mesmo tipo de página, é conferido por tamanho e SHA-256, salvo em `~/backups/received` e só então restaurado.
 
 Essa ação baixa um arquivo existente; ela não gera um backup novo. Se não houver arquivo encontrado, o painel avisa. Gere um backup manual quando precisar de uma cópia atual antes de uma operação.
 

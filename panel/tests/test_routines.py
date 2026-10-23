@@ -89,7 +89,9 @@ def test_manual_backup_flow(tmp_path):
     assert (tmp_path / "backups").is_dir()
 
 
-def test_restore_flow_asks_before_replacing(tmp_path):
+def test_restore_flow_asks_before_replacing(tmp_path, monkeypatch):
+    # A Linux desktop: no "where is the file?" question (SSH: test_webtransfer).
+    monkeypatch.setattr("kei_panel.transfer.where", lambda: "desktop")
     backup = tmp_path / "koha.sql.gz"
     backup.write_bytes(b"x")
 

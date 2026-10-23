@@ -183,9 +183,12 @@ class KohaPanelApp(App):
     def drop_file(self, text: str) -> None:
         """A file dropped on the main window (its path pasted by the
         terminal): a backup (.sql, .sql.gz, .sql.bz2, .sql.xz, .sql.zst)
-        opens Restore database with it; anything else gets a message."""
+        opens Restore database with it; anything else gets a message. Over
+        SSH the path is one of the person's computer: the transfer page
+        (webtransfer) brings the file here first."""
         from . import transfer
         from .routines import backup
+        from .routines.common import facts
         from .screens.files import path_kind
         path = transfer.dropped_path(text)
         name = Path(path).name or path
@@ -202,8 +205,17 @@ class KohaPanelApp(App):
             self.notify(t("This file cannot be read: no permission to open it."),
                         severity="error", timeout=8)
         elif transfer.where() == "ssh":
-            self.notify(t("That file is on your computer, not on this server. Open Restore database: it shows "
-                          "the command that sends it here."), severity="warning", timeout=10)
+            # The path of the person's own computer: the file itself comes
+            # through their browser, then the restore goes on with it.
+            async def receive() -> None:
+                info = await facts(self)
+                title = t("📥  Restore database")
+                received = await backup.receive_from_browser(self, info, title)
+                if received is not None:
+                    await backup.restore(self, file=str(received))
+            self.notify(t("That file is on your computer, not on this server: send it through the browser."),
+                        severity="warning", timeout=8)
+            self.run_worker(receive(), group="routine", exclusive=True, exit_on_error=False)
         else:
             self.notify(t("File not found: ${path}", path=path), severity="error", timeout=8)
 
