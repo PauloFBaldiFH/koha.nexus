@@ -42,7 +42,7 @@ Open **Z39.50 / SRU servers** from the sidebar or press **z**. Distinguish the s
 - This Koha's server lets other libraries search your catalogue. Turning it on or off also changes the corresponding firewall port opening through the panel's flow.
 - The community network configures a shared catalogue source in Koha. This differs from the direct servers queried by on-demand enrichment.
 - The health table shows failures of servers used for direct searches. **Reset** or **Reset all** permits another attempt; it does not repair the remote service.
-- Outbound catalogues support copy cataloguing. Select servers with the space bar, use **Scan**, then **Add to Koha** to register selected working servers. The scan makes a real search, not merely a connection to a port.
+- Outbound catalogues support copy cataloguing. **Show servers** tests every server with a real search (not merely a connection to a port) and lists the ones that return a record; a backup server appears only when its main server returns none. Tick the servers for the cataloguing search with the space bar (at most 20 is recommended) and use **Save to Koha**. **Update** tests again.
 
 SRU support in this configuration does not mean every enrichment search uses SRU. Do not expose the inbound server merely to query an external catalogue: these are different directions of communication.
 

@@ -715,3 +715,44 @@ def test_curated_list_has_no_raw_address():
     hosts = {t.host for t in z.load_curated()}
     assert {"sru.koha.nexus", "lx2.loc.gov"} <= hosts
     assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"200.19.73.127"}
+
+
+def test_backups_shown_only_when_their_main_server_returns_no_record(tmp_path):
+    main = z.Target("UFSC", "z.ufsc.br", 210, "Default")
+    backup = z.make_target({"name": "UFSC (gateway)", "host": "sru.koha.nexus", "port": 443, "db": "sru/ufsc",
+                                "kind": "sru", "priority": "fallback", "backup_for": [main.key]}, "curated")
+    orphan = z.make_target({"name": "Only here", "host": "sru.koha.nexus", "port": 443, "db": "sru/x",
+                                "kind": "sru", "priority": "fallback"}, "curated")
+    other = z.Target("Other", "z.other.example.org", 210, "db")
+    assert backup.backup and backup.backup_for == main.key and orphan.backup and not orphan.backup_for
+    assert not z.make_target({"host": "a.example.org", "priority": "primary"}).backup
+    assert z.test_phases([main, backup, orphan, other]) == ([main, other], [backup, orphan])
+
+    history = z.History(tmp_path / "h.json")
+    targets = [main, backup, orphan, other]
+    assert z.shown(targets, history, set()) == []                 # nothing tested yet
+    assert z.shown(targets, history, {other.key}) == [other]      # a ticked one always shows
+    for key, status in ((main.key, "ok"), (backup.key, "ok"), (orphan.key, "ok"), (other.key, "empty")):
+        history.record(z.ScanResult(key, status))
+    assert z.shown(targets, history, set()) == [main, orphan]
+    history.record(z.ScanResult(main.key, "dead"))
+    assert z.backup_needed(backup, history.works)
+    assert z.shown(targets, history, set()) == [backup, orphan]
+    history.set_manual(orphan.key, True)
+    assert z.shown(targets, history, {orphan.key}) == [backup]
+
+    assert not history.tested
+    history.mark_tested()
+    history.save()
+    assert z.History(tmp_path / "h.json").tested == history.tested > 0
+
+
+def test_ticked_count_per_search_and_check_file():
+    biblio = [z.Target(f"B{i}", f"b{i}.example.org", 210, "db") for i in range(22)]
+    auth = [z.Target(f"A{i}", f"a{i}.example.org", 210, "auth", recordtype="authority") for i in range(3)]
+    everything = biblio + auth
+    assert z.most_ticked(everything, set()) == 0
+    assert z.most_ticked(everything, {t.key for t in auth} | {biblio[0].key}) == 3
+    assert z.most_ticked(everything, {t.key for t in everything}) == 22 > z.SEARCH_LIMIT
+    text = z.check_file_text([(biblio[0], True), (auth[0], False)])
+    assert text == "b0.example.org\t210\tdb\tbiblio\t1\na0.example.org\t210\tauth\tauthority\t0\n"

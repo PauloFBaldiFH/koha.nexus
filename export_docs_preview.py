@@ -227,8 +227,8 @@ FEATURES: tuple[Feature, ...] = (
              "servers, checked for the cataloguing searches; off takes it out."),
     ]),
     Feature("z3950-outbound", "z3950", "views/z3950.py", "Catalogues to copy records from (outbound)", [
-        button("Scan", True), button("Add to Koha"), button("Login"), button("Hide"), button("Community list"),
-        button("Import"), button("Export"), button("Show hidden"),
+        button("Show servers", True), button("Save to Koha"), button("Add server"), button("Login"),
+        button("Hide"), button("Community list"), button("Import"), button("Export"), button("Show all"),
         table(["Server", "Status", "Format", "Address"], "targets"),
     ]),
     Feature("z3950-zeus", "z3950", "data/z3950_targets.json", "Universidade Federal de Santa Catarina (UFSC)", [

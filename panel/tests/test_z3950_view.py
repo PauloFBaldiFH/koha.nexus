@@ -20,9 +20,35 @@ async def _until(pilot, cond, wait=8.0):
     assert cond()
 
 
-def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
+def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
     monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
     from kei_panel.app import KohaPanelApp
+    from kei_panel.views import z3950 as zview
+
+    curated = z3950.load_curated()
+    ufsc = next(t for t in curated if t.key == "z3950.ufsc.br:210/Default")
+    ufsc_backup = next(t for t in curated if t.db == "sru/ufsc")
+    loc = next(t for t in curated if t.key == "lx2.loc.gov:210/LCDB")
+    loc_backup = next(t for t in curated if t.db == "sru/loc")
+    utfpr = next(t for t in curated if t.db == "biblioteca")
+    catalog = next(t for t in curated if t.host == "catalog.koha.nexus")
+    assert ufsc_backup.backup and ufsc_backup.backup_for == ufsc.key and loc_backup.backup_for == loc.key
+    real_scan = zview._demo_scan
+    tested = []
+
+    async def scan_ufsc_empty(targets, each):
+        """The demo scan, but UFSC answers without a record."""
+        def mine(tg, res):
+            if tg.key == ufsc.key:
+                res.status = "empty"
+            each(tg, res)
+        tested.extend(tg.key for tg in targets)
+        out = await real_scan(targets, mine)
+        for res in out:
+            if res.key == ufsc.key:
+                res.status = "empty"
+        return out
+    monkeypatch.setattr(zview, "_demo_scan", scan_ufsc_empty)
 
     async def main():
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
@@ -32,56 +58,93 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             await pilot.pause(0.3)
             view = app.screen.query_one("#view-z3950")
             table = view.query_one("#z-table", DataTable)
-            curated = z3950.load_curated()
-            regions = {t.region for t in curated}
-            assert table.row_count == len(curated) + len(regions) and "other" not in regions
-            assert table.get_row("region:brazil")[1] == "[b]\\[2] Brazil[/b]"
-            assert table.get_row("region:sru_specialized")[1] == \
-                "[b]\\[12] SRU fallback: specialized and union catalogues[/b]"
-            utfpr = next(t for t in curated if t.db == "biblioteca")
-            assert table.get_row(utfpr.key)[1] == "BR UTFPR (Universidade Tecnológica Federal do Paraná)"
-            # Koha's own list was read: its LoC row (https://sru.koha.nexus:443) is marked.
-            loc = next(t for t in curated if t.db == "sru/loc")
-            await _until(pilot, lambda: "In Koha" in table.get_row(loc.key)[2])
+            rows = lambda: [k.value for k in table.rows if not k.value.startswith("region:")]  # noqa: E731
 
-            # The koha.nexus servers, three direct Brazilian servers and the Library of Congress come ticked; untick them before the groups.
-            ticked = {t.key for t in curated if t.preselect}
-            assert view.selected == ticked and len(ticked) == 6
-            for key in ticked:
-                view.toggle(key)
-            assert view.selected == set()
+            # Before any test: only the servers Koha searches (its checked rows), ticked.
+            await _until(pilot, lambda: view.ticks_from_koha)
+            assert view.selected == {catalog.key, loc.key}
+            assert set(rows()) == {catalog.key, loc.key}
+            assert str(view.query_one("#z-scan").label) == "Show servers"
+            assert "Press Show servers" in str(view.query_one("#z-summary").render())
+            assert "at most 20" in str(view.query_one("#z-limit").render())
+            assert "In Koha" in table.get_row(loc.key)[2]
 
-            # A group ticks all of it; space on a server unticks one.
-            view.toggle("region:sru_national")
-            group = [t for t in curated if t.region == "sru_national"]
-            assert view.selected == {t.key for t in group}
-            view.toggle(group[0].key)
-            assert len(view.selected) == len(group) - 1
-            view.toggle("region:sru_national")
-            assert len(view.selected) == len(group)
-
+            # Show servers: every server is tested, then the backups of the ones without a record.
             view.scan()
             await pilot.pause(0.1)
             assert isinstance(app.screen, LoadingScreen)
-            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen), wait=30)
+            assert str(view.query_one("#z-scan").label) == "Update"
             history = json.loads((tmp_path / z3950.HISTORY_FILE).read_text())
-            assert set(history) - {z3950.RULES_KEY} == {t.key for t in group}
-            rede = next(t for t in group if t.db == "sru/bn")
-            assert history[rede.key]["status"] == "ok"
-            assert "Working" in table.get_row(rede.key)[2] and table.get_row(rede.key)[3]
+            assert history[z3950.TESTED_KEY] > 0
+            # UFSC returned no record: its backup was tested and stands in; LoC's backup was not needed.
+            assert ufsc_backup.key in tested and loc_backup.key not in tested
+            shown = set(rows())
+            assert ufsc.key not in shown and ufsc_backup.key in shown and loc_backup.key not in shown
+            assert utfpr.key in shown and "Working" in table.get_row(utfpr.key)[2]
+            # A server that needs a login it does not have answers without a record: hidden.
+            assert not [t for t in curated if t.login and t.key in shown]
+            # "Show all" brings back everything, "Only working" the test's list.
+            view.toggle_hidden()
+            assert len(rows()) == len(curated)
+            view.toggle_hidden()
+            assert set(rows()) == shown
 
-            # Hide one by hand: gone from the list, back with "Show hidden".
-            table.move_cursor(row=table.get_row_index(rede.key))
+            # More than 20 ticked: advised against in the warning colour, never refused.
+            limit = view.query_one("#z-limit")
+            view.toggle("region:europe")
+            assert z3950.most_ticked(view.targets, view.selected) > 20 and limit.has_class("-over")
+            assert "Now " in str(limit.render())
+            view.toggle("region:europe")
+            assert not limit.has_class("-over")
+
+            # Save to Koha: add UTFPR, tick UFSC (in Koha, unticked), untick LoC.
+            view.toggle(utfpr.key)
+            view.toggle(ufsc.key)
+            view.toggle(loc.key)
+            assert ufsc.key in rows() and loc.key in rows()      # ticked or in Koha: still listed to untick
+            seen, tasks = {}, []
+            real_add, real_check = z3950.write_add_file, z3950.write_check_file
+
+            def spy_add(targets, ranks):
+                path = real_add(targets, ranks)
+                seen["add"] = path.read_text()
+                return path
+
+            def spy_check(changes):
+                path = real_check(changes)
+                seen["check"] = path.read_text()
+                return path
+            monkeypatch.setattr(z3950, "write_add_file", spy_add)
+            monkeypatch.setattr(z3950, "write_check_file", spy_check)
+            task = app.bridge.task
+
+            async def spy_task(name, *args, **kw):
+                tasks.append(name)
+                return await task(name, *args, **kw)
+            monkeypatch.setattr(app.bridge, "task", spy_task)
+            view.add()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            preview = app.screen._preview
+            assert "+ " in preview and "☑ UFSC" in preview and "☐ " in preview
+            assert "Add 1 new server(s)" in app.screen._question
+            await _press(pilot, app, "yes")
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            assert tasks[:2] == ["z3950-add", "z3950-check"]
+            assert seen["add"].startswith("z3950.utfpr.edu.br\t210\tbiblioteca\t")
+            assert sorted(seen["check"].splitlines()) == sorted(["z3950.ufsc.br\t210\tDefault\tbiblio\t1",
+                                                                  "lx2.loc.gov\t210\tLCDB\tbiblio\t0"])
+            assert "1 server(s) ticked, 1 unticked" in app.screen._body
+            await _press(pilot, app, "ok")
+
+            # Hide one by hand: gone from the list and the ticks, not tested again.
+            await _until(pilot, lambda: not isinstance(app.screen, MessageScreen))
+            table.move_cursor(row=table.get_row_index(utfpr.key))
             view.hide()
-            assert rede.key not in [k.value for k in table.rows]
-            assert rede.key not in view.selected
-            view.toggle_hidden()
-            assert "Hidden" in table.get_row(rede.key)[2]
-            view.toggle_hidden()
+            assert utfpr.key not in rows() and utfpr.key not in view.selected
 
             # A login: typed in the panel, kept privately, never shown.
-            bl = next(t for t in group if t.db == "sru/bl")
-            table.move_cursor(row=table.get_row_index(bl.key))
+            table.move_cursor(row=table.get_row_index(catalog.key))
             view.login()
             await _until(pilot, lambda: isinstance(app.screen, InputScreen))
             app.screen.query_one("#value").value = "librarian"
@@ -94,25 +157,36 @@ def test_scan_rank_hide_login_and_add(tmp_path, monkeypatch):
             assert saved.stat().st_mode & 0o777 == 0o600 and "s3cret-pw" in saved.read_text()
             assert all("s3cret-pw" not in str(c) for k in table.rows for c in table.get_row(k))
 
-            # Into Koha: the confirmation lists the servers by rank.
-            seen = {}
-            real = z3950.write_add_file
+    asyncio.run(main())
 
-            def spy(targets, ranks):
-                path = real(targets, ranks)
-                seen["path"], seen["text"] = path, path.read_text()
-                return path
-            monkeypatch.setattr(z3950, "write_add_file", spy)
-            view.add()
-            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
-            preview = app.screen._preview
-            # The gateway rows keep their fallback rank, after every direct server.
-            assert int(preview.splitlines()[0].split(".")[0]) >= 500 and "s3cret-pw" not in preview
-            await _press(pilot, app, "yes")
-            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
-            assert "added to Koha: 2" in app.screen._body
-            assert not seen["path"].exists()                     # the list with the login is gone
-            assert "librarian\ts3cret-pw" in seen["text"]
+
+def test_add_server_by_hand_is_tested_and_ticked(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("z")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-z3950")
+            view.new_server()
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen))
+            app.screen.query_one("#value").value = "not an address"
+            await _press(pilot, app, "ok")
+            assert isinstance(app.screen, InputScreen)            # refused, still asking
+            app.screen.query_one("#value").value = "z.minha.example.br:2100/acervo"
+            await _press(pilot, app, "ok")
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen) and
+                         app.screen.query_one("#value").value == "z.minha.example.br")
+            app.screen.query_one("#value").value = "Minha rede"
+            await _press(pilot, app, "ok")
+            key = "z.minha.example.br:2100/acervo"
+            await _until(pilot, lambda: view.history.get(key).get("status") == "dead")
+            # Ticked, so listed even without a record (to be unticked), and kept privately.
+            assert key in view.selected and key in [k.value for k in view.query_one("#z-table").rows]
+            assert "Minha rede" in (tmp_path / z3950.LOCAL_FILE).read_text()
 
     asyncio.run(main())
 
@@ -136,7 +210,11 @@ def test_import_and_export(tmp_path, monkeypatch):
             app.screen.query_one("#value").value = str(src)
             await _press(pilot, app, "ok")
             key = "z.consortium.example.br:2100/acervo"
-            await _until(pilot, lambda: key in [k.value for k in table.rows])
+            # Tested at once: no record (demo mode), so it is listed only with "Show all".
+            await _until(pilot, lambda: view.history.get(key).get("status") == "dead")
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
+            assert key not in [k.value for k in table.rows]
+            view.toggle_hidden()
             assert table.get_row(key)[1] == "My consortium *"
             assert "z.consortium.example.br" in (tmp_path / z3950.LOCAL_FILE).read_text()
 
