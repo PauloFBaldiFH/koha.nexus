@@ -677,11 +677,15 @@ class Z3950View(SectionView):
             result = await run_task(self.app, title, "z3950-sync", str(path))
         finally:
             path.unlink(missing_ok=True)
-        if not failed(result):
-            out = result.value
-            self.app.notify(t("Servers added: ${added} · updated: ${updated}", added=out.get("added", "0"),
-                              updated=out.get("updated", "0")), timeout=10)
-        await show_done(self.app, title, result)
+        if failed(result):
+            await show_done(self.app, title, result)
+            return
+        # No box to close before the test: Paulo found "Updated: 0" and an OK
+        # before the real work odd, so the counts go in a notice and the test
+        # starts at once.
+        out = result.value
+        self.app.notify(t("Servers added: ${added} · updated: ${updated}", added=out.get("added", "0"),
+                          updated=out.get("updated", "0")), timeout=10)
         await self._load_koha()
         self.scan()
 
