@@ -107,3 +107,50 @@ BRANCH_URL=https://raw.githubusercontent.com/Owner/repo/refs/heads/main/installe
     run run_update "$BRANCH_URL"
     [[ "$output" == *"rc=1"* ]]
 }
+
+# The handoff at the top of the installer: an older copy (Windows keeps one in
+# Debian and starts it at every launch) runs the newer config.sh instead, and
+# never copies itself over it.
+handoff_script() {
+    # $1: this copy's version; the config.sh path points into $W.
+    {
+        printf '#!/bin/bash\nPANEL_VERSION=" %s"\n' "$1"
+        printf '_SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"\n'
+        sed -n '/^# 0 when version \$1 is newer than \$2/,/^    exec bash "\$KEI_CONFIG_SH" "\$@"$/p' "$REPO/installer" \
+            | sed "s#^KEI_CONFIG_SH=.*#KEI_CONFIG_SH='$W/config.sh'#"
+        printf 'fi\necho "old copy ran: $*"\n'
+    } > "$W/old.sh"
+}
+
+@test "an older copy hands over to the newer config.sh with the same arguments" {
+    handoff_script 1.5.106
+    printf '#!/bin/bash\nPANEL_VERSION=" 1.5.107"\necho "config.sh ran: $*"\n' > "$W/config.sh"
+    chmod +x "$W/config.sh"
+    run bash "$W/old.sh" --task z3950-list
+    [ "$status" -eq 0 ]
+    [ "$output" = "config.sh ran: --task z3950-list" ]
+}
+
+@test "the same or an older config.sh does not take over" {
+    handoff_script 1.5.107
+    printf '#!/bin/bash\nPANEL_VERSION=" 1.5.107"\necho "config.sh ran"\n' > "$W/config.sh"
+    chmod +x "$W/config.sh"
+    run bash "$W/old.sh" x
+    [ "$output" = "old copy ran: x" ]
+    printf '#!/bin/bash\nPANEL_VERSION=" 1.5.99"\necho "config.sh ran"\n' > "$W/config.sh"
+    run bash "$W/old.sh" x
+    [ "$output" = "old copy ran: x" ]
+    # A newer config.sh with a syntax error is not trusted.
+    printf '#!/bin/bash\nPANEL_VERSION=" 1.6.0"\nif then\n' > "$W/config.sh"
+    run bash "$W/old.sh" x
+    [ "$output" = "old copy ran: x" ]
+}
+
+@test "kei_version_newer compares versions, not text" {
+    eval "$(sed -n '/^kei_version_newer() {/,/^}/p' "$REPO/installer")"
+    kei_version_newer 1.5.107 1.5.99
+    kei_version_newer 1.6.0 1.5.107
+    ! kei_version_newer 1.5.99 1.5.107
+    ! kei_version_newer 1.5.107 1.5.107
+    ! kei_version_newer "" 1.5.107
+}

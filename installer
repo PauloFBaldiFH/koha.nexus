@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.107"
+PANEL_VERSION=" 1.5.108"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -100,6 +100,29 @@ TRANSLATION_CONFIG="${CONFIG_DIR}/translation.conf"
 LANG_REPO_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/lang"
 _SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_PATH")" 2>/dev/null && pwd)"
+
+# 0 when version $1 is newer than $2 (1.5.107 > 1.5.99).
+kei_version_newer() {
+    [ -n "$1" ] && [ -n "$2" ] && [ "$1" != "$2" ] \
+        && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]
+}
+# The PANEL_VERSION written in the script $1.
+kei_script_version() { sed -n 's/^PANEL_VERSION="[[:space:]]*\([^"]*\)".*/\1/p' "$1" 2>/dev/null | head -n 1; }
+
+# An older copy of this script never runs over a newer config.sh: the copy
+# Windows keeps in Debian (/root/koha-easy-installer, from the app's own
+# files) is started at every launch, and it used to put its own older
+# config.sh and panel back over the ones "Update this panel" installed
+# (Paulo kept seeing 1.5.106 after the 1.5.107 update). It hands over to
+# the newer config.sh, with the same arguments, before anything else runs.
+KEI_CONFIG_SH="/usr/local/bin/config.sh"
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ] && [ -z "${KEI_NEWER_HANDOFF:-}" ] && [ -x "$KEI_CONFIG_SH" ] \
+   && [ "$(readlink -f "$_SCRIPT_PATH")" != "$(readlink -f "$KEI_CONFIG_SH")" ] \
+   && kei_version_newer "$(kei_script_version "$KEI_CONFIG_SH")" "${PANEL_VERSION# }" \
+   && bash -n "$KEI_CONFIG_SH" 2>/dev/null; then
+    export KEI_NEWER_HANDOFF=1
+    exec bash "$KEI_CONFIG_SH" "$@"
+fi
 
 # Languages offered by the panel (code used by Koha / display name).
 PANEL_LANG_ITEMS=(
@@ -4926,6 +4949,8 @@ kei_panel_src_ok() { [ -f "$1/kei_panel/__main__.py" ] && [ -f "$1/requirements.
 kei_panel_install_src() {
     local from="$1" tmp
     [ "$(readlink -f "$from")" = "$(readlink -f "$KEI_PANEL_SRC" 2>/dev/null)" ] && return 0
+    # Sources of a newer panel stay (an older copy of this script never puts its own back).
+    kei_version_newer "$(cat "$KEI_PANEL_SRC/.panel-version" 2>/dev/null)" "${PANEL_VERSION# }" && return 0
     mkdir -p "$KEI_LIB_DIR" || return 1
     tmp="${KEI_PANEL_SRC}.new"
     rm -rf "$tmp"
@@ -36797,6 +36822,7 @@ fi
 # ======================================================================
 if [ -f /usr/local/bin/config.sh ] && [ -f "$_SCRIPT_PATH" ] \
    && [ "$(readlink -f "$_SCRIPT_PATH")" != "$(readlink -f /usr/local/bin/config.sh)" ] \
+   && ! kei_version_newer "$(kei_script_version /usr/local/bin/config.sh)" "${PANEL_VERSION# }" \
    && ! cmp -s "$_SCRIPT_PATH" /usr/local/bin/config.sh; then
     install_panel_copy
     log "config.sh refreshed from $_SCRIPT_PATH"

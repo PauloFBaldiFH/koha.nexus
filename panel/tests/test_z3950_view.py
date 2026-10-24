@@ -422,3 +422,23 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             assert any("returned a valid MARC record" in n for n in notes)
 
     asyncio.run(main())
+
+
+def test_title_bar_shows_the_panel_version(tmp_path, monkeypatch):
+    """A screenshot says which version runs (Paulo's Windows copy kept an
+    older one after an update)."""
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.env import panel_version
+
+    version = panel_version(INSTALLER)
+    assert version and version[0].isdigit()
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 50)) as pilot:
+            await pilot.pause(0.2)
+            assert app.title == f"koha.nexus v{version}"
+            assert app.screen.title in (None, f"koha.nexus v{version}")
+
+    asyncio.run(main())
