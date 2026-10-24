@@ -15,6 +15,13 @@ its own id), so a harvest whose "fonte" gave another id still lands on the
 right row. "country" is the ISO 3166 code the panel shows as a flag. Only z3950 and sru targets whose status is not "broken" are
 searched live.
 
+"local_first" (1, 2, ...) marks the catalogues static.db holds nearly whole
+(UNESP, UFPR, UNIFESP, UnB, UFU: 99% of its records, Paulo 2026-10-24):
+their Koha rows come first, in that order, and are ticked; on-demand
+enrichment searches their static.db records before any server; a library's
+own row for the same institution (its host is one of "legacy_hosts" or a
+subdomain of one) moves behind them, unticked, kept (koha_sql.py).
+
 A login never goes in the file: NEXUS_GATEWAY_LOGIN_<ID>=user:password (id
 in capitals, "-" as "_") supplies one from the environment.
 """
@@ -68,6 +75,8 @@ class Target:
     password: str = ""
     status: str = "untested"
     note: str = ""
+    local_first: int = 0
+    legacy_hosts: tuple[str, ...] = ()
 
     @property
     def live(self) -> bool:
@@ -106,7 +115,13 @@ def make_target(raw: dict) -> Target:
         static=tuple(str(s).strip().lower() for s in static), user=user, password=password,
         status=str(raw.get("status") or ("missing" if kind == "missing" else "untested")).strip().lower(),
         note=str(raw.get("note", "")),
+        local_first=int(raw.get("local_first") or 0),
+        legacy_hosts=tuple(str(h).strip().lower() for h in raw.get("legacy_hosts") or ()),
     )
+    if t.local_first < 0:
+        raise TargetError(f"{tid}: local_first is a position, 1 or more")
+    if any(not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", h) for h in t.legacy_hosts):
+        raise TargetError(f"{tid}: legacy_hosts are host names (unesp.br)")
     if t.group not in GROUPS:
         raise TargetError(f"{tid}: unknown group {t.group!r}")
     if t.status not in STATUSES:
@@ -131,4 +146,17 @@ def load(path: Path) -> dict[str, Target]:
         if t.id in out or t.id == UNION:
             raise TargetError(f"{t.id}: listed twice or reserved")
         out[t.id] = t
+    firsts = [t.local_first for t in out.values() if t.local_first]
+    if len(firsts) != len(set(firsts)):
+        raise TargetError("two targets share a local_first position")
     return out
+
+
+def local_first(table: dict[str, Target]) -> list[Target]:
+    """The local-first catalogues, in their order."""
+    return sorted((t for t in table.values() if t.local_first), key=lambda t: t.local_first)
+
+
+def local_first_sources(table: dict[str, Target]) -> dict[str, str]:
+    """{static.db source id: target id} of the local-first catalogues."""
+    return {s: t.id for t in local_first(table) for s in t.static}

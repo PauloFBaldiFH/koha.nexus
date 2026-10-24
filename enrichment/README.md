@@ -126,6 +126,18 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
   the VPS's IPs) move there; it adds `sru/_union` and leaves it as the
   gateway's only ticked row. Of the authority rows only `sru/_union-aut` is
   touched.
+- The local-first catalogues (`"local_first"` in `targets.json`: `sru/unesp`,
+  `sru/ufpr`, `sru/unifesp`, `sru/unb`, `sru/ufu`, the five that hold 99% of
+  `static.db`'s records) are ticked too and ranked 1 to 5, right after
+  `sru/_union` (rank 0). A row of the library's own for one of those
+  institutions (a host in the target's `"legacy_hosts"`, or a subdomain:
+  `z3950.unifesp.br`, `unesp.alma.exlibrisgroup.com`, `*.ufpr.br`, `*.unb.br`,
+  `*.ufu.br`) is kept as the fallback: unticked, so Koha's search no longer
+  waits on it, and ranked 900. Its old rank and tick are saved once in the
+  table `koha_nexus_legacy_z3950`, so a row the librarian ticks again stays
+  ticked. To undo it, for good (later runs leave it undone):
+  `python -m nexus_gateway koha-sql --undo-local-first | sudo koha-mysql INSTANCE`;
+  `--redo-local-first` does it again.
 - Logins: `NEXUS_GATEWAY_LOGIN_<ID>=user:password` in the unit's environment
   file, never in `targets.json`. The unit is `deploy/koha-nexus-sru.service`.
 

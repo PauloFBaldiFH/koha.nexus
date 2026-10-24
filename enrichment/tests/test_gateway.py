@@ -4,6 +4,7 @@ Koha SQL."""
 
 import asyncio
 import json
+import re
 import shutil
 import socket
 import threading
@@ -24,7 +25,7 @@ from nexus_gateway.config import Settings
 from nexus_gateway.engine import Engine, Static, UnknownDatabase, live_clause, query_key
 from nexus_gateway.learned import Learned
 from nexus_gateway.server import make_server
-from nexus_gateway.targets import load, make_target
+from nexus_gateway.targets import TargetError, load, local_first, make_target
 
 ISBN = "9788535902778"
 TARGETS = Path(__file__).resolve().parents[1] / "nexus_gateway" / "targets.json"
@@ -381,6 +382,47 @@ def test_koha_sql():
     assert koha_sql.q("O'Brien") == "'O''Brien'"
 
 
+def test_koha_sql_local_first():
+    table = load(TARGETS)
+    assert [t.id for t in local_first(table)] == ["unesp", "ufpr", "unifesp", "unb", "ufu"]
+    sql = koha_sql.render(table)
+    seven = sql.split("-- 7.")[1].split("-- 8.")[0]
+    for rank, tid in enumerate(["unesp", "ufpr", "unifesp", "unb", "ufu"], 1):
+        assert f"SET checked = 1, `rank` = {rank} WHERE" in seven and f"db = 'sru/{tid}'" in seven
+    assert seven.count("NOT EXISTS (SELECT 1 FROM koha_nexus_legacy_z3950 WHERE id = 0)") == 5
+    eight = sql.split("-- 8.")[1]
+    assert eight.count("INSERT IGNORE INTO koha_nexus_legacy_z3950") == 5
+    assert "SET z.checked = 0, z.`rank` = GREATEST(IFNULL(z.`rank`, 0), 900), b.state = 'demoted'" in eight
+    # The table is created before the transaction (DDL would commit it).
+    assert sql.index("CREATE TABLE IF NOT EXISTS koha_nexus_legacy_z3950") < sql.index("START TRANSACTION")
+    undo = koha_sql.render_undo(table)
+    assert "z.`rank` = b.rank_before, z.checked = b.checked_before, b.state = 'restored'" in undo
+    assert "VALUES (0, '_off', 'off')" in undo and undo.count("SET checked = 0") == 5
+    redo = koha_sql.render_redo(table)
+    assert redo.index("DELETE FROM koha_nexus_legacy_z3950;") < redo.index("-- 7.")
+
+
+def test_legacy_hosts_match_the_institution_only():
+    unesp, unb = load(TARGETS)["unesp"], load(TARGETS)["unb"]
+    pattern = koha_sql.legacy_match(unesp)
+    assert "host REGEXP '(^|[/.])unesp[.]alma[.]exlibrisgroup[.]com([:/]|$)'" in pattern
+    res = [re.compile(r) for r in re.findall(r"REGEXP '([^']+)'", koha_sql.legacy_match(unb))]
+    hit = [h for h in ("unb.br", "bce.unb.br", "https://z3950.bce.unb.br/sru", "fundunb.br", "unb.br.example.com",
+                       "sru.koha.nexus") if any(r.search(h) for r in res)]
+    assert hit == ["unb.br", "bce.unb.br", "https://z3950.bce.unb.br/sru"]
+
+
+def test_local_first_entries_are_checked(tmp_path):
+    base = {"name": "X", "group": "br_universities", "kind": "missing"}
+    with pytest.raises(TargetError, match="legacy_hosts"):
+        make_target({**base, "id": "x", "legacy_hosts": ["not a host"]})
+    path = tmp_path / "t.json"
+    path.write_text(json.dumps({"targets": [{**base, "id": "a", "local_first": 1},
+                                            {**base, "id": "b", "local_first": 1}]}))
+    with pytest.raises(TargetError, match="local_first"):
+        load(path)
+
+
 def test_koha_sql_removes_the_retired_bridges():
     sql = koha_sql.render(load(TARGETS))
     zero = sql.split("-- 0.")[1].split("-- 1.")[0]
@@ -398,22 +440,33 @@ def test_panel_list_is_generated_from_targets_json():
     assert [(t["host"], t["db"], t["region"], t["rank"], t["preselect"]) for t in rows[:2]] == [
         ("catalog.koha.nexus", "sru", "koha_nexus", 1, True), ("sru.koha.nexus", "sru/all", "koha_nexus", 2, True)]
     assert rows[0]["name"] == "Rede koha.nexus (Catalogação Compartilhada)"
-    rows = rows[2:]
-    # Then the direct Z39.50 servers (the primary targets), straight to the libraries.
+    # Then the local-first catalogues (static.db holds them nearly whole), preselected, ranked 1 to 5.
+    assert [(t["db"], t["rank"], t["preselect"], t["priority"]) for t in rows[2:7]] == [
+        ("sru/unesp", 1, True, "primary"), ("sru/ufpr", 2, True, "primary"), ("sru/unifesp", 3, True, "primary"),
+        ("sru/unb", 4, True, "primary"), ("sru/ufu", 5, True, "primary")]
+    assert "direct Z39.50 row UNIFESP" in rows[4]["notes"] and "backup_for" not in rows[4]
+    rows = rows[7:]
+    # Then the direct Z39.50 servers (the primary targets), straight to the libraries; a local-first
+    # library's own server is its gateway row's backup.
     direct = [t for t in rows if t["source"] == koha_sql.DIRECT_SOURCE]
     direct_biblio = [t for t in direct if t.get("recordtype") != "authority"]
     assert rows[:len(direct_biblio)] == direct_biblio and len(direct) - len(direct_biblio) == 16
-    assert {t["kind"] for t in direct} == {"zed"} and all(t["priority"] == "primary" for t in direct)
+    assert {t["kind"] for t in direct} == {"zed"}
+    backups = {t["host"]: t["backup_for"] for t in direct if t["priority"] == "fallback"}
+    assert backups == {"z3950.unifesp.br": ["sru.koha.nexus:443/sru/unifesp"],
+                       "unesp.alma.exlibrisgroup.com": ["sru.koha.nexus:443/sru/unesp"]}
+    assert not any(t["preselect"] for t in direct if t["priority"] == "fallback")
     assert rows[0]["db"] == "biblioteca" and rows[0]["host"] == "z3950.utfpr.edu.br"
     # Then the authority files, then the gateway rows: the fallback, never ticked, ranked after the direct servers.
     assert [t["db"] for t in rows if t.get("recordtype") == "authority" and t["source"] != koha_sql.DIRECT_SOURCE] \
         == ["NAF", "SAF", "sru/bn-aut", "sru/_union-aut"]
-    fallback = [t for t in rows if t.get("priority") == "fallback"]
+    fallback = [t for t in rows if t.get("priority") == "fallback" and t["source"] != koha_sql.DIRECT_SOURCE]
     assert fallback[0]["db"] == "sru/_union" and rows[-len(fallback):] == fallback
+    assert not {"sru/unesp", "sru/ufpr", "sru/unifesp", "sru/unb", "sru/ufu"} & {t["db"] for t in fallback}
     assert {(t["host"], t["port"]) for t in fallback} == {("sru.koha.nexus", 443)}
     assert not any(t["preselect"] for t in fallback)
     assert [t["rank"] for t in fallback] == list(range(koha_sql.FALLBACK_RANK, koha_sql.FALLBACK_RANK + len(fallback)))
-    assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default", "Default", "LCDB"]
+    assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default", "LCDB"]
     # A gateway row a direct server covers says so; the flags come from the countries.
     utfpr = next(t for t in fallback if t["db"] == "sru/utfpr")
     assert "direct Z39.50 row UTFPR" in utfpr["notes"] and utfpr["flag"] == "🇧🇷"

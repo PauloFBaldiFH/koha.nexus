@@ -2202,28 +2202,28 @@
        "sru.koha.nexus:443/sru/all"
       ],
       [
-       "UTFPR (Universidade Tecnológica Federal do Paraná)",
+       "Universidade Estadual Paulista (UNESP)",
        "In Koha",
-       "Z39.50 · USMARC",
-       "z3950.utfpr.edu.br:210/biblioteca"
+       "SRU · MARC21",
+       "sru.koha.nexus:443/sru/unesp"
       ],
       [
-       "UFSC (Universidade Federal de Santa Catarina)",
+       "Universidade Federal do Paraná (UFPR)",
        "In Koha",
-       "Z39.50 · USMARC",
-       "z3950.ufsc.br:210/Default"
+       "SRU · MARC21",
+       "sru.koha.nexus:443/sru/ufpr"
       ],
       [
-       "UNIFESP (Universidade Federal de São Paulo)",
+       "Universidade Federal de São Paulo (UNIFESP)",
        "In Koha",
-       "Z39.50 · USMARC",
-       "z3950.unifesp.br:210/Default"
+       "SRU · MARC21",
+       "sru.koha.nexus:443/sru/unifesp"
       ],
       [
-       "UNESP (Universidade Estadual Paulista)",
-       "Not scanned yet",
-       "Z39.50 · USMARC",
-       "unesp.alma.exlibrisgroup.com:1921/55UNESP_INST"
+       "Universidade de Brasília (UnB)",
+       "In Koha",
+       "SRU · MARC21",
+       "sru.koha.nexus:443/sru/unb"
       ]
      ]
     }
@@ -9477,13 +9477,13 @@
    "ja": null,
    "ko": null
   },
-  "Not scanned yet": {
-   "en": "Not scanned yet",
-   "pt-BR": "Ainda não testado",
-   "es": "Aún sin probar",
-   "fr": "Pas encore testé",
-   "it": "Non ancora provato",
-   "de": "Noch nicht geprüft",
+  "Catalogues to copy records from (outbound)": {
+   "en": "Catalogues to copy records from (outbound)",
+   "pt-BR": "Catálogos de onde copiar registros (saída)",
+   "es": "Catálogos de donde copiar registros (salida)",
+   "fr": "Catalogues d'où copier des notices (sortant)",
+   "it": "Cataloghi da cui copiare record (in uscita)",
+   "de": "Kataloge zum Kopieren von Datensätzen (ausgehend)",
    "nl": null,
    "sv": null,
    "pl": null,
@@ -9502,13 +9502,13 @@
    "ja": null,
    "ko": null
   },
-  "Catalogues to copy records from (outbound)": {
-   "en": "Catalogues to copy records from (outbound)",
-   "pt-BR": "Catálogos de onde copiar registros (saída)",
-   "es": "Catálogos de donde copiar registros (salida)",
-   "fr": "Catalogues d'où copier des notices (sortant)",
-   "it": "Cataloghi da cui copiare record (in uscita)",
-   "de": "Kataloge zum Kopieren von Datensätzen (ausgehend)",
+  "Not scanned yet": {
+   "en": "Not scanned yet",
+   "pt-BR": "Ainda não testado",
+   "es": "Aún sin probar",
+   "fr": "Pas encore testé",
+   "it": "Non ancora provato",
+   "de": "Noch nicht geprüft",
    "nl": null,
    "sv": null,
    "pl": null,

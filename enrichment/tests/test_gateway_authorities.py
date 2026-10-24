@@ -142,7 +142,7 @@ def test_http_koha_authority_query(http):
 
 def test_koha_row_and_panel_list():
     sql = koha_sql.render(load(TARGETS))
-    six = sql.split("-- 6.")[1]
+    six = sql.split("-- 6.")[1].split("-- 7.")[0]
     assert "'sru/_union-aut', 'KOHA.NEXUS (AUTORIDADES)', 1, 0" in six and "'authority'" in six
     assert "authorpersonal=bath.personalName" in six and "subject=dc.subject" in six
     assert "SET checked" not in six                                  # the librarian's tick is kept
