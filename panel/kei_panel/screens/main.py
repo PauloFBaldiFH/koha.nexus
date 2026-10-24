@@ -56,7 +56,7 @@ class MainScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = "koha.nexus"
+        self.title = self.app.title
         self.sub_title = t("Control Dashboard")
         self.action_show("dashboard")
         self.query_one("#sidebar").focus()

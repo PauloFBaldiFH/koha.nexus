@@ -115,6 +115,27 @@ def log_error(text: str) -> None:
         pass
 
 
+def panel_version(installer: Path | None = None) -> str:
+    """The version of the running panel, shown in its title bar: the stamp
+    config.sh writes next to the installed sources, else the installer's
+    PANEL_VERSION. A screenshot then says which version someone runs."""
+    try:
+        stamp = (Path(__file__).resolve().parents[1] / ".panel-version").read_text().strip()
+        if stamp:
+            return stamp
+    except OSError:
+        pass
+    try:
+        with open(installer or REPO_INSTALLER, encoding="utf-8", errors="replace") as f:
+            for _, line in zip(range(200), f):
+                m = re.match(r'^PANEL_VERSION="\s*([^"]+)"', line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
 @dataclass
 class PanelEnv:
     installer: Path | None

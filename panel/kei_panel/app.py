@@ -12,7 +12,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from .bridge import Bridge, BridgeError
-from .env import PanelEnv, log_error
+from .env import PanelEnv, log_error, panel_version
 from .i18n import Translator, install, t
 from .menus import Entry
 from .screens.dialogs import ConfirmScreen, ResultScreen
@@ -44,6 +44,10 @@ class KohaPanelApp(App):
         super().__init__()
         self.env = env
         self.bridge = Bridge(env)
+        version = panel_version(env.installer)
+        if version:
+            # The sections use the subtitle; the version rides on the title.
+            self.title = f"{self.TITLE} v{version}"
 
     def _handle_exception(self, error: Exception) -> None:
         # Textual shows the traceback on the terminal after it exits; config.sh
