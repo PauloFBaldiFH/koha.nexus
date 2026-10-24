@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.109"
+PANEL_VERSION=" 1.5.110"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -33486,7 +33486,10 @@ enrich_retire_bridges() {
 # Cloudflare tunnel https://sru.koha.nexus:443: sru/_union ticked, one
 # unticked row per catalogue, the rows on older addresses (127.0.0.1:5000,
 # the VPS's IPs) moved and the retired bridges' rows removed, and the authority row sru/_union-aut for
-# the authority search in cataloguing; sru/all (Rede Pergamum) ticked too.
+# the authority search in cataloguing; sru/all (Rede Pergamum) ticked too, and
+# the local-first catalogues (UNESP, UFPR, UNIFESP, UnB, UFU: nearly all of
+# static.db) ticked and ranked first, the library's own rows for them kept
+# behind as fallback (koha-sql --undo-local-first gives those back).
 # Then the koha.nexus network's row (catalog_network_auto). Only once
 # Koha's database exists.
 enrich_register() {
@@ -33496,7 +33499,7 @@ enrich_register() {
     local log
     log=$(tools_log enrichment 2>/dev/null || echo "${LOG_DIR:-/tmp}/enrichment.log")
     if gateway_py koha-sql 2>>"$log" | mysql --default-character-set=utf8mb4 "$DB_NAME" 2>>"$log"; then
-        log "enrichment: Koha's rows point at the gateway on https://sru.koha.nexus:443 (sru/_union and sru/all ticked)"
+        log "enrichment: Koha's rows point at the gateway on https://sru.koha.nexus:443 (sru/_union, sru/all and the five local-first catalogues ticked)"
         kei_result koha-target set
         catalog_network_auto || log "enrichment: the koha.nexus network row was not added"
     else

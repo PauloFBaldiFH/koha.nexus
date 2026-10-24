@@ -5,7 +5,8 @@
     exported   Koha's records were exported to jobs/ID/export.xml (by the
                installer, as root: the worker never reads Koha's database)
     matching   the worker reads them 20 at a time, matches each against
-               static.db with nexus_enrich, sleeps, checkpoints
+               static.db with nexus_enrich, checkpoints (no sleep: static.db
+               is a local file, there is no server to spare)
     ready      staged report written (M0/M1/W/R counts, before/after diff);
                nothing has reached Koha
     applying   "Apply": safety backup, then one Koha staged import of at most

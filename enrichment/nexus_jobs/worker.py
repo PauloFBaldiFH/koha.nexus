@@ -1,5 +1,9 @@
 """The batch worker: reads a job's exported records 20 at a time, matches
-each against static.db, records the result, sleeps, and checkpoints.
+each against static.db, records the result and checkpoints.
+
+It reads only the local static.db (no server, no network), so there is no
+request limit and, by default, no sleep between batches (NEXUS_JOBS_PAUSE,
+seconds, puts one back; it was 1.5 s until 1.5.110).
 
 It runs as the koha-nexus-enrich unit (CPUQuota=25%, MemoryMax=256M, idle
 I/O, no access to Koha's database) and backs off on its own:
@@ -32,7 +36,7 @@ class Settings:
     state: Path
     static_db: Path
     batch: int = 20
-    pause: float = 1.5                 # seconds between batches
+    pause: float = 0.0                 # seconds between batches (static.db only: no server to spare)
     chunk: int = 500                   # records per Koha batch at Apply
     max_load: float = 0.0              # 0: the number of CPUs
     policy: Policy = field(default_factory=Policy)

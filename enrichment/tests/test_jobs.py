@@ -232,3 +232,8 @@ def test_cli(static_db, tmp_path, capsys, monkeypatch):
     assert json.loads(capsys.readouterr().out)[0]["id"] == out["job"]
     assert cli.main(base + ["add", "--scope", "x-y"]) == 1
     assert cli.main(base + ["show", "99"]) == 1
+
+
+def test_the_worker_does_not_sleep_between_batches_by_default(monkeypatch):
+    # static.db is a local file: no server to spare, no pause unless NEXUS_JOBS_PAUSE asks for one.
+    assert Settings(Path("/s"), Path("/s/static.db")).pause == 0
