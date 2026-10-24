@@ -1,0 +1,1291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://koha.nexus/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/pt/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/es/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/fr/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/it/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/de/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/nl/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/sv/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/pl/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/cs/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ru/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/uk/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/tr/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/tl/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/id/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ar/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/fa/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/hi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/bn/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/vi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ja/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ko/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/pt/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/es/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/fr/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/it/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/de/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/nl/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/sv/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/pl/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/cs/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ru/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/uk/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/tr/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/tl/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/id/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ar/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/fa/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/hi/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/bn/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/vi/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/zh/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ja/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://koha.nexus/languages/ko/preview/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://koha.nexus/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://koha.nexus/languages/pt/preview/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://koha.nexus/languages/es/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://koha.nexus/languages/fr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://koha.nexus/languages/it/preview/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://koha.nexus/languages/de/preview/"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://koha.nexus/languages/nl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="sv" href="https://koha.nexus/languages/sv/preview/"/>
+    <xhtml:link rel="alternate" hreflang="pl" href="https://koha.nexus/languages/pl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="cs" href="https://koha.nexus/languages/cs/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://koha.nexus/languages/ru/preview/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://koha.nexus/languages/uk/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://koha.nexus/languages/tr/preview/"/>
+    <xhtml:link rel="alternate" hreflang="tl" href="https://koha.nexus/languages/tl/preview/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://koha.nexus/languages/id/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://koha.nexus/languages/ar/preview/"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://koha.nexus/languages/fa/preview/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://koha.nexus/languages/hi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://koha.nexus/languages/bn/preview/"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://koha.nexus/languages/vi/preview/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://koha.nexus/languages/zh/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://koha.nexus/languages/ja/preview/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://koha.nexus/languages/ko/preview/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://koha.nexus/preview/"/>
+    <priority>0.8</priority>
+  </url>
+</urlset>

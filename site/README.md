@@ -30,6 +30,13 @@ only HTML. Both generators are deterministic. The website workflow checks the
 committed pages, language links, alternate links, assets and placeholder counts.
 It does not deploy or create releases.
 
+`export_site.py` also writes `sitemap.xml` and `robots.txt` at the repository
+root and gives every page a canonical link, Open Graph tags and, on homepages
+only, SoftwareApplication data. Search titles and descriptions come from the
+optional `seo` group of a locale (English and Portuguese have one); other
+languages keep `page_title`/`page_description` and the manual title. Submitting
+the sitemap to Google Search Console is done by hand after merging.
+
 Language links work without JavaScript. The manual selector preserves the open
 section. The page path takes priority over saved browser preferences; legacy
 `?lang=br`, `?lang=pt` and other supported query links navigate to the matching

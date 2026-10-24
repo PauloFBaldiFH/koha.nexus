@@ -327,6 +327,7 @@
     .download-banner p{margin:0;color:var(--muted);font-size:.88rem;max-width:690px}
     .download-banner{flex-wrap:wrap}
     .download-banner .codebox{flex:1 1 100%;min-width:0;width:100%}
+    .download-manual{flex:1 1 100%;color:var(--green);font-weight:700;font-size:.9rem;text-decoration:underline;text-underline-offset:3px}
 
     .windows{
       position:relative;

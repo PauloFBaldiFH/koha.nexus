@@ -3,6 +3,7 @@ from collections import Counter
 from html.parser import HTMLParser
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -133,8 +134,51 @@ def test_generator_rejects_a_placeholder_mismatch(tmp_path):
 
 
 def test_generator_output_is_committed_and_reproducible():
-    for rel, generated in site.render_pages().items():
+    for rel, generated in site.render_files().items():
         assert (REPO / rel).read_text(encoding='utf-8') == generated, rel
     run = subprocess.run([sys.executable, str(REPO / 'export_site.py'), '--check'],
                          cwd=REPO, capture_output=True, text=True)
     assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_every_page_has_unique_search_tags_and_only_homepages_carry_app_data():
+    titles, descriptions, canonicals = Counter(), Counter(), []
+    for lang in site.languages():
+        for kind in ['home', 'preview']:
+            path = REPO / site.page_path(lang, kind)
+            text = path.read_text(encoding='utf-8')
+            page = Page(text)
+            title = text.split('<title', 1)[1].split('>', 1)[1].split('</title>', 1)[0]
+            assert title.strip(), path
+            titles[title] += 1
+            meta = {a.get('name') or a.get('property'): a.get('content') for tag, a in page.nodes if tag == 'meta'}
+            assert meta['description'] and meta['og:description'] == meta['description'], path
+            descriptions[(lang['dict'], meta['description'])] += 1
+            canonical = [a['href'] for tag, a in page.nodes if tag == 'link' and a.get('rel') == 'canonical']
+            assert canonical == [site.public_url(lang, kind)] == [meta['og:url']], path
+            assert target(path, canonical[0]) == path.resolve()
+            canonicals.append(canonical[0])
+            assert meta['og:title'] and meta['og:image'].startswith('https://koha.nexus/')
+            assert target(path, meta['og:image']).is_file()
+            ld = [a for tag, a in page.nodes if tag == 'script' and a.get('type') == 'application/ld+json']
+            if kind == 'home':
+                data = json.loads(text.split('<script type="application/ld+json">', 1)[1].split('</script>', 1)[0])
+                assert data['@type'] == 'SoftwareApplication' and data['offers']['price'] == '0'
+                assert 'Windows' in data['operatingSystem'] and data['url'] == canonical[0]
+                assert data['license'] == site.LICENSE_URL and 'GNU GENERAL PUBLIC LICENSE' in (REPO / 'LICENSE').read_text()
+            else:
+                assert not ld, path
+                download = next(a for tag, a in page.nodes if tag == 'a' and 'kp-download' in a.get('class', ''))
+                assert download['href'].endswith('index.html#windows')
+                assert target(path, download['href'].split('#')[0]) == (REPO / site.page_path(lang, 'home')).resolve()
+    assert max(titles.values()) == 1, [t for t, n in titles.items() if n > 1]
+    assert max(descriptions.values()) == 1
+    for code, words in {'pt': ['Koha no Windows', 'Z39.50', 'importação MARC'], 'en': ['Koha on Windows', 'Z39.50', 'MARC import']}.items():
+        lang = next(l for l in site.languages() if l['dict'] == code)
+        text = (REPO / site.page_path(lang, 'home')).read_text(encoding='utf-8')
+        head = text.split('</head>', 1)[0]
+        assert all(w in head for w in words), (code, words)
+    sitemap = (REPO / 'sitemap.xml').read_text(encoding='utf-8')
+    assert sorted(re.findall(r'<loc>([^<]+)</loc>', sitemap)) == sorted(canonicals)
+    robots = (REPO / 'robots.txt').read_text(encoding='utf-8')
+    assert 'Sitemap: https://koha.nexus/sitemap.xml' in robots and 'Disallow: /\n' not in robots
