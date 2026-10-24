@@ -267,5 +267,11 @@
     "exit": "Sair",
     "back_to_site": "Voltar para koha.nexus",
     "screenshot_of": "O painel real"
+  },
+  "seo": {
+    "home_title": "Koha no Windows e Linux: instalação grátis | koha.nexus",
+    "home_description": "Instale o Koha no Windows 10/11 (WSL 2), Debian ou Ubuntu com um comando. Painel gratuito para catalogação Z39.50, importação MARC, backups e o OPAC.",
+    "manual_title": "Manual do koha.nexus: painel do Koha, Z39.50, importação MARC",
+    "manual_description": "Guia passo a passo de cada tela do painel koha.nexus para o Koha: servidores Z39.50/SRU, importação MARC, backups, aparência do OPAC e mais, com simulador interativo."
   }
 }

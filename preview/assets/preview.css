@@ -53,6 +53,7 @@ a { color: var(--green); }
 .kp-heading { flex: 1 1 260px; min-width: 0; }
 .kp-heading h1 { margin: 0; font-size: 1.15rem; line-height: 1.3; }
 .kp-heading p { margin: 0; color: var(--muted); font-size: .88rem; }
+.kp-heading .kp-download { display: inline-block; margin-top: 2px; color: var(--green); font-size: .85rem; font-weight: 700; }
 .kp-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .kp-tools input, .kp-tools select {
   background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px;

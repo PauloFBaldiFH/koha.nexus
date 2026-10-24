@@ -267,5 +267,11 @@
     "exit": "Exit",
     "back_to_site": "Back to koha.nexus",
     "screenshot_of": "The real panel"
+  },
+  "seo": {
+    "home_title": "Install Koha on Windows and Linux, free | koha.nexus",
+    "home_description": "Install the Koha library system on Windows 10/11 (WSL 2), Debian or Ubuntu with one command. Free panel for Z39.50 cataloguing, MARC import, backups and the OPAC.",
+    "manual_title": "koha.nexus manual: Koha panel, Z39.50, MARC import, backups",
+    "manual_description": "Step-by-step guide to every screen of the koha.nexus panel for Koha: Z39.50/SRU servers, MARC import, backups, OPAC appearance and more, with an interactive simulator."
   }
 }

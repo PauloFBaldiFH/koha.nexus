@@ -243,7 +243,6 @@
     if (groups[0]) groups[0].label = ui("full_manual");
     if (groups[1]) groups[1].label = ui("panel_only");
     els.version.textContent = ui("version") + " " + data.panel_version;
-    document.title = "koha.nexus · " + ui("title");
   }
 
   // ------------------------------------------------------------------
