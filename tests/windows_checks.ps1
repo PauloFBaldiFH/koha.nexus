@@ -412,6 +412,32 @@ Check 'msix: the build rewrites no file of windows\' ($rewrites.Count -eq 0) (($
 $version = [regex]::Match($builderText, "(?m)^\`$targetVersion = '([^']+)'").Groups[1].Value
 $revision = [regex]::Match($builderText, "(?m)^\`$payloadRevision = '([^']+)'").Groups[1].Value
 Check 'msix: payload revision follows the version' ($version -and $revision.StartsWith($version + '-')) ('{0} / {1}' -f $version, $revision)
+# Store 10.1.1.11 (tile icon not clear): the build drew the tiles from the
+# .ico with System.Drawing and Windows PowerShell 5.1 turned its PNG frames
+# into colour noise. The tiles are now ready PNGs in windows\msix\Assets
+# (gerar_assets.py), every scale the manifest needs, indexed by resources.pri.
+foreach ($fn in $builderAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -in @('Get-KohaMsixAssetSizes', 'Test-KohaMsixAssets') }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$assetProblems = @(Test-KohaMsixAssets -AssetsDir (Join-Path $repo 'windows\msix\Assets'))
+Check 'msix: Assets has every tile and icon at its size' ($assetProblems.Count -eq 0) ($assetProblems -join '; ')
+$assetCopy = Join-Path ([IO.Path]::GetTempPath()) ('koha-msix-' + [guid]::NewGuid())
+Copy-Item -LiteralPath (Join-Path $repo 'windows\msix\Assets') -Destination $assetCopy -Recurse
+try {
+    Remove-Item -LiteralPath (Join-Path $assetCopy 'StoreLogo.scale-100.png')
+    Copy-Item -LiteralPath (Join-Path $assetCopy 'Square150x150Logo.scale-100.png') -Destination (Join-Path $assetCopy 'Square150x150Logo.scale-200.png') -Force
+    $badAssets = @(Test-KohaMsixAssets -AssetsDir $assetCopy) -join ';'
+    Check 'msix: a missing or wrong-size tile stops the build' ($badAssets -match 'StoreLogo.scale-100' -and $badAssets -match '150x150, esperado 300x300') $badAssets
+} finally {
+    Remove-Item -LiteralPath $assetCopy -Recurse -Force
+}
+Check 'msix: the build no longer draws tiles with System.Drawing' ($builderText -notmatch 'System\.Drawing\.(Icon|Bitmap)') ''
+Check 'msix: the build makes resources.pri' ($builderText -match '\$makePri new ' -and $builderText -match "'resources.pri'") ''
+Check 'msix: the manifest has the wide, small and large tiles' ($builderText -match 'Wide310x150Logo="Assets\\Wide310x150Logo.png"' -and $builderText -match 'Square71x71Logo="Assets\\Square71x71Logo.png"' -and $builderText -match 'Square310x310Logo="Assets\\Square310x310Logo.png"') ''
+# Store 10.1.2.10 (crashes at launch): a declined UAC prompt explains
+# itself, and the launcher reports any exit code the bootstrap did not.
+Check 'msix: a declined UAC prompt shows ElevationBody, not the error box' ($builderText -match '-Verb RunAs -WindowStyle Normal -ErrorAction Stop' -and $builderText -match '\$ui\.ElevationBody') ''
+Check 'msix: bootstrap errors exit 10 and the launcher reports other codes' ($builderText -match '(?m)^    exit 10\r?$' -and $builderText -match 'code != 0 && code != 10') ''
 
 if ($failed) { throw "$failed check(s) failed" }
 Write-Host 'all checks passed'

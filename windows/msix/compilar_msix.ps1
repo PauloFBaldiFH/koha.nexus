@@ -26,14 +26,14 @@ $installer  = Join-Path $repoDir 'installer'
 $installerHash = Join-Path $repoDir 'installer.sha256'
 # Assets customizados entregues junto com este script (devem ficar na mesma pasta).
 $iconPath      = Join-Path $scriptRoot 'KohaNexusIcon.ico'
-$logoImagePath = Join-Path $scriptRoot 'KohaNexusLogo.png'
+$assetsSourceDir = Join-Path $scriptRoot 'Assets'
 
 # Versão solicitada originalmente. Precisa ser maior que qualquer versão
 # anterior que ainda esteja instalada se o pacote for atualizado sem remoção.
-$targetVersion = '1.0.27.0'
+$targetVersion = '1.0.28.0'
 # Revision interna do payload: força a atualização de instalações incompletas
 # feitas por builds anteriores, sem precisar alterar a versão pública do MSIX.
-$payloadRevision = '1.0.27.0-msix-v19'
+$payloadRevision = '1.0.28.0-msix-v20'
 $packageName = 'KohaNexus'
 $packagePublisher = 'CN=PauloFBaldiFH'
 $publisherDisplayName = 'PauloFBaldiFH'
@@ -42,67 +42,81 @@ $applicationId = 'KohaNexus'
 $entryExeName = 'KohaMsixEntry.exe'
 $buildSucceeded = $false
 
-function New-LogoPng {
-    param(
-        [Parameter(Mandatory = $true)][string]$SourceIcon,
-        [Parameter(Mandatory = $true)][string]$Destination,
-        [Parameter(Mandatory = $true)][int]$Size
-    )
-
-    $icon = $null
-    $sourceBitmap = $null
-    $bitmap = $null
-    $graphics = $null
-
-    try {
-        $icon = New-Object System.Drawing.Icon -ArgumentList $SourceIcon
-        $sourceBitmap = $icon.ToBitmap()
-        $bitmap = New-Object System.Drawing.Bitmap -ArgumentList @($Size, $Size)
-        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-        $graphics.Clear([System.Drawing.Color]::Transparent)
-        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $graphics.DrawImage($sourceBitmap, 0, 0, $Size, $Size)
-        $bitmap.Save($Destination, [System.Drawing.Imaging.ImageFormat]::Png)
+# Ícones e blocos do pacote: PNGs prontos em windows\msix\Assets, gerados por
+# gerar_assets.py. Antes eram desenhados aqui com System.Drawing a partir do
+# .ico, cujos quadros são PNG: no Windows PowerShell 5.1 isso saía como ruído
+# colorido, e a Store recusou o pacote (10.1.1.11, ícone não nítido).
+function Get-KohaMsixAssetSizes {
+    $tiles = [ordered]@{
+        'Square44x44Logo'   = @(44, 44)
+        'StoreLogo'         = @(50, 50)
+        'Square71x71Logo'   = @(71, 71)
+        'Square150x150Logo' = @(150, 150)
+        'Wide310x150Logo'   = @(310, 150)
+        'Square310x310Logo' = @(310, 310)
     }
-    finally {
-        if ($graphics) { $graphics.Dispose() }
-        if ($bitmap) { $bitmap.Dispose() }
-        if ($sourceBitmap) { $sourceBitmap.Dispose() }
-        if ($icon) { $icon.Dispose() }
+    $sizes = [ordered]@{}
+    foreach ($tile in $tiles.Keys) {
+        foreach ($scale in @(100, 125, 150, 200, 400)) {
+            $width = [int][Math]::Floor($tiles[$tile][0] * $scale / 100 + 0.5)
+            $height = [int][Math]::Floor($tiles[$tile][1] * $scale / 100 + 0.5)
+            $sizes[('{0}.scale-{1}.png' -f $tile, $scale)] = @($width, $height)
+        }
     }
+    foreach ($target in @(16, 24, 32, 48, 256)) {
+        $sizes[('Square44x44Logo.targetsize-{0}.png' -f $target)] = @($target, $target)
+        $sizes[('Square44x44Logo.targetsize-{0}_altform-unplated.png' -f $target)] = @($target, $target)
+    }
+    return $sizes
 }
 
-function New-LogoFromImagePng {
-    param(
-        [Parameter(Mandatory = $true)][string]$SourceImage,
-        [Parameter(Mandatory = $true)][string]$Destination,
-        [Parameter(Mandatory = $true)][int]$Size
-    )
-
-    $sourceBitmap = $null
-    $bitmap = $null
-    $graphics = $null
-
-    try {
-        $sourceBitmap = [System.Drawing.Bitmap]::FromFile($SourceImage)
-        # Bitmap padrão mantém canal alfa para preservar o fundo transparente do logo.
-        $bitmap = New-Object System.Drawing.Bitmap -ArgumentList @($Size, $Size)
-        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-        $graphics.Clear([System.Drawing.Color]::Transparent)
-        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-        $graphics.DrawImage($sourceBitmap, 0, 0, $Size, $Size)
-        $bitmap.Save($Destination, [System.Drawing.Imaging.ImageFormat]::Png)
+# Lista o que falta ou tem o tamanho errado em Assets (largura e altura lidas
+# do cabeçalho PNG, sem System.Drawing).
+function Test-KohaMsixAssets {
+    param([Parameter(Mandatory = $true)][string]$AssetsDir)
+    $problems = @()
+    $sizes = Get-KohaMsixAssetSizes
+    foreach ($name in $sizes.Keys) {
+        $path = Join-Path $AssetsDir $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            $problems += "falta Assets\$name"
+            continue
+        }
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        if ($bytes.Length -lt 24 -or $bytes[0] -ne 0x89 -or $bytes[1] -ne 0x50 -or $bytes[12] -ne 0x49 -or $bytes[15] -ne 0x52) {
+            $problems += "Assets\$name não é PNG"
+            continue
+        }
+        $width = ([int]$bytes[16] -shl 24) -bor ([int]$bytes[17] -shl 16) -bor ([int]$bytes[18] -shl 8) -bor [int]$bytes[19]
+        $height = ([int]$bytes[20] -shl 24) -bor ([int]$bytes[21] -shl 16) -bor ([int]$bytes[22] -shl 8) -bor [int]$bytes[23]
+        if ($width -ne $sizes[$name][0] -or $height -ne $sizes[$name][1]) {
+            $problems += ('Assets\{0} tem {1}x{2}, esperado {3}x{4}' -f $name, $width, $height, $sizes[$name][0], $sizes[$name][1])
+        }
     }
-    finally {
-        if ($graphics) { $graphics.Dispose() }
-        if ($bitmap) { $bitmap.Dispose() }
-        if ($sourceBitmap) { $sourceBitmap.Dispose() }
+    return $problems
+}
+
+# MakePri.exe vem no mesmo pacote NuGet Microsoft.Windows.SDK.BuildTools do
+# MakeAppx (bin\<versão>\x64) ou no Windows SDK.
+function Find-KohaMakePri {
+    param([Parameter(Mandatory = $true)][string]$SdkDir)
+    $candidates = @(Join-Path $SdkDir 'makepri.exe')
+    if (Test-Path -LiteralPath $SdkDir -PathType Container) {
+        $candidates += @(Get-ChildItem -LiteralPath $SdkDir -Filter 'makepri.exe' -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\(x86|arm64|arm)\\' } | ForEach-Object { $_.FullName })
     }
+    $programFilesX86 = [Environment]::GetFolderPath('ProgramFilesX86')
+    if ($programFilesX86) {
+        $kitsBin = Join-Path $programFilesX86 'Windows Kits\10\bin'
+        if (Test-Path -LiteralPath $kitsBin -PathType Container) {
+            $candidates += @(Get-ChildItem -LiteralPath $kitsBin -Filter 'makepri.exe' -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | ForEach-Object { $_.FullName })
+        }
+    }
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $candidate }
+    }
+    return $null
 }
 
 # A identidade que o Partner Center reservou para o app (Gerenciamento de
@@ -254,7 +268,7 @@ try {
         }
     }
 
-    foreach ($requiredFile in @($installer, $installerHash, $iconPath, $logoImagePath)) {
+    foreach ($requiredFile in @($installer, $installerHash, $iconPath)) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
             throw "Arquivo obrigatório não encontrado: $requiredFile"
         }
@@ -278,6 +292,18 @@ try {
         if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
             throw "Ferramenta do SDK não encontrada: $toolPath"
         }
+    }
+    # Sem resources.pri o Windows usa só o arquivo sem qualificador e amplia
+    # um ícone pequeno: os blocos saem borrados.
+    $makePri = Find-KohaMakePri -SdkDir $sdkDir
+    if (-not $makePri) {
+        throw ("MakePri.exe não encontrado. Ele vem no mesmo pacote NuGet Microsoft.Windows.SDK.BuildTools do MakeAppx " +
+            "(pasta bin\<versão>\x64): copie makepri.exe para $sdkDir.")
+    }
+    $assetProblems = @(Test-KohaMsixAssets -AssetsDir $assetsSourceDir)
+    if ($assetProblems.Count -gt 0) {
+        throw ('Ícones do pacote incompletos em windows\msix\Assets (git pull; ou python3 windows\msix\gerar_assets.py):' +
+            [Environment]::NewLine + ($assetProblems -join [Environment]::NewLine))
     }
 
     $compilerCandidates = @(
@@ -557,6 +583,8 @@ function Get-BootstrapMessages {
             BiosQuestionTitle = 'Abrir BIOS/UEFI'
             BiosFailure = "Não foi possível abrir a BIOS/UEFI automaticamente. O computador pode não oferecer suporte a essa reinicialização, ou a solicitação de administrador pode ter sido cancelada.`r`n`r`nTente manualmente: Configurações > Sistema > Recuperação > Inicialização avançada > Reiniciar agora > Solução de problemas > Opções avançadas > Configurações de Firmware UEFI. Alguns computadores não oferecem essa opção.`r`n`r`nAtive a virtualizacao e execute o Koha.Nexus novamente."
             GenericErrorPrefix = 'Não foi possível iniciar o Koha.Nexus.'
+            ElevationTitle = 'Permissão de administrador'
+            ElevationBody = "Na primeira execução o Koha.Nexus precisa de permissão de administrador para ativar o WSL 2 e instalar o Debian com o Koha. A permissão foi recusada, ou esta conta do Windows não é de administrador.`r`n`r`nAbra o Koha.Nexus de novo e responda Sim no aviso do Windows (ou entre com uma conta de administrador). Nada foi alterado neste computador."
         }
     }
 
@@ -568,6 +596,8 @@ function Get-BootstrapMessages {
         BiosQuestionTitle = 'Open BIOS/UEFI'
         BiosFailure = "Windows could not open BIOS/UEFI automatically, or the administrator request was cancelled.`r`n`r`nTry manually: Settings > System > Recovery > Advanced startup > Restart now > Troubleshoot > Advanced options > UEFI Firmware Settings. Some computers do not offer this option.`r`n`r`nEnable virtualization, then launch Koha.Nexus again."
         GenericErrorPrefix = 'Koha.Nexus could not be started.'
+        ElevationTitle = 'Administrator permission'
+        ElevationBody = "On its first run Koha.Nexus needs administrator permission to turn on WSL 2 and install Debian with Koha. The permission was declined, or this Windows account is not an administrator.`r`n`r`nOpen Koha.Nexus again and answer Yes in the Windows prompt (or sign in with an administrator account). Nothing was changed on this computer."
     }
 }
 function Show-BootstrapMessage {
@@ -687,7 +717,14 @@ try {
         $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath
         Write-BootstrapLog 'Elevation required; opening the elevated bootstrap window.'
-        Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Normal | Out-Null
+        try {
+            Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Normal -ErrorAction Stop | Out-Null
+        }
+        catch {
+            # UAC recusado ou conta sem administrador: explicar, sem a caixa de erro.
+            Write-BootstrapLog ('Elevation declined or unavailable: ' + $_.Exception.Message)
+            $null = Show-BootstrapMessage -Text $ui.ElevationBody -Title $ui.ElevationTitle -Buttons 'OK' -Icon 'Information'
+        }
         exit 0
     }
 
@@ -781,6 +818,7 @@ try {
     Write-BootstrapLog "Abrindo o painel; distribuição 'koha' detectada. MainScript=$mainScript"
     & $mainScript Panel
     Write-BootstrapLog ('O comando Panel terminou; LASTEXITCODE={0}' -f $LASTEXITCODE)
+    exit 0
 }
 catch {
     $message = $_.Exception.Message
@@ -794,7 +832,8 @@ catch {
             [System.Windows.Forms.MessageBoxIcon]::Error
         )
     } catch { }
-    exit 1
+    # 10: erro ja mostrado. O KohaMsixEntry.exe so avisa dos outros codigos.
+    exit 10
 }
 '@
     $bootstrapContent = $bootstrapContent.Replace('__PAYLOAD_VERSION__', $payloadRevision)
@@ -830,17 +869,12 @@ catch {
     # 3. CRIAR LOGOS PNG EXIGIDOS PELO MANIFESTO
     # --------------------------------------------------------
 
-    Write-Host "`n[2/8] Gerando os logotipos PNG..." -ForegroundColor Yellow
-    Add-Type -AssemblyName System.Drawing
+    Write-Host "`n[2/8] Copiando os ícones e blocos PNG..." -ForegroundColor Yellow
     $assetsDir = Join-Path $pkgDir 'Assets'
     New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
-    # Ícone do aplicativo: ICO personalizado. Logo de marca: PNG personalizado.
-    New-LogoFromImagePng -SourceImage $logoImagePath -Destination (Join-Path $assetsDir 'StoreLogo.png') -Size 50
-    New-LogoPng -SourceIcon $iconPath -Destination (Join-Path $assetsDir 'Square44x44Logo.png') -Size 44
-    New-LogoPng -SourceIcon $iconPath -Destination (Join-Path $assetsDir 'Square44x44Logo.targetsize-256.png') -Size 256
-    New-LogoPng -SourceIcon $iconPath -Destination (Join-Path $assetsDir 'Square44x44Logo.scale-200.png') -Size 88
-    New-LogoPng -SourceIcon $iconPath -Destination (Join-Path $assetsDir 'Square150x150Logo.png') -Size 150
-    New-LogoPng -SourceIcon $iconPath -Destination (Join-Path $assetsDir 'Square150x150Logo.scale-200.png') -Size 300
+    foreach ($assetName in (Get-KohaMsixAssetSizes).Keys) {
+        Copy-Item -LiteralPath (Join-Path $assetsSourceDir $assetName) -Destination (Join-Path $assetsDir $assetName) -Force
+    }
 
     # --------------------------------------------------------
     # 4. COMPILAR O PONTO DE ENTRADA MSIX SEM JANELA DE CONSOLE
@@ -851,6 +885,7 @@ catch {
     $entrySource = @'
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -865,6 +900,17 @@ internal static class KohaMsixEntry
     private static void ShowError(string text)
     {
         try { MessageBox(IntPtr.Zero, text, "Koha.Nexus", 0x10); } catch { }
+    }
+
+    // Portugues para Windows em portugues, ingles nos outros (a Store testa em ingles).
+    private static string Text(string pt, string en)
+    {
+        try
+        {
+            if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pt") return pt;
+        }
+        catch { }
+        return en;
     }
 
     private static bool HasKohaDistro()
@@ -929,7 +975,8 @@ internal static class KohaMsixEntry
         string bootstrap = Path.Combine(packageDir, "Bootstrap-MSIX.ps1");
         if (!File.Exists(bootstrap))
         {
-            ShowError("O arquivo de inicialização não foi encontrado dentro do pacote MSIX:\r\n" + bootstrap);
+            ShowError(Text("O arquivo de inicialização não foi encontrado dentro do pacote MSIX:\r\n",
+                "The startup file was not found inside the MSIX package:\r\n") + bootstrap);
             return 2;
         }
 
@@ -937,7 +984,8 @@ internal static class KohaMsixEntry
         string powershell = Path.Combine(systemDir, @"WindowsPowerShell\v1.0\powershell.exe");
         if (!File.Exists(powershell))
         {
-            ShowError("O Windows PowerShell 5.1 não foi encontrado:\r\n" + powershell);
+            ShowError(Text("O Windows PowerShell 5.1 não foi encontrado:\r\n",
+                "Windows PowerShell 5.1 was not found:\r\n") + powershell);
             return 3;
         }
 
@@ -962,17 +1010,29 @@ internal static class KohaMsixEntry
             {
                 if (child == null)
                 {
-                    ShowError("O Windows não conseguiu iniciar o processo de inicialização do Koha.Nexus.");
+                    ShowError(Text("O Windows não conseguiu iniciar o processo de inicialização do Koha.Nexus.",
+                        "Windows could not start the Koha.Nexus startup process."));
                     return 4;
                 }
                 child.WaitForExit();
-                return child.ExitCode;
+                int code = child.ExitCode;
+                // 0: tudo certo; 10: o bootstrap ja mostrou o erro; 0xC000013A: a
+                // pessoa fechou a janela. Outro codigo e uma falha antes ou fora do
+                // try do bootstrap (politica de execucao, PowerShell que nao abre):
+                // sem este aviso o app so piscaria e fecharia.
+                if (code != 0 && code != 10 && code != unchecked((int)0xC000013A))
+                {
+                    ShowError(Text("O Koha.Nexus fechou de forma inesperada (código " + code + ").\r\n\r\nConsulte C:\\Koha\\logs\\msix-bootstrap.log.",
+                        "Koha.Nexus closed unexpectedly (code " + code + ").\r\n\r\nSee C:\\Koha\\logs\\msix-bootstrap.log."));
+                }
+                return code;
             }
         }
         catch (Exception ex)
         {
-            ShowError("Não foi possível iniciar o Koha.Nexus.\r\n\r\n" + ex.Message +
-                "\r\n\r\nTente executar novamente. Se o problema continuar, consulte C:\\Koha\\logs\\msix-bootstrap.log.");
+            ShowError(Text("Não foi possível iniciar o Koha.Nexus.\r\n\r\n", "Koha.Nexus could not be started.\r\n\r\n") + ex.Message +
+                Text("\r\n\r\nTente executar novamente. Se o problema continuar, consulte C:\\Koha\\logs\\msix-bootstrap.log.",
+                    "\r\n\r\nTry again. If the problem continues, see C:\\Koha\\logs\\msix-bootstrap.log."));
             return 1;
         }
     }
@@ -1022,7 +1082,18 @@ internal static class KohaMsixEntry
                           Description="Koha.Nexus para Windows"
                           BackgroundColor="transparent"
                           Square150x150Logo="Assets\Square150x150Logo.png"
-                          Square44x44Logo="Assets\Square44x44Logo.png" />
+                          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
+                         Square71x71Logo="Assets\Square71x71Logo.png"
+                         Square310x310Logo="Assets\Square310x310Logo.png"
+                         ShortName="Koha.Nexus">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+            <uap:ShowOn Tile="square310x310Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+      </uap:VisualElements>
     </Application>
   </Applications>
   <Capabilities>
@@ -1049,9 +1120,38 @@ internal static class KohaMsixEntry
         throw 'A versão gravada no manifesto está incorreta.'
     }
 
+    # resources.pri: indica ao Windows os arquivos scale-* e targetsize-* de
+    # cada ícone. Indexa só Assets e o manifesto (numa cópia), não a carga.
+    $priDir = Join-Path $distDir '_KohaNexus_PRI'
+    if (Test-Path -LiteralPath $priDir) {
+        Remove-Item -LiteralPath $priDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $priDir -Force | Out-Null
+    Copy-Item -LiteralPath $assetsDir -Destination $priDir -Recurse -Force
+    Copy-Item -LiteralPath $manifestPath -Destination $priDir -Force
+    $priConfig = Join-Path $distDir 'priconfig.xml'
+    & $makePri createconfig /cf $priConfig /dq pt-BR /pv 10.0.0 /o
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakePri createconfig falhou com código $LASTEXITCODE."
+    }
+    # Sem a seção packaging: um único resources.pri, sem pacotes de recursos.
+    $priConfigDocument = New-Object System.Xml.XmlDocument
+    $priConfigDocument.Load($priConfig)
+    foreach ($packagingNode in @($priConfigDocument.SelectNodes('//packaging'))) {
+        [void]$packagingNode.ParentNode.RemoveChild($packagingNode)
+    }
+    $priConfigDocument.Save($priConfig)
+    $priPath = Join-Path $pkgDir 'resources.pri'
+    & $makePri new /pr $priDir /cf $priConfig /mn (Join-Path $priDir 'AppxManifest.xml') /of $priPath /o
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakePri new falhou com código $LASTEXITCODE; sem resources.pri os ícones saem borrados."
+    }
+    Remove-Item -LiteralPath $priDir -Recurse -Force
+
     # Confirma que a carga mínima está na raiz do pacote.
     foreach ($requiredInPackage in @(
-        'AppxManifest.xml', 'Bootstrap-MSIX.ps1', $entryExeName,
+        'AppxManifest.xml', 'Bootstrap-MSIX.ps1', $entryExeName, 'resources.pri',
+        'Assets\Square44x44Logo.targetsize-256.png', 'Assets\Square150x150Logo.scale-400.png',
         'Payload\windows\install.ps1', 'Payload\windows\KohaEasy.ps1',
         'Payload\windows\KohaEasy.Core.psm1', 'Payload\windows\KohaEasy.Lang.psm1', 'Payload\windows\KohaMsixPanel.ps1', 'Payload\windows\KohaMsixRefreshIcons.ps1', 'Payload\windows\KohaNexusDesktop.ico',
         'Payload\installer', 'Payload\installer.sha256', 'Payload\lang\pt.cache',
