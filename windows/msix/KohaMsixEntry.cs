@@ -1,12 +1,13 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
 internal static class KohaMsixEntry
 {
-    private const string PayloadVersion = "1.0.25.0-msix-v17";
+    private const string PayloadVersion = "1.0.28.0-msix-v20";
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
@@ -14,6 +15,17 @@ internal static class KohaMsixEntry
     private static void ShowError(string text)
     {
         try { MessageBox(IntPtr.Zero, text, "Koha.Nexus", 0x10); } catch { }
+    }
+
+    // Portugues para Windows em portugues, ingles nos outros (a Store testa em ingles).
+    private static string Text(string pt, string en)
+    {
+        try
+        {
+            if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pt") return pt;
+        }
+        catch { }
+        return en;
     }
 
     private static bool HasKohaDistro()
@@ -78,7 +90,8 @@ internal static class KohaMsixEntry
         string bootstrap = Path.Combine(packageDir, "Bootstrap-MSIX.ps1");
         if (!File.Exists(bootstrap))
         {
-            ShowError("O arquivo de inicialização não foi encontrado dentro do pacote MSIX:\r\n" + bootstrap);
+            ShowError(Text("O arquivo de inicialização não foi encontrado dentro do pacote MSIX:\r\n",
+                "The startup file was not found inside the MSIX package:\r\n") + bootstrap);
             return 2;
         }
 
@@ -86,7 +99,8 @@ internal static class KohaMsixEntry
         string powershell = Path.Combine(systemDir, @"WindowsPowerShell\v1.0\powershell.exe");
         if (!File.Exists(powershell))
         {
-            ShowError("O Windows PowerShell 5.1 não foi encontrado:\r\n" + powershell);
+            ShowError(Text("O Windows PowerShell 5.1 não foi encontrado:\r\n",
+                "Windows PowerShell 5.1 was not found:\r\n") + powershell);
             return 3;
         }
 
@@ -111,17 +125,29 @@ internal static class KohaMsixEntry
             {
                 if (child == null)
                 {
-                    ShowError("O Windows não conseguiu iniciar o processo de inicialização do Koha.Nexus.");
+                    ShowError(Text("O Windows não conseguiu iniciar o processo de inicialização do Koha.Nexus.",
+                        "Windows could not start the Koha.Nexus startup process."));
                     return 4;
                 }
                 child.WaitForExit();
-                return child.ExitCode;
+                int code = child.ExitCode;
+                // 0: tudo certo; 10: o bootstrap ja mostrou o erro; 0xC000013A: a
+                // pessoa fechou a janela. Outro codigo e uma falha antes ou fora do
+                // try do bootstrap (politica de execucao, PowerShell que nao abre):
+                // sem este aviso o app so piscaria e fecharia.
+                if (code != 0 && code != 10 && code != unchecked((int)0xC000013A))
+                {
+                    ShowError(Text("O Koha.Nexus fechou de forma inesperada (código " + code + ").\r\n\r\nConsulte C:\\Koha\\logs\\msix-bootstrap.log.",
+                        "Koha.Nexus closed unexpectedly (code " + code + ").\r\n\r\nSee C:\\Koha\\logs\\msix-bootstrap.log."));
+                }
+                return code;
             }
         }
         catch (Exception ex)
         {
-            ShowError("Não foi possível iniciar o Koha.Nexus.\r\n\r\n" + ex.Message +
-                "\r\n\r\nTente executar novamente. Se o problema continuar, consulte C:\\Koha\\logs\\msix-bootstrap.log.");
+            ShowError(Text("Não foi possível iniciar o Koha.Nexus.\r\n\r\n", "Koha.Nexus could not be started.\r\n\r\n") + ex.Message +
+                Text("\r\n\r\nTente executar novamente. Se o problema continuar, consulte C:\\Koha\\logs\\msix-bootstrap.log.",
+                    "\r\n\r\nTry again. If the problem continues, see C:\\Koha\\logs\\msix-bootstrap.log."));
             return 1;
         }
     }
