@@ -433,3 +433,42 @@ def test_the_job_waits_for_midnight_when_its_servers_used_todays_searches(env):
     asyncio.run(run())
     assert seen[0]["quota"] == "00:01" and net.searches == []
     assert job_of(settings, job_id).done == 0                       # nothing saved as "not found"
+
+
+def test_records_static_db_holds_skip_the_servers_and_the_midnight_wait(env, tmp_path):
+    # UNESP's records are in static.db (a local-first catalogue): with every server
+    # over today's cap the job still finishes at once, from static.db alone.
+    from enrich_build.build import Builder, SourceConfig
+    from nexus_enrich import marc
+    from nexus_ondemand.health import Health
+    settings, config = env
+    d = tmp_path / "build"
+    d.mkdir()
+    (d / "dump.jsonl").write_text(json.dumps({"fonte": "Universidade Estadual Paulista (UNESP)",
+                                              "marcxml": marc.to_xml(donor("Romance brasileiro"))}) + "\n")
+    Builder(tmp_path / "static.db", [SourceConfig.from_dict({"id": "zeus", "paths": ["dump.jsonl"], "mode": "full",
+                                                              "brazilian": True, "source_field": "fonte"})], d).build()
+    settings.static_db = tmp_path / "static.db"
+    config.static, config.local_sources = True, {"unesp": "unesp"}
+    net = FakeNet(s_example_org=Server([donor("Volta")]))
+    cat = catalog(tgt("s"))
+    health = Health(config.health_db)
+    for _ in range(500):
+        health.add_daily(cat.targets["s"].address.host_key)
+    health.close()
+    job_id = ondemand_job(settings, [mine(1), mine(2)])
+    assert serve(settings, config, net, cat) == 1
+    assert job_of(settings, job_id).state == "ready" and net.opened == []
+    row = item(settings, job_id, 2)
+    assert row["status"] == "enriched"
+    after = unpack(row["after"])
+    assert [f.get("a") for f in after.get_fields("650")] == ["Romance brasileiro"]
+    assert any(f.get("q") == "static:unesp" for f in after.get_fields("883"))
+
+
+def test_local_first_settings_from_the_environment():
+    config = Config.from_env({})
+    assert config.static_first and config.local_sources == {
+        "unesp": "unesp", "ufpr": "ufpr", "unifesp": "unifesp", "unb": "unb", "ufu": "ufu"}
+    assert not Config.from_env({"KEI_ONDEMAND_STATIC_FIRST": "0"}).static_first
+    assert Config.from_env({"NEXUS_GATEWAY_TARGETS": "/nowhere.json"}).local_sources == {}

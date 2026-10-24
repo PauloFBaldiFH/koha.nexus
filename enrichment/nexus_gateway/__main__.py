@@ -6,6 +6,8 @@
     init-db     create an empty static.db where there is none (before the
                 first download), print its record count
     koha-sql    print the SQL that points Koha's rows at this gateway
+                (--undo-local-first / --redo-local-first: the local-first
+                catalogues' steps, see koha_sql.py)
     panel-list  print the koha.nexus panel's list of these rows
     check       load targets.json and static.db, print what would be served
 """
@@ -43,6 +45,10 @@ def main(argv: list[str] | None = None) -> int:
     sql = sub.add_parser("koha-sql")
     sql.add_argument("--host", default=koha_sql.KOHA_HOST)
     sql.add_argument("--port", type=int, default=koha_sql.GATEWAY_PORT)
+    how = sql.add_mutually_exclusive_group()
+    how.add_argument("--undo-local-first", action="store_true",
+                     help="give the library's own UNESP/UFPR/UNIFESP/UnB/UFU rows their rank and tick back")
+    how.add_argument("--redo-local-first", action="store_true", help="the local-first steps again, after an undo")
     sub.add_parser("check")
     sub.add_parser("init-db")
     up = sub.add_parser("update")
@@ -76,7 +82,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "koha-sql":
-        sys.stdout.write(koha_sql.render(load(settings.targets), args.host, args.port))
+        render = (koha_sql.render_undo if args.undo_local_first
+                  else koha_sql.render_redo if args.redo_local_first else koha_sql.render)
+        sys.stdout.write(render(load(settings.targets), args.host, args.port))
         return 0
     if args.cmd == "check":
         targets = load(settings.targets)

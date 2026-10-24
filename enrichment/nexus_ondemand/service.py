@@ -5,13 +5,16 @@ worker never takes them, nor this service a batch job), any number of
 records (the whole catalogue too: it takes hours, record after record,
 read from export.xml as it goes), or one typed query, and for each record:
 
-1. asks the direct servers (dispatch.py) unless this round was already
+1. reads the local-first catalogues' records in static.db (UNESP, UFPR,
+   UNIFESP, UnB, UFU) and, when they hold a good donor, goes straight to
+   step 3: no server, no network wait, no daily-cap wait;
+2. asks the direct servers (dispatch.py) unless this round was already
    asked: a job is asked again only by "Search more servers" (a new
    round, the servers already asked passed over) and never by a change
    of donor;
-2. keeps every record found under jobs/ID/candidates/SEQ/ (index.json
+3. keeps every record found under jobs/ID/candidates/SEQ/ (index.json
    says where each came from), and what each server did in od_attempts;
-3. merges (nexus_enrich.merge, unchanged rules) the best record of each
+4. merges (nexus_enrich.merge, unchanged rules) the best record of each
    server, with the donors the librarian chose (od_choices) first for
    their field groups, into the job's item row, as the batch worker does.
 
@@ -221,6 +224,8 @@ class Status:
         kind = ev.get("type")
         if kind == "done":
             self.data["network"] = sorted(set(self.data.get("network", [])) | set(ev.get("network") or []))
+            if ev.get("local"):                      # answered by static.db alone, no server asked
+                self.data["local"] = self.data.get("local", 0) + 1
         if kind == "skipped":                        # the servers passed over for the latest record
             whys = [why for _, why in ev.get("targets") or []]
             self.data["capped"] = sum("daily limit" in w for w in whys)
@@ -452,16 +457,26 @@ async def _one(store: Store, job: Job, settings: Settings, dispatcher: Dispatche
     status.record(seq, rec, query.get("title") or query.get("isbn") or "")
     try:
         asked = bool(store.attempts(job.id, seq, job.rounds))
+        # The local-first catalogues' static.db records (first round only:
+        # "Search more servers" wants the servers). When they are enough, the
+        # record waits neither for the network nor for the daily caps.
+        first = local = None
+        if not asked and rec is not None and job.rounds == 1:
+            first = await asyncio.to_thread(dispatcher.local_first, rec)
+            local = dispatcher.enough_locally(rec, first)
         while not asked:                             # (a round with no server left to ask records nothing)
-            if not await gate.passed(lambda: store.job(job.id).state == "matching"):
-                return seq, None
-            if not await gate.quota(dispatcher.quota_until(rec), lambda: store.job(job.id).state == "matching"):
-                return seq, None
-            res = await dispatcher.run(rec, _steps(rec, query), exclude=store.asked(job.id, seq), tag=seq)
+            if not local:
+                if not await gate.passed(lambda: store.job(job.id).state == "matching"):
+                    return seq, None
+                if not await gate.quota(dispatcher.quota_until(rec), lambda: store.job(job.id).state == "matching"):
+                    return seq, None
+            res = await dispatcher.run(rec, _steps(rec, query), exclude=store.asked(job.id, seq), tag=seq,
+                                       first=first, local_first=job.rounds == 1)
             if Gate.down(res):
                 gate.hold()                          # not "nothing found": asked again when it is back
                 continue
-            gate.open()
+            if res.servers:                          # (a record answered by static.db says nothing of the network)
+                gate.open()
             store.add_attempts(job.id, seq, job.rounds, res.attempts)
             save_found(settings, job.id, seq, job.rounds, res)
             asked = True
@@ -627,11 +642,14 @@ def build(settings: Settings, config: Config, catalog: targets.Catalog | None = 
     if settings.learned_db is not None and settings.learned_db.parent.is_dir():
         learned = Learned(settings.learned_db)
     static = static_candidates(settings.static_db) if config.static else None
+    first = (static_candidates(settings.static_db, config.local_sources)
+             if config.static and config.static_first and config.local_sources else None)
     kw = {"opener": opener} if opener is not None else {}
     limits = Limits(service=max(Limits().service, 3 * max(1, settings.parallel)))
     d = Dispatcher(catalog, health, Limiter(limits, store=health), learned=learned, static=static,
-                   on_event=on_event, **kw)
+                   on_event=on_event, static_first=first, local_sources=config.local_sources, **kw)
     d.settings.static = config.static
+    d.settings.static_first = config.static_first
     return d, health
 
 

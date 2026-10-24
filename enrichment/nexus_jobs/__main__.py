@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("biblionumber", type=int)
     w = sub.add_parser("worker")
     w.add_argument("--once", action="store_true")
-    w.add_argument("--pause", type=float, default=float(os.environ.get("NEXUS_JOBS_PAUSE", "1.5")))
+    w.add_argument("--pause", type=float, default=float(os.environ.get("NEXUS_JOBS_PAUSE", "0")))
     for name in ("chunk-ids", "chunk-file", "check-matches", "committed", "chunk-failed", "reverted",
                  "auth-file", "auth-committed", "auth-reverted"):
         c = sub.add_parser(name)

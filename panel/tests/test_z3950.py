@@ -35,7 +35,7 @@ def marc(title="Don Quixote", tag=b"245"):
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
     assert len(targets) == 250
-    # The koha.nexus servers (shared catalogue, Rede Pergamum), the direct Z39.50 servers by region, the authority files, then the
+    # The koha.nexus servers (shared catalogue, Rede Pergamum, the local-first catalogues), the direct Z39.50 servers by region, the authority files, then the
     # koha.nexus SRU gateway's four groups as the fallback.
     assert list(z.REGIONS) == ["koha_nexus", "brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
                                "authorities", "sru_national", "sru_br_universities", "sru_intl_universities",
@@ -54,14 +54,20 @@ def test_curated_list_loads_and_covers_every_region():
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
     # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
-    assert len(fallback) == 73
+    assert len(fallback) == 68
+    # Then the local-first catalogues static.db holds nearly whole, preselected; a direct server of
+    # the same library is their backup.
     own = [t for t in targets if t.region == "koha_nexus"]
     assert [(t.host, t.port, t.db, t.preselect) for t in own] == [
-        ("catalog.koha.nexus", 443, "sru", True), ("sru.koha.nexus", 443, "sru/all", True)]
+        ("catalog.koha.nexus", 443, "sru", True), ("sru.koha.nexus", 443, "sru/all", True)] + [
+        ("sru.koha.nexus", 443, "sru/" + i, True) for i in ("unesp", "ufpr", "unifesp", "unb", "ufu")]
+    assert {t.host: t.backup_for for t in direct if t.backup} == {
+        "z3950.unifesp.br": "sru.koha.nexus:443/sru/unifesp",
+        "unesp.alma.exlibrisgroup.com": "sru.koha.nexus:443/sru/unesp"}
     assert {(t.host, t.port, t.kind, t.syntax, t.encoding) for t in fallback} == {
         ("sru.koha.nexus", 443, "sru", "MARC21", "utf8")}
     assert all(t.db.startswith("sru/") and not t.login and not t.preselect for t in fallback)
-    assert [t.rank for t in fallback] == list(range(500, 573))
+    assert [t.rank for t in fallback] == list(range(500, 568))
 
 
 def test_curated_flags():
@@ -562,12 +568,13 @@ def test_koha_ranks_follow_latency():
 
 def test_curated_brazil_list_and_the_gateway():
     br = [t.db for t in z.load_curated() if t.region == "sru_br_universities"]
-    assert br == ["sru/" + i for i in "usp unicamp unesp uerj ufg ufmg ufpe ufsc ufscar unifesp ufu ufpr ufrgs "
-                                     "uff utfpr unb".split()]
-    # Ticked when the screen opens: four direct Brazilian servers and the Library of Congress, no SRU row.
+    assert br == ["sru/" + i for i in "usp unicamp uerj ufg ufmg ufpe ufsc ufscar ufrgs uff utfpr".split()]
+    # Ticked when the screen opens: the koha.nexus servers with the local-first catalogues, two direct
+    # Brazilian servers and the Library of Congress (UNIFESP's own server is now its gateway row's backup).
     ticked = {t.key for t in z.load_curated() if t.preselect}
-    assert ticked == {"catalog.koha.nexus:443/sru", "sru.koha.nexus:443/sru/all", "z3950.utfpr.edu.br:210/biblioteca", "z3950.ufsc.br:210/Default",
-                      "z3950.unifesp.br:210/Default", "lx2.loc.gov:210/LCDB"}
+    assert ticked == {"catalog.koha.nexus:443/sru", "sru.koha.nexus:443/sru/all", "z3950.utfpr.edu.br:210/biblioteca",
+                      "z3950.ufsc.br:210/Default", "lx2.loc.gov:210/LCDB"} | {
+                      f"sru.koha.nexus:443/sru/{i}" for i in ("unesp", "ufpr", "unifesp", "unb", "ufu")}
     rede = next(t for t in z.load_curated() if t.db == "sru/all")
     assert (rede.region, rede.sru_options, rede.preselect) == ("koha_nexus", "sru=get,sru_version=1.1", True)
 
