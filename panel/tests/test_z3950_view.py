@@ -405,18 +405,18 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             # It says the whole list is tested next, and how to add servers to Koha.
             assert "every server of the list is tested" in app.screen._question
             await pilot.click("#yes")
-            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
+            # No box to close: the counts are a notice and the test starts at once.
+            await _until(pilot, lambda: any(n.startswith("Servers added") for n in notes), wait=30)
             assert "z3950-sync" in tasks
             lines = seen["text"].splitlines()
             # The direct authority files Koha lacks are left out: only Add puts them in Koha.
             assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 16
             assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
                        for line in lines)
-            assert "Added: 3" in app.screen._body and "Updated: 5" in app.screen._body
             assert "Servers added: 3 · updated: 5" in notes
-            await _press(pilot, app, "ok")
             # Then the whole list is tested, as Show servers does: the list appears.
             await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
+            assert not any(isinstance(s, MessageScreen) for s in app.screen_stack)
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen), wait=30)
             assert view.history.tested and str(view.query_one("#z-scan").label) == "Update"
             assert any("returned a valid MARC record" in n for n in notes)
