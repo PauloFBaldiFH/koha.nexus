@@ -548,3 +548,88 @@ def test_skipped_servers_are_reported(health, clock):
     run(d)
     skipped = next(e for e in events if e["type"] == "skipped")
     assert [tid for tid, _ in skipped["targets"]] == ["br1"] and "daily limit" in skipped["targets"][0][1]
+
+
+# ----------------------------------------------------------------------
+# The local-first catalogues' static.db records, before any server
+# ----------------------------------------------------------------------
+
+LOCAL_SOURCES = {"unesp": "unesp", "unifesp": "unifesp"}
+
+
+def first_lookup(cands, asked=None):
+    def lookup(rec):
+        if asked is not None:
+            asked.append(rec)
+        return list(cands)
+    return lookup
+
+
+def local_dispatcher(targets, net, health, clock, cands, asked=None, **kw):
+    d = dispatcher(targets, net, health, clock, **kw)
+    d.static_first = first_lookup(cands, asked)
+    d.local_sources = dict(LOCAL_SOURCES)
+    return d
+
+
+def test_a_good_local_first_record_asks_no_server(health, clock):
+    events = []
+    net = FakeNet(s_example_org=Server([donor()]))
+    d = local_dispatcher([tgt("s")], net, health, clock, [Candidate(donor(), "unesp", "U1", 0.7, True)])
+    d.on_event = events.append
+    res = run(d)
+    assert net.opened == [] and res.servers == 0 and res.stopped_early and res.static_used
+    assert [(f.source, f.step, f.cls) for f in res.found] == [("static:unesp", "static-first", "M0")]
+    assert [e["type"] for e in events] == ["static", "done"] and events[-1]["local"]
+    assert d.enough_locally(local(), [Candidate(donor(), "unesp", "U1")])
+    assert not d.enough_locally(local(), [Candidate(donor(rich=False, dewey=""), "unesp", "U1")])
+    assert not d.enough_locally(local(), [])
+
+
+def test_a_poor_local_first_record_skips_that_librarys_own_server(health, clock):
+    poor = Candidate(donor(rich=False, dewey=""), "unifesp", "F1", 0.7, True)
+    net = FakeNet(unifesp_example_org=Server([donor()]), s_example_org=Server([donor()]))
+    targets = [tgt("unifesp-z", host="unifesp.example.org", covers="unifesp"), tgt("s")]
+    calls = []
+
+    def static(rec):                                 # the fallback after the servers: every source
+        calls.append(rec)
+        return [poor, Candidate(donor(), "bn", "B1", 0.9)]
+    d = local_dispatcher(targets, net, health, clock, [poor], static=static)
+    res = run(d)
+    assert net.hosts() == ["s.example.org"] and "unifesp-z" not in res.asked
+    assert [f.source for f in res.found] == ["static:unifesp", "z3950:s"]
+    assert calls == []                               # an M0 came back: no fallback; never the same record twice
+
+
+def test_search_more_and_authorities_skip_the_local_first_records(health, clock):
+    asked = []
+    net = FakeNet(s_example_org=Server([donor()]))
+    d = local_dispatcher([tgt("s")], net, health, clock, [Candidate(donor(), "unesp", "U1")], asked)
+    res = run(d, local_first=False)
+    assert asked == [] and net.hosts() == ["s.example.org"] and not res.static_used
+    # the caller's own read is used as it is (the service reads it off the event loop)
+    res = run(d, first=[])
+    assert asked == [] and res.servers == 1
+    d.settings.static_first = False
+    assert d.local_first(local()) == [] and asked == []
+
+
+def test_a_broken_local_first_lookup_falls_through_to_the_servers(health, clock):
+    def broken(rec):
+        raise OSError("disk")
+    net = FakeNet(s_example_org=Server([donor()]))
+    d = dispatcher([tgt("s")], net, health, clock)
+    d.static_first = broken
+    res = run(d)
+    assert net.hosts() == ["s.example.org"] and [f.source for f in res.found] == ["z3950:s"]
+
+
+def test_the_fallback_after_the_servers_does_not_repeat_the_local_first_records(health, clock):
+    unrelated = Candidate(other_book(), "unifesp", "F2", 0.7, True)
+    net = FakeNet(s_example_org=Server())
+    d = local_dispatcher([tgt("s")], net, health, clock, [unrelated],
+                         static=lambda rec: [unrelated, Candidate(donor(), "bn", "B1", 0.9)])
+    res = run(d)
+    assert net.hosts() == ["s.example.org"]
+    assert [(f.source, f.remote_id) for f in res.found] == [("static:unifesp", "F2"), ("static:bn", "B1")]

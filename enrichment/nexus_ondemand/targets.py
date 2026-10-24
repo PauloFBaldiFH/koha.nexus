@@ -87,6 +87,7 @@ class Target:
     password: str = field(default="", repr=False)
     alternates: tuple[Address, ...] = ()
     notes: str = ""
+    covers: str = ""                        # the gateway target id of the same library ("sru_fallback")
 
     @property
     def addresses(self) -> tuple[Address, ...]:
@@ -156,7 +157,7 @@ def make_target(raw: dict, env=os.environ) -> tuple[Target | None, str]:
         recordtype=str(raw.get("recordtype", "biblio")).strip().lower(),
         preselect=bool(raw.get("preselect")), unconfirmed=bool(raw.get("unconfirmed")),
         login_env=login_env, user=user, password=password, alternates=tuple(alternates),
-        notes=str(raw.get("notes", "")),
+        notes=str(raw.get("notes", "")), covers=str(raw.get("sru_fallback", "")).strip().lower(),
     ), ""
 
 

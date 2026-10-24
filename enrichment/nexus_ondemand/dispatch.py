@@ -2,6 +2,13 @@
 direct servers for one record, in waves, and collects what they answer.
 
 One record:
+- first, the local static.db's records of the local-first catalogues
+  (UNESP, UFPR, UNIFESP, UnB, UFU: the gateway's targets.json
+  "local_first", 99% of static.db): a file read, no network, no limiter
+  slot and no daily cap. When they already hold a good same-manifestation
+  donor (the rule below) no server is asked; otherwise the direct servers
+  of the libraries they answered for (Target.covers) are passed over and
+  the others asked as below;
 - the plan's steps (plan.py) are tried in order on each server, in one
   session per server (Init once); a cached answer (learned.db, key
   "direct:<id>") is used before any connection;
@@ -85,6 +92,7 @@ class Settings:
     timeouts: Timeouts = DEFAULT_TIMEOUTS
     provider_timeouts: dict = field(default_factory=lambda: dict(PROVIDER_TIMEOUTS))
     static: bool = True
+    static_first: bool = True     # the local-first catalogues' static.db records before any server
     spread: bool = True           # ask idle servers before busy ones of nearly the same rank
     adaptive_timeouts: bool = True
 
@@ -152,22 +160,30 @@ def _weight(t: Target) -> float:
     return 0.9 if select.is_national(t) else 0.7 if t.preselect else 0.5
 
 
-def static_candidates(path):
-    """A static lookup for Dispatcher(static=...): static.db's candidates
-    for a record, or [] when the file is missing."""
+def static_candidates(path, sources=None):
+    """A static lookup for Dispatcher(static=..., static_first=...):
+    static.db's candidates for a record (only those of SOURCES, static.db
+    source ids, when given), or [] when the file is missing."""
     from pathlib import Path
 
     from nexus_enrich.static import StaticDB
+
+    keep = set(sources) if sources is not None else None
 
     def lookup(rec: marc.Record) -> list[Candidate]:
         if rec is None or not Path(path).is_file():
             return []
         db = StaticDB(path)
         try:
-            return db.candidates_for(rec)[0]
+            cands = db.candidates_for(rec)[0]
         finally:
             db.close()
+        return cands if keep is None else [c for c in cands if c.source in keep]
     return lookup
+
+
+def _found_static(c: Candidate, step: str) -> Found:
+    return Found(f"static:{c.source}", c.record, step, weight=c.weight, brazilian=c.brazilian, remote_id=c.remote_id)
 
 
 class _Request:
@@ -187,13 +203,15 @@ class _Request:
 class Dispatcher:
     def __init__(self, catalog: Catalog, health, limiter, policy: Policy | None = None, learned=None,
                  static=None, settings: Settings | None = None, opener=open_session, clock=time.monotonic,
-                 on_event=None):
+                 on_event=None, static_first=None, local_sources: dict | None = None):
         self.catalog = catalog
         self.health = health
         self.limiter = limiter
         self.policy = policy or Policy()
         self.learned = learned
         self.static = static
+        self.static_first = static_first              # a static_candidates(path, local-first sources)
+        self.local_sources = dict(local_sources or {})   # {static.db source: gateway target id}
         self.settings = settings or Settings()
         self.opener = opener
         self.clock = clock
@@ -230,11 +248,35 @@ class Dispatcher:
             return None
         return next_midnight(time.time() if now is None else now)
 
+    # the local-first catalogues -------------------------------------------
+
+    def local_first(self, rec: marc.Record | None) -> list[Candidate]:
+        """static.db's records of the local-first catalogues for REC (a
+        file read: no network, no limiter, no daily cap), [] when off."""
+        if rec is None or self.static_first is None or not (self.settings.static and self.settings.static_first):
+            return []
+        try:
+            return self.static_first(rec)
+        except Exception as exc:                     # a broken static.db never fails the request
+            log.warning("local-first static lookup failed: %s", exc)
+            return []
+
+    def enough_locally(self, rec: marc.Record | None, cands: list[Candidate]) -> bool:
+        """CANDS (local_first's) already end the search for REC: the
+        servers, their limits and the daily-cap wait are not needed."""
+        if rec is None or not cands:
+            return False
+        req = _Request(rec)
+        for c in cands:
+            self._add(req, _found_static(c, "static-first"))
+        return self._good_enough(req)
+
     # one record ---------------------------------------------------------
 
     async def run(self, local: marc.Record | None, steps: list[Step], *, only=None,
                   max_servers: int | None = None, exclude=(), tag=None, recordtype: str = "biblio",
-                  context: marc.Record | None = None, accept=None) -> Result:
+                  context: marc.Record | None = None, accept=None, first: list[Candidate] | None = None,
+                  local_first: bool = True) -> Result:
         """Ask the servers for LOCAL (None: a typed query) with STEPS. The
         targets in EXCLUDE (an earlier run's Result.asked) are passed over:
         "Search more servers" asks the next ones. TAG (the record's number
@@ -243,17 +285,36 @@ class Dispatcher:
         For an authority heading: RECORDTYPE "authority" (the authority
         servers only), CONTEXT the bibliographic record (its language
         orders the servers), ACCEPT(found) True when the records found so
-        far are enough to stop."""
+        far are enough to stop.
+
+        A bibliographic record first gets the local-first catalogues'
+        static.db records (FIRST when the caller already read them;
+        LOCAL_FIRST False skips them, as "Search more servers" does)."""
         req = _Request(local)
         req.tag = tag
         req.accept = accept
         res = req.result
         if not steps:
             return res
+        exclude = set(exclude)
+        if local_first and local is not None and recordtype == "biblio" and accept is None:
+            cands = first if first is not None else self.local_first(local)
+            for c in cands:
+                self._add(req, _found_static(c, "static-first"))
+            if cands:
+                res.static_used = True
+                self._emit(req, type="static", found=len(cands), first=True)
+                if self._good_enough(req):
+                    res.stopped_early = True
+                    self._emit(req, type="done", found=len(res.found), servers=0, stopped_early=True, network=[],
+                               local=True)
+                    return res
+                # The libraries static.db answered for: their own servers add nothing new.
+                answered = {self.local_sources.get(c.source) for c in cands} - {None}
+                exclude |= {t.id for t in self.catalog.targets.values() if t.covers and t.covers in answered}
         ranked, res.skipped = select.rank(self.catalog.targets.values(), context if context is not None else local,
                                           recordtype=recordtype, only=only, health=self.health, limiter=self.limiter)
         self._emit(req, type="skipped", targets=[[tid, why] for tid, why in res.skipped])
-        exclude = set(exclude)
         queue = self._spread([t for t in ranked if t.id not in exclude])[:max_servers or self.settings.max_servers]
         pending: set[asyncio.Task] = set()
         for n, wave in enumerate(select.waves(queue, self.settings.wave, self.settings.per_wave_provider), 1):
@@ -344,9 +405,10 @@ class Dispatcher:
         except Exception as exc:                     # static.db is a fallback: never fail the request on it
             log.warning("static lookup failed: %s", exc)
             return
+        had = {(f.source, f.remote_id) for f in req.result.found}
+        cands = [c for c in cands if (f"static:{c.source}", c.remote_id) not in had]   # not the local-first ones again
         for c in cands:
-            self._add(req, Found(f"static:{c.source}", c.record, "static", weight=c.weight, brazilian=c.brazilian,
-                                 remote_id=c.remote_id))
+            self._add(req, _found_static(c, "static"))
         req.result.static_used = True
         self._emit(req, type="static", found=len(cands))
 
