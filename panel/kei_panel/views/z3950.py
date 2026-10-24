@@ -660,14 +660,15 @@ class Z3950View(SectionView):
     async def _update_servers(self) -> None:
         """Every server Koha has gets the list's settings (host, port,
         database, format, timeout, SRU fields), keeping its tick and rank;
-        the authority files are added when missing."""
+        the authority files are added when missing. Then the whole list is
+        tested, as Show servers does: people press this button expecting
+        the list of working servers (Paulo, twice), so it brings it."""
         from ..routines.common import failed, run_task, show_done
         title = t("Update server settings")
         question = t("Update the settings of the Z39.50/SRU servers Koha already has (address, port, database, "
                      "format, timeout, SRU fields) from this list? Their tick and rank are kept. The authority "
                      "files (Library of Congress names and subjects, Biblioteca Nacional) are added when "
                      "missing, and the Biblioteca Nacional's old Z39.50 addresses are unticked.")
-        # Not "Update" after Show servers: this one adds no catalogue server.
         question += "\n\n" + add_hint()
         if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
             return
@@ -682,7 +683,7 @@ class Z3950View(SectionView):
                               updated=out.get("updated", "0")), timeout=10)
         await show_done(self.app, title, result)
         await self._load_koha()
-        self.app.notify(add_hint(), timeout=15)
+        self.scan()
 
     # ------------------------------------------------------------------
     # Login, hide
@@ -818,9 +819,9 @@ class Z3950View(SectionView):
 
 
 def add_hint() -> str:
-    return t("This button only refreshes the servers Koha already has and adds the authority files. To add "
-             "catalogue servers: Show servers (it tests them), Select for search the ones you want, then "
-             "Save to Koha.")
+    return t("Then every server of the list is tested, as Show servers does, and the list shows the ones that "
+             "work. \"Updated: 0\" means the servers Koha has already had the right settings. To add catalogue "
+             "servers to Koha: Select for search the ones you want, then Save to Koha.")
 
 
 def health_state(state: str) -> str:
