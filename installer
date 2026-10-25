@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.113"
+PANEL_VERSION=" 1.5.114"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -126,6 +126,87 @@ PANEL_LANG_ITEMS=(
     "zh-Hans-CN" "中文 (简体)"
     "ja-Jpan-JP" "日本語"
     "ko-Kore-KP" "한국어"
+)
+
+# Names of the other languages Koha can install (koha-translate --list
+# --available), offered under "Other Koha languages" of the language menu.
+# Each name is in its own language; the English name follows when the
+# script is not Latin or the language is little known.
+LANG_EXTRA_NAMES=(
+    "af-ZA"      "Afrikaans"
+    "am-Ethi"    "አማርኛ (Amharic)"
+    "as-IN"      "অসমীয়া (Assamese)"
+    "az-AZ"      "Azərbaycanca"
+    "be-BY"      "Беларуская (Belarusian)"
+    "bg-Cyrl"    "Български (Bulgarian)"
+    "bo-CN"      "བོད་སྐད (Tibetan)"
+    "ca-ES"      "Català"
+    "cy-GB"      "Cymraeg (Welsh)"
+    "da-DK"      "Dansk"
+    "de-CH"      "Deutsch (Schweiz)"
+    "dz"         "རྫོང་ཁ (Dzongkha)"
+    "el-GR"      "Ελληνικά (Greek)"
+    "en-NZ"      "English (New Zealand)"
+    "eo"         "Esperanto"
+    "et"         "Eesti (Estonian)"
+    "eu"         "Euskara (Basque)"
+    "fi-FI"      "Suomi"
+    "fo-FO"      "Føroyskt (Faroese)"
+    "fr-CA"      "Français (Canada)"
+    "ga"         "Gaeilge (Irish)"
+    "gd"         "Gàidhlig (Scottish Gaelic)"
+    "gl"         "Galego"
+    "haw-US"     "ʻŌlelo Hawaiʻi (Hawaiian)"
+    "he-Hebr"    "עברית (Hebrew)"
+    "hr-HR"      "Hrvatski"
+    "hu-HU"      "Magyar"
+    "hy-Armn"    "Հայերեն (Armenian)"
+    "hyw-Armn"   "Արեւմտահայերէն (Western Armenian)"
+    "ia"         "Interlingua"
+    "iq-CA"      "Inuinnaqtun (Canada)"
+    "is-IS"      "Íslenska"
+    "iu-CA"      "ᐃᓄᒃᑎᑐᑦ (Inuktitut)"
+    "ka"         "ქართული (Georgian)"
+    "kk-KZ"      "Қазақ тілі (Kazakh)"
+    "km-KH"      "ខ្មែរ (Khmer)"
+    "kn-Knda"    "ಕನ್ನಡ (Kannada)"
+    "ku-Arab"    "کوردی (Kurdish)"
+    "lo-Laoo"    "ລາວ (Lao)"
+    "lv"         "Latviešu"
+    "mi-NZ"      "Te Reo Māori"
+    "ml"         "മലയാളം (Malayalam)"
+    "mon"        "Монгол (Mongolian)"
+    "mr"         "मराठी (Marathi)"
+    "ms-MY"      "Bahasa Melayu"
+    "my"         "မြန်မာ (Burmese)"
+    "nb-NO"      "Norsk bokmål"
+    "ne-NE"      "नेपाली (Nepali)"
+    "nl-BE"      "Nederlands (België)"
+    "nn-NO"      "Norsk nynorsk"
+    "oc"         "Occitan"
+    "pbr"        "Pangwa"
+    "prs"        "دری (Dari)"
+    "pt-PT"      "Português (Portugal)"
+    "ro-RO"      "Română"
+    "rw-RW"      "Kinyarwanda"
+    "sd-PK"      "سنڌي (Sindhi)"
+    "si"         "සිංහල (Sinhala)"
+    "sk-SK"      "Slovenčina"
+    "sl-SI"      "Slovenščina"
+    "sq-AL"      "Shqip (Albanian)"
+    "sr-Cyrl"    "Српски (Serbian)"
+    "sw-KE"      "Kiswahili"
+    "ta-LK"      "தமிழ் - இலங்கை (Tamil, Sri Lanka)"
+    "ta"         "தமிழ் (Tamil)"
+    "te"         "తెలుగు (Telugu)"
+    "tet"        "Tetun (Tetum)"
+    "th-TH"      "ไทย (Thai)"
+    "tk"         "Türkmençe (Turkmen)"
+    "tvl"        "Te Ggana Tuuvalu (Tuvaluan)"
+    "ty"         "Reo Tahiti (Tahitian)"
+    "ur-Arab"    "اردو (Urdu)"
+    "uz"         "Oʻzbekcha (Uzbek)"
+    "zh-Hant-TW" "中文 (繁體)"
 )
 
 # Maps a Koha/locale language code to the name of the panel dictionary (lang/<code>.cache).
@@ -6404,14 +6485,92 @@ lang_installed() {
 
 lang_is_installed() { lang_installed | grep -Fxq -- "$1"; }
 
-# The name of a language code ("pt-BR" -> "Português (Brasil)").
+# Every language this Koha can install (koha-translate --list --available),
+# one code per line; empty when the command is missing.
+lang_available() {
+    local cmd
+    cmd=$(lang_translate_cmd)
+    [ -n "$cmd" ] || return 0
+    "$cmd" --list --available 2>/dev/null \
+        | awk 'NF && $1 ~ /^[A-Za-z0-9-]+$/ && !seen[$1]++ { print $1 }'
+}
+
+# The name of a language code ("pt-BR" -> "Português (Brasil)"), from the
+# panel list, then from LANG_EXTRA_NAMES; an unknown code stays as it is.
 lang_name() {
     local i
     [ "$1" = en ] && { printf 'English'; return 0; }
     for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
         [ "${PANEL_LANG_ITEMS[i]}" = "$1" ] && { printf '%s' "${PANEL_LANG_ITEMS[i+1]}"; return 0; }
     done
+    for ((i = 0; i < ${#LANG_EXTRA_NAMES[@]}; i += 2)); do
+        [ "${LANG_EXTRA_NAMES[i]}" = "$1" ] && { printf '%s' "${LANG_EXTRA_NAMES[i+1]}"; return 0; }
+    done
     printf '%s' "$1"
+}
+
+lang_in_panel_list() {
+    local i
+    for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
+        [ "${PANEL_LANG_ITEMS[i]}" = "$1" ] && return 0
+    done
+    return 1
+}
+
+# 0 when this panel has a dictionary for language $1 (pt-PT and fr-CA share
+# pt and fr): the panel then follows it. Other languages leave the panel in
+# its current language.
+lang_panel_follows() {
+    local n i
+    n=$(normalize_panel_language "$1")
+    [ "$n" = en ] && return 0
+    for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
+        [ "$(normalize_panel_language "${PANEL_LANG_ITEMS[i]}")" = "$n" ] && return 0
+    done
+    return 1
+}
+
+# Templates a language pack is built from: its size is the disk use of one
+# more language (Koha writes a translated copy of them).
+LANG_TMPL_DIRS=(
+    /usr/share/koha/opac/htdocs/opac-tmpl/bootstrap/en
+    /usr/share/koha/intranet/htdocs/intranet-tmpl/prog/en
+)
+
+# Expected disk use of a new pack in MB, or "" when the templates are not found.
+lang_pack_size_mb() {
+    local d kb=0 k found=""
+    for d in "${LANG_TMPL_DIRS[@]}"; do
+        [ -d "$d" ] || continue
+        k=$(du -sk "$d" 2>/dev/null | awk '{print $1}')
+        [ -n "$k" ] && { kb=$((kb + k)); found=1; }
+    done
+    [ -n "$found" ] && printf '%s' $(((kb + 512) / 1024))
+}
+
+# Free space in MB where Koha keeps its templates, or "".
+lang_free_mb() {
+    local d=/usr/share/koha
+    [ -d "$d" ] || d=/usr/share
+    df -Pk "$d" 2>/dev/null | awk 'NR == 2 { printf "%d", $4 / 1024 }'
+}
+
+# Before a new pack: its size and the free space, then yes/no. 1 = stop
+# (refused, or too little space: the pack and 100 MB to spare).
+lang_confirm_size() {
+    local choice="$1" lang_label lang_size lang_free
+    lang_label=$(lang_name "$choice")
+    lang_size=$(lang_pack_size_mb)
+    lang_free=$(lang_free_mb)
+    log "languages: $choice needs ~${lang_size:-?} MB, ${lang_free:-?} MB free"
+    if [ -n "$lang_size" ] && [ -n "$lang_free" ] && [ "$lang_free" -lt $((lang_size + 100)) ]; then
+        msg_error "" "$(t "Not enough disk space for the language pack '\${choice}': about \${lang_size} MB needed, \${lang_free} MB free.\nNothing was installed.")" 10 76
+        return 1
+    fi
+    lang_size="${lang_size:-?}"
+    lang_free="${lang_free:-?}"
+    prompt_yes_no "$(t "Installing the Koha language pack")" \
+        "$(t "Koha builds a translated copy of the OPAC and staff interface templates for '\${choice}' (\${lang_label}).\n\nDisk space needed: about \${lang_size} MB\nFree space: \${lang_free} MB\nIt can take a few minutes.\n\nContinue?")" 15 76
 }
 
 # A comma-separated preference value with $2 moved to the front: Koha shows
@@ -6477,6 +6636,26 @@ lang_prepare_locale() {
         ja-Jpan-JP) loc_prefix="ja_JP" ;;
         ko-Kore-KP) loc_prefix="ko_KR" ;;
         ar-Arab)    loc_prefix="ar_.*" ;;
+        am-Ethi)    loc_prefix="am_ET" ;;
+        he-Hebr)    loc_prefix="he_IL" ;;
+        hy-Armn|hyw-Armn) loc_prefix="hy_AM" ;;
+        ku-Arab)    loc_prefix="ckb_IQ" ;;
+        lo-Laoo)    loc_prefix="lo_LA" ;;
+        ur-Arab)    loc_prefix="ur_PK" ;;
+        prs)        loc_prefix="fa_AF" ;;
+        mon)        loc_prefix="mn_MN" ;;
+        ne-NE)      loc_prefix="ne_NP" ;;
+        et)         loc_prefix="et_EE" ;;
+        lv)         loc_prefix="lv_LV" ;;
+        ka)         loc_prefix="ka_GE" ;;
+        si)         loc_prefix="si_LK" ;;
+        ga)         loc_prefix="ga_IE" ;;
+        gd)         loc_prefix="gd_GB" ;;
+        oc)         loc_prefix="oc_FR" ;;
+        tk)         loc_prefix="tk_TM" ;;
+        uz)         loc_prefix="uz_UZ" ;;
+        ia)         loc_prefix="ia_FR" ;;
+        dz)         loc_prefix="dz_BT" ;;
         fa-Arab)    loc_prefix="fa_IR" ;;
         sr-Cyrl)    loc_prefix="sr_RS" ;;
         bg-Cyrl)    loc_prefix="bg_BG" ;;
@@ -6514,6 +6693,9 @@ lang_download() {
         stub=/usr/local/bin/koha-foreach
         printf '#!/bin/bash\nexit 0\n' > "$stub" && chmod +x "$stub" || stub=""
     fi
+    if ! lang_is_installed "$code"; then
+        lang_confirm_size "$code" || return 1
+    fi
     : > /tmp/koha_lang.log
     if lang_is_installed "$code"; then
         TUI_LOG=/tmp/koha_lang.log tui_run "$(t "Updating the Koha language pack")" "$cmd" --update "$code"
@@ -6538,7 +6720,8 @@ lang_download() {
 }
 
 # Menu of languages: every language the panel knows ($1 = all) or only the
-# installed ones ($1 = installed). The chosen code in REPLY.
+# installed ones ($1 = installed). The chosen code in REPLY. The "all" menu
+# ends with "Other Koha languages": the rest of what this Koha can install.
 lang_pick() {
     local which="$1" title="$2" text="$3" items=() code i
     if [ "$which" = installed ]; then
@@ -6549,8 +6732,31 @@ lang_pick() {
         for ((i = 0; i < ${#PANEL_LANG_ITEMS[@]}; i += 2)); do
             items+=("${PANEL_LANG_ITEMS[i]}" "${PANEL_LANG_ITEMS[i+1]}")
         done
+        items+=("others" "$(t "🌐  Other Koha languages (full list)")")
     fi
     REPLY=$(ui_menu "$title" "$text" "${items[@]}") || return 1
+    [ "$REPLY" = others ] && { lang_pick_others "$title" || return 1; }
+    [ -n "$REPLY" ]
+}
+
+# The languages of this Koha outside the panel list, with their names
+# (lang_other_items prints "code<TAB>name" lines). The chosen code in REPLY.
+lang_other_items() {
+    local code
+    while read -r code; do
+        lang_in_panel_list "$code" || printf '%s\t%s\n' "$code" "$(lang_name "$code")"
+    done < <(lang_available)
+}
+lang_pick_others() {
+    local items=() code name
+    while IFS=$'\t' read -r code name; do
+        items+=("$code" "$name")
+    done < <(lang_other_items)
+    if [ ${#items[@]} -eq 0 ]; then
+        msg_info "$1" "$(t "This Koha did not list any other language (koha-translate --list --available).")" 9 76
+        return 1
+    fi
+    REPLY=$(ui_menu "$1" "$(t "Every other language this Koha can install. Choose one:")" "${items[@]}") || return 1
     [ -n "$REPLY" ]
 }
 
@@ -6588,13 +6794,23 @@ function_install_languages() {
         "$(t "Choose the language to install in Koha and apply to this Panel:")" || return 0
     choice="$REPLY"
 
-    set_panel_language "$choice"
-    log "panel language set to $choice ($SYS_LANG)"
-    kei_result panel_lang "$choice"
+    # A language without a panel dictionary leaves the panel as it is.
+    local panel_note=""
+    if lang_panel_follows "$choice"; then
+        set_panel_language "$choice"
+        log "panel language set to $choice ($SYS_LANG)"
+        kei_result panel_lang "$choice"
+    else
+        panel_note="\n\n$(t "This panel has no translation for '\${choice}' and stays in its current language.")"
+    fi
 
     if ! is_koha_installed || ! mysql -e "USE ${DB_NAME};" >/dev/null 2>&1; then
-        msg_info "$(t "Koha & Panel Languages")" \
-            "$(t "The panel language was changed.\n\nKoha is not installed yet, so its language pack will be installed later (the installer uses the panel language automatically).")" 12 74
+        if [ -z "$panel_note" ]; then
+            msg_info "$(t "Koha & Panel Languages")" \
+                "$(t "The panel language was changed.\n\nKoha is not installed yet, so its language pack will be installed later (the installer uses the panel language automatically).")" 12 74
+        else
+            msg_error "" "$(t "Koha is not installed yet. Please run option 1 first.")${panel_note}" 11 74
+        fi
         return 0
     fi
 
@@ -6607,7 +6823,7 @@ function_install_languages() {
         return 0
     fi
     lang_activate "$choice"
-    msg_ok "$(t "Language '\$choice' enabled successfully.\nFine tuning in: Administration > Preferences > I18N/L10N.")" 10 74
+    msg_ok "$(t "Language '\$choice' enabled successfully.\nFine tuning in: Administration > Preferences > I18N/L10N.")${panel_note}" 12 74
 }
 
 # 3. Set an installed language as active (OPAC, staff and this panel),
@@ -6623,6 +6839,10 @@ function_lang_activate() {
         msg_error "" "$(t "Could not change the language preferences of Koha.")" 9 70
         return 0
     }
+    if ! lang_panel_follows "$choice"; then
+        msg_ok "$(t "Language '\$choice' enabled successfully.\nFine tuning in: Administration > Preferences > I18N/L10N.")\n\n$(t "This panel has no translation for '\${choice}' and stays in its current language.")" 12 76
+        return 0
+    fi
     set_panel_language "$choice"
     kei_result panel_lang "$choice"
     msg_ok "$(t "Language '\$choice' is now the active language of the OPAC, the staff interface and this panel.\nNothing was downloaded.")" 10 76
