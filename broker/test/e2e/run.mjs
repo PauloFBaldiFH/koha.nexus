@@ -254,6 +254,57 @@ try {
     fake.state.dns_records = fake.state.dns_records.filter((r) => r.id !== foreign.id);
   });
 
+  await step("public list: only libraries that opted in, as JSON, plain HTML and a sitemap", async () => {
+    assert.deepEqual((await call("GET", "/api/public-libraries")).json, [], "nobody listed before opting in");
+    assert.equal((await signed(lib, "PUT", "/v1/listing", { public: "yes" })).status, 400);
+    const on = await signed(lib, "PUT", "/v1/listing", { public: true });
+    assert.equal(on.status, 200, on.text);
+    assert.equal((await signed(lib, "GET", "/v1/library")).json.public_listing, true);
+    const list = await call("GET", "/api/public-libraries");
+    assert.deepEqual(list.json, [{ name: "Biblioteca Pública Municipal de Palotina", domain: "t-palotina-pr.example.org", url: "https://t-palotina-pr.example.org" }]);
+    const page = await call("GET", "/libraries");
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get("content-type"), /^text\/html/);
+    assert.match(page.text, /<a href="https:\/\/t-palotina-pr\.example\.org\/">Biblioteca Pública Municipal de Palotina<\/a>/);
+    assert.doesNotMatch(page.text, /<script/i);
+    const sm = await call("GET", "/libraries/sitemap.xml");
+    assert.match(sm.text, /<loc>https:\/\/t-palotina-pr\.example\.org\/<\/loc>/);
+
+    // Names come from the request form: escaped, never markup.
+    await b.db.prepare("UPDATE libraries SET institution_name = ? WHERE id = ?").bind('<img src=x onerror="alert(1)">', lib).run();
+    assert.doesNotMatch((await call("GET", "/libraries")).text, /<img/);
+    await b.db.prepare("UPDATE libraries SET institution_name = ? WHERE id = ?").bind("Biblioteca Pública Municipal de Palotina", lib).run();
+
+    // Silent for over 30 days (no heartbeat): off the list until the next one.
+    await b.db.prepare("UPDATE libraries SET last_heartbeat = ? WHERE id = ?").bind(Math.floor(Date.now() / 1000) - 31 * 86400, lib).run();
+    assert.deepEqual((await call("GET", "/api/public-libraries")).json, []);
+    assert.equal((await signed(lib, "POST", "/v1/heartbeat", { koha_version: "24.11.05", installer_version: "1.5.4" })).status, 200);
+    assert.equal((await call("GET", "/api/public-libraries")).json.length, 1);
+
+    const off = await call("POST", `/admin/libraries/${lib}/listing`, { headers: admin, body: { public: false } });
+    assert.equal(off.status, 200, off.text);
+    assert.deepEqual((await call("GET", "/api/public-libraries")).json, []);
+  });
+
+  await step("admin recovery file: a new key for a lost server; the old key stops at once", async () => {
+    assert.equal((await call("POST", `/admin/libraries/${lib}/recovery-file`)).status, 401);
+    const r = await call("POST", `/admin/libraries/${lib}/recovery-file`, { headers: admin });
+    assert.equal(r.status, 200, r.text);
+    assert.match(r.text, /^KEI_ADDRESS=1$/m);
+    assert.match(r.text, new RegExp(`^LIBRARY_ID=${lib}$`, "m"));
+    assert.match(r.text, /^OPAC_HOST=t-palotina-pr\.example\.org$/m);
+    assert.match(r.text, new RegExp(`^BROKER_URL=${B.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+    assert.equal((await signed(lib, "GET", "/v1/library")).status, 401, "the old key no longer signs");
+    const pem = r.text.slice(r.text.indexOf("-----BEGIN PRIVATE KEY-----"));
+    writeFileSync(KEY, pem, { mode: 0o600 });
+    const pub = execFileSync("bash", [SIGNER, "pubkey", KEY], { encoding: "utf8" }).trim();
+    const row = await b.db.prepare("SELECT public_key FROM libraries WHERE id = ?").bind(lib).first();
+    assert.equal(row.public_key, pub, "openssl reads the key the broker made");
+    const info = await signed(lib, "GET", "/v1/library");
+    assert.equal(info.status, 200, info.text);
+    assert.equal(info.json.slug, "palotina-pr");
+  });
+
   await step("DELETE /v1/library removes tunnel and records; the key stops working", async () => {
     const r = await signed(lib, "DELETE", "/v1/library");
     assert.equal(r.status, 202, r.text);
@@ -271,6 +322,14 @@ try {
     });
     assert.equal(r.status, 200, r.text);
     assert.equal(r.json.suggested_slug, "palotina-pr-2");
+  });
+
+  await step("the admin can end the hold on a released name", async () => {
+    assert.equal((await call("DELETE", "/admin/held-names/palotina-pr")).status, 401);
+    const r = await call("DELETE", "/admin/held-names/palotina-pr", { headers: admin });
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json, { slug: "palotina-pr", available: true });
+    assert.equal((await call("DELETE", "/admin/held-names/palotina-pr", { headers: admin })).status, 404);
   });
 
   await step("device/start is rate limited (3 per minute per IP)", async () => {

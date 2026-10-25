@@ -246,7 +246,22 @@ export async function getLibraryInfo(request: Request, env: Env, body: ArrayBuff
     hostnames: hostnamesFor(lib.slug, env),
     staff_remote_access: Boolean(lib.staff_pass_hash),
     staff_allow_cidrs: lib.staff_allow_cidrs ? JSON.parse(lib.staff_allow_cidrs) : [],
+    public_listing: lib.public_listing === 1,
   });
+}
+
+// The library chooses whether its catalog appears on the public list.
+export async function putListing(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
+  const lib = await signedLibrary(request, env, body);
+  const b = parseJson<{ public?: unknown }>(body);
+  if (typeof b.public !== "boolean") throw new HttpError(400, "public must be true or false");
+  await setListing(env, lib.id, b.public, `library:${lib.id}`);
+  return json({ public_listing: b.public });
+}
+
+export async function setListing(env: Env, libraryId: string, visible: boolean, actor: string): Promise<void> {
+  await env.DB.prepare("UPDATE libraries SET public_listing = ?, updated_at = ? WHERE id = ?").bind(visible ? 1 : 0, now(), libraryId).run();
+  await audit(env, actor, visible ? "listing.on" : "listing.off", libraryId);
 }
 
 // The tunnel token is fetched live from Cloudflare and never stored by the broker.
@@ -337,29 +352,67 @@ export async function deleteLibrary(request: Request, env: Env, body: ArrayBuffe
   return requestDeletion(env, lib.id, `library:${lib.id}`);
 }
 
-export async function listPublicLibraries(env: Env): Promise<Response> {
+// ---- Public list of catalogs ----
+
+// A library that sent no heartbeat for this long (server off, panel removed)
+// leaves the public list; it comes back with its next heartbeat.
+export const LISTING_SILENCE_SECONDS = 30 * 86400;
+
+interface PublicLibrary {
+  name: string;
+  domain: string;
+  url: string;
+}
+
+async function publicLibraries(env: Env): Promise<PublicLibrary[]> {
   const rows = await env.DB.prepare(
-    `SELECT institution_name, slug FROM libraries WHERE status = 'active' ORDER BY created_at DESC LIMIT 100`
-  ).all<{ institution_name: string; slug: string }>();
-
-  const baseZone = env.ZONE_NAME || "koha.nexus";
-
-  const publicList = (rows.results || []).map((lib) => {
-    const domain = `${lib.slug}.${baseZone}`;
-    return {
-      name: lib.institution_name,
-      domain: domain,
-      url: `https://${domain}`,
-    };
+    `SELECT institution_name, slug FROM libraries
+     WHERE status = 'active' AND public_listing = 1 AND COALESCE(last_heartbeat, created_at) > ?
+     ORDER BY institution_name COLLATE NOCASE LIMIT 500`,
+  )
+    .bind(now() - LISTING_SILENCE_SECONDS)
+    .all<{ institution_name: string; slug: string }>();
+  return (rows.results ?? []).map((lib) => {
+    const domain = hostnamesFor(lib.slug, env).opac;
+    return { name: lib.institution_name, domain, url: `https://${domain}` };
   });
+}
 
-  return new Response(JSON.stringify(publicList), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Cache-Control": "public, max-age=60",
-    },
-  });
+const PUBLIC_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Cache-Control": "public, max-age=300",
+};
+
+export async function listPublicLibraries(env: Env): Promise<Response> {
+  return json(await publicLibraries(env), 200, PUBLIC_HEADERS);
+}
+
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+// Plain HTML (no script), so search engines follow the links to each catalog.
+export async function librariesPage(env: Env): Promise<Response> {
+  const items = (await publicLibraries(env))
+    .map((l) => `<li><a href="${escapeHtml(l.url)}/">${escapeHtml(l.name)}</a> <span>${escapeHtml(l.domain)}</span></li>`)
+    .join("\n");
+  const html = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Catálogos da rede koha.nexus</title>
+<meta name="description" content="Catálogos públicos (OPAC Koha) das bibliotecas da rede koha.nexus.">
+<body style="font-family:system-ui;max-width:44rem;margin:3rem auto;padding:0 1rem;line-height:1.5">
+<h1>Catálogos da rede koha.nexus</h1>
+<p>Catálogos públicos das bibliotecas que usam o <a href="https://koha.nexus/">koha.nexus</a>.</p>
+<ul>
+${items || "<li>Nenhum catálogo publicado ainda.</li>"}
+</ul>`;
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", ...PUBLIC_HEADERS } });
+}
+
+// The catalogs' home pages, for a Search Console property that covers the
+// whole zone (Domain property): each catalog keeps its own sitemap of records.
+export async function librariesSitemap(env: Env): Promise<Response> {
+  const urls = (await publicLibraries(env)).map((l) => `  <url><loc>${escapeHtml(l.url)}/</loc></url>`).join("\n");
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  return new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8", ...PUBLIC_HEADERS } });
 }

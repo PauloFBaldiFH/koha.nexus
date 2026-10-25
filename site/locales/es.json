@@ -53,6 +53,7 @@
     "f18_t": "Asistente de IA",
     "f18_d": "Los bibliotecarios preguntan en lenguaje sencillo sobre libros, lectores y préstamos. Todo cambio es una propuesta que solo se ejecuta tras Aprobar y ejecutar.",
     "n_live": "Lista en vivo de la red koha.nexus",
+    "n_all": "Ver la lista completa de catálogos",
     "nav_features": "Características",
     "nav_install": "Instalación",
     "nav_win": "Windows",

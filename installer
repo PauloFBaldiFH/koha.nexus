@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.111"
+PANEL_VERSION=" 1.5.112"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -8481,7 +8481,22 @@ broker_complete_request() {
     broker_connect share
     prompt_yes_no "$(t "Recovery file")" "$(t "Save a recovery file for this address now?\n\nWith it, a new installation (another computer, a reinstalled server) gets this same address back. Without it, a new installation gets a new address.")" 13 76 \
         && broker_save_recovery
+    if prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show this catalog on the public list of the koha.nexus network (koha.nexus and broker.koha.nexus/libraries)?\n\nThe list shows the library's name and the catalog's address, and helps search engines find the catalog. You can change this later in this menu.")" 14 78; then
+        broker_set_listing true
+    fi
     return 0
+}
+
+# broker_set_listing true|false: the catalog on or off the public list.
+broker_set_listing() {
+    if broker_request PUT /v1/listing yes "{\"public\":$1}"; then
+        broker_cleanup
+        kv_write "$TUNNEL_CONF" 644 PUBLIC_LISTING "$([ "$1" = true ] && echo yes || echo no)"
+        return 0
+    fi
+    msg_error "" "$(t "The address service did not confirm:")\n\n$(broker_error)" 10 74
+    broker_cleanup
+    return 1
 }
 
 # broker_connect [share]: fetches the tunnel token and runs cloudflared as a
@@ -8630,17 +8645,20 @@ function_cloudflare_free_address() {
 
 # Menu of a server that already has a free address.
 function_broker_manage() {
-    local choice opac staff remote
+    local choice opac staff remote listed
     while true; do
         opac=$(tunnel_conf_get OPAC_HOST)
         remote="$(t "off")"
         [ "$(tunnel_conf_get STAFF_REMOTE)" = "yes" ] && remote="$(t "on")"
-        choice=$(ui_menu "$(t "Free address")" "$(t "Catalog address: https://\$opac\nRemote staff access: \$remote")" \
+        listed="$(t "off")"
+        [ "$(tunnel_conf_get PUBLIC_LISTING)" = "yes" ] && listed="$(t "on")"
+        choice=$(ui_menu "$(t "Free address")" "$(t "Catalog address: https://\$opac\nRemote staff access: \$remote\nOn the public list of catalogs: \$listed")" \
             "1" "$(t "Remote staff access (password at the edge)")" \
             "2" "$(t "Reconnect the tunnel (fetch the token again)")" \
             "3" "$(t "Renew the tunnel token")" \
             "4" "$(t "Save the recovery file (to move this address to a new installation)")" \
-            "5" "$(t "Give up the free address")") || return 0
+            "5" "$(t "Show or hide the catalog on the public list of catalogs")" \
+            "6" "$(t "Give up the free address")") || return 0
         case "$choice" in
             1) function_broker_staff_access ;;
             2) clear; broker_connect ;;
@@ -8656,7 +8674,16 @@ function_broker_manage() {
                 fi
                 ;;
             4) broker_save_recovery ;;
-            5) function_broker_leave && return 0 ;;
+            6) function_broker_leave && return 0 ;;
+            5)
+                if [ "$(tunnel_conf_get PUBLIC_LISTING)" = "yes" ]; then
+                    prompt_yes_no "$(t "Public list of catalogs")" "$(t "Hide the catalog from the public list of the koha.nexus network?")" 9 70 \
+                        && broker_set_listing false && msg_ok "$(t "The catalog is no longer on the public list.")" 8 60
+                else
+                    prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show the catalog on the public list of the koha.nexus network? The list shows the library's name and the catalog's address.")" 10 74 \
+                        && broker_set_listing true && msg_ok "$(t "The catalog is on the public list.")" 8 60
+                fi
+                ;;
         esac
     done
 }
@@ -8694,7 +8721,7 @@ broker_save_recovery() {
 
 # Reads a recovery file and connects this server under that address.
 broker_restore_address() {
-    local file url lib key bak_conf="" bak_key="" opac staff remote
+    local file url lib key bak_conf="" bak_key="" opac staff remote listed
     file=$(ui_input "$(t "Free address")" "$(t "Path of the recovery file (koha-address-....key). You can drag the file onto this window:")") || return 1
     file=$(clean_path "$file")
     if [ ! -r "$file" ]; then
@@ -8739,11 +8766,13 @@ broker_restore_address() {
     fi
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
-    remote=no
+    remote=no listed=no
     [ "$(json_field "$BROKER_BODY" staff_remote_access)" = "true" ] && remote=yes
+    [ "$(json_field "$BROKER_BODY" public_listing)" = "true" ] && listed=yes
     broker_cleanup
     rm -f "$bak_conf" "$bak_key"
-    kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE "$remote" || return 1
+    kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE "$remote" \
+        PUBLIC_LISTING "$listed" || return 1
     log "broker: address $opac restored from a recovery file (library $lib)"
 
     # A new token: the server that had the address before can no longer connect.

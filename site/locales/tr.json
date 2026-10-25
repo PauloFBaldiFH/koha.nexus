@@ -53,6 +53,7 @@
     "f18_t": "Yapay zekâ asistanı",
     "f18_d": "Kütüphaneciler kitaplar, üyeler ve ödünç işlemleri hakkında günlük dille soru sorar. Her değişiklik, yalnızca Onayla ve Çalıştır sonrasında uygulanan bir öneridir.",
     "n_live": "koha.nexus ağından güncel liste",
+    "n_all": "Kataloglerin tam listesini görün",
     "nav_features": "Özellikler",
     "nav_install": "Kurulum",
     "nav_win": "Windows",

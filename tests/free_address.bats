@@ -114,6 +114,21 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     assert '[ -z "$(ls /root/.kei-broker-* 2>/dev/null)" ]' "temporary files removed"
     assert 'dialogs | grep -q "PROMPT \[Recovery file\].* => yes"' "$(dialogs)"
     assert '[ "$(stat -c %a /root/koha-address-t-palotina-pr.key)" = 600 ]' "recovery file offered and saved"
+    assert 'grep -qx "PUBLIC_LISTING=yes" $CONF/tunnel.conf' "$(cat $CONF/tunnel.conf)"
+    assert '/usr/bin/curl -s "$BROKER/api/public-libraries" | grep -q "t-palotina-pr.example.org"' "on the public list after saying yes"
+}
+
+@test "B01a the catalog leaves the public list and comes back from the menu" {
+    answer yes
+    inputs 5 CANCEL
+    panel function_broker_manage
+    assert 'grep -qx "PUBLIC_LISTING=no" $CONF/tunnel.conf' "$(dialogs)"
+    assert '! /usr/bin/curl -s "$BROKER/api/public-libraries" | grep -q "t-palotina-pr"'
+    answer yes
+    inputs 5 CANCEL
+    panel function_broker_manage
+    assert 'grep -qx "PUBLIC_LISTING=yes" $CONF/tunnel.conf' "$(dialogs)"
+    assert '/usr/bin/curl -s "$BROKER/api/public-libraries" | grep -q "t-palotina-pr.example.org"'
 }
 
 @test "B02 status, credentials and banner read the free address" {
@@ -220,6 +235,7 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     assert '[ "$status" -eq 0 ]' "$output"
     assert 'grep -qx "TUNNEL_MODE=broker" $CONF/tunnel.conf && grep -qx "OPAC_HOST=t-palotina-pr.example.org" $CONF/tunnel.conf' "$(cat $CONF/tunnel.conf)"
     assert 'grep -qx "STAFF_HOST=t-palotina-pr-admin.example.org" $CONF/tunnel.conf && grep -qx "STAFF_REMOTE=no" $CONF/tunnel.conf'
+    assert 'grep -qx "PUBLIC_LISTING=yes" $CONF/tunnel.conf' "the choice made on the old server comes back"
     assert 'cmp -s <(sed -n "/BEGIN/,/END/p" $file) $CONF/broker.key && [ "$(stat -c %a $CONF/broker.key)" = 600 ]'
     assert 'grep -q "^TUNNEL_TOKEN=" "$ENVF" && [ "$(cat "$ENVF")" != "$old_token" ]' "the token is renewed, the old server is cut off"
     assert '[ "$(pref OPACBaseURL)" = "https://t-palotina-pr.example.org" ]' "$(pref OPACBaseURL)"

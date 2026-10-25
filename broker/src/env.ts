@@ -80,6 +80,7 @@ export interface LibraryRow {
   koha_version: string | null;
   installer_version: string | null;
   last_heartbeat: number | null;
+  public_listing: number;
   created_at: number;
   updated_at: number;
 }

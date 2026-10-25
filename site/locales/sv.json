@@ -53,6 +53,7 @@
     "f18_t": "AI-assistent",
     "f18_d": "Bibliotekarier frågar på vanligt språk om böcker, låntagare och lån. Varje ändring är ett förslag som körs först efter Godkänn och kör.",
     "n_live": "Aktuell lista från nätverket koha.nexus",
+    "n_all": "Se hela listan över kataloger",
     "nav_features": "Funktioner",
     "nav_install": "Installation",
     "nav_win": "Windows",

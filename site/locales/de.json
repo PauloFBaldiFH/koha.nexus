@@ -53,6 +53,7 @@
     "f18_t": "KI-Assistent",
     "f18_d": "Bibliothekare fragen in einfacher Sprache nach Büchern, Lesern und Ausleihen. Jede Änderung ist ein Vorschlag, der erst nach Genehmigen &amp; Ausführen läuft.",
     "n_live": "Live-Liste aus dem koha.nexus-Netz",
+    "n_all": "Vollständige Liste der Kataloge ansehen",
     "nav_features": "Funktionen",
     "nav_install": "Installation",
     "nav_win": "Windows",
