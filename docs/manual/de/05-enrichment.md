@@ -4,7 +4,7 @@
 
 ## Vorhandene Datensätze anreichern
 
-Import übernimmt Exportdaten; Anreicherung sucht Ergänzungen oder ein neues Buch. Titelübereinstimmung ersetzt keine bibliografische Prüfung. **Library tools > On-demand enrichment**, Taste `n`; alte bibliografische Stapeloberfläche ist nicht mehr der aktuelle Menüweg.
+Import übernimmt Exportdaten; Anreicherung sucht Ergänzungen oder ein neues Buch. Titelübereinstimmung ersetzt keine bibliografische Prüfung. **Library tools > Enrich from world catalogues**, Taste `n`; alte bibliografische Stapeloberfläche ist nicht mehr der aktuelle Menüweg.
 
 `all` oder `biblionumbers` wie `101, 102, 500-510`, dann **Search**. Auftrag/Server verfolgen; große Aufträge arbeiten im Hintergrund und können nach Neustart fortsetzen, benötigen verfügbaren Rechner. **Pause/Resume** pausiert Suche, macht keine Änderungen rückgängig. Bericht öffnen, Sacherschließung, Klassifikation, Anmerkungen und physische Beschreibung vergleichen. **Search more servers** fragt bisher ungenutzte Quellen, **Choose donor** wählt Spender für Feldgruppen vorhandener Ergebnisse. **Apply** erst nach Prüfung/Bestätigung; Suche und Bericht schreiben noch nichts.
 

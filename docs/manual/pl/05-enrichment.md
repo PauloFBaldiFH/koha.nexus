@@ -4,7 +4,7 @@
 
 ## Wzbogacanie
 
-Import przejmuje eksport, wzbogacanie uzupełnia lub szuka nowej książki. Zgodny tytuł wymaga kontroli bibliograficznej. **Library tools > On-demand enrichment**, `n`; dawny ekran bibliograficznych partii nie jest aktualną ścieżką.
+Import przejmuje eksport, wzbogacanie uzupełnia lub szuka nowej książki. Zgodny tytuł wymaga kontroli bibliograficznej. **Library tools > Enrich from world catalogues**, `n`; dawny ekran bibliograficznych partii nie jest aktualną ścieżką.
 
 `all` lub `biblionumbers`, np. `101, 102, 500-510`, **Search**. Obserwuj zadanie/serwery; duże w tle, może wznowić po restarcie przy dostępnej maszynie. **Pause/Resume** nie cofa zmian. Raport: tematy/klasyfikacja/notatki/opis fizyczny porównać. **Search more servers** odpytuje nowe źródła; **Choose donor** wybiera dawcę grup pól. **Apply** po przeglądzie/potwierdzeniu; szukanie/raport nie zapisuje.
 

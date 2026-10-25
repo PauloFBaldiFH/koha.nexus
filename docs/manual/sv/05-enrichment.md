@@ -4,7 +4,7 @@
 
 ## Berika befintliga poster
 
-Import hämtar exporter, berikning kompletterar eller hittar nytt verk. Titelträff kräver bibliografisk granskning. **Library tools > On-demand enrichment**, `n`; gammal bibliografisk batchskärm är inte aktuell menyväg.
+Import hämtar exporter, berikning kompletterar eller hittar nytt verk. Titelträff kräver bibliografisk granskning. **Library tools > Enrich from world catalogues**, `n`; gammal bibliografisk batchskärm är inte aktuell menyväg.
 
 Ange `all` eller `biblionumbers` som `101, 102, 500-510`, **Search**. Följ jobb/servrar; stora jobb fortsätter i bakgrunden och kan återupptas efter omstart när datorn är tillgänglig. **Pause/Resume** styr sökningen, ångrar inte tillämpning. Läs rapport och jämför ämnen, klassifikation, noter, fysisk beskrivning. **Search more servers** frågar oanvända källor; **Choose donor** väljer givare för fältgrupper. **Apply** efter granskning/bekräftelse; sökning/rapport skriver ännu inte.
 

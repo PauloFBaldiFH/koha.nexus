@@ -4,7 +4,7 @@
 
 ## Bổ sung biểu ghi đang có
 
-Nhập đưa xuất liệu vào Koha; bổ sung tìm dữ liệu thêm cho biểu ghi hiện có hoặc tìm sách mới. Mở **Library tools > On-demand enrichment** hoặc n, không dùng màn hình lô cũ. Nhập `all` hoặc `biblionumbers` như `101, 102, 500-510`, rồi **Search**.
+Nhập đưa xuất liệu vào Koha; bổ sung tìm dữ liệu thêm cho biểu ghi hiện có hoặc tìm sách mới. Mở **Library tools > Enrich from world catalogues** hoặc n, không dùng màn hình lô cũ. Nhập `all` hoặc `biblionumbers` như `101, 102, 500-510`, rồi **Search**.
 
 Theo dõi tác vụ và máy chủ. Tác vụ lớn chạy nền, có thể tiếp tục sau khởi động lại nếu máy còn khả dụng. **Pause**/**Resume** không hoàn tác thay đổi đã áp dụng. Mở báo cáo, so chủ đề, phân loại, ghi chú và mô tả vật lý. **Search more servers** hỏi nguồn chưa dùng; **Choose donor** chọn nguồn cho nhóm trường. Chỉ **Apply** sau xem xét và xác nhận; tìm và tạo báo cáo chưa ghi đề xuất vào mục lục.
 

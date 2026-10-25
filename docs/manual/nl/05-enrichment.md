@@ -4,7 +4,7 @@
 
 ## Bestaande records verrijken
 
-Import haalt exportgegevens binnen; verrijking zoekt aanvulling of een nieuw boek. Titelovereenkomst vereist nog bibliografische beoordeling. **Library tools > On-demand enrichment**, `n`; oude bibliografische batchscherm is geen huidige menuroute.
+Import haalt exportgegevens binnen; verrijking zoekt aanvulling of een nieuw boek. Titelovereenkomst vereist nog bibliografische beoordeling. **Library tools > Enrich from world catalogues**, `n`; oude bibliografische batchscherm is geen huidige menuroute.
 
 `all` of `biblionumbers` zoals `101, 102, 500-510`, **Search**. Taak/servers volgen; groot werk draait op achtergrond en kan na herstart verder, met beschikbare machine. **Pause/Resume** stuurt zoeken, draait geen toegepaste wijzigingen terug. Rapport openen, onderwerpen/classificatie/notities/fysieke beschrijving vergelijken. **Search more servers** vraagt nog ongebruikte bronnen; **Choose donor** kiest bron voor beschikbare veldgroepen. **Apply** na beoordeling/bevestiging; zoeken/rapport schrijft nog niet.
 

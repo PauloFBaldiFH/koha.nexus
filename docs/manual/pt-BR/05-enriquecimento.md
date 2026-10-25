@@ -6,7 +6,7 @@ Importar e enriquecer têm objetivos diferentes. A importação traz registros d
 
 ## Enriquecer registros existentes
 
-Abra **Ferramentas da biblioteca** e **Enriquecimento sob demanda**. A tecla **n** abre essa tela. A tela antiga de enriquecimento bibliográfico em lote não é mais o caminho apresentado no menu atual.
+Abra **Ferramentas da biblioteca** e **Enriquecer com catálogos do mundo**. A tecla **n** abre essa tela. A tela antiga de enriquecimento bibliográfico em lote não é mais o caminho apresentado no menu atual.
 
 1. Informe `all` para todos os registros ou os `biblionumbers` desejados, como `101, 102, 500-510`, e use **Pesquisar**.
 2. Acompanhe o trabalho e o quadro de servidores. Uma tarefa grande continua em segundo plano e pode prosseguir depois de um reinício. A máquina precisa permanecer disponível para que haja progresso.
@@ -40,7 +40,7 @@ Leia o relatório antes de **Aplicar**. A aplicação cria autoridades necessár
 Abra **Servidores Z39.50 / SRU**, pela barra lateral ou pela tecla **z**. Diferencie as funções da tela:
 
 - O servidor deste Koha permite que outras bibliotecas consultem seu catálogo. Ligar ou desligar altera também a abertura da porta correspondente no firewall, segundo o fluxo do painel.
-- A rede comunitária configura uma fonte de catálogo compartilhado no Koha. Isso é distinto da lista de servidores diretos consultados pelo enriquecimento sob demanda.
+- A rede comunitária configura uma fonte de catálogo compartilhado no Koha. Isso é distinto da lista de servidores diretos consultados pelo enriquecimento por catálogos do mundo.
 - O quadro de saúde mostra falhas dos servidores usados nas buscas diretas. **Reset** ou **Reset all** libera uma nova tentativa; não conserta o serviço remoto.
 - Os catálogos de saída servem à catalogação por cópia. **Mostrar servidores** testa cada servidor com uma busca real (não apenas uma conexão à porta) e lista os que devolvem registro; um servidor de backup só aparece quando o principal não devolve nenhum. Marque os servidores da pesquisa da catalogação com **Selecionar** ou a barra de espaço, desmarque com **Desselecionar** (recomendamos no máximo 20) e use **Salvar no Koha**. **Atualizar** testa de novo.
 
@@ -53,6 +53,6 @@ O suporte a SRU nessa configuração não significa que toda pesquisa de enrique
 ## Fontes conferidas
 
 - [Menus](../../../panel/kei_panel/menus.py), ações de ferramentas da biblioteca e servidores.
-- [Enriquecimento sob demanda](../../../panel/kei_panel/views/ondemand.py), composição, busca, importação e proteção de aplicação.
+- [Enriquecer com catálogos do mundo](../../../panel/kei_panel/views/ondemand.py), composição, busca, importação e proteção de aplicação.
 - [Trabalhos e autoridades](../../../panel/kei_panel/views/enrich.py), relatórios, aplicação, reversão e `AuthEnrichView`.
 - [Servidores](../../../panel/kei_panel/views/z3950.py), entrada, saúde, seleção, teste e inclusão.

@@ -4,7 +4,7 @@
 
 ## Record esistenti
 
-Importare acquisisce export; arricchire cerca integrazioni o un libro nuovo. Titolo corrispondente non sostituisce revisione bibliografica. **Library tools > On-demand enrichment**, `n`; vecchia schermata bibliografica a lotti non è più il percorso corrente.
+Importare acquisisce export; arricchire cerca integrazioni o un libro nuovo. Titolo corrispondente non sostituisce revisione bibliografica. **Library tools > Enrich from world catalogues**, `n`; vecchia schermata bibliografica a lotti non è più il percorso corrente.
 
 Inserire `all` o `biblionumbers` come `101, 102, 500-510`, **Search**. Seguire lavoro/server; grandi attività restano in background e possono riprendere dopo riavvio, con macchina disponibile. **Pause/Resume** controlla ricerca, non annulla modifiche. Leggere rapporto confrontando soggetti, classificazione, note, descrizione fisica. **Search more servers** interroga fonti non ancora usate; **Choose donor** sceglie fonte di gruppi di campi disponibili. **Apply** solo dopo revisione e conferma: ricerca/rapporto non scrivono proposte.
 

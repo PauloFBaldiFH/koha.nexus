@@ -4,7 +4,7 @@
 
 ## Pengayaan
 
-Impor mengambil ekspor, pengayaan menambah data atau menemukan buku baru. Judul sama perlu pemeriksaan bibliografis. **Library tools > On-demand enrichment**, `n`; layar batch lama bukan jalur menu kini.
+Impor mengambil ekspor, pengayaan menambah data atau menemukan buku baru. Judul sama perlu pemeriksaan bibliografis. **Library tools > Enrich from world catalogues**, `n`; layar batch lama bukan jalur menu kini.
 
 `all` atau `biblionumbers`, misalnya `101, 102, 500-510`, **Search**. Pantau tugas/server; besar di latar, dapat lanjut setelah restart bila mesin tersedia. **Pause/Resume** tidak membatalkan perubahan. Laporan: subjek/klasifikasi/catatan/deskripsi fisik. **Search more servers** sumber belum dipakai, **Choose donor** donor kelompok bidang. **Apply** sesudah tinjau/konfirmasi; pencarian/laporan tidak menulis.
 

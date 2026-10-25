@@ -179,7 +179,7 @@ class OnDemandView(EnrichView):
         return "enrich-od-add", [scope]
 
     def start_title(self) -> str:
-        return t("On-demand enrichment")
+        return t("Enrich from world catalogues")
 
     def scope_label(self, job: dict) -> str:
         return query_label(job) if job.get("query") else job.get("scope", "")

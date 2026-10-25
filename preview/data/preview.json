@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.112",
+ "panel_version": "1.5.113",
  "languages": [
   {
    "code": "en",
@@ -590,8 +590,8 @@
   {
    "id": "ondemand",
    "item": "sec-ondemand",
-   "label": "⚡  On-demand enrichment",
-   "title": "⚡  On-demand enrichment",
+   "label": "🌐  Enrich from world catalogues",
+   "title": "🌐  Enrich from world catalogues",
    "prompt": "",
    "icon": "",
    "key": "n",
@@ -1233,7 +1233,7 @@
    "id": "sec-ondemand",
    "type": "section",
    "section": "ondemand",
-   "label": "⚡  On-demand enrichment",
+   "label": "🌐  Enrich from world catalogues",
    "description": "",
    "kind": "view",
    "status": "available",
@@ -5577,9 +5577,9 @@
    "ja": null,
    "ko": null
   },
-  "⚡  On-demand enrichment": {
-   "en": "⚡  On-demand enrichment",
-   "pt-BR": "⚡  Enriquecimento sob demanda",
+  "🌐  Enrich from world catalogues": {
+   "en": "🌐  Enrich from world catalogues",
+   "pt-BR": "🌐  Enriquecer com catálogos do mundo",
    "es": null,
    "fr": null,
    "it": null,
