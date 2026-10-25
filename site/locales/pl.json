@@ -18,7 +18,6 @@
     "ct_err": "Nie można teraz wysłać wiadomości. Sprawdź pola i spróbuj ponownie za chwilę.",
     "ct_note": "Twój e-mail służy wyłącznie do odpowiedzi na tę wiadomość.",
     "nav_panel": "Panel",
-    "badge_new": "Nowość",
     "p_kick": "Nowy panel sterowania",
     "p_h2": "Jeden ekran do każdego zadania, z myszą i klawiaturą.",
     "p_p": "Uruchom <code>sudo config.sh</code>, aby otworzyć pełnoekranowy panel: aktualny pulpit, klikalne karty, skróty i paletę poleceń (<kbd>ctrl+p</kbd>). To rzeczywiste zrzuty ekranu panelu.",

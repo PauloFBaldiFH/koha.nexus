@@ -18,7 +18,6 @@
     "ct_err": "Die Nachricht konnte gerade nicht gesendet werden. Prüfen Sie die Felder und versuchen Sie es gleich noch einmal.",
     "ct_note": "Ihre E-Mail-Adresse wird nur für die Antwort verwendet.",
     "nav_panel": "Panel",
-    "badge_new": "Neu",
     "p_kick": "Das neue Kontrollpanel",
     "p_h2": "Ein Bildschirm für jede Aufgabe, mit Maus und Tastatur.",
     "p_p": "Starten Sie <code>sudo config.sh</code> und das Panel öffnet sich im Vollbild: ein Live-Dashboard, anklickbare Karten, Tastenkürzel und eine Befehlspalette (<kbd>Strg+P</kbd>). Das sind echte Bildschirmfotos des Panels.",

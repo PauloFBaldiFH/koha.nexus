@@ -18,7 +18,6 @@
     "ct_err": "Meddelandet kunde inte skickas just nu. Kontrollera fälten och försök igen om en stund.",
     "ct_note": "Din e-postadress används bara för att svara på meddelandet.",
     "nav_panel": "Panel",
-    "badge_new": "Nytt",
     "p_kick": "Den nya kontrollpanelen",
     "p_h2": "En skärm för varje uppgift, med mus och tangentbord.",
     "p_p": "Kör <code>sudo config.sh</code> så öppnas panelen i helskärm: en levande översikt, klickbara kort, kortkommandon och en kommandopalett (<kbd>ctrl+p</kbd>). Här visas riktiga skärmbilder från panelen.",

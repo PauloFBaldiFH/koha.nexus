@@ -18,7 +18,6 @@
     "ct_err": "Het bericht kon niet worden verstuurd. Controleer de velden en probeer het zo nog eens.",
     "ct_note": "Uw e-mailadres wordt alleen gebruikt om dit bericht te beantwoorden.",
     "nav_panel": "Paneel",
-    "badge_new": "Nieuw",
     "p_kick": "Het nieuwe bedieningspaneel",
     "p_h2": "Eén scherm voor elke taak, met muis en toetsenbord.",
     "p_p": "Voer <code>sudo config.sh</code> uit om het paneel op volledig scherm te openen: een live dashboard, aanklikbare kaarten, sneltoetsen en een opdrachtenpalet (<kbd>ctrl+p</kbd>). Dit zijn echte schermafbeeldingen van het paneel.",

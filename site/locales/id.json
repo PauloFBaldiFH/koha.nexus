@@ -18,7 +18,6 @@
     "ct_err": "Pesan belum dapat dikirim. Periksa isian dan coba lagi sebentar lagi.",
     "ct_note": "Email Anda hanya digunakan untuk membalas pesan ini.",
     "nav_panel": "Panel",
-    "badge_new": "Baru",
     "p_kick": "Panel kendali baru",
     "p_h2": "Satu layar untuk setiap tugas, dengan tetikus dan papan ketik.",
     "p_p": "Jalankan <code>sudo config.sh</code> untuk membuka panel layar penuh: dasbor langsung, kartu yang dapat diklik, tombol pintas dan palet perintah (<kbd>ctrl+p</kbd>). Ini adalah tangkapan layar panel sebenarnya.",

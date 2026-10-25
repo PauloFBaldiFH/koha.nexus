@@ -18,7 +18,6 @@
     "ct_err": "Le message n'a pas pu être envoyé. Vérifiez les champs et réessayez dans un instant.",
     "ct_note": "Votre e-mail ne sert qu'à répondre à ce message.",
     "nav_panel": "Panneau",
-    "badge_new": "Nouveau",
     "p_kick": "Le nouveau panneau de contrôle",
     "p_h2": "Un écran pour chaque tâche, à la souris et au clavier.",
     "p_p": "Lancez <code>sudo config.sh</code> et le panneau s'ouvre en plein écran : un tableau de bord en direct, des cartes cliquables, des raccourcis clavier et une palette de commandes (<kbd>ctrl+p</kbd>). Ce sont de vraies captures du panneau.",

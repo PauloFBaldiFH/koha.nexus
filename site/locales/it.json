@@ -18,7 +18,6 @@
     "ct_err": "Non è stato possibile inviare ora. Controlla i campi e riprova tra poco.",
     "ct_note": "La tua e-mail serve solo per rispondere a questo messaggio.",
     "nav_panel": "Pannello",
-    "badge_new": "Nuovo",
     "p_kick": "Il nuovo pannello di controllo",
     "p_h2": "Una schermata per ogni attività, con mouse e tastiera.",
     "p_p": "Esegui <code>sudo config.sh</code> e il pannello si apre a schermo intero: una dashboard in tempo reale, schede cliccabili, scorciatoie da tastiera e una tavolozza dei comandi (<kbd>ctrl+p</kbd>). Sono schermate reali del pannello.",

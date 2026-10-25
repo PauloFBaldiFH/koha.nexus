@@ -18,7 +18,6 @@
     "ct_err": "No se pudo enviar ahora. Revise los campos e inténtelo de nuevo en un momento.",
     "ct_note": "Su correo solo se usa para responder a este mensaje.",
     "nav_panel": "Panel",
-    "badge_new": "Nuevo",
     "p_kick": "El nuevo panel de control",
     "p_h2": "Una pantalla para cada tarea, con ratón y teclado.",
     "p_p": "Ejecute <code>sudo config.sh</code> y el panel se abre a pantalla completa: un tablero en vivo, tarjetas en las que hacer clic, atajos de teclado y una paleta de comandos (<kbd>ctrl+p</kbd>). Son capturas reales del panel.",

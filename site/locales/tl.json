@@ -18,7 +18,6 @@
     "ct_err": "Hindi maipadala ang mensahe ngayon. Suriin ang mga field at subukang muli mamaya.",
     "ct_note": "Ginagamit lamang ang e-mail mo upang sagutin ang mensaheng ito.",
     "nav_panel": "Panel",
-    "badge_new": "Bago",
     "p_kick": "Ang bagong control panel",
     "p_h2": "Isang screen para sa bawat gawain, gamit ang mouse at keyboard.",
     "p_p": "Patakbuhin ang <code>sudo config.sh</code> upang buksan ang panel sa buong screen: kasalukuyang dashboard, mga card na napipindot, shortcut at command palette (<kbd>ctrl+p</kbd>). Ito ang tunay na mga larawan ng panel.",

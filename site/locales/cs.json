@@ -18,7 +18,6 @@
     "ct_err": "Zprávu nyní nelze odeslat. Zkontrolujte pole a zkuste to za chvíli znovu.",
     "ct_note": "Váš e-mail slouží pouze k odpovědi na tuto zprávu.",
     "nav_panel": "Panel",
-    "badge_new": "Novinka",
     "p_kick": "Nový ovládací panel",
     "p_h2": "Jedna obrazovka pro každý úkol, s myší i klávesnicí.",
     "p_p": "Spusťte <code>sudo config.sh</code> a panel se otevře na celou obrazovku: živý přehled, klikatelné karty, klávesové zkratky a paleta příkazů (<kbd>ctrl+p</kbd>). Toto jsou skutečné snímky panelu.",
