@@ -3150,7 +3150,7 @@
    "recordtype": "authority"
   },
   {
-   "name": "KOHA.NEXUS (AUTORIDADES)",
+   "name": "Nexus Autoridades (Cloud)",
    "host": "sru.koha.nexus",
    "port": 443,
    "db": "sru/_union-aut",

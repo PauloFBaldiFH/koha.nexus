@@ -33592,6 +33592,9 @@ z3950_upsert_sql() {
             "${H[i]}" "${P[i]}" "${D[i]}" "${U[i]}" "${W[i]}" "${N[i]}" "${C[i]}" "${R[i]}" "${S[i]}" "${T[i]}" \
             "${K[i]}" "${E[i]}" "${Y[i]}" "${F[i]}" "${O[i]}" "$i" "${Y[i]}" "${H[i]}" "${P[i]}" "${D[i]}"
         printf "SET @kei_added := @kei_added + GREATEST(ROW_COUNT(), 0);\n"
+        if [ "${Y[i]}" = "'authority'" ] && [ "${H[i]}" = "'lx2.loc.gov'" ] && { [ "${D[i]}" = "'NAF'" ] || [ "${D[i]}" = "'SAF'" ]; }; then
+            printf "UPDATE z3950servers SET attributes = '1=1016' WHERE recordtype = 'authority' AND host = 'lx2.loc.gov' AND port = 210 AND db = %s;\n" "${D[i]}"
+        fi
     done
 }
 
@@ -33614,10 +33617,12 @@ Z3950_DEAD_HOSTS="200.20.12.18 162.214.168.248"
 
 # z3950_auth_rows: the authority targets, as z3950_upsert_sql's input.
 z3950_auth_rows() {
-    z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 1 USMARC utf8 10 zed '' '' '' '' authority
+    z3950_row lx2.loc.gov 210 NAF 'BIBLIOTECA DOS NOMES DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
     z3950_row lx2.loc.gov 210 SAF 'BIBLIOTECA DOS ASSUNTOS DO CONGRESSO' 1 2 USMARC utf8 10 zed '' '' '' '' authority
     z3950_row https://sru.koha.nexus 443 sru/bn-aut 'BIBLIOTECA NACIONAL (AUTORIDADES)' 1 3 MARC21 utf8 30 sru \
         "$Z3950_AUTH_SRU_FIELDS" 'sru=get,sru_version=1.1' '' '' authority
+    z3950_row https://sru.koha.nexus 443 sru/_union-aut 'Nexus Autoridades (Cloud)' 1 1 MARC21 utf8 30 sru \
+        "$Z3950_AUTH_SRU_FIELDS,subject=dc.subject,uniformtitle=bath.uniformTitle" 'sru=get,sru_version=1.1' '' '' authority
 }
 
 # z3950_dead_sql: untick the rows on Z3950_DEAD_HOSTS (with or without a

@@ -311,3 +311,63 @@ from Portuguese or Brazilian donors and never with a foreign `$2` (lcsh,
 rameau, gnd…). A stub record gets a replacement *proposal* for review, never
 an automatic replacement. Nothing here writes to Koha: the result feeds a
 staged batch that a librarian applies.
+
+## Central authority gateway and on-demand harvesting
+
+Library clients can search `https://sru.koha.nexus/sru/_union-aut` using SRU
+1.1, port 443 and `recordSchema=marcxml`. They do not need to build or host
+`static.db` for this authority endpoint. The database lives on the central
+server. Its contents and record count depend on the deployed harvest; the
+repository does not guarantee a fixed count or the availability of the cloud
+endpoint. Existing bibliographic search and enrichment services are unchanged.
+
+New authority seeds include these defaults:
+
+| Rank | Target | Protocol / database |
+| --- | --- | --- |
+| 1 | Nexus Autoridades (Cloud) | SRU, `https://sru.koha.nexus:443/sru/_union-aut` |
+| 2 | BIBLIOTECA DOS NOMES DO CONGRESSO | Z39.50, `lx2.loc.gov:210/NAF`, attributes `1=1016` |
+| 2 | BIBLIOTECA DOS ASSUNTOS DO CONGRESSO | Z39.50, `lx2.loc.gov:210/SAF`, attributes `1=1016` |
+| 3 | BIBLIOTECA NACIONAL (AUTORIDADES) | SRU, `https://sru.koha.nexus:443/sru/bn-aut` |
+
+Normal seeding preserves existing rank and checked choices. To explicitly
+apply this hierarchy to an existing installation, from the repository root:
+
+```sh
+python enrichment/setup_z3950_authorities.py --enforce-defaults | sudo koha-mysql INSTANCE
+```
+
+Replace `INSTANCE` with the actual Koha instance. This migration disables
+additional rows at the four managed addresses and legacy LoC authority SRU
+rows; it does not delete them or modify bibliographic targets. Back up the
+configuration and review the generated SQL before applying it. Without
+`--enforce-defaults`, the utility prints the ordinary idempotent seed only.
+
+On the **central gateway server only**, using its Python environment:
+
+```sh
+python enrichment/koha_nexus_harvest.py --source loc --db /var/lib/koha-nexus-enrich/static.db
+python enrichment/koha_nexus_harvest.py --source bn --db /var/lib/koha-nexus-enrich/static.db
+python enrichment/koha_nexus_harvest.py --source all --db /var/lib/koha-nexus-enrich/static.db
+```
+
+The CLI installs no daemon or schedule. It queries Wikidata for humans with
+LoC (`P244`) or BN (`P4619`) identifiers, partitioned by citizenship (`P27`)
+for Brazil, Portugal, France, Germany, Italy, Spain, the UK and the US.
+Each partition is capped at 3,000 rows. This is a bounded collection, not an
+exhaustive harvest: large partitions and other countries are not covered.
+Labels are stored with separate Wikidata provenance and marked preliminary;
+they are not presented as verified official LoC/BN preferred headings.
+Existing official authority sources are preserved.
+
+All requests finish before a single database transaction inserts the batches.
+A failed request leaves the database untouched. Reruns skip existing keys.
+After changes the CLI calls `systemctl reload-or-restart` on the existing
+`koha-nexus-sru.service`, because that unit has no `ExecReload`. Use
+`--reload-service koha-nexus-gateway.service` if that is the unit name in your
+central deployment, or `--no-reload` when managing the service separately.
+The operator needs database write permission and permission to manage that
+unit. A reload failure returns an error but does not undo committed data.
+Back up the central database before harvesting; replacing it with a monthly
+release also replaces these additions, so preserve/reapply the harvest when
+publishing a new central database.
