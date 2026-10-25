@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.110"
+PANEL_VERSION=" 1.5.111"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -982,7 +982,7 @@ panel_lock_release() {
 # --install-data-safety, which only (re)writes the data-safety settings,
 # and --rebuild-search-index (the Koha window's button).
 KEI_CLI_MODE=""
-case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--install-data-safety|--rebuild-search-index|--task) KEI_CLI_MODE="$1" ;; esac
+case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--opac-sitemap|--install-data-safety|--rebuild-search-index|--task) KEI_CLI_MODE="$1" ;; esac
 
 if [ -z "$KEI_CLI_MODE" ]; then
     # A routine started by the new panel (config.sh --run, see
@@ -8479,6 +8479,9 @@ broker_complete_request() {
         return 1
     fi
     broker_connect share
+    prompt_yes_no "$(t "Recovery file")" "$(t "Save a recovery file for this address now?\n\nWith it, a new installation (another computer, a reinstalled server) gets this same address back. Without it, a new installation gets a new address.")" 13 76 \
+        && broker_save_recovery
+    return 0
 }
 
 # broker_connect [share]: fetches the tunnel token and runs cloudflared as a
@@ -8594,8 +8597,16 @@ function_cloudflare_free_address() {
             msg_error "$(t "Free address")" "$(broker_offline_text)" 13 76
             return 0
         fi
+        local how
+        how=$(ui_menu "$(t "Free address")" "$(t "Is this a new address, or one this library already had on another server?")" \
+            "new" "$(t "Get a new free address")" \
+            "restore" "$(t "I already have an address (recovery file)")") || return 0
         if [ -f /etc/cloudflared/config.yml ]; then
             prompt_yes_no "$(t "Free address")" "$(t "This server already publishes Koha with your own domain. A free address replaces it (your domain's tunnel is switched off).\n\nContinue?")" 11 74 defaultno || return 0
+        fi
+        if [ "$how" = "restore" ]; then
+            broker_restore_address
+            return 0
         fi
         msg_info "$(t "Free address")" "$(t "GET A FREE ADDRESS FOR YOUR CATALOG\n\nNo domain or Cloudflare account is needed. Type the library name, a contact\ne-mail and the name you want: the address is created right away and this\nserver connects on its own. If the name is taken, a close variant is used.\n\nThe public catalog (OPAC) goes online. The staff interface stays on the\nlocal network until you turn on remote staff access, which adds a password\nchecked before anyone reaches Koha.")" 17 78
         broker_new_request || return 0
@@ -8628,7 +8639,8 @@ function_broker_manage() {
             "1" "$(t "Remote staff access (password at the edge)")" \
             "2" "$(t "Reconnect the tunnel (fetch the token again)")" \
             "3" "$(t "Renew the tunnel token")" \
-            "4" "$(t "Give up the free address")") || return 0
+            "4" "$(t "Save the recovery file (to move this address to a new installation)")" \
+            "5" "$(t "Give up the free address")") || return 0
         case "$choice" in
             1) function_broker_staff_access ;;
             2) clear; broker_connect ;;
@@ -8643,9 +8655,102 @@ function_broker_manage() {
                     broker_cleanup
                 fi
                 ;;
-            4) function_broker_leave && return 0 ;;
+            4) broker_save_recovery ;;
+            5) function_broker_leave && return 0 ;;
         esac
     done
+}
+
+# ----------------------------------------------------------------------
+# Recovery file: the address belongs to this server's key (broker.key), so
+# a reinstalled server or another computer would get a new address. The
+# file carries the key and the library id; on the new installation it is
+# read back, checked with the address service (a signed call), and the
+# tunnel token is renewed, so the old server can no longer connect.
+#
+#   KEI_ADDRESS=1, BROKER_URL, LIBRARY_ID, OPAC_HOST, then the key in PEM.
+# ----------------------------------------------------------------------
+broker_save_recovery() {
+    local opac file
+    opac=$(tunnel_conf_get OPAC_HOST) && [ -s "$BROKER_KEY" ] || {
+        msg_error "" "$(t "This server has no free address to save.")" 8 60
+        return 1
+    }
+    file="${REAL_HOME:-/root}/koha-address-${opac%%.*}.key"
+    if ! ( umask 077
+           printf '# koha.nexus free address recovery file. Whoever has it can publish this\n'
+           printf '# address: keep it private and outside this server.\n'
+           printf 'KEI_ADDRESS=1\nBROKER_URL=%s\nLIBRARY_ID=%s\nOPAC_HOST=%s\n' \
+               "$(broker_url)" "$(tunnel_conf_get LIBRARY_ID)" "$opac"
+           cat "$BROKER_KEY" ) > "$file"; then
+        msg_error "" "$(t "Could not write the recovery file.")" 8 60
+        return 1
+    fi
+    chmod 600 "$file"
+    [ -n "${REAL_USER:-}" ] && chown "$REAL_USER" "$file" 2>/dev/null
+    log "broker: recovery file saved for $opac"
+    msg_ok "$(t "Recovery file saved:\n\n  \$file\n\nCopy it to a safe place outside this server (a USB stick, the drive with your backups). On a new installation choose Free address, then \"I already have an address\", and this same address comes back.\n\nKeep it private: whoever has the file can publish this address.")" 17 78
+}
+
+# Reads a recovery file and connects this server under that address.
+broker_restore_address() {
+    local file url lib key bak_conf="" bak_key="" opac staff remote
+    file=$(ui_input "$(t "Free address")" "$(t "Path of the recovery file (koha-address-....key). You can drag the file onto this window:")") || return 1
+    file=$(clean_path "$file")
+    if [ ! -r "$file" ]; then
+        msg_error "" "$(t 'The file was not found on this server:\n${file}')" 10 76
+        return 1
+    fi
+    url=$(kv_get "$file" BROKER_URL)
+    lib=$(kv_get "$file" LIBRARY_ID)
+    if [ "$(kv_get "$file" KEI_ADDRESS)" != "1" ] || [ -z "$lib" ] || ! [[ "$url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+        msg_error "" "$(t "This is not a free address recovery file.")" 8 66
+        return 1
+    fi
+    mkdir -p "$CONF_DIR"
+    key=$(umask 077; mktemp "${CONF_DIR}/broker.key.XXXXXX") || return 1
+    sed -n '/^-----BEGIN PRIVATE KEY-----$/,/^-----END PRIVATE KEY-----$/p' "$file" > "$key"
+    if ! openssl pkey -in "$key" -noout -text 2>/dev/null | grep -qi 'ED25519'; then
+        rm -f "$key"
+        msg_error "" "$(t "This is not a free address recovery file.")" 8 66
+        return 1
+    fi
+
+    # What this server had before comes back if the address service says no.
+    if [ -f "$TUNNEL_CONF" ]; then bak_conf=$(mktemp "${TUNNEL_CONF}.XXXXXX") && cp -p "$TUNNEL_CONF" "$bak_conf"; fi
+    if [ -f "$BROKER_KEY" ]; then bak_key=$(umask 077; mktemp "${BROKER_KEY}.old.XXXXXX") && cp -p "$BROKER_KEY" "$bak_key"; fi
+    chmod 600 "$key"
+    mv -f "$key" "$BROKER_KEY"
+    rm -f "$TUNNEL_CONF"
+    kv_write "$TUNNEL_CONF" 644 BROKER_URL "$url" LIBRARY_ID "$lib" || return 1
+
+    clear
+    display_explanation "Checking the address with the address service..."
+    if ! broker_request GET /v1/library yes; then
+        local err
+        err=$(broker_error)
+        [ "$BROKER_STATUS" = "401" ] && err="$(t "The address service does not know this file: the address was given up, or it was already moved with a newer file.")"
+        broker_cleanup
+        rm -f "$TUNNEL_CONF" "$BROKER_KEY"
+        [ -n "$bak_conf" ] && mv -f "$bak_conf" "$TUNNEL_CONF"
+        [ -n "$bak_key" ] && mv -f "$bak_key" "$BROKER_KEY"
+        msg_error "" "$(t "The address could not be restored:")\n\n$err" 11 76
+        return 1
+    fi
+    opac=$(json_field "$BROKER_BODY" hostnames opac)
+    staff=$(json_field "$BROKER_BODY" hostnames staff)
+    remote=no
+    [ "$(json_field "$BROKER_BODY" staff_remote_access)" = "true" ] && remote=yes
+    broker_cleanup
+    rm -f "$bak_conf" "$bak_key"
+    kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE "$remote" || return 1
+    log "broker: address $opac restored from a recovery file (library $lib)"
+
+    # A new token: the server that had the address before can no longer connect.
+    display_explanation "Renewing the tunnel token..."
+    broker_request POST /v1/rotate yes "{}" || log "broker: token renewal after restore failed (HTTP $BROKER_STATUS)"
+    broker_cleanup
+    broker_connect share
 }
 
 # Remote staff access: the staff hostname answers only after a user and
@@ -8824,6 +8929,102 @@ function_configure_cloudflare() {
 # ======================================================================
 # 15. GOOGLE SEARCH CONSOLE / OPAC INDEXING
 # ======================================================================
+# OPAC sitemap: Koha's own misc/cronjobs/sitemap.pl writes sitemapindex.xml
+# and sitemapNNNN.xml (50,000 records each). They go to the OPAC document
+# root, with a robots.txt pointing to them. The assistant below turns on a
+# nightly refresh (/etc/cron.d/koha_sitemap, config.sh --opac-sitemap) that
+# reads the address from OPACBaseURL, so it follows an address change.
+OPAC_DOCROOT="${KEI_OPAC_DOCROOT:-/usr/share/koha/opac/htdocs}"
+CRON_SITEMAP="/etc/cron.d/koha_sitemap"
+ROBOTS_MARK="# koha.nexus: robots.txt of the OPAC (written by the panel)"
+
+opac_sitemap_script() {
+    local candidate
+    # Package installs keep the cron scripts in /usr/share/koha/bin/cronjobs.
+    for candidate in /usr/share/koha/bin/cronjobs/sitemap.pl /usr/share/koha/misc/cronjobs/sitemap.pl; do
+        [ -f "$candidate" ] && { printf '%s' "$candidate"; return 0; }
+    done
+    candidate=$(find /usr/share/koha -type f -name 'sitemap.pl' 2>/dev/null | head -n 1)
+    [ -n "$candidate" ] && printf '%s' "$candidate"
+}
+
+# opac_sitemap_publish URL: 0 once sitemapindex.xml and robots.txt are in
+# the OPAC document root.
+opac_sitemap_publish() {
+    local url="${1%/}" script tmp
+    [[ "$url" =~ ^https?://[^[:space:]\'\"]+$ ]] || return 1
+    script=$(opac_sitemap_script)
+    if [ -z "$script" ]; then
+        log "Warning: sitemap.pl script not found."
+        return 1
+    fi
+    [ -d "$OPAC_DOCROOT" ] || { log "Warning: OPAC document root $OPAC_DOCROOT not found."; return 1; }
+    # The script runs as the instance user, which cannot write in the OPAC
+    # document root: generate in a temporary folder, then publish as root.
+    tmp=$(mktemp -d /tmp/koha_sitemap.XXXXXX) || return 1
+    chown "${INSTANCE}-koha:${INSTANCE}-koha" "$tmp" 2>/dev/null || chmod 777 "$tmp"
+    if /usr/sbin/koha-shell "$INSTANCE" -c "/usr/bin/perl '$script' --dir '$tmp' --url '$url'" \
+            >"${LOG_DIR}/google-sitemap.log" 2>&1 && [ -s "$tmp/sitemapindex.xml" ]; then
+        # Fewer records than last time: older numbered files would linger.
+        rm -f "$OPAC_DOCROOT"/sitemap[0-9]*.xml
+        cp -f "$tmp"/*.xml "$OPAC_DOCROOT"/ && chmod 644 "$OPAC_DOCROOT"/sitemap*.xml
+        log "Koha sitemap generated successfully for $url."
+    else
+        log "Warning: could not run sitemap automatically (see ${LOG_DIR}/google-sitemap.log)."
+        rm -rf "$tmp"
+        return 1
+    fi
+    rm -rf "$tmp"
+    opac_robots_publish "$url"
+}
+
+# opac_robots_publish URL: robots.txt in the OPAC document root with the
+# Sitemap: line. A robots.txt the panel did not write keeps its rules; only
+# its Sitemap: line is set. The panel's own keeps crawlers out of searches
+# and account pages (endless combinations, nothing to index) and leaves the
+# records (/bib/N, opac-detail.pl) open.
+opac_robots_publish() {
+    local url="${1%/}" file="$OPAC_DOCROOT/robots.txt" tmp
+    tmp=$(mktemp "$file.XXXXXX") || return 1
+    if [ -f "$file" ] && ! grep -qxF "$ROBOTS_MARK" "$file"; then
+        grep -vi '^[[:space:]]*Sitemap:' "$file" > "$tmp"
+        printf 'Sitemap: %s/sitemapindex.xml\n' "$url" >> "$tmp"
+    else
+        printf '%s\n' "$ROBOTS_MARK" "User-agent: *" \
+            "Disallow: /cgi-bin/koha/opac-search.pl" \
+            "Disallow: /cgi-bin/koha/opac-export.pl" \
+            "Disallow: /cgi-bin/koha/opac-reserve.pl" \
+            "Disallow: /cgi-bin/koha/opac-user.pl" \
+            "Disallow: /cgi-bin/koha/opac-basket.pl" \
+            "Disallow: /cgi-bin/koha/opac-sendbasket.pl" \
+            "Disallow: /cgi-bin/koha/opac-addbybiblionumber.pl" \
+            "" "Sitemap: ${url}/sitemapindex.xml" > "$tmp"
+    fi
+    chmod 644 "$tmp"
+    mv -f "$tmp" "$file"
+}
+
+opac_sitemap_install_cron() {
+    local panel="/usr/local/bin/config.sh"
+    [ -x "$panel" ] || panel="$(readlink -f "$_SCRIPT_PATH")"
+    printf 'SHELL=/bin/bash\n%d 3 * * * root %s --opac-sitemap >/dev/null 2>&1\n' "$((RANDOM % 60))" "$panel" > "$CRON_SITEMAP"
+    chmod 644 "$CRON_SITEMAP"
+}
+
+# config.sh --opac-sitemap (cron): the sitemap again, for the address in
+# OPACBaseURL. A local address (no dot, or a private IP) is skipped.
+opac_sitemap_nightly() {
+    local url host
+    is_database_ready || return 0
+    url=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='OPACBaseURL' LIMIT 1;" 2>/dev/null || true)
+    url="${url%/}"
+    [[ "$url" =~ ^https?://([A-Za-z0-9.-]+)(:[0-9]+)?$ ]] || return 0
+    host="${BASH_REMATCH[1]}"
+    [[ "$host" == *.* ]] || return 0
+    ip_is_private "$host" && return 0
+    opac_sitemap_publish "$url"
+}
+
 function_google_search_console() {
     local opac_url=""
     local sitemap_path="sitemapindex.xml"
@@ -8833,7 +9034,6 @@ function_google_search_console() {
     local sitemap_code=""
     local robots_body=""
     local meta_robots=""
-    local sitemap_script=""
     local choice=""
 
     clear
@@ -8892,32 +9092,24 @@ function_google_search_console() {
         fi
     fi
 
-    # Package installs keep the cron scripts in /usr/share/koha/bin/cronjobs.
-    sitemap_script=""
-    local candidate
-    for candidate in /usr/share/koha/bin/cronjobs/sitemap.pl /usr/share/koha/misc/cronjobs/sitemap.pl; do
-        [ -f "$candidate" ] && { sitemap_script="$candidate"; break; }
-    done
-    [ -z "$sitemap_script" ] && sitemap_script=$(find /usr/share/koha -type f -name 'sitemap.pl' 2>/dev/null | head -n 1 || true)
-    if [ -n "$sitemap_script" ]; then
-        display_explanation "Generating Koha sitemap..."
-        # The script runs as the instance user, which cannot write in the OPAC
-        # document root: generate in a temporary folder, then publish as root.
-        local sm_tmp opac_root="/usr/share/koha/opac/htdocs"
-        sm_tmp=$(mktemp -d /tmp/koha_sitemap.XXXXXX)
-        chown "${INSTANCE}-koha:${INSTANCE}-koha" "$sm_tmp" 2>/dev/null || chmod 777 "$sm_tmp"
-        if /usr/sbin/koha-shell "$INSTANCE" -c "/usr/bin/perl '$sitemap_script' --dir '$sm_tmp' --url '$opac_url'" \
-                >"${LOG_DIR}/google-sitemap.log" 2>&1 && ls "$sm_tmp"/*.xml >/dev/null 2>&1; then
-            if [ -d "$opac_root" ]; then
-                cp -f "$sm_tmp"/*.xml "$opac_root"/ 2>/dev/null && chmod 644 "$opac_root"/sitemap*.xml 2>/dev/null
+    # The address Koha writes into its pages (canonical links, sitemap):
+    # another address there makes Google index that one instead.
+    if is_database_ready; then
+        local base_url
+        base_url=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='OPACBaseURL' LIMIT 1;" 2>/dev/null || true)
+        base_url="${base_url%/}"
+        if [ "$base_url" != "$opac_url" ]; then
+            if prompt_yes_no "$(t "OPAC address in Koha")" "$(t "Koha tells Google that the catalog's address is:\n\n  \${base_url:-not defined}\n\n(system preference OPACBaseURL, used in the pages' canonical link and in the sitemap). Google then indexes that address instead of:\n\n  \$opac_url\n\nChange OPACBaseURL to \$opac_url?")" 18 80; then
+                set_koha_public_urls "$opac_url" \
+                    || msg_error "" "$(t "OPACBaseURL takes only the address, without a path (e.g. https://catalog.example.org). Change it in Koha: Administration > System preferences > OPACBaseURL.")" 10 78
             fi
-            log "Koha sitemap generated successfully."
-        else
-            log "Warning: could not run sitemap automatically (see ${LOG_DIR}/google-sitemap.log)."
         fi
-        rm -rf "$sm_tmp"
-    else
-        log "Warning: sitemap.pl script not found."
+    fi
+
+    display_explanation "Generating Koha sitemap..."
+    if opac_sitemap_publish "$opac_url"; then
+        opac_sitemap_install_cron
+        msg_ok "$(t "Sitemap generated with Koha's own script, with robots.txt pointing to it.\n\nIt is generated again every night, so new records reach Google on their own.")" 11 78
     fi
 
     display_explanation "Checking the published sitemap..."
@@ -8995,6 +9187,16 @@ function_google_search_console() {
 # ======================================================================
 function_configure_ssl() {
     require_koha || return 0
+    # Behind a Cloudflare Tunnel the visitor's HTTPS ends at Cloudflare and
+    # the tunnel itself is encrypted: a certificate on this server adds
+    # nothing, and Certbot's redirect to https would break the tunnel's
+    # plain http://localhost origin.
+    local opac_host
+    read -r opac_host _ < <(tunnel_public_hosts)
+    if [ "$opac_host" != "-" ] || systemctl is-active --quiet cloudflared 2>/dev/null; then
+        [ "$opac_host" = "-" ] && opac_host="$(t "your domain")"
+        prompt_yes_no "$(t "SSL / HTTPS")" "$(t "This server is published through Cloudflare Tunnel (\$opac_host). HTTPS already comes from Cloudflare and the tunnel is encrypted: no certificate is needed here, and Certbot's redirect to HTTPS can stop the tunnel from reaching Koha.\n\nA certificate is only for a domain of your own pointing straight to this server, with ports 80 and 443 open and no tunnel.\n\nContinue anyway?")" 16 78 defaultno || return 0
+    fi
     prompt_yes_no "$(t "SSL / HTTPS")" \
 "$(t "To issue the free certificate you NEED a domain with an A record\npointing to this server's PUBLIC IP, and port 80 reachable.\n\nIf you use Cloudflare Tunnel, CANCEL: HTTPS already comes from it.\n\nContinue?")" 15 76 || return 0
     clear
@@ -36778,6 +36980,9 @@ if [ -n "$KEI_CLI_MODE" ]; then
         --status-json) kei_status_json ;;
         --export-diagnostics) kei_export_diagnostics "${2:-}" ;;
         --broker-heartbeat) broker_heartbeat ;;
+        # Not read-only: the nightly sitemap (cron.d/koha_sitemap) rewrites
+        # only the sitemap files and robots.txt of the OPAC document root.
+        --opac-sitemap) opac_sitemap_nightly ;;
         # Not read-only, but idempotent: the Windows installer refreshes the
         # data-safety settings of an existing Koha without opening the panel.
         --install-data-safety) is_koha_installed && install_data_safety ;;

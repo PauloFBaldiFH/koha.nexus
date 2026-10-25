@@ -26,7 +26,7 @@ setup_file() {
 teardown_file() {
     [ -f "$BATS_FILE_TMPDIR/broker.pid" ] && kill "$(cat "$BATS_FILE_TMPDIR/broker.pid")" 2>/dev/null
     rm -f /etc/koha-easy-install/tunnel.conf /etc/koha-easy-install/broker.key /etc/koha-easy-install/broker-enroll.conf \
-          /root/koha-catalog-qr.png
+          /root/koha-catalog-qr.png /root/koha-address-*.key
     return 0
 }
 
@@ -85,7 +85,7 @@ state() { /usr/bin/curl -s "$INSPECT"; }
 pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$1';"; }
 
 @test "B01 free address: approved on the spot, tunnel installed with the token out of sight" {
-    inputs "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
+    inputs new "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
     panel function_cloudflare_free_address
     assert '[ "$status" -eq 0 ]' "$output"
 
@@ -112,6 +112,8 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     assert 'dialogs | grep -q "OK .*Your catalog is online"' "$(dialogs)"
     assert '! echo "$output" | grep -qF "/join?c=" && ! dialogs | grep -q "MENU \[Authorization\]"' "no link to open, no wait: $output"
     assert '[ -z "$(ls /root/.kei-broker-* 2>/dev/null)" ]' "temporary files removed"
+    assert 'dialogs | grep -q "PROMPT \[Recovery file\].* => yes"' "$(dialogs)"
+    assert '[ "$(stat -c %a /root/koha-address-t-palotina-pr.key)" = 600 ]' "recovery file offered and saved"
 }
 
 @test "B02 status, credentials and banner read the free address" {
@@ -201,6 +203,47 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
     assert '! echo "$output" | grep -q written'
 }
 
+@test "B07a recovery file: a new installation gets the same address back and the old token stops" {
+    inputs 4 CANCEL
+    panel function_broker_manage
+    local file=/root/koha-address-t-palotina-pr.key
+    assert '[ "$(stat -c %a $file)" = 600 ]' "$(dialogs)"
+    assert 'grep -qx "OPAC_HOST=t-palotina-pr.example.org" $file && grep -qx "KEI_ADDRESS=1" $file && grep -q "BEGIN PRIVATE KEY" $file' "$(grep -v PRIVATE $file)"
+    assert 'dialogs | grep -q "OK .*koha-address-t-palotina-pr.key"' "$(dialogs)"
+
+    # A new installation: no address, no key, no token.
+    local old_token
+    old_token=$(cat "$ENVF")
+    rm -f $CONF/tunnel.conf $CONF/broker.key "$ENVF"
+    inputs restore "'$file'" CANCEL
+    panel function_cloudflare_free_address
+    assert '[ "$status" -eq 0 ]' "$output"
+    assert 'grep -qx "TUNNEL_MODE=broker" $CONF/tunnel.conf && grep -qx "OPAC_HOST=t-palotina-pr.example.org" $CONF/tunnel.conf' "$(cat $CONF/tunnel.conf)"
+    assert 'grep -qx "STAFF_HOST=t-palotina-pr-admin.example.org" $CONF/tunnel.conf && grep -qx "STAFF_REMOTE=no" $CONF/tunnel.conf'
+    assert 'cmp -s <(sed -n "/BEGIN/,/END/p" $file) $CONF/broker.key && [ "$(stat -c %a $CONF/broker.key)" = 600 ]'
+    assert 'grep -q "^TUNNEL_TOKEN=" "$ENVF" && [ "$(cat "$ENVF")" != "$old_token" ]' "the token is renewed, the old server is cut off"
+    assert '[ "$(pref OPACBaseURL)" = "https://t-palotina-pr.example.org" ]' "$(pref OPACBaseURL)"
+    assert 'dialogs | grep -q "OK .*Your catalog is online"' "$(dialogs)"
+}
+
+@test "B07b a wrong or unknown recovery file changes nothing" {
+    cp $CONF/tunnel.conf "$BATS_TEST_TMPDIR/t.bak"
+    cp $CONF/broker.key "$BATS_TEST_TMPDIR/k.bak"
+    printf 'hello\n' > "$BATS_TEST_TMPDIR/junk.key"
+    inputs "$BATS_TEST_TMPDIR/junk.key"
+    panel broker_restore_address
+    assert 'dialogs | grep -q "ERROR.*not a free address recovery file"' "$(dialogs)"
+
+    # Right format, but a key the address service does not know.
+    { grep -v PRIVATE /root/koha-address-t-palotina-pr.key | grep -v "^[A-Za-z0-9+/=]*$"
+      openssl genpkey -algorithm ed25519 2>/dev/null; } > "$BATS_TEST_TMPDIR/foreign.key"
+    inputs "$BATS_TEST_TMPDIR/foreign.key"
+    panel broker_restore_address
+    assert 'dialogs | grep -q "ERROR.*could not be restored"' "$(dialogs)"
+    assert 'cmp -s "$BATS_TEST_TMPDIR/t.bak" $CONF/tunnel.conf && cmp -s "$BATS_TEST_TMPDIR/k.bak" $CONF/broker.key' "the previous address stays"
+    assert '[ -z "$(ls $CONF/broker.key.* $CONF/tunnel.conf.* 2>/dev/null)" ]' "no leftovers: $(ls $CONF)"
+}
+
 @test "B08 giving up the address removes tunnel, records, token and key" {
     answer yes
     panel function_broker_leave
@@ -216,7 +259,7 @@ pref() { mysql -Nse "SELECT value FROM ${DB}.systempreferences WHERE variable='$
 
 @test "B09 a name that is taken gets a close variant, still without review" {
     # B08 gave palotina-pr up; the broker holds a released name for a while.
-    inputs "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
+    inputs new "Biblioteca Pública Municipal de Palotina" "biblioteca@palotina.pr.gov.br" "Palotina PR" CANCEL
     panel function_cloudflare_free_address
     assert '[ "$status" -eq 0 ]' "$output"
     assert 'grep -qx "OPAC_HOST=t-palotina-pr-2.example.org" $CONF/tunnel.conf' "$(cat $CONF/tunnel.conf 2>/dev/null)"
