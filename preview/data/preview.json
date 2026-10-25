@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.110",
+ "panel_version": "1.5.111",
  "languages": [
   {
    "code": "en",
@@ -1024,7 +1024,7 @@
    "type": "entry",
    "section": "security",
    "label": "🔏  Free SSL certificate (Certbot / Apache)",
-   "description": "Gets a free HTTPS certificate from Let's Encrypt",
+   "description": "Free HTTPS certificate, only for your own domain without the tunnel",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1054,7 +1054,7 @@
    "type": "entry",
    "section": "security",
    "label": "🔎  Google Search Console Assistant",
-   "description": "Checks the OPAC and helps Google index it",
+   "description": "Checks the OPAC and keeps its sitemap for Google up to date",
    "kind": "native",
    "status": "available",
    "media": []
@@ -4577,9 +4577,9 @@
    "ja": "🔏  無料の SSL 証明書 (Certbot / Apache)",
    "ko": "🔏  무료 SSL 인증서 (Certbot / Apache)"
   },
-  "Gets a free HTTPS certificate from Let's Encrypt": {
-   "en": "Gets a free HTTPS certificate from Let's Encrypt",
-   "pt-BR": "Emite um certificado HTTPS gratuito do Let's Encrypt",
+  "Free HTTPS certificate, only for your own domain without the tunnel": {
+   "en": "Free HTTPS certificate, only for your own domain without the tunnel",
+   "pt-BR": "Certificado HTTPS gratuito, só para domínio próprio sem o túnel",
    "es": null,
    "fr": null,
    "it": null,
@@ -4727,9 +4727,9 @@
    "ja": "🔎  Google Search Console アシスタント",
    "ko": "🔎  Google Search Console 도우미"
   },
-  "Checks the OPAC and helps Google index it": {
-   "en": "Checks the OPAC and helps Google index it",
-   "pt-BR": "Verifica o OPAC e ajuda o Google a indexá-lo",
+  "Checks the OPAC and keeps its sitemap for Google up to date": {
+   "en": "Checks the OPAC and keeps its sitemap for Google up to date",
+   "pt-BR": "Verifica o OPAC e mantém o sitemap para o Google atualizado",
    "es": null,
    "fr": null,
    "it": null,
