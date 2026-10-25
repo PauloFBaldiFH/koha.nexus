@@ -53,6 +53,7 @@
     "f18_t": "AI assistant",
     "f18_d": "Librarians ask in plain language about books, patrons and loans. Any change is a proposal that runs only after Approve &amp; Execute.",
     "n_live": "Live list from the koha.nexus network",
+    "n_all": "See the full list of catalogs",
     "nav_features": "Features",
     "nav_install": "Installation",
     "nav_win": "Windows",

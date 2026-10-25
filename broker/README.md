@@ -30,6 +30,8 @@ Koha panel (installer)                 Worker (this folder)                     
 - **Rate limits:** 3 new requests per minute per IP address, 30 API calls per minute per IP or library, 20 staff-login attempts per minute.
 - **Optional circuit breaker:** `MAX_LIBRARIES_PER_DAY` above 0 pauses enrollment after that many new libraries in 24 hours. `0` (the default) turns it off.
 - **After the fact:** the admin API can still suspend, restore or remove any library.
+- **Public list of catalogs (opt-in):** a library appears on `/api/public-libraries` (the koha.nexus home page), `/libraries` (plain HTML, so search engines follow the links) and `/libraries/sitemap.xml` only after it says yes in the panel (`PUT /v1/listing`, or the admin's `/listing`). A library with no heartbeat for 30 days leaves the list until its next one. Migration `0002_public_listing.sql` adds the column with every existing library off the list: run `npm run db:migrate` before deploying.
+- **Moving an address to a new server:** the panel saves a recovery file (the server key and the library id); "I already have an address" on the new server reads it and renews the tunnel token. When the file was lost with the server, `POST /admin/libraries/{id}/recovery-file` (after checking with the library's contact) makes a new key pair, keeps only the public half and returns a new file once; the old key stops working at once. `DELETE /admin/held-names/{slug}` ends the 180-day hold of a name that was given up, so the same library can ask for it again.
 
 ## Files
 
@@ -127,7 +129,9 @@ curl -s $B/v1/enroll -H 'Content-Type: application/json' \
 | `POST /v1/heartbeat` | signed | Koha and installer versions |
 | `PUT` / `DELETE /v1/staff-credentials` | signed | turn remote staff access on (user, password, optional CIDRs) or off |
 | `DELETE /v1/library` | signed | remove tunnel and records |
-| `/admin/...` | `Bearer ADMIN_TOKEN` | `GET /admin/enrollments?status=`, `POST /admin/enrollments/{code}/approve` (`{slug?, force?}`) or `/deny`, `GET /admin/libraries`, `POST /admin/libraries/{id}/suspend` or `/restore`, `DELETE /admin/libraries/{id}` |
+| `PUT /v1/listing` | signed | `{public: true\|false}`: the catalog on or off the public list |
+| `GET /api/public-libraries`, `GET /libraries`, `GET /libraries/sitemap.xml` | none | public list of catalogs as JSON (koha.nexus home page), plain HTML and a sitemap of the catalogs' home pages |
+| `/admin/...` | `Bearer ADMIN_TOKEN` | `GET /admin/enrollments?status=`, `POST /admin/enrollments/{code}/approve` (`{slug?, force?}`) or `/deny`, `GET /admin/libraries`, `POST /admin/libraries/{id}/suspend` or `/restore`, `DELETE /admin/libraries/{id}`, `POST /admin/libraries/{id}/recovery-file`, `POST /admin/libraries/{id}/listing` (`{public}`), `DELETE /admin/held-names/{slug}` |
 
 ## Signatures (Ed25519)
 

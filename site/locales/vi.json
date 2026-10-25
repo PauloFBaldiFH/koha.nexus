@@ -53,6 +53,7 @@
     "f18_t": "Trợ lý AI",
     "f18_d": "Thủ thư hỏi bằng ngôn ngữ thông thường về sách, bạn đọc và khoản mượn. Mọi thay đổi đều là đề xuất, chỉ chạy sau Phê duyệt và thực thi.",
     "n_live": "Danh sách trực tiếp từ mạng koha.nexus",
+    "n_all": "Xem danh sách đầy đủ các mục lục",
     "nav_features": "Tính năng",
     "nav_install": "Cài đặt",
     "nav_win": "Windows",

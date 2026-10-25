@@ -11,15 +11,21 @@ import {
   getTunnelToken,
   heartbeat,
   joinPage,
+  librariesPage,
+  librariesSitemap,
   listPublicLibraries,
+  putListing,
   putStaffCredentials,
   rotateToken,
 } from "./api";
 import {
   adminDeleteLibrary,
+  adminSetListing,
   decideEnrollment,
+  issueRecoveryFile,
   listEnrollments,
   listLibraries,
+  releaseHeldName,
   requireAdmin,
   suspendLibrary,
 } from "./admin";
@@ -64,6 +70,7 @@ const routes: Route[] = [
   { method: "POST", pattern: /^\/v1\/heartbeat$/, handler: (r, e, b) => heartbeat(r, e, b) },
   { method: "PUT", pattern: /^\/v1\/staff-credentials$/, handler: (r, e, b) => putStaffCredentials(r, e, b) },
   { method: "DELETE", pattern: /^\/v1\/staff-credentials$/, handler: (r, e, b) => deleteStaffCredentials(r, e, b) },
+  { method: "PUT", pattern: /^\/v1\/listing$/, handler: (r, e, b) => putListing(r, e, b) },
 
   { method: "GET", pattern: /^\/admin\/enrollments$/, handler: admin((r, e, b, p, u) => listEnrollments(e, u)) },
   {
@@ -78,8 +85,17 @@ const routes: Route[] = [
     handler: admin((r, e, b, p) => suspendLibrary(e, p[0]!, p[1] === "suspend")),
   },
   { method: "DELETE", pattern: new RegExp(`^/admin/libraries/(${UUID})$`), handler: admin((r, e, b, p) => adminDeleteLibrary(e, p[0]!)) },
+  {
+    method: "POST",
+    pattern: new RegExp(`^/admin/libraries/(${UUID})/recovery-file$`),
+    handler: admin((r, e, b, p, u) => issueRecoveryFile(e, p[0]!, u)),
+  },
+  { method: "POST", pattern: new RegExp(`^/admin/libraries/(${UUID})/listing$`), handler: admin((r, e, b, p) => adminSetListing(e, p[0]!, b)) },
+  { method: "DELETE", pattern: /^\/admin\/held-names\/([a-z0-9-]{1,63})$/, handler: admin((r, e, b, p) => releaseHeldName(e, p[0]!)) },
 
   { method: "GET", pattern: /^\/api\/public-libraries$/, handler: (r, e) => listPublicLibraries(e) },
+  { method: "GET", pattern: /^\/libraries\/?$/, handler: (r, e) => librariesPage(e) },
+  { method: "GET", pattern: /^\/libraries\/sitemap\.xml$/, handler: (r, e) => librariesSitemap(e) },
   { method: "GET", pattern: /^\/$/, handler: async () => json({ service: "kei-broker", status: "ok" }) },
 ];
 

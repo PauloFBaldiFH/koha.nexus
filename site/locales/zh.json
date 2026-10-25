@@ -53,6 +53,7 @@
     "f18_t": "AI 助手",
     "f18_d": "馆员可用日常语言询问图书、读者和借阅情况。任何更改都会先作为提案，仅在批准并执行后运行。",
     "n_live": "koha.nexus 网络实时列表",
+    "n_all": "查看完整的目录列表",
     "nav_features": "功能",
     "nav_install": "安装",
     "nav_win": "Windows",
