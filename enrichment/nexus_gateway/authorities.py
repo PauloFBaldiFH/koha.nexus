@@ -78,7 +78,7 @@ class AuthoritySearch:
             return set()
         expr = (" OR " if c.relation == "any" else " AND ").join(f'"{w}"' for w in words)
         try:
-            ids = [r[0] for r in self.conn.execute("SELECT rowid FROM auth_fts WHERE auth_fts MATCH ? LIMIT ?",
+            ids = [r[0] for r in self.conn.execute("SELECT rowid FROM auth_fts WHERE auth_fts MATCH ? ORDER BY rank LIMIT ?",
                                                    (expr, LEAF_CAP))]
         except sqlite3.OperationalError:
             return set()
@@ -118,9 +118,19 @@ class AuthoritySearch:
             return 0, []
         exact = {normalize.fold(t) for t in _terms(node)}
         rows = [r for r in rows if r.kind not in SUBJECT_KINDS or (not r.thesaurus.startswith("lcsh") and r.tier != 2)]
-        # An exact heading first, then BN > Brazilian > LoC > other, established, most used.
-        rows.sort(key=lambda r: (not ({r.key, normalize.fold(r.heading)} & exact), r.tier, r.preliminary,
-                                 -r.occurrences, r.id))
+        terms = [set(_words(t)) for t in _terms(node) if _words(t)]
+
+        def relevance(r):
+            key_tokens = set(_words(r.key))
+            # Ignore punctuation and name inversion, but do not reward a
+            # longer homonym as if it were the requested full name.
+            token_match = any(key_tokens == term for term in terms)
+            literal_match = bool({r.key, normalize.fold(r.heading)} & exact)
+            return (not (literal_match or token_match), r.tier, r.preliminary,
+                    not bool(r.dates), not bool(r.source_id or r.lccn),
+                    len(key_tokens), -r.occurrences, r.id)
+
+        rows.sort(key=relevance)
         page = rows[start - 1:start - 1 + maximum]
         return len(rows), [self.record(r) for r in page]
 

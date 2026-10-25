@@ -101,7 +101,7 @@ AUTH_SRU_FIELDS = ("nameany=bath.name,authorany=bath.name,authorpersonal=bath.pe
                    "authorcorp=bath.corporateName,authormeetingcon=bath.conferenceName,subject=dc.subject,"
                    "subjectsubdiv=dc.subject,title=bath.uniformTitle,uniformtitle=bath.uniformTitle,"
                    "srchany=cql.serverChoice")
-AUTH_NAME = "KOHA.NEXUS (AUTORIDADES)"
+AUTH_NAME = "Nexus Autoridades (Cloud)"
 # Ids of the 2026-10-11 list that the 2026-10-15 list renamed.
 RENAMED = {
     "uw_madison": "wisconsin", "psu": "pennstate", "utoronto": "toronto", "bcl": "castilla-leon",
@@ -197,7 +197,7 @@ def render(table: dict[str, Target], host: str = KOHA_HOST, port: int = GATEWAY_
             "   AND a.servertype = b.servertype AND a.id > b.id",
             f" WHERE a.recordtype = 'authority' AND a.servertype = 'sru' AND a.host = {q(host)} AND a.port = {port}"
             f" AND a.db = {q('sru/' + AUTH_UNION)};"]
-    out += _upsert(auth, host, port, "sru/" + AUTH_UNION, AUTH_NAME, 1, 0, "authority", AUTH_SRU_FIELDS)
+    out += _upsert(auth, host, port, "sru/" + AUTH_UNION, AUTH_NAME, 1, 1, "authority", AUTH_SRU_FIELDS)
     out += _local_first(table, mine)
     out += ["", "COMMIT;", ""]
     return "\n".join(out)

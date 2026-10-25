@@ -166,7 +166,7 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     # NAF is already there (setup), unticked, with its own name and rank.
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority'")" = "3" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority'")" = "4" ]
     [ "$(zsql "SELECT servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'NAF'")" = \
       "$(printf 'LOC AUTHORITIES\t0\t0\tUSMARC\tutf8\t10\tzed')" ]
     [ "$(zsql "SELECT host, port, servername, checked, \`rank\`, syntax, encoding, timeout, servertype FROM z3950servers WHERE recordtype = 'authority' AND db = 'SAF'")" = \
@@ -181,11 +181,11 @@ zsql() { mysql -N --default-character-set=utf8mb4 "$DB" -e "$1"; }
     before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
     [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
-    # On a Koha without them: all three inserted, ticked, NAF first.
+    # On a Koha without them: four inserted, cloud first, LoC second.
     zsql "DELETE FROM z3950servers WHERE recordtype = 'authority'"
     run env KEI_EXTRA="$W/extra.sh" KEI_TASK=z3950-seed bash "$PANEL" z3950_seed_authorities
-    [ "$(zsql "SELECT db, servername, checked, \`rank\` FROM z3950servers WHERE recordtype = 'authority' ORDER BY \`rank\`")" = \
-      "$(printf 'NAF\tBIBLIOTECA DOS NOMES DO CONGRESSO\t1\t1\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3')" ]
+    [ "$(zsql "SELECT db, servername, checked, \`rank\` FROM z3950servers WHERE recordtype = 'authority' ORDER BY \`rank\`, db")" = \
+      "$(printf 'sru/_union-aut\tNexus Autoridades (Cloud)\t1\t1\nNAF\tBIBLIOTECA DOS NOMES DO CONGRESSO\t1\t2\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3')" ]
 }
 
 @test "Catalog Network SQL: an older row is updated in place, keeping its tick and rank, re-runnable" {
@@ -299,8 +299,8 @@ print(z3950.add_file_text(z3950.sync_targets(z3950.load_curated(), set()), {}), 
     # No catalogue server Koha did not have was added: still 2 biblio rows (LoC LCDB and BN).
     [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'biblio'")" = "2" ]
     # The authority files: NAF updated (tick and rank kept), SAF, BN and the gateway's headings added; the dead BN row unticked.
-    [ "$(zsql "SELECT db, servername, checked, \`rank\`, timeout FROM z3950servers WHERE recordtype = 'authority' AND host <> '162.214.168.248' ORDER BY db")" = \
-      "$(printf 'NAF\tLOC AUTHORITIES\t0\t0\t10\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\t10\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\t30\nsru/_union-aut\tKOHA.NEXUS (AUTORIDADES)\t1\t0\t15')" ]
+    [ "$(zsql "SELECT db, servername, checked, \`rank\`, timeout FROM z3950servers WHERE recordtype = 'authority' AND host <> '162.214.168.248' ORDER BY BINARY db")" = \
+      "$(printf 'NAF\tLOC AUTHORITIES\t0\t0\t10\nSAF\tBIBLIOTECA DOS ASSUNTOS DO CONGRESSO\t1\t2\t10\nsru/_union-aut\tNexus Autoridades (Cloud)\t1\t1\t30\nsru/bn-aut\tBIBLIOTECA NACIONAL (AUTORIDADES)\t1\t3\t30')" ]
     [ "$(zsql "SELECT checked FROM z3950servers WHERE host = '162.214.168.248'")" = "0" ]
     # BN, NAF and LCDB (a direct server in the list) updated.
     [ "$(cat "$W/results")" = "$(printf 'RESULT added=3\nRESULT updated=3\nRESULT unchecked=1\nRESULT invalid=0')" ]
@@ -521,8 +521,24 @@ SH
     # Again: nothing added, changed or unticked.
     run bash -c "mysql -N --default-character-set=utf8mb4 '$DB' < '$SQL'"
     [ "$status" -eq 0 ]
-    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority' AND checked = 1")" = "2" ]
-    [ "$(zsql "SELECT db FROM z3950servers WHERE recordtype = 'authority' AND checked = 1 ORDER BY db")" = "$(printf 'SAF\nsru/bn-aut')" ]
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype = 'authority' AND checked = 1")" = "3" ]
+    [ "$(zsql "SELECT db FROM z3950servers WHERE recordtype = 'authority' AND checked = 1 ORDER BY BINARY db")" = "$(printf 'SAF\nsru/_union-aut\nsru/bn-aut')" ]
     [ "$(zsql "SELECT checked FROM z3950servers WHERE host = '200.20.12.18'")" = "0" ]
     [ "$output" = "$(printf '0\t0\t0')" ]
+}
+
+@test "authority cloud migration: explicit hierarchy, duplicate suppression and stable rerun" {
+    python3 "$KEI_REPO/enrichment/setup_z3950_authorities.py" --enforce-defaults > "$W/migration.sql"
+    zsql "INSERT INTO z3950servers (host, port, db, servername, checked, servertype, recordtype)
+          VALUES ('lx2.loc.gov', 210, 'NAF', 'duplicate', 1, 'zed', 'authority'),
+                 ('https://lx2.loc.gov', 443, 'authorities', 'old Bath', 1, 'sru', 'authority')"
+    mysql "$DB" < "$W/migration.sql"
+    [ "$(zsql "SELECT COUNT(*) FROM z3950servers WHERE recordtype='authority' AND checked=1")" = 4 ]
+    [ "$(zsql "SELECT checked, attributes, \`rank\` FROM z3950servers WHERE servername='BIBLIOTECA DOS NOMES DO CONGRESSO'")" = "$(printf '1\t1=1016\t2')" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE servername IN ('duplicate','old Bath') ORDER BY id")" = "$(printf '0\n0')" ]
+    [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE servername='Nexus Autoridades (Cloud)'")" = "$(printf '1\t1')" ]
+    before="$(zsql "SELECT * FROM z3950servers ORDER BY id")"
+    mysql "$DB" < "$W/migration.sql"
+    [ "$(zsql "SELECT * FROM z3950servers ORDER BY id")" = "$before" ]
+    [ "$(zsql "SELECT checked FROM z3950servers WHERE recordtype='biblio'")" = 1 ]
 }
