@@ -446,11 +446,6 @@
     .card > *{position:relative}
     .card .icon{transition:transform .3s ease,background .3s ease}
     .card:hover .icon{transform:rotate(-6deg) scale(1.08);background:rgba(99,217,135,.18)}
-    .badge-new{
-      display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;vertical-align:2px;
-      font-size:.62rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
-      color:#07110b;background:linear-gradient(135deg,var(--gold),#ffc14d);
-    }
 
     .callout-warn{background:rgba(255,215,118,.07);border-color:rgba(255,215,118,.25);color:#f3e6c2}
     .callout-warn strong{color:var(--gold)}

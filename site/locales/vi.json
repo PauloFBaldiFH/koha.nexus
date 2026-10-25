@@ -18,7 +18,6 @@
     "ct_err": "Chưa thể gửi tin nhắn lúc này. Kiểm tra các trường rồi thử lại sau ít phút.",
     "ct_note": "Email của bạn chỉ dùng để trả lời tin nhắn này.",
     "nav_panel": "Bảng điều khiển",
-    "badge_new": "Mới",
     "p_kick": "Bảng điều khiển mới",
     "p_h2": "Một màn hình cho mỗi công việc, dùng chuột và bàn phím.",
     "p_p": "Chạy <code>sudo config.sh</code> để mở bảng điều khiển toàn màn hình: tổng quan trực tiếp, thẻ có thể nhấp, phím tắt và bảng lệnh (<kbd>ctrl+p</kbd>). Đây là ảnh chụp thực tế của bảng điều khiển.",

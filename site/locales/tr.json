@@ -18,7 +18,6 @@
     "ct_err": "Mesaj şu anda gönderilemedi. Alanları kontrol edip biraz sonra yeniden deneyin.",
     "ct_note": "E-postanız yalnızca bu mesaja yanıt vermek için kullanılır.",
     "nav_panel": "Panel",
-    "badge_new": "Yeni",
     "p_kick": "Yeni kontrol paneli",
     "p_h2": "Her görev için tek ekran, fare ve klavyeyle.",
     "p_p": "<code>sudo config.sh</code> çalıştırınca panel tam ekran açılır: canlı gösterge paneli, tıklanabilir kartlar, kısayollar ve komut paleti (<kbd>ctrl+p</kbd>). Bunlar panelin gerçek ekran görüntüleridir.",

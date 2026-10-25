@@ -18,7 +18,6 @@
     "ct_err": "The message could not be sent right now. Check the fields and try again in a moment.",
     "ct_note": "Your e-mail is only used to answer this message.",
     "nav_panel": "Panel",
-    "badge_new": "New",
     "p_kick": "The new control panel",
     "p_h2": "One screen for every task, with mouse and keyboard.",
     "p_p": "Run <code>sudo config.sh</code> and the panel opens full screen: a live dashboard, cards you click, shortcut keys and a command palette (<kbd>ctrl+p</kbd>). These are real screenshots of the panel.",
