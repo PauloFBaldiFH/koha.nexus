@@ -78,7 +78,7 @@ class AuthoritySearch:
             return set()
         expr = (" OR " if c.relation == "any" else " AND ").join(f'"{w}"' for w in words)
         try:
-            ids = [r[0] for r in self.conn.execute("SELECT rowid FROM auth_fts WHERE auth_fts MATCH ? LIMIT ?",
+            ids = [r[0] for r in self.conn.execute("SELECT rowid FROM auth_fts WHERE auth_fts MATCH ? ORDER BY rank LIMIT ?",
                                                    (expr, LEAF_CAP))]
         except sqlite3.OperationalError:
             return set()
@@ -118,9 +118,40 @@ class AuthoritySearch:
             return 0, []
         exact = {normalize.fold(t) for t in _terms(node)}
         rows = [r for r in rows if r.kind not in SUBJECT_KINDS or (not r.thesaurus.startswith("lcsh") and r.tier != 2)]
-        # An exact heading first, then BN > Brazilian > LoC > other, established, most used.
-        rows.sort(key=lambda r: (not ({r.key, normalize.fold(r.heading)} & exact), r.tier, r.preliminary,
-                                 -r.occurrences, r.id))
+        
+        def rank_score(r):
+            # Tokenização das chaves e termos de busca para casar "Victor Hugo" com "Hugo, Victor"
+            key_tokens = set(r.key.split())
+            exact_match = 0
+            for t in exact:
+                t_tokens = set(t.split())
+                if t_tokens == key_tokens:
+                    exact_match = 2  # Casamento perfeito dos mesmos tokens (independe de ordem direta/inversa)
+                    break
+                elif t_tokens.issubset(key_tokens):
+                    exact_match = 1  # Todos os termos buscados estão contidos no nome
+
+            has_dates = 1 if r.dates else 0
+            has_source_id = 1 if (getattr(r, 'source_id', '') or getattr(r, 'lccn', '')) else 0
+
+            # Ordem:
+            # 1. Casamento de termos (maior primeiro)
+            # 2. Tier da fonte (0=BN, 1=BR, 2=LoC)
+            # 3. Presença de datas biográficas (canônicos costumam ter datas)
+            # 4. Presença de identificador oficial (LCCN/BN)
+            # 5. Menor comprimento de chave (evita nomes compridos em buscas curtas)
+            # 6. Ocorrências / ID
+            return (
+                -exact_match,
+                r.tier,
+                -has_dates,
+                -has_source_id,
+                len(key_tokens),
+                -r.occurrences,
+                r.id
+            )
+
+        rows.sort(key=rank_score)
         page = rows[start - 1:start - 1 + maximum]
         return len(rows), [self.record(r) for r in page]
 

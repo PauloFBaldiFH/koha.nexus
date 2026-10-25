@@ -277,6 +277,37 @@ The panel's "On-demand enrichment" screen (Library tools, key `n`) drives
 all of this; the Z39.50 screen lists the direct servers whose breaker is
 open or that failed in the last 7 days, with Reset.
 
+## Authority headings in the cloud (`sru/_union-aut`) and on-demand harvesting
+
+The gateway behind the Cloudflare tunnel answers Koha's authority search at
+`https://sru.koha.nexus/sru/_union-aut` (port 443, SRU 1.1, MARCXML), from the
+`auth_headings` of its own `static.db`, so a library's Koha can point its
+authority row there without a local `static.db`. Matches are ranked by
+FTS5's BM25 (`ORDER BY rank`, which decides the `LEAF_CAP` kept), then by
+the heading's words in any order ("Victor Hugo" finds "Hugo, Victor"), the
+source (BN, Brazilian, LoC), biographical dates, an identifier
+(`source_id`/`lccn`), the shorter heading and the most used.
+
+Two scripts written for the VPS that runs the gateway, run by hand, nothing
+in the background:
+
+- `koha_nexus_harvest.py [--source loc|bn|all] [--no-sync]` adds personal
+  name headings from Wikidata's SPARQL endpoint: people with an LCCN (P244)
+  by country (P27; Portugal, France, UK, US, Germany, Spain, Italy,
+  Argentina, Russia; 3,000 per country) as source `Library of Congress`,
+  and Brazilians with a BN id (P4619) as source `Wikidata/BN`. It writes to
+  `/home/ubuntu/Koha.Nexus/static.db`, then (unless `--no-sync`) copies it to
+  `/var/lib/koha-nexus-enrich/static.db` and restarts `koha-nexus-sru`.
+- `setup_z3950_authorities.py` sets Koha's authority rows through
+  `koha-mysql library`: every authority row unticked, then `Nexus Autoridades
+  (Cloud)` (`sru/_union-aut`) rank 1, LoC NAF and SAF (`lx2.loc.gov:210`,
+  attribute `1=1016`) rank 2, BIBLIOTECA NACIONAL (AUTORIDADES)
+  (`sru/bn-aut`) rank 3, all ticked.
+
+The installer's own authority seed (`z3950_seed_authorities`) and
+`koha-sql` are unchanged: they still add LoC NAF rank 1, SAF rank 2, BN
+rank 3 and `KOHA.NEXUS (AUTORIDADES)` rank 0.
+
 ## The engine
 
 ```python
