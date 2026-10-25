@@ -4,7 +4,7 @@
 
 ## Zenginleştirme
 
-İçe aktarma dışa aktarımı taşır, zenginleştirme tamamlar veya yeni kitap bulur. Başlık eşleşmesi bibliyografik inceleme ister. **Library tools > On-demand enrichment**, `n`; eski toplu ekran güncel menü yolu değil.
+İçe aktarma dışa aktarımı taşır, zenginleştirme tamamlar veya yeni kitap bulur. Başlık eşleşmesi bibliyografik inceleme ister. **Library tools > Enrich from world catalogues**, `n`; eski toplu ekran güncel menü yolu değil.
 
 `all` veya `biblionumbers`, örneğin `101, 102, 500-510`, **Search**. İş/sunucuları izleyin; büyük iş arka planda, yeniden başlatma sonrası erişilir makinede devam edebilir. **Pause/Resume** değişikliği geri almaz. Rapor: konu/sınıf/not/fiziksel betimleme karşılaştırın. **Search more servers** kullanılmamış kaynak, **Choose donor** alan grubu bağışçısı. **Apply** inceleme/onay sonrası; arama/rapor yazmaz.
 

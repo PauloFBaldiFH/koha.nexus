@@ -4,7 +4,7 @@
 
 ## Obohacování
 
-Import přebírá export, obohacení doplňuje nebo hledá novou knihu. Shoda názvu potřebuje bibliografickou revizi. **Library tools > On-demand enrichment**, `n`; stará dávková obrazovka není současná cesta.
+Import přebírá export, obohacení doplňuje nebo hledá novou knihu. Shoda názvu potřebuje bibliografickou revizi. **Library tools > Enrich from world catalogues**, `n`; stará dávková obrazovka není současná cesta.
 
 `all` nebo `biblionumbers`, například `101, 102, 500-510`, **Search**. Sledujte práci/servery; velké úlohy na pozadí pokračují po restartu, s dostupným strojem. **Pause/Resume** nevrací změny. Zpráva: porovnat předměty/klasifikaci/poznámky/fyzický popis. **Search more servers** další zdroje, **Choose donor** zdroj skupin polí. **Apply** až po kontrole/potvrzení, hledání/zpráva nepíše.
 

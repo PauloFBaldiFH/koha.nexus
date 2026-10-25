@@ -139,19 +139,19 @@ SECTIONS: tuple[Section, ...] = (
     )),
     # Enrichment jobs (views/enrich.py), opened from Library tools (or its key).
     # The batch "Enrich bibliographic catalog" screen is retired (Paulo, 1.5.94):
-    # On-demand enrichment replaces it. Its view and installer tasks stay in the
+    # "Enrich from world catalogues" (on-demand enrichment) replaces it. Its view and installer tasks stay in the
     # code, but no key, card or sidebar row opens it.
     Section("enrich", "✨  Enrich bibliographic catalog", "✨  Enrich bibliographic catalog", view="enrich",
             sidebar=False, parent="library"),
     Section("enrich-auth", "📇  Enrich & standardize authorities", "📇  Enrich & standardize authorities",
             view="enrich-auth", key="h", sidebar=False, parent="library"),
-    Section("ondemand", "⚡  On-demand enrichment", "⚡  On-demand enrichment", view="ondemand",
+    Section("ondemand", "🌐  Enrich from world catalogues", "🌐  Enrich from world catalogues", view="ondemand",
             key="n", sidebar=False, parent="library"),
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("✨  Enrich bibliographic catalog", "enrich", kind="view", hidden=True),
         Entry("📇  Enrich & standardize authorities", "enrich-auth", kind="view"),
-        Entry("⚡  On-demand enrichment", "ondemand", kind="view"),
+        Entry("🌐  Enrich from world catalogues", "ondemand", kind="view"),
         Entry("🔙  Undo a MARC import", "marc-undo", kind="native"),
         Entry("🔗  Sync & link authorities", "authority-sync", kind="native"),
         Entry("👥  Find duplicate authors (authorities)", "authority-match", kind="native"),
@@ -250,7 +250,7 @@ DESCRIPTIONS: dict[str, str] = {
     "clock": "Sets the timezone and syncs the clock with NTP",
     "enrich": "Adds subjects, classification and notes from open catalogues, with a report before Apply",
     "enrich-auth": "Links names and subjects to authorities (BN first) and creates the missing ones, with a report",
-    "ondemand": "Searches public catalogues for your records (all, or any you list), or finds a book to import as a new record",
+    "ondemand": "Completes your records with data from library catalogues around the world, or finds a new book to import",
     "marc-undo": "Removes the records of an imported MARC batch",
     "authority-sync": "Links the catalog headings to their authorities",
     "authority-match": "Finds variant forms of one author and merges the ones you confirm",

@@ -4,7 +4,7 @@
 
 ## Pagpapayaman
 
-Import naglilipat ng export; pagpapayaman nagdadagdag datos o naghahanap bagong libro. Titulo na tugma kailangan pa ng bibliographic review. **Library tools > On-demand enrichment**, `n`; hindi na kasalukuyang menu ang lumang batch screen.
+Import naglilipat ng export; pagpapayaman nagdadagdag datos o naghahanap bagong libro. Titulo na tugma kailangan pa ng bibliographic review. **Library tools > Enrich from world catalogues**, `n`; hindi na kasalukuyang menu ang lumang batch screen.
 
 `all` o `biblionumbers`, gaya `101, 102, 500-510`, **Search**. Subaybayan trabaho/server; malaki sa background, maaaring tumuloy matapos restart kung may computer. **Pause/Resume** hindi nag-undo pagbabago. Ulat: paksa/klasipikasyon/tala/pisikal na paglalarawan. **Search more servers** hindi pa ginamit, **Choose donor** donor ng field groups. **Apply** matapos review/kumpirma; search/report hindi sumusulat.
 

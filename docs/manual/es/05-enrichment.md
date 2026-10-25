@@ -4,7 +4,7 @@
 
 ## Enriquecer registros existentes
 
-Importar trae una exportación; enriquecer busca datos complementarios o un libro nuevo. Una coincidencia de título requiere revisión bibliográfica. Abra **Library tools > On-demand enrichment**, o `n`; la antigua pantalla bibliográfica por lotes ya no es el acceso del menú actual.
+Importar trae una exportación; enriquecer busca datos complementarios o un libro nuevo. Una coincidencia de título requiere revisión bibliográfica. Abra **Library tools > Enrich from world catalogues**, o `n`; la antigua pantalla bibliográfica por lotes ya no es el acceso del menú actual.
 
 1. Introduzca `all` o `biblionumbers` como `101, 102, 500-510`, y **Search**.
 2. Siga trabajo y servidores. Una tarea grande sigue en segundo plano y puede continuar tras reiniciar; necesita máquina disponible para progresar.

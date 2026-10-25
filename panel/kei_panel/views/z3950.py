@@ -146,7 +146,7 @@ class Z3950View(SectionView):
         self.query_one("#z-inbound").border_title = t("This catalogue's Z39.50 / SRU server (inbound)")
         self.query_one("#z-network").border_title = t("Community network")
         self.query_one("#z-outbound").border_title = t("Catalogues to copy records from (outbound)")
-        self.query_one("#z-health").border_title = t("Direct servers for on-demand enrichment")
+        self.query_one("#z-health").border_title = t("Direct servers for enrichment from world catalogues")
         self.query_one("#z-net-note", Static).update(
             t("The shared catalogue of the koha.nexus libraries. Turning it on adds it to Koha's Z39.50/SRU "
               "servers, checked for the cataloguing searches; off takes it out.")
@@ -460,7 +460,7 @@ class Z3950View(SectionView):
             table.add_row(r.get("id", ""), health_state(r.get("state", "")), str(r.get("ok_7d", 0)),
                           str(r.get("fail_7d", 0)), (r.get("last_error") or "")[:80], key=r.get("id", "") + "|" + r.get("key", ""))
         if not rows:
-            text = t("On-demand enrichment is not installed yet, or has not asked any server.")
+            text = t("Enrichment from world catalogues is not installed yet, or has not asked any server.")
         elif not trouble:
             text = t("All ${n} direct server address(es) answered or were not asked yet.", n=len(rows))
         else:

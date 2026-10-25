@@ -4,7 +4,7 @@
 
 ## 补充现有记录
 
-导入接收外部导出，补充则查找现有记录的附加信息或找到新书。打开 **Library tools > On-demand enrichment**，或按 n；当前菜单不使用旧批量页面。
+导入接收外部导出，补充则查找现有记录的附加信息或找到新书。打开 **Library tools > Enrich from world catalogues**，或按 n；当前菜单不使用旧批量页面。
 
 输入 `all` 或 `101, 102, 500-510` 等 `biblionumbers`，按 **Search**。监视任务与服务器；大任务在后台运行，重启后可继续，但机器须可用。**Pause**/**Resume** 不撤销已应用的修改。
 

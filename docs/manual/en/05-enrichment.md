@@ -6,7 +6,7 @@ Import and enrichment have different purposes. Import brings records from an exp
 
 ## Enrich existing records
 
-Open **Library tools**, then **On-demand enrichment**. The **n** key opens this screen. The old batch bibliographic enrichment screen is no longer the route presented in the current menu.
+Open **Library tools**, then **Enrich from world catalogues**. The **n** key opens this screen. The old batch bibliographic enrichment screen is no longer the route presented in the current menu.
 
 1. Enter `all` for all records or the required `biblionumbers`, such as `101, 102, 500-510`, and use **Search**.
 2. Monitor the job and server table. A large job continues in the background and can resume after a restart. The machine must remain available for it to progress.
@@ -53,6 +53,6 @@ SRU support in this configuration does not mean every enrichment search uses SRU
 ## Checked sources
 
 - [Menus](../../../panel/kei_panel/menus.py), Library tools and server actions.
-- [On-demand enrichment](../../../panel/kei_panel/views/ondemand.py), screen composition, search, import and application protection.
+- [Enrich from world catalogues](../../../panel/kei_panel/views/ondemand.py), screen composition, search, import and application protection.
 - [Jobs and authorities](../../../panel/kei_panel/views/enrich.py), reports, application, revert and `AuthEnrichView`.
 - [Servers](../../../panel/kei_panel/views/z3950.py), inbound service, health, selection, scanning and addition.

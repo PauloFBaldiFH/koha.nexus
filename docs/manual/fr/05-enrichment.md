@@ -4,7 +4,7 @@
 
 ## Enrichir des notices existantes
 
-Importer apporte un export ; enrichir cherche des compléments ou un livre nouveau. Un titre correspondant exige toujours révision bibliographique. Ouvrez **Library tools > On-demand enrichment**, ou `n` ; l’ancienne interface bibliographique par lots n’est plus le parcours actuel du menu.
+Importer apporte un export ; enrichir cherche des compléments ou un livre nouveau. Un titre correspondant exige toujours révision bibliographique. Ouvrez **Library tools > Enrich from world catalogues**, ou `n` ; l’ancienne interface bibliographique par lots n’est plus le parcours actuel du menu.
 
 1. Saisissez `all` ou des `biblionumbers`, par exemple `101, 102, 500-510`, puis **Search**.
 2. Suivez travail et serveurs. Une grosse tâche reste en arrière-plan et peut reprendre après redémarrage ; la machine doit être disponible.
