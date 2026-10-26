@@ -407,7 +407,8 @@ try {
     New-Item -ItemType Directory -Path $payloadLangDir -Force | Out-Null
 
     $excludedWindowsDirectories = @(
-        'setup', '.git', '.github', 'node_modules', '__pycache__',
+        # msix: esta pasta de build (fontes, Assets, o .msix antigo) nao roda no app.
+        'setup', 'msix', '.git', '.github', 'node_modules', '__pycache__',
         '$Recycle.Bin', 'System Volume Information', 'Recovery', 'RECYCLER'
     )
     $excludedWindowsFiles = @('desktop.ini', 'Thumbs.db', 'ehthumbs.db', '.DS_Store')
