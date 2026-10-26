@@ -12,9 +12,11 @@
 The order of the answer:
  1. static.db records matching the whole CQL query (and, or, not; title,
     author, ISBN/ISSN and keyword clauses), most complete first;
- 2. only when static.db has none: for each live target, its answer in
-    learned.db when fresh, else a live search (one clause of the query: the
-    ISBN, else the title, author or keywords) within the reply budget.
+ 2. only when static.db has no catalogue record (none at all, or only
+    repository ones: see catalogue_record): for each live target, its answer
+    in learned.db when fresh, else a live search (one clause of the query:
+    the ISBN, else the title, author or keywords) within the reply budget.
+    The live records come first, then static.db's repository records.
 
 Records go out without 9XX fields and $9 subfields: those are the source
 Koha's own items and authority ids, wrong in any other catalogue.
@@ -38,6 +40,12 @@ from .authorities import AuthoritySearch
 from .learned import Learned
 from .targets import AUTH_UNION, UNION, Target
 
+# A catalogue record has at least one of these. The institutional
+# repository records harvested for UNESP, UFPR, UNIFESP, UnB and UFU are
+# Dublin Core turned into MARC (024, 042, 245, 260, 520, 653, 720): no
+# author heading, ISBN, extent, controlled subject or class number.
+CATALOGUE_TAGS = ("020", "022", "082", "080", "100", "110", "111", "300",
+                  "600", "610", "611", "630", "650", "651")
 LEAF_CAP = 5000          # versions one clause may match before the rest are ignored
 CHUNK = 900              # SQLite's bound-parameter budget, with room to spare
 _ORDER = {"isbn": 0, "title": 1, "author": 2, "keywords": 3}
@@ -65,6 +73,11 @@ def clean(rec: marc.Record) -> marc.Record:
         else:
             out.fields.append(marc.Field(f.tag, f.ind1, f.ind2, [(c, v) for c, v in f.subfields if c != "9"]))
     return out
+
+
+def catalogue_record(rec: marc.Record) -> bool:
+    """A library catalogue record, not a Dublin Core repository record."""
+    return rec.has(*CATALOGUE_TAGS)
 
 
 # ----------------------------------------------------------------------
@@ -168,11 +181,13 @@ class Static:
         rows = []
         for i in range(0, len(ids), CHUNK):
             part = ids[i:i + CHUNK]
-            rows += conn.execute(f"SELECT id, source, completeness FROM versions WHERE body IS NOT NULL AND id IN "
-                                 f"({', '.join('?' * len(part))})", part).fetchall()
+            rows += conn.execute(f"SELECT id, source, completeness, author != '' OR isbns != '' AS cat FROM versions "
+                                 f"WHERE body IS NOT NULL AND id IN ({', '.join('?' * len(part))})", part).fetchall()
         if sources is not None:
             rows = [r for r in rows if r["source"] in sources]
-        rows.sort(key=lambda r: (-r["completeness"], r["id"]))
+        # Catalogue records (an author heading or an ISBN) before repository
+        # ones, whose Dublin Core author is a 720 that main_author never reads.
+        rows.sort(key=lambda r: (-r["cat"], -r["completeness"], r["id"]))
         page = [r["id"] for r in rows[start - 1:start - 1 + maximum]]
         records = []
         if page:
@@ -286,10 +301,27 @@ class Engine:
             return Result(total, [clean(r) for r in records], "static" if total else "none")
         total, records = self.static.search(node, sources, start, maximum)
         if total:
-            return Result(total, [clean(r) for r in records], "static")
+            # The first page is sorted most complete first: a catalogue
+            # record anywhere in the hits shows on it.
+            first = records if start == 1 else self.static.search(node, sources, 1, maximum)[1]
+            if any(catalogue_record(r) for r in first):
+                return Result(total, [clean(r) for r in records], "static")
         clause = live_clause(node)
         if not live or clause is None or self.learned is None:
-            return Result(0, [], "none")
+            return Result(total, [clean(r) for r in records], "static" if total else "none")
+        unique, errors, origin = self._live(live, clause)
+        if not unique:
+            return Result(total, [clean(r) for r in records], "static" if total else "none", errors)
+        # live records first, then static.db's repository records
+        page = unique[start - 1:start - 1 + maximum]
+        if len(page) < maximum and total:
+            skip = max(0, start - 1 - len(unique))
+            page += self.static.search(node, sources, skip + 1, maximum - len(page))[1]
+        return Result(len(unique) + total, [clean(r) for r in page], origin, errors)
+
+    def _live(self, live: list[Target], clause: cql.Clause) -> tuple[list[marc.Record], dict[str, str], str]:
+        """The live targets' records for one clause, without repeats: from
+        learned.db when fresh, else searched within the reply budget."""
         qkey = query_key(clause)
         pooled: list[marc.Record] = []
         errors: dict[str, str] = {}
@@ -317,5 +349,4 @@ class Engine:
                 continue
             seen.add(key)
             unique.append(r)
-        page = unique[start - 1:start - 1 + maximum]
-        return Result(len(unique), [clean(r) for r in page], origin if unique else "none", errors)
+        return unique, errors, origin
