@@ -24,7 +24,7 @@ import sys
 
 from nexus_enrich.static import create_empty, record_count
 
-from . import koha_sql, update, zeus
+from . import koha_sql, pergamum, update, zeus
 from .config import Settings
 from .engine import Engine, Static
 from .learned import Learned
@@ -37,7 +37,9 @@ def build(settings: Settings, live: bool | None = None) -> Engine:
     learned = Learned(settings.learned_db, settings.learned_days)
     use_live = settings.live if live is None else live
     hub = zeus.Zeus(settings.zeus_url) if settings.zeus_url else None
-    runner = Runner(learned, settings.live_timeout, settings.live_grace, zeus=hub) if use_live else None
+    crp = pergamum.Pergamum(settings.pergamum_url) if settings.pergamum_url else None
+    runner = (Runner(learned, settings.live_timeout, settings.live_grace, zeus=hub, pergamum=crp)
+              if use_live else None)
     return Engine(Static(settings.static_db), learned, load(settings.targets), runner)
 
 

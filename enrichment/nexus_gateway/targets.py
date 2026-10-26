@@ -8,8 +8,9 @@ Each entry has an id (the part after /sru/), a name, a group and a kind:
   zeus      a catalogue searched through Catálogo Zeus (target_index): live
             only on the server gateway (NEXUS_GATEWAY_ZEUS_URL set, zeus.py),
             static.db only elsewhere
-  pergamum  Rede Pergamum: harvested on the build server, so here it answers
-            from static.db only (a client never scrapes)
+  pergamum  Rede Pergamum: live only on the server gateway
+            (NEXUS_GATEWAY_PERGAMUM_URL set, pergamum.py), static.db only
+            elsewhere (a library's own gateway never scrapes)
   missing   no address known: static.db only
 
 "static" lists the static.db source ids that belong to the target (default:
