@@ -45,7 +45,7 @@
    "preselect": true,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "On the koha.nexus gateway (sru.koha.nexus). Searched live by the server gateway only (NEXUS_GATEWAY_PERGAMUM_URL, nexus_gateway/pergamum.py), never from /sru/_union."
+   "notes": "On the koha.nexus gateway (sru.koha.nexus). Searched live by the server gateway only (NEXUS_GATEWAY_PERGAMUM_URL, nexus_gateway/pergamum.py), /sru/_union included."
   },
   {
    "name": "Universidade Estadual Paulista (UNESP)",
@@ -3189,7 +3189,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Fallback: every gateway catalogue at once (static.db, then the Z39.50/SRU catalogues live)."
+   "notes": "Fallback: every gateway catalogue at once (static.db, then Catálogo Zeus, Rede Pergamum and the Z39.50/SRU catalogues live)."
   },
   {
    "name": "Fundação Biblioteca Nacional (BN)",

@@ -170,7 +170,7 @@ def test_ask_with_an_address_returns_records():
     assert not answer.error and answer.total == 2 and len(answer.records) == 2
 
 
-def test_live_only_with_an_address_and_never_from_union(tmp_path):
+def test_live_only_with_an_address_also_from_union(tmp_path):
     targets = load(TARGETS)
     assert targets["all"].kind == "pergamum"
 
@@ -183,4 +183,6 @@ def test_live_only_with_an_address_and_never_from_union(tmp_path):
     assert engine.resolve("all")[1] == []
     runner.pergamum = pergamum.Pergamum(get=FakeGet())
     assert [t.id for t in engine.resolve("all")[1]] == ["all"]
+    assert "all" in [t.id for t in engine.resolve("_union")[1]]
+    runner.pergamum = None
     assert "all" not in [t.id for t in engine.resolve("_union")[1]]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -93,8 +94,9 @@ def test_without_a_zeus_address_zeus_targets_stay_static(tmp_path):
     hub = zeus.Zeus("https://catalogo.example/zeus/", get=FakeGet())
     served = Engine(static, learned, table, live.Runner(learned, zeus=hub))
     assert [t.id for t in served.resolve("bn")[1]] == ["bn"]
-    # _union never sends Zeus a search per zeus target
+    # _union never sends Zeus a search per zeus target: no members, no Zeus at all
     assert not any(t.kind == "zeus" for t in served.resolve("_union")[1])
+    assert not any(t.kind == "zeus" for t in plain.resolve("_union")[1])
     plain.runner.close()
     served.runner.close()
 
@@ -107,3 +109,48 @@ def test_direct_list_addresses_replace_missing_and_zeus_where_marc21():
     assert table["bn"].kind == "zeus" and table["bn"].target_index == 0
     # UNIMARC catalogues are not served (MARC21 only), so they stay without an address
     assert table["bn-portugal"].kind == table["porbase"].kind == "missing"
+
+
+def test_union_asks_zeus_once_for_all_its_catalogues(tmp_path):
+    static = Static(tmp_path / "missing.db")
+    learned = Learned(tmp_path / "learned.db")
+    table = load(TARGETS)
+    members = [t for t in table.values() if t.kind == "zeus"]
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=FakeGet(), members=members)
+    served = Engine(static, learned, table, live.Runner(learned, zeus=hub))
+    union = served.resolve("_union")[1]
+    assert union[0].id == zeus.UNION_ID and sum(t.kind == "zeus" for t in union) == 1
+    served.runner.close()
+
+
+def test_search_many_ticks_every_catalogue_on_the_form_in_one_request():
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=get)
+    members = [target("bn", "Fundação Biblioteca Nacional (BN)", 0),
+               target("ufsc", "Universidade Federal de Santa Catarina (UFSC)", 3),
+               target("uff", "Universidade Federal Fluminense (UFF)", 17)]          # not on the form
+    total, recs = hub.search_many(members, "title", "quixote", 5)
+    assert total == len(recs) >= 1
+    searches = [u for u in get.urls if "searchString" in u]
+    assert len(searches) == 1
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(searches[0]).query)
+    assert sorted(k for k in query if k.startswith("targets[")) == ["targets[0]", "targets[11]"]
+
+
+def test_search_many_splits_into_chunks_of_15():
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=get)
+    hub._labels = {n: f"Biblioteca Numero {n} (B{n})" for n in range(20)}
+    hub._labels_at = time.monotonic()
+    members = [target(f"b{n}", f"Biblioteca Numero {n} (B{n})", n) for n in range(20)]
+    hub.search_many(members, "title", "x", 5)
+    sizes = [sum(k.startswith("targets[") for k in urllib.parse.parse_qs(urllib.parse.urlsplit(u).query))
+             for u in get.urls if "searchString" in u]
+    assert sizes == [15, 5]
+
+
+def test_union_answer_through_live_ask():
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=FakeGet(),
+                    members=[target("ufsc", "Universidade Federal de Santa Catarina (UFSC)", 11)])
+    answer = asyncio.run(live.ask(zeus.union_target(), "title", "x", 5, zeus=hub))
+    assert not answer.error and answer.records and answer.target == zeus.UNION_ID

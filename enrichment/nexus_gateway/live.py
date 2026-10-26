@@ -43,7 +43,10 @@ async def ask(target: Target, kind: str, term: str, timeout: float,
         if target.kind == "zeus":
             if zeus is None:
                 raise zeus_mod.ZeusError("no Zeus address (NEXUS_GATEWAY_ZEUS_URL)")
-            total, records = await asyncio.to_thread(zeus.search, target, kind, term, timeout)
+            if target.id == zeus_mod.UNION_ID:
+                total, records = await asyncio.to_thread(zeus.search_many, zeus.members, kind, term, timeout)
+            else:
+                total, records = await asyncio.to_thread(zeus.search, target, kind, term, timeout)
             records = records[:PAGE]
         elif target.kind == "pergamum":
             if pergamum is None:

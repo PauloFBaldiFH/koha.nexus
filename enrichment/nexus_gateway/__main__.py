@@ -36,11 +36,13 @@ from .targets import load
 def build(settings: Settings, live: bool | None = None) -> Engine:
     learned = Learned(settings.learned_db, settings.learned_days)
     use_live = settings.live if live is None else live
-    hub = zeus.Zeus(settings.zeus_url) if settings.zeus_url else None
+    targets = load(settings.targets)
+    members = [t for t in targets.values() if t.kind == "zeus" and t.status != "broken"]
+    hub = zeus.Zeus(settings.zeus_url, members=members) if settings.zeus_url else None
     crp = pergamum.Pergamum(settings.pergamum_url) if settings.pergamum_url else None
     runner = (Runner(learned, settings.live_timeout, settings.live_grace, zeus=hub, pergamum=crp)
               if use_live else None)
-    return Engine(Static(settings.static_db), learned, load(settings.targets), runner)
+    return Engine(Static(settings.static_db), learned, targets, runner)
 
 
 def main(argv: list[str] | None = None) -> int:

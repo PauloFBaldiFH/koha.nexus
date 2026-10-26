@@ -6,6 +6,9 @@ value).
 
 Only the server gateway does this: it runs when NEXUS_GATEWAY_ZEUS_URL is
 set (the VPS behind sru.koha.nexus); a library's own gateway leaves it unset.
+/sru/_union asks Zeus once for all its catalogues (UNION_ID, search_many):
+one page with every targets[n] ticked, as the old bridge did, up to 15 a
+request.
 
 targets.json's target_index values were never checked against the live
 page, so the index searched is taken from the labels on Zeus's own search
@@ -34,6 +37,8 @@ MAX_BYTES = 20_000_000
 ZEUS_LABELS_TTL = 6 * 3600          # the form is fetched again after this
 LABELS_RETRY = 600                  # a failed fetch is tried again after this
 SEARCH_TYPE = {"isbn": 7, "title": 4, "author": 1003, "keywords": 1016}
+UNION_ID = "_zeus"                  # the one live "target" /sru/_union asks for every zeus catalogue
+CHUNK = 15                          # Zeus refuses more targets[n] than this in one request
 
 
 class ZeusError(Exception):
@@ -191,9 +196,10 @@ class Zeus:
     """One Catálogo Zeus address; thread-safe (the live loop runs searches
     in worker threads)."""
 
-    def __init__(self, url: str, get=_get):
+    def __init__(self, url: str, get=_get, members: list[Target] | None = None):
         self.url = url
         self.get = get
+        self.members = list(members or [])      # the zeus catalogues /sru/_union searches
         self._labels: dict[int, str] | None = None
         self._labels_at = 0.0
         self._lock = threading.Lock()
@@ -222,3 +228,39 @@ class Zeus:
         page = self.get(self.url + ("&" if "?" in self.url else "?") + urllib.parse.urlencode(params), timeout)
         records = parse_results(page)
         return len(records), records
+
+    def search_many(self, targets: list[Target], kind: str, term: str, timeout: float
+                    ) -> tuple[int, list[marc.Record]]:
+        """Every catalogue of `targets` that is on the form, in one request
+        per CHUNK of them; records in page order, without repeats."""
+        labels = self.labels(min(timeout, 20.0))
+        if not labels:
+            raise ZeusError("Zeus's search form could not be read, so no target can be picked")
+        ns = sorted({n for n in (index_for(t, labels) for t in targets) if n is not None})
+        if not ns:
+            raise ZeusError("none of the catalogues is among the targets on Zeus's search form")
+        records: list[marc.Record] = []
+        seen: set[tuple[str, str]] = set()
+        errors = []
+        for i in range(0, len(ns), CHUNK):
+            params = [("searchString", term), ("searchType", str(SEARCH_TYPE.get(kind, SEARCH_TYPE["keywords"]))),
+                      ("operator", "and")] + [(f"targets[{n}]", "on") for n in ns[i:i + CHUNK]]
+            try:
+                page = self.get(self.url + ("&" if "?" in self.url else "?") + urllib.parse.urlencode(params), timeout)
+            except ZeusError as exc:
+                errors.append(exc)
+                continue
+            for rec in parse_results(page):
+                key = (rec.control("001").strip(), " ".join(f.text() for f in rec.get_fields("245")))
+                if key[0] and key in seen:
+                    continue
+                seen.add(key)
+                records.append(rec)
+        if errors and not records:
+            raise errors[0]
+        return len(records), records
+
+
+def union_target() -> Target:
+    """The live "target" that stands for every zeus catalogue in /sru/_union."""
+    return Target(id=UNION_ID, name="Catálogo Zeus", kind="zeus", group="national", status="verified")

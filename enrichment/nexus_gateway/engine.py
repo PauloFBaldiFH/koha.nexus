@@ -1,6 +1,8 @@
 """One SRU search: static.db first, then live targets through learned.db.
 
-    database "_union"   every source in static.db; live: every native target
+    database "_union"   every source in static.db; live: Catálogo Zeus (one
+                        request for all its catalogues), Rede Pergamum and
+                        every native target
     database "_union-aut"
                         the authority headings of static.db (authorities.py),
                         MARC21 authority records; never live
@@ -36,6 +38,7 @@ from nexus_enrich import marc, normalize
 from nexus_enrich.static import StaticDB
 
 from . import cql
+from . import zeus as zeus_mod
 from .authorities import AuthoritySearch
 from .learned import Learned
 from .targets import AUTH_UNION, UNION, Target
@@ -280,11 +283,15 @@ class Engine:
 
     def resolve(self, database: str) -> tuple[set[str] | None, list[Target]]:
         """(static sources or None for all, live targets) for a database name.
-        _union never asks Zeus or Pergamum: one union search would send Zeus
-        a dozen, and Pergamum a page of record fetches."""
+        _union asks Zeus once for all its catalogues (zeus.UNION_ID) and the
+        Pergamum target, before the Z39.50/SRU ones, when the runner has
+        their addresses."""
         database = database.strip("/").lower()
         if database in ("", UNION):
-            return None, [t for t in self.targets.values() if t.live]
+            hub = getattr(self.runner, "zeus", None)
+            bridges = [zeus_mod.union_target()] if hub is not None and hub.members else []
+            bridges += [t for t in self.targets.values() if t.kind == "pergamum" and self.is_live(t)]
+            return None, bridges + [t for t in self.targets.values() if t.live]
         if database == AUTH_UNION:
             return None, []
         t = self.targets.get(database)
