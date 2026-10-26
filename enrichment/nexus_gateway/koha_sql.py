@@ -362,7 +362,8 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
         if fid is not None:
             r.update(priority="fallback", preselect=False, backup_for=[f"{host.lower()}:{port}/sru/{fid}"])
     fallback = [row("sru/" + UNION, UNION_NAME, "sru_national", True,
-                    "Fallback: every gateway catalogue at once (static.db, then the Z39.50/SRU catalogues live).")]
+                    "Fallback: every gateway catalogue at once (static.db, then Catálogo Zeus, Rede Pergamum "
+                    "and the Z39.50/SRU catalogues live).")]
     for t in table.values():
         if t.id in PRIMARY_IDS or t.id in firsts:
             continue

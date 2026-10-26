@@ -1,7 +1,7 @@
 {
  "schema": 1,
  "updated": "2026-10-26",
- "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus ones too, through Catálogo Zeus, on the server gateway only (NEXUS_GATEWAY_ZEUS_URL set) and never from /sru/_union; Rede Pergamum (pergamum) likewise, when NEXUS_GATEWAY_PERGAMUM_URL is set; missing ones answer from static.db only. A missing or zeus catalogue that Paulo's validated direct Z39.50 list (panel/kei_panel/data/z3950_direct.json) covers in MARC21 is kind z3950 with that address. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address). local_first (1-5): the catalogues static.db holds nearly whole (UNESP, UFPR, UNIFESP, UnB, UFU); their Koha rows are ticked and ranked first, on-demand enrichment searches their static.db records before any server, and a library row whose host is one of legacy_hosts (or a subdomain) becomes their fallback.",
+ "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus ones too, through Catálogo Zeus, on the server gateway only (NEXUS_GATEWAY_ZEUS_URL set), and /sru/_union asks Zeus once for all of them; Rede Pergamum (pergamum) likewise, when NEXUS_GATEWAY_PERGAMUM_URL is set, /sru/_union included; missing ones answer from static.db only. A missing or zeus catalogue that Paulo's validated direct Z39.50 list (panel/kei_panel/data/z3950_direct.json) covers in MARC21 is kind z3950 with that address. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address). local_first (1-5): the catalogues static.db holds nearly whole (UNESP, UFPR, UNIFESP, UnB, UFU); their Koha rows are ticked and ranked first, on-demand enrichment searches their static.db records before any server, and a library row whose host is one of legacy_hosts (or a subdomain) becomes their fallback.",
  "targets": [
   {
    "id": "bn",
@@ -731,7 +731,7 @@
    "kind": "pergamum",
    "status": "verified",
    "source": "sru-bridge/pergamum_sru: Rede Pergamum CRP, untested live",
-   "note": "Searched live by the server gateway only (NEXUS_GATEWAY_PERGAMUM_URL, nexus_gateway/pergamum.py), never from /sru/_union."
+   "note": "Searched live by the server gateway only (NEXUS_GATEWAY_PERGAMUM_URL, nexus_gateway/pergamum.py), /sru/_union included."
   },
   {
    "id": "nlm",

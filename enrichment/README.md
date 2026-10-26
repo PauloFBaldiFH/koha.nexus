@@ -106,13 +106,18 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
 
 | Database | Answers from |
 |---|---|
-| `sru/_union` | every source in `static.db`; on a miss, every native target live |
+| `sru/_union` | every source in `static.db`; on a miss, Catálogo Zeus (one request for its catalogues), Rede Pergamum and every native target live |
 | `sru/<id>` (a target in `nexus_gateway/targets.json`) | its `static.db` sources (`static`, default its id); on a miss, the target live if it is `z3950` or `sru`, or `zeus` on the server gateway |
 | `sru/<source>` (a `static.db` source with no target) | `static.db` only |
 
-- A search answers from `static.db` whenever it has a record (the whole CQL
-  query: ISBN/ISSN, title, author, keywords, and/or/not).
-- Only when it has none are the native targets asked (Z39.50 or SRU, never
+- A search answers from `static.db` whenever it has a catalogue record (the
+  whole CQL query: ISBN/ISSN, title, author, keywords, and/or/not), catalogue
+  records (an author heading or an ISBN) first.
+- The repository records of UNESP, UFPR, UNIFESP, UnB and UFU are Dublin Core
+  turned into MARC (024, 042, 245, 260, 520, 653, 720): no author heading,
+  ISBN, extent, controlled subject or class number. When those are all
+  `static.db` has, the live answer comes first and they follow it.
+- Only when it has no catalogue record are the native targets asked (Z39.50 or SRU, never
   scraping; `broken` targets are skipped), with one clause of the query (the
   ISBN, else the title, author or keywords). The reply waits 6 s
   (`NEXUS_GATEWAY_LIVE_TIMEOUT`); slower targets run on for 30 s and their
@@ -141,14 +146,15 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
 - Catálogo Zeus (kind `zeus`: BN, UNICAMP, UERJ, UFG, UFMG, UFPE, UFSCar, UFU,
   UFRGS, UFF): searched live only where `NEXUS_GATEWAY_ZEUS_URL` is set (the
   VPS behind sru.koha.nexus: `https://catalogo.bu.ufsc.br/zeus/`), one
-  `targets[n]` per search, never from `sru/_union`. The `n` is the one whose
+  `targets[n]` per search; `sru/_union` asks once for all of them, every
+  `targets[n]` ticked (15 a request), before the Z39.50/SRU targets. The `n` is the one whose
   label on Zeus's search form names the catalogue (`target_index` first); a
   catalogue not on the form is not searched. `python -m nexus_gateway
   zeus-labels` prints that mapping.
 - Rede Pergamum (kind `pergamum`, `sru/all`): searched live only where
   `NEXUS_GATEWAY_PERGAMUM_URL` is set (the VPS:
   `https://www.pergamum.pucpr.br/redepergamum/consultas/site_CRP/pesquisa.php`),
-  never from `sru/_union`: one search lists up to 50 ids, then the first 20
+  `sru/_union` included: one search lists up to 50 ids, then the first 20
   records' MARC tabs are fetched, five at a time (`nexus_gateway/pergamum.py`,
   ported from the retired `pergamum_sru` bridge).
 - Missing and Zeus catalogues that Paulo's validated direct list

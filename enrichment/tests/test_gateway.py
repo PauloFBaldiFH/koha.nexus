@@ -471,3 +471,75 @@ def test_panel_list_is_generated_from_targets_json():
     utfpr = next(t for t in fallback if t["db"] == "sru/utfpr")
     assert "direct Z39.50 row UTFPR" in utfpr["notes"] and utfpr["flag"] == "🇧🇷"
     assert fallback[0]["flag"] == "🌐" and koha_sql.flag("gb") == "🇬🇧"
+
+
+# ----------------------------------------------------------------------
+# repository (Dublin Core) records do not stop the live search
+# ----------------------------------------------------------------------
+def dc_record(title, rid):
+    """A repository record as the UNESP/UFPR harvests hold them: Dublin Core
+    turned into MARC."""
+    rec = marc.Record(leader="00000nam a2200000 a 4500")
+    rec.fields += [Field("001", data=rid),
+                   Field("024", "8", " ", [("a", f"http://hdl.handle.net/11449/{rid}")]),
+                   Field("042", " ", " ", [("a", "dc")]),
+                   Field("245", "0", "0", [("a", title)]),
+                   Field("260", " ", " ", [("c", "2019")]),
+                   Field("520", " ", " ", [("a", "Resumo.")]),
+                   Field("653", " ", " ", [("a", "Cervantes")]),
+                   Field("720", " ", " ", [("a", "Silva, Ana"), ("e", "author")])]
+    return rec
+
+
+@pytest.fixture(scope="module")
+def repo_db(tmp_path_factory):
+    d = tmp_path_factory.mktemp("repo")
+    jsonl(d / "dump.jsonl", [
+        {"fonte": "unesp", "marcxml": marc.to_xml(dc_record("O Quixote na sala de aula", "R1"))},
+        {"fonte": "unesp", "marcxml": marc.to_xml(dc_record("Leituras do Quixote", "R2"))},
+        {"fonte": "unesp", "marcxml": marc.to_xml(bib("Grande sertão", "Rosa, João Guimarães", rid="C1"))},
+        {"fonte": "unesp", "marcxml": marc.to_xml(dc_record("Grande sertão em teses", "R3"))},
+    ])
+    src = SourceConfig.from_dict({"id": "zeus", "paths": ["dump.jsonl"], "mode": "full", "source_field": "fonte"})
+    out = d / "static.db"
+    assert Builder(out, [src], d).build().error_count == 0
+    return out
+
+
+def test_catalogue_record():
+    from nexus_gateway.engine import catalogue_record
+    assert not catalogue_record(dc_record("x", "R"))
+    assert catalogue_record(bib("x", "Autor"))
+    assert catalogue_record(bib("x", extent=None, isbn=ISBN))
+
+
+def test_repository_hits_still_go_live_and_come_after(repo_db, tmp_path):
+    asker = FakeAsker()
+    eng = live_engine(repo_db, tmp_path, asker)
+    r = run(eng, "dc.title=quixote")
+    assert r.origin == "live" and r.total == 4
+    assert ids(r) == ["loc-1", "yale-1", "R1", "R2"]
+    # pages run on from the live records into the repository ones
+    assert len(ids(run(eng, "dc.title=quixote", start=2, maximum=2))) == 2
+    assert ids(run(eng, "dc.title=quixote", start=3, maximum=2)) == ["R1", "R2"]
+    assert ids(run(eng, "dc.title=quixote", start=4, maximum=2)) == ["R2"]
+    eng.runner.close()
+
+
+def test_a_catalogue_hit_never_goes_live(repo_db, tmp_path):
+    asker = FakeAsker()
+    eng = live_engine(repo_db, tmp_path, asker)
+    r = run(eng, 'dc.title="grande sertão"')
+    assert r.origin == "static" and ids(r)[0] == "C1" and asker.calls == []
+    eng.runner.close()
+
+
+def test_repository_hits_stay_when_nothing_live(repo_db, tmp_path):
+    eng = Engine(Static(repo_db), Learned(tmp_path / "l.db"), load(TARGETS))      # no runner
+    r = run(eng, "dc.title=quixote", database="unesp")
+    assert r.origin == "static" and sorted(ids(r)) == ["R1", "R2"]
+    asker = FakeAsker(error="refused")
+    eng = live_engine(repo_db, tmp_path, asker)
+    r = run(eng, "dc.title=quixote")
+    assert r.origin == "static" and ids(r) == ["R1", "R2"] and r.errors
+    eng.runner.close()
