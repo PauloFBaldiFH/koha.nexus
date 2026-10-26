@@ -466,6 +466,7 @@ $bootText = $bootMatch.Groups[1].Value
 Check 'msix: the bootstrap takes -ResultFile and writes stops there' ($bootText -match "(?m)^param\(\[string\]\`$ResultFile = ''\)" -and $bootText -match 'Write-BootstrapResult \$message' -and $bootText -match 'if \(\$ResultFile\) \{ exit 3 \}' -and $bootText -match 'exit 11') ''
 Check 'msix: a declined UAC prompt shows ElevationBody, not the error box' ($builderText -match '-Verb RunAs -WindowStyle Normal -ErrorAction Stop' -and $builderText -match '\$ui\.ElevationBody') ''
 Check 'msix: bootstrap errors exit 10' ($builderText -match '(?m)^    exit 10\r?$') ''
+Check 'msix: windows\msix (build files, old .msix) stays out of the payload' ($builderText -match "'setup', 'msix',") ''
 # Store 10.1.1.11 (1.0.28.0): the tiles showed the Koha community logo. The
 # package icon is now drawn by gerar_assets.py; the old logo file is gone.
 Check 'msix: the Koha logo is not a package source' (-not (Test-Path -LiteralPath (Join-Path $repo 'windows\msix\KohaNexusLogo.png')) -and (Test-Path -LiteralPath (Join-Path $repo 'windows\msix\KohaNexusMark.png'))) ''
