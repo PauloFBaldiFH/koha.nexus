@@ -443,6 +443,7 @@ $entryPath = Join-Path $repo 'windows\msix\KohaMsixEntry.cs'
 $entryText = Get-Content -LiteralPath $entryPath -Raw
 Check 'msix: the build compiles windows\msix\KohaMsixEntry.cs' ($builderText -match "Join-Path \`$scriptRoot 'KohaMsixEntry.cs'" -and $builderText -notmatch "entrySource = @'") ''
 Check 'msix: the launcher has the payload marker and a setup window' ($entryText -match '"__PAYLOAD_VERSION__"' -and $entryText -match 'class SetupForm : Form' -and $entryText -match '-ResultFile') ''
+Check 'msix: the launcher reads the real Windows build (RtlGetVersion, not OSVersion = 9200)' ($entryText -match 'RtlGetVersion' -and $entryText -match 'int build = WindowsBuild\(\);') ''
 Check 'msix: the launcher never shows "could not be started"' ($entryText -notmatch 'could not be started') ''
 $csc = @((Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'), (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')) |
     Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
