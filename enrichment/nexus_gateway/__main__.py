@@ -1,4 +1,4 @@
-"""python -m nexus_gateway serve | update | init-db | koha-sql | panel-list | check
+"""python -m nexus_gateway serve | update | init-db | koha-sql | panel-list | check | zeus-labels
 
     serve       run the SRU server (settings: NEXUS_GATEWAY_* variables)
     update      download the newest static.db release and swap it in
@@ -10,6 +10,8 @@
                 catalogues' steps, see koha_sql.py)
     panel-list  print the koha.nexus panel's list of these rows
     check       load targets.json and static.db, print what would be served
+    zeus-labels fetch Catálogo Zeus's search form (NEXUS_GATEWAY_ZEUS_URL or
+                --url) and print which targets[n] each zeus target is searched as
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ import sys
 
 from nexus_enrich.static import create_empty, record_count
 
-from . import koha_sql, update
+from . import koha_sql, update, zeus
 from .config import Settings
 from .engine import Engine, Static
 from .learned import Learned
@@ -34,7 +36,8 @@ from .targets import load
 def build(settings: Settings, live: bool | None = None) -> Engine:
     learned = Learned(settings.learned_db, settings.learned_days)
     use_live = settings.live if live is None else live
-    runner = Runner(learned, settings.live_timeout, settings.live_grace) if use_live else None
+    hub = zeus.Zeus(settings.zeus_url) if settings.zeus_url else None
+    runner = Runner(learned, settings.live_timeout, settings.live_grace, zeus=hub) if use_live else None
     return Engine(Static(settings.static_db), learned, load(settings.targets), runner)
 
 
@@ -56,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     up.add_argument("--check", action="store_true")
     pl = sub.add_parser("panel-list")
     pl.add_argument("--authorities", help="the panel list whose authority rows to keep")
+    zl = sub.add_parser("zeus-labels")
+    zl.add_argument("--url", help="Catálogo Zeus's address (default NEXUS_GATEWAY_ZEUS_URL)")
     args = ap.parse_args(argv)
     settings = Settings.from_env()
 
@@ -86,6 +91,22 @@ def main(argv: list[str] | None = None) -> int:
                   else koha_sql.render_redo if args.redo_local_first else koha_sql.render)
         sys.stdout.write(render(load(settings.targets), args.host, args.port))
         return 0
+    if args.cmd == "zeus-labels":
+        url = args.url or settings.zeus_url
+        if not url:
+            print("No Zeus address: give --url or set NEXUS_GATEWAY_ZEUS_URL.", file=sys.stderr)
+            return 2
+        try:
+            labels = zeus.parse_labels(zeus._get(url, 20.0))
+        except zeus.ZeusError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        rows = zeus.compare([t for t in load(settings.targets).values() if t.kind == "zeus"], labels)
+        for r in rows:
+            where = f"targets[{r['found']}] {r['label']}" if r["found"] is not None else "not on the page"
+            print(f"{'ok ' if r['found'] is not None else 'NO '} {r['id']:<8} {r['name']}  ->  {where}")
+        print(f"\n{len(labels)} targets on the page:", ", ".join(f"{n}={labels[n]}" for n in sorted(labels)))
+        return 0 if labels and all(r["found"] is not None for r in rows) else 1
     if args.cmd == "check":
         targets = load(settings.targets)
         engine = Engine(Static(settings.static_db), None, targets)

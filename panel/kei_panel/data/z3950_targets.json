@@ -67,7 +67,7 @@
    "preselect": true,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Local first: static.db holds this catalogue; answers from static.db only. Its direct Z39.50 row UNESP (Universidade Estadual Paulista) is the backup."
+   "notes": "Local first: static.db holds this catalogue; answers from static.db, then live Z3950. Its direct Z39.50 row UNESP (Universidade Estadual Paulista) is the backup."
   },
   {
    "name": "Universidade Federal do Paraná (UFPR)",
@@ -3211,7 +3211,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Fundacentro, Biblioteca",
@@ -3255,7 +3255,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row Senado Federal — catálogo legado (Aleph SEN01) covers this library.",
+   "notes": "Status: verified; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Senado Federal — catálogo legado (Aleph SEN01) covers this library.",
    "backup_for": [
     "biblioteca2.senado.gov.br:9991/SEN01"
    ]
@@ -3280,7 +3280,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Needs a login: NEXUS_GATEWAY_LOGIN_SENADO_FOLIO=user:password in the gateway's environment (the panel's .env holds it as KEI_Z3950_SENADO_FOLIO_USER/_PASS). Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library.",
    "backup_for": [
     "z3950.folio.ebsco.com:2100/rvbi"
    ]
@@ -3355,7 +3355,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Biblioteca Nacional de España (BNE) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Biblioteca Nacional de España (BNE) covers this library.",
    "backup_for": [
     "eu00.alma.exlibrisgroup.com:210/34BNE_INST"
    ]
@@ -3493,7 +3493,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row SLSP (Swiss Library Service Platform) network zone covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row SLSP (Swiss Library Service Platform) network zone covers this library.",
    "backup_for": [
     "eu03.alma.exlibrisgroup.com:1921/41SLSP_NETWORK"
    ]
@@ -3543,7 +3543,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Národní knihovna České republiky (NKC) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Národní knihovna České republiky (NKC) covers this library.",
    "backup_for": [
     "aleph.nkp.cz:9991/NKC01"
    ]
@@ -3700,7 +3700,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row USP (Universidade de São Paulo) — Alma covers this library.",
+   "notes": "Status: verified; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row USP (Universidade de São Paulo) — Alma covers this library.",
    "backup_for": [
     "na01.alma.exlibrisgroup.com:1921/55USP_INST"
    ]
@@ -3725,7 +3725,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade do Estado do Rio de Janeiro (UERJ)",
@@ -3747,7 +3747,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal de Goiás (UFG)",
@@ -3769,7 +3769,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal de Minas Gerais (UFMG)",
@@ -3791,7 +3791,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal de Pernambuco (UFPE)",
@@ -3813,7 +3813,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal de Santa Catarina (UFSC)",
@@ -3835,7 +3835,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels. Fallback: the direct Z39.50 row UFSC (Universidade Federal de Santa Catarina) covers this library.",
+   "notes": "Status: verified; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row UFSC (Universidade Federal de Santa Catarina) covers this library.",
    "backup_for": [
     "z3950.ufsc.br:210/Default"
    ]
@@ -3860,7 +3860,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal do Rio Grande do Sul (UFRGS)",
@@ -3882,7 +3882,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Federal Fluminense (UFF)",
@@ -3904,7 +3904,7 @@
    "preselect": false,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: verified; answers from static.db only. target_index to confirm with sru_gateway.zeus_labels."
+   "notes": "Status: verified; answers from static.db, then live through Catálogo Zeus. Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels)."
   },
   {
    "name": "Universidade Tecnológica Federal do Paraná (UTFPR)",
@@ -4042,7 +4042,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Penn State University covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Penn State University covers this library.",
    "backup_for": [
     "zcat.libraries.psu.edu:2200/Unicorn"
    ]
@@ -4092,7 +4092,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Tufts University covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Tufts University covers this library.",
    "backup_for": [
     "tufts.alma.exlibrisgroup.com:1921/01TUN_INST"
    ]
@@ -4117,7 +4117,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Florida State University (FSU) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Florida State University (FSU) covers this library.",
    "backup_for": [
     "fsu.alma.exlibrisgroup.com:1921/01FALSC_FSU"
    ]
@@ -4164,7 +4164,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of British Columbia covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row University of British Columbia covers this library.",
    "backup_for": [
     "ubc.alma.exlibrisgroup.com:1921/01UBC_INST"
    ]
@@ -4189,7 +4189,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row University of Toronto covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row University of Toronto covers this library.",
    "backup_for": [
     "utoronto.alma.exlibrisgroup.com:1921/01UTON_INST"
    ]
@@ -4214,7 +4214,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Simon Fraser University (SFU) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Simon Fraser University (SFU) covers this library.",
    "backup_for": [
     "sfu.alma.exlibrisgroup.com:1921/01SFU_INST"
    ]
@@ -4465,7 +4465,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Pontificia Universidad Católica del Perú (PUCP) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Pontificia Universidad Católica del Perú (PUCP) covers this library.",
    "backup_for": [
     "na01.alma.exlibrisgroup.com:1921/51PUCP_INST"
    ]
@@ -4490,7 +4490,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only. Fallback: the direct Z39.50 row Universidad Peruana de Ciencias Aplicadas (UPC) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Fallback: the direct Z39.50 row Universidad Peruana de Ciencias Aplicadas (UPC) covers this library.",
    "backup_for": [
     "na01.alma.exlibrisgroup.com:1921/51UPC_INST"
    ]

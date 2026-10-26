@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "updated": "2026-10-24",
- "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus, pergamum and missing ones answer from static.db only, since clients never scrape. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address). local_first (1-5): the catalogues static.db holds nearly whole (UNESP, UFPR, UNIFESP, UnB, UFU); their Koha rows are ticked and ranked first, on-demand enrichment searches their static.db records before any server, and a library row whose host is one of legacy_hosts (or a subdomain) becomes their fallback.",
+ "updated": "2026-10-26",
+ "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus ones too, through Catálogo Zeus, on the server gateway only (NEXUS_GATEWAY_ZEUS_URL set) and never from /sru/_union; pergamum and missing ones answer from static.db only. A missing or zeus catalogue that Paulo's validated direct Z39.50 list (panel/kei_panel/data/z3950_direct.json) covers in MARC21 is kind z3950 with that address. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address). local_first (1-5): the catalogues static.db holds nearly whole (UNESP, UFPR, UNIFESP, UnB, UFU); their Koha rows are ticked and ranked first, on-demand enrichment searches their static.db records before any server, and a library row whose host is one of legacy_hosts (or a subdomain) becomes their fallback.",
  "targets": [
   {
    "id": "bn",
@@ -11,7 +11,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 0,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -27,19 +27,29 @@
    "name": "Rede Virtual de Bibliotecas (RVBI), Senado Federal",
    "group": "national",
    "country": "BR",
-   "kind": "zeus",
+   "kind": "z3950",
    "status": "verified",
-   "target_index": 2,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
-   "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+   "host": "biblioteca2.senado.gov.br",
+   "port": 9991,
+   "db": "SEN01",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server senado-legacy; was kind zeus"
   },
   {
    "id": "senado-folio",
    "name": "Senado Federal (FOLIO)",
    "group": "national",
    "country": "BR",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "z3950.folio.ebsco.com",
+   "port": 2100,
+   "db": "rvbi",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server senado-folio; was kind missing",
+   "note": "Needs a login: NEXUS_GATEWAY_LOGIN_SENADO_FOLIO=user:password in the gateway's environment (the panel's .env holds it as KEI_Z3950_SENADO_FOLIO_USER/_PASS)."
   },
   {
    "id": "bn-portugal",
@@ -62,8 +72,14 @@
    "name": "Biblioteca Nacional de España, Espanha",
    "group": "national",
    "country": "ES",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "eu00.alma.exlibrisgroup.com",
+   "port": 210,
+   "db": "34BNE_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server bne; was kind missing"
   },
   {
    "id": "bl",
@@ -123,8 +139,14 @@
    "name": "Swiss Library Service Platform, Suíça",
    "group": "national",
    "country": "CH",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "eu03.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "41SLSP_NETWORK",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server slsp; was kind missing"
   },
   {
    "id": "suecia",
@@ -146,8 +168,14 @@
    "name": "National Library of the Czech Republic, Tchéquia",
    "group": "national",
    "country": "CZ",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "aleph.nkp.cz",
+   "port": 9991,
+   "db": "NKC01",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server nkc; was kind missing"
   },
   {
    "id": "grecia",
@@ -202,11 +230,14 @@
    "name": "Universidade de São Paulo (USP)",
    "group": "br_universities",
    "country": "BR",
-   "kind": "zeus",
+   "kind": "z3950",
    "status": "verified",
-   "target_index": 4,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
-   "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+   "host": "na01.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "55USP_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server usp; was kind zeus"
   },
   {
    "id": "unicamp",
@@ -216,7 +247,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 6,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -224,13 +255,19 @@
    "name": "Universidade Estadual Paulista (UNESP)",
    "group": "br_universities",
    "country": "BR",
-   "kind": "missing",
-   "status": "missing",
+   "kind": "z3950",
+   "status": "untested",
+   "host": "unesp.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "55UNESP_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
    "local_first": 1,
    "legacy_hosts": [
     "unesp.br",
     "unesp.alma.exlibrisgroup.com"
-   ]
+   ],
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server unesp; was kind missing"
   },
   {
    "id": "uerj",
@@ -240,7 +277,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 5,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -251,7 +288,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 8,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -262,7 +299,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 9,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -273,7 +310,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 10,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -281,11 +318,14 @@
    "name": "Universidade Federal de Santa Catarina (UFSC)",
    "group": "br_universities",
    "country": "BR",
-   "kind": "zeus",
+   "kind": "z3950",
    "status": "verified",
-   "source": "sru-bridge/zeus_sru: Catálogo Zeus target 0, tested live on 2026-10-09",
-   "target_index": 11,
-   "note": "target_index to confirm with sru_gateway.zeus_labels."
+   "host": "z3950.ufsc.br",
+   "port": 210,
+   "db": "Default",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server ufsc; was kind zeus"
   },
   {
    "id": "ufscar",
@@ -295,7 +335,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 12,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -325,7 +365,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 14,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)",
    "local_first": 5,
    "legacy_hosts": [
@@ -352,7 +392,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 16,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -363,7 +403,7 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 17,
-   "note": "target_index to confirm with sru_gateway.zeus_labels.",
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
    "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
   },
   {
@@ -458,8 +498,14 @@
    "name": "Penn State University, EUA",
    "group": "intl_universities",
    "country": "US",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "zcat.libraries.psu.edu",
+   "port": 2200,
+   "db": "Unicorn",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server penn-state; was kind missing"
   },
   {
    "id": "upenn",
@@ -485,16 +531,28 @@
    "name": "Tufts University Libraries, EUA",
    "group": "intl_universities",
    "country": "US",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "tufts.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "01TUN_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server tufts; was kind missing"
   },
   {
    "id": "fsu",
    "name": "Florida State University, EUA",
    "group": "intl_universities",
    "country": "US",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "fsu.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "01FALSC_FSU",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server fsu; was kind missing"
   },
   {
    "id": "suno",
@@ -509,24 +567,42 @@
    "name": "University of British Columbia, Canadá",
    "group": "intl_universities",
    "country": "CA",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "ubc.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "01UBC_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server ubc; was kind missing"
   },
   {
    "id": "toronto",
    "name": "University of Toronto, Canadá",
    "group": "intl_universities",
    "country": "CA",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "utoronto.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "01UTON_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server utoronto; was kind missing"
   },
   {
    "id": "sfu",
    "name": "Simon Fraser University, Canadá",
    "group": "intl_universities",
    "country": "CA",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "sfu.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "01SFU_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server sfu; was kind missing"
   },
   {
    "id": "trent",
@@ -624,16 +700,28 @@
    "name": "Pontificia Universidad Católica del Perú, Peru",
    "group": "intl_universities",
    "country": "PE",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "na01.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "51PUCP_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server pucp; was kind missing"
   },
   {
    "id": "upc-peru",
    "name": "Universidad Peruana de Ciencias Aplicadas, Peru",
    "group": "intl_universities",
    "country": "PE",
-   "kind": "missing",
-   "status": "missing"
+   "kind": "z3950",
+   "status": "untested",
+   "host": "na01.alma.exlibrisgroup.com",
+   "port": 1921,
+   "db": "51UPC_INST",
+   "syntax": "USMARC",
+   "encoding": "utf8",
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server upc-peru; was kind missing"
   },
   {
    "id": "all",
