@@ -45,7 +45,7 @@
    "preselect": true,
    "verified": true,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "On the koha.nexus gateway (sru.koha.nexus). Dedicated Python backend (pergamum_sru)."
+   "notes": "On the koha.nexus gateway (sru.koha.nexus). Searched live by the server gateway only (NEXUS_GATEWAY_PERGAMUM_URL, nexus_gateway/pergamum.py), never from /sru/_union."
   },
   {
    "name": "Universidade Estadual Paulista (UNESP)",

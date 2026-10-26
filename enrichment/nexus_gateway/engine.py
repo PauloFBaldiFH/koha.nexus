@@ -256,13 +256,17 @@ class Engine:
 
     def is_live(self, t: Target) -> bool:
         """Searched live when static.db has nothing: z3950 and sru targets,
-        and zeus ones when the runner has a Zeus address."""
-        return t.live or (t.kind == "zeus" and t.status != "broken"
-                          and getattr(self.runner, "zeus", None) is not None)
+        zeus ones when the runner has a Zeus address and the pergamum one
+        when it has a Pergamum address."""
+        if t.live:
+            return True
+        hub = {"zeus": "zeus", "pergamum": "pergamum"}.get(t.kind)
+        return hub is not None and t.status != "broken" and getattr(self.runner, hub, None) is not None
 
     def resolve(self, database: str) -> tuple[set[str] | None, list[Target]]:
         """(static sources or None for all, live targets) for a database name.
-        _union never asks Zeus: one union search would send Zeus a dozen."""
+        _union never asks Zeus or Pergamum: one union search would send Zeus
+        a dozen, and Pergamum a page of record fetches."""
         database = database.strip("/").lower()
         if database in ("", UNION):
             return None, [t for t in self.targets.values() if t.live]

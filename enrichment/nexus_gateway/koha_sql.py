@@ -368,6 +368,7 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
             continue
         how = ("static.db, then live " + t.kind.upper() if t.live
                else "static.db, then live through Catálogo Zeus" if t.kind == "zeus" and t.status != "broken"
+               else "static.db, then live from Rede Pergamum" if t.kind == "pergamum" and t.status != "broken"
                else "static.db only")
         cover = f" Fallback: the direct Z39.50 row {covered[t.id]} covers this library." if t.id in covered else ""
         fallback.append(row("sru/" + t.id, t.name, "sru_" + t.group, t.status == "verified",

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from nexus_enrich import marc
 
 from . import upstream, z3950
+from . import pergamum as pergamum_mod
 from . import zeus as zeus_mod
 from .learned import Learned
 from .targets import Target
@@ -36,7 +37,7 @@ class Answer:
 
 
 async def ask(target: Target, kind: str, term: str, timeout: float,
-              zeus: "zeus_mod.Zeus | None" = None) -> Answer:
+              zeus: "zeus_mod.Zeus | None" = None, pergamum: "pergamum_mod.Pergamum | None" = None) -> Answer:
     """One target, one search: its first page of records, or the error."""
     try:
         if target.kind == "zeus":
@@ -44,6 +45,10 @@ async def ask(target: Target, kind: str, term: str, timeout: float,
                 raise zeus_mod.ZeusError("no Zeus address (NEXUS_GATEWAY_ZEUS_URL)")
             total, records = await asyncio.to_thread(zeus.search, target, kind, term, timeout)
             records = records[:PAGE]
+        elif target.kind == "pergamum":
+            if pergamum is None:
+                raise pergamum_mod.PergamumError("no Pergamum address (NEXUS_GATEWAY_PERGAMUM_URL)")
+            total, records = await asyncio.to_thread(pergamum.search, kind, term, PAGE, timeout)
         elif target.kind == "z3950":
             total, raws = await z3950.search(target.host, target.port, target.db, kind, term, 1, PAGE,
                                              user=target.user, password=target.password, timeout=timeout)
@@ -56,7 +61,8 @@ async def ask(target: Target, kind: str, term: str, timeout: float,
         else:
             total, records = await asyncio.to_thread(upstream.search, target, kind, term, 1, PAGE, timeout)
         return Answer(target.id, total, records)
-    except (z3950.Z3950Error, upstream.UpstreamError, zeus_mod.ZeusError, OSError, ValueError) as exc:
+    except (z3950.Z3950Error, upstream.UpstreamError, zeus_mod.ZeusError, pergamum_mod.PergamumError,
+            OSError, ValueError) as exc:
         return Answer(target.id, 0, [], str(exc) or type(exc).__name__)
 
 
@@ -64,12 +70,13 @@ class Runner:
     """The background loop. Thread-safe: request threads call search()."""
 
     def __init__(self, learned: Learned, budget: float = 6.0, grace: float = 30.0, asker=ask,
-                 zeus: "zeus_mod.Zeus | None" = None):
+                 zeus: "zeus_mod.Zeus | None" = None, pergamum: "pergamum_mod.Pergamum | None" = None):
         self.learned = learned
         self.budget = budget
         self.grace = grace
         self.zeus = zeus                # set: kind zeus targets are searched live too
-        self.asker = functools.partial(ask, zeus=zeus) if asker is ask else asker
+        self.pergamum = pergamum        # set: the kind pergamum target too
+        self.asker = functools.partial(ask, zeus=zeus, pergamum=pergamum) if asker is ask else asker
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self.loop.run_forever, name="nexus-gateway-live", daemon=True)
         self.thread.start()

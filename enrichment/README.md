@@ -145,6 +145,12 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
   label on Zeus's search form names the catalogue (`target_index` first); a
   catalogue not on the form is not searched. `python -m nexus_gateway
   zeus-labels` prints that mapping.
+- Rede Pergamum (kind `pergamum`, `sru/all`): searched live only where
+  `NEXUS_GATEWAY_PERGAMUM_URL` is set (the VPS:
+  `https://www.pergamum.pucpr.br/redepergamum/consultas/site_CRP/pesquisa.php`),
+  never from `sru/_union`: one search lists up to 50 ids, then the first 20
+  records' MARC tabs are fetched, five at a time (`nexus_gateway/pergamum.py`,
+  ported from the retired `pergamum_sru` bridge).
 - Missing and Zeus catalogues that Paulo's validated direct list
   (`panel/kei_panel/data/z3950_direct.json`) covers in MARC21 are kind `z3950`
   with that address (UFSC, USP, Senado, BNE, UNESP, Toronto, UBC, ...).
