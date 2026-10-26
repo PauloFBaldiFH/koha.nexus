@@ -254,8 +254,15 @@ class Engine:
         self.targets = targets
         self.runner = runner
 
+    def is_live(self, t: Target) -> bool:
+        """Searched live when static.db has nothing: z3950 and sru targets,
+        and zeus ones when the runner has a Zeus address."""
+        return t.live or (t.kind == "zeus" and t.status != "broken"
+                          and getattr(self.runner, "zeus", None) is not None)
+
     def resolve(self, database: str) -> tuple[set[str] | None, list[Target]]:
-        """(static sources or None for all, live targets) for a database name."""
+        """(static sources or None for all, live targets) for a database name.
+        _union never asks Zeus: one union search would send Zeus a dozen."""
         database = database.strip("/").lower()
         if database in ("", UNION):
             return None, [t for t in self.targets.values() if t.live]
@@ -263,7 +270,7 @@ class Engine:
             return None, []
         t = self.targets.get(database)
         if t is not None:
-            return set(t.static), [t] if t.live else []
+            return set(t.static), [t] if self.is_live(t) else []
         if self.static.has_source(database):
             return {database}, []
         raise UnknownDatabase(database)

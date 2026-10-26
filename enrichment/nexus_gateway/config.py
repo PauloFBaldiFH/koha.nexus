@@ -31,6 +31,7 @@ class Settings:
     max_records: int = 50
     releases_api: str = RELEASES_API
     mirror: str = ""                  # e.g. the R2 bucket's public URL
+    zeus_url: str = ""                # Catálogo Zeus, for live zeus targets (the server gateway only)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -41,4 +42,5 @@ class Settings:
                    live=_env("LIVE", "1") not in ("0", "no", "false", "off"),
                    live_timeout=float(_env("LIVE_TIMEOUT", "6")), live_grace=float(_env("LIVE_GRACE", "30")),
                    learned_days=int(_env("LEARNED_DAYS", "30")), max_records=int(_env("MAX_RECORDS", "50")),
-                   releases_api=_env("RELEASES_API", RELEASES_API), mirror=_env("MIRROR", ""))
+                   releases_api=_env("RELEASES_API", RELEASES_API), mirror=_env("MIRROR", ""),
+                   zeus_url=_env("ZEUS_URL", ""))

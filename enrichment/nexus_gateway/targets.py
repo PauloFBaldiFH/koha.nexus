@@ -5,8 +5,10 @@ Each entry has an id (the part after /sru/), a name, a group and a kind:
 
   z3950     a Z39.50 server: host, port, db, syntax (USMARC/MARC21), encoding
   sru       an SRU server: url, version, schema, indexes
-  zeus      Catálogo Zeus instances, and
-  pergamum  Rede Pergamum: harvested on the build server, so here they answer
+  zeus      a catalogue searched through Catálogo Zeus (target_index): live
+            only on the server gateway (NEXUS_GATEWAY_ZEUS_URL set, zeus.py),
+            static.db only elsewhere
+  pergamum  Rede Pergamum: harvested on the build server, so here it answers
             from static.db only (a client never scrapes)
   missing   no address known: static.db only
 
@@ -77,6 +79,7 @@ class Target:
     note: str = ""
     local_first: int = 0
     legacy_hosts: tuple[str, ...] = ()
+    target_index: int = -1          # zeus: the n of targets[n] on Zeus's search form
 
     @property
     def live(self) -> bool:
@@ -117,6 +120,7 @@ def make_target(raw: dict) -> Target:
         note=str(raw.get("note", "")),
         local_first=int(raw.get("local_first") or 0),
         legacy_hosts=tuple(str(h).strip().lower() for h in raw.get("legacy_hosts") or ()),
+        target_index=int(raw["target_index"]) if raw.get("target_index") is not None else -1,
     )
     if t.local_first < 0:
         raise TargetError(f"{tid}: local_first is a position, 1 or more")

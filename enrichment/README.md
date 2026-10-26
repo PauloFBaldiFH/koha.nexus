@@ -107,7 +107,7 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
 | Database | Answers from |
 |---|---|
 | `sru/_union` | every source in `static.db`; on a miss, every native target live |
-| `sru/<id>` (a target in `nexus_gateway/targets.json`) | its `static.db` sources (`static`, default its id); on a miss, the target live if it is `z3950` or `sru` |
+| `sru/<id>` (a target in `nexus_gateway/targets.json`) | its `static.db` sources (`static`, default its id); on a miss, the target live if it is `z3950` or `sru`, or `zeus` on the server gateway |
 | `sru/<source>` (a `static.db` source with no target) | `static.db` only |
 
 - A search answers from `static.db` whenever it has a record (the whole CQL
@@ -138,6 +138,18 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
   ticked. To undo it, for good (later runs leave it undone):
   `python -m nexus_gateway koha-sql --undo-local-first | sudo koha-mysql INSTANCE`;
   `--redo-local-first` does it again.
+- Catálogo Zeus (kind `zeus`: BN, UNICAMP, UERJ, UFG, UFMG, UFPE, UFSCar, UFU,
+  UFRGS, UFF): searched live only where `NEXUS_GATEWAY_ZEUS_URL` is set (the
+  VPS behind sru.koha.nexus: `https://catalogo.bu.ufsc.br/zeus/`), one
+  `targets[n]` per search, never from `sru/_union`. The `n` is the one whose
+  label on Zeus's search form names the catalogue (`target_index` first); a
+  catalogue not on the form is not searched. `python -m nexus_gateway
+  zeus-labels` prints that mapping.
+- Missing and Zeus catalogues that Paulo's validated direct list
+  (`panel/kei_panel/data/z3950_direct.json`) covers in MARC21 are kind `z3950`
+  with that address (UFSC, USP, Senado, BNE, UNESP, Toronto, UBC, ...).
+  UNIMARC ones (BN Portugal, PORBASE, SUDOC) stay without one: the gateway
+  serves MARC21 only.
 - Logins: `NEXUS_GATEWAY_LOGIN_<ID>=user:password` in the unit's environment
   file, never in `targets.json`. The unit is `deploy/koha-nexus-sru.service`.
 

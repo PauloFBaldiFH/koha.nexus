@@ -111,7 +111,8 @@ def make_handler(engine: Engine, settings: Settings):
             if path == "/health":
                 body = json.dumps({"status": "ok", "version": __version__, "static": engine.static.info(),
                                    "live": settings.live,
-                                   "targets": sum(1 for t in engine.targets.values() if t.live)})
+                                   "targets": sum(1 for t in engine.targets.values() if engine.is_live(t)),
+                                   "zeus": bool(getattr(engine.runner, "zeus", None))})
                 return self._send(200, body.encode(), "application/json")
             if path != "/sru" and not path.startswith("/sru/"):
                 return self._send(404, b"not found\n", "text/plain")
