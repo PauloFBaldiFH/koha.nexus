@@ -241,6 +241,42 @@ internal static class Requirements
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatus buffer);
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct OsVersionInfo
+    {
+        public int Size;
+        public int Major;
+        public int Minor;
+        public int Build;
+        public int Platform;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string ServicePack;
+    }
+
+    [DllImport("ntdll.dll", CharSet = CharSet.Unicode)]
+    private static extern int RtlGetVersion(ref OsVersionInfo info);
+
+    // Environment.OSVersion diz 6.2 build 9200 (Windows 8) a um programa sem
+    // manifesto de compatibilidade, mesmo no Windows 11. RtlGetVersion não mente.
+    public static int WindowsBuild()
+    {
+        try
+        {
+            OsVersionInfo info = new OsVersionInfo();
+            info.Size = Marshal.SizeOf(typeof(OsVersionInfo));
+            if (RtlGetVersion(ref info) == 0 && info.Build > 0) return info.Build;
+        }
+        catch { }
+        try
+        {
+            object value = Microsoft.Win32.Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber", null);
+            int build;
+            if (value != null && Int32.TryParse(value.ToString(), out build)) return build;
+        }
+        catch { }
+        return Environment.OSVersion.Version.Build;
+    }
+
     private static string T(string pt, string en)
     {
         return KohaMsixEntry.Text(pt, en);
@@ -284,7 +320,7 @@ internal static class Requirements
     public static Check[] Run(out bool? virtualization)
     {
         Check[] rows = new Check[6];
-        int build = Environment.OSVersion.Version.Build;
+        int build = WindowsBuild();
         rows[0] = new Check(build >= 19041 ? 0 : 2,
             T("Windows 10 versão 2004 ou mais nova, ou Windows 11 (este PC: build ", "Windows 10 version 2004 or later, or Windows 11 (this PC: build ") + build + ")");
         rows[1] = new Check(Environment.Is64BitOperatingSystem ? 0 : 2, T("Windows de 64 bits", "64-bit Windows"));
