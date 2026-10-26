@@ -30,10 +30,10 @@ $assetsSourceDir = Join-Path $scriptRoot 'Assets'
 
 # Versão solicitada originalmente. Precisa ser maior que qualquer versão
 # anterior que ainda esteja instalada se o pacote for atualizado sem remoção.
-$targetVersion = '1.0.28.0'
+$targetVersion = '1.0.29.0'
 # Revision interna do payload: força a atualização de instalações incompletas
 # feitas por builds anteriores, sem precisar alterar a versão pública do MSIX.
-$payloadRevision = '1.0.28.0-msix-v20'
+$payloadRevision = '1.0.29.0-msix-v21'
 $packageName = 'KohaNexus'
 $packagePublisher = 'CN=PauloFBaldiFH'
 $publisherDisplayName = 'PauloFBaldiFH'
@@ -508,6 +508,9 @@ try {
     # contexto de instalação; aqui primeiro executamos o bootstrap oficial.
     $bootstrapPath = Join-Path $pkgDir 'Bootstrap-MSIX.ps1'
     $bootstrapContent = @'
+# -ResultFile: o KohaMsixEntry.exe mostra o resultado na janela dele; sem
+# caixas de erro aqui (Store 10.1.2.10). 3 reiniciar, 10 parou, 11 sem virtualizacao.
+param([string]$ResultFile = '')
 $ErrorActionPreference = 'Stop'
 $payloadVersion = '__PAYLOAD_VERSION__'
 $msixDir = $PSScriptRoot
@@ -562,6 +565,15 @@ function Write-BootstrapLog {
     } catch { }
 }
 
+function Write-BootstrapResult {
+    param([string]$Message)
+    if (-not $ResultFile) { return }
+    try {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ResultFile) -Force | Out-Null
+        [System.IO.File]::WriteAllText($ResultFile, $Message, (New-Object System.Text.UTF8Encoding($false)))
+    } catch { }
+}
+
 function Get-BootstrapMessages {
     # Suporta somente Portugues e Ingles nesta tela inicial.
     # pt-PT tambem usa os textos em portugues brasileiro. Outros idiomas usam Ingles.
@@ -583,6 +595,9 @@ function Get-BootstrapMessages {
             BiosQuestionTitle = 'Abrir BIOS/UEFI'
             BiosFailure = "Não foi possível abrir a BIOS/UEFI automaticamente. O computador pode não oferecer suporte a essa reinicialização, ou a solicitação de administrador pode ter sido cancelada.`r`n`r`nTente manualmente: Configurações > Sistema > Recuperação > Inicialização avançada > Reiniciar agora > Solução de problemas > Opções avançadas > Configurações de Firmware UEFI. Alguns computadores não oferecem essa opção.`r`n`r`nAtive a virtualizacao e execute o Koha.Nexus novamente."
             GenericErrorPrefix = 'Não foi possível iniciar o Koha.Nexus.'
+            PayloadMissing = 'Falta um arquivo do aplicativo; reinstale o Koha.Nexus: '
+            InstallStopped = 'A instalação parou (código {0}). As mensagens da janela de console e os registros em C:\Koha\logs dizem o motivo.'
+            MainMissing = 'A preparação terminou, mas o KohaEasy.ps1 não foi copiado para '
             ElevationTitle = 'Permissão de administrador'
             ElevationBody = "Na primeira execução o Koha.Nexus precisa de permissão de administrador para ativar o WSL 2 e instalar o Debian com o Koha. A permissão foi recusada, ou esta conta do Windows não é de administrador.`r`n`r`nAbra o Koha.Nexus de novo e responda Sim no aviso do Windows (ou entre com uma conta de administrador). Nada foi alterado neste computador."
         }
@@ -596,6 +611,9 @@ function Get-BootstrapMessages {
         BiosQuestionTitle = 'Open BIOS/UEFI'
         BiosFailure = "Windows could not open BIOS/UEFI automatically, or the administrator request was cancelled.`r`n`r`nTry manually: Settings > System > Recovery > Advanced startup > Restart now > Troubleshoot > Advanced options > UEFI Firmware Settings. Some computers do not offer this option.`r`n`r`nEnable virtualization, then launch Koha.Nexus again."
         GenericErrorPrefix = 'Koha.Nexus could not be started.'
+        PayloadMissing = 'A file of the app is missing; reinstall Koha.Nexus: '
+        InstallStopped = 'Setup stopped (code {0}). The console window messages and the logs in C:\Koha\logs give the reason.'
+        MainMissing = 'Preparation finished, but KohaEasy.ps1 was not copied to '
         ElevationTitle = 'Administrator permission'
         ElevationBody = "On its first run Koha.Nexus needs administrator permission to turn on WSL 2 and install Debian with Koha. The permission was declined, or this Windows account is not an administrator.`r`n`r`nOpen Koha.Nexus again and answer Yes in the Windows prompt (or sign in with an administrator account). Nothing was changed on this computer."
     }
@@ -648,7 +666,7 @@ Write-BootstrapLog ('START | packageDir={0}; sourceDir={1}; version={2}; user={3
 
 try {
     if (-not (Test-Path -LiteralPath $installScript -PathType Leaf)) {
-        throw "Instalador do payload não encontrado: $installScript"
+        throw ($ui.PayloadMissing + $installScript)
     }
 
     $distroNames = @(Get-BootstrapDistroNames)
@@ -665,6 +683,11 @@ try {
     # Verifique a virtualização antes de instalar ou abrir o painel.
     # Quando a leitura é inconclusiva, não bloqueie por um possível falso positivo.
     $virtualizationState = Get-BootstrapVirtualizationState
+    if ($virtualizationState -is [bool] -and -not $virtualizationState -and $ResultFile) {
+        Write-BootstrapLog 'Virtualization is off; reported to the launcher window.'
+        Write-BootstrapResult $ui.VirtualizationTitle
+        exit 11
+    }
     if ($virtualizationState -is [bool] -and -not $virtualizationState) {
         $null = Show-BootstrapMessage `
             -Text $ui.VirtualizationBody `
@@ -716,6 +739,7 @@ try {
     if (($payloadNeedsUpdate -or -not $distroInstalled) -and -not (Test-BootstrapAdministrator)) {
         $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $PSCommandPath
+        if ($ResultFile) { $arguments += (' -ResultFile "{0}"' -f $ResultFile) }
         Write-BootstrapLog 'Elevation required; opening the elevated bootstrap window.'
         try {
             Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Normal -ErrorAction Stop | Out-Null
@@ -757,6 +781,7 @@ try {
         Write-BootstrapLog ('install.ps1 returned exit code {0}' -f $installProcess.ExitCode)
         if ($installProcess.ExitCode -eq 3) {
             Write-BootstrapLog 'O instalador pediu reinicializacao do Windows; o marcador do payload nao sera atualizado.'
+            if ($ResultFile) { exit 3 }
             if ($ui.Language -eq 'pt') {
                 $restartText = 'O Windows precisa ser reiniciado para concluir a configuracao do WSL. Salve seus arquivos e reinicie o computador. O instalador continuara quando voce entrar novamente.'
                 $restartTitle = 'Reinicializacao necessaria'
@@ -768,11 +793,11 @@ try {
             exit 0
         }
         if ($installProcess.ExitCode -ne 0) {
-            throw "windows\install.ps1 terminou com codigo $($installProcess.ExitCode). Consulte $logDir\msix-bootstrap.log e C:\Koha\logs."
+            throw ($ui.InstallStopped -f $installProcess.ExitCode)
         }
 
         if (-not (Test-Path -LiteralPath $mainScript -PathType Leaf)) {
-            throw "O bootstrap terminou, mas KohaEasy.ps1 não foi copiado para $kohaBin."
+            throw ($ui.MainMissing + $kohaBin)
         }
 
         # Nao consultar koha-conf.xml, credenciais ou estado do banco aqui.
@@ -823,6 +848,10 @@ try {
 catch {
     $message = $_.Exception.Message
     Write-BootstrapLog ('ERRO: ' + $message)
+    if ($ResultFile) {
+        Write-BootstrapResult $message
+        exit 10
+    }
     try {
         Add-Type -AssemblyName System.Windows.Forms
         [void][System.Windows.Forms.MessageBox]::Show(
@@ -832,7 +861,7 @@ catch {
             [System.Windows.Forms.MessageBoxIcon]::Error
         )
     } catch { }
-    # 10: erro ja mostrado. O KohaMsixEntry.exe so avisa dos outros codigos.
+    # 10: erro ja mostrado (ou gravado em -ResultFile para a janela do launcher).
     exit 10
 }
 '@
@@ -882,169 +911,18 @@ catch {
 
     Write-Host "`n[3/8] Compilando o launcher MSIX..." -ForegroundColor Yellow
 
-    $entrySource = @'
-using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Reflection;
-using System.Runtime.InteropServices;
-
-internal static class KohaMsixEntry
-{
-    private const string PayloadVersion = "__PAYLOAD_VERSION__";
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
-
-    private static void ShowError(string text)
-    {
-        try { MessageBox(IntPtr.Zero, text, "Koha.Nexus", 0x10); } catch { }
+    # O launcher fica em windows\msix\KohaMsixEntry.cs (o CI compila o mesmo
+    # arquivo). Ele abre a janela de instalação e o painel.
+    $entrySource = [System.IO.File]::ReadAllText((Join-Path $scriptRoot 'KohaMsixEntry.cs'))
+    if ($entrySource -notmatch '__PAYLOAD_VERSION__') {
+        throw 'KohaMsixEntry.cs sem o marcador __PAYLOAD_VERSION__.'
     }
-
-    // Portugues para Windows em portugues, ingles nos outros (a Store testa em ingles).
-    private static string Text(string pt, string en)
-    {
-        try
-        {
-            if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pt") return pt;
-        }
-        catch { }
-        return en;
-    }
-
-    private static bool HasKohaDistro()
-    {
-        string wsl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "wsl.exe");
-        if (!File.Exists(wsl)) return false;
-
-        try
-        {
-            ProcessStartInfo check = new ProcessStartInfo();
-            check.FileName = wsl;
-            check.Arguments = "--list --quiet";
-            check.UseShellExecute = false;
-            check.CreateNoWindow = true;
-            check.RedirectStandardOutput = true;
-
-            using (Process process = Process.Start(check))
-            {
-                if (process == null) return false;
-                if (!process.WaitForExit(10000))
-                {
-                    try { process.Kill(); } catch { }
-                    try { process.WaitForExit(); } catch { }
-                    return false;
-                }
-                string output = process.StandardOutput.ReadToEnd();
-                if (process.ExitCode != 0) return false;
-
-                output = output.Replace("\0", "");
-                string[] lines = output.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string line in lines)
-                {
-                    string name = line.Trim().TrimStart('*').Trim();
-                    if (String.Equals(name, "koha", StringComparison.OrdinalIgnoreCase)) return true;
-                }
-            }
-        }
-        catch { }
-        return false;
-    }
-
-    private static bool NeedsVisibleSetup()
-    {
-        string bin = @"C:\Koha\bin";
-        string mainScript = Path.Combine(bin, "KohaEasy.ps1");
-        string marker = Path.Combine(bin, ".koha-msix-payload-version");
-
-        try
-        {
-            if (!File.Exists(mainScript) || !File.Exists(marker)) return true;
-            string installedVersion = File.ReadAllText(marker).Trim();
-            if (!String.Equals(installedVersion, PayloadVersion, StringComparison.Ordinal)) return true;
-            return !HasKohaDistro();
-        }
-        catch { return true; }
-    }
-
-    [STAThread]
-    private static int Main(string[] args)
-    {
-        string packageDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        string bootstrap = Path.Combine(packageDir, "Bootstrap-MSIX.ps1");
-        if (!File.Exists(bootstrap))
-        {
-            ShowError(Text("O arquivo de inicialização não foi encontrado dentro do pacote MSIX:\r\n",
-                "The startup file was not found inside the MSIX package:\r\n") + bootstrap);
-            return 2;
-        }
-
-        string systemDir = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        string powershell = Path.Combine(systemDir, @"WindowsPowerShell\v1.0\powershell.exe");
-        if (!File.Exists(powershell))
-        {
-            ShowError(Text("O Windows PowerShell 5.1 não foi encontrado:\r\n",
-                "Windows PowerShell 5.1 was not found:\r\n") + powershell);
-            return 3;
-        }
-
-        // Primeira instalação, payload desatualizado ou distribuição WSL ausente:
-        // mostrar o terminal para que o progresso e eventuais erros não fiquem ocultos.
-        // Quando já está tudo instalado, manter a inicialização silenciosa do painel.
-        bool visibleSetup = NeedsVisibleSetup();
-
-        ProcessStartInfo psi = new ProcessStartInfo();
-        psi.FileName = powershell;
-        psi.Arguments = "-NoProfile -ExecutionPolicy Bypass " +
-            (visibleSetup ? "" : "-WindowStyle Hidden ") +
-            "-File \"" + bootstrap + "\"";
-        psi.WorkingDirectory = packageDir;
-        psi.UseShellExecute = false;
-        psi.CreateNoWindow = !visibleSetup;
-        psi.WindowStyle = visibleSetup ? ProcessWindowStyle.Normal : ProcessWindowStyle.Hidden;
-
-        try
-        {
-            using (Process child = Process.Start(psi))
-            {
-                if (child == null)
-                {
-                    ShowError(Text("O Windows não conseguiu iniciar o processo de inicialização do Koha.Nexus.",
-                        "Windows could not start the Koha.Nexus startup process."));
-                    return 4;
-                }
-                child.WaitForExit();
-                int code = child.ExitCode;
-                // 0: tudo certo; 10: o bootstrap ja mostrou o erro; 0xC000013A: a
-                // pessoa fechou a janela. Outro codigo e uma falha antes ou fora do
-                // try do bootstrap (politica de execucao, PowerShell que nao abre):
-                // sem este aviso o app so piscaria e fecharia.
-                if (code != 0 && code != 10 && code != unchecked((int)0xC000013A))
-                {
-                    ShowError(Text("O Koha.Nexus fechou de forma inesperada (código " + code + ").\r\n\r\nConsulte C:\\Koha\\logs\\msix-bootstrap.log.",
-                        "Koha.Nexus closed unexpectedly (code " + code + ").\r\n\r\nSee C:\\Koha\\logs\\msix-bootstrap.log."));
-                }
-                return code;
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowError(Text("Não foi possível iniciar o Koha.Nexus.\r\n\r\n", "Koha.Nexus could not be started.\r\n\r\n") + ex.Message +
-                Text("\r\n\r\nTente executar novamente. Se o problema continuar, consulte C:\\Koha\\logs\\msix-bootstrap.log.",
-                    "\r\n\r\nTry again. If the problem continues, see C:\\Koha\\logs\\msix-bootstrap.log."));
-            return 1;
-        }
-    }
-}
-'@
-
     $entrySource = $entrySource.Replace('__PAYLOAD_VERSION__', $payloadRevision)
     $entrySourcePath = Join-Path $distDir 'KohaMsixEntry.cs'
     $entryExePath = Join-Path $pkgDir $entryExeName
     [System.IO.File]::WriteAllText($entrySourcePath, $entrySource, (New-Object System.Text.UTF8Encoding($false)))
 
-    & $csc /nologo /target:winexe /platform:anycpu "/out:$entryExePath" "/win32icon:$iconPath" $entrySourcePath
+    & $csc /nologo /target:winexe /platform:anycpu /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Management.dll "/out:$entryExePath" "/win32icon:$iconPath" $entrySourcePath
     if ($LASTEXITCODE -ne 0) {
         throw "csc.exe falhou ao compilar o launcher (código $LASTEXITCODE)."
     }

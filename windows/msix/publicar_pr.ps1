@@ -49,7 +49,7 @@ try {
             if ($LASTEXITCODE -eq 0) { throw "A branch '$Branch' já existe localmente; revise antes de continuar." }
             Run-Command -Exe 'git' -Args @('switch','-c',$Branch)
         }
-        Run-Command -Exe 'git' -Args @('add','--','windows/msix/README.md','windows/msix/compilar_msix.ps1','windows/msix/KohaNexusIcon.ico','windows/msix/KohaNexusLogo.png','windows/msix/publicar_pr.ps1')
+        Run-Command -Exe 'git' -Args @('add','--','windows/msix/README.md','windows/msix/compilar_msix.ps1','windows/msix/KohaNexusIcon.ico','windows/msix/KohaNexusMark.png','windows/msix/gerar_assets.py','windows/msix/Assets','windows/msix/store-listing','windows/msix/KohaMsixEntry.cs','windows/msix/publicar_pr.ps1')
         & git diff --cached --quiet
         if ($LASTEXITCODE -ne 0) {
             Run-Command -Exe 'git' -Args @('commit','-m','build(windows): add MSIX packaging 1.0.25.0')

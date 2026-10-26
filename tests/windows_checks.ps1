@@ -434,10 +434,41 @@ try {
 Check 'msix: the build no longer draws tiles with System.Drawing' ($builderText -notmatch 'System\.Drawing\.(Icon|Bitmap)') ''
 Check 'msix: the build makes resources.pri' ($builderText -match '\$makePri new ' -and $builderText -match "'resources.pri'") ''
 Check 'msix: the manifest has the wide, small and large tiles' ($builderText -match 'Wide310x150Logo="Assets\\Wide310x150Logo.png"' -and $builderText -match 'Square71x71Logo="Assets\\Square71x71Logo.png"' -and $builderText -match 'Square310x310Logo="Assets\\Square310x310Logo.png"') ''
-# Store 10.1.2.10 (crashes at launch): a declined UAC prompt explains
-# itself, and the launcher reports any exit code the bootstrap did not.
+# Store 10.1.2.10 (crashes at launch, 1.0.27.0 and 1.0.28.0): the tester only
+# saw the error box "Koha.Nexus could not be started". The launcher now opens
+# its own setup window (requirements + Install button) and shows every stop
+# inside it; the bootstrap, given -ResultFile, writes the reason there and
+# shows no box.
+$entryPath = Join-Path $repo 'windows\msix\KohaMsixEntry.cs'
+$entryText = Get-Content -LiteralPath $entryPath -Raw
+Check 'msix: the build compiles windows\msix\KohaMsixEntry.cs' ($builderText -match "Join-Path \`$scriptRoot 'KohaMsixEntry.cs'" -and $builderText -notmatch "entrySource = @'") ''
+Check 'msix: the launcher has the payload marker and a setup window' ($entryText -match '"__PAYLOAD_VERSION__"' -and $entryText -match 'class SetupForm : Form' -and $entryText -match '-ResultFile') ''
+Check 'msix: the launcher never shows "could not be started"' ($entryText -notmatch 'could not be started') ''
+$csc = @((Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'), (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')) |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+if ($csc) {
+    $cscDir = Join-Path ([IO.Path]::GetTempPath()) ('koha-msix-' + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $cscDir | Out-Null
+    try {
+        $cscSource = Join-Path $cscDir 'KohaMsixEntry.cs'
+        [IO.File]::WriteAllText($cscSource, $entryText.Replace('__PAYLOAD_VERSION__', 'test'), (New-Object System.Text.UTF8Encoding($false)))
+        $cscOut = & $csc /nologo /target:winexe /platform:anycpu /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Management.dll ('/out:' + (Join-Path $cscDir 'KohaMsixEntry.exe')) $cscSource 2>&1
+        Check 'msix: KohaMsixEntry.cs compiles with the .NET Framework csc' ($LASTEXITCODE -eq 0) (($cscOut | Out-String).Trim())
+    } finally {
+        Remove-Item -LiteralPath $cscDir -Recurse -Force
+    }
+}
+$bootMatch = [regex]::Match($builderText, "(?s)\`$bootstrapContent = @'\r?\n(.*?)\r?\n'@")
+$bootErrors = $null
+[void][System.Management.Automation.Language.Parser]::ParseInput($bootMatch.Groups[1].Value, [ref]$null, [ref]$bootErrors)
+Check 'msix: the bootstrap parses' ($bootMatch.Success -and @($bootErrors).Count -eq 0) ((@($bootErrors) | ForEach-Object { $_.Message }) -join '; ')
+$bootText = $bootMatch.Groups[1].Value
+Check 'msix: the bootstrap takes -ResultFile and writes stops there' ($bootText -match "(?m)^param\(\[string\]\`$ResultFile = ''\)" -and $bootText -match 'Write-BootstrapResult \$message' -and $bootText -match 'if \(\$ResultFile\) \{ exit 3 \}' -and $bootText -match 'exit 11') ''
 Check 'msix: a declined UAC prompt shows ElevationBody, not the error box' ($builderText -match '-Verb RunAs -WindowStyle Normal -ErrorAction Stop' -and $builderText -match '\$ui\.ElevationBody') ''
-Check 'msix: bootstrap errors exit 10 and the launcher reports other codes' ($builderText -match '(?m)^    exit 10\r?$' -and $builderText -match 'code != 0 && code != 10') ''
+Check 'msix: bootstrap errors exit 10' ($builderText -match '(?m)^    exit 10\r?$') ''
+# Store 10.1.1.11 (1.0.28.0): the tiles showed the Koha community logo. The
+# package icon is now drawn by gerar_assets.py; the old logo file is gone.
+Check 'msix: the Koha logo is not a package source' (-not (Test-Path -LiteralPath (Join-Path $repo 'windows\msix\KohaNexusLogo.png')) -and (Test-Path -LiteralPath (Join-Path $repo 'windows\msix\KohaNexusMark.png'))) ''
 
 if ($failed) { throw "$failed check(s) failed" }
 Write-Host 'all checks passed'

@@ -1,18 +1,31 @@
 # Koha.Nexus — Empacotamento MSIX (Windows)
 
-Pasta de compilação do pacote MSIX **1.0.28.0** (payload `1.0.28.0-msix-v20`).
+Pasta de compilação do pacote MSIX **1.0.29.0** (payload `1.0.29.0-msix-v21`).
 A release publicada é a 1.0.27.0 (`windows-v1.0.27.0`).
 Ela fica separada do instalador Inno Setup (`windows/setup/koha-nexus.iss`).
 
 ## Arquivos
 
 - `compilar_msix.ps1` — monta, valida, assina, instala e inicia o MSIX.
-- `KohaNexusIcon.ico` — ícone personalizado do launcher/desktop e recursos MSIX.
-- `KohaNexusLogo.png` — logotipo de origem da gota usada nos ícones.
+- `KohaMsixEntry.cs` — o launcher (`KohaMsixEntry.exe`). Com o Koha ainda não
+  instalado, abre a janela de instalação: requisitos do PC, botão Instalar e o
+  resultado de cada tentativa, sem caixas de erro. Com o Koha instalado, abre
+  o painel direto. O compilador troca `__PAYLOAD_VERSION__` e compila.
+- `KohaNexusMark.png` — o símbolo próprio do Koha.Nexus (livro aberto e rede
+  de três nós), desenhado por `gerar_assets.py`.
+- `KohaNexusIcon.ico` — ícone do launcher, da janela e dos atalhos.
 - `Assets/` — ícones e blocos do pacote (44x44, 71x71, 150x150, 310x150,
-  310x310 e StoreLogo em scale-100/125/150/200/400, mais targetsize-16 a 256),
-  gerados por `gerar_assets.py` (Python + Pillow). O compilador só copia e
-  confere os tamanhos; rode o gerador de novo se trocar o logotipo.
+  310x310 e StoreLogo em scale-100/125/150/200/400, mais targetsize-16 a 256).
+- `store-listing/` — imagens da página da loja (bloco 300x300, box art
+  1080x1080, pôster 720x1080).
+
+`python3 windows/msix/gerar_assets.py` (Pillow) gera o símbolo, o `.ico`, os
+`Assets/` e o `store-listing/`. O compilador só copia e confere os tamanhos.
+
+**Nunca use a gota verde do Koha** nos ícones do pacote ou da loja: ela é o
+logotipo da comunidade Koha, e a Store recusou o 1.0.28.0 por isso (10.1.1.11,
+"imagem de um produto que não é seu"). A bandeja (`windows\koha.ico`) é da
+instalação comum e não entra nos blocos.
 - `publicar_pr.ps1` — cria a branch, envia toda esta pasta e abre um PR rascunho.
 
 **Importante:** o arquivo original `windows/koha.ico` continua intocado para
@@ -86,15 +99,21 @@ privados, dumps do Koha, senhas ou logs ao Git.
 
    ```text
    Koha.Nexus is a desktop (full trust) app that sets up and manages the Koha
-   library system inside WSL 2 (Debian). On first launch it:
+   library system inside WSL 2 (Debian).
+   On first launch it opens a setup window that lists this PC's requirements
+   (Windows 10 2004+/11 64-bit, 8 GB RAM, 10 GB free, virtualization on in
+   BIOS/UEFI) and an "Install Koha.Nexus" button. Nothing is installed until
+   that button is clicked. Then it:
    1. asks for administrator permission (UAC) to turn on WSL 2 and install
-      Debian; answering No shows an explanation and closes without installing;
-   2. needs hardware virtualization on in BIOS/UEFI; if it is off, the app
-      says so and offers to restart into the firmware settings;
-   3. may ask to restart Windows once to finish turning on WSL; launch the
-      app again after the restart to continue;
-   4. opens a console window with the setup progress, then the Koha control
-      panel in Windows Terminal (a text interface, not a regular window).
+      Debian; answering No leaves the window open with an explanation;
+   2. opens a console window with the setup progress and asks for a new
+      Debian user name and password;
+   3. may ask to restart Windows once to finish turning on WSL; open the app
+      again after the restart and click Install to continue;
+   4. then opens the Koha control panel in Windows Terminal (a text
+      interface). If any step stops, the setup window says why and stays open.
+   On a PC without virtualization or with less than 8 GB of RAM, the window
+   shows which requirement is missing and the Install button stays off.
    The first setup downloads Debian and Koha packages (internet needed) and
    can take a long time. Logs: C:\Koha\logs\msix-bootstrap.log.
    runFullTrust is needed to run wsl.exe and PowerShell for this setup.
