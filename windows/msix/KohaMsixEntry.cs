@@ -380,6 +380,7 @@ internal sealed class SetupForm : Form
     {
         Text = "Koha.Nexus";
         Font = new Font("Segoe UI", 10f);
+        AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
