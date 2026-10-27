@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Manifesto do KohaMsixEntry.exe (csc /win32manifest). dpiAware: o WACK
+<!-- Manifesto do KohaMsixEntry.exe (csc /win32manifest). PerMonitorV2: o WACK
      avisa (DPIAwarenessValidation) quando falta. supportedOS Windows 10/11:
      sem ele, Environment.OSVersion diz build 9200. asInvoker: o launcher não
      pede UAC; só a instalação pede, quando a pessoa clica em Instalar. -->
@@ -19,7 +19,8 @@
   </compatibility>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
     </windowsSettings>
   </application>
 </assembly>
