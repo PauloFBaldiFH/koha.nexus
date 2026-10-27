@@ -294,7 +294,8 @@ LoadingScreen {
 
 /* ---- dialogs ------------------------------------------------------- */
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
-TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen {
+TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
+ServerHelperScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -718,3 +719,26 @@ App.-plain #picker-drop {
     padding: 0 1;
     background: $boost;
 }
+
+/* ---- AI server helper (screens/serverhelper.py) -------------------- */
+#helper { height: 95%; }
+#helper-warning { color: $error; border: round $error; }
+#helper-log {
+    height: 1fr;
+    min-height: 6;
+    border: round $panel-lighten-2;
+}
+#helper-proposal {
+    height: auto;
+    border: round $error;
+    border-title-color: $error;
+    border-title-style: bold;
+    padding: 0 1;
+}
+#helper-why { width: 1fr; height: auto; }
+#helper-provider, #helper-setup-note { width: 1fr; height: auto; }
+#helper-proposal .dialog-buttons { padding-top: 0; min-height: 3; }
+#helper-setup-row { height: auto; padding-top: 1; }
+#helper-ask { height: auto; padding-top: 1; }
+#helper-input { width: 1fr; }
+#helper-ask Button { margin-left: 1; }

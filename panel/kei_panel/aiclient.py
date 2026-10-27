@@ -233,3 +233,98 @@ def ollama_keep_only(url: str, keep: list[str]) -> list[str]:
             ollama_unload(url, model)
             gone.append(model)
     return gone
+
+
+# ----------------------------------------------------------------------
+# One chat turn (the server helper): JSON answers, as the AI assistant
+# ----------------------------------------------------------------------
+OLLAMA_CTX = 16384
+
+
+def chat_endpoint(c: dict[str, str]) -> str:
+    """endpoint in KohaEasy::Assistant."""
+    b = base(c)
+    if c["provider"] == "anthropic":
+        return b + "/v1/messages"
+    if c["provider"] == "ollama":
+        return b + "/api/chat"
+    return b + "/chat/completions"
+
+
+def chat_body(c: dict[str, str], messages: list[dict[str, str]]) -> dict:
+    """request_body in KohaEasy::Assistant: the model is asked for one JSON
+    object (json mode where the provider has one)."""
+    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    turns = [dict(m) for m in messages if m["role"] != "system"]
+    p, model = c["provider"], aiconf.chat_model(c)
+    if p == "anthropic":
+        alt: list[dict[str, str]] = []        # user / assistant turns must alternate
+        for m in turns:
+            if alt and alt[-1]["role"] == m["role"]:
+                alt[-1]["content"] += "\n\n" + m["content"]
+            else:
+                alt.append(m)
+        return {"model": model, "max_tokens": 2000, "system": system, "messages": alt}
+    msgs = [{"role": "system", "content": system}] + turns
+    if p == "ollama":
+        return {"model": model, "stream": False, "format": "json",
+                "options": {"temperature": 0, "num_ctx": OLLAMA_CTX}, "messages": msgs}
+    body: dict = {"model": model, "messages": msgs}
+    if p == "openai":
+        body |= {"response_format": {"type": "json_object"}, "max_completion_tokens": 4000}
+    elif p == "gemini":
+        body |= {"response_format": {"type": "json_object"}, "temperature": 0, "max_tokens": 8192}
+    else:
+        body |= {"temperature": 0, "max_tokens": 2000}
+    return body
+
+
+def reply_text(provider: str, d) -> str:
+    """reply_text in KohaEasy::Assistant."""
+    if not isinstance(d, dict):
+        return ""
+    if provider == "anthropic":
+        return "".join(b.get("text") or "" for b in d.get("content") or []
+                       if isinstance(b, dict) and b.get("type") == "text")
+    if provider == "ollama":
+        m = d.get("message")
+        return (m.get("content") or "") if isinstance(m, dict) else ""
+    choices = d.get("choices")
+    m = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else None
+    if not isinstance(m, dict):
+        return ""
+    content = m.get("content")
+    if isinstance(content, list):
+        return "".join(x.get("text") or "" for x in content if isinstance(x, dict))
+    return content or ""
+
+
+def chat(c: dict[str, str], messages: list[dict[str, str]], timeout: float = 120) -> str:
+    """Sends the conversation, returns the model's text. BLOCKS."""
+    problem = aiconf.endpoint_problem(c)
+    if problem:
+        raise RuntimeError(aiconf.PROBLEMS[problem])
+    p, token = c["provider"], c.get("token", "")
+    if p == "ollama":
+        try:
+            ollama_keep_only(c["url"], [aiconf.chat_model(c)])
+        except RuntimeError:
+            pass
+    headers = {"User-Agent": UA, "Content-Type": "application/json"}
+    if p == "anthropic":
+        headers |= {"x-api-key": token, "anthropic-version": "2023-06-01"}
+    elif token and p != "ollama":
+        headers["Authorization"] = f"Bearer {token}"
+    url = chat_endpoint(c)
+    req = urllib.request.Request(url, data=json.dumps(chat_body(c, messages)).encode(), method="POST",
+                                 headers=headers)
+    try:
+        with _open(req, timeout) as resp:
+            data = json.load(resp)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code} from {url}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RuntimeError(f"{_reason(e)} ({url})") from None
+    except ValueError:
+        raise RuntimeError(f"{url}: the answer is not JSON") from None
+    return reply_text(p, data)
