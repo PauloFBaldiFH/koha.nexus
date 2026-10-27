@@ -1,0 +1,20 @@
+# TEMPLATE ONLY. Update paths and user, review allowed-hosts.txt before enabling.
+[Unit]
+Description=Z39 Atlas - allowlisted Z39.50 MARC verification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=z39explorer
+WorkingDirectory=/opt/z39-atlas
+ExecStart=/usr/bin/python3 /opt/z39-atlas/z39atlas.py --db /var/lib/z39-atlas/atlas.sqlite3 probe --allowlist /opt/z39-atlas/allowed-hosts.txt --ack-authorized --workers 2 --host-interval 10 --timeout 25 --max-hours 24 --recheck-hours 168
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/z39-atlas
+TimeoutStartSec=90000
+
+[Install]
+WantedBy=multi-user.target

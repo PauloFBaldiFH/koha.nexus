@@ -1,0 +1,3 @@
+https://www.loc.gov/standards/z3950/lcserver.html
+https://decti.bu.ufsc.br/catalogacao/dados-abertos/
+https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources

@@ -1,0 +1,3 @@
+# One explicitly authorized, PUBLIC host/IP per line. No usernames/passwords.
+# Do not add third-party targets merely because they appear in discovery results.
+# example: z3950.ufsc.br (only if your institution permits active testing)
