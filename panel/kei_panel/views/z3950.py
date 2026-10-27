@@ -300,9 +300,8 @@ class Z3950View(SectionView):
 
     def draw(self) -> None:
         table = self.query_one("#z-table", DataTable)
-        row = table.cursor_row
-        table.clear()
         shown = self.visible()
+        rows = []
         for n, (region, label) in enumerate(z3950.REGIONS.items(), 1):
             group = [tg for tg in shown if tg.region == region]
             if not group:
@@ -310,12 +309,10 @@ class Z3950View(SectionView):
             ticked = sum(tg.key in self.selected for tg in group)
             mark = "☑" if ticked == len(group) else ("◩" if ticked else "☐")
             # "\[" keeps the heading's number from being read as Rich markup.
-            table.add_row(mark, f"[b]\\[{n}] {t(label)}[/b]", f"{len(group)} {t('servers')}", "", "", "",
-                          key=f"region:{region}")
-            for tg in sorted(group, key=self._order):
-                table.add_row(*self._cells(tg), key=tg.key)
-        if shown:
-            table.move_cursor(row=min(row, table.row_count - 1))
+            rows.append((f"region:{region}", (mark, f"[b]\\[{n}] {t(label)}[/b]", f"{len(group)} {t('servers')}",
+                                              "", "", "")))
+            rows.extend((tg.key, self._cells(tg)) for tg in sorted(group, key=self._order))
+        self._fill(table, rows)
         hidden = len(self.targets) - len(shown)
         if not self.history.tested and not self.show_hidden:
             text = t("Not tested yet: press the blue Show servers button to test the ${n} servers of the list "
@@ -336,6 +333,27 @@ class Z3950View(SectionView):
         self.query_one("#z-hidden", Button).label = t("Only working") if self.show_hidden else t("Show all")
         self.query_one("#z-scan", Button).label = t("Update") if self.history.tested else t("Show servers")
         self.draw_limit()
+
+    @staticmethod
+    def _fill(table: DataTable, rows: list[tuple[str, tuple]]) -> None:
+        """Put rows in the table without moving the list: a tick redraws it,
+        and a cleared table scrolls back to its top (Paulo 2026-10-27). The
+        same rows in the same order are updated cell by cell; otherwise the
+        table is refilled and its scroll and cursor row put back."""
+        if [key for key, _ in rows] == [k.value for k in table.rows]:
+            columns = [c.key for c in table.ordered_columns]
+            for key, cells in rows:
+                if tuple(table.get_row(key)) != cells:
+                    for column, value in zip(columns, cells):
+                        table.update_cell(key, column, value)
+            return
+        row, x, y = table.cursor_row, table.scroll_x, table.scroll_y
+        table.clear()
+        for key, cells in rows:
+            table.add_row(*cells, key=key)
+        if rows:
+            table.move_cursor(row=min(row, table.row_count - 1), scroll=False)
+            table.call_after_refresh(table.scroll_to, x, y, animate=False)
 
     def draw_limit(self) -> None:
         """The recommendation of at most SEARCH_LIMIT servers, in the theme's

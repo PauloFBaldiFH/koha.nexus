@@ -422,3 +422,73 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             assert any("returned a valid MARC record" in n for n in notes)
 
     asyncio.run(main())
+
+
+
+def test_ticking_a_server_keeps_the_list_where_it_is(tmp_path, monkeypatch):
+    """A tick redraws the list: the list's scroll, the page and the cursor
+    stay put (Paulo 2026-10-27: the long list jumped to the top on a tick)."""
+    monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(150, 40)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("z")
+            await pilot.pause(0.3)
+            view = app.screen.query_one("#view-z3950")
+            table = view.query_one("#z-table", DataTable)
+            await _until(pilot, lambda: view.ticks_from_koha)
+            view.toggle_hidden()                     # the whole list: far longer than the screen
+            await pilot.pause(0.2)
+            table.scroll_visible(animate=False)
+            await pilot.pause(0.1)
+            table.scroll_to(y=60, animate=False)
+            await pilot.pause(0.2)
+            where = lambda: (view.scroll_y, table.scroll_y)  # noqa: E731
+            spot = where()
+            assert spot[1] == 60
+
+            # A mouse tick: the first click moves the cursor, the second ticks.
+            await pilot.click(table, offset=(5, 10))
+            await pilot.pause(0.2)
+            key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+            assert not key.startswith("region:") and key not in view.selected
+            await pilot.click(table, offset=(5, 10))
+            await pilot.pause(0.2)
+            assert key in view.selected and where() == spot
+            assert table.cursor_row == table.get_row_index(key)
+            # Space and Enter untick and tick again, the list still in place.
+            await pilot.press("space")
+            await pilot.pause(0.2)
+            assert key not in view.selected and where() == spot
+            await pilot.press("enter")
+            await pilot.pause(0.2)
+            assert key in view.selected and where() == spot
+
+            # A whole region from its heading.
+            heading = f"region:{view.by_key(key).region}"
+            table.move_cursor(row=table.get_row_index(heading), scroll=False)
+            await pilot.pause(0.1)
+            spot = where()
+            await pilot.press("enter")
+            await pilot.pause(0.2)
+            assert where() == spot and table.cursor_row == table.get_row_index(heading)
+
+            # Back to the tested list: an untick that drops a row refills the
+            # table, and its scroll comes back too.
+            view.selected = {tg.key for tg in view.targets}  # ticked: listed even untested
+            view.toggle_hidden()
+            await pilot.pause(0.2)
+            assert table.max_scroll_y > 20
+            table.scroll_to(y=20, animate=False)
+            await pilot.pause(0.2)
+            spot = where()
+            gone = table.coordinate_to_cell_key((table.row_count - 1, 0)).row_key.value
+            view.toggle(gone)
+            await pilot.pause(0.2)
+            assert gone not in [k.value for k in table.rows]
+            assert where() == spot
+
+    asyncio.run(main())
