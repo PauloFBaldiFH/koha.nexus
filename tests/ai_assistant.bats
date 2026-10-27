@@ -202,6 +202,83 @@ db() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); print 
     [ "$(fines)" = "144" ]
 }
 
+@test "ai assistant: a report the AI wrote is saved only after Approve & Save, marked as the AI's" {
+    start_mock
+    run ask "make a report of loans per patron"
+    [[ "$output" == *'"action":"save_report"'* && "$output" == *'"state":"pending"'* ]]
+    [[ "$output" == *'"sql":"SELECT b.cardnumber AS `Card`'* && "$output" == *'"columns":["Card","Loans"]'* ]]
+    [[ "$output" == *'"rows":[["C0101","4"]'* ]]
+    [[ "$output" != *'"args"'* && "$output" != *'"question"'* ]]
+    # The model got the columns, never the rows.
+    grep -q 'TOOL RESULT propose_action' "$W/model.log"
+    ! grep -q 'C0101' "$W/model.log"
+    [ "$(db "SELECT COUNT(*) FROM saved_sql")" = "2" ]
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"state":"done"'* && "$output" == *'"result":"3"'* ]]
+    [[ "$output" == *'"label":"[AI] Loans per patron"'* && "$output" == *'"url":"/cgi-bin/koha/reports/guided_reports.pl?reports=3&phase=Show%20SQL&op=show&id=3"'* ]]
+    [ "$(db "SELECT report_name, report_group, public, borrowernumber FROM saved_sql WHERE id = 3")" = "[AI] Loans per patron|CIRC|0|1" ]
+    [[ "$(db "SELECT notes FROM saved_sql WHERE id = 3")" == "Written by the koha.nexus AI assistant and saved by librarian on "*" after review. Request: make a report of loans per patron [KEI-AI:1]" ]]
+    [[ "$(db "SELECT savedsql FROM saved_sql WHERE id = 3")" == *'WHERE i.issuedate >= <<Since|date>> GROUP BY'* ]]
+    grep -q $'\tlibrarian\tsave_report\treport:3\tname:  -> Loans per patron; group:  -> CIRC; columns:  -> Card, Loans$' "$W/kei-ai/changes.log"
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"error":"This proposal was already decided."'* ]]
+}
+
+@test "ai assistant: reports that write, lock, show secrets or fail are never proposed" {
+    start_mock
+    run ask "a report that will delete old loans"
+    [[ "$output" == *'the SQL must start with SELECT'* && "$output" == *'"proposals":[]'* ]]
+    run ask "a report with the password of each patron"
+    [[ "$output" == *'reports may not read passwords'* && "$output" == *'"proposals":[]'* ]]
+    run ask "a report of everything about patrons"
+    [[ "$output" == *'no SELECT *'* && "$output" == *'"proposals":[]'* ]]
+    run ask "a broken report"
+    [[ "$output" == *'the database refused the SQL'* && "$output" == *'nosuchcolumn'* && "$output" == *'"proposals":[]'* ]]
+    [ "$(db "SELECT COUNT(*) FROM saved_sql")" = "2" ]
+    [ "$(db "SELECT COUNT(*) FROM issues")" != "0" ]
+}
+
+@test "ai assistant: no create_reports permission, no report tools; Approve checks it again" {
+    KEI_AIA_PERMS="patrons reports prefs" start_mock
+    run ask "make a report of loans per patron"
+    [[ "$output" == *'unknown tool table_columns'* && "$output" == *'"proposals":[]'* ]]
+    kill "$MOCK_PID"; wait "$MOCK_PID" 2>/dev/null || true
+    start_mock
+    ask "make a report of loans per patron" > /dev/null
+    kill "$MOCK_PID"; wait "$MOCK_PID" 2>/dev/null || true
+    KEI_AIA_PERMS="patrons reports prefs" start_mock
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"error":"Your Koha permissions do not allow this change."'* ]]
+    [ "$(db "SELECT COUNT(*) FROM saved_sql")" = "2" ]
+}
+
+@test "ai assistant: a preference of the list is changed by Koha after Approve, others only open the page" {
+    start_mock
+    run ask "raise the pickup delay to 9 days"
+    [[ "$output" == *'"action":"update_syspref"'* && "$output" == *'"diff":[{"field":"ReservesMaxPickUpDelay","from":"7","to":"9"}]'* ]]
+    [ "$(db "SELECT value FROM systempreferences WHERE variable = 'ReservesMaxPickUpDelay'")" = "7" ]
+    run post -d op=cud-confirm -d proposal=1
+    [[ "$output" == *'"state":"done"'* ]]
+    [ "$(db "SELECT value FROM systempreferences WHERE variable = 'ReservesMaxPickUpDelay'")" = "9" ]
+    grep -q '"before":{"value":"7"}' "$W"/kei-ai/undo/*.json
+    grep -q $'\tlibrarian\tupdate_syspref\tsyspref:ReservesMaxPickUpDelay\tReservesMaxPickUpDelay: 7 -> 9$' "$W/kei-ai/changes.log"
+    run ask "switch the search engine"
+    [[ "$output" == *'SearchEngine is not a preference the assistant can change'* && "$output" == *'"proposals":[]'* ]]
+    [ "$(db "SELECT value FROM systempreferences WHERE variable = 'SearchEngine'")" = "Zebra" ]
+    # Changed by someone else after the proposal: nothing runs.
+    run ask "raise the pickup delay to 9 days"
+    [[ "$output" == *'already 9'* ]]
+    perl -MDBI -e 'DBI->connect("dbi:SQLite:dbname=$ARGV[0]")->do("UPDATE systempreferences SET value = 5 WHERE variable = \"ReservesMaxPickUpDelay\"")' "$W/koha.db"
+    ask "raise the pickup delay to 9 days" > /dev/null
+    perl -MDBI -e 'DBI->connect("dbi:SQLite:dbname=$ARGV[0]")->do("UPDATE systempreferences SET value = 6 WHERE variable = \"ReservesMaxPickUpDelay\"")' "$W/koha.db"
+    run post -d op=cud-confirm -d proposal=2
+    [[ "$output" == *'"error":"The record changed after the proposal'* ]]
+    [ "$(db "SELECT value FROM systempreferences WHERE variable = 'ReservesMaxPickUpDelay'")" = "6" ]
+    # The page card of open_page says it only opens the page.
+    run curl -s "$URL?op=js"
+    [[ "$output" == *'"open_note":"This only opens the page: you make the change there yourself."'* && "$output" == *'"approve_report":"Approve & Save"'* ]]
+}
+
 @test "ai assistant: no patron permission, no patron tool" {
     KEI_AIA_PERMS="reports" start_mock
     run ask "who is the last patron who has 4 overdue books and 144 reais in fines?"

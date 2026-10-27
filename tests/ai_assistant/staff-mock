@@ -98,6 +98,25 @@ def plan(q, history):
 
     def propose(**args):
         return ("propose_action", lambda r: args)
+    if "report" in q:
+        sql = {"delete": "DELETE FROM issues",
+               "password": "SELECT cardnumber, password FROM borrowers",
+               "everything": "SELECT * FROM borrowers",
+               "broken": "SELECT nosuchcolumn FROM issues",
+               "loans": "SELECT b.cardnumber AS `Card`, COUNT(*) AS `Loans` FROM issues i JOIN borrowers b "
+                        "ON b.borrowernumber = i.borrowernumber WHERE i.issuedate >= <<Since|date>> "
+                        "GROUP BY b.cardnumber ORDER BY COUNT(*) DESC, b.cardnumber"}
+        kind = next(k for k in sql if k in q or k == "loans")
+        return [("table_columns", lambda r: {"tables": ["issues", "borrowers"]}),
+                propose(action="save_report", name="Loans per patron", group="CIRC", sql=sql[kind],
+                        summary="Save a report of loans per patron since a date.")]
+    if "pickup delay" in q:
+        return [("get_syspref", lambda r: {"query": "ReservesMaxPickUpDelay"}),
+                propose(action="update_syspref", preference="ReservesMaxPickUpDelay", value="9",
+                        summary="Raise ReservesMaxPickUpDelay from 7 to 9 days.")]
+    if "search engine" in q:
+        return [propose(action="update_syspref", preference="SearchEngine", value="Elasticsearch",
+                        summary="Switch the search engine.")]
     if re.search(r"\bhis\b.*\bclown\b", q):
         # A follow-up: only with the earlier search in the conversation buffer.
         if not any("King, Stephen" in m["content"] for m in history if m["role"] == "assistant"):

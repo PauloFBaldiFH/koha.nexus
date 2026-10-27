@@ -67,6 +67,14 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   fields, write-off) with a field diff and Approve & Execute / Reject; on approval the values
   are re-read and Koha's own Perl objects make the change with the librarian's permissions
   (not /api/v1, which needs OAuth), with undo JSON and a log.
+  Since 1.5.116 (2026-10-27) two more actions: `update_syspref` (closed list `%SYSPREFS`,
+  value checked by kind, needs `manage_sysprefs`) and `save_report`: the only SQL the model
+  writes, one SELECT checked by `check_select` (no `;`, comments, variables, `SELECT *`,
+  write/lock/file words, secrets) and run on `kei_ai_ro` before the card shows it with its
+  first rows (never sent to the model); Approve & Save needs `create_reports` and saves it
+  through `C4::Reports::Guided::save_report` as "[AI] name", private, owned by the approver,
+  notes "[KEI-AI:n]". A saved report later runs under Koha's own account, so the checks are at
+  save time. open_page cards now say they only open the page.
 - **Z39.50 / SRU servers** (1.5.15): panel screen `views/z3950.py` over `z3950.py` (curated
   `data/z3950_targets.json`, community sync from that file on `main`, imports, BER Z39.50 and
   SRU probes that must return valid MARC, blacklist history in `/etc/koha-easy-install`).

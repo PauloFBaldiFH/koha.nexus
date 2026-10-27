@@ -20,4 +20,8 @@ my $DBH;
 sub dbh { return $DBH ||= DBI->connect( "dbi:SQLite:dbname=$ENV{KEI_AIA_DB}", '', '', { RaiseError => 1, PrintError => 0, AutoCommit => 1, sqlite_unicode => 1 } ) }
 sub userenv { return { number => 1, branch => 'CPL' } }
 sub preference { my ( $class, $name ) = @_; return $name eq 'SearchEngine' ? 'Elasticsearch' : '' }
+sub set_preference {
+    my ( $class, $name, $value ) = @_;
+    return dbh()->do( 'UPDATE systempreferences SET value = ? WHERE variable = ?', undef, $value, $name );
+}
 1;

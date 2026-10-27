@@ -285,4 +285,68 @@ like( KohaEasy::Assistant::system_prompt( fresh(), 'pt' ), qr/never announce/i, 
     is( KohaEasy::Assistant::load_conf($conf)->{model}, 'qwen2.5vl:7b', 'no chat_model: the vision model' );
     unlink $conf;
 }
+# Reports the model writes: one SELECT that only reads, or a reason.
+{
+    my $ok = sub { my $r = eval { KohaEasy::Assistant::check_select( $_[0] ) }; $r };
+    my $why = sub { eval { KohaEasy::Assistant::check_select( $_[0] ) }; ref $@ eq 'HASH' ? $@->{error} : '' };
+    is( $ok->("SELECT title AS `Título` FROM biblio WHERE title LIKE 'It;%' ;"), "SELECT title AS `Título` FROM biblio WHERE title LIKE 'It;%'", 'a SELECT: its last ";" dropped, strings untouched' );
+    ok( $ok->("WITH t AS (SELECT biblionumber FROM items) SELECT COUNT(*) AS `Itens` FROM t"), 'WITH ... SELECT' );
+    ok( $ok->("SELECT REPLACE(title, 'a', 'b') AS t, FIND_IN_SET('x', 'x,y') AS f FROM biblio WHERE datecreated > <<Since|date>>"), 'REPLACE() and Koha parameters are fine' );
+    like( $why->('DELETE FROM issues'), qr/must start with SELECT/ );
+    like( $why->('SELECT 1; DROP TABLE biblio'), qr/one statement only/ );
+    like( $why->('SELECT 1 /*! , SLEEP(5) */'), qr/no comments/, 'MariaDB executable comments' );
+    like( $why->('SELECT 1 -- x'), qr/no comments/ );
+    like( $why->('SELECT title FROM biblio INTO OUTFILE \'/tmp/x\''), qr/INTO is not allowed/ );
+    like( $why->('SELECT title FROM biblio FOR UPDATE'), qr/UPDATE is not allowed/ );
+    like( $why->('SELECT SLEEP(100)'), qr/SLEEP is not allowed/ );
+    like( $why->('SELECT LOAD_FILE(\'/etc/passwd\')'), qr/LOAD_FILE is not allowed/ );
+    like( $why->('SELECT @x := 1'), qr/no variables/ );
+    like( $why->("SELECT 'please update me' AS t"), qr/Koha refuses reports with the word UPDATE/, "Koha's own word check, inside strings too" );
+    like( $why->('SELECT * FROM borrowers'), qr/no SELECT \*/ );
+    like( $why->('SELECT b.* FROM borrowers b'), qr/no SELECT \*/ );
+    ok( $ok->('SELECT COUNT(*) AS n, 2 * 3 AS six FROM borrowers'), 'COUNT(*) and * as a product are fine' );
+    like( $why->('SELECT cardnumber, password FROM borrowers'), qr/passwords, secrets/ );
+    like( $why->('SELECT id FROM sessions'), qr/passwords, secrets/ );
+    like( $why->("SELECT 'x"), qr/never closed/ );
+    like( $why->(''), qr/sql is required/ );
+}
+{
+    my %R = ( %ALL, create_reports => 1, manage_prefs => 1 );
+    my $c = fresh( can => {%R}, question => 'loans per patron' );
+    my $cols = tool( $c, 'table_columns', { tables => [ 'borrowers', 'issues', 'sessions', 'nosuch' ] } );
+    ok( ( grep { $_ eq 'cardnumber' } @{ $cols->{tables}{borrowers} } ) && !( grep { $_ eq 'password' } @{ $cols->{tables}{borrowers} } ), 'table_columns: no password column' );
+    is_deeply( $cols->{missing}, [ 'sessions', 'nosuch' ], '  no sessions table' );
+    like( KohaEasy::Assistant::call_tool( fresh(), 'table_columns', { tables => ['issues'] } ), qr/unknown tool table_columns/, 'only with create_reports' );
+    my $sql = 'SELECT b.cardnumber AS `Card`, COUNT(*) AS `Loans` FROM issues i JOIN borrowers b ON b.borrowernumber = i.borrowernumber WHERE i.issuedate >= <<Since|date>> GROUP BY b.cardnumber ORDER BY COUNT(*) DESC, b.cardnumber';
+    my $out = tool( $c, 'propose_action', { action => 'save_report', name => 'Loans per patron', group => 'circ', sql => $sql, summary => 'A report.' } );
+    is( $out->{action}, 'save_report', 'save_report: a proposal' );
+    my $p = $c->{proposals}[0];
+    is_deeply( $p->{preview}{columns}, [ 'Card', 'Loans' ], '  tested: its columns' );
+    is_deeply( $p->{preview}{rows}[0], [ 'C0101', '4' ], '  and its first rows (for the card)' );
+    unlike( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'save_report', name => 'x', sql => $sql, summary => 's' } ), qr/C0101/, '  the rows never go to the model' );
+    is_deeply( $p->{args}, { name => 'Loans per patron', sql => $sql, group => 'CIRC', question => 'loans per patron' } );
+    is( $dbh->selectrow_array('SELECT COUNT(*) FROM saved_sql'), 2, '  nothing saved by the module' );
+    ok( KohaEasy::Assistant::same_snapshot( KohaEasy::Assistant::snapshot( $c, $p ), $p->{before} ), '  the same test on Approve' );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'save_report', name => 'x', sql => 'SELECT nosuch FROM issues', summary => 's' } ),
+        qr/the database refused the SQL: .*nosuch/, 'a broken SELECT: the database error, for the model to fix' );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%ALL} ), 'propose_action', { action => 'save_report', name => 'x', sql => $sql, summary => 's' } ),
+        qr/do not allow save_report/, 'no create_reports: no report' );
+    unlike( KohaEasy::Assistant::system_prompt( fresh(), 'en' ), qr/run_select|MariaDB|"sql"|table_columns/, 'without create_reports the prompt offers no SQL' );
+    like( KohaEasy::Assistant::system_prompt( fresh( can => {%R} ), 'en' ), qr/"sql":"ONE SELECT/, 'with it, the sql argument' );
+    like( KohaEasy::Assistant::system_prompt( fresh( can => {%R} ), 'en' ), qr/# New saved reports/, '  and the report rules' );
+
+    # System preferences: a closed list, the value checked by its kind.
+    $c = fresh( can => {%R} );
+    $out = tool( $c, 'propose_action', { action => 'update_syspref', preference => 'reservesmaxpickupdelay', value => ' 9 ', summary => 'Nine days.' } );
+    is_deeply( $out->{diff}, [ { field => 'ReservesMaxPickUpDelay', from => '7', to => '9' } ], 'update_syspref: now and after' );
+    is_deeply( $c->{proposals}[0]{before}, { value => '7' } );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'update_syspref', preference => 'SearchEngine', value => 'Elasticsearch', summary => 's' } ),
+        qr/SearchEngine is not a preference the assistant can change.*syspref_edit/, 'outside the list: the page' );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'update_syspref', preference => 'ReservesMaxPickUpDelay', value => 'nine', summary => 's' } ), qr/whole number/ );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'update_syspref', preference => 'ReservesMaxPickUpDelay', value => '7', summary => 's' } ), qr/already 7/ );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'update_syspref', preference => 'finesMode', value => 'OFF', summary => 's' } ), qr/"to":"off"/, 'choices: Koha\'s spelling' );
+    like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'update_syspref', preference => 'OverdueNoticeCalendar', value => 'sim', summary => 's' } ), qr/"to":"1"/, 'yes/no: 1 or 0' );
+    like( KohaEasy::Assistant::call_tool( fresh(), 'propose_action', { action => 'update_syspref', preference => 'finesMode', value => 'off', summary => 's' } ), qr/do not allow update_syspref/, 'needs manage_sysprefs' );
+    is( $dbh->selectrow_array("SELECT value FROM systempreferences WHERE variable = 'ReservesMaxPickUpDelay'"), '7', '  nothing changed by the module' );
+}
 done_testing;
