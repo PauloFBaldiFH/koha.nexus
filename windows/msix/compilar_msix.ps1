@@ -923,7 +923,7 @@ catch {
     $entryExePath = Join-Path $pkgDir $entryExeName
     [System.IO.File]::WriteAllText($entrySourcePath, $entrySource, (New-Object System.Text.UTF8Encoding($false)))
 
-    & $csc /nologo /target:winexe /platform:anycpu /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Management.dll "/out:$entryExePath" "/win32icon:$iconPath" $entrySourcePath
+    & $csc /nologo /target:winexe /platform:anycpu /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Management.dll "/out:$entryExePath" "/win32icon:$iconPath" "/win32manifest:$(Join-Path $scriptRoot 'KohaMsixEntry.manifest')" $entrySourcePath
     if ($LASTEXITCODE -ne 0) {
         throw "csc.exe falhou ao compilar o launcher (código $LASTEXITCODE)."
     }
