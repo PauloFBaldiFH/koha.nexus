@@ -1,0 +1,22 @@
+name	host	port	database	kind	source	username	password
+Library of Congress - LCDB	lx2.loc.gov	210	LCDB	bibliographic	https://www.loc.gov/standards/z3950/lcserver.html		
+Library of Congress - Name Authorities	lx2.loc.gov	210	NAF	authority	https://www.loc.gov/standards/z3950/lcserver.html		
+Library of Congress - Subject Authorities	lx2.loc.gov	210	SAF	authority	https://www.loc.gov/standards/z3950/lcserver.html		
+Library of Congress - NLSBPH	lx2.loc.gov	210	NLSBPH	bibliographic	https://www.loc.gov/standards/z3950/lcserver.html		
+Biblioteca Nacional Argentina - Bibliograficos	200.123.191.9	9991	BNA01	bibliographic	https://www.bn.gov.ar/noticias/actualizacion-en-el-acceso-a-bases-de-datos-bibliograficas-y-de-autoridades-de-la-biblioteca-nacional	Z39.50	Z39.50
+Biblioteca Nacional Argentina - Autoridades	200.123.191.9	9991	BNA10	authority	https://www.bn.gov.ar/noticias/actualizacion-en-el-acceso-a-bases-de-datos-bibliograficas-y-de-autoridades-de-la-biblioteca-nacional	Z39.50	Z39.50
+OhioLINK	olc1.ohiolink.edu	210	INNOPAC	bibliographic	https://koha-community.org/manual/latest/en/html/administration.html		
+LIBRIS Sweden	z3950.libris.kb.se	210	LIBR	bibliographic	https://kohasupport.com/resources/z3950/		
+ABES SUDOC France	carmin.sudoc.abes.fr	10646	abes-z39-public	bibliographic	https://www.z-brary.com/		
+Koha - Chan Shun Centennial Library	chanshun.swau.edu	5501	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Koha - Keys Maritime NHP	keys.bywatersolutions.com	9945	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Koha - Next Search Catalog	nekls.bywatersolutions.com	5110	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Koha - Pathfinder CKLS	ckls.bywatersolutions.com	9983	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Koha - SEKnFind	sekls.bywatersolutions.com	9946	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Koha - VOKAL	vokal.bywatersolutions.com	9936	biblios	bibliographic	https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources		
+Biblioteca Universitaria UFSC - Brasil	z3950.ufsc.br	210	Default	bibliographic	https://decti.bu.ufsc.br/catalogacao/dados-abertos/		
+Biblioteca Nacional de Espana - Catalogo	z3950.bne.es	210	34BNE_INST	bibliographic	https://www.bne.es/es/perfiles/bibliotecarios/suministro-registros/descarga-z3950		
+UNESP Brasil	unesp.alma.exlibrisgroup.com	1921	55UNESP_INST	bibliographic	https://acervos.bib.br/2021/09/11/22/41/28/5746/importacao-de-registros-z39-50-no-biblivre/treinamento-biblivre/victor/		
+Biblioteka Narodowa Poland	bn-nl.alma.exlibrisgroup.com	1921	48OMNIS_NLOP	bibliographic	https://github.com/mpasternak/z3950-mcp		
+National Library Czech Republic	aleph.nkp.cz	9991	NKC	bibliographic	https://github.com/mpasternak/z3950-mcp		
+Index Data Demonstration MARC	z3950.indexdata.com	210	marc	bibliographic	https://github.com/mpasternak/z3950-mcp		
