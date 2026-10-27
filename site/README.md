@@ -38,7 +38,10 @@ languages keep `page_title`/`page_description` and the manual title. Submitting
 the sitemap to Google Search Console is done by hand after merging.
 
 Language links work without JavaScript. The manual selector preserves the open
-section. The page path takes priority over saved browser preferences; legacy
+section. On the homepage root, a saved manual choice takes priority over the browser's ordered language preferences. Unsupported preferences fall back to English.
+Direct translated page paths take priority over browser preferences. Manual
+choices are saved when browser storage is available; detection still works
+when storage is blocked. Legacy
 `?lang=br`, `?lang=pt` and other supported query links navigate to the matching
 language directory under `languages/`. `hreflang` links refer to the public `https://koha.nexus/`
 URLs, while navigation and asset links are relative so local previews also work.

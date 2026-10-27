@@ -182,3 +182,61 @@ def test_every_page_has_unique_search_tags_and_only_homepages_carry_app_data():
     assert sorted(re.findall(r'<loc>([^<]+)</loc>', sitemap)) == sorted(canonicals)
     robots = (REPO / 'robots.txt').read_text(encoding='utf-8')
     assert 'Sitemap: https://koha.nexus/sitemap.xml' in robots and 'Disallow: /\n' not in robots
+
+
+def test_home_browser_language_detection_and_manual_override():
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node is required to exercise browser language selection')
+    # Execute the actual routing/listener code with a minimal browser adapter.
+    script = (REPO / 'site/assets/home.js').read_text().split('    function copyFallback', 1)[0]
+    harness = r'''
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const source = SOURCE;
+function visit(path, languages, saved, blocked = false) {
+  let redirect = null;
+  const links = ['en','pt','es','fr','de','tl'].map(code => ({
+    dataset: {language: code}, href: 'https://example.org/project/' + (code === 'en' ? '' : 'languages/' + code + '/'),
+    addEventListener(event, callback) { this.click = callback; }
+  }));
+  const url = new URL(path, 'https://example.org/project/');
+  const context = {
+    URL, navigator: {languages, language: languages[0]},
+    location: {href: url.href, hash: url.hash, replace(value) { redirect = value; }},
+    localStorage: {
+      getItem() { if (blocked) throw Error('blocked'); return saved; },
+      setItem(key, value) { if (blocked) throw Error('blocked'); saved = value; }
+    },
+    document: {
+      currentScript: {src: 'https://example.org/project/site/assets/home.js'},
+      body: {dataset: {language: path.includes('/languages/es/') ? 'es' : 'en'}},
+      getElementById() { return {textContent: '{}'}; },
+      querySelectorAll() { return links; }
+    }
+  };
+  vm.runInNewContext(source, context);
+  return {redirect, links, saved: () => saved};
+}
+assert.equal(visit('./', ['pt-BR']).redirect, 'https://example.org/project/languages/pt/');
+assert.equal(visit('index.html', ['xx', 'fr-CA']).redirect, 'https://example.org/project/languages/fr/');
+assert.equal(visit('./', ['fil-PH']).redirect, 'https://example.org/project/languages/tl/');
+assert.equal(visit('./', ['xx']).redirect, null);
+assert.equal(visit('./', ['en-US', 'pt']).redirect, null);
+assert.equal(visit('./', ['pt'], 'en').redirect, null);
+assert.equal(visit('./', ['pt'], 'de').redirect, 'https://example.org/project/languages/de/');
+assert.equal(visit('./', ['fr'], null, true).redirect, 'https://example.org/project/languages/fr/');
+assert.equal(visit('languages/es/', ['pt'], 'de').redirect, null);
+assert.equal(visit('./?lang=en', ['pt'], 'de').redirect, null);
+assert.equal(visit('./?lang=br&ref=demo#features', ['en']).redirect,
+             'https://example.org/project/languages/pt/?ref=demo#features');
+assert.equal(visit('./#pt', ['en']).redirect, 'https://example.org/project/languages/pt/');
+const manual = visit('./', ['en']);
+manual.links.find(a => a.dataset.language === 'en').click();
+assert.equal(manual.saved(), 'en');
+const blocked = visit('./', ['en'], null, true);
+assert.doesNotThrow(() => blocked.links[0].click());
+'''
+    result = subprocess.run([node, '-e', harness.replace('SOURCE', json.dumps(script), 1)],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr

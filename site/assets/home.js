@@ -2,19 +2,44 @@
 const SITE_ROOT = new URL("../../", document.currentScript.src);
 const SITE_MESSAGES = JSON.parse(document.getElementById("site-messages").textContent);
 function siteText(key) { return SITE_MESSAGES[key] || ""; }
+const SITE_LANGUAGE_KEY = "koha_lang";
+function rememberSiteLanguage(code) {
+  try { localStorage.setItem(SITE_LANGUAGE_KEY, code); } catch (e) {}
+}
 (function () {
-  const requested = new URL(location.href).searchParams.get("lang") || location.hash.slice(1);
+  const current = new URL(location.href);
+  const links = Array.from(document.querySelectorAll("[data-language]"));
   const aliases = {br: "pt", "pt-br": "pt", fil: "tl"};
-  const code = aliases[requested.toLowerCase()] || requested.toLowerCase().split(/[-_]/)[0];
-  const languageHash = () => Array.from(document.querySelectorAll("[data-language]")).some(a => a.dataset.language === location.hash.slice(1));
-  const link = document.querySelector('[data-language="' + code.replace(/[^a-z]/g, "") + '"]');
-  if (link && code !== document.body.dataset.language) {
+  function match(value) {
+    const tag = String(value || "").toLowerCase().replace(/_/g, "-");
+    const base = tag.split("-")[0];
+    const code = aliases[tag] || aliases[base] || base;
+    return links.find(a => a.dataset.language === code);
+  }
+  const hashLanguage = match(current.hash.slice(1));
+  const requested = current.searchParams.get("lang") || (hashLanguage ? current.hash.slice(1) : "");
+  let link;
+  if (requested) {
+    link = match(requested);
+    if (link) rememberSiteLanguage(link.dataset.language);
+  } else if (current.pathname === SITE_ROOT.pathname || current.pathname === SITE_ROOT.pathname + "index.html") {
+    // Explicit translated URLs stay in their language. Only the root detects.
+    let saved;
+    try { saved = localStorage.getItem(SITE_LANGUAGE_KEY); } catch (e) {}
+    link = match(saved);
+    const preferred = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    if (!link) link = preferred.map(match).find(Boolean);
+  }
+  if (link && link.dataset.language !== document.body.dataset.language) {
     const url = new URL(link.href);
-    if (!languageHash()) url.hash = location.hash;
+    current.searchParams.delete("lang");
+    url.search = current.search;
+    if (!hashLanguage) url.hash = current.hash;
     location.replace(url.href);
   }
 })();
 document.querySelectorAll("[data-language]").forEach(a => a.addEventListener("click", () => {
+  rememberSiteLanguage(a.dataset.language);
   if (location.hash && !Array.from(document.querySelectorAll("[data-language]")).some(link => link.dataset.language === location.hash.slice(1))) a.hash = location.hash;
 }));
     function copyFallback(value) {
