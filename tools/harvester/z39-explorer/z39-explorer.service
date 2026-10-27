@@ -1,0 +1,27 @@
+[Unit]
+Description=Z39.50 Explorer - public library catalogue discovery and verification
+Documentation=https://software.indexdata.com/yaz/doc/yaz-client.html
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=z39explorer
+Group=z39explorer
+WorkingDirectory=/opt/z39-explorer
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/z39-explorer/z39_explorer.py scan --state /var/lib/z39-explorer --workers 6 --timeout 22 --host-pause 3
+StateDirectory=z39-explorer
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/z39-explorer
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=4096
+MemoryMax=768M
+TimeoutStartSec=infinity
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
