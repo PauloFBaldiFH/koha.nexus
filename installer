@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.114"
+PANEL_VERSION=" 1.5.115"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -36552,6 +36552,189 @@ vpn_stop() {
     msg_ok "$(t "The VPN is off. The devices and keys are kept: Set up turns it on again.")"
 }
 
+# ======================================================================
+# 43. AI SERVER HELPER (panel: AI tools > Server helper, opt-in)
+# ----------------------------------------------------------------------
+# A chat in the panel that diagnoses this server and proposes fixes. The
+# model never writes a command: it names an action of a fixed list, the
+# panel shows the exact command, and a change runs only after the person
+# approves that one command. Every action, read or change, goes through
+# one root-owned script, run by a system user that has no login:
+#
+#   runuser -u kn-helper -- sudo -n /usr/local/lib/koha-easy-installer/helper/kn-helper-action ACTION [ARG...]
+#
+# The sudoers rule lets kn-helper run that script and nothing else, and the
+# script refuses any action or argument outside its own list (the panel
+# keeps the same list in kei_panel/serverhelper.py; a test compares them).
+# The panel writes the audit log (who approved what, the command, its exit
+# code) to ai-helper.log; the script also logs each change to syslog.
+#
+#   ai-helper-status   installed=yes|no
+#   ai-helper-setup    sudo if missing, the user, the script, the rule
+#   ai-helper-remove   rule, script and user removed (the log is kept)
+# ======================================================================
+AIH_USER="kn-helper"
+AIH_DIR="/usr/local/lib/koha-easy-installer/helper"
+AIH_BIN="${AIH_DIR}/kn-helper-action"
+AIH_SUDOERS="/etc/sudoers.d/koha-nexus-helper"
+AIH_LOG="${LOG_DIR}/ai-helper.log"
+
+# The script. Its lists are the allowlist: a service or log not named here
+# cannot be touched, whatever the model or the panel asks.
+aih_script() {
+    cat <<'AIHSH'
+#!/bin/sh
+# koha.nexus: the AI server helper's only door to this system (panel: AI
+# tools > Server helper). Run as: sudo -n kn-helper-action ACTION [ARG...]
+# Anything not in the case below is refused with exit 2.
+set -u
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+SERVICES="koha-common apache2 mariadb memcached elasticsearch rabbitmq-server cron ollama cloudflared koha-nexus-sru koha-nexus-enrich koha-nexus-ondemand"
+KOHA_LOGS="plack-error intranet-error opac-error zebra-error worker-error indexer-error sip-error"
+SQL_DIR="/var/backups/koha_sql"
+
+refuse() { echo "refused: $*" >&2; exit 2; }
+in_list() {
+    case "$1" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac
+    case " $2 " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+service_ok() { in_list "$1" "$SERVICES" || refuse "service not allowed: $1"; }
+instance_ok() {
+    case "$1" in ''|*[!A-Za-z0-9_-]*) refuse "bad instance name" ;; esac
+    koha-list 2>/dev/null | grep -qx -- "$1" || refuse "no Koha instance named $1"
+}
+note() { logger -t koha-nexus-helper -- "$*" 2>/dev/null || true; }
+
+action="${1:-}"
+[ $# -ge 1 ] || refuse "no action"
+shift
+a1="${1:-}" a2="${2:-}"
+
+case "$action" in
+    # ---- reads: nothing changes ----
+    overview)
+        [ $# -eq 0 ] || refuse "overview takes no argument"
+        for s in $SERVICES; do
+            [ "$(systemctl show -p LoadState --value "$s" 2>/dev/null)" = "loaded" ] || continue
+            printf '%-22s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null)"
+        done
+        echo
+        df -h -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null
+        echo
+        free -m
+        echo
+        uptime
+        newest=$(ls -1t "$SQL_DIR" 2>/dev/null | head -n 1)
+        echo
+        if [ -n "$newest" ]; then echo "newest backup: $newest ($(date -r "$SQL_DIR/$newest" '+%F %H:%M'))"
+        else echo "newest backup: none in $SQL_DIR"; fi ;;
+    service-status)
+        [ $# -eq 1 ] || refuse "service-status takes 1 argument"
+        service_ok "$a1"
+        systemctl status --no-pager -l -n 20 "$a1"
+        exit 0 ;;
+    service-log)
+        [ $# -eq 1 ] || refuse "service-log takes 1 argument"
+        service_ok "$a1"
+        journalctl -u "$a1" -n 80 --no-pager -o short-iso ;;
+    koha-log)
+        [ $# -eq 2 ] || refuse "koha-log takes 2 arguments"
+        instance_ok "$a1"
+        in_list "$a2" "$KOHA_LOGS" || refuse "log not allowed: $a2"
+        f="/var/log/koha/$a1/$a2.log"
+        [ -f "$f" ] || { echo "no such log: $f"; exit 0; }
+        tail -n 80 -- "$f" ;;
+    # ---- changes: only after the person approved this exact command ----
+    restart)
+        [ $# -eq 1 ] || refuse "restart takes 1 argument"
+        service_ok "$a1"
+        note "restart $a1"
+        systemctl restart "$a1"; rc=$?
+        echo "$a1: $(systemctl is-active "$a1" 2>/dev/null)"
+        exit $rc ;;
+    clear-cache)
+        [ $# -eq 1 ] || refuse "clear-cache takes 1 argument"
+        instance_ok "$a1"
+        note "clear-cache $a1"
+        systemctl restart memcached || exit $?
+        koha-plack --restart "$a1"
+        exit 0 ;;
+    reindex)
+        [ $# -eq 1 ] || refuse "reindex takes 1 argument"
+        instance_ok "$a1"
+        note "reindex $a1"
+        if [ -x /usr/local/bin/koha-kei-reindex ]; then exec /usr/local/bin/koha-kei-reindex "$a1"; fi
+        exec koha-rebuild-zebra -f -v -b -a "$a1" ;;
+    clean-old-logs)
+        [ $# -eq 1 ] || refuse "clean-old-logs takes 1 argument"
+        instance_ok "$a1"
+        note "clean-old-logs $a1"
+        find "/var/log/koha/$a1" -maxdepth 1 -type f -name '*.gz' -mtime +14 -print -delete
+        df -h /var/log ;;
+    backup)
+        [ $# -eq 0 ] || refuse "backup takes no argument"
+        note "backup"
+        mkdir -p "$SQL_DIR"
+        exec /usr/local/bin/config.sh --task backup-manual "$SQL_DIR" ;;
+    *)
+        refuse "unknown action: $action" ;;
+esac
+AIHSH
+}
+
+aih_installed() { id "$AIH_USER" >/dev/null 2>&1 && [ -x "$AIH_BIN" ] && [ -f "$AIH_SUDOERS" ]; }
+
+ai_helper_status() {
+    if aih_installed; then kei_result installed yes; else kei_result installed no; fi
+    return 0
+}
+
+ai_helper_setup() {
+    local tmp user="$AIH_USER"
+    if ! command -v sudo >/dev/null 2>&1; then
+        tui_run "$(t "Installing") sudo" apt_install sudo || {
+            msg_error "" "$(t "Could not install sudo, which the server helper needs.")"
+            return 1
+        }
+    fi
+    if ! id "$AIH_USER" >/dev/null 2>&1; then
+        useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$AIH_USER" || {
+            msg_error "" "$(t "Could not create the system user \${user}.")"
+            return 1
+        }
+    fi
+    usermod -L "$AIH_USER" >/dev/null 2>&1 || true
+    install -d -m 0755 -o root -g root "$AIH_DIR"
+    tmp=$(mktemp "${AIH_DIR}/.kn-helper-action.XXXXXX") || return 1
+    aih_script > "$tmp"
+    chown root:root "$tmp" && chmod 0755 "$tmp" && mv -f "$tmp" "$AIH_BIN"
+    tmp=$(mktemp /etc/sudoers.d/.koha-nexus-helper.XXXXXX) || return 1
+    printf '# koha.nexus AI server helper: kn-helper may run this one script as root, nothing else.\n%s ALL=(root) NOPASSWD: %s\n' \
+        "$AIH_USER" "$AIH_BIN" > "$tmp"
+    chmod 0440 "$tmp"
+    if ! visudo -cf "$tmp" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        msg_error "" "$(t "The sudoers rule of the server helper did not pass visudo; nothing was changed.")"
+        return 1
+    fi
+    mv -f "$tmp" "$AIH_SUDOERS"
+    install -d -m 0750 "$LOG_DIR" 2>/dev/null || true
+    touch "$AIH_LOG" && chmod 0640 "$AIH_LOG"
+    log "ai helper: set up ($AIH_USER, $AIH_BIN)"
+    msg_ok "$(t "The server helper is set up. Nothing runs without your approval.")"
+}
+
+ai_helper_remove() {
+    local log="$AIH_LOG"
+    rm -f -- "$AIH_SUDOERS" "$AIH_BIN"
+    rmdir "$AIH_DIR" 2>/dev/null || true
+    if id "$AIH_USER" >/dev/null 2>&1; then userdel "$AIH_USER" >/dev/null 2>&1 || true; fi
+    log "ai helper: removed"
+    msg_ok "$(t "The server helper was removed. Its log is kept: \${log}")"
+}
+
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
@@ -37159,6 +37342,9 @@ kei_task() {
         vpn-peer-add)    [ -n "${1:-}" ] || return 2; vpn_peer_add "$1" ;;
         vpn-peer-revoke) [ -n "${1:-}" ] || return 2; vpn_peer_revoke "$1" ;;
         vpn-stop)        vpn_stop ;;
+        ai-helper-status) ai_helper_status ;;
+        ai-helper-setup)  ai_helper_setup ;;
+        ai-helper-remove) ai_helper_remove ;;
         clock)           function_configure_clock ;;
         status)
             local g label value

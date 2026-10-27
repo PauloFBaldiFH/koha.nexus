@@ -179,6 +179,9 @@ class AIView(SectionView):
             with Horizontal(classes="ai-tool-row"):
                 yield Label("", id="ai-aia-text", classes="ai-tool-text")
                 yield Button(t("Install, update or remove the assistant"), id="ai-assistant", variant="primary")
+            with Horizontal(classes="ai-tool-row"):
+                yield Label("", id="ai-helper-text", classes="ai-tool-text")
+                yield Button(t("Open the server helper"), id="ai-helper", variant="warning")
 
     def preset_options(self) -> list[tuple[str, str]]:
         """The download list: the typed models, then the presets, light first;
@@ -273,6 +276,7 @@ class AIView(SectionView):
             "ai-ollama-install": self.install_ollama,
             "ai-ollama-free": lambda: self.free_ollama([]),
             "ai-assistant": self.open_assistant,
+            "ai-helper": self.open_helper,
             "ai-ollama-pull": self.pull_model,
             "ai-use-chat": lambda: self.use_preset("chat"),
             "ai-use-vision": lambda: self.use_preset("vision"),
@@ -563,6 +567,16 @@ class AIView(SectionView):
         self.app.run_entry(Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
                            after=self.refresh_cards)
 
+    def open_helper(self) -> None:
+        """The server helper: diagnoses this server, proposes fixes that run
+        only after the person approves each command (screens/serverhelper)."""
+        if not self.ready():
+            self.app.notify(t("Set up and save an AI provider first."), severity="warning")
+            return
+        from ..screens.serverhelper import ServerHelperScreen
+        env = self.app.env
+        self.app.push_screen(ServerHelperScreen(self.saved(), env.instance, env.lang, demo=env.demo))
+
     def selected_preset(self) -> str:
         value = self.query_one("#ai-ollama-preset", Select).value
         return value if isinstance(value, str) else FIELDS
@@ -692,6 +706,12 @@ class AIView(SectionView):
                          name=name, model=chat))
         else:
             aia.update(t("AI assistant: ready to install on the staff home page (${model}).", model=chat))
+
+        self.query_one("#ai-helper", Button).disabled = not ready
+        self.query_one("#ai-helper-text", Label).update(
+            t("Server helper (experimental, potentially dangerous): diagnoses this server and proposes fixes; "
+              "nothing runs without your approval.") if ready else
+            t("Server helper: set up and save an AI provider first."))
 
         text = self.query_one("#ai-hook-text", Label)
         button = self.query_one("#ai-marc", Button)
