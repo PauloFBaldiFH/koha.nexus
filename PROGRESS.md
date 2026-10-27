@@ -67,7 +67,7 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   fields, write-off) with a field diff and Approve & Execute / Reject; on approval the values
   are re-read and Koha's own Perl objects make the change with the librarian's permissions
   (not /api/v1, which needs OAuth), with undo JSON and a log.
-  Since 1.5.115 (2026-10-27) two more actions: `update_syspref` (closed list `%SYSPREFS`,
+  Since 1.5.116 (2026-10-27) two more actions: `update_syspref` (closed list `%SYSPREFS`,
   value checked by kind, needs `manage_sysprefs`) and `save_report`: the only SQL the model
   writes, one SELECT checked by `check_select` (no `;`, comments, variables, `SELECT *`,
   write/lock/file words, secrets) and run on `kei_ai_ro` before the card shows it with its
@@ -176,6 +176,15 @@ Repository: `PauloFBaldiFH/koha.nexus` (renamed from Koha-Easy-Installer). Websi
   `qwen2.5:1.5b/3b`, `qwen2.5vl:7b` marked High CPU / Slow on ARM) and a separate
   `chat_model` in `vision.conf` for the assistant (empty = `model`, the vision one;
   `KohaEasy::Assistant::load_conf` uses it, the web AI settings form keeps it).
+- **AI server helper** (1.5.115, Paulo 2026-10-27, own helper chosen over OpenClaw): AI tools >
+  Open the server helper (`screens/serverhelper.py` over `serverhelper.py`). The model answers in
+  JSON naming actions of a fixed list (reads run at once, one change proposed at a time); a change
+  shows its exact command and runs only after Approve and run plus a second Yes. Every action runs as
+  `runuser -u kn-helper -- sudo -n /usr/local/lib/koha-easy-installer/helper/kn-helper-action ACTION`,
+  a root-owned script with its own allowlist (installer section 43, `--task ai-helper-setup |
+  ai-helper-remove | ai-helper-status`; sudoers allows that script only). Warning accepted once
+  (`ai-helper.conf`), secrets masked before the model, audit JSON lines in
+  `/var/log/koha-easy-install/ai-helper.log`. Not yet tried on a live server.
 - **Free addresses**: Paulo bought the `koha.nexus` domain; broker deployed by Paulo on the
   **Cloudflare Workers Free plan** (so `PBKDF2_ITERATIONS=20000`). One broker per Cloudflare
   account. His local `wrangler.toml` holds real IDs; the repo keeps placeholders. The Worker
