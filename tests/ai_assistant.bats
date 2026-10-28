@@ -216,6 +216,8 @@ db() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); print 
     run post -d op=cud-confirm -d proposal=1
     [[ "$output" == *'"state":"done"'* && "$output" == *'"result":"3"'* ]]
     [[ "$output" == *'"label":"[AI] Loans per patron"'* && "$output" == *'"url":"/cgi-bin/koha/reports/guided_reports.pl?reports=3&phase=Show%20SQL&op=show&id=3"'* ]]
+    # The button that runs every row: Koha's own page runs the saved report.
+    [[ "$output" == *'"run_url":"/cgi-bin/koha/reports/guided_reports.pl?reports=3&phase=Run%20this%20report&op=run&id=3"'* ]]
     [ "$(db "SELECT report_name, report_group, public, borrowernumber FROM saved_sql WHERE id = 3")" = "[AI] Loans per patron|CIRC|0|1" ]
     [[ "$(db "SELECT notes FROM saved_sql WHERE id = 3")" == "Written by the koha.nexus AI assistant and saved by librarian on "*" after review. Request: make a report of loans per patron [KEI-AI:1]" ]]
     [[ "$(db "SELECT savedsql FROM saved_sql WHERE id = 3")" == *'WHERE i.issuedate >= <<Since|date>> GROUP BY'* ]]
