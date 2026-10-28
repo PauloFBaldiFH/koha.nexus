@@ -126,7 +126,7 @@
     "inst_a4": "Katalog publiczny jest pod <code>http://SERVER-IP:80</code>",
     "inst_a5": "Otwórz pulpit ponownie przez <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Pełne środowisko Koha na komputerze z systemem Windows.",
+    "win_h2": "Kompletne środowisko Koha w systemie Windows z WSL 2.",
     "win_p": "Wersja dla systemu Windows jest przeznaczona dla małych bibliotek i do celów szkoleniowych.",
     "win_d_k": "INSTALATOR WINDOWS",
     "win_d_t": "Zainstaluj Koha jednym poleceniem.",

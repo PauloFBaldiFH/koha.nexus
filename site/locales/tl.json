@@ -126,7 +126,7 @@
     "inst_a4": "Nasa <code>http://SERVER-IP:80</code> ang pampublikong katalogo",
     "inst_a5": "Buksan muli ang dashboard gamit ang <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Koha sa Windows.",
+    "win_h2": "Isang kumpletong kapaligiran ng Koha sa Windows gamit ang WSL 2.",
     "win_p": "WSL 2 environment.",
     "win_d_k": "WINDOWS INSTALLER",
     "win_d_t": "I-install ang Koha sa isang command.",

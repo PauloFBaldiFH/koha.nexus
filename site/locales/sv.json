@@ -126,7 +126,7 @@
     "inst_a4": "Den offentliga katalogen finns på <code>http://SERVER-IP:80</code>",
     "inst_a5": "Öppna översikten igen med <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "En komplett Koha-miljö på en enda PC.",
+    "win_h2": "En komplett Koha-miljö på Windows med WSL 2.",
     "win_p": "Windows-versionen är utformad för små bibliotek och utbildning.",
     "win_d_k": "WINDOWS INSTALLATION",
     "win_d_t": "Installera Koha med ett enda kommando.",

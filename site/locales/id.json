@@ -126,7 +126,7 @@
     "inst_a4": "Katalog publik berada di <code>http://SERVER-IP:80</code>",
     "inst_a5": "Buka dasbor kembali dengan <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Lingkungan Koha penuh di PC.",
+    "win_h2": "Lingkungan Koha lengkap di Windows dengan WSL 2.",
     "win_p": "Menjalankan Koha via WSL 2 di Windows.",
     "win_d_k": "PENGINSTAL WINDOWS",
     "win_d_t": "Instal Koha dengan satu perintah.",

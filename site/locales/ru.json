@@ -126,7 +126,7 @@
     "inst_a4": "Публичный каталог: <code>http://SERVER-IP:80</code>",
     "inst_a5": "Откройте панель снова: <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Полная среда Koha на одном ПК.",
+    "win_h2": "Полноценная среда Koha в Windows с WSL 2.",
     "win_p": "Версия для Windows идеально подходит для небольших библиотек и обучения.",
     "win_d_k": "УСТАНОВЩИК WINDOWS",
     "win_d_t": "Установка одной командой.",

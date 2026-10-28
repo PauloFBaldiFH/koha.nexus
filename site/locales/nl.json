@@ -126,7 +126,7 @@
     "inst_a4": "De openbare catalogus staat op <code>http://SERVER-IP:80</code>",
     "inst_a5": "Open het dashboard opnieuw met <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Een volledige Koha-omgeving op één pc, via WSL 2.",
+    "win_h2": "Een volledige Koha-omgeving op Windows met WSL 2.",
     "win_p": "De Windows-editie is ontworpen voor kleine bibliotheken en training, waarbij Koha-services in Debian op WSL 2 behouden blijven en native Windows-tools worden geboden.",
     "win_d_k": "WINDOWS INSTALLATEUR",
     "win_d_t": "Installeer Koha met één opdracht.",
