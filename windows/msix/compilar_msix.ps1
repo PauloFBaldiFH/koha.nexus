@@ -209,11 +209,10 @@ function Test-KohaMsixSources {
         @('KohaEasy.Install.psm1', 'KOHA_MSIX_FIRST_RUN', 'conta Debian pedida de novo quando o Debian ainda não existe (KOHA_MSIX_FIRST_RUN)'),
         @('KohaEasy.Install.psm1', 'KOHA_MSIX_FINALIZE', 'fase Windows depois do painel (KOHA_MSIX_FINALIZE)'),
         @('KohaEasy.Install.psm1', '(?m)^function Initialize-KohaPanelDependencies\b', 'dependências do painel no primeiro terminal (Initialize-KohaPanelDependencies)'),
-        @('KohaEasy.Install.psm1', "'Launch -Hidden'", 'segundo terminal aberto por koha.nexus.exe Launch -Hidden'),
+        @('KohaEasy.Install.psm1', 'Start-Process -FilePath ''wsl\.exe'' -ArgumentList \$a -NoNewWindow -Wait', 'painel na mesma janela da instalação (Invoke-KohaPanel)'),
         @('KohaEasy.ps1', "KOHA_MSIX_PANEL_SETUP", 'Launch abre KohaMsixPanel.ps1 (KOHA_MSIX_PANEL_SETUP)'),
         @('KohaEasy.ps1', "'Panel'", 'comando Panel (o bootstrap abre o painel com ele)'),
         @('install.ps1', 'KOHAEASY_SOURCE', 'install.ps1 lê KOHAEASY_SOURCE'),
-        @('install.ps1', 'KOHAEASY_NO_WT', 'install.ps1 respeita KOHAEASY_NO_WT'),
         @('install.ps1', '(?m)^\s*if \(\$PSCommandPath -and \$code -gt 0\) \{ exit \$code \}', 'install.ps1 devolve o código do Install (3 = reiniciar) quando roda com -File'),
         @('KohaMsixPanel.ps1', 'KOHA_MSIX_FINALIZE', 'KohaMsixPanel.ps1 roda a fase Windows depois do painel'),
         @('KohaMsixRefreshIcons.ps1', 'KohaNexusDesktop\.ico', 'KohaMsixRefreshIcons.ps1 usa KohaNexusDesktop.ico')
