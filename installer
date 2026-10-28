@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.118"
+PANEL_VERSION=" 1.5.119"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -31401,7 +31401,7 @@ AIA_KEYS="title read_only expand new_chat placeholder send examples hello you as
     field current proposed approve reject open_page done opened cancelled failed thinking settings err_network err_session \
     err_csrf no_ro no_provider err_state err_empty err_model err_gone err_done err_perm err_changed err_run err_hold err_marc \
     act_place_hold act_update_patron act_update_record act_write_off act_open_page act_save_report act_update_syspref \
-    approve_report open_note report_sql report_rows report_saved report_prefix report_note err_report"
+    approve_report open_note report_sql report_rows report_saved report_run report_prefix report_note err_report"
 
 # The module: the tools, the read-only checks and the system prompt.
 aia_pm() {
@@ -31443,6 +31443,7 @@ use strict;
 use warnings;
 use utf8;
 use DBI;
+use Encode ();
 use HTTP::Tiny;
 use JSON::PP;
 
@@ -31690,6 +31691,8 @@ our %URL = (
     biblio  => '/cgi-bin/koha/catalogue/detail.pl?biblionumber=%s',
     patron  => '/cgi-bin/koha/members/moremember.pl?borrowernumber=%s',
     report  => '/cgi-bin/koha/reports/guided_reports.pl?reports=%s&phase=Show%%20SQL&op=show&id=%s',
+    # Koha runs the saved report itself, every row, with its own checks.
+    report_run => '/cgi-bin/koha/reports/guided_reports.pl?reports=%s&phase=Run%%20this%%20report&op=run&id=%s',
     syspref => '/cgi-bin/koha/admin/preferences.pl?op=search&searchfield=%s',
 );
 
@@ -32204,6 +32207,17 @@ sub check_select {
     return $sql;
 }
 
+# Text from the database as characters. DBD::mysql gives the column names
+# (`Número do cartão` AS ...) as raw UTF-8 bytes even with
+# mysql_enable_utf8, and JSON would then encode each byte again
+# ("NÃºmero"); bytes that are not UTF-8 are left as they are.
+sub _db_text {
+    my ($v) = @_;
+    return $v if !defined $v || utf8::is_utf8($v) || $v !~ /[\x80-\xff]/;
+    my $d = eval { Encode::decode( 'UTF-8', $v, Encode::FB_CROAK | Encode::LEAVE_SRC ) };
+    return defined $d ? $d : $v;
+}
+
 # Runs the SELECT on the read-only account with sample values for Koha's
 # <<parameters>>: its columns and first rows (the rows are for the card
 # of the librarian, never for the model).
@@ -32214,9 +32228,9 @@ sub test_report {
     my $ok = eval {
         my $sth = $ctx->{dbh}->prepare( $run, { mysql_use_result => 1 } );
         $sth->execute;
-        $names = [ @{ $sth->{NAME} || [] } ];
+        $names = [ map { _db_text($_) } @{ $sth->{NAME} || [] } ];
         while ( @rows < $REPORT_SAMPLE_ROWS && ( my $r = $sth->fetchrow_arrayref ) ) {
-            push @rows, [ map { defined $_ ? substr( "$_", 0, 200 ) : '' } @$r ];
+            push @rows, [ map { defined $_ ? substr( _db_text("$_"), 0, 200 ) : '' } @$r ];
         }
         $sth->finish;
         1;
@@ -33111,7 +33125,7 @@ sub prune_sessions {
 # What the widget shows of a proposal (never the arguments it runs with).
 sub public_proposal {
     my ($p) = @_;
-    return { map { defined $p->{$_} ? ( $_ => $p->{$_} ) : () } qw( id action summary target diff label url state result sql preview ) };
+    return { map { defined $p->{$_} ? ( $_ => $p->{$_} ) : () } qw( id action summary target diff label url run_url state result sql preview ) };
 }
 
 sub view {
@@ -33213,7 +33227,8 @@ sub op_confirm {
     if ( $p->{action} eq 'save_report' ) {
         # The new report: a link to it on the card and in the log.
         $target = "report:$done";
-        %$p = ( %$p, label => "$T{report_prefix} $p->{args}{name}", url => KohaEasy::Assistant::_fill( $KohaEasy::Assistant::URL{report}, $done ) );
+        %$p = ( %$p, label => "$T{report_prefix} $p->{args}{name}", url => KohaEasy::Assistant::_fill( $KohaEasy::Assistant::URL{report}, $done ),
+            run_url => KohaEasy::Assistant::_fill( $KohaEasy::Assistant::URL{report_run}, $done ) );
     }
     append_log( join( "\t", $stamp, $user // '', $p->{action}, $target, KohaEasy::Assistant::diff_text($p) ) . "\n" );
     return { proposal => public_proposal($p) };
@@ -33455,6 +33470,12 @@ sub widget_js {
             var ra = el("a", "kei-ai-link", p.label); ra.href = p.url;
             var rp = el("p", "kei-ai-note"); rp.appendChild(document.createTextNode(T.report_saved + " ")); rp.appendChild(ra);
             card.appendChild(rp);
+            // Every row, not the 10 of the test: Koha's own page runs it.
+            if (p.run_url) {
+                var run = el("a", "btn btn-sm btn-primary kei-ai-run", T.report_run); run.href = p.run_url;
+                var rb = el("div", "kei-ai-pbuttons"); rb.appendChild(run);
+                card.appendChild(rb);
+            }
         }
         var st = el("p", "kei-ai-pstate");
         card.appendChild(st);
@@ -33715,6 +33736,7 @@ aia_text() {
         report_sql)    t "SQL written by the AI (read it before saving):" ;;
         report_rows)   t "First rows of the test (read-only):" ;;
         report_saved)  t "Saved in Reports:" ;;
+        report_run)    t "Run the full report" ;;
         report_prefix) t "[AI]" ;;
         report_note)   t "Written by the koha.nexus AI assistant and saved by {user} on {date} after review. Request: {question}" ;;
         err_report)    t "Koha did not accept this SQL as a report." ;;

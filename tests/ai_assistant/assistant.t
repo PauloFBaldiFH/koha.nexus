@@ -327,6 +327,28 @@ like( KohaEasy::Assistant::system_prompt( fresh(), 'pt' ), qr/never announce/i, 
     is_deeply( $p->{args}, { name => 'Loans per patron', sql => $sql, group => 'CIRC', question => 'loans per patron' } );
     is( $dbh->selectrow_array('SELECT COUNT(*) FROM saved_sql'), 2, '  nothing saved by the module' );
     ok( KohaEasy::Assistant::same_snapshot( KohaEasy::Assistant::snapshot( $c, $p ), $p->{before} ), '  the same test on Approve' );
+    # Accents in the column names: DBD::mysql gives them as UTF-8 bytes
+    # (as this double does); the card and the log get characters, once.
+    {
+        package Kei::BytesSth;
+        sub execute { 1 }
+        sub finish  { 1 }
+        sub fetchrow_arrayref { my $s = shift; return shift @{ $s->{rows} } }
+        package Kei::BytesDbh;
+        sub prepare {
+            return bless { NAME => [ Encode::encode( 'UTF-8', 'Número do cartão' ), 'Título' ],
+                rows => [ [ 'C0101', 'Lourenço' ], [ 'C0102', "caf\xe9" ] ] }, 'Kei::BytesSth';
+        }
+    }
+    require Encode;
+    my $acc = KohaEasy::Assistant::test_report( { dbh => bless( {}, 'Kei::BytesDbh' ) }, 'SELECT 1' );
+    is_deeply( $acc->{columns}, [ 'Número do cartão', 'Título' ], 'accents: column names from bytes become characters' );
+    is_deeply( $acc->{rows}, [ [ 'C0101', 'Lourenço' ], [ 'C0102', "caf\xe9" ] ], '  values already text stay as they are' );
+    like( JSON::PP->new->utf8->encode($acc), qr/N\xc3\xbamero do cart\xc3\xa3o/, '  JSON encodes them once (no "NÃºmero")' );
+    my $c2 = fresh( can => {%R} );
+    tool( $c2, 'propose_action', { action => 'save_report', name => 'Empréstimos por leitor', sql => 'SELECT b.cardnumber AS `Número do cartão`, b.surname AS `Nome do leitor` FROM borrowers b ORDER BY b.cardnumber', summary => 's' } );
+    is_deeply( $c2->{proposals}[0]{preview}{columns}, [ 'Número do cartão', 'Nome do leitor' ], '  the database: accented aliases as written' );
+    is( $c2->{proposals}[0]{diff}[1]{to}, 'Número do cartão, Nome do leitor', '  and in the card' );
     like( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'save_report', name => 'x', sql => 'SELECT nosuch FROM issues', summary => 's' } ),
         qr/the database refused the SQL: .*nosuch/, 'a broken SELECT: the database error, for the model to fix' );
     like( KohaEasy::Assistant::call_tool( fresh( can => {%ALL} ), 'propose_action', { action => 'save_report', name => 'x', sql => $sql, summary => 's' } ),
