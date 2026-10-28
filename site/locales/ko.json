@@ -126,7 +126,7 @@
     "inst_a4": "공개 목록: <code>http://SERVER-IP:80</code>",
     "inst_a5": "언제든 <code>sudo config.sh</code>로 대시보드 다시 열기",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "PC의 전체 Koha 환경.",
+    "win_h2": "WSL 2를 사용하는 Windows의 완전한 Koha 환경.",
     "win_p": "Windows에서 Koha 실행.",
     "win_d_k": "WINDOWS 설치 프로그램",
     "win_d_t": "명령 하나로 Koha 설치.",

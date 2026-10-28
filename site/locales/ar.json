@@ -126,7 +126,7 @@
     "inst_a4": "الفهرس العام على <code>http://SERVER-IP:80</code>",
     "inst_a5": "أعد فتح اللوحة باستخدام <code>sudo config.sh</code>",
     "win_kick": "ويندوز 10 / 11",
-    "win_h2": "بيئة Koha كاملة على جهاز الكمبيوتر.",
+    "win_h2": "بيئة Koha كاملة على Windows باستخدام WSL 2.",
     "win_p": "تشغيل Koha عبر WSL 2.",
     "win_d_k": "مثبت ويندوز",
     "win_d_t": "ثبّت Koha بأمر واحد.",

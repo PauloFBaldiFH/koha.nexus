@@ -126,7 +126,7 @@
     "inst_a4": "প্রকাশ্য ক্যাটালগ: <code>http://SERVER-IP:80</code>",
     "inst_a5": "আবার ড্যাশবোর্ড খুলুন: <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "PC-তে সম্পূর্ণ Koha পরিবেশ।",
+    "win_h2": "WSL 2 ব্যবহার করে Windows-এ একটি সম্পূর্ণ Koha পরিবেশ।",
     "win_p": "Windows-এ Koha চালান।",
     "win_d_k": "উইন্ডোজ ইনস্টলার",
     "win_d_t": "একটি কমান্ডে Koha ইনস্টল করুন।",

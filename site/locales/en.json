@@ -126,7 +126,7 @@
     "inst_a4": "The public catalog is at <code>http://SERVER-IP:80</code>",
     "inst_a5": "Reopen the dashboard anytime with <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "A full Koha environment on a single PC, using WSL 2.",
+    "win_h2": "A complete Koha environment on Windows with WSL 2.",
     "win_p": "The Windows edition is designed for small libraries, training, and evaluation, keeping Koha services inside Debian on WSL 2 while offering native Windows tools.",
     "win_d_k": "WINDOWS INSTALLER",
     "win_d_t": "Install Koha with one command.",

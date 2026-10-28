@@ -126,7 +126,7 @@
     "inst_a4": "Mục lục công khai tại <code>http://SERVER-IP:80</code>",
     "inst_a5": "Mở lại bảng điều khiển bằng <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Môi trường Koha đầy đủ trên PC.",
+    "win_h2": "Môi trường Koha hoàn chỉnh trên Windows với WSL 2.",
     "win_p": "Chạy Koha trên Windows.",
     "win_d_k": "TRÌNH CÀI ĐẶT WINDOWS",
     "win_d_t": "Cài đặt Koha bằng một lệnh.",

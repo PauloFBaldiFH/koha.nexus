@@ -126,7 +126,7 @@
     "inst_a4": "Veřejný katalog je na <code>http://SERVER-IP:80</code>",
     "inst_a5": "Znovu otevřete přehled příkazem <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "Plné prostředí Koha na PC.",
+    "win_h2": "Kompletní prostředí Koha ve Windows s WSL 2.",
     "win_p": "Udržuje Koha služby v Debianu pod WSL 2, ale nabízí ikony pro Windows.",
     "win_d_k": "WINDOWS INSTALÁTOR",
     "win_d_t": "Instalace jedním příkazem.",

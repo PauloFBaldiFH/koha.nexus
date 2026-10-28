@@ -126,7 +126,7 @@
     "inst_a4": "सार्वजनिक सूची: <code>http://SERVER-IP:80</code>",
     "inst_a5": "डैशबोर्ड फिर खोलें: <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "PC पर पूर्ण Koha वातावरण।",
+    "win_h2": "WSL 2 के साथ Windows पर एक संपूर्ण Koha परिवेश।",
     "win_p": "Windows में Koha चलाएं।",
     "win_d_k": "विंडोज़ इंस्टॉलर",
     "win_d_t": "एक कमांड से Koha स्थापित करें।",

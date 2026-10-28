@@ -126,7 +126,7 @@
     "inst_a4": "Genel katalog: <code>http://SERVER-IP:80</code>",
     "inst_a5": "Paneli yeniden açın: <code>sudo config.sh</code>",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "WSL 2 kullanarak tek bir bilgisayarda Koha.",
+    "win_h2": "WSL 2 ile Windows üzerinde eksiksiz bir Koha ortamı.",
     "win_p": "Küçük kütüphaneler ve eğitim için mükemmel.",
     "win_d_k": "WINDOWS KURULUM",
     "win_d_t": "Koha'yı tek bir komutla kurun.",

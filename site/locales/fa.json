@@ -126,7 +126,7 @@
     "inst_a4": "فهرست عمومی در <code>http://SERVER-IP:80</code> است",
     "inst_a5": "داشبورد را دوباره با <code>sudo config.sh</code> باز کنید",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "محیط کامل Koha در رایانه شخصی.",
+    "win_h2": "یک محیط کامل Koha در Windows با WSL 2.",
     "win_p": "اجرای Koha در ویندوز.",
     "win_d_k": "نصاب ویندوز",
     "win_d_t": "نصب Koha با یک فرمان.",

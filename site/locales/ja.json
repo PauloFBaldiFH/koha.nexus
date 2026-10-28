@@ -126,7 +126,7 @@
     "inst_a4": "公開目録は <code>http://SERVER-IP:80</code>",
     "inst_a5": "いつでも <code>sudo config.sh</code> でダッシュボードを開く",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "PC上の完全なKoha環境。",
+    "win_h2": "WSL 2 を使用した Windows 上の完全な Koha 環境。",
     "win_p": "WindowsでKohaを実行します。",
     "win_d_k": "WINDOWS インストーラー",
     "win_d_t": "コマンド1つでKohaをインストール。",

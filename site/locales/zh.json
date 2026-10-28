@@ -126,7 +126,7 @@
     "inst_a4": "公共目录位于 <code>http://SERVER-IP:80</code>",
     "inst_a5": "随时通过 <code>sudo config.sh</code> 重新打开仪表板",
     "win_kick": "Windows 10 / 11",
-    "win_h2": "PC 上的完整 Koha 环境。",
+    "win_h2": "通过 WSL 2 在 Windows 上运行完整的 Koha 环境。",
     "win_p": "在 Windows 上运行 Koha。",
     "win_d_k": "WINDOWS 安装程序",
     "win_d_t": "一条命令安装 Koha。",
