@@ -322,6 +322,8 @@ like( KohaEasy::Assistant::system_prompt( fresh(), 'pt' ), qr/never announce/i, 
     is( $out->{action}, 'save_report', 'save_report: a proposal' );
     my $p = $c->{proposals}[0];
     is_deeply( $p->{preview}{columns}, [ 'Card', 'Loans' ], '  tested: its columns' );
+    my $unicode = KohaEasy::Assistant::test_report( $c, "SELECT 'João' AS `Número do cartão`, 1 AS `Título`" );
+    is_deeply( $unicode->{columns}, [ 'Número do cartão', 'Título' ], 'already decoded column names are not decoded twice' );
     is_deeply( $p->{preview}{rows}[0], [ 'C0101', '4' ], '  and its first rows (for the card)' );
     unlike( KohaEasy::Assistant::call_tool( fresh( can => {%R} ), 'propose_action', { action => 'save_report', name => 'x', sql => $sql, summary => 's' } ), qr/C0101/, '  the rows never go to the model' );
     is_deeply( $p->{args}, { name => 'Loans per patron', sql => $sql, group => 'CIRC', question => 'loans per patron' } );

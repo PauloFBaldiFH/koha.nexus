@@ -31443,6 +31443,7 @@ use strict;
 use warnings;
 use utf8;
 use DBI;
+use Encode qw( decode FB_CROAK LEAVE_SRC );
 use HTTP::Tiny;
 use JSON::PP;
 
@@ -31642,7 +31643,7 @@ sub connect_ro {
     close $fh;
     die "NOT_SET_UP\n" unless $c{dsn};
     my $mysql = $c{dsn} =~ /^dbi:mysql:/i;
-    my $dbh = DBI->connect( $c{dsn}, $c{user}, $c{password}, { RaiseError => 1, PrintError => 0, AutoCommit => 1, $mysql ? ( mysql_enable_utf8 => 1 ) : () } )
+    my $dbh = DBI->connect( $c{dsn}, $c{user}, $c{password}, { RaiseError => 1, PrintError => 0, AutoCommit => 1, $mysql ? ( mysql_enable_utf8mb4 => 1 ) : () } )
         or die "the read-only database account could not log in\n";
     if ($mysql) {
         $dbh->do('SET NAMES utf8mb4');
@@ -32214,7 +32215,10 @@ sub test_report {
     my $ok = eval {
         my $sth = $ctx->{dbh}->prepare( $run, { mysql_use_result => 1 } );
         $sth->execute;
-        $names = [ @{ $sth->{NAME} || [] } ];
+        # DBD::mysql can return UTF-8 bytes for column metadata even
+        # when row values are decoded. JSON needs characters here too.
+        $names = [ map { utf8::is_utf8($_) ? $_ : decode( 'UTF-8', $_, FB_CROAK | LEAVE_SRC ) }
+                   @{ $sth->{NAME} || [] } ];
         while ( @rows < $REPORT_SAMPLE_ROWS && ( my $r = $sth->fetchrow_arrayref ) ) {
             push @rows, [ map { defined $_ ? substr( "$_", 0, 200 ) : '' } @$r ];
         }
