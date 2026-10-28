@@ -383,3 +383,10 @@ CREATE USER 'kei_ai_ro_library'@'127.0.0.1' IDENTIFIED BY '$pass';" ]
     run env KEI_EXTRA="$W/prov.sh" bash "$PANEL" aia_ro_provision "$W/log"
     [ "$status" -eq 3 ]
 }
+
+@test "ai assistant: MySQL report aliases and values preserve Unicode" {
+    run env KEI_AIA_LIB="$W/lib" KEI_AIA_MYSQL_DSN="dbi:mysql:database=mysql" \
+        perl "$KEI_REPO/tests/ai_assistant/report-unicode.t"
+    echo "$output"
+    [ "$status" -eq 0 ]
+}
