@@ -43,6 +43,15 @@ Check 'no Koha status window' (-not (Test-Path (Join-Path $repo 'windows\KohaEas
 $tray = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
 Check 'tray: Open Debian terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
 
+# One window (Paulo, 2026-10-28): the install never opens a Windows Terminal
+# or second PowerShell window to continue; the panel runs in the install's
+# own console and the Windows part follows there after Exit.
+$installText = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\install.ps1')
+$installMod = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Install.psm1')
+Check 'one window: install.ps1 starts no wt.exe' ($installText -notmatch 'wt\.exe' -and $installText -match 'Install'' -f \(Join-Path \$bin ''KohaEasy\.ps1''\)' -and $installText -match '-NoNewWindow -Wait -PassThru') ''
+Check 'one window: the panel runs in this console' ($installMod -notmatch 'Launch -Hidden' -and $installMod -match "Start-Process -FilePath 'wsl\.exe' -ArgumentList \`$a -NoNewWindow -Wait") ''
+Check 'one window: elevated steps stay here when already administrator' ($installMod -match '(?s)function Start-KohaElevated.*?if \(Test-KohaAdmin\).*?-NoNewWindow -Wait') ''
+
 # install.ps1 Step 0 (Paulo, 2026-10-16): only its functions are loaded,
 # so nothing is installed and shutdown.exe is never called here.
 $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'windows\install.ps1'), [ref]$null, [ref]$null)

@@ -94,16 +94,24 @@ function Test-KohaWslReady {
     return ($r.ExitCode -eq 0)
 }
 
-# One UAC prompt: "wsl --install --no-distribution" enables the Windows
-# features and installs WSL from the Store package; then "wsl --update".
+# "wsl --install --no-distribution" enables the Windows features and
+# installs WSL from the Store package; then "wsl --update".
 function Install-KohaWslPlatform {
     Start-KohaElevated -FilePath 'wsl.exe' -Arguments '--install --no-distribution' | Out-Null
     Start-KohaElevated -FilePath 'wsl.exe' -Arguments '--update' | Out-Null
 }
 
+# The installer runs as administrator, so these steps run in its own window:
+# their output appears where the librarian is watching and no other window
+# opens. Only without administrator rights does Windows ask for permission
+# (UAC), and then Windows itself runs the step in a window of its own.
 function Start-KohaElevated {
     param([string]$FilePath, [string]$Arguments)
-    $p = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Verb RunAs -Wait -PassThru
+    if (Test-KohaAdmin) {
+        $p = Start-Process -FilePath $FilePath -ArgumentList $Arguments -NoNewWindow -Wait -PassThru
+    } else {
+        $p = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Verb RunAs -Wait -PassThru
+    }
     return $p.ExitCode
 }
 
@@ -684,17 +692,20 @@ function Show-KohaStartProblem {
 }
 
 # The panel runs in this window: the librarian picks the language and
-# "1 - Install Koha server", then leaves the panel with Exit. Start-Process
-# -NoNewWindow hands it the console itself; "& wsl.exe" here would send its
-# screens into Install-Koha's return value, and the panel could not draw.
+# "1 - Install Koha server", then leaves the panel with Exit, and the
+# install goes on here with the Windows part. No second window is opened.
+# Start-Process -NoNewWindow hands the panel the console itself; "& wsl.exe"
+# here would send its screens into Install-Koha's return value, and the
+# panel could not draw.
 # koha-window runs it, so a process the panel left holding the terminal
 # cannot keep wsl.exe (and this installer) waiting after Exit.
-# The console is switched to UTF-8, and the panel is told whether this is
-# Windows Terminal (emoji) or the classic console (plain symbols), through
-# WSLENV, the list of variables WSL passes into Linux.
-# MSIX v17: all panel dependencies are prepared and verified in the FIRST
-# (setup) terminal. Only then is the definitive terminal started at the
-# language selection screen. Never install the Koha server in this stage.
+# The console is switched to UTF-8, and the panel is told, through WSLENV
+# (the list of variables WSL passes into Linux), whether this is Windows
+# Terminal (emoji) or the classic console (plain symbols), and whether this
+# window runs as administrator (Windows then refuses files dragged from
+# Explorer, and the panel says to paste the path instead).
+# The panel's own Debian packages are installed first, so the panel opens
+# straight on the language choice.
 function Initialize-KohaPanelDependencies {
     $dependencyScript = @(
         'set -eu'
@@ -720,49 +731,30 @@ function Initialize-KohaPanelDependencies {
         Write-KohaLog ('Panel dependency preparation failed (exit {0}): {1}' -f $result.ExitCode, ([string]$result.Output).Trim()) 'install'
         throw ('Falha ao preparar as dependencias do painel no Debian. Saida: ' + ([string]$result.Output).Trim())
     }
-    Write-KohaStep 'Dependencias do painel prontas. Abrindo a selecao de idioma no segundo terminal...' 'ok'
+    Write-KohaStep 'Dependencias do painel prontas. Abrindo a selecao de idioma nesta janela...' 'ok'
     return $true
 }
 
 function Invoke-KohaPanel {
-    # Download and verify dependencies while this FIRST terminal is active.
-    # The second terminal must start with the language selection, not with APT.
     if (-not (Initialize-KohaPanelDependencies)) {
         throw 'As dependencias do painel ainda nao estao prontas.'
     }
-    $launcher = Join-Path (Get-KohaPath Bin) 'koha.nexus.exe'
-    if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
-        throw ('Koha launcher not found: ' + $launcher)
-    }
-    $previous = $env:KOHA_MSIX_PANEL_SETUP
-    try {
-        # Keep the proven v16 handoff. This opens a separate terminal with
-        # the Linux panel and avoids starting a non-installed Koha service.
-        $env:KOHA_MSIX_PANEL_SETUP = '1'
-        $process = Start-Process -FilePath $launcher -ArgumentList 'Launch -Hidden' -WorkingDirectory (Get-KohaPath Bin) -PassThru -ErrorAction Stop
-        if ($null -eq $process) { throw 'The definitive Koha launcher did not start.' }
-    }
-    finally {
-        if ($null -eq $previous) {
-            Remove-Item Env:KOHA_MSIX_PANEL_SETUP -ErrorAction SilentlyContinue
-        } else {
-            $env:KOHA_MSIX_PANEL_SETUP = $previous
-        }
-    }
-    return 0
-}function Invoke-KohaPanel_Old {
     $a = '-d {0} -u root --cd {1} -- {2} bash ./installer' -f (Get-KohaConfig).Distro, $script:DistroDir, (Get-KohaConfig).WindowPath
-    $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS }
+    $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS; KEI_WIN_ELEVATED = $env:KEI_WIN_ELEVATED }
     $enc = $null
     try { $enc = [Console]::OutputEncoding; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
     try {
         $env:KEI_PLAIN_GLYPHS = Get-KohaGlyphMode
+        $env:KEI_WIN_ELEVATED = $(if (Test-KohaAdmin) { '1' } else { '0' })
         $env:WSLENV = Add-KohaWslEnv -Current $env:WSLENV -Name 'KEI_PLAIN_GLYPHS'
+        $env:WSLENV = Add-KohaWslEnv -Current $env:WSLENV -Name 'KEI_WIN_ELEVATED'
         $p = Start-Process -FilePath 'wsl.exe' -ArgumentList $a -NoNewWindow -Wait -PassThru
+        Write-KohaLog ('Control panel exited with code {0}' -f $p.ExitCode) 'install'
         return [int]$p.ExitCode
     } finally {
         $env:WSLENV = $saved.WSLENV
         $env:KEI_PLAIN_GLYPHS = $saved.KEI_PLAIN_GLYPHS
+        $env:KEI_WIN_ELEVATED = $saved.KEI_WIN_ELEVATED
         if ($null -ne $enc) { try { [Console]::OutputEncoding = $enc } catch { } }
     }
 }
@@ -962,9 +954,13 @@ function Install-Koha {
             Write-KohaStep (T 'The Koha control panel opens now. Choose your language, then 1 - Install Koha server. When it finishes, leave the panel with Exit.')
             # Read-Host (T 'Press Enter to continue') | Out-Null
             Invoke-KohaPanel | Out-Null
-            # MSIX: panel runs independently. The first terminal only prepares Windows/WSL/Debian.
-            # The panel wrapper runs the deferred Windows integration phase after the user exits.
-            return 0
+            # Back from the panel, in the same window: the Windows part
+            # follows when Koha was installed; when the panel was left
+            # early, what is missing is shown and the same command continues.
+            if (-not (Test-KohaInstalledInDistro)) {
+                Show-KohaInstalledCheck
+                return 1
+            }
         }
         Write-KohaStep (T 'Koha is installed.') 'ok'
         Set-KohaState @{ phase = 'windows' } | Out-Null; $phase = 'windows'

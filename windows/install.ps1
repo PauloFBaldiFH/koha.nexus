@@ -12,7 +12,8 @@
 # C:\Koha\bin (downloaded from GitHub with the
 # SHA-256 of the installer checked), then runs "KohaEasy.ps1 Install" in
 # Windows PowerShell 5.1: checks, the Debian user, WSL 2, Debian, systemd,
-# Koha, shortcuts, the library network. Uninstall-Koha.cmd, in C:\Koha,
+# Koha, shortcuts, the library network. All of it runs in the PowerShell
+# window the command was typed in. Uninstall-Koha.cmd, in C:\Koha,
 # removes it all again.
 # Running it again continues where it stopped. An install made before the
 # folder was renamed stays in C:\KohaEasy and is updated there.
@@ -330,25 +331,11 @@ function Install-KohaEasyBootstrap {
     $env:KOHAEASY_ROOT = $root
     $arg = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install' -f (Join-Path $bin 'KohaEasy.ps1')
 
-    # The classic console has no emoji font. When Windows Terminal is
-    # installed, the install continues in a Windows Terminal window, which
-    # shows the emoji and accents; this window can then be closed. Without
-    # Windows Terminal it stays here, with plain symbols.
-    $wt = $null
-    if (-not $env:WT_SESSION -and $env:KOHAEASY_NO_WT -ne '1') {
-        $wt = Get-Command 'wt.exe' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-    }
-    # A Windows Terminal that is already open would not see KOHAEASY_ROOT;
-    # KohaEasy.ps1 finds the folder from its own place (<root>\bin).
-    if ($wt) {
-        try {
-            Start-Process -FilePath $wt.Source -ArgumentList ('-w new --title Koha "{0}" {1} -Pause' -f $ps, $arg) | Out-Null
-            Write-Host '[>] The installation continues in the new Windows Terminal window.' -ForegroundColor Cyan
-            return -1
-        } catch {
-            Write-Host '[!] Windows Terminal did not open; the installation continues here.' -ForegroundColor Yellow
-        }
-    }
+    # The whole install stays in this window, from the first line to the
+    # end: no Windows Terminal or other window is opened to continue it.
+    # Outside Windows Terminal the classic console has no emoji font, so the
+    # panel shows plain symbols there (KEI_PLAIN_GLYPHS). KOHAEASY_NO_WT is
+    # no longer needed for this and is left unread.
     $p = Start-Process -FilePath $ps -ArgumentList $arg -NoNewWindow -Wait -PassThru
     return [int]$p.ExitCode
 }
@@ -365,8 +352,7 @@ if (-not $kohaVirtOk) {
 } else {
     try {
         $code = Install-KohaEasyBootstrap
-        if ($code -eq -1) { }
-        elseif ($code -eq 3) { Write-Host 'Restart Windows now. The installation continues after you sign in again.' -ForegroundColor Yellow }
+        if ($code -eq 3) { Write-Host 'Restart Windows now. The installation continues after you sign in again.' -ForegroundColor Yellow }
         elseif ($code -ne 0) { Write-Host ('The installation stopped (code {0}). Run the same command again to continue. Log: {1}\logs' -f $code, $env:KOHAEASY_ROOT) -ForegroundColor Red }
         # Run as a file (the MSIX bootstrap does), the exit code says what
         # happened: 3 = restart Windows, other codes = stopped. Under
