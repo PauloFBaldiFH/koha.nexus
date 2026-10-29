@@ -34,7 +34,7 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 250
+    assert len(targets) == 349
     # The koha.nexus servers (shared catalogue, Rede Pergamum, the local-first catalogues), the direct Z39.50 servers by region, the authority files, then the
     # koha.nexus SRU gateway's four groups as the fallback.
     assert list(z.REGIONS) == ["koha_nexus", "brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
@@ -42,7 +42,7 @@ def test_curated_list_loads_and_covers_every_region():
                                "sru_specialized"]
     firsts = {t.region: t.db for t in reversed(targets)}
     assert firsts == {"koha_nexus": "sru", "brazil": "biblioteca", "north_america": "LCDB", "europe": "libr", "latin_america": "56PUC_INST",
-                      "asia_oceania": "INNOPAC", "authorities": "NAF", "sru_national": "sru/_union",
+                      "asia_oceania": "INNOPAC", "other": "innopac", "authorities": "NAF", "sru_national": "sru/_union",
                       "sru_br_universities": "sru/usp", "sru_intl_universities": "sru/harvard",
                       "sru_specialized": "sru/nlm"}
     assert [t.region for t in targets] == sorted((t.region for t in targets), key=list(z.REGIONS).index)
@@ -50,7 +50,7 @@ def test_curated_list_loads_and_covers_every_region():
     assert len(keys) == len(set(keys))
     # The primary targets are Z39.50, straight to the library.
     direct = [t for t in targets if t.source == z.DIRECT_SOURCE]
-    assert len(direct) == 171 and {t.kind for t in direct} == {"zed"}
+    assert len(direct) == 270 and {t.kind for t in direct} == {"zed"}
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
     # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
@@ -92,7 +92,7 @@ def test_sync_leaves_out_direct_authority_files_koha_lacks():
     gnd = next(t for t in targets if t.db == "gnd")
     sent = z.sync_targets(targets, set())
     assert gnd not in sent and next(t for t in targets if t.db == "NAF") in sent
-    assert len(sent) == len(targets) - 16
+    assert len(sent) == len(targets) - 17
     assert gnd in z.sync_targets(targets, {gnd.key})
 
 
@@ -718,10 +718,13 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
 def test_curated_list_has_no_raw_address():
     # The VPS gateway's addresses (public and private IPs) never come back: the
     # gateway rows go through the Cloudflare tunnel (sru.koha.nexus:443).
-    # The one raw address is the RNP server in Rio, which has no host name.
+    # The raw addresses are servers with no host name: the RNP server in Rio,
+    # and from the 2026-10-27 scan Adams State, Bashkir State University and
+    # the Biblioteca Nacional Argentina (catalogue and authorities).
     hosts = {t.host for t in z.load_curated()}
     assert {"sru.koha.nexus", "lx2.loc.gov"} <= hosts
-    assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"200.19.73.127"}
+    assert {h for h in hosts if re.fullmatch(r"[\d.]+", h)} == {"200.19.73.127", "192.245.61.175", "62.76.8.149",
+                                                                 "200.123.191.9"}
 
 
 def test_backups_shown_only_when_their_main_server_returns_no_record(tmp_path):
