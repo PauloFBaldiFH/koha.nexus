@@ -699,7 +699,7 @@ function Show-KohaStartProblem {
 # panel could not draw.
 # koha-window runs it, so a process the panel left holding the terminal
 # cannot keep wsl.exe (and this installer) waiting after Exit.
-# The console is switched to UTF-8, and the panel is told, through WSLENV
+# The console is switched to UTF-8 and to a TrueType font, and the panel is told, through WSLENV
 # (the list of variables WSL passes into Linux), whether this is Windows
 # Terminal (emoji) or the classic console (plain symbols), and whether this
 # window runs as administrator (Windows then refuses files dragged from
@@ -743,6 +743,8 @@ function Invoke-KohaPanel {
     $saved = @{ WSLENV = $env:WSLENV; KEI_PLAIN_GLYPHS = $env:KEI_PLAIN_GLYPHS; KEI_WIN_ELEVATED = $env:KEI_WIN_ELEVATED }
     $enc = $null
     try { $enc = [Console]::OutputEncoding; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
+    # A raster font turns the language names into "?": TrueType font first.
+    if (Set-KohaConsoleFont) { Write-KohaLog 'Console switched to a TrueType font for the panel' 'install' }
     try {
         $env:KEI_PLAIN_GLYPHS = Get-KohaGlyphMode
         $env:KEI_WIN_ELEVATED = $(if (Test-KohaAdmin) { '1' } else { '0' })

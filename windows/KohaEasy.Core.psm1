@@ -182,6 +182,57 @@ function Set-KohaUtf8Console {
     $global:OutputEncoding = $utf8
 }
 
+# The classic console (not Windows Terminal) often starts with "Raster
+# Fonts", a bitmap font with only the old OEM characters: even in UTF-8,
+# Russian, Arabic, Vietnamese and the panel's borders then show as "?".
+# This switches the window the install runs in to a TrueType font (Consolas,
+# else Lucida Console), so the panel's language list is readable without a
+# second window. A TrueType font already chosen is left as it is.
+function Set-KohaConsoleFont {
+    if ($env:WT_SESSION) { return $false }
+    try {
+        if (-not ('KohaConsoleFont' -as [type])) {
+            Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class KohaConsoleFont {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct FontInfoEx {
+        public uint cbSize; public uint nFont; public short X; public short Y;
+        public int FontFamily; public int FontWeight;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string FaceName;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr GetStdHandle(int h);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool GetCurrentConsoleFontEx(IntPtr h, bool max, ref FontInfoEx f);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool SetCurrentConsoleFontEx(IntPtr h, bool max, ref FontInfoEx f);
+    // "" = no console or not a raster font; else the face name now in use.
+    public static string UseTrueType(string face) {
+        IntPtr h = GetStdHandle(-11);
+        FontInfoEx f = new FontInfoEx(); f.cbSize = (uint)Marshal.SizeOf(f);
+        if (!GetCurrentConsoleFontEx(h, false, ref f)) return "";
+        if ((f.FontFamily & 4) != 0) return "";
+        short y = f.Y < 16 ? (short)16 : f.Y;
+        FontInfoEx n = new FontInfoEx(); n.cbSize = (uint)Marshal.SizeOf(n);
+        n.X = 0; n.Y = y; n.FontFamily = 54; n.FontWeight = 400; n.FaceName = face;
+        if (!SetCurrentConsoleFontEx(h, false, ref n)) return "";
+        FontInfoEx c = new FontInfoEx(); c.cbSize = (uint)Marshal.SizeOf(c);
+        if (!GetCurrentConsoleFontEx(h, false, ref c)) return "";
+        return c.FaceName;
+    }
+}
+'@
+        }
+        foreach ($face in @('Consolas', 'Lucida Console')) {
+            $now = [KohaConsoleFont]::UseTrueType($face)
+            if (-not $now) { return $false }
+            if ($now -eq $face) { return $true }
+        }
+    } catch { }
+    return $false
+}
+
 # Windows Terminal (wt.exe), when installed. It draws emoji; the classic
 # console has no emoji font and shows them as boxes. KOHAEASY_NO_WT=1 keeps
 # everything in the classic console.

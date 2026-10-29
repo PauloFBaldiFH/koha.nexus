@@ -19,10 +19,24 @@ from textual.screen import Screen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from ..env import TRANSLATION_CONFIG, normalize_panel_language
+from ..env import TRANSLATION_CONFIG, normalize_panel_language, plain_glyphs_wanted
 
 RESTART_CODE = 3
 DEFAULT = "pt-BR"
+
+# English names for the entries the classic Windows console may not draw
+# (its fonts have no Arabic, Chinese, Japanese or Korean): with plain glyphs
+# the English name comes first, so the line is readable whatever the font.
+ENGLISH_NAMES = {
+    "ru-RU": "Russian",
+    "uk-UA": "Ukrainian",
+    "ar-Arab": "Arabic",
+    "fa-Arab": "Persian",
+    "vi-VN": "Vietnamese",
+    "zh-Hans-CN": "Chinese (Simplified)",
+    "ja-Jpan-JP": "Japanese",
+    "ko-Kore-KP": "Korean",
+}
 
 
 def language_items(installer: Path | None) -> list[tuple[str, str]]:
@@ -34,6 +48,13 @@ def language_items(installer: Path | None) -> list[tuple[str, str]]:
     m = re.search(r"^PANEL_LANG_ITEMS=\($(.*?)^\)", text, re.S | re.M)
     items = re.findall(r'"([^"]+)"\s+"([^"]+)"', m.group(1)) if m else []
     return items or [("en-GB", "English"), ("pt-BR", "Português (Brasil)")]
+
+
+def option_label(code: str, name: str, plain: bool = False) -> str:
+    """One line of the list: the name in its own language, with the English
+    name in front when plain glyphs are wanted (classic console)."""
+    english = ENGLISH_NAMES.get(code) if plain else None
+    return f"{english} - {name}   ({code})" if english else f"{name}   ({code})"
 
 
 def write_language(code: str, path: Path = TRANSLATION_CONFIG) -> None:
@@ -60,7 +81,8 @@ class LanguageScreen(Screen):
         with Vertical(id="language-box"):
             yield Label("koha.nexus", id="language-title")
             yield Label("Select your language / Selecione o idioma:", classes="view-prompt")
-            yield OptionList(*[Option(f"{name}   ({code})", id=code) for code, name in self.items],
+            plain = plain_glyphs_wanted()
+            yield OptionList(*[Option(option_label(code, name, plain), id=code) for code, name in self.items],
                              id="language-list")
 
     def on_mount(self) -> None:
