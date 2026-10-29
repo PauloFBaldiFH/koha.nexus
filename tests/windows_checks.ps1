@@ -52,6 +52,14 @@ Check 'one window: install.ps1 starts no wt.exe' ($installText -notmatch 'wt\.ex
 Check 'one window: the panel runs in this console' ($installMod -notmatch 'Launch -Hidden' -and $installMod -match "Start-Process -FilePath 'wsl\.exe' -ArgumentList \`$a -NoNewWindow -Wait") ''
 Check 'one window: elevated steps stay here when already administrator' ($installMod -match '(?s)function Start-KohaElevated.*?if \(Test-KohaAdmin\).*?-NoNewWindow -Wait') ''
 
+# Readable language list (Paulo, 2026-10-29): UTF-8 before anything is
+# printed, and the classic console leaves "Raster Fonts" for a TrueType font
+# before the panel draws, in the same window.
+Check 'utf-8: install.ps1 sets chcp 65001 and OutputEncoding' ($installText -match 'chcp\.com" 65001' -and $installText -match '\[Console\]::OutputEncoding = \$kohaUtf8') ''
+Check 'font: the panel gets a TrueType font' ($installMod -match "(?s)function Invoke-KohaPanel.*?OutputEncoding = New-Object System\.Text\.UTF8Encoding.*?Set-KohaConsoleFont.*?Start-Process -FilePath 'wsl\.exe'") ''
+$core = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Core.psm1')
+Check 'font: Consolas, else Lucida Console, never in Windows Terminal' ($core -match "(?s)function Set-KohaConsoleFont.*?WT_SESSION.*?SetCurrentConsoleFontEx.*?'Consolas', 'Lucida Console'") ''
+
 # install.ps1 Step 0 (Paulo, 2026-10-16): only its functions are loaded,
 # so nothing is installed and shutdown.exe is never called here.
 $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'windows\install.ps1'), [ref]$null, [ref]$null)

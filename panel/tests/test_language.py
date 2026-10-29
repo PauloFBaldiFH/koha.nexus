@@ -3,7 +3,8 @@ import asyncio
 from conftest import INSTALLER
 
 from kei_panel.env import read_lang_conf
-from kei_panel.screens.language import RESTART_CODE, LanguageScreen, language_items, write_language
+from kei_panel.screens.language import (ENGLISH_NAMES, RESTART_CODE, LanguageScreen, language_items,
+                                       option_label, write_language)
 
 
 def test_items_come_from_the_installer():
@@ -38,3 +39,11 @@ def test_choosing_exits_for_a_restart(tmp_path):
 
     assert asyncio.run(main()) == RESTART_CODE
     assert read_lang_conf("KOHA_PANEL_LANG_FULL", conf) == "es-ES"
+
+
+def test_classic_console_gets_english_names_first():
+    items = dict(language_items(INSTALLER))
+    assert set(ENGLISH_NAMES) <= set(items)
+    assert option_label("ru-RU", items["ru-RU"], plain=True) == "Russian - Русский   (ru-RU)"
+    assert option_label("ru-RU", items["ru-RU"]) == "Русский   (ru-RU)"
+    assert option_label("pt-BR", items["pt-BR"], plain=True) == "Português (Brasil)   (pt-BR)"
