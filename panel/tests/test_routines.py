@@ -11,6 +11,7 @@ from conftest import INSTALLER
 from kei_panel.app import KohaPanelApp
 from kei_panel.bridge import TaskOutcome
 from kei_panel.env import PanelEnv
+from kei_panel.screens.diagnostics import DiagnosticsScreen
 from kei_panel.screens.dialogs import (ChoiceScreen, ConfirmScreen, CredentialsScreen, InputScreen,
                                       MessageScreen, TextScreen)
 from kei_panel.screens.files import PathPickerScreen
@@ -474,9 +475,19 @@ def test_dashboard_export_diagnostics_gives_the_folder():
         app = _app()
         async with app.run_test(size=(140, 45)) as pilot:
             app.run_native("export-diagnostics")
-            return await _wait_for(pilot, MessageScreen)
+            return await _wait_for(pilot, DiagnosticsScreen)
     done = asyncio.run(main())
-    assert done._command.startswith("/var/log/koha-easy-install/diagnostics/koha-diagnostics-")
+    # The export opens in the panel: its summary, then each file.
+    assert done._folder.name.startswith("koha-diagnostics-")
+
+
+def test_dashboard_opens_saved_diagnostics():
+    async def main():
+        app = _app()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.run_native("open-diagnostics")
+            return await _wait_for(pilot, DiagnosticsScreen)
+    assert asyncio.run(main())._folder.is_dir()
 
 
 @pytest.mark.skipif(os.geteuid() != 0, reason="the installer runs as root")

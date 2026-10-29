@@ -550,6 +550,29 @@ def _demo_tmp() -> str:
     return str(folder)
 
 
+def demo_diagnostics() -> "Path":
+    """The demo's diagnostics folder (like KEI_DIAG_DIR), with one export."""
+    import json
+    from pathlib import Path
+    base = Path(_demo_tmp()) / "diagnostics"
+    out = base / "koha-diagnostics-koha-20261004-0130"
+    if not out.exists():
+        (out / "logs").mkdir(parents=True)
+        from .bridge import _DEMO_STATUS
+        (out / "status.json").write_text(json.dumps(_DEMO_STATUS | {"generated_at": 1791077400}))
+        (out / "README.txt").write_text("Koha diagnostics for support.\nstatus.json   services, web pages, "
+                                        "last backup, disk and memory\n")
+        (out / "system.txt").write_text("koha.nexus 1.4.0  |  2026-10-04 01:30:00 -0300\n$ uptime\n"
+                                        " 01:30:00 up 3 days,  2:11,  load average: 0.42, 0.40, 0.38\n")
+        (out / "services.txt").write_text("$ systemctl status apache2 --no-pager -n 30\n"
+                                          "● apache2.service - The Apache HTTP Server\n     Active: active (running)\n")
+        (out / "logs" / "apache2_error.log").write_text(
+            "[Sat Oct 04 01:10:02.123456 2026] [cgi:error] [pid 812] AH01215: DBI connect failed\n"
+            "[Sat Oct 04 01:12:40.000000 2026] [mpm_prefork:notice] [pid 1] resuming normal operations\n")
+        (out / "logs" / "koha_library_plack-error.log").write_text("[2026/10/04 01:20:00] [WARN] slow search\n")
+    return base
+
+
 def _demo_fields(folder) -> None:
     """The Magic Import's field mapping in the demo: a fields.json like the
     engine's, and the engine's fieldmap module (from the installer next to
