@@ -450,7 +450,7 @@ def test_panel_list_is_generated_from_targets_json():
     # library's own server is its gateway row's backup.
     direct = [t for t in rows if t["source"] == koha_sql.DIRECT_SOURCE]
     direct_biblio = [t for t in direct if t.get("recordtype") != "authority"]
-    assert rows[:len(direct_biblio)] == direct_biblio and len(direct) - len(direct_biblio) == 16
+    assert rows[:len(direct_biblio)] == direct_biblio and len(direct) - len(direct_biblio) == 17
     assert {t["kind"] for t in direct} == {"zed"}
     backups = {t["host"]: t["backup_for"] for t in direct if t["priority"] == "fallback"}
     assert backups == {"z3950.unifesp.br": ["sru.koha.nexus:443/sru/unifesp"],

@@ -410,7 +410,7 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             assert "z3950-sync" in tasks
             lines = seen["text"].splitlines()
             # The direct authority files Koha lacks are left out: only Add puts them in Koha.
-            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 16
+            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 17
             assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
                        for line in lines)
             assert "Servers added: 3 · updated: 5" in notes
