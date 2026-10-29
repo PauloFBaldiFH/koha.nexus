@@ -245,7 +245,7 @@ function Set-KohaConsoleDefaults {
         $key = Join-Path $Root $name
         try {
             if (-not (Test-Path -LiteralPath $key)) { New-Item -Path $key -Force | Out-Null }
-            $face = [string](Get-ItemProperty -LiteralPath $key -Name FaceName -ErrorAction SilentlyContinue).FaceName
+            $face = [string](Get-Item -LiteralPath $key).GetValue('FaceName', '')
             if ($face -and $face -ne 'Terminal') { continue }
             Set-ItemProperty -LiteralPath $key -Name FaceName -Value 'Consolas' -Type String
             Set-ItemProperty -LiteralPath $key -Name FontFamily -Value 54 -Type DWord
