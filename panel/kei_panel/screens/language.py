@@ -50,10 +50,18 @@ def language_items(installer: Path | None) -> list[tuple[str, str]]:
     return items or [("en-GB", "English"), ("pt-BR", "Português (Brasil)")]
 
 
+# Right-to-left scripts: the classic console draws their letters one by
+# one, left to right and unjoined, whatever the font, so there only the
+# English name is shown.
+RTL_CODES = {"ar-Arab", "fa-Arab"}
+
+
 def option_label(code: str, name: str, plain: bool = False) -> str:
     """One line of the list: the name in its own language, with the English
     name in front when plain glyphs are wanted (classic console)."""
     english = ENGLISH_NAMES.get(code) if plain else None
+    if english and code in RTL_CODES:
+        return f"{english}   ({code})"
     return f"{english} - {name}   ({code})" if english else f"{name}   ({code})"
 
 

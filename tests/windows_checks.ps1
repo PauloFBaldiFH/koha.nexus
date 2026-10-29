@@ -43,14 +43,23 @@ Check 'no Koha status window' (-not (Test-Path (Join-Path $repo 'windows\KohaEas
 $tray = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
 Check 'tray: Open Debian terminal, no status window' ($tray -match "Invoke-KohaCommand 'Terminal'" -and $tray -notmatch "Invoke-KohaCommand 'Window'")
 
-# One window (Paulo, 2026-10-28): the install never opens a Windows Terminal
-# or second PowerShell window to continue; the panel runs in the install's
-# own console and the Windows part follows there after Exit.
+# One console for the panel (Paulo, 2026-10-28): no Windows Terminal hop,
+# the panel and the Windows part after Exit share one console. Since
+# 2026-10-29 that console is the new window opened at the language choice
+# (the "reopen" checks below).
 $installText = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\install.ps1')
 $installMod = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Install.psm1')
 Check 'one window: install.ps1 starts no wt.exe' ($installText -notmatch 'wt\.exe' -and $installText -match 'Install'' -f \(Join-Path \$bin ''KohaEasy\.ps1''\)' -and $installText -match '-NoNewWindow -Wait -PassThru') ''
 Check 'one window: the panel runs in this console' ($installMod -notmatch 'Launch -Hidden' -and $installMod -match "Start-Process -FilePath 'wsl\.exe' -ArgumentList \`$a -NoNewWindow -Wait") ''
 Check 'one window: elevated steps stay here when already administrator' ($installMod -match '(?s)function Start-KohaElevated.*?if \(Test-KohaAdmin\).*?-NoNewWindow -Wait') ''
+
+# New window at the language choice (Paulo, 2026-10-29, after 1.5.121):
+# the install closes its window and goes on in a new one opened straight on
+# the panel; that one does not open another, and install.ps1 closes the
+# first window on code 75 instead of reporting a stop.
+Check 'reopen: the panel opens in a new window, once' ($installMod -match "(?s)if \(\`$env:KOHA_PANEL_WINDOW -ne '1'\) \{\s+if \(Start-KohaPanelWindow\) \{ return \`$script:ReopenedCode \}.*?Invoke-KohaPanel \| Out-Null" -and $installMod -match "(?s)function Start-KohaPanelWindow.*?Install -Pause.*?KOHA_PANEL_WINDOW = '1'.*?Start-Process -FilePath \`$ps") ''
+Check 'reopen: install.ps1 closes the first window on 75' ($installText -match 'if \(\$code -eq 75\) \{ exit 0 \}') ''
+Check 'reopen: no pause before the first window closes' ((Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.ps1')) -match '\$Pause -and -not \$Quiet -and \$code -ne 75') ''
 
 # Readable language list (Paulo, 2026-10-29): UTF-8 before anything is
 # printed, and the classic console leaves "Raster Fonts" for a TrueType font
