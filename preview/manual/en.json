@@ -151,6 +151,25 @@
     "repair-services"
    ]
   },
+  "dash-health": {
+   "title": "Server health",
+   "summary": "What the server has left and what needs a look: CPU, memory, database and backup sizes, recent errors, the Internet services koha.nexus relies on, the Z39.50 servers and new versions.",
+   "overview": [
+    "**CPU** and **Memory** show how much is in use now; **Database** is the size of Koha's database and **Backup folder** the size of the backups kept on this server, in red when the disk could not hold two more backups.",
+    "**Errors (last 24 h)** counts the errors Apache and Koha wrote to their logs in the last day and shows the newest one.",
+    "**Cloudflare Tunnel** opens the catalogue's public address; **SRU gateway (sru.koha.nexus)** checks the koha.nexus service that cataloguing searches go through; **Z39.50 servers** shows how many servers worked in the last test of the list.",
+    "**Updates** compares the panel with the newest version on GitHub and Koha with the newest version the system's package list knows."
+   ],
+   "tips": [
+    "A backup over 24 hours old turns the **Last backup** card amber: check the nightly backup in the Backup center.",
+    "When the errors keep growing, use **Export diagnostics** and send the folder to support."
+   ],
+   "related": [
+    "dash-status",
+    "dash-components",
+    "dash-export"
+   ]
+  },
   "dash-restart": {
    "title": "Restart Koha",
    "summary": "Restarts Memcached, Plack, the background workers and Apache in one go, without rebooting the server.",
