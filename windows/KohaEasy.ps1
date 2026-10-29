@@ -347,7 +347,8 @@ switch ($Command) {
             Write-Host (T 'Run the installer again to continue from this step. The log is in C:\KohaEasy\logs.') -ForegroundColor Red
             $code = 1
         }
-        if ($Pause -and -not $Quiet) {
+        # 75: the install went on in a new window; this one closes at once.
+        if ($Pause -and -not $Quiet -and $code -ne 75) {
             Write-Host ''
             try { Read-Host (T 'Press Enter to close this window.') | Out-Null } catch { }
         }

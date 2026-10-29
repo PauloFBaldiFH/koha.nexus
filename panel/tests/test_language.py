@@ -47,3 +47,10 @@ def test_classic_console_gets_english_names_first():
     assert option_label("ru-RU", items["ru-RU"], plain=True) == "Russian - Русский   (ru-RU)"
     assert option_label("ru-RU", items["ru-RU"]) == "Русский   (ru-RU)"
     assert option_label("pt-BR", items["pt-BR"], plain=True) == "Português (Brasil)   (pt-BR)"
+
+
+def test_right_to_left_names_only_in_english_in_the_classic_console():
+    items = dict(language_items(INSTALLER))
+    assert option_label("ar-Arab", items["ar-Arab"], plain=True) == "Arabic   (ar-Arab)"
+    assert option_label("fa-Arab", items["fa-Arab"], plain=True) == "Persian   (fa-Arab)"
+    assert option_label("ar-Arab", items["ar-Arab"]) == f"{items['ar-Arab']}   (ar-Arab)"

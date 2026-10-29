@@ -691,9 +691,37 @@ function Show-KohaStartProblem {
     }
 }
 
-# The panel runs in this window: the librarian picks the language and
-# "1 - Install Koha server", then leaves the panel with Exit, and the
-# install goes on here with the Windows part. No second window is opened.
+# Exit code of an install that went on in a new window: install.ps1 then
+# closes the window the command was typed in.
+$script:ReopenedCode = 75
+
+# The install goes on in a new PowerShell window, opened on the language
+# choice: KohaEasy.ps1 Install again (the state file makes it continue at
+# the panel), with KOHA_PANEL_WINDOW=1 so it does not open yet another one,
+# and -Pause so the last messages stay on screen. It inherits this window's
+# administrator rights. Returns $false when the window could not start.
+function Start-KohaPanelWindow {
+    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $arg = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install -Pause' -f (Join-Path $PSScriptRoot 'KohaEasy.ps1')
+    $saved = $env:KOHA_PANEL_WINDOW
+    try {
+        $env:KOHA_PANEL_WINDOW = '1'
+        Start-Process -FilePath $ps -ArgumentList $arg -WindowStyle Normal -ErrorAction Stop | Out-Null
+        Write-KohaLog 'install continues in a new window at the language choice' 'install'
+        Write-KohaStep (T 'The installation continues in a new window, on the language choice. This window closes now.') 'ok'
+        Start-Sleep -Seconds 2
+        return $true
+    } catch {
+        Write-KohaLog ('new panel window failed: ' + $_.Exception.Message) 'install'
+        return $false
+    } finally {
+        $env:KOHA_PANEL_WINDOW = $saved
+    }
+}
+
+# The panel runs in the window Start-KohaPanelWindow opened: the librarian
+# picks the language and "1 - Install Koha server", then leaves the panel
+# with Exit, and the install goes on there with the Windows part.
 # Start-Process -NoNewWindow hands the panel the console itself; "& wsl.exe"
 # here would send its screens into Install-Koha's return value, and the
 # panel could not draw.
@@ -950,8 +978,18 @@ function Install-Koha {
             # install that stops here (Koha half-installed, the panel left
             # early) still leaves the librarian a way in, and the Koha window
             # says what is missing.
-            Install-KohaEntryPoints
+            # (made already when this is the window opened for the panel)
+            if ($env:KOHA_PANEL_WINDOW -ne '1') { Install-KohaEntryPoints }
             $entryDone = $true
+            # Paulo, 2026-10-29: this window closes and a new one opens
+            # straight on the language choice, so the panel starts in a
+            # fresh console (Consolas from HKCU\Console, or Windows Terminal)
+            # instead of one that began in Raster Fonts. The new window runs
+            # this same install, which continues from here.
+            if ($env:KOHA_PANEL_WINDOW -ne '1') {
+                if (Start-KohaPanelWindow) { return $script:ReopenedCode }
+                Write-KohaStep (T 'A new window could not be opened; the panel opens in this one.') 'warn'
+            }
             Write-Host ''
             Write-KohaStep (T 'The Koha control panel opens now. Choose your language, then 1 - Install Koha server. When it finishes, leave the panel with Exit.')
             # Read-Host (T 'Press Enter to continue') | Out-Null

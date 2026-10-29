@@ -12,9 +12,10 @@
 # C:\Koha\bin (downloaded from GitHub with the
 # SHA-256 of the installer checked), then runs "KohaEasy.ps1 Install" in
 # Windows PowerShell 5.1: checks, the Debian user, WSL 2, Debian, systemd,
-# Koha, shortcuts, the library network. All of it runs in the PowerShell
-# window the command was typed in. Uninstall-Koha.cmd, in C:\Koha,
-# removes it all again.
+# Koha, shortcuts, the library network. It runs in the PowerShell window
+# the command was typed in until the Koha control panel, which opens in a
+# new window on the language choice; the rest goes on there.
+# Uninstall-Koha.cmd, in C:\Koha, removes it all again.
 # Running it again continues where it stopped. An install made before the
 # folder was renamed stays in C:\KohaEasy and is updated there.
 #
@@ -331,11 +332,11 @@ function Install-KohaEasyBootstrap {
     $env:KOHAEASY_ROOT = $root
     $arg = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install' -f (Join-Path $bin 'KohaEasy.ps1')
 
-    # The whole install stays in this window, from the first line to the
-    # end: no Windows Terminal or other window is opened to continue it.
-    # Outside Windows Terminal the classic console has no emoji font, so the
-    # panel shows plain symbols there (KEI_PLAIN_GLYPHS). KOHAEASY_NO_WT is
-    # no longer needed for this and is left unread.
+    # The install runs in this window until the Koha control panel; then
+    # it goes on in a new window opened on the language choice, and this
+    # one closes (exit code 75, below). Outside Windows Terminal the classic
+    # console has no emoji font, so the panel shows plain symbols there
+    # (KEI_PLAIN_GLYPHS). KOHAEASY_NO_WT is no longer read.
     $p = Start-Process -FilePath $ps -ArgumentList $arg -NoNewWindow -Wait -PassThru
     return [int]$p.ExitCode
 }
@@ -352,6 +353,9 @@ if (-not $kohaVirtOk) {
 } else {
     try {
         $code = Install-KohaEasyBootstrap
+        # 75: the install went on in a new window (Paulo, 2026-10-29), so
+        # this one closes, also under "irm | iex".
+        if ($code -eq 75) { exit 0 }
         if ($code -eq 3) { Write-Host 'Restart Windows now. The installation continues after you sign in again.' -ForegroundColor Yellow }
         elseif ($code -ne 0) { Write-Host ('The installation stopped (code {0}). Run the same command again to continue. Log: {1}\logs' -f $code, $env:KOHAEASY_ROOT) -ForegroundColor Red }
         # Run as a file (the MSIX bootstrap does), the exit code says what
