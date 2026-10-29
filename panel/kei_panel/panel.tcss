@@ -742,3 +742,9 @@ App.-plain #picker-drop {
 #helper-ask { height: auto; padding-top: 1; }
 #helper-input { width: 1fr; }
 #helper-ask Button { margin-left: 1; }
+
+/* ---- a diagnostics folder read in the panel (screens/diagnostics.py) - */
+.dialog.-diag { width: 96%; max-width: 160; }
+#diag-body { height: 1fr; }
+#diag-files { width: 34; height: 1fr; margin-right: 1; }
+.-narrow #diag-files { width: 24; }

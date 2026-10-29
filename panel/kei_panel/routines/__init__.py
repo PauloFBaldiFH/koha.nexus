@@ -35,6 +35,7 @@ ROUTINES: dict[str, Routine] = {
     "repair-services": diagnostics.repair_services,
     "restart-koha": diagnostics.restart_koha,               # dashboard
     "export-diagnostics": diagnostics.export_diagnostics,   # dashboard
+    "open-diagnostics": diagnostics.open_diagnostics,       # dashboard
     "search-toggle": search.toggle,
     "search-repair": search.repair,
     "fail2ban": security.fail2ban,

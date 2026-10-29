@@ -6,15 +6,19 @@
   apache_log         staff or OPAC error log, followed live in the panel
   repair_services    restart Memcached/Plack/Koha -> what is running now
   restart_koha       the same, asked first (the dashboard's button)
-  export_diagnostics the support folder (--export-diagnostics) -> its path
+  export_diagnostics the support folder (--export-diagnostics) -> read in the panel
+  open_diagnostics   one of the saved support folders, read in the panel
 Texts are the installer's own (same translations as the classic panel).
 """
 
 from __future__ import annotations
 
-from ..env import _is_wsl as is_wsl
+import time
+from pathlib import Path
+
 from ..i18n import t
-from ..opener import open_folder
+from ..opener import over_ssh
+from ..screens.diagnostics import DIAG_DIR, DiagnosticsScreen, list_exports
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, CredentialsScreen, MessageScreen, TextScreen
 from ..screens.logtail import LogTailScreen
 from .common import failed, last_message, run_task, show_done, show_failure, tx
@@ -86,22 +90,52 @@ async def restart_koha(app) -> None:
     await repair_services(app)
 
 
+def _diag_dir(app) -> Path:
+    if app.env.demo:
+        from ..demo import demo_diagnostics
+        return demo_diagnostics()
+    return DIAG_DIR
+
+
+async def _view(app, folder: Path) -> None:
+    # Over SSH no file manager here can show the folder: only its path.
+    await app.push_screen_wait(DiagnosticsScreen(folder, can_open=not over_ssh()))
+
+
 async def export_diagnostics(app) -> None:
     title = t("Export diagnostics")
     result = await run_task(app, title, "export-diagnostics")
     if failed(result):
         await show_failure(app, title, result)
         return
-    path = result.value.get("path")
-    saved = t("Logs and system status were saved in this folder:")
-    note = tx("Passwords, tokens and keys are replaced by [REDACTED]. "
-              "Send this folder to whoever gives you support.")
-    if is_wsl() and not app.env.demo:
-        # Windows can open the folder (\\wsl.localhost\...), so offer it.
-        if await app.push_screen_wait(ConfirmScreen(
-                title, f"{saved}\n\n{path}\n\n{note}\n\n{t('Open the folder in Windows Explorer?')}")):
-            if not open_folder(path):
-                app.notify(t("Windows Explorer could not be opened."), severity="warning")
+    path = Path(result.value.get("path") or "")
+    if app.env.demo:
+        path = list_exports(_diag_dir(app))[0]
+    if path.name and path.is_dir():
+        await _view(app, path)
         return
-    await app.push_screen_wait(MessageScreen(title, "", kind="ok", command=path, command_help=saved,
-                                             command_notes=note, is_command=False))
+    # Saved somewhere the panel cannot read: the path, to send it on.
+    await app.push_screen_wait(MessageScreen(title, "", kind="ok", command=str(path),
+                                             command_help=t("Logs and system status were saved in this folder:"),
+                                             command_notes=tx("Passwords, tokens and keys are replaced by [REDACTED]. "
+                                                              "Send this folder to whoever gives you support."),
+                                             is_command=False))
+
+
+async def open_diagnostics(app) -> None:
+    """The saved support folders (the newest five are kept), newest first."""
+    title = t("Open diagnostics")
+    found = list_exports(_diag_dir(app))
+    if not found:
+        await app.push_screen_wait(MessageScreen(title, t("No diagnostics exported yet. Use Export diagnostics first."),
+                                                 kind="info"))
+        return
+    folder = found[0]
+    if len(found) > 1:
+        options = [(str(p), time.strftime("%Y-%m-%d %H:%M", time.localtime(p.stat().st_mtime)) + f"  {p.name}")
+                   for p in found]
+        key = await app.push_screen_wait(ChoiceScreen(title, t("Which export?"), options))
+        if not key:
+            return
+        folder = Path(key)
+    await _view(app, folder)

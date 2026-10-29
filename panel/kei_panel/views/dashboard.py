@@ -1,7 +1,7 @@
 """DashboardView: Koha's state at a glance, read from --status-json, the
 addresses Koha answers on (Open / Copy), the server's health (read by the
-panel itself, see health.py) and two quick actions: restart Koha and export
-diagnostics.
+panel itself, see health.py) and three quick actions: restart Koha, export
+diagnostics and open the saved ones (screens/diagnostics.py).
 
 The status is loaded in a worker with a one-line Pac-Man inside the view
 (the same PacmanLoader as the modal, compact): a quick read does not need
@@ -289,6 +289,7 @@ class DashboardView(SectionView):
         with Horizontal(classes="quick-actions"):
             yield Button(t("Restart Koha"), id="restart-koha", classes="small")
             yield Button(t("Export diagnostics"), id="export-diagnostics", classes="small")
+            yield Button(t("Open diagnostics"), id="open-diagnostics", classes="small")
         yield PacmanLoader(compact=True, plain=self.app.env.plain, colors=not self.app.env.no_color,
                            id="status-loader")
         with Grid(classes="status-grid"):
@@ -322,7 +323,7 @@ class DashboardView(SectionView):
         bid = event.button.id
         if bid == "refresh":
             self.refresh_data()
-        elif bid in ("restart-koha", "export-diagnostics"):
+        elif bid in ("restart-koha", "export-diagnostics", "open-diagnostics"):
             self.app.run_native(bid, after=self.refresh_data if bid == "restart-koha" else None)
 
     @on(LinkCard.Pressed)
