@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.121"
+PANEL_VERSION=" 1.5.122"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -22882,7 +22882,8 @@ def _by_content(member, fh, head, work):
         return Detection(member, "sql_other", 0.8, "MySQL dump without Koha's tables")
     if re.search(r"(?m)^000\s+\d{5}", text) and re.search(r"(?m)^\d{3}\s+[0-9_\\ ]{2}\s*[|$][a-z0-9]", text):
         return Detection(member, "mrk", 0.9, "textual MARC leader and subfields")
-    if re.search(r"(?m)^\s*\([^\n]*,", text):
+    # Binary bytes can hold "(...," by chance: a tuple fragment is text only.
+    if b"\0" not in head[:4096] and re.search(r"(?m)^\s*\([^\n]*,", text):
         return Detection(member, "sql_other", 0.7, "anonymous SQL tuple fragment")
     if ("MARC21/slim" in text or re.search(r"<(\w+:)?record[\s>]", text)) and re.search(r"<(\w+:)?(datafield|controlfield|leader)[\s>]", text):
         # The outer container wins: SQL was tested before embedded XML.
@@ -26607,7 +26608,7 @@ def _tokens(text):
             continue
         if c in "(),;.":
             # A decimal is one scalar, not a qualified identifier separator.
-            if c == "." and i + 1 < size and text[i + 1].isdigit():
+            if c == "." and i + 1 < size and text[i + 1] in "0123456789":
                 match = re.match(r"\.\d+(?:[eE][-+]?\d+)?", text[i:])
                 yield _Token("number", match.group())
                 i += len(match.group())

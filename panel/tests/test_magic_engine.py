@@ -247,6 +247,26 @@ def test_unknown_files_say_what_they_are(engine, tmp_path):
         assert "application/pdf" in out and "export the records" in out
 
 
+def test_binary_with_a_tuple_shape_is_not_sql(engine, tmp_path):
+    # Random bytes once held "\n('...," by chance: read as an SQL fragment,
+    # the reader failed (exit 4) instead of "format not recognised" (exit 3).
+    d, _ = engine
+    junk = tmp_path / "estragado.bkp"
+    junk.write_bytes(b"\x8f\x00\x13\xfa" * 200 + b"\n('\xc3\x07,\x91\x00\xee" + b"\xa7\x00" * 200)
+    work = tmp_path / "work"
+    work.mkdir()
+    p = subprocess.run([sys.executable, str(d / "kei_import_run.py"), "analyse", "--in", str(junk), "--work", str(work)],
+                       capture_output=True, text=True, cwd=d)
+    assert p.returncode == 3, p.stdout + p.stderr
+
+
+def test_sql_decimal_after_a_non_ascii_digit(engine):
+    d, _ = engine
+    readers = importlib.import_module("kei_import.readers")
+    # "²".isdigit() is true but \d does not match it: no crash, just tokens.
+    assert [t.value for t in readers._tokens("(1,.²)")][:4] == ["(", "1", ",", "."]
+
+
 # ---------------------------------------------------------------- authorities
 
 @pytest.fixture(scope="module")
