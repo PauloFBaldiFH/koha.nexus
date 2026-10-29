@@ -129,6 +129,25 @@
    ],
    "_en": "5185f9b604"
   },
+  "dash-health": {
+   "title": "Saúde do servidor",
+   "summary": "O que o servidor ainda tem e o que precisa de atenção: CPU, memória, tamanho do banco e dos backups, erros recentes, os serviços de Internet de que o koha.nexus depende, os servidores Z39.50 e versões novas.",
+   "overview": [
+    "**CPU** e **Memória** mostram quanto está em uso agora; **Banco de dados** é o tamanho do banco do Koha e **Pasta de backups** o tamanho dos backups guardados neste servidor, em vermelho quando o disco não comportaria mais dois backups.",
+    "**Erros (últimas 24 h)** conta os erros que o Apache e o Koha gravaram nos logs no último dia e mostra o mais recente.",
+    "**Cloudflare Tunnel** abre o endereço público do catálogo; **Gateway SRU (sru.koha.nexus)** verifica o serviço do koha.nexus por onde passam as buscas de catalogação; **Servidores Z39.50** mostra quantos servidores funcionaram no último teste da lista.",
+    "**Atualizações** compara o painel com a versão mais nova no GitHub e o Koha com a versão mais nova que a lista de pacotes do sistema conhece."
+   ],
+   "tips": [
+    "Um backup com mais de 24 horas deixa o cartão **Último backup** amarelo: confira o backup noturno na Central de backup.",
+    "Quando os erros não param de crescer, use **Exportar diagnóstico** e envie a pasta para o suporte."
+   ],
+   "related": [
+    "dash-status",
+    "dash-components",
+    "dash-export"
+   ]
+  },
   "dash-restart": {
    "title": "Reiniciar Koha",
    "summary": "Reinicia de uma vez o Memcached, o Plack, os processos em segundo plano e o Apache, sem reiniciar o servidor.",

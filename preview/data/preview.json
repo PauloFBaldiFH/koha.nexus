@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.113",
+ "panel_version": "1.5.126",
  "languages": [
   {
    "code": "en",
@@ -227,6 +227,7 @@
     "dash-status",
     "dash-addresses",
     "dash-components",
+    "dash-health",
     "dash-restart",
     "dash-export"
    ],
@@ -1644,6 +1645,73 @@
      "type": "status",
      "label": "Staff / OPAC",
      "value": "Answers (HTTP ${code})",
+     "state": "ok"
+    }
+   ],
+   "media": []
+  },
+  "dash-health": {
+   "id": "dash-health",
+   "type": "feature",
+   "section": "dashboard",
+   "label": "Server health",
+   "description": "",
+   "kind": "screen",
+   "status": "available",
+   "source": "panel/kei_panel/views/dashboard.py",
+   "controls": [
+    {
+     "type": "status",
+     "label": "CPU",
+     "value": "${pct}% in use",
+     "state": "ok"
+    },
+    {
+     "type": "status",
+     "label": "Memory",
+     "value": "${pct}% used",
+     "state": "ok"
+    },
+    {
+     "type": "status",
+     "label": "Database",
+     "value": "640 MB",
+     "state": "ok"
+    },
+    {
+     "type": "status",
+     "label": "Backup folder",
+     "value": "Low disk space: the next backups may not fit",
+     "state": "bad"
+    },
+    {
+     "type": "status",
+     "label": "Errors (last 24 h)",
+     "value": "No errors",
+     "state": "ok"
+    },
+    {
+     "type": "status",
+     "label": "Updates",
+     "value": "Update available",
+     "state": "warn"
+    },
+    {
+     "type": "status",
+     "label": "Cloudflare Tunnel",
+     "value": "Answers (HTTP ${code})",
+     "state": "ok"
+    },
+    {
+     "type": "status",
+     "label": "SRU gateway (sru.koha.nexus)",
+     "value": "Does not answer",
+     "state": "warn"
+    },
+    {
+     "type": "status",
+     "label": "Z39.50 servers",
+     "value": "${n} working",
      "state": "ok"
     }
    ],
@@ -7576,6 +7644,406 @@
    "zh": "组件",
    "ja": "コンポーネント",
    "ko": "구성 요소"
+  },
+  "CPU": {
+   "en": "CPU",
+   "pt-BR": null,
+   "es": null,
+   "fr": "Processeur",
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "${pct}% in use": {
+   "en": "${pct}% in use",
+   "pt-BR": "${pct}% em uso",
+   "es": "${pct}% en uso",
+   "fr": "${pct} % utilisé",
+   "it": "${pct}% in uso",
+   "de": "${pct} % belegt",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Memory": {
+   "en": "Memory",
+   "pt-BR": "Memória",
+   "es": "Memoria",
+   "fr": "Mémoire",
+   "it": "Memoria",
+   "de": "Speicher",
+   "nl": "Geheugen",
+   "sv": "Minne",
+   "pl": "Pamięć",
+   "cs": "Paměť",
+   "ru": "Память",
+   "uk": "Навігація",
+   "tr": "Hafıza",
+   "tl": "Alaala",
+   "id": "Memori",
+   "ar": "الذاكرة",
+   "fa": "حافظه",
+   "hi": "स्मृति",
+   "bn": "মেমরি",
+   "vi": "Bộ nhớ",
+   "zh": "内存",
+   "ja": "メモリ",
+   "ko": "기억하기"
+  },
+  "${pct}% used": {
+   "en": "${pct}% used",
+   "pt-BR": "${pct}% usada",
+   "es": "${pct}% usada",
+   "fr": "${pct} % utilisée",
+   "it": "${pct}% usata",
+   "de": "${pct} % belegt",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Database": {
+   "en": "Database",
+   "pt-BR": "Banco de dados",
+   "es": "Base de datos",
+   "fr": "Base de données",
+   "it": null,
+   "de": "Datenbank",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Backup folder": {
+   "en": "Backup folder",
+   "pt-BR": "Pasta de backups",
+   "es": "Carpeta de copias",
+   "fr": "Dossier des sauvegardes",
+   "it": "Cartella dei backup",
+   "de": "Sicherungsordner",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Low disk space: the next backups may not fit": {
+   "en": "Low disk space: the next backups may not fit",
+   "pt-BR": "Pouco espaço em disco: os próximos backups podem não caber",
+   "es": "Poco espacio en disco: las próximas copias pueden no caber",
+   "fr": "Espace disque faible : les prochaines sauvegardes risquent de ne pas tenir",
+   "it": "Poco spazio su disco: i prossimi backup potrebbero non entrare",
+   "de": "Wenig Speicherplatz: die nächsten Sicherungen passen eventuell nicht",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Errors (last 24 h)": {
+   "en": "Errors (last 24 h)",
+   "pt-BR": "Erros (últimas 24 h)",
+   "es": "Errores (últimas 24 h)",
+   "fr": "Erreurs (dernières 24 h)",
+   "it": "Errori (ultime 24 h)",
+   "de": "Fehler (letzte 24 h)",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "No errors": {
+   "en": "No errors",
+   "pt-BR": "Nenhum erro",
+   "es": "Ningún error",
+   "fr": "Aucune erreur",
+   "it": "Nessun errore",
+   "de": "Keine Fehler",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Updates": {
+   "en": "Updates",
+   "pt-BR": "Atualizações",
+   "es": "Actualizaciones",
+   "fr": "Mises à jour",
+   "it": "Aggiornamenti",
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Update available": {
+   "en": "Update available",
+   "pt-BR": "Atualização disponível",
+   "es": "Actualización disponible",
+   "fr": "Mise à jour disponible",
+   "it": "Aggiornamento disponibile",
+   "de": "Update verfügbar",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "SRU gateway (sru.koha.nexus)": {
+   "en": "SRU gateway (sru.koha.nexus)",
+   "pt-BR": "Gateway SRU (sru.koha.nexus)",
+   "es": "Pasarela SRU (sru.koha.nexus)",
+   "fr": "Passerelle SRU (sru.koha.nexus)",
+   "it": "Gateway SRU (sru.koha.nexus)",
+   "de": "SRU-Gateway (sru.koha.nexus)",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Does not answer": {
+   "en": "Does not answer",
+   "pt-BR": "Não responde",
+   "es": "No responde",
+   "fr": "Ne répond pas",
+   "it": "Non risponde",
+   "de": "Antwortet nicht",
+   "nl": "Antwoordt niet",
+   "sv": "Svarar inte",
+   "pl": "Nie odpowiada",
+   "cs": "Neodpovídá",
+   "ru": "Не отвечает",
+   "uk": "Не відповідає",
+   "tr": "Yanıt vermiyor",
+   "tl": "Hindi sumasagot",
+   "id": "Tidak merespons",
+   "ar": "لا يستجيب",
+   "fa": "پاسخ نمی‌دهد",
+   "hi": "जवाब नहीं दे रहा",
+   "bn": "সাড়া দিচ্ছে না",
+   "vi": "Không phản hồi",
+   "zh": "无响应",
+   "ja": "応答なし",
+   "ko": "응답 없음"
+  },
+  "Z39.50 servers": {
+   "en": "Z39.50 servers",
+   "pt-BR": "Servidores Z39.50",
+   "es": "Servidores Z39.50",
+   "fr": "Serveurs Z39.50",
+   "it": "Server Z39.50",
+   "de": "Z39.50-Server",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "${n} working": {
+   "en": "${n} working",
+   "pt-BR": "${n} funcionando",
+   "es": "${n} funcionando",
+   "fr": "${n} fonctionnent",
+   "it": "${n} funzionanti",
+   "de": "${n} funktionieren",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Server health": {
+   "en": "Server health",
+   "pt-BR": "Saúde do servidor",
+   "es": "Salud del servidor",
+   "fr": "Santé du serveur",
+   "it": "Stato del server",
+   "de": "Serverzustand",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "Restart Koha": {
    "en": "Restart Koha",
@@ -16231,6 +16699,41 @@
     ]
    }
   },
+  "dash-health": {
+   "en": {
+    "title": "Server health",
+    "summary": "What the server has left and what needs a look: CPU, memory, database and backup sizes, recent errors, the Internet services koha.nexus relies on, the Z39.50 servers and new versions.",
+    "overview": [
+     "**CPU** and **Memory** show how much is in use now; **Database** is the size of Koha's database and **Backup folder** the size of the backups kept on this server, in red when the disk could not hold two more backups.",
+     "**Errors (last 24 h)** counts the errors Apache and Koha wrote to their logs in the last day and shows the newest one.",
+     "**Cloudflare Tunnel** opens the catalogue's public address; **SRU gateway (sru.koha.nexus)** checks the koha.nexus service that cataloguing searches go through; **Z39.50 servers** shows how many servers worked in the last test of the list.",
+     "**Updates** compares the panel with the newest version on GitHub and Koha with the newest version the system's package list knows."
+    ],
+    "tips": [
+     "A backup over 24 hours old turns the **Last backup** card amber: check the nightly backup in the Backup center.",
+     "When the errors keep growing, use **Export diagnostics** and send the folder to support."
+    ],
+    "related": [
+     "dash-status",
+     "dash-components",
+     "dash-export"
+    ]
+   },
+   "pt-BR": {
+    "title": "Saúde do servidor",
+    "summary": "O que o servidor ainda tem e o que precisa de atenção: CPU, memória, tamanho do banco e dos backups, erros recentes, os serviços de Internet de que o koha.nexus depende, os servidores Z39.50 e versões novas.",
+    "overview": [
+     "**CPU** e **Memória** mostram quanto está em uso agora; **Banco de dados** é o tamanho do banco do Koha e **Pasta de backups** o tamanho dos backups guardados neste servidor, em vermelho quando o disco não comportaria mais dois backups.",
+     "**Erros (últimas 24 h)** conta os erros que o Apache e o Koha gravaram nos logs no último dia e mostra o mais recente.",
+     "**Cloudflare Tunnel** abre o endereço público do catálogo; **Gateway SRU (sru.koha.nexus)** verifica o serviço do koha.nexus por onde passam as buscas de catalogação; **Servidores Z39.50** mostra quantos servidores funcionaram no último teste da lista.",
+     "**Atualizações** compara o painel com a versão mais nova no GitHub e o Koha com a versão mais nova que a lista de pacotes do sistema conhece."
+    ],
+    "tips": [
+     "Um backup com mais de 24 horas deixa o cartão **Último backup** amarelo: confira o backup noturno na Central de backup.",
+     "Quando os erros não param de crescer, use **Exportar diagnóstico** e envie a pasta para o suporte."
+    ]
+   }
+  },
   "dash-restart": {
    "en": {
     "title": "Restart Koha",
@@ -18059,15 +18562,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 111,
-   "manual_total": 111,
+   "manual": 112,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 384,
-   "strings_total": 384
+   "strings": 400,
+   "strings_total": 400
   },
   "pt-BR": {
-   "manual": 111,
-   "manual_total": 111,
+   "manual": 112,
+   "manual_total": 112,
    "manual_outdated": [
     "sec-dashboard",
     "install",
@@ -18082,155 +18585,155 @@
     "backup-safety",
     "ai-ollama"
    ],
-   "strings": 376,
-   "strings_total": 384
+   "strings": 391,
+   "strings_total": 400
   },
   "es": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 261,
-   "strings_total": 384
+   "strings": 276,
+   "strings_total": 400
   },
   "fr": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 256,
-   "strings_total": 384
+   "strings": 272,
+   "strings_total": 400
   },
   "it": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 256,
-   "strings_total": 384
+   "strings": 270,
+   "strings_total": 400
   },
   "de": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 256,
-   "strings_total": 384
+   "strings": 270,
+   "strings_total": 400
   },
   "nl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "sv": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "pl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "cs": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "ru": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "uk": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "tr": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "tl": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "id": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "ar": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "fa": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "hi": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "bn": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "vi": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "zh": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "ja": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   },
   "ko": {
    "manual": 0,
-   "manual_total": 111,
+   "manual_total": 112,
    "manual_outdated": [],
-   "strings": 111,
-   "strings_total": 384
+   "strings": 113,
+   "strings_total": 400
   }
  }
 }

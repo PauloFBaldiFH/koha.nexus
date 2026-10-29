@@ -1,6 +1,7 @@
 """DashboardView: Koha's state at a glance, read from --status-json, the
-addresses Koha answers on (Open / Copy) and two quick actions: restart Koha
-and export diagnostics.
+addresses Koha answers on (Open / Copy), the server's health (read by the
+panel itself, see health.py) and two quick actions: restart Koha and export
+diagnostics.
 
 The status is loaded in a worker with a one-line Pac-Man inside the view
 (the same PacmanLoader as the modal, compact): a quick read does not need
@@ -16,6 +17,7 @@ from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal
 from textual.widgets import Button, Label
 
+from .. import health
 from ..i18n import t
 from ..widgets.cards import LinkCard, StatusCard
 from ..widgets.pacman import PacmanLoader
@@ -44,16 +46,16 @@ def age(epoch: int | None, now: float | None = None) -> str:
     return f"{secs // 86400} d"
 
 
-# A backup counts as recent for two days, like the validation report's
-# "Backup SQL" line (installer: validate_backups).
-BACKUP_FRESH_SECS = 2 * 86400
+# The nightly backup runs once a day: over a day without one means a night
+# was missed. (The validation report's "Backup SQL" line allows two days.)
+BACKUP_FRESH_SECS = 86400
 
 
 def backup_card(b: dict | None, now: float | None = None) -> tuple[str, str, str]:
     """The "Last backup" card from --status-json's "backup" block: the date
     and time of the newest backup (from its name, else its mtime: see the
     installer's latest_sql_backup), how long ago and which file. Green while
-    it is under two days old and the last nightly run did not fail."""
+    it is under a day old and the last nightly run did not fail."""
     b = b or {}
     try:
         epoch = int(b.get("last_epoch") or 0)
@@ -64,8 +66,13 @@ def backup_card(b: dict | None, now: float | None = None) -> tuple[str, str, str
     now = time.time() if now is None else now
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
     note = t("${age} ago", age=age(epoch, now)) + f" · {b.get('last_file') or '-'}"
-    fresh = now - epoch < BACKUP_FRESH_SECS
-    return when, note, "ok" if fresh and b.get("last_result") != "failed" else "warn"
+    if now - epoch >= BACKUP_FRESH_SECS:
+        note = t("No backup for ${age}", age=age(epoch, now)) + f" · {b.get('last_file') or '-'}"
+    elif b.get("last_result") == "failed":
+        note = t("The last nightly backup failed") + f" · {note}"
+    else:
+        return when, note, "ok"
+    return when, note, "warn"
 
 
 # The components the Koha window on Windows lists, in the order Koha needs
@@ -153,6 +160,126 @@ def access_links(s: dict) -> dict[tuple[str, str], tuple[str, str, str]]:
     return links
 
 
+# ----------------------------------------------------------------------
+# Health: one card per fact, (value, note, state) like backup_card. A fact
+# the panel could not read is "-" with a quiet note, never red.
+# ----------------------------------------------------------------------
+HEALTH_CARDS = (
+    ("cpu", "CPU"), ("memory", "Memory"), ("db", "Database"),
+    ("backup-dir", "Backup folder"), ("errors", "Errors (last 24 h)"), ("updates", "Updates"),
+    ("tunnel", "Cloudflare Tunnel"), ("sru", "SRU gateway (sru.koha.nexus)"), ("z3950", "Z39.50 servers"),
+)
+UNREAD = ("-", "Could not read", "")
+
+
+def _unread() -> tuple[str, str, str]:
+    return UNREAD[0], t(UNREAD[1]), UNREAD[2]
+
+
+def cpu_card(cpu: dict | None) -> tuple[str, str, str]:
+    if not cpu or cpu.get("busy") is None:
+        return _unread()
+    busy, cores = cpu["busy"], int(cpu.get("cores") or 1)
+    note = t("${n} cores", n=cores) + f" · {t('load')} {cpu.get('load', 0):.2f}"
+    return t("${pct}% in use", pct=f"{busy:.0f}"), note, "warn" if busy >= 90 else "ok"
+
+
+def memory_card(m: dict | None) -> tuple[str, str, str]:
+    m = m or {}
+    total, avail = int(m.get("total") or 0), int(m.get("available") or 0)
+    if total <= 0:
+        return _unread()
+    used = max(0, total - avail)
+    pct = 100 * used / total
+    note = t("${pct}% used", pct=f"{pct:.0f}") + " · " + t("${size} free", size=human_bytes(avail))
+    return f"{human_bytes(used)} / {human_bytes(total)}", note, "bad" if pct >= 95 else "warn" if pct >= 85 else "ok"
+
+
+def db_card(size: int | None, instance: str = "library") -> tuple[str, str, str]:
+    if size is None:
+        return _unread()
+    return human_bytes(size) if size else "0 B", f"koha_{instance}", "ok"
+
+
+def backup_dir_card(backups: dict | None, disk: dict | None, last_size: int = 0) -> tuple[str, str, str]:
+    """The backup folders' size and whether the disk still has room: two
+    more backups the size of the last one, and a tenth of the disk."""
+    if backups is None:
+        return _unread()
+    disk = disk or {}
+    free, total = int(disk.get("free") or 0), int(disk.get("total") or 0)
+    value = human_bytes(backups.get("bytes")) if backups.get("bytes") else "0 B"
+    if total and (free < 2 * last_size or free / total < 0.1):
+        return value, t("Low disk space: the next backups may not fit") + f" ({human_bytes(free)})", "bad"
+    return value, t("${n} files", n=backups.get("files", 0)), "ok"
+
+
+def errors_card(apache: dict | None, koha: dict | None, now: float | None = None) -> tuple[str, str, str]:
+    if apache is None and koha is None:
+        return _unread()
+    a, k = (apache or {}).get("count", 0), (koha or {}).get("count", 0)
+    counts = f"Apache {a if apache is not None else '-'} · Koha {k if koha is not None else '-'}"
+    if not a and not k:
+        return t("No errors"), counts, "ok"
+    newest = max((x for x in (apache, koha) if x and x.get("count")), key=lambda x: x.get("last_epoch", 0))
+    when = t("${age} ago", age=age(int(newest.get("last_epoch") or 0), now))
+    note = f"{counts} · {when}: {health.short_error(newest.get('last', ''), 50)}"
+    return t("${n} errors", n=a + k), note, "warn"
+
+
+def tunnel_card(check: dict | None, status: dict) -> tuple[str, str, str]:
+    host = health.tunnel_host(status)
+    running = (status.get("services") or {}).get("cloudflared") == "active"
+    if not host:
+        return t("Not used"), t("No Cloudflare Tunnel on this server"), ""
+    if check is None:
+        return _unread()
+    code = int(check.get("code") or 0)
+    if 0 < code < 500:
+        return t("Answers (HTTP ${code})", code=code), f"{host} · {check.get('ms', 0)} ms", "ok"
+    why = t("cloudflared is stopped") if not running else (f"HTTP {code}" if code else t("no answer"))
+    return t("Does not answer"), f"{host} · {why}", "bad"
+
+
+def sru_card(check: dict | None) -> tuple[str, str, str]:
+    if check is None:
+        return _unread()
+    code = int(check.get("code") or 0)
+    if 0 < code < 500:
+        return t("Answers (HTTP ${code})", code=code), f"{check.get('ms', 0)} ms", "ok"
+    return t("Does not answer"), (f"HTTP {code}" if code else t("no answer (Internet or the service is down)")), \
+        "warn"
+
+
+def z3950_card(z: dict | None, now: float | None = None) -> tuple[str, str, str]:
+    if z is None:
+        return _unread()
+    if not z.get("tested"):
+        return t("Not tested yet"), t("Show servers in the Z39.50 screen tests them"), "warn"
+    when = int(z.get("when") or 0)
+    note = t("of ${n} tested", n=z["tested"]) + (f" · {t('${age} ago', age=age(when, now))}" if when else "")
+    return t("${n} working", n=z.get("ok", 0)), note, "ok" if z.get("ok") else "warn"
+
+
+def updates_card(current: str, latest: str | None, koha: tuple[str, str] | None) -> tuple[str, str, str]:
+    parts, newer = [], False
+    if latest and health.version_tuple(latest) > health.version_tuple(current):
+        parts.append(t("Panel ${old} → ${new}", old=current, new=latest))
+        newer = True
+    elif latest:
+        parts.append(t("Panel ${v}", v=current))
+    if koha:
+        installed, candidate = koha
+        if candidate not in ("", "(none)") and candidate != installed:
+            parts.append(t("Koha ${old} → ${new}", old=installed, new=candidate))
+            newer = True
+        else:
+            parts.append(t("Koha ${v}", v=installed))
+    if not parts:
+        return _unread()
+    return (t("Update available") if newer else t("Up to date")), " · ".join(parts), "warn" if newer else "ok"
+
+
 class DashboardView(SectionView):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="view-head"):
@@ -178,6 +305,10 @@ class DashboardView(SectionView):
             for unit, name in COMPONENTS:
                 yield StatusCard(t(name), id=f"card-{unit}")
             yield StatusCard(t("HTTP response"), id="card-http")
+        yield Label(t("Server health"), classes="view-prompt")
+        with Grid(classes="status-grid", id="health"):
+            for key, title in HEALTH_CARDS:
+                yield StatusCard(t(title), id=f"health-{key}")
 
     def on_mount(self) -> None:
         # An installer older than the panel has no such task: the button stays off.
@@ -215,6 +346,30 @@ class DashboardView(SectionView):
             self.query_one("#status-loader").display = False
         if status:
             self.show(status)
+            self.run_worker(self._load_health(status), exclusive=True, group="health", exit_on_error=False)
+
+    async def _load_health(self, status: dict) -> None:
+        env = self.app.env
+        if env.demo:
+            h = health.demo_health()
+        else:
+            h = await health.collect(status, env.instance, env.installer)
+        self.show_health(status, h)
+
+    def show_health(self, s: dict, h: "health.Health") -> None:
+        cards = {
+            "cpu": cpu_card(h.cpu),
+            "memory": memory_card(s.get("memory")),
+            "db": db_card(h.db_size, self.app.env.instance),
+            "backup-dir": backup_dir_card(h.backups, s.get("disk"), int((s.get("backup") or {}).get("last_size") or 0)),
+            "errors": errors_card(h.apache_errors, h.koha_errors),
+            "updates": updates_card(str(s.get("panel_version") or ""), h.panel_latest, h.koha),
+            "tunnel": tunnel_card(h.tunnel, s),
+            "sru": sru_card(h.sru),
+            "z3950": z3950_card(h.z3950),
+        }
+        for key, values in cards.items():
+            self.query_one(f"#health-{key}", StatusCard).set(*values)
 
     def show(self, s: dict) -> None:
         text, state = OVERALL.get(s.get("state", ""), ("Unknown", "bad"))
