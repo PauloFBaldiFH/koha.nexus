@@ -116,6 +116,22 @@ Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
 Import-KeiLanguage -LangDir (Join-Path $repo 'lang') -Culture 'en-US'
 $wsl = 'C:\Windows\System32\wsl.exe'
 
+# Console defaults (Paulo, 2026-10-29): later PowerShell windows open in
+# Consolas; a raster "Terminal" choice is replaced, the user's own font stays.
+$conRoot = 'HKCU:\Software\KohaNexusChecks\Console'
+$conPs = '%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe'
+$conWow = '%SystemRoot%_SysWOW64_WindowsPowerShell_v1.0_powershell.exe'
+New-Item -Path (Join-Path $conRoot $conWow) -Force | Out-Null
+Set-ItemProperty -LiteralPath (Join-Path $conRoot $conWow) -Name FaceName -Value 'Cascadia Mono'
+$conChanged = @(Set-KohaConsoleDefaults -Root $conRoot)
+$conFace = (Get-ItemProperty -LiteralPath (Join-Path $conRoot $conPs)).FaceName
+$conKept = (Get-ItemProperty -LiteralPath (Join-Path $conRoot $conWow)).FaceName
+Check 'console defaults: Consolas set, own font kept' ($conFace -eq 'Consolas' -and $conKept -eq 'Cascadia Mono' -and ($conChanged -join ',') -eq $conPs) ("$conFace / $conKept / " + ($conChanged -join ','))
+Set-ItemProperty -LiteralPath (Join-Path $conRoot $conPs) -Name FaceName -Value 'Terminal'
+Check 'console defaults: raster font replaced' ((@(Set-KohaConsoleDefaults -Root $conRoot) -join ',') -eq $conPs -and (Get-ItemProperty -LiteralPath (Join-Path $conRoot $conPs)).FaceName -eq 'Consolas') ''
+Remove-Item -LiteralPath 'HKCU:\Software\KohaNexusChecks' -Recurse -Force
+Check 'console defaults: set by the install' ((Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.ps1')) -match 'Set-KohaConsoleFont \| Out-Null\s+Set-KohaConsoleDefaults \| Out-Null') ''
+
 # RAM on Windows (a desktop or virtualized environment): 8 GB minimum, 12 GB
 # recommended. Windows reports the usable RAM, so an 8 GB PC shows about 7.7 GB
 # and must still pass. Row 2 of the preflight is the memory row.
