@@ -233,6 +233,30 @@ public static class KohaConsoleFont {
     return $false
 }
 
+# The same for windows opened later (Paulo, 2026-10-29: one window, but the
+# next PowerShell should not start in Raster Fonts either): Consolas becomes
+# the classic console's font for Windows PowerShell, in this user's
+# HKCU\Console. Only an empty or raster ("Terminal") choice is replaced; a
+# font the user picked stays. Returns the keys it changed.
+function Set-KohaConsoleDefaults {
+    param([string]$Root = 'HKCU:\Console')
+    $changed = @()
+    foreach ($name in @('%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe', '%SystemRoot%_SysWOW64_WindowsPowerShell_v1.0_powershell.exe')) {
+        $key = Join-Path $Root $name
+        try {
+            if (-not (Test-Path -LiteralPath $key)) { New-Item -Path $key -Force | Out-Null }
+            $face = [string](Get-Item -LiteralPath $key).GetValue('FaceName', '')
+            if ($face -and $face -ne 'Terminal') { continue }
+            Set-ItemProperty -LiteralPath $key -Name FaceName -Value 'Consolas' -Type String
+            Set-ItemProperty -LiteralPath $key -Name FontFamily -Value 54 -Type DWord
+            Set-ItemProperty -LiteralPath $key -Name FontWeight -Value 400 -Type DWord
+            Set-ItemProperty -LiteralPath $key -Name FontSize -Value 0x00100000 -Type DWord
+            $changed += $name
+        } catch { }
+    }
+    return $changed
+}
+
 # Windows Terminal (wt.exe), when installed. It draws emoji; the classic
 # console has no emoji font and shows them as boxes. KOHAEASY_NO_WT=1 keeps
 # everything in the classic console.

@@ -339,6 +339,7 @@ switch ($Command) {
     'Install' {
         Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Install.psm1') -Force
         Set-KohaConsoleFont | Out-Null
+        Set-KohaConsoleDefaults | Out-Null
         try {
             $code = [int](@(Install-Koha) | Select-Object -Last 1)
         } catch {
