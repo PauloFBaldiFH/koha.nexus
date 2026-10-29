@@ -57,7 +57,17 @@ Check 'one window: elevated steps stay here when already administrator' ($instal
 # the install closes its window and goes on in a new one opened straight on
 # the panel; that one does not open another, and install.ps1 closes the
 # first window on code 75 instead of reporting a stop.
-Check 'reopen: the panel opens in a new window, once' ($installMod -match "(?s)if \(\`$env:KOHA_PANEL_WINDOW -ne '1'\) \{\s+if \(Start-KohaPanelWindow\) \{ return \`$script:ReopenedCode \}.*?Invoke-KohaPanel \| Out-Null" -and $installMod -match "(?s)function Start-KohaPanelWindow.*?Install -Pause.*?KOHA_PANEL_WINDOW = '1'.*?Start-Process -FilePath \`$ps") ''
+Check 'reopen: the panel opens in a new window, once' ($installMod -match "(?s)if \(\`$env:KOHA_PANEL_WINDOW -ne '1'\) \{\s+if \(Start-KohaPanelWindow\) \{ return \`$script:ReopenedCode \}.*?Invoke-KohaPanel \| Out-Null" -and (Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.ps1')) -match "if \(\`$PanelWindow\) \{ \`$env:KOHA_PANEL_WINDOW = '1' \}") ''
+# The new window goes through wt.exe when Windows Terminal is there, so
+# WT_SESSION is set and the panel draws emoji (Paulo, 2026-10-29: a plain
+# powershell.exe handed to Windows Terminal showed plain symbols).
+foreach ($fn in [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'windows\KohaEasy.Install.psm1'), [ref]$null, [ref]$null).FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq 'Get-KohaPanelWindowLaunch' }, $false)) {
+    . ([scriptblock]::Create($fn.Extent.Text))
+}
+$pwWt = Get-KohaPanelWindowLaunch -PowerShell 'C:\ps.exe' -Script 'C:\Koha\bin\KohaEasy.ps1' -Terminal 'C:\wt.exe'
+$pwPs = Get-KohaPanelWindowLaunch -PowerShell 'C:\ps.exe' -Script 'C:\Koha\bin\KohaEasy.ps1' -Terminal $null
+Check 'reopen: Windows Terminal through wt.exe, flag on the command line' ($pwWt.File -eq 'C:\wt.exe' -and $pwWt.Arguments -eq '-w new --title koha.nexus "C:\ps.exe" -NoProfile -ExecutionPolicy Bypass -File "C:\Koha\bin\KohaEasy.ps1" Install -Pause -PanelWindow') $pwWt.Arguments
+Check 'reopen: without Windows Terminal, Windows PowerShell itself' ($pwPs.File -eq 'C:\ps.exe' -and $pwPs.Arguments -eq '-NoProfile -ExecutionPolicy Bypass -File "C:\Koha\bin\KohaEasy.ps1" Install -Pause -PanelWindow') $pwPs.Arguments
 Check 'reopen: install.ps1 closes the first window on 75' ($installText -match 'if \(\$code -eq 75\) \{ exit 0 \}') ''
 Check 'reopen: no pause before the first window closes' ((Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.ps1')) -match '\$Pause -and -not \$Quiet -and \$code -ne 75') ''
 

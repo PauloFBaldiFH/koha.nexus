@@ -695,28 +695,42 @@ function Show-KohaStartProblem {
 # closes the window the command was typed in.
 $script:ReopenedCode = 75
 
-# The install goes on in a new PowerShell window, opened on the language
-# choice: KohaEasy.ps1 Install again (the state file makes it continue at
-# the panel), with KOHA_PANEL_WINDOW=1 so it does not open yet another one,
-# and -Pause so the last messages stay on screen. It inherits this window's
-# administrator rights. Returns $false when the window could not start.
+# The install goes on in a new window, opened on the language choice:
+# KohaEasy.ps1 Install again (the state file makes it continue at the
+# panel), with -PanelWindow so it does not open yet another one, and -Pause
+# so the last messages stay on screen. It inherits this window's
+# administrator rights. With Windows Terminal installed it is a new Windows
+# Terminal window started through wt.exe, so WT_SESSION is set there and
+# the panel draws emoji and its borders. A plain powershell.exe would be
+# handed to Windows Terminal by Windows 11 (default terminal) without
+# WT_SESSION, and the panel would fall back to plain symbols. The flag goes
+# on the command line, not in the environment: a Windows Terminal that is
+# already open starts the new window with its own environment.
+# Returns $false when the window could not start.
 function Start-KohaPanelWindow {
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $arg = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install -Pause' -f (Join-Path $PSScriptRoot 'KohaEasy.ps1')
-    $saved = $env:KOHA_PANEL_WINDOW
+    $launch = Get-KohaPanelWindowLaunch -PowerShell $ps -Script (Join-Path $PSScriptRoot 'KohaEasy.ps1') -Terminal (Get-KohaTerminalPath)
     try {
-        $env:KOHA_PANEL_WINDOW = '1'
-        Start-Process -FilePath $ps -ArgumentList $arg -WindowStyle Normal -ErrorAction Stop | Out-Null
-        Write-KohaLog 'install continues in a new window at the language choice' 'install'
+        Start-Process -FilePath $launch.File -ArgumentList $launch.Arguments -WindowStyle Normal -ErrorAction Stop | Out-Null
+        Write-KohaLog ('install continues in a new window at the language choice: ' + $launch.File) 'install'
         Write-KohaStep (T 'The installation continues in a new window, on the language choice. This window closes now.') 'ok'
         Start-Sleep -Seconds 2
         return $true
     } catch {
         Write-KohaLog ('new panel window failed: ' + $_.Exception.Message) 'install'
         return $false
-    } finally {
-        $env:KOHA_PANEL_WINDOW = $saved
     }
+}
+
+# Pure: what Start-KohaPanelWindow starts. Windows Terminal when wt.exe is
+# there (a new window titled koha.nexus), else Windows PowerShell itself.
+function Get-KohaPanelWindowLaunch {
+    param([string]$PowerShell, [string]$Script, [string]$Terminal)
+    $psArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" Install -Pause -PanelWindow' -f $Script
+    if ($Terminal) {
+        return [pscustomobject]@{ File = $Terminal; Arguments = ('-w new --title koha.nexus "{0}" {1}' -f $PowerShell, $psArgs) }
+    }
+    return [pscustomobject]@{ File = $PowerShell; Arguments = $psArgs }
 }
 
 # The panel runs in the window Start-KohaPanelWindow opened: the librarian

@@ -35,6 +35,7 @@
     KohaEasy.ps1 UninstallAdmin                the part of Uninstall that needs administrator rights (firewall, port forwarding, tasks)
     -Quiet: no dialog boxes (scheduled tasks).
     -Pause: Install waits for Enter before its window closes (Windows Terminal).
+    -PanelWindow: Install runs in the window opened for the panel (no new one).
     -Hidden: started with no console (every shortcut, task and tray launch).
     Windows PowerShell 5.1.
 #>
@@ -47,6 +48,8 @@ param(
     [switch]$Force,
     [switch]$Quiet,
     [switch]$Pause,
+    # Install: this is the window opened for the panel (no other one opens).
+    [switch]$PanelWindow,
     # Painel de Gestão: rotina de execução direta
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Action,
     [switch]$Hidden
@@ -337,6 +340,7 @@ switch ($Command) {
         exit 0
     }
     'Install' {
+        if ($PanelWindow) { $env:KOHA_PANEL_WINDOW = '1' }
         Import-Module (Join-Path $PSScriptRoot 'KohaEasy.Install.psm1') -Force
         Set-KohaConsoleFont | Out-Null
         Set-KohaConsoleDefaults | Out-Null
