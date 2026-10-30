@@ -12022,8 +12022,7 @@ function_library_tools() {
             "15" "$(t "🧮  Cutter Calculator")" \
             "16" "$(t "💬  AI assistant on the staff home page")" \
             "17" "$(t "🔗  Sync & link authorities")" \
-            "18" "$(t "👥  Find duplicate authors (authorities)")" \
-            "19" "$(t "📂  Staff access to server files")") || return 0
+            "18" "$(t "👥  Find duplicate authors (authorities)")") || return 0
         case "$opt" in
             1) lt_magic_import ;;
             2) lt_marc_undo ;;
@@ -12043,7 +12042,6 @@ function_library_tools() {
             16) function_ai_assistant ;;
             17) lt_authority_sync ;;
             18) lt_authority_match ;;
-            19) function_access_files ;;
         esac
         clear
     done
@@ -20660,12 +20658,10 @@ _lt_plugins_register() {
 # Koha's Tools > Access files lists and downloads the files of the folders
 # named in <access_dirs> of koha-conf.xml, for staff with the access_files
 # permission. Debian's koha-conf.xml only has the block as a comment, so the
-# page says "access_dir was not set". New installs get the instance's log
-# folder (Koha's own logs, readable by the instance user); existing ones
-# turn it on or off here. Subfolders and hidden files are never listed by
-# Koha. The previous koha-conf.xml stays next to it (koha-conf.xml.bak-*),
-# a file that is not well-formed or does not read back is never kept, and
-# Koha is restarted (it reads koha-conf.xml when its processes start).
+# page says "access_dir was not set". The installation sets the instance's
+# log folder (Koha's own logs, readable by the instance user) right after
+# koha-create; there is no panel action. Subfolders and hidden files are
+# never listed by Koha. A file that is not well-formed is never kept.
 # ======================================================================
 ACCESS_DEFAULT_DIR="/var/log/koha/${INSTANCE}"
 
@@ -20726,45 +20722,6 @@ access_dirs_edit() {
     printf '%s' "$tmp"
 }
 
-# access_dirs_apply LOG "DIR\nDIR...": koha-conf.xml changed and checked; on
-# any failure the file is left exactly as it was. Keeps the previous file
-# as koha-conf.xml.bak-<time> (ACCESS_BAK).
-access_dirs_apply() {
-    local log="$1" want="$2" tmp n=1 base
-    command -v xmllint >/dev/null 2>&1 || apt_install libxml2-utils >/dev/null 2>&1
-    command -v xmllint >/dev/null 2>&1 || { printf 'xmllint not available\n' >> "$log"; return 1; }
-    base="${KOHA_CONF}.bak-$(date +%Y%m%d-%H%M%S)"; ACCESS_BAK="$base"
-    while [ -e "$ACCESS_BAK" ]; do n=$((n + 1)); ACCESS_BAK="${base}-${n}"; done
-    cp -p "$KOHA_CONF" "$ACCESS_BAK" || { printf 'could not back up %s\n' "$KOHA_CONF" >> "$log"; return 1; }
-    tmp=$(access_dirs_edit "$want") || return 1
-    _replace_koha_conf "$tmp" || { printf 'the new koha-conf.xml was not well-formed: not used\n' >> "$log"; return 1; }
-    if [ "$(access_dirs_list)" != "$(printf '%s\n' "$want" | sed '/^$/d')" ]; then
-        printf 'koha-conf.xml: access_dirs does not read back as wanted: previous file restored\n' >> "$log"
-        cp -p "$ACCESS_BAK" "$KOHA_CONF"
-        return 1
-    fi
-    printf 'koha-conf.xml: access_dirs = %s\n' "$(printf '%s' "$want" | tr '\n' ' ')" >> "$log"
-    return 0
-}
-
-# A folder Koha may show to the staff: absolute, existing, readable by the
-# instance user, and not a system or backup folder (backups hold the whole
-# database, passwords included). Prints the reason when refused.
-access_dir_refused() {
-    local d="$1" real
-    case "$d" in /*) ;; *) t "Type the full path of the folder (starting with /)."; return 0 ;; esac
-    [ -d "$d" ] || { t "That folder does not exist."; return 0; }
-    real=$(readlink -f "$d")
-    case "$real/" in
-        /|/etc/*|/root/*|/boot/*|/proc/*|/sys/*|/dev/*|/run/*|/usr/*|/bin/*|/sbin/*|/lib/*|/var/lib/mysql/*|"${CONF_DIR}"/*|/var/backups/*|/home/|/var/|/var/lib/|/var/lib/koha/)
-            t "That folder holds system files or backups. Choose a folder made for the files the staff may download."; return 0 ;;
-    esac
-    if [ "$(id -u)" = 0 ] && id "${INSTANCE}-koha" >/dev/null 2>&1; then
-        runuser -u "${INSTANCE}-koha" -- test -r "$real" -a -x "$real" || { t "Koha cannot read that folder (it runs as the instance user)."; return 0; }
-    fi
-    return 1
-}
-
 # Installation: the log folder, unless the file already sets a folder.
 access_dirs_install_default() {
     [ -f "$KOHA_CONF" ] || return 0
@@ -20775,81 +20732,6 @@ access_dirs_install_default() {
     tmp=$(access_dirs_edit "$ACCESS_DEFAULT_DIR") || return 0
     _replace_koha_conf "$tmp" || return 0
     log "koha-conf.xml: access_dirs = $ACCESS_DEFAULT_DIR (Tools > Access files)"
-}
-
-function_access_files() {
-    require_database || return 0
-    [ -f "$KOHA_CONF" ] || { msg_error "" "$(t "koha-conf.xml of the instance was not found. Nothing was changed.")" 9 70; return 1; }
-    command -v xmllint >/dev/null 2>&1 || apt_install libxml2-utils >/dev/null 2>&1
-    local opt now
-    while true; do
-        now=$(access_dirs_list)
-        [ -n "$now" ] || now="$(t "off (Koha shows the access_dir error)")"
-        opt=$(ui_menu "$(t "📂  Staff access to server files")" "$(t "Koha's Tools > Access files lets the staff with the access_files permission download the files of the folders set here (not their subfolders).")"$'\n\n'"$(t "Now:") ${now}" \
-            "logs" "$(t "Turn on with Koha's log folder")" \
-            "other" "$(t "Turn on with another folder")" \
-            "off" "$(t "Turn off")") || return 0
-        case "$opt" in
-            logs)  lt_access_files_set "$ACCESS_DEFAULT_DIR" ;;
-            other) lt_access_files_other ;;
-            off)   lt_access_files_off ;;
-        esac
-        clear
-    done
-}
-
-lt_access_files_other() {
-    local d why
-    d=$(ui_input "$(t "Staff access to server files")" "$(t "Full path of the folder whose files the staff may download:")" "/var/lib/koha/${INSTANCE}/arquivos") || return 0
-    d="${d%/}"
-    if [ "$d" = "/var/lib/koha/${INSTANCE}/arquivos" ] && [ ! -d "$d" ]; then
-        mkdir -p "$d" && chown "${INSTANCE}-koha:${INSTANCE}-koha" "$d" 2>/dev/null; chmod 755 "$d" 2>/dev/null
-    fi
-    if why=$(access_dir_refused "$d"); then
-        msg_error "" "$why"$'\n\n'"$(t "Nothing was changed.")" 10 74
-        return 1
-    fi
-    lt_access_files_set "$d"
-}
-
-lt_access_files_off() {
-    if [ -z "$(access_dirs_list)" ]; then
-        msg_info "$(t "Staff access to server files")" "$(t "It is already off.")" 8 60
-        return 0
-    fi
-    prompt_yes_no "$(t "Staff access to server files")" "$(t "Turn off Tools > Access files? The files stay where they are. koha-conf.xml is changed (the previous file is kept next to it) and Koha is restarted.")" 11 76 defaultno || return 0
-    tools_locked _lt_access_files_apply ""
-}
-
-lt_access_files_set() {   # lt_access_files_set DIR
-    local d="$1" why
-    [ "$d" = "$ACCESS_DEFAULT_DIR" ] && mkdir -p "$d"
-    if why=$(access_dir_refused "$d"); then
-        msg_error "" "$why"$'\n\n'"$(t "Nothing was changed.")" 10 74
-        return 1
-    fi
-    if [ "$(access_dirs_list)" = "$d" ]; then
-        msg_info "$(t "Staff access to server files")" "$(t 'Tools > Access files already shows ${d}.')" 8 70
-        return 0
-    fi
-    prompt_yes_no "$(t "Staff access to server files")" "$(t 'Show the files of ${d} in Tools > Access files? koha-conf.xml is changed (the previous file is kept next to it) and Koha is restarted.')" 11 76 || return 0
-    tools_locked _lt_access_files_apply "$d"
-}
-
-_lt_access_files_apply() {   # _lt_access_files_apply DIR|""
-    local log
-    log=$(tools_log access-files)
-    if ! access_dirs_apply "$log" "$1"; then
-        msg_error "" "$(t 'koha-conf.xml could not be changed. Nothing was changed.\n\nLog: ${log}')" 10 72
-        return 1
-    fi
-    plugins_reload
-    log "access files: access_dirs='${1}' (previous koha-conf.xml: $ACCESS_BAK)"
-    if [ -n "$1" ]; then
-        msg_ok "$(t "✅ Tools > Access files is on. Previous koha-conf.xml:") ${ACCESS_BAK}" 9 76
-    else
-        msg_ok "$(t "✅ Tools > Access files is off. Previous koha-conf.xml:") ${ACCESS_BAK}" 9 76
-    fi
 }
 
 # ======================================================================
@@ -37750,7 +37632,6 @@ panel_action_function() {
         cataloguing)        echo function_cataloguing ;;
         cdd)                echo function_cdd ;;
         plugins)            echo function_koha_plugins ;;
-        access-files)       echo function_access_files ;;
         cutter)             echo function_cutter ;;
         marc-replace)       echo function_marc_replace ;;
         ai-assistant)       echo function_ai_assistant ;;
@@ -37924,7 +37805,7 @@ kei_task() {
             restore_apt_timers
             if [ "${1:-}" != "about" ]; then require_systemd || return 1; fi
             case "$fn" in lt_*|function_brazil_tools|function_messaging|function_cataloguing|function_cdd|\
-                          function_koha_plugins|function_access_files|function_cutter) require_koha || return 1 ;; esac
+                          function_koha_plugins|function_cutter) require_koha || return 1 ;; esac
             "$fn" ;;
         ollama-install)
             # Ollama's own install script (AI cataloguing > Local Ollama),

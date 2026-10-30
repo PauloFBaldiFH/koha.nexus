@@ -292,50 +292,18 @@ report_run() {
     assert 'grep -q "WOULD HAVE Updated" "$KEI_S/textbox.last"'
 }
 
-# --- Staff access to server files (Tools > Access files, <access_dirs>) ---
+# --- Tools > Access files: <access_dirs> set by the installation ---
 
 KCONF=/etc/koha/sites/library/koha-conf.xml
 access_dirs() { xmllint --xpath '/yazgfs/config/access_dirs/access_dir/text()' "$KCONF" 2>/dev/null; }
 
-@test "L19 access files: the log folder goes into <access_dirs>, Debian's commented example is kept, Koha restarts" {
-    rm -rf /var/log/koha/library
-    inputs "logs" "CANCEL"
-    panel function_access_files
+@test "L19 access files: the installation sets the log folder once, keeps Debian's commented example and leaves a set folder alone" {
+    panel access_dirs_install_default
     assert '[ "$(access_dirs)" = "/var/log/koha/library" ]' "access_dir must be the instance log folder"
     assert '[ -d /var/log/koha/library ]'
     assert 'xmllint --noout "$KCONF"'
     assert 'grep -q "<access_dir></access_dir>" "$KCONF"' "the commented example stays"
     assert '[ "$(xmllint --xpath "string(/yazgfs/config/pass)" "$KCONF")" = "KeiTest-Pass_42" ]' "other settings untouched"
-    assert 'ls "$KCONF".bak-* >/dev/null' "previous koha-conf.xml kept"
-    assert 'calls | grep -q "koha-plack --restart"' "Koha restarted"
-}
-
-@test "L20 access files: another folder replaces the block, off removes it, the original file can be put back" {
-    cp "$KCONF" "$W/orig.xml"
-    rm -rf /srv/kei-share; mkdir -p /srv/kei-share; chmod 755 /srv/kei-share
-    inputs "logs" "other" "/srv/kei-share" "CANCEL"
-    panel function_access_files
-    assert '[ "$(access_dirs)" = "/srv/kei-share" ]'
-    assert '[ "$(xmllint --xpath "count(/yazgfs/config/access_dirs)" "$KCONF")" = "1" ]' "one block only"
-    inputs "off" "CANCEL"
-    panel function_access_files
-    assert '[ -z "$(access_dirs)" ]'
-    assert 'xmllint --noout "$KCONF"'
-    assert 'diff -q "$KCONF" "$W/orig.xml"' "turning it off gives back the original file"
-}
-
-@test "L21 access files: system, backup and relative folders are refused and nothing changes" {
-    cp "$KCONF" "$W/orig.xml"
-    mkdir -p /var/backups/koha_sql
-    inputs "other" "/etc" "other" "/var/backups/koha_sql" "other" "relative/dir" "other" "/nonexistent-kei" "CANCEL"
-    panel function_access_files
-    assert 'diff -q "$KCONF" "$W/orig.xml"' "koha-conf.xml must not change"
-    assert '[ "$(dialogs | grep -c "^ERROR")" -eq 4 ]'
-}
-
-@test "L22 access files: the installer default fills a fresh koha-conf.xml once and leaves a set folder alone" {
-    panel access_dirs_install_default
-    assert '[ "$(access_dirs)" = "/var/log/koha/library" ]'
     cp "$KCONF" "$W/once.xml"
     panel access_dirs_install_default
     assert 'diff -q "$KCONF" "$W/once.xml"' "a second run changes nothing"

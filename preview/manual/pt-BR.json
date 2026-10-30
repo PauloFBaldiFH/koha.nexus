@@ -1891,35 +1891,6 @@
    ],
    "_en": "d6e4523569"
   },
-  "access-files": {
-   "summary": "Corrige o erro \"a opção access_dir não foi configurada em koha-conf.xml\" de Ferramentas > Acessar arquivos, escolhendo as pastas cujos arquivos a equipe pode baixar.",
-   "overview": [
-    "O `koha-conf.xml` do Debian traz o bloco `<access_dirs>` só como comentário, por isso **Ferramentas > Acessar arquivos** na intranet mostra um erro. Esta ação grava o bloco na seção `<config>` principal, guarda o arquivo anterior como `koha-conf.xml.bak-<data>`, só mantém o novo arquivo se ele estiver bem formado e for lido de volta corretamente, e reinicia o Plack. O Koha lista os arquivos de cada pasta, nunca as subpastas nem os arquivos ocultos."
-   ],
-   "options": [
-    {
-     "name": "Ligar com a pasta de logs do Koha",
-     "text": "Mostra os logs da instância (`/var/log/koha/<instância>`), a pasta que as instalações novas recebem."
-    },
-    {
-     "name": "Ligar com outra pasta",
-     "text": "Uma pasta que você escolhe; pastas do sistema e de backups são recusadas, e o usuário do Koha precisa conseguir lê-la."
-    },
-    {
-     "name": "Desligar",
-     "text": "Remove a configuração; os arquivos continuam onde estão."
-    }
-   ],
-   "steps": [
-    "Abra **Acesso da equipe a arquivos do servidor** e leia o estado atual.",
-    "Escolha **Ligar com a pasta de logs do Koha** ou outra pasta.",
-    "Na intranet, abra **Ferramentas > Acessar arquivos**: a equipe precisa da permissão `access_files`."
-   ],
-   "warnings": [
-    "Toda pessoa da equipe com a permissão `access_files` pode baixar todos os arquivos dessas pastas: nunca aponte para backups ou arquivos privados."
-   ],
-   "_en": "c02e200155"
-  },
   "sec-tools": {
    "summary": "Ferramentas de terminal instaladas sob demanda: monitoramento de recursos ao vivo e um explorador de arquivos.",
    "overview": [
