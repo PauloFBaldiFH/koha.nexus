@@ -2,8 +2,8 @@
 -- the Biblioteca Nacional's dead Z39.50 rows unticked. Run it on the Koha
 -- server, INSTANCE being the Koha instance's name:
 --   sudo koha-mysql INSTANCE < koha-authority-servers.sql
--- The panel does the same with "Update server settings" (Atualizar dados
--- dos servidores) on the Z39.50 / SRU screen, and config.sh at install
+-- The panel does the same with the blue "Update" (Atualizar) button on the
+-- Z39.50 / SRU screen, before it tests the list, and config.sh at install
 -- (--task z3950-seed). Generated from the installer's z3950_auth_rows,
 -- z3950_upsert_sql add and z3950_dead_sql; tests/z3950.bats checks it.
 --

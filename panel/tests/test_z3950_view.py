@@ -369,7 +369,11 @@ def test_network_address_falls_back_to_the_default(monkeypatch, tmp_path):
     assert z3950.network_url() == z3950.NETWORK_URL
 
 
-def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
+def test_one_blue_button_shows_then_updates(tmp_path, monkeypatch):
+    """One button (Paulo 2026-10-30): the first press only tests the list
+    (Show servers); once tested it reads Update, which refreshes Koha's own
+    rows (z3950-sync, the old yellow "Update server settings") and then
+    tests the whole list again."""
     monkeypatch.setenv("KEI_Z3950_DIR", str(tmp_path))
     from kei_panel.app import KohaPanelApp
 
@@ -380,7 +384,8 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
             await pilot.press("z")
             await pilot.pause(0.3)
             view = app.screen.query_one("#view-z3950")
-            assert str(view.query_one("#z-update").label) == "Update server settings"
+            # The yellow button is gone.
+            assert not view.query("#z-update")
             seen, tasks, notes = {}, [], []
             real = z3950.write_add_file
 
@@ -396,33 +401,39 @@ def test_update_server_settings_sends_the_whole_list(tmp_path, monkeypatch):
                 return await task(name, *args, **kw)
             monkeypatch.setattr(app.bridge, "task", spy_task)
             monkeypatch.setattr(app, "notify", lambda msg, **kw: notes.append(str(msg)))
-            # Nothing ticked: the button still takes the whole list.
-            view.selected.clear()
-            view.query_one("#z-update").scroll_visible(animate=False)
+            button = view.query_one("#z-scan")
+
+            # First press, Show servers: the test only, Koha is not touched.
+            assert str(button.label) == "Show servers"
+            button.scroll_visible(animate=False)
             await pilot.pause(0.1)
-            await pilot.click("#z-update")
-            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
-            # It says the whole list is tested next, and how to add servers to Koha.
-            assert "every server of the list is tested" in app.screen._question
-            await pilot.click("#yes")
-            # No box to close: the counts are a notice and the test starts at once.
-            await _until(pilot, lambda: any(n.startswith("Servers added") for n in notes), wait=30)
-            assert "z3950-sync" in tasks
+            await pilot.click("#z-scan")
+            await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
+            await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen), wait=30)
+            assert "z3950-sync" not in tasks
+            assert view.history.tested and str(button.label) == "Update"
+            assert any("returned a valid MARC record" in n for n in notes)
+
+            # Second press, Update: no question, Koha's rows first, then the test.
+            notes.clear()
+            view.selected.clear()      # nothing ticked: the whole list is still sent
+            await pilot.click("#z-scan")
+            await _until(pilot, lambda: "z3950-sync" in tasks, wait=30)
+            assert not isinstance(app.screen, ConfirmScreen)
             lines = seen["text"].splitlines()
             # The direct authority files Koha lacks are left out: only Add puts them in Koha.
             assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 17
             assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
                        for line in lines)
-            assert "Servers added: 3 · updated: 5" in notes
-            # Then the whole list is tested, as Show servers does: the list appears.
+            # The counts are a notice, not a box to close; then the test starts.
+            await _until(pilot, lambda: "Servers added: 3 · updated: 5" in notes, wait=30)
             await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
             assert not any(isinstance(s, MessageScreen) for s in app.screen_stack)
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen), wait=30)
-            assert view.history.tested and str(view.query_one("#z-scan").label) == "Update"
+            assert str(button.label) == "Update"
             assert any("returned a valid MARC record" in n for n in notes)
 
     asyncio.run(main())
-
 
 
 def test_ticking_a_server_keeps_the_list_where_it_is(tmp_path, monkeypatch):

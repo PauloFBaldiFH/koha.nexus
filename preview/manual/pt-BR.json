@@ -752,7 +752,7 @@
    "options": [
     {
      "name": "Mostrar servidores / Atualizar",
-     "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar, para testar de novo; o último teste fica guardado."
+     "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar: ele primeiro passa os dados da lista para os servidores que o Koha já tem (endereço, porta, base, formato; marcação e ordem mantidas) e adiciona os arquivos de autoridade que faltam, e então testa a lista inteira de novo. O último teste fica guardado."
     },
     {
      "name": "Salvar no Koha",
@@ -797,7 +797,7 @@
     "Um endereço marcado com * vem de uma lista antiga: o teste diz se ele ainda funciona.",
     "Exporte a sua lista testada e importe-a nos seus outros servidores Koha para ganhar tempo."
    ],
-   "_en": "6cfdd557a3"
+   "_en": "41d1eb36e1"
   },
   "z3950-zeus": {
    "title": "Catálogo Zeus pelo gateway do koha.nexus (UFSC)",

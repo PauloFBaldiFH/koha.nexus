@@ -899,7 +899,7 @@
    "options": [
     {
      "name": "Show servers / Update",
-     "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update, to test again; the last test is kept."
+     "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update: it first gives the servers Koha already has the list's settings (address, port, database, format; tick and rank kept) and adds the authority files when missing, then tests the whole list again. The last test is kept."
     },
     {
      "name": "Save to Koha",

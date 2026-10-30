@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.131",
+ "panel_version": "1.5.132",
  "languages": [
   {
    "code": "en",
@@ -17543,7 +17543,7 @@
     "options": [
      {
       "name": "Show servers / Update",
-      "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update, to test again; the last test is kept."
+      "text": "Tests every server of the list: its listed port, then 210, 2100 and 2210, then a real search that must return a valid MARC record. The list then shows only the servers that returned one. A backup server (the koha.nexus gateway) is tested and shown only when its main server returned no record. The button then becomes Update: it first gives the servers Koha already has the list's settings (address, port, database, format; tick and rank kept) and adds the authority files when missing, then tests the whole list again. The last test is kept."
      },
      {
       "name": "Save to Koha",
@@ -17600,7 +17600,7 @@
     "options": [
      {
       "name": "Mostrar servidores / Atualizar",
-      "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar, para testar de novo; o último teste fica guardado."
+      "text": "Testa todos os servidores da lista: a porta listada, depois 210, 2100 e 2210, depois uma busca real que precisa devolver um registro MARC válido. A lista mostra só os servidores que devolveram registro. Um servidor de backup (o gateway koha.nexus) só é testado e mostrado quando o servidor principal dele não devolveu registro. Depois o botão vira Atualizar: ele primeiro passa os dados da lista para os servidores que o Koha já tem (endereço, porta, base, formato; marcação e ordem mantidas) e adiciona os arquivos de autoridade que faltam, e então testa a lista inteira de novo. O último teste fica guardado."
      },
      {
       "name": "Salvar no Koha",

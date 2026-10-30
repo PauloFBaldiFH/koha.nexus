@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.131"
+PANEL_VERSION=" 1.5.132"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -35507,7 +35507,7 @@ enrich_snapshot() {
 
 # z3950_add FILE [sync]: put the panel's targets in z3950servers (an upsert:
 # a row Koha has is updated in place, keeping its tick and rank). With sync
-# (the panel's "Update server settings" button) FILE is the panel's whole
+# (the panel's blue Update button, before its test) FILE is the panel's whole
 # catalogue: every row Koha already has gets the catalogue's settings, the
 # authority targets are added when missing, nothing else is added, and the
 # Biblioteca Nacional's dead Z39.50 rows are unticked.
