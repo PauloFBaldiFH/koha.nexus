@@ -21,7 +21,7 @@ def test_english_choice_is_not_overwritten_by_the_portuguese_body(browser, site_
         expect(page.locator('body')).to_have_attribute('data-language', 'es')
         assert page.evaluate("localStorage.getItem('koha_lang')") == 'es'
         page.get_by_role('link', name='Koha staff manual (English)', exact=True).click()
-        expect(page.locator('#lesson')).to_be_visible()
+        expect(page.locator('#staff-options button').first).to_be_visible()
         # Ordinary links must not overwrite the language preference either.
         assert page.evaluate("localStorage.getItem('koha_lang')") == 'es'
     finally:

@@ -63,3 +63,42 @@ h2{font-size:1.6rem}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}
 }
+.view-switch{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}
+.view-switch [aria-pressed=true]{background:#276d42;border-color:var(--green)}
+.staff-explorer{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:22px;align-items:start}
+.koha-window{background:#f4f6f4;color:#26352c;border:1px solid #b6c4ba;border-radius:10px;overflow:hidden}
+.koha-bar{background:#2d4435;color:#fff;display:flex;align-items:center;gap:16px;padding:15px 20px}
+.koha-bar strong{font-size:1.6rem}
+.demo-account{margin-left:auto;font-size:.75rem}
+.koha-breadcrumb{background:#e3e9e4;border-bottom:1px solid #c4cec7;padding:10px 20px;font-size:.85rem}
+.koha-home{display:grid;grid-template-columns:180px minmax(0,1fr);gap:20px;padding:22px}
+.koha-news{background:#fff;border:1px solid #d5ded7;border-radius:5px;padding:16px;font-size:.85rem}
+.koha-news h2{font-size:1.1rem}
+.koha-news small{color:#52685a}
+.staff-home-heading{font-size:1.1rem;margin:0 0 16px}
+.koha-options{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.koha-options button{display:flex;align-items:center;gap:12px;text-align:left;background:#e0e5e0;color:#243b2b;border:1px solid #c0cec4;border-radius:5px;min-height:65px;padding:12px;font-weight:650;font-size:.92rem}
+.koha-options button>span:first-child{font-size:1.65rem;color:#315c3d;min-width:28px;text-align:center}
+.koha-options button:hover,.koha-options button[aria-pressed=true]{background:#c7dfca;border-color:#487b53;box-shadow:inset 4px 0 #3b7546}
+.koha-permissions{padding:0 22px 12px;font-size:.78rem;color:#52685a}
+.module-explanation{background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;padding:22px;position:sticky;top:20px}
+.module-explanation h2{font-size:1.4rem}
+.module-explanation h3{font-size:1rem;margin-top:22px}
+.module-explanation ul{padding-left:20px}
+.module-explanation li{margin-bottom:12px}
+.module-guides{display:flex;flex-direction:column;gap:10px}
+.module-guides a{border:1px solid var(--line-strong);border-radius:7px;padding:10px;text-decoration:none}
+.module-guides a:hover{background:var(--panel-2)}
+@media(max-width:1150px){.staff-explorer{grid-template-columns:minmax(0,1fr) 270px}
+.koha-home{grid-template-columns:1fr}
+.koha-news{display:none}
+}
+@media(max-width:800px){.staff-explorer{grid-template-columns:1fr}
+.module-explanation{position:static}
+.koha-home{padding:14px}
+.koha-options{gap:8px}
+.koha-options button{font-size:.85rem;padding:10px}
+.koha-bar{flex-wrap:wrap;gap:10px}
+.demo-account{margin-left:0;width:100%}
+}
+.koha-option-column{display:flex;flex-direction:column;gap:12px}
