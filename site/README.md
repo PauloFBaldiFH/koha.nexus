@@ -58,3 +58,10 @@ The translated public URLs now use `/languages/<code>/` and
 generated. Update external bookmarks or configure redirects on the hosting
 service if those old URLs have already been published. No hosting redirect or
 deployment is configured by this generator.
+
+## Koha staff manual
+
+`../staff-manual/` is a separate English operational guide and fictional
+training simulator based on supplied Koha staff templates. Every homepage
+links to it as “Koha staff manual (English)”. It does not translate or replace
+the panel manual. See `../staff-manual/README.md` for coverage and source notes.

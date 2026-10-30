@@ -1,0 +1,556 @@
+{
+  "language": "en",
+  "source_archive_sha256": "8ba73ca3ac6aee0f7e010b859d1cb6d9611020bd7a56b4174979840c17624e2d",
+  "lessons": [
+    {
+      "id": "home",
+      "title": "Staff home",
+      "section": "Getting started",
+      "overview": "The staff interface brings library work together. Available modules depend on the staff account and enabled features.",
+      "steps": [
+        "Sign in with your own staff account and check the library you are working at.",
+        "Identify the module for the task: Circulation, Patrons, Cataloging, Authorities or Reports.",
+        "Use the module navigation to continue; this training environment does not sign in to a real Koha instance."
+      ],
+      "fields": [
+        {
+          "label": "Training task",
+          "example": "Check out an item",
+          "hint": "Choose the circulation workflow for lending an item."
+        }
+      ],
+      "result": "Continue with Checkouts to practise the circulation workflow.",
+      "warning": "Use an individual account. Seeing a module does not grant permission to perform every action in it.",
+      "source": {
+        "path": "modules/intranet-main.tt",
+        "sha256": "c4e0347b37fa69875929547a7993b3beae3a91669fbc773117b9020d38ebca5f"
+      },
+      "where": "Getting started → Staff home"
+    },
+    {
+      "id": "patrons",
+      "title": "Add a patron",
+      "section": "Patrons",
+      "overview": "A patron record connects identity, library membership and circulation. Required fields depend on local configuration.",
+      "steps": [
+        "Open the patron entry form and choose the appropriate patron category.",
+        "Enter identity and membership information; check whether the person already has a record.",
+        "Review the form before saving. In real Koha, resolve mandatory-field and duplicate warnings."
+      ],
+      "fields": [
+        {
+          "label": "Surname",
+          "example": "Reader",
+          "hint": "Synthetic family name."
+        },
+        {
+          "label": "First name",
+          "example": "Alex",
+          "hint": "Synthetic first name."
+        },
+        {
+          "label": "Card number",
+          "example": "DEMO-1001",
+          "hint": "Unique training card number."
+        }
+      ],
+      "result": "The training patron Alex Reader has card number DEMO-1001. No real patron was created.",
+      "warning": "Do not use real personal data in this public manual. Library, category, dates and other requirements vary by site.",
+      "source": {
+        "path": "modules/members/memberentrygen.tt",
+        "sha256": "70dbdde17a664b9090ecc306ed8b90542f9fd25bb2ed3c511e94f9b37eb193a7"
+      },
+      "where": "Patrons → Add a patron"
+    },
+    {
+      "id": "checkouts",
+      "title": "Checkouts",
+      "section": "Circulation",
+      "overview": "Find the correct patron, scan an item barcode and inspect the resulting loan and due date.",
+      "steps": [
+        "Find the patron and confirm identity before scanning a book.",
+        "Enter the item barcode in the checkout form. Read any warning instead of overriding it automatically.",
+        "Check the resulting loan and due date; local circulation rules determine whether lending is allowed."
+      ],
+      "fields": [
+        {
+          "label": "Card number",
+          "example": "DEMO-1001",
+          "hint": "Alex Reader, our synthetic patron."
+        },
+        {
+          "label": "Item barcode",
+          "example": "DEMO-2001",
+          "hint": "Training copy of The Example Library."
+        }
+      ],
+      "result": "DEMO-2001 is shown as checked out to Alex Reader in this exercise. The manual does not calculate real loan rules.",
+      "warning": "Blocks, existing loans, holds and permissions can change the real workflow. Due dates shown by your Koha take precedence.",
+      "source": {
+        "path": "modules/circ/circulation.tt",
+        "sha256": "a23a7ed421eead698c92e02d7123850cf25b2a10db77a7f457c09b75ac34c92c"
+      },
+      "where": "Circulation → Checkouts"
+    },
+    {
+      "id": "checkins",
+      "title": "Checkins",
+      "section": "Circulation",
+      "overview": "Checking an item in ends a loan and may trigger a hold or transfer instruction.",
+      "steps": [
+        "Open Checkins and scan the physical item barcode.",
+        "Read the response: verify the returned item and any hold or transfer message.",
+        "Follow the displayed routing instruction and check the item status before shelving."
+      ],
+      "fields": [
+        {
+          "label": "Item barcode",
+          "example": "DEMO-2001",
+          "hint": "Use the same training copy as the checkout lesson."
+        }
+      ],
+      "result": "The training loan is returned. A real return can require additional confirmation or routing.",
+      "warning": "Do not ignore a hold or transfer message. Return dates and fine calculations follow the installation settings.",
+      "source": {
+        "path": "modules/circ/returns.tt",
+        "sha256": "93e4a55459d91976f819dcd6bbe66c73d54032c5a3067f6b110148d239ffa3c2"
+      },
+      "where": "Circulation → Checkins"
+    },
+    {
+      "id": "search",
+      "title": "Search the catalog",
+      "section": "Catalog",
+      "overview": "Catalog results lead to bibliographic details and the physical items attached to each record.",
+      "steps": [
+        "Search for a title, author or identifier using the catalog search.",
+        "Inspect the results and select the matching bibliographic record.",
+        "Check item availability and location on the record before taking a circulation action."
+      ],
+      "fields": [
+        {
+          "label": "Search terms",
+          "example": "The Example Library",
+          "hint": "Synthetic book used throughout the manual."
+        }
+      ],
+      "result": "Example result: The Example Library — Example Author. Copy DEMO-2001 belongs to the training library.",
+      "warning": "An available bibliographic record is not proof that a physical copy is on the shelf. Filters and search engines vary.",
+      "source": {
+        "path": "modules/catalogue/results.tt",
+        "sha256": "3f49612763848cdd1cabc7dafce7959768f825e092248dd50afdc3bda4349877"
+      },
+      "where": "Catalog → Search the catalog"
+    },
+    {
+      "id": "cataloging",
+      "title": "Add a bibliographic record",
+      "section": "Cataloging",
+      "overview": "The MARC editor describes a bibliographic resource using the selected framework.",
+      "steps": [
+        "Choose the appropriate bibliographic framework before entering the record.",
+        "In a MARC21 framework, review the title and responsibility fields and complete mandatory fields.",
+        "Validate the record and inspect duplicate warnings before saving; add physical items separately."
+      ],
+      "fields": [
+        {
+          "label": "Training title",
+          "example": "The Example Library",
+          "hint": "A synthetic title for a MARC21 cataloging exercise."
+        },
+        {
+          "label": "Training author",
+          "example": "Example Author",
+          "hint": "A synthetic statement of responsibility."
+        }
+      ],
+      "result": "The bibliographic description is ready for review. A physical copy is added in the Items exercise.",
+      "warning": "These training fields summarize a MARC21 exercise, not a complete MARC editor. Framework labels and mandatory tags are configured locally.",
+      "source": {
+        "path": "modules/cataloguing/addbiblio.tt",
+        "sha256": "38e277e77bbbe7ada4d700ac972479ea8e65fae7411a1e8968be482b9637a74e"
+      },
+      "where": "Cataloging → Add a bibliographic record"
+    },
+    {
+      "id": "items",
+      "title": "Add an item",
+      "section": "Cataloging",
+      "overview": "An item is a physical copy attached to a bibliographic record. Item fields are generated from the framework.",
+      "steps": [
+        "Open the correct bibliographic record and its item entry screen.",
+        "Enter the copy details, including its unique barcode and locally valid library and item type.",
+        "Review the physical copy and choose Add item only when its details are correct."
+      ],
+      "fields": [
+        {
+          "label": "Training barcode",
+          "example": "DEMO-2001",
+          "hint": "Unique synthetic barcode."
+        },
+        {
+          "label": "Training library",
+          "example": "DEMO",
+          "hint": "Example code only; use a valid local code in real Koha."
+        }
+      ],
+      "result": "One training item is attached to The Example Library. No additional bibliographic record is needed for an identical copy.",
+      "warning": "Item field labels depend on the framework. Never reuse a barcode already assigned to another copy.",
+      "source": {
+        "path": "modules/cataloguing/additem.tt",
+        "sha256": "1522d672af87d981827306d779e316aa68558557327a8db122c5e89b934bd1b5"
+      },
+      "where": "Cataloging → Add an item"
+    },
+    {
+      "id": "holds",
+      "title": "Place a hold",
+      "section": "Circulation",
+      "overview": "A hold records a request for a resource, subject to patron eligibility and local circulation rules.",
+      "steps": [
+        "Open the intended bibliographic record and choose Place hold.",
+        "Find the correct patron and review pickup library and eligible items.",
+        "Read restrictions and confirm the request only when the patron and resource are correct."
+      ],
+      "fields": [
+        {
+          "label": "Card number",
+          "example": "DEMO-1001",
+          "hint": "Training patron."
+        },
+        {
+          "label": "Training pickup library",
+          "example": "DEMO",
+          "hint": "Example pickup location."
+        }
+      ],
+      "result": "A training hold is ready for the example patron and pickup library.",
+      "warning": "Priority, eligibility, pickup choices and title-level versus item-level holds depend on local rules.",
+      "source": {
+        "path": "modules/reserve/request.tt",
+        "sha256": "f7e149987d9a0c78282b5eb9abe3a09c083d4e6ed926ac07a95bb29b7a5f2325"
+      },
+      "where": "Circulation → Place a hold"
+    },
+    {
+      "id": "authorities",
+      "title": "Search authorities",
+      "section": "Authorities",
+      "overview": "Authority records control names and subjects. Similar names may refer to different people or entities.",
+      "steps": [
+        "Open Authorities and select a suitable authority type or search index.",
+        "Search a heading and examine the matching records.",
+        "Review the preferred heading, variants and identifiers before using a match in cataloging."
+      ],
+      "fields": [
+        {
+          "label": "Training heading",
+          "example": "Example Author",
+          "hint": "Synthetic heading, not an authority from a real institution."
+        }
+      ],
+      "result": "Example Author is selected for inspection. A match must be reviewed before linking it to bibliographic records.",
+      "warning": "This exercise does not merge authorities or verify real identities. Do not link records based only on a similar name.",
+      "source": {
+        "path": "modules/authorities/authorities-home.tt",
+        "sha256": "18f8409955298cd6cf9cb69617c9aaf53f0b9ab943c4610fdcb528b3f30b8299"
+      },
+      "where": "Authorities → Search authorities"
+    },
+    {
+      "id": "reports",
+      "title": "Saved reports",
+      "section": "Reports",
+      "overview": "Saved reports let authorized staff run reusable queries and inspect their results.",
+      "steps": [
+        "Open Reports and locate the saved report you need.",
+        "Read its purpose and SQL or parameters before running it.",
+        "Inspect the output and export only what you are authorized to handle."
+      ],
+      "fields": [
+        {
+          "label": "Training report",
+          "example": "Example item count",
+          "hint": "A fixed, synthetic report; SQL entered here is never executed."
+        }
+      ],
+      "result": "Example result: 3 training items. This fixed sample is not a query against a library database.",
+      "warning": "Reports may expose personal data or be expensive to run. Permissions apply; this manual never executes SQL.",
+      "source": {
+        "path": "modules/reports/guided_reports_start.tt",
+        "sha256": "56f2292cfa7b2e3e0c24c7abe817c53c08477c35c0ff049a4eb4bb0e130a4c48"
+      },
+      "where": "Reports → Saved reports"
+    },
+    {
+      "id": "acquisitions",
+      "title": "Find a vendor",
+      "section": "Acquisitions",
+      "overview": "Acquisitions tracks purchasing. Vendors, budgets and permissions must be prepared before ordering.",
+      "steps": [
+        "Open Acquisitions and check the available budgets and funds.",
+        "Use the Vendor search to find the intended supplier.",
+        "Inspect the vendor before continuing to baskets and orders; review fund and currency choices."
+      ],
+      "fields": [
+        {
+          "label": "Vendor",
+          "example": "Example Books",
+          "hint": "A fictional supplier, used only in this exercise."
+        }
+      ],
+      "result": "Example Books is the selected training vendor. Purchasing and receiving are separate stages.",
+      "warning": "This exercise does not place an order or commit funds. Budget, tax and currency settings need local review.",
+      "source": {
+        "path": "modules/acqui/acqui-home.tt",
+        "sha256": "08e3a91fbea2df95006356425df0d552eaff49cd61783e457a7cc4efca344b2e"
+      },
+      "where": "Acquisitions → Find a vendor"
+    },
+    {
+      "id": "serials",
+      "title": "Add a subscription",
+      "section": "Serials",
+      "overview": "A serial subscription connects a bibliographic record with a publication schedule and receiving workflow.",
+      "steps": [
+        "Choose the correct record and vendor for the subscription.",
+        "Review Library, item creation and notes on the first form.",
+        "Continue to the publication pattern and dates, checking the prediction before saving."
+      ],
+      "fields": [
+        {
+          "label": "Record",
+          "example": "Example Journal",
+          "hint": "Synthetic journal title."
+        },
+        {
+          "label": "Library",
+          "example": "DEMO",
+          "hint": "Example library code."
+        }
+      ],
+      "result": "The example subscription information is ready for the next form. Receiving issues is a later operation.",
+      "warning": "Frequency, numbering and irregular issues require careful setup. This simulator does not predict real issue dates.",
+      "source": {
+        "path": "modules/serials/subscription-add.tt",
+        "sha256": "5b81da63a0bea269d13fdb606eb809ff1b5de5c798a6a3650132ec4d61fcdb98"
+      },
+      "where": "Serials → Add a subscription"
+    },
+    {
+      "id": "inventory",
+      "title": "Inventory",
+      "section": "Tools",
+      "overview": "Inventory compares a physical shelf check with item records. Options can affect loans and last-seen information.",
+      "steps": [
+        "Choose the collection or item range to inventory.",
+        "Prepare a barcode file or enter one barcode per line and review the checkin options.",
+        "Inspect the comparison results before accepting updates or acting on missing items."
+      ],
+      "fields": [
+        {
+          "label": "Barcode list (one barcode per line)",
+          "example": "DEMO-2001",
+          "hint": "One synthetic scanned copy in this exercise."
+        }
+      ],
+      "result": "DEMO-2001 appears in the training inventory. An item absent from a scan is not automatically proven lost.",
+      "warning": "Review “Do not check in items scanned during inventory”. Real inventory options can change circulation state.",
+      "source": {
+        "path": "modules/tools/inventory.tt",
+        "sha256": "41eabddc065a41e850451df5eace2d9346e2ec464597264b8915473048174b75"
+      },
+      "where": "Tools → Inventory"
+    },
+    {
+      "id": "marc-import",
+      "title": "Stage MARC records",
+      "section": "Tools",
+      "overview": "MARC staging prepares an import batch for review; staging and committing the batch are different steps.",
+      "steps": [
+        "Select the file and confirm Record type, Character encoding and Format.",
+        "Review the matching rule and actions for matching and unmatched records, including item processing.",
+        "Stage the file, then inspect the batch and matches before committing an import."
+      ],
+      "fields": [
+        {
+          "label": "Training file name",
+          "example": "example-records.mrc",
+          "hint": "A name only. No file is uploaded."
+        },
+        {
+          "label": "Record type",
+          "example": "Bibliographic",
+          "hint": "Training batch type."
+        }
+      ],
+      "result": "A synthetic bibliographic batch is staged for review. Nothing has been committed to a catalog.",
+      "warning": "Test a small batch and make a verified backup before a real import. Incorrect matching actions can overwrite existing records.",
+      "source": {
+        "path": "modules/tools/stage-marc-import.tt",
+        "sha256": "c6e13bfea5237c35eeb2f8ff469ef733d7efb6ac05b5509edc13bf0906d83bf2"
+      },
+      "where": "Tools → Stage MARC records"
+    },
+    {
+      "id": "lists",
+      "title": "Create a list",
+      "section": "Lists",
+      "overview": "Lists collect bibliographic records for a purpose without creating duplicate catalog records.",
+      "steps": [
+        "Open Lists and create or select a list.",
+        "Enter its name and review visibility and who may change its contents.",
+        "Add the intended records and verify the resulting list."
+      ],
+      "fields": [
+        {
+          "label": "Name",
+          "example": "Example reading list",
+          "hint": "A fictional list used for training."
+        }
+      ],
+      "result": "The example list is ready for bibliographic records. List membership does not change item ownership.",
+      "warning": "Public visibility and editing permissions are separate decisions; review both before saving a real list.",
+      "source": {
+        "path": "modules/virtualshelves/shelves.tt",
+        "sha256": "461cf642aa75e35239ee09c711f63d8ebe042ab8d04e4085e2bbfb6e9c107890"
+      },
+      "where": "Lists → Create a list"
+    },
+    {
+      "id": "preferences",
+      "title": "System preferences",
+      "section": "Administration",
+      "overview": "System preferences affect library-wide behavior and should be changed deliberately.",
+      "steps": [
+        "Open Administration and System preferences with an authorized account.",
+        "Search for the specific preference and read its explanation and current value.",
+        "Record the original setting, review the effect and save only the intended change."
+      ],
+      "fields": [
+        {
+          "label": "Training preference search",
+          "example": "SearchEngine",
+          "hint": "Search only; this exercise does not change the search engine."
+        }
+      ],
+      "result": "The example preference is located for inspection. No preference value has been changed.",
+      "warning": "Some settings need additional setup or reindexing. Do not switch engines simply to complete a tutorial.",
+      "source": {
+        "path": "modules/admin/preferences.tt",
+        "sha256": "56ce12ea8bdbbdbe9b36e98192fb9eaec9c51ec8c4890b0376ae2880c6e9c5b2"
+      },
+      "where": "Administration → System preferences"
+    },
+    {
+      "id": "administration",
+      "title": "Administration overview",
+      "section": "Administration",
+      "overview": "Administration groups configuration such as libraries, patron categories, item types and circulation rules.",
+      "steps": [
+        "Identify the configuration area relevant to your task.",
+        "Review existing codes and dependencies before creating or editing settings.",
+        "Test the effect on a representative patron and item before applying broad changes."
+      ],
+      "fields": [
+        {
+          "label": "Training configuration area",
+          "example": "Libraries",
+          "hint": "Start by inspecting existing libraries."
+        }
+      ],
+      "result": "The Libraries area is selected for review. Configuration codes connect many records and rules.",
+      "warning": "Deleting or renaming referenced codes can have broad effects. This exercise does not reproduce all administrative forms.",
+      "source": {
+        "path": "modules/admin/admin-home.tt",
+        "sha256": "01e390110eb990e6b35592bc182bc89e283340de090f77d29acec906bc4f154f"
+      },
+      "where": "Administration → Administration overview"
+    },
+    {
+      "id": "tools",
+      "title": "Tools overview",
+      "section": "Tools",
+      "overview": "Tools contains specialized and batch operations. The available tools depend on permissions and configuration.",
+      "steps": [
+        "Choose a tool based on the operation, not only the name of the file you received.",
+        "Read the tool options and identify whether it can modify or delete records.",
+        "For batch changes, test a small selection and review the result before a larger operation."
+      ],
+      "fields": [
+        {
+          "label": "Training tool",
+          "example": "Inventory",
+          "hint": "Open the Inventory lesson for a guided example."
+        }
+      ],
+      "result": "Inventory is the selected training tool. MARC staging has its own separate lesson.",
+      "warning": "A preview is not always a completed operation. Verify the outcome and retain a recovery path for destructive tools.",
+      "source": {
+        "path": "modules/tools/tools-home.tt",
+        "sha256": "412fb6fe12505a9f215b19bde8f67c0cfdccc840e51dd51bb886cab98c556b60"
+      },
+      "where": "Tools → Tools overview"
+    },
+    {
+      "id": "course-reserves",
+      "title": "Course reserves",
+      "section": "Course reserves",
+      "overview": "Course reserves associates course information with teaching resources when the feature is enabled.",
+      "steps": [
+        "Open Course reserves and check that departments are configured.",
+        "Enter the course details and review instructors and visibility.",
+        "Save the course, then review the separate workflow for adding reserve items."
+      ],
+      "fields": [
+        {
+          "label": "Course name",
+          "example": "Introduction to Libraries",
+          "hint": "Fictional course."
+        },
+        {
+          "label": "Course number",
+          "example": "DEMO-101",
+          "hint": "Training identifier."
+        }
+      ],
+      "result": "The synthetic course is ready to review. Course creation and adding reserve items are separate tasks.",
+      "warning": "The module may be disabled. Required authorized values, permissions and item handling depend on local setup.",
+      "source": {
+        "path": "modules/course_reserves/course.tt",
+        "sha256": "91d30956d72e7b00a4154c6cdb42ba5faaf269c8ab99acbaeddacbad55f41cdd"
+      },
+      "where": "Course reserves → Course reserves"
+    },
+    {
+      "id": "ill",
+      "title": "Interlibrary loans",
+      "section": "Interlibrary loans",
+      "overview": "Interlibrary loan requests use the installed provider and its workflow.",
+      "steps": [
+        "Open the requests list and inspect the patron, resource and request status.",
+        "Review supplier details, costs and staff notes before confirming an action.",
+        "Follow the provider workflow and record the outcome rather than assuming an item has arrived."
+      ],
+      "fields": [
+        {
+          "label": "Patron ID",
+          "example": "DEMO-1001",
+          "hint": "Synthetic patron reference for training."
+        },
+        {
+          "label": "Staff notes",
+          "example": "Training request only",
+          "hint": "Do not send this example to a supplier."
+        }
+      ],
+      "result": "The example request is ready for staff review. No request, email or charge was sent.",
+      "warning": "ILL providers define different fields and transitions. This exercise covers inspection, not every provider operation.",
+      "source": {
+        "path": "modules/ill/ill-requests.tt",
+        "sha256": "8b6a90b0074a6f1bdb4710ebebed9357121df44639d49e1d7574110b89904a37"
+      },
+      "where": "Interlibrary loans → Interlibrary loans"
+    }
+  ]
+}
