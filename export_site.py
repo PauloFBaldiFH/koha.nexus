@@ -146,7 +146,7 @@ class Renderer(HTMLParser):
         elif tag in ('link', 'script', 'img', 'a'):
             for name in ('src', 'href'):
                 value = attrs.get(name, '')
-                if value.startswith(('site/', 'docs/', 'README.md', 'preview/assets/', 'staff-manual/')):
+                if value.startswith(('site/', 'docs/', 'README.md', 'preview/assets/')):
                     attrs[name] = relative(value, self.current) + ('/' if value.endswith('/') else '')
         if tag == 'input' and attrs.get('id') == 'kp-search':
             attrs['placeholder'] = self.text['search']
