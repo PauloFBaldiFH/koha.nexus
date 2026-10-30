@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.129",
+ "panel_version": "1.5.131",
  "languages": [
   {
    "code": "en",
@@ -631,6 +631,7 @@
     "cataloguing",
     "cdd",
     "plugins",
+    "access-files",
     "cutter"
    ],
    "features": [],
@@ -1366,6 +1367,16 @@
    "section": "library",
    "label": "🧩  Koha plugins (turn on or off)",
    "description": "Turns Koha plugins on or off and sets their sources",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "access-files": {
+   "id": "access-files",
+   "type": "entry",
+   "section": "library",
+   "label": "📂  Staff access to server files",
+   "description": "Fixes the access_dir error of Tools > Access files in Koha",
    "kind": "native",
    "status": "available",
    "media": []
@@ -6361,6 +6372,56 @@
    "fr": null,
    "it": null,
    "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📂  Staff access to server files": {
+   "en": "📂  Staff access to server files",
+   "pt-BR": "📂  Acesso da equipe a arquivos do servidor",
+   "es": "📂  Acceso del personal a archivos del servidor",
+   "fr": "📂  Accès du personnel aux fichiers du serveur",
+   "it": "📂  Accesso del personale ai file del server",
+   "de": "📂  Zugriff des Personals auf Serverdateien",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Fixes the access_dir error of Tools > Access files in Koha": {
+   "en": "Fixes the access_dir error of Tools > Access files in Koha",
+   "pt-BR": "Corrige o erro do access_dir em Ferramentas > Acessar arquivos do Koha",
+   "es": "Corrige el error de access_dir en Herramientas > Acceder a archivos de Koha",
+   "fr": "Corrige l'erreur access_dir d'Outils > Accès aux fichiers dans Koha",
+   "it": "Corregge l'errore access_dir di Strumenti > Accedi ai file in Koha",
+   "de": "Behebt den access_dir-Fehler von Werkzeuge > Dateizugriff in Koha",
    "nl": null,
    "sv": null,
    "pl": null,
@@ -16078,6 +16139,68 @@
     ]
    }
   },
+  "access-files": {
+   "en": {
+    "summary": "Fixes Koha's \"access_dir was not set in koha-conf.xml\" error on Tools > Access files by choosing the folders whose files the staff may download.",
+    "overview": [
+     "Debian's `koha-conf.xml` has the `<access_dirs>` block only as a comment, so **Tools > Access files** in the staff interface shows an error. This writes the block into the main `<config>` section, keeps the previous file as `koha-conf.xml.bak-<date>`, keeps the new file only if it is well-formed and reads back correctly, and restarts Plack. Koha lists the files of each folder, never its subfolders or hidden files."
+    ],
+    "steps": [
+     "Open **Staff access to server files** and read the current state.",
+     "Choose **Turn on with Koha's log folder** or another folder.",
+     "In the staff interface, open **Tools > Access files**: staff need the `access_files` permission."
+    ],
+    "options": [
+     {
+      "name": "Turn on with Koha's log folder",
+      "text": "Shows the instance's logs (`/var/log/koha/<instance>`), the folder new installs get."
+     },
+     {
+      "name": "Turn on with another folder",
+      "text": "A folder you choose; system and backup folders are refused, and Koha's user must be able to read it."
+     },
+     {
+      "name": "Turn off",
+      "text": "Removes the setting; the files stay where they are."
+     }
+    ],
+    "warnings": [
+     "Every staff member with the `access_files` permission can download every file in these folders: never point it at backups or private files."
+    ],
+    "related": [
+     "sec-library",
+     "plugins"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Corrige o erro \"a opção access_dir não foi configurada em koha-conf.xml\" de Ferramentas > Acessar arquivos, escolhendo as pastas cujos arquivos a equipe pode baixar.",
+    "overview": [
+     "O `koha-conf.xml` do Debian traz o bloco `<access_dirs>` só como comentário, por isso **Ferramentas > Acessar arquivos** na intranet mostra um erro. Esta ação grava o bloco na seção `<config>` principal, guarda o arquivo anterior como `koha-conf.xml.bak-<data>`, só mantém o novo arquivo se ele estiver bem formado e for lido de volta corretamente, e reinicia o Plack. O Koha lista os arquivos de cada pasta, nunca as subpastas nem os arquivos ocultos."
+    ],
+    "steps": [
+     "Abra **Acesso da equipe a arquivos do servidor** e leia o estado atual.",
+     "Escolha **Ligar com a pasta de logs do Koha** ou outra pasta.",
+     "Na intranet, abra **Ferramentas > Acessar arquivos**: a equipe precisa da permissão `access_files`."
+    ],
+    "options": [
+     {
+      "name": "Ligar com a pasta de logs do Koha",
+      "text": "Mostra os logs da instância (`/var/log/koha/<instância>`), a pasta que as instalações novas recebem."
+     },
+     {
+      "name": "Ligar com outra pasta",
+      "text": "Uma pasta que você escolhe; pastas do sistema e de backups são recusadas, e o usuário do Koha precisa conseguir lê-la."
+     },
+     {
+      "name": "Desligar",
+      "text": "Remove a configuração; os arquivos continuam onde estão."
+     }
+    ],
+    "warnings": [
+     "Toda pessoa da equipe com a permissão `access_files` pode baixar todos os arquivos dessas pastas: nunca aponte para backups ou arquivos privados."
+    ]
+   }
+  },
   "sec-library": {
    "en": {
     "summary": "Day-to-day tools for the library staff, all with Koha's own scripts: imports and their undo, authorities, reports, patron turnover, data quality, privacy (LGPD), Brazilian localisation and plugins.",
@@ -18655,15 +18778,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 112,
-   "manual_total": 112,
+   "manual": 113,
+   "manual_total": 113,
    "manual_outdated": [],
-   "strings": 403,
-   "strings_total": 403
+   "strings": 405,
+   "strings_total": 405
   },
   "pt-BR": {
-   "manual": 112,
-   "manual_total": 112,
+   "manual": 113,
+   "manual_total": 113,
    "manual_outdated": [
     "sec-dashboard",
     "install",
@@ -18679,155 +18802,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 394,
-   "strings_total": 403
+   "strings": 396,
+   "strings_total": 405
   },
   "es": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
-   "strings": 279,
-   "strings_total": 403
+   "strings": 281,
+   "strings_total": 405
   },
   "fr": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
-   "strings": 275,
-   "strings_total": 403
+   "strings": 277,
+   "strings_total": 405
   },
   "it": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
-   "strings": 273,
-   "strings_total": 403
+   "strings": 275,
+   "strings_total": 405
   },
   "de": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
-   "strings": 273,
-   "strings_total": 403
+   "strings": 275,
+   "strings_total": 405
   },
   "nl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "sv": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "pl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "cs": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "ru": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "uk": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "tr": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "tl": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "id": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "ar": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "fa": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "hi": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "bn": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "vi": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "zh": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "ja": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   },
   "ko": {
    "manual": 0,
-   "manual_total": 112,
+   "manual_total": 113,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 403
+   "strings_total": 405
   }
  }
 }
