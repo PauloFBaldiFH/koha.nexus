@@ -165,6 +165,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📝  Cataloguing aids: PHA, Cutter, CDD", "cataloguing", kind="native", hidden=True),
         Entry("🔎  CDD lookup in the cataloguing (staff tool)", "cdd", kind="native", hidden=True),
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
+        Entry("📂  Staff access to server files", "access-files", kind="native"),
         Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
     ), key="l"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
@@ -263,6 +264,7 @@ DESCRIPTIONS: dict[str, str] = {
     "cataloguing": "PHA, Cutter and CDD helpers for cataloguers",
     "cdd": "Adds a CDD lookup to the cataloguing editor",
     "plugins": "Turns Koha plugins on or off and sets their sources",
+    "access-files": "Fixes the access_dir error of Tools > Access files in Koha",
     "cutter": "Finds the Cutter number of an author",
     "monitor": "Watches CPU, memory and network live",
     "mc": "Browses the server's files in Midnight Commander",

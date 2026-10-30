@@ -78,6 +78,7 @@ GENERIC: dict[str, str] = {
     "marc-replace": "🔀  Replace a MARC record (staff tool)",
     "cdd": "🔎  CDD lookup in the cataloguing (staff tool)",
     "plugins": "🧩  Koha plugins (turn on or off)",
+    "access-files": "📂  Staff access to server files",
     "cutter": "🧮  Cutter Calculator",
     "ai-assistant": "💬  AI assistant on the staff home page",
     "crons": "⏰  Schedules & cron tasks",

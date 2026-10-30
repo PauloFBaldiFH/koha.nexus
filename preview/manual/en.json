@@ -2225,6 +2225,38 @@
     "Install plugins only from sources you trust: a plugin runs with Koha's full access to the database."
    ]
   },
+  "access-files": {
+   "summary": "Fixes Koha's \"access_dir was not set in koha-conf.xml\" error on Tools > Access files by choosing the folders whose files the staff may download.",
+   "options": [
+    {
+     "name": "Turn on with Koha's log folder",
+     "text": "Shows the instance's logs (`/var/log/koha/<instance>`), the folder new installs get."
+    },
+    {
+     "name": "Turn on with another folder",
+     "text": "A folder you choose; system and backup folders are refused, and Koha's user must be able to read it."
+    },
+    {
+     "name": "Turn off",
+     "text": "Removes the setting; the files stay where they are."
+    }
+   ],
+   "related": [
+    "sec-library",
+    "plugins"
+   ],
+   "overview": [
+    "Debian's `koha-conf.xml` has the `<access_dirs>` block only as a comment, so **Tools > Access files** in the staff interface shows an error. This writes the block into the main `<config>` section, keeps the previous file as `koha-conf.xml.bak-<date>`, keeps the new file only if it is well-formed and reads back correctly, and restarts Plack. Koha lists the files of each folder, never its subfolders or hidden files."
+   ],
+   "steps": [
+    "Open **Staff access to server files** and read the current state.",
+    "Choose **Turn on with Koha's log folder** or another folder.",
+    "In the staff interface, open **Tools > Access files**: staff need the `access_files` permission."
+   ],
+   "warnings": [
+    "Every staff member with the `access_files` permission can download every file in these folders: never point it at backups or private files."
+   ]
+  },
   "sec-tools": {
    "summary": "Terminal tools installed on demand: live resource monitoring and a file explorer.",
    "related": [
