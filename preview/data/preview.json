@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.128",
+ "panel_version": "1.5.129",
  "languages": [
   {
    "code": "en",
@@ -17625,6 +17625,10 @@
      {
       "name": "Block background and Page colour",
       "text": "The colour of the content blocks, and an optional colour for the page behind them."
+     },
+     {
+      "name": "Style details",
+      "text": "Seven lists, the same on the OPAC and in the Staff interface box, each starting with the look as it was: *Card shadow* (as the texture draws it, none, soft, medium, strong), *Spacing* (normal, compact, airy), *Icons* (filled or outline), *Background pattern* (dots, grid, diagonal lines or grain, only without a wallpaper), *Tables and menus* (as Koha draws them, or in the chosen texture), *Login page* (Koha's own, a highlighted card, or the card on the accent colours) and *Hover animations* (subtle, lively, or off). All drawn in CSS, with no picture files."
      }
     ],
     "tips": [
@@ -17661,6 +17665,10 @@
      {
       "name": "Fundo dos blocos e Cor da página",
       "text": "A cor dos blocos de conteúdo e uma cor opcional para a página atrás deles."
+     },
+     {
+      "name": "Detalhes de estilo",
+      "text": "Sete listas, iguais no OPAC e no quadro da Interface da equipe, cada uma começando pela aparência como era: *Sombra dos cartões* (como a textura desenha, nenhuma, suave, média, forte), *Espaçamento* (normal, compacto, arejado), *Ícones* (preenchidos ou contorno), *Padrão de fundo* (pontos, grade, linhas diagonais ou granulado, só sem papel de parede), *Tabelas e menus* (como o Koha desenha, ou na textura escolhida), *Página de login* (a do Koha, um cartão em destaque, ou o cartão sobre as cores de destaque) e *Animações ao passar o mouse* (discretas, animadas ou desligadas). Tudo desenhado em CSS, sem arquivos de imagem."
      }
     ],
     "tips": [

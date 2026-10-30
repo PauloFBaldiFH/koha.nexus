@@ -880,6 +880,10 @@
     {
      "name": "Fundo dos blocos e Cor da página",
      "text": "A cor dos blocos de conteúdo e uma cor opcional para a página atrás deles."
+    },
+    {
+     "name": "Detalhes de estilo",
+     "text": "Sete listas, iguais no OPAC e no quadro da Interface da equipe, cada uma começando pela aparência como era: *Sombra dos cartões* (como a textura desenha, nenhuma, suave, média, forte), *Espaçamento* (normal, compacto, arejado), *Ícones* (preenchidos ou contorno), *Padrão de fundo* (pontos, grade, linhas diagonais ou granulado, só sem papel de parede), *Tabelas e menus* (como o Koha desenha, ou na textura escolhida), *Página de login* (a do Koha, um cartão em destaque, ou o cartão sobre as cores de destaque) e *Animações ao passar o mouse* (discretas, animadas ou desligadas). Tudo desenhado em CSS, sem arquivos de imagem."
     }
    ],
    "tips": [

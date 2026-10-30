@@ -415,6 +415,9 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             q("#o-val-logo", Input).value = "https://img.example.org/logo.png"
             q("#o-src-logo", Select).value = "url"
             q("#o-staff-font", Slider).value = 110
+            assert q("#o-style-shadow", Select).value == "texture"       # the style details as they were
+            q("#o-style-icons", Select).value = "outline"
+            q("#o-style-login_style", Select).value = "card"
             await pilot.pause(0.1)
             q("#o-staff-copy", Button).press()
             await pilot.pause(0.2)
@@ -429,7 +432,11 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             assert q("#o-staff-header_glass", Switch).value is False     # the glass top bar stays off
             q("#o-staff-header_glass", Switch).value = True
             q("#o-staff-header_opacity", Slider).value = 70
+            assert q("#o-staff-style-icons", Select).value == "outline"  # copied with the preset
+            q("#o-staff-style-motion", Select).value = "off"
             cfg, _p, problem = view.collect()
+            assert (cfg["icons"], cfg["login_style"], cfg["motion"]) == ("outline", "card", "subtle")
+            assert (cfg["staff"]["icons"], cfg["staff"]["motion"]) == ("outline", "off")
             assert problem == "" and cfg["staff"]["page"] == "#101820"
             assert cfg["staff"]["header_glass"] is True and cfg["staff"]["header_opacity"] == 70
 
@@ -442,6 +449,7 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
             assert "feTurbulence" in seen["staff"]          # brushed metal on the staff blocks
             assert "html { font-size: 110%; }" in seen["staff"]
             assert "--nexus-staff-header-a: 0.70" in seen["staff"]
+            assert "html body#main_auth #login {" in seen["staff"] and "/* Animations off. */" in seen["staff"]
 
     asyncio.run(main())
 
