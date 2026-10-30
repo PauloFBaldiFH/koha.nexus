@@ -8,7 +8,7 @@ function rememberSiteLanguage(code) {
 }
 (function () {
   const current = new URL(location.href);
-  const links = Array.from(document.querySelectorAll("[data-language]"));
+  const links = Array.from(document.querySelectorAll("a[data-language]"));
   const aliases = {br: "pt", "pt-br": "pt", fil: "tl"};
   function match(value) {
     const tag = String(value || "").toLowerCase().replace(/_/g, "-");
@@ -22,7 +22,7 @@ function rememberSiteLanguage(code) {
   if (requested) {
     link = match(requested);
     if (link) rememberSiteLanguage(link.dataset.language);
-  } else if (current.pathname === SITE_ROOT.pathname || current.pathname === SITE_ROOT.pathname + "index.html") {
+  } else if (current.pathname === SITE_ROOT.pathname) {
     // Explicit translated URLs stay in their language. Only the root detects.
     let saved;
     try { saved = localStorage.getItem(SITE_LANGUAGE_KEY); } catch (e) {}
@@ -38,9 +38,9 @@ function rememberSiteLanguage(code) {
     location.replace(url.href);
   }
 })();
-document.querySelectorAll("[data-language]").forEach(a => a.addEventListener("click", () => {
+document.querySelectorAll("a[data-language]").forEach(a => a.addEventListener("click", () => {
   rememberSiteLanguage(a.dataset.language);
-  if (location.hash && !Array.from(document.querySelectorAll("[data-language]")).some(link => link.dataset.language === location.hash.slice(1))) a.hash = location.hash;
+  if (location.hash && !Array.from(document.querySelectorAll("a[data-language]")).some(link => link.dataset.language === location.hash.slice(1))) a.hash = location.hash;
 }));
     function copyFallback(value) {
       const area = document.createElement("textarea");

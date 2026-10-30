@@ -219,7 +219,8 @@ function visit(path, languages, saved, blocked = false) {
   return {redirect, links, saved: () => saved};
 }
 assert.equal(visit('./', ['pt-BR']).redirect, 'https://example.org/project/languages/pt/');
-assert.equal(visit('index.html', ['xx', 'fr-CA']).redirect, 'https://example.org/project/languages/fr/');
+assert.equal(visit('./', ['xx', 'fr-CA']).redirect, 'https://example.org/project/languages/fr/');
+assert.equal(visit('index.html', ['pt-BR'], 'pt').redirect, null);
 assert.equal(visit('./', ['fil-PH']).redirect, 'https://example.org/project/languages/tl/');
 assert.equal(visit('./', ['xx']).redirect, null);
 assert.equal(visit('./', ['en-US', 'pt']).redirect, null);
