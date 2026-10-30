@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.129"
+PANEL_VERSION=" 1.5.130"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -3033,32 +3033,82 @@ backup_set_codec() {
     return 0
 }
 
+# Why the last create_safety_backup failed, in words for the operator (empty
+# after a success): read by safety_backup_failed_text and logged.
+SAFETY_BACKUP_ERROR=""
+
 # Dumps the Koha database to $1 (compressed as its name ends: .sql.gz,
 # .sql.zst or .sql.xz) and checks the result (compression test, complete
-# mysqldump, minimum size). Removes the file and returns 1 on any failure.
+# mysqldump). Removes the file and returns 1 on any failure, with the cause
+# in SAFETY_BACKUP_ERROR.
 create_safety_backup() {
     local out="$1" errlog="${2:-${LOG_DIR}/mysql.log}" codec part="${1}.part" um
+    local dir dumperr comperr err free st=()
+    SAFETY_BACKUP_ERROR=""
     case "$out" in *.zst) codec=zst ;; *.xz) codec=xz ;; *) codec=gz ;; esac
-    mkdir -p "$(dirname "$out")" 2>/dev/null
+    dir=$(dirname "$out")
+    mkdir -p "$dir" 2>/dev/null
     # In the backup folder a copy is for root only (600), as the cron
     # backups are: it holds every patron. A manual backup to a folder the
     # operator chose keeps the usual mode, so they can still open it.
     um=$(umask)
     case "$out" in "${DIR_SQL%/}"/*|"${DIR_MARC%/}"/*) umask 077 ;; esac
+    dumperr=$(mktemp 2>/dev/null) || dumperr=/dev/null
+    comperr=$(mktemp 2>/dev/null) || comperr=/dev/null
     # Written as FILE.part and renamed once verified: a dump in progress or
     # cut short is never taken for the newest backup (sql_backup_list).
-    if mysqldump --single-transaction --quick --routines --triggers \
-            --default-character-set=utf8mb4 "$DB_NAME" 2>>"$errlog" | backup_compress "$codec" 2>/dev/null > "$part" \
-       && [ "$(dump_codec "$part")" = "$codec" ] && dump_test "$part" \
-       && [ "$(stat -c %s "$part" 2>/dev/null || echo 0)" -ge 10240 ] \
-       && dump_is_complete "$part" \
-       && mv -f -- "$part" "$out"; then
-        umask "$um"
-        return 0
+    if ! err=$( { : > "$part"; } 2>&1 ); then
+        err=${err##*: }
+        SAFETY_BACKUP_ERROR=$(t 'The folder ${dir} cannot be written (${err}).')
+    else
+        mysqldump --single-transaction --quick --routines --triggers \
+            --default-character-set=utf8mb4 "$DB_NAME" 2>"$dumperr" | backup_compress "$codec" 2>"$comperr" > "$part"
+        st=("${PIPESTATUS[@]}")
+        [ -s "$dumperr" ] && cat -- "$dumperr" >> "$errlog" 2>/dev/null
+        free=$(df -h --output=avail -- "$dir" 2>/dev/null | tail -n 1 | tr -d ' ')
+        if grep -qiE 'no space left|errcode: 28|error 28|disk full' -- "$dumperr" "$comperr" 2>/dev/null; then
+            err=$(grep -hiE 'no space left|errcode: 28|error 28|disk full' -- "$dumperr" "$comperr" | tail -n 1 | cut -c1-200)
+            SAFETY_BACKUP_ERROR=$(t 'The disk is full (free in ${dir}: ${free}): ${err}')
+        elif [ "${st[0]:-1}" -ne 0 ]; then
+            err=$(grep -v '^[[:space:]]*$' -- "$dumperr" 2>/dev/null | tail -n 1 | cut -c1-200)
+            case "$err" in
+                *"Tablespace is missing"*|*"doesn't exist in engine"*|*"Incorrect information in file"*|*"marked as crashed"*|*"Can't find file"*|*"error 194 "*|*" (1030)"*|*" (1932)"*)
+                    SAFETY_BACKUP_ERROR=$(t 'Some tables of the database ${DB_NAME} are damaged on disk (their data files are missing or unreadable), so MariaDB cannot copy them: ${err}') ;;
+                *"Can't connect"*|*"Access denied"*|*"Lost connection"*|*"server has gone away"*)
+                    SAFETY_BACKUP_ERROR=$(t 'MariaDB is not running or refused the connection: ${err}') ;;
+                *)
+                    SAFETY_BACKUP_ERROR=$(t 'MariaDB could not copy the database ${DB_NAME}: ${err}') ;;
+            esac
+        elif [ "${st[1]:-1}" -ne 0 ]; then
+            err=$(grep -v '^[[:space:]]*$' -- "$comperr" 2>/dev/null | tail -n 1 | cut -c1-200)
+            SAFETY_BACKUP_ERROR=$(t 'Writing the copy to ${dir} failed (free: ${free}): ${err}')
+        elif [ "$(dump_codec "$part")" = "$codec" ] && dump_test "$part" && dump_is_complete "$part"; then
+            # The end-of-dump line proves the copy is whole, however small a
+            # nearly empty database makes it.
+            if mv -f -- "$part" "$out" 2>"$comperr"; then
+                rm -f -- "$dumperr" "$comperr" 2>/dev/null
+                umask "$um"
+                return 0
+            fi
+            err=$(tail -n 1 -- "$comperr" 2>/dev/null | cut -c1-200)
+            SAFETY_BACKUP_ERROR=$(t 'Writing the copy to ${dir} failed (free: ${free}): ${err}')
+        else
+            SAFETY_BACKUP_ERROR=$(t 'The copy was written but did not pass its check (damaged compression or missing end of dump). Free space in ${dir}: ${free}.')
+        fi
     fi
+    [ "$dumperr" = /dev/null ] || rm -f -- "$dumperr"
+    [ "$comperr" = /dev/null ] || rm -f -- "$comperr"
     umask "$um"
     rm -f -- "$part" "$out"
+    log "safety backup failed (${out}): ${SAFETY_BACKUP_ERROR}"
     return 1
+}
+
+# The "Safety backup failed" dialog text: the cause found by
+# create_safety_backup, then the promise that nothing was changed.
+safety_backup_failed_text() {
+    local reason="${SAFETY_BACKUP_ERROR:-$(t "unknown cause")}"
+    t 'The safety backup of the current database could not be created.\n\nCause: ${reason}\n\nNothing was changed.'
 }
 
 # ======================================================================
@@ -6135,7 +6185,7 @@ _function_restore_database() {
             CLEANUP_FILE=""
             log "restore aborted: the pre-restore safety backup failed (${rescue}); the current database was not touched"
             restore_release
-            msg_error "$(t "Safety backup failed")" "$(t 'The safety backup of the current database could not be created or validated (check the free space and ${DIR_SQL}).\n\nNothing was changed.')" 12 76
+            msg_error "$(t "Safety backup failed")" "$(safety_backup_failed_text)" 16 80
             return 1
         fi
         CLEANUP_FILE=""
@@ -6248,7 +6298,7 @@ function_manual_backup() {
     clear
     display_explanation "Generating the backup..."
 
-    # Same checks as the safety copies: gzip test, complete mysqldump, size.
+    # Same checks as the safety copies: gzip test, complete mysqldump.
     if create_safety_backup "$target_file"; then
 
         log "manual backup generated: $target_file"
@@ -6287,7 +6337,8 @@ function_manual_backup() {
         pause_terminal
     else
         backup_lock_release
-        msg_error "" "$(t "Failed to generate the backup. Check the free disk space.")" 9 70
+        local reason="${SAFETY_BACKUP_ERROR:-$(t "unknown cause")}"
+        msg_error "" "$(t 'Failed to generate the backup.\n\nCause: ${reason}')" 14 80
         return 1
     fi
 }
@@ -9712,7 +9763,7 @@ function_update_system() {
         if ! tui_run "$(t "Saving a safety backup")" create_safety_backup "$pre_update"; then
             CLEANUP_FILE=""
             backup_lock_release
-            msg_error "$(t "Safety backup failed")" "$(t 'The safety backup of the current database could not be created or validated (check the free space and ${DIR_SQL}).\n\nNothing was changed.')" 12 76
+            msg_error "$(t "Safety backup failed")" "$(safety_backup_failed_text)" 16 80
             return 1
         fi
         CLEANUP_FILE=""
@@ -10825,7 +10876,7 @@ tools_safety_backup() {
     CLEANUP_FILE="$TOOLS_PRE"
     if ! create_safety_backup "$TOOLS_PRE"; then
         CLEANUP_FILE=""; TOOLS_PRE=""
-        msg_error "$(t "Safety backup failed")" "$(t 'The safety backup of the current database could not be created or validated (check the free space and ${DIR_SQL}).\n\nNothing was changed.')" 12 76
+        msg_error "$(t "Safety backup failed")" "$(safety_backup_failed_text)" 16 80
         return 1
     fi
     CLEANUP_FILE=""
