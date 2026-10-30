@@ -272,7 +272,7 @@ print(to_koha_sql([Target("LoC", "lx2.loc.gov", 210, "LCDB", syntax="MARC21"),
     [ "$(zsql "SELECT checked, \`rank\` FROM z3950servers WHERE host = '200.20.12.18'")" = "$(printf '0\t4')" ]
 }
 
-# The panel's catalogue as "Update server settings" sends it (host ... sru_options recordtype).
+# The panel's catalogue as the blue Update button sends it to z3950-sync (host ... sru_options recordtype).
 catalogue_tsv() {
     PYTHONPATH="$BATS_TEST_DIRNAME/../panel" python3 -c '
 from kei_panel import z3950

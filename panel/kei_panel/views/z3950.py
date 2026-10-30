@@ -14,16 +14,16 @@ ID`, or --all) so the next search asks it again.
 Bottom, public catalogues for copy cataloguing. "Show servers" tests the
 whole list (z3950.py) behind the Pac-Man loader, a real search that must
 return a MARC record, the backups (koha.nexus gateway rows) only for the
-servers that returned none; then it becomes "Update", to test again. The
+servers that returned none; then it becomes "Update", which first sends
+the whole list to `config.sh --task z3950-sync` (every row Koha has is
+refreshed, the authority files are added when missing) and tests again. The
 list, grouped by region, shows the servers that returned a record, a backup
 only when its main server did not, and the ticked ones. The tick is
 "selected for the cataloguing search" in Koha (Koha's checked): "Save to
 Koha" adds the ticked servers Koha lacks (`config.sh --task z3950-add`,
 ranked by speed) and ticks or unticks the ones it has
 (`--task z3950-check`); nothing is deleted. More than SEARCH_LIMIT (20)
-ticked is advised against, never refused. "Update server settings" sends
-the whole list to `config.sh --task z3950-sync`: every row Koha has is
-refreshed, the authority files are added when missing. Logins typed here
+ticked is advised against, never refused. Logins typed here
 stay in the panel's private config file and the temporary list the task
 deletes.
 """
@@ -129,8 +129,6 @@ class Z3950View(SectionView):
             yield Button(t("Import"), id="z-import", classes="small")
             yield Button(t("Export"), id="z-export", classes="small")
             yield Button(t("Show all"), id="z-hidden", classes="small")
-        with Horizontal(classes="quick-actions"):
-            yield Button(t("Update server settings"), id="z-update", classes="small", variant="warning")
         yield Static("", id="z-limit", classes="ai-note", markup=False)
         yield Label("", id="z-summary", classes="view-prompt")
         table = DataTable(id="z-table", zebra_stripes=True, cursor_type="row")
@@ -449,7 +447,7 @@ class Z3950View(SectionView):
                    "z-untick": lambda: self.set_ticks(False), "z-untick-all": self.untick_all,
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
                    "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
-                   "z-update": self.update_servers, "z-health-reset": self.reset_health,
+                   "z-health-reset": self.reset_health,
                    "z-health-reset-all": self.reset_all_health}
         if event.button.id in actions:
             event.stop()
@@ -518,9 +516,18 @@ class Z3950View(SectionView):
     # The scan
     # ------------------------------------------------------------------
     def scan(self) -> None:
-        """Show servers / Update: every server of the list (but the ones
-        hidden by hand) is tested; then the backups of the servers that
-        returned no record."""
+        """The blue button. The first time, Show servers: the whole list is
+        tested. Once tested it reads Update: Koha's own rows get the list's
+        settings first (the old yellow "Update server settings", one button
+        less: Paulo 2026-10-30), then the whole list is tested again."""
+        if self.history.tested:
+            self.app.run_worker(self._update_servers(), group="routine", exclusive=True, exit_on_error=False)
+        else:
+            self.test_all()
+
+    def test_all(self) -> None:
+        """Every server of the list (but the ones hidden by hand) is tested;
+        then the backups of the servers that returned no record."""
         targets = [tg for tg in self.targets if not self.history.get(tg.key).get("manual")]
         if not targets:
             return
@@ -672,24 +679,15 @@ class Z3950View(SectionView):
         self._save()
         self._test([tg])
 
-    def update_servers(self) -> None:
-        self.app.run_worker(self._update_servers(), group="routine", exclusive=True, exit_on_error=False)
-
     async def _update_servers(self) -> None:
-        """Every server Koha has gets the list's settings (host, port,
-        database, format, timeout, SRU fields), keeping its tick and rank;
-        the authority files are added when missing. Then the whole list is
-        tested, as Show servers does: people press this button expecting
-        the list of working servers (Paulo, twice), so it brings it."""
+        """Update: every server Koha has gets the list's settings (host,
+        port, database, format, timeout, SRU fields), keeping its tick and
+        rank; the authority files are added when missing and the Biblioteca
+        Nacional's old Z39.50 addresses unticked. Then the whole list is
+        tested. No question first: it changes no tick, rank or server
+        choice. A failed refresh shows its box and the test still runs."""
         from ..routines.common import failed, run_task, show_done
         title = t("Update server settings")
-        question = t("Update the settings of the Z39.50/SRU servers Koha already has (address, port, database, "
-                     "format, timeout, SRU fields) from this list? Their tick and rank are kept. The authority "
-                     "files (Library of Congress names and subjects, Biblioteca Nacional) are added when "
-                     "missing, and the Biblioteca Nacional's old Z39.50 addresses are unticked.")
-        question += "\n\n" + add_hint()
-        if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
-            return
         path = z3950.write_add_file(z3950.sync_targets(self.targets, self.in_koha), {})
         try:
             result = await run_task(self.app, title, "z3950-sync", str(path))
@@ -697,15 +695,17 @@ class Z3950View(SectionView):
             path.unlink(missing_ok=True)
         if failed(result):
             await show_done(self.app, title, result)
-            return
-        # No box to close before the test: Paulo found "Updated: 0" and an OK
-        # before the real work odd, so the counts go in a notice and the test
-        # starts at once.
-        out = result.value
-        self.app.notify(t("Servers added: ${added} · updated: ${updated}", added=out.get("added", "0"),
-                          updated=out.get("updated", "0")), timeout=10)
-        await self._load_koha()
-        self.scan()
+        else:
+            # No box to close before the test (Paulo found "Updated: 0" and an
+            # OK before the real work odd): the counts are a notice, and only
+            # when something changed.
+            out = result.value
+            added, updated = out.get("added", "0"), out.get("updated", "0")
+            if (added, updated) != ("0", "0"):
+                self.app.notify(t("Servers added: ${added} · updated: ${updated}", added=added, updated=updated),
+                                timeout=10)
+            await self._load_koha()
+        self.test_all()
 
     # ------------------------------------------------------------------
     # Login, hide
@@ -838,12 +838,6 @@ class Z3950View(SectionView):
             self.app.notify(str(e), severity="error")
             return
         self.app.notify(t("Saved: ${file}", file=path))
-
-
-def add_hint() -> str:
-    return t("Then every server of the list is tested, as Show servers does, and the list shows the ones that "
-             "work. \"Updated: 0\" means the servers Koha has already had the right settings. To add catalogue "
-             "servers to Koha: Select for search the ones you want, then Save to Koha.")
 
 
 def health_state(state: str) -> str:
