@@ -1030,7 +1030,7 @@
    "options": [
     {
      "name": "Texture",
-     "text": "*Frosted glass*, *Smooth glass*, *Brushed metal*, *Flat solid colour* or *Soft diagonal gradient*."
+     "text": "*Frosted glass*, *Smooth glass*, *Brushed metal*, *Anodised aluminium*, *Wood grain*, *Matte paper*, *Flat solid colour* or *Soft diagonal gradient*."
     },
     {
      "name": "Blur and Opacity",

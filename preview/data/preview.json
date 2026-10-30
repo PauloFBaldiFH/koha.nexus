@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.127",
+ "panel_version": "1.5.128",
  "languages": [
   {
    "code": "en",
@@ -2380,6 +2380,15 @@
       },
       {
        "text": "Brushed metal"
+      },
+      {
+       "text": "Anodised aluminium"
+      },
+      {
+       "text": "Wood grain"
+      },
+      {
+       "text": "Matte paper"
       },
       {
        "text": "Flat solid colour"
@@ -10145,6 +10154,81 @@
    "ja": null,
    "ko": null
   },
+  "Anodised aluminium": {
+   "en": "Anodised aluminium",
+   "pt-BR": "Alumínio anodizado",
+   "es": "Aluminio anodizado",
+   "fr": "Aluminium anodisé",
+   "it": "Alluminio anodizzato",
+   "de": "Eloxiertes Aluminium",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Wood grain": {
+   "en": "Wood grain",
+   "pt-BR": "Veios de madeira",
+   "es": "Vetas de madera",
+   "fr": "Veinage du bois",
+   "it": "Venature del legno",
+   "de": "Holzmaserung",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Matte paper": {
+   "en": "Matte paper",
+   "pt-BR": "Papel fosco",
+   "es": "Papel mate",
+   "fr": "Papier mat",
+   "it": "Carta opaca",
+   "de": "Mattes Papier",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "Flat solid colour": {
    "en": "Flat solid colour",
    "pt-BR": "Cor sólida",
@@ -17524,7 +17608,7 @@
     "options": [
      {
       "name": "Texture",
-      "text": "*Frosted glass*, *Smooth glass*, *Brushed metal*, *Flat solid colour* or *Soft diagonal gradient*."
+      "text": "*Frosted glass*, *Smooth glass*, *Brushed metal*, *Anodised aluminium*, *Wood grain*, *Matte paper*, *Flat solid colour* or *Soft diagonal gradient*."
      },
      {
       "name": "Blur and Opacity",
@@ -17560,7 +17644,7 @@
     "options": [
      {
       "name": "Textura",
-      "text": "*Vidro fosco*, *Vidro liso*, *Metal escovado*, *Cor sólida* ou *Gradiente diagonal suave*."
+      "text": "*Vidro fosco*, *Vidro liso*, *Metal escovado*, *Alumínio anodizado*, *Veios de madeira*, *Papel fosco*, *Cor sólida* ou *Gradiente diagonal suave*."
      },
      {
       "name": "Desfoque e Opacidade",
@@ -17583,7 +17667,8 @@
      "Use as cores da identidade da biblioteca na cor de destaque e na segunda cor, e mantenha o fundo dos blocos claro para leituras longas.",
      "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente.",
      "**Blocos**, **Campos** e **Botões** ajustam o arredondamento das bordas (border-radius): mais pixels deixam os cantos mais curvos, 0 deixa os cantos retos. Passe o mouse sobre um controle para ver quais elementos ele arredonda."
-    ]
+    ],
+    "outdated": true
    }
   },
   "opac-pictures": {
@@ -18565,8 +18650,8 @@
    "manual": 112,
    "manual_total": 112,
    "manual_outdated": [],
-   "strings": 400,
-   "strings_total": 400
+   "strings": 403,
+   "strings_total": 403
   },
   "pt-BR": {
    "manual": 112,
@@ -18583,157 +18668,158 @@
     "apache-log",
     "backup-compression",
     "backup-safety",
-    "ai-ollama"
+    "ai-ollama",
+    "opac-material"
    ],
-   "strings": 391,
-   "strings_total": 400
+   "strings": 394,
+   "strings_total": 403
   },
   "es": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
-   "strings": 276,
-   "strings_total": 400
+   "strings": 279,
+   "strings_total": 403
   },
   "fr": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
-   "strings": 272,
-   "strings_total": 400
+   "strings": 275,
+   "strings_total": 403
   },
   "it": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
-   "strings": 270,
-   "strings_total": 400
+   "strings": 273,
+   "strings_total": 403
   },
   "de": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
-   "strings": 270,
-   "strings_total": 400
+   "strings": 273,
+   "strings_total": 403
   },
   "nl": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "sv": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "pl": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "cs": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "ru": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "uk": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "tr": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "tl": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "id": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "ar": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "fa": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "hi": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "bn": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "vi": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "zh": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "ja": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   },
   "ko": {
    "manual": 0,
    "manual_total": 112,
    "manual_outdated": [],
    "strings": 113,
-   "strings_total": 400
+   "strings_total": 403
   }
  }
 }
