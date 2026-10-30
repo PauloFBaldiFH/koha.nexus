@@ -1,9 +1,40 @@
 """Real DOM regression: the page body is not a language-selector link."""
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import shutil
+import threading
+
 import pytest
+from conftest import REPO
 
 pytest.importorskip('playwright.sync_api')
 from playwright.sync_api import expect
-from test_staff_manual_browser import browser, site_url
+import playwright.sync_api as playwright
+@pytest.fixture(scope='module')
+def site_url():
+    class QuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(QuietHandler, directory=str(REPO)))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f'http://127.0.0.1:{server.server_port}'
+    server.shutdown()
+    server.server_close()
+    thread.join()
+
+
+@pytest.fixture(scope='module')
+def browser():
+    executable = shutil.which('chromium') or shutil.which('chromium-browser')
+    if not executable:
+        pytest.skip('System Chromium is required')
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=executable, headless=True, args=['--no-sandbox'])
+        yield browser
+        browser.close()
+
+
 
 
 def test_english_choice_is_not_overwritten_by_the_portuguese_body(browser, site_url):
@@ -20,8 +51,8 @@ def test_english_choice_is_not_overwritten_by_the_portuguese_body(browser, site_
         page.locator('a[data-language="es"]').click()
         expect(page.locator('body')).to_have_attribute('data-language', 'es')
         assert page.evaluate("localStorage.getItem('koha_lang')") == 'es'
-        page.get_by_role('link', name='Koha staff manual (English)', exact=True).click()
-        expect(page.locator('#staff-options button').first).to_be_visible()
+        page.locator('#main-nav a[href="#features"]').click()
+        expect(page).to_have_url(site_url + '/languages/es/index.html#features')
         # Ordinary links must not overwrite the language preference either.
         assert page.evaluate("localStorage.getItem('koha_lang')") == 'es'
     finally:
