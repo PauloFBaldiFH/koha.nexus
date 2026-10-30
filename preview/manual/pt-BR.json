@@ -863,7 +863,7 @@
    "options": [
     {
      "name": "Textura",
-     "text": "*Vidro fosco*, *Vidro liso*, *Metal escovado*, *Cor sólida* ou *Gradiente diagonal suave*."
+     "text": "*Vidro fosco*, *Vidro liso*, *Metal escovado*, *Alumínio anodizado*, *Veios de madeira*, *Papel fosco*, *Cor sólida* ou *Gradiente diagonal suave*."
     },
     {
      "name": "Desfoque e Opacidade",

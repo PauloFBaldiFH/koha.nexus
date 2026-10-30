@@ -60,9 +60,16 @@ TEXTURES = {
     "frosted": "Frosted glass",
     "smooth": "Smooth glass",
     "metal": "Brushed metal",
+    "anodized": "Anodised aluminium",
+    "wood": "Wood grain",
+    "paper": "Matte paper",
     "flat": "Flat solid colour",
     "gradient": "Soft diagonal gradient",
 }
+# The textures drawn as a material (_material): a solid look of their own
+# over the card, and the brushed buttons for the two metals.
+MATERIALS = ("metal", "anodized", "wood", "paper")
+METALS = ("metal", "anodized")
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
 CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
 CAROUSEL_SOURCES = {"new": "New arrivals", "list": "A public Koha list"}
@@ -887,16 +894,83 @@ def _strong(selectors: str) -> str:
     return ", ".join("html body " + x.strip() for x in selectors.split(","))
 
 
+def _noise(freq: str, octaves: int, matrix: str, size: str = "256 256", kind: str = "fractalNoise") -> str:
+    """A tile of SVG noise as a CSS url(): no picture file, a few hundred
+    bytes in the CSS. freq "x y" stretches it (a low x and a high y give the
+    fine horizontal streaks of brushed metal or of wood); matrix is the
+    feColorMatrix that turns the noise into colour and alpha. Only <, >, #,
+    % and quotes are escaped: the SVG has no script and no closing style tag."""
+    w, h = size.split()
+    svg = (f"<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}'>"
+           f"<filter id='n'><feTurbulence type='{kind}' baseFrequency='{freq}' numOctaves='{octaves}' "
+           f"seed='7' stitchTiles='stitch'/><feColorMatrix values='{matrix}'/></filter>"
+           f"<rect width='100%' height='100%' filter='url(%23n)'/></svg>")
+    svg = svg.replace("%", "%25").replace("%2523", "%23").replace("<", "%3C").replace(">", "%3E").replace('"', "'")
+    return f'url("data:image/svg+xml,{svg}")'
+
+
+# Brushed streaks: light and dark hairlines along the brushing, from noise
+# much finer across than along. Two tiles, one lightens and one darkens, so
+# the streaks stay visible on a white card and on a dark one.
+_BRUSH_LIGHT = _noise(".0006 .9", 3, "0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.35 -.63", "1600 160")
+_BRUSH_DARK = _noise(".0009 .7", 2, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.1 .57", "1600 160")
+# Wood: thin dark rings along the board (the ridges of turbulence noise,
+# stretched) over a finer grain, both in browns.
+_WOOD_RINGS = _noise(".0012 .04", 3, "0 0 0 0 .30  0 0 0 0 .17  0 0 0 0 .06  0 0 0 -9 1.05", "1600 400",
+                     "turbulence")
+_WOOD_GRAIN = _noise(".0015 .5", 2, "0 0 0 0 .32  0 0 0 0 .19  0 0 0 0 .08  0 0 0 -1.6 .78", "1600 160")
+_PAPER_TOOTH = _noise(".85", 2, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -.5 .34", "180 180")
+_PAPER_FIBRE = _noise(".006 .06", 2, "0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .8 -.42", "800 400")
+
+
+def _material(t: str, accent_rgb: str) -> dict:
+    """The look of a material texture over a card, for the OPAC and the
+    staff interface alike: the layers above the card's own colour (sheen),
+    its edge and shadow (shadow). accent_rgb is the CSS variable with the
+    accent as "r, g, b" (the anodised aluminium takes its colour).
+
+    Metal: brushed streaks, a bright specular band at the top fading into a
+    soft shade and a second, fainter reflection lower down, and a bevel
+    (light top and left edges, dark bottom and right). Anodised aluminium:
+    the same metal dyed in the accent colour. Wood: warm boards with rings
+    and grain. Paper: a warm matte sheet with a fine tooth."""
+    bevel = ("inset 0 1px 0 rgba(255, 255, 255, .85), inset 1px 0 0 rgba(255, 255, 255, .35), "
+             "inset 0 -1px 0 rgba(0, 0, 0, .28), inset -1px 0 0 rgba(0, 0, 0, .14)")
+    drop = "0 1px 2px rgba(0, 0, 0, .22), 0 10px 24px -8px rgba(0, 0, 0, .30)"
+    light = (f"{_BRUSH_LIGHT}, {_BRUSH_DARK}, "
+             "linear-gradient(180deg, rgba(255, 255, 255, .62) 0, rgba(255, 255, 255, .18) 34px, "
+             "rgba(0, 0, 0, .05) 90px, rgba(255, 255, 255, .16) 150px, rgba(0, 0, 0, .07) 260px, "
+             "rgba(0, 0, 0, 0) 420px) top / 100% 420px no-repeat, "
+             "linear-gradient(112deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .22) 46%, "
+             "rgba(255, 255, 255, 0) 60%)")
+    if t == "metal":
+        return {"sheen": f"{light}, linear-gradient(rgba(128, 138, 150, .30), rgba(128, 138, 150, .30))",
+                "shadow": f"{bevel}, {drop}"}
+    if t == "anodized":
+        return {"sheen": f"{light}, linear-gradient(rgba(var({accent_rgb}), .26), rgba(var({accent_rgb}), .26)), "
+                         "linear-gradient(rgba(120, 128, 140, .22), rgba(120, 128, 140, .22))",
+                "shadow": f"{bevel}, {drop}"}
+    if t == "wood":
+        return {"sheen": f"{_WOOD_GRAIN}, {_WOOD_RINGS}, "
+                         "linear-gradient(180deg, rgba(255, 240, 210, .30), rgba(255, 240, 210, 0) 40px), "
+                         "linear-gradient(rgba(176, 116, 58, .34), rgba(150, 92, 40, .34))",
+                "shadow": "inset 0 1px 0 rgba(255, 236, 200, .55), inset 0 -2px 0 rgba(70, 40, 15, .25), "
+                          "0 1px 2px rgba(60, 35, 10, .25), 0 12px 26px -10px rgba(60, 35, 10, .40)"}
+    if t == "paper":
+        return {"sheen": f"{_PAPER_TOOTH}, {_PAPER_FIBRE}, "
+                         "linear-gradient(rgba(250, 242, 222, .30), rgba(250, 242, 222, .30))",
+                "shadow": "0 1px 1px rgba(60, 50, 30, .10), 0 2px 4px rgba(60, 50, 30, .06), "
+                          "0 14px 24px -14px rgba(60, 50, 30, .35)"}
+    return {"sheen": "", "shadow": ""}
+
+
 def _texture(cfg: dict) -> dict:
     """What the texture adds to the shared card, the same on every surface:
     a sheen layered over the glass, a shadow, and whether it blurs."""
     t = cfg["texture"]
     none = "linear-gradient(transparent, transparent)"
-    if t == "metal":
-        return {"sheen": "linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
-                         "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px)",
-                "shadow": "inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
-                          "0 2px 8px rgba(0, 0, 0, .14)", "blur": cfg["blur"]}
+    if t in MATERIALS:
+        return {**_material(t, "--kei-accent-rgb"), "blur": cfg["blur"]}
     if t == "gradient":
         return {"sheen": "linear-gradient(135deg, transparent 0%, rgba(var(--kei-accent-rgb), .10) 55%, "
                          "rgba(var(--kei-accent2-rgb), .14) 100%)", "shadow": "0 4px 18px rgba(0, 0, 0, .08)",
@@ -961,7 +1035,25 @@ html body .main::before {{
 }}
 html body .main h1, html body .main h2, html body .main h3, html body .main h4, html body .main legend,
 html body .newsitem h3, html body .news-item h3 {{ color: var(--koha-ink); }}
-html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--koha-muted) !important; }}"""
+html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--koha-muted) !important; }}""" + (
+        _material_main_css() if cfg["texture"] in MATERIALS else "")
+
+
+def _material_main_css() -> str:
+    """A material's streaks and grain on .main sit on a layer above its blur
+    layer (::before): on .main itself the blur would smear them, since the
+    blur layer is inside .main's own stacking context."""
+    return """
+html body .main { background: var(--koha-card-bg) !important; }
+html body .main::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: var(--koha-card-sheen);
+}"""
 
 
 def css_body(cfg: dict) -> str:
@@ -1252,22 +1344,28 @@ _CARD_AREAS = ("#news .newsitem", ".newsitem", ".news-item", "#opacmainuserblock
 _CARD_BUTTONS = (".btn", ".btn-acesso", 'input[type="submit"]', 'input[type="button"]', 'button[type="submit"]')
 
 
+# Brushed buttons for the metal textures, OPAC and staff alike: the
+# streaks over a satin gradient with a hard specular edge at the middle.
+_METAL_MAIN = (f"{_BRUSH_LIGHT}, linear-gradient(180deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, .14) 48%, "
+               "rgba(0, 0, 0, .06) 52%, rgba(0, 0, 0, .18) 100%), {c}")
+_METAL_SOFT = (f"{_BRUSH_LIGHT}, {_BRUSH_DARK}, "
+               "linear-gradient(180deg, #f8f9fa 0%, #e3e6ea 47%, #cdd2d8 53%, #dfe2e6 100%)")
+_METAL_SHADOW = ("inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(0, 0, 0, .22), "
+                 "0 1px 1px rgba(0, 0, 0, .18), 0 4px 8px -2px rgba(0, 0, 0, .22)")
+
+
 def _buttons_css(cfg: dict) -> str:
-    """The OPAC's buttons: the main ones in the accent colour (a brushed
-    sheen with the metal texture), the secondary ones on the block surface,
+    """The OPAC's buttons: the main ones in the accent colour (brushed with
+    the two metal textures), the secondary ones on the block surface,
     and full-width touch targets inside the news and the home page block."""
     main, soft = _strong(_BTN_MAIN), _strong(_BTN_SOFT)
 
     def hover(sel: str) -> str:
         return ", ".join(f"{x}:hover, {x}:focus" for x in sel.split(", "))
 
-    if cfg["texture"] == "metal":
-        main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .08) 50%, "
-                   "rgba(0, 0, 0, .14) 100%), var(--nexus-primary)")
-        soft_bg = "linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 50%, #c9c9c9 100%)"
-        soft_fg, soft_edge = "#333", "#b3b3b3"
-        shadow = ("inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), "
-                  "0 4px 6px rgba(0, 0, 0, .12)")
+    if cfg["texture"] in METALS:
+        main_bg, soft_bg, shadow = _METAL_MAIN.format(c="var(--nexus-primary)"), _METAL_SOFT, _METAL_SHADOW
+        soft_fg, soft_edge = "#2a3038", "#9ba2ab"
     else:
         main_bg = ("linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), "
                    "var(--nexus-primary)")
@@ -1331,7 +1429,7 @@ def _canvas_css(cfg: dict) -> str:
 html[data-kei-theme="dark"] body {{
     background: {glows.replace(".16", ".10").replace(".14", ".08")}, #0d1117 !important;
 }}"""]
-    if cfg["texture"] not in ("metal", "flat"):
+    if cfg["texture"] in ("frosted", "smooth", "gradient"):
         lines.append(f""":root {{ --koha-card-shadow: {shadow}, inset 0 1px 0 rgba(255, 255, 255, {".55" if light else ".06"}); }}""")
     return "\n".join(lines)
 
@@ -1993,8 +2091,9 @@ html body .main .page-section {{ padding: .5rem 0; }}"""]
 
 def _staff_material_css(st: dict) -> list[str]:
     """The OPAC's materials on the staff blocks, from cfg["staff"]: frosted
-    glass (blur + opacity), smooth glass, brushed metal (and metal buttons
-    like the OPAC's), a soft diagonal gradient. "flat" adds nothing: the
+    glass (blur + opacity), smooth glass, brushed metal and anodised
+    aluminium (with metal buttons like the OPAC's), wood, matte paper, a
+    soft diagonal gradient. "flat" adds nothing: the
     solid cards of the staff palette. Without a staff wallpaper, glass gets a
     page with two faint accent glows to blur (the OPAC's canvas)."""
     t = st["texture"]
@@ -2017,12 +2116,10 @@ def _staff_material_css(st: dict) -> list[str]:
         rule += ["    position: relative;", "    isolation: isolate;", f"    box-shadow: {shadow};"]
     elif t == "smooth":
         rule += [f"    box-shadow: {shadow};"]
-    elif t == "metal":
-        rule[1] = ("    background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(0, 0, 0, .06)), "
-                   "repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px), "
-                   f"{wash}, {surface};")
-        rule += ["    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .18), "
-                 "0 2px 8px rgba(0, 0, 0, .14);"]
+    elif t in MATERIALS:
+        mat = _material(t, "--nexus-staff-primary-rgb")
+        rule[1] = f"    background: {mat['sheen']}, {surface};"
+        rule += [f"    box-shadow: {mat['shadow']};"]
     elif t == "gradient":
         rule[1] = (f"    background: linear-gradient(135deg, {surface} 0%, "
                    "rgba(var(--nexus-staff-primary-rgb), .10) 55%, rgba(var(--nexus-staff-secondary-rgb), .14) 100%);")
@@ -2050,23 +2147,22 @@ def _staff_material_css(st: dict) -> list[str]:
             # sits in the body's stacking context instead.
             rule.append("""html body { position: relative; z-index: 0; }
 html body .main { isolation: auto; }""")
-    if t == "metal":
-        # The top bar and the buttons in brushed metal, like the OPAC's.
+    if t in METALS:
+        # The top bar and the buttons brushed, like the OPAC's.
+        bar = _METAL_MAIN.format(c="var(--nexus-staff-primary)")
         rule.append(f"""html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
-    background: linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, .04) 50%, rgba(0, 0, 0, .14) 100%),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 3px),
-        var(--nexus-staff-primary) !important;
+    background: {bar} !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(0, 0, 0, .35);
 }}
 html body .btn-primary, html body input[type="submit"].btn-primary {{
-    background: linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .08) 50%, rgba(0, 0, 0, .14) 100%),
-        var(--nexus-staff-primary);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), 0 4px 6px rgba(0, 0, 0, .12);
+    background: {_METAL_MAIN.format(c="var(--nexus-staff-primary)")};
+    box-shadow: {_METAL_SHADOW};
 }}
 html body .btn-default, html body .btn-secondary, html body .btn-light {{
-    background: linear-gradient(180deg, #f0f0f0 0%, #dcdcdc 50%, #c9c9c9 100%);
-    border-color: #b3b3b3;
-    color: #333;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .2), 0 2px 4px rgba(0, 0, 0, .1);
+    background: {_METAL_SOFT};
+    border-color: #9ba2ab;
+    color: #2a3038;
+    box-shadow: {_METAL_SHADOW};
 }}""")
     if not st["background"]["url"] and t in ("frosted", "smooth"):
         base = staff_page(st)

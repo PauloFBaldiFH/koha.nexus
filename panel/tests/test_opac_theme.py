@@ -62,7 +62,10 @@ def test_settings_travel_in_the_css_and_come_back():
 
 @pytest.mark.parametrize("texture, needle", [
     ("frosted", "backdrop-filter: blur(var(--koha-glass-blur))"),
-    ("metal", "repeating-linear-gradient"),
+    ("metal", "feTurbulence"),
+    ("anodized", "rgba(var(--kei-accent-rgb), .26)"),
+    ("wood", "rgba(176, 116, 58, .34)"),
+    ("paper", "rgba(250, 242, 222, .30)"),
     ("gradient", "linear-gradient(135deg"),
     ("flat", "--koha-glass-blur: 0px;"),
 ])
@@ -287,7 +290,7 @@ def test_depth_and_buttons():
                 'html body #opacmainuserblock input[type="submit"]'):
         assert sel in plain, sel
     assert "width: 100% !important" in plain and "min-height: 44px" in plain
-    assert "#c9c9c9" in ot.css_body(ot.normalize({"texture": "metal"})) and "#c9c9c9" not in plain
+    assert "#cdd2d8" in ot.css_body(ot.normalize({"texture": "metal"})) and "#cdd2d8" not in plain
     # The settings line is untouched by the new rules.
     assert ot.parse_theme_data(ot.css_block(ot.normalize({"texture": "metal"})))["texture"] == "metal"
 
@@ -496,7 +499,7 @@ def test_staff_material_like_the_opac():
     block_rule = css.split("html body .page-section, html body #area-news, html body fieldset.rows {", 1)[1].split("}", 1)[0]
     assert "backdrop-filter" not in block_rule and "isolation: isolate" in block_rule
     metal = ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "texture": "metal"}}))
-    assert "#f0f0f0 0%, #dcdcdc 50%" in metal and "nav.navbar.bg-dark" in metal
+    assert "#f8f9fa 0%, #e3e6ea 47%" in metal and "nav.navbar.bg-dark" in metal
     for tex in ot.TEXTURES:     # every texture is accepted and builds
         assert ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "texture": tex}}))
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["texture"] == "frosted"
@@ -525,7 +528,7 @@ def test_staff_translucent_header():
     nav_rule = glass.split("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {", 1)[1].split("}", 1)[0]
     assert "backdrop-filter" not in nav_rule and "!important" in nav_rule
     # After the texture: the glass bar wins over the brushed metal one.
-    assert css.rindex("rgba(64,133,64, var(--nexus-staff-header-a))") > css.rindex("repeating-linear-gradient")
+    assert css.rindex("rgba(64,133,64, var(--nexus-staff-header-a))") > css.rindex("feTurbulence")
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["header_glass"] is True
 
 
@@ -611,7 +614,7 @@ def test_one_glass_card_for_every_surface():
     assert 'html[data-kei-theme="dark"] body #opaccredits {' in css
     # Flat: no blur; metal: its sheen on every card.
     assert "--koha-glass-blur: 0px;" in ot.css_body(ot.normalize({"texture": "flat"}))
-    assert "--koha-card-sheen: linear-gradient(180deg" in ot.css_body(ot.normalize({"texture": "metal"}))
+    assert "--koha-card-sheen: url(\"data:image/svg+xml," in ot.css_body(ot.normalize({"texture": "metal"}))
     assert ot.check_block(ot.css_block(ot.normalize({})), ot.CSS_BEGIN, ot.CSS_END) == ""
 
 
@@ -730,3 +733,28 @@ def test_news_items_for_each_side():
         assert (work / "contents" / "news-opac.html").read_text().startswith("<!-- kei-news-title:")
     finally:
         __import__("shutil").rmtree(work)
+
+
+def test_material_textures():
+    """Metal, anodised aluminium, wood and paper: drawn in the CSS (SVG
+    noise, no picture file), the same on the OPAC and the staff blocks, the
+    two metals with brushed buttons, the old settings untouched."""
+    assert ot.normalize({})["texture"] == "frosted" and ot.normalize({})["staff"]["texture"] == "flat"
+    for tex in ot.MATERIALS:
+        css = ot.css_body(ot.normalize({"texture": tex}))
+        block = ot.css_block(ot.normalize({"texture": tex}))
+        assert ot.check_block(block, ot.CSS_BEGIN, ot.CSS_END) == ""
+        assert "data:image/svg+xml,%3Csvg" in css and "<svg" not in css and "url(%23n)" in css
+        # The streaks sit above .main's blur layer, so the blur never smears them.
+        assert "html body .main::after" in css and "background: var(--koha-card-sheen);" in css
+        assert ot.parse_theme_data(block)["texture"] == tex
+        staff = ot.staff_css_body(ot.normalize({"staff": {"enabled": True, "texture": tex}}))
+        assert "data:image/svg+xml" in staff and "<svg" not in staff
+        assert ("nav.navbar.navbar-dark {\n    background: url(" in staff) == (tex in ot.METALS)
+        assert ("#cdd2d8" in css) == (tex in ot.METALS)
+    # The anodised metal takes the accent colour, on each side its own.
+    assert "rgba(var(--nexus-staff-primary-rgb), .26)" in ot.staff_css_body(
+        ot.normalize({"staff": {"enabled": True, "texture": "anodized"}}))
+    for tex in ("frosted", "smooth", "flat", "gradient"):
+        css = ot.css_body(ot.normalize({"texture": tex}))
+        assert "html body .main::after" not in css and "data:image/svg+xml" not in css
