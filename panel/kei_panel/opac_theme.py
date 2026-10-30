@@ -70,6 +70,22 @@ TEXTURES = {
 # over the card, and the brushed buttons for the two metals.
 MATERIALS = ("metal", "anodized", "wood", "paper")
 METALS = ("metal", "anodized")
+# Style details, the same choices for the OPAC (cfg) and the staff
+# interface (cfg["staff"]): key -> (label, {value: name}). The first value
+# is the default, the look the panel had before these options existed.
+STYLE = {
+    "shadow": ("Card shadow", {"texture": "As the texture draws it", "none": "None", "soft": "Soft",
+                               "medium": "Medium", "strong": "Strong"}),
+    "spacing": ("Spacing", {"normal": "Normal", "compact": "Compact", "airy": "Airy"}),
+    "icons": ("Icons", {"filled": "Filled", "outline": "Outline"}),
+    "pattern": ("Background pattern", {"none": "None", "dots": "Dots", "grid": "Grid",
+                                       "lines": "Diagonal lines", "grain": "Grain"}),
+    "chrome": ("Tables and menus", {"plain": "As Koha draws them", "texture": "In the chosen texture"}),
+    "login_style": ("Login page", {"koha": "Koha's own", "card": "Highlighted card",
+                                   "accent": "Card on the accent colours"}),
+    "motion": ("Hover animations", {"subtle": "Subtle", "lively": "Lively", "off": "Off"}),
+}
+STYLE_DEFAULTS = {key: next(iter(choices)) for key, (_label, choices) in STYLE.items()}
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
 CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
 CAROUSEL_SOURCES = {"new": "New arrivals", "list": "A public Koha list"}
@@ -95,6 +111,7 @@ MAX_IMAGE = 8_000_000
 DEFAULTS: dict = {
     "version": 1,
     "texture": "frosted",
+    **STYLE_DEFAULTS,         # card shadow, spacing, icons, pattern, tables and menus, login page, animations
     "blur": 12,               # px, frosted glass
     "opacity": 78,            # % of every glass card (header, search, content, sidebars): 0 clear, 100 solid
     "radius_block": 14,       # px, 0-30
@@ -142,7 +159,7 @@ DEFAULTS: dict = {
               "card": "sections", "card_padding": 16,
               # The top bar and the quick search bar under it in translucent
               # glass (_staff_header_css): off keeps them solid.
-              "header_glass": False, "header_opacity": 85, "header_blur": 8},
+              "header_glass": False, "header_opacity": 85, "header_blur": 8, **STYLE_DEFAULTS},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
     # writes: the login instructions of the OPAC and of the staff interface
     # (allow-listed HTML, a banner picture above it) and the OPAC footer
@@ -573,12 +590,19 @@ def contents_settings(cfg: dict) -> dict:
     return {"login": cfg["login"], "credits": cfg["credits"], "news": cfg["news"]}
 
 
+def _style(raw: dict) -> dict:
+    """The style details of one side: a known choice, else the default."""
+    return {key: raw[key] if isinstance(raw.get(key), str) and raw[key] in choices else STYLE_DEFAULTS[key]
+            for key, (_label, choices) in STYLE.items()}
+
+
 def normalize(raw: dict | None) -> dict:
     """Every setting checked: unknown keys dropped, numbers clamped, colours
     and URLs validated, defaults where missing."""
     raw = raw if isinstance(raw, dict) else {}
     cfg = copy.deepcopy(DEFAULTS)
     cfg["texture"] = raw.get("texture") if raw.get("texture") in TEXTURES else DEFAULTS["texture"]
+    cfg.update(_style(raw))
     for key, (lo, hi) in RANGES.items():
         cfg[key] = _clamp(raw.get(key, DEFAULTS[key]), lo, hi, DEFAULTS[key])
     cfg["accent"] = _hex(raw.get("accent"), DEFAULTS["accent"])
@@ -627,6 +651,7 @@ def normalize(raw: dict | None) -> dict:
     for key in STAFF_MATERIAL:
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
+    cfg["staff"].update(_style(st))
     cfg["staff"]["header_glass"] = bool(st.get("header_glass", False))
     for key, (lo, hi) in STAFF_HEADER.items():
         default = DEFAULTS["staff"][key]
@@ -644,15 +669,15 @@ def normalize(raw: dict | None) -> dict:
 # Pictures an https address shows on both sides; a file of this server is
 # in the OPAC's folder (/images/custom), which the staff side does not serve.
 def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
-    """"Copy OPAC preset": the OPAC's material, colours, page colour and
-    pictures into cfg["staff"] (turned on), the staff's own type size,
-    contrast and table density kept. Returns (settings, the names of the
-    pictures left out: OPAC files on this server, re-chosen on the staff
+    """"Copy OPAC preset": the OPAC's material, style details, colours, page
+    colour and pictures into cfg["staff"] (turned on), the staff's own type
+    size, contrast and table density kept. Returns (settings, the names of
+    the pictures left out: OPAC files on this server, re-chosen on the staff
     side)."""
     cfg = normalize(raw)
     st = cfg["staff"]
     st["enabled"] = True
-    for key in ("texture", "accent", "accent2", "surface", "page", *STAFF_MATERIAL):
+    for key in ("texture", "accent", "accent2", "surface", "page", *STAFF_MATERIAL, *STYLE):
         st[key] = cfg[key]
     st["film"] = _clamp(cfg["film"], *STAFF_FILM, DEFAULTS["staff"]["film"])
     skipped = []
@@ -1196,7 +1221,8 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
         out.append(_carousel_css(car))
     if links_on(cfg["links"]):
         out.append(_links_css("#kei-links"))
-    return "\n".join(out) + "\n"
+    out.append(style_css(cfg, "opac"))
+    return "\n".join(x for x in out if x) + "\n"
 
 
 _TEXT = ("p", "li", "dd", "dt", "td", "th", "label", "legend", "caption", "blockquote", ".results_summary",
@@ -1681,7 +1707,8 @@ def staff_css_body(cfg: dict) -> str:
     Koha's own rules are beaten by specificity (html body + the same ids);
     !important only where Koha or Bootstrap use it themselves (.bg-dark) or
     where a library's own inline <style> (news buttons) would win."""
-    st = normalize(cfg)["staff"]
+    cfg = normalize(cfg)
+    st = cfg["staff"]
     accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
     light = luminance(surface) >= 0.30
     bar = mix(accent, "#000000", .22)              # the quick search bar: the top bar's hue, darker
@@ -1950,7 +1977,8 @@ html body .text-muted, html body .hint, html body .help-block, html body .form-t
 html body table, html body table td, html body table th { border-color: #4b5563 !important; }
 html body a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
 html body .btn { border-width: 2px; }""")
-    return "\n".join(out) + "\n"
+    out.append(style_css(cfg, "staff"))
+    return "\n".join(x for x in out if x) + "\n"
 
 
 def _staff_panels_css(st: dict) -> str:
@@ -2172,6 +2200,220 @@ html body .btn-default, html body .btn-secondary, html body .btn-light {{
     background-attachment: fixed;
 }}""")
     return ["\n".join(rule)]
+
+
+# ----------------------------------------------------------------------
+# Style details (STYLE): card shadow, spacing, icons, background pattern,
+# tables and menus, login page, hover animations. One builder for both
+# sides; each side names its own variables and blocks (_STYLE_SIDES).
+# ----------------------------------------------------------------------
+_SHADOWS = {
+    "none": "",
+    "soft": "0 1px 2px rgba(0, 0, 0, .08), 0 4px 12px -2px rgba(0, 0, 0, .10)",
+    "medium": "0 2px 4px rgba(0, 0, 0, .10), 0 14px 30px -8px rgba(0, 0, 0, .26)",
+    "strong": "0 4px 10px rgba(0, 0, 0, .16), 0 26px 52px -12px rgba(0, 0, 0, .45)",
+}
+_METAL_BEVEL = ("inset 0 1px 0 rgba(255, 255, 255, .85), inset 1px 0 0 rgba(255, 255, 255, .35), "
+                "inset 0 -1px 0 rgba(0, 0, 0, .28), inset -1px 0 0 rgba(0, 0, 0, .14)")
+_GRAIN = _noise(".75", 2, "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -.6 .36", "200 200")
+_ICONS = ('i[class*="fa-"]', 'span[class*="fa-"]:not(.fa-stack)', "i.fa", "span.fa")
+
+
+def _side_vars(cfg: dict, side: str) -> dict:
+    """The CSS each side's style details are built from: its accent
+    colours, its card (colour, sheen, blur, edge, corners, text), its blocks
+    and whether it has a wallpaper."""
+    if side == "opac":
+        return {"accent": "var(--kei-accent-rgb)", "accent2": "var(--kei-accent2-rgb)",
+                "solid": "rgba(var(--koha-card-rgb), calc(var(--koha-card-alpha) * .3 + .7))",
+                "sheen": "var(--koha-card-sheen)", "blur": "var(--koha-glass-blur)",
+                "edge": "var(--koha-card-border)", "radius": "var(--koha-card-radius)", "text": "var(--koha-text)",
+                "blocks": f"{_strong(_BLOCKS)}, html body .main", "texture": cfg["texture"],
+                "wallpaper": bool(cfg["background"]["url"]), "login": "html body#opac-login-page",
+                "login_main": "html body#opac-login-page .main", "login_card": "#opac-auth",
+                "login_form": "#auth", "menus": "html body .main #menu, html body .main #usermenu",
+                "cards": "html body .newsitem, html body #opacmainuserblock, html body a.kei-link, "
+                         "html body .kei-action"}
+    st = cfg["staff"]
+    t = st["texture"]
+    if t in MATERIALS:
+        sheen = _material(t, "--nexus-staff-primary-rgb")["sheen"]
+    elif t == "gradient":
+        sheen = ("linear-gradient(135deg, transparent 0%, rgba(var(--nexus-staff-primary-rgb), .10) 55%, "
+                 "rgba(var(--nexus-staff-secondary-rgb), .14) 100%)")
+    else:
+        sheen = "linear-gradient(transparent, transparent)"
+    return {"accent": "var(--nexus-staff-primary-rgb)", "accent2": "var(--nexus-staff-secondary-rgb)",
+            "solid": "rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .3 + .7))",
+            "sheen": sheen, "blur": "var(--nexus-staff-blur)" if t in ("frosted", "smooth") else "0px",
+            "edge": "var(--nexus-staff-edge)", "radius": "var(--nexus-staff-radius)",
+            "text": "var(--nexus-staff-text)", "blocks": _strong(_staff_blocks(st)), "texture": t,
+            "wallpaper": bool(st["background"]["url"]), "login": "html body#main_auth",
+            "login_main": "html body#main_auth .main", "login_card": "#login", "login_form": "#loginform",
+            "menus": "html body #navmenulist, html body .sidebar_menu",
+            "cards": "html body ul.biglinks-list li a.icon_general, html body #area-news .newsitem"}
+
+
+def style_css(cfg: dict, side: str) -> str:
+    """The style details of one side ("opac": cfg, "staff": cfg["staff"])
+    as CSS, after the side's own rules so they win. The defaults add
+    nothing: the look stays as it was before these options existed."""
+    s = cfg if side == "opac" else cfg["staff"]
+    v = _side_vars(cfg, side)
+    out = []
+    if s["shadow"] != "texture":
+        drop = _SHADOWS[s["shadow"]]
+        bevel = _METAL_BEVEL if v["texture"] in METALS else ""
+        shadow = ", ".join(x for x in (bevel, drop) if x) or "none"
+        var = "--koha-card-shadow" if side == "opac" else "--nexus-staff-shadow"
+        out.append(f""":root {{ {var}: {shadow}; }}
+{v['blocks']} {{ box-shadow: {shadow} !important; }}""")
+    out.append(_spacing_css(s["spacing"], side))
+    if s["icons"] == "outline":
+        icons = ", ".join("html body " + x for x in _ICONS)
+        out.append(f"""/* Outline icons: the glyph drawn as its contour, in the text colour. */
+@supports (-webkit-text-stroke: 1px black) {{
+    {icons} {{ -webkit-text-fill-color: transparent; -webkit-text-stroke: .9px currentColor; }}
+}}""")
+    if s["pattern"] != "none" and not v["wallpaper"]:
+        out.append(f"""/* A faint pattern over the page colour, under every block (no wallpaper). */
+html body {{ position: relative; z-index: 0; }}
+html body::before {{
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: {_pattern(s['pattern'], v['accent'])};
+}}""")
+    if s["chrome"] == "texture":
+        out.append(f"""/* Tables and menus in the chosen texture. */
+html body .dropdown-menu {{
+    background: {v['sheen']}, {v['solid']} !important;
+    -webkit-backdrop-filter: blur({v['blur']});
+    backdrop-filter: blur({v['blur']});
+    border: 1px solid {v['edge']} !important;
+    border-radius: min({v['radius']}, 14px) !important;
+    box-shadow: 0 14px 30px -10px rgba(0, 0, 0, .38) !important;
+}}
+html body .dropdown-menu .dropdown-item {{ color: {v['text']} !important; background: transparent !important; }}
+html body .dropdown-menu .dropdown-item:hover, html body .dropdown-menu .dropdown-item:focus {{
+    background: rgba({v['accent']}, .16) !important; }}
+html body table thead th, html body .table thead th {{
+    background: {v['sheen']}, rgba({v['accent']}, .12) !important;
+    color: {v['text']} !important;
+}}
+{v['menus']} {{
+    background: {v['sheen']}, rgba({v['accent']}, .07);
+    border: 1px solid {v['edge']};
+    border-radius: min({v['radius']}, 14px);
+    overflow: hidden;
+}}""")
+    if s["login_style"] != "koha":
+        card, page = f"{v['login']} {v['login_card']}", ""
+        if s["login_style"] == "accent":
+            page = f"""
+{v['login']} {{
+    background: radial-gradient(900px 500px at 15% 10%, rgba(255, 255, 255, .22), transparent 60%),
+        linear-gradient(135deg, rgb({v['accent']}), rgb({v['accent2']})) fixed !important;
+}}"""
+        out.append(_login_css(v, side, card, page))
+    out.append(_motion_css(s["motion"], v))
+    return "\n".join(x for x in out if x)
+
+
+def _login_css(v: dict, side: str, card: str, page: str) -> str:
+    width = f"\n{card} {{ max-width: 26rem; }}" if side == "staff" else ""
+    return f"""/* The login page: the form on one highlighted card, the page's own card clear. */
+{v['login_main']} {{
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}}
+{v['login_main']}::before, {v['login_main']}::after {{ content: none !important; }}
+{card} {{
+    background: {v['sheen']}, {v['solid']};
+    -webkit-backdrop-filter: blur({v['blur']});
+    backdrop-filter: blur({v['blur']});
+    border: 1px solid {v['edge']};
+    border-top: 4px solid rgb({v['accent']});
+    border-radius: {v['radius']};
+    padding: 1.5rem 1.75rem;
+    margin: 2rem auto;
+    box-shadow: {_SHADOWS['strong']};
+    color: {v['text']};
+}}{width}
+{card} h1, {card} h2 {{ text-align: center; }}
+{card} {v['login_form']} .btn, {card} {v['login_form']} input[type="submit"] {{
+    width: 100%;
+    min-height: 44px;
+}}{page}"""
+
+
+def _pattern(kind: str, accent: str) -> str:
+    ink = f"rgba({accent}, .13)"
+    if kind == "dots":
+        return f"radial-gradient(circle, {ink} 1.2px, transparent 1.7px) 0 0 / 18px 18px"
+    if kind == "grid":
+        return (f"linear-gradient({ink} 1px, transparent 1px) 0 0 / 28px 28px, "
+                f"linear-gradient(90deg, {ink} 1px, transparent 1px) 0 0 / 28px 28px")
+    if kind == "lines":
+        return f"repeating-linear-gradient(45deg, {ink} 0 1px, transparent 1px 14px)"
+    return _GRAIN
+
+
+def _spacing_css(kind: str, side: str) -> str:
+    """Compact or airy: the room around the content, the paragraphs and the
+    table cells. The staff's table density and card padding stay its own."""
+    if kind == "normal":
+        return ""
+    compact = kind == "compact"
+    line, gap = ("1.35", ".4rem") if compact else ("1.7", "1rem")
+    if side == "opac":
+        pad, cell = (".7rem", ".3rem .5rem") if compact else ("2rem", ".7rem 1rem")
+        return f"""/* Spacing: {kind}. */
+html body {{ line-height: {line}; }}
+html body .main {{ padding: {pad}; margin-top: {".5rem" if compact else "1.5rem"}; }}
+html body .main p, html body .main li {{ margin-bottom: {gap}; }}
+html body .main table td, html body .main table th {{ padding: {cell} !important; }}
+html body #opac-main-search {{ padding-top: {".35rem" if compact else "1rem"}; padding-bottom: {".35rem" if compact else "1rem"}; }}"""
+    return f"""/* Spacing: {kind}. */
+html body {{ line-height: {line}; }}
+html body .page-section, html body fieldset.rows, html body #area-news {{ margin-bottom: {".5rem" if compact else "1.75rem"}; }}
+html body fieldset.rows li {{ padding-bottom: {".1rem" if compact else ".55rem"}; }}
+html body .main p {{ margin-bottom: {gap}; }}"""
+
+
+def _motion_css(kind: str, v: dict) -> str:
+    """Off: nothing moves or fades (as under the device's reduced motion).
+    Lively: the cards and buttons lift and table rows light up on hover,
+    only where the device does not ask for less motion."""
+    if kind == "off":
+        return f"""/* Animations off. */
+html body *, html body *::before, html body *::after {{
+    transition: none !important;
+    animation-duration: .001s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+}}
+html body .btn:hover, html body .btn:focus, html body button:hover, html body input[type="submit"]:hover,
+{", ".join(x.strip() + ":hover" for x in v["cards"].split(","))} {{ transform: none !important; }}"""
+    if kind == "lively":
+        hover = ", ".join(x.strip() + ":hover" for x in v["cards"].split(","))
+        return f"""/* Lively hover animations. */
+@media (prefers-reduced-motion: no-preference) {{
+    {v['cards']} {{ transition: transform .25s cubic-bezier(.2, .8, .2, 1), box-shadow .25s ease; }}
+    {hover} {{
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 0 18px 34px -14px rgba({v['accent']}, .45) !important;
+    }}
+    html body .btn, html body input[type="submit"] {{ transition: transform .2s ease, filter .2s ease, box-shadow .2s ease; }}
+    html body .btn:hover, html body input[type="submit"]:hover {{ transform: translateY(-2px) scale(1.03); }}
+    html body .btn:active, html body input[type="submit"]:active {{ transform: translateY(0) scale(.98); }}
+    html body table tbody tr td {{ transition: background-color .2s ease; }}
+    html body table tbody tr:hover td {{ background-color: rgba({v['accent']}, .07); }}
+}}"""
+    return ""
 
 
 def _staff_header_css(st: dict) -> list[str]:

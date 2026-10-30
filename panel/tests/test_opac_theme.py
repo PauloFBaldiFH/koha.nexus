@@ -758,3 +758,41 @@ def test_material_textures():
     for tex in ("frosted", "smooth", "flat", "gradient"):
         css = ot.css_body(ot.normalize({"texture": tex}))
         assert "html body .main::after" not in css and "data:image/svg+xml" not in css
+
+
+def test_style_details():
+    """Card shadow, spacing, icons, pattern, tables and menus, login page and
+    hover animations: on each side its own, the defaults add nothing, and
+    unknown values fall back to them."""
+    cfg = ot.normalize({})
+    assert all(cfg[k] == cfg["staff"][k] == ot.STYLE_DEFAULTS[k] for k in ot.STYLE)
+    assert ot.style_css(cfg, "opac") == "" and ot.style_css(ot.normalize({"staff": {"enabled": True}}), "staff") == ""
+    # login_style never touches the login banners (cfg["login"]).
+    bad = ot.normalize({"shadow": "huge", "login_style": {"x": 1}, "staff": {"motion": "fast"}})
+    assert bad["shadow"] == "texture" and bad["login_style"] == "koha" and bad["staff"]["motion"] == "subtle"
+    assert set(bad["login"]) == set(ot.LOGIN_SIDES)
+    picks = {"shadow": "strong", "spacing": "compact", "icons": "outline", "pattern": "dots", "chrome": "texture",
+             "login_style": "accent", "motion": "lively"}
+    cfg = ot.normalize({**picks, "texture": "metal", "staff": {"enabled": True, "texture": "wood", "pattern": "grain",
+                                                                "login_style": "card", "motion": "off"}})
+    opac, staff = ot.css_body(cfg), ot.staff_css_body(cfg)
+    assert ot.check_block(ot.css_block(cfg), ot.CSS_BEGIN, ot.CSS_END) == ""
+    assert {k: ot.parse_theme_data(ot.css_block(cfg))[k] for k in picks} == picks
+    # Shadow: the metal keeps its bevel under the chosen drop shadow.
+    assert ":root { --koha-card-shadow: inset 0 1px 0 rgba(255, 255, 255, .85)" in opac
+    assert "-webkit-text-stroke: .9px currentColor" in opac and "-webkit-text-stroke" not in staff
+    assert "radial-gradient(circle, rgba(var(--kei-accent-rgb), .13)" in opac
+    assert "html body .dropdown-menu {" in opac and "html body .main #menu" in opac
+    assert "html body#opac-login-page #opac-auth {" in opac and "linear-gradient(135deg, rgb(var(--kei-accent-rgb))" in opac
+    assert "prefers-reduced-motion: no-preference" in opac and "translateY(-4px)" in opac
+    assert "html body .main { padding: .7rem;" in opac
+    # Staff: its own choices, its own variables and markup.
+    assert "html body#main_auth #login {" in staff and "max-width: 26rem" in staff and "135deg, rgb(" not in staff
+    assert "transition: none !important" in staff and "translateY(-4px)" not in staff
+    assert "data:image/svg+xml" in staff and "html body::before" in staff
+    # A wallpaper: no pattern over it.
+    wall = ot.normalize({"pattern": "grid", "background": {"source": "url", "url": "https://example.org/w.jpg"}})
+    assert "28px 28px" not in ot.css_body(wall)
+    # Copy OPAC preset brings the style details along.
+    copied, _ = ot.copy_opac_to_staff(cfg)
+    assert {k: copied["staff"][k] for k in picks} == picks

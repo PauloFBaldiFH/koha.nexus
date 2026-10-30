@@ -1047,6 +1047,10 @@
     {
      "name": "Block background and Page colour",
      "text": "The colour of the content blocks, and an optional colour for the page behind them."
+    },
+    {
+     "name": "Style details",
+     "text": "Seven lists, the same on the OPAC and in the Staff interface box, each starting with the look as it was: *Card shadow* (as the texture draws it, none, soft, medium, strong), *Spacing* (normal, compact, airy), *Icons* (filled or outline), *Background pattern* (dots, grid, diagonal lines or grain, only without a wallpaper), *Tables and menus* (as Koha draws them, or in the chosen texture), *Login page* (Koha's own, a highlighted card, or the card on the accent colours) and *Hover animations* (subtle, lively, or off). All drawn in CSS, with no picture files."
     }
    ],
    "tips": [

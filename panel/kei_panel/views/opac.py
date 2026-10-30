@@ -112,6 +112,19 @@ ICON_EXAMPLES = "📖 📜 💬 📧 📷 🔐 📅 ❓ fa-book"
 LINK_SETS = {"links": "o-link", "staff_links": "o-slink"}
 
 
+STYLE_NOTE = ("Style details: the cards' shadow, the room around the content, outline or filled icons, a "
+              "faint pattern on the page (without a wallpaper), tables and menus in the texture, the login page "
+              "and the hover animations. The first choice of each list is the look as it was.")
+
+
+def _style_rows(prefix: str, values: dict):
+    """The style detail lists (ot.STYLE) of one side, ids prefix-<key>."""
+    yield Static(t(STYLE_NOTE), classes="ai-note", markup=False)
+    for key, (label, choices) in ot.STYLE.items():
+        yield from _row(t(label), Select([(t(v), k) for k, v in choices.items()], value=values[key],
+                                         allow_blank=False, id=f"{prefix}-{key}"))
+
+
 class OpacView(SectionView):
     loaded = False
 
@@ -156,6 +169,7 @@ class OpacView(SectionView):
             yield ColorPicker(t("Block background"), c["surface"], "o-surface", bars, id="o-pick-surface")
             yield from _row(t("Page colour"), Switch(bool(c["page"]), id="o-page-on"))
             yield ColorPicker(t("Page background"), c["page"] or "#f3f4f6", "o-page", bars, id="o-pick-page")
+            yield from _style_rows("o-style", c)
         with Vertical(id="o-images", classes="opac-box"):
             yield Static(t("A file on this server (PNG, JPEG, GIF, WebP or ICO; SVG is refused), a file sent to "
                            "ImgBB or Cloudinary, or a direct https address (Postimages and other hosts)."),
@@ -254,6 +268,7 @@ class OpacView(SectionView):
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
                                                   value=st["contrast"], allow_blank=False, id="o-staff-contrast"))
             yield from _row(t("Text size"), Slider(*ot.STAFF_FONT, st["font"], unit="%", id="o-staff-font"))
+            yield from _style_rows("o-staff-style", st)
         for side, (box, _title) in LOGIN_BOXES.items():
             lg = c["login"][side]
             with Vertical(id=box, classes="opac-box"):
@@ -441,6 +456,8 @@ class OpacView(SectionView):
         self.cfg = cfg = ot.normalize(cfg)
         q = self.query_one
         q("#o-texture", Select).value = cfg["texture"]
+        for key in ot.STYLE:
+            q(f"#o-style-{key}", Select).value = cfg[key]
         for key in SLIDERS:
             q(f"#o-{key}", Slider).value = cfg[key]
         q("#o-accent", Input).value = cfg["accent"]
@@ -503,6 +520,8 @@ class OpacView(SectionView):
         for key in ("accent", "accent2", "surface"):
             q(f"#o-staff-{key}", Input).value = st[key]
         q("#o-staff-texture", Select).value = st["texture"]
+        for key in ot.STYLE:
+            q(f"#o-staff-style-{key}", Select).value = st[key]
         for key in ot.STAFF_MATERIAL:
             q(f"#o-staff-{key}", Slider).value = st[key]
         q("#o-staff-page-on", Switch).value = bool(st["page"])
@@ -525,6 +544,7 @@ class OpacView(SectionView):
         """(settings, pictures still to publish {name: (source, file)}, problem)."""
         q = self.query_one
         raw = {"texture": q("#o-texture", Select).value,
+               **{key: q(f"#o-style-{key}", Select).value for key in ot.STYLE},
                "accent": q("#o-accent", Input).value, "accent2": q("#o-accent2", Input).value,
                "surface": q("#o-surface", Input).value,
                "page": q("#o-page", Input).value if q("#o-page-on", Switch).value else "",
@@ -552,6 +572,7 @@ class OpacView(SectionView):
                          "card_padding": q("#o-staff-card_padding", Slider).value,
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
+                         **{key: q(f"#o-staff-style-{key}", Select).value for key in ot.STYLE},
                          **{key: q(f"#o-staff-{key}", Slider).value for key in (*ot.STAFF_MATERIAL, *ot.STAFF_HEADER)}}}
         for key in SLIDERS:
             raw[key] = q(f"#o-{key}", Slider).value
