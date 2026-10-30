@@ -23,6 +23,7 @@
   const $ = id => document.getElementById(id);
   const make = (tag, text) => { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; return el; };
   let lessons = [], exercise, completed = new Set();
+  let modules = [];
   try { const saved = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(saved)) completed = new Set(saved.filter(x => typeof x === "string")); } catch (e) {}
   function progress() { $("progress").textContent = lessons.filter(l => completed.has(l.id)).length + " / " + lessons.length + " guides completed"; }
   function nav() {
@@ -57,6 +58,47 @@
     $("practice-next").textContent = ["Open training task","Review example","Finish exercise"][stage] || "Complete";
     $("practice-message").textContent = stage === 3 ? exercise.lesson.result : "";
   }
+  function view(guides) {
+    $("task-view").hidden = !guides;
+    $("staff-overview").hidden = guides;
+    $("show-staff").setAttribute("aria-pressed",String(!guides));
+    $("show-guides").setAttribute("aria-pressed",String(guides));
+  }
+  function explain(module) {
+    $("module-title").textContent = module.title;
+    $("module-description").textContent = module.description;
+    $("module-tips-title").hidden = false;
+    $("module-tips").replaceChildren(...module.tips.map(t => make("li",t)));
+    $("module-guides").replaceChildren();
+    for (const id of module.guides) {
+      const lesson = lessons.find(l => l.id === id);
+      if (!lesson) continue;
+      const a = make("a", "Read guide: " + lesson.title);
+      a.href = "#" + id;
+      a.addEventListener("click", () => { if (location.hash === a.hash) { view(true); select(id); } });
+      $("module-guides").append(a);
+    }
+    $("module-coverage").textContent = module.guides.length ? "The guides explain selected workflows. This screen does not connect to your library." : "Module overview only. Detailed interactive screens for this module are not included yet.";
+    document.querySelectorAll("#staff-options button").forEach(b => b.setAttribute("aria-pressed",String(b.dataset.module === module.id)));
+    $("module-explanation").focus();
+    if (window.matchMedia("(max-width: 800px)").matches) $("module-explanation").scrollIntoView({block:"start"});
+  }
+  function staffHome() {
+    $("staff-options").replaceChildren();
+    const columns = [make("div"),make("div")];
+    columns.forEach(c => { c.className = "koha-option-column"; $("staff-options").append(c); });
+    for (const [index,module] of modules.entries()) {
+      const button = make("button"); button.type = "button"; button.dataset.module = module.id;
+      button.setAttribute("aria-pressed","false");
+      const icon = make("span",module.icon); icon.setAttribute("aria-hidden","true");
+      button.append(icon,make("span",module.title));
+      button.addEventListener("click", () => explain(module));
+      columns[index < 9 ? 0 : 1].append(button);
+    }
+    $("staff-load-status").hidden = true;
+  }
+  $("show-staff").addEventListener("click", () => { history.replaceState(null,"",location.pathname + location.search); view(false); });
+  $("show-guides").addEventListener("click", () => view(true));
   function select(id) {
     const lesson = lessons.find(l => l.id === id) || lessons[0];
     exercise = new Exercise(lesson);
@@ -101,11 +143,15 @@
   $("guide-search").addEventListener("input",nav);
   $("clear-progress").addEventListener("click", () => { completed.clear(); try { localStorage.removeItem(KEY); } catch (e) {} nav(); });
   for (const [id,delta] of [["previous-lesson",-1],["next-lesson",1]]) $(id).addEventListener("click", () => { const l = lessons[lessons.indexOf(exercise.lesson) + delta]; if (l) location.hash = l.id; });
-  window.addEventListener("hashchange", () => { if (lessons.length) select(location.hash.slice(1)); });
-  fetch("lessons.json").then(r => { if (!r.ok) throw Error("HTTP " + r.status); return r.json(); }).then(data => {
+  window.addEventListener("hashchange", () => { if (lessons.length) { view(Boolean(location.hash)); select(location.hash.slice(1)); } });
+  const load = path => fetch(path).then(r => { if (!r.ok) throw Error("HTTP " + r.status); return r.json(); });
+  Promise.all([load("lessons.json"),load("staff-home.json")]).then(([data, home]) => {
     if (!Array.isArray(data.lessons) || !data.lessons.length) throw Error("No lessons");
     lessons = data.lessons;
+    modules = home.modules;
+    staffHome();
     $("load-status").hidden = true;
     select(location.hash.slice(1));
-  }).catch(() => { $("load-status").textContent = "The guides could not be loaded. Reload this page over HTTP/HTTPS, or use the official Koha manual linked below."; });
+    view(Boolean(location.hash));
+  }).catch(() => { $("staff-load-status").hidden = false; $("staff-load-status").textContent = "The staff screen could not be loaded. Please reload this page."; $("load-status").textContent = "The guides could not be loaded. Reload this page over HTTP/HTTPS, or use the official Koha manual linked below."; });
 })();

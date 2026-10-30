@@ -68,3 +68,15 @@ for (const lesson of data.lessons) {
 '''
     run = subprocess.run([node, '-e', script], cwd=REPO, capture_output=True, text=True, timeout=15)
     assert run.returncode == 0, run.stderr
+
+
+def test_staff_screen_modules_reference_existing_guides():
+    home = json.loads((MANUAL / 'staff-home.json').read_text())
+    assert home['template'] == 'modules/intranet-main.tt'
+    assert len(home['sha256']) == 64
+    guides = {l['id'] for l in json.loads((MANUAL / 'lessons.json').read_text())['lessons']}
+    assert len(home['modules']) == 17
+    for module in home['modules']:
+        assert module['description'] and module['tips']
+        assert module['source_path'].startswith('/cgi-bin/koha/')
+        assert set(module['guides']) <= guides

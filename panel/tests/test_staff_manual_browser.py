@@ -40,7 +40,7 @@ def test_all_guides_complete_in_a_real_browser(browser, site_url):
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     try:
-        page.goto(site_url + '/staff-manual/')
+        page.goto(site_url + '/staff-manual/#home')
         page.locator('#lesson').wait_for(state='visible')
         links = page.locator('#guide-nav a').evaluate_all('(links) => links.map(a => a.hash)')
         assert len(links) == 20
@@ -76,10 +76,13 @@ def test_mobile_layout_and_localized_home_link(browser, site_url):
         page.goto(site_url + '/languages/pt/')
         page.locator('#menu-toggle').click()
         page.get_by_role('link', name='Koha staff manual (English)', exact=True).click()
-        page.locator('#lesson').wait_for(state='visible')
+        page.locator('#staff-options button').first.wait_for(state='visible')
         assert '/staff-manual/' in page.url
         assert page.locator('html').get_attribute('lang') == 'en'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        page.get_by_role('button', name='Circulation', exact=True).click()
+        assert page.locator('#module-title').inner_text() == 'Circulation'
+        assert page.locator('#module-explanation').bounding_box()['y'] < 844
         page.goto(site_url + '/staff-manual/#inventory')
         assert page.locator('#lesson-title').inner_text() == 'Inventory'
         page.locator('#practice-next').click()
@@ -108,3 +111,29 @@ def test_storage_blocked_and_load_error(browser, site_url):
         assert page.locator('#lesson').is_hidden()
     finally:
         context.close()
+
+
+def test_staff_home_explains_each_module_before_opening_guides(browser, site_url):
+    page = browser.new_page()
+    try:
+        page.goto(site_url + '/staff-manual/')
+        page.locator('#staff-options button').first.wait_for(state='visible')
+        assert page.locator('#staff-options button').count() == 17
+        assert page.locator('#task-view').is_hidden()
+        titles = page.locator('#staff-options button').all_text_contents()
+        for title in titles:
+            button = page.locator('#staff-options button').filter(has_text=title)
+            button.click()
+            assert page.locator('#module-title').inner_text() in title
+            assert page.locator('#module-description').inner_text()
+            assert page.locator('#module-tips li').count() == 2
+            assert button.get_attribute('aria-pressed') == 'true'
+        page.get_by_role('button', name='Circulation', exact=True).click()
+        page.get_by_role('link', name='Read guide: Checkouts', exact=True).click()
+        assert page.locator('#lesson-title').inner_text() == 'Checkouts'
+        assert page.locator('#staff-overview').is_hidden()
+        page.get_by_role('button', name='Explore the staff screen', exact=True).click()
+        assert page.locator('#staff-overview').is_visible()
+        assert page.locator('#task-view').is_hidden()
+    finally:
+        page.close()

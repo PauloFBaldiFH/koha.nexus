@@ -1,0 +1,246 @@
+{
+  "template": "modules/intranet-main.tt",
+  "sha256": "c4e0347b37fa69875929547a7993b3beae3a91669fbc773117b9020d38ebca5f",
+  "modules": [
+    {
+      "id": "module-0",
+      "title": "Circulation",
+      "icon": "⇄",
+      "description": "Lend and return items, review loans and manage requests. Start here when working at the circulation desk.",
+      "tips": [
+        "Check the patron before lending.",
+        "Read the due date and any hold or transfer instructions."
+      ],
+      "guides": [
+        "checkouts",
+        "checkins",
+        "holds"
+      ],
+      "source_path": "/cgi-bin/koha/circ/circulation-home.pl"
+    },
+    {
+      "id": "module-1",
+      "title": "Patrons",
+      "icon": "▣",
+      "description": "Find and maintain the people registered with your library. Patron records connect membership, contact details and borrowing activity.",
+      "tips": [
+        "Check for an existing record before adding a person.",
+        "Category and library affect the rules applied to a patron."
+      ],
+      "guides": [
+        "patrons"
+      ],
+      "source_path": "/cgi-bin/koha/members/members-home.pl"
+    },
+    {
+      "id": "module-2",
+      "title": "Advanced search",
+      "icon": "⌕",
+      "description": "Build a catalog search with more criteria and limits than a basic search. Use it to narrow down bibliographic results.",
+      "tips": [
+        "Choose useful search terms and available limits.",
+        "Open a result to inspect its description and copies."
+      ],
+      "guides": [
+        "search"
+      ],
+      "source_path": "/cgi-bin/koha/catalogue/search.pl"
+    },
+    {
+      "id": "module-3",
+      "title": "Item search",
+      "icon": "☷",
+      "description": "Search physical copies rather than just bibliographic descriptions. This helps identify items by their local details.",
+      "tips": [
+        "Distinguish a record describing a title from an individual copy.",
+        "The item-search form has its own filters; the linked guide explains general catalog results, not that complete form."
+      ],
+      "guides": [
+        "search",
+        "items"
+      ],
+      "source_path": "/cgi-bin/koha/catalogue/itemsearch.pl"
+    },
+    {
+      "id": "module-4",
+      "title": "Lists",
+      "icon": "☰",
+      "description": "Collect bibliographic records into named lists, for example a reading list or a selection for an activity.",
+      "tips": [
+        "Review list visibility and editing permissions.",
+        "Adding a record to a list does not create another copy."
+      ],
+      "guides": [
+        "lists"
+      ],
+      "source_path": "/cgi-bin/koha/virtualshelves/shelves.pl"
+    },
+    {
+      "id": "module-5",
+      "title": "Course reserves",
+      "icon": "▤",
+      "description": "Organize courses and the resources reserved for teaching, when this feature is enabled.",
+      "tips": [
+        "Course information and reserve items are separate parts of the workflow.",
+        "Departments and other local settings may need preparation."
+      ],
+      "guides": [
+        "course-reserves"
+      ],
+      "source_path": "/cgi-bin/koha/course_reserves/course-reserves.pl"
+    },
+    {
+      "id": "module-6",
+      "title": "Authorities",
+      "icon": "⚭",
+      "description": "Search and maintain the controlled names, organizations, titles and subjects used in cataloging.",
+      "tips": [
+        "Inspect identifiers and variants before selecting a heading.",
+        "Matching names alone do not prove that two authorities represent the same entity."
+      ],
+      "guides": [
+        "authorities"
+      ],
+      "source_path": "/cgi-bin/koha/authorities/authorities-home.pl"
+    },
+    {
+      "id": "module-7",
+      "title": "Interlibrary loans",
+      "icon": "⇆",
+      "description": "Manage requests for materials from other libraries through the configured ILL provider.",
+      "tips": [
+        "Available actions depend on the provider and current request status.",
+        "Review costs, supplier details and patron information before confirming actions."
+      ],
+      "guides": [
+        "ill"
+      ],
+      "source_path": "/cgi-bin/koha/ill/ill.pl"
+    },
+    {
+      "id": "module-8",
+      "title": "E-resource management",
+      "icon": "▱",
+      "description": "Open Koha’s electronic resource management area when enabled. The module handles electronic-resource workflows such as agreements and licenses.",
+      "tips": [
+        "Availability depends on configuration and permissions.",
+        "This edition explains the entry point; detailed ERM screens are not yet reproduced."
+      ],
+      "guides": [],
+      "source_path": "/cgi-bin/koha/erm/erm.pl"
+    },
+    {
+      "id": "module-9",
+      "title": "Point of sale",
+      "icon": "▦",
+      "description": "Record payments for configured items or services using the enabled cash-register workflow.",
+      "tips": [
+        "Check amount, tendered payment and cash register before confirming.",
+        "This edition does not simulate taking payments or issuing receipts."
+      ],
+      "guides": [],
+      "source_path": "/cgi-bin/koha/pos/pay.pl"
+    },
+    {
+      "id": "module-10",
+      "title": "Cataloging",
+      "icon": "◆",
+      "description": "Create and edit bibliographic records and their items. This is where the description of a resource and its physical copies are maintained.",
+      "tips": [
+        "Select the correct framework and complete required fields.",
+        "Review duplicate warnings and distinguish titles from copies."
+      ],
+      "guides": [
+        "cataloging",
+        "items",
+        "marc-import"
+      ],
+      "source_path": "/cgi-bin/koha/cataloguing/cataloging-home.pl"
+    },
+    {
+      "id": "module-11",
+      "title": "Serials",
+      "icon": "▥",
+      "description": "Manage serial subscriptions and the receiving of issues, using configured publication and numbering patterns.",
+      "tips": [
+        "A subscription links to a bibliographic record.",
+        "Check frequency and numbering carefully before relying on predicted issues."
+      ],
+      "guides": [
+        "serials"
+      ],
+      "source_path": "/cgi-bin/koha/serials/serials-home.pl"
+    },
+    {
+      "id": "module-12",
+      "title": "Acquisitions",
+      "icon": "▧",
+      "description": "Manage purchasing through vendors, budgets, baskets, orders and receiving.",
+      "tips": [
+        "Review funds, currencies and supplier details.",
+        "Finding a vendor is not the same as placing or receiving an order."
+      ],
+      "guides": [
+        "acquisitions"
+      ],
+      "source_path": "/cgi-bin/koha/acqui/acqui-home.pl"
+    },
+    {
+      "id": "module-13",
+      "title": "Reports",
+      "icon": "◴",
+      "description": "Find, build and run reports to answer questions about the library’s data, subject to your permissions.",
+      "tips": [
+        "Read the report purpose and parameters before running it.",
+        "Protect personal data when exporting or sharing results."
+      ],
+      "guides": [
+        "reports"
+      ],
+      "source_path": "/cgi-bin/koha/reports/reports-home.pl"
+    },
+    {
+      "id": "module-14",
+      "title": "Preservation",
+      "icon": "▰",
+      "description": "Open the preservation module when enabled to manage preservation workflows.",
+      "tips": [
+        "Its screens and workflow depend on local configuration.",
+        "This edition identifies the module but does not simulate preservation processing."
+      ],
+      "guides": [],
+      "source_path": "/cgi-bin/koha/preservation/home.pl"
+    },
+    {
+      "id": "module-15",
+      "title": "Tools",
+      "icon": "⚒",
+      "description": "Open specialized and batch tools, including inventory and MARC staging. Some operations can change many records at once.",
+      "tips": [
+        "Read the scope and options before starting a batch job.",
+        "Test a small selection and keep a recovery path for changes."
+      ],
+      "guides": [
+        "tools",
+        "inventory",
+        "marc-import"
+      ],
+      "source_path": "/cgi-bin/koha/tools/tools-home.pl"
+    },
+    {
+      "id": "module-16",
+      "title": "Administration",
+      "icon": "⚙",
+      "description": "Configure how the library operates: preferences, libraries, categories, item types, rules and other settings.",
+      "tips": [
+        "Changes can affect staff and public workflows throughout the installation.",
+        "Review existing settings and permissions before changing them."
+      ],
+      "guides": [
+        "administration",
+        "preferences"
+      ],
+      "source_path": "/cgi-bin/koha/admin/admin-home.pl"
+    }
+  ]
+}

@@ -4,7 +4,15 @@ Open `index.html` through a static HTTP server or use the **Koha staff manual
 (English)** link on the website homepage. This is separate from the existing
 Koha.Nexus panel manual, whose appearance and guides are preserved.
 
-Twenty operational guides cover staff navigation, patron entry, checkouts,
+The default view is now a visual staff home based on `intranet-main.tt`,
+with its two columns of module options. Clicking one opens an explanation,
+things to know and links to related guides. Seventeen module entries are
+explained, including optional modules; those without detailed lessons are
+clearly identified as overviews. This is a reconstructed illustration, not a
+live Koha page or a pixel-identical copy of a customized staff theme.
+
+The “Task guides and practice” view retains the twenty operational guides.
+These cover staff navigation, patron entry, checkouts,
 checkins, catalog search, bibliographic and item entry, holds, authorities,
 saved reports, acquisitions, serials, inventory, MARC staging, lists, system
 preferences, administration, tools, course reserves and interlibrary loans.
