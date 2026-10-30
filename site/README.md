@@ -38,8 +38,10 @@ languages keep `page_title`/`page_description` and the manual title. Submitting
 the sitemap to Google Search Console is done by hand after merging.
 
 Language links work without JavaScript. The manual selector preserves the open
-section. On the homepage root, a saved manual choice takes priority over the browser's ordered language preferences. Unsupported preferences fall back to English.
-Direct translated page paths take priority over browser preferences. Manual
+section. On the directory root (`/`), a saved manual choice takes priority over the browser's ordered language preferences. Unsupported preferences fall back to English.
+Direct translated page paths and the explicit English `index.html` take priority
+over browser preferences. Only language-selector anchors save a manual choice;
+clicking other page content does not change that preference. Manual
 choices are saved when browser storage is available; detection still works
 when storage is blocked. Legacy
 `?lang=br`, `?lang=pt` and other supported query links navigate to the matching
