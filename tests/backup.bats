@@ -177,3 +177,45 @@ EOF
     assert 'grep -q "restore aborted: the pre-restore safety backup failed" /var/log/koha-easy-install/*.log'
     assert 'flock -n /var/lock/koha_backup.lock true'
 }
+
+@test "B15 safety backup of a nearly empty database: a complete small dump is accepted" {
+    mysql -e "DROP DATABASE koha_library; CREATE DATABASE koha_library; CREATE TABLE koha_library.systempreferences (variable varchar(50) PRIMARY KEY, value text);"
+    panel create_safety_backup /var/backups/koha_sql/pre_restore_safety_backup_test.sql.gz
+    assert '[ "$status" -eq 0 ]' "got: $output"
+    assert 'zcat /var/backups/koha_sql/pre_restore_safety_backup_test.sql.gz | tail -n1 | grep -q "^-- Dump completed"'
+    assert '[ "$(stat -c %s /var/backups/koha_sql/pre_restore_safety_backup_test.sql.gz)" -lt 10240 ]'
+}
+
+@test "B16 restore: a damaged table stops the safety backup and the dialog says so" {
+    mysql -e "CREATE TABLE koha_library.damaged_table (id int) ENGINE=InnoDB;"
+    local datadir; datadir=$(mysql -Nse 'SELECT @@datadir')
+    kei_stop_mariadb
+    rm -f "${datadir%/}/koha_library/damaged_table.ibd"
+    kei_start_mariadb
+    export KEI_SELECT_FILE="$FIX/new.sql.gz"
+    panel function_restore_database
+    mysql -e "DROP TABLE IF EXISTS koha_library.damaged_table;" 2>/dev/null
+    assert '[ "$status" -ne 0 ]'
+    assert_catalog_untouched
+    assert 'dialogs | grep "Safety backup failed" | grep -q "damaged on disk"'
+    assert 'dialogs | grep "Safety backup failed" | grep -q "damaged_table"'
+    assert '! dialogs | grep -q "check the free space"'
+    assert '[ -z "$(ls /var/backups/koha_sql/pre_restore_safety_backup_* 2>/dev/null)" ]' "no partial safety copy"
+}
+
+@test "B17 safety backup on a full disk: the cause is the free space" {
+    mkdir -p /var/backups/koha_sql
+    mount -t tmpfs -o size=8k tmpfs /var/backups/koha_sql
+    panel create_safety_backup /var/backups/koha_sql/pre_restore_safety_backup_test.sql.gz
+    assert '[ "$status" -ne 0 ]'
+    assert 'grep "safety backup failed" /var/log/koha-easy-install/*.log | grep -q "disk is full"'
+    assert '[ -z "$(ls -A /var/backups/koha_sql 2>/dev/null)" ]' "partial file (.part included) must be removed"
+}
+
+@test "B18 safety backup with MariaDB down: the cause is the connection, not the disk" {
+    kei_stop_mariadb
+    panel create_safety_backup /var/backups/koha_sql/pre_restore_safety_backup_test.sql.gz
+    kei_start_mariadb
+    assert '[ "$status" -ne 0 ]'
+    assert 'grep "safety backup failed" /var/log/koha-easy-install/*.log | grep -q "MariaDB is not running"'
+}
