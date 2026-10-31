@@ -59,6 +59,7 @@ OPAC_CUSTOM_DIR="$W/custom"
 STAFF_CUSTOM_DIR="$W/staff-custom"
 OPAC_NA_BIN="$W/koha-kei-new-arrivals"
 CRON_OPAC="$W/cron"
+CRON_TASKS="$W/koha_tasks"
 THEME_STATE="$W/etc/theme-settings.json"
 LOG_DIR="$W/logs"
 SH
@@ -401,7 +402,11 @@ SH
     task opac_theme_apply "$W/on"
     [ "$status" -eq 0 ]
     [ -x "$W/koha-kei-new-arrivals" ]
-    grep -q "^40 5 \* \* \* root $W/koha-kei-new-arrivals 8 " "$W/cron"
+    # The schedule is a line of koha_tasks (Schedules & cron tasks), with
+    # no file of its own; the number of covers is in the job.
+    grep -qx "40 5 \* \* \* root $W/koha-kei-new-arrivals >/dev/null 2>&1" "$W/koha_tasks"
+    [ ! -e "$W/cron" ]
+    [ "$(cat "$W/ran")" = "8" ]
     grep -q "RESULT feed=3 of 5" "$W/results"
     rm -f "$W/results"
     task opac_theme_get
@@ -410,12 +415,34 @@ SH
     task opac_carousel_refresh
     [ "$status" -eq 0 ]
     grep -q "OK The New arrivals feed was rebuilt." "$KEI_S/dialogs.log"
-    # Off again: the job and its schedule go.
+    # A time the library chose in Schedules & cron tasks stays on the next apply.
+    sed -i "s|^40 5 \* \* \* root $W/koha-kei-new-arrivals|0 */6 * * * root $W/koha-kei-new-arrivals|" "$W/koha_tasks"
+    task opac_theme_apply "$W/on"
+    [ "$(grep -c koha-kei-new-arrivals "$W/koha_tasks")" = "1" ]
+    grep -q "^0 \*/6 \* \* \* root $W/koha-kei-new-arrivals" "$W/koha_tasks"
+    # Off again: the job and its line go, the other lines stay.
+    printf '0 5 * * * root /usr/sbin/koha-plack --restart library\n' >> "$W/koha_tasks"
     task opac_theme_apply "$W/apply"
-    [ ! -e "$W/cron" ] && [ ! -e "$W/koha-kei-new-arrivals" ]
+    [ ! -e "$W/koha-kei-new-arrivals" ]
+    ! grep -q "koha-kei-new-arrivals\|OPAC carousel" "$W/koha_tasks"
+    grep -qx "0 5 \* \* \* root /usr/sbin/koha-plack --restart library" "$W/koha_tasks"
     task opac_carousel_refresh
     [ "$status" -eq 1 ]
     grep -q "ERROR .*carousel is not on" "$KEI_S/dialogs.log"
+}
+
+@test "new arrivals: an older panel's schedule file moves into koha_tasks" {
+    printf 'PATH=/bin\n\n0 5 * * * root /usr/sbin/koha-plack --restart library\n' > "$W/koha_tasks"
+    printf '# koha.nexus: OPAC "New arrivals" carousel\n40 5 * * * root %s 8 >/dev/null 2>&1\n' "$W/koha-kei-new-arrivals" > "$W/cron"
+    printf 'systemctl() { :; }\n' >> "$W/extra.sh"
+    task upgrade_cron_tasks
+    [ "$status" -eq 0 ]
+    [ ! -e "$W/cron" ]
+    grep -qx "40 5 \* \* \* root $W/koha-kei-new-arrivals 8 >/dev/null 2>&1" "$W/koha_tasks"
+    grep -qx "0 5 \* \* \* root /usr/sbin/koha-plack --restart library" "$W/koha_tasks"
+    # Run again: nothing doubled.
+    task upgrade_cron_tasks
+    [ "$(grep -c koha-kei-new-arrivals "$W/koha_tasks")" = "1" ]
 }
 
 @test "opac-theme: the panel knows the tasks" {
@@ -614,6 +641,36 @@ INSERT INTO additional_contents_localizations (additional_content_id, title, con
     task opac_theme_remove
     [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-%'")" = "0" ]
     [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE id = 10")" = "1" ]
+}
+
+@test "staff news: the koha.nexus item goes in once, as the library's own news, and never comes back" {
+    contents_tables
+    printf 'STAFF_WELCOME_MARK="%s"\n' "$W/etc/staff-welcome-news.done" >> "$W/extra.sh"
+    task staff_welcome_news
+    [ "$status" -eq 0 ]
+    [ "$(ac "SELECT CONCAT(c.category, '|', c.location, '|', IFNULL(c.branchcode, 'all'), '|', l.lang, '|', l.title)
+             FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
+             WHERE c.code = 'koha-nexus-welcome'")" = "news|staff_only|all|default|Welcome to koha.nexus" ]
+    ac "SELECT l.content FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
+        WHERE c.code = 'koha-nexus-welcome'" | grep -qF '<a href="https://koha.nexus" target="_blank" rel="noopener">koha.nexus</a>'
+    [ -f "$W/etc/staff-welcome-news.done" ]
+    # Not one of the panel's own (kei-*): the panel's staff news box shows it
+    # as the library's news item and Apply edits it in place.
+    task opac_contents_ours
+    printf '%s' "$output" | grep -v '^ERROR\|^OK' | head -n1 | base64 -d | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert d["news-staff"]["own"] and d["news-staff"]["title"] == "Welcome to koha.nexus", d'
+    # Deleted by the library: the next start leaves it out.
+    ac "DELETE FROM additional_contents WHERE code = 'koha-nexus-welcome'"
+    task staff_welcome_news
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'koha-nexus-welcome'")" = "0" ]
+    # A database that already has it (restored elsewhere) gets no second one.
+    rm -f "$W/etc/staff-welcome-news.done"
+    ac "INSERT INTO additional_contents (category, code, location, published_on) VALUES ('news', 'koha-nexus-welcome', 'staff_only', CURDATE())"
+    task staff_welcome_news
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'koha-nexus-welcome'")" = "1" ]
+    [ -f "$W/etc/staff-welcome-news.done" ]
 }
 
 @test "contents: scripts, handlers, unknown places or a missing file change nothing" {

@@ -330,7 +330,8 @@ db() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); print 
     run env KEI_EXTRA="$W/js.sh" bash "$PANEL" aia_js_sql add "$W/add.sql"
     grep -qF "UPDATE systempreferences SET value = '/* other */" "$W/add.sql"
     grep -qF '/* koha-easy-installer ai-assistant begin */' "$W/add.sql"
-    grep -qF 'news.replaceWith(box)' "$W/add.sql"
+    grep -qF 'news.before(box)' "$W/add.sql"
+    ! grep -qF 'replaceWith' "$W/add.sql"
     grep -qF '/cgi-bin/koha/tools/ai_assistant.pl?v=' "$W/add.sql"
     env KEI_EXTRA="$W/js.sh" bash "$PANEL" aia_js_block > "$W/old.js"
     run env KEI_EXTRA="$W/js.sh" AIA_OLD="$W/old.js" bash "$PANEL" aia_js_sql remove "$W/rm.sql"
@@ -347,7 +348,7 @@ db() { perl -MDBI -e 'my $d = DBI->connect("dbi:SQLite:dbname=$ARGV[0]"); print 
     grep -qF '"16" "$(t "💬  AI assistant on the staff home page")"' "$KEI_REPO/installer"
 }
 
-@test "ai assistant: the widget in a browser replaces the news block" {
+@test "ai assistant: the widget in a browser sits above the news block" {
     command -v node >/dev/null && NODE_PATH="$(npm root -g 2>/dev/null)" node -e 'require("playwright")' 2>/dev/null \
         && [ -r /usr/share/javascript/jquery/jquery.min.js ] || skip "Playwright or jQuery (libjs-jquery) not installed"
     start_mock
