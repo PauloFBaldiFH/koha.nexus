@@ -38,7 +38,7 @@ def write_list(tmp_path, servers) -> str:
 
 def test_every_direct_server_loads_and_nothing_else():
     catalog = load(targets.DEFAULT_LIST, env={})
-    assert len(catalog.targets) == 211 and catalog.skipped == []
+    assert len(catalog.targets) == 202 and catalog.skipped == []
     hosts = {a.host.lower() for t in catalog.targets.values() for a in t.addresses}
     assert not any(h.endswith("koha.nexus") or h in ("127.0.0.1", "localhost") for h in hosts)
     assert all(not name_refusal(a.host, a.port, a.db) for t in catalog.targets.values() for a in t.addresses)
@@ -54,7 +54,7 @@ def test_real_list_unusable_servers_and_providers():
     assert {t.address.provider for t in catalog.targets.values() if "loc.gov" in t.address.host} == {"loc"}
     usable = catalog.usable()
     assert all(t.recordtype == "biblio" and not t.unusable for t in usable)
-    assert {t.id for t in catalog.targets.values() if t.preselect} == {"utfpr", "ufsc", "unifesp", "loc"}
+    assert {t.id for t in catalog.targets.values() if t.preselect} == {"utfpr", "ufsc", "unifesp"}
 
 
 def test_a_login_from_the_environment_makes_a_server_usable():

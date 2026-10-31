@@ -346,9 +346,9 @@ _SCRIPTS: dict[str, list[str]] = {
                      "@@msg ok OK\tCloud enabled and tested successfully."],
     "z3950-list": ["@@result row=https://catalog.koha.nexus\t443\tsru\tRede koha.nexus (Catalogação Compartilhada)"
                    "\tbiblio\t1",
-                   "@@result row=lx2.loc.gov\t210\tLCDB\tLibrary of Congress\tbiblio\t1",
+                   "@@result row=utoronto.alma.exlibrisgroup.com\t1921\t01UTON_INST\tUniversity of Toronto\tbiblio\t1",
                    "@@result row=z3950.ufsc.br\t210\tDefault\tUFSC\tbiblio\t0",
-                   "@@result row=https://sru.koha.nexus\t443\tsru/loc\tLibrary of Congress, EUA\tbiblio\t0"],
+                   "@@result row=https://sru.koha.nexus\t443\tsru/toronto\tUniversity of Toronto, Canadá\tbiblio\t0"],
     "z3950-check": ["@@result ticked=1", "@@result unticked=1", "@@result missing=0",
                     "@@msg ok OK\tKoha's cataloguing search: 1 server(s) ticked, 1 unticked."],
     "enrich-jobs": ["@@result jobs=" + json.dumps(_ENRICH_JOBS, ensure_ascii=False),

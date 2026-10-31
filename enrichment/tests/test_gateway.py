@@ -466,7 +466,7 @@ def test_panel_list_is_generated_from_targets_json():
     assert {(t["host"], t["port"]) for t in fallback} == {("sru.koha.nexus", 443)}
     assert not any(t["preselect"] for t in fallback)
     assert [t["rank"] for t in fallback] == list(range(koha_sql.FALLBACK_RANK, koha_sql.FALLBACK_RANK + len(fallback)))
-    assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default", "LCDB"]
+    assert [t["db"] for t in rows if t.get("preselect")] == ["biblioteca", "Default"]
     # A gateway row a direct server covers says so; the flags come from the countries.
     utfpr = next(t for t in fallback if t["db"] == "sru/utfpr")
     assert "direct Z39.50 row UTFPR" in utfpr["notes"] and utfpr["flag"] == "🇧🇷"

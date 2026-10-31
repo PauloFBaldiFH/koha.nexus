@@ -380,252 +380,6 @@
    "notes": "Legacy Aleph catalogue, no login; kept for installs without the FOLIO login."
   },
   {
-   "id": "ibict",
-   "name": "IBICT (Instituto Brasileiro de Informação em Ciência e Tecnologia)",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "embauba.ibict.br",
-   "port": 2100,
-   "db": "Default",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client embauba.ibict.br:2100/Default",
-   "alternates": [
-    {
-     "host": "embauba.ibict.br",
-     "port": 2100,
-     "db": "biblios",
-     "note": "Koha's own database name, also accepted",
-     "yaz": "yaz-client embauba.ibict.br:2100/biblios"
-    },
-    {
-     "host": "200.130.0.11",
-     "port": 2100,
-     "db": "Default",
-     "note": "IP address of embauba.ibict.br",
-     "yaz": "yaz-client 200.130.0.11:2100/Default"
-    }
-   ]
-  },
-  {
-   "id": "unifei-antman",
-   "name": "UNIFEI — nó Antman",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "antman.unifei.edu.br",
-   "port": 2100,
-   "db": "Default",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client antman.unifei.edu.br:2100/Default",
-   "alternates": [
-    {
-     "host": "200.131.128.51",
-     "port": 2100,
-     "db": "Default",
-     "note": "IP address",
-     "yaz": "yaz-client 200.131.128.51:2100/Default"
-    }
-   ]
-  },
-  {
-   "id": "unifei-wasp",
-   "name": "UNIFEI — nó Wasp",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "wasp.unifei.edu.br",
-   "port": 2100,
-   "db": "Default",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client wasp.unifei.edu.br:2100/Default",
-   "alternates": [
-    {
-     "host": "200.131.128.52",
-     "port": 2100,
-     "db": "Default",
-     "note": "IP address",
-     "yaz": "yaz-client 200.131.128.52:2100/Default"
-    }
-   ]
-  },
-  {
-   "id": "unifei-viprnp",
-   "name": "UNIFEI — gateway Aleph (viprnp)",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "viprnp.unifei.edu.br",
-   "port": 9991,
-   "db": "SEN01",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client viprnp.unifei.edu.br:9991/SEN01",
-   "alternates": [
-    {
-     "host": "viprnp.unifei.edu.br",
-     "port": 9991,
-     "db": "UNIFEI01",
-     "note": "alternative database",
-     "yaz": "yaz-client viprnp.unifei.edu.br:9991/UNIFEI01"
-    },
-    {
-     "host": "viprnp.unifei.edu.br",
-     "port": 9991,
-     "db": "BASE01",
-     "note": "alternative database",
-     "yaz": "yaz-client viprnp.unifei.edu.br:9991/BASE01"
-    },
-    {
-     "host": "200.131.128.34",
-     "port": 9991,
-     "db": "SEN01",
-     "note": "IP address",
-     "yaz": "yaz-client 200.131.128.34:9991/SEN01"
-    }
-   ],
-   "unconfirmed": "db"
-  },
-  {
-   "id": "unifei-thor",
-   "name": "UNIFEI — nó Thor (Aleph)",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "thor.unifei.edu.br",
-   "port": 9991,
-   "db": "SEN01",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client thor.unifei.edu.br:9991/SEN01",
-   "alternates": [
-    {
-     "host": "200.131.128.48",
-     "port": 9991,
-     "db": "SEN01",
-     "note": "IP address",
-     "yaz": "yaz-client 200.131.128.48:9991/SEN01"
-    }
-   ]
-  },
-  {
-   "id": "ufsm-redes",
-   "name": "UFSM (Universidade Federal de Santa Maria) — nó Redes (Koha)",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "redes.ufsm.br",
-   "port": 2100,
-   "db": "biblios",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client redes.ufsm.br:2100/biblios",
-   "alternates": [
-    {
-     "host": "redes.ufsm.br",
-     "port": 2100,
-     "db": "Default",
-     "note": "database named in the first UFSM entry",
-     "yaz": "yaz-client redes.ufsm.br:2100/Default"
-    },
-    {
-     "host": "200.132.24.13",
-     "port": 2100,
-     "db": "biblios",
-     "note": "IP address",
-     "yaz": "yaz-client 200.132.24.13:2100/biblios"
-    }
-   ],
-   "unconfirmed": "db"
-  },
-  {
-   "id": "ufsm-ceesp",
-   "name": "UFSM — Projeto CEESP (Koha)",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "srv-ceesp.proj.ufsm.br",
-   "port": 2100,
-   "db": "biblios",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client srv-ceesp.proj.ufsm.br:2100/biblios",
-   "alternates": [
-    {
-     "host": "srv-ceesp.proj.ufsm.br",
-     "port": 2100,
-     "db": "Default",
-     "note": "database named in the first UFSM entry",
-     "yaz": "yaz-client srv-ceesp.proj.ufsm.br:2100/Default"
-    },
-    {
-     "host": "200.18.45.228",
-     "port": 2100,
-     "db": "biblios",
-     "note": "IP address",
-     "yaz": "yaz-client 200.18.45.228:2100/biblios"
-    }
-   ],
-   "unconfirmed": "db"
-  },
-  {
-   "id": "ufam",
-   "name": "UFAM (Universidade Federal do Amazonas) — Aleph",
-   "flag": "🇧🇷",
-   "country": "BR",
-   "category": "brazil",
-   "host": "c8113132.ufam.edu.br",
-   "port": 9991,
-   "db": "SEN01",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client c8113132.ufam.edu.br:9991/SEN01",
-   "alternates": [
-    {
-     "host": "200.17.49.50",
-     "port": 9991,
-     "db": "C811313201",
-     "note": "the second UFAM entry's address and database",
-     "yaz": "yaz-client 200.17.49.50:9991/C811313201"
-    },
-    {
-     "host": "c8113132.ufam.edu.br",
-     "port": 9991,
-     "db": "UFAM01",
-     "note": "alternative database",
-     "yaz": "yaz-client c8113132.ufam.edu.br:9991/UFAM01"
-    }
-   ],
-   "unconfirmed": "db"
-  },
-  {
    "id": "rnp-rj",
    "name": "Servidor RNP / Rio de Janeiro (Zebra)",
    "flag": "🇧🇷",
@@ -641,24 +395,6 @@
    "priority": "primary",
    "yaz": "yaz-client 200.19.73.127:210/Default",
    "notes": "Listed twice (28,537 records); IP address only, no host name."
-  },
-  {
-   "id": "loc",
-   "name": "Library of Congress",
-   "flag": "🇺🇸",
-   "country": "US",
-   "category": "north_america",
-   "host": "lx2.loc.gov",
-   "port": 210,
-   "db": "LCDB",
-   "syntax": "MARC21",
-   "encoding": "utf8",
-   "recordtype": "biblio",
-   "protocol": "z3950",
-   "priority": "primary",
-   "yaz": "yaz-client lx2.loc.gov:210/LCDB",
-   "preselect": true,
-   "sru_fallback": "loc"
   },
   {
    "id": "uiowa",
@@ -4324,6 +4060,69 @@
    "port": 210,
    "db": "34BNE_AUTH",
    "reason": "Removed by Paulo on 2026-10-30: did not answer the panel's test (no answer, wrong protocol or no test record)."
+  },
+  {
+   "name": "IBICT (Instituto Brasileiro de Informação em Ciência e Tecnologia)",
+   "host": "embauba.ibict.br",
+   "port": 2100,
+   "db": "Default",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UNIFEI — nó Antman",
+   "host": "antman.unifei.edu.br",
+   "port": 2100,
+   "db": "Default",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UNIFEI — nó Wasp",
+   "host": "wasp.unifei.edu.br",
+   "port": 2100,
+   "db": "Default",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UNIFEI — gateway Aleph (viprnp)",
+   "host": "viprnp.unifei.edu.br",
+   "port": 9991,
+   "db": "SEN01",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UNIFEI — nó Thor (Aleph)",
+   "host": "thor.unifei.edu.br",
+   "port": 9991,
+   "db": "SEN01",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UFSM (Universidade Federal de Santa Maria) — nó Redes (Koha)",
+   "host": "redes.ufsm.br",
+   "port": 2100,
+   "db": "biblios",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UFSM — Projeto CEESP (Koha)",
+   "host": "srv-ceesp.proj.ufsm.br",
+   "port": 2100,
+   "db": "biblios",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "UFAM (Universidade Federal do Amazonas) — Aleph",
+   "host": "c8113132.ufam.edu.br",
+   "port": 9991,
+   "db": "SEN01",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
+  },
+  {
+   "name": "Library of Congress",
+   "host": "lx2.loc.gov",
+   "port": 210,
+   "db": "LCDB",
+   "reason": "Removed by Paulo on 2026-10-31: did not answer the panel's test (it was already ticked in his Koha)."
   }
  ]
 }
