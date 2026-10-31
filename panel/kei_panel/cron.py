@@ -7,7 +7,10 @@ file, keeps a copy of the old one and puts it in place.
 
   * presets: the jobs the panel knows (the backups, the clean-ups, a full
     index rebuild, fines, authority linking, the reader alerts of
-    notify.py), found by their command;
+    notify.py, the OPAC carousel), found by their command;
+  * an optional preset (the OPAC carousel) is a row only while its line is
+    in the file: the installer adds it when the carousel is turned on in
+    OPAC appearance and takes it out when it is turned off;
   * a job that is off stays in the file as "#off# <cron line>", so turning
     it on again keeps its time;
   * lines the library wrote by hand are kept as they are, with the comment
@@ -27,6 +30,7 @@ CRON_PATH = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 OFF = "#off# "
 REINDEX_BIN = "/usr/local/bin/koha-kei-reindex"
 NOTIFY_BIN = "/usr/local/bin/koha-kei-notify"
+NEW_ARRIVALS_BIN = "/usr/local/bin/koha-kei-new-arrivals"
 
 FREQS = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "custom": "Custom"}
 WEEKDAYS = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
@@ -61,6 +65,7 @@ class Preset:
     enabled: bool = True
     freqs: tuple[str, ...] = tuple(FREQS)
     help: str = ""
+    optional: bool = False  # not added when the file lacks it (see the module's notes)
 
 
 PRESETS: tuple[Preset, ...] = (
@@ -95,6 +100,10 @@ PRESETS: tuple[Preset, ...] = (
     Preset("mysqlcheck", "Database table check",
            "/usr/bin/mysqlcheck --check --databases koha_{instance} >/dev/null 2>&1", "mysqlcheck",
            freq="monthly", day=5, hour=1),
+    Preset("carousel", "OPAC carousel refresh (New arrivals and lists)", NEW_ARRIVALS_BIN + " >/dev/null 2>&1",
+           "koha-kei-new-arrivals", hour=5, minute=40, optional=True,
+           help="Rebuilds the covers of the OPAC carousel: the newest titles and the public lists. "
+                "Here while the carousel is on in OPAC appearance."),
 )
 BY_KEY = {p.key: p for p in PRESETS}
 # The reader alerts look ahead a whole period when they run weekly or
@@ -260,7 +269,7 @@ def parse(text: str, instance: str) -> CronFile:
         blocks.append("\n".join(block + ["# END"]))
     empty = not jobs
     for p in PRESETS:
-        if p.key not in seen:
+        if p.key not in seen and not p.optional:
             job = preset_job(p, instance)
             job.enabled = p.enabled if empty else False
             jobs.append(job)

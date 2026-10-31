@@ -80,6 +80,9 @@ SH
     panel lt_patron_category
     assert '! grep -qE "stage_file|update_patrons" "$KEI_S/calls.log" 2>/dev/null' "$(calls)"
     assert '[ "$(dialogs | grep -c "already running")" = "3" ]' "$(dialogs)"
+    # The message names what holds the lock (PID and program).
+    assert 'dialogs | grep -q "Holding it now:"' "$(dialogs)"
+    assert 'dialogs | grep -qE "^[0-9]+ (flock -o|sleep 30)"' "$(dialogs)"
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM saved_sql;")" = "1" ]'
 }
 

@@ -19,9 +19,9 @@ function check(cond, what) {
     try {
         await page.goto(base + "/cgi-bin/koha/mainpage.pl");
         await page.waitForSelector("#kei-ai .kei-ai-log .kei-ai-assistant");
-        check(await page.locator("#area-news").count() === 0, "the news block is gone");
+        check(await page.locator("#area-news").count() === 1 && await page.locator("#area-news").isVisible(), "the news are still there");
         check(await page.locator(".col-md-3 > #kei-ai").count() === 1, "the chat is in the news column");
-        check(await page.locator(".col-md-3 > #kei-ai + #area-quote").count() === 1, "in the place of the news, above the quote");
+        check(await page.locator(".col-md-3 > #kei-ai + #area-news + #area-quote").count() === 1, "above the news, which stay above the quote");
         check(await page.locator("#kei-ai .kei-ai-chip").count() === 0, "no example questions under the chat");
 
         // The input: three lines to start, grows with the text up to its

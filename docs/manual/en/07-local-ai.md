@@ -44,7 +44,7 @@ AI-suggested classification must be reviewed in the schedules adopted by the lib
 
 ## Assistant on the staff home page
 
-Use **Install, update or remove the assistant** to manage the tool. Installation places the chat where the staff home page's news block was; OPAC news is unaffected.
+Use **Install, update or remove the assistant** to manage the tool. Installation places the chat above the staff home page's news block; the news stay visible below it.
 
 The assistant searches through Koha's engine and application-defined read queries. It does not execute unrestricted SQL written by AI. Responses can contain record links and action proposals.
 
