@@ -2781,7 +2781,7 @@ def _carousel_css(car: dict) -> str:
 }}"""
 
 
-# The styles added in 1.5.149 (Paulo, 2026-10-31: "more carousel styles, be
+# The styles added in 1.5.150 (Paulo, 2026-10-31: "more carousel styles, be
 # creative"), the drawn cover of a title with none and the reflections.
 # The 3D ones (ring, wall, fan, spotlight) are placed by the script frame by
 # frame (spin()); these rules only give them their stage and their looks.
