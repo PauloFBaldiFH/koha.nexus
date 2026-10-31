@@ -335,7 +335,9 @@ def panel_list(table: dict[str, Target], keep_from: str | Path | None = None, ho
             "flag": flag("BR"), "priority": "primary", "preselect": True, "verified": True,
             "source": "koha.nexus Catalog Network (catalog-network/)",
             "notes": ("The shared catalogue of the koha.nexus libraries (catalog.koha.nexus). The panel's "
-                      "Community network switch adds or removes the same row.")}]
+                      "Community network switch adds or removes the same row. Live again since 2026-10-31 "
+                      "(koha-nexus-catalog on the VPS answers HTTP 200 with SRU XML); a panel that marked it "
+                      "\"Wrong protocol\" while it was down forgets that mark (HISTORY_RULES 3).")}]
     for i in PRIMARY_IDS:
         if i in table:
             t = table[i]

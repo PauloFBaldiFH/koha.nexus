@@ -37,7 +37,7 @@ def build(settings: Settings, live: bool | None = None) -> Engine:
     learned = Learned(settings.learned_db, settings.learned_days)
     use_live = settings.live if live is None else live
     targets = load(settings.targets)
-    members = [t for t in targets.values() if t.kind == "zeus" and t.status != "broken"]
+    members = zeus.order_members(t for t in targets.values() if t.on_zeus)
     hub = zeus.Zeus(settings.zeus_url, members=members) if settings.zeus_url else None
     crp = pergamum.Pergamum(settings.pergamum_url) if settings.pergamum_url else None
     runner = (Runner(learned, settings.live_timeout, settings.live_grace, zeus=hub, pergamum=crp)

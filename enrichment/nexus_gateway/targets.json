@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "updated": "2026-10-26",
+ "updated": "2026-10-31",
  "about": "The catalogues of the koha.nexus local gateway (127.0.0.1:5000), one per /sru/{id}; /sru/_union searches them all. Every search answers from static.db first (records of the source whose id is the target's id, or the ids listed in \"static\"). kind z3950 and sru targets are also searched live (native protocol only, a 6 s budget) when static.db has nothing; zeus ones too, through Catálogo Zeus, on the server gateway only (NEXUS_GATEWAY_ZEUS_URL set), and /sru/_union asks Zeus once for all of them; Rede Pergamum (pergamum) likewise, when NEXUS_GATEWAY_PERGAMUM_URL is set, /sru/_union included; missing ones answer from static.db only. A missing or zeus catalogue that Paulo's validated direct Z39.50 list (panel/kei_panel/data/z3950_direct.json) covers in MARC21 is kind z3950 with that address. status: verified (searched live, MARC came back), untested, broken (its address does not answer; never searched live), missing (no address). local_first (1-5): the catalogues static.db holds nearly whole (UNESP, UFPR, UNIFESP, UnB, UFU); their Koha rows are ticked and ranked first, on-demand enrichment searches their static.db records before any server, and a library row whose host is one of legacy_hosts (or a subdomain) becomes their fallback.",
  "targets": [
   {
@@ -11,8 +11,9 @@
    "kind": "zeus",
    "status": "verified",
    "target_index": 0,
-   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels).",
-   "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)"
+   "note": "Zeus is searched only by the server gateway (NEXUS_GATEWAY_ZEUS_URL), under the targets[n] whose label on its search form names this catalogue (python -m nexus_gateway zeus-labels). Its node inside Zeus often times out (Paulo, 2026-10-31): zeus_unstable, so /sru/_union asks it alone, after the stable catalogues.",
+   "source": "Paulo's target status list of 2026-10-11 (STATUS_ALVOS.md, folded in here)",
+   "zeus_unstable": true
   },
   {
    "id": "fundacentro",
@@ -34,7 +35,10 @@
    "db": "SEN01",
    "syntax": "USMARC",
    "encoding": "utf8",
-   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server senado-legacy; was kind zeus"
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server senado-legacy; was kind zeus",
+   "target_index": 2,
+   "zeus_priority": 2,
+   "note": "Also on Catálogo Zeus (the RVBI label; n taken from the form), second in the Zeus union request."
   },
   {
    "id": "senado-folio",
@@ -237,7 +241,10 @@
    "db": "55USP_INST",
    "syntax": "USMARC",
    "encoding": "utf8",
-   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server usp; was kind zeus"
+   "source": "panel/kei_panel/data/z3950_direct.json (Paulo's validated direct list of 2026-10-18), server usp; was kind zeus",
+   "target_index": 4,
+   "zeus_priority": 1,
+   "note": "Also on Catálogo Zeus as targets[4], the first catalogue of the Zeus union request: every ISBN-10/13 and title search answered with full MARC21 (020, 100, 245, 260) in Paulo's 2026-10-31 tests."
   },
   {
    "id": "unicamp",

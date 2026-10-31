@@ -715,6 +715,43 @@ def test_history_from_the_older_scan_is_shown_again(tmp_path):
     assert again.get("a.example.org:210/x")["fails"] == 1  # no second reset
 
 
+def test_restored_catalog_loses_its_wrong_protocol_mark(tmp_path):
+    # catalog.koha.nexus was down (Cloudflare's error page read as "Wrong
+    # protocol") and answers again since 2026-10-31: the rules change drops
+    # that old result, so the list shows it untested, not failed.
+    key = "catalog.koha.nexus:443/sru"
+    assert key in z.RESTORED_KEYS
+    old = {key: {"status": "tcp", "fails": 5, "auto": True, "when": 1, "port": 443},
+           "c.example.org:210/z": {"status": "tcp", "fails": 4, "auto": True}, z.RULES_KEY: 2}
+    (tmp_path / z.HISTORY_FILE).write_text(json.dumps(old))
+    h = z.History()
+    assert h.get(key) == {} and not h.blacklisted(key) and not h.works(key)
+    assert h.get("c.example.org:210/z")["status"] == "tcp"     # other servers keep their last result
+    h.record(z.ScanResult(key, "ok"))
+    h.save()
+    assert z.History().works(key)                               # once only: the next result stays
+
+
+def test_restored_catalog_hidden_by_hand_stays_hidden(tmp_path):
+    key = "catalog.koha.nexus:443/sru"
+    (tmp_path / z.HISTORY_FILE).write_text(json.dumps({key: {"status": "dead", "manual": True}}))
+    h = z.History()
+    assert h.blacklisted(key) and "status" not in h.get(key)
+
+
+def test_curated_catalog_row_is_not_marked_failed():
+    catalog = next(t for t in z.load_curated() if t.key == "catalog.koha.nexus:443/sru")
+    assert catalog.kind == "sru" and catalog.port == 443 and catalog.preselect
+
+
+def test_explain_only_answer_is_named_so():
+    t = z.Target("Rede koha.nexus", "catalog.koha.nexus", 443, "sru", kind="sru")
+    explain = ('<zs:explainResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version>'
+               '<zs:record/></zs:explainResponse>')
+    res = asyncio.run(z.probe_sru(t, 443, get=lambda u, timeout: explain))
+    assert res.alive and res.status == "empty" and res.detail == "SRU explain only, no search answer"
+
+
 def test_curated_list_has_no_raw_address():
     # The VPS gateway's addresses (public and private IPs) never come back: the
     # gateway rows go through the Cloudflare tunnel (sru.koha.nexus:443).

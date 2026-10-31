@@ -154,3 +154,107 @@ def test_union_answer_through_live_ask():
                     members=[target("ufsc", "Universidade Federal de Santa Catarina (UFSC)", 11)])
     answer = asyncio.run(live.ask(zeus.union_target(), "title", "x", 5, zeus=hub))
     assert not answer.error and answer.records and answer.target == zeus.UNION_ID
+
+
+# ----------------------------------------------------------------------
+# stable catalogues first, timeout-prone ones alone and last
+# ----------------------------------------------------------------------
+def ranked(tid, name, n, priority=0, unstable=False, kind="zeus"):
+    raw = {"id": tid, "name": name, "group": "national", "kind": kind, "status": "verified",
+           "target_index": n, "zeus_priority": priority, "zeus_unstable": unstable}
+    if kind == "z3950":
+        raw.update(host="z.example", port=210, db="X")
+    return make_target(raw)
+
+
+def search_targets(urls):
+    return [sorted((k for k in urllib.parse.parse_qs(urllib.parse.urlsplit(u).query) if k.startswith("targets[")),
+                   key=lambda k: int(k[8:-1]))
+            for u in urls if "searchString" in u]
+
+
+BN = ("bn", "Fundação Biblioteca Nacional (BN)", 0)
+USP = ("usp", "Universidade de São Paulo (USP)", 4)
+RVBI = ("senado", "Rede Virtual de Bibliotecas (RVBI), Senado Federal", 2)
+UFSC = ("ufsc", "Universidade Federal de Santa Catarina (UFSC)", 11)
+
+
+def test_targets_json_puts_usp_and_rvbi_first_and_bn_last():
+    table = load(TARGETS)
+    assert table["bn"].zeus_unstable and table["bn"].on_zeus
+    assert (table["usp"].kind, table["usp"].target_index, table["usp"].zeus_priority) == ("z3950", 4, 1)
+    assert (table["senado"].target_index, table["senado"].zeus_priority) == (2, 2)
+    members = zeus.order_members(t for t in table.values() if t.on_zeus)
+    assert [t.id for t in members[:2]] == ["usp", "senado"]
+    assert members[-1].id == "bn"
+    # the direct z3950 rows are untouched: still searched live on their own
+    assert table["usp"].live and table["usp"].host == "na01.alma.exlibrisgroup.com"
+
+
+def test_zeus_priority_needs_a_zeus_catalogue():
+    import pytest
+    from nexus_gateway.targets import TargetError
+    with pytest.raises(TargetError):
+        make_target({"id": "x", "name": "X", "kind": "z3950", "host": "h.example", "port": 210, "db": "d",
+                     "zeus_priority": 1})
+    with pytest.raises(TargetError):
+        ranked("y", "Y (Y)", 3, priority=-1)
+
+
+def test_stable_first_and_the_unstable_one_alone_after_them():
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=get)
+    members = [ranked(*BN, unstable=True), ranked(*UFSC), ranked(*RVBI, priority=2),
+               ranked(*USP, priority=1, kind="z3950")]
+    hub.search_many(members, "isbn", "9788535902778", 30)
+    assert search_targets(get.urls) == [["targets[2]", "targets[4]", "targets[11]"], ["targets[0]"]]
+
+
+def test_a_timed_out_unstable_node_keeps_the_stable_records():
+    class SlowBN(FakeGet):
+        def __call__(self, url, timeout):
+            if "targets%5B0%5D" in url:
+                self.urls.append(url)
+                raise zeus.ZeusError("Zeus did not answer: TimeoutError")
+            return super().__call__(url, timeout)
+    get = SlowBN()
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=get)
+    total, recs = hub.search_many([ranked(*BN, unstable=True), ranked(*USP, priority=1)], "title", "x", 30)
+    assert total == len(recs) >= 1
+    assert search_targets(get.urls) == [["targets[4]"], ["targets[0]"]]
+
+
+def test_the_unstable_request_gets_only_the_time_left():
+    waits = []
+
+    class Timed(FakeGet):
+        def __call__(self, url, timeout):
+            if "searchString" in url:
+                waits.append(timeout)
+            return super().__call__(url, timeout)
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=Timed())
+    hub.search_many([ranked(*BN, unstable=True), ranked(*USP, priority=1)], "title", "x", 30)
+    assert waits[0] == 30 and waits[1] <= zeus.UNSTABLE_TIMEOUT
+
+
+def test_no_time_left_skips_the_unstable_node(monkeypatch):
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=get)
+    hub.labels()
+    clock = iter([0.0, 100.0])
+    monkeypatch.setattr(zeus.time, "monotonic", lambda: next(clock, 100.0))
+    total, recs = hub.search_many([ranked(*BN, unstable=True), ranked(*USP, priority=1)], "title", "x", 30)
+    assert recs and search_targets(get.urls) == [["targets[4]"]]
+
+
+def test_only_an_unstable_node_that_fails_is_an_error():
+    import pytest
+
+    class Down(FakeGet):
+        def __call__(self, url, timeout):
+            if "searchString" in url:
+                raise zeus.ZeusError("Zeus did not answer: TimeoutError")
+            return super().__call__(url, timeout)
+    hub = zeus.Zeus("https://catalogo.example/zeus/", get=Down())
+    with pytest.raises(zeus.ZeusError):
+        hub.search_many([ranked(*BN, unstable=True)], "title", "x", 30)

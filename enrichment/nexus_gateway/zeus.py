@@ -8,7 +8,10 @@ Only the server gateway does this: it runs when NEXUS_GATEWAY_ZEUS_URL is
 set (the VPS behind sru.koha.nexus); a library's own gateway leaves it unset.
 /sru/_union asks Zeus once for all its catalogues (UNION_ID, search_many):
 one page with every targets[n] ticked, as the old bridge did, up to 15 a
-request.
+request. The stable catalogues go first (zeus_priority: USP, the RVBI) and
+the timeout-prone ones (zeus_unstable: the BN, targets[0]) are asked one by
+one after them, each with what is left of the time, so a hung BN node never
+costs the records the others found.
 
 targets.json's target_index values were never checked against the live
 page, so the index searched is taken from the labels on Zeus's own search
@@ -39,6 +42,8 @@ LABELS_RETRY = 600                  # a failed fetch is tried again after this
 SEARCH_TYPE = {"isbn": 7, "title": 4, "author": 1003, "keywords": 1016}
 UNION_ID = "_zeus"                  # the one live "target" /sru/_union asks for every zeus catalogue
 CHUNK = 15                          # Zeus refuses more targets[n] than this in one request
+UNSTABLE_TIMEOUT = 10.0             # the most an unstable catalogue's own request may take
+UNSTABLE_MIN = 2.0                  # less time left than this: the unstable ones are skipped
 
 
 class ZeusError(Exception):
@@ -117,6 +122,16 @@ def compare(targets: list[Target], labels: dict[int, str]) -> list[dict]:
         rows.append({"id": t.id, "name": t.name, "target_index": t.target_index, "found": n,
                      "label": labels.get(n, "") if n is not None else ""})
     return rows
+
+
+def member_order(t: Target) -> tuple:
+    """Stable before unstable, then zeus_priority (unranked after the
+    ranked), then the configured n."""
+    return (t.zeus_unstable, t.zeus_priority or 10**6, t.target_index if t.target_index >= 0 else 10**6, t.id)
+
+
+def order_members(targets) -> list[Target]:
+    return sorted(targets, key=member_order)
 
 
 # ----------------------------------------------------------------------
@@ -231,22 +246,39 @@ class Zeus:
 
     def search_many(self, targets: list[Target], kind: str, term: str, timeout: float
                     ) -> tuple[int, list[marc.Record]]:
-        """Every catalogue of `targets` that is on the form, in one request
-        per CHUNK of them; records in page order, without repeats."""
+        """Every catalogue of `targets` that is on the form: the stable ones
+        first, in member_order, one request per CHUNK of them; then each
+        unstable one in its own request while time is left. Records in
+        that order, without repeats."""
+        started = time.monotonic()
         labels = self.labels(min(timeout, 20.0))
         if not labels:
             raise ZeusError("Zeus's search form could not be read, so no target can be picked")
-        ns = sorted({n for n in (index_for(t, labels) for t in targets) if n is not None})
-        if not ns:
+        stable: list[int] = []
+        unstable: list[int] = []
+        for t in order_members(targets):
+            n = index_for(t, labels)
+            if n is None or n in stable or n in unstable:
+                continue
+            (unstable if t.zeus_unstable else stable).append(n)
+        if not stable and not unstable:
             raise ZeusError("none of the catalogues is among the targets on Zeus's search form")
+        requests = [(stable[i:i + CHUNK], timeout) for i in range(0, len(stable), CHUNK)]
+        requests += [([n], None) for n in unstable]
         records: list[marc.Record] = []
         seen: set[tuple[str, str]] = set()
         errors = []
-        for i in range(0, len(ns), CHUNK):
+        for ns, wait in requests:
+            if wait is None:
+                left = timeout - (time.monotonic() - started)
+                if left < UNSTABLE_MIN:
+                    errors.append(ZeusError(f"no time left for targets[{ns[0]}] (timeout-prone, asked last)"))
+                    continue
+                wait = min(left, UNSTABLE_TIMEOUT)
             params = [("searchString", term), ("searchType", str(SEARCH_TYPE.get(kind, SEARCH_TYPE["keywords"]))),
-                      ("operator", "and")] + [(f"targets[{n}]", "on") for n in ns[i:i + CHUNK]]
+                      ("operator", "and")] + [(f"targets[{n}]", "on") for n in ns]
             try:
-                page = self.get(self.url + ("&" if "?" in self.url else "?") + urllib.parse.urlencode(params), timeout)
+                page = self.get(self.url + ("&" if "?" in self.url else "?") + urllib.parse.urlencode(params), wait)
             except ZeusError as exc:
                 errors.append(exc)
                 continue
