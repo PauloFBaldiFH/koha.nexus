@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+import signal
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -147,6 +149,56 @@ async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
     password = len(parts) > 3 and parts[3] == "password"
     value = await ask(out, "input", title, unescape(text), (default, password))
     return "cancel" if value is None else f"ok {value}"
+
+
+def _proc_stat(pid: int) -> tuple[int, int] | None:
+    """(parent PID, session id) of a process, from /proc (None if gone)."""
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    fields = data[data.rfind(b")") + 2:].split()
+    try:
+        return int(fields[1]), int(fields[3])
+    except (IndexError, ValueError):
+        return None
+
+
+def _same_session_descendants(pid: int) -> list[int]:
+    """The processes started by pid, directly or not, still in its session."""
+    root = _proc_stat(pid)
+    if root is None:
+        return []
+    children: dict[int, list[int]] = {}
+    session: dict[int, int] = {}
+    try:
+        entries = os.listdir("/proc")
+    except OSError:
+        return []
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        st = _proc_stat(int(entry))
+        if st is not None:
+            children.setdefault(st[0], []).append(int(entry))
+            session[int(entry)] = st[1]
+    found: list[int] = []
+    todo = [pid]
+    while todo:
+        for child in children.get(todo.pop(), []):
+            if session.get(child) == root[1] and child not in found:
+                found.append(child)
+                todo.append(child)
+    return found
+
+
+def _signal_all(pids: list[int], sig: int) -> None:
+    for pid in pids:
+        try:
+            os.kill(pid, sig)
+        except OSError:
+            pass
 
 
 class BridgeError(RuntimeError):
@@ -368,8 +420,16 @@ class Bridge:
                         pass
             return await proc.wait()
         except asyncio.CancelledError:
-            # Worker cancelled (Esc / Cancel): the task must not outlive the screen.
+            # Worker cancelled (Esc / Cancel): the task must not outlive the
+            # screen, nor what it is running now. Ending only the installer's
+            # bash left its mysqldump | gzip/zstd/xz writing on their own,
+            # with the backup lock they inherited: "Another backup or restore
+            # is already running" until they were done (Paulo, 2026-10-31).
+            # Programs it started in a session of their own (setsid: a
+            # background reindex, Ollama) are kept.
+            stray = _same_session_descendants(proc.pid)
             proc.terminate()
+            _signal_all(stray, signal.SIGTERM)
             try:
                 await asyncio.wait_for(proc.wait(), 5)
             except asyncio.TimeoutError:
