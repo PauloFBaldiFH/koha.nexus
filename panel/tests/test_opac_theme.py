@@ -1016,3 +1016,73 @@ def test_paulo_1031_colour_paints_and_phone_layout():
     assert "width: 132px !important" not in plain
     logo = ot.css_body(ot.normalize({"logo": {"source": "url", "url": "https://i.postimg.cc/a/logo.png"}}))
     assert "max-width: 700px" in logo and "width: 132px !important" in logo
+
+
+def _b64(text: str) -> str:
+    return base64.b64encode(text.encode()).decode()
+
+
+def test_paulo_1031_koha_stylesheet_is_the_base():
+    """Paulo, 2026-10-31 (18:04): what is written in the instance is always
+    the base. The values of the panel's stylesheets in Koha (edited there by
+    hand) win over the settings line; a block without its settings line is
+    read from its CSS; one unreadable part never costs the rest."""
+    cfg = ot.normalize({"accent": "#2563eb", "texture": "metal",
+                        "logo": {"source": "url", "url": "https://i.postimg.cc/a/logo.png"},
+                        "staff": {"enabled": True, "accent": "#112233"}})
+    css = ot.css_block(cfg) if hasattr(ot, "css_block") else ot.data_line(cfg) + "\n" + ot.css_body(cfg)
+    edited = css.replace("--nexus-primary: #2563eb;", "--nexus-primary: #aa0000;").replace(
+        "https://i.postimg.cc/a/logo.png", "/images/custom/kei-logo.png?v=1")
+    staff = ot.staff_css_body(cfg).replace("--nexus-staff-radius: 12px;", "--nexus-staff-radius: 20px;")
+    found = {"data": ot.data_line(cfg), "block_OpacUserCSS": "yes", "block_IntranetUserCSS": "yes",
+             "css_OpacUserCSS": _b64(edited), "css_IntranetUserCSS": _b64(staff)}
+    got, notes, in_koha = ot.sync_settings(found)
+    assert in_koha and got["accent"] == "#aa0000" and got["texture"] == "metal"
+    assert got["logo"] == {"source": "local", "url": "/images/custom/kei-logo.png?v=1"}
+    assert got["staff"]["radius_block"] == 20 and got["staff"]["accent"] == "#112233"
+    assert any("Edited in Koha's stylesheets" in n for n, _ in notes)
+    # Untouched: the same settings, no note.
+    same, notes, _ = ot.sync_settings({**found, "css_OpacUserCSS": _b64(css),
+                                       "css_IntranetUserCSS": _b64(ot.staff_css_body(cfg))})
+    assert same["accent"] == "#2563eb" and not any("Edited in Koha" in n for n, _ in notes)
+    # The settings line gone (edited by hand): rebuilt from the CSS.
+    no_line, notes, in_koha = ot.sync_settings({"block_OpacUserCSS": "yes", "css_OpacUserCSS": _b64(edited)})
+    assert in_koha and no_line["accent"] == "#aa0000" and no_line["opacity"] == cfg["opacity"]
+    assert any("rebuilt from the panel's stylesheet" in n for n, _ in notes)
+
+
+def test_unreadable_news_never_costs_the_look(monkeypatch):
+    cfg = ot.normalize({"accent": "#123456"})
+
+    def boom(*_a, **_k):
+        raise ValueError("bad news")
+    monkeypatch.setattr(ot, "live_contents", boom)
+    got, notes, in_koha = ot.sync_settings({"data": ot.data_line(cfg), "block_OpacUserCSS": "yes"})
+    assert in_koha and got["accent"] == "#123456"
+    assert any("could not be read" in n and v.get("error") == "bad news" for n, v in notes)
+
+
+def test_paulo_1031_credits_without_the_300_limit():
+    long = "Horário estendido nas férias " * 40
+    assert len(long) > 1000
+    assert ot.normalize({"credits": {"enabled": True, "note": long}})["credits"]["note"] == long.strip()
+    assert ot.credits_from_html(f"<p>{long}</p>")["note"] == long.strip()
+
+
+def test_paulo_1031_staff_colour_paints():
+    """The staff's four colours with their own texture and opacity, as on the OPAC."""
+    plain = ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
+    assert "Each staff colour" not in plain
+    cfg = ot.normalize({"staff": {"enabled": True, "page": "#eeeeee",
+                                  "paint": {"accent": {"texture": "wood", "opacity": 70},
+                                            "accent2": {"texture": "metal", "opacity": 90},
+                                            "page": {"texture": "paper", "opacity": 60}}}})
+    css = ot.staff_css_body(cfg)
+    painted = css[css.index("Each staff colour"):]
+    assert "rgba(var(--nexus-staff-primary-rgb), 0.70)" in painted and ".0015 .5" in painted
+    assert "rgba(var(--nexus-staff-secondary-rgb), 0.90)" in painted
+    assert "--nexus-staff-page-rgb: 238,238,238;" in painted and "rgba(var(--nexus-staff-page-rgb), 0.60)" in painted
+    assert ot.parse_theme_data(ot.data_line(cfg))["staff"]["paint"] == cfg["staff"]["paint"]
+    # Copy OPAC preset brings the OPAC's paints.
+    copied, _ = ot.copy_opac_to_staff({"paint": {"accent": {"texture": "paper", "opacity": 40}}})
+    assert copied["staff"]["paint"]["accent"] == {"texture": "paper", "opacity": 40}

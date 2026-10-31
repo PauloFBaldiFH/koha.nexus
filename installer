@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.139"
+PANEL_VERSION=" 1.5.140"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -35910,8 +35910,12 @@ THEME_STATE="${KEI_THEME_STATE:-${CONF_DIR}/theme-settings.json}"
 OPAC_RETIRED="${KEI_OPAC_RETIRED:-${CONF_DIR}/theme-retired.tsv}"
 
 # A system preference as stored (--raw: line breaks kept).
+# Without carriage returns: a preference saved from Koha's own editor (a
+# browser text box) has CRLF lines, and our block's marker lines would no
+# longer match, so the panel would not find its block (Paulo, 2026-10-31).
 opac_pref_raw() {
-    mysql --default-character-set=utf8mb4 -N -B --raw -e "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = $(sql_quote "$1");" 2>/dev/null
+    mysql --default-character-set=utf8mb4 -N -B --raw -e "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable = $(sql_quote "$1");" 2>/dev/null \
+        | tr -d '\r'
 }
 
 # opac_pref_block_sql PREF FILE|-: SQL that rewrites PREF without our block
@@ -36429,6 +36433,14 @@ opac_theme_sync() {
         text=$(opac_pref_raw "$pref")
         if printf '%s\n' "$text" | grep -qxF -e "$OPAC_BEGIN"; then kei_result "block_$pref" yes; else kei_result "block_$pref" no; fi
         kei_result "own_$pref" "$(printf '%s\n' "$text" | opac_own_lines)"
+        # The stylesheets as Koha holds them now: their colours, opacity,
+        # corners and pictures win over the settings line (someone may have
+        # edited them in Koha). Base64: one protocol line.
+        case "$pref" in
+            OpacUserCSS|IntranetUserCSS)
+                line=$(printf '%s\n' "$text" | opac_block_in | base64 -w0)
+                [ -n "$line" ] && kei_result "css_$pref" "$line" ;;
+        esac
         case "$pref" in
             OpacUserJS|IntranetUserJS)
                 line=$(printf '%s\n' "$text" | opac_block_in | grep -m1 '^    var C = ')

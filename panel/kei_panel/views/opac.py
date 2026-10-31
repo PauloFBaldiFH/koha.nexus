@@ -56,13 +56,14 @@ NEWS_BOXES = {"opac": ("o-newsitem-opac", "OPAC news"), "staff": ("o-newsitem-st
 # "Label: value" lines (the label in English or in the panel's language)
 # and "text | address" lines for the other links.
 CREDIT_FIELDS = {
-    "name": ("Library name", "Biblioteca Municipal", 120), "address": ("Address", "Rua Exemplo, 123", 200),
+    "name": ("Library name", "Biblioteca Municipal", ot.CREDITS_TEXT_MAX),
+    "address": ("Address", "Rua Exemplo, 123", ot.CREDITS_TEXT_MAX),
     "phone": ("Phone", "(00) 0000-0000", 40), "whatsapp": ("WhatsApp", "(00) 00000-0000", 30),
     "email": ("E-mail", "contato@biblioteca.gov.br", 120), "website": ("Website", "https://biblioteca.gov.br", 300),
-    "hours": ("Opening hours", "", 120), "instagram": ("Instagram", "https://instagram.com/biblioteca", 300),
+    "hours": ("Opening hours", "", ot.CREDITS_TEXT_MAX), "instagram": ("Instagram", "https://instagram.com/biblioteca", 300),
     "facebook": ("Facebook", "https://facebook.com/biblioteca", 300),
     "youtube": ("YouTube", "https://youtube.com/@biblioteca", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
-    "note": ("Note", "", 300),
+    "note": ("Note", "", ot.CREDITS_TEXT_MAX),
 }
 CREDITS_NOTE = ("Write one item per line as Field: value, only the fields you need. Other links go one per line "
                 "as text | address (at most 6). No HTML to type: the footer is built from these lines.")
@@ -273,13 +274,17 @@ class OpacView(SectionView):
                                  "the menus stay fully opaque."))
             for key, (label, unit) in STAFF_HEADER_SLIDERS.items():
                 yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
-            yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
-            yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
+            yield Static(t(PAINT_NOTE), classes="ai-note", markup=False)
+            yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
+            yield from self._paint_rows("accent", staff=True)
+            yield ColorPicker(t("Second colour"), st["accent2"], "o-staff-accent2", bars, id="o-pick-staff-accent2")
+            yield from self._paint_rows("accent2", staff=True)
             yield from _row(t("Page colour"), Switch(bool(st["page"]), id="o-staff-page-on"))
             yield ColorPicker(t("Page background"), st["page"] or "#f3f4f6", "o-staff-page", bars,
                               id="o-pick-staff-page")
+            yield from self._paint_rows("page", staff=True)
             for name in ot.STAFF_ASSETS:
                 yield from self._asset_row(f"staff-{name}", st[name])
             yield from _row(t("Legibility film"), Slider(*ot.STAFF_FILM, st["film"], step=5, unit="%",
@@ -364,13 +369,15 @@ class OpacView(SectionView):
         with Horizontal(classes="quick-actions"):
             yield Button(t("Add a button"), id=f"{p}-add", classes="small")
 
-    def _paint_rows(self, key: str) -> ComposeResult:
-        """The texture and opacity of one colour of the palette."""
-        p = self.cfg["paint"][key]
+    def _paint_rows(self, key: str, staff: bool = False) -> ComposeResult:
+        """The texture and opacity of one colour of the palette (the OPAC's,
+        or the staff interface's with staff)."""
+        p = (self.cfg["staff"] if staff else self.cfg)["paint"][key]
+        box = "o-staff-paint" if staff else "o-paint"
         yield from _row(t("Its texture"), _tip(Select([(t(v), k) for k, v in ot.PAINTS.items()], value=p["texture"],
-                                                      allow_blank=False, id=f"o-paint-{key}-texture"),
+                                                      allow_blank=False, id=f"{box}-{key}-texture"),
                                                PAINT_HELP[key]))
-        yield from _row(t("Its opacity"), _tip(Slider(0, 100, p["opacity"], unit="%", id=f"o-paint-{key}-opacity"),
+        yield from _row(t("Its opacity"), _tip(Slider(0, 100, p["opacity"], unit="%", id=f"{box}-{key}-opacity"),
                                                PAINT_HELP[key]))
 
     def _slider(self, key: str) -> ComposeResult:
@@ -480,12 +487,14 @@ class OpacView(SectionView):
         return items, ""
 
     def on_show(self) -> None:
-        # Read again after a database restore: the restored Koha has its own
-        # look, and the fields must not keep the one from before.
-        if not self.loaded or getattr(self.app, "restores", 0) != self.restores_seen:
-            self.loaded = True
-            self.restores_seen = getattr(self.app, "restores", 0)
-            self.reload()
+        # Every time the card is opened: what Koha holds now (OpacUserCSS,
+        # OpacUserJS, IntranetUserCSS, IntranetUserJS, the news and the
+        # HTML customizations) is the base, never what the screen showed
+        # before: a restore, an edit in Koha's own tools or another panel
+        # may have changed it (Paulo, 2026-10-31).
+        self.loaded = True
+        self.restores_seen = getattr(self.app, "restores", 0)
+        self.reload()
 
     # ------------------------------------------------------------------
     # Settings <-> fields
@@ -568,6 +577,9 @@ class OpacView(SectionView):
             q(f"#o-staff-style-{key}", Select).value = st[key]
         for key in ot.STAFF_MATERIAL:
             q(f"#o-staff-{key}", Slider).value = st[key]
+        for key in ot.PAINTED:
+            q(f"#o-staff-paint-{key}-texture", Select).value = st["paint"][key]["texture"]
+            q(f"#o-staff-paint-{key}-opacity", Slider).value = st["paint"][key]["opacity"]
         q("#o-staff-page-on", Switch).value = bool(st["page"])
         if st["page"]:
             q("#o-staff-page", Input).value = st["page"]
@@ -623,6 +635,9 @@ class OpacView(SectionView):
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
                          "dark_switch": q("#o-staff-dark_switch", Switch).value,
+                         "paint": {key: {"texture": q(f"#o-staff-paint-{key}-texture", Select).value,
+                                         "opacity": q(f"#o-staff-paint-{key}-opacity", Slider).value}
+                                   for key in ot.PAINTED},
                          **{key: q(f"#o-staff-style-{key}", Select).value for key in ot.STYLE},
                          **{key: q(f"#o-staff-{key}", Slider).value for key in (*ot.STAFF_MATERIAL, *ot.STAFF_HEADER)}}}
         for key in SLIDERS:
@@ -738,7 +753,10 @@ class OpacView(SectionView):
         except Exception:     # noqa: BLE001 (no installer, no database: the fields stay)
             self.summary()
             return
-        self.from_koha(out.results)
+        try:
+            self.from_koha(out.results)
+        except Exception as e:     # noqa: BLE001 (said, never a silent screen of defaults)
+            self.app.notify(t("Sync current OPAC settings") + f": {e}", severity="error", timeout=15)
 
     def from_koha(self, found: dict[str, str]) -> list[tuple[str, dict]]:
         """The fields and the summary from what opac-theme-sync read in Koha;
@@ -766,7 +784,14 @@ class OpacView(SectionView):
         except Exception as e:   # noqa: BLE001 (no installer, no database)
             self.app.notify(f"{title}: {e}", severity="error")
             return
-        notes = self.from_koha(out.results)
+        if out.rc:
+            self.app.notify(t("${title}: the installer could not read Koha (code ${rc}).", title=title,
+                              rc=str(out.rc)), severity="error", timeout=15)
+        try:
+            notes = self.from_koha(out.results)
+        except Exception as e:     # noqa: BLE001 (said, never a silent screen of defaults)
+            self.app.notify(f"{title}: {e}", severity="error", timeout=15)
+            return
         report = "\n".join("• " + t(text, **values) for text, values in notes)
         report += "\n\n" + t("The fields now show what is in Koha. Nothing was written to Koha: Apply "
                                "writes the fields.")

@@ -179,7 +179,9 @@ DEFAULTS: dict = {
               "card": "sections", "card_padding": 16,
               # The top bar and the quick search bar under it in translucent
               # glass (_staff_header_css): off keeps them solid.
-              "header_glass": False, "header_opacity": 85, "header_blur": 8, **STYLE_DEFAULTS},
+              "header_glass": False, "header_opacity": 85, "header_blur": 8,
+              # Each staff colour's own texture and opacity, as the OPAC's.
+              "paint": {key: {"texture": "auto", "opacity": 100} for key in PAINTED}, **STYLE_DEFAULTS},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
     # writes: the login instructions of the OPAC and of the staff interface
     # (allow-listed HTML, a banner picture above it) and the OPAC footer
@@ -432,12 +434,19 @@ def _digits(value) -> str:
     return re.sub(r"\D", "", str(value or ""))
 
 
+# The free text of the footer credits (name, address, hours, note): no
+# limit a librarian would meet (Paulo, 2026-10-31: the 300 characters of
+# the note were too few); only a guard against a runaway paste.
+CREDITS_TEXT_MAX = 100_000
+
+
 def _credits(raw) -> dict:
     """The footer credits form: each field checked (links through safe_link,
     e-mail and WhatsApp by their shape); a field that fails is left empty."""
     r = raw if isinstance(raw, dict) else {}
     out = {"enabled": bool(r.get("enabled", False))}
-    for key, limit in (("name", 120), ("address", 200), ("phone", 40), ("hours", 120), ("note", 300)):
+    for key, limit in (("name", CREDITS_TEXT_MAX), ("address", CREDITS_TEXT_MAX), ("phone", 40),
+                       ("hours", CREDITS_TEXT_MAX), ("note", CREDITS_TEXT_MAX)):
         out[key] = _text(r.get(key), "", limit)
     wa = _digits(r.get("whatsapp"))
     out["whatsapp"] = wa if 8 <= len(wa) <= 15 else ""
@@ -626,6 +635,17 @@ def _style(raw: dict) -> dict:
             for key, (_label, choices) in STYLE.items()}
 
 
+def _paints(raw) -> dict:
+    """The texture and opacity of each colour (PAINTED), checked."""
+    pt = raw if isinstance(raw, dict) else {}
+    out = {}
+    for key in PAINTED:
+        one = pt.get(key) if isinstance(pt.get(key), dict) else {}
+        out[key] = {"texture": one.get("texture") if one.get("texture") in PAINTS else "auto",
+                    "opacity": _clamp(one.get("opacity", 100), 0, 100, 100)}
+    return out
+
+
 def normalize(raw: dict | None) -> dict:
     """Every setting checked: unknown keys dropped, numbers clamped, colours
     and URLs validated, defaults where missing."""
@@ -639,11 +659,7 @@ def normalize(raw: dict | None) -> dict:
     cfg["accent2"] = _hex(raw.get("accent2"), DEFAULTS["accent2"])
     cfg["surface"] = _hex(raw.get("surface"), DEFAULTS["surface"])
     cfg["page"] = _hex(raw.get("page"), "") if raw.get("page") else ""
-    pt = raw.get("paint") if isinstance(raw.get("paint"), dict) else {}
-    for key in PAINTED:
-        one = pt.get(key) if isinstance(pt.get(key), dict) else {}
-        cfg["paint"][key] = {"texture": one.get("texture") if one.get("texture") in PAINTS else "auto",
-                             "opacity": _clamp(one.get("opacity", 100), 0, 100, 100)}
+    cfg["paint"] = _paints(raw.get("paint"))
     for name in ASSETS:
         cfg[name] = _asset(raw.get(name))
     cfg["dark_switch"] = bool(raw.get("dark_switch", DEFAULTS["dark_switch"]))
@@ -691,6 +707,7 @@ def normalize(raw: dict | None) -> dict:
     cfg["staff"].update(_style(st))
     cfg["staff"]["header_glass"] = bool(st.get("header_glass", False))
     cfg["staff"]["dark_switch"] = bool(st.get("dark_switch", False))
+    cfg["staff"]["paint"] = _paints(st.get("paint"))
     for key, (lo, hi) in STAFF_HEADER.items():
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), lo, hi, default)
@@ -717,6 +734,7 @@ def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
     st["enabled"] = True
     for key in ("texture", "accent", "accent2", "surface", "page", *STAFF_MATERIAL, *STYLE):
         st[key] = cfg[key]
+    st["paint"] = copy.deepcopy(cfg["paint"])
     st["film"] = _clamp(cfg["film"], *STAFF_FILM, DEFAULTS["staff"]["film"])
     skipped = []
     for name in STAFF_ASSETS:
@@ -775,6 +793,80 @@ def _from_script(conf: dict) -> dict:
             "links": {**(lk or {}), "enabled": lk is not None}}
 
 
+# The values of the panel's stylesheets that someone can edit in Koha
+# (Administration > System preferences): the CSS variable -> (setting,
+# kind). They win over the settings line, which only says what the panel
+# wrote last (Paulo, 2026-10-31: the instance is always the base).
+_CSS_VARS = {"--nexus-primary": ("accent", "hex"), "--nexus-secondary": ("accent2", "hex"),
+             "--nexus-surface": ("surface", "hex"), "--koha-card-alpha": ("opacity", "alpha"),
+             "--koha-glass-blur": ("blur", "px"), "--koha-card-radius": ("radius_block", "px"),
+             "--kei-r-input": ("radius_input", "px"), "--kei-r-btn": ("radius_button", "px"),
+             "--kei-film": ("film", "alpha")}
+_STAFF_CSS_VARS = {"--nexus-staff-primary": ("accent", "hex"), "--nexus-staff-secondary": ("accent2", "hex"),
+                   "--nexus-staff-card": ("surface", "hex"), "--nexus-staff-surface-a": ("opacity", "alpha"),
+                   "--nexus-staff-blur": ("blur", "px"), "--nexus-staff-radius": ("radius_block", "px"),
+                   "--nexus-staff-r-input": ("radius_input", "px"), "--nexus-staff-r-btn": ("radius_button", "px"),
+                   "--nexus-staff-card-pad": ("card_padding", "px")}
+
+
+def css_values(css: str, staff: bool = False) -> dict:
+    """The settings the panel's stylesheet in Koha says now: the variables
+    of its first :root rule (colours, opacity, blur, corners) and, for the
+    OPAC, the logo and wallpaper addresses. Only what is there."""
+    out: dict = {}
+    m = re.search(r":root\s*\{(.*?)\}", css or "", re.S)
+    if m:
+        for name, value in re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", m.group(1)):
+            key, kind = (_STAFF_CSS_VARS if staff else _CSS_VARS).get(name, (None, None))
+            value = value.strip()
+            if not key:
+                continue
+            if kind == "hex" and re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+                out[key] = value.lower()
+            elif kind == "alpha" and re.fullmatch(r"[0-9.]+", value):
+                out[key] = round(float(value) * 100)
+            elif kind == "px" and re.fullmatch(r"[0-9.]+px", value):
+                out[key] = round(float(value[:-2]))
+    if not staff:
+        logo = re.search(r'#logo, h1#logo a[^{]*\{\s*background-image:\s*url\("([^"]+)"\)', css or "")
+        wall = re.search(r'body\.kei-wallpaper\s*\{\s*background:\s*url\("([^"]+)"\)', css or "")
+        for key, hit in (("logo", logo), ("background", wall)):
+            if hit:
+                out[key] = hit.group(1)
+    return out
+
+
+def _css_overlay(cfg: dict, found: dict[str, str]) -> tuple[dict, list[str]]:
+    """cfg with what the stylesheets in Koha say now (css_values()), and the
+    names of the settings that differed from the settings line."""
+    changed: list[str] = []
+    raw = copy.deepcopy(cfg)
+    for pref, staff in (("OpacUserCSS", False), ("IntranetUserCSS", True)):
+        text = found.get(f"css_{pref}", "")
+        if not text:
+            continue
+        try:
+            css = base64.b64decode(text, validate=True).decode("utf-8", "replace")
+        except ValueError:
+            continue
+        place = raw["staff"] if staff else raw
+        for key, value in css_values(css, staff).items():
+            if key in ("logo", "background"):
+                if value != place[key]["url"]:
+                    # https: a direct address; a path: a file published on this server.
+                    place[key] = {"source": "url" if value.startswith("https://") else "local", "url": value}
+                    changed.append(key)
+                continue
+            if key == "blur" and not value:
+                continue          # a flat material draws no blur: the slider keeps its value
+            if place.get(key) != value:
+                place[key] = value
+                changed.append(("staff " if staff else "") + key)
+        if staff and found.get("block_IntranetUserCSS") == "yes":
+            raw["staff"]["enabled"] = True
+    return normalize(raw), changed
+
+
 def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict, list[tuple[str, dict]], bool]:
     """What `--task opac-theme-sync` read in Koha, as the screen's settings,
     a report: (message, values) pairs, in English, for the screen to
@@ -810,8 +902,25 @@ def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict
                 cfg = normalize(raw)
                 notes.append(("Settings: rebuilt from the panel's scripts in Koha (buttons, carousel, "
                               "light/dark); colours and pictures stay as on this screen.", {}))
+    if cfg is None and (found.get("css_OpacUserCSS") or found.get("css_IntranetUserCSS")):
+        # Our block without its settings line (edited by hand in Koha):
+        # what its stylesheet still says.
+        base, changed = _css_overlay(normalize({}), found)
+        if changed:
+            cfg = base
+            notes.append(("Settings: rebuilt from the panel's stylesheet in Koha (no settings line).", {}))
+    elif cfg is not None:
+        cfg, changed = _css_overlay(cfg, found)
+        if changed:
+            notes.append(("Edited in Koha's stylesheets, read from there: ${names}.",
+                          {"names": ", ".join(changed)}))
     look = in_koha = cfg is not None
-    live = live_contents(found, text)
+    try:
+        live = live_contents(found, text)
+    except Exception as e:      # noqa: BLE001 (one unreadable entry must not cost the rest of the look)
+        live = None
+        notes.append(("Login instructions, footer credits and news could not be read: ${error}",
+                      {"error": str(e)}))
     if live is not None:
         extra, more = live
         on = (any(login_on(lg) for lg in extra["login"].values()) or credits_on(extra["credits"])
@@ -951,7 +1060,7 @@ def credits_from_html(content: str) -> dict:
     all go into the note as plain text."""
     inner, ours = _unwrap(content, "kei-credits")
     if not ours and not _by_class(inner, "p", "kei-credits-name"):
-        return _credits({"enabled": True, "note": _plain(inner)[:300]})
+        return _credits({"enabled": True, "note": _plain(inner)})
     r: dict = {"enabled": True}
     first = lambda cls: (_by_class(inner, "p", cls) or [""])[0]   # noqa: E731
     r["name"] = _plain(first("kei-credits-name"))
@@ -2464,6 +2573,7 @@ html body textarea:focus {{
     out += _staff_header_css(st)
     out += _staff_pictures_css(st)
     out += _staff_inner_css(st)
+    out += _staff_paint_css(st)
     if st["contrast"] == "high":
         out.append("""html body { color: #000 !important; }
 html body .text-muted, html body .hint, html body .help-block, html body .form-text { color: #1f1f1f !important; }
@@ -2565,6 +2675,37 @@ html body .toptabs .tab-content, html body .tab-content {{
 }}
 html body fieldset.rows label, html body fieldset.rows legend {{ color: var(--nexus-staff-text); }}""")
     return "\n".join(out)
+
+
+_STAFF_BTN_MAIN = 'html body .btn-primary, html body input[type="submit"].btn-primary'
+_STAFF_BTN_SOFT = "html body .btn-default, html body .btn-secondary, html body .btn-light"
+
+
+def _staff_paint_css(st: dict) -> list[str]:
+    """The staff colours in their own texture and opacity (st["paint"]),
+    as on the OPAC: the accent on the main buttons, the second colour on
+    the secondary ones, the page colour on the page (without a staff
+    wallpaper). Nothing while all are "auto" at full opacity."""
+    out = []
+    p = st["paint"]["accent"]
+    if p["texture"] != "auto" or p["opacity"] < 100:
+        texture = p["texture"] if p["texture"] != "auto" else ("metal" if st["texture"] in METALS else "flat")
+        out.append(_paint_rule(_STAFF_BTN_MAIN, _paint(texture, "--nexus-staff-primary-rgb", p["opacity"], True),
+                               "var(--nexus-staff-on-primary)"))
+    p = st["paint"]["accent2"]
+    if p["texture"] != "auto":
+        out.append(_paint_rule(_STAFF_BTN_SOFT, _paint(p["texture"], "--nexus-staff-secondary-rgb", p["opacity"],
+                                                       True), "var(--nexus-staff-on-secondary)"))
+        out.append(f"{_STAFF_BTN_SOFT} {{ border-color: var(--nexus-staff-secondary) !important; }}")
+    p = st["paint"]["page"]
+    if not st["background"]["url"] and (p["texture"] != "auto" or p["opacity"] < 100):
+        paint = _paint(p["texture"], "--nexus-staff-page-rgb", p["opacity"], False)
+        out.append(f""":root {{ --nexus-staff-page-rgb: {_rgb(staff_page(st))}; }}
+html body {{
+    background: {paint['bg']}, #ffffff !important;
+    background-attachment: fixed !important;
+}}""")
+    return (["/* Each staff colour in its own texture and opacity. */\n" + "\n".join(out)] if out else [])
 
 
 def staff_page(st: dict) -> str:
