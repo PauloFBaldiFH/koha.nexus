@@ -757,3 +757,40 @@ PY
     [ "$(ac "SELECT content FROM additional_contents_localizations WHERE additional_content_id = 9" | grep -c 'kei-news-button')" = "7" ]
     ! ac "SELECT content FROM additional_contents_localizations WHERE additional_content_id = 9" | grep -q 'kei-news-id'
 }
+
+@test "apply then sync: the panel reads back every field it wrote (colours, material, pictures, staff)" {
+    dir=$(cd "$KEI_REPO/panel" && python3 -c '
+from kei_panel import opac_theme as ot
+cfg = ot.normalize({"texture": "metal", "opacity": 63, "blur": 9, "accent": "#260859", "accent2": "#f4f4f6",
+  "surface": "#e8e8e8", "page": "#f3f4f6", "radius_block": 22,
+  "logo": {"source": "url", "url": "https://i.postimg.cc/a/logo.png"},
+  "background": {"source": "url", "url": "https://i.postimg.cc/a/wall.jpg"},
+  "favicon": {"source": "url", "url": "https://i.postimg.cc/a/fav.png"},
+  "links": {"enabled": True, "items": [{"text": "Acervo", "url": "https://x.org/a"}]},
+  "staff": {"enabled": True, "accent": "#112233", "texture": "wood", "opacity": 70}})
+print(ot.write_apply_dir(cfg, {}))')
+    task opac_theme_apply "$dir"
+    [ "$status" -eq 0 ]
+    rm -f "$W/results" "$W/etc/theme-settings.json"
+    task opac_theme_sync
+    [ "$status" -eq 0 ]
+    grep -q '^RESULT database=koha_' "$W/results"
+    grep -q '^RESULT installer_version=[0-9]' "$W/results"
+    grep -q '^RESULT chars_OpacUserCSS=[1-9]' "$W/results"
+    cd "$KEI_REPO/panel" && python3 -c '
+import sys
+from kei_panel import opac_theme as ot
+found = {}
+for line in open(sys.argv[1], encoding="utf-8"):
+    if line.startswith("RESULT "):
+        k, _, v = line[7:].rstrip("\n").partition("=")
+        found[k] = v
+cfg, notes, in_koha = ot.sync_settings(found)
+assert in_koha
+assert (cfg["texture"], cfg["opacity"], cfg["blur"], cfg["radius_block"]) == ("metal", 63, 9, 22), cfg
+assert (cfg["accent"], cfg["accent2"], cfg["surface"], cfg["page"]) == ("#260859", "#f4f4f6", "#e8e8e8", "#f3f4f6")
+assert cfg["logo"]["url"] == "https://i.postimg.cc/a/logo.png" and cfg["background"]["url"] == "https://i.postimg.cc/a/wall.jpg"
+assert cfg["favicon"]["url"] == "https://i.postimg.cc/a/fav.png" and cfg["links"]["items"][0]["text"] == "Acervo"
+assert (cfg["staff"]["enabled"], cfg["staff"]["accent"], cfg["staff"]["texture"], cfg["staff"]["opacity"]) == (True, "#112233", "wood", 70)
+' "$W/results"
+}

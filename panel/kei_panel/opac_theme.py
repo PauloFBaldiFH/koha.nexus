@@ -953,6 +953,23 @@ def _css_overlay(cfg: dict, found: dict[str, str]) -> tuple[dict, list[str]]:
     return normalize(raw), changed
 
 
+def source_notes(found: dict[str, str]) -> list[tuple[str, dict]]:
+    """Where the sync read: the Koha instance, its database, the installer's
+    version and what each preference holds, so a wrong instance or an
+    installer older than the panel shows at once."""
+    if not found.get("installer_version"):
+        return [("The installer (config.sh) is older than the panel and does not hand over all of Koha's "
+                 "settings: update it (Update in the panel's menu), then sync again.", {})]
+    notes = [("Read from Koha: instance ${instance} (database ${database}), installer ${version}.",
+              {"instance": found.get("instance", "?"), "database": found.get("database", "?"),
+               "version": found["installer_version"]})]
+    for pref in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS", "IntranetUserJS"):
+        notes.append(("${pref}: ${n} characters; the panel's block: ${block}.",
+                      {"pref": pref, "n": found.get(f"chars_{pref}", "0"),
+                       "block": "yes" if found.get(f"block_{pref}") == "yes" else "no"}))
+    return notes
+
+
 def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict, list[tuple[str, dict]], bool]:
     """What `--task opac-theme-sync` read in Koha, as the screen's settings,
     a report: (message, values) pairs, in English, for the screen to

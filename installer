@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.141"
+PANEL_VERSION=" 1.5.142"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -36429,8 +36429,14 @@ opac_theme_sync() {
         line=$(printf '%s\n' "$text" | grep -m1 -F 'KEI-THEME-DATA:')
         [ -n "$line" ] && kei_result data "$line"
     fi
+    # Which Koha and which installer were read: the panel shows it on its
+    # sync card, so a wrong instance or an old installer is seen at once.
+    kei_result instance "${INSTANCE}"
+    kei_result database "${DB_NAME}"
+    kei_result installer_version "${PANEL_VERSION# }"
     for pref in OpacUserCSS OpacUserJS IntranetUserCSS IntranetUserJS; do
         text=$(opac_pref_raw "$pref")
+        kei_result "chars_$pref" "${#text}"
         if printf '%s\n' "$text" | grep -qxF -e "$OPAC_BEGIN"; then kei_result "block_$pref" yes; else kei_result "block_$pref" no; fi
         kei_result "own_$pref" "$(printf '%s\n' "$text" | opac_own_lines)"
         # The stylesheets as Koha holds them now, whole (our block and the

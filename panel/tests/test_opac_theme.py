@@ -1109,3 +1109,16 @@ def test_paulo_1031_staff_colour_paints():
     # Copy OPAC preset brings the OPAC's paints.
     copied, _ = ot.copy_opac_to_staff({"paint": {"accent": {"texture": "paper", "opacity": 40}}})
     assert copied["staff"]["paint"]["accent"] == {"texture": "paper", "opacity": 40}
+
+
+def test_sync_card_says_where_it_read():
+    """Paulo, 2026-10-31 (19:13): the sync card says which Koha and which
+    installer it read, and what each preference holds, so an old installer
+    or another instance is seen at once."""
+    old = ot.source_notes({"block_OpacUserCSS": "yes"})
+    assert len(old) == 1 and "older than the panel" in old[0][0]
+    notes = ot.source_notes({"instance": "library", "database": "koha_library", "installer_version": "1.5.142",
+                             "chars_OpacUserCSS": "51234", "block_OpacUserCSS": "yes"})
+    assert notes[0][1] == {"instance": "library", "database": "koha_library", "version": "1.5.142"}
+    assert notes[1][1] == {"pref": "OpacUserCSS", "n": "51234", "block": "yes"}
+    assert notes[2][1]["block"] == "no"
