@@ -96,7 +96,16 @@ STYLE = {
 }
 STYLE_DEFAULTS = {key: next(iter(choices)) for key, (_label, choices) in STYLE.items()}
 HOVERS = {"zoom": "Smooth zoom", "lift": "Elevation shadow", "tilt": "Tilt", "none": "None"}
-CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow"}
+# The carousel's styles. flat and coverflow first (1.5.63); the others from
+# Paulo's 2026-10-31 references (a cover ring with reflections, a curved
+# wall of covers with their titles) and a few of our own.
+CAROUSEL_MODES = {"flat": "2D flat", "coverflow": "3D coverflow", "ring": "3D ring (turns around)",
+                  "wall": "Curved wall with titles", "shelf": "Bookshelf", "fan": "Fan of cards",
+                  "spotlight": "Spotlight (one title at a time)", "ribbon": "Endless ribbon"}
+# A title whose cover is missing (none found by the nightly job, or the
+# picture does not load in the reader's browser): left out, or a cover
+# drawn in the accent colours with its title and author.
+CAROUSEL_MISSING = {"hide": "Leave the title out", "drawn": "Draw a cover with the title"}
 CAROUSEL_SOURCES = {"new": "New arrivals", "list": "A public Koha list"}
 MAX_SHELF = 999_999_999
 LINK_STYLES = {"solid": "Solid colour", "gradient": "Gradient", "glass": "Glass (blur)", "metal": "Brushed metal"}
@@ -148,6 +157,9 @@ DEFAULTS: dict = {
     "default_theme": "light",
     "carousel": {"enabled": True, "autoplay": True, "speed": 3500, "count": 12, "hover": "lift",
                  "overlay": True, "title": "New arrivals", "amazon_tag": "", "mode": "flat",
+                 # reflect: a mirror image of each cover under it (every
+                 # style but the bookshelf, the fan and the spotlight).
+                 "reflect": False, "missing": "hide",
                  # source "list": the public Koha list number shelf (Lists,
                  # opac-shelves.pl?op=view&shelfnumber=N) instead of the
                  # newest titles. lists: keep the nightly job (and so the
@@ -765,6 +777,8 @@ def normalize(raw: dict | None) -> dict:
     tag = str(c.get("amazon_tag", "")).strip()
     car["amazon_tag"] = tag if re.fullmatch(r"[A-Za-z0-9-]{0,40}", tag) else ""
     car["mode"] = c.get("mode") if c.get("mode") in CAROUSEL_MODES else car["mode"]
+    car["reflect"] = bool(c.get("reflect", car["reflect"]))
+    car["missing"] = c.get("missing") if c.get("missing") in CAROUSEL_MISSING else car["missing"]
     car["shelf"] = _clamp(c.get("shelf", 0), 0, MAX_SHELF, 0)
     car["source"] = "list" if c.get("source") == "list" and car["shelf"] else "new"
     car["lists"] = bool(c.get("lists", car["lists"]))
@@ -2659,7 +2673,7 @@ def staff_links_css(cfg: dict) -> str:
 
 def _carousel_css(car: dict) -> str:
     hover = {
-        "zoom": ".kei-card:hover img, .kei-card:focus img { transform: scale(1.06); }",
+        "zoom": ".kei-card:hover .kei-face img, .kei-card:focus .kei-face img { transform: scale(1.06); }",
         "lift": ".kei-card:hover, .kei-card:focus { transform: translateY(-6px); "
                 "box-shadow: 0 10px 16px -6px rgba(0, 0, 0, .32); }",
         "tilt": ".kei-card { transform-style: preserve-3d; will-change: transform; }",
@@ -2688,6 +2702,7 @@ def _carousel_css(car: dict) -> str:
     box-shadow: 0 4px 10px -3px rgba(0, 0, 0, .22);
     transition: transform .25s ease, box-shadow .25s ease;
 }}
+.kei-face {{ position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }}
 .kei-card img {{ width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }}
 {hover}
 .kei-card-info {{
@@ -2757,10 +2772,180 @@ def _carousel_css(car: dict) -> str:
 .kei-mode-coverflow .kei-nav {{ top: 42%; }}
 .kei-mode-coverflow .kei-prev {{ left: .4rem; }}
 .kei-mode-coverflow .kei-next {{ right: .4rem; }}
+{_CAROUSEL_STYLES_CSS}
 @media (prefers-reduced-motion: reduce) {{
     .kei-card, .kei-card img, .kei-card-info, .kei-track {{ transition: none; scroll-behavior: auto; }}
     .kei-mode-coverflow .kei-card {{ transition: none; }}
+    .kei-belt {{ animation: none; }}
+    .kei-mode-ribbon .kei-track {{ overflow-x: auto; }}
 }}"""
+
+
+# The styles added in 1.5.150 (Paulo, 2026-10-31: "more carousel styles, be
+# creative"), the drawn cover of a title with none and the reflections.
+# The 3D ones (ring, wall, fan, spotlight) are placed by the script frame by
+# frame (spin()); these rules only give them their stage and their looks.
+_CAROUSEL_STYLES_CSS = """/* A title with no cover: a cover drawn in the accent colours. */
+.kei-blank {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: .45rem;
+    padding: 14% 12% 14% 18%;
+    text-align: center;
+    color: #fff;
+    font-family: Georgia, "Times New Roman", serif;
+    background: linear-gradient(180deg, transparent 38%, rgba(0, 0, 0, .18) 38%, rgba(0, 0, 0, .18) 62%, transparent 62%),
+        linear-gradient(160deg, var(--kei-accent), rgb(var(--kei-accent2-rgb)));
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}
+.kei-blank::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 9%;
+    width: 2px;
+    background: rgba(255, 255, 255, .35);
+}
+.kei-blank b { font-size: .92rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical; overflow: hidden; }
+.kei-blank i { font-style: normal; font-size: .72rem; opacity: .9; }
+.kei-blank small { position: absolute; left: 0; right: 0; bottom: 6%; font-size: .58rem; letter-spacing: .14em;
+    text-transform: uppercase; opacity: .75; font-family: inherit; }
+/* Reflections: the cover again, upside down, fading into the page. */
+.kei-reflect .kei-card { overflow: visible; }
+.kei-mirror {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 3px);
+    height: 38%;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, .4), transparent 90%);
+    mask-image: linear-gradient(rgba(0, 0, 0, .4), transparent 90%);
+}
+.kei-mirror > img, .kei-mirror > .kei-blank { position: absolute; left: 0; top: 0; width: 100%;
+    height: calc(100% / .38); transform: scaleY(-1); }
+.kei-reflect .kei-track { padding-bottom: 5.8rem; }
+.kei-reflect.kei-mode-coverflow .kei-stage { height: 370px; }
+/* Every stage: the cards stand on it, the script moves them. */
+.kei-stage { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.kei-stage .kei-card.kei-center .kei-card-info { opacity: 1; transform: none; }
+/* 3D ring: the covers go round, the far ones small and high (a carousel seen from above). */
+.kei-mode-ring .kei-stage { position: relative; height: 330px; perspective: 1000px; perspective-origin: 50% 0;
+    overflow: hidden; }
+.kei-reflect.kei-mode-ring .kei-stage { height: 380px; }
+.kei-mode-ring .kei-card { position: absolute; left: 50%; top: 60px; width: 140px; margin-left: -70px;
+    box-shadow: 0 8px 14px -6px rgba(0, 0, 0, .4); }
+.kei-mode-ring .kei-nav, .kei-mode-wall .kei-nav, .kei-mode-fan .kei-nav { top: 42%; }
+.kei-mode-ring .kei-prev, .kei-mode-wall .kei-prev, .kei-mode-fan .kei-prev, .kei-mode-spotlight .kei-prev { left: .4rem; }
+.kei-mode-ring .kei-next, .kei-mode-wall .kei-next, .kei-mode-fan .kei-next, .kei-mode-spotlight .kei-next { right: .4rem; }
+/* Curved wall: the covers on the inside of a curve, the title under each one. */
+.kei-mode-wall .kei-stage { position: relative; height: 360px; perspective: 900px; overflow: hidden; }
+.kei-reflect.kei-mode-wall .kei-stage { height: 420px; }
+.kei-mode-wall .kei-card { position: absolute; left: 50%; top: 34px; width: 150px; margin-left: -75px;
+    box-shadow: 0 8px 14px -6px rgba(0, 0, 0, .35); }
+.kei-caption {
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    top: calc(100% + 8px);
+    font-size: .8rem;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--kei-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.kei-mode-wall .kei-card.kei-center .kei-caption { font-weight: 600; }
+/* Bookshelf: the covers stand on a wooden board, with a spine and the pages' edge. */
+.kei-mode-shelf .kei-track {
+    align-items: flex-end;
+    gap: .9rem;
+    padding: 1.5rem 1.4rem 30px;
+    background: linear-gradient(180deg, transparent calc(100% - 30px), #9a6a3f calc(100% - 30px),
+        #7a4e2b calc(100% - 12px), #4a2e18 calc(100% - 12px), rgba(0, 0, 0, .18) calc(100% - 4px), transparent 100%);
+    border-radius: calc(var(--kei-r-block) * .5);
+}
+.kei-mode-shelf .kei-card {
+    width: 128px;
+    border-radius: 2px 5px 5px 2px;
+    transform-origin: bottom center;
+    box-shadow: 3px 0 0 #f1ead9, 5px 0 0 #cdbfa3, 8px 2px 10px rgba(0, 0, 0, .4);
+}
+.kei-mode-shelf .kei-card:nth-child(3n+2) { width: 138px; }
+.kei-mode-shelf .kei-card:nth-child(4n+3) { width: 118px; }
+.kei-mode-shelf .kei-face::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(0, 0, 0, .4), rgba(255, 255, 255, .2) 4%, transparent 10%);
+}
+.kei-mode-shelf .kei-card:hover, .kei-mode-shelf .kei-card:focus { transform: translateY(-12px) rotate(-1.5deg); }
+.kei-mode-shelf .kei-nav { top: 40%; }
+/* Fan of cards: held in a hand, the one in front in the middle. */
+.kei-mode-fan .kei-stage { position: relative; height: 380px; overflow: hidden; }
+.kei-mode-fan .kei-card { position: absolute; left: 50%; top: 30px; width: 160px; margin-left: -80px;
+    transform-origin: 50% 135%; box-shadow: 0 6px 16px -4px rgba(0, 0, 0, .45); }
+/* Spotlight: one title at a time, large, over its own cover blurred. */
+.kei-mode-spotlight .kei-stage { position: relative; height: 310px; overflow: hidden;
+    border-radius: var(--kei-r-block); background: rgba(var(--kei-surface-rgb), .55); }
+.kei-mode-spotlight .kei-card {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    aspect-ratio: auto;
+    display: flex;
+    align-items: center;
+    gap: 1.6rem;
+    padding: 24px 64px;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    isolation: isolate;
+    text-decoration: none;
+}
+.kei-backdrop { position: absolute; inset: -40px; z-index: -1; overflow: hidden; opacity: .5;
+    filter: blur(30px) saturate(1.4); }
+.kei-backdrop img { width: 100%; height: 100%; object-fit: cover; }
+.kei-mode-spotlight .kei-face { position: relative; flex: 0 0 170px; height: 255px;
+    border-radius: calc(var(--kei-r-block) * .6); box-shadow: 0 12px 24px -8px rgba(0, 0, 0, .55); }
+.kei-mode-spotlight .kei-card-info { position: static; opacity: 1; transform: none; background: none; padding: 0;
+    color: var(--kei-text); font-size: 1rem; line-height: 1.35; max-width: 34rem; }
+.kei-mode-spotlight .kei-card-info strong { font-size: 1.45rem; line-height: 1.2; margin-bottom: .35rem; }
+.kei-mode-spotlight .kei-card:hover, .kei-mode-spotlight .kei-card:focus { box-shadow: none; }
+.kei-dots { display: flex; justify-content: center; gap: .4rem; margin-top: .6rem; }
+.kei-dots button { width: .6rem; height: .6rem; padding: 0; border-radius: 50%; border: 1px solid var(--kei-edge);
+    background: rgba(var(--kei-surface-rgb), .9); cursor: pointer; }
+.kei-dots button[aria-current="true"] { background: var(--kei-accent); border-color: var(--kei-accent); }
+@media (max-width: 560px) {
+    .kei-mode-ring .kei-card { width: 110px; margin-left: -55px; }
+    .kei-mode-wall .kei-card { width: 120px; margin-left: -60px; }
+    .kei-mode-wall .kei-stage { height: 300px; }
+    .kei-reflect.kei-mode-wall .kei-stage { height: 340px; }
+    .kei-mode-wall .kei-card:not(.kei-center) .kei-caption { visibility: hidden; }
+    .kei-mode-fan .kei-card { width: 130px; margin-left: -65px; }
+    .kei-mode-spotlight .kei-stage { height: 380px; }
+    .kei-mode-spotlight .kei-card { flex-direction: column; justify-content: center; gap: .8rem; padding: 16px 48px;
+        text-align: center; }
+    .kei-mode-spotlight .kei-face { flex: 0 0 auto; width: 130px; height: 195px; }
+    .kei-mode-spotlight .kei-card-info strong { font-size: 1.1rem; }
+}
+/* Endless ribbon: the covers glide by without stopping; a pointer or the keyboard holds them. */
+.kei-mode-ribbon .kei-track { overflow: hidden; scroll-snap-type: none; }
+.kei-mode-ribbon.kei-still .kei-track { overflow-x: auto; }
+.kei-belt { display: flex; width: max-content; animation: kei-ribbon var(--kei-ribbon-time, 60s) linear infinite; }
+.kei-still .kei-belt { animation: none; }
+.kei-belt .kei-card { margin-right: 1rem; }
+.kei-mode-ribbon:hover .kei-belt, .kei-mode-ribbon:focus-within .kei-belt { animation-play-state: paused; }
+@keyframes kei-ribbon { to { transform: translateX(-50%); } }"""
 
 
 def css_block(cfg: dict) -> str:
@@ -3902,8 +4087,10 @@ _JS = r"""(function () {
     // KEI.listCarousel(shelfId, target, options): mounts a carousel of the
     // public Koha list shelfId (opac-shelves.pl?op=view&shelfnumber=N) inside
     // target (a CSS selector or an element), at the end of what it holds.
-    // options: title, mode ("flat" | "coverflow"), count, autoplay, speed,
-    // overlay; the panel's carousel settings otherwise. Covers come
+    // options: title, mode ("flat", "coverflow", "ring", "wall", "shelf",
+    // "fan", "spotlight", "ribbon"), count, autoplay, speed, overlay,
+    // reflect, missing ("hide" | "drawn"); the panel's carousel settings
+    // otherwise. Covers come
     // from the nightly job's kei-list-N.json (Koha's uploaded cover, else
     // OpenLibrary, else Amazon). Resolves to the carousel's element, or
     // null (no such public list, no cover yet, no target).
@@ -4059,15 +4246,19 @@ _JS = r"""(function () {
             feed(C.carousel.feed).then(function (items) { carousel(items, C.carousel, homePlace); });
         }
 
-        // <div data-kei-list="7" data-title="..." data-mode="coverflow"></div>
+        // <div data-kei-list="7" data-title="..." data-mode="ring" data-reflect="1"
+    // data-missing="drawn"></div>
         // in news or an HTML customization: a carousel of that public list.
         Array.prototype.forEach.call(document.querySelectorAll("[data-kei-list]"), function (el) {
             if (el.getAttribute("data-kei-mounted")) { return; }
             el.setAttribute("data-kei-mounted", "1");
             var opts = {};
-            ["title", "mode", "count"].forEach(function (k) {
+            ["title", "mode", "count", "missing"].forEach(function (k) {
                 if (el.hasAttribute("data-" + k)) { opts[k] = el.getAttribute("data-" + k); }
             });
+            if (el.hasAttribute("data-reflect")) {
+                opts.reflect = !/^(0|false|no|off)$/i.test(el.getAttribute("data-reflect"));
+            }
             KEI.listCarousel(el.getAttribute("data-kei-list"), el, opts);
         });
     });
@@ -4112,21 +4303,30 @@ __LINK_NAV__
         }
     }
 
-    // carousel(items, K, place): 2D flat (a strip that loops for ever) or
-    // 3D coverflow (the cards turn around the centre one, like a real
-    // carousel), with the settings K, put in the page by place(box). Both
-    // keep turning after a click or a swipe; only a hidden tab, keyboard
-    // focus inside or "reduce motion" stop them. Returns the element (null
-    // with no card to show).
+    // carousel(items, K, place): the cards of items in the style K.mode
+    // (MODES: a scrolling strip, "track", or a stage where the script
+    // places every card, "stage"), with the settings K, put in the page by
+    // place(box). They keep turning after a click or a swipe; only a hidden
+    // tab, keyboard focus inside or "reduce motion" stop them. A title with
+    // no cover (none found by the nightly job, or the picture does not load)
+    // is left out, or gets a drawn cover with K.missing "drawn". Returns the
+    // element (null with no card to show).
+    var MODES = { flat: "track", shelf: "track", ribbon: "track", coverflow: "stage", ring: "stage",
+                  wall: "stage", fan: "stage", spotlight: "stage" };
+    var MIRRORED = { flat: 1, coverflow: 1, ring: 1, wall: 1, ribbon: 1 };
+    var GOOD_COVER = /^(https:\/\/|\/cgi-bin\/koha\/opac-image\.pl\?)/;
     function carousel(items, K, place) {
+        var mode = MODES.hasOwnProperty(K.mode) ? K.mode : "flat";
+        var drawn = K.missing === "drawn";
         items = items.filter(function (it) {
-            return parseInt(it.biblionumber, 10) &&
-                /^(https:\/\/|\/cgi-bin\/koha\/opac-image\.pl\?)/.test(it.cover || "");
+            if (!parseInt(it.biblionumber, 10)) { return false; }
+            return GOOD_COVER.test(it.cover || "") || (drawn && !it.cover);
         }).slice(0, K.count);
         if (!items.length) { return null; }
-        var flow = K.mode === "coverflow";
+        var staged = MODES[mode] === "stage";
+        var mirror = !!K.reflect && MIRRORED.hasOwnProperty(mode);
         var box = document.createElement("section");
-        box.className = "kei-carousel " + (flow ? "kei-mode-coverflow" : "kei-mode-flat");
+        box.className = "kei-carousel kei-mode-" + mode + (mirror ? " kei-reflect" : "");
         if (K.title) { box.setAttribute("aria-label", K.title); }
         box.setAttribute("aria-roledescription", "carousel");
         if (K.title) {
@@ -4135,32 +4335,71 @@ __LINK_NAV__
             box.appendChild(h);
         }
         var track = document.createElement("div");
-        track.className = flow ? "kei-stage" : "kei-track";
+        track.className = staged ? "kei-stage" : "kei-track";
         box.appendChild(track);
         var pending = items.length;
         function settled() {
             pending -= 1;
             if (pending > 0) { return; }
             if (!track.children.length) { if (box.parentNode) { box.parentNode.removeChild(box); } return; }
-            (flow ? coverflow : flat)(box, track, K);
+            ({ flat: flat, shelf: flat, ribbon: ribbon, coverflow: coverflow, ring: spin, wall: spin, fan: spin,
+               spotlight: spin })[mode](box, track, K, mode);
         }
         items.forEach(function (it) {
             var card = document.createElement("a");
             card.className = "kei-card";
             card.href = "/cgi-bin/koha/opac-detail.pl?biblionumber=" + parseInt(it.biblionumber, 10);
-            var img = document.createElement("img");
-            img.loading = flow ? "eager" : "lazy";
-            img.alt = it.title || "";
-            img.draggable = false;
-            // Amazon answers a missing cover with a 1x1 image: no card then.
-            img.addEventListener("load", function () {
-                if (img.naturalWidth <= 1 && card.parentNode) { card.parentNode.removeChild(card); }
+            var face = document.createElement("span");
+            face.className = "kei-face";
+            card.appendChild(face);
+            // done(pic): the cover is in (the picture, or a drawn one): its
+            // reflection, and the blurred backdrop of the spotlight.
+            function done(pic) {
+                if (pic.parentNode !== face) { face.insertBefore(pic, face.firstChild); }
+                if (mirror) {
+                    var m = document.createElement("span");
+                    m.className = "kei-mirror";
+                    m.setAttribute("aria-hidden", "true");
+                    var copy = pic.cloneNode(true);
+                    if (copy.alt !== undefined) { copy.alt = ""; }
+                    m.appendChild(copy);
+                    card.appendChild(m);
+                }
+                if (mode === "spotlight" && pic.tagName === "IMG") {
+                    var back = document.createElement("span");
+                    back.className = "kei-backdrop";
+                    back.setAttribute("aria-hidden", "true");
+                    var b2 = pic.cloneNode(true);
+                    b2.alt = "";
+                    back.appendChild(b2);
+                    card.insertBefore(back, card.firstChild);
+                }
+            }
+            function missing() {
+                if (img && img.parentNode) { img.parentNode.removeChild(img); }
+                if (drawn) { done(blank(it)); } else if (card.parentNode) { card.parentNode.removeChild(card); }
                 settled();
-            });
-            img.addEventListener("error", function () { if (card.parentNode) { card.parentNode.removeChild(card); } settled(); });
-            img.src = it.cover;
-            card.appendChild(img);
-            if (K.overlay) {
+            }
+            var img = null;
+            if (it.cover) {
+                img = document.createElement("img");
+                img.loading = staged || mode === "ribbon" ? "eager" : "lazy";
+                img.alt = it.title || "";
+                img.draggable = false;
+                // Amazon answers a missing cover with a 1x1 image.
+                img.addEventListener("load", function () {
+                    if (img.naturalWidth <= 1) { missing(); return; }
+                    done(img);
+                    settled();
+                });
+                img.addEventListener("error", missing);
+                img.src = it.cover;
+                face.appendChild(img);   // in the page, so a lazy one loads when it comes into view
+            } else {
+                done(blank(it));
+                setTimeout(settled, 0);
+            }
+            if (K.overlay || mode === "spotlight") {
                 var info = document.createElement("span");
                 info.className = "kei-card-info";
                 var s = document.createElement("strong");
@@ -4176,9 +4415,15 @@ __LINK_NAV__
                     badge.textContent = it.available > 0 ? C.text.available : C.text.out;
                     info.appendChild(badge);
                 }
-                card.appendChild(info);
+                (mode === "spotlight" ? card : face).appendChild(info);
             }
-            if (K.hover === "tilt" && !flow) {
+            if (mode === "wall") {
+                var cap = document.createElement("span");
+                cap.className = "kei-caption";
+                cap.textContent = it.title || "";
+                card.appendChild(cap);
+            }
+            if (K.hover === "tilt" && (mode === "flat" || mode === "ribbon")) {
                 card.addEventListener("mousemove", function (e) {
                     var r = card.getBoundingClientRect();
                     var x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
@@ -4190,6 +4435,26 @@ __LINK_NAV__
         });
         place(box);
         return box;
+    }
+
+    // blank(it): the cover drawn for a title with none.
+    function blank(it) {
+        var el = document.createElement("span");
+        el.className = "kei-blank";
+        el.setAttribute("role", "img");
+        el.setAttribute("aria-label", (it.title || "") + " (" + C.text.no_cover + ")");
+        var t = document.createElement("b");
+        t.textContent = it.title || "";
+        el.appendChild(t);
+        if (it.author) {
+            var a = document.createElement("i");
+            a.textContent = it.author;
+            el.appendChild(a);
+        }
+        var n = document.createElement("small");
+        n.textContent = C.text.no_cover;
+        el.appendChild(n);
+        return el;
     }
 
     function navButtons(box, step) {
@@ -4296,7 +4561,14 @@ __LINK_NAV__
                 }
             });
         });
-        // Swipe (touch or mouse drag).
+        controls(box, track, step);
+        layout();
+        navButtons(box, step);
+        restart = autoplay(box, step, K);
+    }
+
+    // controls(box, track, step): swipe (touch or mouse drag) and the arrow keys.
+    function controls(box, track, step) {
         var x0 = null;
         track.addEventListener("pointerdown", function (e) { x0 = e.clientX; });
         track.addEventListener("pointerup", function (e) {
@@ -4309,9 +4581,150 @@ __LINK_NAV__
             if (e.key === "ArrowRight") { step(1, true); e.preventDefault(); }
             if (e.key === "ArrowLeft") { step(-1, true); e.preventDefault(); }
         });
-        layout();
-        navButtons(box, step);
-        restart = autoplay(box, step, K);
+    }
+
+    function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+    // Where each card of a stage stands, from d: how far it is from the
+    // centre (in cards, with a fraction while they move; -n/2 to n/2).
+    var STAGES = {
+        // The ring seen from above: the far covers small and high.
+        ring: function (card, d, n, track) {
+            var r = Math.max(110, Math.min((track.clientWidth || 800) * .36, 480));
+            var t = d * 2 * Math.PI / n, c = Math.cos(t);
+            card.style.transform = "translate3d(" + (r * Math.sin(t)).toFixed(1) + "px," + (-(1 - c) * 28).toFixed(1) +
+                "px," + (r * (c - 1)).toFixed(1) + "px)";
+            card.style.zIndex = String(Math.round(500 + c * 400));
+            card.style.opacity = (.62 + .38 * (c + 1) / 2).toFixed(3);
+            card.style.pointerEvents = "";
+        },
+        // The inside of a curve: the centre one larger and closer.
+        wall: function (card, d, n, track) {
+            var a = Math.abs(d), side = d < 0 ? -1 : 1, near = clamp01(1 - a);
+            var shown = clamp01(Math.min(4, (n - 1) / 2) + .6 - a);
+            var x = d * Math.min(132, (track.clientWidth || 800) / 7) + side * Math.min(a, 1) * 34;
+            card.style.transform = "translateX(" + x.toFixed(1) + "px) translateZ(" + (near * 70).toFixed(1) +
+                "px) rotateY(" + Math.max(-50, Math.min(50, d * 15)).toFixed(2) + "deg)";
+            card.style.zIndex = String(100 - Math.round(a * 10));
+            card.style.opacity = shown.toFixed(3);
+            card.style.pointerEvents = shown < .2 ? "none" : "";
+        },
+        // A hand of cards.
+        fan: function (card, d, n) {
+            var a = Math.abs(d), shown = clamp01(Math.min(3, (n - 1) / 2) + .6 - a);
+            card.style.transform = "translateX(" + (d * 54).toFixed(1) + "px) translateY(" + (a * a * 5).toFixed(1) +
+                "px) rotate(" + (d * 9).toFixed(2) + "deg) scale(" + (1 + .08 * clamp01(1 - a)).toFixed(3) + ")";
+            card.style.zIndex = String(100 - Math.round(a * 10));
+            card.style.opacity = shown.toFixed(3);
+            card.style.pointerEvents = shown < .2 ? "none" : "";
+        },
+        // One at a time: the next one slides in as this one fades out.
+        spotlight: function (card, d) {
+            var a = Math.abs(d), shown = clamp01(1 - a * 1.6);
+            card.style.transform = "translateX(" + (d * 60).toFixed(1) + "px)";
+            card.style.zIndex = String(100 - Math.round(a * 10));
+            card.style.opacity = shown.toFixed(3);
+            card.style.visibility = shown > 0 ? "" : "hidden";
+            card.style.pointerEvents = a > .5 ? "none" : "";
+        }
+    };
+
+    // spin(box, track, K, mode): the stages above. pos glides towards
+    // target frame by frame, so the cards follow their true path (round the
+    // ring, along the curve) and never jump; a click on a side card brings
+    // it to the centre by the shorter way.
+    function spin(box, track, K, mode) {
+        var cards = Array.prototype.slice.call(track.children);
+        var n = cards.length, pos = 0, target = 0, raf = 0, dots = [];
+        var place = STAGES[mode];
+        var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        var frame = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+        function wrap(d) { d = ((d % n) + n) % n; return d >= n / 2 ? d - n : d; }
+        function centre() { return ((Math.round(pos) % n) + n) % n; }
+        function draw() {
+            var c = centre();
+            cards.forEach(function (card, i) {
+                place(card, n === 1 ? 0 : wrap(i - pos), n, track);
+                card.classList.toggle("kei-center", i === c);
+                card.tabIndex = i === c ? 0 : -1;
+                card.setAttribute("aria-hidden", i === c ? "false" : "true");
+            });
+            dots.forEach(function (dot, i) { dot.setAttribute("aria-current", i === c ? "true" : "false"); });
+        }
+        function tick() {
+            var gap = target - pos;
+            if (still || Math.abs(gap) < .003) { pos = target; raf = 0; draw(); return; }
+            pos += gap * .14;
+            draw();
+            raf = frame(tick);
+        }
+        function go() { if (!raf) { raf = frame(tick); } }
+        var restart = function () {};
+        function step(dir, byHand) {
+            target += dir;
+            go();
+            if (byHand) { restart(); }
+        }
+        function show(i) {
+            var from = Math.round(target);
+            target = from + wrap(i - from);
+            go();
+            restart();
+        }
+        cards.forEach(function (card, i) {
+            card.addEventListener("click", function (e) {
+                if (!card.classList.contains("kei-center")) { e.preventDefault(); show(i); }
+            });
+        });
+        if (mode === "spotlight" && n > 1 && n <= 24) {
+            var row = document.createElement("div");
+            row.className = "kei-dots";
+            cards.forEach(function (card, i) {
+                var dot = document.createElement("button");
+                dot.type = "button";
+                dot.setAttribute("aria-label", String(i + 1) + " / " + n);
+                dot.addEventListener("click", function () { show(i); });
+                row.appendChild(dot);
+                dots.push(dot);
+            });
+            box.appendChild(row);
+        }
+        controls(box, track, step);
+        window.addEventListener("resize", draw);
+        draw();
+        if (n > 1) {
+            navButtons(box, step);
+            restart = autoplay(box, step, K);
+        }
+    }
+
+    // ribbon(box, track, K): the covers glide by for ever (a CSS animation
+    // over the cards twice in a row); held by a pointer or the keyboard.
+    // Still (a strip to scroll, with the arrows) with autoplay off, "reduce
+    // motion", or too few covers to fill the width.
+    function ribbon(box, track, K) {
+        var belt = document.createElement("div");
+        belt.className = "kei-belt";
+        while (track.firstChild) { belt.appendChild(track.firstChild); }
+        track.appendChild(belt);
+        var originals = Array.prototype.slice.call(belt.children);
+        var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!K.autoplay || still || belt.scrollWidth <= track.clientWidth + 8) {
+            box.classList.add("kei-still");
+            navButtons(box, function (dir) {
+                var c = belt.firstElementChild;
+                track.scrollBy({ left: dir * (c ? c.getBoundingClientRect().width + 16 : 160), behavior: "smooth" });
+            });
+            return;
+        }
+        originals.forEach(function (c) {
+            var copy = c.cloneNode(true);
+            copy.setAttribute("aria-hidden", "true");
+            copy.tabIndex = -1;
+            belt.appendChild(copy);
+        });
+        // K.speed: the time each cover takes to pass, about half the turn of the strip.
+        belt.style.setProperty("--kei-ribbon-time", Math.round(originals.length * K.speed / 2000 * 1.6) + "s");
     }
 })();"""
 
@@ -4379,13 +4792,13 @@ __LINK_NAV__
 })();"""
 
 JS_TEXT = {"switch_title": "Light / dark mode", "available": "Available", "out": "On loan", "prev": "Previous",
-           "next": "Next", "links": "Quick access"}
+           "next": "Next", "links": "Quick access", "no_cover": "No cover"}
 
 
 def js_config(cfg: dict, text: dict | None = None) -> dict:
     cfg = normalize(cfg)
     car = cfg["carousel"]
-    look = {k: car[k] for k in ("count", "autoplay", "speed", "hover", "overlay", "mode")}
+    look = {k: car[k] for k in ("count", "autoplay", "speed", "hover", "overlay", "mode", "reflect", "missing")}
     return {
         "default_theme": cfg["default_theme"],
         "dark_switch": cfg["dark_switch"],
