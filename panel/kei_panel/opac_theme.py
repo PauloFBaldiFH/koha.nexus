@@ -870,6 +870,82 @@ def apply_preset(raw: dict | None, name: str) -> dict:
     return normalize(cfg)
 
 
+# The library's own looks (Paulo, 2026-10-31: "o usuário também vai poder
+# salvar até 5 presets"): the look fields of both sides, kept in the panel's
+# private folder next to the image host keys, never in Koha. A saved look
+# carries what a ready-made one does plus the rest of the look (style
+# details, each colour's texture, the staff top bar, card, density,
+# contrast, text size); pictures, texts, news, buttons and the carousel stay
+# out, as with the ready-made ones.
+MAX_USER_PRESETS = 5
+USER_PRESETS_FILE = "look-presets.json"
+LOOK_KEYS = ("texture", "opacity", "blur", "radius_block", "radius_input", "radius_button", "accent", "accent2",
+             "surface", "page", "film", "paint", *STYLE)
+STAFF_LOOK_KEYS = (*LOOK_KEYS, "enabled", "bar", "header_glass", "header_opacity", "header_blur", "card",
+                   "card_padding", "density", "contrast", "font")
+
+
+def look_of(raw: dict | None) -> dict:
+    """The look fields of the settings: {"opac": {...}, "staff": {...}}."""
+    cfg = normalize(raw)
+    return {"opac": {k: copy.deepcopy(cfg[k]) for k in LOOK_KEYS},
+            "staff": {k: copy.deepcopy(cfg["staff"][k]) for k in STAFF_LOOK_KEYS}}
+
+
+def apply_look(raw: dict | None, look: dict) -> dict:
+    """The settings with a saved look laid over them (normalize() checks
+    every value); everything that is not a look field is kept."""
+    cfg = normalize(raw)
+    for key, value in (look.get("opac") or {}).items():
+        if key in LOOK_KEYS:
+            cfg[key] = copy.deepcopy(value)
+    for key, value in (look.get("staff") or {}).items():
+        if key in STAFF_LOOK_KEYS:
+            cfg["staff"][key] = copy.deepcopy(value)
+    return normalize(cfg)
+
+
+def user_presets_file() -> Path:
+    return Path(os.environ.get("KEI_OPAC_PRESETS") or CONFIG_DIR / USER_PRESETS_FILE)
+
+
+def load_user_presets() -> list[dict]:
+    """The saved looks, [{"name", "look"}], at most MAX_USER_PRESETS; a
+    damaged file reads as none."""
+    try:
+        data = json.loads(user_presets_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for item in data if isinstance(data, list) else []:
+        if isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("look"), dict):
+            name = item["name"].strip()[:40]
+            if name and len(out) < MAX_USER_PRESETS:
+                out.append({"name": name, "look": look_of(apply_look({}, item["look"]))})
+    return out
+
+
+def save_user_presets(items: list[dict]) -> None:
+    if len(items) > MAX_USER_PRESETS:
+        raise ValueError(f"at most {MAX_USER_PRESETS} saved looks")
+    path = user_presets_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump([{"name": i["name"], "look": i["look"]} for i in items], fh, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+
+def look_saved(raw: dict | None, items: list[dict] | None = None) -> bool:
+    """The look of the settings is one of the saved looks or a ready-made one
+    as it is (nothing to lose by switching)."""
+    now = look_of(raw)
+    if any(look_of(apply_preset(raw, name)) == now for name in PRESETS):
+        return True
+    return any(item["look"] == now for item in (load_user_presets() if items is None else items))
+
+
 # Pictures an https address shows on both sides; a file of this server is
 # in the OPAC's folder (/images/custom), which the staff side does not serve.
 def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
