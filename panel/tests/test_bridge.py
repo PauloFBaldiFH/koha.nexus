@@ -72,3 +72,40 @@ def test_split_line_falls_back_to_record_separators():
     assert _split_line(buf, limit=4) == b"0123"
     buf = bytearray(b"one\ntwo")
     assert _split_line(buf) == b"one"
+
+
+def test_paulo_1031_long_result_lines_arrive_whole(tmp_path):
+    """Paulo, 2026-10-31 (19:42): the appearance card fell back to Koha's
+    own look although `config.sh --task opac-theme-sync` printed his whole
+    settings. Every output line was cut to 2000 characters for the log, the
+    @@result lines too, so the settings line (~3 KB) and the whole
+    OpacUserCSS (~52 KB base64) reached the panel broken. Protocol lines
+    now arrive whole; only plain log lines are shortened."""
+    import asyncio
+    import base64
+    import sys
+
+    from kei_panel import opac_theme as ot
+    from kei_panel.bridge import TaskOutcome
+
+    cfg = ot.normalize({"accent": "#f4f4f6", "accent2": "#260859", "texture": "frosted", "opacity": 68,
+                        "logo": {"source": "url", "url": "https://i.postimg.cc/a/logo.png?v=" + "a" * 2500},
+                        "paint": {"accent": {"opacity": 100, "texture": "metal"},
+                                  "page": {"opacity": 100, "texture": "wood"}}})
+    data = ot.data_line(cfg)
+    css = data + "\n" + ot.css_body(cfg) + "\n/* the library's own */\n" + ".x{color:red}\n" * 3000
+    css64 = base64.b64encode(css.encode()).decode()
+    assert len(data) > 2000 and len(css64) > 50_000
+    script = tmp_path / "out.txt"
+    script.write_text(f"plain {'y' * 5000}\n@@result css_OpacUserCSS={css64}\n"
+                      f"@@result block_OpacUserCSS=yes\n@@result data={data}\n")
+    out = TaskOutcome()
+    rc = asyncio.run(bridge().stream([sys.executable, "-c", f"print(open({str(script)!r}).read(), end='')"],
+                                     None, on_line=out.feed))
+    assert rc == 0
+    assert out.get("css_OpacUserCSS") == css64 and out.get("data") == data
+    got, notes, in_koha = ot.sync_settings(out.results)
+    assert in_koha and got["accent"] == "#f4f4f6" and got["texture"] == "frosted" and got["opacity"] == 68
+    assert got["logo"]["url"].startswith("https://i.postimg.cc/a/logo.png?v=aaa")
+    assert got["paint"]["page"]["texture"] == "wood"
+    assert not any("rebuilt from the panel's scripts" in n for n, _ in notes)

@@ -55,8 +55,10 @@ _PROMPTS = ("@@ask ", "@@choose ", "@@input ", "@@say ", "@@view ", "@@check ", 
 # Output is read in chunks, not with readline(): a program that prints a long
 # run of bytes with no newline (MARC21 records end in 0x1D, not "\n") made
 # readline() raise "Separator is not found, and chunk exceed the limit".
+# Protocol lines ("@@result css_OpacUserCSS=<base64 of the whole preference>")
+# can be long and must arrive whole: only plain log lines are shortened.
 _CHUNK = 1 << 16
-_MAX_LINE = 1 << 20
+_MAX_LINE = 1 << 23
 _SHOWN = 2000
 _FALLBACK_SEPS = (b"\r", b"\x1d", b"\x1e")
 
@@ -95,7 +97,12 @@ async def read_lines(reader: asyncio.StreamReader, limit: int = _MAX_LINE):
 
 def _clean(raw: bytes) -> str:
     line = _ANSI.sub("", raw.decode("utf-8", errors="replace")).rstrip()
-    return line if len(line) <= _SHOWN else line[:_SHOWN] + " …"
+    return line if line.startswith("@@") else _shown(line)
+
+
+def _shown(text: str) -> str:
+    """A line as the log shows it: at most _SHOWN characters."""
+    return text if len(text) <= _SHOWN else text[:_SHOWN] + " …"
 
 
 async def answer_prompt(out: "TaskOutcome", line: str, ask: Asker) -> str:
@@ -194,7 +201,7 @@ class TaskOutcome:
         """One output line of the routine."""
         def log(text: str) -> None:
             if reporter:
-                reporter.log(text)
+                reporter.log(_shown(text))
 
         def status(text: str) -> None:
             if reporter:
@@ -351,7 +358,7 @@ class Bridge:
                 if on_line:
                     on_line(line)
                 elif reporter:
-                    reporter.log(line)
+                    reporter.log(_shown(line))
                 if answer and proc.stdin and line.startswith(_PROMPTS):
                     reply = await answer(line)
                     try:
