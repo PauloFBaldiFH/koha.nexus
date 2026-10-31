@@ -98,7 +98,9 @@ STAFF_HEADER_SLIDERS = {"header_opacity": ("Top bar opacity", "%"), "header_blur
 PAINT_NOTE = ("The block background takes the texture and opacity above. Each of the other colours has a "
               "texture and an opacity of its own (0% clear, 100% solid).")
 PAINT_HELP = {
-    "accent": "Main buttons (search, place hold, the news buttons) in the accent colour.",
+    "accent": "The highlight: main buttons (search, place hold, the news buttons), active tabs and the focus "
+              "ring. Text keeps its own colours; links take the accent only when it is a real colour (not black, "
+              "grey or white).",
     "accent2": "Secondary buttons in the second colour. As the Material: the second colour only tints the page "
                "and the secondary buttons keep the block background.",
     "page": "The page under the blocks (without a wallpaper). A lower opacity makes the colour paler.",
@@ -289,6 +291,12 @@ class OpacView(SectionView):
                                  "the menus stay fully opaque."))
             for key, (label, unit) in STAFF_HEADER_SLIDERS.items():
                 yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
+            yield from _row(t("Top bar colour"),
+                            _tip(Switch(bool(st["bar"]), id="o-staff-bar-on"),
+                                 "Off: a dark bar that goes with any accent colour. On: the colour below. "
+                                 "The bar's text turns light or dark to stay readable."))
+            yield ColorPicker(t("Top bar"), st["bar"] or ot.staff_bar(st), "o-staff-bar", bars,
+                              id="o-pick-staff-bar")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
             yield Static(t(PAINT_NOTE), classes="ai-note", markup=False)
@@ -625,6 +633,8 @@ class OpacView(SectionView):
             q(f"#o-staff-paint-{key}-texture", Select).value = st["paint"][key]["texture"]
             q(f"#o-staff-paint-{key}-opacity", Slider).value = st["paint"][key]["opacity"]
         q("#o-staff-page-on", Switch).value = bool(st["page"])
+        q("#o-staff-bar-on", Switch).value = bool(st["bar"])
+        q("#o-staff-bar", Input).value = st["bar"] or ot.staff_bar(st)
         if st["page"]:
             q("#o-staff-page", Input).value = st["page"]
         for name in ot.STAFF_ASSETS:
@@ -677,6 +687,7 @@ class OpacView(SectionView):
                          "card": q("#o-staff-card", Select).value,
                          "card_padding": q("#o-staff-card_padding", Slider).value,
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
+                         "bar": q("#o-staff-bar", Input).value if q("#o-staff-bar-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
                          "dark_switch": q("#o-staff-dark_switch", Switch).value,
                          "paint": {key: {"texture": q(f"#o-staff-paint-{key}-texture", Select).value,
