@@ -1089,7 +1089,7 @@ def test_paulo_1031_credits_without_the_300_limit():
     long = "Horário estendido nas férias " * 40
     assert len(long) > 1000
     assert ot.normalize({"credits": {"enabled": True, "note": long}})["credits"]["note"] == long.strip()
-    assert ot.credits_from_html(f"<p>{long}</p>")["note"] == long.strip()
+    assert ot.credits_from_html(f"<p>{long}</p>")["order"] == ["text:" + long.strip()]
 
 
 def test_paulo_1031_staff_colour_paints():
@@ -1122,3 +1122,51 @@ def test_sync_card_says_where_it_read():
     assert notes[0][1] == {"instance": "library", "database": "koha_library", "version": "1.5.142"}
     assert notes[1][1] == {"pref": "OpacUserCSS", "n": "51234", "block": "yes"}
     assert notes[2][1]["block"] == "no"
+
+
+def test_paulo_1031_credits_keep_the_order_written():
+    """Paulo, 2026-10-31 (20:20): the credits moved his lines around and
+    joined his own lines into one. Each line is now its own line of the
+    footer, in the order written, and reads back the same."""
+    cr = ot.normalize({"credits": {
+        "enabled": True, "name": "Biblioteca Exemplo", "email": "contato@biblioteca.gov.br",
+        "instagram": "@biblioteca", "cnpj": "00.000.000/0001-00",
+        "order": ["name", "text:Rua Exemplo, 1 - Centro", "text:Telefone e WhatsApp: +55 (00) 0000-0000",
+                  "email", "instagram", "text:Implementação do sistema e site por:", "text:Fulano de Tal",
+                  "text:Escreva para outra@exemplo.org ou https://exemplo.org/ajuda.", "cnpj",
+                  "bogus", "email"]}})["credits"]
+    assert cr["order"][-1] == "cnpj" and "bogus" not in cr["order"] and cr["order"].count("email") == 1
+    out = ot.credits_html(cr)
+    pos = [out.index(x) for x in ("Biblioteca Exemplo", "Rua Exemplo", "Telefone e WhatsApp", "contato@",
+                                  "Instagram @biblioteca", "Implementação", "Fulano", "outra@", "CNPJ")]
+    assert pos == sorted(pos)
+    assert out.count("<p ") == 9 and " · " not in out
+    assert 'href="mailto:outra@exemplo.org"' in out and 'href="https://exemplo.org/ajuda"' in out
+    back = ot.credits_from_html(out)
+    assert back["order"] == cr["order"] and back["email"] == cr["email"] and back["instagram"] == "@biblioteca"
+    assert ot.credits_html(back) == out
+    # The library's own credits: every line kept, in its order.
+    own = ot.credits_from_html("<p><b>Biblioteca X</b><br>Rua A, 1</p><p>Fone: 1234</p>")
+    assert own["name"] == "Biblioteca X" and own["order"] == ["name", "text:Rua A, 1", "text:Fone: 1234"]
+
+
+def test_paulo_1031_dark_mode_buttons_card_and_record_bar():
+    """Paulo, 2026-10-31 (20:20): light buttons stayed white in the dark
+    theme; the catalogue card and the previous/next bar were unreadable."""
+    css = ot.css_body(ot.normalize({"accent": "#f4f4f6", "accent2": "#260859", "texture": "metal"}))
+    dark = css[css.index('html[data-kei-theme="dark"] {\n    --nexus-primary'):]
+    assert "--nexus-on-primary: #ffffff" in dark and "--nexus-secondary" not in dark.split("}")[0]
+    assert ot.luminance(dark.split("--nexus-primary: ")[1][:7]) < .15
+    assert 'html[data-kei-theme="dark"] body .btn-default' in css
+    assert ".kei-ficha-box .kei-ficha *" in css and 'html[data-kei-theme="dark"] body .nav_results' in css
+    # A dark accent is left as it is.
+    assert 'html[data-kei-theme="dark"] {\n    --nexus-primary' not in ot.css_body(ot.normalize({"accent": "#260859"}))
+
+
+def test_paulo_1031_staff_links_read_on_a_pale_accent():
+    """Paulo, 2026-10-31 (20:20): a pale staff accent made pale links."""
+    cfg = ot.normalize({"staff": {"enabled": True, "accent": "#c9c3f0", "surface": "#ffffff", "dark_switch": True}})
+    css = ot.staff_css_block(cfg)
+    link = css.split("--nexus-staff-link: ")[1][:7]
+    assert ot.contrast(link, "#ffffff") >= 5.5
+    assert "#logged-in-menu" in ot.staff_js_block(cfg)

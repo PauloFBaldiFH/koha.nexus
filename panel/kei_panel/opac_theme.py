@@ -191,7 +191,7 @@ DEFAULTS: dict = {
               "staff": {"enabled": False, "html": "", "image": {"source": "none", "url": ""}, "alt": ""}},
     "credits": {"enabled": False, "name": "", "address": "", "phone": "", "whatsapp": "", "email": "",
                 "website": "", "hours": "", "instagram": "", "facebook": "", "youtube": "", "cnpj": "",
-                "note": "", "links": []},
+                "note": "", "links": [], "order": []},
     # One news item of the panel's own on each side (Koha's News, category
     # "news"): a title, allow-listed HTML and call-to-action buttons.
     "news": {"opac": {"enabled": False, "title": "", "html": "", "buttons": []},
@@ -471,6 +471,32 @@ def _credits(raw) -> dict:
         if text and url:
             links.append({"text": text, "url": url})
     out["links"] = links[:MAX_CREDIT_LINKS]
+    out["order"] = _credits_order(r.get("order"), out)
+    return out
+
+
+# The lines of the footer credits in the order the librarian wrote them
+# (Paulo, 2026-10-31: the fixed order of the form moved his lines around and
+# joined his own lines into one): a field's key, "links" for the other
+# links, or "text:" and a line of plain text shown as it is.
+CREDITS_ORDER_KEYS = ("name", "address", "phone", "whatsapp", "email", "website", "hours", "instagram",
+                      "facebook", "youtube", "links", "note", "cnpj")
+MAX_CREDIT_LINES = 60
+
+
+def _credits_order(raw, fields: dict) -> list[str]:
+    out: list[str] = []
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, str):
+            continue
+        if item.startswith("text:"):
+            line = re.sub(r"\s+", " ", item[5:]).strip()[:CREDITS_TEXT_MAX]
+            if line:
+                out.append("text:" + line)
+        elif item in CREDITS_ORDER_KEYS and item not in out and fields.get(item):
+            out.append(item)
+        if len(out) >= MAX_CREDIT_LINES:
+            break
     return out
 
 
@@ -551,6 +577,8 @@ def credits_html(cr: dict, text: dict | None = None) -> str:
         extra = ' target="_blank" rel="noopener noreferrer"' if new_tab else ""
         return f'<a href="{e(url, quote=True)}"{extra}>{e(label)}</a>'
 
+    if cr.get("order"):
+        return _credits_ordered_html(cr, lab)
     lines = []
     if cr["name"]:
         lines.append(f'<p class="kei-credits-name"><strong>{e(cr["name"])}</strong></p>')
@@ -590,6 +618,65 @@ def credits_html(cr: dict, text: dict | None = None) -> str:
     if cr["cnpj"]:
         lines.append(f'<p class="kei-credits-cnpj">{e(lab["cnpj"])}: {e(cr["cnpj"])}</p>')
     return '<div class="kei-credits">\n' + "\n".join(lines) + "\n</div>" if lines else ""
+
+
+def _credit_link(url: str, label: str, new_tab: bool = True) -> str:
+    extra = ' target="_blank" rel="noopener noreferrer"' if new_tab else ""
+    return f'<a href="{html.escape(url, quote=True)}"{extra}>{html.escape(label)}</a>'
+
+
+_AUTOLINK = re.compile(r"(https?://[^\s<>\"']+[^\s<>\"'.,;:!?)])|([^\s@<>\"'():,;]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+
+
+def _autolink(text: str) -> str:
+    """A plain line, escaped, its web and e-mail addresses made links."""
+    out, at = [], 0
+    for m in _AUTOLINK.finditer(text):
+        out.append(html.escape(text[at:m.start()]))
+        url = m.group(1)
+        out.append(_credit_link(url, url) if url else _credit_link("mailto:" + m.group(2), m.group(2), False))
+        at = m.end()
+    out.append(html.escape(text[at:]))
+    return "".join(out)
+
+
+def _credits_ordered_html(cr: dict, lab: dict) -> str:
+    """The credits one line each, in the order of cr["order"] (fields the
+    order leaves out follow at the end)."""
+    e, link = html.escape, _credit_link
+    order = list(cr["order"]) + [k for k in CREDITS_ORDER_KEYS if cr.get(k) and k not in cr["order"]]
+    lines = []
+    for key in order:
+        if key.startswith("text:"):
+            lines.append(f'<p class="kei-credits-line">{_autolink(key[5:])}</p>')
+            continue
+        value = cr.get(key)
+        if not value:
+            continue
+        if key == "name":
+            body = f"<strong>{e(value)}</strong>"
+        elif key in ("address", "note"):
+            body = e(value)
+        elif key == "phone":
+            body = (f'{e(lab["phone"])}: {link("tel:" + _digits(value), value, False)}'
+                    if len(_digits(value)) >= 3 else f'{e(lab["phone"])}: {e(value)}')
+        elif key == "whatsapp":
+            body = f'{e(lab["whatsapp"])}: {link("https://wa.me/" + value, "+" + value)}'
+        elif key == "email":
+            body = f'{e(lab["email"])}: {link("mailto:" + value, value, False)}'
+        elif key == "website":
+            body = f'{e(lab["website"])}: {link(value, re.sub(r"^https?://", "", value).rstrip("/"))}'
+        elif key in ("hours", "cnpj"):
+            body = f"{e(lab[key])}: {e(value)}"
+        elif key == "instagram":
+            url = value if value.startswith("http") else f"https://www.instagram.com/{value[1:]}/"
+            body = link(url, "Instagram" + (f" {value}" if value.startswith("@") else ""))
+        elif key in ("facebook", "youtube"):
+            body = link(value, "Facebook" if key == "facebook" else "YouTube")
+        else:   # links
+            body = " · ".join(link(x["url"], x["text"], x["url"].startswith("http")) for x in value)
+        lines.append(f'<p class="kei-credits-{key}">{body}</p>')
+    return '<div class="kei-credits kei-credits-ordered">\n' + "\n".join(lines) + "\n</div>" if lines else ""
 
 
 def contents(cfg: dict, text: dict | None = None) -> dict[str, str]:
@@ -878,6 +965,8 @@ def own_css_values(css: str, staff: bool = False) -> dict:
     the content's background (blocks), the logo. The last rule wins, as in
     the browser."""
     css = re.sub(r"/\*.*?\*/", "", css or "", flags=re.S)
+    # The dark theme's rules are not the fields (its darker buttons).
+    css = re.sub(r"""[^{}]*\[data-kei-theme\s*=\s*["']?dark["']?\][^{}]*\{[^{}]*\}""", "", css)
     out: dict = {}
     names = _STAFF_CSS_VARS if staff else _CSS_VARS
     for name, value in re.findall(r"(--[\w-]+)\s*:\s*([^;}]+)", css):
@@ -1165,8 +1254,16 @@ def credits_from_html(content: str) -> dict:
     markup back into its field. Credits that are not the panel's markup at
     all go into the note as plain text."""
     inner, ours = _unwrap(content, "kei-credits")
+    if ours and re.match(r'\s*<div\b[^>]*class="[^"]*\bkei-credits-ordered\b', content or ""):
+        return _credits_ordered_from_html(inner)
     if not ours and not _by_class(inner, "p", "kei-credits-name"):
-        return _credits({"enabled": True, "note": _plain(inner)})
+        # The library's own credits: each of its lines kept, in its order,
+        # the first one as the name (as in the panel's text box).
+        lines = [ln for ln in (_plain(x) for x in _BREAKS.split(inner)) if ln]
+        if len(lines) < 2:
+            return _credits({"enabled": True, "order": ["text:" + ln for ln in lines]})
+        return _credits({"enabled": True, "name": lines[0],
+                         "order": ["name"] + ["text:" + ln for ln in lines[1:]]})
     r: dict = {"enabled": True}
     first = lambda cls: (_by_class(inner, "p", cls) or [""])[0]   # noqa: E731
     r["name"] = _plain(first("kei-credits-name"))
@@ -1200,6 +1297,47 @@ def credits_from_html(content: str) -> dict:
         elif "youtube.com" in href or "youtu.be" in href or label == "YouTube":
             r["youtube"] = href
     r["links"] = [{"text": label, "url": attrs.get("href", "")} for attrs, label in _anchors(first("kei-credits-links"))]
+    return _credits(r)
+
+
+_BREAKS = re.compile(r"<br\s*/?>|</(?:p|div|li|h[1-6]|tr)\s*>|<hr\b[^>]*>|\n", re.I)
+
+
+def _credits_ordered_from_html(inner: str) -> dict:
+    """The form of the panel's credits written one line each, in order."""
+    r: dict = {"enabled": True, "links": []}
+    order: list[str] = []
+    for m in re.finditer(r'<p\b[^>]*class="kei-credits-([a-z]+)"[^>]*>(.*?)</p\s*>', inner, re.S | re.I):
+        key, body = m.group(1), m.group(2)
+        found = _anchors(body)
+        href = found[0][0].get("href", "") if found else ""
+        if key == "line":
+            # Its links (addresses made links) back into the text as they were.
+            line = re.sub(r"\s+", " ", html.unescape(_TAG.sub("", body))).strip()
+            if line:
+                order.append("text:" + line)
+            continue
+        if key not in CREDITS_ORDER_KEYS:
+            continue
+        if key in ("name", "address", "note"):
+            r[key] = _plain(body)
+        elif key in ("hours", "cnpj"):
+            r[key] = _after_label(body)
+        elif key == "phone":
+            r[key] = found[0][1] if found else _after_label(body)
+        elif key == "whatsapp":
+            r[key] = href.rsplit("/", 1)[-1]
+        elif key == "email":
+            r[key] = href[len("mailto:"):] if href.startswith("mailto:") else _after_label(body)
+        elif key == "instagram":
+            label = found[0][1] if found else ""
+            r[key] = (label.split(" ", 1)[1] if label.startswith("Instagram @") else "") or href
+        elif key in ("website", "facebook", "youtube"):
+            r[key] = href
+        else:
+            r["links"] = [{"text": label, "url": a.get("href", "")} for a, label in found]
+        order.append(key)
+    r["order"] = order
     return _credits(r)
 
 
@@ -1676,6 +1814,7 @@ html body .main {{ padding: 1.25rem; margin-top: 1rem; }}
 .form-control, .form-select, input[type="text"], input[type="search"], input[type="password"], select,
 textarea {{ border-radius: var(--kei-r-input) !important; }}
 {_buttons_css(cfg)}
+{_dark_css(cfg)}
 a:focus-visible, .btn:focus-visible {{ outline: 3px solid rgba(var(--kei-accent-rgb), .45); outline-offset: 2px; }}
 {_panels_css(cfg)}"""]
     bg = cfg["background"]["url"]
@@ -2115,6 +2254,61 @@ def _buttons_css(cfg: dict) -> str:
 @media (prefers-reduced-motion: reduce) {{ {main}, {soft} {{ transition: none; }} }}{_painted_buttons(cfg, main, soft)}"""
 
 
+DARK_CARD = "#161b22"
+
+
+def _dark_css(cfg: dict) -> str:
+    """The dark theme (Paulo, 2026-10-31, 20:20):
+
+    - a light accent or second colour (#f4f4f6 buttons) turns into a dark
+      shade of itself, so the buttons darken with the page; the brushed
+      secondary buttons of the metal textures too;
+    - the catalogue card (ficha catalográfica) stays black on white, as on
+      paper, and its "Show" button follows the theme;
+    - the previous / back to results / next bar of a record (.nav_results,
+      white in Koha's own CSS) goes dark."""
+    d = 'html[data-kei-theme="dark"]'
+    swaps = []
+    for colour, var, rgb, on in ((cfg["accent"], "--nexus-primary", "--kei-accent-rgb", "--nexus-on-primary"),
+                                 (cfg["accent2"], "--nexus-secondary", "--kei-accent2-rgb", "--nexus-on-secondary")):
+        if luminance(colour) > .45:
+            dark = mix(colour, DARK_CARD, .72)
+            swaps.append(f"    {var}: {dark};\n    {rgb}: {_rgb(dark)};\n    {on}: {text_on(dark)};")
+            if var == "--nexus-primary":
+                swaps.append(f"    --kei-accent: {dark};")
+    out = [f"{d} {{\n" + "\n".join(swaps) + "\n}"] if swaps else []
+    if cfg["texture"] in METALS:
+        out.append(f"""{", ".join(f"{d} body {x.strip()}" for x in _BTN_SOFT.split(","))} {{
+    background: {_BRUSH_LIGHT}, linear-gradient(180deg, #3a414b 0%, #2b3138 47%, #22272e 53%, #2b3138 100%) !important;
+    color: #e6edf3 !important;
+    border-color: #4b5563 !important;
+}}""")
+    out.append(f"""/* The catalogue card stays black on white, as printed. */
+html body .main .kei-ficha-box .kei-ficha, html body .main .kei-ficha-box .kei-ficha *,
+html[data-kei-theme] body .main .kei-ficha-box .kei-ficha, html[data-kei-theme] body .main .kei-ficha-box .kei-ficha * {{
+    color: #000 !important;
+    text-shadow: none !important;
+}}
+html body .main .kei-ficha-box .kei-ficha, html[data-kei-theme] body .main .kei-ficha-box .kei-ficha {{ background: #fff !important; }}
+{d} body .main .kei-ficha-show {{
+    background: rgba(255, 255, 255, .08) !important;
+    color: var(--kei-text) !important;
+    border-color: rgba(255, 255, 255, .25) !important;
+    text-shadow: none !important;
+}}
+/* Previous / back to results / next of a record. */
+{d} body .nav_results, {d} body .nav_results .l_Results, {d} body .nav_results .pg_menu,
+{d} body .nav_results .pg_menu li, {d} body .nav_results .pg_menu li a {{
+    background: transparent !important;
+    color: var(--kei-text) !important;
+    border-color: rgba(255, 255, 255, .14) !important;
+    text-shadow: none !important;
+}}
+{d} body .nav_results .pg_menu li a:hover {{ background: rgba(255, 255, 255, .08) !important; }}
+{d} body .nav_results .pg_menu li:not(:has(a)) {{ color: var(--kei-muted) !important; }}""")
+    return "\n".join(out)
+
+
 def _painted_buttons(cfg: dict, main: str, soft: str) -> str:
     """The accent and the second colour in their own texture and opacity:
     the accent on the main buttons, the second colour on the secondary
@@ -2425,6 +2619,11 @@ def staff_css_body(cfg: dict) -> str:
     text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
     ink = mix(accent, "#000000", .30) if light else mix(accent, "#ffffff", .45)
     link = mix(accent, "#000000", .12) if light else mix(accent, "#ffffff", .35)
+    # A pale accent made pale links and headings on the white cards (Paulo,
+    # 2026-10-31, 20:20: the Administration links, the cataloguing home's
+    # buttons): they keep its hue, darkened (or lightened) until they read
+    # well on the card and on Koha's grey buttons.
+    ink, link = readable(ink, card, 5.5), readable(link, card, 5.5)
     out = [f""":root {{
     --nexus-staff-primary: {accent};
     --nexus-staff-secondary: {accent2};
@@ -3292,7 +3491,7 @@ def staff_dark_css(cfg: dict) -> str:
     the switch of staff.js): the staff variables on dark surfaces, and
     Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
     st = normalize(cfg)["staff"]
-    link = mix(st["accent"], "#ffffff", .45)
+    link = readable(mix(st["accent"], "#ffffff", .45), "#161b22", 5.5)
     d = 'html[data-kei-theme="dark"]'
     return f"""/* Staff dark mode (the light/dark switch of the top bar). */
 {d} {{
@@ -3867,17 +4066,34 @@ __LINK_NAV__
             root.setAttribute("data-kei-theme", t);
             save(t);
         });
-        var bars = document.querySelectorAll("nav.navbar .navbar-nav");
-        var bar = bars.length ? bars[bars.length - 1] : null;
-        if (bar) {
-            var li = document.createElement("li");
-            li.className = "nav-item";
-            li.style.display = "flex";
-            li.appendChild(b);
-            bar.appendChild(li);
-        } else {
-            b.style.position = "fixed"; b.style.right = "1rem"; b.style.bottom = "1rem"; b.style.zIndex = "1000";
+        // Before the logged-in menu (the end of the bar can be cut off on a
+        // narrow window or sit inside a closed menu), else in the last menu
+        // of the top bar that is not a drop-down; a corner button when the
+        // bar has none or the switch would not be seen.
+        function floating() {
+            b.style.position = "fixed"; b.style.right = "1rem"; b.style.bottom = "1rem"; b.style.zIndex = "1080";
+            b.style.background = "rgba(22, 27, 34, .85)"; b.style.color = "#fff";
             document.body.appendChild(b);
+        }
+        var li = document.createElement("li");
+        li.className = "nav-item";
+        li.style.display = "flex";
+        li.appendChild(b);
+        var user = document.querySelector("#logged-in-menu, #logged-in-info-full, #logged-in-dropdown");
+        var item = user && user.closest ? user.closest("li") : null;
+        if (item && item.parentNode && !(item.parentNode.closest && item.parentNode.closest(".dropdown-menu"))) {
+            item.parentNode.insertBefore(li, item);
+        } else {
+            var bars = Array.prototype.filter.call(document.querySelectorAll("nav.navbar .navbar-nav"), function (n) {
+                return !(n.closest && n.closest(".dropdown-menu"));
+            });
+            if (!bars.length) { floating(); return; }
+            bars[bars.length - 1].appendChild(li);
+        }
+        var r = b.getBoundingClientRect();
+        if (!r.width || r.right > (window.innerWidth || document.documentElement.clientWidth)) {
+            li.parentNode.removeChild(li);
+            floating();
         }
     });
 
