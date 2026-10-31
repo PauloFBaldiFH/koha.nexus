@@ -574,7 +574,7 @@ def parse_contents(text: str) -> dict:
     """The login and credits settings that opac-theme-get read from
     theme-settings.json ({} when there are none)."""
     try:
-        data = json.loads(text or "{}")
+        data = json.loads(text or "{}", strict=False)
     except ValueError:
         return {}
     if not isinstance(data, dict):
@@ -714,8 +714,10 @@ def parse_theme_data(text: str) -> dict | None:
 
 
 def _json(text: str) -> dict | None:
+    # strict=False: the protocol line turns the "\\n" of a value into a real
+    # new line, which JSON strings may then hold.
     try:
-        data = json.loads(text or "")
+        data = json.loads(text or "", strict=False)
     except ValueError:
         return None
     return data if isinstance(data, dict) else None
@@ -735,21 +737,27 @@ def _from_script(conf: dict) -> dict:
             "links": {**(lk or {}), "enabled": lk is not None}}
 
 
-def sync_settings(found: dict[str, str]) -> tuple[dict | None, list[tuple[str, dict]]]:
-    """What `--task opac-theme-sync` read in Koha, as the screen's settings
-    (None: nothing of ours there) and a report: (message, values) pairs, in
-    English, for the screen to translate.
+def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict, list[tuple[str, dict]], bool]:
+    """What `--task opac-theme-sync` read in Koha, as the screen's settings,
+    a report: (message, values) pairs, in English, for the screen to
+    translate, and whether any of the panel's look is in Koha.
 
-    The settings line of OpacUserCSS wins; without it, the copy saved by the
-    last apply (theme-settings.json); without that, what the config of our
-    scripts in OpacUserJS and IntranetUserJS still tells. [kei-button]
-    markers in OpacMainUserBlock turn the news action buttons on."""
+    Koha (the instance) decides, never the panel's own copy: the settings
+    line of OpacUserCSS wins; without it, while our block is still in
+    OpacUserCSS, the copy saved by the last apply (theme-settings.json);
+    without that, what the config of our scripts in OpacUserJS and
+    IntranetUserJS still tells. The login instructions, credits and news are
+    the panel's entries now in Koha (live_contents()). Nothing of ours in
+    Koha: the defaults, Koha's own look. [kei-button] markers in
+    OpacMainUserBlock turn the news action buttons on."""
     notes: list[tuple[str, dict]] = []
+    yes = {k: found.get(f"block_{k}") == "yes" for k in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS",
+                                                          "IntranetUserJS")}
     cfg = parse_theme_data(found.get("data", ""))
     if cfg:
         notes.append(("Settings: read from OpacUserCSS.", {}))
     else:
-        state = _json(found.get("state", ""))
+        state = _json(found.get("state", "")) if yes["OpacUserCSS"] else None
         if state:
             cfg = normalize(state)
             notes.append(("Settings: not in OpacUserCSS; taken from the copy saved by the last Apply "
@@ -764,15 +772,25 @@ def sync_settings(found: dict[str, str]) -> tuple[dict | None, list[tuple[str, d
                 cfg = normalize(raw)
                 notes.append(("Settings: rebuilt from the panel's scripts in Koha (buttons, carousel, "
                               "light/dark); colours and pictures stay as on this screen.", {}))
-    extra = parse_contents(found.get("contents_settings", ""))
-    if cfg is not None and extra:
-        cfg = normalize({**cfg, **extra})
-        notes.append(("Login instructions and footer credits: read from theme-settings.json.", {}))
-    if cfg is None:
-        notes.append(("Nothing of the panel's look is in Koha: the screen keeps its settings.", {}))
-    yes = {k: found.get(f"block_{k}") == "yes" for k in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS",
-                                                          "IntranetUserJS")}
-    if cfg:
+    look = in_koha = cfg is not None
+    live = live_contents(found, text)
+    if live is not None:
+        extra, more = live
+        on = (any(login_on(lg) for lg in extra["login"].values()) or credits_on(extra["credits"])
+              or any(news_on(n) for n in extra["news"].values()))
+        in_koha = in_koha or on
+        cfg = normalize({**(cfg or {}), **extra})
+        notes += more
+    else:
+        extra = parse_contents(found.get("contents_settings", ""))
+        if cfg is not None and extra:
+            cfg = normalize({**cfg, **extra})
+            notes.append(("Login instructions and footer credits: read from theme-settings.json.", {}))
+    if not in_koha:
+        cfg = normalize({})
+        notes.insert(0, ("Nothing of the panel's look is in Koha: the fields are back to the defaults "
+                         "(Koha's own look).", {}))
+    if look:
         if not yes["OpacUserCSS"] or not yes["OpacUserJS"]:
             missing = [k for k in ("OpacUserCSS", "OpacUserJS") if not yes[k]]
             notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
@@ -799,7 +817,196 @@ def sync_settings(found: dict[str, str]) -> tuple[dict | None, list[tuple[str, d
             notes.append(("News action buttons turned on, so those markers become buttons.", {}))
     elif found.get("mainblock") == "yes":
         notes.append(("OpacMainUserBlock: no [kei-button] markers.", {}))
-    return cfg, notes
+    return cfg, notes, in_koha
+
+
+# ----------------------------------------------------------------------
+# The HTML customizations as Koha holds them now
+# ----------------------------------------------------------------------
+# opac-theme-get hands back the panel's own entries (code kei-<place>) that
+# are in Koha now, as live_contents={place: {"title", "content"}}. They are
+# what the OPAC and the staff interface show, so they decide what the screen
+# shows: a backup restore or an edit made in Koha's own News / HTML
+# customizations tool comes back into the fields. The form settings saved by
+# the last apply (theme-settings.json) are used only where they still give
+# exactly the HTML that is in Koha (the credits form keeps its fields that way).
+_TAG = re.compile(r"<[^>]+>")
+_ATTR = re.compile(r'([a-zA-Z-]+)\s*=\s*"([^"]*)"')
+
+
+def _plain(fragment: str) -> str:
+    """The text of an HTML fragment, entities decoded, spaces folded."""
+    return re.sub(r"\s+", " ", html.unescape(_TAG.sub(" ", fragment or ""))).strip()
+
+
+def _anchors(fragment: str) -> list[tuple[dict, str]]:
+    """(attributes, text) of each <a> of fragment, in order."""
+    out = []
+    for m in re.finditer(r"<a\b([^>]*)>(.*?)</a\s*>", fragment or "", re.S | re.I):
+        attrs = {k.lower(): html.unescape(v) for k, v in _ATTR.findall(m.group(1))}
+        out.append((attrs, _plain(m.group(2))))
+    return out
+
+
+def _after_label(fragment: str) -> str:
+    """"Label: value" -> value (the label is in the panel's language)."""
+    text = _plain(fragment)
+    return text.split(": ", 1)[1].strip() if ": " in text else text
+
+
+def _by_class(content: str, tag: str, cls: str) -> list[str]:
+    """The inner HTML of each <tag class="... cls ..."> of content."""
+    pattern = rf'<{tag}\b[^>]*class="[^"]*\b{re.escape(cls)}\b[^"]*"[^>]*>(.*?)</{tag}\s*>'
+    return re.findall(pattern, content or "", re.S | re.I)
+
+
+def _unwrap(content: str, cls: str) -> tuple[str, bool]:
+    """content without our outer <div class="cls"> (and whether it was there)."""
+    text = (content or "").strip()
+    m = re.fullmatch(rf'<div\b[^>]*class="[^"]*\b{re.escape(cls)}\b[^"]*"[^>]*>(.*)</div\s*>', text, re.S | re.I)
+    return (m.group(1).strip(), True) if m else (text, False)
+
+
+def login_from_html(content: str) -> dict:
+    """The login instructions form of what Koha shows on a login page."""
+    inner, _ours = _unwrap(content, "kei-login")
+    image = {"source": "url", "url": ""}
+    alt = ""
+    banner = re.search(r'<p\b[^>]*class="[^"]*\bkei-login-banner-wrap\b[^"]*"[^>]*>\s*(<img\b[^>]*>)\s*</p\s*>',
+                       inner, re.S | re.I)
+    if banner:
+        attrs = {k.lower(): html.unescape(v) for k, v in _ATTR.findall(banner.group(1))}
+        image["url"] = attrs.get("src", "")
+        alt = attrs.get("alt", "")
+        inner = (inner[:banner.start()] + inner[banner.end():]).strip()
+    return _login({"enabled": True, "html": inner, "image": image, "alt": alt})
+
+
+def news_from_html(title: str, content: str) -> dict:
+    """The news form of the panel's news item as Koha holds it: the title of
+    Koha's own field, the text, and the buttons of its row."""
+    text = re.sub(r"<!--\s*kei-news-title:.*?-->", "", content or "", flags=re.S)
+    inner, _ours = _unwrap(text, "kei-news")
+    buttons = [{"text": label, "url": attrs.get("href", "")}
+               for row in _by_class(inner, "p", "kei-news-cta") for attrs, label in _anchors(row)]
+    inner = re.sub(r'<p\b[^>]*class="[^"]*\bkei-news-cta\b[^"]*"[^>]*>.*?</p\s*>', "", inner, flags=re.S | re.I)
+    return _news({"enabled": True, "title": title, "html": inner.strip(), "buttons": buttons})
+
+
+def credits_from_html(content: str) -> dict:
+    """The footer credits form of the credits Koha shows: each line of our
+    markup back into its field. Credits that are not the panel's markup at
+    all go into the note as plain text."""
+    inner, ours = _unwrap(content, "kei-credits")
+    if not ours and not _by_class(inner, "p", "kei-credits-name"):
+        return _credits({"enabled": True, "note": _plain(inner)[:300]})
+    r: dict = {"enabled": True}
+    first = lambda cls: (_by_class(inner, "p", cls) or [""])[0]   # noqa: E731
+    r["name"] = _plain(first("kei-credits-name"))
+    r["address"] = _plain(first("kei-credits-address"))
+    r["hours"] = _after_label(first("kei-credits-hours"))
+    r["note"] = _plain(first("kei-credits-note"))
+    r["cnpj"] = _after_label(first("kei-credits-cnpj"))
+    for part in first("kei-credits-contact").split(" · "):
+        found = _anchors(part)
+        if not found:
+            if _plain(part):
+                r["phone"] = _after_label(part)
+            continue
+        attrs, label = found[0]
+        href = attrs.get("href", "")
+        if href.startswith("tel:"):
+            r["phone"] = label
+        elif "wa.me/" in href:
+            r["whatsapp"] = href.rsplit("/", 1)[-1]
+        elif href.startswith("mailto:"):
+            r["email"] = href[len("mailto:"):]
+        elif href.startswith(("https://", "http://")):
+            r["website"] = href
+    for attrs, label in _anchors(first("kei-credits-social")):
+        href = attrs.get("href", "")
+        if "instagram.com" in href:
+            handle = label.split(" ", 1)[1] if label.startswith("Instagram @") else ""
+            r["instagram"] = handle or href
+        elif "facebook.com" in href or label == "Facebook":
+            r["facebook"] = href
+        elif "youtube.com" in href or "youtu.be" in href or label == "YouTube":
+            r["youtube"] = href
+    r["links"] = [{"text": label, "url": attrs.get("href", "")} for attrs, label in _anchors(first("kei-credits-links"))]
+    return _credits(r)
+
+
+def _same(a: str, b: str) -> bool:
+    return re.sub(r"\s+", " ", a or "").strip() == re.sub(r"\s+", " ", b or "").strip()
+
+
+def live_contents(found: dict[str, str], text: dict | None = None) -> tuple[dict, list[tuple[str, dict]]] | None:
+    """The login, credits and news settings of what Koha holds now (see
+    above), and a report; None when the installer did not read them (an
+    older installer, or a Koha before 23.11)."""
+    raw = (found.get("live_contents") or "").strip()
+    if not raw:
+        return None
+    if not raw.startswith("{"):     # base64 of the JSON, as the installer sends it
+        try:
+            raw = base64.b64decode(raw, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+    live = _json(raw)
+    if live is None:
+        return None
+    saved = parse_contents(found.get("contents_settings", ""))
+    saved = normalize(saved) if saved else None
+    entry = lambda place: live.get(place) if isinstance(live.get(place), dict) else None   # noqa: E731
+    out = {"login": {}, "credits": {}, "news": {}}
+    notes: list[tuple[str, dict]] = []
+    edited: list[str] = []
+    for side, place in LOGIN_SIDES.items():
+        got = entry(place)
+        if not got:
+            out["login"][side] = _login({})
+            continue
+        content = str(got.get("content") or "")
+        if saved and login_on(saved["login"][side]) and _same(login_html(saved["login"][side]), content):
+            out["login"][side] = saved["login"][side]
+        else:
+            out["login"][side] = login_from_html(content)
+            edited.append(place)
+    got = entry("opaccredits")
+    if not got:
+        out["credits"] = _credits({})
+    else:
+        content = str(got.get("content") or "")
+        if saved and credits_on(saved["credits"]) and _same(credits_html(saved["credits"], text), content):
+            out["credits"] = saved["credits"]
+        else:
+            out["credits"] = credits_from_html(content)
+            edited.append("opaccredits")
+    for side, place in NEWS_SIDES.items():
+        got = entry(place)
+        if not got:
+            out["news"][side] = _news({})
+            continue
+        title, content = str(got.get("title") or ""), str(got.get("content") or "")
+        mine = saved["news"][side] if saved else None
+        if (mine and news_on(mine) and mine["title"] == title.strip()
+                and _same(news_html(mine).split("\n", 1)[1], content)):
+            out["news"][side] = mine
+        else:
+            out["news"][side] = news_from_html(title, content)
+            edited.append(place)
+    on = [place for side, place in LOGIN_SIDES.items() if login_on(out["login"][side])]
+    on += ["opaccredits"] if credits_on(out["credits"]) else []
+    on += [place for side, place in NEWS_SIDES.items() if news_on(out["news"][side])]
+    notes.append(("Login instructions, footer credits and news: read from Koha (${places}).",
+                  {"places": ", ".join(on) if on else "-"}))
+    if edited:
+        notes.append(("Changed in Koha since the last Apply, read from Koha's HTML: ${places}.",
+                      {"places": ", ".join(edited)}))
+    buttons = sum(len(out["news"][side]["buttons"]) for side in NEWS_SIDES)
+    if buttons:
+        notes.append(("News buttons in Koha: ${n}.", {"n": str(buttons)}))
+    return out, notes
 
 
 def _rgb(hex_color: str) -> str:

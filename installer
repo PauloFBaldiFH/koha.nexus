@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.136"
+PANEL_VERSION=" 1.5.137"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6260,11 +6260,11 @@ _function_restore_database() {
     cut_time=$(date '+%Y-%m-%d %H:%M:%S')
     tui_run "$(t "Reindexing the catalog")" restore_task_reindex "$engine" "$cut_time" || rebuild_ok="no"
 
-    # The backup's systempreferences replaced the look made in the panel
-    # (OpacUserCSS, OpacUserJS, IntranetUserCSS): it goes back in.
-    if [ -s "$THEME_STATE" ]; then
-        tui_run "$(t "Re-applying the saved OPAC and staff look")" theme_state_reapply || true
-    fi
+    # The restored database is what Koha shows now, the OPAC and staff look
+    # included (OpacUserCSS, OpacUserJS, IntranetUserCSS, IntranetUserJS,
+    # the news and HTML customizations): the panel's saved copy is read
+    # again from it, never written back over it.
+    tui_run "$(t "Reading the restored OPAC and staff look")" theme_state_refresh || true
 
     tui_run "$(t "Restarting Koha services")" resume_koha_services
     tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
@@ -35883,9 +35883,9 @@ z3950_server_status() {
 #   opac-theme-remove    the blocks, the pictures, the feed and its schedule
 #   opac-carousel-refresh  the feed now
 # Each apply also saves what it wrote in theme-settings.json (CONF_DIR,
-# also reached as /etc/koha-nexus/theme-settings.json): a database restore
-# brings back the backup's systempreferences, which would wipe the look, so
-# Restore database writes the saved blocks back (theme_state_reapply).
+# also reached as /etc/koha-nexus/theme-settings.json). A database restore
+# brings back the backup's systempreferences and news, and those decide:
+# Restore database reads the copy again from them (theme_state_refresh).
 # The carousel reads kei-new-arrivals.json, written every night by
 # koha-kei-new-arrivals: the newest titles with a copy that is not lost or
 # withdrawn and a real cover (Koha's uploaded one, else OpenLibrary, else
@@ -36207,6 +36207,32 @@ opac_contents_live() {
         AND (expirationdate IS NULL OR expirationdate >= CURDATE()) ORDER BY id;" 2>/dev/null
 }
 
+# opac_contents_ours: the panel's own entries in Koha now (login
+# instructions, credits and news, code kei-PLACE, shown today), as one
+# base64 line of the JSON {PLACE: {"title": ..., "content": ...}}. Fails when Koha has no
+# localizations table or the database cannot be read.
+opac_contents_ours() {
+    local rows
+    opac_contents_supported || return 1
+    rows=$(mysql --default-character-set=utf8mb4 -N -B -e "SELECT c.code, IFNULL(l.title, ''), IFNULL(l.content, '')
+        FROM ${DB_NAME}.additional_contents c
+        JOIN ${DB_NAME}.additional_contents_localizations l ON l.additional_content_id = c.id
+        WHERE c.code IN ('kei-OpacLoginInstructions', 'kei-StaffLoginInstructions', 'kei-opaccredits', 'kei-news-opac', 'kei-news-staff')
+        AND l.lang = 'default' AND (c.expirationdate IS NULL OR c.expirationdate >= CURDATE()) ORDER BY c.id;" 2>/dev/null) || return 1
+    printf '%s\n' "$rows" | python3 -I -c '
+import base64, json, re, sys
+# mysql --batch writes tab, newline, backslash and NUL as \t \n \\ \0.
+esc = {"n": "\n", "t": "\t", "0": "\0", "\\": "\\"}
+un = lambda s: re.sub(r"\\(.)", lambda m: esc.get(m.group(1), m.group(1)), s)
+out = {}
+for line in sys.stdin.read().split("\n"):
+    parts = line.split("\t")
+    if len(parts) == 3 and parts[0].startswith("kei-"):
+        out[parts[0][4:]] = {"title": un(parts[1]), "content": un(parts[2])}
+# base64: the protocol line turns any "\\n" of the value into a new line.
+print(base64.b64encode(json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode("ascii"))'
+}
+
 # opac_retired_restore_sql LOCATION|"" FILE: SQL giving the library's
 # entries of LOCATION (of every place with "") the expiration date they had;
 # their lines leave FILE.
@@ -36324,8 +36350,14 @@ opac_theme_get() {
     if [ -f "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" ]; then
         kei_result feed_items "$(grep -o '"biblionumber"' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
     fi
+    # The panel's own login instructions, credits and news as Koha holds
+    # them now: they decide what the panel shows.
+    if line=$(opac_contents_ours); then
+        kei_result live_contents "$line"
+    fi
     # The login instructions and credits forms: not in the public
-    # stylesheet, only in theme-settings.json.
+    # stylesheet, only in theme-settings.json (the panel uses them only
+    # where they still give the HTML that is in Koha).
     if [ -s "$THEME_STATE" ]; then
         line=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8")).get("contents_settings") or {}))' \
             "$THEME_STATE" 2>/dev/null) && [ -n "$line" ] && [ "$line" != "{}" ] && kei_result contents_settings "$line"
@@ -36519,87 +36551,78 @@ PY
     return 1
 }
 
-# theme_state_reapply: after a database restore, the look saved by the last
-# apply (theme-settings.json) goes back into systempreferences: the blocks of
-# OpacUserCSS, OpacUserJS, IntranetUserCSS and IntranetUserJS (the rest of each preference is
-# the restored one) and the allowed preferences. Nothing saved: nothing done.
-theme_state_reapply() {
-    [ -s "$THEME_STATE" ] || return 0
-    local dir sql f mode count name value
+# theme_state_refresh: after a database restore, the restored Koha is the
+# truth, its look included (Paulo, 1.5.137): nothing of the panel's saved
+# copy is written back into it. theme-settings.json is written again from
+# what Koha now holds (the panel's blocks of OpacUserCSS, OpacUserJS,
+# IntranetUserCSS and IntranetUserJS, the settings line, the panel's login
+# instructions, credits and news), or removed when none of that is there.
+# The list of the library's own entries the panel set to expired keeps only
+# the ones still expired in the restored database.
+theme_state_refresh() {
+    local dir pref live="" l id orig rc
     dir=$(mktemp -d /tmp/koha_tmp_theme.XXXXXX) || return 1
-    if ! python3 -I - "$THEME_STATE" "$dir" <<'PY'
-import json, os, sys
-state, d = json.load(open(sys.argv[1], encoding="utf-8")), sys.argv[2]
-blocks = state.get("blocks") or {}
-for pref, name in (("OpacUserCSS", "user.css"), ("OpacUserJS", "user.js"), ("IntranetUserCSS", "staff.css"),
-                   ("IntranetUserJS", "staff.js")):
-    if isinstance(blocks.get(pref), str) and blocks[pref]:
-        open(os.path.join(d, name), "w", encoding="utf-8").write(blocks[pref])
-with open(os.path.join(d, "prefs"), "w", encoding="utf-8") as fh:
-    for p in state.get("prefs") or []:
-        if isinstance(p, list) and len(p) == 2:
-            fh.write("%s\t%s\n" % (p[0], str(p[1]).replace("\n", " ")))
-open(os.path.join(d, "carousel"), "w").write(str(state.get("carousel") or "off") + "\n")
-contents = state.get("contents")
-if isinstance(contents, dict) and contents:
-    os.mkdir(os.path.join(d, "contents"))
-    with open(os.path.join(d, "contents.list"), "w", encoding="utf-8") as fh:
-        for loc, markup in contents.items():
-            on = isinstance(markup, str) and markup.strip() != ""
-            fh.write("%s\t%s\n" % (loc, "on" if on else "off"))
-            if on:
-                open(os.path.join(d, "contents", loc + ".html"), "w", encoding="utf-8").write(markup)
-PY
-    then
-        rm -rf -- "$dir"
-        log "theme: $THEME_STATE could not be read; the look was not re-applied"
-        return 1
-    fi
-    for f in user.css user.js staff.css staff.js; do
-        if [ -e "$dir/$f" ] && ! opac_block_ok "$dir/$f"; then
-            rm -rf -- "$dir"
-            log "theme: $THEME_STATE holds a damaged block ($f); the look was not re-applied"
-            return 1
-        fi
+    for pref in OpacUserCSS OpacUserJS IntranetUserCSS IntranetUserJS; do
+        opac_pref_raw "$pref" | awk -v b="$OPAC_BEGIN" -v e="$OPAC_END" '$0 == b { on = 1 } on { print } $0 == e { on = 0 }' \
+            > "$dir/$pref"
     done
-    if ! opac_contents_ok "$dir"; then
-        rm -rf -- "$dir"
-        log "theme: $THEME_STATE holds damaged login instructions or credits; the look was not re-applied"
-        return 1
+    live=$(opac_contents_ours) || live=""
+    if [ -f "$OPAC_RETIRED" ]; then
+        : > "$dir/retired"
+        while IFS=$'\t' read -r l id orig; do
+            [[ "$id" =~ ^[0-9]+$ ]] || continue
+            [ "$(mysql -N -B -e "SELECT COUNT(*) FROM ${DB_NAME}.additional_contents WHERE id = $id
+                AND location = $(sql_quote "$l") AND code NOT LIKE 'kei-%' AND expirationdate < CURDATE();" 2>/dev/null)" = "1" ] \
+                && printf '%s\t%s\t%s\n' "$l" "$id" "$orig" >> "$dir/retired"
+        done < "$OPAC_RETIRED"
+        if [ -s "$dir/retired" ]; then mv -f "$dir/retired" "$OPAC_RETIRED"; else rm -f -- "$OPAC_RETIRED"; fi
     fi
-    if [ ! -e "$dir/user.css" ] || [ ! -e "$dir/user.js" ]; then
-        rm -rf -- "$dir"
-        return 0
+    mkdir -p "${THEME_STATE%/*}"
+    rc=0
+    python3 -I - "$dir" "$THEME_STATE" "${PANEL_VERSION# }" "$live" > "$dir/state.json" <<'PY' || rc=$?
+import base64, json, os, re, sys, time
+d, old_path, version, live = sys.argv[1:5]
+blocks = {}
+for pref in ("OpacUserCSS", "OpacUserJS", "IntranetUserCSS", "IntranetUserJS"):
+    text = open(os.path.join(d, pref), encoding="utf-8").read()
+    if text.strip():
+        blocks[pref] = text
+try:
+    live = json.loads(base64.b64decode(live).decode("utf-8")) if live else {}
+except ValueError:
+    live = {}
+contents = {loc: (v.get("content") or "") for loc, v in live.items() if isinstance(v, dict)}
+if not blocks and not any(contents.values()):
+    sys.exit(3)
+m = re.search(r"/\*\s*KEI-THEME-DATA:\s*(\{.*?\})\s*\*/", blocks.get("OpacUserCSS", ""), re.S)
+try:
+    settings = json.loads(m.group(1)) if m else {}
+except ValueError:
+    settings = {}
+try:
+    old = json.load(open(old_path, encoding="utf-8"))
+except (OSError, ValueError):
+    old = {}
+old = old if isinstance(old, dict) else {}
+# The forms of the login instructions, credits and news: the panel checks
+# them against the HTML in Koha and reads that HTML where they differ.
+json.dump({"format": 1, "saved": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "panel": version, "from": "restore",
+           "settings": settings, "blocks": blocks, "prefs": [], "carousel": str(old.get("carousel") or "off"),
+           "contents": contents, "contents_settings": old.get("contents_settings") or {}},
+          sys.stdout, ensure_ascii=False, indent=1)
+PY
+    if [ "$rc" -eq 0 ] && chmod 644 "$dir/state.json" && mv -f "$dir/state.json" "$THEME_STATE"; then
+        log "theme: theme-settings.json read again from the restored database"
+        kei_result theme_state restored
+    elif [ "$rc" -eq 3 ]; then
+        rm -f -- "$THEME_STATE"
+        log "theme: none of the panel's look is in the restored database; its saved copy was dropped"
+        kei_result theme_state none
+    else
+        rm -f -- "$THEME_STATE"
+        log "theme: theme-settings.json could not be read again after the restore; it was dropped"
     fi
-    sql="$dir/theme.sql"
-    {
-        printf 'START TRANSACTION;\n'
-        opac_pref_block_sql OpacUserCSS "$dir/user.css"
-        opac_pref_block_sql OpacUserJS "$dir/user.js"
-        if [ -e "$dir/staff.css" ]; then opac_pref_block_sql IntranetUserCSS "$dir/staff.css"; else opac_pref_block_sql IntranetUserCSS -; fi
-        if [ -e "$dir/staff.js" ]; then opac_pref_block_sql IntranetUserJS "$dir/staff.js"; else opac_pref_block_sql IntranetUserJS -; fi
-        while IFS=$'\t' read -r name value; do
-            [ -n "$name" ] && opac_pref_line "$name" "$value"
-        done < "$dir/prefs"
-        opac_contents_sql "$dir" "${LOG_DIR}/mysql.log"
-        printf 'COMMIT;\n'
-    } > "$sql"
-    if ! mysql --default-character-set=utf8mb4 "$DB_NAME" < "$sql" >> "${LOG_DIR}/mysql.log" 2>&1; then
-        rm -rf -- "$dir"
-        rm -f -- "$OPAC_RETIRED.new"
-        log "theme: the saved look could not be written back after the restore"
-        return 1
-    fi
-    opac_retired_commit
-    read -r mode count < "$dir/carousel" 2>/dev/null
     rm -rf -- "$dir"
-    memcached_flush >/dev/null 2>&1 || true
-    # The covers of the restored catalogue: the feed again, in the background.
-    if [ "$mode" = "on" ] && [[ "$count" =~ ^[0-9]+$ ]] && [ -x "$OPAC_NA_BIN" ]; then
-        ( "$OPAC_NA_BIN" "$count" ) </dev/null >/dev/null 2>&1 7>&- 8>&- 9>&- &
-    fi
-    log "theme: the saved look was written back after the restore ($THEME_STATE)"
-    kei_result theme_reapplied yes
     return 0
 }
 

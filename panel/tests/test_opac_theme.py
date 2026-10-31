@@ -1,5 +1,6 @@
 """opac_theme: the settings, the CSS/JS blocks Koha receives, the pictures."""
 
+import base64
 import json
 import re
 import shutil
@@ -451,31 +452,144 @@ def test_staff_home_buttons(tmp_path):
 
 def test_sync_settings():
     cfg = ot.normalize({"texture": "gradient", "news_buttons": False})
-    got, notes = ot.sync_settings({"data": ot.data_line(cfg), "block_OpacUserCSS": "yes", "block_OpacUserJS": "yes",
-                                   "mainblock": "yes", "mainblock_buttons": "2", "own_IntranetUserJS": "40"})
+    got, notes, in_koha = ot.sync_settings({"data": ot.data_line(cfg), "block_OpacUserCSS": "yes",
+                                            "block_OpacUserJS": "yes", "mainblock": "yes",
+                                            "mainblock_buttons": "2", "own_IntranetUserJS": "40"})
     text = [n for n, _v in notes]
-    assert got["texture"] == "gradient" and got["news_buttons"] is True
+    assert got["texture"] == "gradient" and got["news_buttons"] is True and in_koha
     assert "Settings: read from OpacUserCSS." in text
     assert not any("missing" in n for n in text)
     assert ("${pref}: ${n} lines of the library's own, kept as they are.", {"pref": "IntranetUserJS", "n": "40"}) in notes
-    # No settings line: the copy of the last apply.
-    got, notes = ot.sync_settings({"state": json.dumps({"accent": "#ff0066"}), "block_OpacUserCSS": "no"})
+    # No settings line, our block still there: the copy of the last apply.
+    got, notes, _in = ot.sync_settings({"state": json.dumps({"accent": "#ff0066"}), "block_OpacUserCSS": "yes"})
     assert got["accent"] == "#ff0066" and "theme-settings.json" in notes[0][0]
-    assert any(v.get("prefs") == "OpacUserCSS, OpacUserJS" for _n, v in notes)
+    assert any(v.get("prefs") == "OpacUserJS" for _n, v in notes)
     # Only our scripts left: what their config tells.
     opac = ot.js_config(ot.normalize({"default_theme": "dark", "carousel": {"enabled": False},
                                       "links": {"enabled": True, "style": "metal", "layout": "grid2",
                                                 "items": [{"text": "A", "url": "/a", "sort_order": 3}]}}))
     staff = ot.staff_js_config(ot.normalize({"staff_links": {"items": [{"text": "S", "url": "/s"}]}}))
-    got, notes = ot.sync_settings({"config_OpacUserJS": json.dumps(opac), "config_IntranetUserJS": json.dumps(staff),
-                                   "block_OpacUserJS": "yes", "block_IntranetUserJS": "yes"})
+    got, notes, _in = ot.sync_settings({"config_OpacUserJS": json.dumps(opac),
+                                        "config_IntranetUserJS": json.dumps(staff),
+                                        "block_OpacUserJS": "yes", "block_IntranetUserJS": "yes"})
     assert got["default_theme"] == "dark" and not got["carousel"]["enabled"]
     assert got["links"]["style"] == "metal" and got["links"]["items"][0]["sort_order"] == 3
     assert got["staff_links"]["enabled"] and got["staff_links"]["items"][0]["text"] == "S"
     assert "rebuilt" in notes[0][0]
-    # Nothing at all: None, the screen keeps its fields.
-    got, notes = ot.sync_settings({"data": "/* KEI-THEME-DATA: {broken */", "state": "[]"})
-    assert got is None and "Nothing of the panel" in notes[0][0]
+    # Nothing of ours in Koha: the defaults (Koha's own look), never the
+    # panel's own copy.
+    got, notes, in_koha = ot.sync_settings({"data": "/* KEI-THEME-DATA: {broken */", "state": "[]"})
+    assert got == ot.normalize({}) and not in_koha and "Nothing of the panel" in notes[0][0]
+
+
+def _applied_contents(cfg: dict, text: dict | None = None) -> dict:
+    """live_contents as opac-theme-get hands back what an apply of cfg wrote
+    (the news title goes to Koha's own field, not into the content)."""
+    live = {}
+    for place, markup in ot.contents(cfg, text).items():
+        if not markup:
+            continue
+        title = ""
+        if place.startswith("news-"):
+            first, markup = markup.split("\n", 1)
+            title = re.fullmatch(r"<!-- kei-news-title: (.*) -->", first).group(1)
+        live[place] = {"title": title, "content": markup}
+    return live
+
+
+def test_restore_then_sync_shows_what_koha_holds():
+    """Paulo, 2026-10-31: after a backup restore, Sync shows the look of the
+    restored Koha (its OpacUserCSS / IntranetUserJS and its news with their
+    buttons), never the panel's copy of the last apply."""
+    mine = ot.normalize({"texture": "frosted", "accent": "#112233",
+                         "links": {"enabled": True, "items": [{"text": "Old", "url": "/old"}]},
+                         "credits": {"enabled": True, "name": "Biblioteca Antiga", "phone": "(00) 0000-0000"},
+                         "news": {"opac": {"enabled": True, "title": "Antiga", "html": "<p>Velha</p>",
+                                           "buttons": [{"text": "Velho", "url": "/velho"}]}}})
+    saved = json.dumps(ot.contents_settings(mine))
+    backup = ot.normalize({"texture": "metal", "accent": "#aa0000",
+                           "staff": {"enabled": True, "accent": "#00aa00"},
+                           "staff_links": {"enabled": True, "items": [{"text": "Circ", "url": "/circ"}]},
+                           "news": {"opac": {"enabled": True, "title": "Julho", "html": "<p>Aberto</p>",
+                                             "buttons": [{"text": "Agenda", "url": "/agenda"},
+                                                         {"text": "Site", "url": "https://example.org/"}]},
+                                    "staff": {"enabled": True, "title": "Equipe", "html": "<p>Reunião</p>",
+                                              "buttons": []}},
+                           "login": {"opac": {"enabled": True, "html": "<p>Use seu CPF</p>",
+                                              "image": {"source": "url", "url": "https://example.org/b.png"},
+                                              "alt": "Banner"}}})
+    found = {"data": ot.data_line(backup), "state": json.dumps(ot.normalize(mine)), "contents_settings": saved,
+             "live_contents": json.dumps(_applied_contents(backup)),
+             "block_OpacUserCSS": "yes", "block_OpacUserJS": "yes", "block_IntranetUserCSS": "yes",
+             "block_IntranetUserJS": "yes"}
+    got, notes, in_koha = ot.sync_settings(found)
+    # As the installer sends it: base64, so no "\\n" of the HTML is lost.
+    b64 = base64.b64encode(found["live_contents"].encode()).decode()
+    assert ot.sync_settings({**found, "live_contents": b64})[0] == got
+    assert in_koha
+    assert got["texture"] == "metal" and got["accent"] == "#aa0000"
+    assert got["staff"]["enabled"] and got["staff"]["accent"] == "#00aa00"
+    assert got["staff_links"]["items"][0]["text"] == "Circ"
+    assert got["links"]["items"] == [] or not got["links"]["enabled"]
+    # The news of the restored Koha, with their buttons; no credits there.
+    assert got["news"]["opac"] == backup["news"]["opac"]
+    assert got["news"]["staff"] == backup["news"]["staff"]
+    assert got["login"]["opac"] == backup["login"]["opac"]
+    assert not ot.credits_on(got["credits"])
+    assert ot.contents(got) == ot.contents(backup)
+    text = " ".join(n for n, _v in notes)
+    assert "read from Koha" in text and "News buttons in Koha" in text
+
+
+def test_sync_keeps_the_form_while_koha_holds_the_same_html():
+    cfg = ot.normalize({"credits": {"enabled": True, "name": "Biblioteca", "address": "Rua Exemplo, 123",
+                                    "phone": "(00) 0000-0000", "whatsapp": "5500000000000",
+                                    "email": "contato@biblioteca.gov.br", "website": "https://biblioteca.gov.br/",
+                                    "hours": "8h-18h", "instagram": "@biblioteca",
+                                    "facebook": "https://facebook.com/biblioteca",
+                                    "links": [{"text": "Regras", "url": "/regras"}], "note": "Aberta ao público",
+                                    "cnpj": "00000000000000"}})
+    found = {"live_contents": json.dumps(_applied_contents(cfg)),
+             "contents_settings": json.dumps(ot.contents_settings(cfg))}
+    got, notes, in_koha = ot.sync_settings(found)
+    assert got["credits"] == cfg["credits"] and in_koha
+    assert not any("Changed in Koha" in n for n, _v in notes)
+    # Without the saved form (restored on another machine): the same fields
+    # read back from the HTML.
+    got, notes, _in = ot.sync_settings({"live_contents": found["live_contents"]})
+    assert got["credits"] == cfg["credits"]
+    assert any("Changed in Koha" in n for n, _v in notes)
+
+
+def test_news_edited_in_koha_comes_back():
+    """A news item of ours changed in Koha's own News tool: its title, text
+    and buttons are what the fields show."""
+    content = ('<div class="kei-news">\n<p>Horário <strong>novo</strong></p>\n<p class="kei-news-cta">'
+               '<a class="btn btn-primary kei-news-button" style="margin:0 .4em .4em 0" href="/novo">Ver</a>\n'
+               '<a class="btn btn-primary kei-news-button" href="https://example.org/x" target="_blank">Mais</a>'
+               '</p>\n</div>')
+    old = ot.normalize({"news": {"opac": {"enabled": True, "title": "Antigo", "html": "<p>x</p>"}}})
+    got, _notes, _in = ot.sync_settings({"live_contents": json.dumps({"news-opac": {"title": "Novo",
+                                                                                    "content": content}}),
+                                         "contents_settings": json.dumps(ot.contents_settings(old))})
+    nw = got["news"]["opac"]
+    assert nw["enabled"] and nw["title"] == "Novo"
+    assert nw["html"] == "<p>Horário <strong>novo</strong></p>"
+    assert nw["buttons"] == [{"text": "Ver", "url": "/novo"}, {"text": "Mais", "url": "https://example.org/x"}]
+    # A side with nothing of ours in Koha is off, whatever the old copy said.
+    assert not got["news"]["staff"]["enabled"]
+    # Script or handlers typed in Koha never reach the fields.
+    bad = '<div class="kei-news"><p onclick="x()">Oi</p><script>alert(1)</script></div>'
+    got, _n, _i = ot.sync_settings({"live_contents": json.dumps({"news-staff": {"title": "T", "content": bad}})})
+    assert got["news"]["staff"]["html"] == "<p>Oi</p>"
+
+
+def test_older_installer_without_live_contents_keeps_the_saved_forms():
+    cfg = ot.normalize({"texture": "metal"})
+    extra = {"credits": {"enabled": True, "name": "Biblioteca"}}
+    got, notes, _in = ot.sync_settings({"data": ot.data_line(cfg), "contents_settings": json.dumps(extra)})
+    assert got["credits"]["name"] == "Biblioteca"
+    assert any("theme-settings.json" in n for n, _v in notes)
 
 
 def test_staff_material_like_the_opac():
@@ -694,7 +808,7 @@ def test_contents_stay_out_of_the_public_stylesheet(tmp_path):
         shutil.rmtree(work)
     # sync: the contents settings join the settings read from Koha.
     found = {"data": ot.data_line(ot.normalize({})), "contents_settings": json.dumps(ot.contents_settings(cfg))}
-    synced, notes = ot.sync_settings(found)
+    synced, notes, _in = ot.sync_settings(found)
     assert synced["credits"]["name"] == "Biblioteca" and any("theme-settings.json" in n for n, _ in notes)
 
 

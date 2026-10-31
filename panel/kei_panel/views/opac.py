@@ -127,6 +127,7 @@ def _style_rows(prefix: str, values: dict):
 
 class OpacView(SectionView):
     loaded = False
+    restores_seen = 0
 
     def __init__(self, section):
         super().__init__(section)
@@ -445,8 +446,11 @@ class OpacView(SectionView):
         return items, ""
 
     def on_show(self) -> None:
-        if not self.loaded:
+        # Read again after a database restore: the restored Koha has its own
+        # look, and the fields must not keep the one from before.
+        if not self.loaded or getattr(self.app, "restores", 0) != self.restores_seen:
             self.loaded = True
+            self.restores_seen = getattr(self.app, "restores", 0)
             self.reload()
 
     # ------------------------------------------------------------------
@@ -677,42 +681,46 @@ class OpacView(SectionView):
         self.run_worker(self._reload(), exclusive=True, group="opac-load", exit_on_error=False)
 
     async def _reload(self) -> None:
-        """The settings now in Koha; quiet when there is no Koha to ask."""
+        """The look now in Koha into the fields, quietly. Koha decides: what
+        a restore or an edit in Koha's own tools left there is what the
+        screen shows. Quiet and unchanged when there is no Koha to ask."""
         try:
-            out = await self.app.bridge.task("opac-theme-get")
-        except Exception:     # noqa: BLE001 (no installer, no database: the defaults stay)
+            out = await self.app.bridge.task("opac-theme-sync")
+        except Exception:     # noqa: BLE001 (no installer, no database: the fields stay)
             self.summary()
             return
-        cfg = ot.parse_theme_data(out.results.get("data", ""))
-        extra = ot.parse_contents(out.results.get("contents_settings", ""))
-        self.carousel_on = out.results.get("carousel") == "on"
-        self.feed_items = out.results.get("feed_items", "")
-        if cfg or extra:
-            self.fill({**(cfg or self.cfg), **extra})
-        self.summary(applied=bool(cfg))
+        self.from_koha(out.results)
+
+    def from_koha(self, found: dict[str, str]) -> list[tuple[str, dict]]:
+        """The fields and the summary from what opac-theme-sync read in Koha;
+        the report's notes back."""
+        self.restores_seen = getattr(self.app, "restores", 0)
+        cfg, notes, in_koha = ot.sync_settings(found, self.js_text())
+        self.carousel_on = found.get("carousel") == "on"
+        self.feed_items = found.get("feed_items", "")
+        self.fill(cfg)
+        self.summary(applied=in_koha)
+        return notes
 
     def sync(self) -> None:
         self.run_worker(self._sync(), exclusive=True, group="opac-load", exit_on_error=False)
 
     async def _sync(self) -> None:
-        """Sync current OPAC settings: what is live in Koha into the fields,
-        and a report of what was found. Nothing is written to Koha."""
+        """Sync current OPAC settings: what is live in Koha (the blocks of
+        OpacUserCSS / OpacUserJS / IntranetUserCSS / IntranetUserJS and the
+        panel's login instructions, credits and news with their buttons)
+        into the fields, and a report of what was found. The fields not
+        saved are replaced; nothing is written to Koha."""
         title = t("Sync current OPAC settings")
         try:
             out = await self.app.bridge.task("opac-theme-sync")
         except Exception as e:   # noqa: BLE001 (no installer, no database)
             self.app.notify(f"{title}: {e}", severity="error")
             return
-        cfg, notes = ot.sync_settings(out.results)
-        self.carousel_on = out.results.get("carousel") == "on"
-        self.feed_items = out.results.get("feed_items", "")
-        if cfg:
-            self.fill(cfg)
-        self.summary(applied=cfg is not None)
+        notes = self.from_koha(out.results)
         report = "\n".join("• " + t(text, **values) for text, values in notes)
-        if cfg:
-            report += "\n\n" + t("The fields now show these settings. Nothing was written to Koha: Apply "
-                                   "writes them.")
+        report += "\n\n" + t("The fields now show what is in Koha. Nothing was written to Koha: Apply "
+                               "writes the fields.")
         self.app.push_screen(TextScreen(title, report))
 
     def summary(self, applied: bool = False) -> None:
@@ -841,7 +849,6 @@ class OpacView(SectionView):
                 title, t("Remove this look from the OPAC and go back to Koha's own? A backup of the database is "
                          "taken first; your own OpacUserCSS and OpacUserJS are kept."))):
             await self._routine(title, "opac-theme-remove")
-            self.fill({})
 
     async def _routine(self, title: str, name: str) -> None:
         from ..routines.common import run_task, show_done
