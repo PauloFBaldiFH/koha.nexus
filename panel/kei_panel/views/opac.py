@@ -45,7 +45,8 @@ from ..widgets.linkrow import LinkRow
 from ..widgets.slider import Slider
 from .base import SectionView
 
-ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon", "login": "Login banner"}
+ASSET_LABELS = {"background": "Wallpaper", "logo": "Logo", "favicon": "Favicon", "login": "Login banner",
+                "header": "Header picture"}
 FILE_SOURCES = ("local", "imgbb", "cloudinary")
 # The login pages: settings side -> (box id, title, picture name).
 LOGIN_BOXES = {"opac": ("o-login-opac", "OPAC login page"), "staff": ("o-login-staff", "Staff login page")}
@@ -102,8 +103,8 @@ RADIUS_HELP = {
 }
 RADIUS_NOTE = ("Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising "
                "the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.")
-GHOST = {"rss": "RSS icons", "cart_badge": "Cart badge", "community": "Community links",
-         "empty_columns": "Empty table columns"}
+GHOST = {"rss": "RSS icons", "cart_badge": "Cart badge", "cart": "Cart (menu and Add to cart)",
+         "community": "Community links", "empty_columns": "Empty table columns"}
 POSTIMAGES_URL = "https://postimages.org/"
 POSTIMAGES_NOTE = ("Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link "
                    "(ends in .png or .jpg) and paste it here with the source Direct URL.")
@@ -184,6 +185,17 @@ class OpacView(SectionView):
             yield from _row(t("Default theme"), Select([(t(v), k) for k, v in ot.THEMES.items()],
                                                        value=c["default_theme"], allow_blank=False,
                                                        id="o-default_theme"))
+        with Vertical(id="o-header", classes="opac-box"):
+            yield Static(t("The header at the top of every OPAC page: the top bar (logo, cart, lists and "
+                           "login), then the search bar. Large: a taller header with the Header picture "
+                           "covering all of it (without a picture, the two colours), the bar and the search "
+                           "over it in white."), classes="ai-note", markup=False)
+            yield from _row(t("Top bar"), Switch(c["header_bar"], id="o-header_bar"))
+            yield from _row(t("Header style"), Select([(t(v), k) for k, v in ot.HEADER_STYLES.items()],
+                                                      value=c["header_style"], allow_blank=False,
+                                                      id="o-header_style"))
+            yield from _row(t("Header height"), Slider(*ot.RANGES["header_height"], c["header_height"], step=10,
+                                                       unit="px", id="o-header_height"))
         car = c["carousel"]
         with Vertical(id="o-carousel", classes="opac-box"):
             yield Static(t("The newest titles with a copy on the shelf and a real cover, or a Koha list, rebuilt "
@@ -269,6 +281,10 @@ class OpacView(SectionView):
             yield from _row(t("Contrast"), Select([(t(v), k) for k, v in ot.STAFF_CONTRAST.items()],
                                                   value=st["contrast"], allow_blank=False, id="o-staff-contrast"))
             yield from _row(t("Text size"), Slider(*ot.STAFF_FONT, st["font"], unit="%", id="o-staff-font"))
+            yield from _row(t("Light/dark switch"),
+                            _tip(Switch(st["dark_switch"], id="o-staff-dark_switch"),
+                                 "A light/dark button in the staff top bar; each person's choice is kept in "
+                                 "their browser."))
             yield from _style_rows("o-staff-style", st)
         for side, (box, _title) in LOGIN_BOXES.items():
             lg = c["login"][side]
@@ -307,8 +323,7 @@ class OpacView(SectionView):
                                                   placeholder=t("Library news")))
                 yield from _row(t("Text (HTML)"), TextArea(nw["html"], id=f"{box}-html", classes="o-html"))
                 yield Static(t("Buttons under the text: the text on the button and the address it "
-                               "opens. Add as many as you need (at most ${n}); ✕ removes one.",
-                               n=str(ot.MAX_NEWS_BUTTONS)), classes="ai-note", markup=False)
+                               "opens. Add as many as you need; ✕ removes one."), classes="ai-note", markup=False)
                 yield Vertical(id=f"{box}-btns", classes="link-rows")
                 with Horizontal(classes="quick-actions"):
                     yield Button(t("Add a button"), id=f"{box}-badd", classes="small")
@@ -368,9 +383,6 @@ class OpacView(SectionView):
 
     def add_news_button(self, box: str, item: dict | None = None) -> None:
         rows = self.query_one(f"#{box}-btns", Vertical)
-        if len(rows.children) >= ot.MAX_NEWS_BUTTONS:
-            self.app.notify(t("At most ${n} buttons.", n=str(ot.MAX_NEWS_BUTTONS)), severity="warning")
-            return
         item = item or {"text": "", "url": ""}
         self.link_rows += 1
         n = self.link_rows
@@ -473,6 +485,9 @@ class OpacView(SectionView):
         for name in ot.ASSETS:
             q(f"#o-src-{name}", Select).value = cfg[name]["source"]
             q(f"#o-val-{name}", Input).value = cfg[name]["url"]
+        q("#o-header_bar", Switch).value = cfg["header_bar"]
+        q("#o-header_style", Select).value = cfg["header_style"]
+        q("#o-header_height", Slider).value = cfg["header_height"]
         q("#o-dark_switch", Switch).value = cfg["dark_switch"]
         q("#o-default_theme", Select).value = cfg["default_theme"]
         car = cfg["carousel"]
@@ -541,6 +556,7 @@ class OpacView(SectionView):
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
         q("#o-staff-header_glass", Switch).value = st["header_glass"]
+        q("#o-staff-dark_switch", Switch).value = st["dark_switch"]
         for key in ot.STAFF_HEADER:
             q(f"#o-staff-{key}", Slider).value = st[key]
 
@@ -553,6 +569,9 @@ class OpacView(SectionView):
                "surface": q("#o-surface", Input).value,
                "page": q("#o-page", Input).value if q("#o-page-on", Switch).value else "",
                "dark_switch": q("#o-dark_switch", Switch).value,
+               "header_bar": q("#o-header_bar", Switch).value,
+               "header_style": q("#o-header_style", Select).value,
+               "header_height": q("#o-header_height", Slider).value,
                "default_theme": q("#o-default_theme", Select).value,
                "carousel": {"enabled": q("#o-car-enabled", Switch).value, "title": q("#o-car-title", Input).value,
                             "autoplay": q("#o-car-autoplay", Switch).value, "speed": q("#o-speed", Slider).value,
@@ -576,6 +595,7 @@ class OpacView(SectionView):
                          "card_padding": q("#o-staff-card_padding", Slider).value,
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
+                         "dark_switch": q("#o-staff-dark_switch", Switch).value,
                          **{key: q(f"#o-staff-style-{key}", Select).value for key in ot.STYLE},
                          **{key: q(f"#o-staff-{key}", Slider).value for key in (*ot.STAFF_MATERIAL, *ot.STAFF_HEADER)}}}
         for key in SLIDERS:
@@ -586,7 +606,9 @@ class OpacView(SectionView):
         raw["news"] = {side: {"enabled": q(f"#{box}-enabled", Switch).value,
                               "title": q(f"#{box}-title", Input).value.strip(),
                               "html": q(f"#{box}-html", TextArea).text,
-                              "buttons": self.collect_news_buttons(box)}
+                              "buttons": self.collect_news_buttons(box),
+                              # The library's own news item the box shows (0: the panel's own).
+                              "koha_id": self.cfg["news"][side]["koha_id"]}
                        for side, (box, _title) in NEWS_BOXES.items()}
         for side, (_box, title) in NEWS_BOXES.items():
             problem = _news_problem(raw["news"][side])
@@ -909,14 +931,16 @@ def _fold(text: str) -> str:
 
 def _credits_parse(text: str) -> tuple[dict, list[dict], str]:
     """(fields, other links, problem) from the credits text: "Field: value"
-    lines (the label in English, in the panel's language or the key) and
-    "text | address" lines."""
+    lines (the label in English, in the panel's language or the key),
+    "text | address" lines, and plain lines: the first is the library's name
+    when there is none, the others go into the note."""
     names = {}
     for key, (label, _hint, _size) in CREDIT_FIELDS.items():
         for name in (key, label, t(label)):
             names[_fold(name)] = key
     fields = {key: "" for key in CREDIT_FIELDS}
-    link_lines = []
+    link_lines: list[str] = []
+    extra: list[str] = []
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -931,10 +955,17 @@ def _credits_parse(text: str) -> tuple[dict, list[dict], str]:
             fields[key] = value
         elif "|" in line:
             link_lines.append(line)
+        elif not fields["name"]:
+            # A line without a known field name: the first is the library's
+            # name, the others join the note (Paulo, 2026-10-31).
+            fields["name"] = line[:CREDIT_FIELDS["name"][2]]
         else:
-            return fields, [], t("${line}: start the line with a field name and a colon (for example "
-                                 "${example}), or write text | address for a link.",
-                                 line=line, example=t("Phone") + ": (00) 0000-0000")
+            extra.append(line)
+    if extra:
+        note = " · ".join(([fields["note"]] if fields["note"] else []) + extra)
+        if len(note) > CREDIT_FIELDS["note"][2]:
+            return fields, [], t("${name}: at most ${n} characters.", name=t("Note"), n=str(CREDIT_FIELDS["note"][2]))
+        fields["note"] = note
     links, problem = _credit_links("\n".join(link_lines))
     return fields, links, problem
 
@@ -965,8 +996,6 @@ def _news_problem(raw: dict) -> str:
                      name=b["text"] or t("Button address"))
         if bool(b["text"]) != bool(b["url"]):
             return t("A button needs its text and its address.")
-    if len(raw["buttons"]) > ot.MAX_NEWS_BUTTONS:
-        return t("At most ${n} buttons.", n=str(ot.MAX_NEWS_BUTTONS))
     if raw["enabled"] and not raw["title"]:
         return t("A news item needs its title.")
     if raw["enabled"] and not (raw["html"].strip() or raw["buttons"]):

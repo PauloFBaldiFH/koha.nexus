@@ -34,7 +34,7 @@ def test_normalize_clamps_and_drops():
     car = cfg["carousel"]
     assert (car["speed"], car["count"], car["hover"]) == (2000, 24, "lift")
     assert car["title"] == "bNew/b" and car["amazon_tag"] == ""
-    assert cfg["ghost"] == {"rss": False, "cart_badge": True, "community": True, "empty_columns": True}
+    assert cfg["ghost"] == {"rss": False, "cart_badge": True, "cart": False, "community": True, "empty_columns": True}
     assert "extra" not in cfg
 
 
@@ -816,8 +816,9 @@ def test_news_single_button_of_1_5_53_is_kept():
     cfg = ot.normalize({"news": {"opac": {"enabled": True, "title": "T", "button_text": "Ir",
                                           "button_url": "https://example.org"}}})
     assert cfg["news"]["opac"]["buttons"] == [{"text": "Ir", "url": "https://example.org"}]
-    many = [{"text": f"B{i}", "url": "https://example.org"} for i in range(10)]
-    assert len(ot.normalize({"news": {"opac": {"buttons": many}}})["news"]["opac"]["buttons"]) == ot.MAX_NEWS_BUTTONS
+    # No limit on the number of buttons (Paulo, 2026-10-31).
+    many = [{"text": f"B{i}", "url": "https://example.org"} for i in range(15)]
+    assert len(ot.normalize({"news": {"opac": {"buttons": many}}})["news"]["opac"]["buttons"]) == 15
 
 
 def test_news_items_for_each_side():
@@ -910,3 +911,57 @@ def test_style_details():
     # Copy OPAC preset brings the style details along.
     copied, _ = ot.copy_opac_to_staff(cfg)
     assert {k: copied["staff"][k] for k in picks} == picks
+
+
+def test_paulo_1031_header_cart_motion_shadow_staff_dark():
+    """Paulo, 2026-10-31: top bar on/off and a large header under a picture,
+    the whole cart hidden, only the buttons move on hover (not the news
+    block), short carousel shadows, and a light/dark switch on the staff side."""
+    plain = ot.css_body(ot.normalize({}))
+    assert "#header-region > nav.navbar { display: none" not in plain and "Large header" not in plain
+    cfg = ot.normalize({"header_bar": False, "header_style": "large", "header_height": 9999,
+                        "header": {"source": "url", "url": "https://example.org/h.jpg"},
+                        "ghost": {"cart": True}, "motion": "lively"})
+    assert cfg["header_height"] == 520
+    css = ot.css_body(cfg)
+    assert "#header-region > nav.navbar { display: none !important; }" in css
+    assert 'url("https://example.org/h.jpg") center / cover no-repeat' in css and "min-height: 520px" in css
+    assert "#cartmenulink" in css and ".addtocart" in css
+    # Without a picture the large header takes the two colours.
+    assert "linear-gradient(135deg, var(--kei-accent), var(--kei-accent2))" in ot.css_body(
+        ot.normalize({"header_style": "large"}))
+    lively = ot.style_css(cfg, "opac")
+    assert ".newsitem:hover" not in lively and "#opacmainuserblock:hover" not in lively
+    assert "a.btn-acesso:hover" in lively and ".btn:hover" in lively
+    car = ot.css_block(ot.normalize({"carousel": {"mode": "coverflow"}}))
+    assert "0 24px 40px" not in car and "0 18px 30px" not in car and "0 18px 36px" not in car
+    # The staff switch: CSS and script only with the staff colours on.
+    off = ot.normalize({"staff": {"dark_switch": True}})
+    assert not ot.staff_dark(off) and not ot.staff_js_on(off)
+    on = ot.normalize({"staff": {"enabled": True, "dark_switch": True}})
+    assert ot.staff_dark(on) and ot.staff_js_on(on)
+    assert 'html[data-kei-theme="dark"]' in ot.staff_css_block(on)
+    js = ot.staff_js_block(on)
+    assert "kei-theme-switch" in js and '"dark_switch": true' in js and "kei_staff_theme" in js
+    work = ot.write_apply_dir(on, {})
+    try:
+        assert (work / "staff.js").exists()
+    finally:
+        shutil.rmtree(work)
+
+
+def test_library_news_item_comes_back_with_its_buttons():
+    content = ('<style>.btn-acesso{display:block}</style>\n'
+               '<p>Olá</p><a href="/cgi-bin/koha/opac-page.pl?page_id=5" class="btn-acesso">📖 Sobre</a> '
+               '<a href="https://example.org/x" class="btn-acesso" target="_blank">Site</a> '
+               '<a href="/plain">plain link</a>')
+    live = {"news-opac": {"id": 9, "own": True, "title": "Bem-vindo", "content": content}}
+    got, notes, in_koha = ot.sync_settings({"live_contents": json.dumps(live)})
+    nw = got["news"]["opac"]
+    assert in_koha and nw["koha_id"] == 9 and nw["title"] == "Bem-vindo"
+    assert [b["text"] for b in nw["buttons"]] == ["📖 Sobre", "Site"]
+    assert "Olá" in nw["html"] and "plain link" in nw["html"] and "btn-acesso" not in nw["html"]
+    assert any("news item ${id}" in n for n, _v in notes)
+    # Apply writes the id so the installer updates item 9 in place.
+    markup = ot.contents(got)["news-opac"]
+    assert markup.splitlines()[:2] == ["<!-- kei-news-title: Bem-vindo -->", "<!-- kei-news-id: 9 -->"]

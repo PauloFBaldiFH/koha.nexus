@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.137"
+PANEL_VERSION=" 1.5.138"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -36209,26 +36209,47 @@ opac_contents_live() {
 
 # opac_contents_ours: the panel's own entries in Koha now (login
 # instructions, credits and news, code kei-PLACE, shown today), as one
-# base64 line of the JSON {PLACE: {"title": ..., "content": ...}}. Fails when Koha has no
+# base64 line of the JSON {PLACE: {"title": ..., "content": ...}}. A side
+# without a news item of the panel gets the library's own newest news item
+# shown there today ({"id": N, "own": true, ...}): the panel's news box
+# shows it and Apply updates it in place. Fails when Koha has no
 # localizations table or the database cannot be read.
 opac_contents_ours() {
-    local rows
+    local rows news
     opac_contents_supported || return 1
     rows=$(mysql --default-character-set=utf8mb4 -N -B -e "SELECT c.code, IFNULL(l.title, ''), IFNULL(l.content, '')
         FROM ${DB_NAME}.additional_contents c
         JOIN ${DB_NAME}.additional_contents_localizations l ON l.additional_content_id = c.id
         WHERE c.code IN ('kei-OpacLoginInstructions', 'kei-StaffLoginInstructions', 'kei-opaccredits', 'kei-news-opac', 'kei-news-staff')
         AND l.lang = 'default' AND (c.expirationdate IS NULL OR c.expirationdate >= CURDATE()) ORDER BY c.id;" 2>/dev/null) || return 1
-    printf '%s\n' "$rows" | python3 -I -c '
+    news=$(mysql --default-character-set=utf8mb4 -N -B -e "SELECT c.id, c.location, IFNULL(l.title, ''), IFNULL(l.content, '')
+        FROM ${DB_NAME}.additional_contents c
+        JOIN ${DB_NAME}.additional_contents_localizations l ON l.additional_content_id = c.id
+        WHERE c.category = 'news' AND c.code NOT LIKE 'kei-%' AND c.location IN ('opac_only', 'staff_only', 'staff_and_opac')
+        AND l.lang = 'default' AND (c.published_on IS NULL OR c.published_on <= CURDATE())
+        AND (c.expirationdate IS NULL OR c.expirationdate >= CURDATE())
+        ORDER BY c.published_on DESC, c.id DESC;" 2>/dev/null) || news=""
+    { printf '%s\n' "$rows" | sed 's/^/K\t/'; printf '%s\n' "$news" | sed 's/^/N\t/'; } | python3 -I -c '
 import base64, json, re, sys
 # mysql --batch writes tab, newline, backslash and NUL as \t \n \\ \0.
 esc = {"n": "\n", "t": "\t", "0": "\0", "\\": "\\"}
 un = lambda s: re.sub(r"\\(.)", lambda m: esc.get(m.group(1), m.group(1)), s)
-out = {}
+out, news = {}, []
 for line in sys.stdin.read().split("\n"):
     parts = line.split("\t")
-    if len(parts) == 3 and parts[0].startswith("kei-"):
-        out[parts[0][4:]] = {"title": un(parts[1]), "content": un(parts[2])}
+    if len(parts) == 4 and parts[0] == "K" and parts[1].startswith("kei-"):
+        out[parts[1][4:]] = {"title": un(parts[2]), "content": un(parts[3])}
+    elif len(parts) == 5 and parts[0] == "N" and parts[1].isdigit():
+        news.append((int(parts[1]), parts[2], un(parts[3]), un(parts[4])))
+taken = set()
+for place, where in (("news-opac", ("opac_only", "staff_and_opac")), ("news-staff", ("staff_only", "staff_and_opac"))):
+    if place in out:
+        continue
+    for nid, loc, title, content in news:
+        if loc in where and nid not in taken:
+            out[place] = {"id": nid, "own": True, "title": title, "content": content}
+            taken.add(nid)
+            break
 # base64: the protocol line turns any "\\n" of the value into a new line.
 print(base64.b64encode(json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).decode("ascii"))'
 }
@@ -36301,7 +36322,7 @@ opac_contents_sql() {
 # Its title is on the first line of the file (<!-- kei-news-title: ... -->).
 # The library's own news are never touched.
 opac_news_sql() {
-    local dir="$1" loc="$2" state="$3" log="$4" where title f
+    local dir="$1" loc="$2" state="$3" log="$4" where title f id body
     case "$loc" in
         news-opac)  where=opac_only ;;
         news-staff) where=staff_only ;;
@@ -36314,10 +36335,21 @@ opac_news_sql() {
     fi
     f="$dir/contents/$loc.html"
     title=$(sed -n '1s/^<!-- kei-news-title: \(.*\) -->$/\1/p' "$f")
+    id=$(sed -n '2s/^<!-- kei-news-id: \([0-9]\{1,9\}\) -->$/\1/p' "$f")
+    body=$(sed -e '1{/^<!-- kei-news-title: .* -->$/d}' -e '/^<!-- kei-news-id: [0-9]* -->$/d' "$f")
+    # The library's own news item the panel's box showed: updated in place
+    # (its title and its default text), never a second item next to it.
+    if [ -n "$id" ] && [ "$(mysql -N -B -e "SELECT COUNT(*) FROM ${DB_NAME}.additional_contents WHERE id = $id
+            AND category = 'news' AND code NOT LIKE 'kei-%';" 2>/dev/null)" = "1" ]; then
+        printf "INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (%s, %s, %s, 'default') ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content);\n" \
+            "$id" "$(sql_quote "$title")" "$(sql_quote "$body")"
+        printf 'news: %s written into the library news item %s\n' "$loc" "$id" >> "$log"
+        return 0
+    fi
     printf "INSERT INTO additional_contents (category, code, location, branchcode, published_on, number) VALUES ('news', %s, %s, NULL, CURDATE(), 0);\n" \
         "$(sql_quote "kei-$loc")" "$(sql_quote "$where")"
     printf "INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (LAST_INSERT_ID(), %s, %s, 'default');\n" \
-        "$(sql_quote "$title")" "$(sql_quote "$(sed '1{/^<!-- kei-news-title: .* -->$/d}' "$f")")"
+        "$(sql_quote "$title")" "$(sql_quote "$body")"
     printf 'news: %s written (%s)\n' "$loc" "$where" >> "$log"
 }
 
@@ -36426,7 +36458,7 @@ opac_theme_apply() {
     fi
     for f in "$dir"/assets/*; do
         [ -e "$f" ] || continue
-        if [[ ! "${f##*/}" =~ ^kei-(staff-)?(background|logo|favicon|login)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
+        if [[ ! "${f##*/}" =~ ^kei-(staff-)?(background|logo|favicon|login|header)\.(png|jpg|gif|webp|ico)$ ]] || [ -L "$f" ] || [ ! -f "$f" ]; then
             msg_error "" "$(t "The OPAC appearance files from the panel are missing or damaged. Nothing was changed.")"
             return 1
         fi
@@ -36591,7 +36623,8 @@ try:
     live = json.loads(base64.b64decode(live).decode("utf-8")) if live else {}
 except ValueError:
     live = {}
-contents = {loc: (v.get("content") or "") for loc, v in live.items() if isinstance(v, dict)}
+# The library's own news items the panel shows ("own") are not the panel's.
+contents = {loc: (v.get("content") or "") for loc, v in live.items() if isinstance(v, dict) and not v.get("own")}
 if not blocks and not any(contents.values()):
     sys.exit(3)
 m = re.search(r"/\*\s*KEI-THEME-DATA:\s*(\{.*?\})\s*\*/", blocks.get("OpacUserCSS", ""), re.S)
