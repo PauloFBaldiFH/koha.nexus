@@ -22,6 +22,16 @@ async def _until(pilot, cond, wait=8.0):
     assert cond()
 
 
+async def _open_opac(pilot):
+    """Open the appearance card and pass its gate: Sync with the instance,
+    then the fields (Paulo, 2026-10-31: they always come from Koha)."""
+    await pilot.press("o")
+    await pilot.pause(0.2)
+    view = pilot.app.screen.query_one("#view-opac")
+    assert not view.query_one("#o-material").display        # nothing before the instance is read
+    view.query_one("#o-gate-sync").press()
+    await _until(pilot, lambda: view.query_one("#o-material").display)
+
 def test_colour_picker_bars_and_code():
     from textual.app import App
 
@@ -101,7 +111,7 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(150, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             await pilot.pause(0.3)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
@@ -169,7 +179,8 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
             await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
             assert "back to Koha's own look" in app.screen._body
             await pilot.press("escape")
-            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "frosted")
+            # Koha's own look again, read from the instance.
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == ot.KOHA_OWN["texture"])
 
     asyncio.run(main())
 
@@ -202,7 +213,7 @@ def test_settings_come_back_from_koha(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(150, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "gradient")
             assert view.query_one("#o-accent", Input).value == "#ff0066"
@@ -232,9 +243,11 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+            # Koha's own look has no carousel: turned on here.
+            view.query_one("#o-car-enabled", Switch).value = True
             view.query_one("#o-car-mode", Select).value = "coverflow"
             view.query_one("#o-surface", Input).value = "#1e293b"
             view.query_one("#o-page-on", Switch).value = True
@@ -315,7 +328,7 @@ def test_order_layout_metal_and_staff_buttons(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
             view.query_one("#o-links-enabled", Switch).value = True
@@ -386,7 +399,7 @@ def test_sync_reads_what_is_live_in_koha(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(150, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "smooth")
             view.query_one("#o-texture", Select).value = "metal"
@@ -426,7 +439,7 @@ def test_restore_makes_the_screen_read_koha_again(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "gradient")
             await _until(pilot, lambda: len(view.query_one("#o-newsitem-opac-btns").children) == 1)
@@ -444,7 +457,7 @@ def test_restore_makes_the_screen_read_koha_again(monkeypatch):
             assert view.query_one("#o-newsitem-opac-title", Input).value == "Typed"
             await pilot.press("d")
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             await _until(pilot, lambda: view.query_one("#o-newsitem-opac-title", Input).value == "Antes")
             assert view.query_one("#o-staff-paint-accent-texture", Select).value == "auto"
             # A restore brought another look into Koha.
@@ -454,7 +467,7 @@ def test_restore_makes_the_screen_read_koha_again(monkeypatch):
             await pilot.press("d")
             app.restores = getattr(app, "restores", 0) + 1
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "metal")
             await _until(pilot, lambda: view.query_one("#o-newsitem-opac-title", Input).value == "Depois")
             await _until(pilot, lambda: [r.query_one(".link-text", Input).value
@@ -465,7 +478,7 @@ def test_restore_makes_the_screen_read_koha_again(monkeypatch):
             await _until(pilot, lambda: isinstance(app.screen, TextScreen))
             assert "Nothing of the panel's look is in Koha" in app.screen._text
             await pilot.press("escape")
-            assert view.query_one("#o-texture", Select).value == ot.DEFAULTS["texture"]
+            assert view.query_one("#o-texture", Select).value == ot.KOHA_OWN["texture"]
             assert not view.query_one("#o-newsitem-opac-enabled", Switch).value
             assert "Not applied" in str(view.query_one("#o-summary").render())
 
@@ -490,7 +503,7 @@ def test_staff_material_and_copy_opac_preset(monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             q = view.query_one
             await _until(pilot, lambda: "Not applied" in str(q("#o-summary").render()))
@@ -558,7 +571,7 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             box = view.query_one("#o-cr-text", TextArea)
             await _until(pilot, lambda: "Library name: Biblioteca Municipal" in box.text)
@@ -626,7 +639,7 @@ def test_corner_help_postimages_and_news(monkeypatch):
         app.copy_to_clipboard = lambda text, quiet=False: copied.append(text)
         async with app.run_test(size=(160, 50)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("o")
+            await _open_opac(pilot)
             view = app.screen.query_one("#view-opac")
             for wid in ("#o-radius_block", "#o-staff-radius_button"):
                 assert "border-radius" in str(view.query_one(wid, Slider).tooltip)

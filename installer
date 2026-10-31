@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.140"
+PANEL_VERSION=" 1.5.141"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -36433,13 +36433,13 @@ opac_theme_sync() {
         text=$(opac_pref_raw "$pref")
         if printf '%s\n' "$text" | grep -qxF -e "$OPAC_BEGIN"; then kei_result "block_$pref" yes; else kei_result "block_$pref" no; fi
         kei_result "own_$pref" "$(printf '%s\n' "$text" | opac_own_lines)"
-        # The stylesheets as Koha holds them now: their colours, opacity,
-        # corners and pictures win over the settings line (someone may have
-        # edited them in Koha). Base64: one protocol line.
+        # The stylesheets as Koha holds them now, whole (our block and the
+        # library's own CSS): their colours, opacity, corners and pictures
+        # are the base of the panel's fields. Base64: one protocol line.
         case "$pref" in
             OpacUserCSS|IntranetUserCSS)
-                line=$(printf '%s\n' "$text" | opac_block_in | base64 -w0)
-                [ -n "$line" ] && kei_result "css_$pref" "$line" ;;
+                line=$(printf '%s\n' "$text" | base64 -w0)
+                [ -n "${text//[[:space:]]/}" ] && kei_result "css_$pref" "$line" ;;
         esac
         case "$pref" in
             OpacUserJS|IntranetUserJS)
@@ -36452,6 +36452,11 @@ opac_theme_sync() {
         line=$(python3 -I -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8")).get("settings") or {}))' \
             "$THEME_STATE" 2>/dev/null) && [ -n "$line" ] && kei_result state "$line"
     fi
+    # The favicons Koha shows now.
+    for pref in OpacFavicon IntranetFavicon; do
+        line=$(opac_pref_raw "$pref" | head -n1)
+        [ -n "$line" ] && kei_result "pref_$pref" "$line"
+    done
     main=$(opac_mainblock_raw)
     if [ -n "${main//[[:space:]]/}" ]; then kei_result mainblock yes; else kei_result mainblock no; fi
     kei_result mainblock_buttons "$(printf '%s\n' "$main" | grep -o '\[kei-button' | wc -l)"

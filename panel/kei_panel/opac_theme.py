@@ -836,6 +836,77 @@ def css_values(css: str, staff: bool = False) -> dict:
     return out
 
 
+# Koha 26's own look (opac.scss, staff _variables.scss), the base of the
+# fields when none of the panel's look is in Koha: the OPAC's green buttons
+# ($base-theme-color), the staff's green ($background-color-primary),
+# white blocks, solid and square-ish like Koha draws them.
+KOHA_OWN = {"texture": "flat", "opacity": 100, "blur": 0, "accent": "#548300", "accent2": "#3f6200",
+            "surface": "#ffffff", "page": "", "radius_block": 0, "radius_input": 4, "radius_button": 4,
+            "dark_switch": False, "carousel": {"enabled": False}, "ghost": {"rss": False, "cart_badge": False,
+                                                                             "community": False, "empty_columns": False},
+            "staff": {"enabled": False, "accent": "#408540", "accent2": "#2f6b2f", "surface": "#ffffff",
+                      "texture": "flat", "opacity": 100, "radius_block": 4, "radius_input": 4, "radius_button": 4}}
+
+
+def split_block(text: str) -> tuple[str, str]:
+    """(the panel's block, the library's own lines) of a preference."""
+    block, own, inside = [], [], False
+    for line in (text or "").replace("\r", "").split("\n"):
+        if line.strip() == CSS_BEGIN:
+            inside = True
+        elif line.strip() == CSS_END:
+            inside = False
+        elif inside:
+            block.append(line)
+        else:
+            own.append(line)
+    return "\n".join(block), "\n".join(own)
+
+
+_HEX = r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b"
+
+
+def _hex6(value: str) -> str:
+    value = value.lower()
+    return "#" + "".join(c * 2 for c in value[1:]) if len(value) == 4 else value
+
+
+def own_css_values(css: str, staff: bool = False) -> dict:
+    """What the library's own CSS (written by hand in Koha, outside the
+    panel's block) says of the fields: the panel's variables if it uses
+    them, the main buttons' colour (accent), the page's colour or picture,
+    the content's background (blocks), the logo. The last rule wins, as in
+    the browser."""
+    css = re.sub(r"/\*.*?\*/", "", css or "", flags=re.S)
+    out: dict = {}
+    names = _STAFF_CSS_VARS if staff else _CSS_VARS
+    for name, value in re.findall(r"(--[\w-]+)\s*:\s*([^;}]+)", css):
+        key, kind = names.get(name, (None, None))
+        value = value.strip()
+        if kind == "hex" and re.fullmatch(_HEX, value):
+            out[key] = _hex6(value)
+        elif kind == "alpha" and re.fullmatch(r"[0-9.]+", value):
+            out[key] = round(float(value) * 100)
+        elif kind == "px" and re.fullmatch(r"[0-9.]+px", value):
+            out[key] = round(float(value[:-2]))
+    for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        sels = [x.strip().lower() for x in selectors.split(",")]
+        colour = re.search(r"background(?:-color)?\s*:[^;]*?(" + _HEX + ")", body)
+        picture = re.search(r"background(?:-image)?\s*:[^;]*?url\(\s*['\"]?([^'\")\s]+)", body)
+        if any(x.endswith(".btn-primary") for x in sels) and colour:
+            out["accent"] = _hex6(colour.group(1))
+        if any(x in ("body", "html body", "html") for x in sels):
+            if picture and not staff:
+                out["background"] = picture.group(1)
+            elif colour:
+                out["page"] = _hex6(colour.group(1))
+        if any(x in (".main", "#main", "html body .main") for x in sels) and colour:
+            out["surface"] = _hex6(colour.group(1))
+        if not staff and any("#logo" in x for x in sels) and picture:
+            out["logo"] = picture.group(1)
+    return out
+
+
 def _css_overlay(cfg: dict, found: dict[str, str]) -> tuple[dict, list[str]]:
     """cfg with what the stylesheets in Koha say now (css_values()), and the
     names of the settings that differed from the settings line."""
@@ -846,11 +917,20 @@ def _css_overlay(cfg: dict, found: dict[str, str]) -> tuple[dict, list[str]]:
         if not text:
             continue
         try:
-            css = base64.b64decode(text, validate=True).decode("utf-8", "replace")
+            whole = base64.b64decode(text, validate=True).decode("utf-8", "replace")
         except ValueError:
             continue
+        block, own = split_block(whole)
         place = raw["staff"] if staff else raw
-        for key, value in css_values(css, staff).items():
+        # The library's own CSS first, the panel's block after it (it comes
+        # last in Koha, so it wins where both say something).
+        values = {**own_css_values(own, staff), **css_values(block, staff)}
+        for key, value in values.items():
+            if key == "page":
+                if place.get("page") != value:
+                    place["page"] = value
+                    changed.append(("staff " if staff else "") + key)
+                continue
             if key in ("logo", "background"):
                 if value != place[key]["url"]:
                     # https: a direct address; a path: a file published on this server.
@@ -864,6 +944,12 @@ def _css_overlay(cfg: dict, found: dict[str, str]) -> tuple[dict, list[str]]:
                 changed.append(("staff " if staff else "") + key)
         if staff and found.get("block_IntranetUserCSS") == "yes":
             raw["staff"]["enabled"] = True
+    # The favicons Koha shows now (preferences OpacFavicon, IntranetFavicon).
+    for pref, place, name in (("OpacFavicon", raw, "favicon"), ("IntranetFavicon", raw["staff"], "staff favicon")):
+        url = safe_url(found.get(f"pref_{pref}", ""))
+        if url and url != place["favicon"]["url"]:
+            place["favicon"] = {"source": "url" if url.startswith("https://") else "local", "url": url}
+            changed.append(name)
     return normalize(raw), changed
 
 
@@ -899,22 +985,26 @@ def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict
                 raw = _from_script(opac_js) if opac_js else {}
                 if staff_js and isinstance(staff_js.get("links"), dict):
                     raw["staff_links"] = {**staff_js["links"], "enabled": True}
-                cfg = normalize(raw)
+                cfg = normalize({**KOHA_OWN, **raw})
                 notes.append(("Settings: rebuilt from the panel's scripts in Koha (buttons, carousel, "
-                              "light/dark); colours and pictures stay as on this screen.", {}))
-    if cfg is None and (found.get("css_OpacUserCSS") or found.get("css_IntranetUserCSS")):
-        # Our block without its settings line (edited by hand in Koha):
-        # what its stylesheet still says.
-        base, changed = _css_overlay(normalize({}), found)
+                              "light/dark); colours and pictures from the stylesheets in Koha.", {}))
+    # The panel's look is in Koha: its settings, or at least its block.
+    look = cfg is not None or yes["OpacUserCSS"] or yes["IntranetUserCSS"]
+    if cfg is None:
+        # Nothing of the panel's settings: the base is Koha's own look, and
+        # over it what the stylesheets in Koha say (the library's own CSS,
+        # a block of ours without its settings line), never the panel's
+        # factory settings.
+        cfg, changed = _css_overlay(normalize(KOHA_OWN), found)
         if changed:
-            cfg = base
-            notes.append(("Settings: rebuilt from the panel's stylesheet in Koha (no settings line).", {}))
-    elif cfg is not None:
+            notes.append(("Read from the stylesheets and preferences in Koha: ${names}.",
+                          {"names": ", ".join(changed)}))
+    else:
         cfg, changed = _css_overlay(cfg, found)
         if changed:
             notes.append(("Edited in Koha's stylesheets, read from there: ${names}.",
                           {"names": ", ".join(changed)}))
-    look = in_koha = cfg is not None
+    in_koha = look
     try:
         live = live_contents(found, text)
     except Exception as e:      # noqa: BLE001 (one unreadable entry must not cost the rest of the look)
@@ -926,17 +1016,16 @@ def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict
         on = (any(login_on(lg) for lg in extra["login"].values()) or credits_on(extra["credits"])
               or any(news_on(n) for n in extra["news"].values()))
         in_koha = in_koha or on
-        cfg = normalize({**(cfg or {}), **extra})
+        cfg = normalize({**cfg, **extra})
         notes += more
     else:
         extra = parse_contents(found.get("contents_settings", ""))
-        if cfg is not None and extra:
+        if look and extra:
             cfg = normalize({**cfg, **extra})
             notes.append(("Login instructions and footer credits: read from theme-settings.json.", {}))
     if not in_koha:
-        cfg = normalize({})
-        notes.insert(0, ("Nothing of the panel's look is in Koha: the fields are back to the defaults "
-                         "(Koha's own look).", {}))
+        notes.insert(0, ("Nothing of the panel's look is in Koha: the fields show Koha's own look and what "
+                         "the library's own CSS and preferences say.", {}))
     if look:
         if not yes["OpacUserCSS"] or not yes["OpacUserJS"]:
             missing = [k for k in ("OpacUserCSS", "OpacUserJS") if not yes[k]]
