@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
-"""Z39 Atlas: passive, public Z39.50 discovery + allowlisted MARC verification.
+"""Z39 Atlas: passive, public Z39.50 discovery + MARC verification.
 
-No Internet-wide network sweeping, authentication guessing, or access-control bypass.
-Python >= 3.10, standard library. Optional dependency: yaz-client.
+Active tests go only to endpoints in an operator allowlist (`probe`), or,
+with `auto-discover --published`, to the complete host:port/database
+endpoints that public HTTPS documents themselves publish (recorded in the
+auto_allowed table for audit). No Internet-wide network sweeping, port
+guessing on published hosts, authentication guessing, or access-control
+bypass. Python >= 3.10, standard library. Optional dependency: yaz-client.
+
+The koha.nexus panel ships an identical copy as panel/kei_panel/z39atlas.py
+(a panel test compares them): edit both.
 """
 from __future__ import annotations
 
@@ -20,6 +27,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -55,6 +63,11 @@ FIELD_RX = {
     'database': re.compile(r'(?i)(?:database(?:\s*name)?|base\s*(?:de\s*dados)?|db\s*name)\s*[:=]\s*([a-z0-9_.+-]+)'),
 }
 ISO_MARC_TYPES_BIB = set('acdefgijkmoprt')
+YAZ_MISSING = ('yaz-client is not installed, so no server can be tested. Install it first '
+               '(Debian/Ubuntu: sudo apt install yaz), then start again.')
+# Exit codes of auto-discover the panel tells apart.
+EXIT_NO_YAZ = 3
+EXIT_ALREADY_RUNNING = 4
 LOCK = threading.Lock()
 
 
@@ -97,7 +110,8 @@ def key_for(host: str, port: int | None, database: str) -> str:
 
 def init_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(path), timeout=30)
+    # Probe workers write from their threads, always under one lock.
+    con = sqlite3.connect(str(path), timeout=30, check_same_thread=False)
     con.execute('PRAGMA journal_mode=WAL')
     con.execute('PRAGMA busy_timeout=10000')
     con.executescript('''
@@ -117,6 +131,21 @@ def init_db(path: Path) -> sqlite3.Connection:
         );
         CREATE TABLE IF NOT EXISTS fetch_history (
             url TEXT PRIMARY KEY, status TEXT NOT NULL, checked_at TEXT NOT NULL, detail TEXT NOT NULL DEFAULT ''
+        );
+        -- The one background run (auto-discover): what the panel shows.
+        CREATE TABLE IF NOT EXISTS run_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1), run_id TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'idle', phase TEXT NOT NULL DEFAULT '', pid INTEGER,
+            started_at TEXT, updated_at TEXT, finished_at TEXT,
+            pages_done INTEGER NOT NULL DEFAULT 0, pages_total INTEGER NOT NULL DEFAULT 0,
+            new_candidates INTEGER NOT NULL DEFAULT 0,
+            targets_done INTEGER NOT NULL DEFAULT 0, targets_total INTEGER NOT NULL DEFAULT 0,
+            approved INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', options TEXT NOT NULL DEFAULT ''
+        );
+        -- Endpoints auto-discover --published tested without an allowlist line:
+        -- each one was published, complete, in the public document named here.
+        CREATE TABLE IF NOT EXISTS auto_allowed (
+            candidate_key TEXT PRIMARY KEY, host TEXT NOT NULL, source TEXT NOT NULL, added_at TEXT NOT NULL
         );
     ''')
     con.commit()
@@ -310,12 +339,38 @@ def read_public_page(url: str, domains: set[str], robots: dict, max_bytes=4_000_
         return text, 'html' in content_type, final_url
 
 
-def cmd_harvest(args):
-    sources = list(DEFAULT_SOURCES) if not args.no_defaults else []
-    if args.urls_file:
-        sources.extend(x.strip() for x in Path(args.urls_file).read_text(encoding='utf-8').splitlines()
+def harvest_sources(no_defaults=False, urls_file=None, urls=None) -> list[str]:
+    sources = list(DEFAULT_SOURCES) if not no_defaults else []
+    if urls_file:
+        sources.extend(x.strip() for x in Path(urls_file).read_text(encoding='utf-8').splitlines()
                        if x.strip() and not x.lstrip().startswith('#'))
-    sources.extend(args.url or [])
+    sources.extend(urls or [])
+    return sources
+
+
+def recently_fetched(con, url: str, hours: float | None) -> bool:
+    """True when url was read successfully within `hours` (resume after a crash)."""
+    if not hours:
+        return False
+    row = con.execute("SELECT checked_at FROM fetch_history WHERE url=? AND status='ok'", (url,)).fetchone()
+    if not row:
+        return False
+    try:
+        return dt.datetime.fromisoformat(row[0]) >= dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
+    except ValueError:
+        return False
+
+
+def harvest(con, sources, *, max_pages=60, delay=2.0, max_bytes=4_000_000, follow_links=False,
+            refetch_hours=None, progress=None, should_stop=None, reader=None) -> dict:
+    """Read public HTTPS documentation pages and save the endpoints they publish.
+
+    One request at a time, `delay` seconds between two requests to the same
+    host, robots.txt respected. With refetch_hours, a page read successfully
+    that recently is not read again (a restarted run continues).
+    progress(pages_done, pages_total, new_candidates) is called after each page.
+    """
+    reader = reader or read_public_page
     domains = set()
     for u in sources:
         p = urlparse(u)
@@ -326,20 +381,27 @@ def cmd_harvest(args):
     queue = list(dict.fromkeys(sources))
     seen = set()
     robots = {}
-    found = 0
-    con = init_db(Path(args.db))
+    found = skipped_recent = 0
     last_request = {}
-    while queue and len(seen) < args.max_pages:
+    while queue and len(seen) < max_pages:
+        if should_stop and should_stop():
+            break
         u = queue.pop(0)
         if u in seen or not public_url_ok(u, domains):
             continue
+        if not follow_links and recently_fetched(con, u, refetch_hours):
+            skipped_recent += 1
+            seen.add(u)
+            if progress:
+                progress(len(seen), min(max_pages, len(seen) + len(queue)), found)
+            continue
         seen.add(u)
         host = urlparse(u).hostname.lower()
-        delay = max(0, args.delay - (time.monotonic() - last_request.get(host, 0)))
-        if delay: time.sleep(delay)
+        wait = max(0, delay - (time.monotonic() - last_request.get(host, 0)))
+        if wait: time.sleep(wait)
         last_request[host] = time.monotonic()
         try:
-            raw, is_html, final = read_public_page(u, domains, robots, max_bytes=args.max_bytes)
+            raw, is_html, final = reader(u, domains, robots, max_bytes=max_bytes)
             matches, links = extract_endpoints(raw, is_html)
             with con:
                 for target_host, port, base, excerpt in matches:
@@ -349,7 +411,7 @@ def cmd_harvest(args):
                                ON CONFLICT(url) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,detail=excluded.detail''',
                             (u,'ok',utcnow(),f'endpoints={len(matches)}'))
             LOG.info('Public source %s: %d parsed, %d new total', u, len(matches), found)
-            if args.follow_links:
+            if follow_links:
                 for href in links:
                     newurl = urljoin(final, href).split('#')[0]
                     if public_url_ok(newurl, domains) and newurl not in seen and newurl not in queue:
@@ -360,7 +422,18 @@ def cmd_harvest(args):
                 con.execute('''INSERT INTO fetch_history(url,status,checked_at,detail) VALUES(?,?,?,?)
                                ON CONFLICT(url) DO UPDATE SET status=excluded.status, checked_at=excluded.checked_at,detail=excluded.detail''',
                             (u,'skipped',utcnow(),str(exc)[:300]))
-    print(json.dumps({'pages_visited':len(seen), 'new_candidates':found, 'total_candidates':con.execute('SELECT COUNT(*) FROM candidates').fetchone()[0]},ensure_ascii=False,indent=2))
+        if progress:
+            progress(len(seen), min(max_pages, len(seen) + len(queue)), found)
+    return {'pages_visited':len(seen), 'pages_resumed':skipped_recent, 'new_candidates':found,
+            'total_candidates':con.execute('SELECT COUNT(*) FROM candidates').fetchone()[0]}
+
+
+def cmd_harvest(args):
+    con = init_db(Path(args.db))
+    sources = harvest_sources(args.no_defaults, args.urls_file, args.url)
+    result = harvest(con, sources, max_pages=args.max_pages, delay=args.delay, max_bytes=args.max_bytes,
+                     follow_links=args.follow_links)
+    print(json.dumps(result,ensure_ascii=False,indent=2))
 
 
 def cmd_import(args):
@@ -498,18 +571,14 @@ def candidates_to_probe(con, allowlist, recheck_hours, infer_missing=False, max_
     return list(targets.values())[:max_targets]
 
 
-def cmd_probe(args):
-    if not args.ack_authorized:
-        raise SystemExit('Active tests require --ack-authorized and a host allowlist you control/are permitted to test.')
-    hosts = load_allowlist(args.allowlist)
-    con = init_db(Path(args.db))
-    targets = candidates_to_probe(con,hosts,args.recheck_hours,args.infer_missing,args.max_targets)
-    if not targets:
-        print('No eligible explicitly allowlisted endpoints to test.'); return
-    if not shutil.which('yaz-client'):
-        raise SystemExit('Install YAZ first: sudo apt install yaz')
-    LOG.info('Active testing: %d allowlisted endpoints, max workers=%d',len(targets),args.workers)
-    deadline = time.monotonic() + args.max_hours*3600
+def run_probe(con, targets, *, workers=2, host_interval=10.0, timeout=25, max_hours=24.0,
+              source_tag='', progress=None, should_stop=None) -> dict:
+    """Test targets with yaz_probe: at most `workers` at a time, one at a time
+    per host, `host_interval` seconds between two tests of the same host.
+    Each result is saved as soon as it arrives (checked_at), so a run that
+    stops is continued by candidates_to_probe/published_targets without
+    testing those again. progress(done, total, approved) after each target."""
+    deadline = time.monotonic() + max_hours*3600
     last_host_access = {}
     host_lock = {}
     host_lock_mutex = threading.Lock()
@@ -520,17 +589,17 @@ def cmd_probe(args):
         with host_lock_mutex:
             lock = host_lock.setdefault(host,threading.Lock())
         with lock:
-            pause = max(0,args.host_interval - (time.monotonic()-last_host_access.get(host,0)))
+            pause = max(0,host_interval - (time.monotonic()-last_host_access.get(host,0)))
             if pause: time.sleep(pause)
             last_host_access[host] = time.monotonic()
             try:
-                result = yaz_probe(host,port,base,args.timeout)
+                result = yaz_probe(host,port,base,timeout)
             except (ValueError, RuntimeError, OSError) as exc:
                 result = ('error',None,None,None,None,str(exc)[:240],0)
             with db_lock:
                 now = utcnow()
                 with con:
-                    save_candidate(con,host,port,base,source='inference:allowlisted' if args.infer_missing else '')
+                    save_candidate(con,host,port,base,source=source_tag)
                     con.execute('''UPDATE candidates SET status=?,hits=?,marc_type=?,marc_bytes=?,leader=?,error=?,
                                    latency_ms=?,checked_at=?,updated_at=? WHERE key=?''',
                                 (*result, now, now,key_for(host,port,base)))
@@ -538,14 +607,16 @@ def cmd_probe(args):
             return result[0]
 
     results = {}
+    total = len(targets)
     # At most `workers` outstanding tasks. Stops scheduling at the time budget
-    # instead of enqueuing the entire backlog on day one.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
+    # (or a stop request) instead of enqueuing the entire backlog on day one.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         pending = set()
         items = iter(targets)
         exhausted = False
         while pending or not exhausted:
-            while not exhausted and len(pending) < args.workers and time.monotonic() < deadline:
+            while (not exhausted and len(pending) < workers and time.monotonic() < deadline
+                   and not (should_stop and should_stop())):
                 item = next(items, None)
                 if item is None:
                     exhausted = True
@@ -557,10 +628,335 @@ def cmd_probe(args):
             for future in completed:
                 status = future.result()
                 results[status] = results.get(status,0)+1
-            if time.monotonic() >= deadline:
+            if progress:
+                progress(sum(results.values()), total, results.get('marc_bibliographic', 0))
+            if time.monotonic() >= deadline or (should_stop and should_stop()):
                 exhausted = True
-    print(json.dumps({'tested':sum(results.values()),'statuses':results},ensure_ascii=False,indent=2))
+    return {'tested':sum(results.values()),'statuses':results}
 
+
+def cmd_probe(args):
+    if not args.ack_authorized:
+        raise SystemExit('Active tests require --ack-authorized and a host allowlist you control/are permitted to test.')
+    hosts = load_allowlist(args.allowlist)
+    con = init_db(Path(args.db))
+    targets = candidates_to_probe(con,hosts,args.recheck_hours,args.infer_missing,args.max_targets)
+    if not targets:
+        print('No eligible explicitly allowlisted endpoints to test.'); return
+    if not shutil.which('yaz-client'):
+        raise SystemExit(YAZ_MISSING)
+    LOG.info('Active testing: %d allowlisted endpoints, max workers=%d',len(targets),args.workers)
+    result = run_probe(con, targets, workers=args.workers, host_interval=args.host_interval, timeout=args.timeout,
+                       max_hours=args.max_hours, source_tag='inference:allowlisted' if args.infer_missing else '')
+    print(json.dumps(result,ensure_ascii=False,indent=2))
+
+
+# ----------------------------------------------------------------------
+# Published-endpoint targets (auto-discover --published)
+# ----------------------------------------------------------------------
+def norm_key(host, port, database) -> str:
+    """One spelling for comparing lists: host|port|database, all lower case,
+    https:// and a trailing dot dropped."""
+    host = re.sub(r'^[a-z0-9+]+://', '', str(host or '').strip().lower()).rstrip('.').split('/')[0]
+    try:
+        port = int(port) if port not in (None, '') else ''
+    except (TypeError, ValueError):
+        port = ''
+    return f'{host}|{port}|{str(database or "").strip().strip("/").lower()}'
+
+
+def load_known(path) -> set[str]:
+    """Endpoint keys (norm_key) from a list Koha already has or the panel ships:
+    z3950_direct.json (servers, their alternates, excluded), z3950_targets.json
+    (targets), a CSV/TSV with host/port/db columns, the rows of
+    `config.sh --task z3950-list` (host TAB port TAB db ...), or lines of
+    host:port/db."""
+    text = Path(path).read_text(encoding='utf-8-sig')
+    keys = set()
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    if data is not None:
+        items = data if isinstance(data, list) else [
+            *data.get('servers', []), *data.get('targets', []), *data.get('excluded', [])]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            for d in [item, *(item.get('alternates') or [])]:
+                if isinstance(d, dict) and d.get('host'):
+                    keys.add(norm_key(d.get('host'), d.get('port') or 210, d.get('db', d.get('database', ''))))
+        return keys
+    lines = [x for x in text.splitlines() if x.strip() and not x.lstrip().startswith('#')]
+    if lines and re.search(r'(?i)\bhost\b', lines[0]) and (',' in lines[0] or '\t' in lines[0]):
+        for row in csv.DictReader(lines, delimiter='\t' if '\t' in lines[0] else ','):
+            row = {(k or '').strip().lower(): v for k, v in row.items()}
+            if row.get('host'):
+                keys.add(norm_key(row['host'], row.get('port') or 210,
+                                  row.get('db') or row.get('database') or row.get('base') or ''))
+        return keys
+    for line in lines:
+        line = line.strip()
+        if '\t' in line:
+            parts = line.split('\t')
+            if len(parts) >= 3:
+                keys.add(norm_key(parts[0], parts[1], parts[2]))
+            continue
+        m = re.match(r'^(?:[a-z0-9+]+://)?([^\s:/]+):(\d{1,5})/?(\S*)$', line, re.I)
+        if m:
+            keys.add(norm_key(m[1], m[2], m[3]))
+    return keys
+
+
+def published_targets(con, recheck_hours, max_targets=5000, known=frozenset()):
+    """The endpoints auto-discover --published may test without an allowlist:
+    host, port AND database all published together in a public HTTPS document
+    (provenance), public host, not already known, not tested within
+    recheck_hours. Nothing is guessed: no default ports or database names,
+    no other hosts. Each one is recorded in auto_allowed with its source."""
+    min_time = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=recheck_hours)
+    rows = con.execute("""SELECT c.key,c.host,c.port,c.database,c.checked_at,MIN(p.source)
+                          FROM candidates c JOIN provenance p ON p.candidate_key=c.key
+                          WHERE c.port IS NOT NULL AND c.database<>'' AND p.source LIKE 'https://%'
+                          GROUP BY c.key ORDER BY COALESCE(c.checked_at,''),c.host,c.port,c.database""").fetchall()
+    targets = []
+    now = utcnow()
+    for key, host, port, base, checked, source in rows:
+        if norm_key(host, port, base) in known or not valid_host(host):
+            continue
+        if checked:
+            try:
+                if dt.datetime.fromisoformat(checked) >= min_time:
+                    continue
+            except ValueError:
+                pass
+        targets.append((host, port, base))
+        con.execute('INSERT OR IGNORE INTO auto_allowed(candidate_key,host,source,added_at) VALUES(?,?,?,?)',
+                    (key, host, source[:1024], now))
+        if len(targets) >= max_targets:
+            break
+    con.commit()
+    return targets
+
+
+# ----------------------------------------------------------------------
+# Run state (the background run the panel starts and watches)
+# ----------------------------------------------------------------------
+STATE_FIELDS = ('run_id', 'status', 'phase', 'pid', 'started_at', 'updated_at', 'finished_at', 'pages_done',
+                'pages_total', 'new_candidates', 'targets_done', 'targets_total', 'approved', 'error', 'options')
+
+
+def set_state(con, **fields) -> None:
+    bad = set(fields) - set(STATE_FIELDS)
+    if bad:
+        raise ValueError(f'unknown state fields: {sorted(bad)}')
+    fields['updated_at'] = utcnow()
+    with con:
+        con.execute('INSERT OR IGNORE INTO run_state(id) VALUES(1)')
+        con.execute('UPDATE run_state SET ' + ','.join(f'{k}=?' for k in fields) + ' WHERE id=1',
+                    list(fields.values()))
+
+
+def pid_alive(pid) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def read_status(db) -> dict:
+    """The last run's state as a dict ('status': idle when none ran yet).
+    A run still marked running whose process is gone (power cut, kill -9)
+    reads as 'interrupted': starting again continues it."""
+    if not Path(db).exists():
+        return {'status': 'idle'}
+    con = init_db(Path(db))
+    try:
+        row = con.execute('SELECT ' + ','.join(STATE_FIELDS) + ' FROM run_state WHERE id=1').fetchone()
+        confirmed = con.execute("SELECT COUNT(*) FROM candidates WHERE status='marc_bibliographic'").fetchone()[0]
+    finally:
+        con.close()
+    if not row:
+        return {'status': 'idle', 'confirmed_total': confirmed}
+    state = dict(zip(STATE_FIELDS, row))
+    if state['status'] == 'running' and not pid_alive(state['pid']):
+        state['status'] = 'interrupted'
+    state['confirmed_total'] = confirmed
+    pages = state['pages_done'] / state['pages_total'] if state['pages_total'] else 0
+    targets = state['targets_done'] / state['targets_total'] if state['targets_total'] else 0
+    # Harvest is the first 20 %, the tests the other 80 %.
+    state['percent'] = (100 if state['status'] == 'finished' else
+                        round(20 * min(pages, 1) + (80 * min(targets, 1) if state['phase'] == 'probe' else 0)))
+    return state
+
+
+def new_servers(db, known=frozenset(), recordtype='bibliographic') -> list[dict]:
+    """The candidates this tool confirmed (marc_bibliographic: a structurally
+    valid ISO 2709 record retrieved by its own test) that are not in `known`."""
+    con = init_db(Path(db))
+    try:
+        rows = con.execute("""SELECT c.name,c.host,c.port,c.database,c.hits,c.latency_ms,c.checked_at,c.leader,
+                                     group_concat(p.source,' | ')
+                              FROM candidates c LEFT JOIN provenance p ON p.candidate_key=c.key
+                              WHERE c.status=? GROUP BY c.key ORDER BY c.host,c.port,c.database""",
+                           ('marc_' + recordtype,)).fetchall()
+    finally:
+        con.close()
+    out = []
+    for name, host, port, base, hits, ms, checked, leader, sources in rows:
+        if norm_key(host, port, base) in known:
+            continue
+        out.append({'name': name or host, 'host': host, 'port': port, 'database': base, 'hits': hits,
+                    'latency_ms': ms, 'checked_at': checked, 'leader': leader or '',
+                    'sources': [x for x in (sources or '').split(' | ') if x]})
+    return out
+
+
+def background_command(script, db, args) -> list[str]:
+    return [sys.executable, str(script), '--db', str(db), 'auto-discover', *args]
+
+
+def start_background(db, args, log_path, script=None) -> int:
+    """Start auto-discover detached from the caller (its own session: closing
+    the panel or the terminal does not stop it). Returns the process id; its
+    output goes to log_path. The run's own state goes to the database."""
+    script = Path(script or __file__).resolve()
+    log_path = Path(log_path)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, 'ab') as log:
+        proc = subprocess.Popen(background_command(script, db, args), stdin=subprocess.DEVNULL, stdout=log,
+                                stderr=subprocess.STDOUT, start_new_session=True, close_fds=True)
+    return proc.pid
+
+
+def stop_run(db) -> bool:
+    """Ask a running auto-discover to stop (SIGTERM): it finishes the tests
+    already started, saves them and ends as 'stopped'."""
+    state = read_status(db)
+    if state.get('status') != 'running':
+        return False
+    try:
+        os.kill(int(state['pid']), signal.SIGTERM)
+    except (OSError, ValueError, TypeError):
+        return False
+    return True
+
+
+def cmd_auto_discover(args):
+    """harvest -> published (or allowlisted) targets -> yaz MARC test -> SQLite,
+    with its progress in run_state."""
+    if not args.published and not args.ack_authorized:
+        raise SystemExit('With --allowlist, active tests also require --ack-authorized.')
+    if shutil.which('yaz-client') is None:
+        print(YAZ_MISSING, file=sys.stderr)
+        raise SystemExit(EXIT_NO_YAZ)
+    db = Path(args.db)
+    state = read_status(db)
+    if state.get('status') == 'running' and int(state.get('pid') or 0) != os.getpid():
+        print(f"A discovery run is already running (process {state['pid']}).", file=sys.stderr)
+        raise SystemExit(EXIT_ALREADY_RUNNING)
+    if args.background:
+        rest = [a for a in argv_after_command(args.argv, ('auto-discover', 'pipeline')) if a != '--background']
+        pid = start_background(db, rest, args.log or db.with_suffix('.log'))
+        print(json.dumps({'started': True, 'pid': pid, 'db': str(db), 'log': str(args.log or db.with_suffix('.log'))}))
+        return
+    allow = None if args.published else load_allowlist(args.allowlist)
+    known = set()
+    for path in args.known or []:
+        known |= load_known(path)
+    con = init_db(db)
+    stop = threading.Event()
+
+    def on_term(signum, frame):
+        LOG.warning('Stop requested: finishing the tests already started.')
+        stop.set()
+    for sig in (signal.SIGTERM, signal.SIGINT, getattr(signal, 'SIGHUP', None)):
+        if sig is not None:
+            signal.signal(sig, on_term)
+    mode = 'published' if args.published else 'allowlist'
+    set_state(con, run_id=dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ'), status='running',
+              phase='harvest', pid=os.getpid(), started_at=utcnow(), finished_at=None, pages_done=0,
+              pages_total=0 if args.skip_harvest else args.max_pages, new_candidates=0, targets_done=0,
+              targets_total=0, approved=0, error='',
+              options=json.dumps({'mode': mode, 'max_pages': args.max_pages, 'delay': args.delay,
+                                  'workers': args.workers, 'host_interval': args.host_interval,
+                                  'timeout': args.timeout, 'recheck_hours': args.recheck_hours,
+                                  'known_lists': len(args.known or []), 'known_endpoints': len(known)}))
+    try:
+        summary = {'mode': mode}
+        if not args.skip_harvest:
+            sources = harvest_sources(args.no_defaults, args.urls_file, args.url)
+            summary['harvest'] = harvest(
+                con, sources, max_pages=args.max_pages, delay=args.delay, max_bytes=args.max_bytes,
+                refetch_hours=args.refetch_hours, should_stop=stop.is_set,
+                progress=lambda done, total, new: set_state(con, pages_done=done, pages_total=total,
+                                                            new_candidates=new))
+        if stop.is_set():
+            raise KeyboardInterrupt
+        if allow is None:
+            targets = published_targets(con, args.recheck_hours, args.max_targets, known)
+        else:
+            targets = [x for x in candidates_to_probe(con, allow, args.recheck_hours, False, args.max_targets)
+                       if norm_key(*x) not in known]
+        set_state(con, phase='probe', targets_total=len(targets), targets_done=0)
+        LOG.info('Testing %d endpoints (%s), workers=%d, %ss between tests of one host',
+                 len(targets), mode, args.workers, args.host_interval)
+        summary['probe'] = run_probe(
+            con, targets, workers=args.workers, host_interval=args.host_interval, timeout=args.timeout,
+            max_hours=args.max_hours, source_tag='', should_stop=stop.is_set,
+            progress=lambda done, total, ok: set_state(con, targets_done=done, approved=ok))
+        set_state(con, status='stopped' if stop.is_set() else 'finished', phase='done', finished_at=utcnow())
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    except KeyboardInterrupt:
+        set_state(con, status='stopped', finished_at=utcnow())
+        raise SystemExit(130)
+    except BaseException as exc:
+        if isinstance(exc, SystemExit) and exc.code in (0, None):
+            raise
+        set_state(con, status='failed', finished_at=utcnow(), error=f'{type(exc).__name__}: {exc}'[:500])
+        raise
+    finally:
+        con.close()
+
+
+def argv_after_command(argv, commands) -> list[str]:
+    for i, a in enumerate(argv):
+        if a in commands:
+            return list(argv[i + 1:])
+    return []
+
+
+def cmd_status(args):
+    print(json.dumps(read_status(args.db), ensure_ascii=False, indent=2))
+
+
+def cmd_stop(args):
+    print('Stop requested.' if stop_run(args.db) else 'No discovery run is running.')
+
+
+def cmd_new_servers(args):
+    known = set()
+    for path in args.known or []:
+        known |= load_known(path)
+    rows = new_servers(args.db, known)
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.output, 'w', newline='', encoding='utf-8-sig') as fp:
+            writer = csv.writer(fp)
+            writer.writerow(['name', 'host', 'port', 'database', 'hits', 'latency_ms', 'checked_at', 'sources'])
+            for r in rows:
+                writer.writerow([r['name'], r['host'], r['port'], r['database'], r['hits'], r['latency_ms'],
+                                 r['checked_at'], ' | '.join(r['sources'])])
+        print(f'{len(rows)} new confirmed servers written to {args.output}')
+    else:
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
 def cmd_search_docs(args):
@@ -643,7 +1039,7 @@ def cmd_stats(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description='Z39 Atlas 2.0: passive endpoint discovery + allowlisted MARC checks')
+    p = argparse.ArgumentParser(description='Z39 Atlas 2.0: passive endpoint discovery + MARC checks')
     p.add_argument('--db',default='z39-atlas.sqlite3',help='SQLite database path')
     p.add_argument('-v','--verbose',action='store_true')
     subs = p.add_subparsers(dest='command',required=True)
@@ -684,7 +1080,44 @@ def main(argv=None):
     ex.set_defaults(func=cmd_export)
     st = subs.add_parser('stats',help='Print database statistics')
     st.set_defaults(func=cmd_stats)
+    ad = subs.add_parser('auto-discover', aliases=['pipeline'],
+                         help='harvest + MARC tests + SQLite in one run, with its progress in run_state')
+    who = ad.add_mutually_exclusive_group(required=True)
+    who.add_argument('--published', action='store_true',
+                     help='test the complete host:port/database endpoints that public HTTPS documents publish '
+                          '(no allowlist; recorded in auto_allowed; nothing guessed)')
+    who.add_argument('--allowlist', help='test only these hosts, as probe does (needs --ack-authorized)')
+    ad.add_argument('--ack-authorized', action='store_true')
+    ad.add_argument('--known', action='append', help='list of endpoints already in Koha / the panel: not tested '
+                                                     '(z3950_direct.json, z3950_targets.json, CSV, TSV, host:port/db)')
+    ad.add_argument('--background', action='store_true', help='detach and return at once (log next to the DB)')
+    ad.add_argument('--log', help='log file for --background (default: the DB name with .log)')
+    ad.add_argument('--skip-harvest', action='store_true', help='only test what the database already has')
+    ad.add_argument('--url', action='append')
+    ad.add_argument('--urls-file')
+    ad.add_argument('--no-defaults', action='store_true')
+    ad.add_argument('--max-pages', type=int, default=60)
+    ad.add_argument('--max-bytes', type=int, default=4_000_000)
+    ad.add_argument('--delay', type=float, default=3.0)
+    ad.add_argument('--refetch-hours', type=float, default=24.0,
+                    help='a page read in the last N hours is not read again (resume)')
+    ad.add_argument('--workers', type=int, default=2)
+    ad.add_argument('--host-interval', type=float, default=10.0)
+    ad.add_argument('--timeout', type=int, default=25)
+    ad.add_argument('--max-hours', type=float, default=24.0)
+    ad.add_argument('--max-targets', type=int, default=5000)
+    ad.add_argument('--recheck-hours', type=float, default=168.0)
+    ad.set_defaults(func=cmd_auto_discover)
+    ss = subs.add_parser('status', help='Print the background run state as JSON')
+    ss.set_defaults(func=cmd_status)
+    sp = subs.add_parser('stop', help='Ask the running auto-discover to stop')
+    sp.set_defaults(func=cmd_stop)
+    ns = subs.add_parser('new-servers', help='Confirmed marc_bibliographic servers not in the known lists')
+    ns.add_argument('--known', action='append', help='z3950_direct.json, z3950_targets.json, CSV, TSV or host:port/db lines')
+    ns.add_argument('--output', help='CSV file (default: JSON on stdout)')
+    ns.set_defaults(func=cmd_new_servers)
     args = p.parse_args(argv)
+    args.argv = list(sys.argv[1:] if argv is None else argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
     if args.command == 'harvest' and (args.max_pages < 1 or args.max_pages > 1000 or args.delay < 1 or args.max_bytes < 4096):
         p.error('harvest limits: 1 <= max-pages <= 1000, delay >= 1 second, max-bytes >= 4096')
@@ -692,6 +1125,13 @@ def main(argv=None):
         p.error('search-docs limits: count 1..20, delay >= 1 second')
     if args.command == 'probe' and (not 1 <= args.workers <= 4 or args.host_interval < 5 or not 5 <= args.timeout <= 120 or not 1 <= args.max_targets <= 5000 or not 0 < args.max_hours <= 168 or args.recheck_hours < 1):
         p.error('probe limits: workers 1..4, host-interval >=5s, timeout 5..120s, max-targets 1..5000, max-hours <=168, recheck-hours >=1')
+    if args.command in ('auto-discover', 'pipeline'):
+        if args.max_pages < 1 or args.max_pages > 1000 or args.delay < 1 or args.max_bytes < 4096:
+            p.error('harvest limits: 1 <= max-pages <= 1000, delay >= 1 second, max-bytes >= 4096')
+        if (not 1 <= args.workers <= 4 or args.host_interval < 5 or not 5 <= args.timeout <= 120
+                or not 1 <= args.max_targets <= 5000 or not 0 < args.max_hours <= 168 or args.recheck_hours < 1):
+            p.error('probe limits: workers 1..4, host-interval >=5s, timeout 5..120s, max-targets 1..5000, '
+                    'max-hours <=168, recheck-hours >=1')
     args.func(args)
 
 

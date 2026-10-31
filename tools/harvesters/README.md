@@ -6,6 +6,11 @@ catálogos do Koha.Nexus. Ficam no repositório só para não se perderem.
 **Não fazem parte do instalador, do painel nem da suíte de testes.** Nada
 aqui é chamado automaticamente; cada script roda à mão, quando alguém quiser.
 
+Exceção: `z39-atlas-2.0/z39-atlas/z39atlas.py` (descoberta de servidores
+Z39.50) tem uma cópia idêntica no painel, `panel/kei_panel/z39atlas.py`, usada
+pelo botão "Descobrir novos servidores" da tela Z39.50 / SRU. Um teste do
+painel compara as duas: ao mudar uma, copie para a outra.
+
 | Script | O que faz |
 | --- | --- |
 | `validate_targets.py` | Lê um `targets.yaml` e confere `Identify` e `ListMetadataFormats` de cada alvo OAI-PMH. |

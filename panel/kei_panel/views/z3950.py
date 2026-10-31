@@ -26,6 +26,14 @@ ranked by speed) and ticks or unticks the ones it has
 ticked is advised against, never refused. Logins typed here
 stay in the panel's private config file and the temporary list the task
 deletes.
+
+"Discover new servers" (Z39 Atlas, kei_panel/z39atlas.py) runs apart from
+the panel: `z39atlas.py auto-discover --published` reads the public lists of
+Z39.50 servers, tests the endpoints they publish with yaz-client and keeps
+everything in config_dir()/z39-atlas/atlas.sqlite3, its progress included.
+The box shows that progress every ATLAS_REFRESH seconds; "New servers found"
+lists only the confirmed MARC servers this list and Koha lack, to tick, and
+adding them goes through the same confirmation and z3950-add as Save to Koha.
 """
 
 from __future__ import annotations
@@ -34,8 +42,10 @@ import asyncio
 import os
 import random
 import re
+import shutil
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 from dataclasses import replace
 from pathlib import Path
@@ -45,12 +55,15 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Label, Static, Switch
 
-from .. import z3950
+from .. import z3950, z39atlas
 from ..i18n import t
-from ..screens.dialogs import ConfirmScreen, InputScreen
+from ..screens.dialogs import ChecklistScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..tasks import Reporter, TaskFailed, TaskResult, run_with_loader
 from .base import SectionView
 
+ATLAS_REFRESH = 15.0
+ATLAS_STATE = {"idle": "No discovery run yet.", "running": "Running", "finished": "Finished",
+               "failed": "Failed", "stopped": "Stopped", "interrupted": "Interrupted (the process ended)"}
 STATUS_MARK = {"ok": "●", "empty": "◐", "no_marc": "◐", "login": "🔒", "tcp": "○", "dead": "✕"}
 
 
@@ -104,6 +117,20 @@ class Z3950View(SectionView):
             with Horizontal(classes="quick-actions"):
                 yield Button(t("Reset"), id="z-health-reset", classes="small", disabled=True)
                 yield Button(t("Reset all"), id="z-health-reset-all", classes="small", disabled=True)
+        with Vertical(id="z-atlas", classes="hub-box z-wide"):
+            yield Static(t("Searches the public lists of Z39.50 servers (Koha wiki, Z-Brary, IRSpy, the Library of "
+                           "Congress and others) and tests each address they publish with at most two small searches "
+                           "that must return a MARC record. It runs in the background and can take hours: it waits "
+                           "between requests so no library is overloaded. You can keep using the panel or close "
+                           "it. Nothing goes to Koha until you tick the new servers and confirm."),
+                         classes="ai-note", markup=False)
+            yield Label(t("No discovery run yet."), id="z-atlas-state")
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("Discover new servers"), id="z-atlas-start", classes="small", variant="primary")
+                yield Button(t("Check scan status"), id="z-atlas-status", classes="small")
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("New servers found"), id="z-atlas-new", classes="small", variant="success")
+                yield Button(t("Stop discovery"), id="z-atlas-stop", classes="small", disabled=True)
         with Vertical(id="z-outbound", classes="hub-box z-wide"):
             yield from self.compose_outbound()
 
@@ -145,6 +172,8 @@ class Z3950View(SectionView):
         self.query_one("#z-network").border_title = t("Community network")
         self.query_one("#z-outbound").border_title = t("Catalogues to copy records from (outbound)")
         self.query_one("#z-health").border_title = t("Direct servers for enrichment from world catalogues")
+        self.query_one("#z-atlas").border_title = t("Discover new servers (Z39 Atlas)")
+        self.set_interval(ATLAS_REFRESH, self.draw_atlas)
         self.query_one("#z-net-note", Static).update(
             t("The shared catalogue of the koha.nexus libraries. Turning it on adds it to Koha's Z39.50/SRU "
               "servers, checked for the cataloguing searches; off takes it out.")
@@ -162,6 +191,7 @@ class Z3950View(SectionView):
             self.run_worker(self._load_koha(), exclusive=True, group="z3950-koha", exit_on_error=False)
             self.load_server()
             self.load_health()
+        self.draw_atlas()
 
     def refresh_data(self) -> None:
         self.load_server()
@@ -448,7 +478,9 @@ class Z3950View(SectionView):
                    "z-sync": self.sync, "z-import": self.import_list, "z-export": self.export,
                    "z-hidden": self.toggle_hidden, "z-reload": self.refresh_data,
                    "z-health-reset": self.reset_health,
-                   "z-health-reset-all": self.reset_all_health}
+                   "z-health-reset-all": self.reset_all_health,
+                   "z-atlas-start": self.atlas_start, "z-atlas-status": self.atlas_status,
+                   "z-atlas-new": self.atlas_new, "z-atlas-stop": self.atlas_stop}
         if event.button.id in actions:
             event.stop()
             actions[event.button.id]()
@@ -653,6 +685,169 @@ class Z3950View(SectionView):
                 path.unlink(missing_ok=True)
         await show_done(self.app, title, result)
         await self._load_koha()
+
+    # ------------------------------------------------------------------
+    # Discover new servers (Z39 Atlas, in the background)
+    # ------------------------------------------------------------------
+    def atlas_state(self) -> dict:
+        try:
+            return z39atlas.read_status(atlas_db())
+        except Exception as exc:     # noqa: BLE001 (a damaged database must not break the screen)
+            return {"status": "failed", "error": str(exc)}
+
+    def draw_atlas(self) -> None:
+        if not self.is_mounted:
+            return
+        state = self.atlas_state()
+        try:
+            self.query_one("#z-atlas-state", Label).update(atlas_summary(state))
+            self.query_one("#z-atlas-stop", Button).disabled = state.get("status") != "running"
+        except Exception:     # noqa: BLE001 (the screen is closing)
+            pass
+
+    def known_keys(self) -> set[str]:
+        """This list and Koha's servers, as z39atlas.norm_key."""
+        keys = {z39atlas.norm_key(tg.host, tg.port, tg.db) for tg in self.targets}
+        for key in self.in_koha:
+            m = re.match(r"^([^:]+):(\d+)/(.*)$", key)
+            if m:
+                keys.add(z39atlas.norm_key(*m.groups()))
+        return keys
+
+    def atlas_start(self) -> None:
+        self.app.run_worker(self._atlas_start(), group="z3950-atlas", exclusive=True, exit_on_error=False)
+
+    async def _atlas_start(self) -> None:
+        title = t("Discover new servers")
+        state = self.atlas_state()
+        if state.get("status") == "running":
+            self.app.notify(atlas_summary(state), timeout=10)
+            return
+        if not yaz_available(self.app.env.demo):
+            await self.app.push_screen_wait(MessageScreen(
+                title, t("The discovery needs YAZ (yaz-client) to test the servers, and it is not installed on "
+                         "this computer. Install it, then press Discover new servers again. Nothing was started."),
+                kind="error", command="sudo apt install -y yaz",
+                command_help=t("In the Debian terminal:")))
+            return
+        question = t("The panel reads the public lists of Z39.50 servers and tests every complete address "
+                     "(host, port and database) they publish, with at most two small title searches each, "
+                     "${interval} seconds apart on the same server and ${delay} seconds between pages. Addresses "
+                     "this list or Koha already have are not tested. It runs in the background and can take "
+                     "hours; a run that stops continues where it was. Start?", interval=10, delay=3)
+        if state.get("status") in ("interrupted", "stopped", "failed"):
+            question += "\n\n" + t("The last run did not finish: this one continues it without testing again "
+                                     "what was already tested.")
+        if not await self.app.push_screen_wait(ConfirmScreen(title, question)):
+            return
+        folder = atlas_db().parent
+        folder.mkdir(parents=True, exist_ok=True)
+        known = folder / "known.txt"
+        known.write_text("".join(f"{k.split('|')[0]}:{k.split('|')[1]}/{k.split('|', 2)[2]}\n"
+                                 for k in sorted(self.known_keys())), encoding="utf-8")
+        args = ["--published", "--known", str(known), "--known", str(z3950.DATA_FILE.with_name("z3950_direct.json"))]
+        try:
+            launch_atlas(args, self.app.env.demo)
+        except OSError as exc:
+            await self.app.push_screen_wait(MessageScreen(title, t("The discovery did not start: ${why}",
+                                                                   why=str(exc)), kind="error"))
+            return
+        self.app.notify(t("Discovery started in the background. Keep using the panel; Check scan status shows "
+                          "how far it is."), timeout=10)
+        self.draw_atlas()
+
+    def atlas_status(self) -> None:
+        self.app.run_worker(self._atlas_status(), group="z3950-atlas", exclusive=True, exit_on_error=False)
+
+    async def _atlas_status(self) -> None:
+        state = self.atlas_state()
+        self.draw_atlas()
+        details = [(t("State"), t(ATLAS_STATE.get(state.get("status", ""), state.get("status", ""))))]
+        if state.get("status") != "idle":
+            details += [
+                (t("Step"), {"harvest": t("Reading the public lists"), "probe": t("Testing the servers"),
+                             "done": t("Done")}.get(state.get("phase", ""), state.get("phase", ""))),
+                (t("Progress"), f"{state.get('percent', 0)}%"),
+                (t("Pages read"), f"{state.get('pages_done', 0)} / {state.get('pages_total', 0)}"),
+                (t("Addresses found"), str(state.get("new_candidates", 0))),
+                (t("Servers tested"), f"{state.get('targets_done', 0)} / {state.get('targets_total', 0)}"),
+                (t("Returned a MARC record"), str(state.get("approved", 0))),
+                (t("Started"), _local(state.get("started_at"))),
+                (t("Last update"), _local(state.get("updated_at"))),
+            ]
+            if state.get("finished_at"):
+                details.append((t("Ended"), _local(state.get("finished_at"))))
+            if state.get("error"):
+                details.append((t("Error"), state["error"]))
+        new = len(self._atlas_new_rows()) if state.get("status") != "idle" else 0
+        body = t("New servers ready to add: ${n}.", n=new) if new else t("No new server to add yet.")
+        await self.app.push_screen_wait(MessageScreen(
+            t("Check scan status"), body, kind="error" if state.get("status") == "failed" else "info",
+            details=details, command=str(atlas_log()), is_command=False,
+            log=_tail(atlas_log()) if state.get("status") in ("failed", "interrupted") else None))
+
+    def _atlas_new_rows(self) -> list[dict]:
+        try:
+            return z39atlas.new_servers(atlas_db(), self.known_keys())
+        except Exception:     # noqa: BLE001
+            return []
+
+    def atlas_new(self) -> None:
+        self.app.run_worker(self._atlas_new(), group="z3950-atlas", exclusive=True, exit_on_error=False)
+
+    async def _atlas_new(self) -> None:
+        rows = self._atlas_new_rows()
+        if not rows:
+            self.app.notify(t("No new confirmed server: every server the discovery confirmed is already in this "
+                              "list or in Koha.") if atlas_db().exists() else
+                            t("No discovery run yet: press Discover new servers first."), severity="warning")
+            return
+        options = []
+        for r in rows:
+            src = urllib.parse.urlparse(r["sources"][0]).hostname if r["sources"] else ""
+            label = f"{r['host']}:{r['port']}/{r['database']}"
+            if r.get("name") and r["name"] != r["host"]:
+                label = f"{r['name']} · {label}"
+            extra = ", ".join(x for x in (f"{r['latency_ms']} ms" if r.get("latency_ms") else "",
+                                          t("source: ${site}", site=src) if src else "") if x)
+            options.append((f"{r['host']}:{r['port']}/{r['database']}", label + (f"  ({extra})" if extra else ""),
+                            False))
+        picked_keys = await self.app.push_screen_wait(ChecklistScreen(
+            t("New servers found"),
+            t("These servers returned a MARC record in the discovery's own test and are not in this list or in "
+              "Koha. Tick the ones to add; the next step shows them again before anything goes to Koha. Check "
+              "each library's terms of use, MARC21 or UNIMARC and the character set."), options))
+        if not picked_keys:
+            return
+        by_key = {f"{r['host']}:{r['port']}/{r['database']}": r for r in rows}
+        new = []
+        for key in picked_keys:
+            r = by_key[key]
+            tg = z3950.make_target({"name": r["name"] or r["host"], "host": r["host"], "port": r["port"],
+                                    "db": r["database"], "syntax": "USMARC", "encoding": "utf8",
+                                    "source": "Z39 Atlas: " + (r["sources"][0] if r["sources"] else "")},
+                                   "imported")
+            if tg:
+                new.append(tg)
+        if not new:
+            return
+        self.targets = z3950.merge(self.targets, new)
+        for tg in new:
+            self.history.set_manual(tg.key, False)
+            self.selected.add(tg.key)
+        self._save()
+        self.draw()
+        picked = [tg for tg in new if tg.key not in self.in_koha]
+        if picked:
+            await self._add(picked, [])
+
+    def atlas_stop(self) -> None:
+        if z39atlas.stop_run(atlas_db()):
+            self.app.notify(t("Stopping: the tests already started finish and are saved. Discover new servers "
+                              "continues from there later."), timeout=10)
+        else:
+            self.app.notify(t("No discovery run is running."), severity="warning")
+        self.draw_atlas()
 
     # ------------------------------------------------------------------
     # A server typed by hand
@@ -891,3 +1086,84 @@ def demo_dir() -> Path:
     path = Path(tempfile.gettempdir()) / "kei-demo-z3950"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+# ----------------------------------------------------------------------
+# Z39 Atlas helpers
+# ----------------------------------------------------------------------
+def atlas_db() -> Path:
+    return z3950.config_dir() / "z39-atlas" / "atlas.sqlite3"
+
+
+def atlas_log() -> Path:
+    return z3950.config_dir() / "z39-atlas" / "atlas.log"
+
+
+def yaz_available(demo: bool = False) -> bool:
+    return demo or shutil.which("yaz-client") is not None
+
+
+def launch_atlas(args: list[str], demo: bool = False) -> None:
+    """Start `z39atlas.py auto-discover ARGS` detached from the panel (the demo
+    writes a finished run instead)."""
+    if demo:
+        _demo_atlas(atlas_db())
+    else:
+        z39atlas.start_background(atlas_db(), args, atlas_log())
+
+
+def atlas_summary(state: dict) -> str:
+    """One line for the box: what the background discovery is doing."""
+    status = state.get("status", "idle")
+    if status == "idle":
+        return t("No discovery run yet.")
+    if status == "running":
+        if state.get("phase") == "probe":
+            return t("Running: ${pct}% · servers tested ${done}/${total} · MARC confirmed ${ok}",
+                     pct=state.get("percent", 0), done=state.get("targets_done", 0),
+                     total=state.get("targets_total", 0), ok=state.get("approved", 0))
+        return t("Running: ${pct}% · reading the public lists, page ${done}/${total}", pct=state.get("percent", 0),
+                 done=state.get("pages_done", 0), total=state.get("pages_total", 0))
+    line = t(ATLAS_STATE.get(status, status))
+    if state.get("finished_at"):
+        line += " " + _local(state["finished_at"])
+    line += " · " + t("MARC confirmed: ${ok} (in this run), ${all} in all", ok=state.get("approved", 0),
+                      all=state.get("confirmed_total", 0))
+    if status in ("interrupted", "stopped", "failed"):
+        line += " · " + t("Discover new servers continues it.")
+    return line
+
+
+def _local(stamp) -> str:
+    if not stamp:
+        return "-"
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(stamp)).astimezone().strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return str(stamp)
+
+
+def _tail(path: Path, n: int = 20) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()[-n:]
+    except OSError:
+        return []
+
+
+def _demo_atlas(db: Path) -> None:
+    """Demo mode: a finished run with two confirmed servers, no network."""
+    con = z39atlas.init_db(db)
+    try:
+        src = "https://wiki.koha-community.org/wiki/Koha_Open_Z39.50_Sources"
+        with con:
+            for host, port, base in (("z3950.demo-library.org", 210, "BIBLIO"), ("catalog.demo-univ.edu", 2100, "MAIN")):
+                z39atlas.save_candidate(con, host, port, base, source=src, excerpt="demo")
+                con.execute("UPDATE candidates SET status='marc_bibliographic', hits=3, latency_ms=420, checked_at=? "
+                            "WHERE key=?", (z39atlas.utcnow(), z39atlas.key_for(host, port, base)))
+        now = z39atlas.utcnow()
+        z39atlas.set_state(con, run_id="demo", status="finished", phase="done", pid=os.getpid(), started_at=now,
+                           finished_at=now, pages_done=3, pages_total=3, new_candidates=2, targets_done=2,
+                           targets_total=2, approved=2, error="")
+    finally:
+        con.close()
