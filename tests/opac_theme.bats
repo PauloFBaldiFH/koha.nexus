@@ -502,6 +502,22 @@ DROP TABLE additional_contents_localizations; DROP TABLE additional_contents;"
     grep -qxF 'RESULT mainblock=no' "$W/results"
 }
 
+@test "opac-theme-sync: the stylesheet in Koha is handed over, CRLF lines from Koha's editor included" {
+    task opac_theme_apply "$W/apply"
+    # Saved again from Koha's own editor: the browser sends CRLF lines.
+    mysql "$DB" -e "UPDATE systempreferences SET value = REPLACE(REPLACE(value, '\\r', ''), '\\n', '\\r\\n')
+        WHERE variable = 'OpacUserCSS';"
+    pref OpacUserCSS | grep -q $'\r'
+    rm -f "$W/results"
+    task opac_theme_sync
+    [ "$status" -eq 0 ]
+    grep -qxF 'RESULT block_OpacUserCSS=yes' "$W/results"
+    grep -qF 'RESULT data=/* KEI-THEME-DATA: {"texture": "frosted", "version": 1} */' "$W/results"
+    line=$(grep '^RESULT css_OpacUserCSS=' "$W/results")
+    printf '%s' "${line#RESULT css_OpacUserCSS=}" | base64 -d | grep -qF 'KEI-THEME-DATA'
+    ! printf '%s' "${line#RESULT css_OpacUserCSS=}" | base64 -d | grep -q $'\r'
+}
+
 # --- login instructions and footer credits (HTML customizations) --------
 
 # Koha 23.11+ tables, and the library's own entries: credits (id 1, shown),

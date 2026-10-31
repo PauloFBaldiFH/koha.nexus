@@ -430,13 +430,23 @@ def test_restore_makes_the_screen_read_koha_again(monkeypatch):
             view = app.screen.query_one("#view-opac")
             await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "gradient")
             await _until(pilot, lambda: len(view.query_one("#o-newsitem-opac-btns").children) == 1)
-            # Back on the screen without a restore: the fields stay as typed.
+            # Back on the card without a restore: Koha is read again, it is
+            # always the base (Paulo, 2026-10-31 18:04); a Preview on top of
+            # the screen does not count as leaving it.
             view.query_one("#o-newsitem-opac-title", Input).value = "Typed"
+            view.query_one("#o-staff-paint-accent-texture", Select).value = "wood"
+            raw, _pending, problem = view.collect()
+            assert problem == "" and raw["staff"]["paint"]["accent"]["texture"] == "wood"
+            view.preview()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen))
+            await pilot.press("escape")
+            await pilot.pause(0.5)
+            assert view.query_one("#o-newsitem-opac-title", Input).value == "Typed"
             await pilot.press("d")
             await pilot.pause(0.2)
             await pilot.press("o")
-            await pilot.pause(0.5)
-            assert view.query_one("#o-newsitem-opac-title", Input).value == "Typed"
+            await _until(pilot, lambda: view.query_one("#o-newsitem-opac-title", Input).value == "Antes")
+            assert view.query_one("#o-staff-paint-accent-texture", Select).value == "auto"
             # A restore brought another look into Koha.
             monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
                 f"@@result data={ot.data_line(after)}", "@@result block_OpacUserCSS=yes",
