@@ -476,10 +476,12 @@ def test_sync_settings():
     assert got["links"]["style"] == "metal" and got["links"]["items"][0]["sort_order"] == 3
     assert got["staff_links"]["enabled"] and got["staff_links"]["items"][0]["text"] == "S"
     assert "rebuilt" in notes[0][0]
-    # Nothing of ours in Koha: the defaults (Koha's own look), never the
-    # panel's own copy.
+    # Nothing of ours in Koha: Koha's own look (Paulo, 2026-10-31: even the
+    # starting values come from the instance), never the panel's own copy
+    # or its factory settings.
     got, notes, in_koha = ot.sync_settings({"data": "/* KEI-THEME-DATA: {broken */", "state": "[]"})
-    assert got == ot.normalize({}) and not in_koha and "Nothing of the panel" in notes[0][0]
+    assert got == ot.normalize(ot.KOHA_OWN) and not in_koha and "Nothing of the panel" in notes[0][0]
+    assert got["accent"] == "#548300" and got["texture"] == "flat" and got["staff"]["accent"] == "#408540"
 
 
 def _applied_contents(cfg: dict, text: dict | None = None) -> dict:
@@ -1033,7 +1035,7 @@ def test_paulo_1031_koha_stylesheet_is_the_base():
     css = ot.css_block(cfg) if hasattr(ot, "css_block") else ot.data_line(cfg) + "\n" + ot.css_body(cfg)
     edited = css.replace("--nexus-primary: #2563eb;", "--nexus-primary: #aa0000;").replace(
         "https://i.postimg.cc/a/logo.png", "/images/custom/kei-logo.png?v=1")
-    staff = ot.staff_css_body(cfg).replace("--nexus-staff-radius: 12px;", "--nexus-staff-radius: 20px;")
+    staff = ot.staff_css_block(cfg).replace("--nexus-staff-radius: 12px;", "--nexus-staff-radius: 20px;")
     found = {"data": ot.data_line(cfg), "block_OpacUserCSS": "yes", "block_IntranetUserCSS": "yes",
              "css_OpacUserCSS": _b64(edited), "css_IntranetUserCSS": _b64(staff)}
     got, notes, in_koha = ot.sync_settings(found)
@@ -1043,12 +1045,33 @@ def test_paulo_1031_koha_stylesheet_is_the_base():
     assert any("Edited in Koha's stylesheets" in n for n, _ in notes)
     # Untouched: the same settings, no note.
     same, notes, _ = ot.sync_settings({**found, "css_OpacUserCSS": _b64(css),
-                                       "css_IntranetUserCSS": _b64(ot.staff_css_body(cfg))})
+                                       "css_IntranetUserCSS": _b64(ot.staff_css_block(cfg))})
     assert same["accent"] == "#2563eb" and not any("Edited in Koha" in n for n, _ in notes)
     # The settings line gone (edited by hand): rebuilt from the CSS.
     no_line, notes, in_koha = ot.sync_settings({"block_OpacUserCSS": "yes", "css_OpacUserCSS": _b64(edited)})
     assert in_koha and no_line["accent"] == "#aa0000" and no_line["opacity"] == cfg["opacity"]
-    assert any("rebuilt from the panel's stylesheet" in n for n, _ in notes)
+    assert any("Read from the stylesheets" in n for n, _ in notes)
+
+
+def test_paulo_1031_no_panel_look_reads_the_librarys_own_css():
+    """No block of the panel in Koha: the fields still come from the
+    instance (the library's own CSS and favicons), over Koha's own look."""
+    own = """/* the library's own */
+.btn-primary { background-color: #260859; border-color: #260859 }
+body { background-color: #f3f4f6; }
+#logo { background: transparent url('https://i.postimg.cc/x/logo.png') no-repeat; }
+.main { background-color: #e8e8e8 }"""
+    staff_own = "html body .btn-primary { background: #123456 !important; }"
+    got, notes, in_koha = ot.sync_settings({"css_OpacUserCSS": _b64(own), "css_IntranetUserCSS": _b64(staff_own),
+                                            "pref_OpacFavicon": "https://i.postimg.cc/x/fav.png",
+                                            "pref_IntranetFavicon": "/intranet-tmpl/kei-custom/kei-staff-favicon.ico"})
+    assert not in_koha
+    assert (got["accent"], got["page"], got["surface"]) == ("#260859", "#f3f4f6", "#e8e8e8")
+    assert got["logo"] == {"source": "url", "url": "https://i.postimg.cc/x/logo.png"}
+    assert got["favicon"]["url"] == "https://i.postimg.cc/x/fav.png"
+    assert got["staff"]["accent"] == "#123456" and got["staff"]["favicon"]["source"] == "local"
+    assert got["texture"] == "flat"            # Koha's own look where the CSS says nothing
+    assert any("Read from the stylesheets and preferences" in n for n, _ in notes)
 
 
 def test_unreadable_news_never_costs_the_look(monkeypatch):

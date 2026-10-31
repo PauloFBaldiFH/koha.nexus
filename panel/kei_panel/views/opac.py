@@ -102,6 +102,11 @@ PAINT_HELP = {
                "and the secondary buttons keep the block background.",
     "page": "The page under the blocks (without a wallpaper). A lower opacity makes the colour paler.",
 }
+GATE_NOTE = ("The fields show what Koha holds now: OpacUserCSS, OpacUserJS, IntranetUserCSS, IntranetUserJS, "
+             "the news and the HTML customizations. Sync with the instance to read them; the fields appear after "
+             "it, filled from Koha.")
+# The view's own parts that stay while the fields wait for the instance.
+GATE_KEEP = ("o-intro", "o-gate")
 RADIUS_HELP = {
     "radius_block": "Rounded corners (border-radius) of the blocks: header, panels, cards and boxes. More "
                     "pixels make the corners rounder; 0 makes them square.",
@@ -156,7 +161,16 @@ class OpacView(SectionView):
                        "light/dark switch for the readers, a New arrivals carousel with the Amazon covers and the "
                        "clean-up of empty parts. Apply writes it into Koha after a backup; Remove brings Koha's own "
                        "look back. Your own OpacUserCSS and OpacUserJS are kept."),
-                     classes="view-prompt", markup=False)
+                     classes="view-prompt", markup=False, id="o-intro")
+        # The gate: the fields only after reading the instance. What Koha
+        # holds (OpacUserCSS, OpacUserJS, IntranetUserCSS, IntranetUserJS,
+        # the news and HTML customizations) is the base of every field,
+        # never the panel's own copy or its factory settings (Paulo, 2026-10-31).
+        with Vertical(id="o-gate", classes="opac-box"):
+            yield Static(t(GATE_NOTE), classes="ai-note", markup=False)
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("Sync with the instance"), id="o-gate-sync", variant="primary")
+            yield Static("", id="o-gate-report", markup=False)
         with Horizontal(classes="quick-actions"):
             yield Button(t("Apply"), id="o-apply", classes="small", variant="success")
             yield Button(t("Preview"), id="o-preview", classes="small")
@@ -394,8 +408,10 @@ class OpacView(SectionView):
                   "o-credits": "Footer credits",
                   **{box: title for box, title in NEWS_BOXES.values()},
                   **{box: title for box, title in LOGIN_BOXES.values()}}
+        titles["o-gate"] = "Instance"
         for wid, title in titles.items():
             self.query_one(f"#{wid}").border_title = t(title)
+        self.show_fields(False)
         for key in LINK_SETS:
             self.set_links(self.cfg[key]["items"], key)
         for side, (box, _title) in NEWS_BOXES.items():
@@ -487,14 +503,41 @@ class OpacView(SectionView):
         return items, ""
 
     def on_show(self) -> None:
-        # Every time the card is opened: what Koha holds now (OpacUserCSS,
-        # OpacUserJS, IntranetUserCSS, IntranetUserJS, the news and the
-        # HTML customizations) is the base, never what the screen showed
-        # before: a restore, an edit in Koha's own tools or another panel
-        # may have changed it (Paulo, 2026-10-31).
+        # Every time the card is opened: the fields wait behind the gate
+        # until the instance is read again (Sync with the instance). A
+        # restore, an edit in Koha's own tools or another panel may have
+        # changed it, and the screen never shows what it held before.
         self.loaded = True
         self.restores_seen = getattr(self.app, "restores", 0)
-        self.reload()
+        self.show_fields(False)
+        self.query_one("#o-gate-report", Static).update("")
+
+    def show_fields(self, on: bool) -> None:
+        """The fields and actions (on), or only the gate (off)."""
+        for child in self.children:
+            if child.id not in GATE_KEEP and "view-head" not in child.classes:
+                child.display = on
+
+    def gate_sync(self) -> None:
+        self.run_worker(self._gate_sync(), exclusive=True, group="opac-load", exit_on_error=False)
+
+    async def _gate_sync(self) -> None:
+        """Sync with the instance: read Koha, fill every field from it and
+        show them, with what was read where; on any failure the fields stay
+        hidden and the reason is shown (never the factory settings)."""
+        report = self.query_one("#o-gate-report", Static)
+        report.update(t("Reading the instance..."))
+        try:
+            out = await self.app.bridge.task("opac-theme-sync")
+            if out.rc:
+                raise RuntimeError(t("the installer could not read Koha (code ${rc}).", rc=str(out.rc)))
+            notes = self.from_koha(out.results)
+        except Exception as e:     # noqa: BLE001 (said on the card, the fields stay hidden)
+            report.update(t("Could not read the instance: ${error}", error=str(e)))
+            self.show_fields(False)
+            return
+        report.update("\n".join("• " + t(text, **values) for text, values in notes))
+        self.show_fields(True)
 
     # ------------------------------------------------------------------
     # Settings <-> fields
@@ -718,7 +761,7 @@ class OpacView(SectionView):
     # Buttons
     # ------------------------------------------------------------------
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {"o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
+        actions = {"o-gate-sync": self.gate_sync, "o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
                    "o-refresh": self.refresh_carousel, "o-keys": self.keys, "o-remove": self.remove_look,
                    "o-staff-copy": self.copy_opac_preset,
                    "o-link-add": lambda: self.add_link(None, "links"),
