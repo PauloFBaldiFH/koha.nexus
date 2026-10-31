@@ -1128,8 +1128,8 @@ fi
 # a backup or restore that is really running:
 #   - a nightly/cloud backup script (backup_sql.sh, backup_marc.sh) is
 #     waited for, up to BACKUP_LOCK_WAIT seconds;
-#   - this installer (a panel task, the terminal menu) or a database import
-#     keeps the lock: BACKUP_LOCK_BUSY says what runs;
+#   - this installer (a panel task, the terminal menu), a database import
+#     or flock(1) taking it on purpose keeps the lock: BACKUP_LOCK_BUSY says what runs;
 #   - anything else holds it by accident: a leftover dump is stopped (and
 #     its unfinished file removed), other programs are left alone, and the
 #     lock file is replaced (the lock is on the file, so a new file is a
@@ -1162,7 +1162,8 @@ backup_lock_cmd() {
 backup_lock_owner() {
     local pid="$1" n=0 k v cmd comm mark
     comm=$(cat "/proc/$pid/comm" 2>/dev/null)
-    case "$comm" in mysql|mariadb) echo installer; return ;; esac
+    # A database import, or flock(1) holding it on purpose ("flock LOCK command").
+    case "$comm" in mysql|mariadb|flock) echo installer; return ;; esac
     mark=$(head -c 16 "$BACKUP_LOCK_FILE" 2>/dev/null | tr -cd '0-9')
     while [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ] && [ "$n" -lt 64 ]; do
         [ "$pid" = "$mark" ] && { echo installer; return; }

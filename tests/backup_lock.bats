@@ -153,3 +153,12 @@ EOF
     run take :
     [[ "$output" == *"rc=1"* ]]
 }
+
+@test "flock(1) holding the lock on purpose keeps it (library_tools L05)" {
+    flock -o "$KEI_BACKUP_LOCK_FILE" sleep 300 </dev/null >/dev/null 2>&1 3>&- &
+    PIDS+=($!)
+    wait_held
+    run take :
+    [[ "$output" == *"rc=1"* ]]
+    kill -0 "${PIDS[0]}"
+}
