@@ -300,7 +300,7 @@ def test_blocks_take_the_chosen_colours():
     css = ot.css_body(ot.normalize({"accent": "#7c3aed", "accent2": "#db2777", "surface": "#ffffff"}))
     card = ot.mix("#ffffff", "#7c3aed", .03)
     assert card != "#ffffff" and f"--koha-card-rgb: {ot._rgb(card).replace(',', ', ')};" in css
-    assert f"--koha-ink: {ot.mix('#7c3aed', '#000000', .30)}" in css and "--kei-ink: var(--koha-ink);" in css
+    assert "--koha-ink: #111827" in css and "--kei-ink: var(--koha-ink);" in css
     assert ot.mix("#000000", "#ffffff", .5) == "#808080"
 
 
@@ -633,7 +633,7 @@ def test_staff_translucent_header():
     cfg["staff"].update(header_opacity=60, header_blur=8)
     css = ot.staff_css_body(cfg)
     for part in ("--nexus-staff-header-a: 0.60", "--nexus-staff-header-blur: 8px",
-                 "rgba(64,133,64, var(--nexus-staff-header-a))",
+                 "rgba(var(--nexus-staff-topbar-rgb), var(--nexus-staff-header-a))", "--nexus-staff-topbar-rgb: 64,133,64",
                  "html body #header_search::before", "backdrop-filter: blur(var(--nexus-staff-header-blur))",
                  "-webkit-backdrop-filter: blur(var(--nexus-staff-header-blur))",
                  "prefers-reduced-transparency", "@supports not"):
@@ -645,7 +645,7 @@ def test_staff_translucent_header():
     nav_rule = glass.split("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {", 1)[1].split("}", 1)[0]
     assert "backdrop-filter" not in nav_rule and "!important" in nav_rule
     # After the texture: the glass bar wins over the brushed metal one.
-    assert css.rindex("rgba(64,133,64, var(--nexus-staff-header-a))") > css.rindex("feTurbulence")
+    assert css.rindex("rgba(var(--nexus-staff-topbar-rgb), var(--nexus-staff-header-a))") > css.rindex("feTurbulence")
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["header_glass"] is True
 
 
@@ -1170,7 +1170,7 @@ def test_paulo_1031_staff_links_read_on_a_pale_accent():
     css = ot.staff_css_block(cfg)
     link = css.split("--nexus-staff-link: ")[1][:7]
     assert ot.contrast(link, "#ffffff") >= 5.5
-    assert "#logged-in-menu" in ot.staff_js_block(cfg)
+    assert "#changelanguage" in ot.staff_js_block(cfg)
 
 
 def test_accent_stays_on_the_highlights():
@@ -1217,3 +1217,53 @@ def test_switch_icon_is_sun_and_moon():
         assert "kei-ico-moon" in js and "kei-ico-sun" in js and "uD83C" not in js
         assert "</svg" not in js  # escaped inside the script
     assert "kei-ico-sun" in ot.staff_dark_css(cfg) and "kei-ico-sun" in ot.css_body(cfg)
+
+
+def test_presets_are_balanced():
+    """Each ready-made look reads well: buttons' text, the bar's text and the
+    links on the cards; the accent stands out from the page."""
+    assert len(ot.PRESETS) == 5
+    for name in ot.PRESETS:
+        cfg = ot.apply_preset({"logo": {"source": "url", "url": "https://x.example/l.png"}}, name)
+        st = cfg["staff"]
+        assert cfg["logo"]["url"] == "https://x.example/l.png"        # pictures stay
+        assert cfg["texture"] == st["texture"] and st["bar"] == ot.PRESETS[name]["bar"]
+        for side in (cfg, st):
+            assert ot.contrast(ot.text_on(side["accent"]), side["accent"]) >= 4.5, name
+            assert ot.contrast(side["accent"], side["page"]) >= 3, name
+        assert ot.contrast(ot.text_on(st["bar"]), st["bar"]) >= 7, name
+        css = ot.staff_css_block(cfg)
+        link = re.search(r"--nexus-staff-link: (#[0-9a-f]{6})", css).group(1)
+        assert ot.contrast(link, st["surface"]) >= 4.5, name
+        light = ot.panel_colors(cfg, False)
+        assert ot.contrast(light["text"], light["card"]) >= 7, name
+
+
+def test_staff_dark_mode_and_bar_transparency():
+    """Paulo, 2026-10-31: the dark mode was ridiculous (white film over the
+    wallpaper, invisible module icons with a black accent, a light top bar,
+    his own grey buttons), the switch belongs at the foot like the OPAC's,
+    and the top bar ignored the transparency."""
+    cfg = ot.normalize({"staff": {"enabled": True, "dark_switch": True, "accent": "#121117", "accent2": "#121117",
+                                  "bar": "#d9d9de", "texture": "frosted", "opacity": 70, "blur": 9,
+                                  "background": {"source": "url", "url": "https://x.example/w.jpg"}, "film": 40}})
+    dark = ot.staff_dark_css(cfg)
+    primary = re.search(r"--nexus-staff-primary: (#[0-9a-f]{6})", dark).group(1)
+    assert ot.contrast(primary, "#161b22") >= 3
+    top = re.search(r"--nexus-staff-topbar: (#[0-9a-f]{6})", dark).group(1)
+    assert ot.luminance(top) < .18                                     # a light bar goes dark
+    assert 'html[data-kei-theme="dark"] body::before { background: rgba(8, 12, 20, 0.55); }' in dark
+    assert ".toptabs:not(#header_search) .tab-content" in dark and "#changelanguage" in dark
+    body = ot.staff_css_body(cfg)
+    assert ".grid-acesso-koha .btn-koha-clone" in body and "var(--nexus-staff-tile)" in body
+    # The bars follow the blocks' opacity and blur; the switch gives them their own.
+    assert "--nexus-staff-header-a: 0.70" in body and "--nexus-staff-header-blur: 9px" in body
+    cfg["staff"].update(header_glass=True, header_opacity=90, header_blur=4)
+    body = ot.staff_css_body(cfg)
+    assert "--nexus-staff-header-a: 0.90" in body and "--nexus-staff-header-blur: 4px" in body
+    cfg["staff"].update(header_glass=False, opacity=100)
+    assert "--nexus-staff-header-a" not in ot.staff_css_body(cfg)
+    # Headings never take the accent; the switch goes to the language bar.
+    assert "--nexus-staff-ink: #111827" in body
+    js = ot.staff_js_block(cfg)
+    assert "#changelanguage #i18nMenu" in js and "kei-theme-floating" in js and "#logged-in-menu" not in js

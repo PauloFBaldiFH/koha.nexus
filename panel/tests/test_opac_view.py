@@ -723,3 +723,35 @@ def test_paulo_1031_credits_text_keeps_his_lines():
                                                  "text:Fulano"]
     again = ot.normalize({"credits": {"enabled": True, **fields, "links": links}})["credits"]
     assert _credits_text(again) == text
+
+
+def test_ready_made_look_fills_both_sides():
+    """Paulo, 2026-10-31: five ready-made looks. Use this look fills the
+    OPAC and staff fields (colours, texture, sliders, the staff top bar);
+    pictures stay; nothing is applied."""
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await _open_opac(pilot)
+            view = app.screen.query_one("#view-opac")
+            q = view.query_one
+            await _until(pilot, lambda: "Not applied" in str(q("#o-summary").render()))
+            q("#o-val-logo", Input).value = "https://img.example.org/logo.png"
+            q("#o-src-logo", Select).value = "url"
+            q("#o-preset", Select).value = "paper"
+            await pilot.pause(0.1)
+            q("#o-preset-use", Button).press()
+            await pilot.pause(0.2)
+            look = ot.PRESETS["paper"]["look"]
+            assert q("#o-texture", Select).value == "paper" and q("#o-staff-texture", Select).value == "paper"
+            assert q("#o-accent", Input).value == look["accent"] and q("#o-staff-accent", Input).value == look["accent"]
+            assert q("#o-opacity", Slider).value == look["opacity"]
+            assert q("#o-staff-bar-on", Switch).value and q("#o-staff-bar", Input).value == ot.PRESETS["paper"]["bar"]
+            cfg, _p, problem = view.collect()
+            assert problem == "" and cfg["logo"]["url"] == "https://img.example.org/logo.png"
+            assert cfg["staff"]["bar"] == ot.PRESETS["paper"]["bar"] and cfg["page"] == look["page"]
+
+    asyncio.run(main())

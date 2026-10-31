@@ -810,6 +810,66 @@ def normalize(raw: dict | None) -> dict:
     return cfg
 
 
+# Ready-made looks (Paulo, 2026-10-31: "uns 5 presets ... bonitos e bem
+# equilibrados"). Each sets the palette, the material, the opacity, the
+# blur and the corners of the OPAC and of the staff interface together;
+# pictures, texts, news, links and the carousel are left as they are, and
+# nothing reaches Koha until Apply. Checked by hand: text 7:1 and links
+# 4.5:1 on the cards, the accent at 3:1 or more on the page (tests).
+PRESETS: dict[str, dict] = {
+    "koha": {"label": "Koha green", "note": "Koha's own green on white, solid and calm.",
+             "look": {"texture": "flat", "opacity": 100, "blur": 0, "radius_block": 8, "radius_input": 6,
+                      "radius_button": 6, "accent": "#3d7a37", "accent2": "#2c5a28", "surface": "#ffffff",
+                      "page": "#f2f5f1", "film": 45, "shadow": "soft"},
+             "bar": "#24331f"},
+    "glass": {"label": "Blue glass", "note": "Frosted glass in blue over a pale sky: the wallpaper shows through.",
+              "look": {"texture": "frosted", "opacity": 72, "blur": 14, "radius_block": 18, "radius_input": 10,
+                       "radius_button": 10, "accent": "#2563eb", "accent2": "#0891b2", "surface": "#ffffff",
+                       "page": "#e8eef8", "film": 35, "shadow": "texture"},
+              "bar": "#16213a"},
+    "graphite": {"label": "Graphite and amber", "note": "Smooth glass, graphite bar, warm amber buttons.",
+                 "look": {"texture": "smooth", "opacity": 86, "blur": 10, "radius_block": 12, "radius_input": 8,
+                          "radius_button": 8, "accent": "#b45309", "accent2": "#475569", "surface": "#ffffff",
+                          "page": "#eceef1", "film": 50, "shadow": "medium"},
+                 "bar": "#1f2733"},
+    "paper": {"label": "Paper and terracotta", "note": "Matte paper, cream blocks and terracotta: a reading room.",
+              "look": {"texture": "paper", "opacity": 96, "blur": 0, "radius_block": 10, "radius_input": 6,
+                       "radius_button": 8, "accent": "#b4462a", "accent2": "#7a5c3e", "surface": "#fffaf1",
+                       "page": "#ede4d6", "film": 55, "shadow": "soft"},
+              "bar": "#3a2a22"},
+    "metal": {"label": "Metal and petrol", "note": "Brushed metal with a petrol-blue accent, crisp and technical.",
+              "look": {"texture": "metal", "opacity": 100, "blur": 0, "radius_block": 8, "radius_input": 6,
+                       "radius_button": 6, "accent": "#0f766e", "accent2": "#64748b", "surface": "#f8fafc",
+                       "page": "#e3e8ed", "film": 50, "shadow": "texture"},
+              "bar": "#2a343e"},
+}
+
+
+def apply_preset(raw: dict | None, name: str) -> dict:
+    """The settings with preset name on both sides (OPAC and staff): its
+    palette, material, opacity, blur, corners and card shadow; each
+    colour's texture back to automatic; the staff top bar in the preset's
+    colour, its opacity following the blocks; the staff colours turned on.
+    Everything else is kept."""
+    cfg = normalize(raw)
+    pre = PRESETS[name]
+    look = pre["look"]
+    for key, value in look.items():
+        cfg[key] = value
+    cfg["paint"] = {key: {"texture": "auto", "opacity": 100} for key in PAINTED}
+    st = cfg["staff"]
+    for key, value in look.items():
+        if key == "film":
+            st[key] = _clamp(value, *STAFF_FILM, DEFAULTS["staff"]["film"])
+        else:
+            st[key] = value
+    st["paint"] = {key: {"texture": "auto", "opacity": 100} for key in PAINTED}
+    st["bar"] = pre["bar"]
+    st["header_glass"] = False
+    st["enabled"] = True
+    return normalize(cfg)
+
+
 # Pictures an https address shows on both sides; a file of this server is
 # in the OPAC's folder (/images/custom), which the staff side does not serve.
 def copy_opac_to_staff(raw: dict | None) -> tuple[dict, list[str]]:
@@ -1509,13 +1569,15 @@ def panel_colors(cfg: dict, dark: bool) -> dict:
     accent, hue = cfg["accent"], link_base(cfg["accent"], cfg["accent2"])
     if dark:
         card, text = "#161b22", "#e6edf3"
-        muted, link, ink = "#9da7b3", "#79b8ff", mix(hue, "#ffffff", .45)
+        muted, link, ink = "#9da7b3", "#79b8ff", "#f0f3f6"
         border, pane, stripe = "rgba(255, 255, 255, .08)", "rgba(255, 255, 255, .10)", "rgba(255, 255, 255, .05)"
         shadow = "0 1px 2px rgba(0, 0, 0, .65)"
     else:
         base = cfg["surface"] if luminance(cfg["surface"]) >= .30 else "#ffffff"
         card, text = mix(base, accent, .03), "#1a1a1a"
-        muted, link, ink = "#4b5563", mix(hue, "#000000", .15), mix(hue, "#000000", .30)
+        # Headings in the text's own tone: letters never take the accent
+        # (Paulo, 2026-10-31); only links carry a hue.
+        muted, link, ink = "#4b5563", mix(hue, "#000000", .15), "#111827"
         border, pane, stripe = "rgba(255, 255, 255, .2)", "rgba(15, 23, 42, .12)", "rgba(15, 23, 42, .04)"
         shadow = "0 1px 1px rgba(255, 255, 255, .55)"
     a = cfg["opacity"] / 100
@@ -2667,23 +2729,28 @@ def staff_css_body(cfg: dict) -> str:
     page = staff_page(st)
     card = surface
     text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
+    # Letters are automatic: dark or light from the background they sit on,
+    # never the accent (Paulo, 2026-10-31: "a cor de destaque afeta as
+    # letras"). Headings are the text colour, a step stronger; only links
+    # carry a hue (link_base), darkened or lightened until they read well.
+    ink = "#111827" if light else "#f0f3f6"
     hue = link_base(accent, accent2)
-    ink = mix(hue, "#000000", .30) if light else mix(hue, "#ffffff", .45)
     link = mix(hue, "#000000", .12) if light else mix(hue, "#ffffff", .35)
-    # A pale accent made pale links and headings on the white cards (Paulo,
-    # 2026-10-31, 20:20: the Administration links, the cataloguing home's
-    # buttons): they keep its hue, darkened (or lightened) until they read
-    # well on the card and on Koha's grey buttons.
-    ink, link = readable(ink, card, 5.5), readable(link, card, 5.5)
+    link = readable(link, card, 5.5)
     out = [f""":root {{
     --nexus-staff-primary: {accent};
     --nexus-staff-secondary: {accent2};
     --nexus-staff-on-primary: {text_on(accent)};
     --nexus-staff-on-secondary: {text_on(accent2)};
     --nexus-staff-bar: {bar};
+    --nexus-staff-bar-rgb: {_rgb(bar)};
     --nexus-staff-topbar: {top};
+    --nexus-staff-topbar-rgb: {_rgb(top)};
+    --nexus-staff-topbar-end: {mix(top, "#000000", .12)};
+    --nexus-staff-topbar-end-rgb: {_rgb(mix(top, "#000000", .12))};
     --nexus-staff-on-topbar: {on_bar};
     --nexus-staff-on-topbar-rgb: {on_rgb};
+    --nexus-staff-menu: {menu};
 {chosen}    --nexus-staff-primary-rgb: {_rgb(accent)};
     --nexus-staff-secondary-rgb: {_rgb(accent2)};
     --nexus-staff-page: {page};
@@ -2700,6 +2767,9 @@ def staff_css_body(cfg: dict) -> str:
     --nexus-staff-r-btn: {st['radius_button']}px;
     --nexus-staff-surface-rgb: {_rgb(surface)};
     --nexus-staff-surface-a: {st['opacity'] / 100:.2f};
+    /* The module tiles and other buttons-as-cards: the block background at
+       the opacity slider, a touch more solid so their text stays crisp. */
+    --nexus-staff-tile: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .5 + .5));
     --nexus-staff-blur: {st['blur']}px;
     --nexus-staff-card-pad: {st['card_padding']}px;
 }}
@@ -2711,7 +2781,7 @@ html body #breadcrumbs a {{ color: var(--nexus-staff-link); }}
 
 /* Top bar: its own colour (not the accent), a gentle fall to a darker shade of it. */
 html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
-    background: linear-gradient(90deg, var(--nexus-staff-topbar), {mix(top, "#000000", .12)}) !important;
+    background: linear-gradient(90deg, var(--nexus-staff-topbar), var(--nexus-staff-topbar-end)) !important;
     border: 0;
     box-shadow: 0 1px 0 rgba(255, 255, 255, .08) inset;
 }}
@@ -2724,7 +2794,7 @@ html body nav.navbar #header .nav-link:hover, html body nav.navbar #header .nav-
 }}
 html body nav.navbar #catalog-search-link {{ border-right-color: rgba({on_rgb}, .25); }}
 html body nav.navbar .dropdown-menu-dark {{
-    --bs-dropdown-bg: {menu};
+    --bs-dropdown-bg: var(--nexus-staff-menu);
     --bs-dropdown-link-hover-bg: rgba(255, 255, 255, .12);
     --bs-dropdown-link-active-bg: var(--nexus-staff-primary);
     border: 0;
@@ -2790,7 +2860,7 @@ html body ul.biglinks-list li a.icon_general {{
     min-height: 56px;
     gap: .8rem;
     padding: .7rem 1rem;
-    background-color: var(--nexus-staff-card);
+    background-color: var(--nexus-staff-tile);
     color: var(--nexus-staff-text);
     font-weight: 600;
     border: 1px solid var(--nexus-staff-edge);
@@ -2824,7 +2894,7 @@ html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-2x {{
     color: inherit;
 }}
 html body ul.biglinks-list li a.icon_general:hover, html body ul.biglinks-list li a.icon_general:focus-visible {{
-    background-color: var(--nexus-staff-card);
+    background-color: var(--nexus-staff-tile);
     color: var(--nexus-staff-ink);
     border-color: var(--nexus-staff-primary);
     box-shadow: var(--nexus-staff-shadow-hi);
@@ -2835,6 +2905,23 @@ html body ul.biglinks-list li a.icon_general:hover > .fa-fw, html body ul.biglin
     color: var(--nexus-staff-on-primary);
 }}
 html body #koha_version a {{ color: var(--nexus-staff-muted); }}
+/* A library's own home page buttons that copy the module tiles (Paulo's
+   .btn-koha-clone grid in an HTML customization, grey #DCDCDC with
+   !important): they take the tiles' look, so they follow the colours, the
+   opacity and the dark mode instead of staying grey. */
+html body .grid-acesso-koha .btn-koha-clone {{
+    background-color: var(--nexus-staff-tile) !important;
+    color: var(--nexus-staff-text) !important;
+    border: 1px solid var(--nexus-staff-edge) !important;
+    border-radius: var(--nexus-staff-radius) !important;
+    box-shadow: var(--nexus-staff-shadow) !important;
+}}
+html body .grid-acesso-koha .btn-koha-clone:hover, html body .grid-acesso-koha .btn-koha-clone:focus-visible {{
+    background-color: var(--nexus-staff-tile) !important;
+    color: var(--nexus-staff-ink) !important;
+    border-color: var(--nexus-staff-primary) !important;
+    box-shadow: var(--nexus-staff-shadow-hi) !important;
+}}
 
 /* News column: a tinted card, clear headings, an airy list. */
 html body #area-news {{
@@ -3424,17 +3511,22 @@ def _staff_header_css(st: dict) -> list[str]:
     button and the dropdown menus keep full opacity and contrast. Off, or
     where the device asks for less transparency or the browser has no
     backdrop-filter, the bars stay solid. Comes after the texture, so it
-    also wins over the metal bar."""
-    if not st["header_glass"]:
+    also wins over the metal bar.
+
+    The bars follow the blocks' opacity and blur (Paulo, 2026-10-31: "a
+    barra superior não aplica transparência"); the "Translucent top bar"
+    switch gives them an opacity and blur of their own instead. The colours
+    are variables, so the dark mode's bar is translucent too."""
+    own = st["header_glass"]
+    alpha, blur = (st["header_opacity"], st["header_blur"]) if own else (st["opacity"], st["blur"])
+    if alpha >= 100:
         return []
     a = "var(--nexus-staff-header-a)"
-    colour = staff_bar(st)
-    top, end, bar = (_rgb(colour), _rgb(mix(colour, "#000000", .12)),
-                     _rgb(mix(colour, "#000000", .22 if luminance(colour) < .18 else .08)))
+    top, end, bar = "var(--nexus-staff-topbar-rgb)", "var(--nexus-staff-topbar-end-rgb)", "var(--nexus-staff-bar-rgb)"
     bars = "html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark, html body #header_search"
     return [f""":root {{
-    --nexus-staff-header-a: {st['header_opacity'] / 100:.2f};
-    --nexus-staff-header-blur: {st['header_blur']}px;
+    --nexus-staff-header-a: {alpha / 100:.2f};
+    --nexus-staff-header-blur: {blur}px;
 }}
 html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
     background: linear-gradient(90deg, rgba({top}, {a}), rgba({end}, {a})) !important;
@@ -3547,16 +3639,46 @@ def staff_dark_css(cfg: dict) -> str:
     the switch of staff.js): the staff variables on dark surfaces, and
     Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
     st = normalize(cfg)["staff"]
-    link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), "#161b22", 5.5)
+    card = "#161b22"
+    link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), card, 5.5)
+    # The accents lifted until they stand out on the dark cards (a black
+    # accent made black buttons and invisible module icons on #161b22).
+    primary, secondary = readable(st["accent"], card, 3), readable(st["accent2"], card, 3)
+    # A light top bar turns dark with the page; a dark one stays.
+    top = staff_bar(st)
+    if luminance(top) >= .18:
+        top = mix(top, "#0d1117", .88)
+    end, bar = mix(top, "#000000", .12), mix(top, "#000000", .22)
     d = 'html[data-kei-theme="dark"]'
-    return f"""/* Staff dark mode (the light/dark switch of the top bar). */
+    film = ""
+    if st["background"]["url"]:
+        # The wallpaper's film goes dark with the page, never a white veil.
+        film = f"\n{d} body::before {{ background: rgba(8, 12, 20, {min(st['film'] + 15, 92) / 100:.2f}); }}"
+    return f"""/* Staff dark mode (the light/dark switch). */
 {d} {{
     --nexus-staff-page: #0d1117;
-    --nexus-staff-card: #161b22;
+    --nexus-staff-card: {card};
     --nexus-staff-text: #e6edf3;
     --nexus-staff-muted: #9da7b3;
-    --nexus-staff-ink: {link};
+    --nexus-staff-ink: #f0f3f6;
     --nexus-staff-link: {link};
+    --nexus-staff-primary: {primary};
+    --nexus-staff-primary-rgb: {_rgb(primary)};
+    --nexus-staff-on-primary: {text_on(primary)};
+    --nexus-staff-secondary: {secondary};
+    --nexus-staff-secondary-rgb: {_rgb(secondary)};
+    --nexus-staff-on-secondary: {text_on(secondary)};
+    --nexus-staff-topbar: {top};
+    --nexus-staff-topbar-rgb: {_rgb(top)};
+    --nexus-staff-topbar-end: {end};
+    --nexus-staff-topbar-end-rgb: {_rgb(end)};
+    --nexus-staff-bar: {bar};
+    --nexus-staff-bar-rgb: {_rgb(bar)};
+    --nexus-staff-on-topbar: #e6edf3;
+    --nexus-staff-on-topbar-rgb: 230,237,243;
+    --nexus-staff-menu: #0d1117;
+    --nexus-staff-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px -8px rgba(0, 0, 0, .6);
+    --nexus-staff-shadow-hi: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 28px -8px rgba({_rgb(primary)}, .45);
     --nexus-staff-surface-rgb: 22, 27, 34;
     --nexus-staff-edge: rgba(255, 255, 255, .10);
     --bs-body-bg: #0d1117;
@@ -3569,7 +3691,7 @@ def staff_dark_css(cfg: dict) -> str:
 {d} body .main label, {d} body .main legend, {d} body .main th, {d} body .main td, {d} body #breadcrumbs,
 {d} body .sidebar_menu, {d} body #navmenulist {{ color: var(--nexus-staff-text) !important; }}
 {d} body .page-section, {d} body fieldset.rows, {d} body .modal-content, {d} body .dropdown-menu:not(.dropdown-menu-dark),
-{d} body #area-news .newsitem, {d} body .card, {d} body .list-group-item, {d} body .toptabs .tab-content,
+{d} body #area-news .newsitem, {d} body .card, {d} body .list-group-item, {d} body .toptabs:not(#header_search) .tab-content,
 {d} body .ui-tabs-panel, {d} body #navmenu, {d} body .sidebar_menu, {d} body .dataTables_wrapper {{
     background-color: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .3 + .7)) !important;
     color: var(--nexus-staff-text);
@@ -3594,19 +3716,42 @@ def staff_dark_css(cfg: dict) -> str:
 {d} body .main a:not(.btn):not(.dropdown-item):not(.nav-link), {d} body #breadcrumbs a {{ color: var(--nexus-staff-link); }}
 {d} body .text-muted, {d} body .hint {{ color: var(--nexus-staff-muted) !important; }}
 {d} body .btn-default, {d} body .btn-light {{ background-color: #21262d; color: var(--nexus-staff-text); border-color: #30363d; }}
+{d} body #area-news {{ background-color: rgba(22, 27, 34, .55); }}
+/* The light textures' sheen (brushed metal, paper, wood) would be a pale
+   veil on the dark cards: in dark mode the blocks are the dark glass only. */
+{", ".join(f"{d} body {x.strip()}" for x in _staff_blocks(st).split(","))} {{
+    background-image: none !important;
+    background-color: rgba(22, 27, 34, calc(var(--nexus-staff-surface-a) * .3 + .7)) !important;
+}}
+{d} body #changelanguage, {d} body #changelanguage.bg-light {{
+    background-color: var(--nexus-staff-page) !important;
+    border-color: #30363d;
+}}
+{d} body #changelanguage .nav-link, {d} body #changelanguage .navbar-text {{ color: var(--nexus-staff-link); }}
+{d} body #changelanguage .nav-link.disabled, {d} body #changelanguage .currentlanguage {{ color: var(--nexus-staff-text); }}
+{d} body #koha_version, {d} body #koha_version a {{ color: var(--nexus-staff-muted); }}
+{d} body #helper, {d} body #helper a, {d} body #breadcrumbs #helper {{ color: var(--nexus-staff-link); }}
+{d} body .ui-autocomplete, {d} body .ui-widget-content {{
+    background-color: var(--nexus-staff-card); color: var(--nexus-staff-text); border-color: #30363d;
+}}{film}
+/* The switch sits at the foot of the page, with the languages (as on the OPAC). */
 #kei-theme-switch {{
-    border: 1px solid rgba(var(--nexus-staff-on-topbar-rgb, 255, 255, 255), .35);
-    background: transparent;
-    color: var(--nexus-staff-on-topbar, #fff);
+    border: 1px solid var(--nexus-staff-edge, rgba(0, 0, 0, .15));
+    background: var(--nexus-staff-card, #fff);
+    color: var(--nexus-staff-text, #1f2933);
     border-radius: 999px;
-    padding: .1rem .6rem;
-    margin: 0 .4rem;
+    padding: .2rem .65rem;
+    margin: 0 .5rem;
     cursor: pointer;
     font-size: 1rem;
     line-height: 1.4;
     align-self: center;
 }}
-#kei-theme-switch:hover {{ background: rgba(var(--nexus-staff-on-topbar-rgb, 255, 255, 255), .14); }}
+#kei-theme-switch:hover {{ border-color: var(--nexus-staff-primary, #408540); }}
+#kei-theme-switch.kei-theme-floating {{
+    position: fixed; right: 1rem; bottom: 1rem; z-index: 1080; margin: 0;
+    box-shadow: var(--nexus-staff-shadow, 0 4px 12px rgba(0, 0, 0, .2));
+}}
 {SWITCH_ICON_CSS}
 """
 
@@ -4109,7 +4254,9 @@ __LINK_NAV__
         if (document.readyState !== "loading") { fn(); } else { document.addEventListener("DOMContentLoaded", fn); }
     }
 
-    // The light/dark switch, in the top bar next to the logged-in menu.
+    // The light/dark switch at the foot of the page, with the languages
+    // (Koha's #changelanguage bar), as on the OPAC (Paulo, 2026-10-31); a
+    // corner button when Koha shows no language bar (one language only).
     ready(function () {
         if (!C.dark_switch || document.getElementById("kei-theme-switch")) { return; }
         var b = document.createElement("button");
@@ -4123,35 +4270,19 @@ __LINK_NAV__
             root.setAttribute("data-kei-theme", t);
             save(t);
         });
-        // Before the logged-in menu (the end of the bar can be cut off on a
-        // narrow window or sit inside a closed menu), else in the last menu
-        // of the top bar that is not a drop-down; a corner button when the
-        // bar has none or the switch would not be seen.
-        function floating() {
-            b.style.position = "fixed"; b.style.right = "1rem"; b.style.bottom = "1rem"; b.style.zIndex = "1080";
-            b.style.background = "rgba(22, 27, 34, .85)"; b.style.color = "#fff";
-            document.body.appendChild(b);
-        }
-        var li = document.createElement("li");
-        li.className = "nav-item";
-        li.style.display = "flex";
-        li.appendChild(b);
-        var user = document.querySelector("#logged-in-menu, #logged-in-info-full, #logged-in-dropdown");
-        var item = user && user.closest ? user.closest("li") : null;
-        if (item && item.parentNode && !(item.parentNode.closest && item.parentNode.closest(".dropdown-menu"))) {
-            item.parentNode.insertBefore(li, item);
-        } else {
-            var bars = Array.prototype.filter.call(document.querySelectorAll("nav.navbar .navbar-nav"), function (n) {
-                return !(n.closest && n.closest(".dropdown-menu"));
-            });
-            if (!bars.length) { floating(); return; }
-            bars[bars.length - 1].appendChild(li);
-        }
-        var r = b.getBoundingClientRect();
-        if (!r.width || r.right > (window.innerWidth || document.documentElement.clientWidth)) {
+        var menu = document.querySelector("#changelanguage #i18nMenu, #changelanguage .navbar-nav");
+        if (menu) {
+            var li = document.createElement("li");
+            li.className = "nav-item";
+            li.style.display = "flex";
+            li.appendChild(b);
+            menu.appendChild(li);
+            var r = b.getBoundingClientRect();
+            if (r.width && r.right <= (window.innerWidth || document.documentElement.clientWidth)) { return; }
             li.parentNode.removeChild(li);
-            floating();
         }
+        b.className = "kei-theme-floating";
+        document.body.appendChild(b);
     });
 
     ready(function () {

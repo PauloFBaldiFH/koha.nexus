@@ -184,6 +184,14 @@ class OpacView(SectionView):
         yield Label("", id="o-summary", classes="view-prompt")
         c = self.cfg
         with Vertical(id="o-material", classes="opac-box"):
+            yield Static(t("Ready-made looks: colours, texture, opacity, blur and corners chosen to go together, "
+                           "for the OPAC and the staff interface at once. Pictures, texts and buttons stay. "
+                           "Fine-tune the fields after; Apply writes it into Koha."), classes="ai-note", markup=False)
+            yield from _row(t("Ready-made look"),
+                            Select([(t(p["label"]), k) for k, p in ot.PRESETS.items()], value=next(iter(ot.PRESETS)),
+                                   allow_blank=False, id="o-preset"))
+            with Horizontal(classes="quick-actions"):
+                yield Button(t("Use this look"), id="o-preset-use", classes="small")
             yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=c["texture"],
                                                  allow_blank=False, id="o-texture"))
             for key in ("blur", "opacity"):
@@ -284,11 +292,11 @@ class OpacView(SectionView):
                     yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
                 yield from _row(t(label), _tip(Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
                                                       id=f"o-staff-{key}"), RADIUS_HELP.get(key, "")))
-            yield from _row(t("Translucent top bar"),
+            yield from _row(t("Top bar opacity of its own"),
                             _tip(Switch(st["header_glass"], id="o-staff-header_glass"),
-                                 "The top bar and the quick search bar in frosted glass: the bar's colour lets "
-                                 "the page or wallpaper show through, blurred. The links, the search field and "
-                                 "the menus stay fully opaque."))
+                                 "Off: the top bar and the quick search bar follow the blocks' opacity and blur. "
+                                 "On: the two sliders below set them apart. The links, the search field and the "
+                                 "menus always stay fully opaque."))
             for key, (label, unit) in STAFF_HEADER_SLIDERS.items():
                 yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
             yield from _row(t("Top bar colour"),
@@ -775,7 +783,7 @@ class OpacView(SectionView):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {"o-gate-sync": self.gate_sync, "o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
                    "o-refresh": self.refresh_carousel, "o-keys": self.keys, "o-remove": self.remove_look,
-                   "o-staff-copy": self.copy_opac_preset,
+                   "o-staff-copy": self.copy_opac_preset, "o-preset-use": self.use_preset,
                    "o-link-add": lambda: self.add_link(None, "links"),
                    "o-slink-add": lambda: self.add_link(None, "staff_links")}
         bid = event.button.id or ""
@@ -857,6 +865,33 @@ class OpacView(SectionView):
         if self.carousel_on:
             text += " · " + t("Carousel: ${n} titles with a cover.", n=self.feed_items or "0")
         self.query_one("#o-summary", Label).update(text)
+
+    def use_preset(self) -> None:
+        """A ready-made look (ot.PRESETS) into the OPAC and staff fields;
+        nothing is written to Koha until Apply."""
+        raw, _pending, problem = self.collect()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        name = self.query_one("#o-preset", Select).value
+        cfg = ot.apply_preset(raw, name)
+        q = self.query_one
+        q("#o-texture", Select).value = cfg["texture"]
+        for key in ot.STYLE:
+            q(f"#o-style-{key}", Select).value = cfg[key]
+        for key in SLIDERS:
+            q(f"#o-{key}", Slider).value = cfg[key]
+        for key in ("accent", "accent2", "surface"):
+            q(f"#o-{key}", Input).value = cfg[key]
+        for key in ot.PAINTED:
+            q(f"#o-paint-{key}-texture", Select).value = cfg["paint"][key]["texture"]
+            q(f"#o-paint-{key}-opacity", Slider).value = cfg["paint"][key]["opacity"]
+        q("#o-page-on", Switch).value = bool(cfg["page"])
+        if cfg["page"]:
+            q("#o-page", Input).value = cfg["page"]
+        self.fill_staff(cfg["staff"])
+        self.app.notify(t("Look \"${name}\" in the fields. Apply writes it into Koha.",
+                          name=t(ot.PRESETS[name]["label"])), timeout=8)
 
     def copy_opac_preset(self) -> None:
         """Copy OPAC preset: the OPAC fields as they are now (saved or not)
