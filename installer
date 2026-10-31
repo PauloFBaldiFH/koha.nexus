@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.135"
+PANEL_VERSION=" 1.5.136"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2311,7 +2311,7 @@ guard_recover() {
     # A fresh backup while the catalog is known to be readable.
     if [ "$db" = "ok" ] || [ "$db" = "errors" ]; then
         if [ -f /root/backup_sql.sh ]; then
-            bash /root/backup_sql.sh >/dev/null 2>&1
+            KEI_NO_MARC_CATCHUP=1 bash /root/backup_sql.sh >/dev/null 2>&1
             last=$(grep -E '\| (OK|FAILED|INFO)' "$BACKUP_LOG" 2>/dev/null | tail -n 1)
             case "$last" in
                 *"| OK: "*) backup="ok" ;;
@@ -4527,6 +4527,15 @@ if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
 fi
 
 find "\$DIR" \\( -name '*.sql.gz' -o -name '*.sql.zst' -o -name '*.sql.xz' \\) -mtime "+\${KEEP_DAYS}" -delete 2>/dev/null || true
+
+# The MARC21 backup has one fixed time (Sundays 03:00 by default): a machine
+# that is off or asleep then never makes it, and cron does not run it later.
+# Each nightly run catches up a missed one (backup_marc.sh --if-due), after
+# letting go of the backup lock. KEI_NO_MARC_CATCHUP=1 skips it.
+if [ -z "\${KEI_NO_MARC_CATCHUP:-}" ] && [ -f /root/backup_marc.sh ]; then
+    exec 9>&-
+    /bin/bash /root/backup_marc.sh --if-due >/dev/null 2>&1 || true
+fi
 exit 0
 EOF
 
@@ -4550,6 +4559,28 @@ log_backup() {
     [ -s "\$LOG" ] && [ -n "\$(tail -c1 "\$LOG")" ] && printf '\n' >> "\$LOG"
     printf '%s | %s\n' "\$(date '+%F %T')" "\$*" >> "\$LOG"
 }
+
+# --if-due (the nightly SQL backup's catch-up): runs only when the scheduled
+# run was missed, i.e. this script's cron line is on and no package is newer
+# than the schedule's period (1, 7 or 31 days). A line switched off means never.
+if [ "\${1:-}" = "--if-due" ]; then
+    SCHED=\$(grep -E '^[[:space:]]*[^#[:space:]].*/root/backup_marc[.]sh' "${CRON_TASKS}" 2>/dev/null | head -n 1 || true)
+    [ -n "\$SCHED" ] || exit 0
+    read -r C_MIN C_HOUR C_DOM C_MON C_DOW _ <<< "\$SCHED" || true
+    case "\$C_MIN" in
+        @daily|@midnight) PERIOD=1 ;;
+        @weekly) PERIOD=7 ;;
+        @monthly) PERIOD=31 ;;
+        @*) exit 0 ;;
+        *) if [ "\${C_DOM:-*}" != "*" ]; then PERIOD=31
+           elif [ "\${C_DOW:-*}" != "*" ]; then PERIOD=7
+           else PERIOD=1; fi ;;
+    esac
+    if [ -n "\$(find "\$DIR" -maxdepth 1 -name 'koha_marc_*.tar.gz' -mtime "-\${PERIOD}" 2>/dev/null | head -n 1 || true)" ]; then
+        exit 0
+    fi
+    log_backup "INFO: catching up the scheduled MARC backup (none in the last \${PERIOD} days)"
+fi
 exec 9>"\$LOCK_FILE"
 if ! flock -n 9; then
     log_backup "INFO: MARC backup skipped because another backup/restore is running"
@@ -4575,6 +4606,7 @@ PACKAGE="\$DIR/koha_marc_\${DATE}.tar.gz"
 # error (warnings, failures) goes to its own file, never into the records
 # or the log; a failure quotes only its last message line.
 EXPORT_ERR="\${LOG%.log}_export_errors.log"
+mkdir -p "\$(dirname "\$LOG")" 2>/dev/null || true
 : > "\$EXPORT_ERR"
 export_part() {
     printf '== %s %s\n' "\$(date '+%F %T')" "\$1" >> "\$EXPORT_ERR"
@@ -6355,8 +6387,9 @@ function_manual_backup() {
 function_marc_backup() {
     require_koha || return 1
     # A script written before 1.5.55 sent export_records.pl's output to the
-    # log, where the records broke the outcome lines: rewritten.
-    if [ ! -f /root/backup_marc.sh ] || ! grep -q 'EXPORT_ERR=' /root/backup_marc.sh 2>/dev/null; then
+    # log, where the records broke the outcome lines; one written before
+    # 1.5.136 had no --if-due catch-up: rewritten.
+    if [ ! -f /root/backup_marc.sh ] || ! grep -q -- '--if-due' /root/backup_marc.sh 2>/dev/null; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     if [ ! -f /root/backup_marc.sh ]; then
@@ -7510,8 +7543,11 @@ rclone_probe() {
 
 # The first full backup after a successful test: in the background, so the
 # set-up ends as soon as the cloud answered.
+# The first SQL backup and the first MARC21 package, one after the other
+# (they share the backup lock), so both cloud folders get a file at once.
 kei_first_cloud_backup() {
-    nohup setsid bash /root/backup_sql.sh >/dev/null 2>&1 </dev/null &
+    nohup setsid bash -c 'KEI_NO_MARC_CATCHUP=1 bash /root/backup_sql.sh; [ -f /root/backup_marc.sh ] && bash /root/backup_marc.sh' \
+        >/dev/null 2>&1 </dev/null &
 }
 
 validate_and_register_rclone() {
@@ -37577,8 +37613,9 @@ kei_task_info() {
     kei_result compression "$(backup_codec_setting)"
     kei_result compression_used "$(backup_codec)"
     # A nightly script written before 1.5.44 dumps straight into its final
-    # name, so a dump in progress looked like the newest backup: rewritten.
-    if [ -f /root/backup_sql.sh ] && ! grep -q 'PART=' /root/backup_sql.sh 2>/dev/null; then
+    # name, so a dump in progress looked like the newest backup; one written
+    # before 1.5.136 never caught up a missed MARC21 backup: rewritten.
+    if [ -f /root/backup_sql.sh ] && ! grep -q 'backup_marc.sh --if-due' /root/backup_sql.sh 2>/dev/null; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
