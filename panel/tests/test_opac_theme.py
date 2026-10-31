@@ -315,7 +315,8 @@ def test_staff_has_its_own_palette():
     staff = ot.staff_css_body(cfg)
     assert "--nexus-staff-primary: #0f766e" in staff and "#123456" not in staff
     for sel in ("nav.navbar.bg-dark", "#header_search .form-content", "ul.biglinks-list li a.icon_general",
-                "#area-news .newsitem .btn-acesso", "--nexus-staff-bar: " + ot.mix("#0f766e", "#000000", .22)):
+                "#area-news .newsitem .btn-acesso",
+                "--nexus-staff-bar: " + ot.mix(ot.staff_bar(cfg["staff"]), "#000000", .22)):
         assert sel in staff, sel
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["accent"] == "#0f766e"
     assert "#0f766e" not in ot.css_body(cfg)
@@ -626,7 +627,7 @@ def test_staff_translucent_header():
     off = ot.normalize({"staff": {"enabled": True}})["staff"]
     assert (off["header_glass"], off["header_opacity"], off["header_blur"]) == (False, 85, 8)
     assert "--nexus-staff-header-a" not in ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
-    cfg = ot.normalize({"staff": {"enabled": True, "accent": "#408540", "texture": "metal",
+    cfg = ot.normalize({"staff": {"enabled": True, "accent": "#123456", "bar": "#408540", "texture": "metal",
                                   "header_glass": True, "header_opacity": 140, "header_blur": -3}})
     assert (cfg["staff"]["header_opacity"], cfg["staff"]["header_blur"]) == (100, 0)
     cfg["staff"].update(header_opacity=60, header_blur=8)
@@ -1170,3 +1171,49 @@ def test_paulo_1031_staff_links_read_on_a_pale_accent():
     link = css.split("--nexus-staff-link: ")[1][:7]
     assert ot.contrast(link, "#ffffff") >= 5.5
     assert "#logged-in-menu" in ot.staff_js_block(cfg)
+
+
+def test_accent_stays_on_the_highlights():
+    """Paulo, 2026-10-31: the accent dyed the letters, the buttons and the
+    top bar. The staff top bar has its own colour (automatic: dark slate),
+    links borrow the accent only when it is a colour, text on buttons and
+    on the bar picks the better contrast."""
+    black = ot.normalize({"accent": "#121117", "accent2": "#121117",
+                          "staff": {"enabled": True, "accent": "#121117", "accent2": "#121117"}})
+    st = black["staff"]
+    assert st["bar"] == "" and not ot.colourful("#121117") and ot.colourful("#2563eb")
+    css = ot.staff_css_body(black)
+    # The bar is not the accent and its text reads on it.
+    bar = ot.staff_bar(st)
+    assert bar != "#121117" and f"--nexus-staff-topbar: {bar}" in css
+    assert ot.contrast(ot.text_on(bar), bar) >= 7
+    assert "linear-gradient(90deg, var(--nexus-staff-topbar)" in css
+    assert "linear-gradient(90deg, var(--nexus-staff-primary)" not in css
+    # Links: a black accent no longer makes them black like the text.
+    link = re.search(r"--nexus-staff-link: (#[0-9a-f]{6})", css).group(1)
+    assert ot.colourful(link) and ot.contrast(link, "#ffffff") >= 5.5
+    assert ot.panel_colors(black, False)["link"] != ot.mix("#121117", "#000000", .15)
+    # A colourful accent still gives the links its hue; a second colour wins over a grey accent.
+    assert ot.link_base("#2563eb", "#121117") == "#2563eb"
+    assert ot.link_base("#808080", "#db2777") == "#db2777"
+    assert ot.link_base("#ffffff", "#000000") == ot.LINK_FALLBACK
+    # The main buttons stay the accent.
+    assert "--nexus-staff-primary: #121117" in css and "background-color: var(--nexus-staff-primary);" in css
+    # A chosen bar colour: written, read back from Koha, its text dark on a light bar.
+    own = ot.normalize({"staff": {"enabled": True, "accent": "#121117", "bar": "#f5f5f5"}})
+    css = ot.staff_css_body(own)
+    assert "--nexus-staff-topbar: #f5f5f5" in css and "--nexus-staff-on-topbar: #111827" in css
+    assert ot.css_values(css, staff=True)["bar"] == "#f5f5f5"
+    assert "bar" not in ot.css_values(ot.staff_css_body(black), staff=True)
+    # Text on a mid colour: the one with more contrast (white on orange was 2.8:1).
+    assert ot.text_on("#f97316") == "#111827"
+    for c in ("#f97316", "#22c55e", "#2563eb", "#121117", "#facc15", "#7c3aed"):
+        assert ot.contrast(ot.text_on(c), c) >= 4.5, c
+
+
+def test_switch_icon_is_sun_and_moon():
+    cfg = ot.normalize({"dark_switch": True, "staff": {"enabled": True, "dark_switch": True}})
+    for js in (ot.staff_js_block(cfg), ot.js_block(cfg)):
+        assert "kei-ico-moon" in js and "kei-ico-sun" in js and "uD83C" not in js
+        assert "</svg" not in js  # escaped inside the script
+    assert "kei-ico-sun" in ot.staff_dark_css(cfg) and "kei-ico-sun" in ot.css_body(cfg)

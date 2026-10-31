@@ -171,7 +171,7 @@ DEFAULTS: dict = {
     # start from the OPAC's (normalize()); before it had a material, "flat"
     # with the corners it had, so their look does not change.
     "staff": {"enabled": False, "accent": "#2563eb", "accent2": "#7c3aed", "surface": "#ffffff",
-              "page": "", "texture": "flat", "blur": 12, "opacity": 100,
+              "page": "", "bar": "", "texture": "flat", "blur": 12, "opacity": 100,
               "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
@@ -787,7 +787,9 @@ def normalize(raw: dict | None) -> dict:
                     "card_padding": _clamp(st.get("card_padding", DEFAULTS["staff"]["card_padding"]),
                                            *STAFF_CARD_PADDING, DEFAULTS["staff"]["card_padding"]),
                     "texture": st.get("texture") if st.get("texture") in TEXTURES else DEFAULTS["staff"]["texture"],
-                    "page": _hex(st.get("page"), "") if st.get("page") else ""}
+                    "page": _hex(st.get("page"), "") if st.get("page") else "",
+                    # The top bar's own colour ("" = automatic, staff_bar()).
+                    "bar": _hex(st.get("bar"), "") if st.get("bar") else ""}
     for key in STAFF_MATERIAL:
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
@@ -893,7 +895,7 @@ _STAFF_CSS_VARS = {"--nexus-staff-primary": ("accent", "hex"), "--nexus-staff-se
                    "--nexus-staff-card": ("surface", "hex"), "--nexus-staff-surface-a": ("opacity", "alpha"),
                    "--nexus-staff-blur": ("blur", "px"), "--nexus-staff-radius": ("radius_block", "px"),
                    "--nexus-staff-r-input": ("radius_input", "px"), "--nexus-staff-r-btn": ("radius_button", "px"),
-                   "--nexus-staff-card-pad": ("card_padding", "px")}
+                   "--nexus-staff-card-pad": ("card_padding", "px"), "--nexus-staff-bar-colour": ("bar", "hex")}
 
 
 def css_values(css: str, staff: bool = False) -> dict:
@@ -1440,8 +1442,9 @@ def luminance(hex_color: str) -> float:
 
 
 def text_on(hex_color: str) -> str:
-    """Dark or light text, whichever reads better on hex_color."""
-    return "#111827" if luminance(hex_color) > 0.40 else "#ffffff"
+    """Dark or light text, whichever has the higher contrast on hex_color
+    (a fixed luminance cut put white on orange and mid greens at 2.8:1)."""
+    return "#111827" if contrast("#111827", hex_color) > contrast("#ffffff", hex_color) else "#ffffff"
 
 
 def contrast(a: str, b: str) -> float:
@@ -1461,6 +1464,40 @@ def readable(color: str, bg: str, minimum: float = 4.5) -> str:
     return target
 
 
+def colourful(hex_color: str) -> bool:
+    """A colour with a hue of its own: not a grey, nor almost black or white
+    (HSL saturation 25% or more, lightness between 10% and 92%)."""
+    r, g, b = (int(hex_color.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    hi, lo = max(r, g, b), min(r, g, b)
+    light = (hi + lo) / 2
+    if hi == lo or not .10 <= light <= .92:
+        return False
+    return (hi - lo) / (1 - abs(2 * light - 1)) >= .25
+
+
+# Links when neither colour has a hue: a plain, legible blue.
+LINK_FALLBACK = "#1d5fa8"
+
+
+def link_base(accent: str, accent2: str) -> str:
+    """The hue links and headings take. The accent is the highlight of the
+    buttons; links only borrow it when it is a colour: a black, grey or
+    white accent made the links look like the text around them (Paulo,
+    2026-10-31: the accent changed the letters). Then the second colour,
+    else a plain blue."""
+    for c in (accent, accent2):
+        if colourful(c):
+            return c
+    return LINK_FALLBACK
+
+
+def staff_bar(st: dict) -> str:
+    """The staff top bar's colour: its own when chosen, else a dark slate
+    with a hint of the accent, so the accent stays on the buttons and the
+    bar keeps light, readable menus whatever the accent is."""
+    return st.get("bar") or mix("#1f252d", st["accent"], .14)
+
+
 def panel_colors(cfg: dict, dark: bool) -> dict:
     """The colours of the one glass card every surface shares: in light
     mode a light glass (the block background when it is light, else white)
@@ -1469,16 +1506,16 @@ def panel_colors(cfg: dict, dark: bool) -> dict:
     checked against the card over a black and over a white wallpaper: text
     gets 7:1, muted text, links and headings 4.5:1, as far as the opacity
     allows (a clear card leans on the text shadow)."""
-    accent = cfg["accent"]
+    accent, hue = cfg["accent"], link_base(cfg["accent"], cfg["accent2"])
     if dark:
         card, text = "#161b22", "#e6edf3"
-        muted, link, ink = "#9da7b3", "#79b8ff", mix(accent, "#ffffff", .45)
+        muted, link, ink = "#9da7b3", "#79b8ff", mix(hue, "#ffffff", .45)
         border, pane, stripe = "rgba(255, 255, 255, .08)", "rgba(255, 255, 255, .10)", "rgba(255, 255, 255, .05)"
         shadow = "0 1px 2px rgba(0, 0, 0, .65)"
     else:
         base = cfg["surface"] if luminance(cfg["surface"]) >= .30 else "#ffffff"
         card, text = mix(base, accent, .03), "#1a1a1a"
-        muted, link, ink = "#4b5563", mix(accent, "#000000", .15), mix(accent, "#000000", .30)
+        muted, link, ink = "#4b5563", mix(hue, "#000000", .15), mix(hue, "#000000", .30)
         border, pane, stripe = "rgba(255, 255, 255, .2)", "rgba(15, 23, 42, .12)", "rgba(15, 23, 42, .04)"
         shadow = "0 1px 1px rgba(255, 255, 255, .55)"
     a = cfg["opacity"] / 100
@@ -1879,6 +1916,7 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     line-height: 1.4;
 }
 #kei-theme-switch:hover { border-color: var(--kei-accent); }""")
+        out.append(SWITCH_ICON_CSS)
     if cfg["news_buttons"]:
         out.append(""".kei-action {
     display: flex;
@@ -2613,12 +2651,25 @@ def staff_css_body(cfg: dict) -> str:
     st = cfg["staff"]
     accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
     light = luminance(surface) >= 0.30
-    bar = mix(accent, "#000000", .22)              # the quick search bar: the top bar's hue, darker
+    # The top bar has its own colour (staff_bar): the accent only marks the
+    # main buttons, the module icons, the active tab and the focus ring
+    # (Paulo, 2026-10-31: the accent dyed the letters, the buttons and the
+    # bar). The quick search bar under it: the bar's hue, a step darker.
+    top = staff_bar(st)
+    top_dark = luminance(top) < .18
+    on_bar = text_on(top)
+    bar = mix(top, "#000000", .22 if top_dark else .08)
+    on_rgb = _rgb(on_bar)
+    menu = mix(top, "#000000", .55) if top_dark else "#212529"
+    # Only a chosen bar colour is written as a setting (css_values reads it
+    # back); the automatic one follows the accent.
+    chosen = f"    --nexus-staff-bar-colour: {st['bar']};\n" if st["bar"] else ""
     page = staff_page(st)
     card = surface
     text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
-    ink = mix(accent, "#000000", .30) if light else mix(accent, "#ffffff", .45)
-    link = mix(accent, "#000000", .12) if light else mix(accent, "#ffffff", .35)
+    hue = link_base(accent, accent2)
+    ink = mix(hue, "#000000", .30) if light else mix(hue, "#ffffff", .45)
+    link = mix(hue, "#000000", .12) if light else mix(hue, "#ffffff", .35)
     # A pale accent made pale links and headings on the white cards (Paulo,
     # 2026-10-31, 20:20: the Administration links, the cataloguing home's
     # buttons): they keep its hue, darkened (or lightened) until they read
@@ -2630,7 +2681,10 @@ def staff_css_body(cfg: dict) -> str:
     --nexus-staff-on-primary: {text_on(accent)};
     --nexus-staff-on-secondary: {text_on(accent2)};
     --nexus-staff-bar: {bar};
-    --nexus-staff-primary-rgb: {_rgb(accent)};
+    --nexus-staff-topbar: {top};
+    --nexus-staff-on-topbar: {on_bar};
+    --nexus-staff-on-topbar-rgb: {on_rgb};
+{chosen}    --nexus-staff-primary-rgb: {_rgb(accent)};
     --nexus-staff-secondary-rgb: {_rgb(accent2)};
     --nexus-staff-page: {page};
     --nexus-staff-card: {card};
@@ -2655,21 +2709,22 @@ html body #container-main a:not(.btn):not(.icon_general):not(.btn-acesso):not(.d
 html body .main a:not(.btn):not(.dropdown-item):not(.nav-link),
 html body #breadcrumbs a {{ color: var(--nexus-staff-link); }}
 
-/* Top bar: one hue, a gentle fall to a darker shade of it. */
+/* Top bar: its own colour (not the accent), a gentle fall to a darker shade of it. */
 html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
-    background: linear-gradient(90deg, var(--nexus-staff-primary), {mix(accent, "#000000", .12)}) !important;
+    background: linear-gradient(90deg, var(--nexus-staff-topbar), {mix(top, "#000000", .12)}) !important;
     border: 0;
     box-shadow: 0 1px 0 rgba(255, 255, 255, .08) inset;
 }}
 html body nav.navbar #header .nav-link, html body nav.navbar #logged-in-info-full,
-html body nav.navbar .navbar-text {{ color: var(--nexus-staff-on-primary); }}
+html body nav.navbar .navbar-text, html body nav.navbar .navbar-nav > li > a,
+html body nav.navbar #user-menu .nav-link, html body nav.navbar .dropdown-toggle {{ color: var(--nexus-staff-on-topbar); }}
 html body nav.navbar #header .nav-link:hover, html body nav.navbar #header .nav-link:focus {{
-    background-color: rgba(255, 255, 255, .14);
+    background-color: rgba({on_rgb}, .14);
     border-radius: 8px;
 }}
-html body nav.navbar #catalog-search-link {{ border-right-color: rgba(255, 255, 255, .25); }}
+html body nav.navbar #catalog-search-link {{ border-right-color: rgba({on_rgb}, .25); }}
 html body nav.navbar .dropdown-menu-dark {{
-    --bs-dropdown-bg: {mix(accent, "#000000", .55)};
+    --bs-dropdown-bg: {menu};
     --bs-dropdown-link-hover-bg: rgba(255, 255, 255, .12);
     --bs-dropdown-link-active-bg: var(--nexus-staff-primary);
     border: 0;
@@ -2686,7 +2741,7 @@ html body #header_search .nav-tabs > li > a:focus {{
 }}
 html body #header_search {{ padding-top: .45rem; padding-bottom: .45rem; gap: .5rem; }}
 html body #header_search form {{ align-items: center; }}
-html body #header_search .form-title label {{ color: #fff; letter-spacing: .01em; }}
+html body #header_search .form-title label {{ color: var(--nexus-staff-on-topbar); letter-spacing: .01em; }}
 html body #header_search .form-content {{
     background-color: var(--nexus-staff-card);
     border-radius: var(--nexus-staff-r-input) 0 0 var(--nexus-staff-r-input);
@@ -2709,22 +2764,22 @@ html body #header_search input[type="submit"], html body #header_search button[t
 html body #header_search input[type="submit"]:hover,
 html body #header_search button[type="submit"]:hover {{ background-color: var(--nexus-staff-secondary); filter: brightness(1.1); }}
 html body #header_search .nav-tabs > li > a {{
-    color: rgba(255, 255, 255, .82);
+    color: rgba({on_rgb}, .82);
     border-radius: 8px;
     margin: 0 .1rem;
     padding: .15rem .4rem;
     transition: background-color .15s ease, color .15s ease;
 }}
 html body #header_search .nav-tabs > li > a:hover, html body #header_search .nav-tabs > li > a:focus {{
-    background-color: rgba(255, 255, 255, .12);
+    background-color: rgba({on_rgb}, .12);
     border-color: transparent;
-    color: #fff;
+    color: var(--nexus-staff-on-topbar);
 }}
 html body #header_search .nav-tabs > li > a.active, html body #header_search .nav-tabs > li > a.active:hover {{
-    background-color: rgba(255, 255, 255, .16);
+    background-color: rgba({on_rgb}, .16);
     border-color: transparent;
-    border-bottom: 2px solid var(--nexus-staff-secondary);
-    color: #fff;
+    border-bottom: 2px solid var(--nexus-staff-primary);
+    color: var(--nexus-staff-on-topbar);
 }}
 html body #header_search .form-extra-content {{ border-color: var(--nexus-staff-bar); border-radius: 0 0 10px 10px; }}
 
@@ -3116,7 +3171,7 @@ def _staff_material_css(st: dict) -> list[str]:
 html body .main { isolation: auto; }""")
     if t in METALS:
         # The top bar and the buttons brushed, like the OPAC's.
-        bar = _METAL_MAIN.format(c="var(--nexus-staff-primary)")
+        bar = _METAL_MAIN.format(c="var(--nexus-staff-topbar)")
         rule.append(f"""html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
     background: {bar} !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(0, 0, 0, .35);
@@ -3373,8 +3428,9 @@ def _staff_header_css(st: dict) -> list[str]:
     if not st["header_glass"]:
         return []
     a = "var(--nexus-staff-header-a)"
-    top, end, bar = (_rgb(st["accent"]), _rgb(mix(st["accent"], "#000000", .12)),
-                     _rgb(mix(st["accent"], "#000000", .22)))
+    colour = staff_bar(st)
+    top, end, bar = (_rgb(colour), _rgb(mix(colour, "#000000", .12)),
+                     _rgb(mix(colour, "#000000", .22 if luminance(colour) < .18 else .08)))
     bars = "html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark, html body #header_search"
     return [f""":root {{
     --nexus-staff-header-a: {st['header_opacity'] / 100:.2f};
@@ -3491,7 +3547,7 @@ def staff_dark_css(cfg: dict) -> str:
     the switch of staff.js): the staff variables on dark surfaces, and
     Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
     st = normalize(cfg)["staff"]
-    link = readable(mix(st["accent"], "#ffffff", .45), "#161b22", 5.5)
+    link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), "#161b22", 5.5)
     d = 'html[data-kei-theme="dark"]'
     return f"""/* Staff dark mode (the light/dark switch of the top bar). */
 {d} {{
@@ -3539,9 +3595,9 @@ def staff_dark_css(cfg: dict) -> str:
 {d} body .text-muted, {d} body .hint {{ color: var(--nexus-staff-muted) !important; }}
 {d} body .btn-default, {d} body .btn-light {{ background-color: #21262d; color: var(--nexus-staff-text); border-color: #30363d; }}
 #kei-theme-switch {{
-    border: 1px solid rgba(255, 255, 255, .35);
+    border: 1px solid rgba(var(--nexus-staff-on-topbar-rgb, 255, 255, 255), .35);
     background: transparent;
-    color: var(--nexus-staff-on-primary, #fff);
+    color: var(--nexus-staff-on-topbar, #fff);
     border-radius: 999px;
     padding: .1rem .6rem;
     margin: 0 .4rem;
@@ -3550,7 +3606,8 @@ def staff_dark_css(cfg: dict) -> str:
     line-height: 1.4;
     align-self: center;
 }}
-#kei-theme-switch:hover {{ background: rgba(255, 255, 255, .14); }}
+#kei-theme-switch:hover {{ background: rgba(var(--nexus-staff-on-topbar-rgb, 255, 255, 255), .14); }}
+{SWITCH_ICON_CSS}
 """
 
 
@@ -3660,7 +3717,7 @@ _JS = r"""(function () {
             b.id = "kei-theme-switch";
             b.title = C.text.switch_title;
             b.setAttribute("aria-label", C.text.switch_title);
-            b.textContent = "\uD83C\uDF13";
+            b.innerHTML = __SWITCH_ICONS__;
             b.addEventListener("click", function () {
                 theme = root.getAttribute("data-kei-theme") === "dark" ? "light" : "dark";
                 setTheme(theme);
@@ -4060,7 +4117,7 @@ __LINK_NAV__
         b.id = "kei-theme-switch";
         b.title = C.switch_title;
         b.setAttribute("aria-label", C.switch_title);
-        b.textContent = "\uD83C\uDF13";
+        b.innerHTML = __SWITCH_ICONS__;
         b.addEventListener("click", function () {
             var t = root.getAttribute("data-kei-theme") === "dark" ? "light" : "dark";
             root.setAttribute("data-kei-theme", t);
@@ -4142,9 +4199,28 @@ def _links_conf(lk: dict) -> dict:
     return {"style": lk["style"], "layout": lk["layout"], "items": lk["items"]}
 
 
+# The light/dark switch's face: a moon in light mode (go dark), a sun in
+# dark mode (go light), drawn in the text colour. The old half-moon emoji
+# came out as a purple and yellow blob that nobody read as a switch (Paulo,
+# 2026-10-31).
+_SWITCH_ICONS = ('<svg class="kei-ico-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+                 '<path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'
+                 '<svg class="kei-ico-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+                 '<circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" '
+                 'stroke-width="2" stroke-linecap="round"><path d="M12 1.5v2.5M12 20v2.5M1.5 12H4M20 12h2.5'
+                 'M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></g></svg>')
+# Which face shows (OPAC and staff).
+SWITCH_ICON_CSS = """#kei-theme-switch { display: inline-flex; align-items: center; justify-content: center; }
+#kei-theme-switch svg { width: 1.1em; height: 1.1em; display: block; }
+#kei-theme-switch .kei-ico-sun, html[data-kei-theme="dark"] #kei-theme-switch .kei-ico-moon { display: none; }
+html[data-kei-theme="dark"] #kei-theme-switch .kei-ico-sun { display: block; }"""
+
+
 def _script(template: str, conf: dict) -> str:
     conf = json.dumps(conf, ensure_ascii=True, sort_keys=True).replace("</", "<\\/")
-    return template.replace("__LINK_NAV__", _LINK_NAV).replace("__CONFIG__", conf)
+    icons = json.dumps(_SWITCH_ICONS).replace("</", "<\\/")
+    return (template.replace("__LINK_NAV__", _LINK_NAV).replace("__CONFIG__", conf)
+            .replace("__SWITCH_ICONS__", icons))
 
 
 def js_block(cfg: dict, text: dict | None = None) -> str:
