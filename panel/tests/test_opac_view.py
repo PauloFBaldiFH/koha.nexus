@@ -170,12 +170,28 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
     asyncio.run(main())
 
 
+def _live(cfg: dict) -> str:
+    """live_contents as opac-theme-get reads Koha after an apply of cfg
+    (base64 of the JSON, as the installer sends it)."""
+    import base64
+    import json
+    live = {}
+    for place, markup in ot.contents(cfg).items():
+        if markup:
+            title = ""
+            if place.startswith("news-"):
+                first, markup = markup.split("\n", 1)
+                title = first[len("<!-- kei-news-title: "):-len(" -->")]
+            live[place] = {"title": title, "content": markup}
+    return base64.b64encode(json.dumps(live).encode()).decode()
+
+
 def test_settings_come_back_from_koha(monkeypatch):
     """The screen opens with the settings of the block in OpacUserCSS."""
     from kei_panel import demo
     cfg = ot.normalize({"texture": "gradient", "accent": "#ff0066", "carousel": {"count": 20, "hover": "tilt"}})
-    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [f"@@result data={ot.data_line(cfg)}",
-                                                          "@@result carousel=on", "@@result feed_items=17"])
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [f"@@result data={ot.data_line(cfg)}",
+                                                           "@@result carousel=on", "@@result feed_items=17"])
     from kei_panel.app import KohaPanelApp
 
     async def main():
@@ -368,7 +384,8 @@ def test_sync_reads_what_is_live_in_koha(monkeypatch):
             await pilot.pause(0.2)
             await pilot.press("o")
             view = app.screen.query_one("#view-opac")
-            await _until(pilot, lambda: "Not applied" in str(view.query_one("#o-summary").render()))
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "smooth")
+            view.query_one("#o-texture", Select).value = "metal"
             view.query_one("#o-sync").press()
             await _until(pilot, lambda: isinstance(app.screen, TextScreen))
             report = app.screen._text
@@ -381,6 +398,62 @@ def test_sync_reads_what_is_live_in_koha(monkeypatch):
             assert not view.query("#o-news_buttons") and not view.query("#o-news")
             assert view.collect()[0]["news_buttons"] is True
             assert len(view.query(".link-row")) == 2
+
+    asyncio.run(main())
+
+
+def test_restore_makes_the_screen_read_koha_again(monkeypatch):
+    """Paulo, 2026-10-31: after a backup restore the screen shows the look of
+    the restored Koha (its news buttons too), not the one it had before; a
+    Koha with none of the panel's look gives the defaults."""
+    from kei_panel import demo
+    before = ot.normalize({"texture": "gradient",
+                           "news": {"opac": {"enabled": True, "title": "Antes", "html": "<p>a</p>",
+                                             "buttons": [{"text": "Velho", "url": "/velho"}]}}})
+    after = ot.normalize({"texture": "metal",
+                          "news": {"opac": {"enabled": True, "title": "Depois", "html": "<p>b</p>",
+                                            "buttons": [{"text": "Novo", "url": "/novo"},
+                                                        {"text": "Agenda", "url": "/agenda"}]}}})
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
+        f"@@result data={ot.data_line(before)}", "@@result block_OpacUserCSS=yes", "@@result live_contents=" + _live(before)])
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 50)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            view = app.screen.query_one("#view-opac")
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "gradient")
+            await _until(pilot, lambda: len(view.query_one("#o-newsitem-opac-btns").children) == 1)
+            # Back on the screen without a restore: the fields stay as typed.
+            view.query_one("#o-newsitem-opac-title", Input).value = "Typed"
+            await pilot.press("d")
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            await pilot.pause(0.5)
+            assert view.query_one("#o-newsitem-opac-title", Input).value == "Typed"
+            # A restore brought another look into Koha.
+            monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
+                f"@@result data={ot.data_line(after)}", "@@result block_OpacUserCSS=yes",
+                "@@result live_contents=" + _live(after)])
+            await pilot.press("d")
+            app.restores = getattr(app, "restores", 0) + 1
+            await pilot.pause(0.2)
+            await pilot.press("o")
+            await _until(pilot, lambda: view.query_one("#o-texture", Select).value == "metal")
+            await _until(pilot, lambda: view.query_one("#o-newsitem-opac-title", Input).value == "Depois")
+            await _until(pilot, lambda: [r.query_one(".link-text", Input).value
+                                         for r in view.query_one("#o-newsitem-opac-btns").children] == ["Novo", "Agenda"])
+            # Restored again, with none of the panel's look: Sync gives the defaults.
+            monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", ["@@result live_contents={}"])
+            view.query_one("#o-sync").press()
+            await _until(pilot, lambda: isinstance(app.screen, TextScreen))
+            assert "Nothing of the panel's look is in Koha" in app.screen._text
+            await pilot.press("escape")
+            assert view.query_one("#o-texture", Select).value == ot.DEFAULTS["texture"]
+            assert not view.query_one("#o-newsitem-opac-enabled", Switch).value
+            assert "Not applied" in str(view.query_one("#o-summary").render())
 
     asyncio.run(main())
 
@@ -461,8 +534,8 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
     banner = tmp_path / "banner.png"
     banner.write_bytes(PNG)
     saved = ot.normalize({"credits": {"enabled": True, "name": "Biblioteca Municipal", "cnpj": "00000000000000"}})
-    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [
-        f"@@result data={ot.data_line(saved)}",
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
+        f"@@result data={ot.data_line(saved)}", "@@result live_contents=" + _live(saved),
         "@@result contents_settings=" + __import__("json").dumps(ot.contents_settings(saved))])
     from textual.widgets import TextArea
     from kei_panel.app import KohaPanelApp
@@ -522,8 +595,8 @@ def test_corner_help_postimages_and_news(monkeypatch):
     from kei_panel.app import KohaPanelApp
     from kei_panel.views.opac import POSTIMAGES_URL
     saved = ot.normalize({"news": {"staff": {"enabled": True, "title": "Equipe", "html": "<p>Reunião</p>"}}})
-    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-get", [
-        f"@@result data={ot.data_line(saved)}",
+    monkeypatch.setitem(demo._SCRIPTS, "opac-theme-sync", [
+        f"@@result data={ot.data_line(saved)}", "@@result live_contents=" + _live(saved),
         "@@result contents_settings=" + __import__("json").dumps(ot.contents_settings(saved))])
 
     async def main():

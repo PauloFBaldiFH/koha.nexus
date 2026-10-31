@@ -211,7 +211,7 @@ task() { run env KEI_EXTRA="$W/extra.sh" bash "$PANEL" "$@"; echo "$output"; cat
     [ "$(pref IntranetUserCSS)" = "#staff { color: navy; }" ]
 }
 
-@test "theme-settings.json: saved by apply, written back after a restore, gone with remove" {
+@test "theme-settings.json: saved by apply, gone with remove" {
     printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" ".navbar { background: #123456; }" \
         "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.css"
     task opac_theme_apply "$W/apply"
@@ -223,46 +223,80 @@ assert s["settings"] == {"texture": "frosted", "version": 1}, s
 assert set(s["blocks"]) == {"OpacUserCSS", "OpacUserJS", "IntranetUserCSS"}, s
 assert ["AmazonAssocTag", "mytag-20"] in s["prefs"] and s["carousel"] == "off", s
 PY
-    # A restore brings back the backup's preferences: the look is gone.
-    mysql "$DB" -e "UPDATE systempreferences SET value = '#old { }' WHERE variable = 'OpacUserCSS';
-UPDATE systempreferences SET value = '' WHERE variable IN ('OpacUserJS', 'IntranetUserCSS', 'AmazonAssocTag');"
-    rm -f "$W/results"
-    task theme_state_reapply
-    [ "$status" -eq 0 ]
-    [ "$(pref OpacUserCSS | head -n1)" = "#old { }" ]
-    pref OpacUserCSS | grep -qxF "a { color: blue; }"
-    [ "$(pref OpacUserCSS | grep -c 'opac-theme begin')" = "1" ]
-    pref OpacUserJS | grep -qF "(function () { var x = 1; })();"
-    pref IntranetUserCSS | grep -qF ".navbar { background: #123456; }"
-    [ "$(pref AmazonAssocTag)" = "mytag-20" ]
-    grep -q "RESULT theme_reapplied=yes" "$W/results"
-    # Twice is the same as once.
-    task theme_state_reapply
-    [ "$(pref OpacUserCSS | grep -c 'opac-theme begin')" = "1" ]
     task opac_theme_remove
     [ ! -e "$W/etc/theme-settings.json" ]
-    [ "$(pref IntranetUserCSS)" = "" ]
+    [ "$(pref IntranetUserCSS)" = "#staff { color: navy; }" ]
 }
 
-@test "theme-settings.json: nothing saved or a damaged file changes nothing" {
-    task theme_state_reapply
+# restored LOOK: the database as a backup brings it back. "other": another
+# look of the panel (metal) in OpacUserCSS / IntranetUserJS; "none": only the
+# library's own CSS and JS.
+restored() {
+    local begin="/* koha-easy-installer opac-theme begin */" end="/* koha-easy-installer opac-theme end */"
+    if [ "$1" = "other" ]; then
+        mysql "$DB" -e "UPDATE systempreferences SET value = $(printf "'%s\n%s\n%s\n%s'" '#old { }' "$begin" \
+            '/* KEI-THEME-DATA: {\"texture\": \"metal\"} */' "$end") WHERE variable = 'OpacUserCSS';
+UPDATE systempreferences SET value = $(printf "'%s\n%s\n%s'" "$begin" '    var C = {\"links\": {\"items\": []}};' "$end") WHERE variable = 'OpacUserJS';
+UPDATE systempreferences SET value = '' WHERE variable IN ('IntranetUserCSS', 'AmazonAssocTag');"
+    else
+        mysql "$DB" -e "UPDATE systempreferences SET value = '#old { }' WHERE variable = 'OpacUserCSS';
+UPDATE systempreferences SET value = '' WHERE variable IN ('OpacUserJS', 'IntranetUserCSS', 'AmazonAssocTag');"
+    fi
+}
+
+@test "restore: the restored database decides the look, theme-settings.json is read again from it" {
+    printf '%s\n%s\n%s\n' "/* koha-easy-installer opac-theme begin */" ".navbar { background: #123456; }" \
+        "/* koha-easy-installer opac-theme end */" > "$W/apply/staff.css"
+    task opac_theme_apply "$W/apply"
+    restored other
+    rm -f "$W/results"
+    task theme_state_refresh
     [ "$status" -eq 0 ]
-    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
-    mkdir -p "$W/etc"
-    printf '{"blocks": {"OpacUserCSS": "</style><script>alert(1)</script>", "OpacUserJS": "x"}}' > "$W/etc/theme-settings.json"
-    task theme_state_reapply
-    [ "$status" -eq 1 ]
-    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
-    printf 'not json' > "$W/etc/theme-settings.json"
-    task theme_state_reapply
-    [ "$status" -eq 1 ]
-    [ "$(pref OpacUserCSS)" = "#mine { color: red; }" ]
+    # Nothing of the panel's saved copy went back into Koha.
+    [ "$(pref OpacUserCSS | grep -c 'KEI-THEME-DATA')" = "1" ]
+    pref OpacUserCSS | grep -qF '"texture": "metal"'
+    ! pref OpacUserCSS | grep -qxF "a { color: blue; }"
+    [ "$(pref IntranetUserCSS)" = "" ]
+    [ "$(pref AmazonAssocTag)" = "" ]
+    grep -qxF "RESULT theme_state=restored" "$W/results"
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert s["settings"] == {"texture": "metal"}, s
+assert set(s["blocks"]) == {"OpacUserCSS", "OpacUserJS"}, s
+assert "#old" not in s["blocks"]["OpacUserCSS"] and "KEI-THEME-DATA" in s["blocks"]["OpacUserCSS"], s
+assert s["from"] == "restore" and s["prefs"] == [], s
+PY
+    # The panel's Sync reads the restored look, not the one of the last apply.
+    rm -f "$W/results"
+    task opac_theme_sync
+    grep -qF 'RESULT data=/* KEI-THEME-DATA: {"texture": "metal"} */' "$W/results"
+    grep -qxF 'RESULT state={"texture": "metal"}' "$W/results"
+    grep -qxF 'RESULT block_IntranetUserCSS=no' "$W/results"
 }
 
-@test "restore database: the saved look goes back in before Koha restarts" {
-    reapply=$(grep -n 'tui_run .*theme_state_reapply' "$KEI_REPO/installer" | head -n1 | cut -d: -f1)
-    resume=$(awk -v n="$reapply" 'NR > n && /tui_run .*resume_koha_services/ { print NR; exit }' "$KEI_REPO/installer")
-    [ -n "$reapply" ] && [ -n "$resume" ] && [ $((resume - reapply)) -lt 5 ]
+@test "restore: none of the panel's look in the restored database, its saved copy goes" {
+    task opac_theme_apply "$W/apply"
+    [ -s "$W/etc/theme-settings.json" ]
+    restored none
+    rm -f "$W/results"
+    task theme_state_refresh
+    [ "$status" -eq 0 ]
+    [ "$(pref OpacUserCSS)" = "#old { }" ]
+    [ "$(pref OpacUserJS)" = "" ]
+    [ ! -e "$W/etc/theme-settings.json" ]
+    grep -qxF "RESULT theme_state=none" "$W/results"
+    # Nothing saved before: still nothing, Koha untouched.
+    task theme_state_refresh
+    [ "$status" -eq 0 ]
+    [ "$(pref OpacUserCSS)" = "#old { }" ]
+}
+
+@test "restore database: the saved look is read again from Koha, never written back" {
+    ! grep -q 'theme_state_reapply' "$KEI_REPO/installer"
+    refresh=$(grep -n 'tui_run .*theme_state_refresh' "$KEI_REPO/installer" | head -n1 | cut -d: -f1)
+    resume=$(awk -v n="$refresh" 'NR > n && /tui_run .*resume_koha_services/ { print NR; exit }' "$KEI_REPO/installer")
+    [ -n "$refresh" ] && [ -n "$resume" ] && [ $((resume - refresh)) -lt 5 ]
 }
 
 # --- the "New arrivals" job -------------------------------------------
@@ -404,11 +438,15 @@ import json, sys
 s = json.load(open(sys.argv[1]))
 assert "var staff = 1;" in s["blocks"]["IntranetUserJS"], s
 PY
-    # A restore wipes it; the saved look puts it back.
+    # A restore brings the backup's IntranetUserJS: it stays as restored.
     mysql "$DB" -e "UPDATE systempreferences SET value = 'var old = 1;' WHERE variable = 'IntranetUserJS';"
-    task theme_state_reapply
-    [ "$(pref IntranetUserJS | head -n1)" = "var old = 1;" ]
-    pref IntranetUserJS | grep -qF "var staff = 1;"
+    task theme_state_refresh
+    [ "$(pref IntranetUserJS)" = "var old = 1;" ]
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert "IntranetUserJS" not in s["blocks"], s
+PY
     # Without staff.js our block goes, the other one stays.
     mysql "$DB" -e "UPDATE systempreferences SET value = CONCAT('var cdd = 1;', CHAR(10), value) WHERE variable = 'IntranetUserJS';"
     rm "$W/apply/staff.js"
@@ -604,9 +642,11 @@ INSERT INTO additional_contents_localizations (additional_content_id, title, con
     pref OpacUserCSS | grep -qxF "a { color: blue; }"
 }
 
-@test "contents: saved in theme-settings.json, written back after a restore, read by opac-theme-get" {
+@test "contents: what Koha holds decides, after a restore too; opac-theme-get hands it to the panel" {
     contents_tables
-    contents "$W/apply" opaccredits=on OpacLoginInstructions=off StaffLoginInstructions=off
+    contents "$W/apply" opaccredits=on OpacLoginInstructions=off StaffLoginInstructions=off news-opac=on
+    printf '<!-- kei-news-title: Férias -->\n<div class="kei-news">\n<p>Fechado</p>\n<p class="kei-news-cta"><a class="btn btn-primary kei-news-button" href="/a">Ver</a></p>\n</div>\n' \
+        > "$W/apply/contents/news-opac.html"
     task opac_theme_apply "$W/apply"
     python3 - "$W/etc/theme-settings.json" <<'PY'
 import json, sys
@@ -614,14 +654,53 @@ s = json.load(open(sys.argv[1]))
 assert "ours" in s["contents"]["opaccredits"] and s["contents"]["OpacLoginInstructions"] == "", s
 assert s["contents_settings"]["credits"]["name"] == "Biblioteca", s
 PY
-    # The restored database has the library's own credits back and none of ours.
-    ac "DELETE FROM additional_contents WHERE code LIKE 'kei-%'; UPDATE additional_contents SET expirationdate = NULL WHERE id = 1;"
-    task theme_state_reapply
-    [ "$status" -eq 0 ]
-    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-opaccredits'")" = "1" ]
-    [ "$(ac "SELECT expirationdate < CURDATE() FROM additional_contents WHERE id = 1")" = "1" ]
     rm -f "$W/results"
     task opac_theme_get
-    grep -qF 'RESULT contents_settings={"credits": {"enabled": true, "name": "Biblioteca"}}' "$W/results"
+    python3 - "$W/results" <<'PY'
+import base64, json, sys
+line = [l for l in open(sys.argv[1], encoding="utf-8") if l.startswith("RESULT live_contents=")][0]
+live = json.loads(base64.b64decode(line.split("=", 1)[1]).decode("utf-8"))
+assert set(live) == {"opaccredits", "news-opac"}, live
+assert live["news-opac"]["title"] == "Férias" and "\n" in live["news-opac"]["content"], live
+assert 'href="/a">Ver</a>' in live["news-opac"]["content"], live
+PY
+    # The restored database: the library's own credits back, none of ours,
+    # and its own version of our news item (another button).
+    ac "DELETE FROM additional_contents WHERE code = 'kei-opaccredits'; UPDATE additional_contents SET expirationdate = NULL WHERE id = 1;
+UPDATE additional_contents_localizations l JOIN additional_contents c ON c.id = l.additional_content_id
+  SET l.title = 'Julho', l.content = '<div class=\"kei-news\">\n<p>Aberto</p>\n<p class=\"kei-news-cta\"><a class=\"btn btn-primary kei-news-button\" href=\"/b\">Agenda</a></p>\n</div>'
+  WHERE c.code = 'kei-news-opac';"
+    rm -f "$W/results"
+    task theme_state_refresh
+    [ "$status" -eq 0 ]
+    # Koha untouched: no credits of ours written back, the library's shown.
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'kei-opaccredits'")" = "0" ]
+    [ "$(ac "SELECT IFNULL(expirationdate, 'none') FROM additional_contents WHERE id = 1")" = "none" ]
+    [ "$(ac "SELECT l.title FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id WHERE c.code = 'kei-news-opac'")" = "Julho" ]
+    # The expired list keeps only what is still expired in the restored database.
+    [ ! -e "$W/etc/theme-retired.tsv" ]
+    python3 - "$W/etc/theme-settings.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert "opaccredits" not in s["contents"], s
+assert "Agenda" in s["contents"]["news-opac"], s
+PY
+    rm -f "$W/results"
+    task opac_theme_get
+    live=$(grep -F 'RESULT live_contents=' "$W/results" | cut -d= -f2- | base64 -d)
+    grep -qF 'Agenda' <<< "$live"
+    ! grep -qF 'opaccredits' <<< "$live"
+    # The panel's Sync: the restored news with its button, no credits of ours.
+    PYTHONPATH="$KEI_REPO/panel" python3 - "$W/results" <<'PY'
+import sys
+from kei_panel import opac_theme as ot
+found = dict(l.rstrip("\n")[len("RESULT "):].split("=", 1) for l in open(sys.argv[1], encoding="utf-8")
+             if l.startswith("RESULT ") and "=" in l)
+cfg, notes, in_koha = ot.sync_settings(found)
+news = cfg["news"]["opac"]
+assert in_koha and news["title"] == "Julho" and news["html"] == "<p>Aberto</p>", news
+assert news["buttons"] == [{"text": "Agenda", "url": "/b"}], news
+assert not ot.credits_on(cfg["credits"]), cfg["credits"]
+PY
 }
 

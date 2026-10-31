@@ -266,6 +266,10 @@ async def _restore_file(app, title: str, file: str) -> None:
 
     result = await run_task(app, t("Restoring the catalog"), "restore", file,
                             cancellable=False, total_steps=RESTORE_STEPS)
+    # The database changed (even a failed restore may have brought the safety
+    # backup back): screens that show what is in Koha, such as OPAC and Staff
+    # Appearance, read it again when shown.
+    app.restores = getattr(app, "restores", 0) + 1
     if failed(result):
         await show_failure(app, title, result)
         return
