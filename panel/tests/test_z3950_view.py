@@ -28,11 +28,11 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
     curated = z3950.load_curated()
     ufsc = next(t for t in curated if t.key == "z3950.ufsc.br:210/Default")
     ufsc_backup = next(t for t in curated if t.db == "sru/ufsc")
-    loc = next(t for t in curated if t.key == "lx2.loc.gov:210/LCDB")
-    loc_backup = next(t for t in curated if t.db == "sru/loc")
+    toronto = next(t for t in curated if t.key == "utoronto.alma.exlibrisgroup.com:1921/01UTON_INST")
+    loc_backup = next(t for t in curated if t.db == "sru/toronto")
     utfpr = next(t for t in curated if t.db == "biblioteca")
     catalog = next(t for t in curated if t.host == "catalog.koha.nexus")
-    assert ufsc_backup.backup and ufsc_backup.backup_for == ufsc.key and loc_backup.backup_for == loc.key
+    assert ufsc_backup.backup and ufsc_backup.backup_for == ufsc.key and loc_backup.backup_for == toronto.key
     real_scan = zview._demo_scan
     tested = []
 
@@ -62,13 +62,13 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
 
             # Before any test: only the servers Koha searches (its checked rows), ticked.
             await _until(pilot, lambda: view.ticks_from_koha)
-            assert view.selected == {catalog.key, loc.key}
-            assert set(rows()) == {catalog.key, loc.key}
+            assert view.selected == {catalog.key, toronto.key}
+            assert set(rows()) == {catalog.key, toronto.key}
             assert str(view.query_one("#z-scan").label) == "Show servers"
             assert "press the blue Show servers" in str(view.query_one("#z-summary").render())
             assert view.query_one("#z-summary").has_class("-todo")
             assert "at most 20" in str(view.query_one("#z-limit").render())
-            assert "In Koha" in table.get_row(loc.key)[2]
+            assert "In Koha" in table.get_row(toronto.key)[2]
 
             # Show servers: every server is tested, then the backups of the ones without a record.
             view.scan()
@@ -78,7 +78,7 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             assert str(view.query_one("#z-scan").label) == "Update"
             history = json.loads((tmp_path / z3950.HISTORY_FILE).read_text())
             assert history[z3950.TESTED_KEY] > 0
-            # UFSC returned no record: its backup was tested and stands in; LoC's backup was not needed.
+            # UFSC returned no record: its backup was tested and stands in; Toronto's backup was not needed.
             assert ufsc_backup.key in tested and loc_backup.key not in tested
             shown = set(rows())
             assert ufsc.key not in shown and ufsc_backup.key in shown and loc_backup.key not in shown
@@ -113,13 +113,13 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             assert catalog.key in view.selected
             await _click(pilot, view, "z-untick-all")
             assert view.selected == set()
-            view.selected = {catalog.key, loc.key}
+            view.selected = {catalog.key, toronto.key}
 
-            # Save to Koha: add UTFPR, tick UFSC (in Koha, unticked), untick LoC.
+            # Save to Koha: add UTFPR, tick UFSC (in Koha, unticked), untick Toronto.
             view.set_ticks(True, utfpr.key)
             view.set_ticks(True, ufsc.key)
-            view.set_ticks(False, loc.key)
-            assert ufsc.key in rows() and loc.key in rows()      # ticked or in Koha: still listed to untick
+            view.set_ticks(False, toronto.key)
+            assert ufsc.key in rows() and toronto.key in rows()      # ticked or in Koha: still listed to untick
             seen, tasks = {}, []
             real_add, real_check = z3950.write_add_file, z3950.write_check_file
 
@@ -150,7 +150,7 @@ def test_show_servers_backups_ticks_and_save_to_koha(tmp_path, monkeypatch):
             assert tasks[:2] == ["z3950-add", "z3950-check"]
             assert seen["add"].startswith("z3950.utfpr.edu.br\t210\tbiblioteca\t")
             assert sorted(seen["check"].splitlines()) == sorted(["z3950.ufsc.br\t210\tDefault\tbiblio\t1",
-                                                                  "lx2.loc.gov\t210\tLCDB\tbiblio\t0"])
+                                                                  "utoronto.alma.exlibrisgroup.com\t1921\t01UTON_INST\tbiblio\t0"])
             assert "1 server(s) ticked, 1 unticked" in app.screen._body
             await _press(pilot, app, "ok")
 
@@ -280,7 +280,7 @@ def test_import_and_export(tmp_path, monkeypatch):
             app.screen.query_one("#value").value = str(out)
             await _press(pilot, app, "ok")
             await _until(pilot, out.exists)
-            assert "z.consortium.example.br" in out.read_text() and "lx2.loc.gov" not in out.read_text()
+            assert "z.consortium.example.br" in out.read_text() and "utoronto.alma.exlibrisgroup.com" not in out.read_text()
 
             view.sync()
             await _until(pilot, lambda: not isinstance(app.screen, LoadingScreen))
@@ -422,7 +422,7 @@ def test_one_blue_button_shows_then_updates(tmp_path, monkeypatch):
             assert not isinstance(app.screen, ConfirmScreen)
             lines = seen["text"].splitlines()
             # The direct authority files Koha lacks are left out: only Add puts them in Koha.
-            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 17
+            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 16
             assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
                        for line in lines)
             # The counts are a notice, not a box to close; then the test starts.

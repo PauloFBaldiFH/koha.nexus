@@ -34,14 +34,14 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 349
+    assert len(targets) == 281
     # The koha.nexus servers (shared catalogue, Rede Pergamum, the local-first catalogues), the direct Z39.50 servers by region, the authority files, then the
     # koha.nexus SRU gateway's four groups as the fallback.
     assert list(z.REGIONS) == ["koha_nexus", "brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
                                "authorities", "sru_national", "sru_br_universities", "sru_intl_universities",
                                "sru_specialized"]
     firsts = {t.region: t.db for t in reversed(targets)}
-    assert firsts == {"koha_nexus": "sru", "brazil": "biblioteca", "north_america": "LCDB", "europe": "libr", "latin_america": "56PUC_INST",
+    assert firsts == {"koha_nexus": "sru", "brazil": "biblioteca", "north_america": "01IOWA_INST", "europe": "libr", "latin_america": "56PUC_INST",
                       "asia_oceania": "INNOPAC", "other": "innopac", "authorities": "NAF", "sru_national": "sru/_union",
                       "sru_br_universities": "sru/usp", "sru_intl_universities": "sru/harvard",
                       "sru_specialized": "sru/nlm"}
@@ -50,7 +50,7 @@ def test_curated_list_loads_and_covers_every_region():
     assert len(keys) == len(set(keys))
     # The primary targets are Z39.50, straight to the library.
     direct = [t for t in targets if t.source == z.DIRECT_SOURCE]
-    assert len(direct) == 270 and {t.kind for t in direct} == {"zed"}
+    assert len(direct) == 202 and {t.kind for t in direct} == {"zed"}
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
     # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
@@ -72,7 +72,7 @@ def test_curated_list_loads_and_covers_every_region():
 
 def test_curated_flags():
     by_db = {t.db: t for t in z.load_curated()}
-    assert (by_db["biblioteca"].flag, by_db["LCDB"].flag, by_db["TOUT-UTF8"].flag) == ("🇧🇷", "🇺🇸", "🇫🇷")
+    assert (by_db["biblioteca"].flag, by_db["01IOWA_INST"].flag, by_db["TOUT-UTF8"].flag) == ("🇧🇷", "🇺🇸", "🇫🇷")
     # The gateway's union rows search catalogues of many countries.
     assert by_db["sru/_union"].flag == by_db["sru/_union-aut"].flag == "🌐"
     assert z.make_target({"host": "z.example.org", "country": "pt"}).flag == "🇵🇹"
@@ -92,7 +92,7 @@ def test_sync_leaves_out_direct_authority_files_koha_lacks():
     gnd = next(t for t in targets if t.db == "gnd")
     sent = z.sync_targets(targets, set())
     assert gnd not in sent and next(t for t in targets if t.db == "NAF") in sent
-    assert len(sent) == len(targets) - 17
+    assert len(sent) == len(targets) - 16
     assert gnd in z.sync_targets(targets, {gnd.key})
 
 
@@ -570,10 +570,10 @@ def test_curated_brazil_list_and_the_gateway():
     br = [t.db for t in z.load_curated() if t.region == "sru_br_universities"]
     assert br == ["sru/" + i for i in "usp unicamp uerj ufg ufmg ufpe ufsc ufscar ufrgs uff utfpr".split()]
     # Ticked when the screen opens: the koha.nexus servers with the local-first catalogues, two direct
-    # Brazilian servers and the Library of Congress (UNIFESP's own server is now its gateway row's backup).
+    # Brazilian servers (UNIFESP's own server is now its gateway row's backup).
     ticked = {t.key for t in z.load_curated() if t.preselect}
     assert ticked == {"catalog.koha.nexus:443/sru", "sru.koha.nexus:443/sru/all", "z3950.utfpr.edu.br:210/biblioteca",
-                      "z3950.ufsc.br:210/Default", "lx2.loc.gov:210/LCDB"} | {
+                      "z3950.ufsc.br:210/Default"} | {
                       f"sru.koha.nexus:443/sru/{i}" for i in ("unesp", "ufpr", "unifesp", "unb", "ufu")}
     rede = next(t for t in z.load_curated() if t.db == "sru/all")
     assert (rede.region, rede.sru_options, rede.preselect) == ("koha_nexus", "sru=get,sru_version=1.1", True)
