@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.143",
+ "panel_version": "1.5.144",
  "languages": [
   {
    "code": "en",
@@ -2997,7 +2997,7 @@
     },
     {
      "type": "note",
-     "text": "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines."
+     "text": "One line per item, in the order the footer shows them: Field: value for the fields below, other links as text | address (at most 6), and any other line as it is. No HTML to type: the footer is built from these lines."
     },
     {
      "type": "input",
@@ -12090,30 +12090,30 @@
    "ja": null,
    "ko": null
   },
-  "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines.": {
-   "en": "Write one item per line as Field: value, only the fields you need. Other links go one per line as text | address (at most 6). No HTML to type: the footer is built from these lines.",
-   "pt-BR": "Escreva um item por linha no formato Campo: valor, só os campos de que precisa. Outros links vão um por linha no formato texto | endereço (no máximo 6). Sem HTML para digitar: o rodapé é montado a partir dessas linhas.",
-   "es": null,
+  "One line per item, in the order the footer shows them: Field: value for the fields below, other links as text | address (at most 6), and any other line as it is. No HTML to type: the footer is built from these lines.": {
+   "en": "One line per item, in the order the footer shows them: Field: value for the fields below, other links as text | address (at most 6), and any other line as it is. No HTML to type: the footer is built from these lines.",
+   "pt-BR": "Uma linha por item, na ordem em que o rodapé as mostra: Campo: valor para os campos abaixo, outros links como texto | endereço (no máximo 6) e qualquer outra linha do jeito que está. Sem HTML para digitar: o rodapé é montado a partir destas linhas.",
+   "es": "Una línea por elemento, en el orden en que el pie de página las muestra: Campo: valor para los campos de abajo, otros enlaces como texto | dirección (como máximo 6) y cualquier otra línea tal como está. Sin HTML que escribir: el pie de página se construye a partir de estas líneas.",
    "fr": null,
    "it": null,
    "de": null,
-   "nl": "Schrijf één item per regel als Field: value, alleen de benodigde velden. Andere links krijgen elk een regel als text | address (maximaal 6). U hoeft geen HTML te typen: de voettekst wordt uit deze regels opgebouwd.",
-   "sv": "Skriv ett objekt per rad som Field: value, bara de fält du behöver. Andra länkar får varsin rad som text | address (högst 6). Ingen HTML behöver skrivas: sidfoten byggs av dessa rader.",
-   "pl": "Wpisz jedną pozycję w wierszu jako Field: value, tylko potrzebne pola. Pozostałe odnośniki wpisuj po jednym w wierszu jako text | address (najwyżej 6). Nie trzeba wpisywać HTML: stopka powstaje z tych wierszy.",
-   "cs": "Pište jednu položku na řádek ve tvaru Field: value, pouze potřebná pole. Další odkazy pište po jednom na řádek jako text | address (nejvýše 6). Není třeba psát HTML: zápatí se sestaví z těchto řádků.",
-   "ru": "Пишите по одному элементу в строке в формате Field: value, только необходимые поля. Остальные ссылки пишите по одной в строке в формате text | address (не более 6). HTML вводить не нужно: колонтитул строится из этих строк.",
-   "uk": "Пишіть один елемент у рядку як Field: value, лише потрібні поля. Інші посилання пишіть по одному в рядку як text | address (щонайбільше 6). Вводити HTML не потрібно: колонтитул будується з цих рядків.",
-   "tr": "Her satıra yalnızca gereken alanları Field: value biçiminde yazın. Diğer bağlantılar satır başına text | address biçiminde girilir (en fazla 6). HTML yazmanız gerekmez: altbilgi bu satırlardan oluşturulur.",
-   "tl": "Isulat ang isang item bawat linya bilang Field: value, ang mga kailangan lamang na field. Isulat ang ibang mga link nang tig-isa bawat linya bilang text | address (hanggang 6). Hindi kailangang mag-type ng HTML: binubuo ang footer mula sa mga linyang ito.",
-   "id": "Tulis satu item per baris sebagai Field: value, hanya bidang yang diperlukan. Tautan lain ditulis satu per baris sebagai text | address (paling banyak 6). Tidak perlu mengetik HTML: kaki halaman dibangun dari baris tersebut.",
-   "ar": "اكتب عنصرًا واحدًا في كل سطر بصيغة Field: value، للحقول التي تحتاجها فقط. الروابط الأخرى تُكتب واحدًا في كل سطر بصيغة text | address (بحد أقصى 6). لا حاجة لكتابة HTML: يُبنى التذييل من هذه الأسطر.",
-   "fa": "هر مورد را در یک خط به‌شکل Field: value بنویسید، فقط فیلدهای لازم را. پیوندهای دیگر را هرکدام در یک خط به‌شکل text | address وارد کنید (حداکثر 6). نیازی به نوشتن HTML نیست: پابرگ از این خط‌ها ساخته می‌شود.",
-   "hi": "प्रति पंक्ति एक मद Field: value के रूप में लिखें, केवल आवश्यक फ़ील्ड। अन्य लिंक प्रति पंक्ति text | address के रूप में लिखें (अधिकतम 6)। HTML लिखना आवश्यक नहीं: इन पंक्तियों से फ़ुटर बनता है।",
-   "bn": "শুধু প্রয়োজনীয় ফিল্ডগুলো প্রতি লাইনে একটি করে Field: value আকারে লিখুন। অন্য লিংক প্রতি লাইনে একটি করে text | address আকারে লিখুন (সর্বোচ্চ 6টি)। HTML লিখতে হয় না: এই লাইনগুলো থেকে ফুটার তৈরি হয়।",
-   "vi": "Viết một mục mỗi dòng theo Field: value, chỉ các trường cần dùng. Liên kết khác viết một dòng mỗi liên kết theo text | address (tối đa 6). Không cần nhập HTML: chân trang được dựng từ các dòng này.",
-   "zh": "每行按 Field: value 格式写一项，仅填写所需字段。其他链接每行按 text | address 格式填写（最多 6 个）。无需编写 HTML：页脚由这些行生成。",
-   "ja": "必要なフィールドだけを、1 行 1 項目ずつ Field: value の形で入力します。その他のリンクは 1 行ずつ text | address の形で入力します（最大 6 個）。HTML は不要です。これらの行からフッターを組み立てます。",
-   "ko": "필요한 필드만 한 줄에 하나씩 Field: value 형식으로 입력하세요. 다른 링크는 한 줄에 하나씩 text | address로 입력합니다(최대 6개). HTML은 필요 없으며, 이 줄들로 바닥글을 구성합니다."
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "Example:": {
    "en": "Example:",
@@ -18809,7 +18809,7 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 281,
+   "strings": 282,
    "strings_total": 405
   },
   "fr": {
@@ -18837,119 +18837,119 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 113,
+   "strings": 112,
    "strings_total": 405
   }
  }

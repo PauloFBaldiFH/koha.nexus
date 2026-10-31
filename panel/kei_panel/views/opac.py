@@ -65,8 +65,9 @@ CREDIT_FIELDS = {
     "youtube": ("YouTube", "https://youtube.com/@biblioteca", 300), "cnpj": ("CNPJ", "00.000.000/0000-00", 30),
     "note": ("Note", "", ot.CREDITS_TEXT_MAX),
 }
-CREDITS_NOTE = ("Write one item per line as Field: value, only the fields you need. Other links go one per line "
-                "as text | address (at most 6). No HTML to type: the footer is built from these lines.")
+CREDITS_NOTE = ("One line per item, in the order the footer shows them: Field: value for the fields below, "
+                "other links as text | address (at most 6), and any other line as it is. No HTML to type: "
+                "the footer is built from these lines.")
 
 
 def _picture(raw: dict, name: str) -> dict:
@@ -1008,9 +1009,23 @@ class OpacView(SectionView):
 
 
 def _credits_text(cr: dict) -> str:
-    """The credits as the text area shows them: the filled fields, then the links."""
-    lines = [f"{t(label)}: {cr[key]}" for key, (label, _hint, _size) in CREDIT_FIELDS.items() if cr.get(key)]
-    return "\n".join(lines + [f"{x['text']} | {x['url']}" for x in cr.get("links") or []])
+    """The credits as the text area shows them, one line each in the order
+    of the footer (credits from before the order: the filled fields, then
+    the links; a note joined with " · " by 1.5.141 back on its own lines)."""
+    def field(key: str) -> list[str]:
+        if key == "links":
+            return [f"{x['text']} | {x['url']}" for x in cr.get("links") or []]
+        return [f"{t(CREDIT_FIELDS[key][0])}: {cr[key]}"] if cr.get(key) else []
+
+    order = cr.get("order") or []
+    if not order:
+        lines = [ln for key in CREDIT_FIELDS if key != "note" for ln in field(key)]
+        lines += [part.strip() for part in (cr.get("note") or "").split(" · ") if part.strip()]
+        return "\n".join(lines + field("links"))
+    lines = []
+    for key in order + [k for k in ot.CREDITS_ORDER_KEYS if cr.get(k) and k not in order]:
+        lines += [key[5:]] if key.startswith("text:") else field(key)
+    return "\n".join(lines)
 
 
 def _credits_example() -> str:
@@ -1027,41 +1042,46 @@ def _fold(text: str) -> str:
 def _credits_parse(text: str) -> tuple[dict, list[dict], str]:
     """(fields, other links, problem) from the credits text: "Field: value"
     lines (the label in English, in the panel's language or the key),
-    "text | address" lines, and plain lines: the first is the library's name
-    when there is none, the others go into the note."""
+    "text | address" lines, and plain lines shown as they are. The footer
+    keeps the order of the lines (fields["order"]); a plain first line is the
+    library's name when no line names it."""
     names = {}
     for key, (label, _hint, _size) in CREDIT_FIELDS.items():
         for name in (key, label, t(label)):
             names[_fold(name)] = key
-    fields = {key: "" for key in CREDIT_FIELDS}
+    fields: dict = {key: "" for key in CREDIT_FIELDS}
+    order: list[str] = []
     link_lines: list[str] = []
-    extra: list[str] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        name, sep, value = line.partition(":")
-        key = names.get(_fold(name)) if sep else None
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    def known(line: str) -> str | None:
+        name, sep, _value = line.partition(":")
+        return names.get(_fold(name)) if sep else None
+
+    named = any(known(ln) == "name" for ln in lines)
+    for i, line in enumerate(lines):
+        key = known(line)
         if key:
             label, _hint, size = CREDIT_FIELDS[key]
-            value = value.strip()
+            value = line.partition(":")[2].strip()
             if len(value) > size:
                 return fields, [], t("${name}: at most ${n} characters.", name=t(label), n=str(size))
             fields[key] = value
+            if key not in order:
+                order.append(key)
         elif "|" in line:
             link_lines.append(line)
-        elif not fields["name"]:
-            # A line without a known field name: the first is the library's
-            # name, the others join the note (Paulo, 2026-10-31).
+            if "links" not in order:
+                order.append("links")
+        elif i == 0 and not named:
             fields["name"] = line[:CREDIT_FIELDS["name"][2]]
+            order.append("name")
         else:
-            extra.append(line)
-    if extra:
-        note = " · ".join(([fields["note"]] if fields["note"] else []) + extra)
-        if len(note) > CREDIT_FIELDS["note"][2]:
-            return fields, [], t("${name}: at most ${n} characters.", name=t("Note"), n=str(CREDIT_FIELDS["note"][2]))
-        fields["note"] = note
+            order.append("text:" + line)
+    if len(order) > ot.MAX_CREDIT_LINES:
+        return fields, [], t("At most ${n} lines.", n=str(ot.MAX_CREDIT_LINES))
     links, problem = _credit_links("\n".join(link_lines))
+    fields["order"] = order
     return fields, links, problem
 
 

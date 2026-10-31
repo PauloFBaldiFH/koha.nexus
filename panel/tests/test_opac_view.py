@@ -581,15 +581,16 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
             _cfg, _pending, problem = view.collect()
             assert problem.startswith("Footer credits: E-mail")
             # Lines without a field name (Paulo, 2026-10-31): the first is the
-            # name when there is none, the others go into the note.
+            # name when there is none, the others stay lines of their own, in
+            # the order written (Paulo, 2026-10-31, 20:20).
             box.text = "Biblioteca Pública Municipal Castro Alves\nRua Exemplo, 123\nAberta ao público"
             raw, _pending, problem = view.collect()
             assert problem == ""
             assert raw["credits"]["name"] == "Biblioteca Pública Municipal Castro Alves"
-            assert raw["credits"]["note"] == "Rua Exemplo, 123 · Aberta ao público"
+            assert raw["credits"]["order"] == ["name", "text:Rua Exemplo, 123", "text:Aberta ao público"]
             box.text = "Library name: Biblioteca Municipal\nPortal | https://biblioteca.gov.br\nno bar here"
             raw, _pending, problem = view.collect()
-            assert problem == "" and raw["credits"]["note"] == "no bar here"
+            assert problem == "" and raw["credits"]["order"] == ["name", "links", "text:no bar here"]
             box.text = "Library name: X\nPortal | javascript:alert(1)"
             assert "the address must start with" in view.collect()[2]
             box.text = ("library NAME: Biblioteca Municipal\nphone: (00) 0000-0000\n"
@@ -706,3 +707,19 @@ def test_credits_text_in_portuguese():
         assert opac._credits_parse("sem campo")[0]["name"] == "sem campo"                # the name, no error
     finally:
         i18n.install(old)
+
+
+def test_paulo_1031_credits_text_keeps_his_lines():
+    """The credits box shows the footer's lines in order; a note that 1.5.141
+    joined with " · " comes back one line each, and a second pass is stable."""
+    from kei_panel.views.opac import _credits_parse, _credits_text
+
+    old = ot.normalize({"credits": {"enabled": True, "name": "Bib", "email": "a@b.org",
+                                    "note": "Rua 1 · Implementação por: · Fulano"}})["credits"]
+    text = _credits_text(old)
+    assert text.splitlines()[-3:] == ["Rua 1", "Implementação por:", "Fulano"]
+    fields, links, problem = _credits_parse(text)
+    assert problem == "" and fields["order"] == ["name", "email", "text:Rua 1", "text:Implementação por:",
+                                                 "text:Fulano"]
+    again = ot.normalize({"credits": {"enabled": True, **fields, "links": links}})["credits"]
+    assert _credits_text(again) == text
