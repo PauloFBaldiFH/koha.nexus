@@ -93,6 +93,14 @@ CARD_HELP = ("One card per section: each of Koha's boxes is a card. One card for
 # The staff glass top bar: id: (label, unit).
 STAFF_HEADER_SLIDERS = {"header_opacity": ("Top bar opacity", "%"), "header_blur": ("Top bar blur", "px")}
 # The three corner sliders: what each one rounds (border-radius).
+PAINT_NOTE = ("The block background takes the texture and opacity above. Each of the other colours has a "
+              "texture and an opacity of its own (0% clear, 100% solid).")
+PAINT_HELP = {
+    "accent": "Main buttons (search, place hold, the news buttons) in the accent colour.",
+    "accent2": "Secondary buttons in the second colour. As the Material: the second colour only tints the page "
+               "and the secondary buttons keep the block background.",
+    "page": "The page under the blocks (without a wallpaper). A lower opacity makes the colour paler.",
+}
 RADIUS_HELP = {
     "radius_block": "Rounded corners (border-radius) of the blocks: header, panels, cards and boxes. More "
                     "pixels make the corners rounder; 0 makes them square.",
@@ -162,15 +170,20 @@ class OpacView(SectionView):
                                                  allow_blank=False, id="o-texture"))
             for key in ("blur", "opacity"):
                 yield from self._slider(key)
+            bars = (t("Hue"), t("Saturation"), t("Lightness"))
+            # The block background's texture and opacity are the two above.
+            yield ColorPicker(t("Block background"), c["surface"], "o-surface", bars, id="o-pick-surface")
+            yield Static(t(PAINT_NOTE), classes="ai-note", markup=False)
+            yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")
+            yield from self._paint_rows("accent")
+            yield ColorPicker(t("Second colour"), c["accent2"], "o-accent2", bars, id="o-pick-accent2")
+            yield from self._paint_rows("accent2")
+            yield from _row(t("Page colour"), Switch(bool(c["page"]), id="o-page-on"))
+            yield ColorPicker(t("Page background"), c["page"] or "#f3f4f6", "o-page", bars, id="o-pick-page")
+            yield from self._paint_rows("page")
             yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
             for key in RADIUS_HELP:
                 yield from self._slider(key)
-            bars = (t("Hue"), t("Saturation"), t("Lightness"))
-            yield ColorPicker(t("Accent colour"), c["accent"], "o-accent", bars, id="o-pick-accent")
-            yield ColorPicker(t("Second colour"), c["accent2"], "o-accent2", bars, id="o-pick-accent2")
-            yield ColorPicker(t("Block background"), c["surface"], "o-surface", bars, id="o-pick-surface")
-            yield from _row(t("Page colour"), Switch(bool(c["page"]), id="o-page-on"))
-            yield ColorPicker(t("Page background"), c["page"] or "#f3f4f6", "o-page", bars, id="o-pick-page")
             yield from _style_rows("o-style", c)
         with Vertical(id="o-images", classes="opac-box"):
             yield Static(t("A file on this server (PNG, JPEG, GIF, WebP or ICO; SVG is refused), a file sent to "
@@ -351,6 +364,15 @@ class OpacView(SectionView):
         with Horizontal(classes="quick-actions"):
             yield Button(t("Add a button"), id=f"{p}-add", classes="small")
 
+    def _paint_rows(self, key: str) -> ComposeResult:
+        """The texture and opacity of one colour of the palette."""
+        p = self.cfg["paint"][key]
+        yield from _row(t("Its texture"), _tip(Select([(t(v), k) for k, v in ot.PAINTS.items()], value=p["texture"],
+                                                      allow_blank=False, id=f"o-paint-{key}-texture"),
+                                               PAINT_HELP[key]))
+        yield from _row(t("Its opacity"), _tip(Slider(0, 100, p["opacity"], unit="%", id=f"o-paint-{key}-opacity"),
+                                               PAINT_HELP[key]))
+
     def _slider(self, key: str) -> ComposeResult:
         label, unit, step = SLIDERS[key]
         lo, hi = ot.RANGES[key]
@@ -479,6 +501,9 @@ class OpacView(SectionView):
         q("#o-accent", Input).value = cfg["accent"]
         q("#o-accent2", Input).value = cfg["accent2"]
         q("#o-surface", Input).value = cfg["surface"]
+        for key in ot.PAINTED:
+            q(f"#o-paint-{key}-texture", Select).value = cfg["paint"][key]["texture"]
+            q(f"#o-paint-{key}-opacity", Slider).value = cfg["paint"][key]["opacity"]
         q("#o-page-on", Switch).value = bool(cfg["page"])
         if cfg["page"]:
             q("#o-page", Input).value = cfg["page"]
@@ -568,6 +593,8 @@ class OpacView(SectionView):
                "accent": q("#o-accent", Input).value, "accent2": q("#o-accent2", Input).value,
                "surface": q("#o-surface", Input).value,
                "page": q("#o-page", Input).value if q("#o-page-on", Switch).value else "",
+               "paint": {key: {"texture": q(f"#o-paint-{key}-texture", Select).value,
+                               "opacity": q(f"#o-paint-{key}-opacity", Slider).value} for key in ot.PAINTED},
                "dark_switch": q("#o-dark_switch", Switch).value,
                "header_bar": q("#o-header_bar", Switch).value,
                "header_style": q("#o-header_style", Select).value,
