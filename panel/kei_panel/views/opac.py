@@ -38,7 +38,7 @@ from textual.widgets import Button, Input, Label, Select, Static, Switch, TextAr
 
 from .. import opac_theme as ot
 from ..i18n import t
-from ..screens.dialogs import ConfirmScreen, InputScreen, TextScreen
+from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, TextScreen
 from ..tasks import Reporter, TaskFailed
 from ..widgets.colorpick import ColorPicker
 from ..widgets.linkrow import LinkRow
@@ -188,10 +188,14 @@ class OpacView(SectionView):
                            "for the OPAC and the staff interface at once. Pictures, texts and buttons stay. "
                            "Fine-tune the fields after; Apply writes it into Koha."), classes="ai-note", markup=False)
             yield from _row(t("Ready-made look"),
-                            Select([(t(p["label"]), k) for k, p in ot.PRESETS.items()], value=next(iter(ot.PRESETS)),
+                            Select(self._preset_options(), value=next(iter(ot.PRESETS)),
                                    allow_blank=False, id="o-preset"))
             with Horizontal(classes="quick-actions"):
                 yield Button(t("Use this look"), id="o-preset-use", classes="small")
+                yield Button(t("Save current look"), id="o-preset-save", classes="small",
+                             tooltip=t("Keep the fields as they are now as one of your looks (up to ${n}).",
+                                       n=ot.MAX_USER_PRESETS))
+                yield Button(t("Delete saved look"), id="o-preset-delete", classes="small")
             yield from _row(t("Texture"), Select([(t(v), k) for k, v in ot.TEXTURES.items()], value=c["texture"],
                                                  allow_blank=False, id="o-texture"))
             for key in ("blur", "opacity"):
@@ -793,6 +797,7 @@ class OpacView(SectionView):
         actions = {"o-gate-sync": self.gate_sync, "o-apply": self.apply, "o-preview": self.preview, "o-sync": self.sync,
                    "o-refresh": self.refresh_carousel, "o-keys": self.keys, "o-remove": self.remove_look,
                    "o-staff-copy": self.copy_opac_preset, "o-preset-use": self.use_preset,
+                   "o-preset-save": self.save_preset, "o-preset-delete": self.delete_preset,
                    "o-link-add": lambda: self.add_link(None, "links"),
                    "o-slink-add": lambda: self.add_link(None, "staff_links")}
         bid = event.button.id or ""
@@ -875,15 +880,23 @@ class OpacView(SectionView):
             text += " · " + t("Carousel: ${n} titles with a cover.", n=self.feed_items or "0")
         self.query_one("#o-summary", Label).update(text)
 
-    def use_preset(self) -> None:
-        """A ready-made look (ot.PRESETS) into the OPAC and staff fields;
-        nothing is written to Koha until Apply."""
-        raw, _pending, problem = self.collect()
-        if problem:
-            self.app.notify(problem, severity="warning")
-            return
-        name = self.query_one("#o-preset", Select).value
-        cfg = ot.apply_preset(raw, name)
+    # ------------------------------------------------------------------
+    # Looks: the ready-made ones (ot.PRESETS) and up to five of the
+    # library's own (ot.load_user_presets), saved in the panel's folder.
+    # ------------------------------------------------------------------
+    def _preset_options(self) -> list[tuple[str, str]]:
+        own = [(f"★ {item['name']}", f"user:{n}") for n, item in enumerate(ot.load_user_presets())]
+        return [(t(p["label"]), k) for k, p in ot.PRESETS.items()] + own
+
+    def _refresh_presets(self, value: str | None = None) -> None:
+        box = self.query_one("#o-preset", Select)
+        options = self._preset_options()
+        box.set_options(options)
+        keys = [k for _label, k in options]
+        box.value = value if value in keys else keys[0]
+
+    def _fill_look(self, cfg: dict) -> None:
+        """The look fields of both sides from cfg (nothing else changes)."""
         q = self.query_one
         q("#o-texture", Select).value = cfg["texture"]
         for key in ot.STYLE:
@@ -899,8 +912,111 @@ class OpacView(SectionView):
         if cfg["page"]:
             q("#o-page", Input).value = cfg["page"]
         self.fill_staff(cfg["staff"])
-        self.app.notify(t("Look \"${name}\" in the fields. Apply writes it into Koha.",
-                          name=t(ot.PRESETS[name]["label"])), timeout=8)
+
+    def use_preset(self) -> None:
+        self.app.run_worker(self._use_preset(), group="opac-preset", exclusive=True, exit_on_error=False)
+
+    async def _use_preset(self) -> None:
+        """A look into the OPAC and staff fields; first, when the fields hold
+        a look that is not saved anywhere, the offer to save it (Paulo,
+        2026-10-31: "para não perder as mudanças"). Nothing is written to
+        Koha until Apply."""
+        raw, _pending, problem = self.collect()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        key = self.query_one("#o-preset", Select).value
+        own = ot.load_user_presets()
+        if key.startswith("user:"):
+            item = own[int(key[5:])] if int(key[5:]) < len(own) else None
+            if item is None:
+                self._refresh_presets()
+                return
+            name, cfg = item["name"], ot.apply_look(raw, item["look"])
+        else:
+            name, cfg = t(ot.PRESETS[key]["label"]), ot.apply_preset(raw, key)
+        title = t("Ready-made look")
+        if not ot.look_saved(raw, own):
+            choice = await self.app.push_screen_wait(ChoiceScreen(
+                title, t("The fields have changes that are not saved as a look. Save them before switching "
+                         "to \"${name}\"?", name=name),
+                [("save", t("Save the current look first")), ("switch", t("Switch without saving")),
+                 ("cancel", t("Cancel"))], default="save"))
+            if choice in (None, "cancel"):
+                return
+            if choice == "save" and not await self._save_look(raw):
+                return
+        self._fill_look(cfg)
+        self.app.notify(t("Look \"${name}\" in the fields. Apply writes it into Koha.", name=name), timeout=8)
+
+    def save_preset(self) -> None:
+        self.app.run_worker(self._save_preset(), group="opac-preset", exclusive=True, exit_on_error=False)
+
+    async def _save_preset(self) -> None:
+        raw, _pending, problem = self.collect()
+        if problem:
+            self.app.notify(problem, severity="warning")
+            return
+        await self._save_look(raw)
+
+    async def _save_look(self, raw: dict) -> bool:
+        """The look of raw as one of the library's own: a name; the same name
+        replaces that look; with five saved, one of them to replace. True
+        when it was saved."""
+        title = t("Save current look")
+        own = ot.load_user_presets()
+        names = [item["name"] for item in own]
+        name = await self.app.push_screen_wait(InputScreen(
+            title, t("A name for this look (colours, texture, opacity, blur, corners and style details of the "
+                     "OPAC and the staff interface). Up to ${n} looks; the same name replaces that one.",
+                     n=ot.MAX_USER_PRESETS),
+            t("Name"), value=f"{t('My look')} {len(own) + 1}" if len(own) < ot.MAX_USER_PRESETS else "",
+            validate=lambda v: "" if 0 < len(v.strip()) <= 40 else t("Between 1 and 40 characters.")))
+        if name is None:
+            return False
+        item = {"name": name.strip(), "look": ot.look_of(raw)}
+        if item["name"] in names:
+            own[names.index(item["name"])] = item
+        elif len(own) < ot.MAX_USER_PRESETS:
+            own.append(item)
+        else:
+            slot = await self.app.push_screen_wait(ChoiceScreen(
+                title, t("${n} looks are saved already. Which one should this replace?", n=ot.MAX_USER_PRESETS),
+                [(str(n), f"★ {old}") for n, old in enumerate(names)]))
+            if slot is None:
+                return False
+            own[int(slot)] = item
+        try:
+            ot.save_user_presets(own)
+        except (OSError, ValueError) as e:
+            self.app.notify(str(e), severity="error")
+            return False
+        self._refresh_presets(f"user:{[i['name'] for i in own].index(item['name'])}")
+        self.app.notify(t("Look \"${name}\" saved.", name=item["name"]))
+        return True
+
+    def delete_preset(self) -> None:
+        self.app.run_worker(self._delete_preset(), group="opac-preset", exclusive=True, exit_on_error=False)
+
+    async def _delete_preset(self) -> None:
+        key = self.query_one("#o-preset", Select).value
+        own = ot.load_user_presets()
+        if not key.startswith("user:") or int(key[5:]) >= len(own):
+            self.app.notify(t("Only your own looks (★) can be deleted."), severity="warning")
+            return
+        name = own[int(key[5:])]["name"]
+        if not await self.app.push_screen_wait(ConfirmScreen(
+                t("Delete saved look"), t("Delete the look \"${name}\"? The fields and Koha do not change.",
+                                          name=name))):
+            return
+        del own[int(key[5:])]
+        try:
+            ot.save_user_presets(own)
+        except OSError as e:
+            self.app.notify(str(e), severity="error")
+            return
+        self._refresh_presets()
+        self.app.notify(t("Look \"${name}\" deleted.", name=name))
 
     def copy_opac_preset(self) -> None:
         """Copy OPAC preset: the OPAC fields as they are now (saved or not)

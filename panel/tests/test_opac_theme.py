@@ -1297,3 +1297,24 @@ def test_new_carousel_styles_reflection_and_drawn_covers():
     # Every style the panel offers has its place in the script.
     for mode in ot.CAROUSEL_MODES:
         assert f"{mode}: " in js.split("var MODES = {", 1)[1].split("};", 1)[0], mode
+
+
+def test_user_presets_up_to_five(tmp_path, monkeypatch):
+    monkeypatch.setenv("KEI_OPAC_PRESETS", str(tmp_path / "p.json"))
+    assert ot.load_user_presets() == []
+    raw = ot.normalize({"accent": "#123abc", "logo": {"source": "url", "url": "https://x.example/l.png"},
+                        "staff": {"enabled": True, "font": 110, "bar": "#202020"}})
+    look = ot.look_of(raw)
+    assert "logo" not in look["opac"] and look["staff"]["font"] == 110 and look["staff"]["bar"] == "#202020"
+    items = [{"name": f"L{n}", "look": look} for n in range(5)]
+    ot.save_user_presets(items)
+    assert [x["name"] for x in ot.load_user_presets()] == [f"L{n}" for n in range(5)]
+    with pytest.raises(ValueError):
+        ot.save_user_presets(items + [items[0]])
+    # Laid over other settings: only the look changes.
+    other = ot.apply_look({"logo": {"source": "url", "url": "https://y.example/o.png"}}, look)
+    assert other["accent"] == "#123abc" and other["logo"]["url"] == "https://y.example/o.png"
+    assert ot.look_saved(raw) and ot.look_saved(ot.apply_preset({}, "metal"), [])
+    assert not ot.look_saved(ot.normalize({"accent": "#654321"}))
+    (tmp_path / "p.json").write_text("not json")
+    assert ot.load_user_presets() == []

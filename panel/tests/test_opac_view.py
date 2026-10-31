@@ -728,11 +728,14 @@ def test_paulo_1031_credits_text_keeps_his_lines():
     assert _credits_text(again) == text
 
 
-def test_ready_made_look_fills_both_sides():
-    """Paulo, 2026-10-31: five ready-made looks. Use this look fills the
-    OPAC and staff fields (colours, texture, sliders, the staff top bar);
-    pictures stay; nothing is applied."""
+def test_ready_made_look_fills_both_sides(tmp_path, monkeypatch):
+    """Paulo, 2026-10-31: five ready-made looks, up to five of his own, and
+    before switching, the offer to save the fields so changes are not lost.
+    Use this look fills the OPAC and staff fields; pictures stay; nothing is
+    applied."""
     from kei_panel.app import KohaPanelApp
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen
+    monkeypatch.setenv("KEI_OPAC_PRESETS", str(tmp_path / "look-presets.json"))
 
     async def main():
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
@@ -744,17 +747,38 @@ def test_ready_made_look_fills_both_sides():
             await _until(pilot, lambda: "Not applied" in str(q("#o-summary").render()))
             q("#o-val-logo", Input).value = "https://img.example.org/logo.png"
             q("#o-src-logo", Select).value = "url"
+            q("#o-accent", Input).value = "#123abc"
             q("#o-preset", Select).value = "paper"
             await pilot.pause(0.1)
+            # The fields are not a saved look: the panel offers to save them first.
             q("#o-preset-use", Button).press()
-            await pilot.pause(0.2)
+            await _until(pilot, lambda: isinstance(app.screen, ChoiceScreen))
+            app.screen.dismiss("save")
+            await _until(pilot, lambda: isinstance(app.screen, InputScreen))
+            app.screen.dismiss("Mine")
+            await _until(pilot, lambda: q("#o-texture", Select).value == "paper")
+            saved = ot.load_user_presets()
+            assert [x["name"] for x in saved] == ["Mine"] and saved[0]["look"]["opac"]["accent"] == "#123abc"
+            assert (tmp_path / "look-presets.json").stat().st_mode & 0o777 == 0o600
             look = ot.PRESETS["paper"]["look"]
-            assert q("#o-texture", Select).value == "paper" and q("#o-staff-texture", Select).value == "paper"
+            assert q("#o-staff-texture", Select).value == "paper"
             assert q("#o-accent", Input).value == look["accent"] and q("#o-staff-accent", Input).value == look["accent"]
             assert q("#o-opacity", Slider).value == look["opacity"]
             assert q("#o-staff-bar-on", Switch).value and q("#o-staff-bar", Input).value == ot.PRESETS["paper"]["bar"]
             cfg, _p, problem = view.collect()
             assert problem == "" and cfg["logo"]["url"] == "https://img.example.org/logo.png"
             assert cfg["staff"]["bar"] == ot.PRESETS["paper"]["bar"] and cfg["page"] == look["page"]
+            # The fields hold a ready-made look as it is: switching asks nothing.
+            q("#o-preset", Select).value = "user:0"
+            await pilot.pause(0.1)
+            q("#o-preset-use", Button).press()
+            await _until(pilot, lambda: q("#o-accent", Input).value == "#123abc")
+            assert not isinstance(app.screen, ChoiceScreen)
+            # Delete it.
+            q("#o-preset-delete", Button).press()
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            app.screen.dismiss(True)
+            await _until(pilot, lambda: ot.load_user_presets() == [])
+            assert q("#o-preset", Select).value == next(iter(ot.PRESETS))
 
     asyncio.run(main())
