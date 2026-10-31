@@ -121,6 +121,40 @@ Isso **não testa nomes de usuário nem senhas**, não descobre IPs vizinhos e n
 
 Se pretende ficar dias **monitorando apenas seus alvos autorizados**, programe uma execução diária por `systemd timer` ou cron; o `--recheck-hours` mantém os testes espaçados.
 
+## 3b — Fluxo automático em segundo plano (`auto-discover`)
+
+`auto-discover` (alias `pipeline`) junta tudo numa execução só: `harvest` das fontes públicas padrão → seleção dos alvos → teste MARC com `yaz-client` → `atlas.sqlite3`, gravando o andamento na tabela `run_state` do próprio banco.
+
+```bash
+# em primeiro plano
+python3 z39atlas.py --db ./atlas.sqlite3 auto-discover --published \
+  --known ../../../../panel/kei_panel/data/z3950_direct.json
+# desanexado do terminal (log em ./atlas.log); volta na hora
+python3 z39atlas.py --db ./atlas.sqlite3 auto-discover --published --background
+python3 z39atlas.py --db ./atlas.sqlite3 status      # running/finished/failed/stopped/interrupted, páginas, alvos, aprovados
+python3 z39atlas.py --db ./atlas.sqlite3 stop        # termina os testes já iniciados, salva e para
+python3 z39atlas.py --db ./atlas.sqlite3 new-servers --known ../../../../panel/kei_panel/data/z3950_direct.json
+```
+
+### Quem pode ser testado: `--published` ou `--allowlist` (obrigatório escolher)
+
+- `--allowlist allowed-hosts.txt --ack-authorized`: **o portão manual continua igual** ao do `probe`; só os hosts da lista são testados.
+- `--published`: **opção explícita que substitui a allowlist manual.** São testados apenas endpoints **completos** (host, porta **e** base) que um documento público HTTPS publicou como servidor Z39.50. Cada um fica registrado na tabela `auto_allowed` com a URL do documento que o publicou. Nesse modo **nada é inferido**: sem porta 210 ou bases `Default`/`innopac`/`voyager` (o `--infer-missing` só existe com allowlist), sem outros hosts, sem IPs vizinhos, sem varredura de portas.
+
+O `probe` não mudou: continua exigindo `--allowlist` e `--ack-authorized`.
+
+### Educação, retomada e falhas
+
+- Os mesmos limites do `harvest`/`probe`: `--delay` ≥ 1 s entre páginas (padrão 3 s), `--host-interval` ≥ 5 s entre testes no mesmo host (padrão 10 s), 1 a 4 testes simultâneos (padrão 2), no máximo duas buscas pequenas por endpoint.
+- `--known ARQUIVO` (repetível): endpoints que o Koha/o painel já têm não são testados. Aceita `z3950_direct.json` (com `alternates` e `excluded`), `z3950_targets.json`, CSV/TSV com colunas host/port/db, as linhas de `config.sh --task z3950-list` e linhas `host:porta/base`.
+- Retomada: cada resultado é gravado ao chegar; uma execução interrompida (queda de energia, `kill -9`) aparece como `interrupted` e a próxima pula os endpoints testados nas últimas `--recheck-hours` (168) e as páginas lidas nas últimas `--refetch-hours` (24).
+- Sem `yaz-client`, o comando avisa (`sudo apt install yaz`) e sai com código 3 **antes** de ler qualquer página ou iniciar o processo de fundo. Uma segunda execução enquanto outra roda sai com código 4.
+- `--background` usa um processo em sessão própria (`start_new_session`): fechar o terminal ou o painel não o interrompe. Não depende de systemd (funciona no WSL).
+
+### No painel do koha.nexus
+
+O painel traz uma cópia idêntica deste arquivo (`panel/kei_panel/z39atlas.py`; um teste compara as duas, então edite as duas). Em **Z39.50 / SRU → Descobrir novos servidores (Z39 Atlas)**: *Descobrir novos servidores* confirma e inicia `auto-discover --published` em segundo plano (banco e log em `z39-atlas/` na pasta de configuração do painel, com a lista do painel e a do Koha como `--known`); a linha de status se atualiza a cada 15 s; *Verificar status da varredura* mostra os números; *Novos servidores encontrados* lista com caixas de seleção só os `marc_bibliographic` que não estão na lista nem no Koha, e os marcados passam pela mesma confirmação e pela mesma tarefa `z3950-add` de *Salvar no Koha*. Nada entra no Koha sem essa confirmação.
+
 ## 4 — Relatórios exportáveis para revisão e Koha
 
 ```bash
@@ -132,7 +166,7 @@ python3 z39atlas.py --db ./atlas.sqlite3 stats
 
 O CSV traz: `name,host,port,database,status,hits,marc_type,marc_bytes,latency_ms,checked_at,error,sources`.
 
-**Atenção:** `hits` é a contagem da consulta de teste, não o número total de obras no catálogo. `marc_bibliographic` e `marc_authority` indicam somente que houve recuperação MARC estruturalmente válida. Revise manualmente MARC21 vs. UNIMARC, codificação (MARC-8/UTF-8), limites de uso e qualidade bibliográfica antes de cadastrar no Koha.Nexus. Não há importação direta no Koha.
+**Atenção:** `hits` é a contagem da consulta de teste, não o número total de obras no catálogo. `marc_bibliographic` e `marc_authority` indicam somente que houve recuperação MARC estruturalmente válida. Revise manualmente MARC21 vs. UNIMARC, codificação (MARC-8/UTF-8), limites de uso e qualidade bibliográfica antes de cadastrar no Koha.Nexus. O script nunca grava no Koha; pelo painel, os servidores marcados só entram depois da confirmação de "Salvar no Koha".
 
 ## 5 — Serviço systemd (opcional)
 
@@ -145,7 +179,7 @@ python3 -m unittest discover -s tests -v
 python3 -m py_compile z39atlas.py
 ```
 
-Os testes offline cobrem: parsing, hosts privados bloqueados, deduplicação/proveniência, estrutura MARC, autorização por allowlist, sugestões de parâmetros e recuperação YAZ simulada. **Este ambiente não possui `yaz-client` ou acesso à sua VPS**, portanto a integração ao vivo deve ser verificada no servidor antes de uso permanente.
+Os testes offline cobrem: parsing, hosts privados bloqueados, deduplicação/proveniência, estrutura MARC, autorização por allowlist, sugestões de parâmetros, recuperação YAZ simulada e, em `tests/test_pipeline.py`, o `auto-discover` de ponta a ponta, o estado da execução, a retomada, a parada, a falta do YAZ, o `--background` e a comparação com a lista do Koha. **Este ambiente não possui `yaz-client` ou acesso à sua VPS**, portanto a integração ao vivo deve ser verificada no servidor antes de uso permanente.
 
 ## Fontes técnicas e convenções
 
