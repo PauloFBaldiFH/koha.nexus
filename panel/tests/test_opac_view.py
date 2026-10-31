@@ -553,11 +553,18 @@ def test_login_instructions_and_credits(tmp_path, monkeypatch):
             box.text = "Library name: Biblioteca Municipal\nE-mail: not-an-email"
             _cfg, _pending, problem = view.collect()
             assert problem.startswith("Footer credits: E-mail")
+            # Lines without a field name (Paulo, 2026-10-31): the first is the
+            # name when there is none, the others go into the note.
+            box.text = "Biblioteca Pública Municipal Castro Alves\nRua Exemplo, 123\nAberta ao público"
+            raw, _pending, problem = view.collect()
+            assert problem == ""
+            assert raw["credits"]["name"] == "Biblioteca Pública Municipal Castro Alves"
+            assert raw["credits"]["note"] == "Rua Exemplo, 123 · Aberta ao público"
             box.text = "Library name: Biblioteca Municipal\nPortal | https://biblioteca.gov.br\nno bar here"
-            _cfg, _pending, problem = view.collect()
-            assert "start the line with a field name" in problem
-            box.text = "Portal https://biblioteca.gov.br"
-            assert "start the line with a field name" in view.collect()[2]
+            raw, _pending, problem = view.collect()
+            assert problem == "" and raw["credits"]["note"] == "no bar here"
+            box.text = "Library name: X\nPortal | javascript:alert(1)"
+            assert "the address must start with" in view.collect()[2]
             box.text = ("library NAME: Biblioteca Municipal\nphone: (00) 0000-0000\n"
                         "E-mail: contato@biblioteca.gov.br\nPortal | https://biblioteca.gov.br")
             view.query_one("#o-login-opac-enabled", Switch).value = True
@@ -669,6 +676,6 @@ def test_credits_text_in_portuguese():
         text = opac._credits_text({**fields, "links": links})
         assert text.splitlines()[0] == "Nome da biblioteca: Biblioteca Municipal"
         assert opac._credits_parse(text)[:2] == (fields, links)                 # round trip
-        assert "comece a linha" in opac._credits_parse("sem campo")[2]
+        assert opac._credits_parse("sem campo")[0]["name"] == "sem campo"                # the name, no error
     finally:
         i18n.install(old)

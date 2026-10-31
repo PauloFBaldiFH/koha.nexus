@@ -704,3 +704,40 @@ assert not ot.credits_on(cfg["credits"]), cfg["credits"]
 PY
 }
 
+
+@test "news: the library's own news item comes into the panel with its buttons and is updated in place" {
+    contents_tables
+    # Koha's news item 9 as Paulo has it: an inline style and .btn-acesso links, no text.
+    ac "INSERT INTO additional_contents (id, category, code, location, published_on) VALUES (9, 'news', 'News_9', 'opac_only', '2025-01-01');
+INSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (9, 'Bem-vindo(a) à biblioteca',
+'<style>\n.btn-acesso { display: block; }\n</style>\n<a href=\"/cgi-bin/koha/opac-page.pl?page_id=5\" class=\"btn-acesso\">📖 Sobre</a> <a href=\"https://wa.me/550000000000\" rel=\"noopener\" class=\"btn-acesso\" target=\"_blank\">💬 WhatsApp</a> <a href=\"mailto:contato@biblioteca.gov.br\" class=\"btn-acesso\">📧 E-mail</a>', 'default');"
+    rm -f "$W/results"
+    task opac_theme_get
+    [ "$status" -eq 0 ]
+    PYTHONPATH="$KEI_REPO/panel" python3 - "$W/results" "$W/apply2" <<'PY'
+import shutil, sys
+from pathlib import Path
+from kei_panel import opac_theme as ot
+found = dict(l.rstrip("\n")[len("RESULT "):].split("=", 1) for l in open(sys.argv[1], encoding="utf-8")
+             if l.startswith("RESULT ") and "=" in l)
+cfg, notes, in_koha = ot.sync_settings(found)
+news = cfg["news"]["opac"]
+assert in_koha and news["enabled"] and news["koha_id"] == 9, news
+assert news["title"] == "Bem-vindo(a) à biblioteca" and news["html"] == "", news
+assert [b["text"] for b in news["buttons"]] == ["📖 Sobre", "💬 WhatsApp", "📧 E-mail"], news
+assert not cfg["news"]["staff"]["enabled"]
+# Seven buttons now (no limit), then Apply.
+news["buttons"] += [{"text": f"Extra {i}", "url": f"/x{i}"} for i in range(4)]
+work = ot.write_apply_dir(cfg, {})
+shutil.copytree(work, sys.argv[2])
+shutil.rmtree(work)
+PY
+    task opac_theme_apply "$W/apply2"
+    [ "$status" -eq 0 ]
+    # Item 9 itself changed; no news item of the panel next to it.
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code LIKE 'kei-news-%'")" = "0" ]
+    [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE category = 'news'")" = "1" ]
+    [ "$(ac "SELECT title FROM additional_contents_localizations WHERE additional_content_id = 9")" = "Bem-vindo(a) à biblioteca" ]
+    [ "$(ac "SELECT content FROM additional_contents_localizations WHERE additional_content_id = 9" | grep -c 'kei-news-button')" = "7" ]
+    ! ac "SELECT content FROM additional_contents_localizations WHERE additional_content_id = 9" | grep -q 'kei-news-id'
+}

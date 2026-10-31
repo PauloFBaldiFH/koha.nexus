@@ -100,10 +100,14 @@ MAX_ORDER = 999
 THEMES = {"light": "Light", "dark": "Dark", "auto": "Follow the device"}
 SOURCES = {"none": "None", "local": "File on this server", "url": "Direct URL", "imgbb": "Upload to ImgBB",
            "cloudinary": "Upload to Cloudinary"}
-ASSETS = ("background", "logo", "favicon")
+# header: the picture of the large header (it covers the whole header).
+ASSETS = ("background", "logo", "favicon", "header")
 # The staff interface's own pictures, in cfg["staff"]; their files are
 # kei-staff-<name>.* on the staff side (STAFF_CUSTOM_URL).
-STAFF_ASSETS = ASSETS
+STAFF_ASSETS = ("background", "logo", "favicon")
+# The OPAC header (#header-region: the top bar with the logo, cart and login,
+# then the search bar): Koha's own, or a large one under a picture.
+HEADER_STYLES = {"normal": "Normal", "large": "Large, with a picture"}
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
                ".webp": "image/webp", ".ico": "image/x-icon"}
 MAX_IMAGE = 8_000_000
@@ -124,6 +128,10 @@ DEFAULTS: dict = {
     "background": {"source": "none", "url": ""},
     "logo": {"source": "none", "url": ""},
     "favicon": {"source": "none", "url": ""},
+    "header": {"source": "none", "url": ""},
+    "header_bar": True,       # the top bar of the header (logo, cart, lists, login)
+    "header_style": "normal",
+    "header_height": 280,     # px of the large header
     "film": 55,               # % of the legibility film over a wallpaper
     "dark_switch": True,
     "default_theme": "light",
@@ -135,7 +143,8 @@ DEFAULTS: dict = {
                  # feeds of KEI.listCarousel and data-kei-list) with the home
                  # page carousel off.
                  "source": "new", "shelf": 0, "lists": False},
-    "ghost": {"rss": True, "cart_badge": True, "community": True, "empty_columns": True},
+    # cart: the whole cart (menu, its message and the "Add to cart" links).
+    "ghost": {"rss": True, "cart_badge": True, "cart": False, "community": True, "empty_columns": True},
     "news_buttons": True,
     # Quick access buttons at the top of the home page (link-tree style):
     # [{"icon": "📖", "text": "...", "url": "https://...", "target": "_blank", "sort_order": 1}],
@@ -177,7 +186,7 @@ DEFAULTS: dict = {
 }
 
 RANGES = {"blur": (0, 30), "opacity": (0, 100), "radius_block": (0, 30), "radius_input": (0, 30),
-          "radius_button": (0, 30), "film": (0, 90)}
+          "radius_button": (0, 30), "film": (0, 90), "header_height": (160, 520)}
 CAROUSEL_RANGES = {"speed": (2000, 10000), "count": (4, 24)}
 STAFF_FONT = (90, 120)
 STAFF_FILM = (0, 90)        # % of the film over the staff wallpaper, the OPAC's range: the cards keep the text readable
@@ -293,7 +302,8 @@ LOGIN_ASSETS = {"opac": "login", "staff": "staff-login"}
 NEWS_SIDES = {"opac": "news-opac", "staff": "news-staff"}
 NEWS_LOCATIONS = {"news-opac": "opac_only", "news-staff": "staff_only"}
 NEWS_TITLE = "<!-- kei-news-title: {} -->"
-MAX_NEWS_BUTTONS = 6
+# The library's own news item the box updates in place (second line).
+NEWS_ID = "<!-- kei-news-id: {} -->"
 MAX_HTML = 20_000
 MAX_CREDIT_LINKS = 6
 # What the login instructions keep of the HTML typed or pasted in the panel:
@@ -455,11 +465,15 @@ def _news(raw) -> dict:
     for item in raw_buttons:
         if not isinstance(item, dict):
             continue
-        text, url = _text(item.get("text"), "", 60), safe_link(item.get("url", ""))
+        text, url = _text(item.get("text"), "", 120), safe_link(item.get("url", ""))
         if text and url:
             buttons.append({"text": text, "url": url})
+    # koha_id: the library's own news item (additional_contents.id) the box
+    # shows and Apply updates in place; 0: the panel's own (code kei-news-*).
+    koha_id = r.get("koha_id")
+    koha_id = koha_id if isinstance(koha_id, int) and not isinstance(koha_id, bool) and 0 < koha_id < 10**9 else 0
     return {"enabled": bool(r.get("enabled", False)), "title": title.strip(),
-            "html": sanitize_html(r.get("html", "")), "buttons": buttons[:MAX_NEWS_BUTTONS]}
+            "html": sanitize_html(r.get("html", "")), "buttons": buttons, "koha_id": koha_id}
 
 
 def news_on(n: dict) -> bool:
@@ -566,7 +580,12 @@ def contents(cfg: dict, text: dict | None = None) -> dict[str, str]:
            for side, loc in LOGIN_SIDES.items()}
     out["opaccredits"] = credits_html(cfg["credits"], text) if credits_on(cfg["credits"]) else ""
     for side, place in NEWS_SIDES.items():
-        out[place] = news_html(cfg["news"][side]) if news_on(cfg["news"][side]) else ""
+        nw = cfg["news"][side]
+        markup = news_html(nw) if news_on(nw) else ""
+        if markup and nw["koha_id"]:
+            first, rest = markup.split("\n", 1)
+            markup = f"{first}\n{NEWS_ID.format(nw['koha_id'])}\n{rest}"
+        out[place] = markup
     return out
 
 
@@ -612,6 +631,8 @@ def normalize(raw: dict | None) -> dict:
     for name in ASSETS:
         cfg[name] = _asset(raw.get(name))
     cfg["dark_switch"] = bool(raw.get("dark_switch", DEFAULTS["dark_switch"]))
+    cfg["header_bar"] = bool(raw.get("header_bar", True))
+    cfg["header_style"] = raw.get("header_style") if raw.get("header_style") in HEADER_STYLES else "normal"
     cfg["default_theme"] = raw.get("default_theme") if raw.get("default_theme") in THEMES else "light"
     c = raw.get("carousel") if isinstance(raw.get("carousel"), dict) else {}
     car = cfg["carousel"]
@@ -653,6 +674,7 @@ def normalize(raw: dict | None) -> dict:
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
     cfg["staff"].update(_style(st))
     cfg["staff"]["header_glass"] = bool(st.get("header_glass", False))
+    cfg["staff"]["dark_switch"] = bool(st.get("dark_switch", False))
     for key, (lo, hi) in STAFF_HEADER.items():
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), lo, hi, default)
@@ -798,7 +820,7 @@ def sync_settings(found: dict[str, str], text: dict | None = None) -> tuple[dict
         if staff_active(cfg) and not yes["IntranetUserCSS"]:
             notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
                           {"prefs": "IntranetUserCSS"}))
-        if links_on(cfg["staff_links"]) and not yes["IntranetUserJS"]:
+        if staff_js_on(cfg) and not yes["IntranetUserJS"]:
             notes.append(("The panel's block is missing from ${prefs}: Apply writes it again.",
                           {"prefs": "IntranetUserJS"}))
         notes.append(("Quick access buttons: OPAC ${opac}, staff ${staff}.",
@@ -882,15 +904,29 @@ def login_from_html(content: str) -> dict:
     return _login({"enabled": True, "html": inner, "image": image, "alt": alt})
 
 
-def news_from_html(title: str, content: str) -> dict:
-    """The news form of the panel's news item as Koha holds it: the title of
-    Koha's own field, the text, and the buttons of its row."""
-    text = re.sub(r"<!--\s*kei-news-title:.*?-->", "", content or "", flags=re.S)
+# A link that looks like a button: Koha's / Bootstrap's .btn, the panel's
+# .kei-news-button, or a library's own class with "btn" or "button" in it
+# (.btn-acesso).
+_BUTTON_LINK = re.compile(r'<a\b(?=[^>]*\bclass="[^"]*(?:\bbtn|button)[^"]*")[^>]*>.*?</a\s*>', re.S | re.I)
+
+
+def news_from_html(title: str, content: str, koha_id: int = 0) -> dict:
+    """The news form of a news item as Koha holds it: the title of Koha's
+    own field, the text, and its buttons (the panel's button row, or the
+    library's own button links, wherever they are in the text)."""
+    text = re.sub(r"<!--\s*kei-news-(?:title|id):.*?-->", "", content or "", flags=re.S)
     inner, _ours = _unwrap(text, "kei-news")
-    buttons = [{"text": label, "url": attrs.get("href", "")}
-               for row in _by_class(inner, "p", "kei-news-cta") for attrs, label in _anchors(row)]
-    inner = re.sub(r'<p\b[^>]*class="[^"]*\bkei-news-cta\b[^"]*"[^>]*>.*?</p\s*>', "", inner, flags=re.S | re.I)
-    return _news({"enabled": True, "title": title, "html": inner.strip(), "buttons": buttons})
+    buttons = []
+    for m in _BUTTON_LINK.finditer(inner):
+        for attrs, label in _anchors(m.group(0)):
+            if label and attrs.get("href"):
+                buttons.append({"text": label, "url": attrs["href"]})
+    inner = _BUTTON_LINK.sub("", inner)
+    inner = re.sub(r'<p\b[^>]*class="[^"]*\bkei-news-cta\b[^"]*"[^>]*>\s*</p\s*>', "", inner, flags=re.S | re.I)
+    html_text = sanitize_html(inner)
+    if not _plain(html_text) and "<img" not in html_text:
+        html_text = ""          # only spaces and &nbsp; were left between the buttons
+    return _news({"enabled": True, "title": title, "html": html_text, "buttons": buttons, "koha_id": koha_id})
 
 
 def credits_from_html(content: str) -> dict:
@@ -988,13 +1024,17 @@ def live_contents(found: dict[str, str], text: dict | None = None) -> tuple[dict
             out["news"][side] = _news({})
             continue
         title, content = str(got.get("title") or ""), str(got.get("content") or "")
+        koha_id = got.get("id") if got.get("own") and isinstance(got.get("id"), int) else 0
         mine = saved["news"][side] if saved else None
-        if (mine and news_on(mine) and mine["title"] == title.strip()
+        if (mine and news_on(mine) and mine["title"] == title.strip() and mine["koha_id"] == koha_id
                 and _same(news_html(mine).split("\n", 1)[1], content)):
             out["news"][side] = mine
         else:
-            out["news"][side] = news_from_html(title, content)
+            out["news"][side] = news_from_html(title, content, koha_id)
             edited.append(place)
+        if koha_id:
+            notes.append(("${place}: the library's own news item ${id} (Tools > News) is shown here; Apply "
+                          "updates it in place.", {"place": place, "id": str(koha_id)}))
     on = [place for side, place in LOGIN_SIDES.items() if login_on(out["login"][side])]
     on += ["opaccredits"] if credits_on(out["credits"]) else []
     on += [place for side, place in NEWS_SIDES.items() if news_on(out["news"][side])]
@@ -1271,6 +1311,63 @@ html body .main .text-muted, html body .newsitem .newsfooter {{ color: var(--koh
         _material_main_css() if cfg["texture"] in MATERIALS else "")
 
 
+def _header_css(cfg: dict) -> list[str]:
+    """The OPAC header (#header-region): its top bar hidden, or the large
+    header: taller, the picture covering all of it (else the two colours),
+    a film for the legibility of the bar and the search over it."""
+    out = []
+    if not cfg["header_bar"]:
+        out.append("html body #header-region > nav.navbar { display: none !important; }")
+    if cfg["header_style"] != "large":
+        return out
+    pic = cfg["header"]["url"]
+    paint = (f'url("{pic}") center / cover no-repeat' if pic
+             else "linear-gradient(135deg, var(--kei-accent), var(--kei-accent2))")
+    h = cfg["header_height"]
+    out.append(f"""/* Large header: the picture covers the whole header. */
+html body #header-region {{
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: {h}px;
+    background: {paint} !important;
+    border-radius: 0 0 var(--kei-r-block) var(--kei-r-block);
+    overflow: visible;
+}}
+html body #header-region::before {{
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(0, 0, 0, .45), rgba(0, 0, 0, .12) 45%, rgba(0, 0, 0, .50));
+    pointer-events: none;
+}}
+html body #header-region > * {{ position: relative; z-index: 1; }}
+html body #header-region > nav.navbar, html body #header-region .navbar {{
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}}
+html body #header-region > nav.navbar .nav-link, html body #header-region > nav.navbar .navbar-text,
+html body #header-region > nav.navbar .cartlabel, html body #header-region > nav.navbar #carticon,
+html body #header-region > nav.navbar .userlabel {{
+    color: #fff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}}
+html body #header-region #opac-main-search, html body #header-region .mastheadsearch,
+html body #header-region #moresearches {{
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}}
+html body #header-region #moresearches a {{ color: #fff !important; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }}
+@media (max-width: 767px) {{
+    html body #header-region {{ min-height: {max(160, h * 6 // 10)}px; }}
+}}""")
+    return out
+
+
 def _material_main_css() -> str:
     """A material's streaks and grain on .main sit on a layer above its blur
     layer (::before): on .main itself the blur would smear them, since the
@@ -1379,11 +1476,18 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     background-position: left center !important;
     min-width: 140px;
 }}""")
+    out += _header_css(cfg)
     hidden = []
     if ghost["rss"]:
         hidden += ["#rssnews", ".rsssearchlink", "a[href*='opac-news-rss']", "a[href*='format=rss']", "#rss"]
     if ghost["cart_badge"]:
         hidden += ["#basketcount", "#cartDetails", "#cartmenulink .badge"]
+    if ghost["cart"]:
+        # Koha 22-26: the Cart menu of the top bar, its message, the "Add to
+        # cart" links and buttons of the results and of a record.
+        hidden += ["#cart-list-nav > li:has(#cartmenulink)", "#cartmenulink", "#cartDetails", "#basketcount",
+                   ".addtocart", "a.addtocart", ".cartRemove", "#addto option[value='addtocart']",
+                   ".selections-toolbar .addtocart", "#toolbar .addtocart", ".cart-message"]
     if ghost["community"]:
         hidden += ["#koha_url", "a[href*='koha-community.org']"]
     if hidden:
@@ -1791,7 +1895,7 @@ def _carousel_css(car: dict) -> str:
     hover = {
         "zoom": ".kei-card:hover img, .kei-card:focus img { transform: scale(1.06); }",
         "lift": ".kei-card:hover, .kei-card:focus { transform: translateY(-6px); "
-                "box-shadow: 0 18px 36px rgba(0, 0, 0, .28); }",
+                "box-shadow: 0 10px 16px -6px rgba(0, 0, 0, .32); }",
         "tilt": ".kei-card { transform-style: preserve-3d; will-change: transform; }",
         "none": "",
     }[car["hover"]]
@@ -1803,7 +1907,7 @@ def _carousel_css(car: dict) -> str:
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
-    padding: .5rem .25rem 1rem;
+    padding: .75rem .4rem 1.25rem;
     scrollbar-width: thin;
 }}
 .kei-card {{
@@ -1815,7 +1919,7 @@ def _carousel_css(car: dict) -> str:
     border-radius: calc(var(--kei-r-block) * .6);
     overflow: hidden;
     background: rgba(var(--kei-surface-rgb), .6);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, .18);
+    box-shadow: 0 4px 10px -3px rgba(0, 0, 0, .22);
     transition: transform .25s ease, box-shadow .25s ease;
 }}
 .kei-card img {{ width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }}
@@ -1858,7 +1962,7 @@ def _carousel_css(car: dict) -> str:
 /* 3D coverflow: the cards stand on a stage and turn around the centre one. */
 .kei-mode-coverflow .kei-stage {{
     position: relative;
-    height: 290px;
+    height: 300px;
     perspective: 1100px;
     overflow: hidden;
     touch-action: pan-y;
@@ -1871,7 +1975,8 @@ def _carousel_css(car: dict) -> str:
     width: 170px;
     margin-left: -85px;
     transition: transform .6s cubic-bezier(.22, .61, .36, 1), opacity .6s ease, box-shadow .6s ease;
-    box-shadow: 0 18px 30px rgba(0, 0, 0, .35);
+    /* Short shadows: they stay inside the stage, which clips (Paulo, 2026-10-31). */
+    box-shadow: 0 8px 12px -4px rgba(0, 0, 0, .35);
 }}
 .kei-mode-coverflow .kei-card::after {{
     content: "";
@@ -1881,7 +1986,7 @@ def _carousel_css(car: dict) -> str:
     background: linear-gradient(90deg, rgba(0, 0, 0, var(--kei-shade-l, 0)), rgba(0, 0, 0, var(--kei-shade-r, 0)));
     transition: background .6s ease;
 }}
-.kei-mode-coverflow .kei-card.kei-center {{ box-shadow: 0 24px 40px rgba(0, 0, 0, .45); }}
+.kei-mode-coverflow .kei-card.kei-center {{ box-shadow: 0 10px 16px -4px rgba(0, 0, 0, .45); }}
 .kei-mode-coverflow .kei-card.kei-center .kei-card-info {{ opacity: 1; transform: none; }}
 .kei-mode-coverflow .kei-nav {{ top: 42%; }}
 .kei-mode-coverflow .kei-prev {{ left: .4rem; }}
@@ -2439,8 +2544,8 @@ def _side_vars(cfg: dict, side: str) -> dict:
                 "wallpaper": bool(cfg["background"]["url"]), "login": "html body#opac-login-page",
                 "login_main": "html body#opac-login-page .main", "login_card": "#opac-auth",
                 "login_form": "#auth", "menus": "html body .main #menu, html body .main #usermenu",
-                "cards": "html body .newsitem, html body #opacmainuserblock, html body a.kei-link, "
-                         "html body .kei-action"}
+                # The news blocks stay still: only their buttons move.
+                "cards": "html body a.kei-link, html body .kei-action"}
     st = cfg["staff"]
     t = st["texture"]
     if t in MATERIALS:
@@ -2458,7 +2563,7 @@ def _side_vars(cfg: dict, side: str) -> dict:
             "wallpaper": bool(st["background"]["url"]), "login": "html body#main_auth",
             "login_main": "html body#main_auth .main", "login_card": "#login", "login_form": "#loginform",
             "menus": "html body #navmenulist, html body .sidebar_menu",
-            "cards": "html body ul.biglinks-list li a.icon_general, html body #area-news .newsitem"}
+            "cards": "html body ul.biglinks-list li a.icon_general"}
 
 
 def style_css(cfg: dict, side: str) -> str:
@@ -2614,9 +2719,15 @@ html body .btn:hover, html body .btn:focus, html body button:hover, html body in
         transform: translateY(-4px) scale(1.01);
         box-shadow: 0 18px 34px -14px rgba({v['accent']}, .45) !important;
     }}
-    html body .btn, html body input[type="submit"] {{ transition: transform .2s ease, filter .2s ease, box-shadow .2s ease; }}
-    html body .btn:hover, html body input[type="submit"]:hover {{ transform: translateY(-2px) scale(1.03); }}
-    html body .btn:active, html body input[type="submit"]:active {{ transform: translateY(0) scale(.98); }}
+    html body .btn, html body input[type="submit"], html body a.btn-acesso {{
+        transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+    }}
+    html body .btn:hover, html body input[type="submit"]:hover, html body a.btn-acesso:hover {{
+        transform: translateY(-2px) scale(1.03);
+    }}
+    html body .btn:active, html body input[type="submit"]:active, html body a.btn-acesso:active {{
+        transform: translateY(0) scale(.98);
+    }}
     html body table tbody tr td {{ transition: background-color .2s ease; }}
     html body table tbody tr:hover td {{ background-color: rgba({v['accent']}, .07); }}
 }}"""
@@ -2742,6 +2853,80 @@ def staff_active(cfg: dict) -> bool:
     return cfg["staff"]["enabled"] or links_on(cfg["staff_links"])
 
 
+def staff_dark(cfg: dict) -> bool:
+    """The staff interface has the light/dark switch (with its own colours on)."""
+    cfg = normalize(cfg)
+    return cfg["staff"]["enabled"] and cfg["staff"]["dark_switch"]
+
+
+def staff_dark_css(cfg: dict) -> str:
+    """The staff interface in dark mode (html[data-kei-theme="dark"], set by
+    the switch of staff.js): the staff variables on dark surfaces, and
+    Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
+    st = normalize(cfg)["staff"]
+    link = mix(st["accent"], "#ffffff", .45)
+    d = 'html[data-kei-theme="dark"]'
+    return f"""/* Staff dark mode (the light/dark switch of the top bar). */
+{d} {{
+    --nexus-staff-page: #0d1117;
+    --nexus-staff-card: #161b22;
+    --nexus-staff-text: #e6edf3;
+    --nexus-staff-muted: #9da7b3;
+    --nexus-staff-ink: {link};
+    --nexus-staff-link: {link};
+    --nexus-staff-surface-rgb: 22, 27, 34;
+    --nexus-staff-edge: rgba(255, 255, 255, .10);
+    --bs-body-bg: #0d1117;
+    --bs-body-color: #e6edf3;
+    --bs-border-color: #30363d;
+    color-scheme: dark;
+}}
+{d} body {{ background-color: var(--nexus-staff-page); color: var(--nexus-staff-text); }}
+{d} body .main, {d} body .main h1, {d} body .main h2, {d} body .main h3, {d} body .main h4,
+{d} body .main label, {d} body .main legend, {d} body .main th, {d} body .main td, {d} body #breadcrumbs,
+{d} body .sidebar_menu, {d} body #navmenulist {{ color: var(--nexus-staff-text) !important; }}
+{d} body .page-section, {d} body fieldset.rows, {d} body .modal-content, {d} body .dropdown-menu:not(.dropdown-menu-dark),
+{d} body #area-news .newsitem, {d} body .card, {d} body .list-group-item, {d} body .toptabs .tab-content,
+{d} body .ui-tabs-panel, {d} body #navmenu, {d} body .sidebar_menu, {d} body .dataTables_wrapper {{
+    background-color: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .3 + .7)) !important;
+    color: var(--nexus-staff-text);
+    border-color: #30363d;
+}}
+{d} body .table, {d} body table {{
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--nexus-staff-text);
+    --bs-table-striped-bg: rgba(255, 255, 255, .03);
+    --bs-table-hover-bg: rgba(255, 255, 255, .06);
+    background-color: transparent;
+    color: var(--nexus-staff-text);
+}}
+{d} body table th {{ background-color: #1c2230 !important; }}
+{d} body table tr td, {d} body table tr.odd td, {d} body table tr.even td {{
+    background-color: transparent !important; border-color: #30363d;
+}}
+{d} body .form-control, {d} body .form-select, {d} body input[type="text"], {d} body input[type="password"],
+{d} body input[type="search"], {d} body input[type="email"], {d} body input[type="number"], {d} body select,
+{d} body textarea {{ background-color: #0d1117; color: var(--nexus-staff-text); border-color: #30363d; }}
+{d} body ::placeholder {{ color: #9da7b3; opacity: 1; }}
+{d} body .main a:not(.btn):not(.dropdown-item):not(.nav-link), {d} body #breadcrumbs a {{ color: var(--nexus-staff-link); }}
+{d} body .text-muted, {d} body .hint {{ color: var(--nexus-staff-muted) !important; }}
+{d} body .btn-default, {d} body .btn-light {{ background-color: #21262d; color: var(--nexus-staff-text); border-color: #30363d; }}
+#kei-theme-switch {{
+    border: 1px solid rgba(255, 255, 255, .35);
+    background: transparent;
+    color: var(--nexus-staff-on-primary, #fff);
+    border-radius: 999px;
+    padding: .1rem .6rem;
+    margin: 0 .4rem;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1.4;
+    align-self: center;
+}}
+#kei-theme-switch:hover {{ background: rgba(255, 255, 255, .14); }}
+"""
+
+
 def staff_css_block(cfg: dict) -> str:
     """IntranetUserCSS: the staff colours when they are on, the home page
     buttons when there are some."""
@@ -2749,6 +2934,8 @@ def staff_css_block(cfg: dict) -> str:
     parts = []
     if cfg["staff"]["enabled"]:
         parts.append(staff_css_body(cfg).rstrip("\n"))
+    if staff_dark(cfg):
+        parts.append(staff_dark_css(cfg).rstrip("\n"))
     if links_on(cfg["staff_links"]):
         parts.append(staff_links_css(cfg).rstrip("\n"))
     return "\n".join([CSS_BEGIN, *parts, CSS_END]) + "\n"
@@ -3207,13 +3394,47 @@ __LINK_NAV__
 _STAFF_JS = r"""(function () {
     "use strict";
     var C = __CONFIG__;
+    var root = document.documentElement;
+    var KEY = "kei_staff_theme";
+    function stored() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+    function save(t) { try { localStorage.setItem(KEY, t); } catch (e) { /* private window */ } }
+    if (C.dark_switch) { root.setAttribute("data-kei-theme", stored() === "dark" ? "dark" : "light"); }
 __LINK_NAV__
 
     function ready(fn) {
         if (document.readyState !== "loading") { fn(); } else { document.addEventListener("DOMContentLoaded", fn); }
     }
 
+    // The light/dark switch, in the top bar next to the logged-in menu.
     ready(function () {
+        if (!C.dark_switch || document.getElementById("kei-theme-switch")) { return; }
+        var b = document.createElement("button");
+        b.type = "button";
+        b.id = "kei-theme-switch";
+        b.title = C.switch_title;
+        b.setAttribute("aria-label", C.switch_title);
+        b.textContent = "\uD83C\uDF13";
+        b.addEventListener("click", function () {
+            var t = root.getAttribute("data-kei-theme") === "dark" ? "light" : "dark";
+            root.setAttribute("data-kei-theme", t);
+            save(t);
+        });
+        var bars = document.querySelectorAll("nav.navbar .navbar-nav");
+        var bar = bars.length ? bars[bars.length - 1] : null;
+        if (bar) {
+            var li = document.createElement("li");
+            li.className = "nav-item";
+            li.style.display = "flex";
+            li.appendChild(b);
+            bar.appendChild(li);
+        } else {
+            b.style.position = "fixed"; b.style.right = "1rem"; b.style.bottom = "1rem"; b.style.zIndex = "1000";
+            document.body.appendChild(b);
+        }
+    });
+
+    ready(function () {
+        if (!C.links) { return; }
         var home = (document.body && document.body.id === "main_intranet-main") || /\/mainpage\.pl$/.test(location.pathname);
         if (!home || document.getElementById("kei-staff-links")) { return; }
         var nav = linkNav("kei-staff-links", C.links, C.label);
@@ -3268,11 +3489,18 @@ def js_block(cfg: dict, text: dict | None = None) -> str:
 
 def staff_js_config(cfg: dict, text: dict | None = None) -> dict:
     cfg = normalize(cfg)
-    return {"links": _links_conf(cfg["staff_links"]), "label": {**JS_TEXT, **(text or {})}["links"]}
+    words = {**JS_TEXT, **(text or {})}
+    return {"links": _links_conf(cfg["staff_links"]),
+            "label": words["links"], "dark_switch": staff_dark(cfg), "switch_title": words["switch_title"]}
+
+
+def staff_js_on(cfg: dict) -> bool:
+    """staff.js goes into IntranetUserJS: home page buttons or the switch."""
+    return links_on(normalize(cfg)["staff_links"]) or staff_dark(cfg)
 
 
 def staff_js_block(cfg: dict, text: dict | None = None) -> str:
-    """IntranetUserJS: the staff home page buttons."""
+    """IntranetUserJS: the staff home page buttons and the light/dark switch."""
     return "\n".join([JS_BEGIN, _script(_STAFF_JS, staff_js_config(cfg, text)), JS_END]) + "\n"
 
 
@@ -3404,7 +3632,7 @@ def write_apply_dir(cfg: dict, files: dict[str, Path], text: dict | None = None)
     # interface's preferences again.
     if staff_active(cfg):
         (work / "staff.css").write_text(staff_css_block(cfg), encoding="utf-8")
-    if links_on(cfg["staff_links"]):
+    if staff_js_on(cfg):
         (work / "staff.js").write_text(staff_js_block(cfg, text), encoding="utf-8")
     prefs = []
     car = cfg["carousel"]
