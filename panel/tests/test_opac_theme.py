@@ -965,3 +965,54 @@ def test_library_news_item_comes_back_with_its_buttons():
     # Apply writes the id so the installer updates item 9 in place.
     markup = ot.contents(got)["news-opac"]
     assert markup.splitlines()[:2] == ["<!-- kei-news-title: Bem-vindo -->", "<!-- kei-news-id: 9 -->"]
+
+
+def test_paulo_1031_colour_paints_and_phone_layout():
+    """Paulo, 2026-10-31 (17:01): each colour with its own texture and
+    opacity; on a phone the holdings readable, the logo at a real size, the
+    cover above the text of a result; the results toolbar that sticks to the
+    top no longer lets the results show through it."""
+    plain = ot.css_body(ot.normalize({}))
+    assert "Each colour in its own texture" not in plain and "--kei-page-rgb" not in plain
+    assert ot.normalize({"paint": {"accent": {"texture": "lava", "opacity": 500}}})["paint"]["accent"] == {
+        "texture": "auto", "opacity": 100}
+    cfg = ot.normalize({"accent": "#112233", "page": "#ffeedd",
+                        "paint": {"accent": {"texture": "wood", "opacity": 60},
+                                  "accent2": {"texture": "frosted", "opacity": 50},
+                                  "page": {"texture": "paper", "opacity": 80}}})
+    css = ot.css_body(cfg)
+    painted = css[css.index("Each colour in its own texture"):]
+    main = painted[painted.index("html body .btn-primary"):]
+    main = main[:main.index("}")]
+    assert "rgba(var(--kei-accent-rgb), 0.60)" in main and ".0015 .5" in main      # wood grain
+    soft = painted[painted.index("html body .btn-default"):]
+    soft = soft[:soft.index("}")]
+    assert "rgba(var(--kei-accent2-rgb), 0.50)" in soft and "backdrop-filter" in soft
+    assert "var(--nexus-on-secondary)" in soft and "--nexus-on-secondary: " in css
+    assert "--kei-page-rgb: 255,238,221;" in css
+    assert "rgba(var(--kei-page-rgb), 0.80)" in css
+    # Only the opacity of the accent: the buttons keep their look, in rgba.
+    only = ot.css_body(ot.normalize({"paint": {"accent": {"opacity": 50}}}))
+    assert "rgba(var(--kei-accent-rgb), 0.50)" in only
+    # The second colour on "As the Material": its opacity scales its glow.
+    glow = ot.css_body(ot.normalize({"paint": {"accent2": {"opacity": 50}}}))
+    assert "rgba(var(--kei-accent2-rgb), 0.07)" in glow and "Each colour" not in glow
+    # Round trip through the stylesheet's settings line.
+    assert ot.parse_theme_data(ot.data_line(cfg))["paint"] == cfg["paint"]
+
+    # The sticky toolbar: a near solid card above the results.
+    sticky = plain[plain.index("html body #floating"):]
+    sticky = sticky[:sticky.index("}")]
+    assert "rgba(var(--koha-card-rgb), .96)" in sticky and "z-index: 1020 !important" in sticky
+    # Phone: cover above the text, Koha's hidden number column kept hidden.
+    assert "html body .searchresults td.covercol { flex: 1 1 100%" in plain
+    assert "td:not(.hidden):not(.d-none)" in plain
+    # Phone: holdings stacked with their headings, every column shown.
+    assert "table.kei-stack > tbody > tr > td[data-kei-label]::before" in plain
+    assert "content: attr(data-kei-label)" in plain
+    js = ot._JS
+    assert "#holdingst, #otherholdingst" in js and "data-kei-label" in js and "draw.dt" in js
+    # Phone: the library's logo instead of Koha's 14 px house icon.
+    assert "width: 132px !important" not in plain
+    logo = ot.css_body(ot.normalize({"logo": {"source": "url", "url": "https://i.postimg.cc/a/logo.png"}}))
+    assert "max-width: 700px" in logo and "width: 132px !important" in logo

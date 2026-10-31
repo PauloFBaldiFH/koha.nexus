@@ -118,8 +118,12 @@ def test_edit_preview_apply_and_remove(tmp_path, monkeypatch):
             view.query_one("#o-src-favicon", Select).value = "imgbb"
             view.query_one("#o-val-favicon", Input).value = str(logo)
             view.query_one("#o-g-rss", Switch).value = False
+            view.query_one("#o-paint-accent-texture", Select).value = "wood"
+            view.query_one("#o-paint-page-opacity", Slider).value = 40
             cfg, pending, problem = view.collect()
             assert problem == "" and set(pending) == {"logo", "favicon"}
+            assert cfg["paint"]["accent"] == {"texture": "wood", "opacity": 100}
+            assert cfg["paint"]["page"]["opacity"] == 40 and cfg["paint"]["accent2"]["texture"] == "auto"
 
             view.preview()
             await _until(pilot, lambda: isinstance(app.screen, TextScreen))

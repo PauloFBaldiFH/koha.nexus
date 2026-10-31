@@ -70,6 +70,15 @@ TEXTURES = {
 # over the card, and the brushed buttons for the two metals.
 MATERIALS = ("metal", "anodized", "wood", "paper")
 METALS = ("metal", "anodized")
+# Each colour of the palette with a texture and an opacity of its own
+# (cfg["paint"][colour]): the accent paints the main buttons, the second
+# colour the secondary buttons, the page colour the page under the blocks.
+# The block background is the Material itself (its texture and opacity).
+# "auto": the look before these options existed (the accent follows the
+# Material, the second colour only tints the page's glows, the page is a
+# plain colour).
+PAINTED = ("accent", "accent2", "page")
+PAINTS = {"auto": "As the Material (default)", **TEXTURES}
 # Style details, the same choices for the OPAC (cfg) and the staff
 # interface (cfg["staff"]): key -> (label, {value: name}). The first value
 # is the default, the look the panel had before these options existed.
@@ -125,6 +134,8 @@ DEFAULTS: dict = {
     "accent2": "#7c3aed",     # second colour of the gradient
     "surface": "#ffffff",     # background of the blocks (header, search, content, news)
     "page": "",               # background of the page ("" = Koha's own)
+    # The texture and opacity (0 clear, 100 solid) of each colour (PAINTED).
+    "paint": {key: {"texture": "auto", "opacity": 100} for key in PAINTED},
     "background": {"source": "none", "url": ""},
     "logo": {"source": "none", "url": ""},
     "favicon": {"source": "none", "url": ""},
@@ -628,6 +639,11 @@ def normalize(raw: dict | None) -> dict:
     cfg["accent2"] = _hex(raw.get("accent2"), DEFAULTS["accent2"])
     cfg["surface"] = _hex(raw.get("surface"), DEFAULTS["surface"])
     cfg["page"] = _hex(raw.get("page"), "") if raw.get("page") else ""
+    pt = raw.get("paint") if isinstance(raw.get("paint"), dict) else {}
+    for key in PAINTED:
+        one = pt.get(key) if isinstance(pt.get(key), dict) else {}
+        cfg["paint"][key] = {"texture": one.get("texture") if one.get("texture") in PAINTS else "auto",
+                             "opacity": _clamp(one.get("opacity", 100), 0, 100, 100)}
     for name in ASSETS:
         cfg[name] = _asset(raw.get(name))
     cfg["dark_switch"] = bool(raw.get("dark_switch", DEFAULTS["dark_switch"]))
@@ -1398,6 +1414,7 @@ def css_body(cfg: dict) -> str:
     --nexus-surface: {cfg['surface']};
     --nexus-text: {text};
     --nexus-on-primary: {text_on(cfg['accent'])};
+    --nexus-on-secondary: {text_on(cfg['accent2'])};
     --kei-accent: {cfg['accent']};
     --kei-accent-rgb: {_rgb(cfg['accent'])};
     --kei-accent2-rgb: {_rgb(cfg['accent2'])};
@@ -1477,6 +1494,7 @@ html[data-kei-theme="dark"] body.kei-wallpaper::before {{ background: rgba(8, 12
     min-width: 140px;
 }}""")
     out += _header_css(cfg)
+    out.append(_phone_css(cfg))
     hidden = []
     if ghost["rss"]:
         hidden += ["#rssnews", ".rsssearchlink", "a[href*='opac-news-rss']", "a[href*='format=rss']", "#rss"]
@@ -1691,6 +1709,140 @@ _METAL_SHADOW = ("inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(0,
                  "0 1px 1px rgba(0, 0, 0, .18), 0 4px 8px -2px rgba(0, 0, 0, .22)")
 
 
+def _phone_css(cfg: dict) -> str:
+    """The search results' toolbar and the phone layout (Koha 26):
+
+    - #floating (the "Select all / Add to cart / Place hold" bar that sticks
+      to the top while the results scroll) is one of the boxes left clear
+      inside the content card, so the titles and covers scrolling under it
+      showed through: it gets a near solid card of its own above them.
+    - Under 700 px Koha swaps the logo for a 14 px house icon; the
+      library's logo keeps a readable size instead.
+    - Under 768 px a result is the cover above the text, not beside it.
+    - The holdings tables (#holdingst, #otherholdingst) become one card per
+      copy with "heading: value" lines (the headings from data-kei-label,
+      set by the OPAC script), every column shown: DataTables hides the
+      columns that do not fit, which left only two and an empty one."""
+    logo = ""
+    if cfg["logo"]["url"]:
+        logo = """
+@media only screen and (max-width: 700px) {
+    html body #header-region #logo {
+        flex: 0 0 auto !important;
+        width: 132px !important;
+        min-width: 132px;
+        height: 40px;
+        margin: 4px 8px !important;
+        background-size: contain !important;
+        background-position: left center !important;
+    }
+    html body #header-region #logo a { width: 132px !important; padding: 40px 0 0 !important; }
+}"""
+    return f"""/* The results toolbar that sticks to the top: a solid card above the results. */
+html body #floating, html body .main #floating, html body .main .floating.sticky {{
+    background: var(--koha-card-sheen), rgba(var(--koha-card-rgb), .96) !important;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: var(--kei-r-block);
+    box-shadow: 0 8px 18px -12px rgba(15, 23, 42, .45);
+    padding: .35rem .6rem;
+    z-index: 1020 !important;
+}}
+html body .main #floating #toolbar, html body .main #floating .selections-toolbar {{ background: transparent !important; }}{logo}
+@media only screen and (max-width: 767px) {{
+    /* A result: the selection box and number on one line, the cover
+       above the text, the text on the card's full width. */
+    html body .searchresults table, html body .searchresults table > tbody {{ display: block; width: 100%; }}
+    html body .searchresults table > tbody > tr {{
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: .6rem 0;
+        border-bottom: 1px solid var(--koha-card-border);
+    }}
+    html body .searchresults table > tbody > tr > td:not(.hidden):not(.d-none) {{ display: block; border: 0 !important; }}
+    html body .searchresults td.selectcol, html body .searchresults td.numcol, html body .searchresults td.itypecol {{
+        flex: 0 0 auto; width: auto !important; padding: .2rem .4rem !important;
+    }}
+    html body .searchresults td.covercol {{ flex: 1 1 100%; width: 100% !important; text-align: center; padding: .3rem 0 !important; }}
+    html body .searchresults td.covercol img {{ max-height: 220px; width: auto; max-width: 70%; margin: 0 auto; }}
+    html body .searchresults td.covercol .cover-slider {{ display: inline-block; }}
+    html body .searchresults td.bibliocol {{ flex: 1 1 100%; width: 100% !important; padding: .3rem .4rem !important; }}
+    /* The holdings: one card per copy, every column a "heading: value" line. */
+    html body table.kei-stack {{ display: block; width: 100% !important; border: 0 !important; }}
+    html body table.kei-stack > thead, html body table.kei-stack > tbody > tr.child,
+    html body table.kei-stack td.dtr-control, html body table.kei-stack th.dtr-control {{ display: none !important; }}
+    html body table.kei-stack > tbody {{ display: block; }}
+    html body table.kei-stack > tbody > tr {{
+        display: block;
+        margin: 0 0 .75rem;
+        padding: .5rem .75rem;
+        border: 1px solid var(--koha-card-border);
+        border-radius: var(--kei-r-block);
+        background: rgba(var(--koha-card-rgb), .55);
+    }}
+    html body table.kei-stack > tbody > tr > td {{
+        display: flex !important;
+        gap: .75rem;
+        width: auto !important;
+        padding: .3rem 0 !important;
+        border: 0 !important;
+        border-bottom: 1px dashed var(--koha-card-border) !important;
+        text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word;
+    }}
+    html body table.kei-stack > tbody > tr > td:last-child {{ border-bottom: 0 !important; }}
+    html body table.kei-stack > tbody > tr > td[data-kei-label]::before {{
+        content: attr(data-kei-label);
+        flex: 0 0 40%;
+        font-weight: 600;
+        color: var(--koha-muted);
+    }}
+    html body table.kei-stack > tbody > tr > td:empty, html body table.kei-stack > tbody > tr > td[data-kei-label=""] {{
+        display: none !important;
+    }}
+}}"""
+
+
+def _paint(texture: str, rgb_var: str, opacity: int, button: bool) -> dict:
+    """One colour in its own texture and opacity: {"bg": the background
+    layers, "shadow": a box-shadow or "", "blur": True to blur what shows
+    through}. rgb_var is the CSS variable with the colour as "r, g, b";
+    button: a button (brushed like the metal buttons) or the page."""
+    a = f"{opacity / 100:.2f}"
+    colour = f"linear-gradient(rgba(var({rgb_var}), {a}), rgba(var({rgb_var}), {a}))"
+    gloss = "linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%)"
+    if texture in METALS and button:
+        return {"bg": _METAL_MAIN.format(c=f"rgba(var({rgb_var}), {a})"), "shadow": _METAL_SHADOW, "blur": False}
+    if texture in MATERIALS:
+        look = _material(texture, rgb_var)
+        return {"bg": f"{look['sheen']}, {colour}", "shadow": look["shadow"] if button else "", "blur": False}
+    if texture == "gradient":
+        return {"bg": "linear-gradient(135deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 50%, "
+                      f"rgba(0, 0, 0, .12) 100%), {colour}", "shadow": "", "blur": False}
+    if texture == "smooth":
+        return {"bg": f"{gloss}, {colour}", "shadow": "0 4px 14px rgba(15, 23, 42, .16)" if button else "",
+                "blur": True}
+    if texture == "frosted":
+        return {"bg": f"{gloss}, {colour}", "shadow": "0 8px 22px rgba(15, 23, 42, .18)" if button else "",
+                "blur": True}
+    return {"bg": colour, "shadow": "none" if button else "", "blur": False}
+
+
+def _paint_rule(sel: str, paint: dict, fg: str) -> str:
+    """The rule that paints the buttons sel with a _paint()."""
+    lines = [f"    background: {paint['bg']} !important;"]
+    if paint["shadow"]:
+        lines.append(f"    box-shadow: {paint['shadow']} !important;")
+    if paint["blur"]:
+        lines += ["    -webkit-backdrop-filter: blur(var(--koha-glass-blur));",
+                  "    backdrop-filter: blur(var(--koha-glass-blur));"]
+    if fg:
+        lines.append(f"    color: {fg} !important;")
+    return sel + " {\n" + "\n".join(lines) + "\n}"
+
+
 def _buttons_css(cfg: dict) -> str:
     """The OPAC's buttons: the main ones in the accent colour (brushed with
     the two metal textures), the secondary ones on the block surface,
@@ -1745,7 +1897,24 @@ def _buttons_css(cfg: dict) -> str:
     text-align: center;
     white-space: normal;
 }}
-@media (prefers-reduced-motion: reduce) {{ {main}, {soft} {{ transition: none; }} }}"""
+@media (prefers-reduced-motion: reduce) {{ {main}, {soft} {{ transition: none; }} }}{_painted_buttons(cfg, main, soft)}"""
+
+
+def _painted_buttons(cfg: dict, main: str, soft: str) -> str:
+    """The accent and the second colour in their own texture and opacity:
+    the accent on the main buttons, the second colour on the secondary
+    ones. Nothing while both are "auto" at full opacity (the look before)."""
+    out = []
+    p = cfg["paint"]["accent"]
+    if p["texture"] != "auto" or p["opacity"] < 100:
+        texture = p["texture"] if p["texture"] != "auto" else ("metal" if cfg["texture"] in METALS else "smooth")
+        out.append(_paint_rule(main, _paint(texture, "--kei-accent-rgb", p["opacity"], True), ""))
+    p = cfg["paint"]["accent2"]
+    if p["texture"] != "auto":
+        out.append(_paint_rule(soft, _paint(p["texture"], "--kei-accent2-rgb", p["opacity"], True),
+                               "var(--nexus-on-secondary)"))
+        out.append(f"{soft} {{ border-color: var(--nexus-secondary) !important; }}")
+    return ("\n/* Each colour in its own texture and opacity. */\n" + "\n".join(out)) if out else ""
 
 
 def _canvas_css(cfg: dict) -> str:
@@ -1757,9 +1926,21 @@ def _canvas_css(cfg: dict) -> str:
     base = cfg["page"] or ("#e8ecf2" if light else "#1b2230")
     shadow = ("0 1px 2px rgba(15, 23, 42, .06), 0 12px 32px -10px rgba(15, 23, 42, .22)" if light
               else "0 1px 2px rgba(0, 0, 0, .25), 0 12px 32px -10px rgba(0, 0, 0, .55)")
+    # The second colour on "auto" only tints the glow at the bottom right:
+    # its opacity there scales that glow.
+    p2 = cfg["paint"]["accent2"]
+    glow2 = f"{.14 * p2['opacity'] / 100:.2f}" if p2["texture"] == "auto" else ".14"
     glows = ("radial-gradient(1200px 600px at 0% 0%, rgba(var(--kei-accent-rgb), .16), transparent 60%), "
-             "radial-gradient(1000px 600px at 100% 100%, rgba(var(--kei-accent2-rgb), .14), transparent 60%)")
-    lines = [f"""html body {{
+             f"radial-gradient(1000px 600px at 100% 100%, rgba(var(--kei-accent2-rgb), {glow2}), transparent 60%)")
+    pp = cfg["paint"]["page"]
+    if pp["texture"] != "auto" or pp["opacity"] < 100:
+        # The page colour in its own texture; under it the browser's white
+        # (or black in the dark theme), so a lower opacity makes it paler.
+        base = _paint(pp["texture"], "--kei-page-rgb", pp["opacity"], False)["bg"] + ", #ffffff"
+        lines = [f":root {{ --kei-page-rgb: {_rgb(cfg['page'] or ('#e8ecf2' if light else '#1b2230'))}; }}"]
+    else:
+        lines = []
+    lines += [f"""html body {{
     background: {glows}, {base} !important;
     background-attachment: fixed !important;
 }}
@@ -3070,6 +3251,26 @@ _JS = r"""(function () {
                 }
             });
         }
+
+        // Holdings on a phone: every cell carries its column's heading, which
+        // the stylesheet shows before the value when the table is stacked
+        // into one card per copy (kei-stack). Again after DataTables draws.
+        function labelHoldings() {
+            Array.prototype.forEach.call(document.querySelectorAll("#holdingst, #otherholdingst"), function (table) {
+                var heads = table.querySelectorAll("thead tr:last-child th");
+                Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (tr) {
+                    Array.prototype.forEach.call(tr.children, function (td, i) {
+                        if (heads[i] && td.tagName === "TD") {
+                            td.setAttribute("data-kei-label", heads[i].textContent.replace(/\s+/g, " ").trim());
+                        }
+                    });
+                });
+                table.classList.add("kei-stack");
+            });
+        }
+        labelHoldings();
+        setTimeout(labelHoldings, 1500);
+        if (window.jQuery) { window.jQuery(document).on("draw.dt", labelHoldings); }
 
         // News action buttons: [kei-button title="..." icon="..." url="..."]text[/kei-button]
         if (C.news_buttons) {
