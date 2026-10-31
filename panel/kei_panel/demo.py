@@ -392,7 +392,8 @@ _SCRIPTS: dict[str, list[str]] = {
                    "@@msg ok OK\tZ39.50/SRU server settings updated.\\nAdded: 3\\nUpdated: 5\\n\\n"
                    "Old Biblioteca Nacional addresses unticked: 1"],
     "opac-theme-get": ["@@result amazon=0"],
-    "opac-theme-sync": ["@@result amazon=0", "@@result block_OpacUserCSS=no", "@@result block_OpacUserJS=no",
+    "opac-theme-sync": ["@@result instance=library", "@@result database=koha_library",
+                        "@@result installer_version=demo", "@@result amazon=0", "@@result block_OpacUserCSS=no", "@@result block_OpacUserJS=no",
                         "@@result block_IntranetUserCSS=no", "@@result block_IntranetUserJS=no",
                         "@@result own_OpacUserCSS=12", "@@result own_OpacUserJS=0", "@@result own_IntranetUserCSS=3",
                         "@@result own_IntranetUserJS=40", "@@result mainblock=yes", "@@result mainblock_buttons=2"],

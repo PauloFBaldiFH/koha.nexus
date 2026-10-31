@@ -810,7 +810,7 @@ class OpacView(SectionView):
         self.feed_items = found.get("feed_items", "")
         self.fill(cfg)
         self.summary(applied=in_koha)
-        return notes
+        return ot.source_notes(found) + notes
 
     def sync(self) -> None:
         self.run_worker(self._sync(), exclusive=True, group="opac-load", exit_on_error=False)
