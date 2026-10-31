@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.144",
+ "panel_version": "1.5.149",
  "languages": [
   {
    "code": "en",
@@ -2619,6 +2619,24 @@
       },
       {
        "text": "3D coverflow"
+      },
+      {
+       "text": "3D ring (turns around)"
+      },
+      {
+       "text": "Curved wall with titles"
+      },
+      {
+       "text": "Bookshelf"
+      },
+      {
+       "text": "Fan of cards"
+      },
+      {
+       "text": "Spotlight (one title at a time)"
+      },
+      {
+       "text": "Endless ribbon"
       }
      ],
      "value": 1
@@ -11165,6 +11183,156 @@
    "ja": null,
    "ko": null
   },
+  "3D ring (turns around)": {
+   "en": "3D ring (turns around)",
+   "pt-BR": "Anel 3D (gira em volta)",
+   "es": "Anillo 3D (gira alrededor)",
+   "fr": "Anneau 3D (tourne en rond)",
+   "it": "Anello 3D (gira intorno)",
+   "de": "3D-Ring (dreht sich)",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Curved wall with titles": {
+   "en": "Curved wall with titles",
+   "pt-BR": "Parede curva com títulos",
+   "es": "Pared curva con títulos",
+   "fr": "Mur incurvé avec titres",
+   "it": "Parete curva con titoli",
+   "de": "Gebogene Wand mit Titeln",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Bookshelf": {
+   "en": "Bookshelf",
+   "pt-BR": "Estante",
+   "es": "Estantería",
+   "fr": "Étagère",
+   "it": "Scaffale",
+   "de": "Bücherregal",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Fan of cards": {
+   "en": "Fan of cards",
+   "pt-BR": "Leque de cartas",
+   "es": "Abanico de cartas",
+   "fr": "Éventail de cartes",
+   "it": "Ventaglio di carte",
+   "de": "Kartenfächer",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Spotlight (one title at a time)": {
+   "en": "Spotlight (one title at a time)",
+   "pt-BR": "Destaque (um título por vez)",
+   "es": "Destacado (un título a la vez)",
+   "fr": "Projecteur (un titre à la fois)",
+   "it": "In evidenza (un titolo alla volta)",
+   "de": "Rampenlicht (ein Titel nach dem anderen)",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Endless ribbon": {
+   "en": "Endless ribbon",
+   "pt-BR": "Faixa sem fim",
+   "es": "Cinta sin fin",
+   "fr": "Ruban sans fin",
+   "it": "Nastro infinito",
+   "de": "Endloses Band",
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "Title": {
    "en": "Title",
    "pt-BR": "Título",
@@ -18781,8 +18949,8 @@
    "manual": 113,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 405,
-   "strings_total": 405
+   "strings": 411,
+   "strings_total": 411
   },
   "pt-BR": {
    "manual": 113,
@@ -18802,155 +18970,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 396,
-   "strings_total": 405
+   "strings": 402,
+   "strings_total": 411
   },
   "es": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 282,
-   "strings_total": 405
+   "strings": 288,
+   "strings_total": 411
   },
   "fr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 277,
-   "strings_total": 405
+   "strings": 283,
+   "strings_total": 411
   },
   "it": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 275,
-   "strings_total": 405
+   "strings": 281,
+   "strings_total": 411
   },
   "de": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 275,
-   "strings_total": 405
+   "strings": 281,
+   "strings_total": 411
   },
   "nl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
    "strings": 112,
-   "strings_total": 405
+   "strings_total": 411
   }
  }
 }

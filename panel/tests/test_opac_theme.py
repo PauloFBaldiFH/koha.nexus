@@ -192,7 +192,8 @@ def test_carousel_from_a_koha_list(tmp_path):
     conf = ot.js_config(cfg)
     assert conf["carousel"]["feed"] == "/images/custom/kei-list-7.json" and conf["carousel"]["shelf"] == 7
     assert conf["lists"] == {"feed": ot.LIST_FEED, "always": False, "count": 12, "autoplay": True, "speed": 3500,
-                             "hover": "lift", "overlay": True, "mode": "coverflow"}
+                             "hover": "lift", "overlay": True, "mode": "coverflow", "reflect": False,
+                             "missing": "hide"}
     # No list number: back to the new arrivals.
     assert ot.normalize({"carousel": {"source": "list", "shelf": "x"}})["carousel"]["source"] == "new"
     assert ot.normalize({"carousel": {"source": "list", "shelf": -3}})["carousel"]["shelf"] == 0
@@ -1267,3 +1268,32 @@ def test_staff_dark_mode_and_bar_transparency():
     assert "--nexus-staff-ink: #111827" in body
     js = ot.staff_js_block(cfg)
     assert "#changelanguage #i18nMenu" in js and "kei-theme-floating" in js and "#logged-in-menu" not in js
+
+
+def test_new_carousel_styles_reflection_and_drawn_covers():
+    """Paulo, 2026-10-31: more carousel styles (a ring with reflections, a
+    curved wall with titles, and our own), a reflection switch and a drawn
+    cover for a title with none."""
+    for mode in ("ring", "wall", "shelf", "fan", "spotlight", "ribbon"):
+        cfg = ot.normalize({"carousel": {"enabled": True, "mode": mode, "reflect": True, "missing": "drawn"}})
+        car = cfg["carousel"]
+        assert car["mode"] == mode and car["reflect"] is True and car["missing"] == "drawn"
+        conf = ot.js_config(cfg)
+        assert conf["carousel"]["mode"] == mode and conf["carousel"]["reflect"] and conf["lists"]["missing"] == "drawn"
+        # The settings come back from the script alone (settings line gone).
+        back = ot.normalize(ot._from_script(conf))["carousel"]
+        assert (back["mode"], back["reflect"], back["missing"]) == (mode, True, "drawn")
+        assert f".kei-mode-{mode}" in ot.css_body(cfg)
+    # Defaults keep the old look: no reflection, titles with no cover left out.
+    car = ot.normalize({})["carousel"]
+    assert car["reflect"] is False and car["missing"] == "hide"
+    assert ot.normalize({"carousel": {"missing": "ghost"}})["carousel"]["missing"] == "hide"
+    css = ot.css_body(ot.normalize({"carousel": {"enabled": True}}))
+    for rule in (".kei-blank {", ".kei-mirror {", "@keyframes kei-ribbon", ".kei-backdrop", ".kei-caption {"):
+        assert rule in css, rule
+    js = ot.js_block(ot.normalize({"carousel": {"enabled": True, "mode": "ring"}}))
+    for name in ("function spin(", "function ribbon(", "function blank(", "STAGES", "data-reflect", "no_cover"):
+        assert name in js, name
+    # Every style the panel offers has its place in the script.
+    for mode in ot.CAROUSEL_MODES:
+        assert f"{mode}: " in js.split("var MODES = {", 1)[1].split("};", 1)[0], mode

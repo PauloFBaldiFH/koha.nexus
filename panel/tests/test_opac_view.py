@@ -249,6 +249,8 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
             # Koha's own look has no carousel: turned on here.
             view.query_one("#o-car-enabled", Switch).value = True
             view.query_one("#o-car-mode", Select).value = "coverflow"
+            view.query_one("#o-car-reflect", Switch).value = True
+            view.query_one("#o-car-missing", Select).value = "drawn"
             view.query_one("#o-surface", Input).value = "#1e293b"
             view.query_one("#o-page-on", Switch).value = True
             view.query_one("#o-page", Input).value = "#0f172a"
@@ -290,6 +292,7 @@ def test_buttons_carousel_mode_colours_and_staff(monkeypatch):
             await pilot.press("escape")
             sent = ot.parse_theme_data(seen["css"])
             assert sent["carousel"]["mode"] == "coverflow"
+            assert sent["carousel"]["reflect"] is True and sent["carousel"]["missing"] == "drawn"
             assert sent["surface"] == "#1e293b" and sent["page"] == "#0f172a"
             assert [i["text"] for i in sent["links"]["items"]] == ["Catálogo", "Contato"]
             assert sent["links"]["items"][0]["target"] == "_blank"

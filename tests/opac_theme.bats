@@ -329,7 +329,7 @@ na() {
         KEI_NA_COVER_BASE="$base" KEI_NA_OL_BASE="${base}ol/" perl "$W/na.pl" "$1"
 }
 
-@test "new arrivals: only titles with a copy and a real Amazon cover, newest first" {
+@test "new arrivals: only titles with a copy, newest first; a missing cover is an empty one" {
     catalog
     task opac_na_script
     printf '%s\n' "$output" > "$W/na.pl"
@@ -342,8 +342,10 @@ na() {
     python3 - "$W/feed.json" <<'PY'
 import json, sys
 items = json.load(open(sys.argv[1]))["items"]
-assert [i["biblionumber"] for i in items] == [1, 5], items
-a, b = items
+# 2 has no cover: cover "" (the carousel leaves it out or draws one).
+assert [i["biblionumber"] for i in items] == [2, 1, 5], items
+assert items[0]["cover"] == "" and items[0]["title"] == "C language", items[0]
+a, b = items[1:]
 assert a["title"] == "Signals" and a["author"] == "Ana Souza", a
 assert a["callnumber"] == "621.3 S578" and a["available"] == 0 and a["total"] == 1, a
 assert a["cover"].endswith("/0306406152.01.LZZZZZZZ.jpg"), a
@@ -383,14 +385,15 @@ $d->do($_) for
     python3 - "$W/kei-list-7.json" "$W/feed.json" <<'PY'
 import json, sys
 items = json.load(open(sys.argv[1]))["items"]
-# By title: Dom Casmurro, Lost, No ISBN (C language has no cover).
-assert [i["biblionumber"] for i in items] == [5, 3, 4], items
-assert items[0]["cover"].endswith("/8535902775.01.LZZZZZZZ.jpg"), items[0]
-assert items[1]["cover"].endswith("/ol/0306406152-L.jpg?default=false") and items[1]["total"] == 0, items[1]
-assert items[2]["cover"] == "/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=4", items[2]
+# By title: C language (no cover: ""), Dom Casmurro, Lost, No ISBN.
+assert [i["biblionumber"] for i in items] == [2, 5, 3, 4], items
+assert items[0]["cover"] == "", items[0]
+assert items[1]["cover"].endswith("/8535902775.01.LZZZZZZZ.jpg"), items[1]
+assert items[2]["cover"].endswith("/ol/0306406152-L.jpg?default=false") and items[2]["total"] == 0, items[2]
+assert items[3]["cover"] == "/cgi-bin/koha/opac-image.pl?thumbnail=1&biblionumber=4", items[3]
 feed = json.load(open(sys.argv[2]))["items"]
-assert [i["biblionumber"] for i in feed] == [4, 1, 5], feed
-assert feed[1]["cover"].endswith("/ol/0306406152-L.jpg?default=false"), feed
+assert [i["biblionumber"] for i in feed] == [4, 2, 1, 5], feed
+assert feed[2]["cover"].endswith("/ol/0306406152-L.jpg?default=false"), feed
 PY
 }
 

@@ -252,6 +252,13 @@ class OpacView(SectionView):
             yield from _row(t("List feeds with the carousel off"), Switch(car["lists"], id="o-car-lists"))
             yield from _row(t("Style"), Select([(t(v), k) for k, v in ot.CAROUSEL_MODES.items()], value=car["mode"],
                                                allow_blank=False, id="o-car-mode"))
+            yield from _row(t("Reflection"), Switch(car["reflect"], id="o-car-reflect"))
+            yield from _row(t("Titles with no cover"),
+                            Select([(t(v), k) for k, v in ot.CAROUSEL_MISSING.items()], value=car["missing"],
+                                   allow_blank=False, id="o-car-missing"))
+            yield Static(t("Reflection: a mirror image under each cover (not on the bookshelf, the fan or the "
+                           "spotlight). A title with no cover can be left out or get a cover drawn in the accent "
+                           "colours, with its title and author."), classes="ai-note", markup=False)
             yield from _row(t("Title"), Input(car["title"], id="o-car-title", max_length=60))
             yield from _row(t("Autoplay"), Switch(car["autoplay"], id="o-car-autoplay"))
             yield from _row(t("Speed"), Slider(*ot.CAROUSEL_RANGES["speed"], car["speed"], step=500, unit=" ms",
@@ -678,6 +685,8 @@ class OpacView(SectionView):
                             "autoplay": q("#o-car-autoplay", Switch).value, "speed": q("#o-speed", Slider).value,
                             "count": q("#o-count", Slider).value, "hover": q("#o-car-hover", Select).value,
                             "overlay": q("#o-car-overlay", Switch).value, "mode": q("#o-car-mode", Select).value,
+                            "reflect": q("#o-car-reflect", Switch).value,
+                            "missing": q("#o-car-missing", Select).value,
                             "amazon_tag": q("#o-car-tag", Input).value.strip(),
                             "source": q("#o-car-source", Select).value, "lists": q("#o-car-lists", Switch).value,
                             "shelf": q("#o-car-shelf", Input).value.strip() or 0},

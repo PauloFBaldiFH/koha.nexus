@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.148"
+PANEL_VERSION=" 1.5.149"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -36269,8 +36269,9 @@ sub cover {
     return $covers{$id} = undef;
 }
 
-# card(ROW, NEED_COPY): one carousel card, or nothing (no cover; no copy
-# that is not lost or withdrawn when NEED_COPY).
+# card(ROW, NEED_COPY): one carousel card, or nothing (no copy that is not
+# lost or withdrawn when NEED_COPY). A title with no cover gets cover "": the
+# carousel leaves it out, or draws it a cover ("Titles with no cover").
 sub card {
     my ($r, $need_copy) = @_;
     my ($id, $title, $author, $isbn) = @$r;
@@ -36283,7 +36284,7 @@ sub card {
         $avail++ if !$it->{onloan} && !$it->{notforloan};
     }
     return if $need_copy && !$total;
-    my $cover = cover($id, isbn10($isbn)) or return;
+    my $cover = cover($id, isbn10($isbn)) // '';
     return { biblionumber => $id + 0, title => clean($title), author => clean($author),
              callnumber => $call, available => $avail, total => $total, cover => $cover };
 }
@@ -36308,12 +36309,16 @@ my $rows = $dbh->selectall_arrayref(
      JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
      WHERE ((bi.isbn IS NOT NULL AND bi.isbn <> '')$own)$hide
      ORDER BY b.datecreated DESC, b.biblionumber DESC LIMIT $limit");
+# COUNT titles with a cover, and on the way at most COUNT without one (so
+# the carousel shows the same covers whether it draws the missing ones or not).
 my (@feed, %seen);
+my ($with, $without) = (0, 0);
 for my $r (@$rows) {
-    last if @feed >= $count;
+    last if $with >= $count;
     my $key = isbn10($r->[3]) // "b$r->[0]";
     next if $seen{$key};
     my $card = card($r, 1) or next;
+    if ($card->{cover} eq '') { next if $without >= $count; $without++ } else { $with++ }
     $seen{$key} = 1;
     push @feed, $card;
 }
@@ -36339,10 +36344,12 @@ for my $s (@$shelves) {
          LEFT JOIN biblioitems bi ON bi.biblionumber = b.biblionumber
          WHERE c.shelfnumber = ?$hide ORDER BY $by, b.biblionumber LIMIT 200", undef, $shelf) } or next;
     my (@cards, %in);
+    my ($w, $wo) = (0, 0);
     for my $r (@$list) {
-        last if @cards >= $count;
+        last if $w >= $count;
         next if $in{$r->[0]}++;
         my $card = card($r, 0) or next;
+        if ($card->{cover} eq '') { next if $wo >= $count; $wo++ } else { $w++ }
         push @cards, $card;
     }
     write_feed("$dir/kei-list-$shelf.json", \@cards);
@@ -36352,7 +36359,7 @@ for my $s (@$shelves) {
 opendir my $dh, $dir or die "$dir: $!\n";
 unlink map { "$dir/$_" } grep { /^kei-list-\d+\.json$/ && !$keep{$_} } readdir $dh;
 closedir $dh;
-printf "%d of %d new titles have a cover; %d public lists\n", scalar @feed, $found, $lists // 0;
+printf "%d of %d new titles have a cover; %d public lists\n", $with, $found, $lists // 0;
 PL
 }
 
@@ -36688,7 +36695,7 @@ opac_theme_get() {
     kei_result amazon "$(opac_pref_raw OPACAmazonCoverImages)"
     { [ -x "$OPAC_NA_BIN" ] || [ -f "$CRON_OPAC" ]; } && kei_result carousel "on"
     if [ -f "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" ]; then
-        kei_result feed_items "$(grep -o '"biblionumber"' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
+        kei_result feed_items "$(grep -o '"cover":"[^"]' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
     fi
     # The panel's own login instructions, credits and news as Koha holds
     # them now: they decide what the panel shows.
