@@ -422,7 +422,7 @@ def test_one_blue_button_shows_then_updates(tmp_path, monkeypatch):
             assert not isinstance(app.screen, ConfirmScreen)
             lines = seen["text"].splitlines()
             # The direct authority files Koha lacks are left out: only Add puts them in Koha.
-            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 17
+            assert len(lines) == len(z3950.sync_targets(z3950.load_curated(), set())) == len(z3950.load_curated()) - 16
             assert any(line.startswith("sru.koha.nexus\t443\tsru/bn-aut\t") and line.endswith("\tauthority")
                        for line in lines)
             # The counts are a notice, not a box to close; then the test starts.

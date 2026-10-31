@@ -34,7 +34,7 @@ def marc(title="Don Quixote", tag=b"245"):
 # ----------------------------------------------------------------------
 def test_curated_list_loads_and_covers_every_region():
     targets = z.load_curated()
-    assert len(targets) == 349
+    assert len(targets) == 290
     # The koha.nexus servers (shared catalogue, Rede Pergamum, the local-first catalogues), the direct Z39.50 servers by region, the authority files, then the
     # koha.nexus SRU gateway's four groups as the fallback.
     assert list(z.REGIONS) == ["koha_nexus", "brazil", "north_america", "europe", "latin_america", "asia_oceania", "other",
@@ -50,7 +50,7 @@ def test_curated_list_loads_and_covers_every_region():
     assert len(keys) == len(set(keys))
     # The primary targets are Z39.50, straight to the library.
     direct = [t for t in targets if t.source == z.DIRECT_SOURCE]
-    assert len(direct) == 270 and {t.kind for t in direct} == {"zed"}
+    assert len(direct) == 211 and {t.kind for t in direct} == {"zed"}
     assert {t.syntax for t in direct} == {"USMARC", "UNIMARC"} and all(t.flag for t in direct)
     # The fallback goes through the koha.nexus gateway behind the Cloudflare tunnel, ranked after every direct server.
     fallback = [t for t in targets if t.region.startswith("sru_")]
@@ -92,7 +92,7 @@ def test_sync_leaves_out_direct_authority_files_koha_lacks():
     gnd = next(t for t in targets if t.db == "gnd")
     sent = z.sync_targets(targets, set())
     assert gnd not in sent and next(t for t in targets if t.db == "NAF") in sent
-    assert len(sent) == len(targets) - 17
+    assert len(sent) == len(targets) - 16
     assert gnd in z.sync_targets(targets, {gnd.key})
 
 

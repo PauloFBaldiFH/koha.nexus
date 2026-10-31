@@ -38,7 +38,7 @@ def write_list(tmp_path, servers) -> str:
 
 def test_every_direct_server_loads_and_nothing_else():
     catalog = load(targets.DEFAULT_LIST, env={})
-    assert len(catalog.targets) == 270 and catalog.skipped == []
+    assert len(catalog.targets) == 211 and catalog.skipped == []
     hosts = {a.host.lower() for t in catalog.targets.values() for a in t.addresses}
     assert not any(h.endswith("koha.nexus") or h in ("127.0.0.1", "localhost") for h in hosts)
     assert all(not name_refusal(a.host, a.port, a.db) for t in catalog.targets.values() for a in t.addresses)
@@ -47,10 +47,10 @@ def test_every_direct_server_loads_and_nothing_else():
 def test_real_list_unusable_servers_and_providers():
     catalog = load(targets.DEFAULT_LIST, env={})
     unimarc = {t.id for t in catalog.targets.values() if "UNIMARC" in t.unusable}
-    assert unimarc == {"bnp", "porbase", "bnf", "sudoc", "bnf-aut", "bnp-aut", "porbase-aut"}
+    assert unimarc == {"porbase", "bnf", "sudoc", "bnf-aut", "bnp-aut", "porbase-aut"}
     logins = {t.id for t in catalog.targets.values() if t.unusable.startswith("login")}
     assert logins == {"senado-folio"}               # bnf / bnf-aut are UNIMARC first
-    assert sum(t.address.provider == "exlibris-alma" for t in catalog.targets.values()) == 128
+    assert sum(t.address.provider == "exlibris-alma" for t in catalog.targets.values()) == 95
     assert {t.address.provider for t in catalog.targets.values() if "loc.gov" in t.address.host} == {"loc"}
     usable = catalog.usable()
     assert all(t.recordtype == "biblio" and not t.unusable for t in usable)
