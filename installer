@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.144"
+PANEL_VERSION=" 1.5.145"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -1120,17 +1120,220 @@ fi
 # a nightly backup never dumps a catalog that is being restored, and a
 # restore never starts while a backup is being written. The kernel releases
 # it if the panel dies.
-BACKUP_LOCK_FILE="/var/lock/koha_backup.lock"
-backup_lock_acquire() {
-    { exec 8>>"$BACKUP_LOCK_FILE"; } 2>/dev/null || return 1
-    flock -n 8 && return 0
-    exec 8>&-
+#
+# A lock can outlive the work it guarded: a panel task cancelled during a
+# safety backup leaves its mysqldump | gzip/zstd/xz running on their own
+# (they inherited the descriptor), and a program started while the lock was
+# held can keep it for good. backup_lock_acquire tells these leftovers from
+# a backup or restore that is really running:
+#   - a nightly/cloud backup script (backup_sql.sh, backup_marc.sh) is
+#     waited for, up to BACKUP_LOCK_WAIT seconds;
+#   - this installer (a panel task, the terminal menu) or a database import
+#     keeps the lock: BACKUP_LOCK_BUSY says what runs;
+#   - anything else holds it by accident: a leftover dump is stopped (and
+#     its unfinished file removed), other programs are left alone, and the
+#     lock file is replaced (the lock is on the file, so a new file is a
+#     free lock).
+BACKUP_LOCK_FILE="${KEI_BACKUP_LOCK_FILE:-/var/lock/koha_backup.lock}"
+BACKUP_LOCK_WAIT="${KEI_BACKUP_LOCK_WAIT:-1200}"
+BACKUP_LOCK_BUSY=""       # "PID command; ..." of what keeps the lock (after a refusal)
+BACKUP_LOCK_CLEARED=""    # what held the stale lock that was cleared
+
+# backup_lock_holders: the PIDs that have the lock file open (this shell left out).
+backup_lock_holders() {
+    local pid
+    for pid in $(fuser "$BACKUP_LOCK_FILE" 2>/dev/null); do
+        [ "$pid" = "$$" ] || [ "$pid" = "${BASHPID:-}" ] || printf '%s\n' "$pid"
+    done
+}
+
+# backup_lock_cmd PID: its command line, on one line (60 characters).
+backup_lock_cmd() {
+    local c
+    c=$(tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null)
+    c="${c% }"
+    printf '%s' "${c:0:60}"
+}
+
+# backup_lock_owner PID: what PID belongs to, from itself up to init:
+# "backup" (a backup script), "installer" (the installer that took the
+# lock, whose PID is in the lock file, a panel task, a database import) or
+# nothing (a leftover).
+backup_lock_owner() {
+    local pid="$1" n=0 k v cmd comm mark
+    comm=$(cat "/proc/$pid/comm" 2>/dev/null)
+    case "$comm" in mysql|mariadb) echo installer; return ;; esac
+    mark=$(head -c 16 "$BACKUP_LOCK_FILE" 2>/dev/null | tr -cd '0-9')
+    while [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ] && [ "$n" -lt 64 ]; do
+        [ "$pid" = "$mark" ] && { echo installer; return; }
+        cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)
+        case "$cmd" in
+            *backup_sql.sh*|*backup_marc.sh*) echo backup; return ;;
+            *config.sh*|*" --task "*|*" --run "*) echo installer; return ;;
+        esac
+        v=""
+        while read -r k v; do [ "$k" = "PPid:" ] && break; v=""; done < "/proc/$pid/status" 2>/dev/null
+        pid="$v"
+        n=$((n + 1))
+    done
+}
+
+# backup_lock_fresh: descriptor 8 is the file now at BACKUP_LOCK_FILE (not
+# one another panel replaced in the meantime).
+backup_lock_fresh() {
+    [ "$(stat -L -c '%d:%i' "/proc/self/fd/8" 2>/dev/null)" = "$(stat -c '%d:%i' "$BACKUP_LOCK_FILE" 2>/dev/null)" ]
+}
+
+# backup_lock_try: opens descriptor 8 and locks it at once, then writes
+# this installer's PID in the file (backup_lock_owner). 0 = locked.
+backup_lock_try() {
+    local i
+    for i in 1 2 3; do
+        { exec 8>>"$BACKUP_LOCK_FILE"; } 2>/dev/null || return 1
+        flock -n 8 || return 1
+        if backup_lock_fresh; then
+            printf '%s\n' "$$" > "$BACKUP_LOCK_FILE" 2>/dev/null
+            return 0
+        fi
+        exec 8>&-
+    done
     return 1
+}
+
+# backup_lock_alive PID: PID still runs (a zombie does not).
+backup_lock_alive() {
+    local k v
+    while read -r k v; do
+        [ "$k" = "State:" ] && { [[ "$v" != Z* ]]; return; }
+    done < "/proc/$1/status" 2>/dev/null
+    return 1
+}
+
+# backup_lock_clear_stale PIDS...: the lock is held only by leftovers.
+# Leftover dumps and compressors are stopped (an unfinished backup file
+# they were writing is removed); then, still checking that nothing real
+# took the lock meanwhile, the lock file is replaced and locked here.
+backup_lock_clear_stale() {
+    local pid comm out i files=() guard
+    { exec {guard}>>"${BACKUP_LOCK_FILE}.clear"; } 2>/dev/null || return 1
+    flock -w 10 "$guard" || { exec {guard}>&-; return 1; }
+    BACKUP_LOCK_CLEARED=""
+    for pid in "$@"; do
+        [ -d "/proc/$pid" ] || continue
+        comm=$(cat "/proc/$pid/comm" 2>/dev/null)
+        BACKUP_LOCK_CLEARED="${BACKUP_LOCK_CLEARED:+$BACKUP_LOCK_CLEARED; }$pid $(backup_lock_cmd "$pid")"
+        case "$comm" in
+            mysqldump|mariadb-dump|gzip|pigz|zstd|xz)
+                out=$(readlink "/proc/$pid/fd/1" 2>/dev/null)
+                case "$out" in
+                    "${DIR_SQL:-/var/backups/koha_sql}"/*.sql.gz|"${DIR_SQL:-/var/backups/koha_sql}"/*.sql.zst|\
+                    "${DIR_SQL:-/var/backups/koha_sql}"/*.sql.xz|"${DIR_SQL:-/var/backups/koha_sql}"/*.part)
+                        files+=("$out") ;;
+                esac
+                kill -TERM "$pid" 2>/dev/null ;;
+        esac
+    done
+    for i in $(seq 30); do
+        out=""
+        for pid in "$@"; do
+            backup_lock_alive "$pid" || continue
+            case "$(cat "/proc/$pid/comm" 2>/dev/null)" in
+                mysqldump|mariadb-dump|gzip|pigz|zstd|xz) out=1 ;;
+            esac
+        done
+        [ -z "$out" ] && break
+        sleep 0.1
+    done
+    # Whatever is still open there now must still be a leftover.
+    for pid in $(backup_lock_holders); do
+        if [ -n "$(backup_lock_owner "$pid")" ]; then
+            exec {guard}>&-
+            return 1
+        fi
+    done
+    for out in "${files[@]}"; do
+        [ -f "$out" ] && rm -f -- "$out" && log "backup lock: removed the unfinished $out"
+    done
+    exec 8>&- 2>/dev/null
+    rm -f -- "$BACKUP_LOCK_FILE"
+    if backup_lock_try; then
+        exec {guard}>&-
+        log "backup lock: cleared a stale lock held by ${BACKUP_LOCK_CLEARED:-?}"
+        return 0
+    fi
+    exec {guard}>&-
+    return 1
+}
+
+# backup_lock_acquire: descriptor 8 locked, 0; 1 = a backup or restore is
+# really running (BACKUP_LOCK_BUSY says which), nothing was waited for
+# beyond BACKUP_LOCK_WAIT.
+backup_lock_acquire() {
+    local pid owner holders="" kind="" waited=""
+    BACKUP_LOCK_BUSY=""
+    backup_lock_try && return 0
+    exec 8>&- 2>/dev/null
+    while :; do
+        holders="" kind=""
+        BACKUP_LOCK_BUSY=""
+        for pid in $(backup_lock_holders); do
+            owner=$(backup_lock_owner "$pid")
+            holders="$holders $pid"
+            BACKUP_LOCK_BUSY="${BACKUP_LOCK_BUSY:+$BACKUP_LOCK_BUSY; }$pid $(backup_lock_cmd "$pid")"
+            case "$owner" in
+                installer) kind=installer ;;
+                backup) [ "$kind" = installer ] || kind=backup ;;
+            esac
+        done
+        if [ -z "$holders" ]; then
+            # Gone in the meantime, or out of sight (another namespace).
+            backup_lock_try && return 0
+            exec 8>&- 2>/dev/null
+            BACKUP_LOCK_BUSY="${BACKUP_LOCK_BUSY:-?}"
+            return 1
+        fi
+        case "$kind" in
+            installer)
+                log "backup lock: busy ($BACKUP_LOCK_BUSY)"
+                return 1 ;;
+            backup)
+                [ -n "$waited" ] && { log "backup lock: still busy ($BACKUP_LOCK_BUSY)"; return 1; }
+                waited=1
+                display_explanation "A backup is running now; waiting for it to finish..." 2>/dev/null
+                log "backup lock: waiting for $BACKUP_LOCK_BUSY"
+                { exec 8>>"$BACKUP_LOCK_FILE"; } 2>/dev/null || return 1
+                if flock -w "$BACKUP_LOCK_WAIT" 8 && backup_lock_fresh; then
+                    BACKUP_LOCK_BUSY=""
+                    return 0
+                fi
+                exec 8>&-
+                backup_lock_try && { BACKUP_LOCK_BUSY=""; return 0; }
+                exec 8>&- 2>/dev/null ;;
+            *)
+                # shellcheck disable=SC2086
+                if backup_lock_clear_stale $holders; then
+                    BACKUP_LOCK_BUSY=""
+                    return 0
+                fi
+                backup_lock_try && { BACKUP_LOCK_BUSY=""; return 0; }
+                exec 8>&- 2>/dev/null
+                log "backup lock: busy ($BACKUP_LOCK_BUSY)"
+                return 1 ;;
+        esac
+    done
 }
 backup_lock_release() {
     exec 8>&-
     return 0
 }
+
+# What keeps the lock, for the "already running" boxes: empty, or two
+# lines starting with an empty one.
+backup_lock_busy_text() {
+    [ -n "$BACKUP_LOCK_BUSY" ] || return 0
+    printf '%s%s %s' '\n\n' "$(t "Running now:")" "${BACKUP_LOCK_BUSY:0:150}"
+}
+# end of backup lock helpers
 
 # Starts or restarts Koha daemons (Plack, Zebra, workers, indexers) without
 # the panel's lock descriptors (7 to 9): a daemon inheriting them would keep
@@ -5671,7 +5874,7 @@ function_install_koha() {
 
         if ! backup_lock_acquire; then
             restore_apt_timers
-            msg_error "" "$(t "Another backup or restore is already running. Reinstallation was cancelled.")" 9 74
+            msg_error "" "$(t "Another backup or restore is already running. Reinstallation was cancelled.")$(backup_lock_busy_text)" 12 74
             return 1
         fi
         local rescue db_has_tables
@@ -6168,7 +6371,7 @@ _function_restore_database() {
 
     clear
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")" 10 72
+        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
         return 0
     fi
     maintenance_begin
@@ -6310,7 +6513,7 @@ _function_restore_database() {
 function_manual_backup() {
     require_database || return 1
     if ! backup_lock_acquire; then
-        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
+        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")$(backup_lock_busy_text)" 12 72
         return 1
     fi
     local target_dir="${1:-}" target_file
@@ -6482,7 +6685,7 @@ function_test_backup() {
 
     clear
     if ! backup_lock_acquire; then
-        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
+        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")$(backup_lock_busy_text)" 12 72
         return 0
     fi
     display_explanation "Importing into a temporary database..."
@@ -7080,7 +7283,7 @@ function_toggle_search_engine() {
         clear
         tui_title "🔎" "$(t "Switching the search engine to Zebra")"
         if ! backup_lock_acquire; then
-            msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")" 9 72
+            msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")$(backup_lock_busy_text)" 12 72
             return 1
         fi
         maintenance_begin
@@ -7144,7 +7347,7 @@ function_toggle_search_engine() {
     clear
     tui_title "🔎" "$(t "Switching the search engine to Elasticsearch")"
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")" 9 72
+        msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")$(backup_lock_busy_text)" 12 72
         return 1
     fi
     maintenance_begin
@@ -9793,7 +9996,7 @@ function_update_system() {
     local cur_tables pre_update
     if is_koha_installed && cur_tables=$(koha_table_count) && [ "$cur_tables" -gt 0 ]; then
         if ! backup_lock_acquire; then
-            msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")" 10 72
+            msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
             return 1
         fi
         pre_update="${DIR_SQL}/PRE-UPDATE_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
@@ -10890,7 +11093,7 @@ tools_log() {
 # lock: no nightly backup, restore or update can run in the middle of it.
 tools_locked() {
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")" 10 72
+        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
         return 1
     fi
     local rc=0

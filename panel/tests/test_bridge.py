@@ -109,3 +109,51 @@ def test_paulo_1031_long_result_lines_arrive_whole(tmp_path):
     assert got["logo"]["url"].startswith("https://i.postimg.cc/a/logo.png?v=aaa")
     assert got["paint"]["page"]["texture"] == "wood"
     assert not any("rebuilt from the panel's scripts" in n for n, _ in notes)
+
+
+def test_paulo_1031_cancel_ends_the_dump_too(tmp_path):
+    """Paulo, 2026-10-31: a cancelled task (Esc on the loader) ended only the
+    installer's bash; its "mysqldump | xz" went on alone, holding the backup
+    lock, and the next change said another backup was running. Cancelling
+    now ends what the task runs; a program it started in a session of its
+    own (setsid: background reindex, Ollama) is kept."""
+    import asyncio
+    import os
+    import time
+
+    pids = tmp_path / "pids"
+    script = (f"trap 'exit 143' TERM; setsid sleep 300 & echo $! > {pids}.own; "
+              f"sleep 300 | cat & echo $! > {pids}; wait")
+
+    async def run_and_cancel():
+        job = asyncio.ensure_future(bridge().stream(["bash", "-c", script], None, on_line=lambda _l: None))
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if pids.exists() and pids.read_text().strip() and (tmp_path / "pids.own").exists():
+                break
+        job.cancel()
+        try:
+            await job
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(run_and_cancel())
+    worker = int(pids.read_text())
+    own = int((tmp_path / "pids.own").read_text())
+
+    def alive(pid: int) -> bool:
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                return f.read().rsplit(")", 1)[1].split()[0] != "Z"
+        except OSError:
+            return False
+
+    for _ in range(30):
+        if not alive(worker):
+            break
+        time.sleep(0.1)
+    try:
+        assert not alive(worker)
+        assert alive(own)
+    finally:
+        os.kill(own, 15)
