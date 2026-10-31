@@ -13,6 +13,18 @@ Each entry has an id (the part after /sru/), a name, a group and a kind:
             elsewhere (a library's own gateway never scrapes)
   missing   no address known: static.db only
 
+"target_index" is the n of targets[n] on Catálogo Zeus's search form. A
+z3950 or sru target may carry one too: the catalogue is then also one of
+the Zeus catalogues /sru/_union asks on the server gateway (USP, the
+Senado's RVBI), a second road when its own server is slow.
+
+"zeus_priority" (1, 2, ...) orders the Zeus catalogues in that union
+request: the stable ones first (USP answered every ISBN and title search in
+Paulo's 2026-10-31 tests), unranked ones after them. "zeus_unstable": true
+marks a catalogue whose node often times out inside Zeus (the BN, targets[0]):
+it is asked on its own, after the others, so its timeout never costs the
+records the stable catalogues found.
+
 "static" lists the static.db source ids that belong to the target (default:
 its own id), so a harvest whose "fonte" gave another id still lands on the
 right row. "country" is the ISO 3166 code the panel shows as a flag. Only z3950 and sru targets whose status is not "broken" are
@@ -81,6 +93,14 @@ class Target:
     local_first: int = 0
     legacy_hosts: tuple[str, ...] = ()
     target_index: int = -1          # zeus: the n of targets[n] on Zeus's search form
+    zeus_priority: int = 0          # order in the Zeus union request (1 first; 0 = after the ranked ones)
+    zeus_unstable: bool = False     # asked alone and last in the Zeus union request
+
+    @property
+    def on_zeus(self) -> bool:
+        """One of the catalogues /sru/_union asks through Zeus: a zeus
+        target, or a z3950/sru one that names its targets[n]."""
+        return self.status != "broken" and (self.kind == "zeus" or self.target_index >= 0)
 
     @property
     def live(self) -> bool:
@@ -122,7 +142,13 @@ def make_target(raw: dict) -> Target:
         local_first=int(raw.get("local_first") or 0),
         legacy_hosts=tuple(str(h).strip().lower() for h in raw.get("legacy_hosts") or ()),
         target_index=int(raw["target_index"]) if raw.get("target_index") is not None else -1,
+        zeus_priority=int(raw.get("zeus_priority") or 0),
+        zeus_unstable=bool(raw.get("zeus_unstable", False)),
     )
+    if t.zeus_priority < 0:
+        raise TargetError(f"{tid}: zeus_priority is a position, 1 or more")
+    if (t.zeus_priority or t.zeus_unstable) and not (kind == "zeus" or t.target_index >= 0):
+        raise TargetError(f"{tid}: zeus_priority/zeus_unstable need kind zeus or a target_index")
     if t.local_first < 0:
         raise TargetError(f"{tid}: local_first is a position, 1 or more")
     if any(not re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", h) for h in t.legacy_hosts):

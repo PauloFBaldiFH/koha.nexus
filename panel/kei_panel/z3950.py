@@ -89,8 +89,14 @@ ALT_PORTS = (210, 2100, 2210)
 CONNECT_TIMEOUT = 3.0
 QUERY_TIMEOUT = 8.0
 FAILS_TO_BLACKLIST = 3
-HISTORY_RULES = 2                     # bumped when the scan's idea of "working" changes
+HISTORY_RULES = 3                     # bumped when the scan's idea of "working" changes
 RULES_KEY = "_rules"
+# koha.nexus services that were down and are back (HISTORY_RULES 3, 2026-10-31:
+# koha-nexus-catalog answers again at https://catalog.koha.nexus/sru). Their
+# old results ("Wrong protocol" from Cloudflare's error page while it was
+# down) are dropped with the rules change, so the list shows them untested
+# until the next test, not failed.
+RESTORED_KEYS = ("catalog.koha.nexus:443/sru",)
 TESTED_KEY = "_tested"                # when "Show servers" last tested the whole list
 # The most servers we recommend ticked for one cataloguing search: Koha asks
 # them all at once, and more than this makes the search unstable. Only a
@@ -805,6 +811,10 @@ class History:
                 if isinstance(h, dict):
                     h.pop("auto", None)
                     h["fails"] = 0
+            for key in RESTORED_KEYS:
+                h = self.data.get(key)
+                if isinstance(h, dict) and h.get("status") not in ("ok", "empty"):
+                    self.data[key] = {"manual": True} if h.get("manual") else {}
             self.data[RULES_KEY] = HISTORY_RULES
 
     def get(self, key: str) -> dict:
@@ -1275,7 +1285,9 @@ async def probe_sru(target: Target, port: int, timeout: float = QUERY_TIMEOUT, g
                 res.answered, res.status = True, "empty"
                 res.query_ms = int((time.monotonic() - t0) * 1000)
                 d = re.search(r"<(?:\w+:)?message>([^<]+)<", text)
-                res.detail = f"SRU diagnostic: {d.group(1).strip()}" if d else "SRU diagnostic"
+                explain = re.search(r"<(?:\w+:)?explainResponse\b", text)
+                res.detail = (f"SRU diagnostic: {d.group(1).strip()}" if d
+                              else "SRU explain only, no search answer" if explain else "SRU diagnostic")
             else:
                 res.detail = "not an SRU response"
             return res

@@ -18,6 +18,7 @@ from __future__ import annotations
 import concurrent.futures
 import html
 import http.cookiejar
+import logging
 import re
 import threading
 import urllib.error
@@ -25,6 +26,8 @@ import urllib.parse
 import urllib.request
 
 from nexus_enrich import marc
+
+log = logging.getLogger(__name__)
 
 BASE_URL = "https://www.pergamum.pucpr.br/redepergamum/consultas/site_CRP/pesquisa.php"
 # Pergamum answers a browser; Python's default agent is not what the
@@ -36,10 +39,24 @@ PAGE_SIZE = 50              # ids Pergamum lists per search (its "50" argument)
 CONCURRENCY = 5             # MARC records fetched at once
 DEFAULT_LEADER = "00000cam a2200000 a 4500"
 SEARCH_TYPE = {"isbn": "ISBN", "author": "AUTOR"}       # else TITULO, also for keywords
+RESULT_CEILING = 500        # Pergamum lists no hit at all past this many
 
 
 class PergamumError(Exception):
     """Pergamum did not answer, or its page could not be read."""
+
+
+class PergamumExcessiveResultsError(PergamumError):
+    """Pergamum refused the search: more than RESULT_CEILING hits ("Resultado
+    maior que 500 linhas. Refine melhor a busca !"). Its answer then lists no
+    id, so without this the search read as 0 records; the term has to be
+    narrowed (a longer title, author and title, an ISBN)."""
+
+    def __init__(self, ptype: str = "", term: str = ""):
+        self.ptype, self.term = ptype, term
+        what = f" for {ptype} {term!r}" if term else ""
+        super().__init__(f"Pergamum found more than {RESULT_CEILING} records{what} and lists none: "
+                         "refine the search")
 
 
 # ----------------------------------------------------------------------
@@ -48,6 +65,9 @@ class PergamumError(Exception):
 _COUNT_RE = re.compile(r"N\S{0,8}?mero de Registros Encontrados\s*:?\s*(?:<[^>]*>\s*)*(\d[\d.]*)", re.I)
 _ID_RE = re.compile(r"mostrar_marc\((\d+)\)")
 _MARC_RE = re.compile(r"(?:<|&lt;)inicio(?:>|&gt;)(.*?)(?:<|&lt;)fim(?:>|&gt;)", re.S)
+# "Resultado maior que 500 linhas. Refine melhor a busca !", whatever the
+# page's encoding did to it and however it is wrapped.
+_TOO_MANY_RE = re.compile(r"Resultado\s+maior\s+que\s+(\d[\d.]*)\s+linhas", re.I)
 _SUBFIELD = re.compile(r"\$([a-zA-Z0-9])\s*([^$]+)")
 # Characters XML 1.0 cannot carry (tab and newline are dealt with before).
 _XML_INVALID = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -75,9 +95,17 @@ def record_params(acervo_id: str) -> list[tuple[str, str]]:
     return [("rs", "ajax_conteudo_pastas"), ("rst", ""), ("rsrnd", "1234567890"), ("rsargs[]", acervo_id)]
 
 
-def parse_results(page: str) -> tuple[int, list[str]]:
+def too_many_results(page: str) -> bool:
+    """Pergamum's answer is its "more than 500 lines" refusal."""
+    return bool(_TOO_MANY_RE.search(html.unescape(page)))
+
+
+def parse_results(page: str, ptype: str = "", term: str = "") -> tuple[int, list[str]]:
     """The count Pergamum reports (the ids listed when absent) and the
-    acervo ids, in order."""
+    acervo ids, in order. Raises PergamumExcessiveResultsError when
+    Pergamum refused the search for having more than 500 hits."""
+    if too_many_results(page):
+        raise PergamumExcessiveResultsError(ptype, term)
     m = _COUNT_RE.search(page)
     count = int(m.group(1).replace(".", "")) if m else 0
     ids = list(dict.fromkeys(_ID_RE.findall(page)))
@@ -176,8 +204,10 @@ class _Fetcher:
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise PergamumError(f"Pergamum did not answer: {type(exc).__name__}: {exc}") from exc
         # A search with no hits answers HTTP 500 with a valid Sajax body
-        # ("+:..."): that is an empty result, not an error.
-        if status == 500 and body.startswith("+:"):
+        # ("+:..."): that is an empty result, not an error. The "more than
+        # 500 lines" refusal goes to the parser whatever the status, so it
+        # is reported as such and not as a bare HTTP error.
+        if (status == 500 and body.startswith("+:")) or too_many_results(body):
             return body
         if status >= 400:
             raise PergamumError(f"Pergamum answered HTTP {status}")
@@ -208,7 +238,12 @@ class Pergamum:
         clean = sanitize_term(term, ptype)
         if not clean:
             return 0, []
-        count, ids = parse_results(self.get(search_params(clean, ptype), timeout))
+        try:
+            count, ids = parse_results(self.get(search_params(clean, ptype), timeout), ptype, clean)
+        except PergamumExcessiveResultsError:
+            log.warning("Pergamum: %s %r has more than %d hits, Pergamum lists none; the search needs "
+                        "refining", ptype, clean, RESULT_CEILING)
+            raise
         ids = ids[:limit]
         if not ids:
             return 0, []

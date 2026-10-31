@@ -19,6 +19,7 @@ FIX = Path(__file__).parent / "fixtures"
 TARGETS = Path(__file__).resolve().parents[1] / "nexus_gateway" / "targets.json"
 RESULTS = (FIX / "pergamum_results.html").read_text(encoding="utf-8")
 MARC_PAGE = (FIX / "pergamum_marc.html").read_text(encoding="utf-8")
+TOO_MANY = (FIX / "pergamum_too_many.html").read_text(encoding="utf-8")
 
 
 def target():
@@ -102,6 +103,51 @@ def test_no_hits():
     assert len(get.calls) == 1
 
 
+# ----------------------------------------------------------------------
+# "Resultado maior que 500 linhas. Refine melhor a busca !"
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize("page", [
+    TOO_MANY,
+    "Resultado maior que 500 linhas. Refine melhor a busca !",
+    "+:var res = 'Resultado&nbsp;maior que 500 linhas.<br>Refine melhor a busca !'; res;",
+    "<p>RESULTADO MAIOR QUE 500\n  LINHAS</p>",
+])
+def test_the_500_line_refusal_is_recognised(page):
+    assert pergamum.too_many_results(page)
+    with pytest.raises(pergamum.PergamumExcessiveResultsError) as exc:
+        pergamum.parse_results(page, "TITULO", "Jesus")
+    assert "more than 500" in str(exc.value) and "refine" in str(exc.value)
+    assert (exc.value.ptype, exc.value.term) == ("TITULO", "Jesus")
+
+
+def test_ordinary_pages_are_not_the_refusal():
+    assert not pergamum.too_many_results(RESULTS)
+    assert not pergamum.too_many_results("+:var res = 'Nenhum registro'; res;")
+    # a record about the number 500 is not the refusal
+    assert not pergamum.too_many_results("245 10 $a Os 500 anos do Brasil")
+
+
+def test_refusal_is_a_pergamum_error():
+    # live.ask and every caller that catches PergamumError still catch it
+    assert issubclass(pergamum.PergamumExcessiveResultsError, pergamum.PergamumError)
+
+
+def test_search_raises_on_the_refusal_and_fetches_no_record(caplog):
+    get = FakeGet(results=TOO_MANY)
+    with caplog.at_level("WARNING", logger="nexus_gateway.pergamum"):
+        with pytest.raises(pergamum.PergamumExcessiveResultsError):
+            pergamum.Pergamum(get=get).search("author", "Jesus", 20, 5)
+    assert len(get.calls) == 1                      # no MARC page asked for
+    assert "more than 500 hits" in caplog.text and "'Jesus'" in caplog.text
+
+
+def test_ask_reports_the_refusal_as_the_answer_error():
+    crp = pergamum.Pergamum(get=FakeGet(results=TOO_MANY))
+    answer = asyncio.run(live.ask(target(), "title", "Jesus", 5, pergamum=crp))
+    assert answer.records == [] and answer.total == 0
+    assert "more than 500" in answer.error and "refine" in answer.error
+
+
 def test_a_record_that_fails_is_left_out():
     class Flaky(FakeGet):
         def __call__(self, params, timeout):
@@ -126,13 +172,17 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             status, body, extra = 200, "<html>pesquisa</html>", [("Set-Cookie", "PHPSESSID=abc; Path=/")]
         elif rs == "ajax_resultados" and q["rsargs[]"][1] == "nada":
             status, body, extra = 500, "+:var res = ''; res;", []
+        elif rs == "ajax_resultados" and q["rsargs[]"][1] == "Jesus":
+            # the refusal comes in Pergamum's own Latin-1, under HTTP 500
+            status, body, extra = 500, TOO_MANY, []
         elif rs == "ajax_resultados":
             status, body, extra = 200, RESULTS, []
         else:
             status, body, extra = 200, MARC_PAGE, []
-        data = body.encode("utf-8")
+        charset = "iso-8859-1" if body is TOO_MANY else "utf-8"
+        data = body.encode(charset)
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", f"text/html; charset={charset}")
         for k, v in extra:
             self.send_header(k, v)
         self.send_header("Content-Length", str(len(data)))
@@ -157,6 +207,12 @@ def test_session_cookie_and_http_500_without_hits(site):
     opens = [s for s in _Handler.seen if s[0] == ""]
     assert len(opens) == 1 and _Handler.seen[0][0] == ""
     assert all("PHPSESSID=abc" in cookie for rs, cookie in _Handler.seen[1:])
+
+
+def test_refusal_under_http_500_is_not_a_bare_http_error(site):
+    with pytest.raises(pergamum.PergamumExcessiveResultsError):
+        pergamum.Pergamum(site).search("title", "Jesus", 20, 5)
+    assert [rs for rs, _ in _Handler.seen].count("ajax_conteudo_pastas") == 0
 
 
 def test_without_an_address_the_target_answers_an_error():
