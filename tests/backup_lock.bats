@@ -110,7 +110,7 @@ EOF
     run take 'BACKUP_LOCK_WAIT=1'
     [[ "$output" == *"rc=1"* ]]
     [[ "$output" == *"busy=${PIDS[0]} bash $W/backup_sql.sh"* ]]
-    [[ "$output" == *'\n\nRunning now: '"${PIDS[0]} bash"* ]]
+    [[ "$output" == *"Holding it now:"$'\n'"${PIDS[0]} bash $W/backup_sql.sh"* ]]
     kill -0 "${PIDS[0]}"
 }
 

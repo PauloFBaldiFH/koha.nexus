@@ -44,7 +44,7 @@ A classificação sugerida pela IA exige revisão nas tabelas adotadas pela bibl
 
 ## Assistente na página inicial da equipe
 
-Use **Instalar, atualizar ou remover o assistente** para gerenciar a ferramenta. A instalação coloca o chat no lugar do bloco de notícias da página inicial da equipe; as notícias do OPAC não são afetadas.
+Use **Instalar, atualizar ou remover o assistente** para gerenciar a ferramenta. A instalação coloca o chat acima do bloco de notícias da página inicial da equipe; as notícias continuam visíveis logo abaixo.
 
 O assistente busca com o mecanismo do Koha e consultas de leitura definidas pela aplicação. Ele não executa SQL livre escrito pela IA. Respostas podem trazer links para registros e propostas de ação.
 

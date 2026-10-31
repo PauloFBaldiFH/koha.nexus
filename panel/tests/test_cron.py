@@ -56,7 +56,8 @@ def test_render_round_trip_keeps_everything():
 def test_empty_file_gets_the_defaults():
     cf = cron.defaults("lib2")
     on = {j.key for j in cf.jobs if j.enabled}
-    assert on == {p.key for p in cron.PRESETS if p.enabled}
+    assert on == {p.key for p in cron.PRESETS if p.enabled and not p.optional}
+    assert "carousel" not in {j.key for j in cf.jobs}
     assert "reindex" not in on and "authorities" not in on and "fines" not in on
     assert 'MAILTO=""' in cf.env
     text = cron.render(cf)
@@ -72,6 +73,29 @@ def test_authority_linking_daily_or_weekly():
                           '"/usr/share/koha/bin/link_bibs_to_authorities.pl" >/dev/null 2>&1')
     daily = cron.with_freq(job, "daily")
     assert daily.schedule() == "0 4 * * *"
+
+
+def test_carousel_row_only_while_its_line_is_there():
+    # The installer writes this line when the carousel is turned on.
+    text = (cron.CRON_PATH + "\n\n# koha.nexus: OPAC carousel (New arrivals and public lists)\n"
+            "40 5 * * * root /usr/local/bin/koha-kei-new-arrivals >/dev/null 2>&1\n")
+    cf = cron.parse(text, "library")
+    job = cf.job("carousel")
+    assert job and job.enabled and job.time() == "05:40" and job.freq == "daily"
+    assert "carousel" not in {j.key for j in cron.parse(cron.CRON_PATH + "\n", "library").jobs}
+    # Moved to every six hours and back: the row keeps the line, the
+    # installer finds it by the job's path.
+    job.freq, job.raw = "custom", "0 */6 * * *"
+    out = cron.render(cf)
+    assert "0 */6 * * * root /usr/local/bin/koha-kei-new-arrivals >/dev/null 2>&1" in out
+    assert cron.file_problem(out) == ""
+    job.enabled = False
+    again = cron.parse(cron.render(cf), "library").job("carousel")
+    assert again and not again.enabled and again.raw == "0 */6 * * *"
+    # An older panel's line still names the number of covers: kept.
+    old = cron.parse(cron.CRON_PATH + "\n40 5 * * * root /usr/local/bin/koha-kei-new-arrivals 8 >/dev/null 2>&1\n",
+                     "library").job("carousel")
+    assert old and old.command == "/usr/local/bin/koha-kei-new-arrivals 8 >/dev/null 2>&1"
 
 
 def test_reindex_preset_uses_the_helper():

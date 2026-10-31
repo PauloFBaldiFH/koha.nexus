@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.145"
+PANEL_VERSION=" 1.5.146"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -1139,8 +1139,8 @@ BACKUP_LOCK_WAIT="${KEI_BACKUP_LOCK_WAIT:-1200}"
 BACKUP_LOCK_BUSY=""       # "PID command; ..." of what keeps the lock (after a refusal)
 BACKUP_LOCK_CLEARED=""    # what held the stale lock that was cleared
 
-# backup_lock_holders: the PIDs that have the lock file open (this shell left out).
-backup_lock_holders() {
+# backup_lock_pids: the PIDs that have the lock file open (this shell left out).
+backup_lock_pids() {
     local pid
     for pid in $(fuser "$BACKUP_LOCK_FILE" 2>/dev/null); do
         [ "$pid" = "$$" ] || [ "$pid" = "${BASHPID:-}" ] || printf '%s\n' "$pid"
@@ -1245,7 +1245,7 @@ backup_lock_clear_stale() {
         sleep 0.1
     done
     # Whatever is still open there now must still be a leftover.
-    for pid in $(backup_lock_holders); do
+    for pid in $(backup_lock_pids); do
         if [ -n "$(backup_lock_owner "$pid")" ]; then
             exec {guard}>&-
             return 1
@@ -1276,7 +1276,7 @@ backup_lock_acquire() {
     while :; do
         holders="" kind=""
         BACKUP_LOCK_BUSY=""
-        for pid in $(backup_lock_holders); do
+        for pid in $(backup_lock_pids); do
             owner=$(backup_lock_owner "$pid")
             holders="$holders $pid"
             BACKUP_LOCK_BUSY="${BACKUP_LOCK_BUSY:+$BACKUP_LOCK_BUSY; }$pid $(backup_lock_cmd "$pid")"
@@ -1327,11 +1327,28 @@ backup_lock_release() {
     return 0
 }
 
-# What keeps the lock, for the "already running" boxes: empty, or two
-# lines starting with an empty one.
+# backup_lock_holders: one line per other process holding the backup lock,
+# "PID program (running for TIME)", empty when none is found.
+backup_lock_holders() {
+    local pid cmd age
+    for pid in $(fuser "$BACKUP_LOCK_FILE" 2>/dev/null); do
+        [ "$pid" = "$$" ] && continue
+        [ -r "/proc/$pid/cmdline" ] || continue
+        cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-70)
+        age=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')
+        printf '%s %s%s\n' "$pid" "${cmd% }" "${age:+ ($(t "running for") $age)}"
+    done
+}
+
+# The "lock is taken" message, naming what holds it: a backup still
+# compressing (xz is slow), a restore, or a program left holding it, which
+# "sudo kill PID" ends.
 backup_lock_busy_text() {
-    [ -n "$BACKUP_LOCK_BUSY" ] || return 0
-    printf '%s%s %s' '\n\n' "$(t "Running now:")" "${BACKUP_LOCK_BUSY:0:150}"
+    local who
+    who=$(backup_lock_holders | head -n 3)
+    printf '%s' "$(t "Another backup or restore is already running.\nNothing was changed.")"
+    [ -n "$who" ] && printf '\n\n%s\n%s' "$(t "Holding it now:")" "$who"
+    return 0
 }
 # end of backup lock helpers
 
@@ -4909,6 +4926,12 @@ upgrade_cron_tasks() {
             log "cron: koha-email-enable failed; the old e-mail block was kept"
         fi
     fi
+    # The OPAC carousel's schedule had its own file (koha_kei_opac), out of
+    # the panel's Schedules & cron tasks: its line moves into koha_tasks.
+    if [ -f "$CRON_OPAC" ]; then
+        opac_na_schedule on "$(grep -m1 -F "$OPAC_NA_BIN" "$CRON_OPAC")"
+        changed=1
+    fi
     [ "$changed" = "1" ] && systemctl restart cron >/dev/null 2>&1
     return 0
 }
@@ -4957,6 +4980,8 @@ MAILTO=""
 30 1 * * * root /usr/sbin/koha-shell ${INSTANCE} -c "/usr/share/koha/bin/cronjobs/cleanup_database.pl --confirm --sessions --sessdays 2 --zebraqueue 10" >/dev/null 2>&1
 EOF
     [ -n "$legacy_email" ] && printf '\n%s\n' "$legacy_email" >> "$CRON_TASKS"
+    # The OPAC carousel is on: its nightly job stays in the new file.
+    [ -x "$OPAC_NA_BIN" ] && opac_na_schedule on
 
     chmod 644 "$CRON_TASKS"
     chown root:root "$CRON_TASKS"
@@ -5874,7 +5899,7 @@ function_install_koha() {
 
         if ! backup_lock_acquire; then
             restore_apt_timers
-            msg_error "" "$(t "Another backup or restore is already running. Reinstallation was cancelled.")$(backup_lock_busy_text)" 12 74
+            msg_error "" "$(t "Another backup or restore is already running. Reinstallation was cancelled.")" 9 74
             return 1
         fi
         local rescue db_has_tables
@@ -5936,6 +5961,7 @@ function_install_koha() {
     tui_step 7 "$steps" "🌐" "$(t "Services")"
     tui_run "$(t "Restarting Koha services")" ensure_koha_services
     tui_run "$(t "Checking the staff authority links")" staff_authlinks_fix
+    staff_welcome_news
     z3950_seed_authorities >/dev/null 2>&1 || log "z3950: the Library of Congress authority targets were not seeded"
     tui_run "$(t "Starting the local catalogue gateway")" enrich_install || true
     tui_run "$(t "Cleaning temporary files")" install_task_cleanup
@@ -6371,7 +6397,7 @@ _function_restore_database() {
 
     clear
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
+        msg_error "" "$(backup_lock_busy_text)" 14 76
         return 0
     fi
     maintenance_begin
@@ -6513,7 +6539,7 @@ _function_restore_database() {
 function_manual_backup() {
     require_database || return 1
     if ! backup_lock_acquire; then
-        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")$(backup_lock_busy_text)" 12 72
+        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
         return 1
     fi
     local target_dir="${1:-}" target_file
@@ -6685,7 +6711,7 @@ function_test_backup() {
 
     clear
     if ! backup_lock_acquire; then
-        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")$(backup_lock_busy_text)" 12 72
+        msg_info "$(t "Backup in progress")" "$(t "Another backup or restore is already running. Try again later.")" 9 72
         return 0
     fi
     display_explanation "Importing into a temporary database..."
@@ -7283,7 +7309,7 @@ function_toggle_search_engine() {
         clear
         tui_title "🔎" "$(t "Switching the search engine to Zebra")"
         if ! backup_lock_acquire; then
-            msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")$(backup_lock_busy_text)" 12 72
+            msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")" 9 72
             return 1
         fi
         maintenance_begin
@@ -7347,7 +7373,7 @@ function_toggle_search_engine() {
     clear
     tui_title "🔎" "$(t "Switching the search engine to Elasticsearch")"
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")$(backup_lock_busy_text)" 12 72
+        msg_error "" "$(t "Another backup/restore is running. Engine switch cancelled.")" 9 72
         return 1
     fi
     maintenance_begin
@@ -9996,7 +10022,7 @@ function_update_system() {
     local cur_tables pre_update
     if is_koha_installed && cur_tables=$(koha_table_count) && [ "$cur_tables" -gt 0 ]; then
         if ! backup_lock_acquire; then
-            msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
+            msg_error "" "$(backup_lock_busy_text)" 14 76
             return 1
         fi
         pre_update="${DIR_SQL}/PRE-UPDATE_$(date +%Y-%m-%d_%Hh%M%S)$(backup_ext)"
@@ -11093,7 +11119,7 @@ tools_log() {
 # lock: no nightly backup, restore or update can run in the middle of it.
 tools_locked() {
     if ! backup_lock_acquire; then
-        msg_error "" "$(t "Another backup or restore is already running.\nNothing was changed.")$(backup_lock_busy_text)" 13 72
+        msg_error "" "$(backup_lock_busy_text)" 14 76
         return 1
     fi
     local rc=0
@@ -33420,8 +33446,8 @@ ai_assistant_script() {
 #!/usr/bin/perl
 
 # ai_assistant.pl (koha-easy-installer)
-# The AI assistant of the staff home page: a chat in the place of the news
-# block (a marked block in IntranetUserJS puts it there and loads op=js and
+# The AI assistant of the staff home page: a chat above the news block
+# (a marked block in IntranetUserJS puts it there and loads op=js and
 # op=css from this page). The librarian asks in plain language; the model of
 # the AI settings (vision.conf, as the AI cataloguing) answers through the
 # tools of KohaEasy::Assistant, and every record it names is a link to its
@@ -33846,8 +33872,8 @@ sub append_log {
 sub widget_js {
     return <<'KEIJS';
 /* koha-easy-installer: the AI assistant of the staff home page (op=js).
-   Draws the chat in #kei-ai (made by the IntranetUserJS block in the place of
-   the news). Text from the model is never HTML: it is put in with text nodes,
+   Draws the chat in #kei-ai (made by the IntranetUserJS block above the
+   news). Text from the model is never HTML: it is put in with text nodes,
    and only [[kind:id|label]] references the server verified become links. */
 (function ($) {
     "use strict";
@@ -34237,8 +34263,10 @@ aia_text() {
     esac
 }
 
-# The marked block of IntranetUserJS: the chat in the place of the news of
-# the staff home page (on top of its first column when there is no news).
+# The marked block of IntranetUserJS: the chat above the news of the staff
+# home page, which stay below it (on top of its first column when there is
+# no news). Blocks of older panels took the place of the news: "Install or
+# update the assistant" puts this one in.
 # The version in the address makes browsers fetch an updated widget.
 aia_js_block() {
     local v="${PANEL_VERSION// /}"
@@ -34248,7 +34276,7 @@ $(document).ready(function () {
     // koha.nexus AI assistant (Library tools > AI assistant on the staff home page).
     if (!$("#main_intranet-main").length || $("#kei-ai").length) return;
     var box = $("<div id=\"kei-ai\"></div>"), news = $("#area-news");
-    if (news.length) news.replaceWith(box);
+    if (news.length) news.before(box);
     else {
         var col = $("#area-quote").parent();
         if (!col.length) col = $("#container-main .row").first().children("div").first();
@@ -34349,7 +34377,7 @@ aia_ro_drop() {
 aia_status() {
     local provider
     if aia_installed; then printf '%s: %s\n' "$(t "Page")" "$(t "installed")"; else printf '%s: %s\n' "$(t "Page")" "$(t "not installed")"; fi
-    if aia_js_on; then printf '%s: %s\n' "$(t "Staff home page")" "$(t "the chat replaces the news block")"; else printf '%s: %s\n' "$(t "Staff home page")" "$(t "unchanged")"; fi
+    if aia_js_on; then printf '%s: %s\n' "$(t "Staff home page")" "$(t "the chat is above the news block")"; else printf '%s: %s\n' "$(t "Staff home page")" "$(t "unchanged")"; fi
     if aia_ro_exists && [ -r "$AIA_CNF" ]; then printf '%s: %s\n' "$(t "Read-only database account")" "$AIA_RO_USER"; else printf '%s: %s\n' "$(t "Read-only database account")" "$(t "missing")"; fi
     provider=$(sed -n 's/^provider=//p' "${MR_DIR}/vision.conf" 2>/dev/null | head -n1)
     printf '%s: %s' "$(t "AI provider")" "${provider:-$(t "not set up (AI cataloguing > AI settings)")}"
@@ -34359,7 +34387,7 @@ function_ai_assistant() {
     require_database || return 0
     local opt
     while true; do
-        opt=$(ui_menu "$(t "💬  AI assistant on the staff home page")" "$(t "A chat on the home page of the Koha staff interface, in the place of the news block. Librarians ask in plain language about books, patrons, loans, reports, settings and opening hours; the answers link to the records. It searches with Koha's own search engine and reads through a read-only database account, never with SQL written by the AI. A change it suggests (a hold, a patron's or a record's fields, a write-off) is an action proposal showing each field before and after: Koha makes it only after a click on Approve & Execute, with the librarian's own permissions.")"$'\n\n'"$(aia_status)" \
+        opt=$(ui_menu "$(t "💬  AI assistant on the staff home page")" "$(t "A chat on the home page of the Koha staff interface, above the news block. Librarians ask in plain language about books, patrons, loans, reports, settings and opening hours; the answers link to the records. It searches with Koha's own search engine and reads through a read-only database account, never with SQL written by the AI. A change it suggests (a hold, a patron's or a record's fields, a write-off) is an action proposal showing each field before and after: Koha makes it only after a click on Approve & Execute, with the librarian's own permissions.")"$'\n\n'"$(aia_status)" \
             "1" "$(t "Install or update the assistant")" \
             "2" "$(t "Remove the assistant")" \
             "3" "$(t "Changes confirmed in the assistant")") || return 0
@@ -34377,7 +34405,7 @@ lt_aia_install() {
         msg_error "" "$(t "The staff interface folder of Koha was not found. Nothing was changed.")" 9 72
         return 1
     fi
-    prompt_yes_no "$(t "AI assistant on the staff home page")" "$(t "Install the AI assistant on the home page of the staff interface? It takes the place of the news block there (news for the OPAC are not affected). A database account that can only read is created for it, and a marked block is added to the IntranetUserJS preference (removed with the assistant; a verified backup is made first).")" 14 76 || return 0
+    prompt_yes_no "$(t "AI assistant on the staff home page")" "$(t "Install the AI assistant on the home page of the staff interface? It goes above the news block there, and the news stay below it. A database account that can only read is created for it, and a marked block is added to the IntranetUserJS preference (removed with the assistant; a verified backup is made first).")" 14 76 || return 0
     tools_locked _lt_aia_install
 }
 
@@ -34469,7 +34497,7 @@ aia_refresh() {
 
 lt_aia_remove() {
     aia_installed || aia_js_on || aia_ro_exists || { msg_info "$(t "AI assistant on the staff home page")" "$(t "Not installed.")" 8 60; return 0; }
-    prompt_yes_no "$(t "AI assistant on the staff home page")" "$(t 'Remove the assistant? The news block comes back to the staff home page, the read-only database account is deleted and the saved conversations are erased. The record of confirmed changes and their undo files stay in ${AIA_DIR}.')" 11 76 defaultno || return 0
+    prompt_yes_no "$(t "AI assistant on the staff home page")" "$(t 'Remove the assistant? The chat leaves the staff home page (the news stay), the read-only database account is deleted and the saved conversations are erased. The record of confirmed changes and their undo files stay in ${AIA_DIR}.')" 11 76 defaultno || return 0
     tools_locked _lt_aia_remove
 }
 
@@ -36089,8 +36117,9 @@ z3950_server_status() {
 # also reached as /etc/koha-nexus/theme-settings.json). A database restore
 # brings back the backup's systempreferences and news, and those decide:
 # Restore database reads the copy again from them (theme_state_refresh).
-# The carousel reads kei-new-arrivals.json, written every night by
-# koha-kei-new-arrivals: the newest titles with a copy that is not lost or
+# The carousel reads kei-new-arrivals.json, written every night (05:40, a
+# line of koha_tasks the panel's Schedules & cron tasks can move or turn
+# off) by koha-kei-new-arrivals: the newest titles with a copy that is not lost or
 # withdrawn and a real cover (Koha's uploaded one, else OpenLibrary, else
 # Amazon, which answers a missing one with a 1x1 picture, skipped). The same
 # job writes kei-list-<number>.json for each public Koha list, the
@@ -36103,7 +36132,10 @@ OPAC_CUSTOM_DIR="/usr/share/koha/opac/htdocs/images/custom"
 STAFF_CUSTOM_DIR="${KEI_STAFF_CUSTOM_DIR:-/usr/share/koha/intranet/htdocs/intranet-tmpl/kei-custom}"
 OPAC_NA_BIN="/usr/local/bin/koha-kei-new-arrivals"
 OPAC_NA_FEED="kei-new-arrivals.json"
+# Before 1.5.145 the carousel's schedule had this file of its own; now its
+# line is in koha_tasks (CRON_TASKS), where Schedules & cron tasks shows it.
 CRON_OPAC="/etc/cron.d/koha_kei_opac"
+OPAC_NA_CRON_NOTE="# koha.nexus: OPAC carousel (New arrivals and public lists)"
 OPAC_BEGIN="/* koha-easy-installer opac-theme begin */"
 OPAC_END="/* koha-easy-installer opac-theme end */"
 THEME_STATE="${KEI_THEME_STATE:-${CONF_DIR}/theme-settings.json}"
@@ -36154,9 +36186,13 @@ opac_pref_line() {
 # The nightly job of the carousel (perl, run as root: DBI on the local
 # MariaDB socket). KEI_NA_DSN / KEI_NA_OUT / KEI_NA_COVER_BASE / KEI_NA_OL_BASE
 # are for the tests.
+# opac_na_script N: N is the number of covers when the job runs with no
+# argument (the nightly line of koha_tasks).
 opac_na_script() {
-    printf '#!/usr/bin/perl\n# koha.nexus: "New arrivals" and public list feeds of the OPAC carousel (config.sh, OPAC appearance).\nour ($DB, $OUT) = (%s, %s);\n' \
-        "$(sql_quote "$DB_NAME")" "$(sql_quote "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}")"
+    local n="${1:-12}"
+    [[ "$n" =~ ^[0-9]+$ ]] || n=12
+    printf '#!/usr/bin/perl\n# koha.nexus: "New arrivals" and public list feeds of the OPAC carousel (config.sh, OPAC appearance).\nour ($DB, $OUT, $COUNT) = (%s, %s, %s);\n' \
+        "$(sql_quote "$DB_NAME")" "$(sql_quote "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}")" "$n"
     cat <<'PL'
 use strict;
 use warnings;
@@ -36164,7 +36200,7 @@ use DBI;
 use HTTP::Tiny;
 use JSON::PP;
 
-my $count = ($ARGV[0] // '') =~ /^\d+$/ ? $ARGV[0] : 12;
+my $count = ($ARGV[0] // '') =~ /^\d+$/ ? $ARGV[0] : ($COUNT // 12);
 $count = 4 if $count < 4;
 $count = 24 if $count > 24;
 my $out = $ENV{KEI_NA_OUT} || $OUT;
@@ -36319,15 +36355,47 @@ printf "%d of %d new titles have a cover; %d public lists\n", scalar @feed, $fou
 PL
 }
 
-# opac_na_install N: the job, its schedule (every night) and a first run.
+# opac_na_install N: the job (N covers), its schedule (every night) and a
+# first run.
 opac_na_install() {
     local tmp
     mkdir -p "$OPAC_CUSTOM_DIR" && chmod 755 "$OPAC_CUSTOM_DIR" || return 1
     tmp=$(mktemp "${OPAC_NA_BIN}.XXXXXX") || return 1
-    opac_na_script > "$tmp" && chmod 755 "$tmp" && mv -f "$tmp" "$OPAC_NA_BIN" || { rm -f -- "$tmp"; return 1; }
-    printf '# koha.nexus: OPAC "New arrivals" carousel\n40 5 * * * root %s %s >/dev/null 2>&1\n' "$OPAC_NA_BIN" "$1" > "$CRON_OPAC"
-    chmod 644 "$CRON_OPAC"
+    opac_na_script "$1" > "$tmp" && chmod 755 "$tmp" && mv -f "$tmp" "$OPAC_NA_BIN" || { rm -f -- "$tmp"; return 1; }
+    opac_na_schedule on
     opac_na_run "$1"
+}
+
+# opac_na_schedule on [LINE] | off: the carousel's line in koha_tasks.
+# "on" keeps a line already there (on or off, at the time the library chose
+# in Schedules & cron tasks) and otherwise adds LINE, or 05:40 every night;
+# the old file of its own (koha_kei_opac) goes. "off" takes the line out.
+opac_na_schedule() {
+    local line="${2:-}" tmp
+    rm -f -- "$CRON_OPAC"
+    if [ "$1" = "on" ]; then
+        if [ -f "$CRON_TASKS" ] && grep -qF "$OPAC_NA_BIN" "$CRON_TASKS"; then
+            return 0
+        fi
+        case "$line" in
+            *"$OPAC_NA_BIN"*) ;;
+            *) line="40 5 * * * root $OPAC_NA_BIN >/dev/null 2>&1" ;;
+        esac
+        [ -f "$CRON_TASKS" ] || printf '%s\n' "$CRON_PATH" > "$CRON_TASKS"
+        [ -n "$(tail -n1 "$CRON_TASKS")" ] && printf '\n' >> "$CRON_TASKS"
+        printf '%s\n%s\n' "$OPAC_NA_CRON_NOTE" "$line" >> "$CRON_TASKS"
+        chmod 644 "$CRON_TASKS"
+        return 0
+    fi
+    [ -f "$CRON_TASKS" ] && grep -qF "$OPAC_NA_BIN" "$CRON_TASKS" || return 0
+    tmp=$(mktemp "${CRON_TASKS}.XXXXXX") || return 1
+    awk -v bin="$OPAC_NA_BIN" -v note="$OPAC_NA_CRON_NOTE" '
+        $0 == note { held = $0; next }
+        index($0, bin) { held = ""; next }
+        held != "" { print held; held = "" }
+        { print }
+        END { if (held != "") print held }' "$CRON_TASKS" > "$tmp" \
+        && chmod 644 "$tmp" && mv -f "$tmp" "$CRON_TASKS" || { rm -f -- "$tmp"; return 1; }
 }
 
 opac_na_run() {
@@ -36343,7 +36411,8 @@ opac_na_run() {
 }
 
 opac_na_remove() {
-    rm -f -- "$CRON_OPAC" "$OPAC_NA_BIN" "${OPAC_CUSTOM_DIR:?}/${OPAC_NA_FEED:?}" "${OPAC_CUSTOM_DIR:?}"/kei-list-*.json
+    opac_na_schedule off
+    rm -f -- "$OPAC_NA_BIN" "${OPAC_CUSTOM_DIR:?}/${OPAC_NA_FEED:?}" "${OPAC_CUSTOM_DIR:?}"/kei-list-*.json
 }
 
 # opac_custom_drop NAME...: our pictures kei-NAME.* in Koha's images/custom.
@@ -36560,6 +36629,37 @@ opac_news_sql() {
     printf 'news: %s written (%s)\n' "$loc" "$where" >> "$log"
 }
 
+# staff_welcome_news: a news item of the staff interface that presents
+# koha.nexus, put in once on each installation (new ones at the end of the
+# install, older ones when the panel starts). It is an ordinary Koha news
+# item of the library (code koha-nexus-welcome, not kei-*): Tools > News or
+# the panel's staff news box change it, and once deleted it never comes
+# back (the mark in CONF_DIR stays, also after a database restore).
+STAFF_WELCOME_CODE="koha-nexus-welcome"
+STAFF_WELCOME_MARK="${CONF_DIR}/staff-welcome-news.done"
+staff_welcome_news() {
+    [ -f "$STAFF_WELCOME_MARK" ] && return 0
+    opac_contents_supported || return 0
+    local n title body
+    n=$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.additional_contents WHERE code = '${STAFF_WELCOME_CODE}';" 2>/dev/null)
+    [[ "$n" =~ ^[0-9]+$ ]] || return 0
+    if [ "$n" = "0" ]; then
+        title=$(t "Welcome to koha.nexus")
+        body="<p>$(t "This Koha was installed with <strong>koha.nexus</strong>, free software that installs Koha and looks after it from one panel (<code>sudo config.sh</code>): verified backups and restore, updates, the look of the OPAC and of this staff interface, Z39.50 catalogues, record import and the AI assistant.")</p>
+<p>$(t "Manual, downloads and news of the project:") <a href=\"https://koha.nexus\" target=\"_blank\" rel=\"noopener\">koha.nexus</a></p>
+<p><em>$(t "This is an ordinary Koha news item: change it or delete it in Tools > News.")</em></p>"
+        if ! printf "START TRANSACTION;\nINSERT INTO additional_contents (category, code, location, branchcode, published_on, number) VALUES ('news', '%s', 'staff_only', NULL, CURDATE(), 1);\nINSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (LAST_INSERT_ID(), %s, %s, 'default');\nCOMMIT;\n" \
+                "$STAFF_WELCOME_CODE" "$(sql_quote "$title")" "$(sql_quote "$body")" \
+                | mysql --default-character-set=utf8mb4 "$DB_NAME" >/dev/null 2>&1; then
+            log "staff news: the koha.nexus welcome item could not be written"
+            return 0
+        fi
+        log "staff news: koha.nexus welcome item added"
+    fi
+    mkdir -p "$CONF_DIR" 2>/dev/null && date '+%F %T' > "$STAFF_WELCOME_MARK" 2>/dev/null
+    return 0
+}
+
 opac_retired_commit() {
     [ -f "$OPAC_RETIRED.new" ] || return 0
     if [ -s "$OPAC_RETIRED.new" ]; then
@@ -36585,7 +36685,7 @@ opac_theme_get() {
         | grep -m1 -F 'KEI-THEME-DATA:')
     [ -n "$line" ] && kei_result data "$line"
     kei_result amazon "$(opac_pref_raw OPACAmazonCoverImages)"
-    [ -f "$CRON_OPAC" ] && kei_result carousel "on"
+    { [ -x "$OPAC_NA_BIN" ] || [ -f "$CRON_OPAC" ]; } && kei_result carousel "on"
     if [ -f "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" ]; then
         kei_result feed_items "$(grep -o '"biblionumber"' "${OPAC_CUSTOM_DIR}/${OPAC_NA_FEED}" | wc -l)"
     fi
@@ -36937,8 +37037,10 @@ opac_carousel_refresh() {
         msg_error "" "$(t "The carousel is not on: turn it on and apply the look first.")"
         return 1
     fi
-    count=$(awk -v b="$OPAC_NA_BIN" '{ for (i = 1; i < NF; i++) if ($i == b) { print $(i + 1); exit } }' "$CRON_OPAC" 2>/dev/null)
-    [[ "$count" =~ ^[0-9]+$ ]] || count=12
+    # The number of covers is in the job itself (a schedule of an older
+    # panel still names it after the job).
+    count=$(cat "$CRON_OPAC" "$CRON_TASKS" 2>/dev/null | awk -v b="$OPAC_NA_BIN" '{ for (i = 1; i < NF; i++) if ($i == b) { print $(i + 1); exit } }')
+    [[ "$count" =~ ^[0-9]+$ ]] || count=""
     if opac_na_run "$count"; then
         msg_ok "$(t "The New arrivals feed was rebuilt.")"
     else
@@ -38331,6 +38433,8 @@ is_koha_installed && install_data_safety
 is_koha_installed && ficha_refresh
 # AI assistant installed by an older panel: same page as this version.
 is_koha_installed && aia_refresh
+# The staff news item that presents koha.nexus (once per installation).
+is_koha_installed && staff_welcome_news
 # Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
 is_koha_installed && mr_refresh
 [ -n "$PANEL_LOCK_CLEARED" ] && log "panel lock: stale lock of PID ${PANEL_LOCK_CLEARED} cleared (dropped session)"
