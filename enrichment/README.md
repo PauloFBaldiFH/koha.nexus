@@ -145,12 +145,20 @@ python -m nexus_gateway koha-sql | sudo koha-mysql INSTANCE
   `--redo-local-first` does it again.
 - Catálogo Zeus (kind `zeus`: BN, UNICAMP, UERJ, UFG, UFMG, UFPE, UFSCar, UFU,
   UFRGS, UFF): searched live only where `NEXUS_GATEWAY_ZEUS_URL` is set (the
-  VPS behind sru.koha.nexus: `https://catalogo.bu.ufsc.br/zeus/`), one
+  VPS behind sru.koha.nexus: `https://catalogo.bu.ufsc.br/zbib/`, the address
+  UFSC uses today; `/zeus/` was the old one), one
   `targets[n]` per search; `sru/_union` asks once for all of them, every
   `targets[n]` ticked (15 a request), before the Z39.50/SRU targets. The `n` is the one whose
   label on Zeus's search form names the catalogue (`target_index` first); a
   catalogue not on the form is not searched. `python -m nexus_gateway
-  zeus-labels` prints that mapping.
+  zeus-labels` prints that mapping for every target.
+- Zeus as a second route (0.5.0): with `NEXUS_GATEWAY_ZEUS_URL` set, a
+  `z3950`/`sru` target whose name is on Zeus's form (USP, UFSC, the Senado,
+  UNESP, UNIFESP...) is asked at its own address and through Zeus at the same
+  time, and the first route with records answers; a `missing` target whose
+  name is on the form (Fundacentro, BUAP...) is asked through Zeus only.
+  `sru/_union` keeps its one Zeus request and leaves this out. An answer with
+  no records is kept in learned.db for 10 minutes, like an error, not 30 days.
 - Rede Pergamum (kind `pergamum`, `sru/all`): searched live only where
   `NEXUS_GATEWAY_PERGAMUM_URL` is set (the VPS:
   `https://www.pergamum.pucpr.br/redepergamum/consultas/site_CRP/pesquisa.php`),

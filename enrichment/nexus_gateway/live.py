@@ -36,37 +36,84 @@ class Answer:
     error: str = ""
 
 
-async def ask(target: Target, kind: str, term: str, timeout: float,
-              zeus: "zeus_mod.Zeus | None" = None, pergamum: "pergamum_mod.Pergamum | None" = None) -> Answer:
-    """One target, one search: its first page of records, or the error."""
+async def _direct(target: Target, kind: str, term: str, timeout: float) -> tuple[int, list[marc.Record]]:
+    """A z3950 or sru target at its own address."""
+    if target.kind == "z3950":
+        total, raws = await z3950.search(target.host, target.port, target.db, kind, term, 1, PAGE,
+                                         user=target.user, password=target.password, timeout=timeout)
+        records = []
+        for raw in raws:
+            try:
+                records.append(marc.from_iso2709(raw))
+            except (marc.RecordError, ValueError):
+                continue
+        return total, records
+    if target.kind == "sru":
+        return await asyncio.to_thread(upstream.search, target, kind, term, 1, PAGE, timeout)
+    raise upstream.UpstreamError(f"{target.id} has no address of its own (kind {target.kind})")
+
+
+async def _answer(target: Target, coro) -> Answer:
     try:
-        if target.kind == "zeus":
-            if zeus is None:
-                raise zeus_mod.ZeusError("no Zeus address (NEXUS_GATEWAY_ZEUS_URL)")
-            if target.id == zeus_mod.UNION_ID:
-                total, records = await asyncio.to_thread(zeus.search_many, zeus.members, kind, term, timeout)
-            else:
-                total, records = await asyncio.to_thread(zeus.search, target, kind, term, timeout)
-            records = records[:PAGE]
-        elif target.kind == "pergamum":
-            if pergamum is None:
-                raise pergamum_mod.PergamumError("no Pergamum address (NEXUS_GATEWAY_PERGAMUM_URL)")
-            total, records = await asyncio.to_thread(pergamum.search, kind, term, PAGE, timeout)
-        elif target.kind == "z3950":
-            total, raws = await z3950.search(target.host, target.port, target.db, kind, term, 1, PAGE,
-                                             user=target.user, password=target.password, timeout=timeout)
-            records = []
-            for raw in raws:
-                try:
-                    records.append(marc.from_iso2709(raw))
-                except (marc.RecordError, ValueError):
-                    continue
-        else:
-            total, records = await asyncio.to_thread(upstream.search, target, kind, term, 1, PAGE, timeout)
-        return Answer(target.id, total, records)
+        total, records = await coro
+        return Answer(target.id, total, records[:PAGE])
     except (z3950.Z3950Error, upstream.UpstreamError, zeus_mod.ZeusError, pergamum_mod.PergamumError,
             OSError, ValueError) as exc:
         return Answer(target.id, 0, [], str(exc) or type(exc).__name__)
+
+
+async def _first_with_records(target: Target, tasks: list[asyncio.Task]) -> Answer:
+    """The first of `tasks` that brings records; else the first one's answer
+    (the direct route), with every route's error when none answered."""
+    pending = set(tasks)
+    while pending:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for d in done:
+            if d.result().records:
+                for p in pending:
+                    p.cancel()
+                return d.result()
+    answers = [t.result() for t in tasks]
+    if all(a.error for a in answers):
+        return Answer(target.id, 0, [], "; ".join(a.error for a in answers))
+    return next(a for a in answers if not a.error)
+
+
+async def ask(target: Target, kind: str, term: str, timeout: float,
+              zeus: "zeus_mod.Zeus | None" = None, pergamum: "pergamum_mod.Pergamum | None" = None,
+              via_zeus: bool = True) -> Answer:
+    """One target, one search: its first page of records, or the error.
+
+    With a Zeus address, a z3950/sru target whose name is on Zeus's search
+    form is also asked through Zeus at the same time, and a target with no
+    address (missing) only through Zeus: the first route that brings
+    records answers. So a catalogue whose own port is closed to this
+    machine (Alma's 1921 asks for a registered IP) still answers when
+    Zeus reaches it. via_zeus=False (/sru/_union, which asks Zeus once for
+    its members) leaves that out."""
+    if target.kind == "zeus":
+        if zeus is None:
+            return Answer(target.id, 0, [], "no Zeus address (NEXUS_GATEWAY_ZEUS_URL)")
+        if target.id == zeus_mod.UNION_ID:
+            return await _answer(target, asyncio.to_thread(zeus.search_many, zeus.members, kind, term, timeout))
+        return await _answer(target, asyncio.to_thread(zeus.search, target, kind, term, timeout))
+    if target.kind == "pergamum":
+        if pergamum is None:
+            return Answer(target.id, 0, [], "no Pergamum address (NEXUS_GATEWAY_PERGAMUM_URL)")
+        return await _answer(target, asyncio.to_thread(pergamum.search, kind, term, PAGE, timeout))
+    tasks = []
+    if target.kind in ("z3950", "sru"):
+        tasks.append(asyncio.ensure_future(_answer(target, _direct(target, kind, term, timeout))))
+    if zeus is not None and via_zeus and target.status != "broken":
+        on_form = await asyncio.to_thread(zeus.has, target, min(timeout, 20.0))
+        if on_form:
+            tasks.append(asyncio.ensure_future(_answer(target, asyncio.to_thread(zeus.search, target, kind,
+                                                                                  term, timeout))))
+        elif not tasks:
+            return Answer(target.id, 0, [], f"{target.name} has no address and is not on Zeus's search form")
+    if not tasks:
+        return Answer(target.id, 0, [], f"{target.id} has no address of its own (kind {target.kind})")
+    return await _first_with_records(target, tasks)
 
 
 class Runner:
@@ -84,9 +131,10 @@ class Runner:
         self.thread = threading.Thread(target=self.loop.run_forever, name="nexus-gateway-live", daemon=True)
         self.thread.start()
 
-    async def _one(self, target: Target, kind: str, term: str, qkey: str) -> Answer:
+    async def _one(self, target: Target, kind: str, term: str, qkey: str, via_zeus: bool = True) -> Answer:
+        extra = {} if via_zeus else {"via_zeus": False}
         try:
-            answer = await asyncio.wait_for(self.asker(target, kind, term, self.grace), self.grace)
+            answer = await asyncio.wait_for(self.asker(target, kind, term, self.grace, **extra), self.grace)
         except asyncio.TimeoutError:
             answer = Answer(target.id, 0, [], f"no answer in {self.grace:g}s")
         try:
@@ -97,9 +145,11 @@ class Runner:
             log.info("%s: %s", target.id, answer.error)
         return answer
 
-    def search(self, targets: list[Target], kind: str, term: str, qkey: str) -> list[Answer]:
+    def search(self, targets: list[Target], kind: str, term: str, qkey: str, via_zeus: bool = True
+               ) -> list[Answer]:
         """The answers that came within the budget, in the targets' order."""
-        futures = {asyncio.run_coroutine_threadsafe(self._one(t, kind, term, qkey), self.loop): t for t in targets}
+        futures = {asyncio.run_coroutine_threadsafe(self._one(t, kind, term, qkey, via_zeus), self.loop): t
+                   for t in targets}
         done, _late = concurrent.futures.wait(futures, timeout=self.budget)
         out = []
         for fut, t in futures.items():

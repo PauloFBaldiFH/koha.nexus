@@ -105,12 +105,21 @@ def main(argv: list[str] | None = None) -> int:
         except zeus.ZeusError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-        rows = zeus.compare([t for t in load(settings.targets).values() if t.kind == "zeus"], labels)
+        all_targets = [t for t in load(settings.targets).values() if t.status != "broken" and t.kind != "pergamum"]
+        rows = zeus.compare(all_targets, labels)
+        kinds = {t.id: t.kind for t in all_targets}
+        print("Every target, and the targets[n] it is asked as through Zeus (kind zeus: only route;"
+              " z3950/sru: second route; missing: only route):")
         for r in rows:
             where = f"targets[{r['found']}] {r['label']}" if r["found"] is not None else "not on the page"
-            print(f"{'ok ' if r['found'] is not None else 'NO '} {r['id']:<8} {r['name']}  ->  {where}")
+            print(f"{'ok ' if r['found'] is not None else 'NO '} {r['id']:<14} {kinds[r['id']]:<8} {r['name']}"
+                  f"  ->  {where}")
+        used = {r["found"] for r in rows}
         print(f"\n{len(labels)} targets on the page:", ", ".join(f"{n}={labels[n]}" for n in sorted(labels)))
-        return 0 if labels and all(r["found"] is not None for r in rows) else 1
+        print("On the page but no target uses it:", ", ".join(f"{n}={labels[n]}" for n in sorted(labels)
+                                                              if n not in used) or "none")
+        zeus_rows = [r for r in rows if kinds[r["id"]] == "zeus"]
+        return 0 if labels and all(r["found"] is not None for r in zeus_rows) else 1
     if args.cmd == "check":
         targets = load(settings.targets)
         engine = Engine(Static(settings.static_db), None, targets)
