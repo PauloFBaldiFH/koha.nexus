@@ -1268,7 +1268,9 @@ def test_staff_dark_mode_and_bar_transparency():
     body = ot.staff_css_body(cfg)
     assert "--nexus-staff-header-a: 0.90" in body and "--nexus-staff-header-blur: 4px" in body
     cfg["staff"].update(header_glass=False, opacity=100)
-    assert "--nexus-staff-header-a" not in ot.staff_css_body(cfg)
+    # Solid blocks over a wallpaper: the bars still let it through.
+    assert "--nexus-staff-header-a: 0.70" in ot.staff_css_body(cfg)
+    assert "--nexus-staff-header-blur: 4px" in ot.staff_css_body(cfg)
     # Headings never take the accent; the switch goes to the language bar.
     assert "--nexus-staff-ink: #111827" in body
     js = ot.staff_js_block(cfg)
@@ -1392,3 +1394,28 @@ def test_staff_top_bar_texture_and_glass():
     assert ot.bar_texture(ot.normalize({"staff": {"texture": "anodized"}})["staff"]) == "anodized"
     # Saved with the user's looks.
     assert "bar_texture" in ot.STAFF_LOOK_KEYS
+
+
+def test_staff_buttons_colour_and_bar_over_wallpaper():
+    """Paulo, 2026-11-01: the buttons and the blocks shared one colour, and the
+    top bar stayed solid over the wallpaper with the blocks at 100%."""
+    base = {"staff": {"enabled": True, "surface": "#9ef0b4", "opacity": 100}}
+    plain = ot.staff_css_body(ot.normalize(base))
+    assert "--nexus-staff-tile-rgb: 158,240,180" in plain and "--nexus-staff-tile-colour" not in plain
+    cfg = ot.normalize({"staff": {**base["staff"], "tile": "#1E3A8A"}})
+    assert cfg["staff"]["tile"] == "#1e3a8a" and ot.staff_tile(cfg["staff"]) == "#1e3a8a"
+    body = ot.staff_css_body(cfg)
+    assert "--nexus-staff-tile-rgb: 30,58,138" in body and "--nexus-staff-on-tile: #ffffff" in body
+    assert "--nexus-staff-tile-colour: #1e3a8a" in body
+    assert ot.css_values(body, staff=True)["tile"] == "#1e3a8a"
+    assert "rgba(var(--nexus-staff-tile-rgb)" in body
+    assert "--kei-text: #ffffff" in ot.staff_links_css(cfg)
+    dark = ot.staff_dark_css(cfg)
+    assert "--nexus-staff-tile-rgb:" in dark and "--nexus-staff-on-tile: #e6edf3" in dark
+    assert "tile" in ot.STAFF_LOOK_KEYS
+    # Over a wallpaper the bars let it through even with solid blocks.
+    wall = ot.normalize({"staff": {**base["staff"], "background": {"source": "url", "url": "https://x.example/w.jpg"}}})
+    assert f"--nexus-staff-header-a: {ot.WALLPAPER_BAR_MAX / 100:.2f}" in ot.staff_css_body(wall)
+    assert "--nexus-staff-header-a" not in plain
+    wall["staff"].update(header_glass=True, header_opacity=100)
+    assert "--nexus-staff-header-a" not in ot.staff_css_body(wall)
