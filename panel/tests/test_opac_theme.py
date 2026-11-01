@@ -1318,3 +1318,27 @@ def test_user_presets_up_to_five(tmp_path, monkeypatch):
     assert not ot.look_saved(ot.normalize({"accent": "#654321"}))
     (tmp_path / "p.json").write_text("not json")
     assert ot.load_user_presets() == []
+
+
+def test_paulo_1101_phone_page_never_slides_sideways():
+    """Paulo, 2026-11-01: on a phone the OPAC could be dragged sideways.
+    Koha's one-row top bar (logo and icons) was wider than a 360 px screen:
+    it now wraps, the logo is smaller on small phones, and the page clips
+    whatever is still wider than the screen. Phones only."""
+    for cfg in (ot.normalize({}), ot.apply_preset({}, "metal"),
+                ot.normalize({"logo": {"source": "url", "url": "/images/custom/kei-logo.png"}})):
+        css = ot.css_body(cfg)
+        guard = css[css.index("the page never slides sideways"):]
+        guard = guard[:guard.index("\n}\n")]
+        assert "@media only screen and (max-width: 767px)" in guard
+        assert "html { overflow-x: hidden; }" in guard
+        assert "@supports (overflow-x: clip) { html, html body { overflow-x: clip; } }" in guard
+        assert "#header-region .navbar { flex-wrap: wrap;" in guard
+        # Never hidden on body as well: body would become the scroller and
+        # the sticky results toolbar would stop sticking.
+        assert "body { overflow-x: hidden" not in css
+        # The library's own pictures: no weight, any other rule wins.
+        assert ":where(.main, #opaccredits) :where(img) { max-width: 100%; height: auto; }" in guard
+    logo = ot.css_body(ot.normalize({"logo": {"source": "url", "url": "/images/custom/kei-logo.png"}}))
+    small = logo[logo.index("@media only screen and (max-width: 400px)"):]
+    assert "#logo { width: 104px !important; min-width: 104px;" in small
