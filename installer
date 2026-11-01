@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.154"
+PANEL_VERSION=" 1.5.155"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -7677,29 +7677,95 @@ $(t "Growing queue + smaller index = indexer is down.")" 18 76
 # ======================================================================
 # 9. SERVER SIZING
 # ======================================================================
+# Sizing profiles, by number: "Plack-workers Memcached-MB InnoDB-buffer".
+# 5 and 6 are for large servers (24 GB and 48 GB of RAM or more).
+sizing_profile() {
+    case "$1" in
+        1) echo "2 64 512M" ;;
+        2) echo "3 128 768M" ;;
+        3) echo "4 128 1G" ;;
+        4) echo "6 256 2G" ;;
+        5) echo "8 512 4G" ;;
+        6) echo "12 1024 8G" ;;
+        *) return 1 ;;
+    esac
+}
+
+# sizing_recommended RAM_GB: the profile for this much RAM (whole GB).
+sizing_recommended() {
+    local g="${1:-0}"
+    if   [ "$g" -lt 4 ];  then echo 1
+    elif [ "$g" -lt 8 ];  then echo 2
+    elif [ "$g" -lt 16 ]; then echo 3
+    elif [ "$g" -lt 24 ]; then echo 4
+    elif [ "$g" -lt 48 ]; then echo 5
+    else echo 6; fi
+}
+
+# sizing_cap_workers WORKERS CORES: at most two Plack workers per CPU core
+# (never fewer than 2): more workers than that only wait for the CPU and
+# take memory.
+sizing_cap_workers() {
+    local wk="$1" cores="${2:-1}" cap
+    [ "$cores" -ge 1 ] 2>/dev/null || cores=1
+    cap=$(( cores * 2 ))
+    [ "$cap" -lt 2 ] && cap=2
+    [ "$wk" -gt "$cap" ] && wk=$cap
+    echo "$wk"
+}
+
+# sizing_need_mb WORKERS SITES MEMCACHED_MB INNODB ES_HEAP_GB: the RAM, in MB,
+# the profile takes. Each Plack worker is counted at 400 MB, and every Koha
+# site (koha-list) has its own workers.
+sizing_need_mb() {
+    local wk="$1" sites="${2:-1}" mem="$3" db="$4" es="${5:-0}" db_mb
+    case "$db" in
+        *G) db_mb=$(( ${db%G} * 1024 )) ;;
+        *M) db_mb=${db%M} ;;
+        *)  db_mb=$(( db / 1024 / 1024 )) ;;
+    esac
+    [ "$sites" -ge 1 ] 2>/dev/null || sites=1
+    echo $(( wk * sites * 400 + mem + db_mb + es * 1024 ))
+}
+
 function_size_server() {
     require_koha || return 0
-    local ram ram_int recommended profile wk mem db
+    local ram ram_int ram_mb recommended profile wk mem db cores sites es_gb need wk_note=""
     ram=$(awk '/MemTotal:/ {printf "%.1f", $2/1024/1024}' /proc/meminfo)
     ram_int=$(awk '/MemTotal:/ {printf "%d", ($2/1024/1024)+0.5}' /proc/meminfo)
-    if   [ "$ram_int" -lt 4 ];  then recommended=1
-    elif [ "$ram_int" -lt 8 ];  then recommended=2
-    elif [ "$ram_int" -lt 16 ]; then recommended=3
-    else recommended=4; fi
+    ram_mb=$(awk '/MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo)
+    recommended=$(sizing_recommended "$ram_int")
     ask_menu "$(t "Sizing")" "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" \
         "$recommended" \
         "1" "< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB" \
         "2" "4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB" \
         "3" "8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB" \
-        "4" "16 GB+   - 6 Plack, 256MB cache, 2G InnoDB" || return 0
+        "4" "16-24 GB - 6 Plack, 256MB cache, 2G InnoDB" \
+        "5" "24-48 GB - 8 Plack, 512MB cache, 4G InnoDB" \
+        "6" "48 GB+   - 12 Plack, 1GB cache, 8G InnoDB" || return 0
     profile=$REPLY
-    case "$profile" in
-        1) wk=2; mem=64;  db=512M ;;
-        2) wk=3; mem=128; db=768M ;;
-        3) wk=4; mem=128; db=1G ;;
-        4) wk=6; mem=256; db=2G ;;
-        *) return 0 ;;
-    esac
+    read -r wk mem db <<< "$(sizing_profile "$profile")" || return 0
+    [ -n "$db" ] || return 0
+    cores=$(nproc 2>/dev/null || echo 1)
+    if [ "$(sizing_cap_workers "$wk" "$cores")" != "$wk" ]; then
+        wk=$(sizing_cap_workers "$wk" "$cores")
+        wk_note="\n\n$(t "Plack limited to \$wk workers: two per CPU core (\$cores cores).")"
+    fi
+    sites=$(koha-list 2>/dev/null | grep -c .)
+    [ "${sites:-0}" -ge 1 ] || sites=1
+    es_gb=0
+    if [ "$(get_search_engine)" = "Elasticsearch" ]; then
+        es_gb=$(( ram_mb / 2048 ))
+        [ "$es_gb" -lt 1 ] && es_gb=1
+        [ "$es_gb" -gt 4 ] && es_gb=4
+    fi
+    need=$(sizing_need_mb "$wk" "$sites" "$mem" "$db" "$es_gb")
+    # The smaller profiles, when recommended, are applied as before; a larger
+    # one, or the large profiles on a server with several sites, is checked.
+    if { [ "$profile" -gt "$recommended" ] || [ "$profile" -ge 5 ]; } \
+        && [ "$need" -gt $(( ram_mb * 8 / 10 )) ]; then
+        prompt_yes_no "$(t "Sizing")" "$(t "This profile needs about \$need MB of RAM for Koha alone (\$sites site(s) x \$wk Plack workers, Memcached, MariaDB and Elasticsearch), more than 80% of this server's \$ram_mb MB. The server may start using swap and get slow.\n\nApply it anyway?")" 14 76 defaultno || return 0
+    fi
     clear
     display_explanation "Applying profile \$profile..."
     adjust_conf_key() {
@@ -7743,8 +7809,8 @@ function_size_server() {
             return 1
         fi
     fi
-    log "tuning profile=$profile plack=$wk memcached=$mem innodb=$db"
-    msg_ok "$(t "Profile \$profile applied.\n\nPlack: \$wk workers\nMemcached: \${mem} MB\nMariaDB InnoDB: \$db\n\nAll services restarted successfully.")" 13 74
+    log "tuning profile=$profile plack=$wk memcached=$mem innodb=$db cores=$cores sites=$sites need_mb=$need"
+    msg_ok "$(t "Profile \$profile applied.\n\nPlack: \$wk workers\nMemcached: \${mem} MB\nMariaDB InnoDB: \$db\n\nAll services restarted successfully.")$wk_note" 16 74
 }
 
 # ======================================================================

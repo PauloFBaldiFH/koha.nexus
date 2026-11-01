@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.152",
+ "panel_version": "1.5.155",
  "languages": [
   {
    "code": "en",
@@ -15587,12 +15587,21 @@
       "text": "4 Plack workers, 128 MB cache, 1 GB InnoDB."
      },
      {
-      "name": "16 GB+",
+      "name": "16–24 GB",
       "text": "6 Plack workers, 256 MB cache, 2 GB InnoDB."
+     },
+     {
+      "name": "24–48 GB",
+      "text": "8 Plack workers, 512 MB cache, 4 GB InnoDB."
+     },
+     {
+      "name": "48 GB+",
+      "text": "12 Plack workers, 1 GB cache, 8 GB InnoDB."
      }
     ],
     "tips": [
-     "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama."
+     "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama.",
+     "Profiles 5 and 6 are for large servers. They give Plack at most two workers per CPU core, and before applying they add up what Koha will take (every site's workers, Memcached, InnoDB and Elasticsearch): above 80% of the RAM they ask first."
     ],
     "warnings": [
      "A profile larger than the server's RAM makes the system swap and slows everything down: when in doubt, choose the smaller one."
@@ -15626,12 +15635,21 @@
       "text": "4 workers do Plack, 128 MB de cache, 1 GB de InnoDB."
      },
      {
-      "name": "16 GB+",
+      "name": "16–24 GB",
       "text": "6 workers do Plack, 256 MB de cache, 2 GB de InnoDB."
+     },
+     {
+      "name": "24–48 GB",
+      "text": "8 workers do Plack, 512 MB de cache, 4 GB de InnoDB."
+     },
+     {
+      "name": "48 GB+",
+      "text": "12 workers do Plack, 1 GB de cache, 8 GB de InnoDB."
      }
     ],
     "tips": [
-     "Escolha o perfil recomendado, e um degrau abaixo se o servidor também rodar o Elasticsearch ou o Ollama."
+     "Escolha o perfil recomendado, e um degrau abaixo se o servidor também rodar o Elasticsearch ou o Ollama.",
+     "Os perfis 5 e 6 são para servidores grandes. Eles dão ao Plack no máximo dois workers por núcleo de CPU e, antes de aplicar, somam o que o Koha vai usar (os workers de cada site, Memcached, InnoDB e Elasticsearch): acima de 80% da RAM, perguntam antes."
     ],
     "warnings": [
      "Um perfil maior que a RAM do servidor faz o sistema usar swap e deixa tudo lento: na dúvida, escolha o menor."

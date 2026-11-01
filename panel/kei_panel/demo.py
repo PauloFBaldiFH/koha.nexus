@@ -307,7 +307,8 @@ _SCRIPTS: dict[str, list[str]] = {
     "sizing": [
         "@@choose Sizing\tDetected RAM: 7.7 GB\\nRecommended profile: 2\t2"
         "\t1\t< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB\t2\t4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB"
-        "\t3\t8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB\t4\t16 GB+   - 6 Plack, 256MB cache, 2G InnoDB",
+        "\t3\t8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB\t4\t16-24 GB - 6 Plack, 256MB cache, 2G InnoDB"
+        "\t5\t24-48 GB - 8 Plack, 512MB cache, 4G InnoDB\t6\t48 GB+   - 12 Plack, 1GB cache, 8G InnoDB",
         "@@note Applying profile 2...",
         "@@msg ok OK\tProfile 2 applied.\\n\\nPlack: 3 workers\\nMemcached: 128 MB\\nMariaDB InnoDB: 768M"],
     "email": ["@@msg info Email Setup\tE-mail is enabled for the instance (koha-email-enable)."],

@@ -1950,12 +1950,21 @@
      "text": "4 Plack workers, 128 MB cache, 1 GB InnoDB."
     },
     {
-     "name": "16 GB+",
+     "name": "16–24 GB",
      "text": "6 Plack workers, 256 MB cache, 2 GB InnoDB."
+    },
+    {
+     "name": "24–48 GB",
+     "text": "8 Plack workers, 512 MB cache, 4 GB InnoDB."
+    },
+    {
+     "name": "48 GB+",
+     "text": "12 Plack workers, 1 GB cache, 8 GB InnoDB."
     }
    ],
    "tips": [
-    "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama."
+    "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama.",
+    "Profiles 5 and 6 are for large servers. They give Plack at most two workers per CPU core, and before applying they add up what Koha will take (every site's workers, Memcached, InnoDB and Elasticsearch): above 80% of the RAM they ask first."
    ],
    "related": [
     "search-toggle",
