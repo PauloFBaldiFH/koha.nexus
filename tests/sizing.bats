@@ -6,7 +6,11 @@
 setup() {
     REPO="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     W="$BATS_TEST_TMPDIR"
-    sed -n '/^sizing_profile() {/,/^function_size_server() {/p' "$REPO/installer" | sed '$d' > "$W/sizing.sh"
+    {
+        sed -n '/^ES_HEAP_CAP_FILE=/,/^adjust_elasticsearch_heap() {/p' "$REPO/installer" | sed '$d'
+        sed -n '/^sizing_profile() {/,/^function_size_server() {/p' "$REPO/installer" | sed '$d'
+    } > "$W/sizing.sh"
+    sed -i "s|^ES_HEAP_CAP_FILE=.*|ES_HEAP_CAP_FILE='$W/es-heap-cap'|" "$W/sizing.sh"
 }
 
 run_sz() { bash -c "source '$W/sizing.sh'; $1"; }
@@ -19,10 +23,10 @@ run_sz() { bash -c "source '$W/sizing.sh'; $1"; }
 }
 
 @test "S02 the profiles keep their values and the large ones grow" {
-    run run_sz "sizing_profile 1"; [ "$output" = "2 64 512M" ]
-    run run_sz "sizing_profile 4"; [ "$output" = "6 256 2G" ]
-    run run_sz "sizing_profile 5"; [ "$output" = "8 512 4G" ]
-    run run_sz "sizing_profile 6"; [ "$output" = "12 1024 8G" ]
+    run run_sz "sizing_profile 1"; [ "$output" = "2 64 512M 100 - 4" ]
+    run run_sz "sizing_profile 4"; [ "$output" = "6 256 2G 100 - 4" ]
+    run run_sz "sizing_profile 5"; [ "$output" = "8 512 4G 500 1G 6" ]
+    run run_sz "sizing_profile 6"; [ "$output" = "12 1024 8G 500 2G 8" ]
     run run_sz "sizing_profile 7"; [ "$status" -ne 0 ]
 }
 
@@ -30,8 +34,8 @@ run_sz() { bash -c "source '$W/sizing.sh'; $1"; }
     for n in 1 2 3 4 5 6; do
         grep -qE "^        \"$n\" \"[^\"]+ - [0-9]+ Plack" "$REPO/installer"
     done
-    grep -q '"5" "24-48 GB - 8 Plack, 512MB cache, 4G InnoDB"' "$REPO/installer"
-    grep -q '"6" "48 GB+   - 12 Plack, 1GB cache, 8G InnoDB"' "$REPO/installer"
+    grep -q '"5" "24-48 GB - 8 Plack, 512MB cache, 4G InnoDB, ES 6G"' "$REPO/installer"
+    grep -q '"6" "48 GB+   - 12 Plack, 1GB cache, 8G InnoDB, ES 8G"' "$REPO/installer"
 }
 
 @test "S04 Plack workers stop at two per CPU core, never under 2" {
@@ -50,10 +54,11 @@ run_sz() { bash -c "source '$W/sizing.sh'; $1"; }
 }
 
 @test "S06 the large profiles fit in 80% of the RAM they are meant for" {
-    # Lowest RAM of each band, one site, Elasticsearch at its 4 GB cap.
+    # Lowest RAM of each band, one site, Elasticsearch at the profile's cap.
     for pair in 24:5 48:6; do
-        g=${pair%%:*} p=${pair##*:} es=4
-        read -r wk mem db <<< "$(run_sz "sizing_profile $p")"
+        g=${pair%%:*} p=${pair##*:}
+        read -r wk mem db _ _ cap <<< "$(run_sz "sizing_profile $p")"
+        es=$(run_sz "es_heap_gb $(( g * 1024 )) $cap")
         need=$(run_sz "sizing_need_mb $wk 1 $mem $db $es")
         [ "$need" -le $(( g * 1024 * 8 / 10 )) ]
     done
@@ -65,4 +70,26 @@ run_sz() { bash -c "source '$W/sizing.sh'; $1"; }
     grep -q 'profile" -ge 5' "$W/fn.sh"
     grep -q 'ram_mb \* 8 / 10' "$W/fn.sh"
     grep -q 'defaultno || return 0' "$W/fn.sh"
+}
+
+@test "S08 Elasticsearch: half the RAM up to the cap; the saved cap survives a reinstall" {
+    run run_sz "es_heap_gb 28057 4";  [ "$output" = "4" ]
+    run run_sz "es_heap_gb 28057 6";  [ "$output" = "6" ]
+    run run_sz "es_heap_gb 65536 8";  [ "$output" = "8" ]
+    run run_sz "es_heap_gb 8192 8";   [ "$output" = "4" ]
+    run run_sz "es_heap_gb 1024 4";   [ "$output" = "1" ]
+    run run_sz "es_heap_cap"; [ "$output" = "4" ]
+    echo 8 > "$W/es-heap-cap";  run run_sz "es_heap_cap"; [ "$output" = "8" ]
+    echo 99 > "$W/es-heap-cap"; run run_sz "es_heap_cap"; [ "$output" = "4" ]
+    echo junk > "$W/es-heap-cap"; run run_sz "es_heap_cap"; [ "$output" = "4" ]
+    grep -q 'es_heap_gb "$(awk' "$REPO/installer"
+}
+
+@test "S09 the large profiles write the redo log and recycle workers less; the small ones do not" {
+    sed -n '/^function_size_server() {/,/^}/p' "$REPO/installer" > "$W/fn.sh"
+    grep -q 'PLACK_MAX_REQUESTS=$maxreq' "$W/fn.sh"
+    grep -q "innodb_log_file_size = %s" "$W/fn.sh"
+    grep -q 'if \[ "$redo" != "-" \]' "$W/fn.sh"
+    grep -q 'rm -f "$ES_HEAP_CAP_FILE"' "$W/fn.sh"
+    for n in 1 2 3 4; do run run_sz "sizing_profile $n"; [[ "$output" == *" 100 - 4" ]]; done
 }

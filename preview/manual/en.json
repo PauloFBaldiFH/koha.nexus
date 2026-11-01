@@ -1955,16 +1955,16 @@
     },
     {
      "name": "24–48 GB",
-     "text": "8 Plack workers, 512 MB cache, 4 GB InnoDB."
+     "text": "8 Plack workers, 512 MB cache, 4 GB InnoDB, Elasticsearch up to 6 GB."
     },
     {
      "name": "48 GB+",
-     "text": "12 Plack workers, 1 GB cache, 8 GB InnoDB."
+     "text": "12 Plack workers, 1 GB cache, 8 GB InnoDB, Elasticsearch up to 8 GB."
     }
    ],
    "tips": [
     "Pick the recommended profile, and one step lower if the server also runs Elasticsearch or Ollama.",
-    "Profiles 5 and 6 are for large servers. They give Plack at most two workers per CPU core, and before applying they add up what Koha will take (every site's workers, Memcached, InnoDB and Elasticsearch): above 80% of the RAM they ask first."
+    "Profiles 5 and 6 are for large servers. They give Plack at most two workers per CPU core, restart each worker after 500 requests instead of 100, set MariaDB's redo log to a quarter of the InnoDB buffer (faster large imports) and let Elasticsearch use more memory (kept when Elasticsearch is reinstalled). Before applying they add up what Koha will take (every site's workers, Memcached, InnoDB and Elasticsearch): above 80% of the RAM they ask first."
    ],
    "related": [
     "search-toggle",

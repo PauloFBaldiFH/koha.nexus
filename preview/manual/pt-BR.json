@@ -1662,11 +1662,11 @@
     },
     {
      "name": "24–48 GB",
-     "text": "8 workers do Plack, 512 MB de cache, 4 GB de InnoDB."
+     "text": "8 workers do Plack, 512 MB de cache, 4 GB de InnoDB, Elasticsearch até 6 GB."
     },
     {
      "name": "48 GB+",
-     "text": "12 workers do Plack, 1 GB de cache, 8 GB de InnoDB."
+     "text": "12 workers do Plack, 1 GB de cache, 8 GB de InnoDB, Elasticsearch até 8 GB."
     }
    ],
    "steps": [
@@ -1676,12 +1676,12 @@
    ],
    "tips": [
     "Escolha o perfil recomendado, e um degrau abaixo se o servidor também rodar o Elasticsearch ou o Ollama.",
-    "Os perfis 5 e 6 são para servidores grandes. Eles dão ao Plack no máximo dois workers por núcleo de CPU e, antes de aplicar, somam o que o Koha vai usar (os workers de cada site, Memcached, InnoDB e Elasticsearch): acima de 80% da RAM, perguntam antes."
+    "Os perfis 5 e 6 são para servidores grandes. Eles dão ao Plack no máximo dois workers por núcleo de CPU, reiniciam cada worker após 500 requisições em vez de 100, ajustam o log de redo do MariaDB para um quarto do buffer InnoDB (importações grandes mais rápidas) e deixam o Elasticsearch usar mais memória (mantida se o Elasticsearch for reinstalado). Antes de aplicar, somam o que o Koha vai usar (os workers de cada site, Memcached, InnoDB e Elasticsearch): acima de 80% da RAM, perguntam antes."
    ],
    "warnings": [
     "Um perfil maior que a RAM do servidor faz o sistema usar swap e deixa tudo lento: na dúvida, escolha o menor."
    ],
-   "_en": "9d81ae9be5"
+   "_en": "d7cfee8d5b"
   },
   "superlibrarian": {
    "summary": "Cria uma conta da equipe com todas as permissões (superbibliotecário), depois do Instalador Web do Koha.",
