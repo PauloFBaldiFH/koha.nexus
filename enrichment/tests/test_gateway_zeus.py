@@ -331,3 +331,20 @@ def test_an_empty_answer_is_kept_only_briefly(tmp_path):
     learned.put("usp", "title:x", 0, [])
     assert learned.get("usp", "title:x") is not None
     assert learned.get("usp", "title:x", now=time.time() + 601) is None
+
+
+def test_live_labels_of_2026_11_01():
+    """Labels from the real /zbib/ form (zeus-labels on the VPS, 2026-11-01)."""
+    labels = {2: "Rede Virtual de Bibliotecas (RVBI), Senado Federal - Aleph",
+              3: "Rede Virtual de Bibliotecas (RVBI), Senado Federal - Folio",
+              20: "Universidade do Porto, Portugal (UNIMARC)",
+              40: "Memorial University, Canadá", 57: "Universiteit Gent, Bélgica"}
+    table = load(TARGETS)
+    assert zeus.index_for(table["senado-folio"], labels) == 3
+    assert zeus.index_for(table["senado"], labels) == 2
+    assert zeus.index_for(table["memorial"], labels) == 40
+    assert zeus.index_for(table["gent-belgica"], labels) == 57
+    assert zeus.index_for(table["porto"], labels) is None          # UNIMARC: Koha reads MARC21
+    # pinning an n does not add the row to the /sru/_union Zeus request
+    assert not table["senado-folio"].on_zeus and not table["memorial"].on_zeus
+    assert table["usp"].on_zeus and table["senado"].on_zeus
