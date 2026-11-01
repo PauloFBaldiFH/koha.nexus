@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.153"
+PANEL_VERSION=" 1.5.154"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -4740,7 +4740,7 @@ RCLONE_REMOTE="\$(printf '%s' "\$RCLONE_REMOTE" | xargs)"
 if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
     if ! rclone listremotes --config /root/.config/rclone/rclone.conf 2>/dev/null | grep -qx "\${RCLONE_REMOTE}:"; then
         log_backup "WARN: RCLONE_REMOTE='\${RCLONE_REMOTE}' does not exist in rclone.conf; skipping upload"
-    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy "\$FILE" "\${RCLONE_REMOTE}:\${RCLONE_SQL_FOLDER}/" >>"\$LOG" 2>&1; then
+    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy --retries 4 --retries-sleep 60s "\$FILE" "\${RCLONE_REMOTE}:\${RCLONE_SQL_FOLDER}/" >>"\$LOG" 2>&1; then
         log_backup "Cloud OK: \${RCLONE_REMOTE}:\${RCLONE_SQL_FOLDER}/"
     else
         log_backup "WARN: cloud upload failed (local copy preserved)"
@@ -4878,7 +4878,7 @@ RCLONE_REMOTE="\$(printf '%s' "\$RCLONE_REMOTE" | xargs)"
 if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
     if ! rclone listremotes --config /root/.config/rclone/rclone.conf 2>/dev/null | grep -qx "\${RCLONE_REMOTE}:"; then
         log_backup "WARN: RCLONE_REMOTE='\${RCLONE_REMOTE}' does not exist in rclone.conf; skipping upload"
-    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy "\$PACKAGE" "\${RCLONE_REMOTE}:\${RCLONE_MARC_FOLDER}/" >>"\$LOG" 2>&1; then
+    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy --retries 4 --retries-sleep 60s "\$PACKAGE" "\${RCLONE_REMOTE}:\${RCLONE_MARC_FOLDER}/" >>"\$LOG" 2>&1; then
         log_backup "Cloud OK: \${RCLONE_REMOTE}:\${RCLONE_MARC_FOLDER}/"
     else
         log_backup "WARN: cloud upload failed"
@@ -6618,8 +6618,10 @@ function_marc_backup() {
     require_koha || return 1
     # A script written before 1.5.55 sent export_records.pl's output to the
     # log, where the records broke the outcome lines; one written before
-    # 1.5.136 had no --if-due catch-up: rewritten.
-    if [ ! -f /root/backup_marc.sh ] || ! grep -q -- '--if-due' /root/backup_marc.sh 2>/dev/null; then
+    # 1.5.136 had no --if-due catch-up, one before 1.5.154 gave up on
+    # Google's per-minute rate limit at once (no --retries-sleep): rewritten.
+    if [ ! -f /root/backup_marc.sh ] || ! grep -q -- '--if-due' /root/backup_marc.sh 2>/dev/null \
+        || ! grep -q -- '--retries-sleep' /root/backup_marc.sh 2>/dev/null; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     if [ ! -f /root/backup_marc.sh ]; then
@@ -7753,14 +7755,52 @@ function_size_server() {
 # a stalled network or API can never keep the screen waiting.
 RCLONE_TEST_SECS=30
 RCLONE_TEST_FLAGS=(--contimeout 15s --timeout 20s --retries 1 --low-level-retries 1)
+# Google Drive counts requests per minute: when it answers rateLimitExceeded
+# the same call is tried again after these pauses (seconds), so a minute
+# that was already used up (often by other users of rclone's shared client
+# id) does not fail the test.
+RCLONE_RATE_WAITS="20 45"
+
+# 0 when rclone's output is Google's "too many requests" answer.
+rclone_rate_limited() {
+    printf '%s' "$1" | grep -qiE 'rateLimitExceeded|userRateLimitExceeded|Quota exceeded for quota metric|Error 429'
+}
+
+# rclone_rate_text OUTPUT: the box text for a rate limit. Google's JSON is
+# dropped; only its first line ("Error 403: Quota exceeded for quota metric
+# ... for consumer 'project_number:...'") is kept, which says whose limit it
+# was.
+rclone_rate_text() {
+    local first
+    first=$(printf '%s\n' "$1" | grep -m1 -oiE '(Error (403|429)[^[{]*|Quota exceeded for quota metric[^[{]*)' | sed -e 's/[[:space:]]*Details:[[:space:]]*$//' | cut -c1-300)
+    printf '%s' "$(t "Google Drive refused the request: too many requests (rateLimitExceeded). The test was tried again after waiting, and Google still refused.\n\nThis is not a problem with your account or your files. Google counts requests per minute for the app that asks: rclone's own built-in client id is shared by every rclone user in the world, and it often runs out of quota.\n\nWait a few minutes and try the test again. If it keeps happening, connect Google Drive with your own Google client id: Configure cloud backup > Other services > Another service (rclone's own wizard), storage drive, then fill in client_id and client_secret.")"
+    # Literal \n, like the rest of the box text (msg_error turns them into lines).
+    [ -n "$first" ] && printf '\\n\\n%s' "$first"
+}
 
 # rclone_probe ARGS...: rclone with the test limits. REPLY = its stdout and
 # stderr (last lines); the exit code is rclone's, 124 when the time ran out.
+# Google's rate limit is waited out (RCLONE_RATE_WAITS) and then explained.
 rclone_probe() {
-    local out rc
-    out=$(timeout --kill-after=5s "${RCLONE_TEST_SECS}s" rclone "${RCLONE_TEST_FLAGS[@]}" "$@" 2>&1 </dev/null)
-    rc=$?
+    local out rc pause waits
+    read -r -a waits <<< "$RCLONE_RATE_WAITS"
+    while true; do
+        out=$(timeout --kill-after=5s "${RCLONE_TEST_SECS}s" rclone "${RCLONE_TEST_FLAGS[@]}" "$@" 2>&1 </dev/null)
+        rc=$?
+        [ "$rc" -eq 0 ] && break
+        rclone_rate_limited "$out" && [ "${#waits[@]}" -gt 0 ] || break
+        pause=${waits[0]}
+        waits=("${waits[@]:1}")
+        log "rclone: Google rate limit on '$1', trying again in ${pause}s"
+        display_explanation "Google Drive asked to slow down (too many requests). Trying again in \$pause seconds..."
+        sleep "$pause"
+    done
     [ "$rc" -eq 137 ] && rc=124
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] && rclone_rate_limited "$out"; then
+        log "rclone: Google rate limit on '$1' after retries: $(printf '%s\n' "$out" | grep -m1 -oiE 'Error (403|429)[^[{]*' | cut -c1-300)"
+        REPLY=$(rclone_rate_text "$out")
+        return "$rc"
+    fi
     REPLY=$(printf '%s\n' "$out" | sed -e '/^[[:space:]]*$/d' | tail -n 12)
     if [ "$rc" -eq 124 ]; then
         local secs="$RCLONE_TEST_SECS"
@@ -38015,8 +38055,10 @@ kei_task_info() {
     kei_result compression_used "$(backup_codec)"
     # A nightly script written before 1.5.44 dumps straight into its final
     # name, so a dump in progress looked like the newest backup; one written
-    # before 1.5.136 never caught up a missed MARC21 backup: rewritten.
-    if [ -f /root/backup_sql.sh ] && ! grep -q 'backup_marc.sh --if-due' /root/backup_sql.sh 2>/dev/null; then
+    # before 1.5.136 never caught up a missed MARC21 backup, one before
+    # 1.5.154 gave up on Google's per-minute rate limit at once: rewritten.
+    if [ -f /root/backup_sql.sh ] && { ! grep -q 'backup_marc.sh --if-due' /root/backup_sql.sh 2>/dev/null \
+        || ! grep -q -- '--retries-sleep' /root/backup_sql.sh 2>/dev/null; }; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
