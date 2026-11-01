@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.154"
+PANEL_VERSION=" 1.5.155"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -1694,13 +1694,28 @@ get_ssh_ports() {
     echo "${ports:-22}"
 }
 
+# Elasticsearch heap: half the RAM, up to a cap (GB). The cap is 4 unless
+# Server sizing saved a larger one (profiles 5 and 6) in ES_HEAP_CAP_FILE,
+# so reinstalling Elasticsearch keeps the size the server was given.
+ES_HEAP_CAP_FILE="/etc/koha-easy-install/es-heap-cap"
+es_heap_cap() {
+    local cap
+    cap=$(cat "$ES_HEAP_CAP_FILE" 2>/dev/null | tr -cd '0-9')
+    [ -n "$cap" ] && [ "$cap" -ge 1 ] && [ "$cap" -le 30 ] || cap=4
+    echo "$cap"
+}
+es_heap_gb() {
+    local ram_mb="$1" cap="${2:-4}" gb
+    gb=$(( ram_mb / 2048 ))
+    [ "$gb" -lt 1 ] && gb=1
+    [ "$gb" -gt "$cap" ] && gb=$cap
+    echo "$gb"
+}
 adjust_elasticsearch_heap() {
     local jvm_dir="/etc/elasticsearch/jvm.options.d"
     mkdir -p "$jvm_dir" 2>/dev/null || return 1
     local ram_gb
-    ram_gb=$(awk '/MemTotal:/ {printf "%d", ($2/1024/1024)/2}' /proc/meminfo)
-    [ "${ram_gb:-0}" -lt 1 ] && ram_gb=1
-    [ "${ram_gb:-0}" -gt 4 ] && ram_gb=4
+    ram_gb=$(es_heap_gb "$(awk '/MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo)" "$(es_heap_cap)")
     cat > "${jvm_dir}/koha_heap.options" << EOF
 -Xms${ram_gb}g
 -Xmx${ram_gb}g
@@ -7677,29 +7692,94 @@ $(t "Growing queue + smaller index = indexer is down.")" 18 76
 # ======================================================================
 # 9. SERVER SIZING
 # ======================================================================
+# Sizing profiles, by number: "Plack-workers Memcached-MB InnoDB-buffer
+# Plack-max-requests InnoDB-redo-log Elasticsearch-heap-cap-GB" (- = MariaDB's
+# own redo log size). 5 and 6 are for large servers (24 GB and 48 GB of RAM
+# or more): their workers are recycled less often, the redo log is a quarter
+# of the buffer (faster large imports) and Elasticsearch may take more.
+sizing_profile() {
+    case "$1" in
+        1) echo "2 64 512M 100 - 4" ;;
+        2) echo "3 128 768M 100 - 4" ;;
+        3) echo "4 128 1G 100 - 4" ;;
+        4) echo "6 256 2G 100 - 4" ;;
+        5) echo "8 512 4G 500 1G 6" ;;
+        6) echo "12 1024 8G 500 2G 8" ;;
+        *) return 1 ;;
+    esac
+}
+
+# sizing_recommended RAM_GB: the profile for this much RAM (whole GB).
+sizing_recommended() {
+    local g="${1:-0}"
+    if   [ "$g" -lt 4 ];  then echo 1
+    elif [ "$g" -lt 8 ];  then echo 2
+    elif [ "$g" -lt 16 ]; then echo 3
+    elif [ "$g" -lt 24 ]; then echo 4
+    elif [ "$g" -lt 48 ]; then echo 5
+    else echo 6; fi
+}
+
+# sizing_cap_workers WORKERS CORES: at most two Plack workers per CPU core
+# (never fewer than 2): more workers than that only wait for the CPU and
+# take memory.
+sizing_cap_workers() {
+    local wk="$1" cores="${2:-1}" cap
+    [ "$cores" -ge 1 ] 2>/dev/null || cores=1
+    cap=$(( cores * 2 ))
+    [ "$cap" -lt 2 ] && cap=2
+    [ "$wk" -gt "$cap" ] && wk=$cap
+    echo "$wk"
+}
+
+# sizing_need_mb WORKERS SITES MEMCACHED_MB INNODB ES_HEAP_GB: the RAM, in MB,
+# the profile takes. Each Plack worker is counted at 400 MB, and every Koha
+# site (koha-list) has its own workers.
+sizing_need_mb() {
+    local wk="$1" sites="${2:-1}" mem="$3" db="$4" es="${5:-0}" db_mb
+    case "$db" in
+        *G) db_mb=$(( ${db%G} * 1024 )) ;;
+        *M) db_mb=${db%M} ;;
+        *)  db_mb=$(( db / 1024 / 1024 )) ;;
+    esac
+    [ "$sites" -ge 1 ] 2>/dev/null || sites=1
+    echo $(( wk * sites * 400 + mem + db_mb + es * 1024 ))
+}
+
 function_size_server() {
     require_koha || return 0
-    local ram ram_int recommended profile wk mem db
+    local ram ram_int ram_mb recommended profile wk mem db maxreq redo es_cap cores sites es_gb need wk_note=""
     ram=$(awk '/MemTotal:/ {printf "%.1f", $2/1024/1024}' /proc/meminfo)
     ram_int=$(awk '/MemTotal:/ {printf "%d", ($2/1024/1024)+0.5}' /proc/meminfo)
-    if   [ "$ram_int" -lt 4 ];  then recommended=1
-    elif [ "$ram_int" -lt 8 ];  then recommended=2
-    elif [ "$ram_int" -lt 16 ]; then recommended=3
-    else recommended=4; fi
+    ram_mb=$(awk '/MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo)
+    recommended=$(sizing_recommended "$ram_int")
     ask_menu "$(t "Sizing")" "$(t "Detected RAM:") ${ram} GB\n$(t "Recommended profile:") ${recommended}" \
         "$recommended" \
         "1" "< 4 GB   - 2 Plack, 64MB cache, 512M InnoDB" \
         "2" "4-8 GB   - 3 Plack, 128MB cache, 768M InnoDB" \
         "3" "8-16 GB  - 4 Plack, 128MB cache, 1G InnoDB" \
-        "4" "16 GB+   - 6 Plack, 256MB cache, 2G InnoDB" || return 0
+        "4" "16-24 GB - 6 Plack, 256MB cache, 2G InnoDB" \
+        "5" "24-48 GB - 8 Plack, 512MB cache, 4G InnoDB, ES 6G" \
+        "6" "48 GB+   - 12 Plack, 1GB cache, 8G InnoDB, ES 8G" || return 0
     profile=$REPLY
-    case "$profile" in
-        1) wk=2; mem=64;  db=512M ;;
-        2) wk=3; mem=128; db=768M ;;
-        3) wk=4; mem=128; db=1G ;;
-        4) wk=6; mem=256; db=2G ;;
-        *) return 0 ;;
-    esac
+    read -r wk mem db maxreq redo es_cap <<< "$(sizing_profile "$profile")" || return 0
+    [ -n "$db" ] || return 0
+    cores=$(nproc 2>/dev/null || echo 1)
+    if [ "$(sizing_cap_workers "$wk" "$cores")" != "$wk" ]; then
+        wk=$(sizing_cap_workers "$wk" "$cores")
+        wk_note="\n\n$(t "Plack limited to \$wk workers: two per CPU core (\$cores cores).")"
+    fi
+    sites=$(koha-list 2>/dev/null | grep -c .)
+    [ "${sites:-0}" -ge 1 ] || sites=1
+    es_gb=0
+    [ "$(get_search_engine)" = "Elasticsearch" ] && es_gb=$(es_heap_gb "$ram_mb" "$es_cap")
+    need=$(sizing_need_mb "$wk" "$sites" "$mem" "$db" "$es_gb")
+    # The smaller profiles, when recommended, are applied as before; a larger
+    # one, or the large profiles on a server with several sites, is checked.
+    if { [ "$profile" -gt "$recommended" ] || [ "$profile" -ge 5 ]; } \
+        && [ "$need" -gt $(( ram_mb * 8 / 10 )) ]; then
+        prompt_yes_no "$(t "Sizing")" "$(t "This profile needs about \$need MB of RAM for Koha alone (\$sites site(s) x \$wk Plack workers, Memcached, MariaDB and Elasticsearch), more than 80% of this server's \$ram_mb MB. The server may start using swap and get slow.\n\nApply it anyway?")" 14 76 defaultno || return 0
+    fi
     clear
     display_explanation "Applying profile \$profile..."
     adjust_conf_key() {
@@ -7709,7 +7789,7 @@ function_size_server() {
         else echo "$line" >> "$file"; fi
     }
     adjust_conf_key /etc/default/koha-common '^[[:space:]]*#?[[:space:]]*PLACK_WORKERS=.*'      "PLACK_WORKERS=$wk"
-    adjust_conf_key /etc/default/koha-common '^[[:space:]]*#?[[:space:]]*PLACK_MAX_REQUESTS=.*' "PLACK_MAX_REQUESTS=100"
+    adjust_conf_key /etc/default/koha-common '^[[:space:]]*#?[[:space:]]*PLACK_MAX_REQUESTS=.*' "PLACK_MAX_REQUESTS=$maxreq"
     adjust_conf_key /etc/memcached.conf       '^[[:space:]]*-m[[:space:]]+.*'                   "-m $mem"
     mkdir -p /etc/mysql/mariadb.conf.d
     local tuning="/etc/mysql/mariadb.conf.d/99-koha-tuning.cnf"
@@ -7723,7 +7803,11 @@ function_size_server() {
     else
         rm -f "$tuning_bak"
     fi
-    printf '[mysqld]\ninnodb_buffer_pool_size = %s\n' "$db" > "$tuning"
+    {
+        printf '[mysqld]\ninnodb_buffer_pool_size = %s\n' "$db"
+        # MariaDB resizes the redo log itself on the restart below.
+        if [ "$redo" != "-" ]; then printf 'innodb_log_file_size = %s\n' "$redo"; fi
+    } > "$tuning"
     systemctl restart memcached >/dev/null 2>&1
     if ! systemctl restart mariadb; then
         if [ "$had_tuning" = "yes" ] && [ -f "$tuning_bak" ]; then
@@ -7737,14 +7821,17 @@ function_size_server() {
     fi
     systemctl restart koha-common >/dev/null 2>&1
     plack_restart
+    mkdir -p "${ES_HEAP_CAP_FILE%/*}" 2>/dev/null
+    if [ "$es_cap" = 4 ]; then rm -f "$ES_HEAP_CAP_FILE"; else echo "$es_cap" > "$ES_HEAP_CAP_FILE"; fi
     if [ "$(get_search_engine)" = "Elasticsearch" ]; then
         if ! adjust_elasticsearch_heap || ! systemctl restart elasticsearch >/dev/null 2>&1; then
             msg_error "" "$(t "Elasticsearch memory tuning failed or the service did not restart.")" 9 74
             return 1
         fi
     fi
-    log "tuning profile=$profile plack=$wk memcached=$mem innodb=$db"
-    msg_ok "$(t "Profile \$profile applied.\n\nPlack: \$wk workers\nMemcached: \${mem} MB\nMariaDB InnoDB: \$db\n\nAll services restarted successfully.")" 13 74
+    [ "$redo" != "-" ] && wk_note="\n$(t "Large server: each Plack worker restarts after \$maxreq requests, InnoDB redo log \$redo, Elasticsearch up to \${es_cap} GB.")$wk_note"
+    log "tuning profile=$profile plack=$wk max_requests=$maxreq memcached=$mem innodb=$db redo=$redo es_cap=$es_cap cores=$cores sites=$sites need_mb=$need"
+    msg_ok "$(t "Profile \$profile applied.\n\nPlack: \$wk workers\nMemcached: \${mem} MB\nMariaDB InnoDB: \$db\n\nAll services restarted successfully.")$wk_note" 16 74
 }
 
 # ======================================================================
