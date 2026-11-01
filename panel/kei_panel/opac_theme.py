@@ -2281,6 +2281,11 @@ def _phone_css(cfg: dict) -> str:
         background-position: left center !important;
     }
     html body #header-region #logo a { width: 132px !important; padding: 40px 0 0 !important; }
+}
+@media only screen and (max-width: 400px) {
+    /* A small phone: a smaller logo, so the bar's icons stay on one row. */
+    html body #header-region #logo { width: 104px !important; min-width: 104px; margin: 4px 4px !important; }
+    html body #header-region #logo a { width: 104px !important; }
 }"""
     return f"""/* The results toolbar that sticks to the top: a solid card above the results. */
 html body #floating, html body .main #floating, html body .main .floating.sticky {{
@@ -2346,7 +2351,35 @@ html body .main #floating #toolbar, html body .main #floating .selections-toolba
     html body table.kei-stack > tbody > tr > td:empty, html body table.kei-stack > tbody > tr > td[data-kei-label=""] {{
         display: none !important;
     }}
-}}"""
+}}
+{_NO_SIDEWAYS}"""
+
+
+# The phone page never slides sideways (Paulo, 2026-11-01: on a phone the
+# OPAC could be dragged to the side, the content cut at the left edge).
+# The page was a few pixels wider than the screen: Koha's top bar is a
+# navbar-expand, one row that never wraps, and the logo (132 px), the
+# cart, lists, self-checkout, language, login and history icons did not
+# fit on a 360-390 px phone. The bar wraps onto a second row when it has
+# to; long words and links break inside the content and the footer; the
+# library's own pictures and embeds stay inside their box; and as the last
+# guard the page clips what is still wider than the screen (overflow-x:
+# clip: no scroll container, so the sticky results toolbar still sticks;
+# hidden on <html> for browsers without clip). Phones only: the desktop
+# layout is untouched.
+_NO_SIDEWAYS = """/* Phones: the page never slides sideways. */
+@media only screen and (max-width: 767px) {
+    html { overflow-x: hidden; }
+    @supports (overflow-x: clip) { html, html body { overflow-x: clip; } }
+    html body #header-region .navbar { flex-wrap: wrap; row-gap: .25rem; max-width: 100%; }
+    html body #header-region .navbar > .navbar-nav, html body #header-region .navbar > .langmenu { min-width: 0; }
+    html body #changelanguage, html body #changelanguage > .container-fluid,
+    html body #changelanguage .navbar-collapse { flex-wrap: wrap; max-width: 100%; }
+    html body #opaccredits, html body .main, html body #changelanguage { overflow-wrap: break-word; }
+    /* No weight (:where): any rule of Koha's or the carousel's wins. */
+    :where(.main, #opaccredits) :where(img) { max-width: 100%; height: auto; }
+    :where(.main, #opaccredits) :where(iframe, video, embed, object) { max-width: 100%; }
+}"""
 
 
 def _paint(texture: str, rgb_var: str, opacity: int, button: bool) -> dict:
