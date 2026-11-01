@@ -12075,6 +12075,163 @@ reports_define() {
         "SELECT i.homebranch AS \`$(t "Library")\`, COALESCE(it.description, i.itype, '-') AS \`$(t "Material type")\`, COUNT(*) AS \`$(t "Items")\`, COUNT(DISTINCT i.biblionumber) AS \`$(t "Titles")\`, SUM(i.itemlost <> 0) AS \`$(t "Lost")\` FROM items i LEFT JOIN itemtypes it ON it.itemtype = i.itype WHERE i.withdrawn = 0 GROUP BY 1, 2 ORDER BY 1, 3 DESC"
     _rp circ-daily CIRC "$(t "Daily circulation (last 30 days)")" \
         "SELECT DATE(s.datetime) AS \`$(t "Day")\`, s.branch AS \`$(t "Library")\`, SUM(s.type = 'issue') AS \`$(t "Loans")\`, SUM(s.type = 'return') AS \`$(t "Returns")\`, SUM(s.type = 'renew') AS \`$(t "Renewals")\`, COUNT(DISTINCT s.borrowernumber) AS \`$(t "Patrons served")\` FROM statistics s WHERE s.type IN ('issue', 'return', 'renew') AND s.datetime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY 1, 2 ORDER BY 1 DESC, 2"
+    # Additional operational reports; stable keys preserve saved report IDs.
+    _rp titles-no-items CAT "$(t "Bibliographic records without items")" \
+        "SELECT b.biblionumber, b.title, b.author FROM biblio b WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.biblionumber=b.biblionumber) ORDER BY b.biblionumber"
+    _rp titles-no-author CAT "$(t "Bibliographic records without an author")" \
+        "SELECT b.biblionumber, b.title FROM biblio b WHERE TRIM(COALESCE(b.author,''))='' ORDER BY b.biblionumber"
+    _rp titles-no-title CAT "$(t "Bibliographic records without a title")" \
+        "SELECT b.biblionumber, b.author FROM biblio b WHERE TRIM(COALESCE(b.title,''))='' ORDER BY b.biblionumber"
+    _rp items-no-type CAT "$(t "Items without a material type")" \
+        "SELECT itemnumber, barcode, biblionumber, homebranch FROM items WHERE TRIM(COALESCE(itype,''))='' ORDER BY itemnumber"
+    _rp items-invalid-type CAT "$(t "Items with an unknown material type")" \
+        "SELECT i.itemnumber,i.barcode,i.itype FROM items i LEFT JOIN itemtypes t ON t.itemtype=i.itype WHERE COALESCE(i.itype,'')<>'' AND t.itemtype IS NULL ORDER BY i.itype,i.itemnumber"
+    _rp items-invalid-home CAT "$(t "Items with an unknown home library")" \
+        "SELECT i.itemnumber,i.barcode,i.homebranch FROM items i LEFT JOIN branches b ON b.branchcode=i.homebranch WHERE b.branchcode IS NULL ORDER BY i.itemnumber"
+    _rp items-invalid-holding CAT "$(t "Items with an unknown holding library")" \
+        "SELECT i.itemnumber,i.barcode,i.holdingbranch FROM items i LEFT JOIN branches b ON b.branchcode=i.holdingbranch WHERE b.branchcode IS NULL ORDER BY i.itemnumber"
+    _rp items-away-home CAT "$(t "Items held at a different library")" \
+        "SELECT itemnumber,barcode,homebranch,holdingbranch FROM items WHERE holdingbranch<>homebranch ORDER BY homebranch,holdingbranch,itemnumber"
+    _rp items-by-location CAT "$(t "Collection by shelving location")" \
+        "SELECT homebranch,location,COUNT(*) AS Items FROM items WHERE withdrawn=0 GROUP BY homebranch,location ORDER BY homebranch,location"
+    _rp items-by-collection CAT "$(t "Collection by collection code")" \
+        "SELECT homebranch,ccode,COUNT(*) AS Items FROM items WHERE withdrawn=0 GROUP BY homebranch,ccode ORDER BY homebranch,ccode"
+    _rp items-by-year CAT "$(t "Collection by acquisition year")" \
+        "SELECT YEAR(dateaccessioned) AS Acquisition_year,homebranch,COUNT(*) AS Items FROM items GROUP BY YEAR(dateaccessioned),homebranch ORDER BY 1,2"
+    _rp items-notforloan CAT "$(t "Items marked not for loan")" \
+        "SELECT itemnumber,barcode,biblionumber,notforloan,homebranch FROM items WHERE notforloan<>0 ORDER BY homebranch,itemnumber"
+    _rp items-restricted CAT "$(t "Items with use restrictions")" \
+        "SELECT itemnumber,barcode,biblionumber,restricted,homebranch FROM items WHERE restricted<>0 ORDER BY homebranch,itemnumber"
+    _rp items-not-seen CAT "$(t "Items not seen in the last two years")" \
+        "SELECT itemnumber,barcode,datelastseen,homebranch FROM items WHERE withdrawn=0 AND (datelastseen IS NULL OR datelastseen<DATE_SUB(CURDATE(),INTERVAL 2 YEAR)) ORDER BY datelastseen,itemnumber"
+    _rp items-future-accession CAT "$(t "Items with a future acquisition date")" \
+        "SELECT itemnumber,barcode,dateaccessioned FROM items WHERE dateaccessioned>CURDATE() ORDER BY dateaccessioned,itemnumber"
+    _rp items-negative-cost CAT "$(t "Items with negative purchase or replacement cost")" \
+        "SELECT itemnumber,barcode,price,replacementprice FROM items WHERE price<0 OR replacementprice<0 ORDER BY itemnumber"
+    _rp items-no-replacement CAT "$(t "Circulating items without replacement cost")" \
+        "SELECT itemnumber,barcode,homebranch,replacementprice FROM items WHERE withdrawn=0 AND notforloan=0 AND COALESCE(replacementprice,0)=0 ORDER BY itemnumber"
+    _rp items-duplicate-barcodes CAT "$(t "Duplicate item barcodes")" \
+        "SELECT barcode,COUNT(*) AS Copies FROM items WHERE TRIM(COALESCE(barcode,''))<>'' GROUP BY barcode HAVING COUNT(*)>1 ORDER BY Copies DESC,barcode"
+    _rp items-orphan-biblio CAT "$(t "Items referencing a missing bibliographic record")" \
+        "SELECT i.itemnumber,i.barcode,i.biblionumber FROM items i LEFT JOIN biblio b ON b.biblionumber=i.biblionumber WHERE b.biblionumber IS NULL ORDER BY i.itemnumber"
+    _rp metadata-missing CAT "$(t "Bibliographic records without MARC metadata")" \
+        "SELECT b.biblionumber,b.title FROM biblio b LEFT JOIN biblio_metadata m ON m.biblionumber=b.biblionumber WHERE m.biblionumber IS NULL OR TRIM(COALESCE(m.metadata,''))='' ORDER BY b.biblionumber"
+    _rp titles-same-name CAT "$(t "Repeated titles and authors for duplicate review")" \
+        "SELECT title,author,COUNT(*) AS Records FROM biblio WHERE TRIM(COALESCE(title,''))<>'' GROUP BY title,author HAVING COUNT(*)>1 ORDER BY Records DESC,title"
+    _rp titles-copy-count CAT "$(t "Titles with the most physical copies")" \
+        "SELECT b.biblionumber,b.title,COUNT(*) AS Copies FROM biblio b JOIN items i ON i.biblionumber=b.biblionumber WHERE i.withdrawn=0 GROUP BY b.biblionumber,b.title ORDER BY Copies DESC,b.biblionumber LIMIT 100"
+    _rp collection-value CAT "$(t "Collection purchase and replacement value by library")" \
+        "SELECT homebranch,COUNT(*) AS Items,SUM(COALESCE(price,0)) AS Purchase_value,SUM(COALESCE(replacementprice,0)) AS Replacement_value FROM items WHERE withdrawn=0 GROUP BY homebranch ORDER BY homebranch"
+    _rp cataloging-month CAT "$(t "Bibliographic records cataloged per month")" \
+        "SELECT DATE_FORMAT(datecreated,'%Y-%m') AS Month,COUNT(*) AS Records FROM biblio WHERE datecreated>=DATE_SUB(CURDATE(),INTERVAL 24 MONTH) GROUP BY DATE_FORMAT(datecreated,'%Y-%m') ORDER BY Month"
+    _rp authors-most-titles CAT "$(t "Authors with the most cataloged titles")" \
+        "SELECT author,COUNT(*) AS Titles FROM biblio WHERE TRIM(COALESCE(author,''))<>'' GROUP BY author ORDER BY Titles DESC,author LIMIT 100"
+    _rp loans-current-library CIRC "$(t "Current loans by checkout library")" \
+        "SELECT branchcode,COUNT(*) AS Loans,COUNT(DISTINCT borrowernumber) AS Patrons FROM issues GROUP BY branchcode ORDER BY branchcode"
+    _rp loans-current-category CIRC "$(t "Current loans by patron category")" \
+        "SELECT p.categorycode,COUNT(*) AS Loans FROM issues c JOIN borrowers p ON p.borrowernumber=c.borrowernumber GROUP BY p.categorycode ORDER BY Loans DESC,p.categorycode"
+    _rp loans-current-type CIRC "$(t "Current loans by item type")" \
+        "SELECT i.itype,COUNT(*) AS Loans FROM issues c JOIN items i ON i.itemnumber=c.itemnumber GROUP BY i.itype ORDER BY Loans DESC,i.itype"
+    _rp loans-due-today CIRC "$(t "Loans due today")" \
+        "SELECT c.borrowernumber,i.barcode,b.title,c.date_due,c.branchcode FROM issues c JOIN items i ON i.itemnumber=c.itemnumber JOIN biblio b ON b.biblionumber=i.biblionumber WHERE c.date_due>=CURDATE() AND c.date_due<DATE_ADD(CURDATE(),INTERVAL 1 DAY) ORDER BY c.date_due,c.itemnumber"
+    _rp loans-due-week CIRC "$(t "Loans due in the next seven days excluding today")" \
+        "SELECT c.borrowernumber,i.barcode,c.date_due,c.branchcode FROM issues c JOIN items i ON i.itemnumber=c.itemnumber WHERE c.date_due>=DATE_ADD(CURDATE(),INTERVAL 1 DAY) AND c.date_due<DATE_ADD(CURDATE(),INTERVAL 8 DAY) ORDER BY c.date_due,c.itemnumber"
+    _rp overdue-bands CIRC "$(t "Overdue loans by delay band")" \
+        "SELECT CASE WHEN DATEDIFF(CURDATE(),date_due)<=7 THEN '01-07' WHEN DATEDIFF(CURDATE(),date_due)<=30 THEN '08-30' WHEN DATEDIFF(CURDATE(),date_due)<=90 THEN '31-90' ELSE '91+' END AS Days_band,branchcode,COUNT(*) AS Loans FROM issues WHERE date_due<NOW() GROUP BY 1,branchcode ORDER BY 1,branchcode"
+    _rp overdue-patron-count CIRC "$(t "Patrons ranked by number of overdue loans")" \
+        "SELECT p.borrowernumber,p.cardnumber,p.surname,p.firstname,COUNT(*) AS Overdue_loans,MIN(c.date_due) AS Earliest_due FROM issues c JOIN borrowers p ON p.borrowernumber=c.borrowernumber WHERE c.date_due<NOW() GROUP BY p.borrowernumber,p.cardnumber,p.surname,p.firstname ORDER BY Overdue_loans DESC,p.borrowernumber"
+    _rp loans-expired-accounts CIRC "$(t "Current loans on expired patron accounts")" \
+        "SELECT p.cardnumber,p.dateexpiry,c.itemnumber,c.date_due FROM issues c JOIN borrowers p ON p.borrowernumber=c.borrowernumber WHERE p.dateexpiry<CURDATE() ORDER BY p.dateexpiry,p.borrowernumber"
+    _rp loans-lost-copies CIRC "$(t "Current loans of items marked lost")" \
+        "SELECT c.borrowernumber,i.barcode,i.itemlost,c.date_due FROM issues c JOIN items i ON i.itemnumber=c.itemnumber WHERE i.itemlost<>0 ORDER BY c.date_due,c.itemnumber"
+    _rp loans-withdrawn-copies CIRC "$(t "Current loans of withdrawn items")" \
+        "SELECT c.borrowernumber,i.barcode,i.withdrawn,c.date_due FROM issues c JOIN items i ON i.itemnumber=c.itemnumber WHERE i.withdrawn<>0 ORDER BY c.date_due,c.itemnumber"
+    _rp loans-missing-borrower CIRC "$(t "Current loans referencing a missing patron")" \
+        "SELECT c.borrowernumber,c.itemnumber,c.date_due FROM issues c LEFT JOIN borrowers p ON p.borrowernumber=c.borrowernumber WHERE p.borrowernumber IS NULL ORDER BY c.itemnumber"
+    _rp loans-missing-item CIRC "$(t "Current loans referencing a missing item")" \
+        "SELECT c.borrowernumber,c.itemnumber,c.date_due FROM issues c LEFT JOIN items i ON i.itemnumber=c.itemnumber WHERE i.itemnumber IS NULL ORDER BY c.itemnumber"
+    _rp loans-renewed-current CIRC "$(t "Current loans with renewals")" \
+        "SELECT borrowernumber,itemnumber,issuedate,date_due,renewals FROM issues WHERE renewals>0 ORDER BY renewals DESC,itemnumber"
+    _rp loans-invalid-dates CIRC "$(t "Loans whose due date precedes checkout")" \
+        "SELECT borrowernumber,itemnumber,issuedate,date_due FROM issues WHERE date_due<issuedate ORDER BY issuedate,itemnumber"
+    _rp returns-month CIRC "$(t "Completed loans returned per month")" \
+        "SELECT DATE_FORMAT(returndate,'%Y-%m') AS Month,branchcode,COUNT(*) AS Returns FROM old_issues WHERE returndate>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY DATE_FORMAT(returndate,'%Y-%m'),branchcode ORDER BY Month,branchcode"
+    _rp returns-lateness CIRC "$(t "Completed loans returned after their due date")" \
+        "SELECT itemnumber,issuedate,date_due,returndate,branchcode,DATEDIFF(returndate,date_due) AS Days_late FROM old_issues WHERE returndate>date_due AND returndate>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) ORDER BY returndate DESC,itemnumber"
+    _rp loan-duration CIRC "$(t "Average completed loan duration by library")" \
+        "SELECT branchcode,COUNT(*) AS Loans,ROUND(AVG(TIMESTAMPDIFF(HOUR,issuedate,returndate))/24,2) AS Average_days FROM old_issues WHERE returndate>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) AND returndate>=issuedate GROUP BY branchcode ORDER BY branchcode"
+    _rp circulation-weekday CIRC "$(t "Circulation transactions by day of week")" \
+        "SELECT WEEKDAY(datetime)+1 AS Weekday_Monday_1,type,COUNT(*) AS Transactions FROM statistics WHERE type IN ('issue','return','renew','localuse') AND datetime>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY WEEKDAY(datetime)+1,type ORDER BY 1,type"
+    _rp circulation-hour CIRC "$(t "Circulation transactions by hour")" \
+        "SELECT HOUR(datetime) AS Hour,type,COUNT(*) AS Transactions FROM statistics WHERE type IN ('issue','return','renew') AND datetime>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY HOUR(datetime),type ORDER BY 1,type"
+    _rp renewals-month CIRC "$(t "Renewals per month and library")" \
+        "SELECT DATE_FORMAT(datetime,'%Y-%m') AS Month,branch,COUNT(*) AS Renewals FROM statistics WHERE type='renew' AND datetime>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY DATE_FORMAT(datetime,'%Y-%m'),branch ORDER BY Month,branch"
+    _rp localuse-month CIRC "$(t "In-library use per month and library")" \
+        "SELECT DATE_FORMAT(datetime,'%Y-%m') AS Month,branch,COUNT(*) AS Uses FROM statistics WHERE type='localuse' AND datetime>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) GROUP BY DATE_FORMAT(datetime,'%Y-%m'),branch ORDER BY Month,branch"
+    _rp patrons-library-category PAT "$(t "Registered patrons by library and category")" \
+        "SELECT branchcode,categorycode,COUNT(*) AS Patrons FROM borrowers GROUP BY branchcode,categorycode ORDER BY branchcode,categorycode"
+    _rp patrons-age-bands PAT "$(t "Patrons by age band")" \
+        "SELECT CASE WHEN dateofbirth IS NULL THEN 'Unknown' WHEN dateofbirth>CURDATE() THEN 'Future date' WHEN TIMESTAMPDIFF(YEAR,dateofbirth,CURDATE())<12 THEN '00-11' WHEN TIMESTAMPDIFF(YEAR,dateofbirth,CURDATE())<18 THEN '12-17' WHEN TIMESTAMPDIFF(YEAR,dateofbirth,CURDATE())<60 THEN '18-59' ELSE '60+' END AS Age_band,COUNT(*) AS Patrons FROM borrowers GROUP BY 1 ORDER BY 1"
+    _rp patrons-expired PAT "$(t "Expired patron memberships")" \
+        "SELECT borrowernumber,cardnumber,surname,firstname,dateexpiry,branchcode FROM borrowers WHERE dateexpiry<CURDATE() ORDER BY dateexpiry,borrowernumber"
+    _rp patrons-no-expiry PAT "$(t "Patrons without a membership expiry date")" \
+        "SELECT borrowernumber,cardnumber,categorycode,branchcode FROM borrowers WHERE dateexpiry IS NULL ORDER BY borrowernumber"
+    _rp patrons-no-contacts PAT "$(t "Patrons without email or telephone contact")" \
+        "SELECT borrowernumber,cardnumber,surname,firstname,branchcode FROM borrowers WHERE TRIM(COALESCE(email,''))='' AND TRIM(COALESCE(phone,''))='' AND TRIM(COALESCE(mobile,''))='' ORDER BY borrowernumber"
+    _rp patrons-no-address PAT "$(t "Patrons without a street address")" \
+        "SELECT borrowernumber,cardnumber,branchcode FROM borrowers WHERE TRIM(COALESCE(address,''))='' ORDER BY borrowernumber"
+    _rp patrons-invalid-birth PAT "$(t "Patrons with a future birth date")" \
+        "SELECT borrowernumber,cardnumber,dateofbirth FROM borrowers WHERE dateofbirth>CURDATE() ORDER BY dateofbirth,borrowernumber"
+    _rp patrons-invalid-membership PAT "$(t "Patron memberships expiring before enrollment")" \
+        "SELECT borrowernumber,cardnumber,dateenrolled,dateexpiry FROM borrowers WHERE dateexpiry<dateenrolled ORDER BY borrowernumber"
+    _rp patrons-duplicate-email PAT "$(t "Email addresses shared by multiple patrons")" \
+        "SELECT LOWER(TRIM(email)) AS Email,COUNT(*) AS Patrons FROM borrowers WHERE TRIM(COALESCE(email,''))<>'' GROUP BY LOWER(TRIM(email)) HAVING COUNT(*)>1 ORDER BY Patrons DESC,Email"
+    _rp patrons-duplicate-card PAT "$(t "Duplicate patron card numbers")" \
+        "SELECT cardnumber,COUNT(*) AS Patrons FROM borrowers WHERE TRIM(COALESCE(cardnumber,''))<>'' GROUP BY cardnumber HAVING COUNT(*)>1 ORDER BY Patrons DESC,cardnumber"
+    _rp patrons-invalid-category PAT "$(t "Patrons with an unknown category")" \
+        "SELECT p.borrowernumber,p.cardnumber,p.categorycode FROM borrowers p LEFT JOIN categories c ON c.categorycode=p.categorycode WHERE c.categorycode IS NULL ORDER BY p.borrowernumber"
+    _rp patrons-invalid-library PAT "$(t "Patrons with an unknown library")" \
+        "SELECT p.borrowernumber,p.cardnumber,p.branchcode FROM borrowers p LEFT JOIN branches b ON b.branchcode=p.branchcode WHERE b.branchcode IS NULL ORDER BY p.borrowernumber"
+    _rp patrons-current-load PAT "$(t "Patrons ranked by current borrowing load")" \
+        "SELECT p.cardnumber,p.surname,p.firstname,COUNT(*) AS Current_loans FROM borrowers p JOIN issues c ON c.borrowernumber=p.borrowernumber GROUP BY p.borrowernumber,p.cardnumber,p.surname,p.firstname ORDER BY Current_loans DESC,p.borrowernumber LIMIT 100"
+    _rp patrons-no-current-loans PAT "$(t "Valid patron accounts without current loans")" \
+        "SELECT p.borrowernumber,p.cardnumber,p.categorycode,p.branchcode FROM borrowers p WHERE p.dateexpiry>=CURDATE() AND NOT EXISTS (SELECT 1 FROM issues c WHERE c.borrowernumber=p.borrowernumber) ORDER BY p.borrowernumber"
+    _rp holds-by-library CIRC "$(t "Active holds by pickup library and status")" \
+        "SELECT branchcode,COALESCE(found,'Queued') AS Status,COUNT(*) AS Holds FROM reserves GROUP BY branchcode,found ORDER BY branchcode,found"
+    _rp holds-queued CIRC "$(t "Unfilled holds in priority order")" \
+        "SELECT reserve_id,borrowernumber,biblionumber,itemnumber,priority,reservedate,branchcode FROM reserves WHERE found IS NULL OR found='' ORDER BY biblionumber,priority,reservedate"
+    _rp holds-suspended CIRC "$(t "Suspended holds")" \
+        "SELECT reserve_id,borrowernumber,biblionumber,suspend_until,branchcode FROM reserves WHERE suspend=1 ORDER BY suspend_until,reserve_id"
+    _rp holds-expired CIRC "$(t "Holds past their explicit expiration date")" \
+        "SELECT reserve_id,borrowernumber,biblionumber,expirationdate,branchcode FROM reserves WHERE expirationdate<CURDATE() ORDER BY expirationdate,reserve_id"
+    _rp holds-old-waiting CIRC "$(t "Holds waiting for pickup for more than seven days")" \
+        "SELECT reserve_id,borrowernumber,biblionumber,waitingdate,branchcode FROM reserves WHERE found='W' AND waitingdate<DATE_SUB(CURDATE(),INTERVAL 7 DAY) ORDER BY waitingdate,reserve_id"
+    _rp holds-no-copies CIRC "$(t "Holds on titles without physical copies")" \
+        "SELECT r.reserve_id,r.biblionumber,r.borrowernumber,r.branchcode FROM reserves r WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.biblionumber=r.biblionumber) ORDER BY r.biblionumber,r.reserve_id"
+    _rp holds-missing-patron CIRC "$(t "Holds referencing a missing patron")" \
+        "SELECT r.reserve_id,r.borrowernumber,r.biblionumber FROM reserves r LEFT JOIN borrowers p ON p.borrowernumber=r.borrowernumber WHERE p.borrowernumber IS NULL ORDER BY r.reserve_id"
+    _rp holds-missing-record CIRC "$(t "Holds referencing a missing bibliographic record")" \
+        "SELECT r.reserve_id,r.borrowernumber,r.biblionumber FROM reserves r LEFT JOIN biblio b ON b.biblionumber=r.biblionumber WHERE b.biblionumber IS NULL ORDER BY r.reserve_id"
+    _rp holds-demand CIRC "$(t "Titles ranked by active hold demand")" \
+        "SELECT b.biblionumber,b.title,COUNT(*) AS Holds FROM reserves r JOIN biblio b ON b.biblionumber=r.biblionumber GROUP BY b.biblionumber,b.title ORDER BY Holds DESC,b.biblionumber LIMIT 100"
+    _rp holds-pressure CIRC "$(t "Hold demand compared with nonwithdrawn copies")" \
+        "SELECT b.biblionumber,b.title,h.Holds,COALESCE(i.Copies,0) AS Copies FROM (SELECT biblionumber,COUNT(*) AS Holds FROM reserves GROUP BY biblionumber) h JOIN biblio b ON b.biblionumber=h.biblionumber LEFT JOIN (SELECT biblionumber,COUNT(*) AS Copies FROM items WHERE withdrawn=0 GROUP BY biblionumber) i ON i.biblionumber=h.biblionumber ORDER BY (COALESCE(i.Copies,0)=0) DESC,h.Holds/NULLIF(COALESCE(i.Copies,0),0) DESC,b.biblionumber"
+    _rp debits-by-code PAT "$(t "Outstanding debit balances by charge type")" \
+        "SELECT debit_type_code,COUNT(*) AS Charges,SUM(amountoutstanding) AS Balance FROM accountlines WHERE amountoutstanding>0 GROUP BY debit_type_code ORDER BY Balance DESC,debit_type_code"
+    _rp credits-by-code PAT "$(t "Unallocated credit balances by credit type")" \
+        "SELECT credit_type_code,COUNT(*) AS Credits,SUM(amountoutstanding) AS Balance FROM accountlines WHERE amountoutstanding<0 GROUP BY credit_type_code ORDER BY Balance,credit_type_code"
+    _rp debits-age PAT "$(t "Outstanding debits by age band")" \
+        "SELECT CASE WHEN DATEDIFF(CURDATE(),date)<=30 THEN '00-30' WHEN DATEDIFF(CURDATE(),date)<=90 THEN '31-90' WHEN DATEDIFF(CURDATE(),date)<=365 THEN '91-365' ELSE '366+' END AS Days_band,COUNT(*) AS Charges,SUM(amountoutstanding) AS Balance FROM accountlines WHERE amountoutstanding>0 GROUP BY 1 ORDER BY 1"
+    _rp patrons-net-balances PAT "$(t "Patron net account balances")" \
+        "SELECT p.borrowernumber,p.cardnumber,SUM(a.amountoutstanding) AS Net_balance FROM accountlines a JOIN borrowers p ON p.borrowernumber=a.borrowernumber GROUP BY p.borrowernumber,p.cardnumber HAVING SUM(a.amountoutstanding)<>0 ORDER BY Net_balance DESC,p.borrowernumber"
+    _rp account-orphan-patron PAT "$(t "Account entries referencing a missing patron")" \
+        "SELECT a.accountlines_id,a.borrowernumber,a.amount,a.amountoutstanding FROM accountlines a LEFT JOIN borrowers p ON p.borrowernumber=a.borrowernumber WHERE p.borrowernumber IS NULL ORDER BY a.accountlines_id"
+    _rp authority-type-count CAT "$(t "Authority records by authority type")" \
+        "SELECT authtypecode,COUNT(*) AS Authorities FROM auth_header GROUP BY authtypecode ORDER BY authtypecode"
+    _rp authority-missing-marc CAT "$(t "Authority records without MARCXML")" \
+        "SELECT authid,authtypecode,datecreated FROM auth_header WHERE TRIM(COALESCE(marcxml,''))='' ORDER BY authid"
+    _rp authority-created-month CAT "$(t "Authority records created per month")" \
+        "SELECT DATE_FORMAT(datecreated,'%Y-%m') AS Month,authtypecode,COUNT(*) AS Authorities FROM auth_header WHERE datecreated>=DATE_SUB(CURDATE(),INTERVAL 24 MONTH) GROUP BY DATE_FORMAT(datecreated,'%Y-%m'),authtypecode ORDER BY Month,authtypecode"
 }
 
 # Query of a report with a sample value in each of Koha's run-time
