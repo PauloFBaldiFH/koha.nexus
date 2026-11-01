@@ -1,6 +1,7 @@
-"""Searching Catálogo Zeus (catalogo.bu.ufsc.br/zeus/) live, for the kind
-zeus targets: Zeus is a federated catalogue whose search form lists other
-libraries' catalogues as targets[n] checkboxes; one search asks one of them
+"""Searching Catálogo Zeus (catalogo.bu.ufsc.br/zbib/, once /zeus/) live, for
+the kind zeus targets, and as a second route for the others whose name is
+on its form (live.ask): Zeus is a federated catalogue whose search form
+lists other libraries' catalogues as targets[n] checkboxes; one search asks one of them
 and the result page carries each record as MARCXML (or a rawRecord ISO 2709
 value).
 
@@ -94,13 +95,19 @@ def _fold(s: str) -> str:
 
 def names_match(name: str, label: str) -> bool:
     """The label names the catalogue: its acronym in parentheses (UFSC, USP)
-    as a word, or every word of four letters or more of the rest of the name."""
+    as a word, or every word of four letters or more of the rest of the name
+    (or of its part before a comma)."""
     folded = _fold(label)
     acronym = re.search(r"\(([^)]+)\)", name)
     if acronym and re.search(r"\b" + re.escape(_fold(acronym.group(1))) + r"\b", folded):
         return True
-    words = [w for w in re.findall(r"\w+", _fold(name.split("(")[0])) if len(w) >= 4]
-    return bool(words) and all(re.search(r"\b" + w + r"\b", folded) for w in words)
+    for part in (name.split("(")[0], name.split("(")[0].split(",")[0]):
+        # the whole name, then the part before a comma ("Fundacentro, Biblioteca",
+        # "Universidade de Coimbra, Portugal")
+        words = [w for w in re.findall(r"\w+", _fold(part)) if len(w) >= 4]
+        if words and all(re.search(r"\b" + w + r"\b", folded) for w in words):
+            return True
+    return False
 
 
 def index_for(target: Target, labels: dict[int, str]) -> int | None:
@@ -193,7 +200,8 @@ def parse_results(page: str) -> list[marc.Record]:
 # the client
 # ----------------------------------------------------------------------
 def _get(url: str, timeout: float) -> str:
-    base = url.split("/zeus")[0] + "/"
+    parts = urllib.parse.urlsplit(url)
+    base = f"{parts.scheme}://{parts.netloc}/"
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Referer": base,
                                                "Accept": "text/html,application/xhtml+xml"})
     try:
@@ -230,6 +238,11 @@ class Zeus:
                 self._labels = self._labels or {}
             self._labels_at = time.monotonic()
             return self._labels
+
+    def has(self, target: Target, timeout: float = 20.0) -> bool:
+        """The target's name is on Zeus's search form (the form is read once
+        and kept, so this costs a request only now and then)."""
+        return index_for(target, self.labels(timeout)) is not None
 
     def search(self, target: Target, kind: str, term: str, timeout: float) -> tuple[int, list[marc.Record]]:
         labels = self.labels(min(timeout, 20.0))

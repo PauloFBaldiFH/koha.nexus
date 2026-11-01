@@ -6,4 +6,4 @@ gateway (NEXUS_GATEWAY_ZEUS_URL / NEXUS_GATEWAY_PERGAMUM_URL set) also
 searches Catálogo Zeus and Rede Pergamum pages.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

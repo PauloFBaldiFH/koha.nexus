@@ -274,10 +274,13 @@ class Engine:
 
     def is_live(self, t: Target) -> bool:
         """Searched live when static.db has nothing: z3950 and sru targets,
-        zeus ones when the runner has a Zeus address and the pergamum one
-        when it has a Pergamum address."""
+        zeus ones and the ones with no address (missing, asked through
+        Zeus when their name is on its search form) when the runner has a
+        Zeus address, and the pergamum one when it has a Pergamum address."""
         if t.live:
             return True
+        if t.kind == "missing":     # no address of its own: Zeus, when its name is on Zeus's form
+            return t.status != "broken" and getattr(self.runner, "zeus", None) is not None
         hub = {"zeus": "zeus", "pergamum": "pergamum"}.get(t.kind)
         return hub is not None and t.status != "broken" and getattr(self.runner, hub, None) is not None
 
@@ -316,7 +319,7 @@ class Engine:
         clause = live_clause(node)
         if not live or clause is None or self.learned is None:
             return Result(total, [clean(r) for r in records], "static" if total else "none")
-        unique, errors, origin = self._live(live, clause)
+        unique, errors, origin = self._live(live, clause, union=database.strip("/").lower() in ("", UNION))
         if not unique:
             return Result(total, [clean(r) for r in records], "static" if total else "none", errors)
         # live records first, then static.db's repository records
@@ -326,10 +329,14 @@ class Engine:
             page += self.static.search(node, sources, skip + 1, maximum - len(page))[1]
         return Result(len(unique) + total, [clean(r) for r in page], origin, errors)
 
-    def _live(self, live: list[Target], clause: cql.Clause) -> tuple[list[marc.Record], dict[str, str], str]:
+    def _live(self, live: list[Target], clause: cql.Clause, union: bool = False
+              ) -> tuple[list[marc.Record], dict[str, str], str]:
         """The live targets' records for one clause, without repeats: from
-        learned.db when fresh, else searched within the reply budget."""
-        qkey = query_key(clause)
+        learned.db when fresh, else searched within the reply budget.
+        union: /sru/_union, which asks Zeus once for its members, so the
+        Z39.50/SRU targets are not also asked through Zeus one by one."""
+        union = union and getattr(self.runner, "zeus", None) is not None    # only then is there a fallback to leave out
+        qkey = query_key(clause) + ("#union" if union else "")     # a union answer had no Zeus fallback
         pooled: list[marc.Record] = []
         errors: dict[str, str] = {}
         origin = "learned"
@@ -345,7 +352,7 @@ class Engine:
             pooled += recs
         if ask and self.runner is not None:
             origin = "live"
-            for answer in self.runner.search(ask, clause.field, clause.term, qkey):
+            for answer in self.runner.search(ask, clause.field, clause.term, qkey, via_zeus=not union):
                 if answer.error:
                     errors[answer.target] = answer.error
                 pooled += answer.records

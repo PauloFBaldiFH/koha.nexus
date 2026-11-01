@@ -6,8 +6,10 @@ sent is not lost). Local to this machine, never shipped.
               target reported, or the error it gave
     records   the first page of records of that answer, as UTF-8 ISO 2709
 
-An answer is used for LEARNED_DAYS; an error only for ERROR_SECONDS, so a
-target that is down is not asked on every search but is tried again soon.
+An answer is used for LEARNED_DAYS; an error, or an answer with no
+records, only for ERROR_SECONDS, so a target that is down is not asked on
+every search but is tried again soon, and a "nothing found" from a broken
+route does not stick for a month once the route is fixed.
 """
 
 from __future__ import annotations
@@ -61,7 +63,7 @@ class Learned:
         if row is None:
             return None
         fetched, total, error = row
-        if now - fetched > (ERROR_SECONDS if error else self.max_age):
+        if now - fetched > (ERROR_SECONDS if error or not total else self.max_age):
             return None
         records = []
         for (body,) in conn.execute("SELECT body FROM records WHERE target = ? AND qkey = ? ORDER BY pos",

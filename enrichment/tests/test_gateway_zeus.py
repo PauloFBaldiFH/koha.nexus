@@ -258,3 +258,76 @@ def test_only_an_unstable_node_that_fails_is_an_error():
     hub = zeus.Zeus("https://catalogo.example/zeus/", get=Down())
     with pytest.raises(zeus.ZeusError):
         hub.search_many([ranked(*BN, unstable=True)], "title", "x", 30)
+
+
+# ----------------------------------------------------------------------
+# Zeus as the second route of z3950/sru targets and the only one of the
+# targets with no address (2026-11-01: USP, UFSC, Fundacentro... gave no
+# records while Zeus reaches them)
+# ----------------------------------------------------------------------
+def closed_port() -> int:
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def direct(tid, name, **extra):
+    return make_target({"id": tid, "name": name, "group": "br_universities", "kind": "z3950",
+                        "host": "127.0.0.1", "port": closed_port(), "db": "d", "status": "verified", **extra})
+
+
+def test_a_closed_direct_port_still_answers_through_zeus():
+    hub = zeus.Zeus("https://catalogo.example/zbib/", get=FakeGet())
+    answer = asyncio.run(live.ask(direct("usp", "Universidade de São Paulo (USP)"), "title", "x", 5, zeus=hub))
+    assert answer.records and not answer.error
+
+
+def test_a_target_not_on_the_form_keeps_only_its_own_route():
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zbib/", get=get)
+    answer = asyncio.run(live.ask(direct("toronto", "University of Toronto, Canadá"), "title", "x", 5, zeus=hub))
+    assert answer.records == [] and answer.error
+    assert not any("searchString" in u for u in get.urls)       # Zeus was not searched
+
+
+def test_union_leaves_the_zeus_route_out():
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zbib/", get=get)
+    answer = asyncio.run(live.ask(direct("usp", "Universidade de São Paulo (USP)"), "title", "x", 5, zeus=hub,
+                                  via_zeus=False))
+    assert answer.records == [] and not any("searchString" in u for u in get.urls)
+
+
+def test_a_target_with_no_address_is_asked_through_zeus(tmp_path):
+    fundacentro = make_target({"id": "fundacentro", "name": "Fundacentro, Biblioteca", "group": "national",
+                               "kind": "missing", "status": "missing"})
+    get = FakeGet()
+    hub = zeus.Zeus("https://catalogo.example/zbib/", get=get)
+    answer = asyncio.run(live.ask(fundacentro, "title", "x", 5, zeus=hub))
+    assert answer.records and "targets%5B20%5D=on" in get.urls[-1]
+    nowhere = make_target({"id": "macau", "name": "Macau", "group": "intl_universities", "kind": "missing",
+                           "status": "missing"})
+    assert "not on Zeus's search form" in asyncio.run(live.ask(nowhere, "title", "x", 5, zeus=hub)).error
+    learned = Learned(tmp_path / "learned.db")
+    static = Static(tmp_path / "missing.db")
+    table = {t.id: t for t in (fundacentro, nowhere)}
+    assert Engine(static, learned, table, live.Runner(learned)).resolve("fundacentro")[1] == []
+    served = Engine(static, learned, table, live.Runner(learned, zeus=hub))
+    assert [t.id for t in served.resolve("fundacentro")[1]] == ["fundacentro"]
+    served.runner.close()
+
+
+def test_name_before_a_comma_matches_the_label():
+    assert zeus.names_match("Fundacentro, Biblioteca", "Fundação Jorge Duprat Figueiredo (Fundacentro)")
+    assert zeus.names_match("Universidade de Coimbra, Portugal", "Universidade de Coimbra - SIBUC")
+    assert not zeus.names_match("Universidade de Coimbra, Portugal", "Universidade do Porto")
+
+
+def test_an_empty_answer_is_kept_only_briefly(tmp_path):
+    learned = Learned(tmp_path / "learned.db")
+    learned.put("usp", "title:x", 0, [])
+    assert learned.get("usp", "title:x") is not None
+    assert learned.get("usp", "title:x", now=time.time() + 601) is None
