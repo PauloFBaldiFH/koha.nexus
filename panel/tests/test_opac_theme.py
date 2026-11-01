@@ -1342,3 +1342,21 @@ def test_paulo_1101_phone_page_never_slides_sideways():
     logo = ot.css_body(ot.normalize({"logo": {"source": "url", "url": "/images/custom/kei-logo.png"}}))
     small = logo[logo.index("@media only screen and (max-width: 400px)"):]
     assert "#logo { width: 104px !important; min-width: 104px;" in small
+
+
+def test_staff_dark_mode_reads_on_koha_panels():
+    """Paulo, 2026-11-01 (system preferences in dark mode): Koha's light
+    sidebar menu, toolbar and tab panels, its dark labels and red warnings,
+    and the quick search tabs on a light bar read poorly."""
+    cfg = ot.normalize({"staff": {"enabled": True, "dark_switch": True, "bar": "#d9d9de"}})
+    dark = ot.staff_dark_css(cfg)
+    for part in (".sidebar_menu ul ul", "body #toolbar", "body .tab-content", "body label", ".text-danger",
+                 ".sidebar_menu ul li.active > a"):
+        assert part in dark, part
+    link = re.search(r"--nexus-staff-link: (#[0-9a-f]{6})", dark).group(1)
+    assert ot.contrast(link, "#161b22") >= 7
+    assert ot.contrast("#ff8a80", "#161b22") >= 4.5
+    # The quick search tabs take the bar's text colour as a variable, so the
+    # dark mode's bar keeps them light.
+    body = ot.staff_css_body(cfg)
+    assert "color: rgba(var(--nexus-staff-on-topbar-rgb), .82)" in body

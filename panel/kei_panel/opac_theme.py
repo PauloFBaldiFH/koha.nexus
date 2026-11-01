@@ -3083,10 +3083,10 @@ html body nav.navbar #header .nav-link, html body nav.navbar #logged-in-info-ful
 html body nav.navbar .navbar-text, html body nav.navbar .navbar-nav > li > a,
 html body nav.navbar #user-menu .nav-link, html body nav.navbar .dropdown-toggle {{ color: var(--nexus-staff-on-topbar); }}
 html body nav.navbar #header .nav-link:hover, html body nav.navbar #header .nav-link:focus {{
-    background-color: rgba({on_rgb}, .14);
+    background-color: rgba(var(--nexus-staff-on-topbar-rgb), .14);
     border-radius: 8px;
 }}
-html body nav.navbar #catalog-search-link {{ border-right-color: rgba({on_rgb}, .25); }}
+html body nav.navbar #catalog-search-link {{ border-right-color: rgba(var(--nexus-staff-on-topbar-rgb), .25); }}
 html body nav.navbar .dropdown-menu-dark {{
     --bs-dropdown-bg: var(--nexus-staff-menu);
     --bs-dropdown-link-hover-bg: rgba(255, 255, 255, .12);
@@ -3128,19 +3128,19 @@ html body #header_search input[type="submit"], html body #header_search button[t
 html body #header_search input[type="submit"]:hover,
 html body #header_search button[type="submit"]:hover {{ background-color: var(--nexus-staff-secondary); filter: brightness(1.1); }}
 html body #header_search .nav-tabs > li > a {{
-    color: rgba({on_rgb}, .82);
+    color: rgba(var(--nexus-staff-on-topbar-rgb), .82);
     border-radius: 8px;
     margin: 0 .1rem;
     padding: .15rem .4rem;
     transition: background-color .15s ease, color .15s ease;
 }}
 html body #header_search .nav-tabs > li > a:hover, html body #header_search .nav-tabs > li > a:focus {{
-    background-color: rgba({on_rgb}, .12);
+    background-color: rgba(var(--nexus-staff-on-topbar-rgb), .12);
     border-color: transparent;
     color: var(--nexus-staff-on-topbar);
 }}
 html body #header_search .nav-tabs > li > a.active, html body #header_search .nav-tabs > li > a.active:hover {{
-    background-color: rgba({on_rgb}, .16);
+    background-color: rgba(var(--nexus-staff-on-topbar-rgb), .16);
     border-color: transparent;
     border-bottom: 2px solid var(--nexus-staff-primary);
     color: var(--nexus-staff-on-topbar);
@@ -3934,7 +3934,7 @@ def staff_dark_css(cfg: dict) -> str:
     Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
     st = normalize(cfg)["staff"]
     card = "#161b22"
-    link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), card, 5.5)
+    link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), card, 7)
     # The accents lifted until they stand out on the dark cards (a black
     # accent made black buttons and invisible module icons on #161b22).
     primary, secondary = readable(st["accent"], card, 3), readable(st["accent2"], card, 3)
@@ -4025,6 +4025,50 @@ def staff_dark_css(cfg: dict) -> str:
 {d} body #changelanguage .nav-link.disabled, {d} body #changelanguage .currentlanguage {{ color: var(--nexus-staff-text); }}
 {d} body #koha_version, {d} body #koha_version a {{ color: var(--nexus-staff-muted); }}
 {d} body #helper, {d} body #helper a, {d} body #breadcrumbs #helper {{ color: var(--nexus-staff-link); }}
+/* Koha's own light panels and dark letters (staff-global.css of Koha 26,
+   checked against the system preferences, the circulation and the patron
+   pages; Paulo, 2026-11-01: "ainda tem partes com contraste ruim"). */
+{d} body .sidebar_menu, {d} body .sidebar_menu ul ul, {d} body #toolbar, {d} body .btn-toolbar,
+{d} body #toolbar.floating, {d} body .tab-content, {d} body fieldset.standard, {d} body fieldset.contrast,
+{d} body fieldset.rows.unselected, {d} body .panel, {d} body .panel-collapse, {d} body .modal-body,
+{d} body .modal-body fieldset, {d} body .patroninfo, {d} body .searchheader, {d} body #search-facets,
+{d} body #searchresults, {d} body .branchgriditem, {d} body .buttons-list li a, {d} body div.lastchecked,
+{d} body div.rule, {d} body .term, {d} body .number_box a, {d} body .number_box span,
+{d} body #catalogue_stats_wrapper, {d} body #resulttable_wrapper, {d} body .import_export_options,
+{d} body .ac-library, {d} body .currentlibrary, {d} body .flatpickr-calendar, {d} body div.mainmenu,
+{d} body table.group td.group, {d} body #marcPreview th, {d} body .card-header, {d} body .card-footer,
+{d} body .list-group-item, {d} body .toptabs .nav-tabs .nav-link.active {{
+    background-color: rgba(22, 27, 34, calc(var(--nexus-staff-surface-a) * .3 + .7)) !important;
+    color: var(--nexus-staff-text);
+    border-color: #30363d !important;
+}}
+{d} body .sidebar_menu ul li a, {d} body .sidebar_menu h5, {d} body label, {d} body legend, {d} body fieldset legend,
+{d} body caption, {d} body h1, {d} body h2, {d} body h3, {d} body h4, {d} body h5, {d} body .label,
+{d} body .results_summary, {d} body .results_summary .label, {d} body aside fieldset.brief label,
+{d} body .patroninfo h5, {d} body .modal-header h3, {d} body .modal-title, {d} body .dropdown-header,
+{d} body .labeledmarc-label, {d} body .labeledmarc-value, {d} body .permissioncode, {d} body .term,
+{d} body .panel-default > .panel-heading a, {d} body div.settings-links ul li a, {d} body .nav-tabs .nav-link,
+{d} body .dt-container, {d} body .dt-info, {d} body .dt-length, {d} body .dt-search,
+{d} body div.dt-container .dt-paging .dt-paging-button, {d} body .flatpickr-day,
+{d} body .flatpickr-months, {d} body .flatpickr-weekday, {d} body #breadcrumbs .breadcrumb-item,
+{d} body #breadcrumbs .breadcrumb-item.active, {d} body .breadcrumb-item + .breadcrumb-item::before {{
+    color: var(--nexus-staff-text) !important;
+}}
+{d} body .sidebar_menu ul li.active > a, {d} body .sidebar_menu ul li a:hover, {d} body .sidebar_menu ul li a.current {{
+    background-color: rgba(var(--nexus-staff-primary-rgb), .18) !important;
+    border-left-color: var(--nexus-staff-primary) !important;
+    color: #ffffff !important;
+}}
+{d} body .nav-tabs .nav-link.active, {d} body .toptabs .nav-tabs .nav-link.active {{ color: #ffffff !important; }}
+{d} body .hint, {d} body .form-text, {d} body .help-block, {d} body fieldset div.help-block,
+{d} body .text-muted, {d} body .text-body-secondary, {d} body small {{ color: #b1bac4 !important; }}
+/* Warnings and errors: Koha's dark reds read at 3:1 on the dark cards. */
+{d} body .text-danger, {d} body .error, {d} body .problem, {d} body .warning, {d} body span.required,
+{d} body label.required, {d} body div.required, {d} body .overdue, {d} body .debit, {d} body .lost,
+{d} body .blocker, {d} body span.expired {{ color: #ff8a80 !important; }}
+{d} body .text-success, {d} body .success, {d} body .credit {{ color: #7ee2a8 !important; }}
+{d} body .text-warning {{ color: #f2cc60 !important; }}
+{d} body .text-info {{ color: #79c0ff !important; }}
 {d} body .ui-autocomplete, {d} body .ui-widget-content {{
     background-color: var(--nexus-staff-card); color: var(--nexus-staff-text); border-color: #30363d;
 }}{film}
