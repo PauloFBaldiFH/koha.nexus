@@ -5,11 +5,14 @@
 # stops the distro: by the shutdown watcher when Windows shuts down,
 # restarts or signs out, and through stdin by Stop, Restart and "Shut down
 # the PC safely". Koha's services stop in the order a clean shutdown uses:
-# the web and the search engine first, then the queue and the cache, then
-# MariaDB, so nothing is cut off mid-write; then everything still cached is
-# written to Debian's virtual disk (ext4.vhdx), and koha-stop-guard records
-# the clean stop the next start looks for. A few seconds on a library PC;
-# the caller bounds it (timeout) all the same.
+# the web, Koha's own daemons and the search engine first, so nothing writes
+# to the database any more; then MariaDB, the one whose files must not be
+# cut off mid-write; then the queue, the cache and Elasticsearch, which can
+# take long and hold nothing that cannot be rebuilt (at the end of a Windows
+# session the time is short, so MariaDB goes before them); then everything
+# still cached is written to Debian's virtual disk (ext4.vhdx), and
+# koha-stop-guard records the clean stop the next start looks for. A few
+# seconds on a library PC; the caller bounds it (timeout) all the same.
 # Exit 0 only when everything stopped and the guard recorded it.
 # "@step N": how far the stop got, for the progress the Windows side shows.
 # Tests: tests/graceful_shutdown.bats (KOHA_STOP_GUARD points at a stand-in).
@@ -18,7 +21,7 @@ rc=0
 if [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
   # No systemd (an old wsl.conf): nothing is a unit, but a MariaDB started
   # by hand still gets its own clean shutdown before the disk is synced.
-  echo "@step 3"
+  echo "@step 2"
   if command -v mariadb-admin >/dev/null 2>&1 && mariadb-admin ping >/dev/null 2>&1; then
     mariadb-admin shutdown || { echo "did not stop: mariadb"; rc=1; }
   fi
@@ -43,9 +46,9 @@ for i in $(koha-list 2>/dev/null); do
   command -v koha-worker >/dev/null 2>&1 && koha-worker --stop --queue long_tasks "$i" >/dev/null 2>&1
 done
 echo "@step 2"
-stop_units rabbitmq-server memcached elasticsearch
-echo "@step 3"
 stop_units mariadb
+echo "@step 3"
+stop_units rabbitmq-server memcached elasticsearch
 echo "@step 4"
 sync
 if [ -x "$guard" ]; then

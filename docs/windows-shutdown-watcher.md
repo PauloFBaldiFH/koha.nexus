@@ -9,7 +9,7 @@ wait for Koha's clean stop first.
 
 | File | Runs on | What it does |
 | --- | --- | --- |
-| `windows/koha-graceful-shutdown.sh` | Debian (WSL2), as root | Stops Apache and koha-common, then Plack, the background workers (both queues), the indexers and Zebra of every instance, then RabbitMQ, Memcached and Elasticsearch, then MariaDB; runs `sync`; `koha-stop-guard stop` records the clean stop. Exit 0 only when everything stopped. |
+| `windows/koha-graceful-shutdown.sh` | Debian (WSL2), as root | Stops Apache and koha-common, then Plack, the background workers (both queues), the indexers and Zebra of every instance, then MariaDB, then RabbitMQ, Memcached and Elasticsearch (MariaDB first: the 20 s at the end of a session go to the database); runs `sync`; `koha-stop-guard stop` records the clean stop. Exit 0 only when everything stopped. |
 | `windows/KohaEasy.Watcher.ps1` | Windows, at sign-in, hidden | `KohaEasy.ps1 Watcher`. Checks every 30 s whether the `koha` distro runs. |
 | `windows/KohaEasy.Watcher.cs` | loaded by the watcher | The hidden window that answers `WM_QUERYENDSESSION` / `WM_ENDSESSION`. |
 

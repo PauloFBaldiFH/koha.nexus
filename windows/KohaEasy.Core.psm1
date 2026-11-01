@@ -1416,8 +1416,8 @@ function Stop-Koha {
 function Get-KohaStopSteps {
     return @(
         (T 'Stopping the web interface and the search engine (Zebra)')
-        (T 'Stopping the message queue and the cache')
         (T 'Closing the database (MariaDB) safely')
+        (T 'Stopping the message queue and the cache')
         (T 'Writing everything to disk')
         (T 'Closing Debian and its virtual disk')
     )

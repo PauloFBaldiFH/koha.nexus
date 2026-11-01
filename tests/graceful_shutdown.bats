@@ -44,7 +44,7 @@ stub() {
 # line N of the call log.
 nth() { sed -n "$1p" "$LOG"; }
 
-@test "services stop in order: web, Koha's daemons, queue and cache, MariaDB, then sync and the guard" {
+@test "services stop in order: web, Koha's daemons, MariaDB, then queue and cache, sync and the guard" {
     run sh "$SCRIPT"
     [ "$status" -eq 0 ]
     [ "$(nth 1)" = "systemctl stop apache2.service koha-common.service" ]
@@ -54,11 +54,20 @@ nth() { sed -n "$1p" "$LOG"; }
     [ "$(nth 5)" = "koha-es-indexer --stop library" ]
     [ "$(nth 6)" = "koha-zebra --stop library" ]
     [ "$(nth 7)" = "koha-worker --stop --queue long_tasks library" ]
-    [ "$(nth 8)" = "systemctl stop rabbitmq-server.service memcached.service" ]
-    [ "$(nth 9)" = "systemctl stop mariadb.service" ]
+    [ "$(nth 8)" = "systemctl stop mariadb.service" ]
+    [ "$(nth 9)" = "systemctl stop rabbitmq-server.service memcached.service" ]
     [ "$(nth 10)" = "sync" ]
     [ "$(nth 11)" = "guard stop" ]
     [ "$(wc -l < "$LOG")" -eq 11 ]
+}
+
+@test "MariaDB stops before Elasticsearch, which can take long" {
+    export UNITS="$UNITS elasticsearch"
+    run sh "$SCRIPT"
+    [ "$status" -eq 0 ]
+    db=$(grep -n "systemctl stop mariadb.service" "$LOG" | cut -d: -f1)
+    es=$(grep -n "elasticsearch.service" "$LOG" | cut -d: -f1)
+    [ -n "$db" ] && [ -n "$es" ] && [ "$db" -lt "$es" ]
 }
 
 @test "the steps are reported for the progress on Windows" {
