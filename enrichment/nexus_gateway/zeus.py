@@ -110,13 +110,28 @@ def names_match(name: str, label: str) -> bool:
     return False
 
 
+def unimarc(label: str) -> bool:
+    """Zeus marks the catalogues that answer in UNIMARC (Porto, the BNP,
+    Porbase, Greece): Koha reads these rows as MARC21, so they are not asked."""
+    return "UNIMARC" in label.upper()
+
+
+def names(target: Target, label: str) -> bool:
+    """names_match, or the target's zeus_label is in the label."""
+    if target.zeus_label and _fold(target.zeus_label) in _fold(label):
+        return True
+    return names_match(target.name, label)
+
+
 def index_for(target: Target, labels: dict[int, str]) -> int | None:
     """The n whose label names the target: its target_index when that label
-    matches, else the first label that does, else None."""
-    if target.target_index in labels and names_match(target.name, labels[target.target_index]):
+    matches, else the first label that does, else None. A label marked
+    UNIMARC is never used."""
+    if (target.target_index in labels and not unimarc(labels[target.target_index])
+            and names(target, labels[target.target_index])):
         return target.target_index
     for n in sorted(labels):
-        if names_match(target.name, labels[n]):
+        if not unimarc(labels[n]) and names(target, labels[n]):
             return n
     return None
 

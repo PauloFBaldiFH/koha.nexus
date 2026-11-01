@@ -3807,7 +3807,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: untested; answers from static.db, then live Z3950. Needs a login: NEXUS_GATEWAY_LOGIN_SENADO_FOLIO=user:password in the gateway's environment (the panel's .env holds it as KEI_Z3950_SENADO_FOLIO_USER/_PASS). Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library.",
+   "notes": "Status: untested; answers from static.db, then live Z3950. Needs a login: NEXUS_GATEWAY_LOGIN_SENADO_FOLIO=user:password in the gateway's environment (the panel's .env holds it as KEI_Z3950_SENADO_FOLIO_USER/_PASS). On Catálogo Zeus as targets[3], the RVBI Folio node (label checked live on the VPS 2026-11-01); targets[2] is the Aleph one. Fallback: the direct Z39.50 row Senado Federal — Rede RVBI (FOLIO) covers this library.",
    "backup_for": [
     "z3950.folio.ebsco.com:2100/rvbi"
    ]
@@ -4767,7 +4767,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only."
+   "notes": "Status: missing; answers from static.db only. On Catálogo Zeus as targets[40] 'Memorial University, Canadá' (label checked live 2026-11-01); searched there only."
   },
   {
    "name": "University of Oxford, Reino Unido",
@@ -4883,7 +4883,7 @@
    "preselect": false,
    "verified": false,
    "source": "koha.nexus gateway (enrichment/nexus_gateway/targets.json)",
-   "notes": "Status: missing; answers from static.db only."
+   "notes": "Status: missing; answers from static.db only. On Catálogo Zeus as targets[57] 'Universiteit Gent, Bélgica' (label checked live 2026-11-01); searched there only."
   },
   {
    "name": "Hamburg University of Technology (TUHH), Alemanha",
