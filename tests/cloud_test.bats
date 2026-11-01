@@ -22,6 +22,7 @@ TUI_LOG="$W/tui.log"
 write_backup_config() { touch "\$BACKUP_CONF"; }
 kei_first_cloud_backup() { echo "FIRST BACKUP" >> "$W/calls"; }
 RCLONE_TEST_SECS=2
+RCLONE_RATE_WAITS="0 0"
 PATH="$W/bin:\$PATH"
 SH
     export FAKE_MODE=ok FAKE_STEP=none W
@@ -41,6 +42,26 @@ done
 if [ "$cmd" = "${FAKE_STEP:-}" ]; then
     [ "$FAKE_MODE" = hang ] && exec sleep 600
     [ "$FAKE_MODE" = fail ] && { echo "ERROR : Backup_SQL_Koha: googleapi: Error 403: The user's Drive storage quota has been exceeded." >&2; exit 7; }
+    if [ "$FAKE_MODE" = rate ] && [ "$(cat "$W/rate_left" 2>/dev/null || echo 0)" -gt 0 ]; then
+        echo $(( $(cat "$W/rate_left") - 1 )) > "$W/rate_left"
+        cat >&2 <<'JSON'
+ERROR : Attempt 1/1 failed with 1 errors and: googleapi: Error 403: Quota exceeded for quota metric 'Queries' and limit 'Queries per minute' of service 'drive.googleapis.com' for consumer 'project_number:202264815644'.
+Details:
+[
+  {
+    "@type": "type.googleapis.com/google.rpc.Help",
+    "links": [
+      {
+        "description": "Request a higher quota limit.",
+        "url": "https://cloud.google.com/docs/quotas/help/request_increase"
+      }
+    ]
+  }
+]
+, rateLimitExceeded
+JSON
+        exit 7
+    fi
 fi
 case "$cmd" in
     listremotes) echo "gdrive:" ;;
@@ -139,4 +160,32 @@ TOKEN='{"access_token":"ya29.A","token_type":"Bearer","refresh_token":"1//R","ex
     run env KEI_EXTRA="$W/extra.sh" PASTE='{"access_token":"a" "refresh_token":"r","expiry":"x"}' bash "$PANEL" eval 'rclone_create_gdrive "$PASTE"; echo "rc=$?"' 
     [ "${lines[-1]}" = "rc=1" ]
     [ ! -s "$W/rclone.conf" ] || ! grep -q '^\[gdrive\]' "$W/rclone.conf"
+}
+
+@test "C09 Google's rate limit is waited out and the test goes on" {
+    fake_rclone
+    export FAKE_MODE=rate FAKE_STEP=mkdir
+    echo 2 > "$W/rate_left"
+    run_fn validate_and_register_rclone gdrive
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^--contimeout.* mkdir gdrive:Backup_SQL_Koha$' "$W/rclone.log")" -eq 3 ]
+    grep -qx 'RCLONE_REMOTE="gdrive"' "$W/backup.conf"
+}
+
+@test "C10 a rate limit that does not pass is explained, without Google's JSON" {
+    fake_rclone
+    export FAKE_MODE=rate FAKE_STEP=mkdir
+    echo 9 > "$W/rate_left"
+    run_fn validate_and_register_rclone gdrive
+    [ "$status" -eq 1 ]
+    [ "$(grep -c '^--contimeout.* mkdir gdrive:Backup_SQL_Koha$' "$W/rclone.log")" -eq 3 ]
+    grep -q "ERROR .*write test failed.*too many requests (rateLimitExceeded).*shared by every rclone user.*own Google client id.*project_number:202264815644" "$KEI_S/dialogs.log"
+    ! grep -q "google.rpc.Help" "$KEI_S/dialogs.log"
+    [ ! -e "$W/backup.conf" ]
+}
+
+@test "C11 the nightly uploads try again with a pause, and old scripts are rewritten" {
+    grep -q 'copy --retries 4 --retries-sleep 60s "\\$FILE"' "$KEI_REPO/installer"
+    grep -q 'copy --retries 4 --retries-sleep 60s "\\$PACKAGE"' "$KEI_REPO/installer"
+    [ "$(grep -c -- "grep -q -- '--retries-sleep' /root/backup_" "$KEI_REPO/installer")" -eq 2 ]
 }
