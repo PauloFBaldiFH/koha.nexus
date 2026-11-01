@@ -1257,8 +1257,11 @@ def test_staff_dark_mode_and_bar_transparency():
     assert ".toptabs:not(#header_search) .tab-content" in dark and "#changelanguage" in dark
     body = ot.staff_css_body(cfg)
     assert ".grid-acesso-koha .btn-koha-clone" in body and "var(--nexus-staff-tile)" in body
-    # The bars follow the blocks' opacity and blur; the switch gives them their own.
-    assert "--nexus-staff-header-a: 0.70" in body and "--nexus-staff-header-blur: 9px" in body
+    # The bars follow the blocks' opacity, clearer and less blurred so the
+    # wallpaper shows through; the switch gives them their own.
+    assert "--nexus-staff-header-a: 0.52" in body and "--nexus-staff-header-blur: 4px" in body
+    assert ot.bar_glass(100, 12) == (100, 12) and ot.bar_glass(95, 2) == (92, 2)
+    assert ot.bar_glass(20, 30) == (30, 4)
     cfg["staff"].update(header_glass=True, header_opacity=90, header_blur=4)
     body = ot.staff_css_body(cfg)
     assert "--nexus-staff-header-a: 0.90" in body and "--nexus-staff-header-blur: 4px" in body

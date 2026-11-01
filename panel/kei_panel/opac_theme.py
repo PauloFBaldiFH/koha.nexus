@@ -3797,6 +3797,18 @@ html body .btn:hover, html body .btn:focus, html body button:hover, html body in
     return ""
 
 
+def bar_glass(opacity: int, blur: int) -> tuple[int, int]:
+    """The top bars' opacity and blur when they follow the blocks. A thin bar
+    at the blocks' opacity and blur looked solid (Paulo, 2026-11-01: "a barra
+    superior não está aparecendo transparente"): a 14px blur turns the strip
+    of wallpaper behind it into one flat colour. So the bars show more of the
+    wallpaper than the blocks (the gap to solid grows by 60%, never under 30%)
+    and blur it at most 4px, enough to keep the links readable."""
+    if opacity >= 100:
+        return 100, blur
+    return max(30, round(100 - (100 - opacity) * 1.6)), min(blur, 4)
+
+
 def _staff_header_css(st: dict) -> list[str]:
     """The top bar (nav.navbar) and the quick search bar (#header_search) in
     translucent glass: the bar's own colours at --nexus-staff-header-a over a
@@ -3812,7 +3824,7 @@ def _staff_header_css(st: dict) -> list[str]:
     switch gives them an opacity and blur of their own instead. The colours
     are variables, so the dark mode's bar is translucent too."""
     own = st["header_glass"]
-    alpha, blur = (st["header_opacity"], st["header_blur"]) if own else (st["opacity"], st["blur"])
+    alpha, blur = (st["header_opacity"], st["header_blur"]) if own else bar_glass(st["opacity"], st["blur"])
     if alpha >= 100:
         return []
     a = "var(--nexus-staff-header-a)"
