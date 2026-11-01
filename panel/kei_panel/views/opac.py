@@ -327,6 +327,13 @@ class OpacView(SectionView):
                 yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
+            yield from _row(t("Button colour of its own"),
+                            _tip(Switch(bool(st["tile"]), id="o-staff-tile-on"),
+                                 "Off: the home page modules and quick access buttons take the block background. "
+                                 "On: the colour below, with the blocks' opacity. Their text turns light or dark "
+                                 "to stay readable."))
+            yield ColorPicker(t("Buttons"), st["tile"] or st["surface"], "o-staff-tile", bars,
+                              id="o-pick-staff-tile")
             yield Static(t(PAINT_NOTE), classes="ai-note", markup=False)
             yield ColorPicker(t("Accent colour"), st["accent"], "o-staff-accent", bars, id="o-pick-staff-accent")
             yield from self._paint_rows("accent", staff=True)
@@ -663,6 +670,8 @@ class OpacView(SectionView):
         q("#o-staff-page-on", Switch).value = bool(st["page"])
         q("#o-staff-bar-on", Switch).value = bool(st["bar"])
         q("#o-staff-bar", Input).value = st["bar"] or ot.staff_bar(st)
+        q("#o-staff-tile-on", Switch).value = bool(st["tile"])
+        q("#o-staff-tile", Input).value = st["tile"] or st["surface"]
         if st["page"]:
             q("#o-staff-page", Input).value = st["page"]
         for name in ot.STAFF_ASSETS:
@@ -721,6 +730,7 @@ class OpacView(SectionView):
                          "bar": q("#o-staff-bar", Input).value if q("#o-staff-bar-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
                          "bar_texture": q("#o-staff-bar_texture", Select).value,
+                         "tile": q("#o-staff-tile", Input).value if q("#o-staff-tile-on", Switch).value else "",
                          "dark_switch": q("#o-staff-dark_switch", Switch).value,
                          "paint": {key: {"texture": q(f"#o-staff-paint-{key}-texture", Select).value,
                                          "opacity": q(f"#o-staff-paint-{key}-opacity", Slider).value}

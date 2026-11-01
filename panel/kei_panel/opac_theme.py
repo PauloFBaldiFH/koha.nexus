@@ -183,7 +183,7 @@ DEFAULTS: dict = {
     # start from the OPAC's (normalize()); before it had a material, "flat"
     # with the corners it had, so their look does not change.
     "staff": {"enabled": False, "accent": "#2563eb", "accent2": "#7c3aed", "surface": "#ffffff",
-              "page": "", "bar": "", "texture": "flat", "blur": 12, "opacity": 100,
+              "page": "", "bar": "", "tile": "", "texture": "flat", "blur": 12, "opacity": 100,
               "radius_block": 12, "radius_input": 10, "radius_button": 8,
               "density": "normal", "contrast": "normal", "font": 100,
               "background": {"source": "none", "url": ""}, "logo": {"source": "none", "url": ""},
@@ -803,7 +803,9 @@ def normalize(raw: dict | None) -> dict:
                     "texture": st.get("texture") if st.get("texture") in TEXTURES else DEFAULTS["staff"]["texture"],
                     "page": _hex(st.get("page"), "") if st.get("page") else "",
                     # The top bar's own colour ("" = automatic, staff_bar()).
-                    "bar": _hex(st.get("bar"), "") if st.get("bar") else ""}
+                    "bar": _hex(st.get("bar"), "") if st.get("bar") else "",
+                    # The buttons-as-cards' own colour ("" = the block background).
+                    "tile": _hex(st.get("tile"), "") if st.get("tile") else ""}
     for key in STAFF_MATERIAL:
         default = DEFAULTS["staff"][key]
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
@@ -883,6 +885,7 @@ def apply_preset(raw: dict | None, name: str) -> dict:
     st["bar"] = pre["bar"]
     st["header_glass"] = False
     st["bar_texture"] = "auto"
+    st["tile"] = ""
     st["enabled"] = True
     return normalize(cfg)
 
@@ -898,7 +901,7 @@ MAX_USER_PRESETS = 5
 USER_PRESETS_FILE = "look-presets.json"
 LOOK_KEYS = ("texture", "opacity", "blur", "radius_block", "radius_input", "radius_button", "accent", "accent2",
              "surface", "page", "film", "paint", *STYLE)
-STAFF_LOOK_KEYS = (*LOOK_KEYS, "enabled", "bar", "bar_texture", "header_glass", "header_opacity", "header_blur", "card",
+STAFF_LOOK_KEYS = (*LOOK_KEYS, "enabled", "bar", "tile", "bar_texture", "header_glass", "header_opacity", "header_blur", "card",
                    "card_padding", "density", "contrast", "font")
 
 
@@ -1048,7 +1051,8 @@ _STAFF_CSS_VARS = {"--nexus-staff-primary": ("accent", "hex"), "--nexus-staff-se
                    "--nexus-staff-card": ("surface", "hex"), "--nexus-staff-surface-a": ("opacity", "alpha"),
                    "--nexus-staff-blur": ("blur", "px"), "--nexus-staff-radius": ("radius_block", "px"),
                    "--nexus-staff-r-input": ("radius_input", "px"), "--nexus-staff-r-btn": ("radius_button", "px"),
-                   "--nexus-staff-card-pad": ("card_padding", "px"), "--nexus-staff-bar-colour": ("bar", "hex")}
+                   "--nexus-staff-card-pad": ("card_padding", "px"), "--nexus-staff-bar-colour": ("bar", "hex"),
+                   "--nexus-staff-tile-colour": ("tile", "hex")}
 
 
 def css_values(css: str, staff: bool = False) -> dict:
@@ -2691,7 +2695,7 @@ def staff_links_css(cfg: dict) -> str:
     staff interface's colours set on the nav itself, so they work with or
     without the staff colour theme."""
     st = normalize(cfg)["staff"]
-    accent, accent2, surface = st["accent"], st["accent2"], st["surface"]
+    accent, accent2, surface = st["accent"], st["accent2"], staff_tile(st)
     return f"""html body #kei-staff-links {{
     --nexus-primary: {accent};
     --nexus-secondary: {accent2};
@@ -3023,6 +3027,11 @@ def staff_css_body(cfg: dict) -> str:
     # Only a chosen bar colour is written as a setting (css_values reads it
     # back); the automatic one follows the accent.
     chosen = f"    --nexus-staff-bar-colour: {st['bar']};\n" if st["bar"] else ""
+    chosen += f"    --nexus-staff-tile-colour: {st['tile']};\n" if st["tile"] else ""
+    tile = staff_tile(st)
+    # The tiles' letters: the page text when they share the block colour,
+    # otherwise dark or light from their own colour.
+    on_tile = text_on(tile) if st["tile"] else ("#1f2933" if light else "#e6edf3")
     page = staff_page(st)
     card = surface
     text, muted = ("#1f2933", "#5b6875") if light else ("#e6edf3", "#9da7b3")
@@ -3064,9 +3073,12 @@ def staff_css_body(cfg: dict) -> str:
     --nexus-staff-r-btn: {st['radius_button']}px;
     --nexus-staff-surface-rgb: {_rgb(surface)};
     --nexus-staff-surface-a: {st['opacity'] / 100:.2f};
-    /* The module tiles and other buttons-as-cards: the block background at
-       the opacity slider, a touch more solid so their text stays crisp. */
-    --nexus-staff-tile: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .5 + .5));
+    /* The module tiles and other buttons-as-cards: their own colour (or the
+       block background) at the opacity slider, a touch more solid so their
+       text stays crisp. */
+    --nexus-staff-tile-rgb: {_rgb(tile)};
+    --nexus-staff-on-tile: {on_tile};
+    --nexus-staff-tile: rgba(var(--nexus-staff-tile-rgb), calc(var(--nexus-staff-surface-a) * .5 + .5));
     --nexus-staff-blur: {st['blur']}px;
     --nexus-staff-card-pad: {st['card_padding']}px;
 }}
@@ -3158,7 +3170,7 @@ html body ul.biglinks-list li a.icon_general {{
     gap: .8rem;
     padding: .7rem 1rem;
     background-color: var(--nexus-staff-tile);
-    color: var(--nexus-staff-text);
+    color: var(--nexus-staff-on-tile);
     font-weight: 600;
     border: 1px solid var(--nexus-staff-edge);
     border-radius: var(--nexus-staff-radius);
@@ -3192,7 +3204,7 @@ html body ul.biglinks-list li a.icon_general > .fa-stack .fa-stack-2x {{
 }}
 html body ul.biglinks-list li a.icon_general:hover, html body ul.biglinks-list li a.icon_general:focus-visible {{
     background-color: var(--nexus-staff-tile);
-    color: var(--nexus-staff-ink);
+    color: var(--nexus-staff-on-tile);
     border-color: var(--nexus-staff-primary);
     box-shadow: var(--nexus-staff-shadow-hi);
     transform: translateY(-2px);
@@ -3208,14 +3220,14 @@ html body #koha_version a {{ color: var(--nexus-staff-muted); }}
    opacity and the dark mode instead of staying grey. */
 html body .grid-acesso-koha .btn-koha-clone {{
     background-color: var(--nexus-staff-tile) !important;
-    color: var(--nexus-staff-text) !important;
+    color: var(--nexus-staff-on-tile) !important;
     border: 1px solid var(--nexus-staff-edge) !important;
     border-radius: var(--nexus-staff-radius) !important;
     box-shadow: var(--nexus-staff-shadow) !important;
 }}
 html body .grid-acesso-koha .btn-koha-clone:hover, html body .grid-acesso-koha .btn-koha-clone:focus-visible {{
     background-color: var(--nexus-staff-tile) !important;
-    color: var(--nexus-staff-ink) !important;
+    color: var(--nexus-staff-on-tile) !important;
     border-color: var(--nexus-staff-primary) !important;
     box-shadow: var(--nexus-staff-shadow-hi) !important;
 }}
@@ -3533,7 +3545,7 @@ def _staff_material_css(st: dict) -> list[str]:
     rule.append("}")
     # The cards inside: the same surface, a touch more solid, so text stays crisp.
     rule.append(f"""{cards} {{
-    background-color: rgba(var(--nexus-staff-surface-rgb), calc(var(--nexus-staff-surface-a) * .5 + .5));
+    background-color: var(--nexus-staff-tile);
 }}""")
     if t == "frosted":
         layer = ", ".join(f"{x}::before" for x in blocks.split(", "))
@@ -3800,6 +3812,11 @@ html body .btn:hover, html body .btn:focus, html body button:hover, html body in
     return ""
 
 
+# The most opaque the staff top bars get over a wallpaper while they follow
+# the blocks (the switch "Top bar opacity of its own" off).
+WALLPAPER_BAR_MAX = 70
+
+
 def bar_glass(opacity: int, blur: int) -> tuple[int, int]:
     """The top bars' opacity and blur when they follow the blocks. A thin bar
     at the blocks' opacity and blur looked solid (Paulo, 2026-11-01: "a barra
@@ -3810,6 +3827,14 @@ def bar_glass(opacity: int, blur: int) -> tuple[int, int]:
     if opacity >= 100:
         return 100, blur
     return max(30, round(100 - (100 - opacity) * 1.6)), min(blur, 4)
+
+
+def staff_tile(st: dict) -> str:
+    """The colour of the staff buttons drawn as cards (the home page modules,
+    the quick access buttons, a library's own tile grid): their own, or the
+    block background (Paulo, 2026-11-01: "os botões e cor do bloco é
+    definida pela mesma barra, não seria bom separar?")."""
+    return st.get("tile") or st["surface"]
 
 
 def bar_texture(st: dict) -> str:
@@ -3855,6 +3880,11 @@ def _staff_header_css(st: dict) -> list[str]:
     dark mode's bar is translucent and textured too."""
     own = st["header_glass"]
     alpha, blur = (st["header_opacity"], st["header_blur"]) if own else bar_glass(st["opacity"], st["blur"])
+    if not own and st["background"]["url"]:
+        # Over a wallpaper the bars always let it through a little, even with
+        # solid blocks (Paulo, 2026-11-01, again: "ainda nada de
+        # transparência" with the blocks at 100%, the bars were solid too).
+        alpha, blur = min(alpha, WALLPAPER_BAR_MAX), min(blur, 4)
     texture = bar_texture(st)
     if alpha >= 100 and texture == "flat":
         return []
@@ -3985,6 +4015,8 @@ def staff_dark_css(cfg: dict) -> str:
     Koha's and Bootstrap's white boxes, tables, fields and menus with them."""
     st = normalize(cfg)["staff"]
     card = "#161b22"
+    # The tiles' own colour shows as a faint tint of the dark card.
+    dark_tile = mix(st["tile"], card, .82) if st["tile"] else card
     link = readable(mix(link_base(st["accent"], st["accent2"]), "#ffffff", .45), card, 7)
     # The accents lifted until they stand out on the dark cards (a black
     # accent made black buttons and invisible module icons on #161b22).
@@ -4025,6 +4057,8 @@ def staff_dark_css(cfg: dict) -> str:
     --nexus-staff-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px -8px rgba(0, 0, 0, .6);
     --nexus-staff-shadow-hi: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 28px -8px rgba({_rgb(primary)}, .45);
     --nexus-staff-surface-rgb: 22, 27, 34;
+    --nexus-staff-tile-rgb: {_rgb(dark_tile)};
+    --nexus-staff-on-tile: #e6edf3;
     --nexus-staff-edge: rgba(255, 255, 255, .10);
     --bs-body-bg: #0d1117;
     --bs-body-color: #e6edf3;
