@@ -655,7 +655,12 @@ INSERT INTO additional_contents_localizations (additional_content_id, title, con
              FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
              WHERE c.code = 'koha-nexus-welcome'")" = "news|staff_only|all|default|Welcome to koha.nexus" ]
     ac "SELECT l.content FROM additional_contents c JOIN additional_contents_localizations l ON l.additional_content_id = c.id
-        WHERE c.code = 'koha-nexus-welcome'" | grep -qF '<a href="https://koha.nexus" target="_blank" rel="noopener">koha.nexus</a>'
+        WHERE c.code = 'koha-nexus-welcome'" > "$W/welcome.html"
+    grep -qF '<a href="https://koha.nexus" target="_blank" rel="noopener">koha.nexus</a>' "$W/welcome.html"
+    grep -qF '<a href="https://github.com/PauloFBaldiFH/koha.nexus" target="_blank" rel="noopener">' "$W/welcome.html"
+    grep -qF 'without budget or technical support' "$W/welcome.html"
+    grep -qF '<li>Pix: <code>076.650.449.21</code></li>' "$W/welcome.html"
+    grep -qF '<li>Bitcoin (BTC): <code>bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx</code></li>' "$W/welcome.html"
     [ -f "$W/etc/staff-welcome-news.done" ]
     # Not one of the panel's own (kei-*): the panel's staff news box shows it
     # as the library's news item and Apply edits it in place.
@@ -674,6 +679,14 @@ assert d["news-staff"]["own"] and d["news-staff"]["title"] == "Welcome to koha.n
     task staff_welcome_news
     [ "$(ac "SELECT COUNT(*) FROM additional_contents WHERE code = 'koha-nexus-welcome'")" = "1" ]
     [ -f "$W/etc/staff-welcome-news.done" ]
+}
+
+@test "staff news: the koha.nexus item is put in only by a new install, never when the panel opens" {
+    # Called by the install of a new instance...
+    sed -n '/^install_koha_flow\|^    tui_step 7 /,/install_task_cleanup/p' "$BATS_TEST_DIRNAME/../installer" | grep -q '^    staff_welcome_news$'
+    # ...and by nothing that runs on every start of the panel.
+    [ "$(grep -c '^[^#]*staff_welcome_news$' "$BATS_TEST_DIRNAME/../installer")" = "1" ]
+    ! grep -q 'is_koha_installed && staff_welcome_news' "$BATS_TEST_DIRNAME/../installer"
 }
 
 @test "contents: scripts, handlers, unknown places or a missing file change nothing" {
