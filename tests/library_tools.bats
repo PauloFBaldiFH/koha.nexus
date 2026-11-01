@@ -126,6 +126,11 @@ ALTER TABLE items ADD COLUMN IF NOT EXISTS itype varchar(10), ADD COLUMN IF NOT 
   ADD COLUMN IF NOT EXISTS damaged tinyint(1) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS damaged_on datetime,
   ADD COLUMN IF NOT EXISTS datelastborrowed date;
 ALTER TABLE statistics ADD COLUMN IF NOT EXISTS itemtype varchar(10);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS holdingbranch varchar(10), ADD COLUMN IF NOT EXISTS location varchar(80),
+  ADD COLUMN IF NOT EXISTS notforloan smallint NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS restricted smallint NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS datelastseen date;
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS renewals smallint DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS itemtypes (itemtype varchar(10) NOT NULL PRIMARY KEY, description longtext) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE accountlines (accountlines_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11), amountoutstanding decimal(28,6));
 CREATE TABLE borrower_debarments (borrower_debarment_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, borrowernumber int(11) NOT NULL,
@@ -134,6 +139,11 @@ CREATE TABLE reserves (reserve_id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, b
   itemnumber int(11), branchcode varchar(10), found varchar(1), waitingdate date);
 CREATE TABLE auth_header (authid bigint(20) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, authtypecode varchar(10) NOT NULL DEFAULT '',
   datecreated date, marcxml longtext NOT NULL) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE reserves ADD COLUMN IF NOT EXISTS priority smallint DEFAULT 1, ADD COLUMN IF NOT EXISTS reservedate date,
+  ADD COLUMN IF NOT EXISTS expirationdate date, ADD COLUMN IF NOT EXISTS suspend tinyint DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS suspend_until datetime;
+ALTER TABLE accountlines ADD COLUMN IF NOT EXISTS debit_type_code varchar(80), ADD COLUMN IF NOT EXISTS credit_type_code varchar(80),
+  ADD COLUMN IF NOT EXISTS amount decimal(28,6), ADD COLUMN IF NOT EXISTS date date;
 INSERT INTO itemtypes VALUES ('LIVRO', 'Livro') ON DUPLICATE KEY UPDATE description = VALUES(description);
 UPDATE items SET itype = 'LIVRO', itemcallnumber = '869.3 A1', booksellerid = 'Doação da prefeitura', dateaccessioned = CURDATE() WHERE itemnumber = 20;
 UPDATE items SET withdrawn = 1, withdrawn_on = '2025-05-01' WHERE itemnumber = 30;
@@ -167,7 +177,7 @@ report_run() {
     assert '[ "$status" -eq 0 ]' "$output"
     local n ids
     n=$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '%[koha-easy-installer:%';")
-    assert '[ "$n" = "22" ]' "22 reports expected, got $n: $(dialogs) $(cat "$KEI_S/textbox.last")"
+    assert '[ "$n" = "100" ]' "100 reports expected, got $n: $(dialogs) $(cat "$KEI_S/textbox.last")"
     # C4::Reports::Guided refuses these words anywhere in a saved report.
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '"'"'%[koha-easy-installer:%'"'"' AND savedsql REGEXP '"'"'[[:<:]](UPDATE|DELETE|DROP|INSERT|SHOW|CREATE)[[:>:]]'"'"';")" = "0" ]' "a report has a word Koha refuses"
     # Each new report finds the row made for it.
@@ -186,6 +196,16 @@ report_run() {
     assert '[ "$(report_run holds-waiting | wc -l)" = "1" ]'
     assert 'report_run collection-type | grep -qP "^CPL\tLivro\t1\t1\t0$"' "$(report_run collection-type)"
     assert 'report_run circ-daily | grep -q .'
+    assert 'report_run items-by-location | grep -q .'
+    assert 'report_run patrons-library-category | grep -qP "^CPL\tST\t2$"' "$(report_run patrons-library-category)"
+    assert '[ -z "$(report_run patrons-invalid-birth)" ]' "no future birthdays in the fixture"
+    # Inject a future birthday and verify the data-quality report selects it.
+    tools_sql "UPDATE borrowers SET dateofbirth = DATE_ADD(CURDATE(), INTERVAL 1 YEAR) WHERE cardnumber = 'S1'"
+    assert 'report_run patrons-invalid-birth | grep -q S1'
+    assert 'report_run holds-by-library | grep -qP "^CPL\tW\t1$"'
+    assert 'report_run debits-by-code | grep -q 2.500000'
+    assert 'report_run authority-type-count | grep -qP "^PERSO_NAME\t1$"'
+
 
     assert '[ "$(pre_backups REPORTS)" = "1" ]'
     assert '[ "$(tools_sql "SELECT COUNT(*) FROM saved_sql WHERE notes LIKE '"'"'%[koha-easy-installer:%'"'"' AND savedsql NOT LIKE '"'"'SELECT %'"'"';")" = "0" ]' "only SELECT statements"
