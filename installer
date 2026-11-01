@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.151"
+PANEL_VERSION=" 1.5.152"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -10951,8 +10951,8 @@ function_about() {
     txt_about="$(panel_name)\n\n"
     txt_about+="$(t "Born from real-life experience facing technical barriers in collection management, designed for libraries without budget for expensive commercial systems or dedicated technical support.")\n\n"
     txt_about+="$(t "Support this open-source initiative:")\n"
-    txt_about+="  * Pix (Brazil)  : 076.650.449.21\n"
-    txt_about+="  * Bitcoin (BTC) : bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx\n\n"
+    txt_about+="  * Pix (Brazil)  : ${KOHA_NEXUS_PIX}\n"
+    txt_about+="  * Bitcoin (BTC) : ${KOHA_NEXUS_BTC}\n\n"
     txt_about+="$(t "If this project helped you:")\n"
     txt_about+="  ⭐ $(t "Star the repository on GitHub!")\n"
     txt_about+="  ⭐ $(t "Share it with colleagues and other institutions.")\n\n"
@@ -36638,12 +36638,15 @@ opac_news_sql() {
 }
 
 # staff_welcome_news: a news item of the staff interface that presents
-# koha.nexus, put in once on each installation (new ones at the end of the
-# install, older ones when the panel starts). It is an ordinary Koha news
-# item of the library (code koha-nexus-welcome, not kei-*): Tools > News or
-# the panel's staff news box change it, and once deleted it never comes
-# back (the mark in CONF_DIR stays, also after a database restore).
+# koha.nexus, put in only when a new Koha instance is created (at the end of
+# the install; opening the panel on an existing Koha never adds it). It is an
+# ordinary Koha news item of the library (code koha-nexus-welcome, not kei-*):
+# Tools > News or the panel's staff news box change it, and once deleted it
+# never comes back (the mark in CONF_DIR stays, also after a database restore).
 STAFF_WELCOME_CODE="koha-nexus-welcome"
+# The project's contribution keys (also in About and the READMEs).
+KOHA_NEXUS_PIX="076.650.449.21"
+KOHA_NEXUS_BTC="bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx"
 STAFF_WELCOME_MARK="${CONF_DIR}/staff-welcome-news.done"
 staff_welcome_news() {
     [ -f "$STAFF_WELCOME_MARK" ] && return 0
@@ -36654,7 +36657,13 @@ staff_welcome_news() {
     if [ "$n" = "0" ]; then
         title=$(t "Welcome to koha.nexus")
         body="<p>$(t "This Koha was installed with <strong>koha.nexus</strong>, free software that installs Koha and looks after it from one panel (<code>sudo config.sh</code>): verified backups and restore, updates, the look of the OPAC and of this staff interface, Z39.50 catalogues, record import and the AI assistant.")</p>
-<p>$(t "Manual, downloads and news of the project:") <a href=\"https://koha.nexus\" target=\"_blank\" rel=\"noopener\">koha.nexus</a></p>
+<p>$(t "The project was made for libraries without budget or technical support. If it helped your library, consider contributing:")</p>
+<ul>
+<li>Pix: <code>${KOHA_NEXUS_PIX}</code></li>
+<li>Bitcoin (BTC): <code>${KOHA_NEXUS_BTC}</code></li>
+</ul>
+<p>$(t "Site, manual and downloads:") <a href=\"https://koha.nexus\" target=\"_blank\" rel=\"noopener\">koha.nexus</a><br>
+GitHub: <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\" target=\"_blank\" rel=\"noopener\">github.com/PauloFBaldiFH/koha.nexus</a></p>
 <p><em>$(t "This is an ordinary Koha news item: change it or delete it in Tools > News.")</em></p>"
         if ! printf "START TRANSACTION;\nINSERT INTO additional_contents (category, code, location, branchcode, published_on, number) VALUES ('news', '%s', 'staff_only', NULL, CURDATE(), 1);\nINSERT INTO additional_contents_localizations (additional_content_id, title, content, lang) VALUES (LAST_INSERT_ID(), %s, %s, 'default');\nCOMMIT;\n" \
                 "$STAFF_WELCOME_CODE" "$(sql_quote "$title")" "$(sql_quote "$body")" \
@@ -36664,7 +36673,7 @@ staff_welcome_news() {
         fi
         log "staff news: koha.nexus welcome item added"
     fi
-    mkdir -p "$CONF_DIR" 2>/dev/null && date '+%F %T' > "$STAFF_WELCOME_MARK" 2>/dev/null
+    mkdir -p "${STAFF_WELCOME_MARK%/*}" 2>/dev/null && date '+%F %T' > "$STAFF_WELCOME_MARK" 2>/dev/null
     return 0
 }
 
@@ -38441,8 +38450,6 @@ is_koha_installed && install_data_safety
 is_koha_installed && ficha_refresh
 # AI assistant installed by an older panel: same page as this version.
 is_koha_installed && aia_refresh
-# The staff news item that presents koha.nexus (once per installation).
-is_koha_installed && staff_welcome_news
 # Replace a MARC record / AI cataloguing installed by an older panel: same page as this version.
 is_koha_installed && mr_refresh
 [ -n "$PANEL_LOCK_CLEARED" ] && log "panel lock: stale lock of PID ${PANEL_LOCK_CLEARED} cleared (dropped session)"
