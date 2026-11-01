@@ -626,7 +626,7 @@ def test_staff_material_like_the_opac():
 def test_staff_translucent_header():
     # Off by default: the bars stay solid, nothing of the glass bar is written.
     off = ot.normalize({"staff": {"enabled": True}})["staff"]
-    assert (off["header_glass"], off["header_opacity"], off["header_blur"]) == (False, 85, 8)
+    assert (off["header_glass"], off["header_opacity"], off["header_blur"]) == (False, 55, 4)
     assert "--nexus-staff-header-a" not in ot.staff_css_body(ot.normalize({"staff": {"enabled": True}}))
     cfg = ot.normalize({"staff": {"enabled": True, "accent": "#123456", "bar": "#408540", "texture": "metal",
                                   "header_glass": True, "header_opacity": 140, "header_blur": -3}})
@@ -645,8 +645,10 @@ def test_staff_translucent_header():
     assert "opacity: ." not in glass and "opacity: 0" not in glass
     nav_rule = glass.split("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {", 1)[1].split("}", 1)[0]
     assert "backdrop-filter" not in nav_rule and "!important" in nav_rule
-    # After the texture: the glass bar wins over the brushed metal one.
-    assert css.rindex("rgba(var(--nexus-staff-topbar-rgb), var(--nexus-staff-header-a))") > css.rindex("feTurbulence")
+    # After the material: the last bar rule is the glass one, still brushed
+    # (the metal texture's bar keeps its streaks over the translucent colour).
+    last = css.rsplit("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {\n    background:", 1)[1].split("}", 1)[0]
+    assert "rgba(var(--nexus-staff-topbar-rgb), var(--nexus-staff-header-a))" in last and "feTurbulence" in last
     assert ot.parse_theme_data(ot.css_block(cfg))["staff"]["header_glass"] is True
 
 
@@ -1363,3 +1365,30 @@ def test_staff_dark_mode_reads_on_koha_panels():
     # dark mode's bar keeps them light.
     body = ot.staff_css_body(cfg)
     assert "color: rgba(var(--nexus-staff-on-topbar-rgb), .82)" in body
+
+
+def test_staff_top_bar_texture_and_glass():
+    """Paulo, 2026-11-01: the staff top bar looked solid over the wallpaper and
+    took no texture. The bars get a texture of their own, drawn over their
+    translucent colour, and the blur layer only while they are translucent."""
+    base = {"staff": {"enabled": True, "texture": "paper", "opacity": 96,
+                      "background": {"source": "url", "url": "https://x.example/w.jpg"}}}
+    cfg = ot.normalize(base)
+    assert cfg["staff"]["bar_texture"] == "auto" and ot.bar_texture(cfg["staff"]) == "flat"
+    assert ot.normalize({"staff": {"bar_texture": "lava"}})["staff"]["bar_texture"] == "auto"
+    # Own opacity: the wallpaper shows through at 55% with a light blur.
+    cfg["staff"].update(header_glass=True, bar_texture="wood")
+    body = ot.staff_css_body(cfg)
+    assert "--nexus-staff-header-a: 0.55" in body and "--nexus-staff-header-blur: 4px" in body
+    bar = body.split("html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {\n    background: ", 2)[-1]
+    assert bar.index("url(") < bar.index("rgba(var(--nexus-staff-topbar-rgb), var(--nexus-staff-header-a))")
+    assert "backdrop-filter: blur(var(--nexus-staff-header-blur))" in body
+    # Solid but textured: the texture without the glass layer.
+    cfg["staff"].update(header_opacity=100, bar_texture="metal")
+    body = ot.staff_css_body(cfg)
+    assert "--nexus-staff-header-a: 1.00" in body and "--nexus-staff-header-blur" in body
+    assert "blur(var(--nexus-staff-header-blur))" not in body
+    # The metal textures brush the bar on their own, as before.
+    assert ot.bar_texture(ot.normalize({"staff": {"texture": "anodized"}})["staff"]) == "anodized"
+    # Saved with the user's looks.
+    assert "bar_texture" in ot.STAFF_LOOK_KEYS

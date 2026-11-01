@@ -191,7 +191,7 @@ DEFAULTS: dict = {
               "card": "sections", "card_padding": 16,
               # The top bar and the quick search bar under it in translucent
               # glass (_staff_header_css): off keeps them solid.
-              "header_glass": False, "header_opacity": 85, "header_blur": 8,
+              "header_glass": False, "header_opacity": 55, "header_blur": 4, "bar_texture": "auto",
               # Each staff colour's own texture and opacity, as the OPAC's.
               "paint": {key: {"texture": "auto", "opacity": 100} for key in PAINTED}, **STYLE_DEFAULTS},
     # Koha's HTML customizations (Tools > HTML customizations) the panel
@@ -809,6 +809,8 @@ def normalize(raw: dict | None) -> dict:
         cfg["staff"][key] = _clamp(st.get(key, default), *RANGES[key], default)
     cfg["staff"].update(_style(st))
     cfg["staff"]["header_glass"] = bool(st.get("header_glass", False))
+    # The top bars' own texture ("auto": brushed with the metal textures, plain otherwise).
+    cfg["staff"]["bar_texture"] = st.get("bar_texture") if st.get("bar_texture") in PAINTS else "auto"
     cfg["staff"]["dark_switch"] = bool(st.get("dark_switch", False))
     cfg["staff"]["paint"] = _paints(st.get("paint"))
     for key, (lo, hi) in STAFF_HEADER.items():
@@ -880,6 +882,7 @@ def apply_preset(raw: dict | None, name: str) -> dict:
     st["paint"] = {key: {"texture": "auto", "opacity": 100} for key in PAINTED}
     st["bar"] = pre["bar"]
     st["header_glass"] = False
+    st["bar_texture"] = "auto"
     st["enabled"] = True
     return normalize(cfg)
 
@@ -895,7 +898,7 @@ MAX_USER_PRESETS = 5
 USER_PRESETS_FILE = "look-presets.json"
 LOOK_KEYS = ("texture", "opacity", "blur", "radius_block", "radius_input", "radius_button", "accent", "accent2",
              "surface", "page", "film", "paint", *STYLE)
-STAFF_LOOK_KEYS = (*LOOK_KEYS, "enabled", "bar", "header_glass", "header_opacity", "header_blur", "card",
+STAFF_LOOK_KEYS = (*LOOK_KEYS, "enabled", "bar", "bar_texture", "header_glass", "header_opacity", "header_blur", "card",
                    "card_padding", "density", "contrast", "font")
 
 
@@ -3809,44 +3812,79 @@ def bar_glass(opacity: int, blur: int) -> tuple[int, int]:
     return max(30, round(100 - (100 - opacity) * 1.6)), min(blur, 4)
 
 
+def bar_texture(st: dict) -> str:
+    """The texture the staff top bars are drawn in: their own, or with
+    "auto" the brushed metal of the metal textures and a plain colour
+    otherwise (the look before the bars had a texture of their own)."""
+    t = st.get("bar_texture", "auto")
+    if t != "auto":
+        return t
+    return st["texture"] if st["texture"] in METALS else "flat"
+
+
+def _bar_bg(texture: str, colour: str) -> str:
+    """The background layers of one top bar: the texture over colour (a
+    gradient layer, translucent or not)."""
+    if texture in METALS:
+        return _METAL_MAIN.format(c=colour)
+    if texture in MATERIALS:
+        return f"{_material(texture, '--nexus-staff-primary-rgb')['sheen']}, {colour}"
+    if texture == "gradient":
+        return ("linear-gradient(135deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 50%, "
+                f"rgba(0, 0, 0, .12) 100%), {colour}")
+    if texture in ("smooth", "frosted"):
+        return f"linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%), {colour}"
+    return colour
+
+
 def _staff_header_css(st: dict) -> list[str]:
     """The top bar (nav.navbar) and the quick search bar (#header_search) in
-    translucent glass: the bar's own colours at --nexus-staff-header-a over a
-    blur of --nexus-staff-header-blur. Only the bars' backgrounds go
-    translucent (rgba, never opacity), so the links, the search field, its
-    button and the dropdown menus keep full opacity and contrast. Off, or
-    where the device asks for less transparency or the browser has no
-    backdrop-filter, the bars stay solid. Comes after the texture, so it
-    also wins over the metal bar.
+    their texture (bar_texture) and in translucent glass: the bar's own
+    colours at --nexus-staff-header-a over a blur of
+    --nexus-staff-header-blur, the wallpaper showing through. Only the bars'
+    backgrounds go translucent (rgba, never opacity), so the links, the
+    search field, its button and the dropdown menus keep full opacity and
+    contrast. Where the device asks for less transparency or the browser
+    has no backdrop-filter, the bars stay solid. Comes after the material,
+    so it wins over its metal bar.
 
-    The bars follow the blocks' opacity and blur (Paulo, 2026-10-31: "a
-    barra superior não aplica transparência"); the "Translucent top bar"
-    switch gives them an opacity and blur of their own instead. The colours
-    are variables, so the dark mode's bar is translucent too."""
+    The bars follow the blocks' opacity and blur (bar_glass); the "Top bar
+    opacity of its own" switch gives them their own instead (Paulo,
+    2026-11-01: "a barra superior do staff não fica transparente ... não
+    consigo por textura nessa barra"). The colours are variables, so the
+    dark mode's bar is translucent and textured too."""
     own = st["header_glass"]
     alpha, blur = (st["header_opacity"], st["header_blur"]) if own else bar_glass(st["opacity"], st["blur"])
-    if alpha >= 100:
+    texture = bar_texture(st)
+    if alpha >= 100 and texture == "flat":
         return []
     a = "var(--nexus-staff-header-a)"
     top, end, bar = "var(--nexus-staff-topbar-rgb)", "var(--nexus-staff-topbar-end-rgb)", "var(--nexus-staff-bar-rgb)"
     bars = "html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark, html body #header_search"
-    return [f""":root {{
-    --nexus-staff-header-a: {alpha / 100:.2f};
+    top_bg = _bar_bg(texture, f"linear-gradient(90deg, rgba({top}, {a}), rgba({end}, {a}))")
+    search_bg = _bar_bg(texture, f"linear-gradient(rgba({bar}, {a}), rgba({bar}, {a}))")
+    edge = ("inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -1px 0 rgba(0, 0, 0, .35)"
+            if texture in MATERIALS else "0 1px 0 rgba(255, 255, 255, .08) inset")
+    out = [f""":root {{
+    --nexus-staff-header-a: {min(alpha, 100) / 100:.2f};
     --nexus-staff-header-blur: {blur}px;
 }}
 html body nav.navbar.bg-dark, html body nav.navbar.navbar-dark {{
-    background: linear-gradient(90deg, rgba({top}, {a}), rgba({end}, {a})) !important;
+    background: {top_bg} !important;
+    box-shadow: {edge};
     border-bottom: 1px solid rgba(255, 255, 255, .18);
 }}
-html body #header_search {{ background-color: rgba({bar}, {a}) !important; border-color: transparent; }}
+html body #header_search {{ background: {search_bg} !important; border-color: transparent; }}
 /* One layer only: the tabs, labels and lists inside the search bar are clear,
    the bar behind them carries the colour. */
 html body #header_search ul, html body #header_search .form-title,
 html body #header_search .nav-tabs > li > a:not(.active):not(:hover):not(:focus) {{
     background-color: transparent;
     border-color: transparent;
-}}
-/* The blur sits on a layer behind the bar (as on the frosted blocks), and the
+}}"""]
+    if alpha >= 100:
+        return out
+    out.append(f"""/* The blur sits on a layer behind the bar (as on the frosted blocks), and the
    bar stays above the page so its dropdown menus are never covered. */
 {bars} {{ position: relative; isolation: isolate; z-index: 1030; }}
 html body #header_search {{ z-index: 1029; }}
@@ -3871,7 +3909,8 @@ html body nav.navbar .dropdown-menu:not(.dropdown-menu-dark) {{ background-color
 }}
 @media (prefers-reduced-transparency: reduce) {{
     :root {{ --nexus-staff-header-a: 1; }}
-}}"""]
+}}""")
+    return out
 
 
 def _staff_pictures_css(st: dict) -> list[str]:

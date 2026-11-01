@@ -93,6 +93,11 @@ CARD_HELP = ("One card per section: each of Koha's boxes is a card. One card for
              "and its sidebar sit on one card and the boxes inside it are clear. The Opacity and Blocks sliders "
              "set its transparency and corners.")
 # The staff glass top bar: id: (label, unit).
+# The staff top bar's settings, together (Paulo, 2026-11-01: lost between
+# the bar's colour, its opacity switch and no texture of its own).
+BAR_NOTE = ("Top bar: the bar and the quick search bar under it. Their colour, their texture, and how much of "
+            "the wallpaper shows through them: with the switch off they follow the blocks, a little clearer; "
+            "on, the opacity and blur below are theirs alone (lower opacity, more wallpaper).")
 STAFF_HEADER_SLIDERS = {"header_opacity": ("Top bar opacity", "%"), "header_blur": ("Top bar blur", "px")}
 # The three corner sliders: what each one rounds (border-radius).
 PAINT_NOTE = ("The block background takes the texture and opacity above. Each of the other colours has a "
@@ -303,6 +308,16 @@ class OpacView(SectionView):
                     yield Static(t(RADIUS_NOTE), classes="ai-note", markup=False)
                 yield from _row(t(label), _tip(Slider(*ot.RANGES[key], st[key], step=step, unit=unit,
                                                       id=f"o-staff-{key}"), RADIUS_HELP.get(key, "")))
+            yield Static(t(BAR_NOTE), classes="ai-note", markup=False)
+            yield from _row(t("Top bar colour"),
+                            _tip(Switch(bool(st["bar"]), id="o-staff-bar-on"),
+                                 "Off: a dark bar that goes with any accent colour. On: the colour below. "
+                                 "The bar's text turns light or dark to stay readable."))
+            yield ColorPicker(t("Top bar"), st["bar"] or ot.staff_bar(st), "o-staff-bar", bars,
+                              id="o-pick-staff-bar")
+            yield from _row(t("Top bar texture"),
+                            Select([(t(v), k) for k, v in ot.PAINTS.items()], value=st["bar_texture"],
+                                   allow_blank=False, id="o-staff-bar_texture"))
             yield from _row(t("Top bar opacity of its own"),
                             _tip(Switch(st["header_glass"], id="o-staff-header_glass"),
                                  "Off: the top bar and the quick search bar follow the blocks' opacity and blur. "
@@ -310,12 +325,6 @@ class OpacView(SectionView):
                                  "menus always stay fully opaque."))
             for key, (label, unit) in STAFF_HEADER_SLIDERS.items():
                 yield from _row(t(label), Slider(*ot.STAFF_HEADER[key], st[key], unit=unit, id=f"o-staff-{key}"))
-            yield from _row(t("Top bar colour"),
-                            _tip(Switch(bool(st["bar"]), id="o-staff-bar-on"),
-                                 "Off: a dark bar that goes with any accent colour. On: the colour below. "
-                                 "The bar's text turns light or dark to stay readable."))
-            yield ColorPicker(t("Top bar"), st["bar"] or ot.staff_bar(st), "o-staff-bar", bars,
-                              id="o-pick-staff-bar")
             yield ColorPicker(t("Block background"), st["surface"], "o-staff-surface", bars,
                               id="o-pick-staff-surface")
             yield Static(t(PAINT_NOTE), classes="ai-note", markup=False)
@@ -666,6 +675,7 @@ class OpacView(SectionView):
         q("#o-staff-contrast", Select).value = st["contrast"]
         q("#o-staff-font", Slider).value = st["font"]
         q("#o-staff-header_glass", Switch).value = st["header_glass"]
+        q("#o-staff-bar_texture", Select).value = st["bar_texture"]
         q("#o-staff-dark_switch", Switch).value = st["dark_switch"]
         for key in ot.STAFF_HEADER:
             q(f"#o-staff-{key}", Slider).value = st[key]
@@ -710,6 +720,7 @@ class OpacView(SectionView):
                          "page": q("#o-staff-page", Input).value if q("#o-staff-page-on", Switch).value else "",
                          "bar": q("#o-staff-bar", Input).value if q("#o-staff-bar-on", Switch).value else "",
                          "header_glass": q("#o-staff-header_glass", Switch).value,
+                         "bar_texture": q("#o-staff-bar_texture", Select).value,
                          "dark_switch": q("#o-staff-dark_switch", Switch).value,
                          "paint": {key: {"texture": q(f"#o-staff-paint-{key}-texture", Select).value,
                                          "opacity": q(f"#o-staff-paint-{key}-opacity", Slider).value}
