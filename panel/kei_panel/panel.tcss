@@ -295,7 +295,8 @@ LoadingScreen {
 /* ---- dialogs ------------------------------------------------------- */
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
 TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
-ServerHelperScreen {
+ServerHelperScreen, SaveBackupScreen, WebTransferScreen, ProfileScreen, OAuthScreen,
+DiagnosticsScreen, LogTailScreen, CheckReportScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -313,6 +314,8 @@ ServerHelperScreen {
 .dialog.-wide { width: 96; max-height: 90%; }
 /* On a short terminal FitsScreen (screens/dialogs.py) lowers these. */
 .dialog-scroll { height: auto; max-height: 24; }
+/* Save database backup: its parts take their own height, not the whole dialog */
+#sb-form, #sb-progress, #sb-done { height: auto; }
 .dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
 .dialog-note { color: $text-muted; }
