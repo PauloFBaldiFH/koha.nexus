@@ -1,5 +1,6 @@
-"""The sign-in of a cloud service that needs a browser (OneDrive), from a
-panel that may be on a server with none.
+"""The sign-in of a cloud service that needs a browser (Google Drive,
+OneDrive, Dropbox, Box, pCloud...), from a panel that may be on a server
+with none.
 
 The screen shows the service's sign-in address with 📋 Copy link and Open
 buttons, and a box for what comes back: the address the browser ended on
@@ -21,6 +22,7 @@ from textual.widgets import Button, Input, Label, Static
 
 from .. import cloud
 from ..i18n import t
+from ..widgets.copy import CopyButton
 from .dialogs import FitsScreen
 
 
@@ -30,6 +32,10 @@ class OAuthScreen(FitsScreen, ModalScreen[Optional[str]]):
     def __init__(self, title: str, service: str, authorizer: cloud.Authorizer):
         super().__init__()
         self._title, self._service, self.authorizer = title, service, authorizer
+        # The same sign-in on a computer with a browser and rclone: its token is pasted below.
+        self.command = f'rclone authorize "{authorizer.provider}"'
+        if authorizer.extra:
+            self.command += " " + " ".join(f'"{a}"' for a in authorizer.extra)
         self.url = ""
         self._done = False
 
@@ -44,6 +50,12 @@ class OAuthScreen(FitsScreen, ModalScreen[Optional[str]]):
                       "copy the whole address from the address bar and paste it below."),
                 ]), classes="dialog-body", markup=False)
                 yield Static(t("Starting the sign-in..."), id="oauth-link", classes="dialog-body", markup=False)
+                yield Static(t("Or, on a computer with a browser and rclone installed (Windows: winget install "
+                               "Rclone.Rclone), run this command and paste the token it prints:"),
+                             classes="dialog-note", markup=False)
+                with Horizontal(classes="sb-side-row"):
+                    yield Static(self.command, id="oauth-command", classes="dialog-command", markup=False)
+                    yield CopyButton(command=True, id="oauth-copy-command")
             with Horizontal(classes="dialog-buttons"):
                 yield Button(t("📋 Copy link"), id="oauth-copy", variant="primary")
                 yield Button(t("Open in the browser"), id="oauth-open")
@@ -90,6 +102,10 @@ class OAuthScreen(FitsScreen, ModalScreen[Optional[str]]):
     def _copy(self, event: Button.Pressed) -> None:
         if self.url:
             self.app.copy_to_clipboard(self.url)
+
+    @on(Button.Pressed, "#oauth-copy-command")
+    def _copy_command(self) -> None:
+        self.app.copy_to_clipboard(self.command)
 
     @on(Button.Pressed, "#oauth-open")
     def _open(self) -> None:

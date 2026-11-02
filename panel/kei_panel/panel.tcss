@@ -296,6 +296,7 @@ LoadingScreen {
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
 TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
 ServerHelperScreen, SaveBackupScreen, WebTransferScreen, ProfileScreen, OAuthScreen,
+CloudBackupScreen, RemoteFormScreen,
 DiagnosticsScreen, LogTailScreen, CheckReportScreen {
     align: center middle;
     background: $background 70%;
@@ -360,6 +361,46 @@ DiagnosticsScreen, LogTailScreen, CheckReportScreen {
 .sb-side-row { height: auto; }
 .sb-side-row .dialog-command { width: 1fr; height: auto; margin: 1 1 0 0; }
 .sb-side-row Button { min-width: 14; height: 3; }
+/* ---- Automatic cloud backup (screens/cloud_backup.py) and its connection
+   form (screens/cloud_remote.py): the same cards as the backup screens */
+#cb-box, #cr-box {
+    width: 96%;
+    max-width: 200;
+    height: 92%;
+    border: round $success;
+    background: $surface;
+    padding: 1 2;
+}
+#cb-title, #cr-title { width: 1fr; }
+#cb-pill { width: auto; }
+.cb-switch-label { padding: 1 2 0 0; color: $text-muted; }
+#cb-body, #cr-body { height: 1fr; }
+#cb-tabs { width: 1fr; }
+#cb-tabs TabPane { padding: 1 0 0 0; }
+#cb-side { width: 56; margin-left: 1; }
+#cb-remotes { height: auto; max-height: 10; border: round $panel-lighten-2; }
+#cb-tree { height: 1fr; min-height: 5; border: round $panel-lighten-2; }
+#cb-files { height: 1fr; min-height: 5; border: round $panel-lighten-2; }
+#cb-history { height: 1fr; min-height: 5; border: round $panel-lighten-2; }
+#cb-busy { height: auto; padding-top: 1; }
+#cb-busy-text { width: 1fr; color: $accent; }
+#cb-bar { width: 30; }
+#cb-a-bar { margin: 1 0 0 0; }
+.cb-plan-row { height: auto; }
+.cb-plan-row Switch { margin-right: 1; }
+.cb-freq { width: 28; }
+.cb-day { width: 22; }
+.cb-time { width: 12; }
+.cb-plan-key { width: 26; padding-top: 1; color: $text-muted; }
+#cr-left { width: 46; margin-right: 1; }
+#cr-services { height: 1fr; border: round $panel-lighten-2; }
+#cr-form { width: 1fr; }
+.cr-field { height: auto; padding-bottom: 1; }
+#cr-name-box, #cr-fields, #cr-crypt-fields { height: auto; }
+.cr-label { text-style: bold; }
+.cr-switch-row { height: auto; }
+.cr-switch-row Label { padding-top: 1; }
+#cr-problem { height: auto; }
 .dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
 .dialog-note { color: $text-muted; }
@@ -488,6 +529,8 @@ App.-plain #loader-box,
 App.-plain .dialog,
 App.-plain #picker-box,
 App.-plain #sb-box,
+App.-plain #cb-box,
+App.-plain #cr-box,
 App.-plain .sb-card,
 App.-plain #sb-tree,
 App.-plain #picker-tree,

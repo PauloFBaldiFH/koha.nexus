@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.161"
+PANEL_VERSION=" 1.5.162"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -4655,6 +4655,14 @@ KEEP_DAYS=7
 # Compression of new SQL backups: gz (opens anywhere), zst (fast, smaller)
 # or xz (smallest, slow). Restores read any of them.
 BACKUP_COMPRESSION="gz"
+# Cloud copies (panel: Automatic cloud backup). CLOUD_KEEP_DAYS: copies in
+# the cloud older than this are deleted after each upload (0 = keep all).
+# RCLONE_REMOTE2: a second cloud that gets the same files. RCLONE_BWLIMIT:
+# rclone's --bwlimit (empty = no limit). CLOUD_MARC: send the MARC21 packages.
+CLOUD_KEEP_DAYS=0
+RCLONE_REMOTE2=""
+RCLONE_BWLIMIT=""
+CLOUD_MARC="yes"
 EOF
     chmod 600 "$BACKUP_CONF"
 }
@@ -4674,6 +4682,7 @@ DIR="${DIR_SQL}"
 LOG="${LOG_DIR}/backup_sql.log"
 LOCK_FILE="/var/lock/koha_backup.lock"
 RCLONE_REMOTE=""; RCLONE_SQL_FOLDER="Backup_SQL_Koha"; KEEP_DAYS=7; BACKUP_COMPRESSION="gz"
+CLOUD_KEEP_DAYS=0; RCLONE_REMOTE2=""; RCLONE_BWLIMIT=""
 [ -f "\$CONF" ] && . "\$CONF"
 case "\${KEEP_DAYS}" in ''|*[!0-9]*) KEEP_DAYS=7;; esac
 # gz (default), zst or xz; gzip when the chosen program is missing.
@@ -4751,16 +4760,37 @@ fi
 mv -f -- "\$PART" "\$FILE"
 log_backup "OK: \$FILE (\$SIZE bytes)"
 
-RCLONE_REMOTE="\$(printf '%s' "\$RCLONE_REMOTE" | xargs)"
-if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
-    if ! rclone listremotes --config /root/.config/rclone/rclone.conf 2>/dev/null | grep -qx "\${RCLONE_REMOTE}:"; then
-        log_backup "WARN: RCLONE_REMOTE='\${RCLONE_REMOTE}' does not exist in rclone.conf; skipping upload"
-    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy --retries 4 --retries-sleep 60s "\$FILE" "\${RCLONE_REMOTE}:\${RCLONE_SQL_FOLDER}/" >>"\$LOG" 2>&1; then
-        log_backup "Cloud OK: \${RCLONE_REMOTE}:\${RCLONE_SQL_FOLDER}/"
-    else
-        log_backup "WARN: cloud upload failed (local copy preserved)"
-    fi
-fi
+# Sends FILE to the cloud: the backup destination and the second copy
+# (RCLONE_REMOTE2), each in its own folder; then, when CLOUD_KEEP_DAYS is
+# set, copies older than that in the same folder (PATTERN only, that folder
+# only) are deleted. A failed upload never deletes anything.
+cloud_send() {
+    local file="\$1" folder="\$2" pattern="\$3" remote flags=()
+    local conf=/root/.config/rclone/rclone.conf
+    [ -f "\$conf" ] || return 0
+    case "\${CLOUD_KEEP_DAYS:-0}" in ''|*[!0-9]*) CLOUD_KEEP_DAYS=0;; esac
+    [ -n "\${RCLONE_BWLIMIT:-}" ] && flags+=(--bwlimit "\$RCLONE_BWLIMIT")
+    for remote in "\$(printf '%s' "\${RCLONE_REMOTE:-}" | xargs)" "\$(printf '%s' "\${RCLONE_REMOTE2:-}" | xargs)"; do
+        [ -n "\$remote" ] || continue
+        if ! rclone listremotes --config "\$conf" 2>/dev/null | grep -qx "\${remote}:"; then
+            log_backup "WARN: RCLONE_REMOTE='\${remote}' does not exist in rclone.conf; skipping upload"
+            continue
+        fi
+        if /usr/bin/rclone --config "\$conf" copy --retries 4 --retries-sleep 60s "\${flags[@]}" "\$file" "\${remote}:\${folder}/" >>"\$LOG" 2>&1; then
+            log_backup "Cloud OK: \${remote}:\${folder}/ (\${file##*/})"
+            if [ "\$CLOUD_KEEP_DAYS" -gt 0 ]; then
+                if /usr/bin/rclone --config "\$conf" delete --max-depth 1 --min-age "\${CLOUD_KEEP_DAYS}d" --include "\$pattern" "\${remote}:\${folder}/" >>"\$LOG" 2>&1; then
+                    log_backup "Cloud cleanup: copies older than \${CLOUD_KEEP_DAYS} days removed from \${remote}:\${folder}/"
+                else
+                    log_backup "WARN: cloud cleanup failed on \${remote}:\${folder}/"
+                fi
+            fi
+        else
+            log_backup "WARN: cloud upload failed on \${remote} (local copy preserved)"
+        fi
+    done
+}
+cloud_send "\$FILE" "\$RCLONE_SQL_FOLDER" '*.sql.*'
 
 find "\$DIR" \\( -name '*.sql.gz' -o -name '*.sql.zst' -o -name '*.sql.xz' \\) -mtime "+\${KEEP_DAYS}" -delete 2>/dev/null || true
 
@@ -4786,6 +4816,7 @@ DIR="${DIR_MARC}"
 LOG="${LOG_DIR}/backup_marc.log"
 LOCK_FILE="/var/lock/koha_backup.lock"
 RCLONE_REMOTE=""; RCLONE_MARC_FOLDER="Backup_MARC_Koha"; KEEP_DAYS=7
+CLOUD_KEEP_DAYS=0; RCLONE_REMOTE2=""; RCLONE_BWLIMIT=""; CLOUD_MARC="yes"
 [ -f "\$CONF" ] && . "\$CONF"
 case "\${KEEP_DAYS}" in ''|*[!0-9]*) KEEP_DAYS=7;; esac
 
@@ -4889,16 +4920,37 @@ if ! tar -tzf "\$PACKAGE" >/dev/null 2>&1; then
 fi
 log_backup "OK: \$PACKAGE (\$(stat -c %s "\$PACKAGE" 2>/dev/null) bytes)"
 
-RCLONE_REMOTE="\$(printf '%s' "\$RCLONE_REMOTE" | xargs)"
-if [ -n "\$RCLONE_REMOTE" ] && [ -f /root/.config/rclone/rclone.conf ]; then
-    if ! rclone listremotes --config /root/.config/rclone/rclone.conf 2>/dev/null | grep -qx "\${RCLONE_REMOTE}:"; then
-        log_backup "WARN: RCLONE_REMOTE='\${RCLONE_REMOTE}' does not exist in rclone.conf; skipping upload"
-    elif /usr/bin/rclone --config /root/.config/rclone/rclone.conf copy --retries 4 --retries-sleep 60s "\$PACKAGE" "\${RCLONE_REMOTE}:\${RCLONE_MARC_FOLDER}/" >>"\$LOG" 2>&1; then
-        log_backup "Cloud OK: \${RCLONE_REMOTE}:\${RCLONE_MARC_FOLDER}/"
-    else
-        log_backup "WARN: cloud upload failed"
-    fi
-fi
+# Sends FILE to the cloud: the backup destination and the second copy
+# (RCLONE_REMOTE2), each in its own folder; then, when CLOUD_KEEP_DAYS is
+# set, copies older than that in the same folder (PATTERN only, that folder
+# only) are deleted. A failed upload never deletes anything.
+cloud_send() {
+    local file="\$1" folder="\$2" pattern="\$3" remote flags=()
+    local conf=/root/.config/rclone/rclone.conf
+    [ -f "\$conf" ] || return 0
+    case "\${CLOUD_KEEP_DAYS:-0}" in ''|*[!0-9]*) CLOUD_KEEP_DAYS=0;; esac
+    [ -n "\${RCLONE_BWLIMIT:-}" ] && flags+=(--bwlimit "\$RCLONE_BWLIMIT")
+    for remote in "\$(printf '%s' "\${RCLONE_REMOTE:-}" | xargs)" "\$(printf '%s' "\${RCLONE_REMOTE2:-}" | xargs)"; do
+        [ -n "\$remote" ] || continue
+        if ! rclone listremotes --config "\$conf" 2>/dev/null | grep -qx "\${remote}:"; then
+            log_backup "WARN: RCLONE_REMOTE='\${remote}' does not exist in rclone.conf; skipping upload"
+            continue
+        fi
+        if /usr/bin/rclone --config "\$conf" copy --retries 4 --retries-sleep 60s "\${flags[@]}" "\$file" "\${remote}:\${folder}/" >>"\$LOG" 2>&1; then
+            log_backup "Cloud OK: \${remote}:\${folder}/ (\${file##*/})"
+            if [ "\$CLOUD_KEEP_DAYS" -gt 0 ]; then
+                if /usr/bin/rclone --config "\$conf" delete --max-depth 1 --min-age "\${CLOUD_KEEP_DAYS}d" --include "\$pattern" "\${remote}:\${folder}/" >>"\$LOG" 2>&1; then
+                    log_backup "Cloud cleanup: copies older than \${CLOUD_KEEP_DAYS} days removed from \${remote}:\${folder}/"
+                else
+                    log_backup "WARN: cloud cleanup failed on \${remote}:\${folder}/"
+                fi
+            fi
+        else
+            log_backup "WARN: cloud upload failed on \${remote} (local copy preserved)"
+        fi
+    done
+}
+[ "\${CLOUD_MARC:-yes}" = no ] || cloud_send "\$PACKAGE" "\$RCLONE_MARC_FOLDER" 'koha_marc_*.tar.gz'
 
 find "\$DIR" -name 'koha_marc_*.tar.gz' -mtime "+\${KEEP_DAYS}" -delete 2>/dev/null || true
 exit 0
@@ -6640,7 +6692,8 @@ function_marc_backup() {
     # 1.5.136 had no --if-due catch-up, one before 1.5.154 gave up on
     # Google's per-minute rate limit at once (no --retries-sleep): rewritten.
     if [ ! -f /root/backup_marc.sh ] || ! grep -q -- '--if-due' /root/backup_marc.sh 2>/dev/null \
-        || ! grep -q -- '--retries-sleep' /root/backup_marc.sh 2>/dev/null; then
+        || ! grep -q -- '--retries-sleep' /root/backup_marc.sh 2>/dev/null \
+        || ! grep -q 'cloud_send' /root/backup_marc.sh 2>/dev/null; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     if [ ! -f /root/backup_marc.sh ]; then
@@ -7928,28 +7981,24 @@ kei_first_cloud_backup() {
         >/dev/null 2>&1 </dev/null &
 }
 
-validate_and_register_rclone() {
-    local name="$1" err probe
-    [ -z "$name" ] && return 1
-    if ! rclone listremotes 2>/dev/null | grep -qx "${name}:"; then
-        local remotes
-        remotes=$(rclone listremotes 2>/dev/null)
-        msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")" 14 74
-        return 1
-    fi
-    if ! rclone_probe mkdir "${name}:Backup_SQL_Koha"; then
+# rclone_upload_test NAME SQL_DIR MARC_DIR: the folders are made, a test
+# file is sent to SQL_DIR, read back and removed. 1 with REPLY = what went
+# wrong (rclone's own words); 0 when the cloud took the file.
+rclone_upload_test() {
+    local name="$1" sql_dir="$2" marc_dir="$3" err probe
+    if ! rclone_probe mkdir "${name}:${sql_dir}"; then
         err=$REPLY
         log "rclone: write test on ${name} failed"
-        msg_error "" "$(t "Remote '\$name' exists but the write test failed.\n\nDetail:\n\$err")" 20 78
+        REPLY="$(t "Remote '\$name' exists but the write test failed.\n\nDetail:\n\$err")"
         return 1
     fi
-    rclone_probe mkdir "${name}:Backup_MARC_Koha" || true
+    rclone_probe mkdir "${name}:${marc_dir}" || true
     display_explanation "Testing the real cloud upload..."
     probe=$(mktemp /tmp/kei-cloud-test.XXXXXX) || return 1
     printf 'koha.nexus cloud upload test %s\n' "$(date '+%F %T')" > "$probe"
-    if ! rclone_probe copyto "$probe" "${name}:Backup_SQL_Koha/kei-upload-test.txt"; then
+    if ! rclone_probe copyto "$probe" "${name}:${sql_dir}/kei-upload-test.txt"; then
         err=$REPLY
-    elif ! rclone_probe lsf "${name}:Backup_SQL_Koha" --include kei-upload-test.txt || [ "$REPLY" != "kei-upload-test.txt" ]; then
+    elif ! rclone_probe lsf "${name}:${sql_dir}" --include kei-upload-test.txt || [ "$REPLY" != "kei-upload-test.txt" ]; then
         err=${REPLY:-$(t "The test file was sent but could not be read back.")}
     else
         err=""
@@ -7957,10 +8006,44 @@ validate_and_register_rclone() {
     rm -f "$probe"
     if [ -n "$err" ]; then
         log "rclone: upload test on ${name} failed"
-        msg_error "" "$(t "The test upload to \${name}:Backup_SQL_Koha failed.\n\nDetail:\n\$err")" 20 78
+        local dest="${name}:${sql_dir}"
+        REPLY="$(t "The test upload to \${dest} failed.\n\nDetail:\n\$err")"
         return 1
     fi
-    rclone_probe deletefile "${name}:Backup_SQL_Koha/kei-upload-test.txt" || true
+    rclone_probe deletefile "${name}:${sql_dir}/kei-upload-test.txt" || true
+    REPLY=""
+    return 0
+}
+
+# validate_and_register_rclone NAME [BASE]: the upload test, then NAME becomes
+# the backup destination. With BASE (a folder of the cloud, "" for its top)
+# the backups go to BASE/Backup_SQL_Koha and BASE/Backup_MARC_Koha; without
+# it, the folders already in backup.conf are kept.
+validate_and_register_rclone() {
+    local name="$1" sql_dir marc_dir set_dirs=0
+    [ -z "$name" ] && return 1
+    if ! rclone listremotes 2>/dev/null | grep -qx "${name}:"; then
+        local remotes
+        remotes=$(rclone listremotes 2>/dev/null)
+        msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")" 14 74
+        return 1
+    fi
+    if [ $# -ge 2 ]; then
+        if ! cloud_base_clean "$2"; then
+            msg_error "" "$(t "That folder name cannot be used in the cloud. Use letters, digits, spaces, . _ - and / between folders.")"
+            return 1
+        fi
+        sql_dir="${REPLY:+$REPLY/}Backup_SQL_Koha"
+        marc_dir="${REPLY:+$REPLY/}Backup_MARC_Koha"
+        set_dirs=1
+    else
+        sql_dir=$(cloud_conf_get RCLONE_SQL_FOLDER Backup_SQL_Koha)
+        marc_dir=$(cloud_conf_get RCLONE_MARC_FOLDER Backup_MARC_Koha)
+    fi
+    if ! rclone_upload_test "$name" "$sql_dir" "$marc_dir"; then
+        msg_error "" "$REPLY" 20 78
+        return 1
+    fi
     write_backup_config
     if grep -qE "^RCLONE_REMOTE=" "$BACKUP_CONF" 2>/dev/null; then
         sed -i -E "s|^RCLONE_REMOTE=.*|RCLONE_REMOTE=\"${name}\"|" "$BACKUP_CONF"
@@ -7971,10 +8054,16 @@ validate_and_register_rclone() {
         msg_error "" "$(t "The remote was validated, but I could NOT save '\${name}' in \${BACKUP_CONF}.\nCheck the file permissions.")" 11 76
         return 1
     fi
+    if [ "$set_dirs" = 1 ]; then
+        cloud_conf_set RCLONE_SQL_FOLDER "$sql_dir"
+        cloud_conf_set RCLONE_MARC_FOLDER "$marc_dir"
+    fi
     chmod 600 "$BACKUP_CONF"
-    log "rclone remote configured: $name"
+    log "rclone remote configured: $name ($sql_dir)"
+    kei_result remote "$name"
+    kei_result sql_folder "$sql_dir"
     kei_first_cloud_backup
-    msg_ok "$(t "Cloud enabled and tested successfully.\n\nRemote: \${name}\nSQL folder: Backup_SQL_Koha (a test file was sent and read back)\n\nThe first full backup is now running in the background.\nLog: \${LOG_DIR}/backup_sql.log")" 14 76
+    msg_ok "$(t "Cloud enabled and tested successfully.\n\nRemote: \${name}\nSQL folder: \${sql_dir} (a test file was sent and read back)\n\nThe first full backup is now running in the background.\nLog: \${LOG_DIR}/backup_sql.log")" 14 76
     return 0
 }
 
@@ -37606,6 +37695,510 @@ cloud_provider_add() {
 }
 
 # ======================================================================
+# 41.1 AUTOMATIC CLOUD BACKUP SCREEN (panel: screens/cloud_backup.py)
+# ----------------------------------------------------------------------
+# Every rclone service, set up from the panel's forms (never rclone's own
+# text wizard). The rclone file is root's (/root/.config/rclone/rclone.conf,
+# the one the nightly scripts read); secrets reach these tasks in a private
+# file (0600) that is deleted at once, and never come back to the panel.
+#
+#   cloud-status             destination, folders, retention, second copy,
+#                            bandwidth, rclone version, recent cloud history
+#   cloud-list               the rclone connections (name, service, target)
+#   cloud-show NAME          a connection's settings, secrets left out
+#   cloud-save FILE          create or change a connection (any service),
+#                            with an optional encrypted layer (NAME-crypt)
+#   cloud-test NAME [BASE]   the upload test only (nothing is saved)
+#   cloud-remote NAME [BASE] the upload test, then the backup destination
+#   cloud-delete NAME        the connection removed (and as a destination)
+#   cloud-settings FILE      retention, second copy, bandwidth, MARC21
+#   cloud-ls PATH [dirs]     the folders (and files) of NAME:PATH
+#   cloud-about NAME         space used and free, when the service tells
+#   cloud-get PATH           a backup copied from the cloud to ~/backups/from_cloud
+#   cloud-rm PATH            a backup deleted from the cloud
+#   cloud-send-now [marc]    the nightly backup run now (and the MARC21 package)
+#   cloud-rclone-official    the official rclone build (every service)
+# ======================================================================
+CLOUD_RCLONE_CONF="/root/.config/rclone/rclone.conf"
+CLOUD_CRYPT_DIR="KohaNexus_encrypted"
+CLOUD_LS_SECS=60
+CLOUD_SETTINGS_KEYS="CLOUD_KEEP_DAYS KEEP_DAYS RCLONE_REMOTE2 RCLONE_BWLIMIT CLOUD_MARC"
+
+# cloud_conf_get KEY DEFAULT: a value of backup.conf, quotes removed.
+cloud_conf_get() {
+    local v
+    v=$(grep -E "^$1=" "$BACKUP_CONF" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"')
+    printf '%s' "${v:-$2}"
+}
+
+# cloud_conf_set KEY VALUE: written as KEY="VALUE" (the value was checked:
+# no quote, $, backquote or backslash reaches a file the scripts source).
+cloud_conf_set() {
+    local key="$1" value="$2"
+    case "$value" in *'"'*|*'$'*|*'`'*|*\\*|*$'\n'*) return 1 ;; esac
+    write_backup_config
+    if grep -qE "^${key}=" "$BACKUP_CONF" 2>/dev/null; then
+        local tmp
+        tmp=$(mktemp "${BACKUP_CONF}.XXXXXX") || return 1
+        awk -v k="$key" -v v="$value" 'BEGIN { done = 0 }
+            index($0, k "=") == 1 { if (!done) print k "=\"" v "\""; done = 1; next } { print }' "$BACKUP_CONF" > "$tmp" \
+            && cat "$tmp" > "$BACKUP_CONF"
+        rm -f "$tmp"
+    else
+        printf '%s="%s"\n' "$key" "$value" >> "$BACKUP_CONF"
+    fi
+    chmod 600 "$BACKUP_CONF" 2>/dev/null || true
+}
+
+cloud_name_ok() { [[ "${1:-}" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}$ ]]; }
+
+# cloud_base_clean BASE: REPLY = the folder without leading/trailing slashes;
+# 1 for a name the cloud folders cannot take.
+cloud_base_clean() {
+    local b="${1:-}"
+    while [[ "$b" == /* ]]; do b=${b#/}; done
+    while [[ "$b" == */ ]]; do b=${b%/}; done
+    REPLY=$b
+    [ -z "$b" ] && return 0
+    [[ "$b" =~ ^[A-Za-z0-9._\ /-]{1,200}$ ]] || return 1
+    case "/$b/" in */../*|*/./*|*//*) return 1 ;; esac
+    return 0
+}
+
+cloud_remote_exists() { rclone listremotes 2>/dev/null | grep -qx "${1}:"; }
+
+# cloud_path_split PATH: CLOUD_NAME and CLOUD_SUB of NAME:SUB (1 when NAME is
+# not a connection or SUB is not a clean path).
+cloud_path_split() {
+    local p="${1:-}"
+    CLOUD_NAME=${p%%:*}
+    CLOUD_SUB=""
+    [[ "$p" == *:* ]] && CLOUD_SUB=${p#*:}
+    cloud_name_ok "$CLOUD_NAME" || return 1
+    cloud_base_clean "$CLOUD_SUB" || return 1
+    CLOUD_SUB=$REPLY
+    cloud_remote_exists "$CLOUD_NAME"
+}
+
+# rclone's words without anything that looks like a secret.
+cloud_clean_error() {
+    grep -viE 'token|secret|pass|key' | sed -e '/^[[:space:]]*$/d' | tail -n 6
+}
+
+cloud_status() {
+    local f line
+    kei_result remote "$(cloud_conf_get RCLONE_REMOTE "")"
+    kei_result remote2 "$(cloud_conf_get RCLONE_REMOTE2 "")"
+    kei_result sql_folder "$(cloud_conf_get RCLONE_SQL_FOLDER Backup_SQL_Koha)"
+    kei_result marc_folder "$(cloud_conf_get RCLONE_MARC_FOLDER Backup_MARC_Koha)"
+    kei_result keep_days "$(cloud_conf_get KEEP_DAYS 7)"
+    kei_result cloud_keep_days "$(cloud_conf_get CLOUD_KEEP_DAYS 0)"
+    kei_result bwlimit "$(cloud_conf_get RCLONE_BWLIMIT "")"
+    kei_result cloud_marc "$(cloud_conf_get CLOUD_MARC yes)"
+    kei_result dir_sql "$DIR_SQL"
+    if command -v rclone >/dev/null 2>&1; then
+        kei_result rclone "$(rclone version 2>/dev/null | head -n1 | awk '{print $2}')"
+        kei_result rclone_backends "$(rclone help backends 2>/dev/null | grep -cE '^  [a-z]')"
+        dpkg -S "$(command -v rclone)" >/dev/null 2>&1 && kei_result rclone_source debian || kei_result rclone_source official
+    else
+        kei_result rclone ""
+    fi
+    pgrep -f '/root/backup_(sql|marc)\.sh' >/dev/null 2>&1 && kei_result running yes
+    for f in sql marc; do
+        [ -f "${LOG_DIR}/backup_${f}.log" ] || continue
+        while IFS= read -r line; do
+            [ -n "$line" ] && kei_result history "${f}"$'\t'"${line:0:400}"
+        done < <(grep -E 'Cloud OK|Cloud cleanup|WARN: cloud|WARN: RCLONE_REMOTE|FAILED|OK: /' "${LOG_DIR}/backup_${f}.log" 2>/dev/null | tail -n 12)
+    done
+    return 0
+}
+
+cloud_list() {
+    local line name type
+    command -v rclone >/dev/null 2>&1 || return 0
+    while IFS= read -r line; do
+        name=${line%%:*}
+        type=$(printf '%s' "${line#*:}" | xargs)
+        [ -n "$name" ] && kei_result remote "${name}"$'\t'"${type}"
+    done < <(rclone listremotes --long 2>/dev/null)
+    return 0
+}
+
+# cloud-show NAME: "opt KEY<TAB>VALUE" for what can be shown, "secret KEY" for
+# what is kept (a password, a key, a token): the edit form leaves it blank.
+cloud_show() {
+    local name="${1:-}" line
+    cloud_name_ok "$name" && cloud_remote_exists "$name" || { msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"; return 1; }
+    while IFS= read -r line; do
+        case "$line" in
+            opt$'\t'*)    kei_result opt "${line#opt$'\t'}" ;;
+            secret$'\t'*) kei_result secret "${line#secret$'\t'}" ;;
+        esac
+    done < <(rclone config dump 2>/dev/null | python3 -c '
+import json, re, sys
+name = sys.argv[1]
+secret = re.compile(r"(pass|secret|token|key_pem|sas_url|^key$|api_key|private|bearer|credentials)", re.I)
+conf = json.load(sys.stdin).get(name, {})
+for k, v in conf.items():
+    v = str(v).replace("\t", " ").replace("\n", " ")
+    if secret.search(k):
+        print("secret\t" + k)
+    else:
+        print("opt\t" + k + "\t" + v[:300])
+' "$name" 2>/dev/null)
+    return 0
+}
+
+# cloud-save FILE (the panel's answers, 0600, deleted here):
+#   name NAME / type BACKEND / mode create|update
+#   opt KEY VALUE (one per setting) / crypt PASSWORD / crypt2 SALT /
+#   cryptdir BUCKET (object storage: the bucket of the encrypted folder)
+cloud_save() {
+    local f="$1" kind key value name="" type="" mode="" crypt="" crypt2="" cryptdir="" err target rc=0
+    local args=()
+    if [ ! -f "$f" ]; then
+        msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"
+        return 1
+    fi
+    while IFS=$'\t' read -r kind key value; do
+        case "$kind" in
+            name) name=$key ;;
+            type) type=$key ;;
+            mode) mode=$key ;;
+            crypt) crypt=$key ;;
+            crypt2) crypt2=$key ;;
+            cryptdir) cryptdir=$key ;;
+            opt)
+                if ! [[ "$key" =~ ^[a-z0-9_]{1,64}$ ]] || [ "$key" = "type" ]; then
+                    rm -f -- "$f"
+                    msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"
+                    return 1
+                fi
+                args+=("$key" "$value") ;;
+        esac
+    done < "$f"
+    rm -f -- "$f"
+    if ! cloud_name_ok "$name" || ! [[ "$type" =~ ^[a-z0-9]{1,32}$ ]] || ! [[ "$mode" =~ ^(create|update)$ ]]; then
+        msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"
+        return 1
+    fi
+    rclone_prepare || return 1
+    if ! rclone help backend "$type" >/dev/null 2>&1; then
+        msg_error "" "$(t "This rclone does not know the service '\${type}'. Install the official rclone (button on the cloud backup screen) and try again.")"
+        return 1
+    fi
+    display_explanation "Registering the connection in rclone..."
+    if [ "$mode" = create ]; then
+        if cloud_remote_exists "$name"; then
+            msg_error "" "$(t "There is already a connection called '\${name}'. Choose another name, or edit that one.")"
+            return 1
+        fi
+        err=$(rclone config create "$name" "$type" "${args[@]}" --obscure --non-interactive < /dev/null 2>&1) || rc=$?
+    else
+        if ! cloud_remote_exists "$name"; then
+            msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"
+            return 1
+        fi
+        err=""
+        if [ "${#args[@]}" -gt 0 ]; then
+            err=$(rclone config update "$name" "${args[@]}" --obscure --non-interactive < /dev/null 2>&1) || rc=$?
+        fi
+    fi
+    if [ "$rc" -ne 0 ] || ! cloud_remote_exists "$name"; then
+        log "rclone: the ${type} connection ${name} was not saved"
+        printf '%s\n' "$err" | cloud_clean_error >> "$RUN_LOG" 2>/dev/null
+        local detail
+        detail=$(printf '%s\n' "$err" | cloud_clean_error)
+        msg_error "" "$(t "rclone could not create the connection. Check the answers (account, keys, address) and try again.")${detail:+\n\n$detail}"
+        return 1
+    fi
+    target=$name
+    if [ -n "$crypt" ]; then
+        # Encrypted layer: files and names are encrypted on this server before
+        # they leave; only this password (and the salt) opens them again.
+        # On object storage (S3, B2...) the encrypted folder sits in a bucket.
+        target="${name}-crypt"
+        if ! cloud_base_clean "$cryptdir"; then
+            msg_error "" "$(t "That folder name cannot be used in the cloud. Use letters, digits, spaces, . _ - and / between folders.")"
+            return 1
+        fi
+        cryptdir="${REPLY:+$REPLY/}${CLOUD_CRYPT_DIR}"
+        rclone config delete "$target" >/dev/null 2>&1 || true
+        local cargs=(remote "${name}:${cryptdir}" password "$crypt" filename_encryption standard directory_name_encryption true)
+        [ -n "$crypt2" ] && cargs+=(password2 "$crypt2")
+        if ! rclone config create "$target" crypt "${cargs[@]}" --obscure --non-interactive < /dev/null >/dev/null 2>&1; then
+            msg_error "" "$(t "The connection was saved, but its encrypted layer could not be created.")"
+            return 1
+        fi
+    fi
+    log "rclone: ${type} connection ${name} saved by the panel (${mode})"
+    kei_result remote "$target"
+    return 0
+}
+
+# cloud-test NAME [BASE]: the upload test only; the destination is not changed.
+cloud_test() {
+    local name="${1:-}" sql_dir marc_dir start
+    rclone_prepare || return 1
+    if ! cloud_name_ok "$name" || ! cloud_remote_exists "$name"; then
+        local remotes
+        remotes=$(rclone listremotes 2>/dev/null)
+        msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"
+        return 1
+    fi
+    if [ $# -ge 2 ]; then
+        cloud_base_clean "$2" || { msg_error "" "$(t "That folder name cannot be used in the cloud. Use letters, digits, spaces, . _ - and / between folders.")"; return 1; }
+        sql_dir="${REPLY:+$REPLY/}Backup_SQL_Koha"
+        marc_dir="${REPLY:+$REPLY/}Backup_MARC_Koha"
+    else
+        sql_dir=$(cloud_conf_get RCLONE_SQL_FOLDER Backup_SQL_Koha)
+        marc_dir=$(cloud_conf_get RCLONE_MARC_FOLDER Backup_MARC_Koha)
+    fi
+    start=$SECONDS
+    if ! rclone_upload_test "$name" "$sql_dir" "$marc_dir"; then
+        kei_result test fail
+        msg_error "" "$REPLY" 20 78
+        return 1
+    fi
+    kei_result test ok
+    kei_result seconds "$((SECONDS - start))"
+    local dest="${name}:${sql_dir}"
+    msg_ok "$(t "✅ The cloud answered: a test file was sent to \${dest}, read back and removed.")"
+}
+
+cloud_delete() {
+    local name="${1:-}"
+    if ! cloud_name_ok "$name" || ! cloud_remote_exists "$name"; then
+        local remotes
+        remotes=$(rclone listremotes 2>/dev/null)
+        msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"
+        return 1
+    fi
+    rclone config delete "$name" >/dev/null 2>&1
+    if cloud_remote_exists "$name"; then
+        msg_error "" "$(t "rclone could not remove the connection '\${name}'.")"
+        return 1
+    fi
+    [ "$(cloud_conf_get RCLONE_REMOTE "")" = "$name" ] && cloud_conf_set RCLONE_REMOTE ""
+    [ "$(cloud_conf_get RCLONE_REMOTE2 "")" = "$name" ] && cloud_conf_set RCLONE_REMOTE2 ""
+    log "rclone: connection ${name} removed by the panel"
+    msg_ok "$(t "The connection '\${name}' was removed. The files already in the cloud were not touched.")"
+}
+
+# cloud-settings FILE: KEY<TAB>VALUE lines (CLOUD_SETTINGS_KEYS only).
+cloud_settings() {
+    local f="$1" key value bad=""
+    local -A want=()
+    [ -f "$f" ] || { msg_error "" "$(t "The cloud settings from the panel are missing. Nothing was changed.")"; return 1; }
+    while IFS=$'\t' read -r key value; do
+        [ -n "$key" ] || continue
+        case " $CLOUD_SETTINGS_KEYS " in *" $key "*) ;; *) bad=$key; break ;; esac
+        case "$key" in
+            CLOUD_KEEP_DAYS) [[ "$value" =~ ^[0-9]{1,4}$ ]] || bad=$key ;;
+            KEEP_DAYS)       [[ "$value" =~ ^[0-9]{1,4}$ ]] && [ "$value" -ge 1 ] || bad=$key ;;
+            RCLONE_REMOTE2)  [ -z "$value" ] || { cloud_name_ok "$value" && cloud_remote_exists "$value"; } || bad=$key ;;
+            RCLONE_BWLIMIT)  [[ "$value" =~ ^[0-9A-Za-z.:,\ -]{0,120}$ ]] || bad=$key ;;
+            CLOUD_MARC)      [[ "$value" =~ ^(yes|no)$ ]] || bad=$key ;;
+        esac
+        [ -n "$bad" ] && break
+        want[$key]=$value
+    done < "$f"
+    rm -f -- "$f"
+    if [ -n "$bad" ]; then
+        msg_error "" "$(t "The setting \${bad} from the panel is not valid. Nothing was changed.")"
+        return 1
+    fi
+    if [ -n "${want[RCLONE_BWLIMIT]:-}" ] && command -v rclone >/dev/null 2>&1 \
+        && ! rclone --bwlimit "${want[RCLONE_BWLIMIT]}" version >/dev/null 2>&1; then
+        msg_error "" "$(t "rclone does not accept that speed limit. Examples: 2M, 512k, or 08:00,1M 19:00,off")"
+        return 1
+    fi
+    for key in "${!want[@]}"; do
+        cloud_conf_set "$key" "${want[$key]}" || { msg_error "" "$(t "The setting \${key} could not be saved in \${BACKUP_CONF}.")"; return 1; }
+    done
+    log "cloud: settings saved by the panel (${!want[*]})"
+    msg_ok "$(t "Cloud backup settings saved. They apply from the next backup.")"
+}
+
+# cloud-ls NAME:PATH [dirs]: "entry D|F<TAB>name<TAB>bytes<TAB>modified".
+cloud_ls() {
+    local dirs=() out
+    cloud_path_split "${1:-}" || { msg_error "" "$(t "That folder of the cloud cannot be listed.")"; return 1; }
+    [ "${2:-}" = dirs ] && dirs=(--dirs-only)
+    if ! out=$(timeout --kill-after=5s "${CLOUD_LS_SECS}s" rclone --contimeout 15s --timeout 30s --retries 1 \
+            --low-level-retries 2 lsjson --max-depth 1 --no-mimetype "${dirs[@]}" "${CLOUD_NAME}:${CLOUD_SUB}" 2>&1 </dev/null); then
+        local detail
+        detail=$(printf '%s\n' "$out" | cloud_clean_error)
+        msg_error "" "$(t "The cloud did not list the folder.")${detail:+\n\n$detail}"
+        return 1
+    fi
+    while IFS= read -r out; do
+        [ -n "$out" ] && kei_result entry "$out"
+    done < <(printf '%s' "$out" | python3 -c '
+import json, sys
+try:
+    items = json.load(sys.stdin)
+except ValueError:
+    items = []
+for it in items[:3000]:
+    name = str(it.get("Name", "")).replace("\t", " ").replace("\n", " ")
+    kind = "D" if it.get("IsDir") else "F"
+    print("%s\t%s\t%s\t%s" % (kind, name, max(int(it.get("Size") or 0), 0), str(it.get("ModTime", ""))[:19]))
+' 2>/dev/null)
+    return 0
+}
+
+cloud_about() {
+    local name="${1:-}" out
+    cloud_name_ok "$name" && cloud_remote_exists "$name" || return 1
+    out=$(timeout --kill-after=5s 40s rclone --contimeout 15s --timeout 30s --retries 1 about "${name}:" --json 2>/dev/null </dev/null) || {
+        kei_result about none
+        return 0
+    }
+    while IFS= read -r out; do
+        [ -n "$out" ] && kei_result "${out%%=*}" "${out#*=}"
+    done < <(printf '%s' "$out" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for k in ("total", "used", "free", "trashed", "other"):
+    if isinstance(d.get(k), (int, float)):
+        print("%s=%d" % (k, d[k]))
+' 2>/dev/null)
+    return 0
+}
+
+# A file the backup screens may fetch or delete: an SQL backup or a MARC21 package.
+cloud_backup_name_ok() {
+    local n="${1##*/}"
+    [[ "$n" =~ ^[A-Za-z0-9._-]+\.sql(\.(gz|zst|xz|bz2))?$ ]] || [[ "$n" =~ ^koha_marc_[0-9_-]+\.tar\.gz$ ]]
+}
+
+# cloud-get NAME:PATH: copied to ~/backups/from_cloud of the person (theirs).
+cloud_get() {
+    local dest file
+    if ! cloud_path_split "${1:-}" || [ -z "$CLOUD_SUB" ] || ! cloud_backup_name_ok "$CLOUD_SUB"; then
+        msg_error "" "$(t "Only Koha backups (.sql.gz, .sql.zst, .sql.xz) and MARC21 packages can be fetched here.")"
+        return 1
+    fi
+    dest="${REAL_HOME:-/root}/backups/from_cloud"
+    mkdir -p "$dest" || return 1
+    file="${dest}/${CLOUD_SUB##*/}"
+    display_explanation "Downloading from the cloud..."
+    if ! rclone --contimeout 15s --timeout 60s --retries 3 --stats 2s --stats-one-line --stats-log-level NOTICE \
+            copyto "${CLOUD_NAME}:${CLOUD_SUB}" "${file}.part" </dev/null 2>&1; then
+        rm -f "${file}.part"
+        msg_error "" "$(t "The download from the cloud failed. Nothing was saved.")"
+        return 1
+    fi
+    mv -f -- "${file}.part" "$file"
+    if [ -n "${REAL_USER:-}" ] && [ "$REAL_USER" != root ] && [[ "$dest" == "${REAL_HOME}"/* ]]; then
+        chown "$REAL_USER": "${REAL_HOME}/backups" "$dest" "$file" 2>/dev/null || true
+    fi
+    kei_result file "$file"
+    kei_result size "$(du -h "$file" | cut -f1)"
+    msg_ok "$(t "Downloaded to \${file}")"
+}
+
+cloud_rm() {
+    if ! cloud_path_split "${1:-}" || [ -z "$CLOUD_SUB" ] || ! cloud_backup_name_ok "$CLOUD_SUB"; then
+        msg_error "" "$(t "Only Koha backups and MARC21 packages can be deleted here.")"
+        return 1
+    fi
+    if ! rclone --contimeout 15s --timeout 30s --retries 1 deletefile "${CLOUD_NAME}:${CLOUD_SUB}" </dev/null >/dev/null 2>&1; then
+        msg_error "" "$(t "The cloud did not delete the file.")"
+        return 1
+    fi
+    log "cloud: ${CLOUD_NAME}:${CLOUD_SUB} deleted by the panel"
+    local gone="${CLOUD_SUB##*/}"
+    msg_ok "$(t "Deleted from the cloud: \${gone}")"
+}
+
+# cloud-send-now [marc]: the nightly backup now, in front of the person; the
+# new lines of its log tell what reached the cloud.
+cloud_send_now() {
+    local before_sql before_marc lines line
+    require_database || return 1
+    rclone_prepare || return 1
+    if [ -z "$(cloud_conf_get RCLONE_REMOTE "")" ]; then
+        msg_error "" "$(t "No cloud is chosen for the backups yet. Choose a connection and press Use for backups.")"
+        return 1
+    fi
+    before_sql=$(wc -l < "${LOG_DIR}/backup_sql.log" 2>/dev/null || echo 0)
+    before_marc=$(wc -l < "${LOG_DIR}/backup_marc.log" 2>/dev/null || echo 0)
+    kei_emit note "$(t "Making the database backup and sending it to the cloud...")"
+    KEI_NO_MARC_CATCHUP=1 bash /root/backup_sql.sh >/dev/null 2>&1 </dev/null || true
+    if [ "${1:-}" = marc ] && [ -f /root/backup_marc.sh ]; then
+        kei_emit note "$(t "Making the MARC21 package and sending it to the cloud...")"
+        bash /root/backup_marc.sh >/dev/null 2>&1 </dev/null || true
+    fi
+    lines=$( { tail -n +"$((before_sql + 1))" "${LOG_DIR}/backup_sql.log" 2>/dev/null; \
+               tail -n +"$((before_marc + 1))" "${LOG_DIR}/backup_marc.log" 2>/dev/null; } | cut -c1-400)
+    while IFS= read -r line; do
+        [ -n "$line" ] && kei_result line "$line"
+    done <<< "$lines"
+    if printf '%s\n' "$lines" | grep -q 'Cloud OK' && ! printf '%s\n' "$lines" | grep -qE 'WARN: cloud upload failed|FAILED'; then
+        msg_ok "$(t "✅ Backup made and sent to the cloud.")"
+        return 0
+    fi
+    if printf '%s\n' "$lines" | grep -q 'skipped because another backup'; then
+        msg_error "" "$(t "Another backup is running right now. Try again in a few minutes.")"
+        return 1
+    fi
+    msg_error "" "$(t "The backup did not reach the cloud. See the lines below and the log: \${LOG_DIR}/backup_sql.log")"
+    return 1
+}
+
+# cloud-rclone-official: the build from rclone.org (every service; Debian's
+# package leaves some out, MEGA among them), checked against its SHA256SUMS.
+cloud_rclone_official() {
+    local arch ver tmp zip sums want got bin
+    case "$(dpkg --print-architecture 2>/dev/null || uname -m)" in
+        amd64|x86_64) arch=amd64 ;;
+        arm64|aarch64) arch=arm64 ;;
+        armhf|armv7l) arch=arm-v7 ;;
+        i386|i686) arch=386 ;;
+        *) msg_error "" "$(t "There is no official rclone for this processor.")"; return 1 ;;
+    esac
+    display_explanation "Downloading the official rclone..."
+    ver=$(curl -fsSL --max-time 30 https://downloads.rclone.org/version.txt 2>/dev/null | awk '{print $2}')
+    if ! [[ "$ver" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        msg_error "" "$(t "rclone.org did not answer. Check the internet connection of this server and try again.")"
+        return 1
+    fi
+    tmp=$(mktemp -d /tmp/kei-rclone.XXXXXX) || return 1
+    zip="rclone-${ver}-linux-${arch}.zip"
+    if ! curl -fsSL --max-time 600 -o "${tmp}/${zip}" "https://downloads.rclone.org/${ver}/${zip}" \
+        || ! curl -fsSL --max-time 30 -o "${tmp}/SHA256SUMS" "https://downloads.rclone.org/${ver}/SHA256SUMS"; then
+        rm -rf "$tmp"
+        msg_error "" "$(t "rclone.org did not answer. Check the internet connection of this server and try again.")"
+        return 1
+    fi
+    want=$(awk -v f="$zip" '$2 == f { print $1 }' "${tmp}/SHA256SUMS")
+    got=$(sha256sum "${tmp}/${zip}" | awk '{print $1}')
+    if [ -z "$want" ] || [ "$want" != "$got" ]; then
+        rm -rf "$tmp"
+        msg_error "" "$(t "The rclone download does not match its checksum. Nothing was installed.")"
+        return 1
+    fi
+    python3 -m zipfile -e "${tmp}/${zip}" "$tmp" >/dev/null 2>&1 || { rm -rf "$tmp"; msg_error "" "$(t "Could not install rclone.")"; return 1; }
+    bin=$(find "$tmp" -type f -name rclone | head -n1)
+    if [ -z "$bin" ] || ! "$bin" version >/dev/null 2>&1; then
+        rm -rf "$tmp"
+        msg_error "" "$(t "Could not install rclone.")"
+        return 1
+    fi
+    # Debian's package would put its older build back on an upgrade.
+    dpkg -s rclone >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get remove -y rclone >/dev/null 2>&1
+    install -m 755 "$bin" /usr/bin/rclone.kei-new && mv -f /usr/bin/rclone.kei-new /usr/bin/rclone
+    rm -rf "$tmp"
+    hash -r
+    kei_result rclone "$(rclone version 2>/dev/null | head -n1 | awk '{print $2}')"
+    kei_result rclone_backends "$(rclone help backends 2>/dev/null | grep -cE '^  [a-z]')"
+    log "rclone: official ${ver} installed"
+    msg_ok "$(t "The official rclone \${ver} is installed: every service it supports can be chosen now.")"
+}
+
+# ======================================================================
 # 42. WIREGUARD VPN (panel screen)
 # ----------------------------------------------------------------------
 # Optional VPN for the staff interface (:8080) and SSH (ROADMAP subject 6).
@@ -38322,9 +38915,11 @@ kei_task_info() {
     # A nightly script written before 1.5.44 dumps straight into its final
     # name, so a dump in progress looked like the newest backup; one written
     # before 1.5.136 never caught up a missed MARC21 backup, one before
-    # 1.5.154 gave up on Google's per-minute rate limit at once: rewritten.
+    # 1.5.154 gave up on Google's per-minute rate limit at once, one before
+    # 1.5.162 had no cloud retention or second copy (cloud_send): rewritten.
     if [ -f /root/backup_sql.sh ] && { ! grep -q 'backup_marc.sh --if-due' /root/backup_sql.sh 2>/dev/null \
-        || ! grep -q -- '--retries-sleep' /root/backup_sql.sh 2>/dev/null; }; then
+        || ! grep -q -- '--retries-sleep' /root/backup_sql.sh 2>/dev/null \
+        || ! grep -q 'cloud_send' /root/backup_sql.sh 2>/dev/null; }; then
         write_backup_scripts >/dev/null 2>&1 || true
     fi
     kei_result koha_installed "$(is_koha_installed && echo yes || echo no)"
@@ -38540,6 +39135,8 @@ kei_task() {
     # reads /dev/null instead, so none can swallow or wait for an answer.
     [ "${KEI_TASK_INTERACTIVE:-}" = "1" ] && exec {KEI_IN}<&0 </dev/null
     log "panel task: $name"
+    # The cloud tasks use root's rclone file, the one the nightly backups read.
+    [[ "$name" == cloud-* ]] && [ -z "${RCLONE_CONFIG:-}" ] && [ "$(id -u)" = 0 ] && export RCLONE_CONFIG="$CLOUD_RCLONE_CONF"
     case "$name" in
         info)            kei_task_info ;;
         backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
@@ -38568,7 +39165,20 @@ kei_task() {
         cloud-remote)
             require_database || return 1
             rclone_prepare || return 1
-            validate_and_register_rclone "${1:-}" ;;
+            validate_and_register_rclone "$@" ;;
+        cloud-status)    cloud_status ;;
+        cloud-list)      cloud_list ;;
+        cloud-show)      cloud_show "${1:-}" ;;
+        cloud-save)      [ -n "${1:-}" ] || return 2; cloud_save "$1" ;;
+        cloud-test)      cloud_test "$@" ;;
+        cloud-delete)    cloud_delete "${1:-}" ;;
+        cloud-settings)  [ -n "${1:-}" ] || return 2; cloud_settings "$1" ;;
+        cloud-ls)        cloud_ls "${1:-}" "${2:-}" ;;
+        cloud-about)     cloud_about "${1:-}" ;;
+        cloud-get)       cloud_get "${1:-}" ;;
+        cloud-rm)        cloud_rm "${1:-}" ;;
+        cloud-send-now)  cloud_send_now "${1:-}" ;;
+        cloud-rclone-official) cloud_rclone_official ;;
         db-maintenance)  function_deep_maintenance ;;
         reports-install)
             require_database || return 1
