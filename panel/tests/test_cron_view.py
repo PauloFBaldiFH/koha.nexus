@@ -110,7 +110,8 @@ def test_custom_schedule_is_checked_and_nothing_changed(tmp_path, monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 60)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("s")
+            # Straight to the view: a key pressed before the app listens is lost.
+            app.screen.action_show("crons")
             view = app.screen.query_one("#view-crons")
             await _until(pilot, lambda: view.drawn)
             # Nothing changed: no confirmation, no task.
@@ -159,3 +160,37 @@ def test_the_time_box_shows_the_whole_time(tmp_path, monkeypatch):
 
     width, shown = asyncio.run(main())
     assert width >= 6 and shown.strip() == "00:30"
+
+
+def test_a_cloud_backup_row_changes_what_it_sends(tmp_path, monkeypatch):
+    path = tmp_path / "koha_tasks"
+    path.write_text(FILE + "\n# Cloud backup gdrive: sql+marc\n"
+                    "30 23 * * * root /bin/bash /root/cloud_plan.sh gdrive sql+marc >/dev/null 2>&1\n")
+    monkeypatch.setenv("KEI_CRON_FILE", str(path))
+    from kei_panel.app import KohaPanelApp
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(160, 60)) as pilot:
+            await pilot.pause(0.2)
+            # Straight to the view: a key pressed before the app listens is lost.
+            app.screen.action_show("crons")
+            view = app.screen.query_one("#view-crons")
+            await _until(pilot, lambda: view.drawn)
+            c = _index(view, "cloud:gdrive")
+            name = str(view.query_one(f"#cr-row-{c} .cron-name").render())
+            assert view.query_one(f"#cr-what-{c}", Select).value == "sql+marc"
+            view.query_one(f"#cr-what-{c}", Select).value = "marc"
+            view.query_one(f"#cr-freq-{c}", Select).value = "weekly"
+            await pilot.pause(0.1)
+            view.query_one(f"#cr-day-{c}", Select).value = 6
+            text, problem = view.new_text()
+            # Defaults keep the cloud backup.
+            view.defaults()
+            await _until(pilot, lambda: view.drawn)
+            kept = any(j.key == "cloud:gdrive" for j in view.cf.jobs)
+            return name, text, problem, kept
+    name, text, problem, kept = asyncio.run(main())
+    assert "Cloud backup: gdrive" in name
+    assert problem == "" and "30 23 * * 6 root /bin/bash /root/cloud_plan.sh gdrive marc >/dev/null 2>&1" in text
+    assert kept

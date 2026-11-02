@@ -13,6 +13,9 @@ file, keeps a copy of the old one and puts it in place.
     OPAC appearance and takes it out when it is turned off;
   * a job that is off stays in the file as "#off# <cron line>", so turning
     it on again keeps its time;
+  * the cloud backups of Automatic cloud backup are rows too, one each
+    ("/root/cloud_plan.sh ID WHAT", key "cloud:ID"): their schedule and what
+    they send (SQL, MARC21 or both) can be changed here or there;
   * lines the library wrote by hand are kept as they are, with the comment
     right above them, and so are "# BEGIN ... / # END ..." blocks.
 """
@@ -31,6 +34,12 @@ OFF = "#off# "
 REINDEX_BIN = "/usr/local/bin/koha-kei-reindex"
 NOTIFY_BIN = "/usr/local/bin/koha-kei-notify"
 NEW_ARRIVALS_BIN = "/usr/local/bin/koha-kei-new-arrivals"
+
+CLOUD_BIN = "/root/cloud_plan.sh"
+CLOUD_PREFIX = "cloud:"
+CLOUD_WHATS = ("sql", "marc", "sql+marc")
+WHAT_LABELS = {"sql": "SQL", "marc": "MARC21", "sql+marc": "SQL + MARC21"}
+_CLOUD = re.compile(r"/root/cloud_plan\.sh\s+([A-Za-z][A-Za-z0-9_-]{0,31})\s+(sql\+marc|sql|marc)(?=\s|$)")
 
 FREQS = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "custom": "Custom"}
 WEEKDAYS = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
@@ -71,7 +80,7 @@ class Preset:
 PRESETS: tuple[Preset, ...] = (
     Preset("backup_sql", "Database backup (compressed SQL)", "/bin/bash /root/backup_sql.sh >/dev/null 2>&1",
            "backup_sql.sh", hour=23,
-           help="Generates the .sql.gz file, checks it and sends it to the cloud when one is set."),
+           help="Generates the .sql.gz file and checks it. The cloud backups send it to the cloud."),
     Preset("backup_marc", "MARC21 records backup", "/bin/bash /root/backup_marc.sh >/dev/null 2>&1",
            "backup_marc.sh", freq="weekly", day=0, hour=3,
            help="Exports the catalogue and the authorities in MARC21."),
@@ -245,6 +254,15 @@ def parse(text: str, instance: str) -> CronFile:
         m = _LINE.match(body.strip())
         if m and not body.lstrip().startswith("#"):
             cmd = m.group("cmd").strip()
+            plan = _CLOUD.search(cmd)
+            if plan and CLOUD_PREFIX + plan.group(1) not in seen:
+                key = CLOUD_PREFIX + plan.group(1)
+                job = Job(key, cloud_label(plan.group(1)), cmd, enabled, user=m.group("user"))
+                _from_schedule(job, m.group("sched"))
+                seen.add(key)
+                jobs.append(job)
+                note = []
+                continue
             preset = next((p for p in PRESETS if p.match in cmd and p.key not in seen), None)
             job = Job(preset.key if preset else "", preset.label if preset else "", cmd, enabled,
                       user=m.group("user"), note=[] if preset else note)
@@ -296,9 +314,15 @@ def describe(job: Job) -> str:
 def render(cf: CronFile) -> str:
     out = [HEADER, CRON_PATH, *cf.env, ""]
     order = {p.key: i for i, p in enumerate(PRESETS)}
-    known = sorted((j for j in cf.jobs if j.key), key=lambda j: order.get(j.key, 99))
+    after_marc = order["backup_marc"] + 0.5      # the cloud backups follow the local ones
+    known = sorted((j for j in cf.jobs if j.key),
+                   key=lambda j: after_marc if is_cloud(j) else order.get(j.key, 99))
     for job in known:
-        out += [f"# {job.label} - {describe(job)}", job.line(), ""]
+        if is_cloud(job):
+            head = f"# Cloud backup {cloud_id(job)}: {cloud_what(job)} - {describe(job)}"
+        else:
+            head = f"# {job.label} - {describe(job)}"
+        out += [head, job.line(), ""]
     for job in (j for j in cf.jobs if not j.key):
         out += [*job.note, job.line(), ""]
     for block in cf.blocks:
@@ -363,3 +387,65 @@ def with_job_on(text: str, key: str, instance: str) -> str:
         return ""
     job.enabled = True
     return render(cf)
+
+
+# ----------------------------------------------------------------------
+# The cloud backups (Automatic cloud backup): one job each
+# ----------------------------------------------------------------------
+def cloud_label(plan_id: str) -> str:
+    return f"Cloud backup: {plan_id}"
+
+
+def cloud_command(plan_id: str, what: str) -> str:
+    return f"/bin/bash {CLOUD_BIN} {plan_id} {what} >/dev/null 2>&1"
+
+
+def is_cloud(job: Job) -> bool:
+    return job.key.startswith(CLOUD_PREFIX)
+
+
+def cloud_id(job: Job) -> str:
+    return job.key[len(CLOUD_PREFIX):] if is_cloud(job) else ""
+
+
+def cloud_what(job: Job) -> str:
+    m = _CLOUD.search(job.command)
+    return m.group(2) if m else "sql"
+
+
+def cloud_job(plan_id: str, what: str = "sql+marc", hour: int = 23, minute: int = 30) -> Job:
+    """A new cloud backup's job: daily, on."""
+    return Job(CLOUD_PREFIX + plan_id, cloud_label(plan_id), cloud_command(plan_id, what), True, "daily",
+               hour=hour, minute=minute)
+
+
+def with_what(job: Job, what: str) -> Job:
+    """The cloud backup's job sending WHAT (sql, marc or sql+marc)."""
+    return replace(job, command=cloud_command(cloud_id(job), what))
+
+
+def cloud_jobs(cf: CronFile) -> list[Job]:
+    return [j for j in cf.jobs if is_cloud(j)]
+
+
+def put_cloud_job(cf: CronFile, job: Job, old_id: str = "") -> None:
+    """JOB in the file in place of the cloud backup's job (or OLD_ID's)."""
+    keys = {job.key, CLOUD_PREFIX + old_id} if old_id else {job.key}
+    for i, j in enumerate(cf.jobs):
+        if j.key in keys:
+            cf.jobs[i] = job
+            cf.jobs[:] = [x for k, x in enumerate(cf.jobs) if k == i or x.key not in keys]
+            return
+    cf.jobs.append(job)
+
+
+def drop_cloud_job(cf: CronFile, plan_id: str) -> None:
+    cf.jobs[:] = [j for j in cf.jobs if j.key != CLOUD_PREFIX + plan_id]
+
+
+def after_backup(cf: CronFile) -> tuple[int, int]:
+    """Half an hour after the nightly database backup (23:30 by default)."""
+    job = cf.job("backup_sql")
+    hour, minute = (job.hour, job.minute) if job and job.freq != "custom" else (23, 0)
+    minute += 30
+    return (hour + minute // 60) % 24, minute % 60

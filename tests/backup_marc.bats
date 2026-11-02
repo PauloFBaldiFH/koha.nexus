@@ -62,9 +62,12 @@ write_scripts() {
     run bash -c '
         source "$1/installer" >/dev/null 2>&1
         BACKUP_CONF="$2/backup.conf" DIR_SQL="$2/sql" DIR_MARC="$2/marc" LOG_DIR="$2/log" CRON_TASKS="$2/koha_tasks"
+        CLOUD_PLANS_FILE="$2/cloud_plans.conf" CLOUD_PLAN_SCRIPT="$2/cloud_plan.sh"
         write_backup_scripts' _ "$KEI_REPO" "$W"
     [ "$status" -eq 0 ]
     sed -i 's/^RCLONE_REMOTE=.*/RCLONE_REMOTE="gdrive"/' "$W/backup.conf"
+    # These tests are the scripts' own upload (up to 1.5.162): no cloud backups yet.
+    rm -f "$W/cloud_plans.conf"
 }
 
 marc_packages() { find "$W/marc" -maxdepth 1 -name 'koha_marc_*.tar.gz' 2>/dev/null | wc -l; }
@@ -210,4 +213,14 @@ FAKE
     [ "$status" -eq 0 ]
     grep -q "WARN: RCLONE_REMOTE='gone' does not exist in rclone.conf" "$W/log/backup_sql.log"
     grep -q '| Cloud OK: gdrive:Backup_SQL_Koha/' "$W/log/backup_sql.log"
+}
+
+@test "M14 once the cloud backups exist, the nightly scripts make local backups only" {
+    : > "$W/cloud_plans.conf"
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    [ "$status" -eq 0 ]
+    run bash /root/backup_marc.sh
+    [ "$status" -eq 0 ]
+    ! grep -q ' copy ' "$W/rclone.calls" 2>/dev/null
+    [ -x "$W/cloud_plan.sh" ]
 }
