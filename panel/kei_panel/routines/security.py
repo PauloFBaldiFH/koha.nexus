@@ -5,6 +5,8 @@
   staff_firewall  block port 8080 from the internet, or open it -> result
   rotate_password confirm -> new password under Pac-Man -> the password,
                   with a Copy button
+  cloudflare      the Cloudflare Tunnel screen (screens/cloudflare.py);
+                  an installer without `--task cf-status` keeps its menu
 Texts are the installer's own (same translations as the classic panel).
 """
 
@@ -62,3 +64,15 @@ async def rotate_password(app) -> None:
     kind, head, body = ("error", error[1], error[2]) if error else last_message(out)
     await app.push_screen_wait(MessageScreen(head if head and head != "OK" else title, body, kind=kind,
                                              command=password, is_command=False))
+
+
+CLOUDFLARE_TITLE = "🌉  Cloudflare Tunnel Manager (Recommended)"
+
+
+async def cloudflare(app) -> None:
+    if not app.bridge.has_task("cf-status"):
+        from .tools import generic
+        await generic("cloudflare", CLOUDFLARE_TITLE)(app)
+        return
+    from ..screens.cloudflare import CloudflareScreen
+    await app.push_screen_wait(CloudflareScreen())

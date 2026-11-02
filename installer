@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.163"
+PANEL_VERSION=" 1.5.164"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9122,9 +9122,9 @@ tunnel_public_hosts() {
     if tunnel_mode_is broker; then
         opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
         [ "$(tunnel_conf_get STAFF_REMOTE 2>/dev/null)" = "yes" ] && staff=$(tunnel_conf_get STAFF_HOST 2>/dev/null)
-    elif [ -f /etc/cloudflared/config.yml ]; then
-        opac=$(grep -B1 "localhost:80$" /etc/cloudflared/config.yml | grep "hostname:" | awk '{print $NF}' 2>/dev/null)
-        staff=$(grep -B1 "localhost:8080$" /etc/cloudflared/config.yml | grep "hostname:" | awk '{print $NF}' 2>/dev/null)
+    elif [ -f "${CF_CONFIG:-/etc/cloudflared/config.yml}" ]; then
+        opac=$(grep -B1 "localhost:80$" "${CF_CONFIG:-/etc/cloudflared/config.yml}" | grep "hostname:" | awk '{print $NF}' 2>/dev/null)
+        staff=$(grep -B1 "localhost:8080$" "${CF_CONFIG:-/etc/cloudflared/config.yml}" | grep "hostname:" | awk '{print $NF}' 2>/dev/null)
     fi
     printf '%s %s\n' "${opac:--}" "${staff:--}"
 }
@@ -9586,31 +9586,40 @@ function_broker_manage() {
             "6" "$(t "Give up the free address")") || return 0
         case "$choice" in
             1) function_broker_staff_access ;;
-            2) clear; broker_connect ;;
-            3)
-                clear
-                display_explanation "Renewing the tunnel token..."
-                if broker_request POST /v1/rotate yes "{}"; then
-                    broker_cleanup
-                    broker_connect
-                else
-                    msg_error "" "$(broker_error)" 9 70
-                    broker_cleanup
-                fi
-                ;;
+            2) function_broker_reconnect ;;
+            3) function_broker_rotate ;;
             4) broker_save_recovery ;;
             6) function_broker_leave && return 0 ;;
-            5)
-                if [ "$(tunnel_conf_get PUBLIC_LISTING)" = "yes" ]; then
-                    prompt_yes_no "$(t "Public list of catalogs")" "$(t "Hide the catalog from the public list of the koha.nexus network?")" 9 70 \
-                        && broker_set_listing false && msg_ok "$(t "The catalog is no longer on the public list.")" 8 60
-                else
-                    prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show the catalog on the public list of the koha.nexus network? The list shows the library's name and the catalog's address.")" 10 74 \
-                        && broker_set_listing true && msg_ok "$(t "The catalog is on the public list.")" 8 60
-                fi
-                ;;
+            5) function_broker_listing ;;
         esac
     done
+}
+
+function_broker_reconnect() {
+    clear
+    broker_connect
+}
+
+function_broker_rotate() {
+    clear
+    display_explanation "Renewing the tunnel token..."
+    if broker_request POST /v1/rotate yes "{}"; then
+        broker_cleanup
+        broker_connect
+    else
+        msg_error "" "$(broker_error)" 9 70
+        broker_cleanup
+    fi
+}
+
+function_broker_listing() {
+    if [ "$(tunnel_conf_get PUBLIC_LISTING)" = "yes" ]; then
+        prompt_yes_no "$(t "Public list of catalogs")" "$(t "Hide the catalog from the public list of the koha.nexus network?")" 9 70 \
+            && broker_set_listing false && msg_ok "$(t "The catalog is no longer on the public list.")" 8 60
+    else
+        prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show the catalog on the public list of the koha.nexus network? The list shows the library's name and the catalog's address.")" 10 74 \
+            && broker_set_listing true && msg_ok "$(t "The catalog is on the public list.")" 8 60
+    fi
 }
 
 # ----------------------------------------------------------------------
@@ -9863,21 +9872,327 @@ function_configure_cloudflare() {
                 systemctl restart cloudflared >/dev/null 2>&1
                 msg_ok "$(t "Service restarted successfully.")" 8 60
                 ;;
-            6)
-                if tunnel_mode_is broker; then
-                    function_broker_leave
-                    continue
-                fi
-                if prompt_yes_no "$(t "Disable Tunnel")" "$(t "This will stop the service and remove auto-start.\nYour catalog will go offline to the internet.\n\nContinue?")" 10 70; then
-                    clear
-                    display_explanation "Uninstalling service..."
-                    cloudflared service uninstall >/dev/null 2>&1 || true
-                    systemctl disable --now cloudflared >/dev/null 2>&1 || true
-                    msg_ok "$(t "Tunnel disabled.\nKoha is now only accessible on the local network.")" 10 70
-                fi
-                ;;
+            6) function_cloudflare_remove ;;
         esac
     done
+}
+
+# Option 6 of the manager: the free address is given up; a tunnel of the
+# library's own domain is stopped and its service removed (config.yml and
+# the Cloudflare login stay, so setting it up again is quick).
+function_cloudflare_remove() {
+    if tunnel_mode_is broker; then
+        function_broker_leave
+        return
+    fi
+    if prompt_yes_no "$(t "Disable Tunnel")" "$(t "This will stop the service and remove auto-start.\nYour catalog will go offline to the internet.\n\nContinue?")" 10 70; then
+        clear
+        display_explanation "Uninstalling service..."
+        cloudflared service uninstall >/dev/null 2>&1 || true
+        systemctl disable --now cloudflared >/dev/null 2>&1 || true
+        msg_ok "$(t "Tunnel disabled.\nKoha is now only accessible on the local network.")" 10 70
+    fi
+}
+
+# ----------------------------------------------------------------------
+# 14.2 CLOUDFLARE TUNNEL SCREEN (panel: screens/cloudflare.py)
+# ----------------------------------------------------------------------
+# The panel draws the tunnel's state itself and runs these tasks; the
+# wizards above (free address, own domain, remote staff access...) keep
+# their questions and are started with `--task cf-run NAME`.
+#
+#   cf-status              mode, addresses, service, cloudflared, Koha's
+#                          addresses, edge connections, the recent log
+#   cf-check               the path a reader takes, step by step: service,
+#                          Apache on this server, DNS, the public address
+#   cf-service ACTION      restart | pause (stopped, no start at boot) |
+#                          resume
+#   cf-urls                Koha's OPACBaseURL / staffClientBaseURL set to
+#                          the tunnel's addresses
+#   cf-qr                  the catalog's QR code (text and a PNG to print)
+#   cf-update              cloudflared updated from Cloudflare's repository
+#   cf-run NAME            free | domain | share | remove | staff |
+#                          reconnect | rotate | recovery | listing | leave
+# ----------------------------------------------------------------------
+CF_CONFIG="${KEI_CF_CONFIG:-/etc/cloudflared/config.yml}"
+
+# The cloudflared service exists (installed by either way of publishing).
+cf_unit_exists() {
+    [ -f "$CLOUDFLARED_UNIT" ] || systemctl cat cloudflared.service >/dev/null 2>&1
+}
+
+# cf_public_urls: "OPAC_URL STAFF_URL" as Koha should have them: the
+# tunnel's https addresses; a staff interface not published stays on the
+# local network (http://IP:8080), as the free address sets it.
+cf_public_urls() {
+    local opac staff
+    read -r opac staff < <(tunnel_public_hosts)
+    [ "$opac" = "-" ] && return 1
+    if [ "$staff" = "-" ]; then
+        staff="http://$(get_server_ip):8080"
+    else
+        staff="https://${staff}"
+    fi
+    printf '%s %s\n' "https://${opac}" "$staff"
+}
+
+cf_status() {
+    local mode=none opac staff state line since rec
+    if tunnel_mode_is broker; then
+        mode=broker
+    elif [ -f "$BROKER_ENROLL" ]; then
+        mode=pending
+    elif [ -f "$CF_CONFIG" ]; then
+        mode=domain
+    fi
+    kei_result mode "$mode"
+    read -r opac staff < <(tunnel_public_hosts)
+    [ "$opac" = "-" ] && opac=""
+    [ "$staff" = "-" ] && staff=""
+    kei_result opac "$opac"
+    kei_result staff "$staff"
+    kei_result local_ip "$(get_server_ip)"
+    if command -v cloudflared >/dev/null 2>&1; then
+        kei_result version "$(cloudflared --version 2>/dev/null | head -n1 | awk '{print $3}')"
+        dpkg -s cloudflared >/dev/null 2>&1 && kei_result package yes
+    fi
+    if cf_unit_exists; then
+        kei_result unit yes
+        state=$(systemctl is-active cloudflared 2>/dev/null)
+        kei_result service "${state:-inactive}"
+        state=$(systemctl is-enabled cloudflared 2>/dev/null)
+        kei_result enabled "${state:-disabled}"
+        state=$(systemctl is-active cloudflared 2>/dev/null)
+        if [ "$state" = "active" ]; then
+            since=$(systemctl show -p ActiveEnterTimestamp --value cloudflared 2>/dev/null)
+            kei_result since "$since"
+        fi
+        kei_result restarts "$(systemctl show -p NRestarts --value cloudflared 2>/dev/null)"
+    else
+        kei_result unit no
+        kei_result service absent
+    fi
+    { [ -f "${REAL_HOME:-/root}/.cloudflared/cert.pem" ] || [ -f /root/.cloudflared/cert.pem ]; } && kei_result cert yes
+    if [ "$mode" = "broker" ]; then
+        kei_result staff_host "$(tunnel_conf_get STAFF_HOST 2>/dev/null)"
+        kei_result staff_remote "$(tunnel_conf_get STAFF_REMOTE 2>/dev/null || echo no)"
+        kei_result listing "$(tunnel_conf_get PUBLIC_LISTING 2>/dev/null || echo no)"
+        kei_result broker "$(broker_url)"
+        rec=$(ls -1t "${REAL_HOME:-/root}"/koha-address-*.key 2>/dev/null | head -n1)
+        [ -n "$rec" ] && kei_result recovery "$rec"
+    fi
+    if [ -f "$CF_CONFIG" ]; then
+        kei_result tunnel_id "$(awk '/^tunnel:/ {print $2; exit}' "$CF_CONFIG" 2>/dev/null)"
+        while IFS= read -r line; do
+            [ -n "$line" ] && kei_result ingress "$line"
+        done < <(awk '/^[[:space:]]*-[[:space:]]*hostname:/ { h = $NF; next }
+                      /^[[:space:]]*service:/ { if (h != "") print h "\t" $NF; h = "" }' "$CF_CONFIG" 2>/dev/null)
+    fi
+    if is_database_ready; then
+        kei_result opac_base "$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='OPACBaseURL' LIMIT 1;")"
+        kei_result staff_base "$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='staffClientBaseURL' LIMIT 1;")"
+    fi
+    if command -v journalctl >/dev/null 2>&1 && cf_unit_exists; then
+        local logs
+        logs=$(journalctl -u cloudflared -n 300 --no-pager -o cat 2>/dev/null | grep -vi 'token')
+        # Edge connections of the current run: those registered after the
+        # last start (cloudflared keeps 4, in 2 Cloudflare locations).
+        printf '%s\n' "$logs" | awk '/Starting tunnel/ { delete c; delete l }
+            /Registered tunnel connection/ {
+                if (match($0, /connIndex=[0-9]+/)) i = substr($0, RSTART + 10, RLENGTH - 10); else i = NR
+                loc = ""; if (match($0, /location=[A-Za-z0-9]+/)) loc = substr($0, RSTART + 9, RLENGTH - 9)
+                c[i] = 1; if (loc != "") l[loc] = 1 }
+            END { n = 0; for (k in c) n++; print "connections\t" n; for (k in l) print "edge\t" k }' \
+            | while IFS=$'\t' read -r k v; do kei_result "$k" "$v"; done
+        while IFS= read -r line; do
+            kei_result log "${line:0:300}"
+        done < <(journalctl -u cloudflared -n 40 --no-pager -o short-iso 2>/dev/null | grep -vi 'token')
+    fi
+    return 0
+}
+
+# cf_check_row ID STATE DETAIL (STATE: ok, warn, fail, skip)
+cf_check_row() { kei_result check "$1"$'\t'"$2"$'\t'"${3:-}"; }
+
+# cf_probe URL [HOST]: "CODE SECONDS" of one request (CODE 000: no answer).
+cf_probe() {
+    local args=(-s -o /dev/null -w '%{http_code} %{time_total}' --max-time "${KEI_CF_PROBE_SECS:-15}")
+    [ -n "${2:-}" ] && args+=(-H "Host: $2")
+    local out
+    out=$(curl "${args[@]}" "$1" 2>/dev/null)
+    [[ "$out" =~ ^[0-9]{3}\  ]] || out="000 0"
+    printf '%s\n' "$out"
+}
+
+cf_check() {
+    local opac staff code secs base want
+    read -r opac staff < <(tunnel_public_hosts)
+    if [ "$opac" = "-" ]; then
+        cf_check_row setup fail ""
+        return 0
+    fi
+    if systemctl is-active --quiet cloudflared; then
+        cf_check_row service ok ""
+    else
+        code=$(systemctl is-active cloudflared 2>/dev/null)
+        cf_check_row service fail "${code:-inactive}"
+    fi
+    # What cloudflared itself asks Apache, with the public name.
+    read -r code secs < <(cf_probe "http://localhost:80/" "$opac")
+    if [[ "$code" == [23]?? ]]; then cf_check_row origin-opac ok "HTTP $code"
+    else cf_check_row origin-opac fail "HTTP $code"; fi
+    if [ "$staff" != "-" ]; then
+        read -r code secs < <(cf_probe "http://localhost:8080/" "$staff")
+        if [[ "$code" == [23]?? ]]; then cf_check_row origin-staff ok "HTTP $code"
+        else cf_check_row origin-staff fail "HTTP $code"; fi
+    fi
+    if getent ahosts "$opac" >/dev/null 2>&1; then cf_check_row dns-opac ok "$opac"
+    else cf_check_row dns-opac fail "$opac"; fi
+    read -r code secs < <(cf_probe "https://${opac}/")
+    case "$code" in
+        2??|3??) cf_check_row public-opac ok "HTTP $code · ${secs} s" ;;
+        000)     cf_check_row public-opac fail "" ;;
+        *)       cf_check_row public-opac fail "HTTP $code" ;;
+    esac
+    if [ "$staff" != "-" ]; then
+        read -r code secs < <(cf_probe "https://${staff}/")
+        case "$code" in
+            2??|3??) cf_check_row public-staff ok "HTTP $code · ${secs} s" ;;
+            # The free address asks for the remote access password first.
+            401)     cf_check_row public-staff ok "HTTP 401" ;;
+            000)     cf_check_row public-staff fail "" ;;
+            *)       cf_check_row public-staff fail "HTTP $code" ;;
+        esac
+    fi
+    if is_database_ready; then
+        base=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='OPACBaseURL' LIMIT 1;")
+        want="https://${opac}"
+        if [ "${base%/}" = "$want" ]; then cf_check_row koha-url ok "$want"
+        else cf_check_row koha-url warn "${base:--}"; fi
+    fi
+    return 0
+}
+
+cf_service() {
+    cf_unit_exists || {
+        msg_error "" "$(t "The tunnel is not set up on this server yet.")"
+        return 1
+    }
+    case "${1:-}" in
+        restart)
+            display_explanation "Restarting Cloudflare Tunnel..."
+            systemctl restart cloudflared >/dev/null 2>&1 ;;
+        pause)
+            display_explanation "Pausing the tunnel..."
+            systemctl disable --now cloudflared >/dev/null 2>&1
+            log "cloudflared paused from the panel"
+            msg_ok "$(t "The tunnel is paused: the catalog is off the internet until you resume it (also after a restart of the server). Its settings are kept.")"
+            return 0 ;;
+        resume)
+            display_explanation "Resuming the tunnel..."
+            systemctl enable --now cloudflared >/dev/null 2>&1 ;;
+        *) return 2 ;;
+    esac
+    sleep "${KEI_CF_SETTLE_SECS:-3}"
+    if systemctl is-active --quiet cloudflared; then
+        log "cloudflared $1 from the panel"
+        msg_ok "$(t "The tunnel is running.")"
+        return 0
+    fi
+    msg_error "" "$(t "The tunnel did not start. Its last lines:")\n\n$(journalctl -u cloudflared -n 6 --no-pager -o cat 2>/dev/null | grep -vi token | cut -c1-110)"
+    return 1
+}
+
+cf_urls() {
+    local opac staff
+    require_database || return 1
+    read -r opac staff < <(cf_public_urls) || true
+    if [ -z "$opac" ]; then
+        msg_error "" "$(t "The tunnel has no public address yet.")"
+        return 1
+    fi
+    set_koha_public_urls "$opac" "$staff" || {
+        msg_error "" "$(t "Could not change Koha's addresses.")"
+        return 1
+    }
+    log "Koha addresses set to the tunnel: $opac $staff"
+    msg_ok "$(t "Koha now uses the tunnel's addresses:")\n\n  OPACBaseURL: ${opac}\n  staffClientBaseURL: ${staff}"
+}
+
+cf_qr() {
+    local opac url png line
+    read -r opac _ < <(tunnel_public_hosts)
+    if [ "$opac" = "-" ]; then
+        msg_error "" "$(t "The catalog has no internet address yet. Set up the tunnel first.")"
+        return 1
+    fi
+    url="https://${opac}"
+    is_auth_url "$url" || return 1
+    if ! ensure_qrencode >/dev/null; then
+        msg_error "" "$(t "Could not create the image.")"
+        return 1
+    fi
+    while IFS= read -r line; do
+        kei_result qr "$line"
+    done < <(qrencode -t UTF8 -l M -m 2 "$url" 2>/dev/null)
+    png="${REAL_HOME:-/root}/koha-catalog-qr.png"
+    if qrencode -t PNG -l M -s 12 -m 4 -o "$png" "$url" 2>/dev/null; then
+        [ -n "${REAL_USER:-}" ] && chown "$REAL_USER" "$png" 2>/dev/null
+        kei_result png "$png"
+    fi
+    kei_result url "$url"
+    return 0
+}
+
+cf_update_task() {
+    wait_for_apt_locks || return 1
+    apt_update_indices || return 1
+    apt_install cloudflared
+}
+
+cf_update() {
+    local before after
+    if ! dpkg -s cloudflared >/dev/null 2>&1; then
+        msg_error "" "$(t "cloudflared was not installed from Cloudflare's repository, so the panel cannot update it.")"
+        return 1
+    fi
+    before=$(cloudflared --version 2>/dev/null | head -n1 | awk '{print $3}')
+    if ! TUI_LOG="$APT_LOG" tui_run "$(t "Updating cloudflared")" cf_update_task; then
+        restore_apt_timers
+        msg_error "" "$(t "cloudflared could not be updated.")\n\n$(apt_log_tail 6)"
+        return 1
+    fi
+    restore_apt_timers
+    after=$(cloudflared --version 2>/dev/null | head -n1 | awk '{print $3}')
+    kei_result version "$after"
+    if [ "$before" = "$after" ]; then
+        msg_ok "$(t "cloudflared is already the newest version:") ${after}"
+        return 0
+    fi
+    systemctl is-active --quiet cloudflared && systemctl restart cloudflared >/dev/null 2>&1
+    log "cloudflared updated: $before -> $after"
+    msg_ok "$(t "cloudflared updated:") ${before} → ${after}"
+}
+
+# cf-run NAME: one of the manager's wizards, its questions asked by the panel.
+cf_run() {
+    local fn
+    case "${1:-}" in
+        free)      fn=function_cloudflare_free_address ;;
+        domain)    fn=function_cloudflare_setup ;;
+        share)     fn=function_share_catalog_link ;;
+        remove)    fn=function_cloudflare_remove ;;
+        staff)     fn=function_broker_staff_access ;;
+        reconnect) fn=function_broker_reconnect ;;
+        rotate)    fn=function_broker_rotate ;;
+        recovery)  fn=broker_save_recovery ;;
+        listing)   fn=function_broker_listing ;;
+        leave)     fn=function_broker_leave ;;
+        *)         return 2 ;;
+    esac
+    restore_apt_timers
+    require_systemd || return 1
+    "$fn"
 }
 
 # ======================================================================
@@ -39519,6 +39834,13 @@ kei_task() {
         cloud-plan-save) cloud_plan_save "${1:-}" "${2:-}" "${3:-}" "${4:-0}" "${5:-}" ;;
         cloud-plan-delete) cloud_plan_delete "${1:-}" ;;
         cloud-rclone-official) cloud_rclone_official ;;
+        cf-status)       cf_status ;;
+        cf-check)        cf_check ;;
+        cf-service)      cf_service "${1:-}" ;;
+        cf-urls)         cf_urls ;;
+        cf-qr)           cf_qr ;;
+        cf-update)       cf_update ;;
+        cf-run)          cf_run "${1:-}" ;;
         db-maintenance)  function_deep_maintenance ;;
         reports-install)
             require_database || return 1

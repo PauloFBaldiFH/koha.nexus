@@ -296,7 +296,7 @@ LoadingScreen {
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
 TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
 ServerHelperScreen, SaveBackupScreen, WebTransferScreen, ProfileScreen, OAuthScreen,
-CloudBackupScreen, RemoteFormScreen, PlanFormScreen,
+CloudBackupScreen, RemoteFormScreen, PlanFormScreen, CloudflareScreen,
 DiagnosticsScreen, LogTailScreen, CheckReportScreen {
     align: center middle;
     background: $background 70%;
@@ -406,6 +406,29 @@ DiagnosticsScreen, LogTailScreen, CheckReportScreen {
 #cp-dest, #cp-problem { height: auto; }
 #cb-plans { height: auto; max-height: 12; border: round $panel-lighten-2; }
 #cb-files-plan { width: 30; margin-right: 1; }
+/* ---- Cloudflare Tunnel (screens/cloudflare.py): the same cards */
+#cf-box {
+    width: 96%;
+    max-width: 200;
+    height: 92%;
+    border: round $success;
+    background: $surface;
+    padding: 1 2;
+}
+#cf-title { width: 1fr; }
+#cf-pill { width: auto; }
+#cf-body { height: 1fr; }
+#cf-tabs { width: 1fr; }
+#cf-tabs TabPane { padding: 1 0 0 0; }
+#cf-side { width: 56; margin-left: 1; }
+#cf-addr { height: auto; max-height: 10; border: round $panel-lighten-2; }
+#cf-checks { height: auto; max-height: 14; border: round $panel-lighten-2; }
+#cf-log-box { height: 1fr; min-height: 5; border: round $panel-lighten-2; padding: 0 1; }
+#cf-qr-code { width: auto; }
+#cf-koha .sb-key { width: 21; }
+#cf-busy { height: auto; padding-top: 1; }
+#cf-busy-text { width: 1fr; color: $accent; }
+#cf-bar { width: 30; }
 .dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
 .dialog-note { color: $text-muted; }
@@ -535,6 +558,7 @@ App.-plain .dialog,
 App.-plain #picker-box,
 App.-plain #sb-box,
 App.-plain #cb-box,
+App.-plain #cf-box,
 App.-plain #cr-box,
 App.-plain #cp-box,
 App.-plain .sb-card,
