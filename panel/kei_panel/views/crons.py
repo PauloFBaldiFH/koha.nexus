@@ -4,7 +4,9 @@ One row per job of /etc/cron.d/koha_tasks (cron.py): a switch, how often
 (daily, weekly, monthly, or a schedule written by hand), the day and the
 time. The presets the panel knows are always there (a full index rebuild,
 fines, authority linking...), off until switched on; lines written by hand
-keep their own schedule. Save shows what changes and hands the whole file
+keep their own schedule. Each cloud backup of Automatic cloud backup is a
+row too, with what it sends (SQL, MARC21 or both): the same cron line that
+screen changes. Save shows what changes and hands the whole file
 to `config.sh --task cron-apply`, which checks it and keeps a copy of the
 old one. No text editor.
 """
@@ -76,12 +78,16 @@ class CronView(SectionView):
             freqs = preset.freqs if preset else tuple(cron.FREQS)
             if job.freq not in freqs:
                 freqs = (*freqs, job.freq)
-            label = t(job.label) if job.key else _own_label(job)
+            label = _label(job)
+            if cron.is_cloud(job):
+                help_text = t("Sends the newest backup of this server to the cloud. Its connection and folder: "
+                              "Backup > Automatic cloud backup.")
+            else:
+                help_text = t(preset.help) if preset and preset.help else ""
             row = Horizontal(classes="cron-row", id=f"cr-row-{i}")
             widgets = [
                 Switch(job.enabled, id=f"cr-on-{i}"),
-                Vertical(Label(label, classes="cron-name"),
-                         Label(t(preset.help) if preset and preset.help else "", classes="cron-help"),
+                Vertical(Label(label, classes="cron-name"), Label(help_text, classes="cron-help"),
                          classes="cron-text"),
                 Select([(t(cron.FREQS[f]), f) for f in freqs], value=job.freq, allow_blank=False,
                        id=f"cr-freq-{i}", classes="cron-freq"),
@@ -90,6 +96,10 @@ class CronView(SectionView):
                 Input(job.time(), id=f"cr-time-{i}", classes="cron-time", max_length=5),
                 Input(job.raw or job.schedule(), id=f"cr-raw-{i}", classes="cron-raw"),
             ]
+            if cron.is_cloud(job):
+                widgets.insert(2, Select([(t(cron.WHAT_LABELS[w]), w) for w in cron.CLOUD_WHATS],
+                                         value=cron.cloud_what(job), allow_blank=False, id=f"cr-what-{i}",
+                                         classes="cron-what"))
             rows.append((row, widgets, job.freq))
         for row, widgets, _freq in rows:
             await box.mount(row)
@@ -122,7 +132,9 @@ class CronView(SectionView):
             freq = str(self.query_one(f"#cr-freq-{i}", Select).value)
             job = cron.Job(old.key, old.label, old.command, self.query_one(f"#cr-on-{i}", Switch).value,
                            freq, user=old.user, note=list(old.note))
-            name = t(old.label) if old.key else _own_label(old)
+            if cron.is_cloud(old):
+                job = cron.with_what(job, str(self.query_one(f"#cr-what-{i}", Select).value))
+            name = _label(old)
             if freq == "custom":
                 raw = " ".join(self.query_one(f"#cr-raw-{i}", Input).value.split())
                 problem = cron.schedule_problem(raw)
@@ -160,7 +172,8 @@ class CronView(SectionView):
     def defaults(self) -> None:
         self.cf = cron.defaults(self.app.env.instance)
         keep = cron.parse(cron.read(), self.app.env.instance)
-        self.cf.jobs += [j for j in keep.jobs if not j.key]    # lines written by hand stay
+        # Lines written by hand and the cloud backups (Automatic cloud backup) stay.
+        self.cf.jobs += [j for j in keep.jobs if not j.key or cron.is_cloud(j)]
         self.cf.env, self.cf.blocks = keep.env, keep.blocks
         self.draw()
         self.app.notify(t("Default schedules on the screen: Save to keep them."))
@@ -185,7 +198,9 @@ class CronView(SectionView):
         jobs, _ = self.collect()
         changes = []
         for old, new in zip(self.cf.jobs, jobs):
-            name = t(old.label) if old.key else _own_label(old)
+            name = _label(old)
+            if cron.is_cloud(old) and cron.cloud_what(old) != cron.cloud_what(new):
+                changes.append(f"{name}: {t('sends')} {t(cron.WHAT_LABELS[cron.cloud_what(new)])}")
             if old.enabled != new.enabled:
                 changes.append(f"{name}: {t('on') if new.enabled else t('off')}")
             elif new.enabled and old.schedule() != new.schedule():
@@ -203,6 +218,12 @@ class CronView(SectionView):
             path.unlink(missing_ok=True)
         await show_done(self.app, title, result)
         self.reload()
+
+
+def _label(job: cron.Job) -> str:
+    if cron.is_cloud(job):
+        return t("☁ Cloud backup: ${name}", name=cron.cloud_id(job))
+    return t(job.label) if job.key else _own_label(job)
 
 
 def _own_label(job: cron.Job) -> str:

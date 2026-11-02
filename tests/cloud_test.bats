@@ -16,11 +16,18 @@ SYS_LANG=en
 require_database() { return 0; }
 rclone_prepare() { return 0; }
 BACKUP_CONF="$W/backup.conf"
+CONF_DIR="$W"
+CLOUD_PLANS_FILE="$W/cloud_plans.conf"
+CLOUD_PLAN_SCRIPT="$W/cloud_plan.sh"
+CRON_TASKS="$W/koha_tasks"
+DIR_SQL="$W/sql"
+DIR_MARC="$W/marc"
 LOG_DIR="$W"
 RUN_LOG="$W/run.log"
 TUI_LOG="$W/tui.log"
 write_backup_config() { touch "\$BACKUP_CONF"; }
-kei_first_cloud_backup() { echo "FIRST BACKUP" >> "$W/calls"; }
+kei_first_cloud_backup() { echo "FIRST BACKUP \${1:-}" >> "$W/calls"; }
+write_backup_scripts() { echo "WRITE SCRIPTS" >> "$W/calls"; }
 RCLONE_TEST_SECS=2
 RCLONE_RATE_WAITS="0 0"
 PATH="$W/bin:\$PATH"
@@ -122,7 +129,10 @@ SH
     [ -e "$W/uploaded" ] && [ -e "$W/listed" ]
     grep -q "deletefile gdrive:Backup_SQL_Koha/kei-upload-test.txt" "$W/rclone.log"
     grep -qx 'RCLONE_REMOTE="gdrive"' "$W/backup.conf"
-    grep -qx "FIRST BACKUP" "$W/calls"
+    grep -qx "FIRST BACKUP gdrive" "$W/calls"
+    # The terminal menu's way in makes a cloud backup with its own cron line.
+    grep -qx 'gdrive|gdrive||0' "$W/cloud_plans.conf"
+    grep -qx '30 23 \* \* \* root /bin/bash /root/cloud_plan.sh gdrive sql+marc >/dev/null 2>&1' "$W/koha_tasks"
     grep -q "^OK Cloud enabled and tested successfully" "$KEI_S/dialogs.log"
     [ -z "$(ls /tmp/kei-cloud-test.* 2>/dev/null)" ]
 }
@@ -185,7 +195,7 @@ TOKEN='{"access_token":"ya29.A","token_type":"Bearer","refresh_token":"1//R","ex
 }
 
 @test "C11 the nightly uploads try again with a pause, and old scripts are rewritten" {
-    [ "$(grep -c 'copy --retries 4 --retries-sleep 60s' "$KEI_REPO/installer")" -eq 2 ]
+    [ "$(grep -c 'copy --retries 4 --retries-sleep 60s' "$KEI_REPO/installer")" -eq 3 ]
     grep -q 'cloud_send "\\$FILE" "\\$RCLONE_SQL_FOLDER"' "$KEI_REPO/installer"
     grep -q 'cloud_send "\\$PACKAGE" "\\$RCLONE_MARC_FOLDER"' "$KEI_REPO/installer"
     [ "$(grep -c -- "grep -q -- '--retries-sleep' /root/backup_" "$KEI_REPO/installer")" -eq 2 ]
@@ -319,4 +329,131 @@ answers() { printf '%b' "$1" > "$W/answers.tsv"; chmod 600 "$W/answers.tsv"; }
     run_fn cloud_rm "gdrive:Backup_SQL_Koha/koha_library_2026-11-02_23h00.sql.gz"
     [ "$status" -eq 0 ]
     grep -q 'deletefile gdrive:Backup_SQL_Koha/koha_library_2026-11-02_23h00.sql.gz' "$W/rclone.log"
+}
+
+
+@test "C19 the destination and second copy of 1.5.162 become cloud backups, once" {
+    conf_rclone
+    printf 'RCLONE_REMOTE="gdrive"\nRCLONE_REMOTE2="wasabi"\nRCLONE_SQL_FOLDER="koha/Backup_SQL_Koha"\nCLOUD_KEEP_DAYS=30\nCLOUD_MARC="no"\n' > "$W/backup.conf"
+    printf 'PATH=/usr/bin\n45 22 * * * root /bin/bash /root/backup_sql.sh >/dev/null 2>&1\n' > "$W/koha_tasks"
+    run_fn cloud_plans_migrate
+    [ "$status" -eq 0 ]
+    [ "$(cat "$W/cloud_plans.conf")" = "$(printf 'gdrive|gdrive|koha|30\nwasabi|wasabi|koha|30')" ]
+    grep -qx '15 23 \* \* \* root /bin/bash /root/cloud_plan.sh gdrive sql >/dev/null 2>&1' "$W/koha_tasks"
+    grep -qx '15 23 \* \* \* root /bin/bash /root/cloud_plan.sh wasabi sql >/dev/null 2>&1' "$W/koha_tasks"
+    grep -qx 'RCLONE_REMOTE2=""' "$W/backup.conf"
+    [ "$(stat -c %a "$W/cloud_plans.conf")" = 600 ]
+    cp "$W/koha_tasks" "$W/before"
+    run_fn cloud_plans_migrate
+    cmp "$W/koha_tasks" "$W/before"
+}
+
+@test "C20 cloud-plan-save: checked, renamed in place, the old cron line goes" {
+    conf_rclone
+    printf 'gdrive drive\nnas sftp\n' > "$W/remotes"
+    : > "$W/backup.conf"
+    printf 'a|gdrive||0\nb|nas|x|7\n' > "$W/cloud_plans.conf"
+    printf 'PATH=/usr/bin\n# Cloud backup a: sql - Daily at 23:30\n30 23 * * * root /bin/bash /root/cloud_plan.sh a sql >/dev/null 2>&1\n#off# 0 2 * * 0 root /bin/bash /root/cloud_plan.sh ab sql >/dev/null 2>&1\n' > "$W/koha_tasks"
+    run_fn cloud_plan_save c ghost "" 0
+    [ "$status" -eq 1 ]
+    run_fn cloud_plan_save 1bad gdrive "" 0
+    [ "$status" -eq 1 ]
+    run_fn cloud_plan_save b gdrive "" 0
+    [ "$status" -eq 1 ]
+    grep -q "already a cloud backup called 'b'" "$KEI_S/dialogs.log"
+    run_fn cloud_plan_save c nas "a/../b" 0
+    [ "$status" -eq 1 ]
+    run_fn cloud_plan_save daily gdrive "/koha/lib/" 30 a
+    [ "$status" -eq 0 ]
+    [ "$(cat "$W/cloud_plans.conf")" = "$(printf 'daily|gdrive|koha/lib|30\nb|nas|x|7')" ]
+    ! grep -q 'cloud_plan.sh a ' "$W/koha_tasks"
+    ! grep -q '^# Cloud backup a:' "$W/koha_tasks"
+    grep -q 'cloud_plan.sh ab sql' "$W/koha_tasks"          # a name that starts the same stays
+    grep -qx 'RCLONE_REMOTE="gdrive"' "$W/backup.conf"
+    run_fn cloud_plan_save new nas "" 0
+    [ "$status" -eq 0 ]
+    [ "$(tail -n1 "$W/cloud_plans.conf")" = 'new|nas||0' ]
+}
+
+@test "C21 cloud-plan-delete and cloud-delete take the cloud backups and their cron lines out" {
+    conf_rclone
+    printf 'gdrive drive\nnas sftp\n' > "$W/remotes"
+    printf 'RCLONE_REMOTE="nas"\n' > "$W/backup.conf"
+    printf 'usb|nas||0\ng1|gdrive||0\ng2|gdrive|k|9\n' > "$W/cloud_plans.conf"
+    printf 'PATH=/usr/bin\n0 1 * * * root /bin/bash /root/cloud_plan.sh usb sql >/dev/null 2>&1\n0 2 * * * root /bin/bash /root/cloud_plan.sh g1 sql >/dev/null 2>&1\n0 3 * * * root /bin/bash /root/cloud_plan.sh g2 marc >/dev/null 2>&1\n' > "$W/koha_tasks"
+    run_fn cloud_plan_delete usb
+    [ "$status" -eq 0 ]
+    ! grep -q 'usb' "$W/cloud_plans.conf" "$W/koha_tasks"
+    grep -qx 'RCLONE_REMOTE="gdrive"' "$W/backup.conf"
+    run_fn cloud_plan_delete usb
+    [ "$status" -eq 1 ]
+    run_fn cloud_delete gdrive
+    [ "$status" -eq 0 ]
+    [ ! -s "$W/cloud_plans.conf" ]
+    ! grep -q 'cloud_plan.sh' "$W/koha_tasks"
+    grep -qx 'RCLONE_REMOTE=""' "$W/backup.conf"
+}
+
+@test "C22 cloud_plan.sh sends the newest backup to its own folder, then cleans only after it worked" {
+    conf_rclone
+    echo "gdrive drive" > "$W/remotes"
+    mkdir -p "$W/sql" "$W/marc" "$W/locks"
+    printf 'g1|gdrive|koha/lib|30\n' > "$W/cloud_plans.conf"
+    : > "$W/backup.conf"
+    echo old > "$W/sql/koha_library_2026-11-01_23h00.sql.gz"
+    touch -d '-2 hours' "$W/sql/koha_library_2026-11-01_23h00.sql.gz"
+    echo new > "$W/sql/koha_library_2026-11-02_23h00.sql.gz"
+    echo part > "$W/sql/koha_library_2026-11-02_23h30.sql.gz.part"
+    echo pkg > "$W/marc/koha_marc_2026-11-01_0300.tar.gz"
+    printf '#!/bin/bash\necho "SQL BACKUP $KEI_NO_CLOUD" >> "%s/calls"\n' "$W" > "$W/backup_sql.sh"
+    printf '#!/bin/bash\necho "MARC BACKUP" >> "%s/calls"\n' "$W" > "$W/backup_marc.sh"
+    run_fn write_cloud_plan_script
+    [ "$status" -eq 0 ] && [ -x "$W/cloud_plan.sh" ]
+    export KEI_RCLONE="$W/bin/rclone" KEI_LOCK_DIR="$W/locks" KEI_BACKUP_SQL="$W/backup_sql.sh" KEI_BACKUP_MARC="$W/backup_marc.sh"
+    sed -i "s#^RCONF=.*#RCONF=$W/rclone.conf#" "$W/cloud_plan.sh"
+    run bash "$W/cloud_plan.sh" g1 sql+marc
+    [ "$status" -eq 0 ]
+    grep -q "copy --retries 4 --retries-sleep 60s $W/sql/koha_library_2026-11-02_23h00.sql.gz gdrive:koha/lib/Backup_SQL_Koha/" "$W/rclone.log"
+    grep -q "copy --retries 4 --retries-sleep 60s $W/marc/koha_marc_2026-11-01_0300.tar.gz gdrive:koha/lib/Backup_MARC_Koha/" "$W/rclone.log"
+    grep -q "delete --max-depth 1 --min-age 30d --include \*.sql.\* gdrive:koha/lib/Backup_SQL_Koha/" "$W/rclone.log"
+    grep -q 'Cloud OK: gdrive:koha/lib/Backup_SQL_Koha/ (koha_library_2026-11-02_23h00.sql.gz) \[g1\]' "$W/backup_sql.log"
+    grep -q 'Cloud OK: gdrive:koha/lib/Backup_MARC_Koha/' "$W/backup_marc.log"
+    ! grep -q "BACKUP" "$W/calls" 2>/dev/null                  # both were new enough
+    # "fresh" (Run now) makes a new one first, without the old in-script upload.
+    run bash "$W/cloud_plan.sh" g1 sql fresh
+    grep -qx "SQL BACKUP 1" "$W/calls"
+    ! grep -q "MARC BACKUP" "$W/calls"
+    # An unknown cloud backup or connection sends nothing.
+    : > "$W/rclone.log"
+    run bash "$W/cloud_plan.sh" ghost sql
+    [ "$status" -eq 1 ]
+    printf 'g2|nope||0\n' >> "$W/cloud_plans.conf"
+    run bash "$W/cloud_plan.sh" g2 sql
+    [ "$status" -eq 1 ]
+    ! grep -q '^copy' "$W/rclone.log"
+    grep -q "the connection 'nope' does not exist" "$W/backup_sql.log"
+}
+
+@test "C23 a failed upload deletes nothing and keeps the local copy" {
+    conf_rclone
+    echo "gdrive drive" > "$W/remotes"
+    mkdir -p "$W/sql" "$W/marc" "$W/locks"
+    printf 'g1|gdrive||30\n' > "$W/cloud_plans.conf"
+    echo new > "$W/sql/koha_library_2026-11-02_23h00.sql.gz"
+    run_fn write_cloud_plan_script
+    mv "$W/bin/rclone" "$W/bin/rclone.real"
+    printf '#!/bin/bash\nfor a in "$@"; do [ "$a" = copy ] && { echo "$*" >> "$W/rclone.log"; exit 5; }; done\nexec "$W/bin/rclone.real" "$@"\n' > "$W/bin/rclone"
+    chmod +x "$W/bin/rclone"
+    export KEI_RCLONE="$W/bin/rclone" KEI_LOCK_DIR="$W/locks"
+    run bash "$W/cloud_plan.sh" g1 sql
+    [ "$status" -eq 1 ]
+    ! grep -q '^delete' "$W/rclone.log"
+    grep -q 'WARN: cloud upload failed on gdrive \[g1\] (local copy preserved)' "$W/backup_sql.log"
+    [ -f "$W/sql/koha_library_2026-11-02_23h00.sql.gz" ]
+}
+
+@test "C24 the old in-script upload stops once the cloud backups exist" {
+    grep -q '\[ -e "${CLOUD_PLANS_FILE}" \] && return 0' "$KEI_REPO/installer"
+    [ "$(grep -c '\[ -n "\\${KEI_NO_CLOUD:-}" \] && return 0' "$KEI_REPO/installer")" -eq 2 ]
+    [ "$(grep -c "grep -q 'KEI_NO_CLOUD' /root/backup_" "$KEI_REPO/installer")" -ge 2 ]
 }

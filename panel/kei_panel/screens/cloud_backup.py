@@ -2,20 +2,26 @@
 laid out like the manual backup and MARC21 export screens: the work on the
 left (in tabs), what is true now on the right.
 
-  ╭ ☁ Automatic cloud backup ─────────────────────────── ✅ On: gdrive ──╮
-  │ [🔌 Connections] [🗓 Schedule & retention] [📂 In the cloud] [📜 History]│
-  │ ┌ connections ───────────────────────┐  ╭ Where the backups go ────╮ │
-  │ │ ⭐ gdrive   Google Drive   backups  │  │ gdrive:Backup_SQL_Koha/  │ │
-  │ │    wasabi   S3 (Wasabi)    2nd copy │  │ MARC21, 2nd copy, 🔒     │ │
-  │ └────────────────────────────────────┘  ├ Status ──────────────────┤ │
-  │ [➕ New] [✏ Edit] [🧪 Test] [🗑 Remove]  │ last upload, next backup │ │
-  │ Folder in the cloud [koha/biblioteca]   ├ Space in the cloud ──────┤ │
-  │ ╭ cloud folders (tree, loaded on open)╮ │ used / free  ▓▓▓░░░      │ │
-  │ ╰─────────────────────────────────────╯ ├ rclone ──────────────────┤ │
-  │ [⭐ Use for the backups]                 │ version, services        │ │
-  │                                          ╰──────────────────────────╯ │
+  ╭ ☁ Automatic cloud backup ───────────────── ✅ On: 2 cloud backups ──╮
+  │ [🔌 Connections] [☁ Cloud backups] [📂 In the cloud] [📜 History]      │
+  │ ┌ cloud backups ──────────────────────────┐  ╭ Where the backups go ╮ │
+  │ │ ✅ gdrive   gdrive:     SQL+MARC21 daily │  │ gdrive → gdrive:     │ │
+  │ │ ✅ wasabi-w wasabi:koha SQL  Sun 02:00   │  │ wasabi-w → wasabi:.. │ │
+  │ └─────────────────────────────────────────┘  ├ Status ──────────────┤ │
+  │ [➕ New cloud backup] [✏ Edit] [▶ Run now]    │ last upload, result  │ │
+  │ ╭ Backups on this server ─────────────────╮  ├ Space in the cloud ──┤ │
+  │ │ SQL [■] daily 23:00   MARC21 [■] Sun 03 │  │ used / free ▓▓▓░░░   │ │
+  │ │ days kept here, upload speed limit       │  ├ rclone ──────────────┤ │
+  │ ╰─────────────────────────────────────────╯  ╰──────────────────────╯ │
   │                                                              [Close]  │
   ╰───────────────────────────────────────────────────────────────────────╯
+
+A cloud backup is a connection, a folder in it, what it sends (SQL,
+MARC21 or both), its own schedule and how long the copies stay in the
+cloud; there can be several, each to another service or account. The
+installer keeps them in cloud_plans.conf and runs each from its own cron
+line (/root/cloud_plan.sh ID WHAT), which is also its row in Schedules &
+cron tasks: either screen changes the same line.
 
 Everything rclone does runs in the installer (`config.sh --task cloud-*`,
 as root, with root's rclone.conf: the file the nightly scripts read), so
@@ -44,9 +50,6 @@ from ..i18n import t
 from ..widgets.copy import CopyButton
 from .dialogs import ConfirmScreen, MessageScreen
 
-KEEP_CHOICES = (0, 7, 14, 30, 60, 90, 180, 365)
-CUSTOM = -1
-
 
 class _Reporter:
     """bridge.task's reporter: the busy line of the screen."""
@@ -69,7 +72,9 @@ class _Reporter:
 
 
 def _when(job: cron.Job | None) -> str:
-    if job is None or not job.enabled:
+    if job is None:
+        return t("Not scheduled")
+    if not job.enabled:
         return t("Off")
     if job.freq == "daily":
         return t("Daily at ${time}", time=job.time())
@@ -91,6 +96,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         self.remotes: list[cloud.Remote] = []
         self.catalog: list[cloud.Backend] = []
         self.files: list[cloud.Entry] = []
+        self.plans: list[cloud.Plan] = []
         self.cron = cron.defaults(self._instance())
         self._busy = False
         self._tree_for = ""
@@ -131,8 +137,8 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
             with Horizontal(id="cb-body"):
                 with TabbedContent(id="cb-tabs"):
                     with TabPane(t("🔌 Connections"), id="cb-tab-conn"):
-                        yield Static(t("The clouds rclone can send to. ⭐ marks the one the backups go to; "
-                                       "any service rclone supports can be added."), classes="sb-hint",
+                        yield Static(t("The clouds rclone can send to. ⭐ marks the ones a cloud backup "
+                                       "sends to; any service rclone supports can be added."), classes="sb-hint",
                                      markup=False)
                         yield DataTable(id="cb-remotes", cursor_type="row", zebra_stripes=True)
                         with Horizontal(classes="sb-card-buttons"):
@@ -146,50 +152,41 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
                         yield Static("", id="cb-base-dest", classes="sb-hint", markup=False)
                         yield Tree(t("Choose a connection above"), id="cb-tree")
                         with Horizontal(classes="sb-card-buttons"):
-                            yield Button(t("⭐ Use for the backups"), id="cb-use", variant="primary")
+                            yield Button(t("☁ Back up to this connection"), id="cb-use", variant="primary")
                             yield Button(t("🔄 Reload folders"), id="cb-tree-reload")
-                    with TabPane(t("🗓 Schedule & retention"), id="cb-tab-plan"):
+                    with TabPane(t("☁ Cloud backups"), id="cb-tab-plan"):
                         with VerticalScroll():
-                            with self._card(t("Database backup (SQL), sent to the cloud"), "cb-plan-sql"):
+                            yield Static(t("Each cloud backup sends to one connection on its own schedule. Make "
+                                           "as many as you want, to other services or accounts (3-2-1 rule). "
+                                           "Each is also a row in Schedules & cron tasks."), classes="sb-hint",
+                                         markup=False)
+                            yield DataTable(id="cb-plans", cursor_type="row", zebra_stripes=True)
+                            with Horizontal(classes="sb-card-buttons"):
+                                yield Button(t("➕ New cloud backup"), id="cb-plan-new", variant="success")
+                                yield Button(t("✏ Edit"), id="cb-plan-edit")
+                                yield Button(t("▶ Run now"), id="cb-plan-run")
+                                yield Button(t("🗑 Remove"), id="cb-plan-rm", variant="error")
+                            with self._card(t("Backups on this server"), "cb-plan-local"):
+                                yield Static(t("What the cloud backups send: made here first, checked, and kept "
+                                               "here for some days."), classes="sb-hint", markup=False)
+                                yield Label(t("Database backup (SQL)"), classes="cr-label", markup=False)
                                 yield from self._schedule_rows("sql")
-                                yield Static(t("The whole Koha database, checked before it is sent. Daily is "
-                                               "best; a machine that is off at that time catches up at start."),
-                                             classes="sb-hint", markup=False)
-                            with self._card(t("MARC21 records"), "cb-plan-marc"):
+                                yield Label(t("MARC21 package"), classes="cr-label", markup=False)
                                 yield from self._schedule_rows("marc")
-                                with Horizontal(classes="cr-switch-row"):
-                                    yield Switch(value=True, id="cb-marc-cloud")
-                                    yield Label(t("Send the MARC21 packages to the cloud too"), markup=False)
-                            with self._card(t("How long the copies are kept"), "cb-plan-keep"):
                                 with Horizontal(classes="cb-plan-row"):
-                                    yield Label(t("On this server (days):"), classes="cb-plan-key", markup=False)
+                                    yield Label(t("Days kept on this server:"), classes="cb-plan-key", markup=False)
                                     yield Input("7", id="cb-keep-local", classes="cb-time", max_length=4)
                                 with Horizontal(classes="cb-plan-row"):
-                                    yield Label(t("In the cloud:"), classes="cb-plan-key", markup=False)
-                                    yield Select([(t("Keep everything"), 0)] + [
-                                        (t("${n} days", n=n), n) for n in KEEP_CHOICES[1:]] + [
-                                        (t("Another number of days"), CUSTOM)],
-                                        value=0, allow_blank=False, id="cb-keep-cloud", classes="cb-freq")
-                                    yield Input("", id="cb-keep-cloud-n", classes="cb-time", max_length=4)
-                                yield Static(t("Copies older than this are deleted from the backup folders in "
-                                               "the cloud after each upload that worked; a failed upload never "
-                                               "deletes anything."), classes="sb-hint", markup=False)
-                            with self._card(t("Second copy in another cloud (3-2-1 rule)"), "cb-plan-two"):
-                                yield Select([(t("No second copy"), "")], value="", allow_blank=False,
-                                             id="cb-remote2")
-                                yield Static(t("Each backup also goes to this connection, in the same folders. "
-                                               "If one service fails or locks the account, the other still "
-                                               "has the copies."), classes="sb-hint", markup=False)
-                            with self._card(t("Upload speed limit"), "cb-plan-bw"):
-                                yield Input("", id="cb-bw", placeholder=t("no limit"))
+                                    yield Label(t("Upload speed limit:"), classes="cb-plan-key", markup=False)
+                                    yield Input("", id="cb-bw", placeholder=t("no limit"))
                                 yield Static(t("Leave empty for no limit. 2M = 2 MB/s; 512k; or by the clock: "
                                                "08:00,1M 19:00,off (slow during the day, free at night)."),
                                              classes="sb-hint", markup=False)
-                            with Horizontal(classes="sb-card-buttons"):
-                                yield Button(t("💾 Save schedule and retention"), id="cb-save-plan",
-                                             variant="primary")
+                                with Horizontal(classes="sb-card-buttons"):
+                                    yield Button(t("💾 Save"), id="cb-save-plan", variant="primary")
                     with TabPane(t("📂 In the cloud"), id="cb-tab-files"):
                         with Horizontal(classes="cb-plan-row"):
+                            yield Select([], prompt=t("Cloud backup"), id="cb-files-plan", classes="cb-freq")
                             yield Select([(t("Database backups (SQL)"), "sql"), (t("MARC21 packages"), "marc")],
                                          value="sql", allow_blank=False, id="cb-which", classes="cb-freq")
                             yield Button(t("🔄 Refresh"), id="cb-files-reload")
@@ -204,23 +201,17 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
                                      markup=False)
                         yield DataTable(id="cb-history", cursor_type="row", zebra_stripes=True)
                         with Horizontal(classes="sb-card-buttons"):
-                            yield Button(t("☁ Send a backup now"), id="cb-send-now", variant="success")
+                            yield Button(t("☁ Run every cloud backup now"), id="cb-send-now", variant="success")
                             yield Button(t("🔄 Refresh"), id="cb-hist-reload")
                 with VerticalScroll(id="cb-side"):
                     with self._card(t("Where the backups go"), "cb-where", "-download"):
-                        yield self._row(t("Connection"), "cb-w-remote")
-                        yield self._row(t("Service"), "cb-w-service")
-                        yield self._row(t("SQL backups"), "cb-w-sql")
-                        yield self._row(t("MARC21"), "cb-w-marc")
-                        yield self._row(t("Second copy"), "cb-w-two")
-                        yield self._row(t("Encrypted"), "cb-w-crypt")
+                        yield Static("", id="cb-w-list", markup=False)
                         with Horizontal(classes="sb-card-buttons"):
                             yield CopyButton(id="cb-copy-dest")
                     with self._card(t("Status"), "cb-state"):
                         yield self._row(t("Last upload"), "cb-s-last")
                         yield self._row(t("Result"), "cb-s-result")
-                        yield self._row(t("Next backup"), "cb-s-next")
-                        yield self._row(t("Kept"), "cb-s-keep")
+                        yield self._row(t("Kept here"), "cb-s-keep")
                         yield self._row(t("Speed limit"), "cb-s-bw")
                     with self._card(t("Space in the cloud"), "cb-space"):
                         yield self._row(t("Used"), "cb-a-used")
@@ -244,7 +235,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
     def _tips(self) -> str:
         where = transfer.where()
         lines = [t("• Keep the 3-2-1 rule: 3 copies, on 2 kinds of storage, 1 away from the library. "
-                   "This server, the cloud and a second cloud (or a USB drive) do that."),
+                   "This server and two cloud backups to different services do that."),
                  t("• The backups go up from this server at night, even with this panel closed."),
                  t("• Test the connection after changing a password or plan of the service.")]
         if where in ("ssh", "server"):
@@ -256,7 +247,8 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         self.query_one("#cb-remotes", DataTable).add_columns(" ", t("Name"), t("Service"), t("Use"))
         self.query_one("#cb-files", DataTable).add_columns(t("File"), t("Size"), t("Date"))
         self.query_one("#cb-history", DataTable).add_columns(t("When"), t("Backup"), t("What happened"))
-        self.query_one("#cb-keep-cloud-n").display = False
+        self.query_one("#cb-plans", DataTable).add_columns(" ", t("Name"), t("Where"), t("Sends"), t("When"),
+                                                           t("Kept in the cloud"))
         self.query_one("#cb-busy").display = False
         self.query_one("#cb-r-buttons").display = False
         self._load_cron()
@@ -317,17 +309,20 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         if status is not None:
             self.status = dict(status.results)
             self.history = cloud.parse_history(status.lists.get("history", []))
+            self.plans = cloud.parse_plans(status.lists.get("plan", []))
+        self._load_cron()
         listed = await self.task(t("Reading the connections..."), "cloud-list", quiet=True)
         if listed is not None:
             self.remotes = cloud.parse_remotes(listed.lists.get("remote", []))
         self._draw_remotes()
+        self._draw_plans()
         self._draw_plan()
         self._draw_side()
         self._draw_history()
-        base = cloud.base_of(self.status.get("sql_folder", ""))
-        self.query_one("#cb-base", Input).value = base
-        if self.status.get("remote"):
-            self._about(self.status["remote"])
+        self._draw_files_plans()
+        if self.plans:
+            self.query_one("#cb-base", Input).value = self.plans[0].base
+            self._about(self.plans[0].remote)
             self._load_files()
 
     def _remote(self, name: str) -> cloud.Remote | None:
@@ -352,57 +347,52 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         table = self.query_one("#cb-remotes", DataTable)
         keep = table.cursor_row or 0
         table.clear()
-        active, second = self.status.get("remote", ""), self.status.get("remote2", "")
         for r in self.remotes:
-            use = t("backups") if r.name == active else t("second copy") if r.name == second else ""
+            uses = [p.id for p in self.plans if p.remote == r.name]
             service = self._service(r)
-            table.add_row("⭐" if r.name == active else "", r.name,
-                          service if len(service) <= 36 else service[:35] + "…", use)
+            table.add_row("⭐" if uses else "", r.name,
+                          service if len(service) <= 36 else service[:35] + "…", ", ".join(uses))
         if not self.remotes:
             table.add_row("", t("(none yet)"), t("Press ➕ New connection"), "")
         if self.remotes:
-            index = next((i for i, r in enumerate(self.remotes) if r.name == active), min(keep, len(self.remotes) - 1))
-            table.move_cursor(row=index)
+            table.move_cursor(row=min(keep, len(self.remotes) - 1))
         for b in ("#cb-edit", "#cb-test", "#cb-remove", "#cb-use"):
             self.query_one(b, Button).disabled = not self.remotes
         self._show_tree()
 
+    def _plan_job(self, plan: cloud.Plan) -> cron.Job | None:
+        return self.cron.job(cron.CLOUD_PREFIX + plan.id)
+
+    def _sends(self, job: cron.Job | None) -> str:
+        return cron.WHAT_LABELS[cron.cloud_what(job)] if job else "—"
+
     def _draw_side(self) -> None:
         s = self.status
-        active = s.get("remote", "")
-        remote = self._remote(active)
+        on = [p for p in self.plans if (j := self._plan_job(p)) is not None and j.enabled]
         pill = self.query_one("#cb-pill", Static)
-        if active:
-            pill.update(Text(" " + t("✅ On: ${name}", name=active) + " ", style="bold reverse green"))
+        if on:
+            pill.update(Text(" " + t("✅ On: ${n} cloud backup(s)", n=len(on)) + " ", style="bold reverse green"))
         else:
-            pill.update(Text(" " + t("⚠ Off: no cloud chosen") + " ", style="bold reverse yellow"))
-        sql, marc = s.get("sql_folder", cloud.SQL_DIR), s.get("marc_folder", cloud.MARC_DIR)
-        self.query_one("#cb-w-remote", Static).update(active or t("none yet"))
-        self.query_one("#cb-w-service", Static).update(self._service(remote) if active else "—")
-        self.query_one("#cb-w-sql", Static).update(f"{active}:{sql}/" if active else "—")
-        marc_on = s.get("cloud_marc", "yes") != "no"
-        self.query_one("#cb-w-marc", Static).update(f"{active}:{marc}/" if active and marc_on
-                                                    else t("not sent") if active else "—")
-        two = s.get("remote2", "")
-        self.query_one("#cb-w-two", Static).update(f"{two}:{sql}/" if two else t("none"))
-        self.query_one("#cb-w-crypt", Static).update(t("yes (🔒 ${name})", name=active) if remote and remote.encrypted
-                                                     else t("no"))
+            pill.update(Text(" " + t("⚠ Off: no cloud backup scheduled") + " ", style="bold reverse yellow"))
+        lines = []
+        for p in self.plans:
+            job = self._plan_job(p)
+            remote = self._remote(p.remote)
+            lock = " 🔒" if remote and remote.encrypted else ""
+            mark = "✅" if job and job.enabled else "⏸"
+            lines.append(f"{mark} {p.id} → {p.where()}{lock}\n   {self._sends(job)} · {_when(job)}")
+        self.query_one("#cb-w-list", Static).update("\n".join(lines) if lines else t(
+            "No cloud backup yet: the backups stay only on this server. Make one in ☁ Cloud backups."))
         last = cloud.last_cloud(self.history)
         self.query_one("#cb-s-last", Static).update(last.when if last else t("never"))
         if last is None:
-            result = t("No upload yet") if active else "—"
+            result = t("No upload yet") if self.plans else "—"
         else:
             result = t("✅ Sent") if last.ok else "⚠ " + last.text[:120]
         if s.get("running") == "yes":
             result = t("⏳ A backup is running now")
         self.query_one("#cb-s-result", Static).update(result)
-        self.query_one("#cb-s-next", Static).update(_when(self.cron.job("backup_sql")))
-        keep_cloud = int(s.get("cloud_keep_days") or 0) if (s.get("cloud_keep_days") or "0").isdigit() else 0
-        self.query_one("#cb-s-keep", Static).update(t("${local} days here; ${cloud} in the cloud",
-                                                      local=s.get("keep_days", "7"),
-                                                      cloud=t("${n} days", n=keep_cloud) if keep_cloud
-                                                      else t("everything"))
-                                                    )
+        self.query_one("#cb-s-keep", Static).update(t("${n} days", n=s.get("keep_days", "7")))
         self.query_one("#cb-s-bw", Static).update(s.get("bwlimit") or t("no limit"))
         version = s.get("rclone", "")
         self.query_one("#cb-r-version", Static).update(
@@ -555,11 +545,12 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         await self.refresh_all()
         self._select(target)
         tested = await self._test(target)
-        if tested and not self.status.get("remote"):
+        if tested and not any(p.remote == target for p in self.plans):
             if await self.app.push_screen_wait(ConfirmScreen(
                     t("☁ Automatic cloud backup"),
-                    t("The connection works. Send the automatic backups to ${name} now?", name=target))):
-                await self._use(target, self.query_one("#cb-base", Input).value)
+                    t("The connection works. Make a cloud backup to ${name} now?", name=target))):
+                base = self.query_one("#cb-base", Input).value
+                await self._plan_edit_run(None, remote=target, base="" if cloud.base_problem(base) else base)
 
     def _select(self, name: str) -> None:
         for i, r in enumerate(self.remotes):
@@ -572,8 +563,9 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         if remote and self._guard():
             self.run_worker(self._test(remote.name), group="cb-test", exclusive=True, exit_on_error=False)
 
-    async def _test(self, name: str) -> bool:
-        base = self.query_one("#cb-base", Input).value
+    async def _test(self, name: str, base: str | None = None) -> bool:
+        if base is None:
+            base = self.query_one("#cb-base", Input).value
         if cloud.base_problem(base):
             base = ""
         remote = self._remote(name)
@@ -598,22 +590,9 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         if remote is None or not self._guard():
             return
         base = self.query_one("#cb-base", Input).value
-        problem = cloud.base_problem(base)
-        if not problem and cloud.needs_bucket(remote.kind) and not cloud.clean_base(base):
-            problem = "Type the name of the bucket in the folder box first."
-        if problem:
-            self.app.notify(t(problem), severity="error")
-            return
-        self.run_worker(self._use(remote.name, base), group="cb-use", exclusive=True, exit_on_error=False)
-
-    async def _use(self, name: str, base: str) -> None:
-        out = await self.task(t("Testing ${name} and making it the backup destination...", name=name),
-                              "cloud-remote", name, cloud.clean_base(base))
-        if out is None or not out.ok:
-            return
-        msg = out.last("ok")
-        await self._say(t("☁ Automatic cloud backup"), msg[2] if msg else t("Cloud configured"), "ok")
-        await self.refresh_all()
+        if cloud.base_problem(base):
+            base = ""
+        self._plan_edit(None, remote=remote.name, base=base)
 
     @on(Button.Pressed, "#cb-remove")
     def _remove_pressed(self) -> None:
@@ -623,9 +602,10 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
 
     async def _remove(self, remote: cloud.Remote) -> None:
         warn = ""
-        if remote.name == self.status.get("remote"):
-            warn = "\n\n" + t("⚠ The automatic backups go to this connection: they will stay only on this "
-                              "server until another cloud is chosen.")
+        uses = [p.id for p in self.plans if p.remote == remote.name]
+        if uses:
+            warn = "\n\n" + t("⚠ These cloud backups send to it and are removed with it: ${names}",
+                              names=", ".join(uses))
         if not await self.app.push_screen_wait(ConfirmScreen(
                 t("🗑 Remove"), t("Remove the connection ${name}? The files already in the cloud are kept.",
                                   name=remote.name) + warn, danger=True)):
@@ -669,11 +649,134 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         sql = [e for e in self.files if not e.is_dir]
         return max(sql, key=lambda e: e.modified).size if sql else 0
 
-    # --- schedule & retention -----------------------------------------------------------
+    # --- the cloud backups ----------------------------------------------------------------
     def _load_cron(self) -> None:
         text = "" if self.app.env.demo else cron.read()
         self.cron = cron.parse(text, self._instance()) if text else cron.defaults(self._instance())
+        if self.app.env.demo:
+            # The demo has no cron file: its cloud backups get a schedule here.
+            for i, p in enumerate(self.plans):
+                if self.cron.job(cron.CLOUD_PREFIX + p.id) is None:
+                    job = cron.cloud_job(p.id, "sql+marc" if i == 0 else "sql", hour=23 if i == 0 else 2,
+                                         minute=30 if i == 0 else 0)
+                    if i:
+                        job.freq, job.day = "weekly", 0
+                    self.cron.jobs.append(job)
 
+    def _draw_plans(self) -> None:
+        table = self.query_one("#cb-plans", DataTable)
+        keep = table.cursor_row or 0
+        table.clear()
+        for p in self.plans:
+            job = self._plan_job(p)
+            mark = "✅" if job and job.enabled else "⏸"
+            table.add_row(mark, p.id, p.where(), self._sends(job), _when(job),
+                          t("${n} days", n=p.keep) if p.keep else t("everything"))
+        if not self.plans:
+            table.add_row("", t("(none yet)"), t("Press ➕ New cloud backup"), "", "", "")
+        else:
+            table.move_cursor(row=min(keep, len(self.plans) - 1))
+        for b in ("#cb-plan-edit", "#cb-plan-run", "#cb-plan-rm"):
+            self.query_one(b, Button).disabled = not self.plans
+
+    def selected_plan(self) -> cloud.Plan | None:
+        table = self.query_one("#cb-plans", DataTable)
+        if not self.plans or table.cursor_row is None or table.cursor_row >= len(self.plans):
+            return None
+        return self.plans[table.cursor_row]
+
+    @on(Button.Pressed, "#cb-plan-new")
+    def _plan_new(self) -> None:
+        if self._guard():
+            remote = self.selected()
+            self._plan_edit(None, remote=remote.name if remote else "")
+
+    @on(Button.Pressed, "#cb-plan-edit")
+    def _plan_edit_pressed(self) -> None:
+        plan = self.selected_plan()
+        if plan and self._guard():
+            self._plan_edit(plan)
+
+    @work(exclusive=True, group="cb-plan-edit", exit_on_error=False)
+    async def _plan_edit(self, plan: cloud.Plan | None, remote: str = "", base: str = "") -> None:
+        await self._plan_edit_run(plan, remote, base)
+
+    async def _plan_edit_run(self, plan: cloud.Plan | None, remote: str = "", base: str = "") -> None:
+        from .cloud_plan import PlanFormScreen
+        if not self.remotes:
+            self.app.notify(t("Make a connection first: 🔌 Connections, ➕ New connection."), severity="warning")
+            return
+        services = {r.name: self._service(r) for r in self.remotes}
+        answers = await self.app.push_screen_wait(PlanFormScreen(
+            self.remotes, [p.id for p in self.plans], plan=plan, job=self._plan_job(plan) if plan else None,
+            remote=remote, base=base, default_time=cron.after_backup(self.cron), services=services))
+        if not answers:
+            return
+        await self._plan_save(answers)
+
+    async def _plan_save(self, a: dict) -> None:
+        out = await self.task(t("Saving the cloud backup..."), "cloud-plan-save", a["id"], a["remote"], a["base"],
+                              str(a["keep"]), *((a["old_id"],) if a["old_id"] else ()))
+        if out is None or not out.ok:
+            return
+        # The task may have taken the renamed backup's line out: read again.
+        self._load_cron()
+        cf = cron.parse(cron.render(self.cron), self._instance())
+        cron.put_cloud_job(cf, a["job"], old_id=a["old_id"])
+        text = cron.render(cf)
+        if text != cron.render(self.cron):
+            if not await self._apply_cron(text):
+                return
+        self.app.notify(t("Cloud backup ${name} saved.", name=a["id"]), timeout=6)
+        new = not a["old_id"]
+        await self.refresh_all()
+        self._select_plan(a["id"])
+        if new:
+            await self._test(a["remote"], a["base"])
+
+    async def _apply_cron(self, text: str) -> bool:
+        problem = cron.file_problem(text)
+        if problem:
+            await self._say(t("☁ Automatic cloud backup"), t(problem), "error")
+            return False
+        path = cron.write_temp(text)
+        try:
+            out = await self.task(t("Saving the schedule..."), "cron-apply", str(path))
+        finally:
+            path.unlink(missing_ok=True)
+        if out is None or not out.ok:
+            return False
+        self.cron = cron.parse(text, self._instance())
+        return True
+
+    def _select_plan(self, plan_id: str) -> None:
+        for i, p in enumerate(self.plans):
+            if p.id == plan_id:
+                self.query_one("#cb-plans", DataTable).move_cursor(row=i)
+
+    @on(Button.Pressed, "#cb-plan-rm")
+    def _plan_rm_pressed(self) -> None:
+        plan = self.selected_plan()
+        if plan and self._guard():
+            self.run_worker(self._plan_rm(plan), group="cb-plan-rm", exclusive=True, exit_on_error=False)
+
+    async def _plan_rm(self, plan: cloud.Plan) -> None:
+        if not await self.app.push_screen_wait(ConfirmScreen(
+                t("🗑 Remove"), t("Remove the cloud backup ${name}? Its schedule goes too; the files already in "
+                                  "the cloud are kept.", name=plan.id), danger=True)):
+            return
+        out = await self.task(t("Removing ${name}...", name=plan.id), "cloud-plan-delete", plan.id)
+        if out is not None and out.ok:
+            self.app.notify(t("Cloud backup removed: ${name}", name=plan.id), timeout=5)
+            await self.refresh_all()
+
+    @on(Button.Pressed, "#cb-plan-run")
+    def _plan_run_pressed(self) -> None:
+        plan = self.selected_plan()
+        if plan and self._guard():
+            self.run_worker(self._send_now([plan]), group="cb-send", exclusive=True, exit_on_error=False)
+
+    # --- backups on this server ----------------------------------------------------------
     def _draw_plan(self) -> None:
         for key, preset in (("sql", "backup_sql"), ("marc", "backup_marc")):
             job = self.cron.job(preset) or cron.preset_job(cron.BY_KEY[preset], self._instance())
@@ -683,22 +786,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
             self._day_options(key, freq, job.day)
             self.query_one(f"#cb-{key}-time", Input).value = job.time()
         s = self.status
-        self.query_one("#cb-marc-cloud", Switch).value = s.get("cloud_marc", "yes") != "no"
         self.query_one("#cb-keep-local", Input).value = s.get("keep_days", "7")
-        keep = s.get("cloud_keep_days", "0")
-        keep_n = int(keep) if keep.isdigit() else 0
-        sel = self.query_one("#cb-keep-cloud", Select)
-        if keep_n in KEEP_CHOICES:
-            sel.value = keep_n
-        else:
-            sel.value = CUSTOM
-            self.query_one("#cb-keep-cloud-n", Input).value = str(keep_n)
-        two = self.query_one("#cb-remote2", Select)
-        active = s.get("remote", "")
-        choices = [(t("No second copy"), "")] + [(f"{r.name} · {self._service(r)}", r.name)
-                                                for r in self.remotes if r.name != active]
-        two.set_options(choices)
-        two.value = s.get("remote2", "") if s.get("remote2", "") in {v for _, v in choices} else ""
         self.query_one("#cb-bw", Input).value = s.get("bwlimit", "")
 
     def _day_options(self, key: str, freq: str, day: int) -> None:
@@ -718,27 +806,13 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         day = self.query_one(f"#cb-{key}-day", Select).value
         self._day_options(key, str(event.value), day if isinstance(day, int) else 0)
 
-    @on(Select.Changed, "#cb-keep-cloud")
-    def _keep_changed(self, event: Select.Changed) -> None:
-        self.query_one("#cb-keep-cloud-n").display = event.value == CUSTOM
-
     def plan(self) -> tuple[dict[str, str], str, str]:
-        """(backup.conf settings, new cron file, problem) from the tab."""
+        """(backup.conf settings, new cron file, problem) from the local card."""
         values: dict[str, str] = {}
         local = self.query_one("#cb-keep-local", Input).value.strip()
         if cloud.keep_problem(local, low=1):
             return {}, "", t("Days on this server: type a number of days (1 or more).")
         values["KEEP_DAYS"] = str(int(local))
-        keep = self.query_one("#cb-keep-cloud", Select).value
-        if keep == CUSTOM:
-            n = self.query_one("#cb-keep-cloud-n", Input).value.strip()
-            if cloud.keep_problem(n, low=1):
-                return {}, "", t("Days in the cloud: type a number of days (1 or more).")
-            keep = int(n)
-        values["CLOUD_KEEP_DAYS"] = str(int(keep or 0))
-        values["CLOUD_MARC"] = "yes" if self.query_one("#cb-marc-cloud", Switch).value else "no"
-        two = self.query_one("#cb-remote2", Select).value
-        values["RCLONE_REMOTE2"] = two if isinstance(two, str) else ""
         bw = self.query_one("#cb-bw", Input).value.strip()
         if cloud.bwlimit_problem(bw):
             return {}, "", t("Upload speed limit: ${why}", why=t(cloud.bwlimit_problem(bw)))
@@ -772,11 +846,11 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         self.run_worker(self._save_plan(values, text), group="cb-plan", exclusive=True, exit_on_error=False)
 
     async def _save_plan(self, values: dict[str, str], text: str) -> None:
-        if not self.query_one("#cb-sql-on", Switch).value and self.status.get("remote"):
+        if not self.query_one("#cb-sql-on", Switch).value and self.plans:
             if not await self.app.push_screen_wait(ConfirmScreen(
-                    t("🗓 Schedule & retention"),
-                    t("The nightly database backup is off: nothing new will reach the cloud. Save anyway?"),
-                    danger=True)):
+                    t("☁ Cloud backups"),
+                    t("The nightly database backup is off: the cloud backups will make one each time they run. "
+                      "Save anyway?"))):
                 return
         path = cloud.settings_file(values)
         try:
@@ -785,42 +859,50 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
             path.unlink(missing_ok=True)
         if out is None or not out.ok:
             return
-        if text != cron.render(self.cron):
-            cron_path = cron.write_temp(text)
-            try:
-                out = await self.task(t("Saving the schedule..."), "cron-apply", str(cron_path))
-            finally:
-                cron_path.unlink(missing_ok=True)
-            if out is None or not out.ok:
-                return
-            self.cron = cron.parse(text, self._instance())
-        self.app.notify(t("Schedule and retention saved. They apply from the next backup."), timeout=6)
+        if text != cron.render(self.cron) and not await self._apply_cron(text):
+            return
+        self.app.notify(t("Saved. It applies from the next backup."), timeout=6)
         await self.refresh_all()
 
     # --- in the cloud -------------------------------------------------------------------
-    def _files_folder(self) -> str:
-        which = self.query_one("#cb-which", Select).value
-        key = "marc_folder" if which == "marc" else "sql_folder"
-        return self.status.get(key) or (cloud.MARC_DIR if which == "marc" else cloud.SQL_DIR)
+    def _draw_files_plans(self) -> None:
+        sel = self.query_one("#cb-files-plan", Select)
+        value = sel.value
+        sel.set_options([(p.id, p.id) for p in self.plans])
+        ids = [p.id for p in self.plans]
+        if ids:
+            sel.value = value if value in ids else ids[0]
+
+    def _files_plan(self) -> cloud.Plan | None:
+        value = self.query_one("#cb-files-plan", Select).value
+        return next((p for p in self.plans if p.id == value), self.plans[0] if self.plans else None)
+
+    def _files_where(self) -> tuple[str, str]:
+        """(connection, folder) of the list in In the cloud."""
+        plan = self._files_plan()
+        if plan is None:
+            return "", ""
+        sql, marc = plan.folders()
+        return plan.remote, marc if self.query_one("#cb-which", Select).value == "marc" else sql
 
     @on(Select.Changed, "#cb-which")
+    @on(Select.Changed, "#cb-files-plan")
     @on(Button.Pressed, "#cb-files-reload")
     def _files_reload(self) -> None:
-        if self.status.get("remote"):
+        if self.plans:
             self._load_files()
 
     @on(TabbedContent.TabActivated, "#cb-tabs")
     def _tab(self, event: TabbedContent.TabActivated) -> None:
-        if event.pane.id == "cb-tab-files" and self.status.get("remote") and not self.files:
+        if event.pane.id == "cb-tab-files" and self.plans and not self.files:
             self._load_files()
 
     @work(exclusive=True, group="cb-files", exit_on_error=False)
     async def _load_files(self) -> None:
-        remote = self.status.get("remote", "")
+        remote, folder = self._files_where()
         table = self.query_one("#cb-files", DataTable)
         if not remote:
             return
-        folder = self._files_folder()
         out = await self.task(t("Listing ${where}...", where=f"{remote}:{folder}"), "cloud-ls",
                               f"{remote}:{folder}", quiet=True)
         table.clear()
@@ -866,9 +948,9 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         self.run_worker(self._get(entry, restore=True), group="cb-get", exclusive=True, exit_on_error=False)
 
     async def _get(self, entry: cloud.Entry, restore: bool) -> None:
-        remote = self.status.get("remote", "")
+        remote, folder = self._files_where()
         out = await self.task(t("Downloading ${file}...", file=entry.name), "cloud-get",
-                              f"{remote}:{self._files_folder()}/{entry.name}")
+                              f"{remote}:{folder}/{entry.name}")
         if out is None or not out.ok:
             return
         file = out.get("file")
@@ -890,9 +972,9 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
                 t("Delete ${file} from the cloud? This copy cannot be brought back.", file=entry.name),
                 danger=True)):
             return
-        remote = self.status.get("remote", "")
+        remote, folder = self._files_where()
         out = await self.task(t("Deleting ${file}...", file=entry.name), "cloud-rm",
-                              f"{remote}:{self._files_folder()}/{entry.name}")
+                              f"{remote}:{folder}/{entry.name}")
         if out is not None and out.ok:
             self.app.notify(t("Deleted from the cloud: ${gone}", gone=entry.name), timeout=5)
             self._load_files()
@@ -907,22 +989,29 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
     def _send_now_pressed(self) -> None:
         if not self._guard():
             return
-        if not self.status.get("remote"):
-            self.app.notify(t("Choose a connection and press ⭐ Use for the backups first."), severity="warning")
+        if not self.plans:
+            self.app.notify(t("Make a cloud backup first: ☁ Cloud backups, ➕ New cloud backup."),
+                            severity="warning")
             return
-        self.run_worker(self._send_now(), group="cb-send", exclusive=True, exit_on_error=False)
+        self.run_worker(self._send_now(list(self.plans)), group="cb-send", exclusive=True, exit_on_error=False)
 
-    async def _send_now(self) -> None:
-        marc = "marc" if self.status.get("cloud_marc", "yes") != "no" else ""
-        out = await self.task(t("Making the backup and sending it to the cloud..."), "cloud-send-now",
-                              *((marc,) if marc else ()), quiet=True)
-        if out is None:
-            return
-        lines = out.lists.get("line", [])
-        msg = out.last("ok", "error")
-        await self._say(t("☁ Send a backup now"), (msg[2] if msg else "") + ("\n\n" + "\n".join(lines[-8:])
-                                                                          if lines else ""),
-                        "ok" if out.ok else "error")
+    async def _send_now(self, plans: list[cloud.Plan]) -> None:
+        """Each cloud backup now; the first makes a fresh backup, the others send that one."""
+        lines: list[str] = []
+        ok = True
+        last = ""
+        for i, plan in enumerate(plans):
+            what = cron.cloud_what(self._plan_job(plan)) if self._plan_job(plan) else "sql+marc"
+            out = await self.task(t("Sending to the cloud: ${name}...", name=plan.id), "cloud-send-now", plan.id,
+                                  what, *(("fresh",) if i == 0 else ()), quiet=True)
+            if out is None:
+                return
+            lines += out.lists.get("line", [])
+            msg = out.last("ok", "error")
+            last = msg[2] if msg else last
+            ok = ok and out.ok
+        await self._say(t("☁ Send a backup now"), last + ("\n\n" + "\n".join(lines[-12:]) if lines else ""),
+                        "ok" if ok else "error")
         await self.refresh_all()
 
     @on(Button.Pressed, "#cb-official")
@@ -947,9 +1036,9 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
 
     @on(Button.Pressed, "#cb-copy-dest")
     def _copy_dest(self) -> None:
-        active = self.status.get("remote", "")
-        if active:
-            self.app.copy_to_clipboard(f"{active}:{self.status.get('sql_folder', cloud.SQL_DIR)}/")
+        plan = self.selected_plan() or (self.plans[0] if self.plans else None)
+        if plan:
+            self.app.copy_to_clipboard(f"{plan.remote}:{plan.folders()[0]}/")
 
     @on(Button.Pressed, "#cb-close")
     def action_close(self) -> None:

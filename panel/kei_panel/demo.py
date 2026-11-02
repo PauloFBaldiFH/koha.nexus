@@ -443,6 +443,7 @@ _SCRIPTS: dict[str, list[str]] = {
                        "@@msg ok OK\tCloud enabled and tested successfully."],
     # The automatic cloud backup screen (screens/cloud_backup.py).
     "cloud-status": [
+        "@@result plan=gdrive\tgdrive\t\t30", "@@result plan=wasabi-weekly\twasabi\tkoha-library\t90",
         "@@result remote=gdrive", "@@result remote2=", "@@result sql_folder=Backup_SQL_Koha",
         "@@result marc_folder=Backup_MARC_Koha", "@@result keep_days=7", "@@result cloud_keep_days=30",
         "@@result bwlimit=", "@@result cloud_marc=yes", "@@result dir_sql=/var/backups/koha_sql",
@@ -452,8 +453,10 @@ _SCRIPTS: dict[str, list[str]] = {
         "@@result history=sql\t2026-10-31 23:01:30 | Cloud OK: gdrive:Backup_SQL_Koha/"
         " (koha_library_2026-10-31_23h00.sql.gz)",
         "@@result history=sql\t2026-11-01 23:01:12 | WARN: cloud upload failed on gdrive (local copy preserved)",
-        "@@result history=sql\t2026-11-02 23:01:20 | Cloud OK: gdrive:Backup_SQL_Koha/"
-        " (koha_library_2026-11-02_23h00.sql.gz)",
+        "@@result history=sql\t2026-11-02 23:31:20 | Cloud OK: gdrive:Backup_SQL_Koha/"
+        " (koha_library_2026-11-02_23h00.sql.gz) [gdrive]",
+        "@@result history=sql\t2026-11-01 02:12:40 | Cloud OK: wasabi:koha-library/Backup_SQL_Koha/"
+        " (koha_library_2026-10-31_23h00.sql.gz) [wasabi-weekly]",
         "@@result history=marc\t2026-11-01 03:02:10 | Cloud OK: gdrive:Backup_MARC_Koha/"
         " (koha_marc_2026-11-01_0300.tar.gz)",
     ],
@@ -479,11 +482,14 @@ _SCRIPTS: dict[str, list[str]] = {
                   "@@result file=/home/demo/backups/from_cloud/koha_library_2026-11-02_23h00.sql.gz",
                   "@@result size=47M", "@@msg ok OK\tDownloaded"],
     "cloud-rm": ["@@msg ok OK\tDeleted from the cloud"],
-    "cloud-send-now": ["@@note Making the database backup and sending it to the cloud...",
+    "cloud-plan-save": ["@@result plan={0}", "@@msg ok OK\tCloud backup {0} saved."],
+    "cloud-plan-delete": ["@@msg ok OK\tCloud backup {0} removed. The files already in the cloud were not "
+                          "touched."],
+    "cloud-send-now": ["@@note Sending to the cloud: {0}...",
                        "@@result line=2026-11-02 14:40:02 | OK: /var/backups/koha_sql/koha_library_2026-11-02_14h40"
                        ".sql.gz (48322112 bytes)",
-                       "@@result line=2026-11-02 14:40:31 | Cloud OK: gdrive:Backup_SQL_Koha/"
-                       " (koha_library_2026-11-02_14h40.sql.gz)",
+                       "@@result line=2026-11-02 14:40:31 | Cloud OK: {0}:Backup_SQL_Koha/"
+                       " (koha_library_2026-11-02_14h40.sql.gz) [{0}]",
                        "@@msg ok OK\t✅ Backup made and sent to the cloud."],
     "cloud-rclone-official": ["@@note Downloading the official rclone...", "@@result rclone=v1.71.2",
                               "@@result rclone_backends=72",

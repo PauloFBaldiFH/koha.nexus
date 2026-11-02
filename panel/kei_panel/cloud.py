@@ -457,6 +457,56 @@ def parse_remotes(lines: list[str]) -> list[Remote]:
     return out
 
 
+@dataclass(frozen=True)
+class Plan:
+    """A cloud backup: what the installer keeps in cloud_plans.conf. Its
+    schedule and what it sends are its cron job (cron.cloud_job)."""
+    id: str
+    remote: str
+    base: str
+    keep: int          # days kept in the cloud, 0 = everything
+
+    def folders(self) -> tuple[str, str]:
+        return folders(self.base)
+
+    def where(self) -> str:
+        return f"{self.remote}:{self.base + '/' if self.base else ''}"
+
+
+def parse_plans(lines: list[str]) -> list[Plan]:
+    """cloud-status "plan" lines: ID<TAB>CONNECTION<TAB>FOLDER<TAB>DAYS."""
+    out = []
+    for line in lines:
+        parts = (line.split("\t") + ["", "", "", ""])[:4]
+        if not parts[0]:
+            continue
+        keep = int(parts[3]) if parts[3].isdigit() else 0
+        out.append(Plan(parts[0], parts[1], clean_base(parts[2]), keep))
+    return out
+
+
+def plan_problem(plan_id: str, taken: list[str] | tuple[str, ...] = ()) -> str:
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,31}", plan_id or ""):
+        return "Use a short name: a letter, then letters, digits, _ or -."
+    if plan_id.endswith(CRYPT_SUFFIX):
+        return "Names ending in -crypt are kept for the encrypted layer."
+    if plan_id.lower() in {n.lower() for n in taken}:
+        return "There is already a cloud backup with this name."
+    return ""
+
+
+def free_plan_id(remote: str, taken: list[str] | tuple[str, ...]) -> str:
+    """A name for a new cloud backup to REMOTE: the connection's own, then -2, -3..."""
+    low = {n.lower() for n in taken}
+    base = remote[:28] or "cloud"
+    if base.lower() not in low:
+        return base
+    n = 2
+    while f"{base}-{n}".lower() in low:
+        n += 1
+    return f"{base}-{n}"
+
+
 @dataclass
 class History:
     which: str        # sql or marc

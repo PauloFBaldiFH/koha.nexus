@@ -245,15 +245,20 @@ def test_cloud_screen_shows_destination_status_and_files():
                     break
             def text(sel):
                 return str(screen.query_one(sel).render())
-            return (text("#cb-w-sql"), text("#cb-s-result"), text("#cb-s-keep"), text("#cb-a-used"),
+            return (text("#cb-w-list"), text("#cb-s-result"), text("#cb-s-keep"), text("#cb-a-used"),
                     [r.name for r in screen.remotes], [f.name for f in screen.files],
-                    screen.query_one("#cb-r-buttons").display, screen.query_one("#cb-history").row_count)
-    sql, result, keep, used, remotes, files, official, history = asyncio.run(main())
-    assert sql == "gdrive:Backup_SQL_Koha/" and "Sent" in result and "30 days" in keep and "GB" in used
+                    screen.query_one("#cb-r-buttons").display, screen.query_one("#cb-history").row_count,
+                    [(p.id, p.remote, p.base, p.keep) for p in screen.plans],
+                    screen.query_one("#cb-plans").row_count, text("#cb-pill"))
+    where, result, keep, used, remotes, files, official, history, plans, rows, pill = asyncio.run(main())
+    assert "gdrive → gdrive:" in where and "wasabi-weekly → wasabi:koha-library/" in where
+    assert "Sent" in result and "7 days" in keep and "GB" in used
+    assert plans == [("gdrive", "gdrive", "", 30), ("wasabi-weekly", "wasabi", "koha-library", 90)] and rows == 2
+    assert "2 cloud backup" in pill
     assert remotes == ["gdrive", "wasabi", "nas"]
     assert files[0] == "koha_library_2026-11-02_23h00.sql.gz"     # newest first
     assert official                                              # Debian's rclone: the button is offered
-    assert history == 5
+    assert history == 6
 
 
 def test_new_connection_form_saves_tests_and_offers_the_destination(monkeypatch):
@@ -308,9 +313,9 @@ def test_new_connection_form_saves_tests_and_offers_the_destination(monkeypatch)
     assert not seen["path"].exists()
 
 
-def test_schedule_tab_builds_cron_and_settings():
+def test_local_card_builds_cron_and_settings():
     from kei_panel import cron
-    from kei_panel.screens.cloud_backup import CUSTOM, CloudBackupScreen
+    from kei_panel.screens.cloud_backup import CloudBackupScreen
 
     async def main():
         app = _app()
@@ -327,9 +332,6 @@ def test_schedule_tab_builds_cron_and_settings():
             screen.query_one("#cb-marc-freq").value = "monthly"
             await pilot.pause(0.2)
             screen.query_one("#cb-marc-day").value = 5
-            screen.query_one("#cb-keep-cloud").value = CUSTOM
-            screen.query_one("#cb-keep-cloud-n").value = "45"
-            screen.query_one("#cb-remote2").value = "wasabi"
             screen.query_one("#cb-bw").value = "08:00,1M 19:00,off"
             good = screen.plan()
             screen.query_one("#cb-bw").value = "fast"
@@ -337,9 +339,88 @@ def test_schedule_tab_builds_cron_and_settings():
             return good, bad
     (values, text, problem), bad = asyncio.run(main())
     assert problem == "" and bad[2]
-    assert values == {"KEEP_DAYS": "7", "CLOUD_KEEP_DAYS": "45", "CLOUD_MARC": "yes", "RCLONE_REMOTE2": "wasabi",
-                      "RCLONE_BWLIMIT": "08:00,1M 19:00,off"}
+    assert values == {"KEEP_DAYS": "7", "RCLONE_BWLIMIT": "08:00,1M 19:00,off"}
     cf = cron.parse(text, "library")
     assert cf.job("backup_sql").schedule() == "30 21 * * *"
     assert cf.job("backup_marc").schedule() == "0 3 5 * *"
+    # The demo's cloud backups keep their own rows.
+    assert [cron.cloud_id(j) for j in cron.cloud_jobs(cf)] == ["gdrive", "wasabi-weekly"]
     assert cron.file_problem(text) == ""
+
+
+def test_a_new_cloud_backup_saves_its_line_and_its_schedule(monkeypatch):
+    from kei_panel import cron
+    from kei_panel.screens.cloud_backup import CloudBackupScreen
+    from kei_panel.screens.cloud_plan import PlanFormScreen
+    sent, calls = {}, []
+    real = cron.write_temp
+
+    def spy(text):
+        sent["text"] = text
+        return real(text)
+    monkeypatch.setattr(cron, "write_temp", spy)
+
+    async def main():
+        app = _app()
+        async with app.run_test(size=(160, 48)) as pilot:
+            app.run_native("backup-cloud")
+            screen = await _wait_for(pilot, CloudBackupScreen)
+            for _ in range(20):
+                await pilot.pause(0.1)
+                if screen.plans:
+                    break
+            real_task = screen.task
+
+            async def task(label, name, *args, **kw):
+                calls.append((name, args))
+                return await real_task(label, name, *args, **kw)
+            screen.task = task
+            screen.query_one("#cb-tabs").active = "cb-tab-plan"
+            await pilot.pause(0.2)
+            screen.query_one("#cb-plan-new").press()
+            form = await _wait_for(pilot, PlanFormScreen)
+            assert form.query_one("#cp-time").value == "23:30"      # half an hour after the SQL backup
+            form.query_one("#cp-name").value = "gdrive"
+            form.query_one("#cp-save").press()
+            await pilot.pause(0.1)
+            taken = str(form.query_one("#cp-problem").render())
+            form.query_one("#cp-name").value = "wasabi-2"
+            form.query_one("#cp-remote").value = "wasabi"
+            await pilot.pause(0.1)
+            form.query_one("#cp-base").value = ""
+            form.query_one("#cp-save").press()
+            await pilot.pause(0.1)
+            bucket = str(form.query_one("#cp-problem").render())
+            form.query_one("#cp-remote").value = "nas"
+            form.query_one("#cp-base").value = "backups/koha"
+            form.query_one("#cp-what").value = "sql"
+            form.query_one("#cp-freq").value = "weekly"
+            await pilot.pause(0.1)
+            form.query_one("#cp-day").value = 3
+            form.query_one("#cp-time").value = "1:15"
+            form.query_one("#cp-keep").value = 14
+            await pilot.pause(0.1)
+            dest = str(form.query_one("#cp-dest").render())
+            form.query_one("#cp-save").press()
+            for _ in range(60):
+                await pilot.pause(0.1)
+                if any(c[0] == "cloud-test" for c in calls):
+                    break
+            return taken, bucket, dest
+    taken, bucket, dest = asyncio.run(main())
+    assert "already" in taken and "bucket" in bucket
+    assert dest == "→ nas:backups/koha/Backup_SQL_Koha/"
+    assert ("cloud-plan-save", ("wasabi-2", "nas", "backups/koha", "14")) in calls
+    assert "15 1 * * 3 root /bin/bash /root/cloud_plan.sh wasabi-2 sql >/dev/null 2>&1" in sent["text"]
+    assert "cloud_plan.sh gdrive sql+marc" in sent["text"]          # the other cloud backups stay
+    assert ("cloud-test", ("nas", "backups/koha")) in calls
+
+
+def test_plans_parse_and_names():
+    plans = cloud.parse_plans(["gdrive\tgdrive\t\t30", "usb\tnas\t/koha/x/\tabc", ""])
+    assert plans[0].where() == "gdrive:" and plans[0].keep == 30
+    assert plans[1].base == "koha/x" and plans[1].keep == 0 and plans[1].folders()[1] == "koha/x/Backup_MARC_Koha"
+    assert cloud.plan_problem("daily-1") == "" and cloud.plan_problem("1x") and cloud.plan_problem("a-crypt")
+    assert "already" in cloud.plan_problem("GDrive", ["gdrive"])
+    assert cloud.free_plan_id("gdrive", ["gdrive", "gdrive-2"]) == "gdrive-3"
+    assert cloud.free_plan_id("nas", ["gdrive"]) == "nas"

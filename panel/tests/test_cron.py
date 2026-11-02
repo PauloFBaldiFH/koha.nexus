@@ -135,3 +135,32 @@ def test_write_temp_and_read(tmp_path, monkeypatch):
         path.unlink()
     monkeypatch.setenv("KEI_CRON_FILE", str(tmp_path / "nope"))
     assert cron.read() == ""
+
+
+def test_cloud_backups_are_rows_with_what_they_send():
+    text = """PATH=/usr/bin
+0 23 * * * root /bin/bash /root/backup_sql.sh >/dev/null 2>&1
+
+# Cloud backup gdrive: sql+marc
+30 23 * * * root /bin/bash /root/cloud_plan.sh gdrive sql+marc >/dev/null 2>&1
+#off# 0 2 * * 0 root /bin/bash /root/cloud_plan.sh wasabi sql >/dev/null 2>&1
+"""
+    cf = cron.parse(text, "library")
+    jobs = cron.cloud_jobs(cf)
+    assert [(cron.cloud_id(j), j.enabled, j.freq, cron.cloud_what(j)) for j in jobs] == [
+        ("gdrive", True, "daily", "sql+marc"), ("wasabi", False, "weekly", "sql")]
+    out = cron.render(cf)
+    assert "# Cloud backup gdrive: sql+marc - Daily at 23:30\n30 23 * * * root /bin/bash /root/cloud_plan.sh" in out
+    assert out.index("cloud_plan.sh gdrive") > out.index("backup_marc.sh")   # right after the local backups
+    assert out.index("cloud_plan.sh gdrive") < out.index("koha-kei-reindex")
+    assert cron.render(cron.parse(out, "library")) == out
+    # What it sends, renamed, removed.
+    cron.put_cloud_job(cf, cron.with_what(jobs[0], "marc"))
+    assert "cloud_plan.sh gdrive marc >" in cron.render(cf)
+    cron.put_cloud_job(cf, cron.cloud_job("drive2", "sql", 1, 5), old_id="gdrive")
+    assert "cloud_plan.sh gdrive" not in cron.render(cf) and "5 1 * * * root /bin/bash /root/cloud_plan.sh drive2 sql" in cron.render(cf)
+    cron.drop_cloud_job(cf, "wasabi")
+    assert "wasabi" not in cron.render(cf)
+    assert cron.after_backup(cf) == (23, 30)
+    cf.job("backup_sql").hour, cf.job("backup_sql").minute = 23, 45
+    assert cron.after_backup(cf) == (0, 15)
