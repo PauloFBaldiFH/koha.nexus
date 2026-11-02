@@ -1338,43 +1338,43 @@
    "summary": "Publica o OPAC (e, se você quiser, a intranet) na Internet por um Túnel Cloudflare: HTTPS incluído e nenhuma porta aberta no roteador.",
    "overview": [
     "Um Túnel Cloudflare é uma conexão de saída do seu servidor até a Cloudflare: os leitores chegam ao catálogo pela Cloudflare, com HTTPS, e nada é aberto no roteador nem no firewall. Funciona atrás de CGNAT, em links 4G e em redes que você não controla.",
-    "O gerenciador mostra se o túnel está *ATIVO* ou *INATIVO* e oferece cada ação abaixo. Quando a Cloudflare pede para autorizar o servidor, o painel deixa você escolher um QR code para escanear com o celular, o navegador deste computador (o navegador do Windows, no WSL) ou um link para copiar."
+    "A tela do Túnel Cloudflare mostra o estado no topo (no ar, pausado, parado ou não publicado) e nos cartões à direita, e faz um teste rápido do endereço público ao abrir. Quando a Cloudflare pede para autorizar o servidor, o painel deixa você escolher um QR code para escanear com o celular, o navegador deste computador (o navegador do Windows, no WSL) ou um link para copiar."
    ],
    "options": [
     {
-     "name": "Endereço gratuito (sem precisar de domínio)",
-     "text": "Um endereço público para o catálogo sem comprar domínio nem abrir conta na Cloudflare, compartilhável como QR code. Esse serviço ainda está em testes e não está aberto às bibliotecas."
+     "name": "Endereços",
+     "text": "O que o túnel publica e onde chega neste servidor, com Copiar, Abrir no navegador e QR code (na tela e em PNG para imprimir). Os endereços do próprio Koha (OPACBaseURL, staffClientBaseURL) são comparados com os públicos e corrigidos com um botão."
     },
     {
-     "name": "Usar meu próprio domínio (conta Cloudflare)",
-     "text": "Liga o túnel ao seu domínio na Cloudflare. O login pode ser feito por QR code no celular, pelo navegador ou por um link."
+     "name": "Configurar e gerenciar",
+     "text": "Endereço gratuito (sem domínio): obter ou restaurar, acesso remoto da equipe, lista pública, arquivo de recuperação, reconectar, renovar o token, abrir mão. Domínio próprio: entrar na Cloudflare, criar o túnel e os endereços, trocar o domínio, remover o túnel."
     },
     {
-     "name": "Ver links públicos e status de segurança",
-     "text": "Os endereços publicados e se o acesso remoto da equipe está protegido."
+     "name": "Teste",
+     "text": "Segue a visita de um leitor passo a passo (cloudflared, Apache neste servidor, o nome no DNS, o endereço público, o endereço do Koha) e diz o que fazer na primeira etapa que falha."
     },
     {
-     "name": "Compartilhar o link do catálogo",
-     "text": "QR code na tela, imagem de QR para imprimir ou link."
+     "name": "Registro",
+     "text": "As últimas linhas do serviço cloudflared, sem os tokens, com Copiar."
     },
     {
-     "name": "Reiniciar / Desativar e remover o túnel",
-     "text": "Reinicia o serviço do túnel, ou tira o catálogo da Internet."
+     "name": "Cartão Status",
+     "text": "Rodando ou parado, se inicia com o servidor, desde quando, as conexões com a Cloudflare e os reinícios, com Reiniciar e Pausar / Retomar. O cartão cloudflared mostra a versão e atualiza pelo repositório da Cloudflare."
     }
    ],
    "steps": [
     "Abra o **Gerenciador do Túnel Cloudflare (recomendado)** na Central de Segurança & Acesso.",
-    "Escolha **Usar meu próprio domínio** (ou o endereço gratuito, quando ele abrir) e autorize o servidor na sua conta Cloudflare.",
-    "Escolha os endereços do OPAC e, se precisar, da intranet.",
-    "Use **Ver links públicos e status de segurança** para conferir o resultado e depois **Compartilhar o link do catálogo** para divulgá-lo."
+    "Em **Configurar e gerenciar**, escolha o endereço gratuito ou **Configurar meu próprio domínio** e responda às perguntas.",
+    "Rode o **Teste** para conferir cada etapa e aperte **Usar os endereços do túnel** se o Koha ainda usar um endereço local.",
+    "Divulgue o catálogo com **Código QR** ou **Copiar** na aba **Endereços**."
    ],
    "tips": [
     "Publique o OPAC e deixe a intranet para a VPN; se você publicar a intranet, mantenha ligada a senha extra na Cloudflare."
    ],
    "warnings": [
-    "**Desativar e remover o túnel** tira o catálogo da Internet na hora: o Koha fica acessível só na rede local."
+    "**Pausar** e **Remover o túnel** tiram o catálogo da Internet na hora: o Koha fica acessível só na rede local. Pausar mantém tudo e **Retomar** traz de volta."
    ],
-   "_en": "4826de08cc"
+   "_en": "108eec1246"
   },
   "ufw": {
    "summary": "Lista as regras de firewall (UFW) ativas neste servidor: quais portas estão abertas e para quem.",

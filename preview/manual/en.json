@@ -1577,24 +1577,24 @@
    "summary": "Publishes the OPAC (and, if you want, the staff interface) on the Internet through a Cloudflare Tunnel: HTTPS included and no port opened on the router.",
    "options": [
     {
-     "name": "Free Address (no domain needed)",
-     "text": "A public catalogue address without buying a domain or opening a Cloudflare account, shareable as a QR code. This service is still being tested and not open to libraries yet."
+     "name": "Addresses",
+     "text": "What the tunnel publishes and where it lands on this server, with Copy, Open in the browser and a QR code (on screen and as a PNG to print). Koha's own addresses (OPACBaseURL, staffClientBaseURL) are compared with the public ones and fixed with one button."
     },
     {
-     "name": "Use My Own Domain (Cloudflare account)",
-     "text": "Connects the tunnel to your domain on Cloudflare. Sign-in can be done with a QR code on your phone, the browser or a link."
+     "name": "Set up & manage",
+     "text": "Free address (no domain needed): get or restore one, remote staff access, public list, recovery file, reconnect, renew the token, give it up. Your own domain: sign in to Cloudflare, create the tunnel and its addresses, change the domain, remove the tunnel."
     },
     {
-     "name": "View Public Links and Security Status",
-     "text": "The published addresses and whether remote staff access is protected."
+     "name": "Test",
+     "text": "Follows a reader's visit step by step (cloudflared, Apache on this server, the name in DNS, the public address, Koha's address) and says what to do at the first step that fails."
     },
     {
-     "name": "Share the Catalog Link",
-     "text": "QR code on screen, printable QR image or link."
+     "name": "Log",
+     "text": "The last lines of the cloudflared service, tokens left out, with Copy."
     },
     {
-     "name": "Restart / Disable and Remove Tunnel",
-     "text": "Restarts the tunnel service, or takes the catalogue offline from the Internet."
+     "name": "Status card",
+     "text": "Running or stopped, whether it starts with the server, since when, the edge connections to Cloudflare and restarts, with Restart and Pause / Resume. The cloudflared card shows its version and updates it from Cloudflare's repository."
     }
    ],
    "tips": [
@@ -1607,16 +1607,16 @@
    ],
    "overview": [
     "A Cloudflare Tunnel is an outgoing connection from your server to Cloudflare: readers reach the catalogue through Cloudflare, with HTTPS, and nothing is opened on the router or the firewall. It works behind CGNAT, on 4G links and on networks you do not control.",
-    "The manager shows whether the tunnel is *ACTIVE* or *INACTIVE* and offers each action below. When Cloudflare asks you to authorise the server, the panel lets you choose a QR code to scan with your phone, the browser of this computer (the Windows browser under WSL) or a link to copy."
+    "The Cloudflare Tunnel screen shows the state at the top (online, paused, stopped or not published) and in the cards on the right, and runs a quick test of the public address when it opens. When Cloudflare asks you to authorise the server, the panel lets you choose a QR code to scan with your phone, the browser of this computer (the Windows browser under WSL) or a link to copy."
    ],
    "steps": [
     "Open **Cloudflare Tunnel Manager (Recommended)** in the Security & access hub.",
-    "Choose **Use My Own Domain** (or the free address once it opens) and authorise the server in your Cloudflare account.",
-    "Choose the addresses for the OPAC and, if needed, the staff interface.",
-    "Use **View Public Links and Security Status** to check the result, then **Share the Catalog Link** to hand it out."
+    "In **Set up & manage**, choose the free address or **Set up my own domain** and answer its questions.",
+    "Run **Test** to check every step, and press **Use the tunnel's addresses** if Koha still uses a local address.",
+    "Share the catalogue with **QR code** or **Copy** on the **Addresses** tab."
    ],
    "warnings": [
-    "**Disable and Remove Tunnel** takes the catalogue off the Internet at once: Koha stays reachable only on the local network."
+    "**Pause** and **Remove the tunnel** take the catalogue off the Internet at once: Koha stays reachable only on the local network. Pause keeps everything and **Resume** brings it back."
    ]
   },
   "ufw": {

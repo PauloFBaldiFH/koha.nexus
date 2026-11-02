@@ -41,10 +41,14 @@ def test_new_prompt_lines_are_answered():
 
 
 def test_cloudflare_menu_loops_and_ends_quietly():
+    # The classic menu: what an installer without `--task cf-status` opens.
+    from kei_panel.routines.security import CLOUDFLARE_TITLE
+    from kei_panel.routines.tools import generic
+
     async def main():
         app = _app()
         async with app.run_test(size=(140, 45)) as pilot:
-            app.run_native("cloudflare")
+            app.run_worker(generic("cloudflare", CLOUDFLARE_TITLE)(app), exit_on_error=False)
             menu = await _wait_for(pilot, ChoiceScreen)
             keys = [k for k, _ in menu._options]
             menu.dismiss("5")

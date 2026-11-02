@@ -42,6 +42,7 @@ ROUTINES: dict[str, Routine] = {
     "ufw": security.ufw,
     "staff-firewall": security.staff_firewall,
     "rotate-db-password": security.rotate_password,
+    "cloudflare": security.cloudflare,
     "sizing": settings.sizing,
     "email": settings.email,
     "superlibrarian": settings.superlibrarian,
@@ -59,7 +60,6 @@ ROUTINES: dict[str, Routine] = {
 # The rest run their classic routine with `--task run ACTION`; the title is
 # the menu label's (an installer text).
 GENERIC: dict[str, str] = {
-    "cloudflare": "🌉  Cloudflare Tunnel Manager (Recommended)",
     "ssl": "🔏  Free SSL certificate (Certbot / Apache)",
     "search-console": "🔎  Google Search Console Assistant",
     "library-tools": "📚  Library tools",

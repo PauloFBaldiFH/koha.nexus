@@ -169,6 +169,16 @@ _BY_ARG: dict[tuple[str, str], list[str]] = {
                                 "@@result authorities=214", "@@result applied=655", "@@result apply=done",
                                 "@@msg ok OK\t✅ Job 3 applied: 214 new authority record(s), 655 record(s) "
                                 "linked and standardised."],
+    ("cf-service", "restart"): ["@@note Restarting Cloudflare Tunnel...", "@@msg ok OK\tThe tunnel is running."],
+    ("cf-service", "resume"): ["@@note Resuming the tunnel...", "@@msg ok OK\tThe tunnel is running."],
+    ("cf-service", "pause"): ["@@note Pausing the tunnel...",
+                              "@@msg ok OK\tThe tunnel is paused: the catalog is off the internet until you resume "
+                              "it (also after a restart of the server). Its settings are kept."],
+    ("cf-run", "staff"): [
+        "@@choose Remote staff access\tStaff interface from outside the library: https://biblioteca-admin.koha.nexus"
+        "\t\ton\tTurn on or change the password\toff\tTurn off (staff interface only on the local network)",
+        "@@msg ok OK\tRemote staff access is off."],
+    ("cf-run", "recovery"): ["@@msg ok OK\tRecovery file saved:\n\n  /home/biblioteca/koha-address-biblioteca.key"],
 }
 
 _SCRIPTS: dict[str, list[str]] = {
@@ -491,6 +501,36 @@ _SCRIPTS: dict[str, list[str]] = {
                        "@@result line=2026-11-02 14:40:31 | Cloud OK: {0}:Backup_SQL_Koha/"
                        " (koha_library_2026-11-02_14h40.sql.gz) [{0}]",
                        "@@msg ok OK\t✅ Backup made and sent to the cloud."],
+    # The Cloudflare Tunnel screen (screens/cloudflare.py): a free address.
+    "cf-status": [
+        "@@result mode=broker", "@@result opac=biblioteca.koha.nexus", "@@result staff=",
+        "@@result local_ip=192.168.0.10", "@@result version=2026.9.1", "@@result package=yes", "@@result unit=yes",
+        "@@result service=active", "@@result enabled=enabled", "@@result since=Mon 2026-11-02 08:14:03 -03",
+        "@@result restarts=0", "@@result staff_host=biblioteca-admin.koha.nexus", "@@result staff_remote=no",
+        "@@result listing=yes", "@@result broker=https://broker.koha.nexus",
+        "@@result opac_base=http://192.168.0.10", "@@result staff_base=http://192.168.0.10:8080",
+        "@@result connections=4", "@@result edge=gru01", "@@result edge=gru02",
+        "@@result log=2026-11-02T08:14:03-0300 INF Starting tunnel tunnelID=5f2c…",
+        "@@result log=2026-11-02T08:14:04-0300 INF Registered tunnel connection connIndex=0 location=gru01 "
+        "protocol=quic",
+        "@@result log=2026-11-02T08:14:04-0300 INF Registered tunnel connection connIndex=1 location=gru02 "
+        "protocol=quic",
+        "@@result log=2026-11-02T08:14:05-0300 INF Registered tunnel connection connIndex=2 location=gru01 "
+        "protocol=quic",
+        "@@result log=2026-11-02T08:14:05-0300 INF Registered tunnel connection connIndex=3 location=gru02 "
+        "protocol=quic"],
+    "cf-check": [
+        "@@result check=service\tok\t", "@@result check=origin-opac\tok\tHTTP 200",
+        "@@result check=dns-opac\tok\tbiblioteca.koha.nexus",
+        "@@result check=public-opac\tok\tHTTP 200 · 0.412 s", "@@result check=koha-url\twarn\thttp://192.168.0.10"],
+    "cf-urls": ["@@note Setting Koha URL system preferences...",
+                "@@msg ok OK\tKoha now uses the tunnel's addresses:\n\n  OPACBaseURL: https://biblioteca.koha.nexus"
+                "\n  staffClientBaseURL: http://192.168.0.10:8080"],
+    "cf-qr": [*("@@result qr=" + line for line in ['█▀▀▀▀▀█ ▄▀▄ █▀▀▀▀▀█', '█ ███ █ ▀█▀ █ ███ █', '█ ▀▀▀ █ ▄ ▄ █ ▀▀▀ █', '▀▀▀▀▀▀▀ █▄▀ ▀▀▀▀▀▀▀', '▀█▄ ▀▀▀▄▀█▄▀▀▄█▀ ▄▀', '█▀▀▀▀▀█ ▄█▀ ▀▄█▄ █▀', '█ ███ █ ▀▄▄▀█▀ ▀▄▄█', '▀▀▀▀▀▀▀ ▀ ▀▀  ▀ ▀▀']), "@@result png=/home/biblioteca/koha-catalog-qr.png",
+              "@@result url=https://biblioteca.koha.nexus"],
+    "cf-update": ["@@note Updating cloudflared", "@@result version=2026.10.0",
+                  "@@msg ok OK\tcloudflared updated: 2026.9.1 → 2026.10.0"],
+    "cf-run": ["@@msg ok OK\tDone."],
     "cloud-rclone-official": ["@@note Downloading the official rclone...", "@@result rclone=v1.71.2",
                               "@@result rclone_backends=72",
                               "@@msg ok OK\tThe official rclone v1.71.2 is installed: every service it "
@@ -582,7 +622,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         out.rc = 2
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
-                            "cloud-about", "cloud-ls", "timezones", "credentials") \
+                            "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check") \
         else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
