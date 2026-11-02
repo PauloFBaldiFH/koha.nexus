@@ -95,7 +95,14 @@ class _LoopReporter:
 
 
 class SaveBackupScreen(ModalScreen[None]):
+    """The SQL backup. MarcExportScreen (screens/marc_export.py) is the same
+    screen for the MARC21 package: it changes the texts, the file and the
+    task through the hooks below."""
+
     BINDINGS = [Binding("escape", "close", t("Cancel"))]
+    TASK = "backup-manual"
+    TREE_SUFFIXES = BACKUP_SUFFIXES
+    WANTED = staticmethod(save_backup.is_sql_backup)
 
     def __init__(self, info: dict):
         super().__init__()
@@ -144,7 +151,7 @@ class SaveBackupScreen(ModalScreen[None]):
         start = save_backup.existing_folder(self._default.parent)
         with Vertical(id="sb-box"):
             with Horizontal(id="sb-head"):
-                yield Label(t("💾 Save database backup"), classes="dialog-title", id="sb-title", markup=False)
+                yield Label(self._title_text(), classes="dialog-title", id="sb-title", markup=False)
                 yield Static("", id="sb-steps")
             with Horizontal(id="sb-body"):
                 with Vertical(id="sb-main"):
@@ -157,19 +164,18 @@ class SaveBackupScreen(ModalScreen[None]):
                             yield Button(t("📁 New folder"), id="sb-new")
                             if self._where in ("wsl", "desktop"):
                                 yield Button(t("📂 Open file manager"), id="sb-open")
-                        yield Label(t("Save the backup in this folder of the server:"), classes="sb-prompt",
-                                    markup=False)
+                        yield Label(self._prompt_text(), classes="sb-prompt", markup=False)
                         yield PathInput(value=str(self._default), placeholder=str(self._default), id="sb-folder")
-                        yield FilteredTree(start, BACKUP_SUFFIXES, id="sb-tree")
+                        yield FilteredTree(start, self.TREE_SUFFIXES, id="sb-tree")
                         yield Label("", id="sb-problem", classes="dialog-error", markup=False)
                     # Step 2: the save running.
-                    with self._card(t("Saving"), "sb-progress"):
+                    with self._card(self._step_labels()[1], "sb-progress"):
                         yield Label("", id="sb-status", markup=False)
                         yield ProgressBar(total=None, show_eta=False, id="sb-bar")
                         yield self._row(t("Full path"), "sb-target")
                     # Step 3: the ways to take the file to the person's computer.
                     with VerticalScroll(id="sb-done"):
-                        yield Label(t("✅ Backup saved and verified"), id="sb-ok", markup=False)
+                        yield Label(self._ok_text(), id="sb-ok", markup=False)
                         with self._card(t("Download to your computer"), "sb-download", "-download"):
                             if self._wsl:
                                 yield Static(t("Copies the file from the Linux side to Windows, where you use it."),
@@ -197,36 +203,94 @@ class SaveBackupScreen(ModalScreen[None]):
                             yield Static(t("You will be asked for the password of user '${user}'.",
                                            user=self._user), classes="dialog-note sb-note", markup=False)
                         with self._card(t("Good to know"), "sb-tips"):
-                            yield Static(t("• The file stays on this server; Finish and exit deletes nothing.\n"
-                                           "• Keep a copy off this server too (your computer, a USB drive or the "
-                                           "cloud): a copy on the same disk is lost with the disk.\n"
-                                           "• To bring it back later: Backup center > Restore database."),
-                                         classes="sb-hint", markup=False)
+                            yield Static(self._tips_text(), classes="sb-hint", markup=False)
                 # The right side: what the save makes, and where.
                 with VerticalScroll(id="sb-side"):
                     with self._card(t("The file that will be created"), "sb-preview"):
                         yield self._row(t("Folder"), "sb-pv-folder")
                         yield self._row(t("File name"), "sb-pv-name")
                         yield self._row(t("Full path"), "sb-pv-path")
-                        yield self._row(t("Compression"), "sb-pv-codec", save_backup.codec_label(self._codec))
-                        yield self._row(t("Size"), "sb-pv-size", "—")
-                        yield Static(t("The compression is the one chosen on the Backup screen."),
-                                     classes="dialog-note sb-note", markup=False)
+                        yield from self._format_rows()
                         with Horizontal(classes="sb-card-buttons", id="sb-path-buttons"):
                             yield CopyButton(id="copy-path")
+                    yield from self._extra_side()
                     with self._card(t("Disk space"), "sb-space"):
                         yield self._row(t("Free"), "sb-free")
                         yield self._row(t("Needed"), "sb-need")
                         yield Static("", id="sb-space-note", classes="sb-hint", markup=False)
                     with self._card(t("Already in this folder"), "sb-there"):
                         yield Static("", id="sb-there-text", markup=False)
-                    with self._card(t("After saving"), "sb-then"):
+                    with self._card(self._after_title(), "sb-then"):
                         yield Static(self._then_text(), classes="sb-hint", markup=False)
             with Horizontal(id="sb-buttons-save", classes="dialog-buttons"):
-                yield Button(t("💾 Save backup here"), id="save", variant="primary")
+                yield Button(self._save_label(), id="save", variant="primary")
                 yield Button(t("Cancel"), id="cancel")
             with Horizontal(id="sb-buttons-done", classes="dialog-buttons"):
                 yield Button(t("Finish and exit"), id="done", variant="primary")
+
+    # --- what the MARC21 screen changes (screens/marc_export.py) -------------
+    def _title_text(self) -> str:
+        return t("💾 Save database backup")
+
+    def _prompt_text(self) -> str:
+        return t("Save the backup in this folder of the server:")
+
+    def _save_label(self) -> str:
+        return t("💾 Save backup here")
+
+    def _saving_text(self) -> str:
+        return t("Saving the backup...")
+
+    def _ok_text(self) -> str:
+        return t("✅ Backup saved and verified")
+
+    def _wait_text(self) -> str:
+        return t("Wait until the backup is saved.")
+
+    def _file_name(self) -> str:
+        return save_backup.file_name(self._db, self._codec)
+
+    def _task_args(self, folder: Path) -> tuple[str, ...]:
+        return (self.TASK, str(folder))
+
+    def _format_rows(self) -> ComposeResult:
+        yield self._row(t("Compression"), "sb-pv-codec", save_backup.codec_label(self._codec))
+        yield self._row(t("Size"), "sb-pv-size", "—")
+        yield Static(t("The compression is the one chosen on the Backup screen."),
+                     classes="dialog-note sb-note", markup=False)
+
+    def _extra_side(self) -> ComposeResult:
+        yield from ()
+
+    def _step_labels(self) -> tuple[str, str, str]:
+        return t("Folder"), t("Saving"), t("Download")
+
+    def _after_title(self) -> str:
+        return t("After saving")
+
+    def _after_save(self, out) -> None:
+        """The task's other results (the MARC21 screen shows the contents)."""
+
+    def _need_text(self, size: str) -> str:
+        return t("about ${size} (the newest backup)", size=size)
+
+    def _tight_text(self) -> str:
+        return t("⚠ Little room: the save needs about twice the size of a backup while it is written.")
+
+    def _there_text(self, n: int, size: str, name: str) -> str:
+        return t("${n} backup(s), ${size} in all.\nNewest: ${name}", n=n, size=size, name=name)
+
+    def _none_there_text(self) -> str:
+        return t("No backup in this folder yet.")
+
+    def _created_later_text(self) -> str:
+        return t("The folder will be created when the backup is saved.")
+
+    def _tips_text(self) -> str:
+        return t("• The file stays on this server; Finish and exit deletes nothing.\n"
+                 "• Keep a copy off this server too (your computer, a USB drive or the "
+                 "cloud): a copy on the same disk is lost with the disk.\n"
+                 "• To bring it back later: Backup center > Restore database.")
 
     def _then_text(self) -> str:
         if self._wsl:
@@ -250,7 +314,7 @@ class SaveBackupScreen(ModalScreen[None]):
 
     # --- the header and the right side -------------------------------------
     def _show_step(self, current: int) -> None:
-        steps = (t("Folder"), t("Saving"), t("Download"))
+        steps = self._step_labels()
         text = Text()
         for n, label in enumerate(steps, 1):
             if n > 1:
@@ -271,7 +335,7 @@ class SaveBackupScreen(ModalScreen[None]):
         if self._file is not None or self._busy:
             return
         folder = self._target_folder()
-        name = save_backup.file_name(self._db, self._codec)
+        name = self._file_name()
         if folder is None:
             self.query_one("#sb-pv-folder", Static).update(t("Use the full path, starting with /."))
             self.query_one("#sb-pv-name", Static).update(name)
@@ -286,26 +350,25 @@ class SaveBackupScreen(ModalScreen[None]):
         self._show_folder_facts(folder)
 
     def _show_folder_facts(self, folder: Path) -> None:
-        facts = save_backup.folder_facts(folder)
+        facts = save_backup.folder_facts(folder, self.WANTED)
         free = facts["free"]
         self.query_one("#sb-free", Static).update(transfer.human_size(free) if free is not None else "—")
         need = self._estimate
         self.query_one("#sb-need", Static).update(
-            t("about ${size} (the newest backup)", size=transfer.human_size(need)) if need else "—")
+            self._need_text(transfer.human_size(need)) if need else "—")
         if free is None:
             note = ""
         elif need and free < need * 2:
-            note = t("⚠ Little room: the save needs about twice the size of a backup while it is written.")
+            note = self._tight_text()
         else:
             note = t("✓ Enough room on this disk.")
         self.query_one("#sb-space-note", Static).update(note)
         if facts["count"]:
-            text = t("${n} backup(s), ${size} in all.\nNewest: ${name}", n=facts["count"],
-                     size=transfer.human_size(facts["bytes"]), name=facts["newest"])
+            text = self._there_text(facts["count"], transfer.human_size(facts["bytes"]), facts["newest"])
         elif folder.is_dir():
-            text = t("No backup in this folder yet.")
+            text = self._none_there_text()
         else:
-            text = t("The folder will be created when the backup is saved.")
+            text = self._created_later_text()
         self.query_one("#sb-there-text", Static).update(text)
 
     def _problem(self, text: str) -> None:
@@ -423,9 +486,9 @@ class SaveBackupScreen(ModalScreen[None]):
         self.query_one("#sb-then").display = False
         self.query_one("#sb-buttons-save").display = False
         self.query_one("#sb-target", Static).update(
-            (folder / save_backup.file_name(self._db, self._codec)).as_posix())
+            (folder / self._file_name()).as_posix())
         self._show_step(2)
-        self.set_status(t("Saving the backup..."))
+        self.set_status(self._saving_text())
         self.show_bar(0, 0)
         self._save(folder)
 
@@ -433,7 +496,7 @@ class SaveBackupScreen(ModalScreen[None]):
     async def _save(self, folder: Path) -> None:
         try:
             folder.mkdir(parents=True, exist_ok=True)
-            out = await self.app.bridge.task("backup-manual", str(folder), reporter=_LoopReporter(self))
+            out = await self.app.bridge.task(*self._task_args(folder), reporter=_LoopReporter(self))
         except Exception as e:  # noqa: BLE001 - shown, the screen stays usable
             self._save_failed(f"{type(e).__name__}: {e}")
             return
@@ -446,6 +509,7 @@ class SaveBackupScreen(ModalScreen[None]):
         self._user = out.get("user") or self._user
         self._scp = save_backup.scp_command(self._user, self._host, str(self._file))
         self._show_done(out.get("size") or "")
+        self._after_save(out)
 
     def _save_failed(self, text: str) -> None:
         self._busy = False
@@ -545,7 +609,7 @@ class SaveBackupScreen(ModalScreen[None]):
         from .web_transfer import WebTransferScreen, browser_server
         if self._file is None or not self._file.is_file():
             return
-        self.app.push_screen(WebTransferScreen(t("Save database backup"), browser_server(
+        self.app.push_screen(WebTransferScreen(self._title_text(), browser_server(
             self._info, "download", self._file), user=self._user))
 
     @on(Button.Pressed, "#copy-scp")
@@ -565,7 +629,7 @@ class SaveBackupScreen(ModalScreen[None]):
     @on(Button.Pressed, "#cancel")
     def action_close(self) -> None:
         if self._busy:
-            self.app.notify(t("Wait until the backup is saved."), severity="warning")
+            self.app.notify(self._wait_text(), severity="warning")
             return
         # Done or Cancel: the file stays on the server either way; nothing is deleted here.
         self.dismiss(None)

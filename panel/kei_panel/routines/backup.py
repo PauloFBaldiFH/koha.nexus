@@ -84,34 +84,13 @@ async def manual_backup(app) -> None:
 # MARC21 export now (the weekly /root/backup_marc.sh, run at once)
 # ----------------------------------------------------------------------
 async def marc_backup(app) -> None:
-    title = t("📚  Export MARC21 records now")
-    if not await app.push_screen_wait(ConfirmScreen(
-            title, t("Exports every bibliographic and authority record in MARC21 (ISO 2709) into one "
-                     ".tar.gz package in the MARC backup folder, the same file the weekly backup makes. "
-                     "Koha keeps working while it runs. Export now?"))):
-        return
-    result = await run_task(app, t("Exporting the MARC21 records..."), "backup-marc")
-    if failed(result):
-        await show_failure(app, title, result)
-        return
-    out = result.value
-    details = [(t("File:"), out.get("file")), (t("Size:"), out.get("size"))]
-    if out.get("contents"):    # the .mrc files (ISO 2709) inside the package
-        details.append((t("Contents:"), out.get("contents")))
-    if out.get("cloud") == "yes":
-        details.append((t("Cloud"), t("sent")))
-    steps = t("Open Terminal or PowerShell on your personal computer and paste the exact command:")
-    # On WSL or a Linux desktop one button copies the package to Downloads;
-    # over SSH the same button offers it through the browser. No scp needed.
-    here = transfer.where() in ("wsl", "desktop", "ssh", "server")
-    choice = await app.push_screen_wait(MessageScreen(
-        t("MARC21 RECORDS EXPORTED"), "", details=details, command=out.get("scp"),
-        command_help=f"\n{t('HOW TO SAVE TO YOUR DOWNLOADS FOLDER (WINDOWS / MAC / LINUX)')}\n{steps}",
-        command_notes=tx("3. You will be asked for the password of user '${REAL_USER:-root}'.",
-                         REAL_USER=out.get("user", "root")),
-        extra=t(DOWNLOAD_FILE) if here else ""))
-    if choice == "extra":
-        await download_file(app, Path(out.get("file") or ""), t(DOWNLOAD_FILE))
+    """Export the MARC21 records into a folder of this server (~/backups by
+    default), then the ways to get the package to the person: the same
+    screen as the manual backup (screens/marc_export, screens/save_backup)."""
+    from ..screens.marc_export import MarcExportScreen
+    info = await facts(app)
+    marc = await app.bridge.task("marc-info")
+    await app.push_screen_wait(MarcExportScreen(info, marc))
 
 
 # ----------------------------------------------------------------------

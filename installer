@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.160"
+PANEL_VERSION=" 1.5.161"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6629,8 +6629,12 @@ function_manual_backup() {
 # authority records packed in DIR_MARC/koha_marc_<date>.tar.gz, sent to the
 # cloud when one is set) right now, and reports the package it made. The
 # script takes the backup lock itself and logs one line per outcome.
+# function_marc_backup [FOLDER]: the new panel names a folder of the server;
+# the package is copied there too (owned by the person, so scp as that user
+# reads it) and the one in DIR_MARC stays for the weekly rotation.
 function_marc_backup() {
     require_koha || return 1
+    local target_dir="${1:-}"
     # A script written before 1.5.55 sent export_records.pl's output to the
     # log, where the records broke the outcome lines; one written before
     # 1.5.136 had no --if-due catch-up, one before 1.5.154 gave up on
@@ -6673,8 +6677,25 @@ function_marc_backup() {
     ip_addr=$(get_server_ip)
     log "MARC21 export generated: $pkg"
     contents=$(tar -tzf "$pkg" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+    local kept="$pkg"
+    if [ -n "$target_dir" ] && [ "${target_dir%/}" != "${DIR_MARC%/}" ]; then
+        local copy n=2 base
+        base=$(basename "$pkg" .tar.gz)
+        copy="${target_dir%/}/${base}.tar.gz"
+        while [ -e "$copy" ]; do copy="${target_dir%/}/${base}_${n}.tar.gz"; n=$((n + 1)); done
+        if ! mkdir -p "$target_dir" 2>/dev/null || ! cp "$pkg" "$copy" 2>/dev/null; then
+            msg_error "" "$(t "The MARC21 package was made, but it could not be copied to") $target_dir\n\n$(t "File:") $pkg" 11 76
+            return 1
+        fi
+        if [ -n "${REAL_USER:-}" ] && [ "${REAL_USER}" != "root" ] && [ "${copy#"${REAL_HOME:-/nonexistent}"/}" != "$copy" ]; then
+            chown "${REAL_USER}:" "$copy" 2>/dev/null || true
+        fi
+        chmod 640 "$copy" 2>/dev/null || true
+        pkg="$copy"
+    fi
     if [ -n "${KEI_TASK:-}" ]; then
         kei_result file "$pkg"
+        kei_result kept "$kept"
         kei_result contents "$contents"
         kei_result size "$size"
         kei_result scp "scp ${REAL_USER:-root}@${ip_addr}:${pkg} Downloads/"
@@ -38318,6 +38339,22 @@ kei_task_info() {
     return 0
 }
 
+# What the MARC21 export screen shows before the export: the records it
+# will write, the folder of the weekly packages and the newest package.
+kei_task_marc_info() {
+    local newest
+    kei_result dir_marc "$DIR_MARC"
+    kei_result biblios "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.biblio;" 2>/dev/null || true)"
+    kei_result authorities "$(run_sql "SELECT COUNT(*) FROM ${DB_NAME}.auth_header;" 2>/dev/null || true)"
+    newest=$(ls -1t "$DIR_MARC"/koha_marc_*.tar.gz 2>/dev/null | head -n 1 || true)
+    if [ -n "$newest" ]; then
+        kei_result newest "$newest"
+        kei_result newest_size "$(du -h "$newest" | cut -f1)"
+        kei_result newest_date "$(date -r "$newest" '+%Y-%m-%d %H:%M' 2>/dev/null || true)"
+    fi
+    return 0
+}
+
 # What every cloud set-up needs first: rclone and the backup scripts.
 rclone_prepare() {
     command -v rclone >/dev/null 2>&1 || apt_install rclone >/dev/null 2>&1
@@ -38507,7 +38544,8 @@ kei_task() {
         info)            kei_task_info ;;
         backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
         backup-test)     function_test_backup "${1:-}" ;;
-        backup-marc)     function_marc_backup ;;
+        backup-marc)     function_marc_backup "${1:-}" ;;
+        marc-info)       kei_task_marc_info ;;
         backup-compression) [ -n "${1:-}" ] || return 2; backup_set_codec "$1" ;;
         restore-check)
             [ -n "${1:-}" ] || return 2

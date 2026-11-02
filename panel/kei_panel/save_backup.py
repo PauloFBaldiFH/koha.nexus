@@ -67,6 +67,23 @@ def file_name(db_name: str, codec: str, when: datetime | None = None) -> str:
     return f"{db_name or 'koha_library'}_manual_{when:%Y-%m-%d_%Hh%M}.sql.{codec}"
 
 
+def marc_file_name(when: datetime | None = None) -> str:
+    """The name /root/backup_marc.sh gives the MARC21 package:
+    koha_marc_YYYY-MM-DD_HHMM.tar.gz, the time of the export."""
+    when = when or datetime.now()
+    return f"koha_marc_{when:%Y-%m-%d_%H%M}.tar.gz"
+
+
+def is_marc_package(name: str) -> bool:
+    name = name.lower()
+    return name.startswith("koha_marc_") and name.endswith(".tar.gz")
+
+
+def is_sql_backup(name: str) -> bool:
+    name = name.lower()
+    return ".sql" in name and name.endswith(BACKUP_ENDS)
+
+
 def size_bytes(text: str) -> int:
     """du -h's size ("46M", "1.2G", "512K") in bytes; 0 when unknown."""
     text = (text or "").strip().upper().rstrip("B")
@@ -87,9 +104,10 @@ def existing_folder(path: Path) -> Path:
     return path
 
 
-def folder_facts(folder: Path) -> dict:
+def folder_facts(folder: Path, wanted=None) -> dict:
     """What the side of the screen tells about a folder: the free space of
-    its disk, and the backups already in it (count, bytes, newest name).
+    its disk, and the backups already in it (count, bytes, newest name);
+    wanted(name) tells which files count (SQL backups by default).
     Never raises: a folder that cannot be read has no backups listed."""
     base = existing_folder(folder)
     facts = {"free": None, "count": 0, "bytes": 0, "newest": ""}
@@ -102,8 +120,7 @@ def folder_facts(folder: Path) -> dict:
     found = []
     try:
         for entry in os.scandir(folder):
-            name = entry.name.lower()
-            if entry.is_file() and ".sql" in name and name.endswith(BACKUP_ENDS):
+            if entry.is_file() and (wanted or is_sql_backup)(entry.name):
                 st = entry.stat()
                 found.append((st.st_mtime, entry.name, st.st_size))
     except OSError:
