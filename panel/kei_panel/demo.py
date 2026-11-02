@@ -441,6 +441,54 @@ _SCRIPTS: dict[str, list[str]] = {
     "vpn-stop": ["@@msg ok OK\tThe VPN is off. The devices and keys are kept: Set up turns it on again."],
     "cloud-provider": ["@@note Registering the connection in rclone...", "@@note Testing the real cloud upload...",
                        "@@msg ok OK\tCloud enabled and tested successfully."],
+    # The automatic cloud backup screen (screens/cloud_backup.py).
+    "cloud-status": [
+        "@@result remote=gdrive", "@@result remote2=", "@@result sql_folder=Backup_SQL_Koha",
+        "@@result marc_folder=Backup_MARC_Koha", "@@result keep_days=7", "@@result cloud_keep_days=30",
+        "@@result bwlimit=", "@@result cloud_marc=yes", "@@result dir_sql=/var/backups/koha_sql",
+        "@@result rclone=v1.60.1-DEV", "@@result rclone_backends=46", "@@result rclone_source=debian",
+        "@@result history=sql\t2026-10-31 23:00:41 | OK: /var/backups/koha_sql/koha_library_2026-10-31_23h00.sql.gz"
+        " (48213412 bytes)",
+        "@@result history=sql\t2026-10-31 23:01:30 | Cloud OK: gdrive:Backup_SQL_Koha/"
+        " (koha_library_2026-10-31_23h00.sql.gz)",
+        "@@result history=sql\t2026-11-01 23:01:12 | WARN: cloud upload failed on gdrive (local copy preserved)",
+        "@@result history=sql\t2026-11-02 23:01:20 | Cloud OK: gdrive:Backup_SQL_Koha/"
+        " (koha_library_2026-11-02_23h00.sql.gz)",
+        "@@result history=marc\t2026-11-01 03:02:10 | Cloud OK: gdrive:Backup_MARC_Koha/"
+        " (koha_marc_2026-11-01_0300.tar.gz)",
+    ],
+    "cloud-list": ["@@result remote=gdrive\tdrive", "@@result remote=wasabi\ts3",
+                   "@@result remote=nas\tsftp"],
+    "cloud-show": ["@@result opt=provider\tWasabi", "@@result opt=endpoint\ts3.wasabisys.com",
+                   "@@result opt=access_key_id\tAKIADEMO", "@@result secret=secret_access_key"],
+    "cloud-save": ["@@note Registering the connection in rclone...", "@@result remote=newcloud"],
+    "cloud-test": ["@@note Testing the real cloud upload...", "@@result test=ok", "@@result seconds=3",
+                   "@@msg ok OK\t✅ The cloud answered: a test file was sent to {0}:Backup_SQL_Koha, read back "
+                   "and removed."],
+    "cloud-delete": ["@@msg ok OK\tThe connection '{0}' was removed. The files already in the cloud were not "
+                     "touched."],
+    "cloud-settings": ["@@msg ok OK\tCloud backup settings saved. They apply from the next backup."],
+    "cloud-ls": ["@@result entry=D\tBackup_SQL_Koha\t0\t2026-10-01T10:00:00",
+                 "@@result entry=D\tBackup_MARC_Koha\t0\t2026-10-01T10:00:00",
+                 "@@result entry=D\tDocuments\t0\t2026-09-12T08:00:00",
+                 "@@result entry=F\tkoha_library_2026-11-02_23h00.sql.gz\t48322112\t2026-11-02T23:01:20",
+                 "@@result entry=F\tkoha_library_2026-11-01_23h00.sql.gz\t48297001\t2026-11-01T23:01:00",
+                 "@@result entry=F\tkoha_library_2026-10-31_23h00.sql.gz\t48213412\t2026-10-31T23:01:30"],
+    "cloud-about": ["@@result total=16106127360", "@@result used=5153960755", "@@result free=10952166605"],
+    "cloud-get": ["@@note Downloading from the cloud...",
+                  "@@result file=/home/demo/backups/from_cloud/koha_library_2026-11-02_23h00.sql.gz",
+                  "@@result size=47M", "@@msg ok OK\tDownloaded"],
+    "cloud-rm": ["@@msg ok OK\tDeleted from the cloud"],
+    "cloud-send-now": ["@@note Making the database backup and sending it to the cloud...",
+                       "@@result line=2026-11-02 14:40:02 | OK: /var/backups/koha_sql/koha_library_2026-11-02_14h40"
+                       ".sql.gz (48322112 bytes)",
+                       "@@result line=2026-11-02 14:40:31 | Cloud OK: gdrive:Backup_SQL_Koha/"
+                       " (koha_library_2026-11-02_14h40.sql.gz)",
+                       "@@msg ok OK\t✅ Backup made and sent to the cloud."],
+    "cloud-rclone-official": ["@@note Downloading the official rclone...", "@@result rclone=v1.71.2",
+                              "@@result rclone_backends=72",
+                              "@@msg ok OK\tThe official rclone v1.71.2 is installed: every service it "
+                              "supports can be chosen now."],
 }
 
 
@@ -527,7 +575,9 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2
         return out
-    pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
+    pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
+                            "cloud-about", "cloud-ls", "timezones", "credentials") \
+        else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
         optional = line.startswith("~")

@@ -151,3 +151,63 @@ old_package() {   # a package made $1 days ago
     grep -q 'Backup_SQL_Koha/' "$W/rclone.calls"
     [ "$(marc_uploads)" -eq 0 ]
 }
+
+# The cloud settings of the panel's cloud backup screen (backup.conf).
+conf_set() { printf '%s="%s"\n' "$1" "$2" >> "$W/backup.conf"; }
+fake_rclone_failing_copy() {   # copies to $1 fail; the rest work
+    cat > /usr/bin/rclone <<FAKE
+#!/bin/bash
+echo "\$*" >> "$W/rclone.calls"
+case "\$1" in listremotes) printf 'gdrive:\nwasabi:\n'; exit 0 ;; esac
+for a in "\$@"; do case "\$a" in $1:*) [[ " \$* " == *" copy "* ]] && exit 5 ;; esac; done
+exit 0
+FAKE
+    chmod +x /usr/bin/rclone
+}
+
+@test "M10 cloud retention: after an upload that worked, older copies of that folder only are deleted" {
+    conf_set CLOUD_KEEP_DAYS 30
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    [ "$status" -eq 0 ]
+    grep -q -- "delete --max-depth 1 --min-age 30d --include \*.sql.\* gdrive:Backup_SQL_Koha/" "$W/rclone.calls"
+    grep -q '| Cloud cleanup: copies older than 30 days removed from gdrive:Backup_SQL_Koha/' "$W/log/backup_sql.log"
+    run bash /root/backup_marc.sh
+    grep -q -- "delete --max-depth 1 --min-age 30d --include koha_marc_\*.tar.gz gdrive:Backup_MARC_Koha/" "$W/rclone.calls"
+}
+
+@test "M11 cloud retention off (0) deletes nothing; a failed upload never deletes" {
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    ! grep -q ' delete ' "$W/rclone.calls"
+    rm -f "$W/rclone.calls"
+    conf_set CLOUD_KEEP_DAYS 7
+    fake_rclone_failing_copy gdrive
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    [ "$status" -eq 0 ]
+    ! grep -q ' delete ' "$W/rclone.calls"
+    grep -q 'WARN: cloud upload failed on gdrive (local copy preserved)' "$W/log/backup_sql.log"
+}
+
+@test "M12 second copy, speed limit and MARC21 kept off the cloud" {
+    conf_set RCLONE_REMOTE2 wasabi
+    conf_set RCLONE_BWLIMIT "08:00,1M 19:00,off"
+    conf_set CLOUD_MARC no
+    fake_rclone_failing_copy nothing
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    [ "$status" -eq 0 ]
+    grep -q -- '--bwlimit 08:00,1M 19:00,off .*gdrive:Backup_SQL_Koha/' "$W/rclone.calls"
+    grep -q -- 'copy .*wasabi:Backup_SQL_Koha/' "$W/rclone.calls"
+    grep -q '| Cloud OK: wasabi:Backup_SQL_Koha/' "$W/log/backup_sql.log"
+    rm -f "$W/rclone.calls"
+    run bash /root/backup_marc.sh
+    [ "$status" -eq 0 ]
+    [ "$(marc_packages)" -eq 1 ]
+    ! grep -q 'Backup_MARC_Koha' "$W/rclone.calls"
+}
+
+@test "M13 a second copy that is not in rclone.conf is skipped with a warning; the first still goes" {
+    conf_set RCLONE_REMOTE2 gone
+    KEI_NO_MARC_CATCHUP=1 run bash /root/backup_sql.sh
+    [ "$status" -eq 0 ]
+    grep -q "WARN: RCLONE_REMOTE='gone' does not exist in rclone.conf" "$W/log/backup_sql.log"
+    grep -q '| Cloud OK: gdrive:Backup_SQL_Koha/' "$W/log/backup_sql.log"
+}
