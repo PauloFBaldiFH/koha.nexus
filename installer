@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.159"
+PANEL_VERSION=" 1.5.160"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -38297,6 +38297,7 @@ kei_task_info() {
     kei_result dir_sql "$DIR_SQL"
     kei_result compression "$(backup_codec_setting)"
     kei_result compression_used "$(backup_codec)"
+    kei_result db_name "$DB_NAME"
     # A nightly script written before 1.5.44 dumps straight into its final
     # name, so a dump in progress looked like the newest backup; one written
     # before 1.5.136 never caught up a missed MARC21 backup, one before

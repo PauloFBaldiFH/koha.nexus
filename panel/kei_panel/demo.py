@@ -178,6 +178,7 @@ _SCRIPTS: dict[str, list[str]] = {
     "info": [
         "@@result real_user=root", "@@result timezone=America/Sao_Paulo", f"@@result real_home={_HOME}", "@@result server_ip=192.0.2.10",
         "@@result dir_sql=/var/backups/koha_sql", "@@result compression=gz", "@@result compression_used=gz",
+        "@@result db_name=koha_library",
         "@@result koha_installed=yes",
         f"@@result newest={_NEWEST}", "@@result newest_date=2026-10-02 03:00",
         "@@result newest_size=46M", "@@result rclone=yes", "@@result rclone_remote=gdrive",
