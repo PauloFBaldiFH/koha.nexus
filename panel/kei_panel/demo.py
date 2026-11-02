@@ -192,10 +192,16 @@ _SCRIPTS: dict[str, list[str]] = {
     ],
     "backup-marc": [
         "@@note Exporting the MARC21 records...",
-        "@@result file=/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz", "@@result size=21M",
+        "@@result file={0}/koha_marc_2026-10-03_1200.tar.gz", "@@result size=21M",
+        "@@result kept=/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz",
         "@@result contents=biblios_2026-10-03_1200.mrc authorities_2026-10-03_1200.mrc",
-        "@@result scp=scp root@192.0.2.10:/var/backups/koha_marc/koha_marc_2026-10-03_1200.tar.gz Downloads/",
+        "@@result scp=scp root@192.0.2.10:{0}/koha_marc_2026-10-03_1200.tar.gz Downloads/",
         "@@result user=root", "@@result cloud=no",
+    ],
+    "marc-info": [
+        "@@result dir_marc=/var/backups/koha_marc", "@@result biblios=12840", "@@result authorities=3175",
+        "@@result newest=/var/backups/koha_marc/koha_marc_2026-10-26_0300.tar.gz",
+        "@@result newest_size=21M", "@@result newest_date=2026-10-26 03:00",
     ],
     "backup-test": [
         "@@ask Test Backup\tRun the test now?", "@@note Importing into a temporary database...",
@@ -521,7 +527,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2
         return out
-    pause = 0.0 if name in ("tool-install", "info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
+    pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "timezones", "credentials") else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
         optional = line.startswith("~")

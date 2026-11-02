@@ -49,13 +49,16 @@ def test_compression_choice_runs_the_task():
 def test_the_cards_are_the_only_backup_actions(tmp_path, monkeypatch):
     """Paulo, 2026-10-15: no buttons above the status cards; the cards hold
     Download latest backup, manual backup, MARC21, restore and cloud. The
-    MARC21 result offers Download to computer where Downloads is reachable."""
+    MARC21 card opens the export screen (screens/marc_export), whose result
+    offers the Windows Downloads button under WSL."""
     from kei_panel import transfer
     from kei_panel.app import KohaPanelApp
-    from kei_panel.screens.dialogs import ConfirmScreen, MessageScreen
+    from kei_panel import save_backup
+    from kei_panel.screens.marc_export import MarcExportScreen
     from kei_panel.widgets.cards import ActionCard
 
     monkeypatch.setattr(transfer, "where", lambda: "wsl")
+    monkeypatch.setattr(save_backup, "is_wsl", lambda: True)
 
     async def main():
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
@@ -75,12 +78,13 @@ def test_the_cards_are_the_only_backup_actions(tmp_path, monkeypatch):
             assert ran == ["restore"]
             app.run_native = run_native
             cards["backup-marc"].action_choose()
-            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
-            app.screen.dismiss(True)
-            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
-            assert "koha_marc_" in str(app.screen._details)
-            await _until(pilot, lambda: bool(app.screen.query("#extra")))
-            assert str(app.screen.query_one("#extra").label) == "📥 Download to computer"
+            await _until(pilot, lambda: isinstance(app.screen, MarcExportScreen))
+            screen = app.screen
+            screen.query_one("#sb-folder").value = str(tmp_path / "marc")
+            screen.query_one("#save").press()
+            await _until(pilot, lambda: screen._file is not None)
+            assert "koha_marc_" in str(screen._file) and str(tmp_path / "marc") in screen._scp
+            assert screen.query("#win-downloads") and screen.query_one("#sb-done").display
 
     asyncio.run(main())
 
@@ -110,3 +114,29 @@ def test_marc_package_download_to_computer(tmp_path, monkeypatch):
     details = asyncio.run(main())
     saved = downloads / "koha_marc_2026-10-15 (2).tar.gz"
     assert saved.read_bytes() == b"marc" and saved.name in str(details)
+
+
+def test_marc_screen_shows_the_package_and_the_records(tmp_path):
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.screens.marc_export import MarcExportScreen
+
+    (tmp_path / "koha_marc_2026-10-01_0300.tar.gz").write_bytes(b"x" * 5)
+    marc = {"dir_marc": "/var/backups/koha_marc", "biblios": "12840", "authorities": "",
+            "newest_size": "21M"}
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
+        async with app.run_test(size=(170, 48)) as pilot:
+            await app.push_screen(MarcExportScreen({"real_home": str(tmp_path), "real_user": "ana"}, marc))
+            await pilot.pause(0.3)
+            screen = app.screen
+            screen.query_one("#sb-folder").value = str(tmp_path)
+            await pilot.pause(0.2)
+            full = str(screen.query_one("#sb-pv-path").render())
+            assert full.startswith(str(tmp_path / "koha_marc_")) and full.endswith(".tar.gz")
+            assert "biblios_" in str(screen.query_one("#sb-pv-contents").render())
+            assert str(screen.query_one("#sb-biblios").render()) == "12,840"
+            assert str(screen.query_one("#sb-auths").render()) == "—"
+            assert "1 MARC21 package" in str(screen.query_one("#sb-there-text").render())
+            assert "newest package" in str(screen.query_one("#sb-need").render())
+    asyncio.run(main())
