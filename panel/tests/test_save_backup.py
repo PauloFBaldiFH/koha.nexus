@@ -193,3 +193,20 @@ def test_save_shows_the_scp_command_and_done_keeps_the_file(tmp_path):
             assert not isinstance(app.screen, SaveBackupScreen)
     asyncio.run(main())
     assert folder.is_dir()
+
+
+def test_dialog_is_centred_and_only_as_tall_as_its_content():
+    """The Save database backup dialog sat in the top-left corner, as tall as
+    the window: its screen had no centring rule and its parts took 1fr."""
+    async def main():
+        app = _demo_app()
+        async with app.run_test(size=(140, 50)) as pilot:
+            await app.push_screen(SaveBackupScreen(INFO))
+            await pilot.pause(0.3)
+            dialog = app.screen.query_one(".dialog").region
+            assert abs(dialog.x - (140 - dialog.right)) <= 1
+            assert abs(dialog.y - (50 - dialog.bottom)) <= 1
+            assert dialog.height < 25
+            save = app.screen.query_one("#save").region
+            assert dialog.y < save.y and save.bottom <= dialog.bottom
+    asyncio.run(main())
