@@ -314,8 +314,52 @@ DiagnosticsScreen, LogTailScreen, CheckReportScreen {
 .dialog.-wide { width: 96; max-height: 90%; }
 /* On a short terminal FitsScreen (screens/dialogs.py) lowers these. */
 .dialog-scroll { height: auto; max-height: 24; }
-/* Save database backup: its parts take their own height, not the whole dialog */
-#sb-form, #sb-progress, #sb-done { height: auto; }
+/* ---- Save database backup (screens/save_backup.py): laid out like the
+   Restore picker, the folder on the left, what the save makes on the right */
+#sb-box {
+    width: 96%;
+    max-width: 200;
+    height: 90%;
+    border: round $success;
+    background: $surface;
+    padding: 1 2;
+}
+#sb-head { height: auto; }
+#sb-title { width: 1fr; }
+#sb-steps { width: auto; color: $accent; }
+#sb-body { height: 1fr; }
+#sb-main { width: 1fr; }
+#sb-form { height: 1fr; }
+#sb-shortcuts { height: auto; }
+#sb-shortcuts Button { min-width: 8; margin-right: 1; }
+.sb-prompt { text-style: bold; padding-top: 1; }
+#sb-tree { height: 1fr; min-height: 5; border: round $panel-lighten-2; }
+#sb-problem { height: auto; }
+#sb-progress { height: auto; }
+#sb-done { height: 1fr; }
+#sb-side { width: 60; margin-left: 1; }
+.sb-card {
+    height: auto;
+    border: round $panel-lighten-2;
+    border-title-align: left;
+    border-title-style: bold;
+    border-title-color: $accent;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+.sb-card.-download { border: round $success; }
+.sb-hint { color: $text-muted; height: auto; }
+.sb-row { height: auto; }
+.sb-key { width: 17; color: $text-muted; }
+.sb-val { width: 1fr; text-style: bold; }
+.sb-note { padding-top: 1; }
+#sb-ok { color: $success; text-style: bold; padding-bottom: 1; }
+#sb-bar { margin: 1 0; }
+.sb-card-buttons { height: auto; padding-top: 1; }
+.sb-card-buttons Button { margin-right: 2; min-width: 12; height: 3; }
+.sb-side-row { height: auto; }
+.sb-side-row .dialog-command { width: 1fr; height: auto; margin: 1 1 0 0; }
+.sb-side-row Button { min-width: 14; height: 3; }
 .dialog-preview { border: round $panel-lighten-2; padding: 0 1; margin-bottom: 1; }
 .dialog-options { height: auto; max-height: 12; margin-bottom: 1; }
 .dialog-note { color: $text-muted; }
@@ -443,6 +487,9 @@ App.-plain .action-card,
 App.-plain #loader-box,
 App.-plain .dialog,
 App.-plain #picker-box,
+App.-plain #sb-box,
+App.-plain .sb-card,
+App.-plain #sb-tree,
 App.-plain #picker-tree,
 App.-plain #picker-help,
 App.-plain #loader-notice,

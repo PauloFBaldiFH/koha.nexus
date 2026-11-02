@@ -195,18 +195,80 @@ def test_save_shows_the_scp_command_and_done_keeps_the_file(tmp_path):
     assert folder.is_dir()
 
 
-def test_dialog_is_centred_and_only_as_tall_as_its_content():
-    """The Save database backup dialog sat in the top-left corner, as tall as
-    the window: its screen had no centring rule and its parts took 1fr."""
+def test_file_name_is_the_installers():
+    from datetime import datetime
+    when = datetime(2026, 11, 2, 13, 5)
+    assert save_backup.file_name("koha_library", "gz", when) == "koha_library_manual_2026-11-02_13h05.sql.gz"
+    assert save_backup.file_name("koha_x", "zst", when).endswith(".sql.zst")
+    assert save_backup.file_name("", "nope", when) == "koha_library_manual_2026-11-02_13h05.sql.gz"
+
+
+def test_codec_is_the_one_in_effect():
+    assert save_backup.codec_of({"compression": "zst", "compression_used": "gz"}) == "gz"
+    assert save_backup.codec_of({"compression": "xz"}) == "xz"
+    assert save_backup.codec_of({}) == "gz"
+    assert save_backup.codec_label("zst") == "zstd (.sql.zst)"
+
+
+def test_size_bytes_reads_du():
+    assert save_backup.size_bytes("46M") == 46 << 20
+    assert save_backup.size_bytes("1.5G") == int(1.5 * (1 << 30))
+    assert save_backup.size_bytes("") == 0 and save_backup.size_bytes("??") == 0
+
+
+def test_folder_facts_count_the_backups_there(tmp_path):
+    (tmp_path / "a_manual_2026-10-01_10h00.sql.gz").write_bytes(b"x" * 10)
+    (tmp_path / "notes.txt").write_text("no")
+    facts = save_backup.folder_facts(tmp_path)
+    assert facts["count"] == 1 and facts["bytes"] == 10 and facts["free"] > 0
+    missing = save_backup.folder_facts(tmp_path / "new" / "deeper")
+    assert missing["count"] == 0 and missing["free"] > 0
+
+
+def test_screen_shows_the_exact_file_before_saving(tmp_path):
+    info = dict(INFO, real_home=str(tmp_path), db_name="koha_test", compression_used="xz", newest_size="2M")
+
+    async def main():
+        app = _demo_app()
+        async with app.run_test(size=(160, 48)) as pilot:
+            await app.push_screen(SaveBackupScreen(info))
+            await pilot.pause(0.3)
+            screen = app.screen
+            full = str(screen.query_one("#sb-pv-path").render())
+            assert full.startswith(str(tmp_path / "backups" / "koha_test_manual_")) and full.endswith(".sql.xz")
+            assert "created" in str(screen.query_one("#sb-pv-folder").render())
+            screen.query_one("#sb-folder").value = "relative"
+            await pilot.pause(0.1)
+            assert "starting with /" in str(screen.query_one("#sb-pv-folder").render())
+    asyncio.run(main())
+
+
+def test_new_folder_is_made_where_the_box_points(tmp_path):
+    async def main():
+        app = _demo_app()
+        async with app.run_test(size=(160, 48)) as pilot:
+            await app.push_screen(SaveBackupScreen(dict(INFO, real_home=str(tmp_path))))
+            await pilot.pause(0.3)
+            screen = app.screen
+            screen.query_one("#sb-folder").value = str(tmp_path)
+            screen.query_one("#sb-new").press()
+            await pilot.pause(0.3)
+            app.screen.dismiss("2026")
+            await pilot.pause(0.3)
+            assert screen.query_one("#sb-folder").value == str(tmp_path / "2026")
+    asyncio.run(main())
+    assert (tmp_path / "2026").is_dir()
+
+
+def test_screen_is_centred_and_keeps_its_buttons():
     async def main():
         app = _demo_app()
         async with app.run_test(size=(140, 50)) as pilot:
             await app.push_screen(SaveBackupScreen(INFO))
             await pilot.pause(0.3)
-            dialog = app.screen.query_one(".dialog").region
-            assert abs(dialog.x - (140 - dialog.right)) <= 1
-            assert abs(dialog.y - (50 - dialog.bottom)) <= 1
-            assert dialog.height < 25
+            box = app.screen.query_one("#sb-box").region
+            assert abs(box.x - (140 - box.right)) <= 1
+            assert abs(box.y - (50 - box.bottom)) <= 1
             save = app.screen.query_one("#save").region
-            assert dialog.y < save.y and save.bottom <= dialog.bottom
+            assert box.y < save.y and save.bottom <= box.bottom
     asyncio.run(main())

@@ -19,6 +19,7 @@ import os
 import shutil
 import socket
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from . import transfer
@@ -35,6 +36,85 @@ PICK_FOLDER_SCRIPT = (
     "$d.Description = 'Save the backup in'; $d.ShowNewFolderButton = $true; "
     "if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }"
 )
+
+
+# The compressions of the Backup screen (installer backup_codec): the name
+# shown and the file's extension.
+CODECS = {"gz": "gzip", "zst": "zstd", "xz": "xz"}
+
+
+def codec_of(info: dict) -> str:
+    """The compression the save will use: the one in effect (compression_used,
+    zstd/xz fall back to gz when the tool is missing), else the one chosen."""
+    for key in ("compression_used", "compression"):
+        value = (info.get(key) or "").strip()
+        if value in CODECS:
+            return value
+    return "gz"
+
+
+def codec_label(codec: str) -> str:
+    """"gzip (.sql.gz)", for the line that says how the file is compressed."""
+    codec = codec if codec in CODECS else "gz"
+    return f"{CODECS[codec]} (.sql.{codec})"
+
+
+def file_name(db_name: str, codec: str, when: datetime | None = None) -> str:
+    """The name the installer gives the file (function_manual_backup):
+    DB_manual_YYYY-MM-DD_HHhMM.sql.CODEC, the time of the save."""
+    when = when or datetime.now()
+    codec = codec if codec in CODECS else "gz"
+    return f"{db_name or 'koha_library'}_manual_{when:%Y-%m-%d_%Hh%M}.sql.{codec}"
+
+
+def size_bytes(text: str) -> int:
+    """du -h's size ("46M", "1.2G", "512K") in bytes; 0 when unknown."""
+    text = (text or "").strip().upper().rstrip("B")
+    units = {"K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40}
+    try:
+        if text and text[-1] in units:
+            return int(float(text[:-1].replace(",", ".")) * units[text[-1]])
+        return int(float(text)) if text else 0
+    except ValueError:
+        return 0
+
+
+def existing_folder(path: Path) -> Path:
+    """The folder itself, or the nearest one above it that exists (the disk
+    a folder still to be created will be on)."""
+    while not path.is_dir() and path != path.parent:
+        path = path.parent
+    return path
+
+
+def folder_facts(folder: Path) -> dict:
+    """What the side of the screen tells about a folder: the free space of
+    its disk, and the backups already in it (count, bytes, newest name).
+    Never raises: a folder that cannot be read has no backups listed."""
+    base = existing_folder(folder)
+    facts = {"free": None, "count": 0, "bytes": 0, "newest": ""}
+    try:
+        facts["free"] = shutil.disk_usage(base).free
+    except OSError:
+        pass
+    if base != folder:
+        return facts
+    found = []
+    try:
+        for entry in os.scandir(folder):
+            name = entry.name.lower()
+            if entry.is_file() and ".sql" in name and name.endswith(BACKUP_ENDS):
+                st = entry.stat()
+                found.append((st.st_mtime, entry.name, st.st_size))
+    except OSError:
+        return facts
+    if found:
+        found.sort()
+        facts.update(count=len(found), bytes=sum(f[2] for f in found), newest=found[-1][1])
+    return facts
+
+
+BACKUP_ENDS = (".sql", ".sql.gz", ".sql.zst", ".sql.xz", ".sql.bz2")
 
 
 def is_wsl() -> bool:
