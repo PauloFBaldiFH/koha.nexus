@@ -9240,7 +9240,7 @@
    "fr": "Télécharger",
    "it": "Scarica",
    "de": "Herunterladen",
-   "nl": null,
+   "nl": "Downloaden",
    "sv": null,
    "pl": null,
    "cs": null,
@@ -19023,7 +19023,7 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "sv": {
