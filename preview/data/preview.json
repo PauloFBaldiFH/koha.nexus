@@ -3504,7 +3504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在本服务器上安装使用 MariaDB 和 Apache 的 Koha",
    "ja": null,
    "ko": null
   },
@@ -3554,7 +3554,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示首次访问的登录名和密码",
    "ja": null,
    "ko": null
   },
@@ -3679,7 +3679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将最新备份复制到本机的“下载”文件夹",
    "ja": null,
    "ko": null
   },
@@ -3729,7 +3729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "生成完整备份，并显示如何将其复制到电脑",
    "ja": null,
    "ko": null
   },
@@ -3754,7 +3754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📚  立即导出 MARC21 记录",
    "ja": null,
    "ko": null
   },
@@ -3779,7 +3779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "立即以 MARC21 格式导出目录和规范记录",
    "ja": null,
    "ko": null
   },
@@ -3829,7 +3829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "用备份替换 Koha 数据库（先进行测试）",
    "ja": null,
    "ko": null
   },
@@ -3879,7 +3879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "自动化上传到云存储服务的备份",
    "ja": null,
    "ko": null
   },
@@ -3929,7 +3929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将备份导入测试数据库以进行检查",
    "ja": null,
    "ko": null
   },
@@ -4029,7 +4029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "导入书目和规范记录以及读者数据：MARC、ISIS、CSV、备份",
    "ja": null,
    "ko": null
   },
@@ -4054,7 +4054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📑  数据库表",
    "ja": null,
    "ko": null
   },
@@ -4079,7 +4079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🤖  AI",
    "ja": null,
    "ko": null
   },
@@ -4129,7 +4129,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "安装用于替换记录 MARC 的员工页面",
    "ja": null,
    "ko": null
   },
@@ -4154,7 +4154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "💬  员工端首页上的 AI 助手",
    "ja": null,
    "ko": null
   },
@@ -4179,7 +4179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在员工界面首页添加 AI 聊天",
    "ja": null,
    "ko": null
   },
@@ -4204,7 +4204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📡  Z39.50 / SRU 服务器",
    "ja": null,
    "ko": null
   },
@@ -4229,7 +4229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🎨  OPAC 与员工界面外观",
    "ja": null,
    "ko": null
   },
@@ -4254,7 +4254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📨  消息与互操作",
    "ja": null,
    "ko": null
   },
@@ -4304,7 +4304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设置 SMTP 服务器和流通电子邮件",
    "ja": null,
    "ko": null
   },
@@ -4354,7 +4354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "通过 WhatsApp 和 Telegram 发送 Koha 通知",
    "ja": null,
    "ko": null
   },
@@ -4404,7 +4404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "开启 Koha 的 SIP2 和 Z39.50 服务器",
    "ja": null,
    "ko": null
   },
@@ -4429,7 +4429,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔐  WireGuard VPN",
    "ja": null,
    "ko": null
   },
@@ -4454,7 +4454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔒  安全与访问中心",
    "ja": null,
    "ko": null
   },
@@ -4479,7 +4479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔒 安全与访问中心",
    "ja": null,
    "ko": null
   },
@@ -4504,7 +4504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "选择安全或远程访问工具：",
    "ja": null,
    "ko": null
   },
@@ -4554,7 +4554,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "通过 Cloudflare 发布 OPAC 和员工网站",
    "ja": null,
    "ko": null
   },
@@ -4604,7 +4604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "列出本服务器上生效的防火墙规则",
    "ja": null,
    "ko": null
   },
@@ -4654,7 +4654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "阻止或将员工端端口 8080 开放到互联网",
    "ja": null,
    "ko": null
   },
@@ -4704,7 +4704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "免费 HTTPS 证书，仅适用于不使用隧道的自有域名",
    "ja": null,
    "ko": null
   },
@@ -4754,7 +4754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示被封禁的 IP 和入侵尝试",
    "ja": null,
    "ko": null
   },
@@ -4804,7 +4804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "为 Koha 生成新的 MariaDB 密码",
    "ja": null,
    "ko": null
   },
@@ -4854,7 +4854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "检查 OPAC，并使供 Google 使用的站点地图保持最新",
    "ja": null,
    "ko": null
   },
@@ -4979,7 +4979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在 Zebra 和 Elasticsearch 之间切换目录搜索",
    "ja": null,
    "ko": null
   },
@@ -5029,7 +5029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "修复搜索引擎并重建目录索引",
    "ja": null,
    "ko": null
   },
@@ -5154,7 +5154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示服务、搜索、磁盘和最近一次备份",
    "ja": null,
    "ko": null
   },
@@ -5204,7 +5204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "运行所有检查并生成验证报告",
    "ja": null,
    "ko": null
   },
@@ -5254,7 +5254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "打开最新的验证报告",
    "ja": null,
    "ko": null
   },
@@ -5304,7 +5304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "实时跟踪员工端或 OPAC 错误日志",
    "ja": null,
    "ko": null
   },
@@ -5354,7 +5354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "优化数据表并清除旧日志（附预览）",
    "ja": null,
    "ko": null
   },
@@ -5404,7 +5404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "重启 Memcached、Plack 和 Koha 的服务",
    "ja": null,
    "ko": null
   },
@@ -5529,7 +5529,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "根据本服务器的内存调整内存和工作进程",
    "ja": null,
    "ko": null
   },
@@ -5579,7 +5579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "创建拥有全部权限的员工账户",
    "ja": null,
    "ko": null
   },
@@ -5629,7 +5629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设置时区并通过 NTP 同步时钟",
    "ja": null,
    "ko": null
   },
@@ -5654,7 +5654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "✨  充实书目目录",
    "ja": null,
    "ko": null
   },
@@ -5679,7 +5679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📇  充实并规范化规范记录",
    "ja": null,
    "ko": null
   },
@@ -5704,7 +5704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🌐  从世界书目充实数据",
    "ja": null,
    "ko": null
   },
@@ -5804,7 +5804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "删除已导入 MARC 批次的记录",
    "ja": null,
    "ko": null
   },
@@ -5829,7 +5829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔗  同步并链接规范记录",
    "ja": null,
    "ko": null
   },
@@ -5854,7 +5854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将目录标目链接到其规范记录",
    "ja": null,
    "ko": null
   },
@@ -5879,7 +5879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "👥  查找重复作者（规范记录）",
    "ja": null,
    "ko": null
   },
@@ -5904,7 +5904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "查找同一作者的变体形式，并合并您确认的形式",
    "ja": null,
    "ko": null
   },
@@ -5954,7 +5954,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "向 Koha 的报表模块添加现成的 SQL 报表",
    "ja": null,
    "ko": null
   },
@@ -6004,7 +6004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将读者从一个类别移至另一个类别",
    "ja": null,
    "ko": null
   },
@@ -6054,7 +6054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "查找数据缺失或损坏的记录",
    "ja": null,
    "ko": null
   },
@@ -6104,7 +6104,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将很久以前结束的借阅与预约记录匿名化",
    "ja": null,
    "ko": null
   },
@@ -6154,7 +6154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "备份后删除已过期且无借阅记录的读者",
    "ja": null,
    "ko": null
   },
@@ -6204,7 +6204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示图书馆工具执行过的操作及其时间",
    "ja": null,
    "ko": null
   },
@@ -6254,7 +6254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "CPF 校验、Pimaco 标签、节假日、ABNT 与人口普查",
    "ja": null,
    "ko": null
   },
@@ -6304,7 +6304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "面向编目员的 PHA、Cutter 和 CDD 辅助工具",
    "ja": null,
    "ko": null
   },
@@ -6354,7 +6354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在编目编辑器中添加 CDD 查询",
    "ja": null,
    "ko": null
   },
@@ -6404,7 +6404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "开启或关闭 Koha 插件，并设置其来源",
    "ja": null,
    "ko": null
   },
@@ -6429,7 +6429,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📂  员工访问服务器文件",
    "ja": null,
    "ko": null
   },
@@ -6454,7 +6454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "修复 Koha 中“工具 > 访问文件”的 access_dir 错误",
    "ja": null,
    "ko": null
   },
@@ -6504,7 +6504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "查找作者的 Cutter 号",
    "ja": null,
    "ko": null
   },
@@ -6579,7 +6579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📂  打开用户文件夹",
    "ja": null,
    "ko": null
   },
@@ -6604,7 +6604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在 Windows 资源管理器或文件管理器中打开您的主文件夹",
    "ja": null,
    "ko": null
   },
@@ -6629,7 +6629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "💻  打开 Debian 终端",
    "ja": null,
    "ko": null
   },
@@ -6654,7 +6654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Debian 命令行：在 Windows 上为独立窗口，在其他系统上为此窗口",
    "ja": null,
    "ko": null
   },
@@ -6704,7 +6704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "实时监控 CPU、内存和网络",
    "ja": null,
    "ko": null
   },
@@ -6754,7 +6754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在 Midnight Commander 中浏览服务器文件",
    "ja": null,
    "ko": null
   },
@@ -6804,7 +6804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "开启或关闭 Koha 的计划任务",
    "ja": null,
    "ko": null
   },
@@ -6854,7 +6854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🌍 Koha 与面板语言",
    "ja": null,
    "ko": null
   },
@@ -6879,7 +6879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🌍  下载并启用语言",
    "ja": null,
    "ko": null
   },
@@ -6904,7 +6904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "下载语言并将其设为 OPAC、员工端和面板的语言",
    "ja": null,
    "ko": null
   },
@@ -6929,7 +6929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📥  仅下载语言包",
    "ja": null,
    "ko": null
   },
@@ -6954,7 +6954,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "下载 Koha 语言包，且不更改其他内容",
    "ja": null,
    "ko": null
   },
@@ -6979,7 +6979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "✅  将已安装的语言设为当前语言",
    "ja": null,
    "ko": null
   },
@@ -7004,7 +7004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将已安装的语言设为当前语言，不下载",
    "ja": null,
    "ko": null
   },
@@ -7029,7 +7029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📋  已安装的语言及当前语言",
    "ja": null,
    "ko": null
   },
@@ -7054,7 +7054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "列出已安装的语言及当前启用的语言",
    "ja": null,
    "ko": null
   },
@@ -7179,7 +7179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "更新系统软件包和 Koha 数据库",
    "ja": null,
    "ko": null
   },
@@ -7229,7 +7229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "下载本面板的最新版本",
    "ja": null,
    "ko": null
   },
@@ -7279,7 +7279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "版本、许可证及获取帮助的途径",
    "ja": null,
    "ko": null
   },
@@ -7329,7 +7329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "重启整台服务器",
    "ja": null,
    "ko": null
   },
@@ -7679,7 +7679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "员工端 / OPAC",
    "ja": null,
    "ko": null
   },
@@ -7754,7 +7754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "CPU",
    "ja": null,
    "ko": null
   },
@@ -7854,7 +7854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "数据库",
    "ja": null,
    "ko": null
   },
@@ -7879,7 +7879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "备份文件夹",
    "ja": null,
    "ko": null
   },
@@ -7929,7 +7929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "错误（最近 24 小时）",
    "ja": null,
    "ko": null
   },
@@ -7979,7 +7979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "更新",
    "ja": null,
    "ko": null
   },
@@ -8029,7 +8029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "SRU 网关（sru.koha.nexus）",
    "ja": null,
    "ko": null
   },
@@ -8079,7 +8079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Z39.50 服务器",
    "ja": null,
    "ko": null
   },
@@ -8329,7 +8329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Gzip（.sql.gz）· 可在任何系统中打开",
    "ja": null,
    "ko": null
   },
@@ -8354,7 +8354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Zstandard（.sql.zst）· 快速且体积较小：适合大型目录",
    "ja": null,
    "ko": null
   },
@@ -8379,7 +8379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "XZ / LZMA（.sql.xz）· 体积最小，生成较慢：适合长期保存",
    "ja": null,
    "ko": null
   },
@@ -8479,7 +8479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "搜索引擎",
    "ja": null,
    "ko": null
   },
@@ -8604,7 +8604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "提供方",
    "ja": null,
    "ko": null
   },
@@ -8629,7 +8629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "本地 Ollama",
    "ja": null,
    "ko": null
   },
@@ -8729,7 +8729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "LM Studio / 兼容 OpenAI 的服务",
    "ja": null,
    "ko": null
   },
@@ -8754,7 +8754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "服务器 URL",
    "ja": null,
    "ko": null
   },
@@ -8779,7 +8779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "API 密钥",
    "ja": null,
    "ko": null
   },
@@ -8804,7 +8804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在此粘贴 API 密钥",
    "ja": null,
    "ko": null
   },
@@ -8829,7 +8829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔗 获取 API 密钥",
    "ja": null,
    "ko": null
   },
@@ -8854,7 +8854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "视觉模型",
    "ja": null,
    "ko": null
   },
@@ -8879,7 +8879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "聊天模型",
    "ja": null,
    "ko": null
   },
@@ -8904,7 +8904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "留空：与视觉模型相同",
    "ja": null,
    "ko": null
   },
@@ -8929,7 +8929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "测试连接",
    "ja": null,
    "ko": null
   },
@@ -8979,7 +8979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "选择模型",
    "ja": null,
    "ko": null
   },
@@ -9004,7 +9004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "加载模型",
    "ja": null,
    "ko": null
   },
@@ -9029,7 +9029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "用于编目",
    "ja": null,
    "ko": null
   },
@@ -9054,7 +9054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "用于聊天",
    "ja": null,
    "ko": null
   },
@@ -9079,7 +9079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "模型",
    "ja": null,
    "ko": null
   },
@@ -9104,7 +9104,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "检查 Ollama",
    "ja": null,
    "ko": null
   },
@@ -9129,7 +9129,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "安装 Ollama",
    "ja": null,
    "ko": null
   },
@@ -9154,7 +9154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "模型",
    "ja": null,
    "ko": null
   },
@@ -9179,7 +9179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "快速聊天（CPU）",
    "ja": null,
    "ko": null
   },
@@ -9204,7 +9204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "均衡、通用（CPU）",
    "ja": null,
    "ko": null
   },
@@ -9229,7 +9229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "视觉 / 编目 [CPU 占用高 / 在 ARM 上较慢]",
    "ja": null,
    "ko": null
   },
@@ -9254,7 +9254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "下载",
    "ja": null,
    "ko": null
   },
@@ -9279,7 +9279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "没有 GPU 时，请优先选择轻量模型：7B 视觉模型在 CPU 上每次回答可能需要数分钟。",
    "ja": null,
    "ko": null
   },
@@ -9329,7 +9329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "本服务器上的 Ollama",
    "ja": null,
    "ko": null
   },
@@ -9379,7 +9379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "打开 MARC 替换",
    "ja": null,
    "ko": null
   },
@@ -9404,7 +9404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "💬  AI 助手",
    "ja": null,
    "ko": null
   },
@@ -9454,7 +9454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "安装、更新或删除助手",
    "ja": null,
    "ko": null
   },
@@ -9479,7 +9479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "AI 工具",
    "ja": null,
    "ko": null
   },
@@ -9504,7 +9504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Z39.50/SRU 服务器（koha-z3950-daemon）",
    "ja": null,
    "ko": null
   },
@@ -9554,7 +9554,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "本目录的 Z39.50 / SRU 服务器（入站）",
    "ja": null,
    "ko": null
   },
@@ -9579,7 +9579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "社区网络",
    "ja": null,
    "ko": null
   },
@@ -9629,7 +9629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示服务器",
    "ja": null,
    "ko": null
   },
@@ -9654,7 +9654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "保存到 Koha",
    "ja": null,
    "ko": null
   },
@@ -9679,7 +9679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "添加服务器",
    "ja": null,
    "ko": null
   },
@@ -9729,7 +9729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "隐藏",
    "ja": null,
    "ko": null
   },
@@ -9754,7 +9754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "选中用于搜索",
    "ja": null,
    "ko": null
   },
@@ -9779,7 +9779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "取消选中用于搜索",
    "ja": null,
    "ko": null
   },
@@ -9804,7 +9804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "全部取消选中",
    "ja": null,
    "ko": null
   },
@@ -9829,7 +9829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "社区列表",
    "ja": null,
    "ko": null
   },
@@ -9854,7 +9854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "导入",
    "ja": null,
    "ko": null
   },
@@ -9879,7 +9879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "导出",
    "ja": null,
    "ko": null
   },
@@ -9904,7 +9904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示全部",
    "ja": null,
    "ko": null
   },
@@ -9929,7 +9929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "服务器",
    "ja": null,
    "ko": null
   },
@@ -9979,7 +9979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "格式",
    "ja": null,
    "ko": null
   },
@@ -10004,7 +10004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "地址",
    "ja": null,
    "ko": null
   },
@@ -10029,7 +10029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在 Koha 中",
    "ja": null,
    "ko": null
   },
@@ -10054,7 +10054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "复制记录的来源目录（外发）",
    "ja": null,
    "ko": null
   },
@@ -10079,7 +10079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "尚未扫描",
    "ja": null,
    "ko": null
   },
@@ -10154,7 +10154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "纹理",
    "ja": null,
    "ko": null
   },
@@ -10179,7 +10179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "磨砂玻璃",
    "ja": null,
    "ko": null
   },
@@ -10204,7 +10204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "平滑玻璃",
    "ja": null,
    "ko": null
   },
@@ -10229,7 +10229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "拉丝金属",
    "ja": null,
    "ko": null
   },
@@ -10254,7 +10254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "阳极氧化铝",
    "ja": null,
    "ko": null
   },
@@ -10279,7 +10279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "木纹",
    "ja": null,
    "ko": null
   },
@@ -10304,7 +10304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "哑光纸",
    "ja": null,
    "ko": null
   },
@@ -10329,7 +10329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "平面纯色",
    "ja": null,
    "ko": null
   },
@@ -10354,7 +10354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "柔和对角渐变",
    "ja": null,
    "ko": null
   },
@@ -10379,7 +10379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "模糊",
    "ja": null,
    "ko": null
   },
@@ -10404,7 +10404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "不透明度",
    "ja": null,
    "ko": null
   },
@@ -10454,7 +10454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "区块",
    "ja": null,
    "ko": null
   },
@@ -10479,7 +10479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "输入",
    "ja": null,
    "ko": null
   },
@@ -10504,7 +10504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "按钮",
    "ja": null,
    "ko": null
   },
@@ -10529,7 +10529,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "强调色",
    "ja": null,
    "ko": null
   },
@@ -10554,7 +10554,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "第二颜色",
    "ja": null,
    "ko": null
   },
@@ -10579,7 +10579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "区块背景",
    "ja": null,
    "ko": null
   },
@@ -10604,7 +10604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "页面颜色",
    "ja": null,
    "ko": null
   },
@@ -10629,7 +10629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "资料",
    "ja": null,
    "ko": null
   },
@@ -10654,7 +10654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "壁纸",
    "ja": null,
    "ko": null
   },
@@ -10704,7 +10704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "本服务器上的文件",
    "ja": null,
    "ko": null
   },
@@ -10729,7 +10729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "直接 URL",
    "ja": null,
    "ko": null
   },
@@ -10754,7 +10754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "上传到 ImgBB",
    "ja": null,
    "ko": null
   },
@@ -10779,7 +10779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "上传到 Cloudinary",
    "ja": null,
    "ko": null
   },
@@ -10804,7 +10804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "标志",
    "ja": null,
    "ko": null
   },
@@ -10829,7 +10829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "网站图标",
    "ja": null,
    "ko": null
   },
@@ -10879,7 +10879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🔗 打开链接",
    "ja": null,
    "ko": null
   },
@@ -10904,7 +10904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "图片",
    "ja": null,
    "ko": null
   },
@@ -10929,7 +10929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "易读薄膜",
    "ja": null,
    "ko": null
   },
@@ -10954,7 +10954,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "亮色/暗色切换",
    "ja": null,
    "ko": null
   },
@@ -10979,7 +10979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "默认主题",
    "ja": null,
    "ko": null
   },
@@ -11004,7 +11004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "浅色",
    "ja": null,
    "ko": null
   },
@@ -11029,7 +11029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "深色",
    "ja": null,
    "ko": null
   },
@@ -11054,7 +11054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "跟随设备",
    "ja": null,
    "ko": null
   },
@@ -11079,7 +11079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "易读性与深色模式",
    "ja": null,
    "ko": null
   },
@@ -11104,7 +11104,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "显示",
    "ja": null,
    "ko": null
   },
@@ -11129,7 +11129,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "样式",
    "ja": null,
    "ko": null
   },
@@ -11154,7 +11154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "2D 平面",
    "ja": null,
    "ko": null
   },
@@ -11179,7 +11179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "3D 叠层",
    "ja": null,
    "ko": null
   },
@@ -11204,7 +11204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "3D 环形（旋转）",
    "ja": null,
    "ko": null
   },
@@ -11229,7 +11229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "弧形书墙",
    "ja": null,
    "ko": null
   },
@@ -11254,7 +11254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "书架",
    "ja": null,
    "ko": null
   },
@@ -11279,7 +11279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "卡片扇形",
    "ja": null,
    "ko": null
   },
@@ -11304,7 +11304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "聚光灯（每次一种书目）",
    "ja": null,
    "ko": null
   },
@@ -11329,7 +11329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "无尽丝带",
    "ja": null,
    "ko": null
   },
@@ -11379,7 +11379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "自动播放",
    "ja": null,
    "ko": null
   },
@@ -11404,7 +11404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "速度",
    "ja": null,
    "ko": null
   },
@@ -11454,7 +11454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "悬停效果",
    "ja": null,
    "ko": null
   },
@@ -11479,7 +11479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "平滑缩放",
    "ja": null,
    "ko": null
   },
@@ -11504,7 +11504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "层级阴影",
    "ja": null,
    "ko": null
   },
@@ -11529,7 +11529,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "倾斜",
    "ja": null,
    "ko": null
   },
@@ -11579,7 +11579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "Amazon 标签",
    "ja": null,
    "ko": null
   },
@@ -11604,7 +11604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "可选",
    "ja": null,
    "ko": null
   },
@@ -11629,7 +11629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "新到馆资料轮播",
    "ja": null,
    "ko": null
   },
@@ -11654,7 +11654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "纯色",
    "ja": null,
    "ko": null
   },
@@ -11679,7 +11679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "渐变",
    "ja": null,
    "ko": null
   },
@@ -11704,7 +11704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "玻璃（模糊）",
    "ja": null,
    "ko": null
   },
@@ -11729,7 +11729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "布局",
    "ja": null,
    "ko": null
   },
@@ -11754,7 +11754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "每行一个",
    "ja": null,
    "ko": null
   },
@@ -11779,7 +11779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "双栏",
    "ja": null,
    "ko": null
   },
@@ -11804,7 +11804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "顺序（1 排在最前）",
    "ja": null,
    "ko": null
   },
@@ -11829,7 +11829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "文本",
    "ja": null,
    "ko": null
   },
@@ -11854,7 +11854,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "添加按钮",
    "ja": null,
    "ko": null
   },
@@ -11879,7 +11879,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "快捷访问按钮",
    "ja": null,
    "ko": null
   },
@@ -11904,7 +11904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "员工端首页按钮",
    "ja": null,
    "ko": null
   },
@@ -11929,7 +11929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "将配色主题应用到员工端",
    "ja": null,
    "ko": null
   },
@@ -11954,7 +11954,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "表格密度",
    "ja": null,
    "ko": null
   },
@@ -11979,7 +11979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "舒适",
    "ja": null,
    "ko": null
   },
@@ -12004,7 +12004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "正常",
    "ja": null,
    "ko": null
   },
@@ -12029,7 +12029,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "紧凑",
    "ja": null,
    "ko": null
   },
@@ -12054,7 +12054,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "对比度",
    "ja": null,
    "ko": null
   },
@@ -12079,7 +12079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "高",
    "ja": null,
    "ko": null
   },
@@ -12104,7 +12104,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "文字大小",
    "ja": null,
    "ko": null
   },
@@ -12154,7 +12154,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "登录横幅",
    "ja": null,
    "ko": null
   },
@@ -12179,7 +12179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "图片说明",
    "ja": null,
    "ko": null
   },
@@ -12204,7 +12204,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "文本（HTML）",
    "ja": null,
    "ko": null
   },
@@ -12229,7 +12229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "OPAC 登录页",
    "ja": null,
    "ko": null
   },
@@ -12254,7 +12254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "员工登录页",
    "ja": null,
    "ko": null
   },
@@ -12279,7 +12279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "每项一行，按页脚显示的顺序排列：字段：值（适用于下方字段），其他链接以“文字 | 地址”形式（最多 6 个），其他行原样保留。无需输入 HTML：页脚由这些行生成。",
    "ja": null,
    "ko": null
   },
@@ -12304,7 +12304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "示例：",
    "ja": null,
    "ko": null
   },
@@ -12329,7 +12329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "页脚署名",
    "ja": null,
    "ko": null
   },
@@ -12354,7 +12354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "发布",
    "ja": null,
    "ko": null
   },
@@ -12379,7 +12379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "按钮文字",
    "ja": null,
    "ko": null
   },
@@ -12404,7 +12404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "按钮地址",
    "ja": null,
    "ko": null
   },
@@ -12429,7 +12429,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "OPAC 新闻",
    "ja": null,
    "ko": null
   },
@@ -12454,7 +12454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "RSS 图标",
    "ja": null,
    "ko": null
   },
@@ -12479,7 +12479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "购物车角标",
    "ja": null,
    "ko": null
   },
@@ -12504,7 +12504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "社区链接",
    "ja": null,
    "ko": null
   },
@@ -12529,7 +12529,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "空表列",
    "ja": null,
    "ko": null
   },
@@ -12604,7 +12604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "同步当前 OPAC 设置",
    "ja": null,
    "ko": null
   },
@@ -12629,7 +12629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "刷新轮播",
    "ja": null,
    "ko": null
   },
@@ -12654,7 +12654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "图片托管密钥",
    "ja": null,
    "ko": null
   },
@@ -12704,7 +12704,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "开启 Koha 的电子邮件",
    "ja": null,
    "ko": null
   },
@@ -12729,7 +12729,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "SMTP 服务器",
    "ja": null,
    "ko": null
   },
@@ -12754,7 +12754,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "新建 SMTP 服务器",
    "ja": null,
    "ko": null
   },
@@ -12779,7 +12779,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "图书馆电子邮件地址",
    "ja": null,
    "ko": null
   },
@@ -12804,7 +12804,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "创建 Google 应用专用密码",
    "ja": null,
    "ko": null
   },
@@ -12829,7 +12829,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📧  电子邮件",
    "ja": null,
    "ko": null
   },
@@ -12904,7 +12904,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设置 WhatsApp 和 Telegram",
    "ja": null,
    "ko": null
   },
@@ -12929,7 +12929,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "💬  WhatsApp 和 Telegram",
    "ja": null,
    "ko": null
   },
@@ -12954,7 +12954,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "SMS 驱动（SMSSendDriver）",
    "ja": null,
    "ko": null
   },
@@ -12979,7 +12979,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "读者消息偏好",
    "ja": null,
    "ko": null
   },
@@ -13004,7 +13004,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📱  短信",
    "ja": null,
    "ko": null
   },
@@ -13079,7 +13079,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "仅本服务器（127.0.0.1）",
    "ja": null,
    "ko": null
   },
@@ -13104,7 +13104,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "所有网络（开放防火墙端口）",
    "ja": null,
    "ko": null
   },
@@ -13129,7 +13129,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "SIP 登录",
    "ja": null,
    "ko": null
   },
@@ -13179,7 +13179,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "至少 8 个字符",
    "ja": null,
    "ko": null
   },
@@ -13229,7 +13229,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "选择图书馆",
    "ja": null,
    "ko": null
   },
@@ -13254,7 +13254,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "删除示例",
    "ja": null,
    "ko": null
   },
@@ -13279,7 +13279,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "在 Koha 中创建 SIP 读者",
    "ja": null,
    "ko": null
   },
@@ -13304,7 +13304,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "🏧  SIP2",
    "ja": null,
    "ko": null
   },
@@ -13329,7 +13329,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "📡  Z39.50",
    "ja": null,
    "ko": null
   },
@@ -13354,7 +13354,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "公网 IP 或名称，例如 vpn.library.org",
    "ja": null,
    "ko": null
   },
@@ -13379,7 +13379,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "UDP 端口",
    "ja": null,
    "ko": null
   },
@@ -13404,7 +13404,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设置 VPN",
    "ja": null,
    "ko": null
   },
@@ -13454,7 +13454,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "新设备",
    "ja": null,
    "ko": null
   },
@@ -13479,7 +13479,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "例如 maria-laptop",
    "ja": null,
    "ko": null
   },
@@ -13504,7 +13504,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "添加设备",
    "ja": null,
    "ko": null
   },
@@ -13529,7 +13529,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "二维码与配置文件",
    "ja": null,
    "ko": null
   },
@@ -13554,7 +13554,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "撤销",
    "ja": null,
    "ko": null
   },
@@ -13579,7 +13579,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设备",
    "ja": null,
    "ko": null
   },
@@ -13604,7 +13604,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "最后出现",
    "ja": null,
    "ko": null
   },
@@ -13629,7 +13629,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "已接收",
    "ja": null,
    "ko": null
   },
@@ -13654,7 +13654,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "已发送",
    "ja": null,
    "ko": null
   },
@@ -13679,7 +13679,7 @@
    "hi": null,
    "bn": null,
    "vi": null,
-   "zh": null,
+   "zh": "设备",
    "ja": null,
    "ko": null
   },
@@ -19121,7 +19121,7 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 404,
    "strings_total": 411
   },
   "ja": {
