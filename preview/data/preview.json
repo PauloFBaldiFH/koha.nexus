@@ -7665,23 +7665,23 @@
    "fr": "Bibliothécaire / OPAC",
    "it": "Staff / OPAC",
    "de": "Mitarbeitende / OPAC",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "Medewerkers / OPAC",
+   "sv": "Personal / OPAC",
+   "pl": "Personel / OPAC",
+   "cs": "Pracovníci / OPAC",
+   "ru": "Сотрудники / OPAC",
+   "uk": "Працівники / OPAC",
+   "tr": "Personel / OPAC",
+   "tl": "Kawani / OPAC",
+   "id": "Staf / OPAC",
+   "ar": "الموظفون / OPAC",
+   "fa": "کارکنان / OPAC",
+   "hi": "कर्मचारी / OPAC",
+   "bn": "কর্মী / OPAC",
+   "vi": "Nhân viên / OPAC",
+   "zh": "工作人员 / OPAC",
+   "ja": "職員 / OPAC",
+   "ko": "직원 / OPAC"
   },
   "Answers (HTTP ${code})": {
    "en": "Answers (HTTP ${code})",
@@ -19023,119 +19023,119 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 134,
+   "strings": 135,
    "strings_total": 411
   }
  }
