@@ -9915,23 +9915,23 @@
    "fr": "Serveur",
    "it": "Server",
    "de": "Server",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "Server",
+   "sv": "Server",
+   "pl": "Serwer",
+   "cs": "Server",
+   "ru": "Сервер",
+   "uk": "Сервер",
+   "tr": "Sunucu",
+   "tl": "Server",
+   "id": "Server",
+   "ar": "الخادم",
+   "fa": "سرور",
+   "hi": "सर्वर",
+   "bn": "সার্ভার",
+   "vi": "Máy chủ",
+   "zh": "服务器",
+   "ja": "サーバー",
+   "ko": "서버"
   },
   "Status": {
    "en": "Status",
@@ -19023,119 +19023,119 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 136,
+   "strings": 137,
    "strings_total": 411
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 135,
+   "strings": 136,
    "strings_total": 411
   }
  }
