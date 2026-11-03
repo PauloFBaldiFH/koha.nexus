@@ -3486,7 +3486,7 @@
   "Installs Koha with MariaDB and Apache on this server": {
    "en": "Installs Koha with MariaDB and Apache on this server",
    "pt-BR": "Instala o Koha com MariaDB e Apache neste servidor",
-   "es": null,
+   "es": "Instala Koha con MariaDB y Apache en este servidor",
    "fr": null,
    "it": null,
    "de": "Installiert Koha mit MariaDB und Apache auf diesem Server",
@@ -3536,7 +3536,7 @@
   "Shows the logins and passwords of the first access": {
    "en": "Shows the logins and passwords of the first access",
    "pt-BR": "Mostra os logins e senhas do primeiro acesso",
-   "es": null,
+   "es": "Muestra los accesos y contraseñas del primer acceso",
    "fr": null,
    "it": null,
    "de": "Zeigt die Zugangsdaten des ersten Zugriffs",
@@ -3661,7 +3661,7 @@
   "Copies the newest backup to this computer's Downloads folder": {
    "en": "Copies the newest backup to this computer's Downloads folder",
    "pt-BR": "Copia o backup mais recente para a pasta Downloads deste computador",
-   "es": null,
+   "es": "Copia el backup más reciente a la carpeta Descargas de este equipo",
    "fr": null,
    "it": null,
    "de": "Kopiert das neueste Backup in den Downloads-Ordner dieses Computers",
@@ -3711,7 +3711,7 @@
   "Makes a full backup and shows how to copy it to a PC": {
    "en": "Makes a full backup and shows how to copy it to a PC",
    "pt-BR": "Gera um backup completo e mostra como baixá-lo no PC",
-   "es": null,
+   "es": "Hace un backup completo y muestra cómo copiarlo a un PC",
    "fr": null,
    "it": null,
    "de": "Erstellt ein vollständiges Backup und zeigt, wie es auf einen PC kopiert wird",
@@ -3736,7 +3736,7 @@
   "📚  Export MARC21 records now": {
    "en": "📚  Export MARC21 records now",
    "pt-BR": "📚  Exportar registros MARC21 agora",
-   "es": null,
+   "es": "📚  Exportar ahora los registros MARC21",
    "fr": null,
    "it": null,
    "de": "📚  MARC21-Datensätze jetzt exportieren",
@@ -3761,7 +3761,7 @@
   "Exports the catalogue and the authorities in MARC21 now": {
    "en": "Exports the catalogue and the authorities in MARC21 now",
    "pt-BR": "Exporta agora o catálogo e as autoridades em MARC21",
-   "es": null,
+   "es": "Exporta ya el catálogo y las autoridades en MARC21",
    "fr": null,
    "it": null,
    "de": "Exportiert jetzt Katalog und Normdaten in MARC21",
@@ -3811,7 +3811,7 @@
   "Replaces Koha's database with a backup, tested first": {
    "en": "Replaces Koha's database with a backup, tested first",
    "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
-   "es": null,
+   "es": "Reemplaza la base de datos de Koha por un backup, probado antes",
    "fr": null,
    "it": null,
    "de": "Ersetzt die Datenbank von Koha durch ein Backup, vorher geprüft",
@@ -3861,7 +3861,7 @@
   "Automates backups uploaded to cloud storage services": {
    "en": "Automates backups uploaded to cloud storage services",
    "pt-BR": "Automatizar backups para upload em serviços de armazenamento em nuvem",
-   "es": null,
+   "es": "Automatiza los backups subidos a servicios de almacenamiento en la nube",
    "fr": null,
    "it": null,
    "de": "Automatisiert Backups, die in Cloud-Speicherdienste hochgeladen werden",
@@ -3911,7 +3911,7 @@
   "Imports a backup into a test database to check it": {
    "en": "Imports a backup into a test database to check it",
    "pt-BR": "Importa um backup num banco de teste para validá-lo",
-   "es": null,
+   "es": "Importa un backup en una base de datos de prueba para comprobarlo",
    "fr": null,
    "it": null,
    "de": "Importiert ein Backup zur Prüfung in eine Testdatenbank",
@@ -3961,7 +3961,7 @@
   "Imports bibliographic records, authority records and patron (reader) data from other systems: MARC, ISIS, CSV and spreadsheets, and old-system backups.": {
    "en": "Imports bibliographic records, authority records and patron (reader) data from other systems: MARC, ISIS, CSV and spreadsheets, and old-system backups.",
    "pt-BR": "Importa registros bibliográficos, registros de autoridade e dados de leitores/usuários de outros sistemas: MARC, ISIS, CSV e planilhas, e backups do sistema antigo.",
-   "es": null,
+   "es": "Importa registros bibliográficos, registros de autoridad y datos de usuarios (lectores) de otros sistemas: MARC, ISIS, CSV y hojas de cálculo, y backups de sistemas antiguos.",
    "fr": null,
    "it": null,
    "de": "Importiert bibliografische Datensätze, Normdatensätze und Benutzerdaten (Leser) aus anderen Systemen: MARC, ISIS, CSV und Tabellen sowie Backups alter Systeme.",
@@ -4011,7 +4011,7 @@
   "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups": {
    "en": "Imports bibliographic and authority records and patron data: MARC, ISIS, CSV, backups",
    "pt-BR": "Importa registros bibliográficos e de autoridade e também dados de leitores/usuários: MARC, ISIS, CSV, backups",
-   "es": null,
+   "es": "Importa registros bibliográficos y de autoridad y datos de usuarios: MARC, ISIS, CSV, backups",
    "fr": null,
    "it": null,
    "de": "Importiert bibliografische und Normdatensätze sowie Benutzerdaten: MARC, ISIS, CSV, Backups",
@@ -4036,7 +4036,7 @@
   "📑  Database tables": {
    "en": "📑  Database tables",
    "pt-BR": "📑  Tabelas do banco de dados",
-   "es": null,
+   "es": "📑  Tablas de la base de datos",
    "fr": null,
    "it": null,
    "de": "📑  Datenbanktabellen",
@@ -4061,7 +4061,7 @@
   "🤖  AI": {
    "en": "🤖  AI",
    "pt-BR": "🤖  IA",
-   "es": null,
+   "es": "🤖  IA",
    "fr": null,
    "it": null,
    "de": "🤖  KI",
@@ -4111,7 +4111,7 @@
   "Installs a staff page that replaces a record's MARC": {
    "en": "Installs a staff page that replaces a record's MARC",
    "pt-BR": "Instala na intranet uma página que substitui o MARC de um registro",
-   "es": null,
+   "es": "Instala una página del personal que reemplaza el MARC de un registro",
    "fr": null,
    "it": null,
    "de": "Installiert eine Mitarbeiterseite, die das MARC eines Datensatzes ersetzt",
@@ -4136,7 +4136,7 @@
   "💬  AI assistant on the staff home page": {
    "en": "💬  AI assistant on the staff home page",
    "pt-BR": "💬  Assistente de IA na página inicial da equipe",
-   "es": null,
+   "es": "💬  Asistente de IA en la página de inicio del personal",
    "fr": null,
    "it": null,
    "de": "💬  KI-Assistent auf der Startseite der Mitarbeitenden",
@@ -4161,7 +4161,7 @@
   "Puts an AI chat on the staff interface home page": {
    "en": "Puts an AI chat on the staff interface home page",
    "pt-BR": "Coloca um chat de IA na página inicial da intranet",
-   "es": null,
+   "es": "Pone un chat de IA en la página de inicio de la interfaz de personal",
    "fr": null,
    "it": null,
    "de": "Setzt einen KI-Chat auf die Startseite der Mitarbeiteroberfläche",
@@ -4286,7 +4286,7 @@
   "Sets up the SMTP server and the circulation e-mails": {
    "en": "Sets up the SMTP server and the circulation e-mails",
    "pt-BR": "Configura o servidor SMTP e os e-mails de circulação",
-   "es": null,
+   "es": "Configura el servidor SMTP y los correos de circulación",
    "fr": null,
    "it": null,
    "de": "Richtet den SMTP-Server und die Ausleih-E-Mails ein",
@@ -4336,7 +4336,7 @@
   "Sends Koha's notices through WhatsApp and Telegram": {
    "en": "Sends Koha's notices through WhatsApp and Telegram",
    "pt-BR": "Envia os avisos do Koha por WhatsApp e Telegram",
-   "es": null,
+   "es": "Envía los avisos de Koha por WhatsApp y Telegram",
    "fr": null,
    "it": null,
    "de": "Sendet Kohas Mitteilungen über WhatsApp und Telegram",
@@ -4386,7 +4386,7 @@
   "Turns on Koha's SIP2 and Z39.50 servers": {
    "en": "Turns on Koha's SIP2 and Z39.50 servers",
    "pt-BR": "Liga os servidores SIP2 e Z39.50 do Koha",
-   "es": null,
+   "es": "Activa los servidores SIP2 y Z39.50 de Koha",
    "fr": null,
    "it": null,
    "de": "Schaltet Kohas SIP2- und Z39.50-Server ein",
@@ -4536,7 +4536,7 @@
   "Publishes the OPAC and the staff site through Cloudflare": {
    "en": "Publishes the OPAC and the staff site through Cloudflare",
    "pt-BR": "Publica o OPAC e a intranet na internet via Cloudflare",
-   "es": null,
+   "es": "Publica el OPAC y el sitio del personal a través de Cloudflare",
    "fr": null,
    "it": null,
    "de": "Veröffentlicht den OPAC und die Mitarbeiterseite über Cloudflare",
@@ -4586,7 +4586,7 @@
   "Lists the firewall rules active on this server": {
    "en": "Lists the firewall rules active on this server",
    "pt-BR": "Lista as regras de firewall ativas neste servidor",
-   "es": null,
+   "es": "Muestra las reglas del cortafuegos activas en este servidor",
    "fr": null,
    "it": null,
    "de": "Listet die aktiven Firewall-Regeln auf diesem Server auf",
@@ -4636,7 +4636,7 @@
   "Blocks or opens the staff port 8080 to the internet": {
    "en": "Blocks or opens the staff port 8080 to the internet",
    "pt-BR": "Bloqueia ou libera a porta 8080 da intranet na internet",
-   "es": null,
+   "es": "Bloquea o abre a Internet el puerto 8080 del personal",
    "fr": null,
    "it": null,
    "de": "Sperrt den Mitarbeiterport 8080 oder öffnet ihn für das Internet",
@@ -4686,7 +4686,7 @@
   "Free HTTPS certificate, only for your own domain without the tunnel": {
    "en": "Free HTTPS certificate, only for your own domain without the tunnel",
    "pt-BR": "Certificado HTTPS gratuito, só para domínio próprio sem o túnel",
-   "es": null,
+   "es": "Certificado HTTPS gratuito, solo para su propio dominio sin el túnel",
    "fr": null,
    "it": null,
    "de": "Kostenloses HTTPS-Zertifikat, nur für Ihre eigene Domain ohne Tunnel",
@@ -4736,7 +4736,7 @@
   "Shows the banned IPs and the intrusion attempts": {
    "en": "Shows the banned IPs and the intrusion attempts",
    "pt-BR": "Mostra os IPs bloqueados e as tentativas de invasão",
-   "es": null,
+   "es": "Muestra las IP bloqueadas y los intentos de intrusión",
    "fr": null,
    "it": null,
    "de": "Zeigt die gesperrten IPs und die Einbruchsversuche",
@@ -4786,7 +4786,7 @@
   "Makes a new MariaDB password for Koha": {
    "en": "Makes a new MariaDB password for Koha",
    "pt-BR": "Gera uma nova senha do MariaDB para o Koha",
-   "es": null,
+   "es": "Genera una contraseña nueva de MariaDB para Koha",
    "fr": null,
    "it": null,
    "de": "Erzeugt ein neues MariaDB-Passwort für Koha",
@@ -4836,7 +4836,7 @@
   "Checks the OPAC and keeps its sitemap for Google up to date": {
    "en": "Checks the OPAC and keeps its sitemap for Google up to date",
    "pt-BR": "Verifica o OPAC e mantém o sitemap para o Google atualizado",
-   "es": null,
+   "es": "Comprueba el OPAC y mantiene actualizado su mapa del sitio para Google",
    "fr": null,
    "it": null,
    "de": "Prüft den OPAC und hält seine Sitemap für Google aktuell",
@@ -4961,7 +4961,7 @@
   "Switches the catalog search between Zebra and Elasticsearch": {
    "en": "Switches the catalog search between Zebra and Elasticsearch",
    "pt-BR": "Alterna a busca do catálogo entre Zebra e Elasticsearch",
-   "es": null,
+   "es": "Cambia la búsqueda del catálogo entre Zebra y Elasticsearch",
    "fr": null,
    "it": null,
    "de": "Schaltet die Katalogsuche zwischen Zebra und Elasticsearch um",
@@ -5011,7 +5011,7 @@
   "Repairs the search engine and reindexes the catalog": {
    "en": "Repairs the search engine and reindexes the catalog",
    "pt-BR": "Repara o motor de busca e reindexa o catálogo",
-   "es": null,
+   "es": "Repara el motor de búsqueda y reindexa el catálogo",
    "fr": null,
    "it": null,
    "de": "Repariert die Suchmaschine und indexiert den Katalog neu",
@@ -5136,7 +5136,7 @@
   "Shows services, search, disk and the last backup": {
    "en": "Shows services, search, disk and the last backup",
    "pt-BR": "Mostra serviços, busca, disco e o último backup",
-   "es": null,
+   "es": "Muestra los servicios, la búsqueda, el disco y el último backup",
    "fr": null,
    "it": null,
    "de": "Zeigt Dienste, Suche, Speicherplatz und das letzte Backup",
@@ -5186,7 +5186,7 @@
   "Runs every check and writes a validation report": {
    "en": "Runs every check and writes a validation report",
    "pt-BR": "Roda todas as verificações e gera um relatório",
-   "es": null,
+   "es": "Ejecuta todas las comprobaciones y escribe un informe de validación",
    "fr": null,
    "it": null,
    "de": "Führt alle Prüfungen aus und schreibt einen Prüfbericht",
@@ -5236,7 +5236,7 @@
   "Opens the latest validation report": {
    "en": "Opens the latest validation report",
    "pt-BR": "Abre o último relatório de validação",
-   "es": null,
+   "es": "Abre el último informe de validación",
    "fr": null,
    "it": null,
    "de": "Öffnet den letzten Prüfbericht",
@@ -5286,7 +5286,7 @@
   "Follows the staff or OPAC error log live": {
    "en": "Follows the staff or OPAC error log live",
    "pt-BR": "Acompanha ao vivo o log de erros da intranet ou do OPAC",
-   "es": null,
+   "es": "Muestra en directo el registro de errores del personal o del OPAC",
    "fr": null,
    "it": null,
    "de": "Verfolgt das Fehlerprotokoll der Mitarbeiteroberfläche oder des OPAC live",
@@ -5336,7 +5336,7 @@
   "Optimizes the tables and clears old logs, with a preview": {
    "en": "Optimizes the tables and clears old logs, with a preview",
    "pt-BR": "Otimiza as tabelas e limpa logs antigos, com prévia",
-   "es": null,
+   "es": "Optimiza las tablas y borra los registros antiguos, con una vista previa",
    "fr": null,
    "it": null,
    "de": "Optimiert die Tabellen und löscht alte Protokolle, mit Vorschau",
@@ -5386,7 +5386,7 @@
   "Restarts Memcached, Plack and Koha's services": {
    "en": "Restarts Memcached, Plack and Koha's services",
    "pt-BR": "Reinicia o Memcached, o Plack e os serviços do Koha",
-   "es": null,
+   "es": "Reinicia Memcached, Plack y los servicios de Koha",
    "fr": null,
    "it": null,
    "de": "Startet Memcached, Plack und die Dienste von Koha neu",
@@ -5511,7 +5511,7 @@
   "Tunes memory and workers to this server's RAM": {
    "en": "Tunes memory and workers to this server's RAM",
    "pt-BR": "Ajusta memória e workers à RAM deste servidor",
-   "es": null,
+   "es": "Ajusta la memoria y los procesos de trabajo a la RAM de este servidor",
    "fr": null,
    "it": null,
    "de": "Stimmt Speicher und Worker auf den RAM dieses Servers ab",
@@ -5561,7 +5561,7 @@
   "Creates a staff account with every permission": {
    "en": "Creates a staff account with every permission",
    "pt-BR": "Cria uma conta da equipe com todas as permissões",
-   "es": null,
+   "es": "Crea una cuenta de personal con todos los permisos",
    "fr": null,
    "it": null,
    "de": "Legt ein Mitarbeiterkonto mit allen Rechten an",
@@ -5611,7 +5611,7 @@
   "Sets the timezone and syncs the clock with NTP": {
    "en": "Sets the timezone and syncs the clock with NTP",
    "pt-BR": "Define o fuso horário e sincroniza o relógio por NTP",
-   "es": null,
+   "es": "Ajusta la zona horaria y sincroniza el reloj con NTP",
    "fr": null,
    "it": null,
    "de": "Legt die Zeitzone fest und synchronisiert die Uhr mit NTP",
@@ -5636,7 +5636,7 @@
   "✨  Enrich bibliographic catalog": {
    "en": "✨  Enrich bibliographic catalog",
    "pt-BR": "✨  Enriquecer catálogo bibliográfico",
-   "es": null,
+   "es": "✨  Enriquecer catálogo bibliográfico",
    "fr": null,
    "it": null,
    "de": "✨  Bibliografischen Katalog anreichern",
@@ -5661,7 +5661,7 @@
   "📇  Enrich & standardize authorities": {
    "en": "📇  Enrich & standardize authorities",
    "pt-BR": "📇  Enriquecer e padronizar autoridades",
-   "es": null,
+   "es": "📇  Enriquecer y normalizar autoridades",
    "fr": null,
    "it": null,
    "de": "📇  Normdaten anreichern und vereinheitlichen",
@@ -5686,7 +5686,7 @@
   "🌐  Enrich from world catalogues": {
    "en": "🌐  Enrich from world catalogues",
    "pt-BR": "🌐  Enriquecer com catálogos do mundo",
-   "es": null,
+   "es": "🌐  Enriquecer desde catálogos del mundo",
    "fr": null,
    "it": null,
    "de": "🌐  Aus Katalogen weltweit anreichern",
@@ -5786,7 +5786,7 @@
   "Removes the records of an imported MARC batch": {
    "en": "Removes the records of an imported MARC batch",
    "pt-BR": "Remove os registros de um lote MARC importado",
-   "es": null,
+   "es": "Elimina los registros de un lote MARC importado",
    "fr": null,
    "it": null,
    "de": "Entfernt die Datensätze eines importierten MARC-Stapels",
@@ -5836,7 +5836,7 @@
   "Links the catalog headings to their authorities": {
    "en": "Links the catalog headings to their authorities",
    "pt-BR": "Vincula os cabeçalhos do catálogo às autoridades",
-   "es": null,
+   "es": "Enlaza los encabezamientos del catálogo con sus autoridades",
    "fr": null,
    "it": null,
    "de": "Verknüpft die Katalogansetzungen mit ihren Normdaten",
@@ -5936,7 +5936,7 @@
   "Adds ready-made SQL reports to Koha's Reports module": {
    "en": "Adds ready-made SQL reports to Koha's Reports module",
    "pt-BR": "Adiciona relatórios SQL prontos ao módulo Relatórios do Koha",
-   "es": null,
+   "es": "Añade informes SQL preparados al módulo de informes de Koha",
    "fr": null,
    "it": null,
    "de": "Fügt fertige SQL-Berichte zum Berichtsmodul von Koha hinzu",
@@ -5986,7 +5986,7 @@
   "Moves patrons from one category to another": {
    "en": "Moves patrons from one category to another",
    "pt-BR": "Move leitores de uma categoria para outra",
-   "es": null,
+   "es": "Pasa usuarios de una categoría a otra",
    "fr": null,
    "it": null,
    "de": "Verschiebt Benutzende von einer Kategorie in eine andere",
@@ -6036,7 +6036,7 @@
   "Finds records with missing or broken data": {
    "en": "Finds records with missing or broken data",
    "pt-BR": "Encontra registros com dados ausentes ou inválidos",
-   "es": null,
+   "es": "Busca registros con datos que faltan o están rotos",
    "fr": null,
    "it": null,
    "de": "Findet Datensätze mit fehlenden oder fehlerhaften Daten",
@@ -6086,7 +6086,7 @@
   "Anonymises loans and holds that ended long ago": {
    "en": "Anonymises loans and holds that ended long ago",
    "pt-BR": "Anonimiza empréstimos e reservas encerrados há tempo",
-   "es": null,
+   "es": "Anonimiza los préstamos y reservas que terminaron hace mucho",
    "fr": null,
    "it": null,
    "de": "Anonymisiert Ausleihen und Vormerkungen, die vor langer Zeit endeten",
@@ -6136,7 +6136,7 @@
   "Deletes expired patrons with no loans, after a backup": {
    "en": "Deletes expired patrons with no loans, after a backup",
    "pt-BR": "Exclui leitores expirados sem empréstimos, após backup",
-   "es": null,
+   "es": "Elimina los usuarios caducados sin préstamos, después de un backup",
    "fr": null,
    "it": null,
    "de": "Löscht abgelaufene Benutzende ohne Ausleihen, nach einem Backup",
@@ -6186,7 +6186,7 @@
   "Shows what the library tools did and when": {
    "en": "Shows what the library tools did and when",
    "pt-BR": "Mostra o que as ferramentas fizeram e quando",
-   "es": null,
+   "es": "Muestra qué hicieron las herramientas de la biblioteca y cuándo",
    "fr": null,
    "it": null,
    "de": "Zeigt, was die Bibliothekswerkzeuge wann getan haben",
@@ -6236,7 +6236,7 @@
   "CPF check, Pimaco labels, holidays, ABNT and census": {
    "en": "CPF check, Pimaco labels, holidays, ABNT and census",
    "pt-BR": "CPF, etiquetas Pimaco, feriados, ABNT e censo",
-   "es": null,
+   "es": "Verificación de CPF, etiquetas Pimaco, festivos, ABNT y censo",
    "fr": null,
    "it": null,
    "de": "CPF-Prüfung, Pimaco-Etiketten, Feiertage, ABNT und Volkszählung",
@@ -6286,7 +6286,7 @@
   "PHA, Cutter and CDD helpers for cataloguers": {
    "en": "PHA, Cutter and CDD helpers for cataloguers",
    "pt-BR": "Auxiliares PHA, Cutter e CDD para a catalogação",
-   "es": null,
+   "es": "Ayudas PHA, Cutter y CDD para catalogadores",
    "fr": null,
    "it": null,
    "de": "PHA-, Cutter- und CDD-Hilfen für Katalogisierende",
@@ -6336,7 +6336,7 @@
   "Adds a CDD lookup to the cataloguing editor": {
    "en": "Adds a CDD lookup to the cataloguing editor",
    "pt-BR": "Adiciona a consulta CDD ao editor de catalogação",
-   "es": null,
+   "es": "Añade una consulta de CDD al editor de catalogación",
    "fr": null,
    "it": null,
    "de": "Fügt dem Katalogisierungseditor eine CDD-Suche hinzu",
@@ -6386,7 +6386,7 @@
   "Turns Koha plugins on or off and sets their sources": {
    "en": "Turns Koha plugins on or off and sets their sources",
    "pt-BR": "Liga ou desliga os plugins do Koha e suas origens",
-   "es": null,
+   "es": "Activa o desactiva los plugins de Koha y fija sus fuentes",
    "fr": null,
    "it": null,
    "de": "Schaltet Koha-Erweiterungen ein oder aus und legt ihre Quellen fest",
@@ -6486,7 +6486,7 @@
   "Finds the Cutter number of an author": {
    "en": "Finds the Cutter number of an author",
    "pt-BR": "Calcula o número Cutter de um autor",
-   "es": null,
+   "es": "Obtiene el número Cutter de un autor",
    "fr": null,
    "it": null,
    "de": "Findet die Cutter-Nummer eines Verfassers",
@@ -6561,7 +6561,7 @@
   "📂  Open user folder": {
    "en": "📂  Open user folder",
    "pt-BR": "📂  Abrir a pasta do usuário",
-   "es": null,
+   "es": "📂  Abrir la carpeta del usuario",
    "fr": null,
    "it": null,
    "de": "📂  Benutzerordner öffnen",
@@ -6586,7 +6586,7 @@
   "Opens your home folder in Windows Explorer or the file manager": {
    "en": "Opens your home folder in Windows Explorer or the file manager",
    "pt-BR": "Abre a sua pasta pessoal no Explorador do Windows ou no gerenciador de arquivos",
-   "es": null,
+   "es": "Abre su carpeta personal en el Explorador de Windows o en el explorador de archivos",
    "fr": null,
    "it": null,
    "de": "Öffnet Ihren Benutzerordner im Windows-Explorer oder im Dateimanager",
@@ -6611,7 +6611,7 @@
   "💻  Open Debian terminal": {
    "en": "💻  Open Debian terminal",
    "pt-BR": "💻  Abrir o terminal do Debian",
-   "es": null,
+   "es": "💻  Abrir terminal de Debian",
    "fr": null,
    "it": null,
    "de": "💻  Debian-Terminal öffnen",
@@ -6636,7 +6636,7 @@
   "A Debian command line: its own window on Windows, this window elsewhere": {
    "en": "A Debian command line: its own window on Windows, this window elsewhere",
    "pt-BR": "Uma linha de comando do Debian: em janela própria no Windows, nesta janela nos outros casos",
-   "es": null,
+   "es": "Una línea de comandos de Debian: su propia ventana en Windows, esta ventana en otros sistemas",
    "fr": null,
    "it": null,
    "de": "Eine Debian-Kommandozeile: unter Windows in einem eigenen Fenster, sonst in diesem Fenster",
@@ -6686,7 +6686,7 @@
   "Watches CPU, memory and network live": {
    "en": "Watches CPU, memory and network live",
    "pt-BR": "Acompanha CPU, memória e rede em tempo real",
-   "es": null,
+   "es": "Vigila la CPU, la memoria y la red en directo",
    "fr": null,
    "it": null,
    "de": "Beobachtet CPU, Speicher und Netzwerk live",
@@ -6736,7 +6736,7 @@
   "Browses the server's files in Midnight Commander": {
    "en": "Browses the server's files in Midnight Commander",
    "pt-BR": "Navega pelos arquivos do servidor no Midnight Commander",
-   "es": null,
+   "es": "Explora los archivos del servidor en Midnight Commander",
    "fr": null,
    "it": null,
    "de": "Durchsucht die Dateien des Servers im Midnight Commander",
@@ -6786,7 +6786,7 @@
   "Turns Koha's scheduled jobs on or off": {
    "en": "Turns Koha's scheduled jobs on or off",
    "pt-BR": "Liga ou desliga as tarefas agendadas do Koha",
-   "es": null,
+   "es": "Activa o desactiva las tareas programadas de Koha",
    "fr": null,
    "it": null,
    "de": "Schaltet Kohas geplante Aufgaben ein oder aus",
@@ -6836,7 +6836,7 @@
   "🌍 Koha & Panel Languages": {
    "en": "🌍 Koha & Panel Languages",
    "pt-BR": "🌍 Idiomas do Koha e do Painel",
-   "es": null,
+   "es": "🌍 Idiomas de Koha y del panel",
    "fr": null,
    "it": null,
    "de": "🌍 Koha- und Panel-Sprachen",
@@ -6861,7 +6861,7 @@
   "🌍  Download & activate a language": {
    "en": "🌍  Download & activate a language",
    "pt-BR": "🌍  Baixar e ativar um idioma",
-   "es": null,
+   "es": "🌍  Descargar y activar un idioma",
    "fr": null,
    "it": null,
    "de": "🌍  Sprache herunterladen und aktivieren",
@@ -6886,7 +6886,7 @@
   "Downloads a language and makes it the OPAC, staff and panel one": {
    "en": "Downloads a language and makes it the OPAC, staff and panel one",
    "pt-BR": "Baixa um idioma e o ativa no OPAC, na equipe e no painel",
-   "es": null,
+   "es": "Descarga un idioma y lo pone como idioma del OPAC, del personal y del panel",
    "fr": null,
    "it": null,
    "de": "Lädt eine Sprache herunter und macht sie zur Sprache von OPAC, Mitarbeiteroberfläche und Panel",
@@ -6911,7 +6911,7 @@
   "📥  Download a language pack only": {
    "en": "📥  Download a language pack only",
    "pt-BR": "📥  Só baixar um pacote de idioma",
-   "es": null,
+   "es": "📥  Descargar solo un paquete de idioma",
    "fr": null,
    "it": null,
    "de": "📥  Nur ein Sprachpaket herunterladen",
@@ -6936,7 +6936,7 @@
   "Downloads a Koha language pack and changes nothing else": {
    "en": "Downloads a Koha language pack and changes nothing else",
    "pt-BR": "Baixa um pacote de idioma do Koha sem alterar mais nada",
-   "es": null,
+   "es": "Descarga un paquete de idioma de Koha y no cambia nada más",
    "fr": null,
    "it": null,
    "de": "Lädt ein Koha-Sprachpaket herunter und ändert sonst nichts",
@@ -6961,7 +6961,7 @@
   "✅  Set an installed language as active": {
    "en": "✅  Set an installed language as active",
    "pt-BR": "✅  Ativar um idioma já instalado",
-   "es": null,
+   "es": "✅  Poner un idioma instalado como activo",
    "fr": null,
    "it": null,
    "de": "✅  Eine installierte Sprache als aktiv festlegen",
@@ -6986,7 +6986,7 @@
   "Makes an installed language the active one, no download": {
    "en": "Makes an installed language the active one, no download",
    "pt-BR": "Ativa um idioma já instalado, sem baixar nada",
-   "es": null,
+   "es": "Hace activo un idioma instalado, sin descargar nada",
    "fr": null,
    "it": null,
    "de": "Macht eine installierte Sprache zur aktiven, ohne Download",
@@ -7011,7 +7011,7 @@
   "📋  Installed languages & active one": {
    "en": "📋  Installed languages & active one",
    "pt-BR": "📋  Idiomas instalados e o ativo",
-   "es": null,
+   "es": "📋  Idiomas instalados y el activo",
    "fr": null,
    "it": null,
    "de": "📋  Installierte Sprachen und die aktive",
@@ -7036,7 +7036,7 @@
   "Lists the installed languages and the active ones": {
    "en": "Lists the installed languages and the active ones",
    "pt-BR": "Lista os idiomas instalados e os ativos",
-   "es": null,
+   "es": "Muestra los idiomas instalados y los activos",
    "fr": null,
    "it": null,
    "de": "Listet die installierten Sprachen und die aktiven auf",
@@ -7161,7 +7161,7 @@
   "Updates the system packages and Koha's database": {
    "en": "Updates the system packages and Koha's database",
    "pt-BR": "Atualiza os pacotes do sistema e o banco do Koha",
-   "es": null,
+   "es": "Actualiza los paquetes del sistema y la base de datos de Koha",
    "fr": null,
    "it": null,
    "de": "Aktualisiert die Systempakete und die Datenbank von Koha",
@@ -7211,7 +7211,7 @@
   "Downloads the newest version of this panel": {
    "en": "Downloads the newest version of this panel",
    "pt-BR": "Baixa a versão mais nova deste painel",
-   "es": null,
+   "es": "Descarga la versión más reciente de este panel",
    "fr": null,
    "it": null,
    "de": "Lädt die neueste Version dieses Panels herunter",
@@ -7261,7 +7261,7 @@
   "Version, license and where to get help": {
    "en": "Version, license and where to get help",
    "pt-BR": "Versão, licença e onde pedir ajuda",
-   "es": null,
+   "es": "Versión, licencia y dónde obtener ayuda",
    "fr": null,
    "it": null,
    "de": "Version, Lizenz und wo Sie Hilfe bekommen",
@@ -7311,7 +7311,7 @@
   "Restarts the whole server": {
    "en": "Restarts the whole server",
    "pt-BR": "Reinicia o servidor inteiro",
-   "es": null,
+   "es": "Reinicia todo el servidor",
    "fr": null,
    "it": null,
    "de": "Startet den ganzen Server neu",
@@ -7661,7 +7661,7 @@
   "Staff / OPAC": {
    "en": "Staff / OPAC",
    "pt-BR": "Equipe / OPAC",
-   "es": null,
+   "es": "Personal / OPAC",
    "fr": null,
    "it": null,
    "de": "Mitarbeitende / OPAC",
@@ -7736,7 +7736,7 @@
   "CPU": {
    "en": "CPU",
    "pt-BR": null,
-   "es": null,
+   "es": "CPU",
    "fr": "Processeur",
    "it": null,
    "de": "CPU",
@@ -8461,7 +8461,7 @@
   "Search engine": {
    "en": "Search engine",
    "pt-BR": "Motor de busca",
-   "es": null,
+   "es": "Motor de búsqueda",
    "fr": null,
    "it": null,
    "de": "Suchmaschine",
@@ -8586,7 +8586,7 @@
   "Provider": {
    "en": "Provider",
    "pt-BR": "Provedor",
-   "es": null,
+   "es": "Proveedor",
    "fr": null,
    "it": null,
    "de": "Anbieter",
@@ -8611,7 +8611,7 @@
   "Local Ollama": {
    "en": "Local Ollama",
    "pt-BR": "Ollama local",
-   "es": null,
+   "es": "Ollama local",
    "fr": null,
    "it": null,
    "de": "Lokales Ollama",
@@ -8736,7 +8736,7 @@
   "Server URL": {
    "en": "Server URL",
    "pt-BR": "URL do servidor",
-   "es": null,
+   "es": "URL del servidor",
    "fr": null,
    "it": null,
    "de": "Server-URL",
@@ -8761,7 +8761,7 @@
   "API key": {
    "en": "API key",
    "pt-BR": "Chave de API",
-   "es": null,
+   "es": "Clave de API",
    "fr": null,
    "it": null,
    "de": "API-Schlüssel",
@@ -8786,7 +8786,7 @@
   "paste the API key here": {
    "en": "paste the API key here",
    "pt-BR": "cole a chave de API aqui",
-   "es": null,
+   "es": "pegue aquí la clave de API",
    "fr": null,
    "it": null,
    "de": "den API-Schlüssel hier einfügen",
@@ -8811,7 +8811,7 @@
   "🔗 Get an API key": {
    "en": "🔗 Get an API key",
    "pt-BR": "🔗 Obter chave de API",
-   "es": null,
+   "es": "🔗 Obtener una clave de API",
    "fr": null,
    "it": null,
    "de": "🔗 API-Schlüssel holen",
@@ -8911,7 +8911,7 @@
   "Test connection": {
    "en": "Test connection",
    "pt-BR": "Testar conexão",
-   "es": null,
+   "es": "Probar conexión",
    "fr": null,
    "it": null,
    "de": "Verbindung testen",
@@ -9086,7 +9086,7 @@
   "Check Ollama": {
    "en": "Check Ollama",
    "pt-BR": "Verificar o Ollama",
-   "es": null,
+   "es": "Comprobar Ollama",
    "fr": null,
    "it": null,
    "de": "Ollama prüfen",
@@ -9111,7 +9111,7 @@
   "Install Ollama": {
    "en": "Install Ollama",
    "pt-BR": "Instalar o Ollama",
-   "es": null,
+   "es": "Instalar Ollama",
    "fr": null,
    "it": null,
    "de": "Ollama installieren",
@@ -9136,7 +9136,7 @@
   "Model": {
    "en": "Model",
    "pt-BR": "Modelo",
-   "es": null,
+   "es": "Modelo",
    "fr": null,
    "it": null,
    "de": "Modell",
@@ -9286,7 +9286,7 @@
   "Local AI models and tools are heavy on the computer: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on this server's hardware.": {
    "en": "Local AI models and tools are heavy on the computer: while they work they can take most of the processor and memory and slow down the whole system, Koha included, depending on this server's hardware.",
    "pt-BR": "Modelos e ferramentas de IA locais são pesados para o computador: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware deste servidor.",
-   "es": null,
+   "es": "Los modelos y herramientas de IA locales consumen mucho en el equipo: mientras trabajan pueden ocupar casi todo el procesador y la memoria y ralentizar todo el sistema, Koha incluido, según el hardware de este servidor.",
    "fr": null,
    "it": null,
    "de": "Lokale KI-Modelle und Werkzeuge belasten den Computer stark: Während sie arbeiten, können sie den größten Teil von Prozessor und Speicher beanspruchen und je nach Hardware dieses Servers das ganze System verlangsamen, Koha eingeschlossen.",
@@ -9311,7 +9311,7 @@
   "Ollama on this server": {
    "en": "Ollama on this server",
    "pt-BR": "Ollama neste servidor",
-   "es": null,
+   "es": "Ollama en este servidor",
    "fr": null,
    "it": null,
    "de": "Ollama auf diesem Server",
@@ -9361,7 +9361,7 @@
   "Open MARC Replace": {
    "en": "Open MARC Replace",
    "pt-BR": "Abrir o MARC Replace",
-   "es": null,
+   "es": "Abrir MARC Replace",
    "fr": null,
    "it": null,
    "de": "MARC Replace öffnen",
@@ -9436,7 +9436,7 @@
   "Install, update or remove the assistant": {
    "en": "Install, update or remove the assistant",
    "pt-BR": "Instalar, atualizar ou remover o assistente",
-   "es": null,
+   "es": "Instalar, actualizar o quitar el asistente",
    "fr": null,
    "it": null,
    "de": "Assistenten installieren, aktualisieren oder entfernen",
@@ -9611,7 +9611,7 @@
   "Show servers": {
    "en": "Show servers",
    "pt-BR": "Mostrar servidores",
-   "es": null,
+   "es": "Mostrar servidores",
    "fr": null,
    "it": null,
    "de": "Server anzeigen",
@@ -9636,7 +9636,7 @@
   "Save to Koha": {
    "en": "Save to Koha",
    "pt-BR": "Salvar no Koha",
-   "es": null,
+   "es": "Guardar en Koha",
    "fr": null,
    "it": null,
    "de": "In Koha speichern",
@@ -9661,7 +9661,7 @@
   "Add server": {
    "en": "Add server",
    "pt-BR": "Adicionar servidor",
-   "es": null,
+   "es": "Añadir servidor",
    "fr": null,
    "it": null,
    "de": "Server hinzufügen",
@@ -9736,7 +9736,7 @@
   "Select for search": {
    "en": "Select for search",
    "pt-BR": "Selecionar",
-   "es": null,
+   "es": "Seleccionar para la búsqueda",
    "fr": null,
    "it": null,
    "de": "Für Suche auswählen",
@@ -9761,7 +9761,7 @@
   "Unselect for search": {
    "en": "Unselect for search",
    "pt-BR": "Desselecionar",
-   "es": null,
+   "es": "Desmarcar para la búsqueda",
    "fr": null,
    "it": null,
    "de": "Für Suche abwählen",
@@ -9786,7 +9786,7 @@
   "Unselect all": {
    "en": "Unselect all",
    "pt-BR": "Desmarcar todos",
-   "es": null,
+   "es": "Desmarcar todos",
    "fr": null,
    "it": null,
    "de": "Alle abwählen",
@@ -9886,7 +9886,7 @@
   "Show all": {
    "en": "Show all",
    "pt-BR": "Mostrar todos",
-   "es": null,
+   "es": "Mostrar todo",
    "fr": null,
    "it": null,
    "de": "Alle anzeigen",
@@ -10411,7 +10411,7 @@
   "Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.": {
    "en": "Blocks, Inputs and Buttons set the rounded corners (border-radius) of those elements: raising the value in px curves the corners more, lowering it makes them straighter, 0 makes them square.",
    "pt-BR": "Blocos, Campos e Botões ajustam o arredondamento das bordas (border-radius) desses elementos: aumentar o valor em px deixa os cantos mais curvos, diminuir deixa os cantos mais retos e 0 deixa os cantos totalmente retos.",
-   "es": null,
+   "es": "Bloques, campos y botones definen las esquinas redondeadas (border-radius) de esos elementos: al subir el valor en px las esquinas se curvan más, al bajarlo se enderezan, y 0 las deja cuadradas.",
    "fr": null,
    "it": null,
    "de": "Blöcke, Eingabefelder und Schaltflächen legen die abgerundeten Ecken (border-radius) dieser Elemente fest: ein höherer Wert in px rundet sie stärker, ein niedrigerer macht sie gerader, 0 macht sie eckig.",
@@ -10836,7 +10836,7 @@
   "Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link (ends in .png or .jpg) and paste it here with the source Direct URL.": {
    "en": "Free picture hosting, no account needed: send the picture at Postimages, copy its Direct link (ends in .png or .jpg) and paste it here with the source Direct URL.",
    "pt-BR": "Hospedagem de imagens gratuita, sem precisar de conta: envie a imagem no Postimages, copie o Direct link (link direto, termina em .png ou .jpg) e cole aqui com a origem URL direta.",
-   "es": null,
+   "es": "Alojamiento gratuito de imágenes, sin cuenta: suba la imagen a Postimages, copie su Direct link (termina en .png o .jpg) y péguelo aquí junto con la Direct URL de origen.",
    "fr": null,
    "it": null,
    "de": "Kostenloser Bildhosting-Dienst, kein Konto nötig: Bild bei Postimages hochladen, dessen direkten Link (endet auf .png oder .jpg) kopieren und hier mit der direkten Quell-URL einfügen.",
@@ -10861,7 +10861,7 @@
   "🔗 Open link": {
    "en": "🔗 Open link",
    "pt-BR": "🔗 Abrir link",
-   "es": null,
+   "es": "🔗 Abrir enlace",
    "fr": null,
    "it": null,
    "de": "🔗 Link öffnen",
@@ -12286,7 +12286,7 @@
   "Example:": {
    "en": "Example:",
    "pt-BR": "Exemplo:",
-   "es": null,
+   "es": "Ejemplo:",
    "fr": null,
    "it": null,
    "de": "Beispiel:",
@@ -12336,7 +12336,7 @@
   "Publish": {
    "en": "Publish",
    "pt-BR": "Publicar",
-   "es": null,
+   "es": "Publicar",
    "fr": null,
    "it": null,
    "de": "Veröffentlichen",
@@ -12361,7 +12361,7 @@
   "Button text": {
    "en": "Button text",
    "pt-BR": "Texto do botão",
-   "es": null,
+   "es": "Texto del botón",
    "fr": null,
    "it": null,
    "de": "Schaltflächentext",
@@ -12386,7 +12386,7 @@
   "Button address": {
    "en": "Button address",
    "pt-BR": "Endereço do botão",
-   "es": null,
+   "es": "Dirección del botón",
    "fr": null,
    "it": null,
    "de": "Schaltflächen-Adresse",
@@ -12411,7 +12411,7 @@
   "OPAC news": {
    "en": "OPAC news",
    "pt-BR": "Notícias do OPAC",
-   "es": null,
+   "es": "Noticias del OPAC",
    "fr": null,
    "it": null,
    "de": "OPAC-Nachrichten",
@@ -12861,7 +12861,7 @@
   "How to get the WhatsApp credentials (Evolution API v2):\n1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR code with the library's WhatsApp (Linked devices).\n3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the instance name and the API key.\n4. Send a test message to check that it arrives.": {
    "en": "How to get the WhatsApp credentials (Evolution API v2):\n1. Install Evolution API on this or another server (Docker is the easiest way, see the guide below). The AUTHENTICATION_API_KEY you set in its .env file is the token (API key).\n2. Open its manager (http://SERVER:8080/manager), create an instance (for example biblioteca) and scan the QR code with the library's WhatsApp (Linked devices).\n3. Press Set up WhatsApp and Telegram > WhatsApp and type the gateway address (http://SERVER:8080), the instance name and the API key.\n4. Send a test message to check that it arrives.",
    "pt-BR": "Como obter as credenciais do WhatsApp (Evolution API v2):\n1. Instale a Evolution API neste ou em outro servidor (o Docker é o caminho mais fácil, veja o guia abaixo). A AUTHENTICATION_API_KEY que você define no arquivo .env dela é o token (chave de API).\n2. Abra o gerenciador (http://SERVIDOR:8080/manager), crie uma instância (por exemplo biblioteca) e leia o QR code com o WhatsApp da biblioteca (Aparelhos conectados).\n3. Pressione Configurar WhatsApp e Telegram > WhatsApp e digite o endereço do gateway (http://SERVIDOR:8080), o nome da instância e a chave de API.\n4. Envie uma mensagem de teste para conferir se ela chega.",
-   "es": null,
+   "es": "Cómo obtener las credenciales de WhatsApp (Evolution API v2):\n1. Instale Evolution API en este servidor u otro (Docker es la forma más sencilla, vea la guía más abajo). La AUTHENTICATION_API_KEY que defina en su archivo .env es el token (clave de API).\n2. Abra su gestor (http://SERVER:8080/manager), cree una instancia (por ejemplo biblioteca) y escanee el código QR con el WhatsApp de la biblioteca (Dispositivos vinculados).\n3. Pulse Configurar WhatsApp y Telegram > WhatsApp y escriba la dirección de la pasarela (http://SERVER:8080), el nombre de la instancia y la clave de API.\n4. Envíe un mensaje de prueba para comprobar que llega.",
    "fr": null,
    "it": null,
    "de": null,
@@ -18995,7 +18995,7 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 298,
+   "strings": 404,
    "strings_total": 411
   },
   "fr": {
