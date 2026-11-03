@@ -168,7 +168,13 @@ bf_circ_schema() {
     local f
     : > "$W/empty.mrc"
     echo "hello" > "$W/text.mrc"
-    head -c 4000 /dev/urandom > "$W/estragado.bkp"
+    # Fixed unknown binary data: random prefixes can resemble JSON or XML
+    # and take a different diagnostic path even though nothing is imported.
+    python3 - "$W/estragado.bkp" <<'PYJUNK'
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_bytes(b"\x8f\x00\x13\xfa" * 1000)
+PYJUNK
     # pg_dump's custom and tar formats, names with blanks and parentheses.
     printf 'PGDMP\001\016\000' > "$W/BKP_BIBLIOTECA (2).backup"
     mkdir "$W/pgtar" && echo x > "$W/pgtar/toc.dat" && tar cf "$W/pg (3).tar" -C "$W/pgtar" toc.dat
