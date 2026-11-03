@@ -9990,23 +9990,23 @@
    "fr": "Adresse",
    "it": "Indirizzo",
    "de": "Adresse",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "Adres",
+   "sv": "Adress",
+   "pl": "Adres",
+   "cs": "Adresa",
+   "ru": "Адрес",
+   "uk": "Адреса",
+   "tr": "Adres",
+   "tl": "Tirahan",
+   "id": "Alamat",
+   "ar": "العنوان",
+   "fa": "نشانی",
+   "hi": "पता",
+   "bn": "ঠিকানা",
+   "vi": "Địa chỉ",
+   "zh": "地址",
+   "ja": "住所",
+   "ko": "주소"
   },
   "In Koha": {
    "en": "In Koha",
@@ -12265,23 +12265,23 @@
    "fr": "Une ligne par élément, dans l'ordre d'affichage du pied de page : Champ : valeur pour les champs ci-dessous, autres liens sous la forme texte | adresse (6 au maximum), et toute autre ligne telle quelle. Pas de HTML à saisir : le pied de page est construit à partir de ces lignes.",
    "it": "Una riga per voce, nell'ordine in cui il piè di pagina le mostra: Campo: valore per i campi sotto, altri collegamenti come testo | indirizzo (al massimo 6), e ogni altra riga così com'è. Nessun HTML da scrivere: il piè di pagina si costruisce da queste righe.",
    "de": "Eine Zeile pro Eintrag, in der Reihenfolge, in der die Fußzeile sie zeigt: Feld: Wert für die Felder unten, andere Links als Text | Adresse (höchstens 6), und jede andere Zeile unverändert. Kein HTML nötig: Die Fußzeile entsteht aus diesen Zeilen.",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "Eén regel per item, in de volgorde van de voettekst: Veld: waarde voor de onderstaande velden, andere links als tekst | adres (maximaal 6), en andere regels ongewijzigd. Geen HTML nodig: de voettekst wordt uit deze regels opgebouwd.",
+   "sv": "En rad per uppgift, i den ordning sidfoten visar dem: Fält: värde för fälten nedan, andra länkar som text | adress (högst 6) och övriga rader som de är. Ingen HTML behöver skrivas: sidfoten byggs från dessa rader.",
+   "pl": "Jeden wiersz na element, w kolejności wyświetlania w stopce: Pole: wartość dla pól poniżej, inne odnośniki jako tekst | adres (najwyżej 6), a pozostałe wiersze bez zmian. Bez wpisywania HTML: stopka powstaje z tych wierszy.",
+   "cs": "Jeden řádek pro každou položku v pořadí zobrazení v zápatí: Pole: hodnota pro níže uvedená pole, další odkazy jako text | adresa (nejvýše 6) a ostatní řádky beze změn. Není třeba psát HTML: zápatí se sestaví z těchto řádků.",
+   "ru": "По одной строке на элемент в порядке отображения в подвале: Поле: значение для полей ниже, другие ссылки как текст | адрес (не более 6), остальные строки без изменений. HTML вводить не нужно: подвал формируется из этих строк.",
+   "uk": "Один рядок на елемент у порядку відображення внизу сторінки: Поле: значення для полів нижче, інші посилання як текст | адреса (не більше 6), решта рядків без змін. HTML вводити не потрібно: нижній колонтитул формується із цих рядків.",
+   "tr": "Altbilgide gösterilecek sırayla her öğe için bir satır: aşağıdaki alanlar için Alan: değer, diğer bağlantılar için metin | adres (en fazla 6), diğer satırlar olduğu gibi. HTML yazmanız gerekmez: altbilgi bu satırlardan oluşturulur.",
+   "tl": "Isang linya bawat item, ayon sa pagkakasunod sa footer: Patlang: halaga para sa mga patlang sa ibaba, ibang link bilang teksto | address (hanggang 6), at ibang linya nang walang pagbabago. Walang HTML na kailangang isulat: binubuo ang footer mula sa mga linyang ito.",
+   "id": "Satu baris per butir, sesuai urutan pada kaki halaman: Kolom: nilai untuk kolom di bawah, tautan lain sebagai teks | alamat (maksimal 6), dan baris lain apa adanya. Tidak perlu menulis HTML: kaki halaman dibuat dari baris-baris ini.",
+   "ar": "سطر لكل عنصر بترتيب ظهوره في التذييل: حقل: قيمة للحقول أدناه، والروابط الأخرى بصيغة نص | عنوان (بحد أقصى 6)، وأي سطر آخر كما هو. لا حاجة لكتابة HTML: يُبنى التذييل من هذه السطور.",
+   "fa": "هر مورد در یک سطر، به‌ترتیب نمایش در پابرگ: کادر: مقدار برای کادرهای زیر، پیوندهای دیگر به‌شکل متن | نشانی (حداکثر 6) و سطرهای دیگر بدون تغییر. نیازی به نوشتن HTML نیست: پابرگ از این سطرها ساخته می‌شود.",
+   "hi": "हर मद के लिए एक पंक्ति, पादलेख में दिखने के क्रम में: नीचे के फ़ील्ड के लिए फ़ील्ड: मान, अन्य लिंक के लिए पाठ | पता (अधिकतम 6), और बाकी पंक्तियाँ जैसी हैं। HTML लिखने की ज़रूरत नहीं: इन्हीं पंक्तियों से पादलेख बनता है।",
+   "bn": "প্রতি উপাদান এক লাইনে, পাদলেখে দেখানোর ক্রমে: নিচের ক্ষেত্রগুলোর জন্য ক্ষেত্র: মান, অন্য লিংক লেখা | ঠিকানা আকারে (সর্বোচ্চ 6টি), আর অন্য লাইন অপরিবর্তিত। HTML লিখতে হবে না: এই লাইনগুলো থেকে পাদলেখ তৈরি হয়।",
+   "vi": "Mỗi mục một dòng, theo thứ tự hiển thị ở chân trang: Trường: giá trị cho các trường bên dưới, liên kết khác theo dạng văn bản | địa chỉ (tối đa 6), các dòng còn lại giữ nguyên. Không cần viết HTML: chân trang được tạo từ các dòng này.",
+   "zh": "每项一行，按页脚显示顺序排列：下方字段使用 字段: 值，其他链接使用 文字 | 地址（最多 6 个），其他行保持原样。无需编写 HTML：页脚会根据这些行生成。",
+   "ja": "各項目をフッターに表示する順で1行ずつ入力します。下の項目は フィールド: 値、その他のリンクは テキスト | アドレス（最大6件）、それ以外の行はそのまま表示されます。HTML は不要で、これらの行からフッターを作成します。",
+   "ko": "항목마다 한 줄씩 바닥글에 표시할 순서로 입력하세요. 아래 필드는 필드: 값, 다른 링크는 텍스트 | 주소 (최대 6개), 나머지 줄은 그대로 표시합니다. HTML을 입력할 필요 없이 이 줄들로 바닥글을 만듭니다."
   },
   "Example:": {
    "en": "Example:",
@@ -19023,119 +19023,119 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 228,
+   "strings": 230,
    "strings_total": 411
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 227,
+   "strings": 229,
    "strings_total": 411
   }
  }
