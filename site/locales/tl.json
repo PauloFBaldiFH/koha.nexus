@@ -231,7 +231,19 @@
     "panel_screens": "Mga screen ng panel",
     "back_to_top": "Bumalik sa itaas",
     "network_empty": "Walang pampublikong aklatang nakalista sa ngayon.",
-    "network_error": "Hindi ma-load ang network ng mga aklatan sa ngayon."
+    "network_error": "Hindi ma-load ang network ng mga aklatan sa ngayon.",
+    "support_title": "Kumusta! Paumanhin sa pag-abala.",
+    "support_intro": "Binuo ko ang koha.nexus upang tulungan lalo na ang mga aklatang may maliit na badyet at walang teknikal na suporta na mag-install at mamahala ng kumpleto, moderno at de-kalidad na sistema nang ganap na libre.",
+    "support_appeal": "Naglaan ako, at patuloy na naglalaan, ng maraming oras at malasakit sa kasangkapang ito. Kung nakatulong ito sa iyo o sa iyong institusyon, sana ay isaalang-alang mong magbigay ng pinansyal na suporta sa halagang bukal sa iyong loob. Direktang tumutulong ang donasyon mo sa mga gastos sa imprastraktura at patuloy na pagbuo, at nagbibigay rin sa akin ng saya at motibasyon!",
+    "support_optional": "Kung hindi ka makapag-donate, ayos lang. Malaking tulong na ang pagrekomenda ng koha.nexus sa ibang aklatan at propesyonal na nangangailangan nito at, kung maaari, pagbibigay ng bituin sa <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repository sa GitHub</a> ng proyekto. Kahit wala kang magawa sa mga ito, malugod mong gamitin ang sistema. Masaya akong nakatulong!",
+    "support_thanks": "Maraming salamat sa suporta!",
+    "support_share": "⭐ Bigyan ng bituin ang <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repository sa GitHub</a> at ibahagi sa ibang aklatan.",
+    "support_hamster_alt": "Hamster na malalaki ang mata at may nagmamakaawang mukha",
+    "support_methods": "Mga paraan ng pag-donate",
+    "support_bitcoin_alt": "QR code ng Bitcoin address para sa donasyon",
+    "support_copy_bitcoin": "Kopyahin ang Bitcoin address",
+    "support_copied": "Nakopya!",
+    "support_copy_error": "Hindi makopya."
   },
   "manual_ui": {
     "title": "Interaktibong preview at manwal",

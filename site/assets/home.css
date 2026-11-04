@@ -560,12 +560,13 @@
     .support-message .support-signature{color:var(--text);font-weight:700}
     .donation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin:26px 0}
     .donation-option{min-width:0;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--bg)}
+    .donation-option:only-child{grid-column:1/-1;max-width:420px;width:100%}
     .donation-option h3{margin:0 0 16px}
     .donation-option .donation-qr{display:block;width:100%;max-width:220px;height:auto;margin:0 auto 16px;background:#fff;border-radius:8px}
     .donation-option code{display:block;overflow-wrap:anywhere;white-space:normal;margin-bottom:16px;color:var(--text);font-size:.85rem}
     .donation-copy{position:relative;display:inline-block;max-width:100%}
     .donation-copy .btn{cursor:pointer;white-space:normal;min-height:44px;padding:10px 14px;font-size:.85rem}
-    .donation-feedback{position:absolute;bottom:calc(100% + 8px);left:0;z-index:2;max-width:260px;padding:8px 12px;border-radius:9px;background:var(--green);color:var(--bg);font-size:.85rem;font-weight:700;box-shadow:var(--shadow)}
+    .donation-feedback{position:absolute;bottom:calc(100% + 8px);inset-inline-start:0;z-index:2;max-width:260px;padding:8px 12px;border-radius:9px;background:var(--green);color:var(--bg);font-size:.85rem;font-weight:700;box-shadow:var(--shadow)}
     .donation-feedback:empty{display:none}
     .donation-feedback[data-state="error"]{background:var(--danger)}
     .support-message .support-share{margin-bottom:0}

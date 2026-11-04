@@ -231,7 +231,19 @@
     "panel_screens": "Panelens skärmar",
     "back_to_top": "Till toppen",
     "network_empty": "Inga offentliga bibliotek finns i listan just nu.",
-    "network_error": "Biblioteksnätverket kunde inte läsas in just nu."
+    "network_error": "Biblioteksnätverket kunde inte läsas in just nu.",
+    "support_title": "Hej! Ursäkta att jag stör.",
+    "support_intro": "Jag utvecklade koha.nexus för att främst hjälpa bibliotek med små budgetar och utan tekniskt stöd att installera och administrera ett komplett, modernt system av god kvalitet, helt utan kostnad.",
+    "support_appeal": "Jag har lagt, och fortsätter att lägga, mycket tid och omsorg på det här verktyget. Om det har hjälpt dig eller din organisation får du gärna överväga ett ekonomiskt bidrag med ett belopp som känns bra för dig. Din donation hjälper direkt till att täcka infrastrukturkostnader och hålla utvecklingen igång, och gör mig glad och motiverad!",
+    "support_optional": "Om du inte kan donera är det helt okej. Du hjälper redan mycket genom att rekommendera koha.nexus till andra bibliotek och yrkesverksamma som behöver det och, om möjligt, ge projektets <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-arkiv</a> en stjärna. Även om du inte gör något av detta får du gärna använda systemet. Jag är glad att ha kunnat hjälpa!",
+    "support_thanks": "Stort tack för ditt stöd!",
+    "support_share": "⭐ Ge vårt <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-arkiv</a> en stjärna och dela projektet med andra bibliotek.",
+    "support_hamster_alt": "Hamster med stora ögon och en bedjande blick",
+    "support_methods": "Sätt att donera",
+    "support_bitcoin_alt": "QR-kod för Bitcoin-adressen för donationer",
+    "support_copy_bitcoin": "Kopiera Bitcoin-adress",
+    "support_copied": "Kopierat!",
+    "support_copy_error": "Kunde inte kopiera."
   },
   "manual_ui": {
     "title": "Interaktiv förhandsvisning och handbok",

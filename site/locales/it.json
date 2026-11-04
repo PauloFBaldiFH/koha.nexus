@@ -231,7 +231,19 @@
     "panel_screens": "Schermate del pannello",
     "back_to_top": "Torna in alto",
     "network_empty": "Al momento non sono elencate biblioteche pubbliche.",
-    "network_error": "Impossibile caricare la rete di biblioteche in questo momento."
+    "network_error": "Impossibile caricare la rete di biblioteche in questo momento.",
+    "support_title": "Ciao! Permesso, scusa il disturbo.",
+    "support_intro": "Ho sviluppato koha.nexus per aiutare soprattutto le biblioteche con un budget limitato e senza assistenza tecnica a installare e amministrare un sistema completo, moderno e di qualità in modo totalmente gratuito.",
+    "support_appeal": "Ho dedicato, e continuo a dedicare, molto tempo e cura a questo strumento. Se è stato utile a te o alla tua istituzione, ti chiedo di valutare un contributo economico dell’importo che desideri. La tua donazione aiuta direttamente a coprire i costi dell’infrastruttura e a mantenere attivo lo sviluppo, oltre a rendermi felice e motivato!",
+    "support_optional": "Se non puoi donare, non c’è problema. Aiuti già molto consigliando koha.nexus ad altre biblioteche e professionisti che ne hanno bisogno e, se possibile, dando una stella al <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repository su GitHub</a> del progetto. Ma anche se non fai nulla di tutto questo, va bene: usa il sistema liberamente. Sono contento di esserti stato d’aiuto!",
+    "support_thanks": "Grazie mille per il sostegno!",
+    "support_share": "⭐ Dai una stella al <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repository su GitHub</a> e condividilo con altre biblioteche.",
+    "support_hamster_alt": "Criceto dagli occhi grandi e dall’espressione implorante",
+    "support_methods": "Modi per donare",
+    "support_bitcoin_alt": "Codice QR dell’indirizzo Bitcoin per le donazioni",
+    "support_copy_bitcoin": "Copia indirizzo Bitcoin",
+    "support_copied": "Copiato!",
+    "support_copy_error": "Impossibile copiare."
   },
   "manual_ui": {
     "title": "Anteprima interattiva e manuale",

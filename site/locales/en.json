@@ -231,7 +231,19 @@
     "panel_screens": "Panel screens",
     "back_to_top": "Back to top",
     "network_empty": "No public libraries listed at the moment.",
-    "network_error": "Unable to load the library network at this time."
+    "network_error": "Unable to load the library network at this time.",
+    "support_title": "Hi! Excuse me, sorry to bother you.",
+    "support_intro": "I developed koha.nexus to help libraries, especially those with limited budgets and no technical support, install and manage a complete, modern, quality system entirely free of charge.",
+    "support_appeal": "I have put, and continue to put, a great deal of time and care into this tool. If it has helped you or your institution, please consider supporting it financially with any amount you feel comfortable giving. Your donation directly helps cover infrastructure costs and keep development going, and it makes me happy and motivated!",
+    "support_optional": "If you cannot donate, that is absolutely fine. You already help a lot by recommending koha.nexus to other libraries and professionals who need it, and, if possible, giving the project a star on its <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub repository</a>. Even if you do none of these things, that is fine too: enjoy the system. I am glad I could help!",
+    "support_thanks": "Thank you very much for your support!",
+    "support_share": "⭐ Star the <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub repository</a> and share it with other libraries.",
+    "support_hamster_alt": "Hamster with big eyes and a pleading expression",
+    "support_methods": "Ways to donate",
+    "support_bitcoin_alt": "QR code of the Bitcoin donation address",
+    "support_copy_bitcoin": "Copy Bitcoin address",
+    "support_copied": "Copied!",
+    "support_copy_error": "Could not copy."
   },
   "manual_ui": {
     "title": "Interactive preview & manual",

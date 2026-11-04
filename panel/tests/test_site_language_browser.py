@@ -75,8 +75,9 @@ def test_explicit_english_index_survives_a_portuguese_browser_and_blocked_storag
         context.close()
 
 
-@pytest.mark.parametrize('method', ['clipboard', 'fallback', 'failure'])
-def test_donation_copy_feedback(browser, site_url, method):
+@pytest.mark.parametrize('code,method', [('pt', 'clipboard'), ('pt', 'fallback'), ('pt', 'failure'),
+                                         ('en', 'clipboard'), ('ar', 'clipboard'), ('ja', 'clipboard')])
+def test_donation_copy_feedback(browser, site_url, code, method):
     context = browser.new_context(locale='pt-BR', reduced_motion='reduce')
     context.add_init_script("""(method => {
       window.copiedDonationValues = [];
@@ -94,13 +95,14 @@ def test_donation_copy_feedback(browser, site_url, method):
     })(%s);""" % repr(method))
     page = context.new_page()
     try:
-        page.goto(site_url + '/languages/pt/')
+        page.goto(site_url + ('/index.html' if code == 'en' else '/languages/' + code + '/'))
+        expect(page.locator('body')).to_have_attribute('data-language', code)
         for button in page.locator('#support button[data-copy]').all():
             original = button.inner_text()
             value = button.get_attribute('data-copy')
             status = page.locator('#' + button.get_attribute('data-copy-status'))
             button.click()
-            expect(status).to_have_text('Não foi possível copiar.' if method == 'failure' else 'Copiado!')
+            expect(status).to_have_text(button.get_attribute('data-copy-error' if method == 'failure' else 'data-copy-success'))
             if method != 'failure':
                 assert page.evaluate('window.copiedDonationValues.at(-1)') == value
                 # A second click must still restore the original label.

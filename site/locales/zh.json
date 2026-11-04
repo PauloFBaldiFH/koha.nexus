@@ -231,7 +231,19 @@
     "panel_screens": "面板屏幕",
     "back_to_top": "返回顶部",
     "network_empty": "目前未列出公共图书馆。",
-    "network_error": "暂时无法加载图书馆网络。"
+    "network_error": "暂时无法加载图书馆网络。",
+    "support_title": "您好！不好意思，打扰一下。",
+    "support_intro": "我开发 koha.nexus，是为了帮助预算有限、缺少技术支持的图书馆完全免费地安装和管理一套完整、现代且优质的系统。",
+    "support_appeal": "我已经并仍在为这个工具投入大量时间和心血。如果它帮助了您或您的机构，恳请您考虑按自己的意愿提供任意金额的资助。您的捐赠会直接帮助支付基础设施费用、维持开发，也让我感到开心和受到鼓励！",
+    "support_optional": "如果无法捐赠，完全没有关系。向有需要的图书馆和专业人士推荐 koha.nexus，或者在方便时给项目的 <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub 仓库</a> 点一颗星，就已经是很大的帮助。即使这些都不做，也请放心使用系统。能够帮到您，我就很高兴！",
+    "support_thanks": "非常感谢您的支持！",
+    "support_share": "⭐ 给 <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub 仓库</a> 点一颗星，并分享给其他图书馆。",
+    "support_hamster_alt": "睁着大眼睛、表情恳求的仓鼠",
+    "support_methods": "捐赠方式",
+    "support_bitcoin_alt": "Bitcoin 捐赠地址的二维码",
+    "support_copy_bitcoin": "复制 Bitcoin 地址",
+    "support_copied": "已复制！",
+    "support_copy_error": "无法复制。"
   },
   "manual_ui": {
     "title": "交互式预览和手册",

@@ -231,7 +231,19 @@
     "panel_screens": "Paneelschermen",
     "back_to_top": "Naar boven",
     "network_empty": "Er zijn momenteel geen openbare bibliotheken vermeld.",
-    "network_error": "Het bibliotheeknetwerk kan momenteel niet worden geladen."
+    "network_error": "Het bibliotheeknetwerk kan momenteel niet worden geladen.",
+    "support_title": "Hallo! Neem me niet kwalijk dat ik u stoor.",
+    "support_intro": "Ik heb koha.nexus ontwikkeld om vooral bibliotheken met een beperkt budget en zonder technische ondersteuning te helpen een volledig, modern en degelijk systeem geheel gratis te installeren en te beheren.",
+    "support_appeal": "Ik heb veel tijd en zorg aan dit hulpmiddel besteed en blijf dat doen. Als het u of uw instelling heeft geholpen, wilt u dan een financiële bijdrage overwegen van een bedrag dat u zelf prettig vindt? Uw donatie helpt rechtstreeks de infrastructuurkosten te dekken en de ontwikkeling voort te zetten, en maakt mij blij en gemotiveerd!",
+    "support_optional": "Kunt u niet doneren, dan is dat helemaal geen probleem. U helpt al enorm door koha.nexus aan te bevelen aan andere bibliotheken en professionals die het nodig hebben en, als het kan, de <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-repository</a> van het project een ster te geven. Ook als u niets daarvan doet, geniet gerust van het systeem. Ik ben blij dat ik kon helpen!",
+    "support_thanks": "Hartelijk dank voor uw steun!",
+    "support_share": "⭐ Geef de <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-repository</a> een ster en deel het project met andere bibliotheken.",
+    "support_hamster_alt": "Hamster met grote ogen en een smekende blik",
+    "support_methods": "Manieren om te doneren",
+    "support_bitcoin_alt": "QR-code van het Bitcoin-donatieadres",
+    "support_copy_bitcoin": "Bitcoin-adres kopiëren",
+    "support_copied": "Gekopieerd!",
+    "support_copy_error": "Kopiëren is niet gelukt."
   },
   "manual_ui": {
     "title": "Interactieve voorvertoning en handleiding",

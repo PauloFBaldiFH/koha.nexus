@@ -231,7 +231,19 @@
     "panel_screens": "Obrazovky panelu",
     "back_to_top": "Nahoru",
     "network_empty": "Nyní nejsou uvedeny žádné veřejné knihovny.",
-    "network_error": "Síť knihoven se nyní nepodařilo načíst."
+    "network_error": "Síť knihoven se nyní nepodařilo načíst.",
+    "support_title": "Dobrý den! Omlouvám se, že vyrušuji.",
+    "support_intro": "Projekt koha.nexus jsem vytvořil především na pomoc knihovnám s omezeným rozpočtem a bez technické podpory, aby mohly zcela zdarma instalovat a spravovat úplný, moderní a kvalitní systém.",
+    "support_appeal": "Tomuto nástroji jsem věnoval a nadále věnuji mnoho času a péče. Pokud pomohl vám nebo vaší instituci, prosím, zvažte finanční podporu v částce, která vám vyhovuje. Váš dar přímo pomáhá hradit infrastrukturu a pokračovat ve vývoji a zároveň mi přináší radost a motivaci!",
+    "support_optional": "Pokud přispět nemůžete, vůbec to nevadí. Velmi pomáháte už tím, že koha.nexus doporučíte dalším knihovnám a odborníkům, kteří jej potřebují, a případně dáte hvězdičku <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repozitáři na GitHub</a> projektu. I když nic z toho neuděláte, systém bez obav používejte. Jsem rád, že jsem mohl pomoci!",
+    "support_thanks": "Moc děkuji za podporu!",
+    "support_share": "⭐ Dejte hvězdičku <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repozitáři na GitHub</a> a sdílejte projekt s dalšími knihovnami.",
+    "support_hamster_alt": "Křeček s velkýma očima a prosebným výrazem",
+    "support_methods": "Možnosti darování",
+    "support_bitcoin_alt": "QR kód adresy Bitcoin pro dary",
+    "support_copy_bitcoin": "Kopírovat adresu Bitcoin",
+    "support_copied": "Zkopírováno!",
+    "support_copy_error": "Kopírování se nezdařilo."
   },
   "manual_ui": {
     "title": "Interaktivní náhled a příručka",

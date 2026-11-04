@@ -231,7 +231,19 @@
     "panel_screens": "Écrans du panneau",
     "back_to_top": "Retour en haut",
     "network_empty": "Aucune bibliothèque publique répertoriée actuellement.",
-    "network_error": "Impossible de charger le réseau des bibliothèques pour le moment."
+    "network_error": "Impossible de charger le réseau des bibliothèques pour le moment.",
+    "support_title": "Bonjour ! Excusez-moi de vous déranger.",
+    "support_intro": "J’ai développé koha.nexus pour aider surtout les bibliothèques disposant d’un budget limité et sans assistance technique à installer et administrer un système complet, moderne et de qualité, entièrement gratuit.",
+    "support_appeal": "J’ai consacré, et continue de consacrer, beaucoup de temps et de soin à cet outil. S’il vous a été utile, à vous ou à votre établissement, je vous invite à envisager une contribution financière du montant qui vous convient. Votre don aide directement à couvrir les frais d’infrastructure et à poursuivre le développement, tout en m’apportant joie et motivation !",
+    "support_optional": "Si vous ne pouvez pas faire de don, aucun problème. Vous aidez déjà beaucoup en recommandant koha.nexus aux bibliothèques et aux professionnels qui en ont besoin et, si possible, en ajoutant une étoile au <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">dépôt GitHub</a> du projet. Même si vous ne faites rien de tout cela, profitez du système : je suis heureux d’avoir pu vous aider !",
+    "support_thanks": "Merci beaucoup pour votre soutien !",
+    "support_share": "⭐ Ajoutez une étoile au <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">dépôt GitHub</a> et partagez-le avec d’autres bibliothèques.",
+    "support_hamster_alt": "Hamster aux grands yeux et à l’expression implorante",
+    "support_methods": "Moyens de faire un don",
+    "support_bitcoin_alt": "Code QR de l’adresse Bitcoin pour les dons",
+    "support_copy_bitcoin": "Copier l’adresse Bitcoin",
+    "support_copied": "Copié !",
+    "support_copy_error": "Impossible de copier."
   },
   "manual_ui": {
     "title": "Aperçu interactif et manuel",

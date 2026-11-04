@@ -231,7 +231,19 @@
     "panel_screens": "Telas do painel",
     "back_to_top": "Voltar ao topo",
     "network_empty": "Nenhuma biblioteca pública listada no momento.",
-    "network_error": "Não foi possível carregar a rede de bibliotecas agora."
+    "network_error": "Não foi possível carregar a rede de bibliotecas agora.",
+    "support_title": "Oi! Com licença, desculpe incomodar.",
+    "support_thanks": "Muito obrigado pelo apoio!",
+    "support_optional": "E se você não puder doar, não tem problema, você já ajuda demais recomendando o koha.nexus para outras bibliotecas e profissionais que precisam dessa solução, e se possível marcar uma estrelinha no <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repositório do projeto no GitHub</a>, mas mesmo se você não fizer isso tudo bem, aproveita o sistema a vontade, fico contente por ter ajudado!",
+    "support_appeal": "Dediquei (e continuo dedicando) muito tempo e carinho a essa ferramenta. Se ela foi útil para você ou para a sua instituição, peço com carinho que considere colaborar financeiramente com qualquer valor que o seu coração mandar. Sua doação ajuda diretamente a cobrir os custos de infraestrutura e a manter o desenvolvimento ativo, além de me deixar feliz e motivado!",
+    "support_intro": "Eu desenvolvi o projeto koha.nexus com o objetivo de ajudar principalmente bibliotecas com orçamento reduzido e sem assistência técnica a instalarem e administrarem um sistema completo, moderno e de qualidade de forma 100% gratuita.",
+    "support_share": "⭐ Dê uma estrela no <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repositório</a> e compartilhe com outras bibliotecas.",
+    "support_hamster_alt": "Hamster com olhos grandes e expressão de pidão",
+    "support_methods": "Formas de doar",
+    "support_bitcoin_alt": "QR code do endereço Bitcoin para doação",
+    "support_copy_bitcoin": "Copiar endereço Bitcoin",
+    "support_copied": "Copiado!",
+    "support_copy_error": "Não foi possível copiar."
   },
   "manual_ui": {
     "title": "Prévia interativa e manual",
