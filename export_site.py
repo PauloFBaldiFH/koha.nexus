@@ -216,6 +216,10 @@ def render_pages(source_root=ROOT):
             if kind == 'preview':
                 extra['download_link'] = locales[lang['dict']]['home']['win_d_t']
             template = (source_root / 'site/templates' / (kind + '.html')).read_text(encoding='utf-8')
+            if kind == 'home':
+                support = ((source_root / 'site/templates/support.pt.html').read_text(encoding='utf-8')
+                           if lang['dict'] == 'pt' else '')
+                template = template.replace('{{SUPPORT_SECTION}}', support)
             renderer = Renderer(lang, kind, {**text, **extra}, all_languages)
             renderer.feed(template)
             renderer.close()
