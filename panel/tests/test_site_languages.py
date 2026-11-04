@@ -54,27 +54,33 @@ def test_languages_come_from_existing_panel_dictionaries():
             assert not (REPO / lang['dict']).exists(), 'obsolete root language directory'
 
 
-def test_support_message_is_portuguese_only_and_before_contact():
+def test_support_message_is_localized_and_pix_is_portuguese_only():
+    locales = site.read_locales()
     for lang in site.languages():
         path = REPO / site.page_path(lang, 'home')
         html = path.read_text(encoding='utf-8')
-        if lang['dict'] != 'pt':
-            assert 'id="support"' not in html
-            assert 'hamster-piduncho.png' not in html
-            continue
+        text = locales[lang['dict']]['home']
         assert html.index('id="support"') < html.index('id="contact"')
-        assert 'Sua doação ajuda diretamente a cobrir os custos de infraestrutura' in html
+        assert text['support_title'] in html
+        assert text['support_appeal'] in html
+        if lang['dict'] != 'pt':
+            assert 'donation-pix.png' not in html
+            assert 'br.gov.bcb.pix' not in html
+            assert 'pix-copy-status' not in html
         page = Page(html)
         picture = next(a for tag, a in page.nodes if tag == 'img' and 'hamster-piduncho.png' in a.get('src', ''))
         assert target(path, picture['src']).is_file()
-        assert picture['alt'] and picture['loading'] == 'lazy'
+        assert picture['alt'] == text['support_hamster_alt'] and picture['loading'] == 'lazy'
         buttons = [a for tag, a in page.nodes if tag == 'button' and a.get('data-copy-status')]
-        assert len(buttons) == 2
+        assert len(buttons) == (2 if lang['dict'] == 'pt' else 1)
         for button in buttons:
             assert button['data-copy']
-            assert button['data-copy-success'] == 'Copiado!'
+            assert button['data-copy-success'] == text['support_copied']
+            assert button['data-copy-error'] == text['support_copy_error']
+        bitcoin = next(b for b in buttons if b['data-copy-status'] == 'bitcoin-copy-status')
+        assert bitcoin['data-copy'] == 'bc1qw0kvacdkzul0panuppxcv90y08ah443m2z89tx'
         qrs = [a for tag, a in page.nodes if tag == 'img' and 'donation-' in a.get('src', '')]
-        assert len(qrs) == 2
+        assert len(qrs) == (2 if lang['dict'] == 'pt' else 1)
         assert all(target(path, qr['src']).is_file() for qr in qrs)
 
 

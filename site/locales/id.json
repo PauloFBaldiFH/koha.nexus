@@ -231,7 +231,19 @@
     "panel_screens": "Layar panel",
     "back_to_top": "Kembali ke atas",
     "network_empty": "Belum ada perpustakaan publik dalam daftar saat ini.",
-    "network_error": "Jaringan perpustakaan belum dapat dimuat saat ini."
+    "network_error": "Jaringan perpustakaan belum dapat dimuat saat ini.",
+    "support_title": "Halo! Permisi, maaf mengganggu.",
+    "support_intro": "Saya mengembangkan koha.nexus terutama untuk membantu perpustakaan dengan anggaran terbatas dan tanpa dukungan teknis memasang serta mengelola sistem yang lengkap, modern, dan berkualitas secara sepenuhnya gratis.",
+    "support_appeal": "Saya telah mencurahkan, dan terus mencurahkan, banyak waktu dan perhatian untuk alat ini. Jika alat ini membantu Anda atau lembaga Anda, mohon pertimbangkan dukungan finansial dengan jumlah yang Anda inginkan. Donasi Anda langsung membantu menutup biaya infrastruktur dan menjaga pengembangan tetap berjalan, sekaligus membuat saya senang dan termotivasi!",
+    "support_optional": "Jika Anda tidak dapat berdonasi, tidak masalah. Anda sudah sangat membantu dengan merekomendasikan koha.nexus kepada perpustakaan dan profesional lain yang membutuhkannya serta, jika memungkinkan, memberi bintang pada <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repositori GitHub</a> proyek. Bahkan jika tidak melakukan semua itu, silakan nikmati sistemnya. Saya senang telah membantu!",
+    "support_thanks": "Terima kasih banyak atas dukungan Anda!",
+    "support_share": "⭐ Beri bintang pada <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repositori GitHub</a> dan bagikan kepada perpustakaan lain.",
+    "support_hamster_alt": "Hamster bermata besar dengan ekspresi memohon",
+    "support_methods": "Cara berdonasi",
+    "support_bitcoin_alt": "Kode QR alamat Bitcoin untuk donasi",
+    "support_copy_bitcoin": "Salin alamat Bitcoin",
+    "support_copied": "Disalin!",
+    "support_copy_error": "Tidak dapat menyalin."
   },
   "manual_ui": {
     "title": "Pratinjau interaktif dan panduan",

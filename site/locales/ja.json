@@ -231,7 +231,19 @@
     "panel_screens": "パネルの画面",
     "back_to_top": "先頭に戻る",
     "network_empty": "現在、公開図書館の登録はありません。",
-    "network_error": "現在、図書館ネットワークを読み込めません。"
+    "network_error": "現在、図書館ネットワークを読み込めません。",
+    "support_title": "こんにちは。お邪魔してすみません。",
+    "support_intro": "私は、予算が限られ技術支援を受けられない図書館でも、充実した現代的で質の高いシステムを完全無料で導入・管理できるよう、koha.nexus を開発しました。",
+    "support_appeal": "このツールには多くの時間と心を注いできましたし、今も続けています。皆様や所属機関のお役に立てたなら、無理のない金額でのご寄付をご検討いただけるとうれしいです。ご寄付はインフラ費用と開発の継続に直接役立ち、私にとっても喜びと励みになります！",
+    "support_optional": "寄付が難しくても、まったく問題ありません。必要としている図書館や専門職の方に koha.nexus を紹介したり、可能ならプロジェクトの <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub リポジトリ</a> にスターを付けていただくだけでも大きな助けになります。何もできなくても、どうぞ自由にご利用ください。お役に立てたことがうれしいです！",
+    "support_thanks": "ご支援、本当にありがとうございます！",
+    "support_share": "⭐ <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub リポジトリ</a> にスターを付け、ほかの図書館にも紹介してください。",
+    "support_hamster_alt": "大きな目でお願いするような表情のハムスター",
+    "support_methods": "寄付の方法",
+    "support_bitcoin_alt": "寄付用 Bitcoin アドレスの QR コード",
+    "support_copy_bitcoin": "Bitcoin アドレスをコピー",
+    "support_copied": "コピーしました！",
+    "support_copy_error": "コピーできませんでした。"
   },
   "manual_ui": {
     "title": "インタラクティブプレビューとマニュアル",

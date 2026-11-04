@@ -138,6 +138,8 @@ class Renderer(HTMLParser):
         if tag == 'body':
             attrs['data-language'] = self.lang['dict']
         for marker, dest in [('data-i18n-ph', 'placeholder'), ('data-i18n-aria', 'aria-label'), ('data-ui-aria', 'aria-label'),
+                             ('data-i18n-alt', 'alt'), ('data-i18n-copy-success', 'data-copy-success'),
+                             ('data-i18n-copy-error', 'data-copy-error'),
                              ('data-i18n-meta', 'content'), ('data-ui-meta', 'content'), ('data-ui-title', 'title')]:
             if marker in attrs:
                 attrs[dest] = self.text[attrs[marker]]
@@ -217,8 +219,10 @@ def render_pages(source_root=ROOT):
                 extra['download_link'] = locales[lang['dict']]['home']['win_d_t']
             template = (source_root / 'site/templates' / (kind + '.html')).read_text(encoding='utf-8')
             if kind == 'home':
-                support = ((source_root / 'site/templates/support.pt.html').read_text(encoding='utf-8')
-                           if lang['dict'] == 'pt' else '')
+                support = (source_root / 'site/templates/support.html').read_text(encoding='utf-8')
+                pix = ((source_root / 'site/templates/support.pix.pt.html').read_text(encoding='utf-8')
+                       if lang['dict'] == 'pt' else '')
+                support = support.replace('{{PIX_OPTION}}', pix)
                 template = template.replace('{{SUPPORT_SECTION}}', support)
             renderer = Renderer(lang, kind, {**text, **extra}, all_languages)
             renderer.feed(template)

@@ -231,7 +231,19 @@
     "panel_screens": "Ekrany panelu",
     "back_to_top": "Na górę",
     "network_empty": "Obecnie nie ma na liście bibliotek publicznych.",
-    "network_error": "Nie można teraz wczytać sieci bibliotek."
+    "network_error": "Nie można teraz wczytać sieci bibliotek.",
+    "support_title": "Cześć! Przepraszam, że przeszkadzam.",
+    "support_intro": "Stworzyłem koha.nexus, aby pomóc przede wszystkim bibliotekom z ograniczonym budżetem i bez wsparcia technicznego instalować i obsługiwać kompletny, nowoczesny system dobrej jakości, całkowicie bezpłatnie.",
+    "support_appeal": "Poświęciłem i nadal poświęcam temu narzędziu wiele czasu i troski. Jeśli pomogło Tobie lub Twojej instytucji, proszę o rozważenie wsparcia finansowego w dowolnej dogodnej kwocie. Darowizna bezpośrednio pomaga pokryć koszty infrastruktury i kontynuować rozwój, a mnie daje radość i motywację!",
+    "support_optional": "Jeśli nie możesz przekazać darowizny, to żaden problem. Bardzo pomagasz już przez polecanie koha.nexus innym bibliotekom i specjalistom, którzy go potrzebują, oraz, jeśli to możliwe, dodanie gwiazdki w <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repozytorium na GitHub</a> projektu. Nawet jeśli nic z tego nie zrobisz, korzystaj z systemu swobodnie. Cieszę się, że mogłem pomóc!",
+    "support_thanks": "Bardzo dziękuję za wsparcie!",
+    "support_share": "⭐ Dodaj gwiazdkę w <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">repozytorium na GitHub</a> i udostępnij projekt innym bibliotekom.",
+    "support_hamster_alt": "Chomik o dużych oczach i błagalnym spojrzeniu",
+    "support_methods": "Sposoby przekazania darowizny",
+    "support_bitcoin_alt": "Kod QR adresu Bitcoin do darowizn",
+    "support_copy_bitcoin": "Kopiuj adres Bitcoin",
+    "support_copied": "Skopiowano!",
+    "support_copy_error": "Nie udało się skopiować."
   },
   "manual_ui": {
     "title": "Interaktywny podgląd i podręcznik",

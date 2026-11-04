@@ -231,7 +231,19 @@
     "panel_screens": "패널 화면",
     "back_to_top": "맨 위로",
     "network_empty": "현재 등록된 공개 도서관이 없습니다.",
-    "network_error": "지금 도서관 네트워크를 불러올 수 없습니다."
+    "network_error": "지금 도서관 네트워크를 불러올 수 없습니다.",
+    "support_title": "안녕하세요! 잠시 실례하겠습니다.",
+    "support_intro": "저는 예산이 부족하고 기술 지원을 받기 어려운 도서관도 완전하고 현대적인 고품질 시스템을 무료로 설치하고 관리할 수 있도록 koha.nexus를 개발했습니다.",
+    "support_appeal": "이 도구에 많은 시간과 정성을 쏟았으며 지금도 계속하고 있습니다. 여러분이나 소속 기관에 도움이 되었다면, 부담 없는 금액으로 후원해 주시는 것을 고려해 주세요. 후원금은 인프라 비용과 개발 지속에 직접 도움이 되며, 저에게도 기쁨과 동기를 줍니다!",
+    "support_optional": "후원이 어려워도 괜찮습니다. koha.nexus가 필요한 다른 도서관과 전문가에게 추천하거나, 가능하다면 프로젝트의 <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub 저장소</a>에 별을 눌러 주는 것만으로도 큰 도움이 됩니다. 아무것도 하지 않으셔도 시스템을 편하게 사용해 주세요. 도움을 드릴 수 있어 기쁩니다!",
+    "support_thanks": "응원해 주셔서 정말 감사합니다!",
+    "support_share": "⭐ <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub 저장소</a>에 별을 누르고 다른 도서관에도 공유해 주세요.",
+    "support_hamster_alt": "큰 눈으로 부탁하는 표정의 햄스터",
+    "support_methods": "후원 방법",
+    "support_bitcoin_alt": "후원용 Bitcoin 주소 QR 코드",
+    "support_copy_bitcoin": "Bitcoin 주소 복사",
+    "support_copied": "복사했습니다!",
+    "support_copy_error": "복사하지 못했습니다."
   },
   "manual_ui": {
     "title": "대화형 미리보기와 설명서",

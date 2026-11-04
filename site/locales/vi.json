@@ -231,7 +231,19 @@
     "panel_screens": "Màn hình bảng điều khiển",
     "back_to_top": "Về đầu trang",
     "network_empty": "Hiện chưa có thư viện công khai trong danh sách.",
-    "network_error": "Hiện không thể tải mạng thư viện."
+    "network_error": "Hiện không thể tải mạng thư viện.",
+    "support_title": "Xin chào! Xin lỗi vì đã làm phiền bạn.",
+    "support_intro": "Tôi phát triển koha.nexus nhằm giúp đặc biệt các thư viện có ngân sách hạn chế và không có hỗ trợ kỹ thuật cài đặt, quản lý một hệ thống đầy đủ, hiện đại và chất lượng, hoàn toàn miễn phí.",
+    "support_appeal": "Tôi đã và vẫn đang dành rất nhiều thời gian, tâm huyết cho công cụ này. Nếu công cụ hữu ích với bạn hoặc đơn vị của bạn, mong bạn cân nhắc hỗ trợ tài chính với số tiền tùy lòng. Đóng góp của bạn trực tiếp giúp trang trải hạ tầng và duy trì phát triển, đồng thời mang lại niềm vui và động lực cho tôi!",
+    "support_optional": "Nếu không thể quyên góp thì không sao cả. Bạn đã giúp rất nhiều khi giới thiệu koha.nexus cho các thư viện và người làm nghề cần nó và, nếu có thể, tặng một sao cho <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">kho mã GitHub</a> của dự án. Ngay cả khi không làm những điều đó, bạn cứ thoải mái sử dụng hệ thống. Tôi vui vì đã giúp được bạn!",
+    "support_thanks": "Xin chân thành cảm ơn sự hỗ trợ của bạn!",
+    "support_share": "⭐ Tặng sao cho <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">kho mã GitHub</a> và chia sẻ với các thư viện khác.",
+    "support_hamster_alt": "Hamster mắt to với vẻ mặt nài nỉ",
+    "support_methods": "Cách quyên góp",
+    "support_bitcoin_alt": "Mã QR địa chỉ Bitcoin nhận đóng góp",
+    "support_copy_bitcoin": "Sao chép địa chỉ Bitcoin",
+    "support_copied": "Đã sao chép!",
+    "support_copy_error": "Không thể sao chép."
   },
   "manual_ui": {
     "title": "Xem trước tương tác và hướng dẫn",

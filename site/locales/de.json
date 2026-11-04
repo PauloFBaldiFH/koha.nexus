@@ -231,7 +231,19 @@
     "panel_screens": "Panelbildschirme",
     "back_to_top": "Nach oben",
     "network_empty": "Derzeit sind keine öffentlichen Bibliotheken aufgeführt.",
-    "network_error": "Das Bibliotheksnetzwerk kann derzeit nicht geladen werden."
+    "network_error": "Das Bibliotheksnetzwerk kann derzeit nicht geladen werden.",
+    "support_title": "Hallo! Entschuldigen Sie bitte die Störung.",
+    "support_intro": "Ich habe koha.nexus entwickelt, um vor allem Bibliotheken mit kleinem Budget und ohne technische Unterstützung zu helfen, ein vollständiges, modernes und hochwertiges System völlig kostenlos zu installieren und zu verwalten.",
+    "support_appeal": "In dieses Werkzeug habe ich viel Zeit und Sorgfalt investiert und tue es weiterhin. Wenn es Ihnen oder Ihrer Einrichtung geholfen hat, würde ich mich über eine finanzielle Unterstützung in einer Höhe Ihrer Wahl freuen. Ihre Spende hilft unmittelbar, die Infrastrukturkosten zu decken und die Entwicklung fortzusetzen, und gibt mir Freude und Motivation!",
+    "support_optional": "Wenn Sie nicht spenden können, ist das völlig in Ordnung. Sie helfen bereits sehr, indem Sie koha.nexus anderen Bibliotheken und Fachleuten empfehlen und dem <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-Repository</a> des Projekts nach Möglichkeit einen Stern geben. Auch wenn Sie nichts davon tun, nutzen Sie das System gern. Ich freue mich, geholfen zu haben!",
+    "support_thanks": "Vielen Dank für Ihre Unterstützung!",
+    "support_share": "⭐ Geben Sie dem <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub-Repository</a> einen Stern und teilen Sie es mit anderen Bibliotheken.",
+    "support_hamster_alt": "Hamster mit großen Augen und bittendem Blick",
+    "support_methods": "Spendenmöglichkeiten",
+    "support_bitcoin_alt": "QR-Code der Bitcoin-Spendenadresse",
+    "support_copy_bitcoin": "Bitcoin-Adresse kopieren",
+    "support_copied": "Kopiert!",
+    "support_copy_error": "Kopieren nicht möglich."
   },
   "manual_ui": {
     "title": "Interaktive Vorschau und Handbuch",

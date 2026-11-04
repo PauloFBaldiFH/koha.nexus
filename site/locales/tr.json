@@ -231,7 +231,19 @@
     "panel_screens": "Panel ekranları",
     "back_to_top": "Başa dön",
     "network_empty": "Şu anda listelenen genel kütüphane yok.",
-    "network_error": "Kütüphane ağı şu anda yüklenemedi."
+    "network_error": "Kütüphane ağı şu anda yüklenemedi.",
+    "support_title": "Merhaba! Rahatsız ettiğim için kusura bakmayın.",
+    "support_intro": "koha.nexus'u özellikle bütçesi kısıtlı ve teknik desteği olmayan kütüphanelerin eksiksiz, modern ve kaliteli bir sistemi tamamen ücretsiz kurup yönetmesine yardımcı olmak için geliştirdim.",
+    "support_appeal": "Bu araca çok zaman ve emek verdim, vermeye de devam ediyorum. Size veya kurumunuza yararlı olduysa, gönlünüzden geçen herhangi bir tutarla maddi katkıda bulunmayı değerlendirmenizi rica ederim. Bağışınız altyapı giderlerini karşılamaya ve geliştirmeyi sürdürmeye doğrudan yardımcı olur; beni de mutlu eder ve motive eder!",
+    "support_optional": "Bağış yapamıyorsanız hiç sorun değil. koha.nexus'u ihtiyacı olan diğer kütüphanelere ve meslektaşlarınıza önererek, mümkünse projenin <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub deposu</a> sayfasına yıldız vererek de çok yardımcı olursunuz. Bunların hiçbirini yapmasanız da sistemi gönül rahatlığıyla kullanın. Yardım edebildiğim için mutluyum!",
+    "support_thanks": "Desteğiniz için çok teşekkür ederim!",
+    "support_share": "⭐ <a href=\"https://github.com/PauloFBaldiFH/koha.nexus\">GitHub deposu</a> sayfasına yıldız verin ve projeyi diğer kütüphanelerle paylaşın.",
+    "support_hamster_alt": "Büyük gözlü ve yalvaran bakışlı hamster",
+    "support_methods": "Bağış yöntemleri",
+    "support_bitcoin_alt": "Bitcoin bağış adresinin QR kodu",
+    "support_copy_bitcoin": "Bitcoin adresini kopyala",
+    "support_copied": "Kopyalandı!",
+    "support_copy_error": "Kopyalanamadı."
   },
   "manual_ui": {
     "title": "Etkileşimli önizleme ve kılavuz",
