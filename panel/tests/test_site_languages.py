@@ -54,6 +54,23 @@ def test_languages_come_from_existing_panel_dictionaries():
             assert not (REPO / lang['dict']).exists(), 'obsolete root language directory'
 
 
+def test_support_message_is_portuguese_only_and_before_contact():
+    for lang in site.languages():
+        path = REPO / site.page_path(lang, 'home')
+        html = path.read_text(encoding='utf-8')
+        if lang['dict'] != 'pt':
+            assert 'id="support"' not in html
+            assert 'hamster-piduncho.png' not in html
+            continue
+        assert html.index('id="support"') < html.index('id="contact"')
+        assert 'Sua doação ajuda diretamente a cobrir os custos de infraestrutura' in html
+        page = Page(html)
+        picture = next(a for tag, a in page.nodes if tag == 'img' and 'hamster-piduncho.png' in a.get('src', ''))
+        assert target(path, picture['src']).is_file()
+        assert picture['alt'] and picture['loading'] == 'lazy'
+        assert '#support-the-project' in html
+
+
 @pytest.mark.parametrize('kind', ['home', 'preview'])
 def test_all_static_pages_have_working_language_links_and_alternates(kind):
     langs = site.languages()
