@@ -9241,22 +9241,22 @@
    "it": "Scarica",
    "de": "Herunterladen",
    "nl": "Downloaden",
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "sv": "Ladda ned",
+   "pl": "Pobierz",
+   "cs": "Stáhnout",
+   "ru": "Скачать",
+   "uk": "Завантажити",
+   "tr": "İndir",
+   "tl": "I-download",
+   "id": "Unduh",
+   "ar": "تنزيل",
+   "fa": "دریافت",
+   "hi": "डाउनलोड करें",
+   "bn": "ডাউনলোড করুন",
+   "vi": "Tải xuống",
+   "zh": "下载",
+   "ja": "ダウンロード",
+   "ko": "다운로드"
   },
   "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU.": {
    "en": "Without a GPU, prefer the light models: a 7B vision model can take minutes per answer on a CPU.",
@@ -19030,112 +19030,112 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 289,
+   "strings": 290,
    "strings_total": 411
   }
  }
