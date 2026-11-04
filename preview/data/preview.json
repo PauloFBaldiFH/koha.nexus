@@ -8615,23 +8615,23 @@
    "fr": "Ollama local",
    "it": "Ollama locale",
    "de": "Lokales Ollama",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "Lokale Ollama",
+   "sv": "Lokal Ollama",
+   "pl": "Lokalny Ollama",
+   "cs": "Místní Ollama",
+   "ru": "Локальный Ollama",
+   "uk": "Локальний Ollama",
+   "tr": "Yerel Ollama",
+   "tl": "Lokal na Ollama",
+   "id": "Ollama lokal",
+   "ar": "Ollama المحلي",
+   "fa": "Ollama محلی",
+   "hi": "स्थानीय Ollama",
+   "bn": "স্থানীয় Ollama",
+   "vi": "Ollama cục bộ",
+   "zh": "本地 Ollama",
+   "ja": "ローカル Ollama",
+   "ko": "로컬 Ollama"
   },
   "Google Gemini": {
    "en": "Google Gemini",
@@ -8715,23 +8715,23 @@
    "fr": "LM Studio / compatible OpenAI",
    "it": "LM Studio / compatibile con OpenAI",
    "de": "LM Studio / OpenAI-kompatibel",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "nl": "LM Studio / OpenAI-compatibel",
+   "sv": "LM Studio / OpenAI-kompatibel",
+   "pl": "LM Studio / Zgodny z OpenAI",
+   "cs": "LM Studio / Kompatibilní s OpenAI",
+   "ru": "LM Studio / Совместимый с OpenAI",
+   "uk": "LM Studio / Сумісний з OpenAI",
+   "tr": "LM Studio / OpenAI uyumlu",
+   "tl": "LM Studio / Katugma sa OpenAI",
+   "id": "LM Studio / Kompatibel dengan OpenAI",
+   "ar": "LM Studio / متوافق مع OpenAI",
+   "fa": "LM Studio / سازگار با OpenAI",
+   "hi": "LM Studio / OpenAI-संगत",
+   "bn": "LM Studio / OpenAI-সামঞ্জস্যপূর্ণ",
+   "vi": "LM Studio / Tương thích OpenAI",
+   "zh": "LM Studio / 兼容 OpenAI",
+   "ja": "LM Studio / OpenAI 互換",
+   "ko": "LM Studio / OpenAI 호환"
   },
   "Server URL": {
    "en": "Server URL",
@@ -19023,119 +19023,119 @@
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "sv": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "pl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "cs": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "ru": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "uk": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "tr": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "tl": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "id": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "ar": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "fa": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "hi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "bn": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "vi": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "zh": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "ja": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   },
   "ko": {
    "manual": 0,
    "manual_total": 113,
    "manual_outdated": [],
-   "strings": 290,
+   "strings": 292,
    "strings_total": 411
   }
  }
