@@ -178,13 +178,14 @@ def test_alerts_tab_dry_run_and_schedule(tmp_path, monkeypatch):
 
             # Save switches the schedule's job on (it was off).
             view.query_one("#h-al-save").press()
-            await _until(pilot, lambda: "text" in sent and isinstance(app.screen, MessageScreen))
+            await _until(pilot, lambda: "text" in sent and isinstance(app.screen, MessageScreen)
+                         and app.screen.query("#ok"))
             assert "\n0 7 * * * root /usr/local/bin/koha-kei-notify library" in sent["text"]
             assert "\n15 22 * * * root /bin/bash /root/backup_sql.sh" in sent["text"]
             app.screen.query_one("#ok").press()
-            await pilot.pause(0.1)
+            await _until(pilot, lambda: app.screen is view.screen)
 
-            view.query_one("#h-al-cron").press()
+            await pilot.click("#h-al-cron")
             await _until(pilot, lambda: app.screen.query_one("#views").current == "view-crons")
             crons = app.screen.query_one("#view-crons")
             await _until(pilot, lambda: crons.drawn)
