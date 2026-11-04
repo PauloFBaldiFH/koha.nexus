@@ -73,3 +73,42 @@ def test_explicit_english_index_survives_a_portuguese_browser_and_blocked_storag
         expect(page.locator('body')).to_have_attribute('data-language', 'en')
     finally:
         context.close()
+
+
+@pytest.mark.parametrize('method', ['clipboard', 'fallback', 'failure'])
+def test_donation_copy_feedback(browser, site_url, method):
+    context = browser.new_context(locale='pt-BR', reduced_motion='reduce')
+    context.add_init_script("""(method => {
+      window.copiedDonationValues = [];
+      Object.defineProperty(navigator, 'clipboard', {value: {
+        writeText: async value => {
+          if (method !== 'clipboard') throw Error('blocked');
+          window.copiedDonationValues.push(value);
+        }
+      }});
+      document.execCommand = command => {
+        if (method !== 'fallback') return false;
+        window.copiedDonationValues.push(document.querySelector('textarea[readonly]').value);
+        return command === 'copy';
+      };
+    })(%s);""" % repr(method))
+    page = context.new_page()
+    try:
+        page.goto(site_url + '/languages/pt/')
+        for button in page.locator('#support button[data-copy]').all():
+            original = button.inner_text()
+            value = button.get_attribute('data-copy')
+            status = page.locator('#' + button.get_attribute('data-copy-status'))
+            button.click()
+            expect(status).to_have_text('Não foi possível copiar.' if method == 'failure' else 'Copiado!')
+            if method != 'failure':
+                assert page.evaluate('window.copiedDonationValues.at(-1)') == value
+                # A second click must still restore the original label.
+                button.click()
+            expect(button).to_have_text(original)
+            expect(status).to_be_empty()
+        expect(page.locator('#support .support-share a')).to_have_attribute(
+            'href', 'https://github.com/PauloFBaldiFH/koha.nexus')
+        assert page.locator('textarea[readonly]').count() == 0
+    finally:
+        context.close()
