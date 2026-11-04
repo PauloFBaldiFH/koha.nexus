@@ -68,7 +68,14 @@ def test_support_message_is_portuguese_only_and_before_contact():
         picture = next(a for tag, a in page.nodes if tag == 'img' and 'hamster-piduncho.png' in a.get('src', ''))
         assert target(path, picture['src']).is_file()
         assert picture['alt'] and picture['loading'] == 'lazy'
-        assert '#support-the-project' in html
+        buttons = [a for tag, a in page.nodes if tag == 'button' and a.get('data-copy-status')]
+        assert len(buttons) == 2
+        for button in buttons:
+            assert button['data-copy']
+            assert button['data-copy-success'] == 'Copiado!'
+        qrs = [a for tag, a in page.nodes if tag == 'img' and 'donation-' in a.get('src', '')]
+        assert len(qrs) == 2
+        assert all(target(path, qr['src']).is_file() for qr in qrs)
 
 
 @pytest.mark.parametrize('kind', ['home', 'preview'])

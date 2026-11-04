@@ -56,9 +56,10 @@ document.querySelectorAll("a[data-language]").forEach(a => a.addEventListener("c
     }
 
     document.querySelectorAll(".copy").forEach(button => {
+      const original = button.innerHTML;
+      let reset;
       button.addEventListener("click", async () => {
         const value = button.dataset.copy || "";
-        const original = button.innerHTML;
         let ok = false;
         try {
           await navigator.clipboard.writeText(value);
@@ -66,8 +67,17 @@ document.querySelectorAll("a[data-language]").forEach(a => a.addEventListener("c
         } catch (e) {
           ok = copyFallback(value);
         }
+        const status = document.getElementById(button.dataset.copyStatus || "");
+        if (status) {
+          status.textContent = ok ? button.dataset.copySuccess : button.dataset.copyError;
+          status.dataset.state = ok ? "ok" : "error";
+        }
         button.textContent = ok ? "✓" : "✗";
-        setTimeout(() => button.innerHTML = original, ok ? 1600 : 2200);
+        clearTimeout(reset);
+        reset = setTimeout(() => {
+          button.innerHTML = original;
+          if (status) status.textContent = "";
+        }, ok ? 1600 : 2200);
       });
     });
 
