@@ -247,6 +247,8 @@ class TainacanState:
     url: str = ""
     services: str = "none"
     health: str = "unknown"
+    events: str = "off"          # Nexus Eventos: "on" only after the plan and a Yes
+    events_dependency: str = ""  # Events Manager: "ours" (Koha.Nexus put it there), "preexisting", ""
 
 
 def tainacan_from_status(status: dict | None) -> TainacanState:
@@ -257,7 +259,9 @@ def tainacan_from_status(status: dict | None) -> TainacanState:
                 known=True, status=_norm(raw.get("status"), TAINACAN_STATUS, "absent"),
                 url=url[:200] if url.startswith(("http://", "https://")) else "",
                 services=_norm(raw.get("services"), SERVICES, "none"),
-                health=_norm(raw.get("health"), HEALTH, "unknown"))
+                health=_norm(raw.get("health"), HEALTH, "unknown"),
+                events=_norm(raw.get("events"), ("off", "on"), "off"),
+                events_dependency=_norm(raw.get("events_dependency"), ("ours", "preexisting"), ""))
     return TainacanState()
 
 
@@ -281,6 +285,8 @@ def describe_tainacan(state: TainacanState, docker: DockerState) -> tuple[str, s
     card = "ok" if state.services == "active" and state.health == "healthy" else (
         "bad" if state.services == "inactive" or state.health == "failing" else "warn")
     note = f"{services} · {health}"
+    if state.events == "on":
+        note += " · " + t("events on")
     if state.url:
         note += f" · {state.url}"
     return t("Installed"), note, card
@@ -292,6 +298,30 @@ def tainacan_can_install(state: TainacanState, docker: DockerState) -> bool:
 
 def tainacan_installed(state: TainacanState) -> bool:
     return state.known and state.status == "installed"
+
+
+# Events in Tainacan (installer: --task tainacan-events): optional and off
+# until the person turns them on, after the plan and a Yes. The buttons only
+# follow --status-json; the installer checks everything again.
+def events_buttons(state: TainacanState, has_task: bool) -> dict[str, bool]:
+    """Which events buttons the Tainacan card shows: none without Tainacan
+    installed or with an installer that has no events tasks; "on" while they
+    are off, "off" while they are on, and their state always."""
+    if not (has_task and tainacan_installed(state)):
+        return {"on": False, "off": False, "status": False}
+    return {"on": state.events != "on", "off": state.events == "on", "status": True}
+
+
+def events_off_choices(state: TainacanState) -> list[tuple[str, str]]:
+    """What turning events off does to Events Manager, safest first: one
+    that was there before stays on unless the person says otherwise; one
+    Koha.Nexus installed goes off with them unless asked to stay. (key =
+    the installer's argument: "" by default, keep-dependency, dependency.)"""
+    if state.events_dependency == "ours":
+        return [("default", t("Turn Events Manager off too (Koha.Nexus installed it)")),
+                ("keep-dependency", t("Keep Events Manager on"))]
+    return [("default", t("Keep Events Manager on: it was in this WordPress before")),
+            ("dependency", t("Turn Events Manager off too (whatever else uses it stops)"))]
 
 
 def missing_reason(platform: str) -> str:

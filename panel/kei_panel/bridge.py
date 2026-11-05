@@ -571,7 +571,7 @@ _DEMO_STATUS = {
          "units": {"apache2": "active", "mariadb": "active", "memcached": "active", "koha-common": "active"},
          "health": "unknown"},
         {"id": "tainacan", "supported": True, "detected": False, "services": "none", "units": {}, "health": "unknown",
-         "status": "absent", "url": ""},
+         "status": "absent", "url": "", "events": "off", "events_dependency": ""},
         {"id": "atom", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
         {"id": "dspace", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
     ],

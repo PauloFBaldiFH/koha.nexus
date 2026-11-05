@@ -1,0 +1,51 @@
+# The panel's Platforms screen (panel/kei_panel/views/platforms.py) against
+# the installer's tasks: Docker, Tainacan, the platform backups and the
+# optional events in Tainacan (buttons, what each one shows, the plan and
+# the Yes before anything, cancelling, the installer's failure messages).
+# The panel runs in its demo mode; the installer is only read.
+name: Platforms panel
+
+on:
+  push:
+    paths:
+      - "installer"
+      - "lang/pt.cache"
+      - "panel/kei_panel/**"
+      - "panel/tests/test_platforms.py"
+      - "panel/tests/conftest.py"
+      - "panel/requirements.txt"
+      - ".github/workflows/platforms-panel.yml"
+  pull_request:
+    paths:
+      - "installer"
+      - "lang/pt.cache"
+      - "panel/kei_panel/**"
+      - "panel/tests/test_platforms.py"
+      - "panel/tests/conftest.py"
+      - "panel/requirements.txt"
+      - ".github/workflows/platforms-panel.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  platforms:
+    name: Python ${{ matrix.python }}
+    # Python 3.9 needs a runner actions/setup-python still supports.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: panel/requirements.txt
+      - run: python -m pip install pytest -r panel/requirements.txt
+      - name: Platforms screen, with Koha and without
+        working-directory: panel
+        run: python -m pytest -q tests/test_platforms.py

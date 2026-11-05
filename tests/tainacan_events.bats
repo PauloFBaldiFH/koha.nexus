@@ -194,6 +194,64 @@ D0='dir\tevents-manager\t0'; N0='dir\tnexus-eventos\t0'; D1='dir\tevents-manager
     [ "$status" -eq 3 ]
 }
 
+@test "plan: a run cut half way (Cancel in the panel, a reboot) goes on, only over what Koha.Nexus was writing" {
+    # Both folders half written by an enable that recorded them first.
+    run decide "status=installed events_em=ours events_plugin=0.1.1" "$D1" "$N1"
+    echo "$output"
+    [ "$status" -eq 0 ]
+    grep -qx $'em_action\trepair' <<< "$output"
+    grep -qx $'em_origin\tours' <<< "$output"
+    grep -qx $'nx_action\trepair' <<< "$output"
+    # Events Manager in place, Nexus Eventos half written.
+    run decide "status=installed events_em=ours events_plugin=0.1.1" 'em\tevents-manager/events-manager.php\t7.4.13\tactive' "$D1" "$N1"
+    [ "$status" -eq 0 ]
+    grep -qx $'em_action\tkeep' <<< "$output"
+    grep -qx $'nx_action\trepair' <<< "$output"
+    # Cut after Nexus Eventos was installed, before it was turned on: it is ours.
+    run decide "status=installed events_em=ours events_plugin=0.1.1" 'em\tevents-manager/events-manager.php\t7.4.13\tactive' \
+        'nx\tnexus-eventos/nexus-eventos.php\t0.1.1\tinactive' "$D1" "$N1"
+    [ "$status" -eq 0 ]
+    grep -qx $'nx_action\tkeep' <<< "$output"
+    # A broken folder of someone else stays as it is.
+    run decide "status=installed events_em=preexisting" "$D1" "$N0"
+    [ "$status" -eq 3 ]
+    grep -q 'without a working plugin' <<< "$output"
+    run decide "status=installed events_em=preexisting" 'em\tevents-manager/events-manager.php\t7.4.13\tactive' "$D1" "$N1"
+    [ "$status" -eq 3 ]
+}
+
+@test "enable: who put each plugin there is recorded before the first change, and the tests can cut it there" {
+    body=$(sed -n '/^kei_tainacan_events_enable() {/,/^}/p' "$REPO/installer")
+    rec=$(grep -n '_kei_tn_set events_plugin' <<< "$body" | head -n 1 | cut -d: -f1)
+    first=$(grep -n '_kei_tn_wp plugin' <<< "$body" | head -n 1 | cut -d: -f1)
+    [ -n "$rec" ] && [ -n "$first" ] && [ "$rec" -lt "$first" ]
+    em=$(grep -n '_kei_tn_set events_em ' <<< "$body" | head -n 1 | cut -d: -f1)
+    [ "$em" -lt "$first" ]
+    grep -q '_kei_ev_test_cut em' <<< "$body"
+    grep -q '_kei_ev_test_cut nx' <<< "$body"
+    run lib '_kei_ev_test_cut em; echo still here'
+    [ "$output" = "still here" ]
+}
+
+@test "--status-json: events off by default; on, and who put Events Manager there, from the state" {
+    printf 'status=installed\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'kei_tainacan_json'
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["events"] == "off" and d["events_dependency"] == "", d'
+    printf 'status=installed\nevents=on\nevents_em=preexisting\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["events"] == "on" and d["events_dependency"] == "preexisting", d'
+    printf 'status=installed\nevents=off\nevents_em=ours\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["events"] == "off" and d["events_dependency"] == "ours", d'
+}
+
 @test "disable: Events Manager is turned off only when Koha.Nexus installed it, or when asked explicitly" {
     run lib '_kei_ev_turn_off_em ours ""'; [ "$status" -eq 0 ]
     run lib '_kei_ev_turn_off_em ours keep-dependency'; [ "$status" -eq 1 ]

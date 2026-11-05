@@ -77,6 +77,16 @@ or a running service is no proof that a platform works.
   now, test a restore in an isolated copy, restore, administrator password
   and uninstall (keep or delete the data; deleting makes a last backup
   first). Every action is an installer task (`--task tainacan-*`).
+- Events in Tainacan (Nexus Eventos over Events Manager, `--task
+  tainacan-events`) are optional and off until turned on. Once Tainacan is
+  installed its card gains "Turn events on" (the installer's plan, then
+  Yes), "Turn events off" (asks what happens to Events Manager: one that
+  was in the site before stays on unless the person picks otherwise; no
+  data is deleted) and "Events" (both plugins and the data counts). The
+  buttons follow the `events` and `events_dependency` fields of the
+  Tainacan entry in `--status-json`; the installer checks everything again.
+  A restore without the recovery phrase first says how many pass links
+  already sent stop working (`--task tainacan-restore-notes`) and asks.
 - Platform backups (installer `kei_backup_*`, the common engine for the
   platforms in containers; Koha's own backup is unchanged): a "Platform
   backups" card with the backup key, the restic repository, the cloud

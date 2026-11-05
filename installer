@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.170"
+PANEL_VERSION=" 1.5.171"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -13170,8 +13170,12 @@ kei_tainacan_json() {
             services=unknown
         fi
     fi
-    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s}' \
-        "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$(_kei_tn_get url)")"
+    # Events (Nexus Eventos): on or off, and who put Events Manager there,
+    # from the state file only (the panel's buttons follow them; the
+    # installer checks everything again).
+    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s,"events":%s,"events_dependency":%s}' \
+        "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$(_kei_tn_get url)")" \
+        "$(json_str "$( [ "$(_kei_tn_get events)" = on ] && echo on || echo off)")" "$(json_str "$(_kei_tn_get events_em)")"
 }
 
 # ----------------------------------------------------------------------
@@ -13655,9 +13659,10 @@ foreach (array("events-manager", "nexus-eventos") as $d) {
 _kei_ev_refuse() { printf 'plan\trefuse\nnote\t%s\n' "$1"; }
 
 # _kei_ev_decide SCAN_FILE: the plan from a scan and the state, as
-# "key<TAB>value" lines: plan enable|refuse, em_action install|activate|keep,
-# em_origin ours|preexisting, em_file, nx_action install|update|keep, and
-# note lines. Returns 3 on refuse. (Kept free of Docker: tests call it.)
+# "key<TAB>value" lines: plan enable|refuse, em_action
+# install|repair|activate|keep, em_origin ours|preexisting, em_file,
+# nx_action install|repair|update|keep, and note lines ("repair": a folder
+# Koha.Nexus was writing when a run was cut, installed again over). Returns 3 on refuse. (Kept free of Docker: tests call it.)
 _kei_ev_decide() {
     local scan="$1" em_n nx_n em_file em_ver em_st em_dir nx_file nx_ver nx_st nx_dir origin ours
     em_n=$(awk -F'\t' '$1 == "em"' "$scan" | grep -c .)
@@ -13669,7 +13674,10 @@ _kei_ev_decide() {
     origin=$(_kei_tn_get events_em); ours=$(_kei_tn_get events_plugin)
     if [ "$em_n" -gt 1 ]; then _kei_ev_refuse "$(t "There is more than one copy of Events Manager in this WordPress. Keep one (Plugins) and try again.")"; return 3; fi
     if [ "$nx_n" -gt 1 ]; then _kei_ev_refuse "$(t "There is more than one copy of Nexus Eventos in this WordPress. Keep one (Plugins) and try again.")"; return 3; fi
-    if [ -z "$em_file" ] && [ "$em_dir" = 1 ]; then
+    # A folder without a working plugin is left alone, unless Koha.Nexus
+    # was putting it there when it was cut (the panel's Cancel, a reboot):
+    # the state says so, written before the install began.
+    if [ -z "$em_file" ] && [ "$em_dir" = 1 ] && [ "$origin" != ours ]; then
         _kei_ev_refuse "$(t "The folder events-manager exists without a working plugin. It was left as it is: check it in Plugins.")"; return 3
     fi
     if [ -n "$em_file" ] && { [ -z "$em_ver" ] || _kei_tn_newer "$KEI_EVENTS_EM_VERSION" "$em_ver"; }; then
@@ -13681,12 +13689,13 @@ _kei_ev_decide() {
     if [ -n "$nx_file" ] && [ -z "$ours" ]; then
         _kei_ev_refuse "$(t "Nexus Eventos was put in this WordPress by hand. It was left as it is: remove it in Plugins first if Koha.Nexus should manage events.")"; return 3
     fi
-    if [ -z "$nx_file" ] && [ "$nx_dir" = 1 ]; then
+    if [ -z "$nx_file" ] && [ "$nx_dir" = 1 ] && [ -z "$ours" ]; then
         _kei_ev_refuse "$(t "The folder nexus-eventos exists without a working plugin. It was left as it is: check it in Plugins.")"; return 3
     fi
     printf 'plan\tenable\n'
     if [ -z "$em_file" ]; then
-        printf 'em_action\tinstall\nem_origin\tours\nem_file\tevents-manager/events-manager.php\n'
+        if [ "$em_dir" = 1 ]; then printf 'em_action\trepair\n'; else printf 'em_action\tinstall\n'; fi
+        printf 'em_origin\tours\nem_file\tevents-manager/events-manager.php\n'
         printf 'dependency\t%s\n' "Events Manager $KEI_EVENTS_EM_VERSION ($(t "downloaded from wordpress.org, checked against the published checksums"))"
     else
         [ "$origin" = ours ] || origin=preexisting
@@ -13698,7 +13707,8 @@ _kei_ev_decide() {
             printf 'dependency\t%s\n' "Events Manager $em_ver ($(t "installed by Koha.Nexus"))"
         fi
     fi
-    if [ -z "$nx_file" ]; then printf 'nx_action\tinstall\n'
+    if [ -z "$nx_file" ] && [ "$nx_dir" = 1 ]; then printf 'nx_action\trepair\n'
+    elif [ -z "$nx_file" ]; then printf 'nx_action\tinstall\n'
     elif [ "$nx_ver" != "$KEI_EVENTS_PLUGIN_VERSION" ]; then printf 'nx_action\tupdate\n'
     else printf 'nx_action\tkeep\n'; fi
     printf 'plugin\t%s\n' "Nexus Eventos $KEI_EVENTS_PLUGIN_VERSION ($(t "production package, each file checked"))"
@@ -13729,7 +13739,14 @@ kei_tainacan_events_plan() {
 # _kei_ev_get PLAN KEY: a value of a plan.
 _kei_ev_get() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1 == k { print $2; exit }'; }
 
-# kei_tainacan_events_enable confirm: events on.
+# _kei_ev_test_cut STEP: the tests cut an enable run here, as the panel's
+# Cancel or a reboot would (_KEI_EV_CUT_AFTER=em|nx).
+_kei_ev_test_cut() {
+    if [ -n "${_KEI_EV_CUT_AFTER:-}" ] && [ "$_KEI_EV_CUT_AFTER" = "$1" ]; then kill -KILL "$BASHPID"; fi
+}
+
+# kei_tainacan_events_enable confirm: events on. Run again after a cut,
+# it goes on from where it stopped.
 kei_tainacan_events_enable() {
     local plan rc em_action em_origin em_file nx_action work="$KEI_TAINACAN_DIR/work" v="$KEI_EVENTS_PLUGIN_VERSION" chk emv
     if [ "${1:-}" != confirm ]; then
@@ -13742,17 +13759,23 @@ kei_tainacan_events_enable() {
     if [ "$rc" != 0 ]; then printf '%s\n' "$plan" | awk -F'\t' '$1 == "note" { print $2 }' >&2; return 3; fi
     em_action=$(_kei_ev_get "$plan" em_action); em_origin=$(_kei_ev_get "$plan" em_origin)
     em_file=$(_kei_ev_get "$plan" em_file); nx_action=$(_kei_ev_get "$plan" nx_action)
-    if [ "$em_action" = install ]; then _kei_ev_fetch_em || return 1; fi
+    case "$em_action" in install|repair) _kei_ev_fetch_em || return 1 ;; esac
     _kei_ev_build_package "$work/nexus-eventos.$v.zip" || return 1
-    # Who put Events Manager there is written before anything changes, so a
-    # later "disable" knows it even when this run stops half way.
-    if [ "$em_action" = install ] || [ -z "$(_kei_tn_get events_em)" ]; then _kei_tn_set events_em "$em_origin"; fi
+    # Who put each plugin there is written before anything changes, so a
+    # later "disable", or this enable run again, knows it even when this run
+    # was cut half way (the panel's Cancel, a reboot).
+    case "$em_action" in install|repair) _kei_tn_set events_em ours ;; esac
+    [ -n "$(_kei_tn_get events_em)" ] || _kei_tn_set events_em "$em_origin"
     _kei_tn_set events_em_file "$em_file"
-    if [ "$em_action" = install ]; then
-        # No --force: an existing folder is never overwritten.
-        _kei_tn_wp plugin install "/work/events-manager.$KEI_EVENTS_EM_VERSION.zip" >/dev/null 2>&1 \
-            || { echo "$(t "Events Manager could not be installed in WordPress.")" >&2; return 1; }
-    fi
+    case "$nx_action" in install|repair|update) _kei_tn_set events_plugin "$v" ;; esac
+    case "$em_action" in
+        # No --force for a new install: an existing folder is never
+        # overwritten. "repair" is a folder this enable left half written.
+        install) _kei_tn_wp plugin install "/work/events-manager.$KEI_EVENTS_EM_VERSION.zip" >/dev/null 2>&1 ;;
+        repair)  _kei_tn_wp plugin install "/work/events-manager.$KEI_EVENTS_EM_VERSION.zip" --force >/dev/null 2>&1 ;;
+        *) true ;;
+    esac || { echo "$(t "Events Manager could not be installed in WordPress.")" >&2; return 1; }
+    _kei_ev_test_cut em
     if [ "$em_action" != keep ]; then
         _kei_tn_wp plugin activate "${em_file%%/*}" >/dev/null 2>&1 \
             || { echo "$(t "Events Manager could not be activated.")" >&2; return 1; }
@@ -13762,10 +13785,10 @@ kei_tainacan_events_enable() {
     _kei_tn_wp eval 'if (function_exists("em_upgrade_plugin_check")) { em_upgrade_plugin_check(); }' >/dev/null 2>&1
     case "$nx_action" in
         install) _kei_tn_wp plugin install "/work/nexus-eventos.$v.zip" >/dev/null 2>&1 ;;
-        update)  _kei_tn_wp plugin install "/work/nexus-eventos.$v.zip" --force >/dev/null 2>&1 ;;
+        repair|update) _kei_tn_wp plugin install "/work/nexus-eventos.$v.zip" --force >/dev/null 2>&1 ;;
         *) true ;;
     esac || { echo "$(t "Nexus Eventos could not be installed in WordPress.")" >&2; return 1; }
-    _kei_tn_set events_plugin "$v"
+    _kei_ev_test_cut nx
     _kei_tn_wp plugin activate nexus-eventos >/dev/null 2>&1 || { echo "$(t "Nexus Eventos could not be activated.")" >&2; return 1; }
     chk=$(_kei_tn_wp eval 'global $wpdb; echo (class_exists("Nexus_Eventos\\Admin") && defined("EM_VERSION") && get_option("nxev_schema") === "2" && get_option("dbem_version") && $wpdb->get_var("SHOW TABLES LIKE \x27" . $wpdb->prefix . "em_events\x27")) ? "ok " . EM_VERSION : "missing";' 2>/dev/null)
     case "$chk" in ok\ *) emv="${chk#ok }" ;; *) echo "$(t "Events did not pass the check after activation.") ($chk)" >&2; return 1 ;; esac

@@ -158,6 +158,32 @@ _Z_HEALTH = [
 
 # Answers that depend on the first argument (the job): the authority job.
 _BY_ARG: dict[tuple[str, str], list[str]] = {
+    # Events in Tainacan (installer: --task tainacan-events, tainacan-restore-notes).
+    ("tainacan-events", "plan"): [
+        "@@result plan=enable", "@@result em_action=install", "@@result em_origin=ours",
+        "@@result em_file=events-manager/events-manager.php",
+        "@@result dependency=Events Manager 7.4.13 (downloaded from wordpress.org, checked against the published "
+        "checksums)", "@@result nx_action=install",
+        "@@result plugin=Nexus Eventos 0.1.1 (production package, each file checked)",
+        "@@result data=Tables wp_em_* and wp_nxev_* in the WordPress database: in the Tainacan backups, also with "
+        "events off.",
+        "@@result undo=Turning events off keeps their data; it never deletes events, bookings or certificates.",
+        "@@result rc=0"],
+    ("tainacan-events", "enable"): [
+        "@@note Downloading Events Manager 7.4.13 from wordpress.org...", "@@note Checking every file...",
+        "@@note Installing Nexus Eventos 0.1.1...",
+        "@@msg ok OK\tEvents are on: Nexus Eventos 0.1.1 and Events Manager (Plugins, Events)."],
+    ("tainacan-events", "disable"): ["@@msg ok OK\tEvents are off. Their data was kept. Events Manager was turned "
+                                     "off too."],
+    ("tainacan-events", "status"): [
+        "@@result events=on", "@@result dependency_origin=ours", "@@result dependency=7.4.13|active",
+        "@@result plugin=0.1.1|active", "@@result count_events=3", "@@result count_bookings=12",
+        "@@result count_passes=9", "@@result count_attendance=7", "@@result count_certificates=5"],
+    ("tainacan-restore-notes", "knx-tainacan-20261105-020000"): [
+        "@@result note=Without the recovery phrase, the 9 event pass links already sent stop working (they were "
+        "signed with the keys of the backup). Restore with the phrase to keep them, or send the passes again "
+        "from Events Manager."],
+    ("tainacan-restore-notes", "knx-tainacan-20261104-020000"): [],
     ("enrich-job-show", "5"): ["@@result job=" + json.dumps(_OD_SHOW, ensure_ascii=False)],
     ("enrich-job-show", "6"): ["@@result job=" + json.dumps(_OD_QUERY_SHOW, ensure_ascii=False)],
     ("enrich-job-apply", "5"): ["@@result backup=/var/lib/koha-nexus-enrich/jobs/5/snapshot-apply-2026-10-18.xml",
@@ -698,8 +724,11 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
                             "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
+                            "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete") \
         else 0.05 if name == "install" else 0.15
+    if name == "tainacan-events" and args[:1] in (("plan",), ("status",)):
+        pause = 0.0
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
         optional = line.startswith("~")

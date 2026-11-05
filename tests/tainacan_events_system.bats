@@ -364,15 +364,34 @@ EOF
     [ "$(ev_count passes)" = 1 ]
 }
 
-@test "a site without Events Manager: installed from wordpress.org, every file as published; off with events" {
+@test "a site without Events Manager: installed from wordpress.org, every file as published, also after a cut run; off with events" {
     wp 'plugin deactivate nexus-eventos events-manager' >/dev/null
     wp 'plugin delete nexus-eventos events-manager' >/dev/null
-    sed -i '/^events_em=/d; /^events_em_file=/d; /^events_plugin=/d' "$TN/state"
+    sed -i '/^events=/d; /^events_em=/d; /^events_em_file=/d; /^events_plugin=/d' "$TN/state"
     run lib 'kei_tainacan_events_plan'
     grep -qx $'em_action\tinstall' <<< "$output"
+    # Cut right after Events Manager was put in (the panel's Cancel, a
+    # reboot), with its folder left half written: events stay off, the
+    # state already says whose it is, and the next run installs over it.
+    run lib '_KEI_EV_CUT_AFTER=em kei_tainacan_events_enable confirm'
+    [ "$status" -ne 0 ]
+    [ "$(lib '_kei_tn_get events')" != on ]
+    [ "$(lib '_kei_tn_get events_em')" = ours ]
+    [ -z "$(plugin_state nexus-eventos)" ]
+    rm -f "$(wp_volume)/wp-content/plugins/events-manager/events-manager.php"
+    run lib 'kei_tainacan_events_plan'
+    echo "$output" >&3
+    grep -qx $'em_action\trepair' <<< "$output"
+    # Cut again, after Nexus Eventos was put in, before it was turned on.
+    run lib '_KEI_EV_CUT_AFTER=nx kei_tainacan_events_enable confirm'
+    [ "$status" -ne 0 ]
+    [ "$(lib '_kei_tn_get events')" != on ]
+    run lib 'kei_tainacan_events_plan'
+    grep -qx $'nx_action\tkeep' <<< "$output"
     run lib 'kei_tainacan_events_enable confirm'
     echo "$output" >&3
     [ "$status" -eq 0 ]
+    [ "$(lib '_kei_tn_get events')" = on ]
     [ "$(lib '_kei_tn_get events_em')" = ours ]
     [ "$(wp 'plugin get events-manager --field=version')" = 7.4.13 ]
     # What WordPress has is exactly what wordpress.org publishes.
