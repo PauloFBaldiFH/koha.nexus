@@ -1,7 +1,12 @@
-"""DashboardView: Koha's state at a glance, read from --status-json, the
-addresses Koha answers on (Open / Copy), the server's health (read by the
-panel itself, see health.py) and three quick actions: restart Koha, export
-diagnostics and open the saved ones (screens/diagnostics.py).
+"""DashboardView: the server at a glance, read from --status-json, in tabs.
+
+General: export and open diagnostics (screens/diagnostics.py), the disk,
+one card per platform and the server's health (read by the panel itself,
+see health.py). Koha (only with Koha installed): restart Koha, its state,
+its last backup, the addresses it answers on (Open / Copy) and its
+components. Tainacan (only with Tainacan installed): the summary of its
+section (views/tainacan.py), read from what is already known; the full
+diagnosis never runs here by itself.
 
 The status is loaded in a worker with a one-line Pac-Man inside the view
 (the same PacmanLoader as the modal, compact): a quick read does not need
@@ -15,13 +20,14 @@ import time
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal
-from textual.widgets import Button, Label
+from textual.widgets import Button, Label, TabbedContent, TabPane
 
 from .. import health, platforms
 from ..i18n import t
 from ..widgets.cards import LinkCard, StatusCard
 from ..widgets.pacman import PacmanLoader
 from .base import SectionView
+from .tainacan import TainacanSummary, read_tainacan
 
 
 def human_bytes(n: int | None) -> str:
@@ -295,34 +301,43 @@ class DashboardView(SectionView):
             icon = "" if self.app.env.plain else f"{self.section.icon} "
             yield Label(icon + t("Control Dashboard"), classes="view-title")
             yield Button(t("Refresh"), id="refresh", classes="small")
-        with Horizontal(classes="quick-actions"):
-            yield Button(t("Restart Koha"), id="restart-koha", classes="small")
-            yield Button(t("Export diagnostics"), id="export-diagnostics", classes="small")
-            yield Button(t("Open diagnostics"), id="open-diagnostics", classes="small")
         yield PacmanLoader(compact=True, plain=self.app.env.plain, colors=not self.app.env.no_color,
                            id="status-loader")
-        with Grid(classes="status-grid"):
-            yield StatusCard(t("Koha"), id="card-state")
-            yield StatusCard(t("Last backup"), id="card-backup")
-            yield StatusCard(t("Disk free"), id="card-disk")
-        yield Label(t("Platforms"), classes="view-prompt")
-        with Grid(classes="status-grid", id="dash-platforms"):
-            for p in platforms.CATALOG:
-                yield StatusCard(p.name, id=f"dash-platform-{p.id}")
-        yield Label(t("Addresses"), classes="view-prompt koha-only")
-        with Grid(classes="status-grid koha-only", id="addresses"):
-            for page in PAGES:
-                for where in WHERES:
-                    yield LinkCard(t(LINK_TITLES[where, page]), id=f"link-{where}-{page}")
-        yield Label(t("Components"), classes="view-prompt koha-only")
-        with Grid(classes="status-grid koha-only", id="components"):
-            for unit, name in COMPONENTS:
-                yield StatusCard(t(name), id=f"card-{unit}")
-            yield StatusCard(t("HTTP response"), id="card-http")
-        yield Label(t("Server health"), classes="view-prompt")
-        with Grid(classes="status-grid", id="health"):
-            for key, title in HEALTH_CARDS:
-                yield StatusCard(t(title), id=f"health-{key}")
+        with TabbedContent(id="dash-tabs", initial="dash-tab-general"):
+            with TabPane(t("General"), id="dash-tab-general"):
+                with Horizontal(classes="quick-actions"):
+                    yield Button(t("Export diagnostics"), id="export-diagnostics", classes="small")
+                    yield Button(t("Open diagnostics"), id="open-diagnostics", classes="small")
+                yield Label(t("Platforms"), classes="view-prompt")
+                with Grid(classes="status-grid", id="dash-platforms"):
+                    for p in platforms.CATALOG:
+                        yield StatusCard(p.name, id=f"dash-platform-{p.id}")
+                    yield StatusCard(t("Disk free"), id="card-disk")
+                yield Label(t("Server health"), classes="view-prompt")
+                with Grid(classes="status-grid", id="health"):
+                    for key, title in HEALTH_CARDS:
+                        yield StatusCard(t(title), id=f"health-{key}")
+            with TabPane("Koha", id="dash-tab-koha"):
+                with Horizontal(classes="quick-actions"):
+                    yield Button(t("Restart Koha"), id="restart-koha", classes="small")
+                with Grid(classes="status-grid"):
+                    yield StatusCard(t("Koha"), id="card-state")
+                    yield StatusCard(t("Last backup"), id="card-backup")
+                yield Label(t("Addresses"), classes="view-prompt koha-only")
+                with Grid(classes="status-grid koha-only", id="addresses"):
+                    for page in PAGES:
+                        for where in WHERES:
+                            yield LinkCard(t(LINK_TITLES[where, page]), id=f"link-{where}-{page}")
+                yield Label(t("Components"), classes="view-prompt koha-only")
+                with Grid(classes="status-grid koha-only", id="components"):
+                    for unit, name in COMPONENTS:
+                        yield StatusCard(t(name), id=f"card-{unit}")
+                    yield StatusCard(t("HTTP response"), id="card-http")
+            with TabPane("Tainacan", id="dash-tab-tainacan"):
+                with Horizontal(classes="quick-actions"):
+                    yield Button(t("Open the Tainacan section"), id="dash-open-tainacan", classes="small")
+                yield Label("", classes="view-prompt", id="dash-tn-read")
+                yield TainacanSummary("dash-tn", id="dash-tainacan")
 
     def on_mount(self) -> None:
         self.koha_layout()
@@ -341,6 +356,15 @@ class DashboardView(SectionView):
                 button.tooltip = None if koha else platforms.missing_reason(platforms.KOHA)
         for widget in self.query(".koha-only"):
             widget.display = koha
+        # A tab only for an installed platform; without any, General alone.
+        tabs = self.query_one("#dash-tabs", TabbedContent)
+        for pane, shown in (("dash-tab-koha", koha), ("dash-tab-tainacan", self.app.tainacan_installed)):
+            if shown:
+                tabs.show_tab(pane)
+            else:
+                if tabs.active == pane:
+                    tabs.active = "dash-tab-general"
+                tabs.hide_tab(pane)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
@@ -348,6 +372,8 @@ class DashboardView(SectionView):
             self.refresh_data()
         elif bid in ("restart-koha", "export-diagnostics", "open-diagnostics"):
             self.app.run_native(bid, after=self.refresh_data if bid == "restart-koha" else None)
+        elif bid == "dash-open-tainacan":
+            self.app.screen.action_show("tainacan")
 
     @on(LinkCard.Pressed)
     def _link(self, event: LinkCard.Pressed) -> None:
@@ -373,6 +399,18 @@ class DashboardView(SectionView):
             self.koha_layout()
             self.show(status)
             self.run_worker(self._load_health(status), exclusive=True, group="health", exit_on_error=False)
+            if self.app.tainacan_installed:
+                self.run_worker(self._load_tainacan(status), exclusive=True, group="dash-tainacan",
+                                exit_on_error=False)
+
+    async def _load_tainacan(self, status: dict) -> None:
+        """The Tainacan tab: what --status-json and the backup engine say
+        (both read only); the full diagnosis is the section's button."""
+        state, docker, backups = await read_tainacan(self.app, status)
+        self.query_one("#dash-tainacan", TainacanSummary).show(state, docker, backups)
+        read = int(status.get("generated_at") or 0) if str(status.get("generated_at") or "").isdigit() else 0
+        self.query_one("#dash-tn-read", Label).update(
+            t("State read at ${when}", when=platforms.when(read)) if read else "")
 
     async def _load_health(self, status: dict) -> None:
         env = self.app.env

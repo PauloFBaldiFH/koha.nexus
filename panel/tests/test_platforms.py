@@ -165,7 +165,8 @@ def test_with_koha_the_sidebar_is_the_same_plus_platforms():
             await pilot.pause(0.3)
             return sidebar_ids(app)
 
-    expected = [s.id for s in menus.SECTIONS if s.sidebar]
+    # Tainacan's section only comes with Tainacan installed (not in this demo).
+    expected = [s.id for s in menus.SECTIONS if s.sidebar and s.requires != "tainacan"]
     assert asyncio.run(main()) == expected
     assert "platforms" in expected and expected.index("platforms") > expected.index("update")
 
@@ -480,7 +481,7 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
             await pilot.pause(2.0)
             button = app.screen.query_one("#tainacan-install")
             shown = button.display
-            hidden = [b for b in ("status", "backup", "restore", "uninstall")
+            hidden = [b for b in ("section", "backup", "restore", "uninstall")
                       if not app.screen.query_one(f"#tainacan-{b}").display]
             button.press()
             await pilot.pause(1.0)
@@ -494,7 +495,7 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
 
     shown, hidden, asked, preview, ran = asyncio.run(main("no"))
     assert (shown, asked, preview) == (True, True, True)
-    assert hidden == ["status", "backup", "restore", "uninstall"]
+    assert hidden == ["section", "backup", "restore", "uninstall"]
     assert ran == [("tainacan-plan", ())]                                   # "No": nothing installed
     *_, ran = asyncio.run(main("yes"))
     assert ran == [("tainacan-plan", ()), ("tainacan-install", ("confirm", "http://192.168.0.10:8090"))]
@@ -565,7 +566,7 @@ def test_backup_status_is_read_and_unknown_values_are_not_trusted():
 def test_the_installer_knows_every_backup_task_the_panel_calls():
     import pathlib
     from kei_panel.bridge import installer_tasks
-    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("platforms.py").read_text(encoding="utf-8")
+    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("tainacan.py").read_text(encoding="utf-8")
     called = set(re.findall(r'"(platform-backup-[a-z-]+)"', view)) | {"platform-backup-resume",
                                                                     "platform-backup-discard"}
     assert called and called <= installer_tasks(INSTALLER)
@@ -743,7 +744,7 @@ def test_the_installer_knows_the_events_tasks_and_arguments_the_panel_uses():
     body = re.search(r"^        tainacan-events\)(.*?);;\n        tainacan-restore-notes", TEXT, re.S | re.M).group(1)
     for sub in ("plan)", "status)", "enable)", "disable)"):
         assert sub in body, sub
-    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("platforms.py").read_text(encoding="utf-8")
+    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("tainacan.py").read_text(encoding="utf-8")
     assert '"tainacan-events", "enable", "confirm"' in view
     # The default disable (no argument) and the two explicit ones are the installer's.
     assert re.search(r'case "\$how" in ""\|keep-dependency\|dependency\)', TEXT)
@@ -779,6 +780,7 @@ def _events_app(ran, events="off", dependency="", tainacan="installed", fail=Non
                             "events_dependency": dependency} for p in st["platforms"]]
         return st
     app.bridge.task, app.bridge.status = task, status
+    app.tainacan_installed = tainacan == "installed"    # as its state file would say
     return app
 
 
@@ -786,6 +788,14 @@ async def _open_platforms(app, pilot):
     await pilot.pause(0.3)
     app.screen.query_one("#sidebar").blur()
     await pilot.press("p")
+    await pilot.pause(2.0)
+
+
+async def _open_tainacan(app, pilot):
+    """The Tainacan section (key g), where the events buttons are."""
+    await pilot.pause(0.3)
+    app.screen.query_one("#sidebar").blur()
+    await pilot.press("g")
     await pilot.pause(2.0)
 
 
@@ -798,14 +808,14 @@ def test_events_are_off_by_default_and_their_buttons_follow_the_card(no_koha):
         ran: list = []
         app = _events_app(ran, **kw)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
-            shown = {k: app.screen.query_one(f"#events-{k}").display for k in ("on", "off", "status")}
+            await _open_tainacan(app, pilot)
+            shown = {k: any(b.display for b in app.screen.query(f"#events-{k}")) for k in ("on", "off", "status")}
             return shown, _events_ran(ran)
 
     # Nothing is asked of the installer while the card is drawn.
     assert asyncio.run(main()) == ({"on": True, "off": False, "status": True}, [])
     assert asyncio.run(main(events="on", dependency="ours"))[0] == {"on": False, "off": True, "status": True}
-    # Tainacan not installed: no events buttons at all.
+    # Tainacan not installed: no section, so no events buttons at all.
     assert asyncio.run(main(tainacan="absent"))[0] == {"on": False, "off": False, "status": False}
 
 
@@ -816,7 +826,7 @@ def test_events_are_turned_on_only_after_the_plan_and_a_yes(no_koha):
         ran: list = []
         app = _events_app(ran)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-on").press()
             await pilot.pause(1.0)
             screen = app.screen
@@ -843,7 +853,7 @@ def test_a_refused_plan_is_said_and_nothing_is_turned_on(no_koha):
         ran: list = []
         app = _events_app(ran, results=refused)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-on").press()
             await pilot.pause(1.0)
             screen = app.screen
@@ -863,7 +873,7 @@ def test_a_failed_enable_shows_the_installers_reason(no_koha):
         ran: list = []
         app = _events_app(ran, fail={("tainacan-events", "enable"): reason})
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-on").press()
             await pilot.pause(1.0)
             await pilot.click("#yes")
@@ -882,7 +892,7 @@ def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
         ran: list = []
         app = _events_app(ran)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-on").press()
             await pilot.pause(1.0)
             await pilot.click("#yes")
@@ -906,7 +916,7 @@ def test_turning_events_off_keeps_the_data_and_a_preexisting_dependency(no_koha)
         ran: list = []
         app = _events_app(ran, events="on", dependency=dependency)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-off").press()
             await pilot.pause(1.0)
             options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
@@ -946,7 +956,7 @@ def test_a_failed_disable_shows_the_installers_reason(no_koha):
         ran: list = []
         app = _events_app(ran, events="on", dependency="ours", fail={("tainacan-events", "disable"): reason})
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-off").press()
             await pilot.pause(1.0)
             app.screen.dismiss("default")
@@ -966,7 +976,7 @@ def test_the_events_state_screen_lists_both_plugins_and_the_data(no_koha):
         ran: list = []
         app = _events_app(ran, events="on", dependency="ours", fail=fail)
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
+            await _open_tainacan(app, pilot)
             app.screen.query_one("#events-status").press()
             await pilot.pause(1.0)
             return app.screen._text if isinstance(app.screen, TextScreen) else ""

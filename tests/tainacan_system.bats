@@ -160,6 +160,15 @@ wp_php() {
     docker volume create someone-data >/dev/null
     docker run -d --restart unless-stopped --name someone --network someone-net -v someone-data:/data "$IMG" sleep 3600 >/dev/null
     koha_answers_as_before
+    # A server with Koha only: nothing of Tainacan shows, no address or
+    # diagnosis made up.
+    run config.sh --status-json
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | grep '^{' | tail -n 1 | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+t = [p for p in d["platforms"] if p["id"] == "tainacan"][0]
+assert t["detected"] is False and t["status"] == "absent" and t["admin_url"] == "" and t["checked"] == {}, t'
+    [ ! -e /var/lib/koha-nexus/platforms/tainacan/last-status ]
 }
 
 @test "plan, and nothing without confirm" {
@@ -219,6 +228,36 @@ wp_php() {
     run lib 'kei_tainacan_status'
     [[ "$output" == *"health=healthy"* ]]
     [[ "$output" == *"attachments_missing=0"* ]]
+}
+
+@test "the diagnosis kept for the panel matches the database, with no secret, and --status-json shows it" {
+    run lib 'kei_tainacan_check'
+    echo "$output" >&3
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"result=ok"* ]]
+    f="$TN/last-status"
+    [ "$(stat -c '%a %U' "$f")" = "600 root" ]
+    read -r c i a <<< "$(counts)"
+    grep -qx "collections=$c" "$f"
+    grep -qx "items=$i" "$f"
+    grep -qx "attachments=$a" "$f"
+    grep -Eqx 'checked_at=[0-9]+' "$f"
+    # None of the passwords of .env, nor anything named like a secret.
+    while IFS= read -r pw; do
+        [ -n "$pw" ] || continue
+        run grep -cF "$pw" "$f"
+        [ "$output" = 0 ]
+    done < <(awk -F= '/^KN_.*(PASSWORD|KEY|SALT)=/ { print substr($0, index($0, "=") + 1) }' "$TN/.env")
+    run grep -Eci '^[a-z_]*(pass|key|token|secret|link)' "$f"
+    [ "$output" = 0 ]
+    run config.sh --status-json
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | grep '^{' | tail -n 1 | C="$c" I="$i" python3 -c 'import json,os,sys
+d = json.load(sys.stdin)
+t = [p for p in d["platforms"] if p["id"] == "tainacan"][0]
+assert t["admin_url"].endswith("/wp-admin/") and t["admin_url"].startswith(t["url"].rstrip("/")), t
+assert t["checked"]["collections"] == os.environ["C"] and t["checked"]["items"] == os.environ["I"], t
+assert t["checked"]["checked_at"].isdigit() and t["checked"]["failed_at"] == "", t'
 }
 
 @test "isolation: Tainacan's containers cannot reach the host's services" {

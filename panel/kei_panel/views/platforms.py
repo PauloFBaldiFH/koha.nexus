@@ -4,12 +4,11 @@ Read only. Each card keeps the four facts apart (platforms.py): supported
 by this panel, installation detected, services, functional health (not
 verified yet). Koha keeps its own "Install Koha server" entry. Docker and
 Tainacan can be installed from here: the installer's plan is shown first
-and nothing happens without a Yes. Tainacan's card also has its diagnosis,
-backup, restore (tested first in an isolated copy) and uninstall, and its
-optional events (Nexus Eventos over Events Manager): off until turned on,
-after the installer's plan and a Yes; turning them off keeps their data and
-never turns off an Events Manager that was there before unless the person
-says so. AtoM and DSpace are planned. The "Platform backups" card shows the common backup
+and nothing happens without a Yes. Tainacan's card also has its backup,
+restore (tested first in an isolated copy) and uninstall; once it is
+installed, its day to day (summary, addresses, diagnosis, logs,
+administrator, optional events) is in its own section (views/tainacan.py),
+which "Open the Tainacan section" leads to. AtoM and DSpace are planned. The "Platform backups" card shows the common backup
 engine (encryption key, restic repository, cloud copy, schedule, last
 restore test) with its own buttons; the recovery phrase is passed to the
 installer in the environment, never on its command line.
@@ -52,9 +51,6 @@ class PlatformsView(SectionView):
         with Horizontal(classes="form-buttons", id="platforms-tainacan-buttons"):
             for key, label in TAINACAN_BUTTONS:
                 yield Button(t(label), id=f"tainacan-{key}", classes="small")
-        with Horizontal(classes="form-buttons", id="platforms-events-buttons"):
-            for key, label in EVENTS_BUTTONS:
-                yield Button(t(label), id=f"events-{key}", classes="small")
         with Horizontal(classes="form-buttons", id="platforms-backup-buttons"):
             for key, label in BACKUP_BUTTONS:
                 yield Button(t(label), id=f"pbackup-{key}", classes="small")
@@ -64,8 +60,6 @@ class PlatformsView(SectionView):
         self.query_one("#platforms-docker-remove").display = False
         for key, _label in TAINACAN_BUTTONS:
             self.query_one(f"#tainacan-{key}").display = False
-        for key, _label in EVENTS_BUTTONS:
-            self.query_one(f"#events-{key}").display = False
         for key, _label in BACKUP_BUTTONS:
             self.query_one(f"#pbackup-{key}").display = False
         self.query_one("#platform-backups").display = False
@@ -81,13 +75,12 @@ class PlatformsView(SectionView):
         elif event.button.id == "platforms-docker-remove":
             event.stop()
             self.app.run_worker(self.remove_docker(), group="routine", exclusive=True, exit_on_error=False)
+        elif event.button.id == "tainacan-section":
+            event.stop()
+            self.app.screen.action_show("tainacan")
         elif event.button.id and event.button.id.startswith("tainacan-"):
             event.stop()
             action = getattr(self, "tainacan_" + event.button.id[len("tainacan-"):].replace("-", "_"))
-            self.app.run_worker(action(), group="routine", exclusive=True, exit_on_error=False)
-        elif event.button.id and event.button.id.startswith("events-"):
-            event.stop()
-            action = getattr(self, "events_" + event.button.id[len("events-"):])
             self.app.run_worker(action(), group="routine", exclusive=True, exit_on_error=False)
         elif event.button.id and event.button.id.startswith("pbackup-"):
             event.stop()
@@ -121,10 +114,11 @@ class PlatformsView(SectionView):
         for key, _label in TAINACAN_BUTTONS[1:]:
             self.query_one(f"#tainacan-{key}").display = has and platforms.tainacan_installed(tainacan)
         self.tainacan_state = tainacan
-        for key, on in platforms.events_buttons(tainacan, self.app.bridge.has_task("tainacan-events")).items():
-            self.query_one(f"#events-{key}").display = on
         await self._load_backups(platforms.tainacan_installed(tainacan))
         self.app.platforms_seen(status)
+        # After platforms_seen: the section exists once the app knows Tainacan is there.
+        self.query_one("#tainacan-section").display = has and platforms.tainacan_installed(tainacan) \
+            and self.app.platform_ready(platforms.TAINACAN)
 
     async def _load_backups(self, installed: bool) -> None:
         """The "Platform backups" card: shown once a platform with backups
@@ -239,27 +233,6 @@ class PlatformsView(SectionView):
         result = await run_task(self.app, title, "tainacan-install", *args)
         await show_done(self.app, title, result, t("Tainacan is installed."))
         self.refresh_data()
-
-    async def tainacan_status(self) -> None:
-        """The installer's diagnosis, as a list."""
-        from ..screens.dialogs import TextScreen
-
-        out = await self.app.bridge.task("tainacan-status")
-        labels = (("status", t("Status")), ("url", t("Address")), ("health", t("Health")), ("reason", t("Reason")),
-                  ("db", t("Database")), ("wordpress", "WordPress"), ("wordpress_version", t("WordPress version")),
-                  ("tainacan_version", t("Tainacan version")), ("images_pinned", t("Images as fixed")),
-                  ("collections", t("Collections")), ("items", t("Items")), ("attachments", t("Attachments")),
-                  ("attachments_missing", t("Attachments missing on disk")), ("audit", t("Isolation rules")),
-                  ("apache_site", t("Apache site")), ("last_backup", t("Last backup")), ("backups", t("Backups")),
-                  ("disk_db", t("Database size")), ("disk_wp", t("Files size")), ("docker", "Docker"))
-        text = "\n".join(f"{label}: {out.get(key)}" for key, label in labels if out.get(key))
-        await self.app.push_screen_wait(TextScreen(t("Tainacan diagnosis"), text or t("Not checked")))
-
-    async def tainacan_logs(self) -> None:
-        from ..routines.common import run_task, show_done
-
-        result = await run_task(self.app, t("Tainacan logs"), "tainacan-logs", "200")
-        await show_done(self.app, t("Tainacan logs"), result)
 
     async def tainacan_backup(self) -> None:
         from ..routines.common import run_task, show_done
@@ -510,100 +483,6 @@ class PlatformsView(SectionView):
         await show_done(self.app, title, result)
         self.refresh_data()
 
-    # Events in Tainacan (installer: --task tainacan-events). Off until the
-    # person turns them on; every step is the installer's, which checks
-    # again what the buttons only follow.
-    async def events_on(self) -> None:
-        """The installer's plan, then the person's Yes, then events on."""
-        from ..routines.common import run_task, show_done
-        from ..screens.dialogs import ConfirmScreen, MessageScreen
-
-        title = t("Turn events on")
-        plan = await self.app.bridge.task("tainacan-events", "plan")
-        if plan.get("plan") != "enable":
-            await self.app.push_screen_wait(MessageScreen(
-                title, plan.get("note") or t("Events cannot be turned on now."), kind="error"))
-            self.refresh_data()
-            return
-        labels = (("dependency", "Events Manager"), ("plugin", "Nexus Eventos"), ("data", t("Data")),
-                  ("undo", ""))
-        steps = "\n".join(f"{label}: {plan.get(key)}" if label else plan.get(key)
-                          for key, label in labels if plan.get(key))
-        if not await self.app.push_screen_wait(ConfirmScreen(
-                title, t("Turn events on in Tainacan? Its collections and items do not change."), preview=steps,
-                preview_title=t("What will change on this server"))):
-            return
-        result = await run_task(self.app, title, "tainacan-events", "enable", "confirm")
-        if result.cancelled:
-            await self.app.push_screen_wait(MessageScreen(title, t(
-                "Turning events on was stopped before the end, so events stay off. What was already put in is "
-                "kept and used when you turn events on again."), kind="info"))
-        else:
-            await show_done(self.app, title, result, t("Events are on."))
-        self.refresh_data()
-
-    async def events_off(self) -> None:
-        """Events off, their data kept. Events Manager: the person decides,
-        and one that was there before stays on by default."""
-        from ..routines.common import run_task, show_done
-        from ..screens.dialogs import ChoiceScreen, ConfirmScreen
-
-        title = t("Turn events off")
-        state = getattr(self, "tainacan_state", platforms.TainacanState())
-        how = await self.app.push_screen_wait(ChoiceScreen(
-            title, t("Events, bookings, attendance and certificates are kept: turning events on again brings "
-                     "them back. What happens to Events Manager?"), platforms.events_off_choices(state)))
-        if how not in ("default", "keep-dependency", "dependency"):
-            return
-        if how == "dependency":
-            question = t("Turn events off and also turn off Events Manager, which was in this WordPress before "
-                         "Koha.Nexus? Whatever else uses it in this site stops too. No data is deleted.")
-        else:
-            question = t("Turn events off? No data is deleted.")
-        if not await self.app.push_screen_wait(ConfirmScreen(title, question, danger=how == "dependency")):
-            return
-        result = await run_task(self.app, title, "tainacan-events", "disable",
-                                *([] if how == "default" else [how]))
-        await show_done(self.app, title, result, t("Events are off. Their data was kept."))
-        self.refresh_data()
-
-    async def events_status(self) -> None:
-        """The installer's view of events: on or off, both plugins, the data."""
-        from ..screens.dialogs import TextScreen
-
-        out = await self.app.bridge.task("tainacan-events", "status")
-        origin = {"ours": t("installed by Koha.Nexus"), "preexisting": t("was in this WordPress before")}
-
-        def plugin(value: str | None, who: str = "") -> str:
-            if not value or value == "absent":
-                return t("not installed")
-            version, _sep, active = value.partition("|")
-            text = f"{version} ({t('active') if active == 'active' else t('inactive')})"
-            return f"{text}, {who}" if who else text
-
-        lines = [t("Events are on.") if out.get("events") == "on" else t("Events are off.")]
-        if out.get("reason"):
-            lines.append(f"{t('Reason')}: {out.get('reason')}")
-        if out.get("dependency"):
-            lines.append(f"Events Manager: {plugin(out.get('dependency'), origin.get(out.get('dependency_origin') or '', ''))}")
-        if out.get("plugin"):
-            lines.append(f"Nexus Eventos: {plugin(out.get('plugin'))}")
-        for key, label in (("count_events", t("Events")), ("count_bookings", t("Bookings")),
-                           ("count_passes", t("Bookings with a pass")), ("count_attendance", t("Attendance")),
-                           ("count_certificates", t("Certificates"))):
-            if out.get(key):
-                lines.append(f"{label}: {out.get(key)}")
-        if not out.ok:
-            lines.append((out.last("error") or ("", "", t("Not checked")))[2])
-        await self.app.push_screen_wait(TextScreen(t("Events in Tainacan"), "\n".join(lines)))
-
-    async def tainacan_credentials(self) -> None:
-        from ..routines.common import run_task, show_done
-
-        title = t("Tainacan administrator")
-        result = await run_task(self.app, title, "tainacan-credentials")
-        await show_done(self.app, title, result)
-
     async def tainacan_uninstall(self) -> None:
         from ..routines.common import run_task, show_done
         from ..screens.dialogs import ChoiceScreen, ConfirmScreen
@@ -625,25 +504,15 @@ class PlatformsView(SectionView):
 
 
 # The Tainacan buttons, in order; the first shows while it is not
-# installed, the others once it is.
+# installed, the others once it is. Diagnosis, logs, administrator and
+# events are in the Tainacan section ("section" leads there).
 TAINACAN_BUTTONS = (
     ("install", "Install Tainacan"),
-    ("status", "Diagnosis"),
-    ("logs", "Logs"),
+    ("section", "Open the Tainacan section"),
     ("backup", "Back up now"),
     ("restore-test", "Test a restore"),
     ("restore", "Restore"),
-    ("credentials", "Administrator"),
     ("uninstall", "Uninstall Tainacan"),
-)
-
-
-# The events buttons of the Tainacan card (platforms.events_buttons decides
-# which show).
-EVENTS_BUTTONS = (
-    ("on", "Turn events on"),
-    ("off", "Turn events off"),
-    ("status", "Events"),
 )
 
 

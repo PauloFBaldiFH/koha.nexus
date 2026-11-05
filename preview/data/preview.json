@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.164",
+ "panel_version": "1.5.172",
  "languages": [
   {
    "code": "en",
@@ -715,6 +715,22 @@
     "update-system",
     "update-panel"
    ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "tainacan",
+   "item": "sec-tainacan",
+   "label": "🏺  Tainacan",
+   "title": "🏺  Tainacan",
+   "prompt": "Your digital collections: their state, addresses, events and diagnosis.",
+   "icon": "",
+   "key": "g",
+   "view": "tainacan",
+   "sidebar": true,
+   "parent": "",
+   "entries": [],
    "features": [],
    "media": [],
    "single": ""
@@ -1556,6 +1572,16 @@
    "label": "🔄  Update center",
    "description": "Choose what to update:",
    "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "sec-tainacan": {
+   "id": "sec-tainacan",
+   "type": "section",
+   "section": "tainacan",
+   "label": "🏺  Tainacan",
+   "description": "Your digital collections: their state, addresses, events and diagnosis.",
+   "kind": "view",
    "status": "available",
    "media": []
   },
@@ -7258,6 +7284,56 @@
    "zh": "下载此面板的最新版本",
    "ja": "このパネルの最新版をダウンロードします",
    "ko": "이 패널의 최신 버전을 다운로드합니다"
+  },
+  "🏺  Tainacan": {
+   "en": "🏺  Tainacan",
+   "pt-BR": "🏺  Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Your digital collections: their state, addresses, events and diagnosis.": {
+   "en": "Your digital collections: their state, addresses, events and diagnosis.",
+   "pt-BR": "Seus acervos digitais: estado, endereços, eventos e diagnóstico.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🧩  Platforms": {
    "en": "🧩  Platforms",
@@ -13925,6 +14001,7 @@
     "summary": "The Control Dashboard is the panel's home screen: one look tells you whether Koha is running, when the last backup was made, how much disk is left and at which addresses the catalogue answers.",
     "overview": [
      "The dashboard opens with sudo config.sh and is available through d. Reading its status does not itself change the server.",
+     "It has tabs: General (diagnostics, one card per platform, disk space and the server's health), Koha (as before) and Tainacan (the summary of its section). A tab only appears when its platform is installed; on a server without any, General is the only one.",
      "It shows overall state, backup age, disk space, access addresses and components including MariaDB, Apache, RabbitMQ, Memcached and Koha, plus HTTP checks.",
      "Restart Koha requests the service repair routine. Export diagnostics prepares a support package with redaction; review its contents before sharing."
     ],
@@ -13952,6 +14029,7 @@
     "summary": "O Painel de Controle é a tela inicial do painel: num relance você vê se o Koha está funcionando, quando foi feito o último backup, quanto disco resta e em quais endereços o catálogo responde.",
     "overview": [
      "Abra com `sudo config.sh` no Linux ou pelo ícone Koha no Windows. Na tela principal, **d** abre o Painel de Controle. A consulta de estado não executa a instalação.",
+     "Ele tem abas: Geral (diagnóstico, um cartão por plataforma, espaço em disco e a saúde do servidor), Koha (como antes) e Tainacan (o resumo da seção dele). Uma aba só aparece com a plataforma instalada; num servidor sem nenhuma, fica só Geral.",
      "Os cartões mostram estado geral, último backup e espaço livre; em seguida vêm os endereços e os componentes MariaDB, Apache, RabbitMQ, Memcached e Koha, com a resposta HTTP.",
      "**Atualizar** consulta novamente. **Reiniciar Koha** e **Exportar diagnóstico** executam tarefas próprias; podem ficar indisponíveis quando o instalador não oferece a tarefa correspondente."
     ],
@@ -13964,8 +14042,7 @@
     "tips": [
      "O indicador de backup usa uma referência de dois dias e o resultado da última execução noturna. Ele não substitui testar o arquivo.",
      "Planeje reinícios de serviços considerando os usuários conectados."
-    ],
-    "outdated": true
+    ]
    }
   },
   "install": {
@@ -16944,12 +17021,44 @@
     ]
    }
   },
+  "sec-tainacan": {
+   "en": {
+    "summary": "Tainacan's own section: the addresses of the collections and of the WordPress administration, a summary of its state, the diagnosis, the logs, the administrator and the optional events.",
+    "overview": [
+     "The section appears only with Tainacan installed. The summary shows what is already known, without a new check: state, events, collections and items, versions and space, the last backup and the last restore test. Opening it never starts, stops or restarts anything.",
+     "**Diagnosis** reads everything again (collections, items, attachments, versions, space). The result is kept with the time it was read; if a reading fails, the summary keeps the one before, with its time, and says the last one failed.",
+     "**Administrator** is the WordPress account of Tainacan. Koha's accounts, the superlibrarian included, are not WordPress accounts and get no access here.",
+     "Events (Nexus Eventos over Events Manager) are off until you turn them on: the plan is shown first and nothing changes without Yes. Turning them off keeps their data."
+    ],
+    "tips": [
+     "Installing, backing up, testing a restore and removing Tainacan stay in Platforms.",
+     "Run Diagnosis after big changes in the collections to update the summary."
+    ],
+    "related": [
+     "sec-platforms",
+     "sec-dashboard"
+    ]
+   },
+   "pt-BR": {
+    "summary": "A seção própria do Tainacan: os endereços do acervo e da administração do WordPress, um resumo do estado, o diagnóstico, os logs, o administrador e os eventos opcionais.",
+    "overview": [
+     "A seção só aparece com o Tainacan instalado. O resumo mostra o que já se sabe, sem uma nova checagem: estado, eventos, coleções e itens, versões e espaço, o último backup e o último teste de restauração. Abrir a seção nunca liga, para nem reinicia nada.",
+     "**Diagnóstico** lê tudo de novo (coleções, itens, anexos, versões, espaço). O resultado fica guardado com a hora da leitura; se uma leitura falhar, o resumo mantém a anterior, com a hora dela, e avisa que a última falhou.",
+     "**Administrador** é a conta do WordPress do Tainacan. As contas do Koha, inclusive o superlibrarian, não são contas do WordPress e não têm acesso aqui.",
+     "Os eventos (Nexus Eventos sobre o Events Manager) ficam desligados até você ligá-los: o plano aparece antes e nada muda sem o Sim. Desligar mantém os dados."
+    ],
+    "tips": [
+     "Instalar, fazer backup, testar a restauração e remover o Tainacan continuam em Plataformas.",
+     "Rode o Diagnóstico depois de grandes mudanças no acervo para atualizar o resumo."
+    ]
+   }
+  },
   "sec-platforms": {
    "en": {
     "summary": "Shows the platforms this panel knows and what was found on this server. Koha is optional.",
     "overview": [
      "One card per platform keeps four facts apart: whether this version of the panel supports it, whether an installation was found, whether its services are running, and its functional health. A configuration file or a running service is no proof that a platform works, so health stays *not verified* until a real check exists.",
-     "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan, AtoM and DSpace are planned and nothing of them is installed from here."
+     "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan is installed, backed up and removed from here; its own section (key g) appears once it is installed. AtoM and DSpace are planned."
     ],
     "tips": [
      "Install Koha with **Install Koha server** when you need it; its screens come back as soon as the installation ends.",
@@ -16961,7 +17070,7 @@
     "summary": "Mostra as plataformas que este painel conhece e o que foi encontrado neste servidor. O Koha é opcional.",
     "overview": [
      "Um cartão por plataforma mantém quatro fatos separados: se esta versão do painel dá suporte a ela, se uma instalação foi encontrada, se os serviços estão rodando e a saúde funcional. Um arquivo de configuração ou um serviço ativo não prova que a plataforma funciona, então a saúde fica *não verificada* até existir uma verificação real.",
-     "Num servidor sem Koha o painel abre do mesmo jeito: as telas e rotinas do Koha ficam ocultas ou dizem por que não estão disponíveis, e idiomas, atualização do painel e as ferramentas do servidor continuam funcionando. Tainacan, AtoM e DSpace estão planejados e nada deles é instalado por aqui."
+     "Num servidor sem Koha o painel abre do mesmo jeito: as telas e rotinas do Koha ficam ocultas ou dizem por que não estão disponíveis, e idiomas, atualização do painel e as ferramentas do servidor continuam funcionando. O Tainacan é instalado, copiado e removido por aqui; a seção própria dele (tecla g) aparece depois de instalado. AtoM e DSpace estão planejados."
     ],
     "tips": [
      "Instale o Koha com **Instalar servidor Koha** quando precisar; as telas dele voltam assim que a instalação termina.",
@@ -19065,17 +19174,16 @@
  },
  "coverage": {
   "en": {
-   "manual": 114,
-   "manual_total": 114,
+   "manual": 115,
+   "manual_total": 115,
    "manual_outdated": [],
-   "strings": 413,
-   "strings_total": 413
+   "strings": 415,
+   "strings_total": 415
   },
   "pt-BR": {
-   "manual": 114,
-   "manual_total": 114,
+   "manual": 115,
+   "manual_total": 115,
    "manual_outdated": [
-    "sec-dashboard",
     "install",
     "backup-manual",
     "restore",
@@ -19089,155 +19197,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 405,
-   "strings_total": 413
+   "strings": 407,
+   "strings_total": 415
   },
   "es": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 413
+   "strings_total": 415
   },
   "fr": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 413
+   "strings_total": 415
   },
   "it": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 413
+   "strings_total": 415
   },
   "de": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 403,
-   "strings_total": 413
+   "strings_total": 415
   },
   "nl": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "sv": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "pl": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "cs": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "ru": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "uk": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "tr": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "tl": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "id": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "ar": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "fa": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "hi": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "bn": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "vi": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "zh": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "ja": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   },
   "ko": {
    "manual": 0,
-   "manual_total": 114,
+   "manual_total": 115,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 413
+   "strings_total": 415
   }
  }
 }

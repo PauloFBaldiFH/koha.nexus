@@ -264,3 +264,92 @@ assert d["detected"] is False and d["status"] == "kept", d'
     run lib 'kei_task_needs_koha tainacan-backup'
     [ "$status" -eq 1 ]
 }
+
+# The last diagnosis kept for the panel's summary (kei_tainacan_check).
+diag_ok() {
+    printf 'kei_tainacan_status() { printf "status=installed\\nurl=http://192.168.0.10:8090\\ndb=running\\nwordpress=running\\nhealth=healthy\\ncollections=%s\\nitems=128\\nattachments=117\\nattachments_missing=0\\nwordpress_version=7.1.4\\ntainacan_version=1.4.1\\nimages_pinned=yes\\naudit=ok\\nlast_backup=knx-tainacan-20261105-020000\\nbackups=3\\ndisk_db=84.2MB\\ndisk_wp=2.1GB\\n"; }\n' "${1:-3}"
+}
+# "! cmd" never fails a bats test (set -e ignores it); a function does.
+nope() { ! "$@"; }
+diag_down() {
+    printf 'kei_tainacan_status() { printf "status=installed\\nurl=http://192.168.0.10:8090\\ndocker=down\\nhealth=unknown\\n"; }\n'
+}
+
+@test "diagnosis: kept in last-status (600), with its time and result, nothing but the summary's fields" {
+    mkdir -p "$KEI_TAINACAN_DIR"
+    printf 'status=installed\nurl=http://192.168.0.10:8090\n' > "$KEI_TAINACAN_DIR/state"
+    printf 'KN_DB_PASSWORD=s3cr3t-db\nKN_WP_ADMIN_PASSWORD=s3cr3t-admin\n' > "$KEI_TAINACAN_DIR/.env"
+    run lib "$(diag_ok 3)
+kei_tainacan_check"
+    [ "$status" -eq 0 ]
+    grep -qx 'result=ok' <<< "$output"
+    grep -Eqx 'checked_at=[0-9]+' <<< "$output"
+    f="$KEI_TAINACAN_DIR/last-status"
+    [ "$(stat -c %a "$f")" = 600 ]
+    [ "$(stat -c %a "$KEI_TAINACAN_DIR")" = 700 ]
+    grep -qx 'collections=3' "$f"
+    grep -qx 'result=ok' "$f"
+    grep -Eqx 'checked_at=[0-9]+' "$f"
+    # Only the summary's fields: no secret, no audit text, no temporary file left.
+    nope grep -q 's3cr3t' "$f"
+    nope grep -Eqi '^[a-z_]*(pass|key|token|secret|link)' "$f"
+    nope grep -q '^audit=' "$f"
+    [ "$(ls "$KEI_TAINACAN_DIR" | grep -c '^last-status')" = 1 ]
+}
+
+@test "diagnosis: a failed read keeps the good one with its time and only adds when it failed" {
+    mkdir -p "$KEI_TAINACAN_DIR"
+    printf 'status=installed\nurl=http://192.168.0.10:8090\n' > "$KEI_TAINACAN_DIR/state"
+    lib "$(diag_ok 5)
+kei_tainacan_check" >/dev/null
+    before=$(grep '^checked_at=' "$KEI_TAINACAN_DIR/last-status")
+    run lib "$(diag_down)
+kei_tainacan_check"
+    [ "$status" -eq 1 ]
+    grep -qx 'result=failed' <<< "$output"
+    f="$KEI_TAINACAN_DIR/last-status"
+    grep -qx 'collections=5' "$f"
+    grep -qx "$before" "$f"
+    grep -Eqx 'failed_at=[0-9]+' "$f"
+    grep -qx 'failed_reason=down' "$f"
+    [ "$(stat -c %a "$f")" = 600 ]
+    # A good read again clears the failure.
+    lib "$(diag_ok 6)
+kei_tainacan_check" >/dev/null
+    nope grep -q '^failed_at=' "$f"
+    grep -qx 'collections=6' "$f"
+}
+
+@test "diagnosis: nothing is kept without Tainacan" {
+    run lib 'kei_tainacan_check'
+    [ "$status" -eq 0 ]
+    [ "$output" = "status=absent" ]
+    [ ! -e "$KEI_TAINACAN_DIR/last-status" ]
+}
+
+@test "--status-json: admin address and the kept diagnosis only with Tainacan installed" {
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["admin_url"] == "" and d["checked"] == {}, d'
+    mkdir -p "$KEI_TAINACAN_DIR"
+    printf 'status=installed\nurl=http://192.168.0.10:8090\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["admin_url"] == "http://192.168.0.10:8090/wp-admin/" and d["checked"] == {}, d'
+    lib "$(diag_ok 4)
+kei_tainacan_check" >/dev/null
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+c = d["checked"]
+assert c["collections"] == "4" and c["items"] == "128" and c["disk_db"] == "84.2MB" and c["checked_at"].isdigit(), c
+assert c["failed_at"] == "" and "password" not in json.dumps(d).lower(), c'
+    # Removed with its data kept: no address, no diagnosis shown as current.
+    printf 'status=kept\nurl=http://192.168.0.10:8090\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'kei_tainacan_json'
+    printf '%s' "$output" | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+assert d["detected"] is False and d["admin_url"] == "" and d["checked"] == {}, d'
+}

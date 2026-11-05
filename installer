@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.171"
+PANEL_VERSION=" 1.5.172"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -13139,6 +13139,43 @@ kei_tainacan_status() {
     return 0
 }
 
+# kei_tainacan_check: the diagnosis (kei_tainacan_status) with the time it
+# was read and its result: ok when it read everything (Docker running, both
+# containers up, the counts read), else failed. The last good read is kept
+# in last-status (600, root) for the panel's summary, which shows it with
+# its time and never runs the diagnosis on its own; a failed read keeps it
+# and only adds failed_at, so the summary never shows old data as current.
+# It holds only what the diagnosis prints (addresses, states, versions,
+# counts, sizes): no password, key, token or pass link.
+KEI_TN_LAST_KEYS='status|url|lang|db|wordpress|health|reason|collections|items|attachments|attachments_missing|wordpress_version|tainacan_version|last_backup|backups|disk_db|disk_wp|docker'
+kei_tainacan_check() {
+    local out now f tmp result=failed
+    out=$(kei_tainacan_status) || { printf '%s\n' "$out"; return 1; }
+    now=$(date +%s)
+    printf '%s\n' "$out" | grep -qx 'status=installed' || { printf '%s\n' "$out"; return 0; }
+    printf '%s\n' "$out" | grep -Eqx 'collections=[0-9]+' && ! printf '%s\n' "$out" | grep -qx 'docker=down' && result=ok
+    printf '%s\nchecked_at=%s\nresult=%s\n' "$out" "$now" "$result"
+    f="$KEI_TAINACAN_DIR/last-status"
+    mkdir -p "$KEI_TAINACAN_DIR" && chmod 700 "$KEI_TAINACAN_DIR" || return 0
+    tmp=$(mktemp "$f.XXXXXX") || return 0
+    if [ "$result" = ok ]; then
+        { printf '%s\n' "$out" | grep -E "^($KEI_TN_LAST_KEYS)="
+          printf 'checked_at=%s\nresult=ok\n' "$now"; } > "$tmp"
+    else
+        { [ -f "$f" ] && grep -Ev '^(failed_at|failed_reason)=' "$f"
+          printf 'failed_at=%s\n' "$now"
+          printf 'failed_reason=%s\n' "$(printf '%s\n' "$out" | grep -E '^(reason|docker)=' | head -n 1 | cut -d= -f2- | tr -d '\t' | cut -c1-200)"; } > "$tmp"
+    fi
+    chmod 600 "$tmp" && mv -f "$tmp" "$f"
+    [ "$result" = ok ]
+}
+
+# _kei_tn_last KEY: a value of the last diagnosis kept ("" when none).
+_kei_tn_last() {
+    local f="$KEI_TAINACAN_DIR/last-status"
+    [ -f "$f" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "$f"
+}
+
 # kei_tainacan_logs [LINES]: the last lines of each container, with the
 # passwords of .env blanked out and the rest through kei_redact (event pass
 # keys and certificate codes in the access log lines among them).
@@ -13173,9 +13210,20 @@ kei_tainacan_json() {
     # Events (Nexus Eventos): on or off, and who put Events Manager there,
     # from the state file only (the panel's buttons follow them; the
     # installer checks everything again).
-    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s,"events":%s,"events_dependency":%s}' \
-        "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$(_kei_tn_get url)")" \
-        "$(json_str "$( [ "$(_kei_tn_get events)" = on ] && echo on || echo off)")" "$(json_str "$(_kei_tn_get events_em)")"
+    # The admin address, and the last diagnosis kept (kei_tainacan_check),
+    # with the time it was read: the panel's summary, never read again here.
+    local url admin="" checked="" k
+    url=$(_kei_tn_get url)
+    [ "$detected" = true ] && [ -n "$url" ] && admin="${url%/}/wp-admin/"
+    if [ "$detected" = true ] && [ -f "$KEI_TAINACAN_DIR/last-status" ]; then
+        for k in checked_at collections items attachments attachments_missing wordpress_version tainacan_version disk_db disk_wp lang failed_at; do
+            checked="$checked${checked:+,}$(json_str "$k"):$(json_str "$(_kei_tn_last "$k")")"
+        done
+    fi
+    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s,"admin_url":%s,"events":%s,"events_dependency":%s,"checked":{%s}}' \
+        "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$url")" \
+        "$(json_str "$admin")" "$(json_str "$( [ "$(_kei_tn_get events)" = on ] && echo on || echo off)")" "$(json_str "$(_kei_tn_get events_em)")" \
+        "$checked"
 }
 
 # ----------------------------------------------------------------------
@@ -43797,8 +43845,15 @@ kei_task() {
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
         tainacan-status)
             local k v
-            while IFS='=' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_status)
-            return 0 ;;
+            local out rc
+            out=$(kei_tainacan_check); rc=$?
+            while IFS='=' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done <<<"$out"
+            if [ "$rc" != 0 ]; then
+                v=$(printf '%s\n' "$out" | sed -n 's/^reason=//p' | head -n 1)
+                printf '%s\n' "$out" | grep -qx 'docker=down' && v="$(t "Docker is not running.")"
+                msg_error "" "$(t "The diagnosis could not read Tainacan.") ${v:-$(t "Its containers are not running.")}"
+            fi
+            return "$rc" ;;
         tainacan-plan)
             local k v
             while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_plan "${1:-}"; echo "rc	$?")
