@@ -178,12 +178,12 @@ FEATURES: tuple[Feature, ...] = (
     Feature("dash-health", "dashboard", "views/dashboard.py", "Server health", [
         status("CPU", "${pct}% in use"), status("Memory", "${pct}% used"), status("Database", "640 MB"),
         status("Backup folder", "Low disk space: the next backups may not fit", "bad"),
-        status("Errors (last 24 h)", "No errors"), status("Updates", "Update available", "warn"),
+        status("Errors (last 24 h)", "No errors"), status("Panel updates", "Update available", "warn"),
+        status("Koha updates", "Up to date"),
         status("Cloudflare Tunnel", "Answers (HTTP ${code})"), status("SRU gateway (sru.koha.nexus)", "Does not answer", "warn"),
         status("Z39.50 servers", "${n} working"),
     ]),
     Feature("dash-restart", "dashboard", "views/dashboard.py", "Restart Koha", [button("Restart Koha", True)]),
-    Feature("dash-export", "dashboard", "views/dashboard.py", "Export diagnostics", [button("Export diagnostics")]),
     # Backup center
     Feature("backup-status", "backup", "views/backup.py", "Last backup", [
         status("Last backup", "${age} ago"), status("Size", "184 MB"), status("Result", "OK"),

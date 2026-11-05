@@ -158,17 +158,39 @@ def make_app():
     return KohaPanelApp(PanelEnv(installer=None, lang="en", plain=False, demo=True))
 
 
-def test_with_koha_the_sidebar_is_the_same_plus_platforms():
+async def _open(app, pilot, section):
+    """Open a screen as its sidebar row does; the cards follow the state read."""
+    await pilot.pause(0.3)
+    app.screen.query_one("#sidebar").blur()
+    app.screen.action_show(section)
+    await pilot.pause(2.0)
+    from textual.widgets import ContentSwitcher
+    switcher = app.screen.query_one("#views", ContentSwitcher)
+    return switcher.query_one(f"#{switcher.current}")
+
+
+def _shown(view) -> list[str]:
+    from kei_panel.widgets.cards import ActionCard
+    return [c.entry.action for c in view.query(ActionCard) if c.display]
+
+
+def _choose(view, action) -> None:
+    from kei_panel.widgets.cards import ActionCard
+    next(c for c in view.query(ActionCard) if c.entry.action == action and c.display).action_choose()
+
+
+def test_with_koha_the_sidebar_has_its_group_then_the_server():
     async def main():
         app = make_app()
         async with app.run_test() as pilot:
             await pilot.pause(0.3)
             return sidebar_ids(app)
 
-    # Tainacan's section only comes with Tainacan installed (not in this demo).
-    expected = [s.id for s in menus.SECTIONS if s.sidebar and s.requires != "tainacan"]
-    assert asyncio.run(main()) == expected
-    assert "platforms" in expected and expected.index("platforms") > expected.index("update")
+    # Tainacan's screens only come with Tainacan installed (not in this demo).
+    koha = [s.id for s in menus.children("koha")]
+    server = [s.id for s in menus.SECTIONS if s.sidebar and not s.group and s.id != "dashboard"]
+    assert asyncio.run(main()) == ["dashboard", "koha", *koha, "tainacan", "sidebar-server", *server]
+    assert "platforms" not in server and "infra" in server
 
 
 def test_without_koha_the_panel_opens_with_the_shared_sections(no_koha):
@@ -180,10 +202,12 @@ def test_without_koha_the_panel_opens_with_the_shared_sections(no_koha):
 
     installed, ids = asyncio.run(main())
     assert installed is False
-    for gone in ("backup", "import", "ai", "z3950", "opac", "hub", "search", "library", "crons", "credentials"):
+    for gone in ("backup", "import", "ai", "z3950", "opac", "hub", "search", "library", "crons", "credentials",
+                 "settings", "diagnostics", "koha-security"):
         assert gone not in ids
-    for kept in ("dashboard", "install", "security", "diagnostics", "settings", "tools", "languages",
-                 "update", "platforms", "about", "reboot"):
+    # The group's own row stays: it is where Koha is installed.
+    for kept in ("dashboard", "koha", "tainacan", "security", "infra", "server-diagnostics", "tools",
+                 "languages", "update", "about", "reboot"):
         assert kept in ids
 
 
@@ -288,22 +312,19 @@ def test_installing_koha_brings_its_sections_back(no_koha, monkeypatch):
     assert current == "view-backup"
 
 
-def test_platforms_screen_shows_a_card_per_platform(no_koha):
+def test_the_dashboard_shows_a_card_per_supported_platform_only(no_koha):
     from kei_panel.widgets.cards import StatusCard
 
     async def main():
         app = make_app()
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            view = app.screen.query_one("#view-platforms")
-            return {p.id: str(view.query_one(f"#platform-{p.id}", StatusCard).query_one(".card-value").render())
-                    for p in platforms.CATALOG}
+            await pilot.pause(2.5)
+            view = app.screen.query_one("#view-dashboard")
+            return {c.id: str(c.query_one(".card-value").render())
+                    for c in view.query_one("#dash-platforms").query(StatusCard) if c.id.startswith("dash-platform-")}
 
-    assert asyncio.run(main()) == {"koha": "Not installed", "tainacan": "Not installed", "atom": "Planned",
-                                   "dspace": "Planned"}
+    # AtoM and DSpace are planned: they are said in About, never as a card.
+    assert asyncio.run(main()) == {"dash-platform-koha": "Not installed", "dash-platform-tainacan": "Not installed"}
 
 
 # ----------------------------------------------------------------------
@@ -327,18 +348,14 @@ def test_proxy_card_never_promises_a_change():
     assert external[0] == "caddy" and external[2] == "warn"
 
 
-def test_platforms_screen_shows_the_proxy_card(no_koha):
+def test_shared_infrastructure_shows_the_proxy_card(no_koha):
     from kei_panel.widgets.cards import StatusCard
 
     async def main():
         app = make_app()
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            card = app.screen.query_one("#view-platforms #platform-proxy", StatusCard)
-            return str(card.query_one(".card-value").render())
+            view = await _open(app, pilot, "infra")
+            return str(view.query_one("#pstatus-proxy", StatusCard).query_one(".card-value").render())
 
     assert asyncio.run(main()) == "No web server"
 
@@ -392,16 +409,11 @@ def test_docker_is_installed_only_after_the_plan_and_a_yes(no_koha):
             return await real_task(name, *args, **kwargs)
         app.bridge.task = task
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            card = app.screen.query_one("#view-platforms #platform-docker", StatusCard)
-            value = str(card.query_one(".card-value").render())
-            button = app.screen.query_one("#platforms-docker-install")
-            shown = button.display
-            button.press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "infra")
+            value = str(view.query_one("#pstatus-docker", StatusCard).query_one(".card-value").render())
+            shown = _shown(view)
+            _choose(view, "docker-install")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             dialog = app.screen
             preview = isinstance(dialog, ConfirmScreen) and "download.docker.com" in dialog._preview
             await pilot.click(f"#{answer}")
@@ -409,7 +421,9 @@ def test_docker_is_installed_only_after_the_plan_and_a_yes(no_koha):
             return value, shown, preview, [name for name, _ in ran if name.startswith("docker-")], ran
 
     value, shown, preview, names, _ = asyncio.run(main("no"))
-    assert (value, shown, preview) == ("Not installed", True, True)
+    assert (value, preview) == ("Not installed", True)
+    # The demo has a backup key: its kit is offered; removing Docker is not (it is not here).
+    assert shown == ["docker-install", "pbackup-kit"]
     assert names == ["docker-plan"]                                            # "No": nothing installed
     *_, names, ran = asyncio.run(main("yes"))
     assert names == ["docker-plan", "docker-install"]
@@ -437,7 +451,8 @@ def test_tainacan_card_and_buttons_follow_the_installer():
     absent = platforms.TainacanState(True)
     assert platforms.tainacan_can_install(absent, docker)
     assert not platforms.tainacan_can_install(absent, platforms.DockerState(True))     # no Docker yet
-    assert platforms.describe_tainacan(absent, platforms.DockerState(True))[1] == "Needs Docker: install Docker first"
+    assert platforms.describe_tainacan(absent, platforms.DockerState(True))[1] == \
+        "Needs Docker: its installation prepares it first"
     up = platforms.TainacanState(True, "installed", "http://x.org", "active", "healthy")
     assert platforms.describe_tainacan(up, docker)[2] == "ok"
     assert "http://x.org" in platforms.describe_tainacan(up, docker)[1]
@@ -475,30 +490,70 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
             return _with_docker(await real_status(*args, **kwargs))
         app.bridge.task, app.bridge.status = task, status
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            button = app.screen.query_one("#tainacan-install")
-            shown = button.display
-            hidden = [b for b in ("section", "backup", "restore", "uninstall")
-                      if not app.screen.query_one(f"#tainacan-{b}").display]
-            button.press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "tainacan")
+            shown = _shown(view)
+            _choose(view, "tainacan-install")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             asked = isinstance(app.screen, InputScreen)
             await pilot.click("#ok")              # empty: the server's own address
             await pilot.pause(1.0)
             preview = isinstance(app.screen, ConfirmScreen) and "wordpress.org" in app.screen._preview
             await pilot.click(f"#{answer}")
             await pilot.pause(2.0)
-            return shown, hidden, asked, preview, [r for r in ran if r[0].startswith("tainacan-")]
+            return shown, asked, preview, [r for r in ran if r[0].startswith("tainacan-")]
 
-    shown, hidden, asked, preview, ran = asyncio.run(main("no"))
-    assert (shown, asked, preview) == (True, True, True)
-    assert hidden == ["section", "backup", "restore", "uninstall"]
+    shown, asked, preview, ran = asyncio.run(main("no"))
+    # Absent: its home offers the installation and nothing that needs it.
+    assert (shown, asked, preview) == (["tainacan-install"], True, True)
     assert ran == [("tainacan-plan", ())]                                   # "No": nothing installed
     *_, ran = asyncio.run(main("yes"))
     assert ran == [("tainacan-plan", ()), ("tainacan-install", ("confirm", "http://192.168.0.10:8090"))]
+
+
+def test_without_docker_the_tainacan_installation_prepares_it_first_and_goes_on(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen, InputScreen
+
+    async def main(answers):
+        app = make_app()
+        ran: list[tuple[str, tuple[str, ...]]] = []
+        real_task, real_status = app.bridge.task, app.bridge.status
+        docker_in = []
+
+        async def task(name, *args, **kwargs):
+            ran.append((name, args))
+            if name == "docker-install":
+                docker_in.append(True)
+            return await real_task(name, *args, **kwargs)
+
+        async def status(*args, **kwargs):
+            st = await real_status(*args, **kwargs)
+            return _with_docker(st) if docker_in else st
+        app.bridge.task, app.bridge.status = task, status
+        async with app.run_test() as pilot:
+            view = await _open(app, pilot, "tainacan")
+            _choose(view, "tainacan-install")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
+            screens = []
+            for answer in answers:
+                screen = app.screen
+                screens.append(type(screen).__name__ + (":docker" if isinstance(screen, ConfirmScreen) and
+                                                        "download.docker.com" in screen._preview else ""))
+                await pilot.click(f"#{answer}")
+                await pilot.pause(1.5)
+            if isinstance(app.screen, InputScreen):
+                screens.append("InputScreen")
+            return screens, [r[0] for r in ran if r[0].startswith(("docker-", "tainacan-"))]
+
+    # "No" at the explanation: nothing is asked of the installer.
+    screens, ran = asyncio.run(main(["no"]))
+    assert screens == ["ConfirmScreen"] and ran == []
+    # "Yes", then Docker's own plan and "Yes": Docker goes in and Tainacan goes on.
+    screens, ran = asyncio.run(main(["yes", "yes"]))
+    assert screens == ["ConfirmScreen", "ConfirmScreen:docker", "InputScreen"]
+    assert ran == ["docker-plan", "docker-install"]
+    # "No" at Docker's plan: neither is installed.
+    screens, ran = asyncio.run(main(["yes", "no"]))
+    assert ran == ["docker-plan"]
 
 
 def test_tainacan_uninstall_asks_what_happens_to_the_data(no_koha):
@@ -514,29 +569,24 @@ def test_tainacan_uninstall_asks_what_happens_to_the_data(no_koha):
             return await real_task(name, *args, **kwargs)
 
         async def status(*args, **kwargs):
-            st = _with_docker(await real_status(*args, **kwargs))
-            st["platforms"] = [p if p["id"] != "tainacan" else
-                               {**p, "detected": True, "status": "installed", "services": "active",
-                                "health": "healthy", "url": "http://192.168.0.10:8090"} for p in st["platforms"]]
-            return st
+            return _tainacan_installed(await real_status(*args, **kwargs))
         app.bridge.task, app.bridge.status = task, status
+        app.tainacan_installed = True
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            assert not app.screen.query_one("#tainacan-install").display
-            app.screen.query_one("#tainacan-uninstall").press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "tainacan")
+            shown = _shown(view)
+            _choose(view, "tainacan-uninstall")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             choice = isinstance(app.screen, ChoiceScreen)
             app.screen.dismiss("delete")
             await pilot.pause(1.0)
             danger = isinstance(app.screen, ConfirmScreen) and app.screen._danger and "DELETE" in app.screen._question
             await pilot.click("#yes")
             await pilot.pause(2.0)
-            return choice, danger, [r for r in ran if r[0] == "tainacan-uninstall"]
+            return shown, choice, danger, [r for r in ran if r[0] == "tainacan-uninstall"]
 
-    choice, danger, ran = asyncio.run(main())
+    shown, choice, danger, ran = asyncio.run(main())
+    assert "tainacan-install" not in shown and shown[-1] == "tainacan-uninstall"     # removal drawn last
     assert (choice, danger) == (True, True)
     assert ran == [("tainacan-uninstall", ("delete",))]
 
@@ -551,7 +601,8 @@ def test_backup_status_is_read_and_unknown_values_are_not_trusted():
         "tainacan.verified": "2026-11-01 04:30:12 knx-tainacan-20261002-023000 ok"})
     assert st.known and st.key.startswith("3F2A") and st.schedule == "02:30" and st.count == 4
     value, note, card = platforms.describe_backups(st)
-    assert value == "Encrypted" and card == "ok"
+    assert value == "Configuration encrypted" and card == "ok"
+    assert "files in an encrypted restic repository" in note and "database not encrypted" in note
     assert "rclone" in note and "gd:y" in note and "02:30" in note and "passed" in note
     odd = platforms.backup_from_results({"key": "not-a-key; rm", "tainacan.schedule": "25:99",
                                          "tainacan.count": "lots", "tainacan.incomplete": "2"})
@@ -566,7 +617,7 @@ def test_backup_status_is_read_and_unknown_values_are_not_trusted():
 def test_the_installer_knows_every_backup_task_the_panel_calls():
     import pathlib
     from kei_panel.bridge import installer_tasks
-    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("tainacan.py").read_text(encoding="utf-8")
+    view = pathlib.Path(platforms.__file__).with_name("routines").joinpath("platforms.py").read_text(encoding="utf-8")
     called = set(re.findall(r'"(platform-backup-[a-z-]+)"', view)) | {"platform-backup-resume",
                                                                     "platform-backup-discard"}
     assert called and called <= installer_tasks(INSTALLER)
@@ -595,6 +646,7 @@ def _platforms_app(ran, results=None):
     async def status(*args, **kwargs):
         return _tainacan_installed(await real_status(*args, **kwargs))
     app.bridge.task, app.bridge.status = task, status
+    app.tainacan_installed = True        # as its state file would say
     return app
 
 
@@ -606,15 +658,11 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
         ran: list = []
         app = _platforms_app(ran)
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            card = app.screen.query_one("#platform-backups").display
-            buttons = {b: app.screen.query_one(f"#pbackup-{b}").display
-                       for b in ("setup", "configure", "kit", "schedule", "verify", "incomplete")}
-            app.screen.query_one("#tainacan-restore").press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "tainacan-backups")
+            card = view.query_one("#pstatus-backups").display
+            shown = _shown(view)
+            _choose(view, "tainacan-restore")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             app.screen.dismiss("knx-tainacan-20261105-020000")       # the backup
             await pilot.pause(1.0)
             await pilot.click("#yes")                                 # restore over the one in use
@@ -623,12 +671,12 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
             app.screen.query_one("#value", Input).value = "MY-SECRET-RECOVERY-PHRASE"
             await pilot.click("#ok")
             await pilot.pause(2.0)
-            return card, buttons, asked, [r for r in ran if r[0] == "tainacan-restore"]
+            return card, shown, asked, [r for r in ran if r[0] == "tainacan-restore"]
 
-    card, buttons, asked, ran = asyncio.run(main())
+    card, shown, asked, ran = asyncio.run(main())
     assert card and asked
-    assert buttons == {"setup": False, "configure": True, "kit": True, "schedule": True, "verify": True,
-                       "incomplete": True}
+    assert shown == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
+                     "pbackup-configure", "pbackup-verify", "pbackup-incomplete"]
     assert ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",),
                     {"KEI_BACKUP_PHRASE": "MY-SECRET-RECOVERY-PHRASE"})]
     assert all("MY-SECRET" not in " ".join(r[1]) for r in ran)
@@ -644,14 +692,10 @@ def test_backup_setup_shows_the_plan_and_needs_a_yes(no_koha):
         ran: list = []
         app = _platforms_app(ran, no_key)
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            shown = app.screen.query_one("#pbackup-setup").display
-            kit = app.screen.query_one("#pbackup-kit").display
-            app.screen.query_one("#pbackup-setup").press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "infra")
+            shown = _shown(view)
+            _choose(view, "pbackup-setup")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             preview = isinstance(app.screen, ConfirmScreen) and "restic" in app.screen._preview
             await pilot.click(f"#{answer}")
             await pilot.pause(1.0)
@@ -659,11 +703,11 @@ def test_backup_setup_shows_the_plan_and_needs_a_yes(no_koha):
             if asked:
                 await pilot.click("#ok")          # empty: a new phrase, shown once
                 await pilot.pause(2.0)
-            return shown, kit, preview, [r[:2] for r in ran if r[0].startswith("platform-backup-") and
-                                         r[0] != "platform-backup-status"]
+            return shown, preview, [r[:2] for r in ran if r[0].startswith("platform-backup-") and
+                                    r[0] != "platform-backup-status"]
 
-    shown, kit, preview, ran = asyncio.run(main("no"))
-    assert (shown, kit, preview) == (True, False, True)
+    shown, preview, ran = asyncio.run(main("no"))
+    assert "pbackup-setup" in shown and "pbackup-kit" not in shown and preview
     assert ran == [("platform-backup-plan", ())]
     *_, ran = asyncio.run(main("yes"))
     assert ran == [("platform-backup-plan", ()), ("platform-backup-setup", ("confirm",))]
@@ -676,12 +720,9 @@ def test_an_incomplete_backup_is_resumed_or_discarded(no_koha):
         ran: list = []
         app = _platforms_app(ran)
         async with app.run_test() as pilot:
-            await pilot.pause(0.3)
-            app.screen.query_one("#sidebar").blur()
-            await pilot.press("p")
-            await pilot.pause(2.0)
-            app.screen.query_one("#pbackup-incomplete").press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "tainacan-backups")
+            _choose(view, "pbackup-incomplete")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
             app.screen.dismiss("resume")
             await pilot.pause(2.0)
@@ -744,7 +785,7 @@ def test_the_installer_knows_the_events_tasks_and_arguments_the_panel_uses():
     body = re.search(r"^        tainacan-events\)(.*?);;\n        tainacan-restore-notes", TEXT, re.S | re.M).group(1)
     for sub in ("plan)", "status)", "enable)", "disable)"):
         assert sub in body, sub
-    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("tainacan.py").read_text(encoding="utf-8")
+    view = pathlib.Path(platforms.__file__).with_name("routines").joinpath("platforms.py").read_text(encoding="utf-8")
     assert '"tainacan-events", "enable", "confirm"' in view
     # The default disable (no argument) and the two explicit ones are the installer's.
     assert re.search(r'case "\$how" in ""\|keep-dependency\|dependency\)', TEXT)
@@ -784,19 +825,14 @@ def _events_app(ran, events="off", dependency="", tainacan="installed", fail=Non
     return app
 
 
-async def _open_platforms(app, pilot):
-    await pilot.pause(0.3)
-    app.screen.query_one("#sidebar").blur()
-    await pilot.press("p")
-    await pilot.pause(2.0)
+async def _open_events(app, pilot):
+    """Tainacan, Events: where the events cards are."""
+    return await _open(app, pilot, "tainacan-events")
 
 
-async def _open_tainacan(app, pilot):
-    """The Tainacan section (key g), where the events buttons are."""
-    await pilot.pause(0.3)
-    app.screen.query_one("#sidebar").blur()
-    await pilot.press("g")
-    await pilot.pause(2.0)
+def _press(app, action):
+    view = app.screen.query_one("#views").query_one(f"#{app.screen.query_one('#views').current}")
+    _choose(view, action)
 
 
 def _events_ran(ran):
@@ -808,14 +844,14 @@ def test_events_are_off_by_default_and_their_buttons_follow_the_card(no_koha):
         ran: list = []
         app = _events_app(ran, **kw)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            shown = {k: any(b.display for b in app.screen.query(f"#events-{k}")) for k in ("on", "off", "status")}
-            return shown, _events_ran(ran)
+            view = await _open_events(app, pilot)
+            shown = _shown(view) if view.id == "view-tainacan-events" else []
+            return {k: f"events-{k}" in shown for k in ("on", "off", "status")}, _events_ran(ran)
 
-    # Nothing is asked of the installer while the card is drawn.
+    # Nothing is asked of the installer while the cards are drawn.
     assert asyncio.run(main()) == ({"on": True, "off": False, "status": True}, [])
     assert asyncio.run(main(events="on", dependency="ours"))[0] == {"on": False, "off": True, "status": True}
-    # Tainacan not installed: no section, so no events buttons at all.
+    # Tainacan not installed: the screen says why, with no events card at all.
     assert asyncio.run(main(tainacan="absent"))[0] == {"on": False, "off": False, "status": False}
 
 
@@ -826,9 +862,9 @@ def test_events_are_turned_on_only_after_the_plan_and_a_yes(no_koha):
         ran: list = []
         app = _events_app(ran)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-on").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-on")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             screen = app.screen
             preview = screen._preview if isinstance(screen, ConfirmScreen) else ""
             await pilot.click(f"#{answer}")
@@ -853,9 +889,9 @@ def test_a_refused_plan_is_said_and_nothing_is_turned_on(no_koha):
         ran: list = []
         app = _events_app(ran, results=refused)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-on").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-on")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             screen = app.screen
             said = isinstance(screen, MessageScreen) and screen._kind == "error" and "6.4.0" in screen._body
             return said, _events_ran(ran)
@@ -873,9 +909,9 @@ def test_a_failed_enable_shows_the_installers_reason(no_koha):
         ran: list = []
         app = _events_app(ran, fail={("tainacan-events", "enable"): reason})
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-on").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-on")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             await pilot.click("#yes")
             await pilot.pause(2.5)
             screen = app.screen
@@ -892,9 +928,9 @@ def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
         ran: list = []
         app = _events_app(ran)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-on").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-on")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             await pilot.click("#yes")
             await pilot.pause(0.2)
             loading = isinstance(app.screen, LoadingScreen)
@@ -916,9 +952,9 @@ def test_turning_events_off_keeps_the_data_and_a_preexisting_dependency(no_koha)
         ran: list = []
         app = _events_app(ran, events="on", dependency=dependency)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-off").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-off")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
             prompt = app.screen._prompt if isinstance(app.screen, ChoiceScreen) else ""
             app.screen.dismiss(choice)
@@ -956,9 +992,9 @@ def test_a_failed_disable_shows_the_installers_reason(no_koha):
         ran: list = []
         app = _events_app(ran, events="on", dependency="ours", fail={("tainacan-events", "disable"): reason})
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-off").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-off")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             app.screen.dismiss("default")
             await pilot.pause(1.0)
             await pilot.click("#yes")
@@ -976,9 +1012,9 @@ def test_the_events_state_screen_lists_both_plugins_and_the_data(no_koha):
         ran: list = []
         app = _events_app(ran, events="on", dependency="ours", fail=fail)
         async with app.run_test() as pilot:
-            await _open_tainacan(app, pilot)
-            app.screen.query_one("#events-status").press()
-            await pilot.pause(1.0)
+            await _open_events(app, pilot)
+            _press(app, "events-status")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             return app.screen._text if isinstance(app.screen, TextScreen) else ""
 
     text = asyncio.run(main())
@@ -996,9 +1032,9 @@ def test_restore_without_the_phrase_warns_about_event_passes_first(no_koha):
         ran: list = []
         app = _events_app(ran, events="on")
         async with app.run_test() as pilot:
-            await _open_platforms(app, pilot)
-            app.screen.query_one("#tainacan-restore").press()
-            await pilot.pause(1.0)
+            view = await _open(app, pilot, "tainacan-backups")
+            _choose(view, "tainacan-restore")
+            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             app.screen.dismiss(backup)
             await pilot.pause(1.0)
             await pilot.click("#yes")                                  # restore over the one in use

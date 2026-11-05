@@ -2,7 +2,7 @@
 
 from .ai import AIView
 from .backup import BackupView
-from .base import SectionView
+from .base import SectionView, UnavailableView
 from .crons import CronView
 from .dashboard import DashboardView
 from .enrich import AuthEnrichView, EnrichView
@@ -10,8 +10,7 @@ from .database import DatabaseView
 from .hub import HubView
 from .ondemand import OnDemandView
 from .opac import OpacView
-from .platforms import PlatformsView, UnavailableView
-from .tainacan import TainacanView
+from .platform import PlatformHomeView, PlatformSectionView
 from .vpn import VpnView
 from .z3950 import Z3950View
 
@@ -29,9 +28,9 @@ VIEWS = {
     "hub": HubView,
     "crons": CronView,
     "vpn": VpnView,
-    "platforms": PlatformsView,
-    "tainacan": TainacanView,
+    "platform-home": PlatformHomeView,
+    "platform-section": PlatformSectionView,
 }
 
 __all__ = ["VIEWS", "SectionView", "DashboardView", "BackupView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OnDemandView", "OpacView",
-           "HubView", "CronView", "VpnView", "PlatformsView", "TainacanView", "UnavailableView"]
+           "HubView", "CronView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]

@@ -338,7 +338,7 @@ def describe_tainacan(state: TainacanState, docker: DockerState) -> tuple[str, s
         return t("Installation incomplete"), t("Install again: it goes on where it stopped"), "warn"
     if state.status in ("absent", "installing"):
         if not docker.installed:
-            return t("Not installed"), t("Needs Docker: install Docker first"), ""
+            return t("Not installed"), t("Needs Docker: its installation prepares it first"), ""
         return t("Not installed"), t("Optional: install it when you need it"), ""
     services = {
         "active": t("services running"), "partial": t("some services stopped"),
@@ -394,7 +394,7 @@ def missing_reason(platform: str) -> str:
                  "Install it with \"Install Koha server\" when you need it.")
     if platform == TAINACAN:
         return t("Tainacan is not installed on this server, so this is not available. "
-                 "Install it in Platforms when you need it.")
+                 "Install it from Tainacan (collections and museums) when you need it.")
     return t("This needs a platform that is not installed on this server.")
 
 
@@ -413,7 +413,7 @@ def tainacan_summary(state: TainacanState, docker: "DockerState", backups: "Back
     """Card id -> (value, note, card state) for the summary."""
     cards: dict[str, tuple[str, str, str]] = {"state": describe_tainacan(state, docker)}
     cards["events"] = (t("Turned on"), t("Nexus Eventos and Events Manager"), "ok") if state.events == "on" else \
-        (t("Turned off"), t("Optional: turn them on in the Tainacan section"), "")
+        (t("Turned off"), t("Optional: turn them on in Tainacan, Events"), "")
     if not backups.known:
         cards["backup"] = (t("Not checked"), "", "")
     elif backups.last:
@@ -421,13 +421,14 @@ def tainacan_summary(state: TainacanState, docker: "DockerState", backups: "Back
         created = rest.partition("|")[0]
         cards["backup"] = (created or name, t("${n} complete backups", n=backups.count), "ok")
     else:
-        cards["backup"] = (t("None yet"), t("Back up in Platforms"), "warn")
+        cards["backup"] = (t("None yet"), t("Back up in Tainacan, Backups"), "warn")
     if backups.verified:
         bits = backups.verified.split()
         cards["restore-test"] = ((t("Passed") if bits[-1:] == ["ok"] else t("Failed")), " ".join(bits[:2]),
                                  "ok" if bits[-1:] == ["ok"] else "bad")
     else:
-        cards["restore-test"] = (t("Not yet"), t("Test a restore in Platforms"), "warn" if backups.count else "")
+        cards["restore-test"] = (t("Not yet"), t("Test a restore in Tainacan, Backups"),
+                                 "warn" if backups.count else "")
     failed = t("The diagnosis at ${when} failed: run it again", when=when(state.failed_at)) \
         if state.failed_at else ""
     if state.checked_at:
@@ -497,13 +498,33 @@ def backup_from_results(results: dict | None, platform: str = "tainacan") -> Bac
         maintained=val(f"{platform}.maintained"))
 
 
+def describe_vault(state: BackupState) -> tuple[str, str, str]:
+    """(value, note, card state) for the backup key of Shared infrastructure:
+    the key every platform's backups use, and its recovery kit."""
+    if not state.known:
+        return t("Not checked"), t("Not available in this version of the panel"), ""
+    if not state.key:
+        return t("Not set up"), t("The configuration in the backups is not encrypted yet"), "warn"
+    note = t("Key ${fpr}", fpr=state.key[-16:]) + " · " + (t("recovery kit saved") if state.kit
+                                                           else t("recovery kit not saved yet"))
+    return t("Set up"), note, "ok" if state.kit else "warn"
+
+
 def describe_backups(state: BackupState) -> tuple[str, str, str]:
     """(value, note, card state) for the "Platform backups" card."""
     if not state.known:
         return t("Not checked"), t("Not available in this version of the panel"), ""
     parts: list[str] = []
+    # What is encrypted, part by part (installer: the package format 2 of
+    # kei_backup_*): the configuration (secrets.tar.gpg) with the server's
+    # key; the files only in a restic repository (restic's own encryption);
+    # the database (db.sql.gz) never, in the package and in its cloud copy.
     if state.repo:
-        parts.append(t("files in a restic repository") + (" (rclone)" if state.repo.startswith("rclone:") else ""))
+        parts.append(t("files in an encrypted restic repository")
+                     + (" (rclone)" if state.repo.startswith("rclone:") else ""))
+    else:
+        parts.append(t("files in the packages, not encrypted"))
+    parts.append(t("database not encrypted"))
     if state.copy:
         parts.append(t("copied to") + f" {state.copy}")
     parts.append((t("daily at") + f" {state.schedule}") if state.schedule else t("not scheduled"))
@@ -516,7 +537,145 @@ def describe_backups(state: BackupState) -> tuple[str, str, str]:
         parts.append(t("no restore test yet"))
     if state.incomplete:
         parts.append(t("incomplete backup to resume or discard"))
-    value = t("Encrypted") if state.key else t("Configuration not encrypted")
+    value = t("Configuration encrypted") if state.key else t("Configuration not encrypted")
     card = "ok" if state.key and state.schedule and not state.incomplete and state.verified.endswith(" ok") \
         else ("bad" if state.verified.endswith(" failed") else "warn")
     return value, " · ".join(parts), card
+
+
+# ----------------------------------------------------------------------
+# A platform's home in the sidebar (menus.py: the group's own row) and
+# which cards a platform screen shows. Pure: what --status-json, the backup
+# engine and the installer's task list say decides; nothing is read here.
+# ----------------------------------------------------------------------
+# The modes of a home: absent (install it), installed (its tools), failing
+# (installed, but something is stopped or failing: the problem first, with
+# diagnosis), incomplete (an installation that stopped before the end), and
+# unknown (an installer too old to say).
+MODES = ("absent", "installed", "failing", "incomplete", "unknown")
+
+# Which zones of the cards (menus.Entry.zone) each mode shows.
+ZONES = {
+    "absent": ("setup",),
+    "incomplete": ("setup", "recovery", "removal"),
+    "failing": ("recovery", "", "removal"),
+    "installed": ("", "removal"),
+    "unknown": (),
+}
+
+
+@dataclass(frozen=True)
+class Facts:
+    """What a platform screen knows when it draws its cards."""
+    status: dict
+    koha: bool = False
+    tainacan: TainacanState = TainacanState()
+    docker: DockerState = DockerState()
+    backups: BackupState = BackupState()
+    has_task: object = None      # the bridge's has_task; None = every task
+
+    def has(self, task: str) -> bool:
+        return self.has_task is None or bool(self.has_task(task))
+
+
+def koha_mode(facts: Facts) -> str:
+    if not facts.koha:
+        return "absent"
+    if (facts.status or {}).get("state") in ("stopped", "degraded"):
+        return "failing"
+    return "installed"
+
+
+def tainacan_mode(facts: Facts) -> str:
+    state, docker = facts.tainacan, facts.docker
+    if not state.known:
+        return "unknown"
+    if state.status in ("absent", "kept"):
+        return "absent"
+    if state.status in ("installing", "failed"):
+        return "incomplete"
+    if (docker.known and not docker.running) or state.services in ("inactive", "partial") \
+            or state.health == "failing":
+        return "failing"
+    return "installed"
+
+
+def home_mode(platform: str, facts: Facts) -> str:
+    return koha_mode(facts) if platform == KOHA else tainacan_mode(facts)
+
+
+def koha_problem(facts: Facts) -> str:
+    """The line under the Koha home's title: what is wrong, or ""."""
+    mode = koha_mode(facts)
+    if mode == "absent":
+        return t("Koha is not installed on this server. Install it when you need it: everything is asked first.")
+    if mode == "failing":
+        services = (facts.status or {}).get("services") or {}
+        down = [name for unit, name in (("mariadb", "MariaDB"), ("apache2", "Apache"),
+                                        ("memcached", "Memcached"), ("koha-common", "Koha"))
+                if services.get(unit) in ("inactive", "failed")]
+        if down:
+            return t("Koha is installed, but these services are stopped: ${list}. Start with the diagnosis "
+                     "below.", list=", ".join(down))
+        return t("Koha is installed, but something is not working. Start with the diagnosis below.")
+    return ""
+
+
+def tainacan_problem(facts: Facts) -> str:
+    """The line under the Tainacan home's title: what is wrong and what to
+    look at, or "". A stopped container never leads to a restore."""
+    state, docker = facts.tainacan, facts.docker
+    mode = tainacan_mode(facts)
+    if mode == "unknown":
+        return t("The installer in use does not know Tainacan: update this panel first (Update center).")
+    if mode == "absent":
+        text = t("Tainacan is not installed on this server.")
+        if state.status == "kept":
+            text += " " + t("The data of an installation removed before was kept: installing again uses it.")
+        if docker.known and not docker.installed:
+            text += " " + t("It runs in containers: Docker is prepared first, after its own plan and a Yes.")
+        return text
+    if mode == "incomplete":
+        return t("The installation of Tainacan stopped before the end. Install again: it goes on where it "
+                 "stopped. The diagnosis and the logs say what happened.")
+    if mode == "failing":
+        if docker.known and not docker.running:
+            return t("Docker is stopped, so Tainacan's containers are not running. See Shared infrastructure "
+                     "and the diagnosis; your data is kept in Docker's volumes.")
+        if state.services in ("inactive", "partial"):
+            return t("Tainacan is installed, but its containers are not all running. Run the diagnosis and "
+                     "read the logs before anything else; your data is kept in Docker's volumes.")
+        return t("Tainacan answers, but its last check failed. Run the diagnosis to see which part.")
+    return ""
+
+
+def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
+    """Is a card drawn? Its zone in the mode of the screen, the installer's
+    task for it, and the facts that decide some cards (a button that would
+    only answer "not possible here" is not drawn)."""
+    from .menus import PLATFORM_TASKS
+    if zone not in ZONES.get(mode, ("", "removal")):
+        return False
+    task = PLATFORM_TASKS.get(action)
+    if task and not facts.has(task):
+        return False
+    docker, backups, state = facts.docker, facts.backups, facts.tainacan
+    if action == "docker-install":
+        return docker_can_install(docker)
+    if action == "docker-remove":
+        return docker_can_remove(docker)
+    if action == "infra":       # in the Tainacan home: only when Docker is what is wrong
+        return docker.known and (not docker.installed or not docker.running) and mode != "absent"
+    if action in ("events-on", "events-off", "events-status"):
+        return events_buttons(state, True)[action.removeprefix("events-")]
+    if action == "pbackup-setup":
+        return backups.known and not backups.key
+    if action == "pbackup-kit":
+        return backups.known and bool(backups.key)
+    if action == "pbackup-verify":
+        return backups.count > 0
+    if action == "pbackup-incomplete":
+        return backups.incomplete > 0
+    if action in ("tainacan-restore", "tainacan-restore-test"):
+        return backups.count > 0 or not backups.known
+    return True

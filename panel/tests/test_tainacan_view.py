@@ -1,9 +1,13 @@
-"""Tainacan's own section and the dashboard's tabs (plan Q, PR 1).
+"""The panel organized by platform, on four servers (demo mode, simulated
+installer answers): no platform, Koha only, Tainacan only, both.
 
-The panel on four servers (demo mode): no platform, Koha only, Tainacan
-only, both. The section and the tabs follow what is installed; opening
-them reads, never changes, the server; the full diagnosis only runs when
-asked, and a failed one keeps the one before with its time.
+The sidebar: the dashboard, the groups Koha (library) and Tainacan
+(collections and museums), then the Server area; the dashboard's tabs are
+the only summary. A platform's home follows its state (absent: install;
+installed: its tools; failing or incomplete: the problem and the
+diagnosis first, never a restore). Opening a screen reads, never changes,
+the server; the full diagnosis only runs when asked, and a failed one
+keeps the one before with its time.
 """
 
 import asyncio
@@ -76,9 +80,31 @@ async def open_section(app, pilot, key):
     await pilot.pause(2.0)
 
 
+def current_view(app):
+    from textual.widgets import ContentSwitcher
+    switcher = app.screen.query_one("#views", ContentSwitcher)
+    return switcher.query_one(f"#{switcher.current}")
+
+
+def shown_cards(view) -> list[str]:
+    from kei_panel.widgets.cards import ActionCard
+    return [c.entry.action for c in view.query(ActionCard) if c.display]
+
+
+def choose(view, action) -> None:
+    from kei_panel.widgets.cards import ActionCard
+    next(c for c in view.query(ActionCard) if c.entry.action == action).action_choose()
+
+
 # ----------------------------------------------------------------------
-# Four servers: the sidebar and the dashboard's tabs
+# Four servers: the sidebar, the dashboard's tabs, the platform homes
 # ----------------------------------------------------------------------
+KOHA_SCREENS = ["backup", "import", "library", "z3950", "ai", "opac", "hub", "search", "crons", "settings",
+                "diagnostics", "koha-security"]
+TAINACAN_SCREENS = ["tainacan-maintenance", "tainacan-events", "tainacan-backups"]
+SERVER_SCREENS = ["security", "infra", "server-diagnostics", "languages", "update", "tools", "about", "reboot"]
+
+
 @pytest.mark.parametrize("server", list(SERVERS), indirect=True)
 def test_the_sidebar_and_the_tabs_follow_what_is_installed(server):
     from textual.widgets import TabbedContent
@@ -91,72 +117,205 @@ def test_the_sidebar_and_the_tabs_follow_what_is_installed(server):
             tabs = app.screen.query_one("#dash-tabs", TabbedContent)
             shown = {pane: tabs.get_tab(pane).display for pane in
                      ("dash-tab-general", "dash-tab-koha", "dash-tab-tainacan")}
-            return sidebar_ids(app), shown, tabs.active, ran
+            dash = app.screen.query_one("#view-dashboard")
+            planned = [c for c in ("atom", "dspace") if dash.query(f"#dash-platform-{c}")]
+            return sidebar_ids(app), shown, tabs.active, ran, planned
 
-    ids, shown, active, ran = asyncio.run(main())
+    ids, shown, active, ran, planned = asyncio.run(main())
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
-    assert ("tainacan" in ids) is tainacan
-    assert ("backup" in ids) is koha                      # Koha's sections, as before
-    assert "platforms" in ids and "dashboard" in ids
+    expected = ["dashboard", "koha"] + (KOHA_SCREENS if koha else []) + ["tainacan"] + \
+        (TAINACAN_SCREENS if tainacan else []) + ["sidebar-server"] + SERVER_SCREENS
+    assert ids == expected
+    assert "platforms" not in ids and "install" not in ids
     assert shown == {"dash-tab-general": True, "dash-tab-koha": koha, "dash-tab-tainacan": tainacan}
     assert active == "dash-tab-general"
+    assert planned == []                        # AtoM and DSpace are not in the operational summary
     # The dashboard only reads: --status-json, and the backup engine's state with Tainacan.
     assert {name for name, _a in ran} <= READS
     assert bool(ran) is tainacan
 
 
+@pytest.mark.parametrize("server", list(SERVERS), indirect=True)
+def test_each_platform_home_follows_its_state(server):
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        async with app.run_test(size=(160, 48)) as pilot:
+            homes = {}
+            for key in ("k", "g"):
+                await open_section(app, pilot, key)
+                view = current_view(app)
+                problem = str(view.query_one("#platform-problem").render())
+                homes[key] = (view.id, shown_cards(view), problem,
+                              view.query_one("#home-dashboard").display)
+            return homes, ran
+
+    homes, ran = asyncio.run(main())
+    koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
+    kid, kcards, kproblem, kdash = homes["k"]
+    assert kid == "view-koha"
+    if koha:
+        assert kcards == ["credentials"] + KOHA_SCREENS and kproblem == "" and kdash
+    else:
+        assert kcards == ["install"] and "not installed" in kproblem and not kdash
+    tid, tcards, tproblem, tdash = homes["g"]
+    assert tid == "view-tainacan"
+    if tainacan:
+        assert tcards == TAINACAN_SCREENS + ["tainacan-uninstall"] and tproblem == "" and tdash
+    else:
+        assert tcards == ["tainacan-install"] and "not installed" in tproblem and not tdash
+    # Opening the homes only reads.
+    assert {name for name, _a in ran} <= READS
+
+
+@pytest.mark.parametrize("server", ["tainacan"], indirect=True)
+@pytest.mark.parametrize("patch,docker,why", [
+    ({"services": "inactive"}, None, "containers are not all running"),
+    ({}, {"running": False}, "Docker is stopped"),
+    ({"status": "failed"}, None, "stopped before the end"),
+])
+def test_a_stopped_or_incomplete_tainacan_shows_the_problem_and_the_diagnosis_never_a_restore(
+        server, patch, docker, why):
+    async def main():
+        app = make_app(status_patch=patch)
+        if docker:
+            real = app.bridge.status
+
+            async def status(*a, **k):
+                st = dict(await real(*a, **k))
+                st["docker"] = {**st["docker"], "installed": True, "running": False, "compose": "2.29"}
+                return st
+            app.bridge.status = status
+        async with app.run_test(size=(160, 48)) as pilot:
+            await open_section(app, pilot, "g")
+            view = current_view(app)
+            titles = [w.id for w in view.query(".zone-title") if w.display]
+            return shown_cards(view), str(view.query_one("#platform-problem").render()), titles
+
+    cards, problem, titles = asyncio.run(main())
+    assert why in problem
+    assert cards[:2] == ["tainacan-status", "tainacan-logs"] or cards[:3] == \
+        ["tainacan-install", "tainacan-status", "tainacan-logs"]
+    assert not {"tainacan-restore", "tainacan-restore-test", "tainacan-backup"} & set(cards)
+    assert "zone-recovery-title" in titles and "zone-removal-title" in titles
+    assert ("infra" in cards) is bool(docker)
+
+
+@pytest.mark.parametrize("server", ["koha"], indirect=True)
+def test_a_stopped_koha_puts_the_diagnosis_first(server):
+    async def main():
+        app = make_app()
+        real = app.bridge.status
+
+        async def status(*a, **k):
+            st = dict(await real(*a, **k))
+            st["state"] = "stopped"
+            st["services"] = {**st.get("services", {}), "mariadb": "inactive", "apache2": "failed"}
+            return st
+        app.bridge.status = status
+        async with app.run_test(size=(160, 48)) as pilot:
+            await open_section(app, pilot, "k")
+            view = current_view(app)
+            return shown_cards(view), str(view.query_one("#platform-problem").render())
+
+    cards, problem = asyncio.run(main())
+    assert "MariaDB, Apache" in problem
+    assert cards[:4] == ["status", "health", "repair-services", "apache-log"]
+    assert "backup" in cards and "install" not in cards and "restore" not in cards
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+def test_groups_expand_and_collapse_with_the_arrows_and_keys_keep_their_screens(server):
+    from textual.widgets import ContentSwitcher, OptionList
+
+    keys = {"d": "dashboard", "k": "koha", "b": "backup", "i": "import", "l": "library", "h": "enrich-auth",
+            "n": "ondemand", "z": "z3950", "a": "ai", "o": "opac", "m": "hub", "s": "crons", "t": "database",
+            "g": "tainacan", "x": "security", "v": "vpn", "p": "infra"}
+
+    async def main():
+        app = make_app()
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.5)
+            sidebar = app.screen.query_one("#sidebar", OptionList)
+            sidebar.focus()
+            sidebar.highlighted = sidebar.get_option_index("tainacan")
+            await pilot.press("left")
+            collapsed = sidebar_ids(app)
+            highlighted = sidebar.get_option_at_index(sidebar.highlighted).id
+            await pilot.press("right")
+            expanded = sidebar_ids(app)
+            current = app.screen.query_one("#views", ContentSwitcher).current
+            opened = {}
+            sidebar.blur()
+            for key, sec in keys.items():
+                await pilot.press(key)
+                await pilot.pause(0.3)
+                for _ in range(50):          # the tables screen reads them behind its loader
+                    if app.screen.query("#views"):
+                        break
+                    await pilot.pause(0.1)
+                opened[key] = app.screen.query_one("#views", ContentSwitcher).current
+                await pilot.press("escape")
+            # A key of a screen of a collapsed group opens it and expands the group.
+            app.screen.set_group("koha", False)
+            await pilot.pause(0.1)
+            await pilot.press("b")
+            await pilot.pause(0.3)
+            return collapsed, highlighted, expanded, current, opened, sidebar_ids(app), \
+                sidebar.get_option_at_index(sidebar.highlighted).id
+
+    collapsed, highlighted, expanded, current, opened, after_b, hl_b = asyncio.run(main())
+    assert not set(TAINACAN_SCREENS) & set(collapsed) and highlighted == "tainacan"
+    assert set(TAINACAN_SCREENS) <= set(expanded)
+    assert current == "view-dashboard"                   # the arrows never change the screen
+    assert opened == {k: f"view-{v}" for k, v in keys.items()}
+    assert "backup" in after_b and hl_b == "backup"
+
+
 @pytest.mark.parametrize("server", ["none", "koha"], indirect=True)
-def test_without_tainacan_its_key_shows_the_reason_and_loads_nothing(server):
-    from textual.widgets import ContentSwitcher, Label
+def test_without_tainacan_its_screens_show_the_reason_and_load_nothing(server):
+    from textual.widgets import Label
 
     async def main():
         ran: list = []
         app = make_app(ran)
         async with app.run_test() as pilot:
-            await open_section(app, pilot, "g")
-            switcher = app.screen.query_one("#views", ContentSwitcher)
-            current = switcher.current
-            reason = str(app.screen.query_one(f"#{current} #unavailable-reason", Label).render())
-            real = [w.id for w in switcher.children if w.id == "view-tainacan"]
-            return current, reason, real, ran
+            await pilot.pause(0.3)
+            app.screen.action_show("tainacan-backups")
+            await pilot.pause(0.5)
+            view = current_view(app)
+            return view.id, str(view.query_one("#unavailable-reason", Label).render()), ran
 
-    current, reason, real, ran = asyncio.run(main())
-    assert current == "view-tainacan-off" and real == []
-    assert "Tainacan is not installed" in reason and "Platforms" in reason
+    vid, reason, ran = asyncio.run(main())
+    assert vid == "view-tainacan-backups-off"
+    assert "Tainacan is not installed" in reason and "Tainacan (collections and museums)" in reason
     assert ran == []
 
 
 @pytest.mark.parametrize("server", ["tainacan", "both"], indirect=True)
-def test_the_section_shows_the_summary_and_changes_nothing(server):
+def test_the_tainacan_screens_have_their_tools_and_no_second_summary(server):
     from kei_panel.widgets.cards import LinkCard
 
     async def main():
         ran: list = []
         app = make_app(ran)
-        async with app.run_test() as pilot:
-            await open_section(app, pilot, "g")
-            view = app.screen.query_one("#view-tainacan")
-            links = {k: view.query_one(f"#tn-link-{k}", LinkCard).url for k in ("site", "admin")}
-            cards = {k: card(view, f"tn-{k}") for k in ("state", "events", "content", "versions", "backup",
-                                                         "restore-test")}
-            notes = " ".join(str(w.render()) for w in view.query(".view-prompt"))
-            buttons = {b: view.query_one(f"#{b}").display for b in
-                       ("tainacan-status", "tainacan-logs", "tainacan-credentials", "events-on", "events-off",
-                        "events-status")}
-            return links, cards, notes, buttons, ran
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            out = {}
+            for sec in TAINACAN_SCREENS + ["tainacan"]:
+                app.screen.action_show(sec)
+                await pilot.pause(2.0)
+                view = current_view(app)
+                out[sec] = (shown_cards(view), len(view.query(LinkCard)))
+            return out, ran
 
-    links, cards, notes, buttons, ran = asyncio.run(main())
-    assert links == {"site": "http://192.168.0.20:8090/", "admin": "http://192.168.0.20:8090/wp-admin/"}
-    assert cards["state"][0] == "Installed"
-    assert cards["events"][0] == "Turned off"
-    assert cards["content"][0] == "4 collections · 1250 items · 3110 attachments"
-    assert cards["content"][1] == f"read at {platforms.when(1793872800)}"
-    assert "WordPress 6.8.3" in cards["versions"][0] and "84.2MB + 2.1GB" in cards["versions"][1]
-    assert cards["backup"][0] == "2026-11-05 02:30:00"         # the demo engine's newest
-    # Koha's accounts are never WordPress administrators.
-    assert "superlibrarian" in notes and "not WordPress accounts" in notes
-    assert buttons == {"tainacan-status": True, "tainacan-logs": True, "tainacan-credentials": True,
-                       "events-on": True, "events-off": False, "events-status": True}
+    out, ran = asyncio.run(main())
+    assert out["tainacan-maintenance"][0] == ["tainacan-status", "tainacan-logs", "tainacan-credentials"]
+    assert out["tainacan-events"][0] == ["events-on", "events-status"]         # off: no "turn off"
+    assert out["tainacan-backups"][0] == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore",
+                                          "pbackup-schedule", "pbackup-configure", "pbackup-verify",
+                                          "pbackup-incomplete"]
+    assert all(links == 0 for _c, links in out.values())         # addresses: the dashboard only
     assert {name for name, _a in ran} <= READS
 
 
@@ -168,9 +327,11 @@ def test_the_diagnosis_runs_only_when_asked_and_says_when_it_was_read(server):
         ran: list = []
         app = make_app(ran)
         async with app.run_test() as pilot:
-            await open_section(app, pilot, "g")
+            await pilot.pause(0.3)
+            app.screen.action_show("tainacan-maintenance")
+            await pilot.pause(2.0)
             before = [name for name, _a in ran]
-            app.screen.query_one("#tainacan-status").press()
+            choose(current_view(app), "tainacan-status")
             await pilot.pause(1.5)
             text = app.screen._text if isinstance(app.screen, TextScreen) else ""
             return before, text, [name for name, _a in ran]
@@ -183,6 +344,8 @@ def test_the_diagnosis_runs_only_when_asked_and_says_when_it_was_read(server):
 
 @pytest.mark.parametrize("server", ["tainacan"], indirect=True)
 def test_a_failed_diagnosis_keeps_the_one_before_marked_as_old(server):
+    from textual.widgets import TabbedContent
+
     from kei_panel.screens.dialogs import MessageScreen
 
     reason = "The diagnosis could not read Tainacan. Docker is not running."
@@ -192,15 +355,20 @@ def test_a_failed_diagnosis_keeps_the_one_before_marked_as_old(server):
     async def main():
         app = make_app(fail={"tainacan-status": reason}, status_patch=old)
         async with app.run_test() as pilot:
-            await open_section(app, pilot, "g")
-            app.screen.query_one("#tainacan-status").press()
+            await pilot.pause(0.3)
+            app.screen.action_show("tainacan-maintenance")
+            await pilot.pause(2.0)
+            choose(current_view(app), "tainacan-status")
             await pilot.pause(1.5)
             screen = app.screen
             said = isinstance(screen, MessageScreen) and screen._kind == "error" and reason in screen._body \
                 and "keeps the diagnosis before" in screen._body
             await pilot.press("escape")
-            await pilot.pause(2.0)
-            return said, card(app.screen.query_one("#view-tainacan"), "tn-content")
+            await pilot.pause(0.3)
+            app.screen.action_show("dashboard")
+            app.screen.query_one("#dash-tabs", TabbedContent).active = "dash-tab-tainacan"
+            await pilot.pause(2.5)
+            return said, card(app.screen.query_one("#view-dashboard"), "dash-tn-content")
 
     said, (value, note) = asyncio.run(main())
     assert said
@@ -210,12 +378,12 @@ def test_a_failed_diagnosis_keeps_the_one_before_marked_as_old(server):
 
 
 @pytest.mark.parametrize("server", ["both"], indirect=True)
-def test_the_tainacan_tab_and_the_platforms_card_open_the_section(server):
+def test_the_tabs_lead_to_the_tools_and_the_homes_lead_back_to_the_tabs(server):
     from textual.widgets import ContentSwitcher, TabbedContent
 
     async def main():
         app = make_app()
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(160, 48)) as pilot:
             await pilot.pause(2.5)
             tabs = app.screen.query_one("#dash-tabs", TabbedContent)
             tabs.active = "dash-tab-tainacan"
@@ -223,23 +391,26 @@ def test_the_tainacan_tab_and_the_platforms_card_open_the_section(server):
             dash = app.screen.query_one("#view-dashboard")
             content = card(dash, "dash-tn-content")
             dash.query_one("#dash-open-tainacan").press()
-            await pilot.pause(0.5)
+            await pilot.pause(2.0)
             from_tab = app.screen.query_one("#views", ContentSwitcher).current
-            await open_section(app, pilot, "p")
-            button = app.screen.query_one("#tainacan-section")
-            shown = button.display
-            button.press()
+            current_view(app).query_one("#home-dashboard").press()
             await pilot.pause(0.5)
-            return content, from_tab, shown, app.screen.query_one("#views", ContentSwitcher).current
+            back = app.screen.query_one("#views", ContentSwitcher).current, tabs.active
+            tabs.active = "dash-tab-koha"
+            await pilot.pause(0.3)
+            dash.query_one("#dash-open-koha").press()
+            await pilot.pause(0.5)
+            return content, from_tab, back, app.screen.query_one("#views", ContentSwitcher).current
 
-    content, from_tab, shown, from_card = asyncio.run(main())
+    content, from_tab, back, koha = asyncio.run(main())
     assert content[0] == "4 collections · 1250 items · 3110 attachments"
     assert from_tab == "view-tainacan"
-    assert shown and from_card == "view-tainacan"
+    assert back == ("view-dashboard", "dash-tab-tainacan")
+    assert koha == "view-koha"
 
 
 @pytest.mark.parametrize("server", ["both"], indirect=True)
-def test_the_koha_tab_keeps_the_dashboard_as_it_was(server):
+def test_the_koha_tab_holds_koha_and_general_holds_the_server(server):
     from textual.widgets import Button
 
     async def main():
@@ -247,11 +418,18 @@ def test_the_koha_tab_keeps_the_dashboard_as_it_was(server):
         async with app.run_test() as pilot:
             await pilot.pause(2.5)
             dash = app.screen.query_one("#view-dashboard")
+            general = [w.id for w in dash.query_one("#dash-tab-general").query(".status-card")]
+            koha = [w.id for w in dash.query_one("#dash-tab-koha").query(".status-card")]
             return (dash.query_one("#restart-koha", Button).disabled, card(dash, "card-state")[0],
-                    dash.query_one("#addresses").display, card(dash, "health-db")[0])
+                    dash.query_one("#addresses").display, card(dash, "health-db")[0], general, koha)
 
-    disabled, state, addresses, db = asyncio.run(main())
+    disabled, state, addresses, db, general, koha = asyncio.run(main())
     assert disabled is False and state == "Running" and addresses is True and db != "-"
+    assert general == ["dash-platform-koha", "dash-platform-tainacan", "card-disk", "health-cpu", "health-memory",
+                       "health-updates"]
+    for koha_only in ("health-db", "health-backup-dir", "health-errors", "health-koha-updates", "health-tunnel",
+                      "health-sru", "health-z3950"):
+        assert koha_only in koha
 
 
 # ----------------------------------------------------------------------

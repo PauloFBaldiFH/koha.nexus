@@ -72,12 +72,16 @@ def test_restore_is_only_in_the_backup_center():
 
 
 def test_security_and_access_hub():
-    # VPN, Cloudflare Tunnel, firewall, HTTPS and Fail2ban in one place.
+    # VPN, Cloudflare Tunnel, firewall, HTTPS and Fail2ban in one place;
+    # Cloudflare and HTTPS say they only serve Koha (Paulo, 2026-11-05),
+    # and the staff firewall went to Koha security.
     from kei_panel.menus import section
     hub = section("security")
     actions = [e.action for e in hub.entries]
-    for a in ("vpn", "cloudflare", "ufw", "staff-firewall", "ssl", "fail2ban"):
+    for a in ("vpn", "cloudflare", "ufw", "ssl", "fail2ban"):
         assert a in actions
+    assert {e.action for e in hub.entries if e.requires == "koha"} == {"cloudflare", "ssl"}
+    assert "staff-firewall" in [e.action for e in section("koha-security").entries]
     assert [e.kind for e in hub.entries if e.action == "vpn"] == ["view"]
     ids = [s.id for s in SECTIONS]
     assert "publish" not in ids

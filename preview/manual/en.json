@@ -40,9 +40,9 @@
    "summary": "The Control Dashboard is the panel's home screen: one look tells you whether Koha is running, when the last backup was made, how much disk is left and at which addresses the catalogue answers.",
    "overview": [
     "The dashboard opens with sudo config.sh and is available through d. Reading its status does not itself change the server.",
-    "It has tabs: General (diagnostics, one card per platform, disk space and the server's health), Koha (as before) and Tainacan (the summary of its section). A tab only appears when its platform is installed; on a server without any, General is the only one.",
+    "It is the only place of the state, addresses and indicators. It has tabs: General (the server and its platforms: one card per platform, disk space, CPU, memory and panel updates), Koha (its state, backup, addresses, components and indicators) and Tainacan (its summary). The tools of each platform are in its group of the sidebar. A tab only appears when its platform is installed; on a server without any, General is the only one.",
     "It shows overall state, backup age, disk space, access addresses and components including MariaDB, Apache, RabbitMQ, Memcached and Koha, plus HTTP checks.",
-    "Restart Koha requests the service repair routine. Export diagnostics prepares a support package with redaction; review its contents before sharing."
+    "Restart Koha requests the service repair routine. Export diagnostics is in Server diagnostics."
    ],
    "steps": [
     "Open the panel and read the status cards.",
@@ -168,7 +168,7 @@
    "related": [
     "dash-status",
     "dash-components",
-    "dash-export"
+    "export-diagnostics"
    ]
   },
   "dash-restart": {
@@ -188,25 +188,6 @@
     "repair-services",
     "reboot",
     "dash-components"
-   ]
-  },
-  "dash-export": {
-   "title": "Export diagnostics",
-   "summary": "Collects the logs and the system state into one folder you can send to whoever supports your library, with passwords, tokens and keys replaced by [REDACTED].",
-   "steps": [
-    "Press **Export diagnostics** on the dashboard.",
-    "Wait while the panel gathers the Koha, Apache, MariaDB and panel logs and the system status.",
-    "Note the folder shown at the end. On Windows (WSL) the panel offers to open it in Windows Explorer.",
-    "Compress the folder and send it with a short description of the problem and when it started."
-   ],
-   "tips": [
-    "Export right after the problem happens: logs rotate, and the useful lines may be gone a few days later.",
-    "Even redacted, logs can contain patron names: send them only to people you trust and delete the copy afterwards."
-   ],
-   "related": [
-    "health",
-    "validation-report",
-    "apache-log"
    ]
   },
   "install": {
@@ -1550,10 +1531,10 @@
    ]
   },
   "sec-security": {
-   "summary": "Security, remote access and the firewall in one hub: WireGuard VPN, Cloudflare Tunnel, firewall rules, the staff port, free HTTPS, Fail2ban, database password rotation and Google Search Console.",
+   "summary": "Security and remote access of the server: WireGuard VPN, firewall rules, Fail2ban, and the Cloudflare Tunnel and free HTTPS, which only serve Koha for now.",
    "overview": [
-    "The hub (key **x**) gathers everything that decides who can reach your Koha and how. A safe default for most libraries: OPAC published through a Cloudflare Tunnel, staff port 8080 closed to the Internet, staff working remotely through the WireGuard VPN, Fail2ban on, and the database password rotated after the installation.",
-    "Its cards: **WireGuard VPN** (opens its own screen, key **v**), **Cloudflare Tunnel Manager**, **Show active UFW rules**, **Staff firewall**, **Free SSL certificate**, **Fail2ban status**, **Rotate database password** and **Google Search Console Assistant**."
+    "The hub (key **x**) gathers what decides who can reach this server and how. A safe default for most libraries: OPAC published through a Cloudflare Tunnel, staff working remotely through the WireGuard VPN and Fail2ban on.",
+    "Its cards: **WireGuard VPN** (opens its own screen, key **v**), **Show active UFW rules**, **Fail2ban status**, and, marked *only Koha* and shown only with Koha installed, **Cloudflare Tunnel Manager** and **Free SSL certificate**. Tainacan has no tunnel or HTTPS of its own yet. The staff port, the database password and Google Search Console are in **Koha › Koha security**."
    ],
    "related": [
     "sec-vpn",
@@ -1564,10 +1545,9 @@
    ],
    "steps": [
     "Publish the OPAC with **Cloudflare Tunnel Manager** (or with your own domain and **Free SSL certificate**).",
-    "Close the staff port to the Internet with **Staff firewall**.",
+    "Close the staff port to the Internet in **Koha › Koha security**.",
     "Set up the **WireGuard VPN** for staff who work from home or other branches.",
-    "Check **Fail2ban status** and **Show active UFW rules** once a month.",
-    "Help Google find the catalogue with **Google Search Console Assistant**."
+    "Check **Fail2ban status** and **Show active UFW rules** once a month."
    ],
    "tips": [
     "Review who has a VPN profile every few months and revoke the ones no longer needed.",
@@ -1816,7 +1796,7 @@
    ]
   },
   "sec-diagnostics": {
-   "summary": "Tools to understand and fix the server: status, the full health check, its report, live logs, database maintenance, the database tables and service repair.",
+   "summary": "Koha's diagnosis and upkeep: the full health check, live Apache logs, database maintenance, the database tables and service repair.",
    "related": [
     "status",
     "health",
@@ -1826,15 +1806,15 @@
     "sec-database"
    ],
    "overview": [
-    "The Diagnostics & maintenance center is where you go when something is wrong, or to prevent it. Start with **Full system health check**: it runs every check and points at the cause. **Detailed server & Koha status** is a quick snapshot; **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
+    "Koha diagnostics & maintenance is where you go when Koha is wrong, or to prevent it (the server's own status and report are in Server diagnostics). Start with **Full system health check**: it runs every check and points at the cause. **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
    ],
    "steps": [
     "Run **Full system health check**.",
-    "Open **View latest validation report** and read the failures first, then the warnings.",
+    "Open **View latest validation report** (Server diagnostics) and read the failures first, then the warnings.",
     "Fix what it points at (services, search index, disk), then run the check again."
    ],
    "tips": [
-    "Export the diagnostics from the dashboard before asking for help: it saves a round of questions."
+    "Export the diagnostics (Server diagnostics) before asking for help: it saves a round of questions."
    ]
   },
   "status": {
@@ -1864,7 +1844,7 @@
    ],
    "related": [
     "validation-report",
-    "dash-export"
+    "export-diagnostics"
    ],
    "overview": [
     "The health check (validation) tests the services, the web answers of the OPAC and staff interface, the database, the search engine and its index, the disk, the memory, the schedules and the panel's own files. Each check is OK, a warning or a failure, and the full report is written to the validation log.",
@@ -1892,7 +1872,7 @@
     "In Textual, use Pause or p to suspend display updates and Back or Esc to leave. The classic panel uses Ctrl+C for its monitoring flow."
    ],
    "related": [
-    "dash-export",
+    "export-diagnostics",
     "health"
    ],
    "overview": [
@@ -1920,19 +1900,17 @@
    ]
   },
   "sec-settings": {
-   "summary": "Basic Koha parameters: server sizing, the first super librarian and the clock.",
+   "summary": "Basic Koha parameters: server sizing and the first super librarian.",
    "related": [
     "sizing",
-    "superlibrarian",
-    "clock"
+    "superlibrarian"
    ],
    "overview": [
-    "A few parameters that the Web Installer does not cover and that matter from the first day: how much memory each part of Koha may use, your first personal staff account with every permission, and the server's clock and timezone. E-mail notices are configured in the Messaging & interoperability hub."
+    "A few parameters that the Web Installer does not cover and that matter from the first day: how much memory each part of Koha may use and your first personal staff account with every permission. The server's clock and timezone are in General tools. E-mail notices are configured in the Messaging & interoperability hub."
    ],
    "steps": [
     "Run **Server sizing** right after the installation.",
-    "Create your **super librarian** after the Web Installer.",
-    "Check the **Clock and timezone** once."
+    "Create your **super librarian** after the Web Installer."
    ]
   },
   "sizing": {
@@ -2268,10 +2246,11 @@
    ]
   },
   "sec-tools": {
-   "summary": "Terminal tools installed on demand: live resource monitoring and a file explorer.",
+   "summary": "Server tools: your folder, a terminal, live resource monitoring, a file explorer, and the clock and timezone.",
    "related": [
     "monitor",
-    "mc"
+    "mc",
+    "clock"
    ],
    "overview": [
     "Two classic terminal programs, installed on demand behind the loader the first time you open them: htop/nethogs to see what uses the machine, and Midnight Commander to browse files. Leave each program with its own exit key (F10 or q) to come back to the panel."
@@ -2467,31 +2446,19 @@
     "Read Koha's release notes before a major version upgrade."
    ]
   },
-  "sec-platforms": {
-   "summary": "Shows the platforms this panel knows and what was found on this server. Koha is optional.",
-   "overview": [
-    "One card per platform keeps four facts apart: whether this version of the panel supports it, whether an installation was found, whether its services are running, and its functional health. A configuration file or a running service is no proof that a platform works, so health stays *not verified* until a real check exists.",
-    "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan is installed, backed up and removed from here; its own section (key g) appears once it is installed. AtoM and DSpace are planned."
-   ],
-   "tips": [
-    "Install Koha with **Install Koha server** when you need it; its screens come back as soon as the installation ends.",
-    "Press **Refresh** to read the state again."
-   ]
-  },
   "sec-tainacan": {
-   "summary": "Tainacan's own section: the addresses of the collections and of the WordPress administration, a summary of its state, the diagnosis, the logs, the administrator and the optional events.",
+   "summary": "Tainacan's home (key g): installing it when it is absent, its tools once it is installed, and the problem with the right diagnosis first when something is stopped.",
    "overview": [
-    "The section appears only with Tainacan installed. The summary shows what is already known, without a new check: state, events, collections and items, versions and space, the last backup and the last restore test. Opening it never starts, stops or restarts anything.",
-    "**Diagnosis** reads everything again (collections, items, attachments, versions, space). The result is kept with the time it was read; if a reading fails, the summary keeps the one before, with its time, and says the last one failed.",
-    "**Administrator** is the WordPress account of Tainacan. Koha's accounts, the superlibrarian included, are not WordPress accounts and get no access here.",
-    "Events (Nexus Eventos over Events Manager) are off until you turn them on: the plan is shown first and nothing changes without Yes. Turning them off keeps their data."
-   ],
-   "tips": [
-    "Installing, backing up, testing a restore and removing Tainacan stay in Platforms.",
-    "Run Diagnosis after big changes in the collections to update the summary."
+    "Absent: **Install Tainacan** asks for the address, shows the installer's plan and waits for Yes. Tainacan runs in containers: when Docker is missing, Docker's own plan is shown first and, after its Yes, the installation of Tainacan goes on in the same flow.",
+    "Installed: **Diagnosis & maintenance**, **Events** and **Backups**, with **Uninstall Tainacan** apart, under Removal.",
+    "Something stopped: the home says what (Docker stopped, containers not running, last check failed) and offers the diagnosis and the logs first. A stopped container never leads to a restore: restoring lives in Tainacan's Backups only. An installation that stopped before the end is installed again: it goes on where it stopped.",
+    "State, addresses and indicators are in the Control Dashboard, Tainacan tab (**State and addresses**)."
    ],
    "related": [
-    "sec-platforms",
+    "tainacan-install",
+    "sec-tainacan-maintenance",
+    "sec-tainacan-backups",
+    "sec-infra",
     "sec-dashboard"
    ]
   },
@@ -2795,6 +2762,175 @@
    "related": [
     "sec-z3950",
     "marc-undo"
+   ]
+  },
+  "export-diagnostics": {
+   "summary": "Collects the logs and the system state into one folder you can send to whoever supports your library, with passwords, tokens and keys replaced by [REDACTED].",
+   "steps": [
+    "Open **Server diagnostics** and choose **Export diagnostics**.",
+    "Wait while the panel gathers the Koha, Apache, MariaDB and panel logs and the system status.",
+    "Note the folder shown at the end. On Windows (WSL) the panel offers to open it in Windows Explorer.",
+    "Compress the folder and send it with a short description of the problem and when it started."
+   ],
+   "tips": [
+    "Export right after the problem happens: logs rotate, and the useful lines may be gone a few days later.",
+    "Even redacted, logs can contain patron names: send them only to people you trust and delete the copy afterwards."
+   ],
+   "related": [
+    "health",
+    "validation-report",
+    "apache-log"
+   ]
+  },
+  "open-diagnostics": {
+   "summary": "Reads a diagnostics report saved on this server (the newest five are kept) or one someone sent you, inside the panel.",
+   "tips": [
+    "Open the newest one after **Export diagnostics** to check what it contains before sending it."
+   ],
+   "related": [
+    "export-diagnostics",
+    "sec-server-diagnostics"
+   ]
+  },
+  "sec-server-diagnostics": {
+   "summary": "The server's own diagnosis, whatever is installed: its detailed status, the latest validation report, and the diagnostics report to send to whoever helps you.",
+   "overview": [
+    "Koha's own checks (the full health check, the Apache log, database upkeep, restarting its services) are in **Koha (library) › Koha diagnostics & maintenance**; Tainacan's are in **Tainacan › Diagnosis & maintenance**."
+   ],
+   "related": [
+    "status",
+    "validation-report",
+    "export-diagnostics",
+    "open-diagnostics",
+    "sec-diagnostics"
+   ]
+  },
+  "sec-koha": {
+   "summary": "Koha's home (key k): installing it when it is absent, its tools once it is installed, and diagnosis and recovery first when its services are stopped.",
+   "overview": [
+    "The group **Koha (library)** in the sidebar holds only Koha's screens: backups, import, library tools, Z39.50/SRU, AI, appearance, messaging, search, schedules, settings, diagnostics and Koha security. → and ← expand and collapse the group; its row opens this home.",
+    "Without Koha, the home offers **Install Koha server** and the group has no screens. With Koha installed and running it shows one card per screen of the group and the first-access credentials. When MariaDB, Apache, Memcached or Koha are stopped, it says which and puts the status, the health check, the service repair and the Apache log first.",
+    "State, addresses and indicators are not repeated here: **State and addresses** opens the Control Dashboard on its Koha tab."
+   ],
+   "related": [
+    "install",
+    "credentials",
+    "sec-dashboard",
+    "sec-diagnostics"
+   ]
+  },
+  "sec-koha-security": {
+   "summary": "Koha's own protections: the staff port 8080, the database password and Google Search Console for the OPAC.",
+   "overview": [
+    "The server's protections (VPN, firewall rules, Fail2ban, the Cloudflare Tunnel and HTTPS) stay in **Security & access**."
+   ],
+   "related": [
+    "staff-firewall",
+    "rotate-db-password",
+    "search-console",
+    "sec-security"
+   ]
+  },
+  "tainacan-install": {
+   "summary": "Installs WordPress and the Tainacan plugin in containers of their own: the address, the installer's plan, then Yes. Docker comes first when it is missing, after its own plan."
+  },
+  "tainacan-status": {
+   "summary": "Reads everything again: containers, WordPress, the plugin, the collections, items and attachments, versions and space. The result is kept with the time it was read and shown in the Control Dashboard."
+  },
+  "tainacan-logs": {
+   "summary": "The latest lines of the logs of Tainacan's containers, with passwords and keys blanked."
+  },
+  "tainacan-credentials": {
+   "summary": "The address of the WordPress administration and the account of Tainacan's administrator. Koha's accounts, the superlibrarian included, are not WordPress accounts."
+  },
+  "tainacan-uninstall": {
+   "summary": "Removes Tainacan. You choose first: keep its data (installing again uses it) or delete it, after a last backup that is kept."
+  },
+  "events-on": {
+   "summary": "Shows the plan, then turns on Nexus Eventos over Events Manager. Collections and items do not change."
+  },
+  "events-off": {
+   "summary": "Turns events off and keeps their data. An Events Manager that was in this WordPress before stays on unless you say otherwise."
+  },
+  "events-status": {
+   "summary": "Whether events are on, both plugins and the data kept (events, bookings, attendance, certificates)."
+  },
+  "tainacan-backup": {
+   "summary": "A full backup now: database, files and configuration, as a package of the platform backups."
+  },
+  "tainacan-restore-test": {
+   "summary": "Restores a backup in an isolated copy and compares collections, items and attachments. The Tainacan in use does not change."
+  },
+  "tainacan-restore": {
+   "summary": "Replaces the Tainacan in use with a backup, after testing it in an isolated copy and saving the present state in a safety backup."
+  },
+  "pbackup-schedule": {
+   "summary": "A daily backup at the time you choose, upkeep on Sundays and a restore test of an older backup on the 1st of each month. Type off to stop."
+  },
+  "pbackup-configure": {
+   "summary": "Where the files go (a restic repository on this server or in the cloud, or self-contained packages) and whether each package is copied to the cloud."
+  },
+  "pbackup-verify": {
+   "summary": "Checks the backups and the restic repository now."
+  },
+  "pbackup-incomplete": {
+   "summary": "A backup that stopped before the end: resume it, or discard it when it cannot be restored."
+  },
+  "docker-install": {
+   "summary": "Installs Docker from its official repository after showing the plan; nothing else is installed with it and nobody is added to the docker group."
+  },
+  "docker-remove": {
+   "summary": "Removes a Docker that Koha.Nexus installed, only when no container, network or platform is left in it. A Docker that was here before is never removed."
+  },
+  "pbackup-setup": {
+   "summary": "Makes the server key that encrypts the configuration in every platform backup, with a recovery phrase you write down."
+  },
+  "pbackup-kit": {
+   "summary": "Saves the recovery kit: with the recovery phrase, a new server reads the encrypted backups and the restic repositories."
+  },
+  "sec-tainacan-maintenance": {
+   "summary": "Tainacan's diagnosis, its logs and the WordPress administrator account.",
+   "overview": [
+    "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown in the Control Dashboard, Tainacan tab."
+   ],
+   "related": [
+    "tainacan-status",
+    "tainacan-logs",
+    "tainacan-credentials"
+   ]
+  },
+  "sec-tainacan-events": {
+   "summary": "Optional events in Tainacan (Nexus Eventos over Events Manager): off until you turn them on, after the plan and a Yes.",
+   "related": [
+    "events-on",
+    "events-off",
+    "events-status"
+   ]
+  },
+  "sec-tainacan-backups": {
+   "summary": "Tainacan's backups: back up now, test a restore in an isolated copy, restore, schedule, repository and cloud copy, verify and incomplete backups.",
+   "overview": [
+    "What is encrypted: the configuration with the server key; the files only in a restic repository; the database is not encrypted, in the package nor in its cloud copy."
+   ],
+   "related": [
+    "tainacan-backup",
+    "tainacan-restore-test",
+    "tainacan-restore",
+    "sec-infra"
+   ]
+  },
+  "sec-infra": {
+   "summary": "What the platforms in containers share (key p): the web server in front of them, Docker and the key of their backups.",
+   "overview": [
+    "**Web proxy**, **Docker** and **Backup key** are read-only cards. **Install Docker** shows its plan first; **Remove Docker**, under Removal, only removes a Docker Koha.Nexus installed and left empty.",
+    "What the platform backups encrypt: the configuration with this server's key (the recovery phrase opens it); the files only in a restic repository; the database not at all, in the package nor in its cloud copy. Keep the backup folder and the cloud account protected."
+   ],
+   "related": [
+    "docker-install",
+    "pbackup-setup",
+    "pbackup-kit",
+    "docker-remove",
+    "sec-tainacan-backups"
    ]
   }
  }
