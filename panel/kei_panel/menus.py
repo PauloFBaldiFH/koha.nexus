@@ -215,9 +215,11 @@ SECTIONS: tuple[Section, ...] = (
     # by itself: restoring lives in its Backups.
     Section("tainacan", "🏺  Tainacan (collections and museums)", "🏺  Tainacan (collections and museums)", entries=(
         Entry("📦  Install Tainacan", "tainacan-install", kind="native", zone="setup"),
+        Entry("▶  Start Tainacan", "tainacan-start", kind="native", zone="recovery", requires="tainacan"),
         Entry("🩺  Tainacan diagnosis", "tainacan-status", kind="native", zone="recovery", requires="tainacan"),
         Entry("📜  Tainacan logs", "tainacan-logs", kind="native", zone="recovery", requires="tainacan"),
         Entry("🧱  Shared infrastructure", "infra", kind="view", zone="recovery"),
+        Entry("🏠  Prepare the home page", "tainacan-site", kind="native", requires="tainacan"),
         Entry("🩺  Tainacan diagnosis & maintenance", "tainacan-maintenance", kind="view"),
         Entry("🎟  Tainacan events", "tainacan-events", kind="view"),
         Entry("💾  Tainacan backups", "tainacan-backups", kind="view"),
@@ -229,6 +231,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🩺  Tainacan diagnosis", "tainacan-status", kind="native"),
         Entry("📜  Tainacan logs", "tainacan-logs", kind="native"),
         Entry("👤  WordPress administrator", "tainacan-credentials", kind="native"),
+        Entry("🏠  Prepare the home page", "tainacan-site", kind="native"),
+        Entry("↩  Undo the home page", "tainacan-site-undo", kind="native"),
     ), view="platform-section", requires="tainacan", group="tainacan"),
     Section("tainacan-events", "🎟  Tainacan events", "🎟  Tainacan events",
             "Optional and off until you turn them on, after the plan and a Yes. Turning them off keeps "
@@ -320,6 +324,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
+    "tainacan-start": "tainacan-start", "tainacan-site": "tainacan-site", "tainacan-site-undo": "tainacan-site",
     "tainacan-backup": "tainacan-backup", "tainacan-restore-test": "tainacan-restore-test",
     "tainacan-restore": "tainacan-restore", "events-on": "tainacan-events", "events-off": "tainacan-events",
     "events-status": "tainacan-events", "pbackup-setup": "platform-backup-setup",
@@ -464,6 +469,9 @@ DESCRIPTIONS: dict[str, str] = {
     "tainacan-status": "Checks the containers, WordPress, the plugin and the collections",
     "tainacan-logs": "The latest lines of the containers' logs, secrets blanked",
     "tainacan-credentials": "The WordPress account of Tainacan's administrators",
+    "tainacan-start": "Starts Docker and Tainacan's containers again, with the data as it is; nothing is restored",
+    "tainacan-site": "A home page with the search of the collection and links to the collections and items",
+    "tainacan-site-undo": "Puts back the home page and settings that were there before",
     "tainacan-uninstall": "Removes Tainacan; you choose whether its data is kept",
     "events-on": "Shows the plan, then turns on Nexus Eventos over Events Manager",
     "events-off": "Turns events off and keeps their data",

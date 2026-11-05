@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.173"
+PANEL_VERSION=" 1.5.174"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -13296,10 +13296,12 @@ kei_tainacan_json() {
             checked="$checked${checked:+,}$(json_str "$k"):$(json_str "$(_kei_tn_last "$k")")"
         done
     fi
-    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s,"admin_url":%s,"events":%s,"events_dependency":%s,"checked":{%s}}' \
+    # "home": the home page of the collection, prepared by Koha.Nexus (the
+    # state file only; the diagnosis reads WordPress itself: checked.site).
+    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s,"admin_url":%s,"events":%s,"events_dependency":%s,"home":%s,"checked":{%s}}' \
         "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$url")" \
         "$(json_str "$admin")" "$(json_str "$( [ "$(_kei_tn_get events)" = on ] && echo on || echo off)")" "$(json_str "$(_kei_tn_get events_em)")" \
-        "$checked"
+        "$(json_str "$( [ -n "$(_kei_tn_get site_page)" ] && echo prepared)")" "$checked"
 }
 
 # ----------------------------------------------------------------------

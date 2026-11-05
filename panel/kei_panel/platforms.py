@@ -274,6 +274,7 @@ class TainacanState:
     events_dependency: str = ""  # Events Manager: "ours" (Koha.Nexus put it there), "preexisting", ""
     admin_url: str = ""
     checked: tuple[tuple[str, str], ...] = ()   # the last diagnosis kept (installer: last-status)
+    home: str = ""               # "prepared": the home page of the collection made by Koha.Nexus
 
     def check(self, key: str) -> str:
         return dict(self.checked).get(key, "")
@@ -298,6 +299,7 @@ CHECKED_FIELDS = {
     "wordpress_version": r"[0-9][0-9A-Za-z.+-]{0,30}", "tainacan_version": r"[0-9][0-9A-Za-z.+-]{0,30}",
     "disk_db": r"[0-9][0-9.]{0,9} ?[kKMGT]?i?B", "disk_wp": r"[0-9][0-9.]{0,9} ?[kKMGT]?i?B",
     "lang": r"[a-z]{2,3}(_[A-Z]{2})?",
+    "site": r"ready|blog|custom", "facets": r"on|partial|off", "address_interface": r"[A-Za-z0-9._@-]{1,20}",
 }
 
 
@@ -324,7 +326,8 @@ def tainacan_from_status(status: dict | None) -> TainacanState:
                 health=_norm(raw.get("health"), HEALTH, "unknown"),
                 events=_norm(raw.get("events"), ("off", "on"), "off"),
                 events_dependency=_norm(raw.get("events_dependency"), ("ours", "preexisting"), ""),
-                admin_url=_web_url(raw.get("admin_url")), checked=_checked(raw.get("checked")))
+                admin_url=_web_url(raw.get("admin_url")), checked=_checked(raw.get("checked")),
+                home=_norm(raw.get("home"), ("prepared",), ""))
     return TainacanState()
 
 
@@ -414,6 +417,15 @@ def tainacan_summary(state: TainacanState, docker: "DockerState", backups: "Back
     cards: dict[str, tuple[str, str, str]] = {"state": describe_tainacan(state, docker)}
     cards["events"] = (t("Turned on"), t("Nexus Eventos and Events Manager"), "ok") if state.events == "on" else \
         (t("Turned off"), t("Optional: turn them on in Tainacan, Events"), "")
+    site = state.check("site")
+    if site == "ready" or (state.home == "prepared" and not site):
+        cards["public"] = (t("Prepared"), t("Search, collections and items"), "ok")
+    elif site == "blog":
+        cards["public"] = (t("WordPress's sample blog"), t("Prepare it in Tainacan (its home)"), "warn")
+    elif site == "custom":
+        cards["public"] = (t("A page of this site"), t("Kept as it is"), "")
+    else:
+        cards["public"] = (t("Not read yet"), t("Run Diagnosis to read it"), "")
     if not backups.known:
         cards["backup"] = (t("Not checked"), "", "")
     elif backups.last:
@@ -640,12 +652,15 @@ def tainacan_problem(facts: Facts) -> str:
                  "stopped. The diagnosis and the logs say what happened.")
     if mode == "failing":
         if docker.known and not docker.running:
-            return t("Docker is stopped, so Tainacan's containers are not running. See Shared infrastructure "
-                     "and the diagnosis; your data is kept in Docker's volumes.")
+            return t("Docker is stopped, so Tainacan's containers are not running. Your data is kept in "
+                     "Docker's volumes: start Tainacan below, or see the diagnosis first.")
         if state.services in ("inactive", "partial"):
-            return t("Tainacan is installed, but its containers are not all running. Run the diagnosis and "
-                     "read the logs before anything else; your data is kept in Docker's volumes.")
+            return t("Tainacan is installed, but its containers are not all running. Your data is kept in "
+                     "Docker's volumes: read the diagnosis and the logs, then start Tainacan below.")
         return t("Tainacan answers, but its last check failed. Run the diagnosis to see which part.")
+    if state.check("site") == "blog" and state.home != "prepared":
+        return t("Tainacan works, but its public address still opens WordPress's sample blog. Prepare the "
+                 "home page of the collection below: its plan says what changes, and it can be undone.")
     return ""
 
 
@@ -678,4 +693,11 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
         return backups.incomplete > 0
     if action in ("tainacan-restore", "tainacan-restore-test"):
         return backups.count > 0 or not backups.known
+    if action == "tainacan-start":      # only what is stopped: never a restore
+        return (docker.known and docker.installed and not docker.running) \
+            or state.services in ("inactive", "partial")
+    if action == "tainacan-site":
+        return state.home != "prepared" and state.check("site") != "ready"
+    if action == "tainacan-site-undo":
+        return state.home == "prepared"
     return True

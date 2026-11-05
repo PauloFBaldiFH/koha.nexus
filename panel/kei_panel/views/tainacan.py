@@ -20,6 +20,7 @@ from ..widgets.cards import LinkCard, StatusCard
 # The cards of the summary, in order: (id, title).
 SUMMARY_CARDS = (
     ("state", "Tainacan"),
+    ("public", "Public home page"),
     ("events", "Events"),
     ("content", "Collections"),
     ("versions", "Versions"),

@@ -470,6 +470,78 @@ async def tainacan_credentials(app) -> None:
     result = await run_task(app, title, "tainacan-credentials")
     await show_done(app, title, result)
 
+
+
+def _plan_steps(plan, labels) -> str:
+    return "\n".join(f"{label}: {plan.get(key)}" if label else plan.get(key)
+                     for key, label in labels if plan.get(key))
+
+
+async def tainacan_start(app) -> None:
+    """A stopped Tainacan: Docker and its two containers started again, the
+    data as it is. The plan first, then the person's Yes; never a restore."""
+    from .common import run_task, show_done
+    from ..screens.dialogs import ConfirmScreen, MessageScreen
+
+    title = t("Start Tainacan")
+    plan = await app.bridge.task("tainacan-start")
+    kind, note = plan.get("plan"), plan.get("note")
+    if kind == "ready":
+        await app.push_screen_wait(MessageScreen(title, note or t("The Tainacan containers are already running.")))
+        return
+    if kind != "start":
+        await app.push_screen_wait(MessageScreen(title, note or t("Tainacan cannot be started here."), kind="error"))
+        return
+    steps = _plan_steps(plan, (("docker", ""), ("containers", ""), ("start", ""), ("check", "")))
+    if not await app.push_screen_wait(ConfirmScreen(title, t("Start Tainacan now?"), preview=steps,
+                                                    preview_title=t("What will change on this server"))):
+        return
+    result = await run_task(app, title, "tainacan-start", "confirm")
+    await show_done(app, title, result, t("Tainacan is running again, with its data as it was."))
+    app.check_platforms()
+
+
+async def tainacan_site(app) -> None:
+    """The public home page of the collection: the installer's plan (what
+    changes, what stays), the person's Yes, then the change. Nothing of the
+    site is deleted; undo puts it back."""
+    from .common import run_task, show_done
+    from ..screens.dialogs import ConfirmScreen, MessageScreen
+
+    title = t("Prepare the home page")
+    plan = await app.bridge.task("tainacan-site", "plan")
+    kind, note = plan.get("plan"), plan.get("note")
+    if kind == "ready":
+        await app.push_screen_wait(MessageScreen(title, note or t("The home page of the collection is already prepared.")))
+        return
+    if kind != "apply":
+        await app.push_screen_wait(MessageScreen(title, note or t("The home page cannot be prepared here."),
+                                                 kind="error"))
+        return
+    steps = _plan_steps(plan, (("page", ""), ("front", ""), ("posts", ""), ("facets", ""), ("kept", ""), ("undo", "")))
+    if not await app.push_screen_wait(ConfirmScreen(
+            title, t("Prepare the public home page of the collection now?"), preview=steps,
+            preview_title=t("What will change in WordPress"))):
+        return
+    result = await run_task(app, title, "tainacan-site", "apply", "confirm")
+    await show_done(app, title, result, t("The home page of the collection is ready."))
+    app.check_platforms()
+
+
+async def tainacan_site_undo(app) -> None:
+    from .common import run_task, show_done
+    from ..screens.dialogs import ConfirmScreen
+
+    title = t("Undo the home page")
+    if not await app.push_screen_wait(ConfirmScreen(title, t(
+            "Put back the home page and settings that were there before? The page of the collection goes to "
+            "the trash if nobody edited it; an edited one is kept. Tainacan's collections and items do not "
+            "change."))):
+        return
+    result = await run_task(app, title, "tainacan-site", "undo", "confirm")
+    await show_done(app, title, result, t("The previous home page and settings are back."))
+    app.check_platforms()
+
 # Events in Tainacan (installer: --task tainacan-events). Off until the
 # person turns them on; every step is the installer's, which checks
 # again what the buttons only follow.

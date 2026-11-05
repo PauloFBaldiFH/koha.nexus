@@ -17,8 +17,9 @@ TEXT = INSTALLER.read_text(encoding="utf-8")
 
 
 def bash(body: str) -> str:
-    """Runs BODY with the installer's functions (sourced, nothing runs)."""
-    script = f'source "{INSTALLER}" >/dev/null 2>&1\n{body}\n'
+    """Runs BODY with the installer's functions (sourced, nothing runs), in English
+    whatever language this machine's configuration has."""
+    script = f'source "{INSTALLER}" >/dev/null 2>&1\nSYS_LANG=en\n{body}\n'
     return subprocess.run(["bash", "-c", script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                           text=True, timeout=60).stdout
 

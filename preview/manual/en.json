@@ -2932,6 +2932,15 @@
     "docker-remove",
     "sec-tainacan-backups"
    ]
+  },
+  "tainacan-start": {
+   "summary": "Starts a stopped Tainacan again: Docker's service when it is the one stopped, then the database and WordPress containers, with their data as it is. The plan comes first and nothing is restored or deleted."
+  },
+  "tainacan-site": {
+   "summary": "Makes the public address open the collection instead of WordPress's sample blog: a page with the search of the collection and links to the collections and to all the items, set as the home page, and Tainacan's faceted search in its collection and items pages. The plan says what changes; the theme, menus, posts and pages stay, and nothing is deleted."
+  },
+  "tainacan-site-undo": {
+   "summary": "Puts back the home page and the Tainacan settings that were there before the home page was prepared. The page of the collection goes to the trash only if nobody edited it."
   }
  }
 }

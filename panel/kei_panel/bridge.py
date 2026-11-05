@@ -610,8 +610,8 @@ _DEMO_TAINACAN = {
     "id": "tainacan", "supported": True, "detected": True, "services": "active",
     "units": {"db": "running", "wordpress": "running"}, "health": "healthy",
     "status": "installed", "url": "http://192.168.0.20:8090/", "admin_url": "http://192.168.0.20:8090/wp-admin/",
-    "events": "off", "events_dependency": "",
-    "checked": {"checked_at": "1793872800", "collections": "4", "items": "1250", "attachments": "3110",
+    "events": "off", "events_dependency": "", "home": "prepared",
+    "checked": {"site": "ready", "facets": "on", "checked_at": "1793872800", "collections": "4", "items": "1250", "attachments": "3110",
                 "attachments_missing": "0", "wordpress_version": "6.8.3", "tainacan_version": "1.0.1",
                 "disk_db": "84.2MB", "disk_wp": "2.1GB", "lang": "pt_BR"},
 }
