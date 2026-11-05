@@ -1,0 +1,37 @@
+install.url=http://172.17.0.2:8090
+install.status=installed
+net.route_get=1.1.1.1 via 172.17.0.1 dev eth0 src 172.17.0.2 uid 0 
+net.addresses=lo=127.0.0.1/8 eth0=172.17.0.2/16 kn-tainacan=10.213.1.1/24 docker0=172.18.0.1/16 
+net.default_routes=default via 172.17.0.1 dev eth0 ;
+net.get_server_ip=172.17.0.2
+service.home_http=200
+service.home_redirect=
+wordpress.installed=yes
+wordpress.version=7.1.4
+wordpress.home=http://172.17.0.2:8090
+wordpress.siteurl=http://172.17.0.2:8090
+wordpress.lang=pt_BR
+plugin.list=akismet,inactive,5.7.2 hello,inactive,1.7.2 tainacan,active,1.4.1 
+plugin.tainacan_files=assets classes migrations.php readme.txt tainacan.php vendor views 
+admin.login_http=200
+admin.tainacan_page_http_anonymous=302
+public.theme_active=twentytwentyfive
+public.themes=twentytwentyfive,active,1.5 twentytwentyfour,inactive,1.6 twentytwentythree,inactive,1.7 
+public.block_theme=
+public.show_on_front=posts
+public.page_on_front=0
+public.permalink_structure=/%postname%/
+public.posts=1,"Hello world!",publish 
+public.pages=2,"Sample Page",publish 3,"Privacy Policy",draft 
+public.menus=
+public.navigation_posts=4,Navegação 
+public.collection_type=
+public.collections_archive_link=
+public.items_repository_link=
+public.tainacan_options=
+public.rewrite_tainacan=itens/?$,index.php?tainacan_repository_archive=1,other itens/page/([0-9]+)/?$,index.php?tainacan_repository_archive=1&paged=$matches[1],other colecoes/?$,index.php?post_type=tainacan-collection,other colecoes/feed/(feed|rdf|rss|rss2|atom)/?$,index.php?post_type=tainacan-collection&feed=$matches[1],other colecoes/(feed|rdf|rss|rss2|atom)/?$,index.php?post_type=tainacan-collection&feed=$matches[1],o
+public.block_templates=
+public.tainacan_blocks=
+public.home_text=Tainacan Pular para o conteúdo Tainacan Sample Page Blog Hello world! Welcome to WordPress. This is your first post. Edit or delete it, then start writing! novembro 5, 2026 Tainacan Blog About FAQs Authors Events Shop Patterns Themes Twenty Twenty-Five Designed with WordPress
+public.collections_api_anonymous=[{"status":"publish","id":6,"name":"Acervo E2E P\u00fablico","author_id":"1","creation_date":"novembro 5, 2026","modification_date":"novembro 5, 2026","order":null,"parent":0,"description":"Cole\u00e7\u00e3o de teste (publish)","slug":"acervo-e2e-publico","default_orderby":"date","default_order":"AS
+health.panel=ok 1
