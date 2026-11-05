@@ -169,6 +169,15 @@ async def _open(app, pilot, section):
     return switcher.query_one(f"#{switcher.current}")
 
 
+async def _until(pilot, ready, seconds=10.0):
+    """Wait for a screen to come up: slow CI machines take longer than a fixed pause."""
+    waited = 0.0
+    while not ready() and waited < seconds:
+        await pilot.pause(0.25)
+        waited += 0.25
+    return ready()
+
+
 def _shown(view) -> list[str]:
     from kei_panel.widgets.cards import ActionCard
     return [c.entry.action for c in view.query(ActionCard) if c.display]
@@ -921,7 +930,7 @@ def test_a_failed_enable_shows_the_installers_reason(no_koha):
 
 
 def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
-    from kei_panel.screens.dialogs import MessageScreen
+    from kei_panel.screens.dialogs import ConfirmScreen, MessageScreen
     from kei_panel.screens.loading import LoadingScreen
 
     async def main():
@@ -930,12 +939,11 @@ def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
         async with app.run_test() as pilot:
             await _open_events(app, pilot)
             _press(app, "events-on")
-            await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))   # the plan comes first
             await pilot.click("#yes")
-            await pilot.pause(0.2)
-            loading = isinstance(app.screen, LoadingScreen)
+            loading = await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
             await pilot.click("#cancel")
-            await pilot.pause(1.5)
+            await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
             screen = app.screen
             said = isinstance(screen, MessageScreen) and screen._kind == "info" and "stay off" in screen._body and "turn events on again" in screen._body
             return loading, said, _events_ran(ran)
