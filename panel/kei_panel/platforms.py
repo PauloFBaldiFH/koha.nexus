@@ -300,3 +300,73 @@ def missing_reason(platform: str) -> str:
         return t("Koha is not installed on this server, so this is not available. "
                  "Install it with \"Install Koha server\" when you need it.")
     return t("This needs a platform that is not installed on this server.")
+
+
+# Backups of the platforms (installer: kei_backup_*, the common engine):
+# `--task platform-backup-status` reports key=value lines, read here. The
+# installer decides everything again; the card only shows the state.
+@dataclass(frozen=True)
+class BackupState:
+    known: bool = False          # False = not reported (an older installer)
+    key: str = ""                # the fingerprint of the backup key, "" = not set up
+    restic: str = ""             # restic's version, "" = not installed
+    kit: str = ""                # the path of the recovery kit
+    repo: str = ""               # Tainacan's restic repository, "" = self-contained packages
+    copy: str = ""               # the cloud copy, REMOTE:PATH
+    schedule: str = ""           # HH:MM, "" = off
+    last: str = ""               # NAME|created|mode of the newest complete package
+    count: int = 0
+    incomplete: int = 0
+    verified: str = ""           # "DATE TIME NAME ok|failed"
+    maintained: str = ""
+
+
+
+def backup_from_results(results: dict | None, platform: str = "tainacan") -> BackupState:
+    import re
+    r = results or {}
+    if not r or "key" not in r:
+        return BackupState()
+
+    def val(key: str, limit: int = 200) -> str:
+        v = r.get(key)
+        return v[:limit] if isinstance(v, str) else ""
+
+    def num(key: str) -> int:
+        v = val(key, 9)
+        return int(v) if v.isdigit() else 0
+
+    key = val("key", 64)
+    sched = val(f"{platform}.schedule", 5)
+    return BackupState(
+        known=True, key=key if re.fullmatch(r"[0-9A-F]{40,64}", key) else "",
+        restic=val("restic", 20), kit=val("kit"), repo=val(f"{platform}.repo"),
+        copy=val(f"{platform}.copy"), schedule=sched if re.fullmatch(r"[0-2][0-9]:[0-5][0-9]", sched) else "",
+        last=val(f"{platform}.last"), count=num(f"{platform}.count"),
+        incomplete=num(f"{platform}.incomplete"), verified=val(f"{platform}.verified"),
+        maintained=val(f"{platform}.maintained"))
+
+
+def describe_backups(state: BackupState) -> tuple[str, str, str]:
+    """(value, note, card state) for the "Platform backups" card."""
+    if not state.known:
+        return t("Not checked"), t("Not available in this version of the panel"), ""
+    parts: list[str] = []
+    if state.repo:
+        parts.append(t("files in a restic repository") + (" (rclone)" if state.repo.startswith("rclone:") else ""))
+    if state.copy:
+        parts.append(t("copied to") + f" {state.copy}")
+    parts.append((t("daily at") + f" {state.schedule}") if state.schedule else t("not scheduled"))
+    if state.verified:
+        bits = state.verified.split()
+        when = " ".join(bits[:2])
+        parts.append((t("last restore test passed") if bits[-1:] == ["ok"] else t("last restore test failed"))
+                     + f" ({when})")
+    else:
+        parts.append(t("no restore test yet"))
+    if state.incomplete:
+        parts.append(t("incomplete backup to resume or discard"))
+    value = t("Encrypted") if state.key else t("Configuration not encrypted")
+    card = "ok" if state.key and state.schedule and not state.incomplete and state.verified.endswith(" ok") \
+        else ("bad" if state.verified.endswith(" failed") else "warn")
+    return value, " · ".join(parts), card

@@ -15,6 +15,12 @@
 #           persistence, backup, isolated restore test, restore, address,
 #           uninstall (tainacan_system.bats), then a real reboot of the
 #           machine between two phases (tainacan_reboot.bats).
+#   engine  the same machines: the common backup engine of the platforms
+#           with a real Tainacan (backup_engine_system.bats): crashes inside
+#           and after the window without writes, resume, restic repositories
+#           (local and through rclone), the encrypted configuration and the
+#           recovery phrase, the recovery kit, the cloud copy, the schedule.
+#           Its unit tests (backup_engine.bats, no Docker) run in apache.
 name: proxy
 
 on:
@@ -31,6 +37,8 @@ on:
       - "tests/tainacan.bats"
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
+      - "tests/backup_engine.bats"
+      - "tests/backup_engine_system.bats"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
   pull_request:
@@ -46,6 +54,8 @@ on:
       - "tests/tainacan.bats"
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
+      - "tests/backup_engine.bats"
+      - "tests/backup_engine_system.bats"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
 
@@ -67,9 +77,11 @@ jobs:
             "${{ matrix.image }}" bash -c '
               set -e
               apt-get update -qq
-              apt-get install -y -qq apache2 bats curl python3 iproute2 >/dev/null
+              apt-get install -y -qq apache2 bats curl python3 iproute2 gnupg restic rclone >/dev/null
+              restic version
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
+              bats tests/backup_engine.bats
               bats tests/uninstall_registry.bats'
 
   system:
@@ -125,6 +137,25 @@ jobs:
         run: tests/system/container.sh reboot kn-system
       - name: After the reboot
         run: KEI_REBOOT_PHASE=after tests/system/container.sh run kn-system bats tests/tainacan_reboot.bats
+      - name: Stop
+        if: always()
+        run: tests/system/container.sh stop kn-system
+
+  engine:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12", "debian:13"]
+    env:
+      KEI_REQUIRE_REAL_TAINACAN: "1"
+      KEI_TAINACAN_REGISTRY: docker.io
+    steps:
+      - uses: actions/checkout@v4
+      - name: A machine with systemd
+        run: tests/system/container.sh start "${{ matrix.image }}" kn-system
+      - name: Backup engine with a real Tainacan; Koha and third parties preserved
+        run: tests/system/container.sh run kn-system bats tests/backup_engine_system.bats
       - name: Stop
         if: always()
         run: tests/system/container.sh stop kn-system

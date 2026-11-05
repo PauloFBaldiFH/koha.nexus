@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.168"
+PANEL_VERSION=" 1.5.169"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12448,6 +12448,13 @@ _kei_tn_set() {
 }
 # A value of .env (KEY=VALUE, no quotes).
 _kei_tn_env() { [ -f "${2:-$KEI_TAINACAN_DIR}/.env" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "${2:-$KEI_TAINACAN_DIR}/.env"; }
+# _kei_tn_env_set KEY VALUE: one value of the installation's .env.
+_kei_tn_env_set() {
+    local f="$KEI_TAINACAN_DIR/.env" tmp
+    [ -f "$f" ] || return 1
+    tmp=$(mktemp "$f.XXXXXX") || return 1
+    { awk -F= -v k="$1" '$1 != k' "$f"; printf '%s=%s\n' "$1" "$2"; } > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$f"
+}
 
 # _kei_tn_random N: N letters and digits (passwords and salts: no quote, $
 # or space, so .env and the YAML need no escaping).
@@ -13164,183 +13171,32 @@ kei_tainacan_json() {
 }
 
 # ----------------------------------------------------------------------
-# Backup.
+# Backup: the platform backup engine (kei_backup_*, below) with the
+# Tainacan adapter (_kei_bk_tainacan_*).
 # ----------------------------------------------------------------------
-_kei_tn_journal() {
-    # _kei_tn_journal DIR STEP [KEY VALUE]...
-    local dir="$1" step="$2" line
-    shift 2
-    line="{\"at\":$(json_str "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"),\"step\":$(json_str "$step")"
-    while [ $# -ge 2 ]; do line+=",$(json_str "$1"):$(json_str "$2")"; shift 2; done
-    printf '%s}\n' "$line" >> "$dir/journal.jsonl"
-}
-_kei_tn_sha() { sha256sum "$1" | awk '{ print $1 }'; }
-_kei_tn_size() { stat -c %s "$1" 2>/dev/null || echo 0; }
-
-# _kei_tn_manifest_get DIR KEY: a value of manifest.json (one key per line).
-_kei_tn_manifest_get() {
-    [ -f "$1/manifest.json" ] || return 1
-    sed -n -e "s/^  \"$2\": \"\\(.*\\)\",\\{0,1\\}\$/\\1/p" -e "s/^  \"$2\": \\([^\",]*\\),\\{0,1\\}\$/\\1/p" "$1/manifest.json" | head -n 1
-}
+_kei_tn_journal() { _kei_bk_journal "$@"; }
+_kei_tn_manifest_get() { _kei_bk_mget "$@"; }
 
 # kei_tainacan_backups: complete backups, newest first: "DIR<TAB>created<TAB>label".
-kei_tainacan_backups() {
-    local d
-    [ -d "$KEI_TAINACAN_BACKUPS" ] || return 0
-    for d in "$KEI_TAINACAN_BACKUPS"/knx-tainacan-*/; do
-        d="${d%/}"
-        [ -f "$d/manifest.json" ] || continue
-        [ "$(_kei_tn_manifest_get "$d" complete)" = true ] || continue
-        printf '%s\t%s\t%s\n' "$d" "$(_kei_tn_manifest_get "$d" created)" "$(_kei_tn_manifest_get "$d" label)"
-    done | sort -t$'\t' -k2,2r -k1,1r
-}
+kei_tainacan_backups() { kei_backup_list tainacan | cut -f1-3; }
 
 # kei_tainacan_backup [LABEL]: a complete backup; prints its directory.
-kei_tainacan_backup() {
-    local label="${1:-manual}" ts dir n wpc dbc t0 t1 rc=0 c i a p wpv plv need free sz_db sz_wp missing url ps
-    [[ "$label" =~ ^[a-z0-9-]{1,20}$ ]] || label=manual
-    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
-    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
-    dbc=$(_kei_tn_cid db); wpc=$(_kei_tn_cid wordpress)
-    [ -n "$dbc" ] && [ -n "$wpc" ] && [ "$(_kei_tn_container_state db)" = running ] || {
-        echo "$(t "The Tainacan database is not running.")" >&2; return 3; }
-    mkdir -p "$KEI_TAINACAN_BACKUPS" && chmod 700 "$KEI_TAINACAN_BACKUPS" "${KEI_TAINACAN_BACKUPS%/*}" 2>/dev/null
-    sz_db=$(_kei_docker exec "$dbc" du -sm /var/lib/mysql 2>/dev/null | awk '{ print $1 }')
-    sz_wp=$(timeout 600 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
-        --security-opt no-new-privileges -v kn-tainacan-wp:/data:ro --entrypoint du "$(_kei_tn_image wp)" -sm /data 2>/dev/null | awk '{ print $1 }')
-    need=$(( (${sz_db:-0} + ${sz_wp:-0}) * 12 / 10 + 50 ))
-    free=$(_kei_tn_disk_mb "$KEI_TAINACAN_BACKUPS")
-    if [ -n "$free" ] && [ "$free" -lt "$need" ]; then
-        echo "$(a="$free"; b="$need"; t "Not enough free disk for the backup: \${a} MB free, about \${b} MB needed.")" >&2; return 5
-    fi
-    ts=$(date '+%Y%m%d-%H%M%S'); dir="$KEI_TAINACAN_BACKUPS/knx-tainacan-$ts"; n=1
-    while [ -e "$dir" ]; do dir="$KEI_TAINACAN_BACKUPS/knx-tainacan-$ts-$n"; n=$((n + 1)); done
-    mkdir -m 700 "$dir" || return 1
-    _kei_tn_journal "$dir" start label "$label"
-    chmod 600 "$dir/journal.jsonl"
-    wpv=$(_kei_docker exec "$wpc" sh -c "sed -n \"s/^\\\$wp_version = '\\(.*\\)';/\\1/p\" /var/www/html/wp-includes/version.php" 2>/dev/null)
-    plv=$(_kei_docker exec "$wpc" sh -c "sed -n 's/^[ *]*Version:[ ]*//p' /var/www/html/wp-content/plugins/tainacan/tainacan.php | head -n 1" 2>/dev/null)
-    # The window: every writer (web, REST, WP-Cron, Tainacan's jobs) runs in
-    # the wordpress container; a graceful stop lets requests finish.
-    t0=$(date +%s)
-    _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1 || { _kei_tn_journal "$dir" error what stop; echo "$(t "WordPress could not be stopped for the backup.")" >&2; return 1; }
-    _kei_tn_journal "$dir" writes-stopped
-    {
-        read -r c i a p < <(_kei_tn_counts)
-        timeout 7200 docker exec -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD)" "$dbc" mariadb-dump -uroot --single-transaction \
-            --routines --triggers --events --default-character-set=utf8mb4 wordpress 2>"$dir/.dump.err" | gzip -6 > "$dir/db.sql.gz.part"
-        ps=("${PIPESTATUS[@]}")
-        [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/db.sql.gz.part" "$dir/db.sql.gz" || rc=1
-        [ "$rc" = 0 ] && _kei_tn_journal "$dir" db file db.sql.gz bytes "$(_kei_tn_size "$dir/db.sql.gz")" sha256 "$(_kei_tn_sha "$dir/db.sql.gz")"
-        if [ "$rc" = 0 ]; then
-            timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
-                --security-opt no-new-privileges -v kn-tainacan-wp:/data:ro --entrypoint tar "$(_kei_tn_image wp)" \
-                -C /data -cf - . 2>"$dir/.tar.err" | gzip -6 > "$dir/files.tar.gz.part"
-            ps=("${PIPESTATUS[@]}")
-            [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/files.tar.gz.part" "$dir/files.tar.gz" || rc=1
-            [ "$rc" = 0 ] && _kei_tn_journal "$dir" files file files.tar.gz bytes "$(_kei_tn_size "$dir/files.tar.gz")" sha256 "$(_kei_tn_sha "$dir/files.tar.gz")"
-        fi
-    }
-    _kei_tn_dc start wordpress >/dev/null 2>&1 || _kei_tn_dc up -d wordpress >/dev/null 2>&1
-    t1=$(date +%s)
-    _kei_tn_journal "$dir" writes-resumed seconds "$((t1 - t0))"
-    if [ "$rc" != 0 ]; then
-        _kei_tn_journal "$dir" error what "$(cat "$dir/.dump.err" "$dir/.tar.err" 2>/dev/null | tail -n 3 | tr '\n' ' ')"
-        rm -f "$dir"/*.part
-        echo "$(t "The backup failed; WordPress was started again.") $(cat "$dir/.dump.err" "$dir/.tar.err" 2>/dev/null | tail -n 3)" >&2
-        return 1
-    fi
-    rm -f "$dir/.dump.err" "$dir/.tar.err"
-    missing=$(awk 'NR == FNR { have[$0] = 1; next } $0 != "" { if (!(("./wp-content/uploads/" $0) in have)) n++ } END { print n + 0 }' \
-        <(gzip -dc "$dir/files.tar.gz" | tar -tf - 2>/dev/null) \
-        <(_kei_tn_sql "SELECT meta_value FROM wp_postmeta WHERE meta_key = '_wp_attached_file'" 2>/dev/null))
-    mkdir -m 700 "$dir/secrets" && ( umask 077; cp "$KEI_TAINACAN_DIR/.env" "$KEI_TAINACAN_DIR/compose.yml" "$(_kei_tn_state_file)" "$dir/secrets/" ) \
-        && chmod 600 "$dir/secrets/.env" "$dir/secrets/compose.yml" "$dir/secrets/state" || { echo "$(t "The configuration could not be copied.")" >&2; return 1; }
-    _kei_tn_journal "$dir" secrets
-    url=$(_kei_tn_get url)
-    {
-        printf '{\n'
-        printf '  "format": 1,\n'
-        printf '  "platform": "tainacan",\n'
-        printf '  "created": %s,\n' "$(json_str "$(date '+%Y-%m-%d %H:%M:%S')")"
-        printf '  "label": %s,\n' "$(json_str "$label")"
-        printf '  "host": %s,\n' "$(json_str "$(hostname 2>/dev/null)")"
-        printf '  "url": %s,\n' "$(json_str "$url")"
-        printf '  "wordpress_version": %s,\n' "$(json_str "${wpv:-?}")"
-        printf '  "tainacan_version": %s,\n' "$(json_str "${plv:-?}")"
-        printf '  "wp_image": %s,\n' "$(json_str "$KEI_TAINACAN_WP_IMAGE")"
-        printf '  "db_image": %s,\n' "$(json_str "$KEI_TAINACAN_DB_IMAGE")"
-        printf '  "count_collections": %s,\n' "$(json_num "$c")"
-        printf '  "count_items": %s,\n' "$(json_num "$i")"
-        printf '  "count_attachments": %s,\n' "$(json_num "$a")"
-        printf '  "count_posts": %s,\n' "$(json_num "$p")"
-        printf '  "attachments_missing": %s,\n' "$(json_num "${missing:-0}")"
-        printf '  "window_seconds": %s,\n' "$(json_num "$((t1 - t0))")"
-        printf '  "db_bytes": %s,\n' "$(json_num "$(_kei_tn_size "$dir/db.sql.gz")")"
-        printf '  "files_bytes": %s,\n' "$(json_num "$(_kei_tn_size "$dir/files.tar.gz")")"
-        printf '  "complete": true\n'
-        printf '}\n'
-    } > "$dir/manifest.json.part"
-    ( cd "$dir" && sha256sum db.sql.gz files.tar.gz secrets/.env secrets/compose.yml secrets/state manifest.json.part | sed 's/manifest.json.part$/manifest.json/' > SHA256SUMS ) || return 1
-    mv -f "$dir/manifest.json.part" "$dir/manifest.json"
-    _kei_tn_journal "$dir" done
-    chmod 600 "$dir"/*.gz "$dir"/*.json "$dir"/*.jsonl "$dir/SHA256SUMS"
-    # Retention: the newest KEI_TAINACAN_KEEP complete backups.
-    kei_tainacan_backups | tail -n +"$((KEI_TAINACAN_KEEP + 1))" | cut -f1 | while IFS= read -r old; do
-        [ -n "$old" ] && [ "$old" != "$dir" ] && case "$old" in "$KEI_TAINACAN_BACKUPS"/knx-tainacan-*) rm -rf -- "$old" ;; esac
-    done
-    log "tainacan: backup $dir ($((t1 - t0)) s without writes)"
-    printf '%s\n' "$dir"
-}
+kei_tainacan_backup() { kei_backup_run tainacan "${1:-manual}"; }
 
 # ----------------------------------------------------------------------
 # Restore.
 # ----------------------------------------------------------------------
-# kei_tainacan_check_tar FILE: 0 when the archive only has regular files,
-# directories and links that stay inside it, with no absolute path or "..".
-kei_tainacan_check_tar() {
-    python3 -I - "$1" <<'PYEOF'
-import posixpath, sys, tarfile
-bad = []
-try:
-    with tarfile.open(sys.argv[1], "r:*") as tf:
-        for m in tf:
-            n = m.name
-            parts = n.split("/")
-            if n.startswith("/") or ".." in parts:
-                bad.append("unsafe path: " + n); continue
-            if m.isdev() or m.isfifo() or m.islnk():
-                bad.append("special file: " + n); continue
-            if m.issym():
-                target = m.linkname
-                if target.startswith("/"):
-                    bad.append("link outside: " + n); continue
-                full = posixpath.normpath(posixpath.join(posixpath.dirname(n), target))
-                if full.startswith("..") or full.startswith("/"):
-                    bad.append("link outside: " + n); continue
-            elif not (m.isfile() or m.isdir()):
-                bad.append("unknown type: " + n)
-except Exception as exc:
-    print("unreadable archive: %s" % exc); sys.exit(1)
-if bad:
-    print("\n".join(bad[:20])); sys.exit(1)
-PYEOF
-}
+# kei_tainacan_check_tar FILE: see kei_bk_check_tar.
+kei_tainacan_check_tar() { kei_bk_check_tar "$1" "${2:-0}"; }
 
 # _kei_tn_vercmp A B: true when A is newer than B.
 _kei_tn_newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]; }
 
-# kei_tainacan_backup_check DIR: the backup can be restored here.
+# kei_tainacan_backup_check DIR: the backup can be restored here
+# (kei_backup_check, then the versions).
 kei_tainacan_backup_check() {
-    local dir="$1" out wpv plv
-    [ -f "$dir/manifest.json" ] && [ "$(_kei_tn_manifest_get "$dir" complete)" = true ] \
-        || { echo "$(t "This backup is not complete (no manifest): it cannot be restored.")" >&2; return 4; }
-    [ "$(_kei_tn_manifest_get "$dir" platform)" = tainacan ] || { echo "$(t "This is not a Tainacan backup.")" >&2; return 4; }
-    ( cd "$dir" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ) || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
-    if ! out=$(kei_tainacan_check_tar "$dir/files.tar.gz"); then
-        echo "$(t "The backup archive has unsafe entries:") $out" >&2; return 4
-    fi
-    gzip -t "$dir/db.sql.gz" 2>/dev/null || { echo "$(t "The database dump is damaged.")" >&2; return 4; }
+    local dir="$1" wpv plv
+    kei_backup_check "$dir" tainacan || return $?
     wpv=$(_kei_tn_manifest_get "$dir" wordpress_version); plv=$(_kei_tn_manifest_get "$dir" tainacan_version)
     if _kei_tn_newer "$wpv" "$KEI_TAINACAN_WP_VERSION" || _kei_tn_newer "$plv" "$KEI_TAINACAN_PLUGIN_VERSION"; then
         echo "$(a="$wpv/$plv"; b="$KEI_TAINACAN_WP_VERSION/$KEI_TAINACAN_PLUGIN_VERSION"; t "This backup is from a newer version (\${a}) than the one installed (\${b}): update Koha.Nexus first.")" >&2
@@ -13360,13 +13216,26 @@ _kei_tn_resolve() {
     esac
 }
 
-# _kei_tn_fill VOLUME DUMP|FILES BACKUP_DIR: the WordPress tree of the
-# backup into an emptied volume (a throwaway container, no network).
+# _kei_tn_fill_files VOLUME BACKUP_DIR: the WordPress tree of the backup
+# into an emptied volume (a throwaway container, no network): from
+# files.tar.gz, or from the restic snapshot of files.ref.json, restored and
+# checked in a staging area first.
 _kei_tn_fill_files() {
-    local vol="$1" bdir="$2"
+    local vol="$1" bdir="$2" st stage tree rc
+    if [ -f "$bdir/files.tar.gz" ]; then
+        timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+            --security-opt no-new-privileges -v "$vol":/data -v "$bdir/files.tar.gz":/backup/files.tar.gz:ro --entrypoint sh \
+            "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && tar -C /data -xzpf /backup/files.tar.gz' >/dev/null 2>&1
+        return
+    fi
+    st=$(_kei_bk_stage_ref "$bdir" tainacan) || return 1
+    IFS=$'\t' read -r stage tree <<< "$st"
     timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
-        --security-opt no-new-privileges -v "$vol":/data -v "$bdir/files.tar.gz":/backup/files.tar.gz:ro --entrypoint sh \
-        "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && tar -C /data -xzpf /backup/files.tar.gz' >/dev/null 2>&1
+        --security-opt no-new-privileges -v "$vol":/data -v "$tree":/backup/tree:ro --entrypoint sh \
+        "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && cp -a /backup/tree/. /data/' >/dev/null 2>&1
+    rc=$?
+    rm -rf "$stage"
+    return "$rc"
 }
 _kei_tn_load_db() {
     local which="$1" bdir="$2" cid dir="$KEI_TAINACAN_DIR"
@@ -13422,14 +13291,29 @@ _kei_tn_rt_down() {
 # copy and checked; the copy goes afterwards (KEI_TAINACAN_KEEP_RT=1 keeps
 # it, for tests). The installation in use is not touched.
 kei_tainacan_restore_test() {
-    local bdir rc out subnet rt="$KEI_TAINACAN_DIR/rt"
+    local bdir rc out subnet rt="$KEI_TAINACAN_DIR/rt" sec src note=""
+    _kei_bk_lock tainacan || return $?
     bdir=$(_kei_tn_resolve "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
     [ -n "$bdir" ] || { echo "$(t "Backup not found.")" >&2; return 2; }
     kei_tainacan_backup_check "$bdir" || return $?
     _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    sec=$(_kei_bk_secrets_open "$bdir"); src=$?
+    if [ "$src" = 7 ] && [ -n "${KEI_BACKUP_PHRASE:-}" ]; then
+        echo "$(t "The recovery phrase does not open this backup.")" >&2; return 7
+    fi
+    [ "$src" = 0 ] || [ "$src" = 7 ] || { echo "$(t "The configuration in the backup is damaged.")" >&2; return 4; }
+    [ "$src" = 7 ] && [ ! -f "$KEI_TAINACAN_DIR/.env" ] && { echo "$(t "The recovery phrase is needed.")" >&2; return 7; }
     _kei_tn_rt_down
     mkdir -p "$rt/work" && chmod 700 "$rt" || return 1
-    ( umask 077; cp "$bdir/secrets/.env" "$rt/.env" ) || return 1
+    if [ "$src" = 0 ]; then
+        ( umask 077; cp "$sec/.env" "$rt/.env" ) || { rm -rf "$sec"; return 1; }
+        rm -rf "$sec"
+    else
+        # Encrypted configuration and no phrase: the copy runs with this
+        # installation's configuration (the data is what is tested).
+        ( umask 077; cp "$KEI_TAINACAN_DIR/.env" "$rt/.env" ) || return 1
+        note=" $(t "(configuration not opened: no recovery phrase)")"
+    fi
     _kei_tn_compose rt > "$rt/compose.yml" && _kei_tn_php_ini > "$rt/php.ini" && _kei_tn_nomail_plugin > "$rt/kn-restore-test.php" || return 1
     chmod 644 "$rt/compose.yml" "$rt/php.ini" "$rt/kn-restore-test.php"
     # An internal network (no way out), isolated like the platform's own.
@@ -13462,20 +13346,34 @@ kei_tainacan_restore_test() {
         return 1
     fi
     log "tainacan: restore test of $bdir passed ($out)"
-    echo "$(b="${bdir##*/}"; t "Restore test passed for \${b}: the isolated copy had the same collections, items and attachments, and answered through the API.") ($out)"
+    echo "$(b="${bdir##*/}"; t "Restore test passed for \${b}: the isolated copy had the same collections, items and attachments, and answered through the API.") ($out)$note"
 }
 
 # kei_tainacan_restore BACKUP: test first; then a safety backup of what is
 # there, the backup on the real installation, and the check; when the
 # check fails, the safety backup goes back.
 kei_tainacan_restore() {
-    local bdir safety out old new rc
+    local bdir safety out old new rc sec src k v conf
+    _kei_bk_lock tainacan || return $?
     bdir=$(_kei_tn_resolve "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
     [ -n "$bdir" ] || { echo "$(t "Backup not found.")" >&2; return 2; }
     [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
     if [ "${_KEI_TN_ROLLBACK:-}" != 1 ]; then
         kei_tainacan_restore_test "$bdir" >/dev/null || return $?
-        safety=$(kei_tainacan_backup pre-restore) || { echo "$(t "The safety backup failed: nothing was restored.")" >&2; return 1; }
+        safety=$(KEI_BK_PROTECT="$bdir" kei_tainacan_backup pre-restore) || { echo "$(t "The safety backup failed: nothing was restored.")" >&2; return 1; }
+    fi
+    # The keys of the sessions (salts) of the backup, when its configuration
+    # opens; the database passwords stay those of this installation.
+    sec=$(_kei_bk_secrets_open "$bdir"); src=$?
+    conf="$(t "Configuration kept from this installation (no recovery phrase).")"
+    ( umask 077; cp -p "$KEI_TAINACAN_DIR/.env" "$KEI_TAINACAN_DIR/.env.before-restore" ) || return 1
+    if [ "$src" = 0 ]; then
+        for k in KN_AUTH_KEY KN_SECURE_AUTH_KEY KN_LOGGED_IN_KEY KN_NONCE_KEY KN_AUTH_SALT KN_SECURE_AUTH_SALT KN_LOGGED_IN_SALT KN_NONCE_SALT; do
+            v=$(_kei_tn_env "$k" "$sec")
+            [ -n "$v" ] && _kei_tn_env_set "$k" "$v"
+        done
+        rm -rf "$sec"
+        conf="$(t "The configuration of the backup came back.")"
     fi
     _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1
     rc=0
@@ -13489,6 +13387,8 @@ kei_tainacan_restore() {
     fi
     if [ "$rc" = 0 ]; then out=$(_kei_tn_validate "$bdir") || rc=1; else out="$(t "loading failed")"; fi
     if [ "$rc" != 0 ]; then
+        # The configuration of this installation comes back with the data.
+        mv -f "$KEI_TAINACAN_DIR/.env.before-restore" "$KEI_TAINACAN_DIR/.env"
         if [ "${_KEI_TN_ROLLBACK:-}" != 1 ] && [ -n "$safety" ]; then
             _KEI_TN_ROLLBACK=1 kei_tainacan_restore "$safety" >/dev/null 2>&1
             echo "$(t "The restore did not pass the check, so the previous state was put back:") $out" >&2
@@ -13498,9 +13398,10 @@ kei_tainacan_restore() {
         log "tainacan: restore of $bdir failed: $out"
         return 1
     fi
+    rm -f "$KEI_TAINACAN_DIR/.env.before-restore"
     log "tainacan: restored $bdir"
     [ "${_KEI_TN_ROLLBACK:-}" = 1 ] && return 0
-    echo "$(b="${bdir##*/}"; s="${safety##*/}"; t "Restored \${b}. The state before is in the safety backup \${s}.") ($out)"
+    echo "$(b="${bdir##*/}"; s="${safety##*/}"; t "Restored \${b}. The state before is in the safety backup \${s}.") ($out) $conf"
 }
 
 # ----------------------------------------------------------------------
@@ -13580,6 +13481,7 @@ kei_tainacan_uninstall() {
     kei_docker_platform_remove "$KEI_TAINACAN_ID" "$data" || failed=1
     kei_platform_release "$KEI_TAINACAN_ID" >/dev/null || failed=1
     kei_owned_del package apache2 "$KEI_TAINACAN_ID"
+    [ -n "$(_kei_bk_get schedule_tainacan)" ] && kei_backup_schedule tainacan off >/dev/null 2>&1
     if [ "$data" = delete ]; then
         rm -rf -- "$KEI_TAINACAN_DIR"
     else
@@ -13596,6 +13498,1016 @@ kei_tainacan_uninstall() {
         echo "$(t "Tainacan was uninstalled. Its data was kept: installing it again uses it.")"
     fi
 }
+
+# ======================================================================
+# PLATFORM BACKUP ENGINE (journal and resume, encrypted secrets, restic)
+# ======================================================================
+# One engine for the platforms in containers (Tainacan today). Koha's own
+# backup (backup_sql.sh, MARC21, cloud plans) does not use it and does not
+# change.
+#
+# A package (format 2), /var/backups/koha-nexus/<platform>/knx-<platform>-<time>/:
+#   journal.jsonl      one line per step, from the start
+#   db.sql.gz          the database (written as .part, renamed when done)
+#   files.tar.gz       the files tree (self-contained package), or
+#   files.ref.json     a restic snapshot of it (referenced package)
+#   secrets.tar.gpg    the platform's .env, compose.yml and state, encrypted
+#                      to the backup key (plain secrets/ when no key exists)
+#   manifest.json      written last; without it nothing is restorable
+#   SHA256SUMS
+#
+# Steps: capture (writes-stopped, db, files, writes-resumed, capture-done)
+# inside the window without writes, then secrets, manifest, copy (to a
+# cloud remote, when set) and done. Resume: an unfinished capture is done
+# again whole (database and files must be of the same moment); after the
+# capture, the next step goes on, with the parts done checked by sha256. A
+# window left open by a crash is closed (writers started) first by every
+# engine action on that platform.
+#
+# Keys: GnuPG in $KEI_BK_DIR/gnupg. The server keeps the public key and the
+# private key protected by the recovery phrase; the phrase is shown once
+# and never stored. Scheduled backups encrypt without it. The recovery kit
+# holds the protected private key, the restic passwords encrypted to the
+# key and the procedure, not the phrase.
+#
+# Platform adapters: _kei_bk_<platform>_{preflight,size,stop,start,meta,
+# dump,tar,path,after,secrets}.
+KEI_BK_DIR="${KEI_BK_DIR:-$KEI_OWNED_DIR/backup}"
+KEI_BK_ROOT="${KEI_BK_ROOT:-/var/backups/koha-nexus}"
+KEI_BK_CRON="${KEI_BK_CRON:-/etc/cron.d/koha-nexus-platform-backups}"
+KEI_BK_KEEP_LAST="${KEI_BK_KEEP_LAST:-7}"
+KEI_BK_KEEP_DAILY="${KEI_BK_KEEP_DAILY:-7}"
+KEI_BK_KEEP_WEEKLY="${KEI_BK_KEEP_WEEKLY:-4}"
+KEI_BK_KEEP_MONTHLY="${KEI_BK_KEEP_MONTHLY:-6}"
+KEI_BK_RATIO="${KEI_BK_RATIO:-100}"
+KEI_BK_RATIO_FLOOR_MB="${KEI_BK_RATIO_FLOOR_MB:-64}"
+KEI_BK_PLATFORMS="tainacan"
+KEI_BK_UID="Koha.Nexus backup <backup@koha-nexus.invalid>"
+KEI_BK_CHECK_TEXT="koha-nexus-recovery-kit-check"
+
+_kei_bk_known() { case " $KEI_BK_PLATFORMS " in *" ${1:-} "*) return 0 ;; esac; return 1; }
+_kei_bk_pdir() { if [ "$1" = tainacan ]; then printf '%s' "$KEI_TAINACAN_BACKUPS"; else printf '%s/%s' "$KEI_BK_ROOT" "$1"; fi; }
+_kei_bk_conf() { printf '%s/config' "$KEI_BK_DIR"; }
+_kei_bk_get() { local f; f=$(_kei_bk_conf); [ -f "$f" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "$f"; }
+_kei_bk_set() {
+    local f tmp
+    f=$(_kei_bk_conf)
+    mkdir -p "$KEI_BK_DIR" && chmod 700 "$KEI_BK_DIR" || return 1
+    tmp=$(mktemp "$f.XXXXXX") || return 1
+    { [ -f "$f" ] && awk -F= -v k="$1" '$1 != k' "$f"; [ -n "${2:-}" ] && printf '%s=%s\n' "$1" "${2//$'\n'/ }"; } > "$tmp"
+    chmod 600 "$tmp" && mv -f "$tmp" "$f"
+}
+_kei_bk_sha() { sha256sum "$1" | awk '{ print $1 }'; }
+_kei_bk_size() { stat -c %s "$1" 2>/dev/null || echo 0; }
+_kei_bk_now() { printf '%s' "${_KEI_BK_NOW:-$(date +%s)}"; }
+
+# _kei_bk_journal DIR STEP [KEY VALUE]...
+_kei_bk_journal() {
+    local dir="$1" step="$2" line
+    shift 2
+    line="{\"at\":$(json_str "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"),\"step\":$(json_str "$step")"
+    while [ $# -ge 2 ]; do line+=",$(json_str "$1"):$(json_str "$2")"; shift 2; done
+    printf '%s}\n' "$line" >> "$dir/journal.jsonl"
+    chmod 600 "$dir/journal.jsonl" 2>/dev/null
+    # Tests: a crash right after a step (the process dies, as with a power cut).
+    if [ -n "${_KEI_BK_CRASH_AFTER:-}" ] && [ "$_KEI_BK_CRASH_AFTER" = "$step" ]; then kill -KILL "$BASHPID"; fi
+    return 0
+}
+_kei_bk_steps() { [ -f "$1/journal.jsonl" ] && sed -n 's/.*"step":"\([a-z-]*\)".*/\1/p' "$1/journal.jsonl"; }
+_kei_bk_has() { _kei_bk_steps "$1" | grep -qx "$2"; }
+# The sha256 the journal recorded for FILE (the last one).
+_kei_bk_part_sha() { sed -n "s/.*\"file\":\"$2\".*\"sha256\":\"\\([0-9a-f]*\\)\".*/\\1/p" "$1/journal.jsonl" 2>/dev/null | tail -n 1; }
+# The window is open: writers stopped and not started again.
+_kei_bk_window_open() { [ "$(_kei_bk_steps "$1" | grep -E '^writes-(stopped|resumed)$' | tail -n 1)" = writes-stopped ]; }
+
+# _kei_bk_mget DIR KEY: a value of manifest.json.
+_kei_bk_mget() {
+    [ -f "$1/manifest.json" ] || return 1
+    sed -n -e "s/^  \"$2\": \"\\(.*\\)\",\\{0,1\\}\$/\\1/p" -e "s/^  \"$2\": \\([^\",]*\\),\\{0,1\\}\$/\\1/p" "$1/manifest.json" | head -n 1
+}
+
+# _kei_bk_lock PLATFORM: one engine action at a time per platform (the
+# lock goes with the process; nested calls of the same process pass).
+_kei_bk_lock() {
+    local fd
+    [ "${_KEI_BK_LOCKED:-}" = "$1" ] && return 0
+    mkdir -p "$KEI_BK_DIR" && chmod 700 "$KEI_BK_DIR" || return 1
+    exec {fd}>"$KEI_BK_DIR/$1.lock" || return 1
+    if ! flock -n "$fd"; then
+        echo "$(t "Another backup action of this platform is running. Try again when it ends.")" >&2
+        return 9
+    fi
+    _KEI_BK_LOCKED="$1"
+}
+
+# kei_backup_list PLATFORM: complete packages, newest first:
+# "DIR<TAB>created<TAB>label<TAB>mode".
+kei_backup_list() {
+    local p="$1" pd d mode
+    pd=$(_kei_bk_pdir "$p")
+    [ -d "$pd" ] || return 0
+    for d in "$pd"/knx-"$p"-*/; do
+        d="${d%/}"
+        [ -f "$d/manifest.json" ] || continue
+        [ "$(_kei_bk_mget "$d" complete)" = true ] || continue
+        mode=self; [ -f "$d/files.ref.json" ] && mode=ref
+        printf '%s\t%s\t%s\t%s\n' "$d" "$(_kei_bk_mget "$d" created)" "$(_kei_bk_mget "$d" label)" "$mode"
+    done | sort -t$'\t' -k2,2r -k1,1r
+}
+
+# kei_backup_incomplete [PLATFORM]: packages whose journal has no "done":
+# "DIR<TAB>last step<TAB>restorable yes|no".
+kei_backup_incomplete() {
+    local p d last ok
+    for p in ${1:-$KEI_BK_PLATFORMS}; do
+        _kei_bk_known "$p" || continue
+        for d in "$(_kei_bk_pdir "$p")"/knx-"$p"-*/; do
+            d="${d%/}"
+            [ -f "$d/journal.jsonl" ] || continue
+            _kei_bk_has "$d" done && continue
+            last=$(_kei_bk_steps "$d" | tail -n 1)
+            ok=no; [ "$(_kei_bk_mget "$d" complete 2>/dev/null)" = true ] && ok=yes
+            printf '%s\t%s\t%s\n' "$d" "${last:-none}" "$ok"
+        done
+    done
+}
+
+# _kei_bk_recover PLATFORM: a window left open by a crash is closed.
+_kei_bk_recover() {
+    local p="$1" d
+    while IFS=$'\t' read -r d _ _; do
+        [ -n "$d" ] || continue
+        if _kei_bk_window_open "$d"; then
+            if "_kei_bk_${p}_start"; then
+                _kei_bk_journal "$d" writes-resumed reason recovered
+                log "$p: writers started again after an interrupted backup ($d)"
+            else
+                echo "$(t "The platform stopped by an interrupted backup could not be started again.")" >&2
+                return 1
+            fi
+        fi
+    done < <(kei_backup_incomplete "$p")
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Keys, recovery phrase, recovery kit.
+# ----------------------------------------------------------------------
+_kei_bk_home() { printf '%s/gnupg' "$KEI_BK_DIR"; }
+_kei_bk_gpg() { GNUPGHOME="$(_kei_bk_home)" gpg --batch --quiet --no-tty --trust-model always "$@"; }
+_kei_bk_gpg_done() { GNUPGHOME="$(_kei_bk_home)" gpgconf --kill gpg-agent >/dev/null 2>&1; return 0; }
+# _kei_bk_gpg_phrase PHRASE ARGS: gpg with the phrase on a descriptor (never
+# on the command line). The agent caches nothing (gpg-agent.conf).
+_kei_bk_gpg_phrase() {
+    local phrase="$1" rc
+    shift
+    _kei_bk_gpg --pinentry-mode loopback --passphrase-fd 3 "$@" 3< <(printf '%s' "$phrase"); rc=$?
+    _kei_bk_gpg_done
+    return "$rc"
+}
+_kei_bk_fpr() { _kei_bk_get fpr; }
+_kei_bk_has_key() { local f; f=$(_kei_bk_fpr); [ -n "$f" ] && _kei_bk_gpg --list-keys "$f" >/dev/null 2>&1; }
+_kei_bk_home_init() {
+    local h
+    h=$(_kei_bk_home)
+    mkdir -p "$h" && chmod 700 "$KEI_BK_DIR" "$h" || return 1
+    printf 'default-cache-ttl 0\nmax-cache-ttl 0\nallow-loopback-pinentry\n' > "$h/gpg-agent.conf" && chmod 600 "$h/gpg-agent.conf"
+}
+# A phrase of 24 letters and digits in groups of 4 (120 bits).
+_kei_bk_new_phrase() {
+    local s=""
+    while [ "${#s}" -lt 24 ]; do s+=$(head -c 64 /dev/urandom | tr -dc 'A-HJ-NP-Z2-9'); done
+    s="${s:0:24}"
+    printf '%s-%s-%s-%s-%s-%s' "${s:0:4}" "${s:4:4}" "${s:8:4}" "${s:12:4}" "${s:16:4}" "${s:20:4}"
+}
+
+# kei_backup_plan: what setting up encrypted backups does.
+kei_backup_plan() {
+    local p missing=""
+    command -v gpg >/dev/null 2>&1 || missing+=" gnupg"
+    command -v restic >/dev/null 2>&1 || missing+=" restic"
+    if _kei_bk_has_key; then printf 'plan\tready\n'; else printf 'plan\tsetup\n'; fi
+    printf 'key\t%s\n' "$(_kei_bk_fpr)"
+    for p in $missing; do printf 'package\t%s\n' "$p"; done
+    printf 'phrase\t%s\n' "$(t "A recovery phrase is shown once: write it down and keep it away from this server. Without it, the encrypted configuration of a backup cannot be read.")"
+}
+
+# kei_backup_setup confirm: packages (gnupg, restic), the key pair, the
+# recovery phrase (KEI_BACKUP_PHRASE, or a new one shown once) and the kit.
+kei_backup_setup() {
+    local phrase="${KEI_BACKUP_PHRASE:-}" shown=no fpr pk
+    [ "${1:-}" = confirm ] || { kei_backup_plan; return 3; }
+    if _kei_bk_has_key; then echo "$(t "Encrypted backups are already set up.")"; return 0; fi
+    pk=""
+    command -v gpg >/dev/null 2>&1 || pk+=" gnupg"
+    command -v restic >/dev/null 2>&1 || pk+=" restic"
+    if [ -n "$pk" ]; then
+        # shellcheck disable=SC2086
+        apt_install $pk >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $pk >/dev/null 2>&1 \
+            || { echo "$(p="$pk"; t "Could not install:\${p}")" >&2; return 1; }
+    fi
+    if [ -z "$phrase" ]; then phrase=$(_kei_bk_new_phrase); shown=yes; fi
+    [ "${#phrase}" -ge 12 ] || { echo "$(t "The recovery phrase must have at least 12 characters.")" >&2; return 2; }
+    _kei_bk_home_init || return 1
+    _kei_bk_gpg_phrase "$phrase" --quick-generate-key "$KEI_BK_UID" future-default default never >/dev/null 2>&1 \
+        || { echo "$(t "The backup key could not be created.")" >&2; return 1; }
+    fpr=$(_kei_bk_gpg --list-keys --with-colons "$KEI_BK_UID" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')
+    [ -n "$fpr" ] || { echo "$(t "The backup key could not be created.")" >&2; return 1; }
+    ( umask 077
+      _kei_bk_gpg_phrase "$phrase" --armor --export-secret-keys "$fpr" > "$KEI_BK_DIR/secret-key.asc"
+      _kei_bk_gpg --armor --export "$fpr" > "$KEI_BK_DIR/public-key.asc"
+      printf '%s' "$KEI_BK_CHECK_TEXT" | _kei_bk_gpg --armor -r "$fpr" --encrypt > "$KEI_BK_DIR/check.asc" ) || return 1
+    grep -q 'PRIVATE KEY BLOCK' "$KEI_BK_DIR/secret-key.asc" || { echo "$(t "The backup key could not be exported.")" >&2; return 1; }
+    _kei_bk_set fpr "$fpr"
+    _kei_bk_set created "$(date '+%Y-%m-%d %H:%M:%S')"
+    kei_backup_kit >/dev/null || return 1
+    log "backup: key $fpr created"
+    if [ "$shown" = yes ]; then
+        echo "$(t "Recovery phrase (write it down now; it is not saved on this server):") $phrase"
+    fi
+    echo "$(f="$KEI_BK_DIR/recovery-kit.txt"; t "Encrypted backups are set up. Keep a copy of the recovery kit away from this server: \${f}")"
+}
+
+# _kei_bk_restic_pass PLATFORM: the password file of its restic repositories.
+_kei_bk_restic_pass() { printf '%s/restic-%s.pass' "$KEI_BK_DIR" "$1"; }
+
+# kei_backup_kit [FILE]: the recovery kit (default $KEI_BK_DIR/recovery-kit.txt).
+kei_backup_kit() {
+    local out="${1:-$KEI_BK_DIR/recovery-kit.txt}" fpr p r tmp
+    fpr=$(_kei_bk_fpr)
+    [ -n "$fpr" ] && [ -f "$KEI_BK_DIR/secret-key.asc" ] || { echo "$(t "Encrypted backups are not set up.")" >&2; return 3; }
+    tmp=$(mktemp "$out.XXXXXX") || return 1
+    chmod 600 "$tmp"
+    {
+        printf '# Koha.Nexus recovery kit. Keep it away from the server, with the recovery\n'
+        printf '# phrase written down apart from it. The kit alone does not open anything.\n'
+        printf '#\n# To use on a new server: install Koha.Nexus and the platform, then\n'
+        printf '#   sudo KEI_BACKUP_PHRASE=... config.sh --task platform-backup-kit-import /path/to/this/file\n'
+        printf '# and restore a backup copied from the cloud (Platforms, Restore).\n'
+        printf 'fingerprint=%s\n' "$fpr"
+        printf 'created=%s\n' "$(_kei_bk_get created)"
+        printf 'host=%s\n' "$(hostname 2>/dev/null)"
+        for p in $KEI_BK_PLATFORMS; do
+            r=$(_kei_bk_get "repo_$p"); [ -n "$r" ] && printf 'repo_%s=%s\n' "$p" "$r"
+            r=$(_kei_bk_get "copy_$p"); [ -n "$r" ] && printf 'copy_%s=%s\n' "$p" "$r"
+        done
+        printf '@@begin secret-key\n'; cat "$KEI_BK_DIR/secret-key.asc"; printf '@@end\n'
+        printf '@@begin check\n'; cat "$KEI_BK_DIR/check.asc"; printf '@@end\n'
+        for p in $KEI_BK_PLATFORMS; do
+            [ -f "$(_kei_bk_restic_pass "$p")" ] || continue
+            printf '@@begin restic-%s\n' "$p"
+            _kei_bk_gpg --armor -r "$fpr" --encrypt < "$(_kei_bk_restic_pass "$p")" || { rm -f "$tmp"; return 1; }
+            printf '@@end\n'
+        done
+    } > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$out" || return 1
+    printf '%s\n' "$out"
+}
+
+# _kei_bk_kit_section FILE NAME: one @@begin NAME ... @@end block.
+_kei_bk_kit_section() { awk -v n="$2" '$0 == "@@begin " n { on = 1; next } $0 == "@@end" { on = 0 } on' "$1"; }
+
+# kei_backup_kit_import FILE: on a new server, with KEI_BACKUP_PHRASE: the
+# key, the restic passwords and the repositories of the kit.
+kei_backup_kit_import() {
+    local kit="${1:-}" phrase="${KEI_BACKUP_PHRASE:-}" fpr old line p
+    [ -f "$kit" ] && grep -q '^@@begin secret-key$' "$kit" || { echo "$(t "This is not a Koha.Nexus recovery kit.")" >&2; return 2; }
+    [ -n "$phrase" ] || { echo "$(t "The recovery phrase is needed.")" >&2; return 7; }
+    fpr=$(sed -n 's/^fingerprint=\([0-9A-F]\{40,64\}\)$/\1/p' "$kit" | head -n 1)
+    [ -n "$fpr" ] || { echo "$(t "This is not a Koha.Nexus recovery kit.")" >&2; return 2; }
+    old=$(_kei_bk_fpr)
+    if [ -n "$old" ] && [ "$old" != "$fpr" ]; then
+        echo "$(t "This server already has another backup key; it was not replaced.")" >&2; return 3
+    fi
+    _kei_bk_home_init || return 1
+    _kei_bk_kit_section "$kit" secret-key | _kei_bk_gpg_phrase "$phrase" --import >/dev/null 2>&1
+    [ "$(_kei_bk_kit_section "$kit" check | _kei_bk_gpg_phrase "$phrase" --decrypt 2>/dev/null)" = "$KEI_BK_CHECK_TEXT" ] \
+        || { echo "$(t "The recovery phrase does not open this kit.")" >&2; return 7; }
+    ( umask 077
+      _kei_bk_kit_section "$kit" secret-key > "$KEI_BK_DIR/secret-key.asc"
+      _kei_bk_kit_section "$kit" check > "$KEI_BK_DIR/check.asc"
+      _kei_bk_gpg --armor --export "$fpr" > "$KEI_BK_DIR/public-key.asc" ) || return 1
+    _kei_bk_set fpr "$fpr"
+    _kei_bk_set created "$(sed -n 's/^created=//p' "$kit" | head -n 1)"
+    for p in $KEI_BK_PLATFORMS; do
+        if grep -qx "@@begin restic-$p" "$kit"; then
+            ( umask 077; _kei_bk_kit_section "$kit" "restic-$p" | _kei_bk_gpg_phrase "$phrase" --decrypt > "$(_kei_bk_restic_pass "$p")" 2>/dev/null ) \
+                || { echo "$(t "A restic password of the kit could not be read.")" >&2; return 1; }
+        fi
+        line=$(sed -n "s/^repo_$p=//p" "$kit" | head -n 1); [ -n "$line" ] && _kei_bk_set "repo_$p" "$line"
+        line=$(sed -n "s/^copy_$p=//p" "$kit" | head -n 1); [ -n "$line" ] && _kei_bk_set "copy_$p" "$line"
+    done
+    log "backup: recovery kit imported ($fpr)"
+    echo "$(t "The recovery kit was imported: this server can read the backups made with it.")"
+}
+
+# ----------------------------------------------------------------------
+# restic and the cloud copy.
+# ----------------------------------------------------------------------
+# _kei_bk_repo_url VALUE: local -> the directory; rclone:REMOTE:PATH as is.
+_kei_bk_repo_url() {
+    case "$2" in
+        local) printf '%s/restic/%s' "$KEI_BK_ROOT" "$1" ;;
+        rclone:*:*) printf '%s' "$2" ;;
+        /*) printf '%s' "$2" ;;
+        *) return 2 ;;
+    esac
+}
+# _kei_bk_restic PLATFORM REPO ARGS...
+_kei_bk_restic() {
+    local p="$1" repo="$2"
+    shift 2
+    RESTIC_REPOSITORY="$repo" RESTIC_PASSWORD_FILE="$(_kei_bk_restic_pass "$p")" RESTIC_CACHE_DIR="$KEI_BK_DIR/cache" \
+        timeout "${KEI_BK_RESTIC_TIMEOUT:-14400}" restic "$@"
+}
+
+# kei_backup_repo PLATFORM local|rclone:REMOTE:PATH|none: where the files
+# tree goes as restic snapshots (none: self-contained packages).
+kei_backup_repo() {
+    local p="${1:-}" v="${2:-}" url
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    if [ "$v" = none ]; then
+        _kei_bk_set "repo_$p" ""
+        echo "$(t "New backups of this platform will be self-contained. The snapshots already made stay in their repository.")"
+        return 0
+    fi
+    url=$(_kei_bk_repo_url "$p" "$v") || { echo "$(t "Use local, or rclone:REMOTE:PATH with a cloud connection of the panel.")" >&2; return 2; }
+    command -v restic >/dev/null 2>&1 || { echo "$(t "restic is not installed: set up encrypted backups first.")" >&2; return 3; }
+    case "$v" in rclone:*) command -v rclone >/dev/null 2>&1 || { echo "$(t "rclone is not installed.")" >&2; return 3; } ;; esac
+    _kei_bk_lock "$p" || return $?
+    mkdir -p "$KEI_BK_DIR" && chmod 700 "$KEI_BK_DIR"
+    [ -s "$(_kei_bk_restic_pass "$p")" ] || ( umask 077; _kei_tn_random 40 > "$(_kei_bk_restic_pass "$p")" ) || return 1
+    case "$url" in /*) mkdir -p "$url" && chmod 700 "$url" || return 1 ;; esac
+    if ! _kei_bk_restic "$p" "$url" cat config >/dev/null 2>&1; then
+        _kei_bk_restic "$p" "$url" init >/dev/null 2>&1 || { echo "$(t "The restic repository could not be opened or created (password or address).")" >&2; return 1; }
+    fi
+    _kei_bk_set "repo_$p" "$url"
+    _kei_bk_has_key && kei_backup_kit >/dev/null
+    log "backup: $p repository $url"
+    echo "$(r="$url"; t "Files of this platform now go to the restic repository \${r}. Save the recovery kit again.")"
+}
+
+# kei_backup_copy PLATFORM REMOTE:PATH|none: each package is also copied there.
+kei_backup_copy() {
+    local p="${1:-}" v="${2:-}"
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    if [ "$v" = none ]; then _kei_bk_set "copy_$p" ""; echo "$(t "Packages are no longer copied.")"; return 0; fi
+    [[ "$v" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}:[A-Za-z0-9_./-]*$ ]] && [[ "$v" != *..* ]] || { echo "$(t "Use REMOTE:PATH, with a cloud connection of the panel.")" >&2; return 2; }
+    # The configuration (passwords of the platform) never leaves the server in clear.
+    _kei_bk_has_key || { echo "$(t "Set up the backup key first: without it the configuration would go to the cloud unencrypted.")" >&2; return 6; }
+    command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "${v%%:*}:" \
+        || { echo "$(r="${v%%:*}"; t "There is no cloud connection named \${r}.")" >&2; return 3; }
+    _kei_bk_set "copy_$p" "$v"
+    _kei_bk_has_key && kei_backup_kit >/dev/null
+    echo "$(r="$v"; t "Each new package will also be copied to \${r}.")"
+}
+
+# ----------------------------------------------------------------------
+# Making a package.
+# ----------------------------------------------------------------------
+# kei_backup_run PLATFORM [LABEL]: a package; prints its directory.
+kei_backup_run() {
+    local p="${1:-}" label="${2:-manual}" pd ts dir n need free
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    [[ "$label" =~ ^[a-z0-9-]{1,20}$ ]] || label=manual
+    _kei_bk_lock "$p" || return $?
+    _kei_bk_recover "$p" || return 1
+    "_kei_bk_${p}_preflight" || return $?
+    pd=$(_kei_bk_pdir "$p")
+    mkdir -p "$pd" && chmod 700 "$pd" "${pd%/*}" 2>/dev/null
+    need=$("_kei_bk_${p}_size"); need=$(( ${need:-0} * 12 / 10 + 50 ))
+    free=$(df -Pm "$pd" 2>/dev/null | awk 'NR == 2 { print $4 }')
+    if [ -n "$free" ] && [ "$free" -lt "$need" ]; then
+        echo "$(a="$free"; b="$need"; t "Not enough free disk for the backup: \${a} MB free, about \${b} MB needed.")" >&2; return 5
+    fi
+    ts=$(date '+%Y%m%d-%H%M%S'); dir="$pd/knx-$p-$ts"; n=1
+    while [ -e "$dir" ]; do dir="$pd/knx-$p-$ts-$n"; n=$((n + 1)); done
+    mkdir -m 700 "$dir" || return 1
+    _kei_bk_journal "$dir" start label "$label" platform "$p"
+    _kei_bk_capture "$p" "$dir" || return 1
+    _kei_bk_post "$p" "$dir" || return 1
+    # shellcheck disable=SC2086
+    kei_backup_retention "$p" "$dir" ${KEI_BK_PROTECT:-} >/dev/null 2>&1
+    printf '%s\n' "$dir"
+}
+
+# _kei_bk_capture PLATFORM DIR: the window without writes.
+_kei_bk_capture() {
+    local p="$1" dir="$2" repo t0 t1 rc=0 ps err="" path snap out
+    repo=$(_kei_bk_get "repo_$p")
+    _kei_bk_journal "$dir" capture mode "$([ -n "$repo" ] && echo ref || echo self)"
+    t0=$(date +%s)
+    if ! "_kei_bk_${p}_stop"; then
+        _kei_bk_journal "$dir" error what stop
+        echo "$(t "The platform could not be stopped for the backup.")" >&2
+        return 1
+    fi
+    _kei_bk_journal "$dir" writes-stopped
+    "_kei_bk_${p}_meta" > "$dir/.meta" 2>/dev/null || rc=1
+    if [ "$rc" = 0 ]; then
+        "_kei_bk_${p}_dump" 2>"$dir/.dump.err" | gzip -6 > "$dir/db.sql.gz.part"
+        ps=("${PIPESTATUS[@]}")
+        if [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/db.sql.gz.part" "$dir/db.sql.gz"; then
+            _kei_bk_journal "$dir" db file db.sql.gz bytes "$(_kei_bk_size "$dir/db.sql.gz")" sha256 "$(_kei_bk_sha "$dir/db.sql.gz")"
+        else rc=1; err=$(tail -n 3 "$dir/.dump.err" 2>/dev/null); fi
+    fi
+    if [ "$rc" = 0 ] && [ -n "$repo" ]; then
+        path=$("_kei_bk_${p}_path")
+        if [ -d "$path" ]; then
+            ( cd "$path" && find . -type f -printf '%P\t%s\n' | LC_ALL=C sort ) > "$dir/.files.list.full"
+            out=$(_kei_bk_restic "$p" "$repo" backup --json --host koha-nexus --tag "knx-$p" --tag "${dir##*/}" "$path" 2>"$dir/.tar.err")
+            snap=$(printf '%s\n' "$out" | sed -n 's/.*"message_type":"summary".*"snapshot_id":"\([0-9a-f]*\)".*/\1/p' | tail -n 1)
+            if [ -n "$snap" ]; then
+                {
+                    printf '{\n'
+                    printf '  "repository": %s,\n' "$(json_str "$repo")"
+                    printf '  "snapshot": %s,\n' "$(json_str "$snap")"
+                    printf '  "path": %s,\n' "$(json_str "$path")"
+                    printf '  "files": %s,\n' "$(json_num "$(wc -l < "$dir/.files.list.full")")"
+                    printf '  "bytes": %s,\n' "$(json_num "$(awk -F'\t' '{ s += $2 } END { printf "%d", s }' "$dir/.files.list.full")")"
+                    printf '  "list_sha256": %s\n' "$(json_str "$(_kei_bk_sha "$dir/.files.list.full")")"
+                    printf '}\n'
+                } > "$dir/files.ref.json.part" && mv -f "$dir/files.ref.json.part" "$dir/files.ref.json" || rc=1
+                cut -f1 "$dir/.files.list.full" > "$dir/.files.list"
+                rm -f "$dir/.files.list.full"
+            else rc=1; err=$(tail -n 3 "$dir/.tar.err" 2>/dev/null); fi
+        else rc=1; err="$(t "the files of the platform were not found")"; fi
+        [ "$rc" = 0 ] && _kei_bk_journal "$dir" files file files.ref.json bytes "$(_kei_bk_size "$dir/files.ref.json")" sha256 "$(_kei_bk_sha "$dir/files.ref.json")" snapshot "$snap"
+    elif [ "$rc" = 0 ]; then
+        "_kei_bk_${p}_tar" 2>"$dir/.tar.err" | gzip -6 > "$dir/files.tar.gz.part"
+        ps=("${PIPESTATUS[@]}")
+        if [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/files.tar.gz.part" "$dir/files.tar.gz"; then
+            gzip -dc "$dir/files.tar.gz" | tar -tf - 2>/dev/null | sed 's#^\./##' > "$dir/.files.list"
+            _kei_bk_journal "$dir" files file files.tar.gz bytes "$(_kei_bk_size "$dir/files.tar.gz")" sha256 "$(_kei_bk_sha "$dir/files.tar.gz")"
+        else rc=1; err=$(tail -n 3 "$dir/.tar.err" 2>/dev/null); fi
+    fi
+    "_kei_bk_${p}_start" || rc=1
+    t1=$(date +%s)
+    _kei_bk_journal "$dir" writes-resumed seconds "$((t1 - t0))"
+    rm -f "$dir/.dump.err" "$dir/.tar.err"
+    if [ "$rc" != 0 ]; then
+        _kei_bk_journal "$dir" error what "${err//$'\n'/ }"
+        rm -f "$dir"/*.part
+        echo "$(t "The backup failed; the platform was started again.") $err" >&2
+        return 1
+    fi
+    printf 'window_seconds\t%s\n' "$((t1 - t0))" >> "$dir/.meta"
+    _kei_bk_journal "$dir" capture-done seconds "$((t1 - t0))"
+}
+
+# _kei_bk_post PLATFORM DIR: secrets, manifest, copy; each step once.
+_kei_bk_post() {
+    local p="$1" dir="$2" fpr tmp f files k v dest name secrets=plain label ps
+    if ! _kei_bk_has "$dir" secrets; then
+        rm -rf "$dir/secrets" "$dir/secrets.tar.gpg" "$dir"/*.part
+        fpr=$(_kei_bk_fpr)
+        if [ -n "$fpr" ] && _kei_bk_has_key; then
+            tmp=$(mktemp -d) && chmod 700 "$tmp" || return 1
+            for f in $("_kei_bk_${p}_secrets"); do cp -p "$f" "$tmp/" || { rm -rf "$tmp"; echo "$(t "The configuration could not be copied.")" >&2; return 1; }; done
+            tar -C "$tmp" -czf - . | _kei_bk_gpg -r "$fpr" --encrypt > "$dir/secrets.tar.gpg.part"
+            ps=("${PIPESTATUS[@]}")
+            rm -rf "$tmp"
+            [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/secrets.tar.gpg.part" "$dir/secrets.tar.gpg" \
+                || { rm -f "$dir/secrets.tar.gpg.part"; echo "$(t "The configuration could not be encrypted.")" >&2; return 1; }
+            _kei_bk_journal "$dir" secrets file secrets.tar.gpg bytes "$(_kei_bk_size "$dir/secrets.tar.gpg")" sha256 "$(_kei_bk_sha "$dir/secrets.tar.gpg")" key "$fpr"
+        else
+            # No backup key yet: the configuration as in format 1 (600, 700).
+            mkdir -m 700 "$dir/secrets" || return 1
+            for f in $("_kei_bk_${p}_secrets"); do ( umask 077; cp "$f" "$dir/secrets/" ) || { echo "$(t "The configuration could not be copied.")" >&2; return 1; }; done
+            chmod 600 "$dir"/secrets/* "$dir"/secrets/.[!.]* 2>/dev/null
+            _kei_bk_journal "$dir" secrets plain yes
+        fi
+    fi
+    if ! _kei_bk_has "$dir" manifest; then
+        [ -f "$dir/secrets.tar.gpg" ] && secrets=gpg
+        "_kei_bk_${p}_after" "$dir" > "$dir/.meta.after" 2>/dev/null
+        label=$(sed -n 's/.*"step":"start".*"label":"\([a-z0-9-]*\)".*/\1/p' "$dir/journal.jsonl" | head -n 1)
+        {
+            printf '{\n'
+            printf '  "format": 2,\n'
+            printf '  "platform": %s,\n' "$(json_str "$p")"
+            printf '  "created": %s,\n' "$(json_str "$(date '+%Y-%m-%d %H:%M:%S')")"
+            printf '  "label": %s,\n' "$(json_str "${label:-manual}")"
+            printf '  "host": %s,\n' "$(json_str "$(hostname 2>/dev/null)")"
+            printf '  "mode": %s,\n' "$(json_str "$([ -f "$dir/files.ref.json" ] && echo ref || echo self)")"
+            printf '  "secrets": %s,\n' "$(json_str "$secrets")"
+            printf '  "key": %s,\n' "$(json_str "$([ "$secrets" = gpg ] && _kei_bk_fpr)")"
+            printf '  "db_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$dir/db.sql.gz")")"
+            if [ -f "$dir/files.tar.gz" ]; then printf '  "files_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$dir/files.tar.gz")")"; fi
+            while IFS=$'\t' read -r k v; do
+                [[ "$k" =~ ^[a-z_]{1,40}$ ]] || continue
+                printf '  "%s": %s,\n' "$k" "$v"
+            done < <(cat "$dir/.meta" "$dir/.meta.after" 2>/dev/null)
+            printf '  "complete": true\n'
+            printf '}\n'
+        } > "$dir/manifest.json.part"
+        files="db.sql.gz"
+        for f in files.tar.gz files.ref.json secrets.tar.gpg; do [ -f "$dir/$f" ] && files+=" $f"; done
+        [ -d "$dir/secrets" ] && for f in "$dir"/secrets/* "$dir"/secrets/.[!.]*; do [ -f "$f" ] && files+=" secrets/${f##*/}"; done
+        # shellcheck disable=SC2086
+        ( cd "$dir" && sha256sum $files manifest.json.part | sed 's/manifest.json.part$/manifest.json/' > SHA256SUMS ) || return 1
+        mv -f "$dir/manifest.json.part" "$dir/manifest.json" || return 1
+        chmod 600 "$dir"/*.gz "$dir"/*.json "$dir"/*.gpg "$dir/SHA256SUMS" 2>/dev/null
+        _kei_bk_journal "$dir" manifest file manifest.json sha256 "$(_kei_bk_sha "$dir/manifest.json")"
+    fi
+    dest=$(_kei_bk_get "copy_$p")
+    if [ -n "$dest" ] && ! _kei_bk_has "$dir" copy; then
+        name="${dir##*/}"
+        if [ -d "$dir/secrets" ]; then
+            _kei_bk_journal "$dir" error what copy dest "$dest" why plain
+            echo "$(t "The package was made here, but it was not copied: its configuration is not encrypted. Set up the backup key.")" >&2
+            return 1
+        fi
+        if ! timeout "${KEI_BK_COPY_TIMEOUT:-21600}" rclone copy --exclude '/.*' "$dir" "${dest%/}/$name" >/dev/null 2>&1 \
+            || ! timeout "${KEI_BK_COPY_TIMEOUT:-21600}" rclone check --one-way --exclude '/.*' "$dir" "${dest%/}/$name" >/dev/null 2>&1; then
+            _kei_bk_journal "$dir" error what copy dest "$dest"
+            echo "$(r="$dest"; t "The package was made here, but the copy to \${r} failed. Resume it from the panel.")" >&2
+            return 1
+        fi
+        _kei_bk_journal "$dir" copy dest "${dest%/}/$name"
+    fi
+    rm -f "$dir/.meta" "$dir/.meta.after" "$dir/.files.list"
+    _kei_bk_journal "$dir" done
+    log "$p: backup $dir"
+    return 0
+}
+
+# kei_backup_resume DIR|NAME: an interrupted package goes on.
+kei_backup_resume() {
+    local dir p f sha
+    dir=$(_kei_bk_resolve_any "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    p=$(_kei_bk_platform_of "$dir") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    _kei_bk_lock "$p" || return $?
+    _kei_bk_recover "$p" || return 1
+    if _kei_bk_has "$dir" done; then echo "$(t "This backup is complete: there is nothing to resume.")"; printf '%s\n' "$dir"; return 0; fi
+    if ! _kei_bk_has "$dir" capture-done; then
+        "_kei_bk_${p}_preflight" || return $?
+        _kei_bk_journal "$dir" capture-restart
+        rm -rf "$dir"/db.sql.gz "$dir"/files.tar.gz "$dir"/files.ref.json "$dir"/*.part "$dir"/.meta "$dir"/.files.list* "$dir/secrets" "$dir/secrets.tar.gpg"
+        _kei_bk_capture "$p" "$dir" || return 1
+    else
+        for f in db.sql.gz files.tar.gz files.ref.json; do
+            [ -f "$dir/$f" ] || continue
+            sha=$(_kei_bk_part_sha "$dir" "$f")
+            [ -n "$sha" ] && [ "$sha" = "$(_kei_bk_sha "$dir/$f")" ] || {
+                echo "$(n="$f"; t "A part already made (\${n}) changed since: discard this backup and make a new one.")" >&2; return 4; }
+        done
+        [ -f "$dir/.meta" ] || { echo "$(t "This backup cannot be resumed: discard it and make a new one.")" >&2; return 4; }
+    fi
+    _kei_bk_journal "$dir" resumed
+    _kei_bk_post "$p" "$dir" || return 1
+    kei_backup_retention "$p" "$dir" >/dev/null 2>&1
+    printf '%s\n' "$dir"
+}
+
+# kei_backup_discard DIR|NAME: an incomplete package goes (a restorable one
+# never does; a complete one waiting for its copy is resumed instead).
+kei_backup_discard() {
+    local dir p
+    dir=$(_kei_bk_resolve_any "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    p=$(_kei_bk_platform_of "$dir") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    _kei_bk_lock "$p" || return $?
+    _kei_bk_recover "$p" || return 1
+    if [ -f "$dir/manifest.json" ]; then
+        echo "$(t "This backup can be restored: it is not discarded. Resume it, or delete it on purpose.")" >&2; return 3
+    fi
+    rm -rf -- "$dir"
+    log "$p: incomplete backup $dir discarded"
+    echo "$(b="${dir##*/}"; t "The incomplete backup \${b} was discarded.")"
+}
+
+# _kei_bk_resolve_any NAME: a package directory of any platform.
+_kei_bk_resolve_any() {
+    local v="${1:-}" p
+    case "$v" in
+        "") return 2 ;;
+        /*) [ -d "$v" ] && [ -f "${v%/}/journal.jsonl" ] && printf '%s' "${v%/}" && return 0; return 2 ;;
+        knx-*) for p in $KEI_BK_PLATFORMS; do
+                   case "$v" in "knx-$p-"*) [ -d "$(_kei_bk_pdir "$p")/$v" ] && printf '%s' "$(_kei_bk_pdir "$p")/$v" && return 0 ;; esac
+               done ;;
+    esac
+    return 2
+}
+_kei_bk_platform_of() {
+    local name="${1##*/}" p
+    for p in $KEI_BK_PLATFORMS; do case "$name" in "knx-$p-"*) printf '%s' "$p"; return 0 ;; esac; done
+    return 1
+}
+
+# ----------------------------------------------------------------------
+# Checking a package before restoring it.
+# ----------------------------------------------------------------------
+# kei_bk_check_tar FILE [FREE_BYTES]: regular files, directories and links
+# that stay inside; no absolute path or ".."; the expanded size fits the
+# free space and the expansion stays below KEI_BK_RATIO (above the floor).
+kei_bk_check_tar() {
+    python3 -I - "$1" "${2:-0}" "$KEI_BK_RATIO" "$KEI_BK_RATIO_FLOOR_MB" <<'PYEOF'
+import os, posixpath, sys, tarfile
+path, free, ratio, floor = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]) << 20
+bad = []
+total = 0
+try:
+    with tarfile.open(path, "r:*") as tf:
+        for m in tf:
+            n = m.name
+            parts = n.split("/")
+            if n.startswith("/") or ".." in parts:
+                bad.append("unsafe path: " + n); continue
+            if m.isdev() or m.isfifo() or m.islnk():
+                bad.append("special file: " + n); continue
+            if m.issym():
+                target = m.linkname
+                full = posixpath.normpath(posixpath.join(posixpath.dirname(n), target))
+                if target.startswith("/") or full.startswith("..") or full.startswith("/"):
+                    bad.append("link outside: " + n)
+                continue
+            if not (m.isfile() or m.isdir()):
+                bad.append("unknown type: " + n); continue
+            total += m.size
+            if free and total > free:
+                bad.append("larger than the free disk"); break
+            if total > floor and total > ratio * max(os.path.getsize(path), 1):
+                bad.append("expands too much (%d bytes)" % total); break
+except Exception as exc:
+    print("unreadable archive: %s" % exc); sys.exit(1)
+if bad:
+    print("\n".join(bad[:20])); sys.exit(1)
+PYEOF
+}
+
+# kei_bk_check_tree DIR: a restored tree with no link out of it and no
+# device, fifo or socket.
+kei_bk_check_tree() {
+    python3 -I - "$1" <<'PYEOF'
+import os, stat, sys
+root = os.path.realpath(sys.argv[1])
+bad = []
+for d, dirs, files in os.walk(root):
+    for n in dirs + files:
+        p = os.path.join(d, n)
+        st = os.lstat(p)
+        if stat.S_ISLNK(st.st_mode):
+            t = os.readlink(p)
+            full = os.path.normpath(os.path.join(d, t))
+            if os.path.isabs(t) or not (full == root or full.startswith(root + os.sep)):
+                bad.append("link outside: " + os.path.relpath(p, root))
+        elif not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode)):
+            bad.append("special file: " + os.path.relpath(p, root))
+if bad:
+    print("\n".join(bad[:20])); sys.exit(1)
+PYEOF
+}
+
+# _kei_bk_free_bytes: the free bytes where a restore expands (the least of
+# the engine directory, Docker's data and the backups).
+_kei_bk_free_bytes() {
+    local d paths=()
+    for d in "$KEI_BK_DIR" "$KEI_OWNED_DIR" /var/lib/docker "$KEI_BK_ROOT"; do [ -d "$d" ] && paths+=("$d"); done
+    [ "${#paths[@]}" -gt 0 ] || { echo 0; return; }
+    df -PB1 "${paths[@]}" 2>/dev/null | awk 'NR > 1 && (m == "" || $4 < m) { m = $4 } END { print m + 0 }'
+}
+
+# kei_backup_check DIR [PLATFORM]: complete, valid manifest and checksums,
+# nothing unsafe; 4 otherwise.
+kei_backup_check() {
+    local dir="$1" p="${2:-}" free out limit n
+    [ -f "$dir/manifest.json" ] && [ "$(_kei_bk_mget "$dir" complete)" = true ] \
+        || { echo "$(t "This backup is not complete (no manifest): it cannot be restored.")" >&2; return 4; }
+    python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if isinstance(d, dict) and d.get("complete") is True else 1)' "$dir/manifest.json" 2>/dev/null \
+        || { echo "$(t "The backup manifest is damaged.")" >&2; return 4; }
+    if [ -n "$p" ] && [ "$(_kei_bk_mget "$dir" platform)" != "$p" ]; then
+        echo "$(t "This backup is of another platform.")" >&2; return 4
+    fi
+    [ -f "$dir/SHA256SUMS" ] || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
+    # Only names of the package itself.
+    n=$(grep -cvE '^[0-9a-f]{64}  (db\.sql\.gz|files\.tar\.gz|files\.ref\.json|secrets\.tar\.gpg|manifest\.json|secrets/(\.env|compose\.yml|state))$' "$dir/SHA256SUMS")
+    [ "$n" = 0 ] || { echo "$(t "The backup checksum list names files outside the package.")" >&2; return 4; }
+    grep -qE '  db\.sql\.gz$' "$dir/SHA256SUMS" && grep -qE '  manifest\.json$' "$dir/SHA256SUMS" \
+        && grep -qE '  files\.(tar\.gz|ref\.json)$' "$dir/SHA256SUMS" \
+        || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
+    ( cd "$dir" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ) || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
+    free=$(_kei_bk_free_bytes)
+    if [ -f "$dir/files.tar.gz" ]; then
+        out=$(kei_bk_check_tar "$dir/files.tar.gz" "$free") || { echo "$(t "The backup archive has unsafe entries:") $out" >&2; return 4; }
+    else
+        python3 -I -c '
+import json, re, sys
+d = json.load(open(sys.argv[1]))
+ok = isinstance(d, dict) and re.fullmatch(r"[0-9a-f]{8,64}", str(d.get("snapshot", ""))) \
+    and str(d.get("path", "")).startswith("/") and ".." not in str(d.get("path", "")).split("/") \
+    and re.fullmatch(r"[0-9a-f]{64}", str(d.get("list_sha256", ""))) and isinstance(d.get("repository"), str)
+sys.exit(0 if ok else 1)' "$dir/files.ref.json" 2>/dev/null || { echo "$(t "The reference to the restic snapshot is damaged.")" >&2; return 4; }
+    fi
+    gzip -t "$dir/db.sql.gz" 2>/dev/null || { echo "$(t "The database dump is damaged.")" >&2; return 4; }
+    limit=$free; [ "${limit:-0}" -gt 0 ] || limit=$((1 << 40))
+    n=$(gzip -dc "$dir/db.sql.gz" 2>/dev/null | head -c "$((limit + 1))" | wc -c)
+    [ "$n" -le "$limit" ] || { echo "$(t "The database dump is larger than the free disk.")" >&2; return 4; }
+    if [ "$n" -gt "$((KEI_BK_RATIO_FLOOR_MB << 20))" ] && [ "$n" -gt "$((KEI_BK_RATIO * $(_kei_bk_size "$dir/db.sql.gz")))" ]; then
+        echo "$(t "The database dump expands too much to be trusted.")" >&2; return 4
+    fi
+    return 0
+}
+
+# _kei_bk_secrets_open DIR: a temporary directory (700) with the package's
+# configuration files; KEI_BACKUP_PHRASE opens an encrypted one. 7 when
+# the phrase is missing or wrong. The caller removes the directory.
+_kei_bk_secrets_open() {
+    local dir="$1" tmp out
+    tmp=$(mktemp -d) && chmod 700 "$tmp" || return 1
+    if [ -d "$dir/secrets" ]; then
+        cp -p "$dir"/secrets/.[!.]* "$dir"/secrets/* "$tmp/" 2>/dev/null
+        printf '%s' "$tmp"; return 0
+    fi
+    if [ ! -f "$dir/secrets.tar.gpg" ] || [ -z "${KEI_BACKUP_PHRASE:-}" ] || ! _kei_bk_has_key; then rm -rf "$tmp"; return 7; fi
+    if ! _kei_bk_gpg_phrase "$KEI_BACKUP_PHRASE" --decrypt "$dir/secrets.tar.gpg" > "$tmp/.s.tgz" 2>/dev/null; then
+        rm -rf "$tmp"; return 7
+    fi
+    if ! out=$(kei_bk_check_tar "$tmp/.s.tgz" 0); then rm -rf "$tmp"; echo "$out" >&2; return 4; fi
+    tar -C "$tmp" -xzf "$tmp/.s.tgz" --no-same-owner 2>/dev/null || { rm -rf "$tmp"; return 4; }
+    rm -f "$tmp/.s.tgz"
+    printf '%s' "$tmp"
+}
+
+# _kei_bk_stage_ref DIR PLATFORM: the restic snapshot of a referenced
+# package restored (and verified) in a staging area; prints
+# "STAGE<TAB>TREE". The caller removes STAGE.
+_kei_bk_stage_ref() {
+    local dir="$1" p="$2" repo snap path want stage tree got out
+    repo=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["repository"])' "$dir/files.ref.json") || return 4
+    snap=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["snapshot"])' "$dir/files.ref.json") || return 4
+    path=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["path"])' "$dir/files.ref.json") || return 4
+    want=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["list_sha256"])' "$dir/files.ref.json") || return 4
+    [ -s "$(_kei_bk_restic_pass "$p")" ] || { echo "$(t "The password of the restic repository is missing: import the recovery kit.")" >&2; return 7; }
+    mkdir -p "$KEI_BK_DIR" && stage=$(mktemp -d "$KEI_BK_DIR/stage.XXXXXX") && chmod 700 "$stage" || return 1
+    if ! _kei_bk_restic "$p" "$repo" restore "$snap" --target "$stage" --verify >/dev/null 2>"$stage.err"; then
+        echo "$(t "The restic snapshot could not be restored:") $(tail -n 2 "$stage.err")" >&2
+        rm -rf "$stage" "$stage.err"; return 1
+    fi
+    rm -f "$stage.err"
+    tree="$stage$path"
+    [ -d "$tree" ] || { rm -rf "$stage"; echo "$(t "The restic snapshot does not have the expected files.")" >&2; return 4; }
+    if ! out=$(kei_bk_check_tree "$tree"); then rm -rf "$stage"; echo "$(t "The restored files have unsafe entries:") $out" >&2; return 4; fi
+    got=$( cd "$tree" && find . -type f -printf '%P\t%s\n' | LC_ALL=C sort | sha256sum | awk '{ print $1 }' )
+    [ "$got" = "$want" ] || { rm -rf "$stage"; echo "$(t "The restored files differ from the list recorded in the backup.")" >&2; return 4; }
+    printf '%s\t%s\n' "$stage" "$tree"
+}
+
+# ----------------------------------------------------------------------
+# Retention, maintenance, verification, schedule.
+# ----------------------------------------------------------------------
+# kei_backup_retention PLATFORM [KEEP_DIR]...: the newest KEI_BK_KEEP_LAST,
+# one per day (KEEP_DAILY days), week and month; "final" always; the newest
+# that passed a restore test always; the dirs given always. Then restic
+# snapshots no package refers to are forgotten.
+kei_backup_retention() {
+    local p="$1" keep d c l m day week month repo ids snap
+    shift
+    _kei_bk_known "$p" || return 2
+    _kei_bk_lock "$p" || return $?
+    keep=$(kei_backup_list "$p" | python3 -I -c '
+import sys, datetime
+last, daily, weekly, monthly = (int(x) for x in sys.argv[1:5])
+protect = set(sys.argv[5:])
+rows = [l.rstrip("\n").split("\t") for l in sys.stdin if l.strip()]
+keep = set()
+days, weeks, months = [], [], []
+for i, (d, created, label, mode) in enumerate(rows):
+    try:
+        t = datetime.datetime.strptime(created, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        keep.add(d); continue
+    if i < last or label == "final" or d in protect:
+        keep.add(d)
+    k = t.date()
+    if k not in days and len(days) < daily:
+        days.append(k); keep.add(d)
+    k = t.isocalendar()[:2]
+    if k not in weeks and len(weeks) < weekly:
+        weeks.append(k); keep.add(d)
+    k = (t.year, t.month)
+    if k not in months and len(months) < monthly:
+        months.append(k); keep.add(d)
+print("\n".join(sorted(keep)))
+' "$KEI_BK_KEEP_LAST" "$KEI_BK_KEEP_DAILY" "$KEI_BK_KEEP_WEEKLY" "$KEI_BK_KEEP_MONTHLY" "$@" "$(_kei_bk_last_verified "$p")")
+    [ -n "$keep" ] || return 0
+    while IFS=$'\t' read -r d c l m; do
+        [ -n "$d" ] || continue
+        printf '%s\n' "$keep" | grep -qxF "$d" && continue
+        case "$d" in "$(_kei_bk_pdir "$p")"/knx-"$p"-*) rm -rf -- "$d"; log "$p: retention removed $d" ;; esac
+    done < <(kei_backup_list "$p")
+    # restic: snapshots of this platform that no package (complete or not) names.
+    repo=$(_kei_bk_get "repo_$p")
+    [ -n "$repo" ] && command -v restic >/dev/null 2>&1 || return 0
+    ids=$(for d in "$(_kei_bk_pdir "$p")"/knx-"$p"-*/files.ref.json; do
+              [ -f "$d" ] && python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["snapshot"])' "$d" 2>/dev/null
+          done)
+    while IFS= read -r snap; do
+        [ -n "$snap" ] || continue
+        printf '%s\n' "$ids" | grep -q "^${snap:0:8}" && continue
+        _kei_bk_restic "$p" "$repo" forget "$snap" >/dev/null 2>&1 && log "$p: restic snapshot $snap forgotten"
+    done < <(_kei_bk_restic "$p" "$repo" snapshots --json --tag "knx-$p" 2>/dev/null | python3 -I -c '
+import json, sys
+try:
+    for s in json.load(sys.stdin) or []:
+        print(s.get("id", ""))
+except Exception:
+    pass')
+    return 0
+}
+
+# The newest package that passed a restore test (verified=DIR|ok in its verify.json).
+_kei_bk_last_verified() {
+    local d
+    while IFS=$'\t' read -r d _; do
+        [ -f "$d/verify.json" ] && grep -q '"result": "ok"' "$d/verify.json" && { printf '%s' "$d"; return 0; }
+    done < <(kei_backup_list "$1")
+    printf '%s' "-"
+}
+
+# kei_backup_maintain PLATFORM: retention, then restic prune and check.
+kei_backup_maintain() {
+    local p="${1:-}" repo rc=0
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    _kei_bk_lock "$p" || return $?
+    _kei_bk_recover "$p"
+    kei_backup_retention "$p"
+    repo=$(_kei_bk_get "repo_$p")
+    if [ -n "$repo" ]; then
+        _kei_bk_restic "$p" "$repo" prune >/dev/null 2>&1 || rc=1
+        _kei_bk_restic "$p" "$repo" check >/dev/null 2>&1 || rc=1
+    fi
+    _kei_bk_set "maintained_$p" "$(date '+%Y-%m-%d %H:%M:%S') $([ "$rc" = 0 ] && echo ok || echo failed)"
+    if [ "$rc" = 0 ]; then echo "$(t "Retention applied; the restic repository is consistent.")"
+    else echo "$(t "The restic repository check failed: see the log.")" >&2; fi
+    log "$p: maintenance rc=$rc"
+    return "$rc"
+}
+
+# kei_backup_pick PLATFORM DAYS: the newest complete package made at least
+# DAYS days ago; the oldest one when none is that old.
+kei_backup_pick() {
+    local p="$1" days="${2:-30}" limit d c pick=""
+    limit=$(( $(_kei_bk_now) - days * 86400 ))
+    while IFS=$'\t' read -r d c _; do
+        [ -n "$d" ] || continue
+        if [ "$(date -d "$c" +%s 2>/dev/null || echo 0)" -le "$limit" ]; then printf '%s' "$d"; return 0; fi
+        pick="$d"
+    done < <(kei_backup_list "$p")
+    [ -n "$pick" ] && printf '%s' "$pick"
+}
+
+# kei_backup_verify PLATFORM [DAYS]: restic check --read-data-subset=1/12
+# and a restore test of the package of DAYS (30) days ago, in isolation.
+kei_backup_verify() {
+    local p="${1:-}" days="${2:-30}" d repo rc=0 out msg
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    [[ "$days" =~ ^[0-9]{1,4}$ ]] || days=30
+    _kei_bk_lock "$p" || return $?
+    _kei_bk_recover "$p"
+    repo=$(_kei_bk_get "repo_$p")
+    if [ -n "$repo" ] && ! _kei_bk_restic "$p" "$repo" check --read-data-subset=1/12 >/dev/null 2>&1; then
+        rc=1; msg="$(t "the restic repository check failed")"
+    fi
+    d=$(kei_backup_pick "$p" "$days")
+    [ -n "$d" ] || { echo "$(t "There is no complete backup to verify.")" >&2; return 3; }
+    if [ "$rc" = 0 ]; then
+        if out=$("kei_${p}_restore_test" "$d" 2>&1); then :; else rc=1; msg="$out"; fi
+    fi
+    {
+        printf '{\n'
+        printf '  "at": %s,\n' "$(json_str "$(date '+%Y-%m-%d %H:%M:%S')")"
+        printf '  "days": %s,\n' "$(json_num "$days")"
+        printf '  "result": %s,\n' "$(json_str "$([ "$rc" = 0 ] && echo ok || echo failed)")"
+        printf '  "message": %s\n' "$(json_str "${msg:-$out}")"
+        printf '}\n'
+    } > "$d/verify.json"
+    chmod 600 "$d/verify.json"
+    _kei_bk_set "verified_$p" "$(date '+%Y-%m-%d %H:%M:%S') ${d##*/} $([ "$rc" = 0 ] && echo ok || echo failed)"
+    log "$p: verify ${d##*/} rc=$rc"
+    if [ "$rc" = 0 ]; then
+        echo "$(b="${d##*/}"; t "Verified: the backup \${b} was restored in isolation and matched its manifest.") $out"
+    else
+        echo "$(b="${d##*/}"; t "The verification of \${b} failed:") $msg" >&2
+    fi
+    return "$rc"
+}
+
+# kei_backup_schedule PLATFORM HH:MM|off: the daily package, the weekly
+# maintenance and the monthly verification, in $KEI_BK_CRON.
+kei_backup_schedule() {
+    local p="${1:-}" v="${2:-}" h m tmp q hh
+    _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
+    case "$v" in
+        off) _kei_bk_set "schedule_$p" "" ;;
+        [0-2][0-9]:[0-5][0-9])
+            [ "${v%%:*}" -le 23 ] || { echo "$(t "Use HH:MM (00:00 to 23:59) or off.")" >&2; return 2; }
+            _kei_bk_set "schedule_$p" "$v" ;;
+        *) echo "$(t "Use HH:MM (00:00 to 23:59) or off.")" >&2; return 2 ;;
+    esac
+    tmp=$(mktemp) || return 1
+    {
+        printf '# Managed by Koha.Nexus: backups of the platforms. config.sh writes it again.\n'
+        printf 'SHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n'
+        for q in $KEI_BK_PLATFORMS; do
+            v=$(_kei_bk_get "schedule_$q"); [ -n "$v" ] || continue
+            h=$((10#${v%%:*})); m=$((10#${v##*:})); hh=$(( (h + 1) % 24 ))
+            printf '\n# %s\n' "$q"
+            printf '%s %s * * * root %s --task platform-backup-run %s scheduled >/dev/null 2>&1\n' "$m" "$h" "$KEI_PANEL_COMMAND" "$q"
+            printf '%s %s * * 0 root %s --task platform-backup-maintain %s >/dev/null 2>&1\n' "$m" "$hh" "$KEI_PANEL_COMMAND" "$q"
+            printf '%s %s 1 * * root %s --task platform-backup-verify %s 30 >/dev/null 2>&1\n' "$m" "$(( (h + 2) % 24 ))" "$KEI_PANEL_COMMAND" "$q"
+        done
+    } > "$tmp"
+    if grep -q -- '--task' "$tmp"; then
+        install -m 644 "$tmp" "$KEI_BK_CRON" || { rm -f "$tmp"; return 1; }
+        for q in $KEI_BK_PLATFORMS; do
+            if [ -n "$(_kei_bk_get "schedule_$q")" ]; then kei_owned_add cron-file "${KEI_BK_CRON##*/}" "$q" no "" "$KEI_BK_CRON"
+            else kei_owned_del cron-file "${KEI_BK_CRON##*/}" "$q"; fi
+        done
+    else
+        rm -f "$KEI_BK_CRON"
+        for q in $KEI_BK_PLATFORMS; do kei_owned_del cron-file "${KEI_BK_CRON##*/}" "$q"; done
+    fi
+    rm -f "$tmp"
+    if [ "${2:-}" = off ]; then echo "$(t "Scheduled backups of this platform are off.")"
+    else echo "$(a="${2}"; t "Daily backup at \${a}; maintenance on Sundays and a restore test of an older backup on the 1st of each month.")"; fi
+}
+
+# kei_backup_status [PLATFORM]: key=value lines for the panel.
+kei_backup_status() {
+    local p last inc
+    printf 'key=%s\n' "$(_kei_bk_has_key && _kei_bk_fpr)"
+    printf 'gpg=%s\n' "$(command -v gpg >/dev/null 2>&1 && echo yes || echo no)"
+    printf 'restic=%s\n' "$(command -v restic >/dev/null 2>&1 && restic version 2>/dev/null | awk '{ print $2; exit }')"
+    printf 'kit=%s\n' "$([ -f "$KEI_BK_DIR/recovery-kit.txt" ] && echo "$KEI_BK_DIR/recovery-kit.txt")"
+    for p in ${1:-$KEI_BK_PLATFORMS}; do
+        _kei_bk_known "$p" || continue
+        last=$(kei_backup_list "$p" | head -n 1)
+        inc=$(kei_backup_incomplete "$p" | grep -c .)
+        printf '%s.repo=%s\n' "$p" "$(_kei_bk_get "repo_$p")"
+        printf '%s.copy=%s\n' "$p" "$(_kei_bk_get "copy_$p")"
+        printf '%s.schedule=%s\n' "$p" "$(_kei_bk_get "schedule_$p")"
+        printf '%s.last=%s\n' "$p" "$(printf '%s' "$last" | awk -F'\t' '{ n = split($1, a, "/"); print a[n] "|" $2 "|" $4 }')"
+        printf '%s.count=%s\n' "$p" "$(kei_backup_list "$p" | grep -c .)"
+        printf '%s.incomplete=%s\n' "$p" "$inc"
+        printf '%s.verified=%s\n' "$p" "$(_kei_bk_get "verified_$p")"
+        printf '%s.maintained=%s\n' "$p" "$(_kei_bk_get "maintained_$p")"
+    done
+}
+
+# ----------------------------------------------------------------------
+# The Tainacan adapter.
+# ----------------------------------------------------------------------
+_kei_bk_tainacan_preflight() {
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    [ -n "$(_kei_tn_cid db)" ] && [ "$(_kei_tn_container_state db)" = running ] || {
+        echo "$(t "The Tainacan database is not running.")" >&2; return 3; }
+}
+_kei_bk_tainacan_size() {
+    local db wp dbc
+    dbc=$(_kei_tn_cid db)
+    db=$(_kei_docker exec "$dbc" du -sm /var/lib/mysql 2>/dev/null | awk '{ print $1 }')
+    wp=$(du -sm "$(_kei_bk_tainacan_path)" 2>/dev/null | awk '{ print $1 }')
+    printf '%s' "$(( ${db:-0} + ${wp:-0} ))"
+}
+# Every writer (web, REST, WP-Cron, Tainacan's jobs) runs in the wordpress
+# container; a graceful stop lets requests finish (document G, item 1).
+_kei_bk_tainacan_stop() { _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1; }
+_kei_bk_tainacan_start() { _kei_tn_dc start wordpress >/dev/null 2>&1 || _kei_tn_dc up -d wordpress >/dev/null 2>&1; }
+_kei_bk_tainacan_meta() {
+    local c i a p wpv plv
+    read -r c i a p < <(_kei_tn_counts)
+    [ -n "$c" ] || return 1
+    # The wordpress container is stopped: versions are read from its volume.
+    wpv=$(sed -n "s/^\$wp_version = '\\(.*\\)';/\\1/p" "$(_kei_bk_tainacan_path)/wp-includes/version.php" 2>/dev/null)
+    plv=$(sed -n 's/^[ *]*Version:[ ]*//p' "$(_kei_bk_tainacan_path)/wp-content/plugins/tainacan/tainacan.php" 2>/dev/null | head -n 1)
+    printf 'url\t%s\n' "$(json_str "$(_kei_tn_get url)")"
+    printf 'wordpress_version\t%s\n' "$(json_str "${wpv:-?}")"
+    printf 'tainacan_version\t%s\n' "$(json_str "${plv:-?}")"
+    printf 'wp_image\t%s\n' "$(json_str "$KEI_TAINACAN_WP_IMAGE")"
+    printf 'db_image\t%s\n' "$(json_str "$KEI_TAINACAN_DB_IMAGE")"
+    printf 'count_collections\t%s\n' "$(json_num "$c")"
+    printf 'count_items\t%s\n' "$(json_num "$i")"
+    printf 'count_attachments\t%s\n' "$(json_num "$a")"
+    printf 'count_posts\t%s\n' "$(json_num "$p")"
+}
+_kei_bk_tainacan_dump() {
+    timeout 7200 docker exec -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD)" "$(_kei_tn_cid db)" mariadb-dump -uroot --single-transaction \
+        --routines --triggers --events --default-character-set=utf8mb4 wordpress
+}
+_kei_bk_tainacan_tar() {
+    timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+        --security-opt no-new-privileges -v kn-tainacan-wp:/data:ro --entrypoint tar "$(_kei_tn_image wp)" -C /data -cf - .
+}
+_kei_bk_tainacan_path() { _kei_docker volume inspect -f '{{.Mountpoint}}' kn-tainacan-wp 2>/dev/null; }
+# Attachments the database names that the files part does not have.
+_kei_bk_tainacan_after() {
+    local missing
+    missing=$(awk 'NR == FNR { have[$0] = 1; next } $0 != "" { if (!(("wp-content/uploads/" $0) in have)) n++ } END { print n + 0 }' \
+        "$1/.files.list" <(_kei_tn_sql "SELECT meta_value FROM wp_postmeta WHERE meta_key = '_wp_attached_file'" 2>/dev/null))
+    printf 'attachments_missing\t%s\n' "$(json_num "${missing:-0}")"
+}
+_kei_bk_tainacan_secrets() { printf '%s\n' "$KEI_TAINACAN_DIR/.env" "$KEI_TAINACAN_DIR/compose.yml" "$(_kei_tn_state_file)"; }
 
 # ======================================================================
 # PLATFORMS (Koha is optional)
@@ -42470,6 +43382,29 @@ kei_task() {
             return 0 ;;
         tainacan-install)   _kei_docker_task kei_tainacan_install "${1:-}" "${2:-}" "${3:-}" ;;
         tainacan-logs)      _kei_docker_task kei_tainacan_logs "${1:-200}" ;;
+        platform-backup-plan)
+            local k v
+            while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_backup_plan)
+            return 0 ;;
+        platform-backup-setup)    _kei_docker_task kei_backup_setup "$@" ;;
+        platform-backup-status)
+            local line
+            while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < <(kei_backup_status "$@")
+            return 0 ;;
+        platform-backup-run)      _kei_docker_task kei_backup_run "${1:-}" "${2:-manual}" ;;
+        platform-backup-incomplete)
+            local d l r
+            while IFS=$'\t' read -r d l r; do [ -n "$d" ] && kei_result incomplete "${d##*/}|$l|$r"; done < <(kei_backup_incomplete "$@")
+            return 0 ;;
+        platform-backup-resume)   _kei_docker_task kei_backup_resume "${1:-}" ;;
+        platform-backup-discard)  _kei_docker_task kei_backup_discard "${1:-}" ;;
+        platform-backup-repo)     _kei_docker_task kei_backup_repo "${1:-}" "${2:-}" ;;
+        platform-backup-copy)     _kei_docker_task kei_backup_copy "${1:-}" "${2:-}" ;;
+        platform-backup-schedule) _kei_docker_task kei_backup_schedule "${1:-}" "${2:-}" ;;
+        platform-backup-verify)   _kei_docker_task kei_backup_verify "${1:-}" "${2:-30}" ;;
+        platform-backup-maintain) _kei_docker_task kei_backup_maintain "${1:-}" ;;
+        platform-backup-kit)      _kei_docker_task kei_backup_kit ;;
+        platform-backup-kit-import) _kei_docker_task kei_backup_kit_import "${1:-}" ;;
         tainacan-backup)    _kei_docker_task kei_tainacan_backup manual ;;
         tainacan-backups)
             local d c l

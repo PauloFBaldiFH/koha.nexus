@@ -538,3 +538,154 @@ def test_tainacan_uninstall_asks_what_happens_to_the_data(no_koha):
     choice, danger, ran = asyncio.run(main())
     assert (choice, danger) == (True, True)
     assert ran == [("tainacan-uninstall", ("delete",))]
+
+
+# ----------------------------------------------------------------------
+# The "Platform backups" card (installer: kei_backup_*)
+# ----------------------------------------------------------------------
+def test_backup_status_is_read_and_unknown_values_are_not_trusted():
+    st = platforms.backup_from_results({
+        "key": "3F2A9C0E5B7D1A4C8E6F0B2D4A6C8E0F1A3B5C7D", "restic": "0.16.4", "tainacan.repo": "rclone:gd:x",
+        "tainacan.copy": "gd:y", "tainacan.schedule": "02:30", "tainacan.count": "4", "tainacan.incomplete": "0",
+        "tainacan.verified": "2026-11-01 04:30:12 knx-tainacan-20261002-023000 ok"})
+    assert st.known and st.key.startswith("3F2A") and st.schedule == "02:30" and st.count == 4
+    value, note, card = platforms.describe_backups(st)
+    assert value == "Encrypted" and card == "ok"
+    assert "rclone" in note and "gd:y" in note and "02:30" in note and "passed" in note
+    odd = platforms.backup_from_results({"key": "not-a-key; rm", "tainacan.schedule": "25:99",
+                                         "tainacan.count": "lots", "tainacan.incomplete": "2"})
+    assert (odd.key, odd.schedule, odd.count, odd.incomplete) == ("", "", 0, 2)
+    value, note, card = platforms.describe_backups(odd)
+    assert value == "Configuration not encrypted" and card == "warn" and "incomplete" in note
+    assert platforms.describe_backups(platforms.BackupState(True, verified="x y z failed"))[2] == "bad"
+    # An installer without the engine: nothing reported, nothing shown.
+    assert not platforms.backup_from_results({}).known
+
+
+def test_the_installer_knows_every_backup_task_the_panel_calls():
+    import pathlib
+    from kei_panel.bridge import installer_tasks
+    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("platforms.py").read_text(encoding="utf-8")
+    called = set(re.findall(r'"(platform-backup-[a-z-]+)"', view)) | {"platform-backup-resume",
+                                                                    "platform-backup-discard"}
+    assert called and called <= installer_tasks(INSTALLER)
+
+
+def _tainacan_installed(st: dict) -> dict:
+    st = _with_docker(st)
+    st["platforms"] = [p if p["id"] != "tainacan" else
+                       {**p, "detected": True, "status": "installed", "services": "active",
+                        "health": "healthy", "url": "http://192.168.0.10:8090"} for p in st["platforms"]]
+    return st
+
+
+def _platforms_app(ran, results=None):
+    app = make_app()
+    real_task, real_status = app.bridge.task, app.bridge.status
+
+    async def task(name, *args, **kwargs):
+        ran.append((name, args, dict(kwargs.get("env") or {})))
+        out = await real_task(name, *args, **kwargs)
+        if results and name in results:
+            out.results.clear()
+            out.results.update(results[name])
+        return out
+
+    async def status(*args, **kwargs):
+        return _tainacan_installed(await real_status(*args, **kwargs))
+    app.bridge.task, app.bridge.status = task, status
+    return app
+
+
+def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
+    from kei_panel.screens.dialogs import InputScreen
+    from textual.widgets import Input
+
+    async def main():
+        ran: list = []
+        app = _platforms_app(ran)
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            card = app.screen.query_one("#platform-backups").display
+            buttons = {b: app.screen.query_one(f"#pbackup-{b}").display
+                       for b in ("setup", "configure", "kit", "schedule", "verify", "incomplete")}
+            app.screen.query_one("#tainacan-restore").press()
+            await pilot.pause(1.0)
+            app.screen.dismiss("knx-tainacan-20261105-020000")       # the backup
+            await pilot.pause(1.0)
+            await pilot.click("#yes")                                 # restore over the one in use
+            await pilot.pause(1.0)
+            asked = isinstance(app.screen, InputScreen) and app.screen._password
+            app.screen.query_one("#value", Input).value = "MY-SECRET-RECOVERY-PHRASE"
+            await pilot.click("#ok")
+            await pilot.pause(2.0)
+            return card, buttons, asked, [r for r in ran if r[0] == "tainacan-restore"]
+
+    card, buttons, asked, ran = asyncio.run(main())
+    assert card and asked
+    assert buttons == {"setup": False, "configure": True, "kit": True, "schedule": True, "verify": True,
+                       "incomplete": True}
+    assert ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",),
+                    {"KEI_BACKUP_PHRASE": "MY-SECRET-RECOVERY-PHRASE"})]
+    assert all("MY-SECRET" not in " ".join(r[1]) for r in ran)
+
+
+def test_backup_setup_shows_the_plan_and_needs_a_yes(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen, InputScreen
+
+    no_key = {"platform-backup-status": {"key": "", "restic": "", "tainacan.count": "0",
+                                         "tainacan.incomplete": "0"}}
+
+    async def main(answer: str):
+        ran: list = []
+        app = _platforms_app(ran, no_key)
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            shown = app.screen.query_one("#pbackup-setup").display
+            kit = app.screen.query_one("#pbackup-kit").display
+            app.screen.query_one("#pbackup-setup").press()
+            await pilot.pause(1.0)
+            preview = isinstance(app.screen, ConfirmScreen) and "restic" in app.screen._preview
+            await pilot.click(f"#{answer}")
+            await pilot.pause(1.0)
+            asked = isinstance(app.screen, InputScreen)
+            if asked:
+                await pilot.click("#ok")          # empty: a new phrase, shown once
+                await pilot.pause(2.0)
+            return shown, kit, preview, [r[:2] for r in ran if r[0].startswith("platform-backup-") and
+                                         r[0] != "platform-backup-status"]
+
+    shown, kit, preview, ran = asyncio.run(main("no"))
+    assert (shown, kit, preview) == (True, False, True)
+    assert ran == [("platform-backup-plan", ())]
+    *_, ran = asyncio.run(main("yes"))
+    assert ran == [("platform-backup-plan", ()), ("platform-backup-setup", ("confirm",))]
+
+
+def test_an_incomplete_backup_is_resumed_or_discarded(no_koha):
+    from kei_panel.screens.dialogs import ChoiceScreen
+
+    async def main():
+        ran: list = []
+        app = _platforms_app(ran)
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            app.screen.query_one("#pbackup-incomplete").press()
+            await pilot.pause(1.0)
+            options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
+            app.screen.dismiss("resume")
+            await pilot.pause(2.0)
+            return options, [r[:2] for r in ran if r[0] in ("platform-backup-resume", "platform-backup-discard")]
+
+    options, ran = asyncio.run(main())
+    assert options == ["resume", "discard"]
+    assert ran == [("platform-backup-resume", ("knx-tainacan-20261105-143000",))]
