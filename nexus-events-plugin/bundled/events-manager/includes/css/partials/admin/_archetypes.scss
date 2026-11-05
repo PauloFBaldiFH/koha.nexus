@@ -1,0 +1,183 @@
+#em-opt-archetypes {
+	input::placeholder {
+		color: #ccc;
+		font-style: italic;
+	}
+
+	#event-archetypes-container {
+		margin-bottom: 20px;
+	}
+
+	.base-event-form,
+	.archetypes-ui-container {
+		h4 {
+			margin-top: 0;
+			margin-bottom: 10px;
+			padding-bottom: 5px;
+			border-bottom: 1px solid #eee;
+			font-size: 16px;
+		}
+	}
+
+	.archetypes-ui-container {
+		margin-bottom: 15px;
+	}
+
+	.archetype-item {
+		background: #f9f9f9;
+		border: 1px solid #ddd;
+		margin-bottom: 15px;
+		padding: 10px;
+		border-radius: 3px;
+
+		h4 {
+			margin-top: 0;
+			margin-bottom: 10px;
+			padding-bottom: 5px;
+			border-bottom: 1px solid #eee;
+
+			span {
+				color: #888;
+				font-weight: normal;
+				font-style: italic;
+			}
+		}
+	}
+
+	.archetype-display table,
+	.archetype-edit table {
+		margin-bottom: 10px;
+	}
+
+	.archetype-edit {
+		input {
+			&[readonly] {
+				background-color: #f0f0f0;
+				color: #777;
+			}
+		}
+	}
+
+	.archetype-actions {
+		margin-top: 10px;
+	}
+
+	.dashicons-edit {
+		cursor: pointer;
+		color: #0073aa;
+		vertical-align: middle;
+		margin-left: 5px;
+	}
+
+	.add-new-archetype {
+		margin-top: 20px;
+	}
+
+	.archetype-buttons {
+		display: flex;
+		gap: 10px;
+	}
+
+	/* Base event form styles */
+	.base-event-form input[disabled] {
+		background-color: #f0f0f0;
+		color: #777;
+	}
+
+	/* Hide label fields, taxonomy selection, and recurrence fields in base event form by default */
+	.base-event-features-info {
+		display: table-row-group;
+	}
+
+	/* Show these fields when there's at least one custom archetype */
+	#event-archetypes-container:has(#archetypes-list > .archetype-item) .base-event-features-info {
+		display: none;
+	}
+
+	/* Show these fields when there's at least one custom archetype */
+	.archetypes-list-row:not(:has(#archetypes-list > .archetype-item)) td {
+		padding: 0;
+	}
+}
+
+#em-opt-archetypes .em-archetype-tabs { margin-bottom: 10px; }
+
+#em-options-page {
+	.em-archetype-tabs.subsubsub {
+		display: block;
+		float: none;
+		a[data-archetype] {
+			cursor: pointer;
+		}
+	}
+	&[data-archetype="all"] {
+		.em-archetype-options, .em-options-archetypes-description, .em-archetype-option-desc {
+			display: none;
+			visibility: hidden;
+		}
+	}
+	&[data-archetype]:not([data-archetype="all"]) {
+		.nav-tab-wrapper .nav-tab, div.em-menu-group, div.postbox, table, tbody, tr {
+			&:not(.has-archetype-options):not(.persist):not(.em-header):not(.em-subheader) {
+				display: none;
+				visibility: hidden;
+			}
+		}
+		.em-archetype-option {
+			& ::placeholder {
+				font-style: italic;
+				opacity: 0.6;
+			}
+
+			&.option-checkboxes {
+				&[data-default] input[type="checkbox"] {
+					&[data-default]:not(:checked):before {
+						content: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 15 15"><path fill="%233276c3" fill-rule="evenodd" d="M5 7.5c0-.3.2-.5.5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5Z" clip-rule="evenodd"/></svg>')
+					}
+					&:disabled {
+						pointer-events: all;
+					}
+				}
+				.em-archetype-checkbox-buttons {
+					margin-top: 5px;
+				}
+			}
+		}
+
+		.em-archetype-option-desc {
+			display: block;
+		}
+		.em-options-archetypes-description {
+			display: grid ;
+			grid-template-columns: 25px 1fr;
+			align-items: center;
+			grid-gap: 5px;
+			background: #fff;
+			border: 1px solid #c3c4c7;
+			border-left-width: 4px;
+			border-left-color: #72aee6;
+			box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+			margin: 10px 0 5px;
+			padding: 10px 12px;
+			vertical-align: middle;
+			line-height: 20px;
+			span.em-icon {
+				align-self: start;
+			}
+			p:first-child { margin: 0; }
+			p { margin: 10px 0 0 }
+		}
+		.em-default-option {
+			display: none;
+			visibility: hidden;
+		}
+		.em-archetype-options {
+			display: block;
+			visibility: visible;
+			.em-archetype-option {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+}

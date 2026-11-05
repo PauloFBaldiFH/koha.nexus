@@ -1,0 +1,86 @@
+.wp-admin {
+	.em-postbox-notice {
+		&.em-postbox-notice-info {
+			border-left: 4px solid #72aee6;
+		}
+		span.status {
+			font-style: italic;
+			&.enabled {
+				color: #00a32a;
+			}
+			&.disabled {
+				color: #999;
+			}
+		}
+	}
+
+
+	.em-settings-notice {
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-left-width: 4px;
+		box-shadow: 0 1px 1px rgb(0 0 0 / 4%);
+		margin: 10px 0 20px 0;
+		padding: 20px;
+
+		&.em-settings-notice-info {
+			border-left-color: #72aee6;
+		}
+		p:first-child {
+			margin-top: 0;
+		}
+		p:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.dbem_advanced_formatting_modes_row {
+		th {
+			text-decoration: 2px underline dotted #c45500;
+			text-underline-offset: 6px;
+		}
+		th, td {
+			color: #c45500;
+		}
+	}
+
+	.em-menu-formats {
+		textarea {
+			height: 313px;
+		}
+	}
+
+	#em-opt-advanced-formatting{
+		.inside {
+			display: grid;
+			width: 100%;
+			column-gap: 30px;
+			grid-template-columns: min-content 1fr;
+		}
+		.em-af-status {
+			font-size: 110%;
+			font-weight: bold;
+			.em-af-status-save {
+				color: #c45500;
+			}
+		}
+	}
+
+	.em-archetype-option-default {
+		cursor: pointer;
+	}
+}
+
+#em-options-form {
+	fieldset.em-field-checkboxes {
+		label {
+			display: block;
+			padding: 0 !important;
+			margin: 0 0 5px 0 !important;
+
+			input {
+				padding-right: 5px;
+			}
+		}
+	}
+}

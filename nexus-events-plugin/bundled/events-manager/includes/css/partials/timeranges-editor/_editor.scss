@@ -1,0 +1,213 @@
+// Timeranges Editor Styles
+.em-timeranges {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+
+    // Hide template element
+    template {
+        display: none !important;
+    }
+
+    // Individual timerange styling - minimal styling, no borders/backgrounds
+    fieldset.em-timerange {
+        position: relative;
+	    margin-bottom: 0 !important;
+
+	    label {
+		    width: min-content;
+		    margin: 0;
+	    }
+
+	    legend {
+		    display: none;
+	    }
+
+        // Time input fields
+        .em-timerange-inputs {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            margin-bottom: 0;
+
+            .em-time-input {
+                width: 80px;
+            }
+        }
+
+	    .em-timerange-allday {
+		    display: none !important;
+		    visibility: hidden;
+	    }
+	    .em-timerange-delete {
+		    height: 25px;
+	    }
+    }
+
+    // Show delete buttons only when more than one timerange exists
+    &[data-count="1"] {
+	    fieldset.em-timerange {
+		    .em-timerange-delete {
+			    display: none;
+			    visibility: hidden;
+			    margin-left: 10px;
+		    }
+		    .em-timerange-allday {
+			    display: block !important;
+			    visibility: visible;
+		    }
+	    }
+    }
+
+    // Advanced options trigger
+    .em-timerange-timeslots-trigger {
+        margin: 10px 0;
+	    width: min-content;
+
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+    }
+
+    // Advanced section - hidden by default, shown when checkbox is checked
+    .em-timerange-timeslots {
+	    width: min-content;
+	    margin-top: 10px;
+
+        .em-timerange-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+
+	        &:last-child {
+		        margin-bottom: 0;
+	        }
+
+            label {
+                flex: 1;
+                margin: 0;
+            }
+
+            input[type="text"] {
+                width: 60px !important;
+                flex: none !important;
+	            margin: 0 !important;
+            }
+
+            select {
+                width: 100px !important;
+                flex: none !important;
+	            margin: 0 !important;
+            }
+        }
+    }
+
+	button.em-icon:not([disabled]) {
+		cursor: pointer;
+	}
+
+	// CSS-based visibility for frequency row when overlap is checked
+	//.em-timerange-overlap-trigger:has(input[type="checkbox"]:not(:checked)) ~ .em-timerange-frequency,
+	.em-time-range:not( :has( .em-timerange-timeslots-trigger input[type="checkbox"]:checked) ) ~ .em-timerange-timeslots {
+        display: none;
+	    visibility: hidden;
+    }
+
+}
+.em-timeranges-editor {
+	width: 100%;
+
+	.em-timeranges-actions {
+		// Minimal reset only
+		margin-top: 10px;
+	}
+	.em-timeranges-preview {
+		margin: 15px 0;
+		a.em-timeranges-preview-toggle {
+			&:focus {
+				box-shadow: none;
+				outline: 0;
+			}
+			.em-icon {
+				background-size: 15px;
+				width: 15px;
+				height: 15px;
+			}
+		}
+		.em-timeranges-preview-content {
+			display : grid;
+			grid-template-columns: repeat( auto-fit, minmax( 70px, 82px ) );
+			gap: 3px;
+			padding: 10px 0;
+			.em-timeranges-preview-time {
+				border: 1px solid #efefef;
+				background-color: #efefef;
+				font-size: 12px;
+				border-radius: 5px;
+				padding: 3px 5px;
+				text-align: center;
+			}
+		}
+	}
+	.em-timerange-editor-edit {
+		display: none;
+		visibility: hidden;
+	}
+	.timeranges-edit-action label {
+		margin: 0;
+	}
+
+	&.disabled {
+		/*
+		.em-timeranges {
+			pointer-events: none !important;
+			grid-gap: 0 !important;
+			.em-timerange {
+				.em-timerange-inputs {
+					margin-left: 10px;
+				}
+				.em-timerange-timeslots {
+					margin: 0 0 0 25px;
+					.em-timerange-row {
+						margin: 0;
+						&:has(input[value=""]) {
+							display: none;
+							visibility: hidden;
+						}
+						input[type="text"] {
+							width: 25px !important;
+						}
+					}
+				}
+			}
+		}
+		input[type="text"] {
+			border: 0 !important;
+			padding: 0 !important;
+			margin: 0 !important;
+			width: auto !important;
+		}
+		select {
+			border: 0 !important;
+			padding: 0 !important;
+			margin: 0 !important;
+			background: none !important;
+		}
+		.em-timeranges-actions, .em-timerange-delete, .em-timerange-timeslots-trigger, .em-timerange-allday {
+			display: none;
+			visibility: hidden;
+		}
+		 */
+		.em-timerange-editor-edit {
+			display: inline-block;
+			visibility: visible;
+			width: 16px;
+			height: 16px;
+			background-size: 16px;
+			margin-left: 5px;
+			cursor: pointer;
+			pointer-events: all !important;
+		}
+	}
+}

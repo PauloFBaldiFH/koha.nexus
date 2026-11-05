@@ -1,0 +1,95 @@
+/* Attendee Info i.e. Ticket Bookings */
+.em-ticket-bookings {
+	&.hidden {
+		display: none !important;
+		visibility: hidden !important;
+	}
+	margin: 0 20px 20px;
+	padding-bottom: 0;
+	border: 0;
+	text-align: left;
+
+	td:last-child {
+		text-align: left;
+	}
+
+	.em-ticket-booking {
+
+		& > td {
+			padding: 0;
+			margin: 0;
+		}
+
+		& > td > div {
+			position: relative;
+			margin: 25px 30px 10px 20px;
+			padding: 15px 20px 0 20px;
+			border-top: 1px solid #dedede;
+		}
+
+		&:first-child > td > div {
+			margin-top: 0;
+			padding-top: 0;
+			border-top: 0;
+			.em-ticket-booking-remove-trigger {
+				top: 0;
+			}
+		}
+
+		&:last-child > td > div {
+			margin-bottom:20px;
+		}
+
+		.em-ticket-booking-attendee-number {
+			font-weight: bold;
+		}
+
+		.em-ticket-booking-remove-trigger {
+			position: absolute;
+			cursor: pointer;
+			left: -5px;
+			top: 30px;
+			width: 16px;
+			height: 16px;
+			background-size: 16px;
+			opacity: 0.5;
+		}
+
+		> strong {
+			display: block;
+			margin-bottom: 15px;
+		}
+		&:first-child {
+			border-top: none;
+		}
+	}
+
+	.em-ticket-booking-template {
+		/* This can be completely hidden, even from screen readers */
+		display: none;
+		visibility: hidden;
+	}
+}
+#em-event-bookings {
+	.em-booking-options {
+		margin-top: 30px;
+		h4 {
+			font-size: 16px;
+			border-bottom : 1px solid #dedede;
+			padding-bottom:5px;
+			margin-bottom: 15px;
+			width: 100%;
+			display:block;
+		}
+	}
+}
+
+.em-bookings-admin-single {
+	.em-booking-single-rsvp-status {
+		display: block;
+		margin: 15px 0;
+		.button-secondary {
+			vertical-align : initial;
+		}
+	}
+}

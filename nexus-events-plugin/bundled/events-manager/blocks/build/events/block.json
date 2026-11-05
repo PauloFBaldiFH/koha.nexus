@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "events-manager/events",
+  "title": "Events List",
+  "category": "events-manager",
+  "icon": "list-view",
+  "description": "Display a list of events with filtering and ordering.",
+  "keywords": [
+    "events",
+    "list",
+    "upcoming"
+  ],
+  "textdomain": "events-manager",
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "default": ""
+    },
+    "scope": {
+      "type": "string",
+      "default": "future"
+    },
+    "order": {
+      "type": "string",
+      "default": "ASC"
+    },
+    "orderby": {
+      "type": "string",
+      "default": "event_start_date,event_start_time,event_name"
+    },
+    "limit": {
+      "type": "number",
+      "default": 5
+    },
+    "category": {
+      "type": "string",
+      "default": "0"
+    },
+    "all_events": {
+      "type": "boolean",
+      "default": false
+    },
+    "all_events_text": {
+      "type": "string",
+      "default": ""
+    },
+    "no_events_text": {
+      "type": "string",
+      "default": ""
+    },
+    "format_header": {
+      "type": "string",
+      "default": ""
+    },
+    "format": {
+      "type": "string",
+      "default": ""
+    },
+    "format_footer": {
+      "type": "string",
+      "default": ""
+    },
+    "event_archetype": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js"
+}

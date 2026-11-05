@@ -1,0 +1,3718 @@
+openapi: 3.1.0
+info:
+  title: Events Manager REST API
+  version: 7.2.3.1
+  description: |
+    REST API exposed by the Events Manager WordPress plugin.
+
+    Source of truth: active `register_rest_route()` calls in `classes/uploads/em-uploads-api.php`
+    and `classes/api/em-api-rest.php`.
+  contact:
+    name: Pixelite
+    url: https://pixelite.com
+  license:
+    name: GPL-2.0-or-later
+    identifier: GPL-2.0-or-later
+servers:
+  - url: "{site_url}/wp-json"
+    description: WordPress REST API root.
+    variables:
+      site_url:
+        default: https://example.com
+        description: Base URL of the WordPress site.
+tags:
+  - name: Uploads
+    description: Temporary upload, revert, and load helpers used by Events Manager forms.
+  - name: Events
+    description: Event list, read, validation, availability, create, update, and delete operations.
+  - name: Locations
+    description: Location list, read, validation, create, update, and delete operations.
+  - name: Bookings
+    description: Booking list, read, validation, create, update, status, and delete operations.
+  - name: Categories
+    description: Events Manager event category term operations.
+  - name: Tags
+    description: Events Manager event tag term operations.
+paths:
+  /events-manager/v1/uploads:
+    get:
+      operationId: loadUpload
+      summary: Load uploaded file
+      description: |
+        Loads a previously uploaded temporary file by `temp_id`. On success, the endpoint streams
+        file bytes with a dynamic content type instead of JSON.
+      tags: [Uploads]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TempId"
+        - $ref: "#/components/parameters/XFilenames"
+      responses:
+        "200":
+          $ref: "#/components/responses/UploadFileContentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: uploadFile
+      summary: Upload file
+      description: |
+        Accepts a multipart form upload, validates it through Events Manager upload filters,
+        stores it temporarily, and returns a temporary file ID plus a revert nonce.
+      tags: [Uploads]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UploadPath"
+        - $ref: "#/components/parameters/XEMNonce"
+      requestBody:
+        $ref: "#/components/requestBodies/UploadMultipart"
+      responses:
+        "200":
+          $ref: "#/components/responses/UploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: revertUpload
+      summary: Revert upload
+      description: |
+        Deletes a temporary upload created by the upload endpoint. The callback expects the
+        temporary file ID and the nonce returned by `uploadFile`.
+      tags: [Uploads]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TmpFile"
+        - $ref: "#/components/parameters/UploadNonce"
+      responses:
+        "200":
+          $ref: "#/components/responses/UploadRevertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/events:
+    get:
+      operationId: listEvents
+      summary: List events
+      description: |
+        Returns a paginated collection of events matching the supplied Events Manager search filters.
+        Public requests are limited to readable published events.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Context"
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/EventStatus"
+        - $ref: "#/components/parameters/ActiveStatus"
+        - $ref: "#/components/parameters/Cancelled"
+        - $ref: "#/components/parameters/Active"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/TagFilter"
+        - $ref: "#/components/parameters/LocationFilter"
+        - $ref: "#/components/parameters/LocationIdFilter"
+        - $ref: "#/components/parameters/Town"
+        - $ref: "#/components/parameters/State"
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/Region"
+        - $ref: "#/components/parameters/Near"
+        - $ref: "#/components/parameters/NearUnit"
+        - $ref: "#/components/parameters/NearDistance"
+        - $ref: "#/components/parameters/EventType"
+        - $ref: "#/components/parameters/EventArchetype"
+        - $ref: "#/components/parameters/OrderBy"
+        - $ref: "#/components/parameters/Order"
+        - $ref: "#/components/parameters/Blog"
+        - $ref: "#/components/parameters/Private"
+        - $ref: "#/components/parameters/PrivateOnly"
+        - $ref: "#/components/parameters/Timeslots"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventCollectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createEvent
+      summary: Create event
+      description: |
+        Creates an Events Manager event using the shared API service. The user must have the
+        Events Manager event editing capability; publishing depends on the user's publish capability.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/EventInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/EventCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/events/validate:
+    post:
+      operationId: validateEvent
+      summary: Validate event
+      description: |
+        Validates event input without saving it. This is intended as a safe preflight endpoint for
+        UI flows and AI agents before creating or updating an event.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/EventInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventValidationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/events/{event_id}/availability:
+    get:
+      operationId: getEventAvailability
+      summary: Get event availability
+      description: |
+        Returns booking availability, event-wide spaces, and per-ticket availability for a readable
+        event. The endpoint does not create or reserve spaces.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventAvailabilityResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/events/{event_id}:
+    get:
+      operationId: getEvent
+      summary: Get event
+      description: |
+        Retrieves one event by Events Manager event ID. Timeslot-specific IDs may use the
+        `event_id:timeslot_id` format accepted by the route pattern.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/Context"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      operationId: updateEvent
+      summary: Update event
+      description: |
+        Partially updates an existing event. Validation and Events Manager capability checks run
+        before the event is saved.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/EventInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteEvent
+      summary: Delete event
+      description: |
+        Deletes or trashes an event, depending on the Events Manager object behavior and the `force`
+        query parameter. The response includes the previous serialized event data.
+      tags: [Events]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/Force"
+      responses:
+        "200":
+          $ref: "#/components/responses/DeleteEventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations:
+    get:
+      operationId: listLocations
+      summary: List locations
+      description: |
+        Returns a paginated collection of Events Manager locations matching the supplied filters.
+        Public requests are limited to readable published locations.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Context"
+        - $ref: "#/components/parameters/Scope"
+        - $ref: "#/components/parameters/EventStatus"
+        - $ref: "#/components/parameters/Eventful"
+        - $ref: "#/components/parameters/Eventless"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/TagFilter"
+        - $ref: "#/components/parameters/Town"
+        - $ref: "#/components/parameters/State"
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/Region"
+        - $ref: "#/components/parameters/Near"
+        - $ref: "#/components/parameters/NearUnit"
+        - $ref: "#/components/parameters/NearDistance"
+        - $ref: "#/components/parameters/OrderBy"
+        - $ref: "#/components/parameters/Order"
+        - $ref: "#/components/parameters/Blog"
+        - $ref: "#/components/parameters/Private"
+        - $ref: "#/components/parameters/PrivateOnly"
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationCollectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createLocation
+      summary: Create location
+      description: |
+        Creates a physical Events Manager location. The user must have Events Manager location
+        editing permissions; publishing depends on the user's publish capability.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/LocationInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/LocationCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/countries:
+    get:
+      operationId: listLocationCountries
+      summary: List location countries
+      description: |
+        Returns countries with their ISO-3166 alpha-2 code and translated display name.
+
+        By default the full ISO-3166 country list is returned — useful for populating a
+        country picker on a fresh install with no locations yet, or any UI that needs
+        every country WordPress knows about.
+
+        Pass `only_available=true` to narrow the result to countries that have at least
+        one stored location row. This is the right mode for answering *"what countries
+        do I have events in?"*.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - name: only_available
+          in: query
+          description: When `true`, only return countries with at least one stored location. Defaults to `false` (full ISO list).
+          schema:
+            type: boolean
+            default: false
+            example: true
+        - name: search
+          in: query
+          description: Optional case-insensitive substring filter against the country code or its display name.
+          schema:
+            type: string
+            example: united
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationCountryListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/regions:
+    get:
+      operationId: listLocationRegions
+      summary: List location regions
+      description: |
+        Returns the distinct list of region names present in the Events Manager locations table.
+        Pass `country` to narrow the result to a single country.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Country"
+        - name: search
+          in: query
+          description: Optional case-insensitive substring filter against the region name.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationGeoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/states:
+    get:
+      operationId: listLocationStates
+      summary: List location states
+      description: |
+        Returns the distinct list of state/province names present in the Events Manager
+        locations table. Pass `country` and/or `region` to narrow the result.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/Region"
+        - name: search
+          in: query
+          description: Optional case-insensitive substring filter against the state name.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationGeoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/towns:
+    get:
+      operationId: listLocationTowns
+      summary: List location towns
+      description: |
+        Returns the distinct list of town/city names present in the Events Manager
+        locations table. Pass `country`, `region`, and/or `state` to narrow the result.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/Region"
+        - $ref: "#/components/parameters/State"
+        - name: search
+          in: query
+          description: Optional case-insensitive substring filter against the town name.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationGeoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/validate:
+    post:
+      operationId: validateLocation
+      summary: Validate location
+      description: |
+        Validates location input without saving it. This is intended as a safe preflight endpoint
+        before creating or updating a location.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/LocationInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationValidationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/locations/{location_id}:
+    get:
+      operationId: getLocation
+      summary: Get location
+      description: |
+        Retrieves one Events Manager location by ID. The `edit` context requires location
+        management permission.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+        - $ref: "#/components/parameters/Context"
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      operationId: updateLocation
+      summary: Update location
+      description: |
+        Partially updates an existing location. Validation and Events Manager capability checks run
+        before the location is saved.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+      requestBody:
+        $ref: "#/components/requestBodies/LocationInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/LocationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteLocation
+      summary: Delete location
+      description: |
+        Deletes or trashes a location, depending on object behavior and the `force` query parameter.
+        The response includes the previous serialized location data.
+      tags: [Locations]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+        - $ref: "#/components/parameters/Force"
+      responses:
+        "200":
+          $ref: "#/components/responses/DeleteLocationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/bookings:
+    get:
+      operationId: listBookings
+      summary: List bookings
+      description: |
+        Returns bookings visible to the current user. Regular logged-in users are scoped to their
+        own bookings; booking managers may query broader booking collections.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - name: scope
+          in: query
+          description: |
+            Filter bookings by their event's date using an Events Manager date scope —
+            `future`, `past`, `today`, `tomorrow`, `this-week`, `this-month`, `next-month`, `all`,
+            or a `YYYY-MM-DD,YYYY-MM-DD` range. Omit to include bookings for events of any date.
+          schema:
+            type: string
+            example: future
+        - $ref: "#/components/parameters/Context"
+        - $ref: "#/components/parameters/BookingEvent"
+        - $ref: "#/components/parameters/BookingEventId"
+        - $ref: "#/components/parameters/BookingStatus"
+        - $ref: "#/components/parameters/RsvpStatus"
+        - $ref: "#/components/parameters/Person"
+        - $ref: "#/components/parameters/TicketId"
+        - $ref: "#/components/parameters/BookingIdFilter"
+        - $ref: "#/components/parameters/OrderBy"
+        - $ref: "#/components/parameters/Order"
+        - $ref: "#/components/parameters/Blog"
+        - $ref: "#/components/parameters/TimeslotId"
+      responses:
+        "200":
+          $ref: "#/components/responses/BookingCollectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createBooking
+      summary: Create booking
+      description: |
+        Creates a booking for an event using ticket-space selections. Anonymous booking creation is
+        disabled by default in the service unless explicitly enabled by the plugin filter.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/BookingInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/BookingCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/bookings/validate:
+    post:
+      operationId: validateBooking
+      summary: Validate booking
+      description: |
+        Validates booking input without saving it. Availability, ticket, and required guest data
+        checks run through the Events Manager booking objects.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/BookingInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/BookingValidationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/bookings/{booking_id}:
+    get:
+      operationId: getBooking
+      summary: Get booking
+      description: |
+        Retrieves one booking by ID if the booking is visible to the current user. Booking managers
+        may view managed bookings; regular users may view their own bookings.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+        - $ref: "#/components/parameters/Context"
+      responses:
+        "200":
+          $ref: "#/components/responses/BookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      operationId: updateBooking
+      summary: Update booking
+      description: |
+        Partially updates ticket selections, comments, guest details, and other supported booking
+        fields. Booking management permission is required.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        $ref: "#/components/requestBodies/BookingInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/BookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteBooking
+      summary: Delete booking
+      description: |
+        Permanently deletes a booking and its ticket bookings. The response includes the previous
+        serialized booking data.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      responses:
+        "200":
+          $ref: "#/components/responses/DeleteBookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/bookings/{booking_id}/status:
+    post:
+      operationId: setBookingStatus
+      summary: Set booking status
+      description: |
+        Changes a booking status, such as pending, approved, rejected, or cancelled. The operation
+        may send booking status email notifications unless `send_email` is false.
+      tags: [Bookings]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        $ref: "#/components/requestBodies/BookingStatusInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/BookingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/media:
+    post:
+      operationId: uploadMedia
+      summary: Upload media
+      description: |
+        Uploads an image (or other media) to the WordPress media library and returns
+        the resulting attachment metadata. Three input shapes are accepted — pick the
+        one that matches your client:
+
+        - **URL sideload** — `{ source_url: "https://..." }`. Public URL is fetched
+          and stored. Good for AI agents pulling stock images.
+        - **Base64 inline** — `{ filename, mime_type, content_base64 }`. Bytes are
+          decoded and stored.
+        - **Multipart** — standard `multipart/form-data` with a `file` field.
+
+        Returns `{ id, url, mime_type, title, alt_text, width, height }`. The `id`
+        can be passed straight to `featured_image` on events/locations or `image`
+        on categories/tags.
+
+        Requires the `upload_files` capability.
+      tags: [Media]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/MediaUploadInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/MediaResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/categories:
+    get:
+      operationId: listCategories
+      summary: List categories
+      description: |
+        Returns paginated Events Manager event category terms. Category routes are generated from
+        the plugin's active term route map.
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/HideEmpty"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermCollectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createCategory
+      summary: Create category
+      description: |
+        Creates an Events Manager event category term. Requires Events Manager term management
+        permission.
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/TermInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/TermCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/categories/{term_id}:
+    get:
+      operationId: getCategory
+      summary: Get category
+      description: |
+        Retrieves one Events Manager event category term by term ID.
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      operationId: updateCategory
+      summary: Update category
+      description: |
+        Partially updates an Events Manager event category term. Requires Events Manager term
+        management permission.
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      requestBody:
+        $ref: "#/components/requestBodies/TermInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteCategory
+      summary: Delete category
+      description: |
+        Deletes an Events Manager event category term. The response includes the previous serialized
+        term data.
+      tags: [Categories]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      responses:
+        "200":
+          $ref: "#/components/responses/DeleteTermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/tags:
+    get:
+      operationId: listTags
+      summary: List tags
+      description: |
+        Returns paginated Events Manager event tag terms. Tag routes are generated from the plugin's
+        active term route map.
+      tags: [Tags]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/HideEmpty"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermCollectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      operationId: createTag
+      summary: Create tag
+      description: |
+        Creates an Events Manager event tag term. Requires Events Manager term management
+        permission.
+      tags: [Tags]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/TermInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/TermCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /events-manager/v1/tags/{term_id}:
+    get:
+      operationId: getTag
+      summary: Get tag
+      description: |
+        Retrieves one Events Manager event tag term by term ID.
+      tags: [Tags]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    patch:
+      operationId: updateTag
+      summary: Update tag
+      description: |
+        Partially updates an Events Manager event tag term. Requires Events Manager term management
+        permission.
+      tags: [Tags]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      requestBody:
+        $ref: "#/components/requestBodies/TermInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/TermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      operationId: deleteTag
+      summary: Delete tag
+      description: |
+        Deletes an Events Manager event tag term. The response includes the previous serialized
+        term data.
+      tags: [Tags]
+      security:
+        - cookieAuth: []
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TermId"
+      responses:
+        "200":
+          $ref: "#/components/responses/DeleteTermResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  x-example-values:
+    event: &event_value
+      name: Summer Pottery Workshop
+      id: "123"
+      type: single
+      post_id: 456
+      parent: null
+      owner:
+        guest: false
+        name: Events Team
+      slug: summer-pottery-workshop
+      status: 0
+      content: Learn hand-building basics in a relaxed studio session.
+      bookings:
+        end_date: "2026-07-10"
+        end_time: "17:00:00"
+        rsvp_spaces: 4
+        spaces: 24
+      when:
+        all_day: false
+        start: "2026-07-12T00:00:00Z"
+        start_date: "2026-07-12"
+        start_time: "10:00:00"
+        end: "2026-07-12T03:00:00Z"
+        end_date: "2026-07-12"
+        end_time: "13:00:00"
+        timezone: Australia/Sydney
+      location:
+        name: Harbour Studio
+        id: 45
+        post_id: 222
+        owner: 1
+        status: 1
+        slug: harbour-studio
+        content: Accessible studio space near Circular Quay.
+        geo:
+          latitude: -33.861
+          longitude: 151.21
+        address:
+          address: 12 Workshop Lane
+          town: Sydney
+          region: New South Wales
+          state: NSW
+          postcode: "2000"
+          country: AU
+      recurrence: false
+      recurring: false
+      language: en
+      translation: 0
+    location: &location_value
+      name: Harbour Studio
+      id: 45
+      parent: null
+      post_id: 222
+      owner: 1
+      status: 1
+      slug: harbour-studio
+      content: Accessible studio space near Circular Quay.
+      geo:
+        latitude: -33.861
+        longitude: 151.21
+      address:
+        address: 12 Workshop Lane
+        town: Sydney
+        region: New South Wales
+        state: NSW
+        postcode: "2000"
+        country: AU
+      language: en
+      translation: 0
+    booking: &booking_value
+      id: 789
+      event_id: "123"
+      uuid: 7f7d9e11c8d8460a8aa5f2c4c58f4020
+      person_id: 23
+      status: 1
+      spaces: 2
+      price: "98.00"
+      tax_rate: 0.1
+      taxes: "8.91"
+      comment: Please seat us near the front.
+      meta: {}
+      tickets:
+        "55":
+          name: General Admission
+          description: Standard workshop ticket.
+          spaces: 2
+          price: "98.00"
+          attendees:
+            - uuid: 9d5d1c8e4b7a4c3ab2c078d557bbcd11
+              price: "49.00"
+              meta: {}
+            - uuid: 7c0d2b2a01244ecfa5fdbf91da555111
+              price: "49.00"
+              meta: {}
+      datetime: "2026-05-19T02:15:00Z"
+      person:
+        guest: false
+        email: ada@example.com
+        name: Ada Lovelace
+        phone: "+61400111222"
+    term: &term_value
+      id: 12
+      name: Workshops
+      slug: workshops
+      taxonomy: event-categories
+      description: Hands-on learning events.
+      parent: 0
+      count: 8
+      color: "#80b538"
+      image_url: https://example.com/wp-content/uploads/workshops.jpg
+      url: https://example.com/events/categories/workshops/
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: header
+      name: X-WP-Nonce
+      description: WordPress REST nonce for cookie-authenticated requests.
+    basicAuth:
+      type: http
+      scheme: basic
+      description: WordPress Application Passwords over HTTP Basic Authentication.
+    emUploadNonce:
+      type: apiKey
+      in: header
+      name: X-EM-Nonce
+      description: Events Manager upload nonce used by the upload endpoint.
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number for paginated collection responses.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      description: Number of items to return per page. The service caps this at 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Search:
+      name: search
+      in: query
+      description: Free-text search term.
+      schema:
+        type: string
+        example: workshop
+    Context:
+      name: context
+      in: query
+      description: Response context. `edit` may expose management metadata and requires object permissions.
+      schema:
+        type: string
+        enum: [view, edit, embed]
+        default: view
+    EventId:
+      name: event_id
+      in: path
+      required: true
+      description: Events Manager event ID. Timeslot-specific IDs may use `event_id:timeslot_id`.
+      schema:
+        type: string
+        pattern: "^\\d+(?::\\d+)?$"
+        example: "123"
+    LocationId:
+      name: location_id
+      in: path
+      required: true
+      description: Events Manager location ID.
+      schema:
+        type: integer
+        format: int64
+        example: 45
+    BookingId:
+      name: booking_id
+      in: path
+      required: true
+      description: Events Manager booking ID (integer) or booking UUID (32-character hex string).
+      schema:
+        oneOf:
+          - type: integer
+            format: int64
+            example: 789
+          - type: string
+            pattern: "^[0-9a-f]{32}$"
+            example: fab91000f7e149dea28baa7f2bafcabf
+    TermId:
+      name: term_id
+      in: path
+      required: true
+      description: WordPress term ID.
+      schema:
+        type: integer
+        format: int64
+        example: 12
+    Force:
+      name: force
+      in: query
+      description: Whether to force deletion where supported by the underlying object.
+      schema:
+        type: boolean
+        default: false
+    Scope:
+      name: scope
+      in: query
+      description: Events Manager date scope such as `future`, `past`, `today`, or a date range.
+      schema:
+        type: string
+        default: future
+        example: future
+    EventStatus:
+      name: status
+      in: query
+      description: Events Manager event/location publish status filter.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 1
+    ActiveStatus:
+      name: active_status
+      in: query
+      description: Event active status filter.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 1
+    Cancelled:
+      name: cancelled
+      in: query
+      description: Include or exclude cancelled events.
+      schema:
+        type: boolean
+    Active:
+      name: active
+      in: query
+      description: Include active events.
+      schema:
+        type: boolean
+    CategoryFilter:
+      name: category
+      in: query
+      description: Category ID, slug, or comma-separated category filter.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: workshops
+    TagFilter:
+      name: tag
+      in: query
+      description: Tag ID, slug, or comma-separated tag filter.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: training
+    LocationFilter:
+      name: location
+      in: query
+      description: Location ID or comma-separated location IDs.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 45
+    LocationIdFilter:
+      name: location_id
+      in: query
+      description: Location ID alias accepted by Events Manager search defaults.
+      schema:
+        type: integer
+        format: int64
+        example: 45
+    Town:
+      name: town
+      in: query
+      description: Location town/city filter.
+      schema:
+        type: string
+        example: Sydney
+    State:
+      name: state
+      in: query
+      description: Location state filter.
+      schema:
+        type: string
+        example: NSW
+    Country:
+      name: country
+      in: query
+      description: Location country filter, usually a country code.
+      schema:
+        type: string
+        example: AU
+    Region:
+      name: region
+      in: query
+      description: Location region filter.
+      schema:
+        type: string
+        example: New South Wales
+    Near:
+      name: near
+      in: query
+      description: Latitude/longitude pair used by geo search.
+      schema:
+        type: string
+        example: "-33.8688,151.2093"
+    NearUnit:
+      name: near_unit
+      in: query
+      description: Unit for geo distance.
+      schema:
+        type: string
+        enum: [mi, km]
+        example: km
+    NearDistance:
+      name: near_distance
+      in: query
+      description: Distance from the `near` coordinates.
+      schema:
+        type: integer
+        minimum: 1
+        example: 25
+    EventType:
+      name: event_type
+      in: query
+      description: Events Manager event type.
+      schema:
+        type: string
+        enum: [single, recurring, repeating, recurrence]
+        example: single
+    EventArchetype:
+      name: event_archetype
+      in: query
+      description: Event archetype/custom post type filter.
+      schema:
+        type: string
+        example: event
+    OrderBy:
+      name: orderby
+      in: query
+      description: Field or comma-separated fields used for ordering.
+      schema:
+        type: string
+        example: event_start_date,event_start_time
+    Order:
+      name: order
+      in: query
+      description: Sort direction.
+      schema:
+        type: string
+        enum: [ASC, DESC, asc, desc]
+        example: ASC
+    Blog:
+      name: blog
+      in: query
+      description: Multisite blog ID filter when global tables are enabled.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 1
+    Private:
+      name: private
+      in: query
+      description: Include private objects when the current user can read them.
+      schema:
+        type: boolean
+    PrivateOnly:
+      name: private_only
+      in: query
+      description: Only return private objects.
+      schema:
+        type: boolean
+    Timeslots:
+      name: timeslots
+      in: query
+      description: Split matching events by timeslot where Events Manager timeslots are enabled.
+      schema:
+        type: boolean
+    Eventful:
+      name: eventful
+      in: query
+      description: Only return locations that have associated events.
+      schema:
+        type: boolean
+    Eventless:
+      name: eventless
+      in: query
+      description: Only return locations that do not have associated events.
+      schema:
+        type: boolean
+    BookingEvent:
+      name: event
+      in: query
+      description: Booking event filter. Timeslot IDs may use `event_id:timeslot_id`.
+      schema:
+        type: string
+        example: "123"
+    BookingEventId:
+      name: event_id
+      in: query
+      description: Alias for the booking event filter.
+      schema:
+        type: string
+        example: "123"
+    BookingStatus:
+      name: status
+      in: query
+      description: Booking status filter. Multiple statuses may be comma-separated.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: "0,1"
+    RsvpStatus:
+      name: rsvp_status
+      in: query
+      description: Booking RSVP status filter.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 1
+    Person:
+      name: person
+      in: query
+      description: Person/user ID filter. Non-managers are scoped to their own user ID.
+      schema:
+        type: integer
+        format: int64
+        example: 23
+    TicketId:
+      name: ticket_id
+      in: query
+      description: Ticket ID filter.
+      schema:
+        type: integer
+        format: int64
+        example: 55
+    BookingIdFilter:
+      name: booking_id
+      in: query
+      description: Booking ID or comma-separated booking IDs.
+      schema:
+        oneOf:
+          - type: integer
+          - type: string
+        example: 789
+    TimeslotId:
+      name: timeslot_id
+      in: query
+      description: Timeslot ID filter.
+      schema:
+        type: integer
+        format: int64
+        example: 7
+    HideEmpty:
+      name: hide_empty
+      in: query
+      description: Hide terms with no assigned posts.
+      schema:
+        type: boolean
+        default: false
+    TempId:
+      name: temp_id
+      in: query
+      required: true
+      description: Temporary upload ID returned by the upload endpoint.
+      schema:
+        type: string
+        example: phpA1b2C3
+    XFilenames:
+      name: X-Filenames
+      in: header
+      description: Optional JSON map of temporary file IDs to original filenames.
+      schema:
+        type: string
+        example: '{"phpA1b2C3":{"name":"venue-map.png"}}'
+    UploadPath:
+      name: path
+      in: query
+      required: true
+      description: Upload validation path used for Events Manager nonce and filters.
+      schema:
+        type: string
+        example: event-image
+    XEMNonce:
+      name: X-EM-Nonce
+      in: header
+      required: true
+      description: Nonce generated for `em_uploads_api/{path}`.
+      schema:
+        type: string
+        example: 91f4a2d8bc
+    TmpFile:
+      name: tmp_file
+      in: query
+      required: true
+      description: Temporary upload ID to revert.
+      schema:
+        type: string
+        example: phpA1b2C3
+    UploadNonce:
+      name: nonce
+      in: query
+      required: true
+      description: Revert nonce returned by the upload endpoint.
+      schema:
+        type: string
+        example: a7b6c5d4e3
+  requestBodies:
+    UploadMultipart:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            $ref: "#/components/schemas/UploadRequest"
+          examples:
+            eventImage:
+              summary: Upload an event image
+              value:
+                file: ./event-banner.jpg
+    EventInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventInput"
+          examples:
+            workshop:
+              summary: Create a workshop event
+              value:
+                event_name: Summer Pottery Workshop
+                content: Learn hand-building basics in a relaxed studio session.
+                event_type: single
+                post_status: publish
+                event_start_date: "2026-07-12"
+                event_start_time: "10:00:00"
+                event_end_date: "2026-07-12"
+                event_end_time: "13:00:00"
+                event_timezone: Australia/Sydney
+                location_id: 45
+                event_categories: [12]
+                event_tags: [34]
+    LocationInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LocationInput"
+          examples:
+            venue:
+              summary: Create a physical venue
+              value:
+                name: Harbour Studio
+                content: Accessible studio space near Circular Quay.
+                post_status: publish
+                address:
+                  address: 12 Workshop Lane
+                  town: Sydney
+                  state: NSW
+                  postcode: "2000"
+                  region: New South Wales
+                  country: AU
+                geo:
+                  latitude: -33.861
+                  longitude: 151.21
+    BookingInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BookingInput"
+          examples:
+            attendeeBooking:
+              summary: Book two spaces
+              value:
+                event_id: "123"
+                comment: Please seat us near the front.
+                tickets:
+                  - ticket_id: 55
+                    spaces: 2
+                person:
+                  name: Ada Lovelace
+                  email: ada@example.com
+                  phone: "+61400111222"
+                send_email: true
+    BookingStatusInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BookingStatusInput"
+          examples:
+            approveBooking:
+              summary: Approve a booking
+              value:
+                status: 1
+                send_email: true
+                ignore_spaces: false
+    TermInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TermInput"
+          examples:
+            workshopCategory:
+              summary: Create a workshop category
+              value:
+                name: Workshops
+                slug: workshops
+                description: Hands-on learning events.
+                parent: 0
+    MediaUploadInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MediaUploadInput"
+          examples:
+            sideloadUrl:
+              summary: Sideload an image from a public URL
+              value:
+                source_url: https://images.unsplash.com/photo-1556909114-f6e7ad7d3136
+                title: Knitting workshop hero
+                alt_text: Person knitting with a teal yarn ball
+            inlineBase64:
+              summary: Inline base64 upload
+              value:
+                filename: hero.jpg
+                mime_type: image/jpeg
+                content_base64: /9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/...
+            existingId:
+              summary: Look up an existing attachment
+              value:
+                id: 12345
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+                description: The file to upload.
+              title:
+                type: string
+              alt_text:
+                type: string
+              post_id:
+                type: integer
+            required: [file]
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WPError"
+          examples:
+            invalid:
+              $ref: "#/components/examples/BadRequestError"
+    Unauthorized:
+      description: Authentication is required or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WPError"
+          examples:
+            unauthorized:
+              $ref: "#/components/examples/UnauthorizedError"
+    Forbidden:
+      description: The authenticated user cannot perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WPError"
+          examples:
+            forbidden:
+              $ref: "#/components/examples/ForbiddenError"
+    NotFound:
+      description: The requested object was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WPError"
+          examples:
+            notFound:
+              $ref: "#/components/examples/NotFoundError"
+    ServerError:
+      description: An unexpected server error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WPError"
+          examples:
+            serverError:
+              $ref: "#/components/examples/ServerError"
+    UploadResponse:
+      description: Temporary file upload was accepted.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/UploadResponse"
+          examples:
+            uploaded:
+              value:
+                success: true
+                file:
+                  id: phpA1b2C3
+                  name: event-banner.jpg
+                  size: 184233
+                  type: image/jpeg
+                nonce: a7b6c5d4e3
+    UploadRevertResponse:
+      description: Temporary file revert result.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MessageResponse"
+          examples:
+            reverted:
+              value:
+                success: true
+                message: File deleted.
+    UploadFileContentResponse:
+      description: Raw file contents.
+      content:
+        application/octet-stream:
+          schema:
+            $ref: "#/components/schemas/UploadedFileContent"
+          examples:
+            file:
+              value: raw file bytes omitted
+    EventCollectionResponse:
+      description: Paginated events.
+      headers:
+        X-WP-Total:
+          $ref: "#/components/headers/XWPTotal"
+        X-WP-TotalPages:
+          $ref: "#/components/headers/XWPTotalPages"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventCollection"
+          examples:
+            events:
+              $ref: "#/components/examples/EventCollectionExample"
+    EventResponse:
+      description: Event response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Event"
+          examples:
+            event:
+              $ref: "#/components/examples/EventExample"
+    EventCreatedResponse:
+      description: Event was created.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Event"
+          examples:
+            event:
+              $ref: "#/components/examples/EventExample"
+    EventValidationResponse:
+      description: Event validation result.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventValidation"
+          examples:
+            valid:
+              value:
+                valid: true
+                event: *event_value
+    EventAvailabilityResponse:
+      description: Event availability response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventAvailability"
+          examples:
+            availability:
+              $ref: "#/components/examples/EventAvailabilityExample"
+    DeleteEventResponse:
+      description: Event delete response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DeleteEventResponse"
+          examples:
+            deleted:
+              value:
+                deleted: true
+                previous: *event_value
+    LocationCollectionResponse:
+      description: Paginated locations.
+      headers:
+        X-WP-Total:
+          $ref: "#/components/headers/XWPTotal"
+        X-WP-TotalPages:
+          $ref: "#/components/headers/XWPTotalPages"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LocationCollection"
+          examples:
+            locations:
+              $ref: "#/components/examples/LocationCollectionExample"
+    LocationResponse:
+      description: Location response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Location"
+          examples:
+            location:
+              $ref: "#/components/examples/LocationExample"
+    LocationCreatedResponse:
+      description: Location was created.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Location"
+          examples:
+            location:
+              $ref: "#/components/examples/LocationExample"
+    LocationCountryListResponse:
+      description: Distinct list of countries present in the locations table.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                      description: ISO-3166 alpha-2 country code.
+                      example: GB
+                    name:
+                      type: string
+                      description: Translated display name for the country.
+                      example: United Kingdom
+                  required: [code, name]
+          example:
+            items:
+              - code: AU
+                name: Australia
+              - code: GB
+                name: United Kingdom
+              - code: US
+                name: United States
+    LocationGeoListResponse:
+      description: Distinct list of region / state / town values present in the locations table.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  type: string
+          example:
+            items:
+              - London
+              - Manchester
+              - Edinburgh
+    LocationValidationResponse:
+      description: Location validation result.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LocationValidation"
+          examples:
+            valid:
+              value:
+                valid: true
+                location: *location_value
+    DeleteLocationResponse:
+      description: Location delete response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DeleteLocationResponse"
+          examples:
+            deleted:
+              value:
+                deleted: true
+                previous: *location_value
+    BookingCollectionResponse:
+      description: Paginated bookings.
+      headers:
+        X-WP-Total:
+          $ref: "#/components/headers/XWPTotal"
+        X-WP-TotalPages:
+          $ref: "#/components/headers/XWPTotalPages"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BookingCollection"
+          examples:
+            bookings:
+              $ref: "#/components/examples/BookingCollectionExample"
+    MediaResponse:
+      description: Newly created (or looked-up) media library attachment.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Attachment"
+          example:
+            id: 12345
+            url: https://example.com/wp-content/uploads/2026/06/hero.jpg
+            mime_type: image/jpeg
+            title: Knitting workshop hero
+            alt_text: Person knitting with a teal yarn ball
+            width: 1920
+            height: 1080
+    BookingResponse:
+      description: Booking response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Booking"
+          examples:
+            booking:
+              $ref: "#/components/examples/BookingExample"
+    BookingCreatedResponse:
+      description: Booking was created.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Booking"
+          examples:
+            booking:
+              $ref: "#/components/examples/BookingExample"
+    BookingValidationResponse:
+      description: Booking validation result.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BookingValidation"
+          examples:
+            valid:
+              value:
+                valid: true
+                booking: *booking_value
+    DeleteBookingResponse:
+      description: Booking delete response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DeleteBookingResponse"
+          examples:
+            deleted:
+              value:
+                deleted: true
+                previous: *booking_value
+    TermCollectionResponse:
+      description: Paginated terms.
+      headers:
+        X-WP-Total:
+          $ref: "#/components/headers/XWPTotal"
+        X-WP-TotalPages:
+          $ref: "#/components/headers/XWPTotalPages"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TermCollection"
+          examples:
+            terms:
+              $ref: "#/components/examples/TermCollectionExample"
+    TermResponse:
+      description: Term response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Term"
+          examples:
+            term:
+              $ref: "#/components/examples/TermExample"
+    TermCreatedResponse:
+      description: Term was created.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Term"
+          examples:
+            term:
+              $ref: "#/components/examples/TermExample"
+    DeleteTermResponse:
+      description: Term delete response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/DeleteTermResponse"
+          examples:
+            deleted:
+              value:
+                deleted: true
+                previous: *term_value
+  headers:
+    XWPTotal:
+      description: Total number of matching items.
+      schema:
+        type: integer
+        example: 42
+    XWPTotalPages:
+      description: Total number of result pages.
+      schema:
+        type: integer
+        example: 3
+  schemas:
+    WPError:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: string
+          example: em_api_event_not_found
+        message:
+          type: string
+          example: Event not found.
+        data:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: integer
+              example: 404
+      additionalProperties: true
+    MessageResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
+      additionalProperties: true
+    UploadRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: File upload. The callback supports deeply nested upload arrays but expects one uploaded file.
+    UploadResponse:
+      type: object
+      required: [success, file, nonce]
+      properties:
+        success:
+          type: boolean
+        file:
+          $ref: "#/components/schemas/UploadFile"
+        nonce:
+          type: string
+          description: Nonce used to revert this temporary upload.
+    UploadFile:
+      type: object
+      required: [id, name, size, type]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+        type:
+          type: string
+    UploadedFileContent:
+      type: string
+      format: binary
+      description: Raw file bytes.
+    Pagination:
+      type: object
+      required: [total, total_pages, page, per_page]
+      properties:
+        total:
+          type: integer
+        total_pages:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+    EventCollection:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    Event:
+      type: object
+      required: [name, id, type, post_id, slug, status, content, bookings, when, location, recurring]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Events Manager event ID. Timeslot contexts may use `event_id:timeslot_id`.
+        type:
+          type: string
+          enum: [single, recurring, repeating]
+        post_id:
+          type:
+            - integer
+            - "null"
+        parent:
+          type:
+            - integer
+            - "null"
+        owner:
+          $ref: "#/components/schemas/Owner"
+        blog_id:
+          type:
+            - integer
+            - "null"
+        group_id:
+          type:
+            - integer
+            - "null"
+        slug:
+          type: string
+        status:
+          type:
+            - integer
+            - "null"
+          description: "TODO: `EM_Event::to_api()` currently maps this from `event_private`; confirm intended meaning before freezing docs."
+        content:
+          type: string
+        image:
+          description: Featured image URLs (thumbnail + full), or null if the event has no image.
+          type:
+            - object
+            - "null"
+          properties:
+            thumbnail:
+              type: string
+              format: uri
+            full:
+              type: string
+              format: uri
+        bookings:
+          $ref: "#/components/schemas/EventBookings"
+        when:
+          $ref: "#/components/schemas/EventWhen"
+        location:
+          anyOf:
+            - $ref: "#/components/schemas/Location"
+            - $ref: "#/components/schemas/EventLocation"
+            - type: boolean
+        location_type:
+          type: string
+        categories:
+          type: array
+          description: >-
+            The event's categories. To change them on create/update send
+            `event_categories` as an array of term IDs; omitting it on update
+            leaves the existing categories unchanged (send `[]` to clear).
+          items:
+            $ref: "#/components/schemas/TermRef"
+        tags:
+          type: array
+          description: >-
+            The event's tags. Set via `event_tags` (array of term IDs); omitting
+            on update preserves them, `[]` clears them.
+          items:
+            $ref: "#/components/schemas/TermRef"
+        recurrence:
+          oneOf:
+            - $ref: "#/components/schemas/GenericObject"
+            - type: boolean
+        recurrences:
+          $ref: "#/components/schemas/GenericObject"
+        recurring:
+          type: boolean
+        language:
+          type:
+            - string
+            - "null"
+        translation:
+          type:
+            - integer
+            - "null"
+        timeslot_id:
+          type: integer
+        featured_image:
+          oneOf:
+            - $ref: "#/components/schemas/Attachment"
+            - type: "null"
+          description: Featured image attachment, or `null` if none is set.
+        warnings:
+          $ref: "#/components/schemas/ApiWarnings"
+        permissions:
+          $ref: "#/components/schemas/Permissions"
+      additionalProperties: true
+    EventInput:
+      type: object
+      description: |
+        Event create/update payload. Top-level field names mirror the live admin/public form
+        $_POST contract so the same shape works across `EM_Event::get_post()`, MCP abilities,
+        and REST. Pro overlay fields are marked `::pro::`. Extras pass through verbatim — see
+        `additionalProperties` at the bottom of the schema for the policy on undocumented keys.
+      required:
+        - event_name
+        - event_start_date
+      properties:
+        event_name:
+          type: string
+          description: Event display title. **Required.**
+        content:
+          type: string
+          description: Long-form event description. Accepts HTML, sanitized by `wp_kses` against the post-content allowlist.
+        event_type:
+          type: string
+          enum: [single, recurring, repeating]
+          description: Event timing model. `single` is one occurrence; `recurring` is a parent that generates child occurrences; `repeating` is a parent CPT for separately-tracked instances. Defaults to `single`.
+        event_archetype:
+          type: string
+          description: Custom event-archetype CPT slug (configured under Events > Settings > Archetypes). Defaults to the base event type.
+        post_status:
+          type: string
+          enum: [publish, pending, draft, private]
+          description: WP post status. Setting `publish` requires the `publish_events` capability; without it, EM saves as `pending` regardless.
+        featured_image:
+          $ref: "#/components/schemas/ImageAssignmentInput"
+          description: WordPress featured image for the event. Sets `_thumbnail_id` on the underlying CPT. Accepts an attachment ID, public URL (sideloaded), media-upload object, or `null` to clear.
+        featured_image_alt:
+          type: string
+          description: Alt text applied to the featured image attachment (`_wp_attachment_image_alt`). Only takes effect when `featured_image` is also provided.
+        event_start_date:
+          type: string
+          format: date
+          description: Event start date in ISO format (`YYYY-MM-DD`). **Required.**
+        event_end_date:
+          type: string
+          format: date
+          description: Event end date. Defaults to `event_start_date` if omitted.
+        event_start_time:
+          type: string
+          pattern: "^([01]\\d|[0-9]|2[0-3])(:[0-5]\\d)?(:[0-5]\\d)?( ?(AM|PM))?$"
+          description: |
+            Event start time. Accepted forms: `HH:MM`, `HH:MM:SS`, or 12-hour `h:MM AM/PM`.
+            API-friendly alias for `event_timeranges[0].start` — translated server-side. If both
+            this and `event_timeranges` are sent, the explicit nested value wins per-field.
+        event_end_time:
+          type: string
+          pattern: "^([01]\\d|[0-9]|2[0-3])(:[0-5]\\d)?(:[0-5]\\d)?( ?(AM|PM))?$"
+          description: Event end time (same formats as `event_start_time`). Alias for `event_timeranges[0].end`.
+        event_rsvp_date:
+          type: string
+          format: date
+          description: Booking cut-off date (no bookings accepted after this date).
+        event_rsvp_time:
+          type: string
+          pattern: "^([01]\\d|[0-9]|2[0-3])(:[0-5]\\d)?(:[0-5]\\d)?( ?(AM|PM))?$"
+          description: Booking cut-off time of day, partnering with `event_rsvp_date`.
+        event_timezone:
+          type: string
+          description: IANA timezone (e.g. `Europe/London`). Defaults to the site timezone if omitted.
+        event_all_day:
+          type: boolean
+          description: When true, EM clears `start`/`end` times and treats the event as all-day. Alias for `event_timeranges[0].all_day`.
+        event_timeranges:
+          type: array
+          description: |
+            Canonical EM time-range structure (mirrors the live event form). Index 0 holds the
+            primary range; additional indices are timeslot generators when `timeslots: true` is
+            set. Sending `event_start_time` / `event_end_time` / `event_all_day` at the top
+            level is translated into this shape — pick whichever style suits the consumer.
+          items:
+            type: object
+            properties:
+              start:
+                type: string
+                description: Start of the range. Accepts `HH:MM`, `HH:MM:SS`, or `h:MM AM/PM`.
+              end:
+                type: string
+                description: End of the range, same formats as `start`.
+              all_day:
+                description: Presence sets this range to all-day; clears `start`/`end`.
+                oneOf:
+                  - type: boolean
+                  - type: string
+              timeslots:
+                description: When set, this range generates repeated timeslots using `duration` / `buffer` / `frequency` below.
+                oneOf:
+                  - type: boolean
+                  - type: string
+              duration:
+                type: object
+                description: Length of each generated timeslot.
+                properties:
+                  qty: { type: integer, description: Quantity. }
+                  unit: { type: string, enum: [M, H, D], description: 'Minutes / Hours / Days.' }
+              buffer:
+                type: object
+                description: Gap between consecutive timeslots.
+                properties:
+                  qty: { type: integer }
+                  unit: { type: string, enum: [M, H, D] }
+              frequency:
+                type: object
+                description: Repeat interval between timeslots.
+                properties:
+                  qty: { type: integer }
+                  unit: { type: string, enum: [M, H, D] }
+        event_rsvp:
+          type: integer
+          description: Bookings master switch — `1` to enable, `0` to disable. **Must be `1` for `em_tickets` to take effect** (mirrors the admin-form bookings checkbox).
+        event_rsvp_spaces:
+          type: integer
+          description: Per-booking maximum spaces. `0` = no per-booking cap.
+        event_spaces:
+          type: integer
+          minimum: 0
+          description: Total event capacity across all tickets. `0` = no event-wide cap.
+        event_active_status:
+          type: integer
+          description: Active-status code (1 = active, 0 = cancelled/inactive; see `EM_Event::get_active_statuses()` for the full enum).
+        event_private:
+          type: integer
+          description: Privacy flag — `1` = private (visible only to users with `read_private_events`), `0` = public.
+
+        location_id:
+          type: integer
+          description: |
+            Existing location ID to bind. Leave empty (and supply `location_name` plus address
+            fields) to create a new location inline during this event save.
+        location_name:
+          type: string
+          description: Inline location create — used only when `location_id` is empty.
+        location_address:
+          type: string
+          description: Inline location create — street address.
+        location_town:
+          type: string
+          description: Inline location create — town / city.
+        location_state:
+          type: string
+          description: Inline location create — state / county.
+        location_postcode:
+          type: string
+          description: Inline location create — postal / ZIP code.
+        location_region:
+          type: string
+          description: Inline location create — free-form region label, used for filtering.
+        location_country:
+          type: string
+          description: Inline location create — ISO 3166-1 alpha-2 country code (e.g. `GB`, `US`).
+        location_latitude:
+          type: number
+          description: Inline location create — WGS-84 latitude.
+        location_longitude:
+          type: number
+          description: Inline location create — WGS-84 longitude.
+        location_type:
+          type: string
+          description: Location type. Default `location` (physical, uses `location_id` or inline fields). `::pro::` values include `url` and `online`.
+        location_url:
+          type: string
+          description: '`::pro::` URL for url-type locations.'
+        event_location_url:
+          type: string
+          description: '`::pro::` Legacy event URL field (predates `location_url`).'
+        event_location_url_text:
+          type: string
+          description: '`::pro::` Display text for `event_location_url`.'
+
+        event_categories:
+          type: array
+          description: >-
+            Category term IDs. Canonical name matches the live event form $_POST
+            contract. PATCH semantics: omit this key on update to leave the
+            existing categories unchanged; send an explicit `[]` to clear them.
+          items:
+            type: integer
+        event_tags:
+          type: array
+          description: >-
+            Tag term IDs. Omit on update to preserve existing tags; send `[]` to
+            clear.
+          items:
+            type: integer
+        categories:
+          type: array
+          description: '*Deprecated.* Alias for `event_categories`. Kept for back-compat.'
+          items:
+            type: integer
+        tags:
+          type: array
+          description: '*Deprecated.* Alias for `event_tags`.'
+          items:
+            type: integer
+
+        em_tickets:
+          type: object
+          description: |
+            Tickets bound to this event. Object keyed by ticket ID (existing) or 1-based
+            sequential index (new). Key `0` is reserved by `EM_Tickets::get_post()` (admin-form
+            template row); the API auto-shifts 0-indexed payloads. **Requires `event_rsvp: 1`**
+            on the event to take effect — sending tickets without bookings enabled is silently
+            ignored (matches the admin-form behaviour).
+          additionalProperties:
+            $ref: "#/components/schemas/TicketInput"
+        em_attributes:
+          type: object
+          description: |
+            Custom event attributes, keyed by attribute label as configured under
+            Events > Settings > Attributes. Values are typically strings; select-multiple
+            attributes accept an array of strings.
+          additionalProperties: true
+        em_coupons:
+          type: array
+          description: '`::pro::` Coupon IDs to bind to this event (event-wide discounts).'
+          items:
+            type: integer
+
+        waitlist:
+          type: integer
+          description: '`::pro::` (waitlists) `1` enables the waitlist on this event, `0` disables.'
+        waitlist_booking_limit:
+          type: integer
+          description: '`::pro::` (waitlists) Maximum spaces a single waitlist booking may request.'
+        waitlist_expiry:
+          type: string
+          description: '`::pro::` (waitlists) Minutes before an offered waitlist slot lapses if not confirmed.'
+        waitlist_limit:
+          type: integer
+          description: '`::pro::` (waitlists) Maximum total waitlist size.'
+        rsvp_policy:
+          type: string
+          description: '`::pro::` (rsvp-policy) Deadline / cancel policy slug.'
+        rsvp_policy_type:
+          type: string
+          description: '`::pro::` (rsvp-policy) Policy enforcement type.'
+        bookings_can_cancel:
+          type: string
+          description: '`::pro::` Whether attendees may self-cancel their bookings.'
+        bookings_can_cancel_time:
+          type: string
+          description: '`::pro::` Cancel cut-off as an ISO 8601 duration before event start (e.g. `P1D` = 1 day before).'
+        minimum_capacity_spaces:
+          type: integer
+          description: '`::pro::` Minimum bookings required by the `minimum_capacity_time` deadline; if not met, EM can cancel automatically.'
+        minimum_capacity_time:
+          type: string
+          description: '`::pro::` ISO 8601 duration before event start by which `minimum_capacity_spaces` must be met.'
+        dependent_event:
+          type: string
+          description: '`::pro::` Prerequisite event UID or ID — bookers must have a booking on that event first.'
+        custom_attendee_form:
+          type: integer
+          description: '`::pro::` (bookings-form) Form ID overriding the default attendee form for this event.'
+        custom_booking_form:
+          type: integer
+          description: '`::pro::` (bookings-form) Form ID overriding the default booking form.'
+        recurrence_rsvp_days:
+          type: integer
+          description: '`::pro::` Per-recurrence RSVP cut-off offset (days). Used with `recurrence_rsvp_days_when`.'
+        recurrence_rsvp_days_when:
+          type: string
+          description: '`::pro::` `before` or `after`, qualifies `recurrence_rsvp_days`.'
+
+        data_privacy_consent:
+          type: boolean
+          description: Privacy-policy acknowledgement, required when the privacy add-on is configured to enforce it.
+        data_comms_consent:
+          type: boolean
+          description: Marketing/comms opt-in.
+      additionalProperties:
+        description: |
+          Any extra field name accepted by `EM_Event::get_post()` / `EM_Event::get_post_meta()` —
+          or by callbacks hooking into those methods (Pro add-ons, custom plugins, theme code).
+          Documented properties above are the canonical core set; everything else passes through
+          to `$_REQUEST` unchanged.
+    EventWhen:
+      type: object
+      required: [all_day, start, start_date, start_time, end, end_date, end_time, timezone]
+      properties:
+        all_day:
+          type: boolean
+        start:
+          type: string
+          format: date-time
+        start_date:
+          type: string
+          format: date
+        start_time:
+          type: string
+        end:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date
+        end_time:
+          type: string
+        timezone:
+          type: string
+    EventBookings:
+      type: object
+      properties:
+        end_date:
+          type:
+            - string
+            - "null"
+          format: date
+        end_time:
+          type:
+            - string
+            - "null"
+        rsvp_spaces:
+          type:
+            - integer
+            - "null"
+        spaces:
+          type:
+            - integer
+            - "null"
+        booked_spaces:
+          type:
+            - integer
+            - "null"
+          description: Confirmed booked spaces. Populated for booking-enabled events only.
+        available_spaces:
+          type:
+            - integer
+            - "null"
+          description: Spaces still available. Populated for booking-enabled events only.
+    EventAvailability:
+      type: object
+      required: [event_id, bookings_enabled, open, spaces, available_spaces, tickets]
+      properties:
+        event_id:
+          type: string
+        bookings_enabled:
+          type: boolean
+        open:
+          type: boolean
+        spaces:
+          type: integer
+        available_spaces:
+          type: integer
+        tickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketAvailability"
+    TicketAvailability:
+      type: object
+      required: [id, name, price, spaces, available_spaces, available]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        price:
+          oneOf:
+            - type: number
+            - type: string
+        spaces:
+          type: integer
+        available_spaces:
+          type: integer
+        available:
+          type: boolean
+    EventValidation:
+      type: object
+      required: [valid, event]
+      properties:
+        valid:
+          type: boolean
+        event:
+          $ref: "#/components/schemas/Event"
+    LocationCollection:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    Location:
+      type: object
+      required: [name, id, post_id, slug, status, content, geo, address]
+      properties:
+        name:
+          type: string
+        id:
+          type: integer
+        parent:
+          type:
+            - integer
+            - "null"
+        post_id:
+          type:
+            - integer
+            - "null"
+        blog_id:
+          type:
+            - integer
+            - "null"
+        owner:
+          type:
+            - integer
+            - "null"
+        status:
+          type:
+            - integer
+            - "null"
+        slug:
+          type: string
+        content:
+          type: string
+        geo:
+          $ref: "#/components/schemas/Geo"
+        address:
+          $ref: "#/components/schemas/Address"
+        image:
+          description: Featured image URLs (thumbnail + full), or null if the location has no image.
+          type:
+            - object
+            - "null"
+          properties:
+            thumbnail:
+              type: string
+              format: uri
+            full:
+              type: string
+              format: uri
+        upcoming_events_count:
+          type:
+            - integer
+            - "null"
+          description: Number of upcoming (future-scope) events at this location.
+        language:
+          type:
+            - string
+            - "null"
+        translation:
+          type:
+            - integer
+            - "null"
+        featured_image:
+          oneOf:
+            - $ref: "#/components/schemas/Attachment"
+            - type: "null"
+          description: Featured image attachment, or `null` if none is set.
+        warnings:
+          $ref: "#/components/schemas/ApiWarnings"
+        permissions:
+          $ref: "#/components/schemas/Permissions"
+      additionalProperties: true
+    LocationInput:
+      type: object
+      description: |
+        Location create/update payload. Top-level field names mirror the live admin/public form
+        $_POST contract. Extras pass through via `additionalProperties` — see the policy at
+        the bottom of the schema.
+      required:
+        - location_name
+        - location_address
+        - location_town
+        - location_country
+      properties:
+        location_name:
+          type: string
+          description: Display name of the venue. **Required.**
+        content:
+          type: string
+          description: Long-form venue description. Accepts HTML, sanitized by `wp_kses`.
+        post_status:
+          type: string
+          enum: [publish, pending, draft, private]
+          description: WP post status. `publish` requires the `publish_locations` capability.
+        featured_image:
+          $ref: "#/components/schemas/ImageAssignmentInput"
+          description: WordPress featured image for the location. Sets `_thumbnail_id` on the underlying CPT. Accepts an attachment ID, public URL (sideloaded), media-upload object, or `null` to clear.
+        featured_image_alt:
+          type: string
+          description: Alt text applied to the featured image attachment (`_wp_attachment_image_alt`). Only takes effect when `featured_image` is also provided.
+        location_address:
+          type: string
+          description: Street address. **Required.**
+        location_town:
+          type: string
+          description: Town or city. **Required.**
+        location_state:
+          type: string
+          description: State, province, or county.
+        location_postcode:
+          type: string
+          description: Postal or ZIP code.
+        location_region:
+          type: string
+          description: Region label (free-form, used for filtering).
+        location_country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code (e.g. `GB`, `US`). **Required.**
+        location_latitude:
+          type: number
+          description: WGS-84 latitude.
+        location_longitude:
+          type: number
+          description: WGS-84 longitude.
+        em_attributes:
+          type: object
+          description: Custom location attributes, keyed by attribute label as configured under Events > Settings > Attributes.
+          additionalProperties: true
+        data_privacy_consent:
+          type: boolean
+          description: Privacy-policy acknowledgement, required when the privacy add-on is configured to enforce it.
+        data_comms_consent:
+          type: boolean
+          description: Marketing/comms opt-in.
+      additionalProperties:
+        description: |
+          Any extra field name accepted by `EM_Location::get_post()` / `EM_Location::get_post_meta()` —
+          or by callbacks hooking into those methods. Documented properties above are the
+          canonical core set; everything else passes through to `$_REQUEST` unchanged.
+    Geo:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+    Address:
+      type: object
+      properties:
+        address:
+          type: string
+        town:
+          type: string
+        region:
+          type: string
+        state:
+          type: string
+        postcode:
+          type: string
+        country:
+          type: string
+    AddressInput:
+      type: object
+      properties:
+        address:
+          type: string
+        town:
+          type: string
+        state:
+          type: string
+        postcode:
+          type: string
+        region:
+          type: string
+        country:
+          type: string
+    EventLocation:
+      type: object
+      description: Event-specific location object such as URL/webinar. Shape is supplied by event-location classes.
+      additionalProperties: true
+    LocationValidation:
+      type: object
+      required: [valid, location]
+      properties:
+        valid:
+          type: boolean
+        location:
+          $ref: "#/components/schemas/Location"
+    BookingCollection:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    Booking:
+      type: object
+      required: [id, event_id, uuid, person_id, status, spaces, price, tickets, datetime, person]
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: string
+        uuid:
+          type: string
+        person_id:
+          type: integer
+        status:
+          type: integer
+          description: Booking status. Common values include 0 pending, 1 approved, 2 rejected, and 3 cancelled.
+        spaces:
+          type: integer
+        price:
+          oneOf:
+            - type: number
+            - type: string
+        tax_rate:
+          type: number
+        taxes:
+          oneOf:
+            - type: number
+            - type: string
+        comment:
+          type: string
+        meta:
+          $ref: "#/components/schemas/GenericObject"
+        tickets:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/BookingTicket"
+        datetime:
+          type: string
+          format: date-time
+        event:
+          $ref: "#/components/schemas/Event"
+        person:
+          $ref: "#/components/schemas/BookingPerson"
+        permissions:
+          $ref: "#/components/schemas/Permissions"
+      additionalProperties: true
+    BookingInput:
+      type: object
+      description: |
+        Booking create/update payload. Top-level field names mirror `EM_Booking::get_post()`'s
+        `$_REQUEST` contract — the same shape the live booking form posts. Person fields are
+        flat (`user_name`, `user_email`, `dbem_phone`, `dbem_country`), or you may send a
+        structured `person` object instead.
+
+        **Booking on someone's behalf (Events Manager Pro only):** core always attributes a
+        booking to the authenticated account. With Pro, an authenticated manager can send the
+        booker's identity (`user_name` + `user_email`, or a `person` object) to file the booking
+        under that guest instead. No WP user is created — this uses EM's guest-person model. Pass
+        `person_id` (Pro) to attribute the booking to an existing WP user. Without Pro these
+        attribution fields are ignored and the booking is the authenticated account's.
+
+        Admin-only fields (`booking_status`, `booking_tax_rate`, `person_id`, `manual_booking*`,
+        `payment_*`) are accepted in the schema but **stripped server-side for callers without
+        the `manage_bookings` capability**, so a public consumer can't escalate by sending them.
+      required:
+        - event_id
+        - em_tickets
+      properties:
+        event_id:
+          type: string
+          description: Event the booking is being made against. **Required.**
+        em_tickets:
+          type: object
+          description: |
+            Tickets being booked. Object keyed by ticket ID (the real `ticket_id`, not a positional
+            index). Value: `{ spaces, ticket_bookings? }`. `ticket_bookings[i].attendee` carries
+            per-attendee form-field values when the Pro `bookings-form` add-on is active.
+            **Required** — a booking must reference at least one ticket.
+          additionalProperties:
+            $ref: "#/components/schemas/BookingTicketInput"
+        user_name:
+          type: string
+          description: "Booker's display name. `::pro::` With Events Manager Pro, a manager supplying `user_name` + `user_email` books on behalf of that guest (attributed to them, not the calling account). Ignored for attribution without Pro."
+        user_email:
+          type: string
+          format: email
+          description: "Booker's email address, paired with `user_name`. `::pro::` Used by Pro to book on behalf of a guest (stored as a guest, no WP user account, unless `person_id` is supplied). Ignored for attribution without Pro."
+        person:
+          $ref: "#/components/schemas/BookingPersonInput"
+        dbem_phone:
+          type: string
+          description: Booker's phone number. Legacy field name — the `dbem_` prefix matches EM core's $_POST contract.
+        dbem_country:
+          type: string
+          description: Booker's country (ISO 3166-1 alpha-2). Used by some Pro forms.
+
+        booking_comment:
+          type: string
+          description: Free-text note attached to the booking.
+        gateway:
+          type: string
+          description: Payment gateway slug (e.g. `offline`, `stripe_checkout`, `paypal_advanced`). See the gateway introspection endpoint for the active list.
+        coupon_code:
+          type: string
+          description: '`::pro::` Promotional discount code to apply to this booking.'
+        waitlist:
+          type: boolean
+          description: '`::pro::` Set to `true` to opt this booking into the waitlist when the event is full.'
+        waitlist_spaces:
+          type: integer
+          minimum: 1
+          description: '`::pro::` Spaces requested when joining the waitlist.'
+        waitlist_booking_uuid:
+          type: string
+          description: '`::pro::` UUID of an existing waitlist booking being promoted to a real booking.'
+
+        donation_amount:
+          type: string
+          description: '`::pro::` (donations) Optional donation added on top of the ticket cost.'
+        extra_charge:
+          type: string
+          description: '`::pro::` (extra-charges) Selected extra-charge option.'
+        terms_agreement:
+          type: boolean
+          description: Terms-and-conditions acknowledgement, required by the public booking form when configured.
+        recurrence_timezone:
+          type: string
+          description: Timezone to interpret the booking against for a specific occurrence of a recurring event.
+
+        booking:
+          type: object
+          description: '`::pro::` (bookings-form) Booking-form field values. Flattened into `$_REQUEST` server-side before `EM_Booking::get_post()` so the form add-on reads them under their configured field slugs.'
+        booking_fields:
+          type: object
+          description: '`::pro::` (bookings-form) Alias of `booking`. Kept for back-compat with older clients.'
+        registration:
+          type: object
+          description: Booking-form fields that map to WordPress user registration (name, email, etc.). Flattened into `$_REQUEST`.
+        send_email:
+          type: boolean
+          description: When true (default), EM sends the configured booking-confirmation email after save.
+        override_availability:
+          type: boolean
+          description: Admin-only. Bypass per-ticket availability checks (used by the admin manual-booking flow).
+
+        person_id:
+          type: integer
+          description: Admin-only. Assigns the booking to an existing user ID instead of the logged-in caller.
+        booking_status:
+          type: integer
+          description: >-
+            Admin-only (requires booking-management capability). Sets the booking status (see `BookingStatusInput.status` for the enum).
+            On create, a payment gateway may assign its own initial status (e.g. the offline gateway sets 5 = awaiting payment); this value is re-applied afterwards so the booking ends in the status you requested. Status-change emails are not sent for this re-apply unless you also pass `send_email: true`.
+        booking_tax_rate:
+          type: number
+          description: Admin-only. Override the booking's tax rate (decimal, e.g. `0.20` = 20%).
+        manual_booking:
+          type: string
+          description: Admin-only. Nonce that triggers the admin manual-booking flow (bypasses some public-form validations).
+        manual_booking_confirm:
+          type: boolean
+          description: Admin-only. Confirms the booking immediately after creation.
+        manual_booking_override:
+          type: boolean
+          description: Admin-only. Bypasses availability / capacity / member-only restrictions.
+        payment_amount:
+          type: string
+          description: Admin-only. Record an upfront payment amount against the booking.
+        payment_full:
+          type: boolean
+          description: Admin-only. Mark the booking as fully paid (skips outstanding-balance accounting).
+
+        data_privacy_consent:
+          type: boolean
+          description: Privacy-policy acknowledgement, required when the privacy add-on is configured to enforce it.
+        data_comms_consent:
+          type: boolean
+          description: Marketing/comms opt-in.
+      additionalProperties:
+        description: |
+          Any extra field name accepted by `EM_Booking::get_post()` — or by callbacks hooking
+          into that method, including the `em_booking_get_post` filter, Pro form add-ons, and
+          custom plugins. Documented properties above are the canonical core set; everything
+          else passes through to `$_REQUEST` unchanged.
+    BookingTicketInput:
+      type: object
+      description: |
+        Per-ticket entry inside a booking POST. EM core only reads `spaces`; the optional
+        `ticket_bookings` array carries per-attendee form data when the Pro `bookings-form`
+        add-on is active (it reads each entry via the `em_ticket_booking_get_post` filter).
+      required:
+        - spaces
+      properties:
+        ticket_id:
+          type: integer
+          description: Redundant when this object is keyed by ticket ID at the parent level. Provided for callers who prefer to set it explicitly on the body.
+        spaces:
+          type: integer
+          minimum: 0
+          description: Number of seats to book at this ticket. Should equal `ticket_bookings.length` when per-attendee data is provided. **Required.**
+        ticket_bookings:
+          type: array
+          description: |
+            One entry per attendee. `::pro::` (bookings-form) The shape of `attendee` is
+            freeform — its keys are the field slugs configured for the event's attendee form
+            (Events > Booking Forms > Attendee Forms). Default slugs include `attendee_name`
+            and `phone_number`; custom fields use whatever slug the admin set, and slugs may
+            contain spaces (e.g. `"Beverage Choice"`).
+          items:
+            $ref: "#/components/schemas/BookingAttendeeInput"
+      additionalProperties:
+        description: |
+          Any extra field name accepted by `EM_Ticket_Bookings::get_post()` or callbacks
+          hooking into it. Documented properties above are the canonical core set.
+    BookingAttendeeInput:
+      type: object
+      description: |
+        `::pro::` (bookings-form) Per-attendee form payload. Wraps a single `attendee` object
+        whose keys are the field slugs configured for the active attendee form.
+
+        Field discovery: until a dedicated field-schema endpoint ships
+        (`GET /events-manager-pro/v1/bookings/forms/attendee/{id}/fields` — roadmap), inspect
+        the form via `GET /events-manager-pro/v1/bookings/forms/attendee/{id}` and read the
+        `form_fields` array. Each item's `field_id` is the key to use here. The form ID
+        attached to an event is on `bookings.forms.attendee.id` in the event response.
+
+        Example shape (depends on form config):
+
+        ```
+        {
+          "attendee": {
+            "attendee_name": "Alice Smith",
+            "phone_number": "+44 20 7946 0001",
+            "choices": ["choice-x", "choice-y"],
+            "Beverage Choice": ["wine", "beer"],
+            "bdate": { "start": "1990-04-12" },
+            "document": ["upload-tmp-id-abc123"]
+          }
+        }
+        ```
+      properties:
+        attendee:
+          type: object
+          description: Form field values keyed by the field's configured slug. See parent description for discovery.
+          additionalProperties:
+            description: Custom field value — type depends on the field's form-builder configuration (string, array, file-upload-id, nested date object, etc.).
+      additionalProperties:
+        description: Reserved for future ticket-booking-level fields beyond the `attendee` wrapper.
+    TicketInput:
+      type: object
+      description: |
+        Event ticket create/update payload. Top-level field names mirror `EM_Ticket::get_post()`'s
+        `$_POST` contract. Used in two contexts: nested under `EventInput.em_tickets` (where the
+        outer key identifies the row), or as the body of `/tickets/{id}` calls.
+      required:
+        - ticket_name
+      properties:
+        ticket_id:
+          type: integer
+          description: Existing ticket ID (omit for new tickets). When sent inside `em_tickets[<key>]`, identifies the row to update; new tickets use a positional outer key and leave this empty.
+        event_id:
+          type: string
+          description: Owning event ID. Auto-populated when the ticket is nested under an event POST/PATCH; required when sending to `/tickets/{id}` directly.
+        ticket_name:
+          type: string
+          description: Ticket display name. **Required.**
+        ticket_description:
+          type: string
+          description: Long-form ticket description (e.g. what's included). Accepts HTML.
+        ticket_status:
+          type: integer
+          description: '`1` = bookable, `0` = disabled. **Defaults to `0` if omitted** — set explicitly to `1` to make new tickets bookable.'
+        ticket_price:
+          type: number
+          description: Ticket price in the site currency. `0` = free.
+        ticket_spaces:
+          type: integer
+          minimum: 0
+          description: Total spaces available at this ticket. `0` = unlimited (subject to `event_spaces`).
+        ticket_min:
+          type: integer
+          minimum: 0
+          description: Minimum spaces a single booking must request at this ticket.
+        ticket_max:
+          type: integer
+          minimum: 0
+          description: Maximum spaces a single booking may request at this ticket. `0` = inherit `event_rsvp_spaces`.
+        ticket_required:
+          type: boolean
+          description: When true, every booking must include at least `ticket_min` spaces at this ticket.
+        ticket_type:
+          type: string
+          enum: [members, guests]
+          description: Audience restriction. `members` = logged-in users only (see `ticket_members_roles`); `guests` = not-logged-in only; omit for all.
+        ticket_members_roles:
+          type: array
+          description: WP role slugs allowed to book when `ticket_type` is `members`.
+          items:
+            type: string
+        ticket_start:
+          type: string
+          description: When this ticket becomes available (datetime string, partners with `ticket_start_time`).
+        ticket_end:
+          type: string
+          description: When this ticket stops being available.
+        ticket_start_time:
+          type: string
+          description: Time-of-day partner for `ticket_start` (same formats as `event_start_time`).
+        ticket_end_time:
+          type: string
+          description: Time-of-day partner for `ticket_end`.
+        ticket_order:
+          type: integer
+          description: Display sort index (lowest first).
+        delete:
+          type: string
+          description: WP nonce required by `EM_Tickets::get_post()` to delete this ticket row when sent inside `em_tickets`.
+      additionalProperties:
+        description: |
+          Any extra field name accepted by `EM_Ticket::get_post()` — or by callbacks hooking
+          into it. Documented properties above are the canonical core set.
+    BookingTicket:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        spaces:
+          type: integer
+        price:
+          oneOf:
+            - type: number
+            - type: string
+        attendees:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingAttendee"
+    BookingAttendee:
+      type: object
+      properties:
+        uuid:
+          type: string
+        price:
+          oneOf:
+            - type: number
+            - type: string
+        meta:
+          $ref: "#/components/schemas/GenericObject"
+    BookingPerson:
+      type: object
+      required: [guest, email, name]
+      properties:
+        guest:
+          type: boolean
+          description: '`true` when the booking is filed under EM''s guest-person model (no backing WP user account, `person_id` of 0); `false` when attributed to a registered WP user.'
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        phone:
+          type: string
+    BookingPersonInput:
+      type: object
+      description: |
+        `::pro::` Structured booker identity — an alternative to the flat `user_name` /
+        `user_email` / `dbem_phone` fields. Requires Events Manager Pro: when a manager supplies
+        this, the booking is attributed to this guest rather than to the calling account (no WP
+        user account is created). Ignored without Pro.
+      properties:
+        name:
+          type: string
+          description: Full display name. Or supply `first_name`/`last_name` and a name is composed from them.
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+    BookingStatusInput:
+      type: object
+      description: |
+        Payload for `POST /bookings/{id}/status`. Lets booking managers transition a booking
+        between statuses (pending / approved / rejected / cancelled / waitlist states) with
+        the option to suppress the change-notification email.
+      required:
+        - status
+      properties:
+        status:
+          type: integer
+          enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+          description: |
+            New booking status code. **Required.** Values (from `EM_Booking::$status_array`):
+            `0` pending, `1` approved, `2` rejected, `3` cancelled, `4` awaiting online payment,
+            `5` offline payment, `6` waitlist confirmed, `7` waitlist pending, `8` waitlist expired.
+        send_email:
+          type: boolean
+          default: true
+          description: When true (default), sends the configured status-change email to the booker.
+        ignore_spaces:
+          type: boolean
+          default: false
+          description: When true, allow the transition even if the event's spaces are exhausted (admin override).
+    BookingValidation:
+      type: object
+      required: [valid, booking]
+      properties:
+        valid:
+          type: boolean
+        booking:
+          $ref: "#/components/schemas/Booking"
+    TermCollection:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    TermRef:
+      type: object
+      description: Compact term reference embedded in event responses (categories/tags).
+      required: [id, name, slug]
+      properties:
+        id:
+          type: integer
+          example: 12
+        name:
+          type: string
+          example: Workshops
+        slug:
+          type: string
+          example: workshops
+    Term:
+      type: object
+      required: [id, name, slug, taxonomy, description, parent, count]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        taxonomy:
+          type: string
+          enum: [event-categories, event-tags]
+        description:
+          type: string
+        parent:
+          type: integer
+        count:
+          type: integer
+        color:
+          type:
+            - string
+            - "null"
+          example: "#80b538"
+          description: Term colour stored under EM meta key `{taxonomy}-bgcolor`. Used by the EM front-end and Pro blocks to colour-code terms.
+        image_url:
+          type:
+            - string
+            - "null"
+          format: uri
+          description: Public URL of the term image attachment (mirror of `image.url`). Kept for backwards compatibility.
+        image:
+          oneOf:
+            - $ref: "#/components/schemas/Attachment"
+            - type: "null"
+          description: Term image attachment with id/url/dimensions, or `null` if none is set.
+        url:
+          type: string
+          format: uri
+          description: Public archive URL for this term.
+      additionalProperties: true
+    TermInput:
+      type: object
+      description: Create/update payload for event categories and tags.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Term display name. **Required.**
+        slug:
+          type: string
+          description: URL-friendly slug. Auto-generated from `name` if omitted.
+        description:
+          type: string
+          description: Long-form term description.
+        parent:
+          type: integer
+          description: Parent term ID for hierarchical taxonomies (categories support nesting; tags don't).
+        color:
+          type:
+            - string
+            - "null"
+          example: "#80b538"
+          description: Hex colour used by the EM front-end / Pro blocks. Stored under `{taxonomy}-bgcolor` in EM meta. Pass `null` to clear.
+        image:
+          $ref: "#/components/schemas/ImageAssignmentInput"
+          description: Term image. Accepts an attachment ID, public URL (sideloaded), media-upload object, or `null` to clear. Stored under `{taxonomy}-image` (URL) and `{taxonomy}-image-id` (attachment ID).
+      additionalProperties: false
+    Owner:
+      type: object
+      properties:
+        guest:
+          type: boolean
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+    Permissions:
+      type: object
+      properties:
+        edit:
+          type: boolean
+        delete:
+          type: boolean
+    DeleteEventResponse:
+      type: object
+      required: [deleted, previous]
+      properties:
+        deleted:
+          type: boolean
+        previous:
+          $ref: "#/components/schemas/Event"
+    DeleteLocationResponse:
+      type: object
+      required: [deleted, previous]
+      properties:
+        deleted:
+          type: boolean
+        previous:
+          $ref: "#/components/schemas/Location"
+    DeleteBookingResponse:
+      type: object
+      required: [deleted, previous]
+      properties:
+        deleted:
+          type: boolean
+        previous:
+          $ref: "#/components/schemas/Booking"
+    DeleteTermResponse:
+      type: object
+      required: [deleted, previous]
+      properties:
+        deleted:
+          type: boolean
+        previous:
+          $ref: "#/components/schemas/Term"
+    MediaUploadInput:
+      type: object
+      description: |
+        Polymorphic input — provide ONE of `source_url`, `content_base64`+`filename`,
+        a multipart `file` field, or `id` for an existing attachment. Optional
+        metadata fields apply regardless of upload mode.
+      properties:
+        id:
+          type: integer
+          description: Existing media library attachment ID. Returns its current metadata without re-uploading.
+        source_url:
+          type: string
+          format: uri
+          description: Public URL of a file to sideload into the media library.
+        content_base64:
+          type: string
+          description: Base64-encoded file bytes. Pair with `filename` (required) and `mime_type` (recommended).
+        filename:
+          type: string
+          description: Filename for inline upload. Required when `content_base64` is provided.
+        mime_type:
+          type: string
+          description: MIME type for the inline upload. Optional; sniffed from filename otherwise.
+        title:
+          type: string
+          description: Attachment display title.
+        alt_text:
+          type: string
+          description: Alt text for accessibility (`_wp_attachment_image_alt`).
+        caption:
+          type: string
+          description: Attachment caption (`post_excerpt`).
+        description:
+          type: string
+          description: Long-form attachment description (`post_content`).
+        post_id:
+          type: integer
+          description: >-
+            Media-library organisation only — sets the attachment's `post_parent`.
+            Does NOT set a featured image. Use `featured_image_for_event` /
+            `featured_image_for_location` for that, or pass the returned id as
+            `featured_image` to update-event / update-location.
+        featured_image_for_event:
+          type: integer
+          description: >-
+            After uploading, set this attachment as the featured image (thumbnail)
+            of the given Events Manager event ID, in one call. Requires permission
+            to edit that event. The response carries a `featured_image_set`
+            confirmation, or a `warnings` entry if it couldn't be applied.
+        featured_image_for_location:
+          type: integer
+          description: >-
+            After uploading, set this attachment as the featured image of the given
+            Events Manager location ID. Requires permission to edit that location.
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12345
+        url:
+          type: string
+          format: uri
+          example: https://example.com/wp-content/uploads/2026/06/hero.jpg
+        mime_type:
+          type: string
+          example: image/jpeg
+        title:
+          type: string
+          example: Knitting workshop hero
+        alt_text:
+          type: string
+          example: Person knitting with a teal yarn ball
+        width:
+          type:
+            - integer
+            - "null"
+          example: 1920
+        height:
+          type:
+            - integer
+            - "null"
+          example: 1080
+        featured_image_set:
+          type: object
+          description: >-
+            Present only on an upload-media response when `featured_image_for_event`
+            / `featured_image_for_location` was supplied and applied successfully.
+            Confirms which resource now uses this attachment as its featured image.
+          properties:
+            event_id:
+              type: integer
+            location_id:
+              type: integer
+            post_id:
+              type: integer
+            attachment_id:
+              type: integer
+        warnings:
+          $ref: "#/components/schemas/ApiWarnings"
+    ApiWarnings:
+      type: array
+      description: >-
+        Non-fatal issues encountered while saving. Present only when something
+        secondary failed but the primary resource was still created/updated —
+        e.g. a featured-image sideload that couldn't fetch the source URL. The
+        resource is valid; the caller can act on each warning (e.g. re-upload
+        the image) without re-creating the resource.
+      items:
+        type: object
+        properties:
+          field:
+            type: string
+            example: featured_image
+          code:
+            type: string
+            example: http_404
+          message:
+            type: string
+            example: "The event was saved but its featured image could not be attached: ..."
+    ImageAssignmentInput:
+      description: |
+        Polymorphic image reference used by `featured_image` on events/locations
+        and `image` on terms. Accepts an attachment ID, URL (sideloaded), the full
+        media-upload object shape, or `null` to clear.
+      oneOf:
+        - type: integer
+          description: Existing attachment ID.
+        - type: string
+          description: Public URL — sideloaded into the media library if not already there.
+        - $ref: "#/components/schemas/MediaUploadInput"
+        - type: "null"
+    GenericObject:
+      type: object
+      additionalProperties: true
+  examples:
+    BadRequestError:
+      value:
+        code: em_api_event_invalid
+        message: Event data is invalid.
+        data:
+          status: 400
+    UnauthorizedError:
+      value:
+        code: rest_not_logged_in
+        message: You are not currently logged in.
+        data:
+          status: 401
+    ForbiddenError:
+      value:
+        code: em_api_event_forbidden
+        message: You do not have permission to save this event.
+        data:
+          status: 403
+    NotFoundError:
+      value:
+        code: em_api_event_not_found
+        message: Event not found.
+        data:
+          status: 404
+    ServerError:
+      value:
+        code: em_api_event_save_failed
+        message: Event could not be saved.
+        data:
+          status: 500
+    EventExample:
+      value: *event_value
+    EventCollectionExample:
+      value:
+        items:
+          - *event_value
+        pagination:
+          total: 1
+          total_pages: 1
+          page: 1
+          per_page: 20
+    EventAvailabilityExample:
+      value:
+        event_id: "123"
+        bookings_enabled: true
+        open: true
+        spaces: 24
+        available_spaces: 18
+        tickets:
+          - id: 55
+            name: General Admission
+            description: Standard workshop ticket.
+            price: "49.00"
+            spaces: 24
+            available_spaces: 18
+            available: true
+    LocationExample:
+      value: *location_value
+    LocationCollectionExample:
+      value:
+        items:
+          - *location_value
+        pagination:
+          total: 1
+          total_pages: 1
+          page: 1
+          per_page: 20
+    BookingExample:
+      value: *booking_value
+    BookingCollectionExample:
+      value:
+        items:
+          - *booking_value
+        pagination:
+          total: 1
+          total_pages: 1
+          page: 1
+          per_page: 20
+    TermExample:
+      value: *term_value
+    TermCollectionExample:
+      value:
+        items:
+          - *term_value
+        pagination:
+          total: 1
+          total_pages: 1
+          page: 1
+          per_page: 20

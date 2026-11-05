@@ -1,0 +1,138 @@
+.em-view-container, div[data-view-id] { position:relative; }
+.em-wrapper label span.screen-reader-text, #em-wrapper label span.screen-reader-text { clip: rect(1px 1px 1px 1px); position: absolute !important; height: 1px; width: 1px; overflow: hidden; }
+
+/* Search Form */
+	.em-search .hidden { display:none !important; }
+
+/* General Notices */
+#event-form .em-notice-warning, #post .em-notice-warning { margin:10px 0px; padding:15px 20px; border-left: 4px solid #ffa500; }
+#event-form .em-notice-warning h4, #post .em-notice-warning h4 { margin-top:0px; }
+#event-form .em-notice-warning div.warning-bold, #post .em-notice-warning div.warning-bold{ color:#c45500; font-weight: bold; }
+#event-form .em-notice-warning div.warning-bold p, #post .em-notice-warning div.warning-bold p { margin-top:0px; font-size:14px; }
+
+/* Events List */
+	.css-events-list table.events-table { border-spacing: 0px; border-collapse: collapse; }
+	.css-events-list table.events-table td { padding:0px; }
+	.css-events-list table.events-table th.event-time { width:150px; }
+	.css-events-list table.events-table th.event-description { width:auto; }
+
+/* Booking Form */
+	#em-booking { margin:15px 0px 10px 0px; position:relative; }
+	#em-booking .em-booking-form  { position:relative; clear:left; }
+	#em-booking .em-booking-form-details  { padding:10px; width:360px; float:left; }
+	#em-booking .em-booking-form-details input.input, .em-booking-form-details textarea { width:250px; }
+	#em-booking .em-booking-form p { clear:left; }
+	#em-booking .em-booking-form label { display:block; float:left; }
+	#em-booking .em-booking-form span.input-group input { margin-left:-20px; }
+	#em-booking .em-booking-form span.input-group { display:block; margin-left:120px; }
+	#em-booking .em-booking-form label  { display:inline-block; width:100px; }
+	#em-booking .em-booking-form p.em-consent-checkbox label { display:block; width:100%; }
+	#em-booking .em-booking-form-details .em-booking-submit { width:auto; }
+	/* Tickets */
+	#em-booking .em-tickets { margin-bottom:20px; }
+	/* Message Errors */
+	#em-booking div.em-booking-message { margin:10px 0px; padding:10px; color:#333; border-radius:3px; }
+	#em-booking div.em-booking-message p { margin:10px 0px !important; padding:0px; color:#333; }
+	#em-booking div.em-booking-message-success { background-color:#f1fff0; border:1px solid #a8d144; }
+	#em-booking div.em-booking-message-error { background-color:#FFEBE8; border:1px solid #C00; }
+	/* Optional Login Form */
+	#em-booking div.em-booking-login { padding: 10px 10px 10px 20px; margin: 0px 0px 0px 390px;	border-left: 1px solid black; }
+	#em-booking div.em-booking-login label { display:inline-block; width:90px; }
+	#em-booking div.em-booking-login p{ margin:10px 0px !important; padding:0px !important;	}
+	#em-booking div.em-booking-login input { margin:0px; }
+
+/* Locations Admin */
+#em-wrapper #locations-filter .subsubsub .current { font-weight:bold; }
+#em-wrapper .em-locations-admin-list .em-button { float:right; }
+
+/* Events Admin */
+#em-wrapper #posts-filter .subsubsub .current { font-weight:bold; }
+#em-wrapper .em-events-admin-list .em-button { float:right; }
+		
+/* Add Event Form */
+	#event-form h4 { margin:25px 0px 15px 0px; font-weight:bold; }
+	#event-form p { margin-top:10px; }
+	#event-form .inside { clear:both; margin-bottom:20px; }
+	#buddypress .wp-editor-wrap table { width:auto; }
+	#buddypress .wp-editor-wrap table tr td, #buddypress .wp-editor-wrap table tr th { padding:0; }
+	#buddypress .wp-editor-wrap a.button, #buddypress .wp-editor-wrap button, #buddypress .wp-editor-wrap input[type=submit], #buddypress .wp-editor-wrap input[type=button], #buddypress .wp-editor-wrap input[type=reset] { padding: 0px 10px 1px; }
+	/* Event Details */
+		#event-form #event-name { width:80%; padding:2px; }
+		#event-form .event-extra-details { margin-top:20px; }
+		#event-form .event-extra-details select { vertical-align:top; }
+	/* Recurring Event Rescheduling */
+	#event-form .reschedule-hidden, #post .reschedule-hidden { display:none; visibility:hidden; }
+	#event-form .em-recurrence-reschedule, #post .em-recurrence-reschedule { padding:15px 20px; border-left: 4px solid #ffa500; }
+	#event-form .em-recurrence-reschedule h4, #post .em-recurrence-reschedule h4 { margin-top:0px; }
+	#event-form .recurrence-reschedule-warning, #post .recurrence-reschedule-warning { margin-bottom:25px; color:#c45500; }
+	#event-form .recurrence-reschedule-warning p, #post .recurrence-reschedule-warning p { margin-top:0px; font-size:14px; }
+	/*Tickets*/
+		#event-rsvp-box { margin:10px; }
+		#event-rsvp-options label { font-weight:bold; }
+		/*Tickets*/
+			#em-tickets-form tbody.em-ticket-template { display:none; }
+			#em-tickets-form th { width:auto; }
+			#em-tickets-form th.ticket-status, .em-tickets-row .ticket-status { width:20px; }
+			#em-tickets-form .em-tickets-row .ticket-status span.dashicons { display:block; width:16px; height:16px; line-height:16px; font-size:16px; font-weight: bolder; }
+			#em-tickets-form .em-tickets-row .ticket-status.single span.dashicons { cursor:auto; }
+			#em-tickets-form .em-tickets-row .ticket-status span.ticket-on { color: #008000; }
+			#em-tickets-form .em-tickets-row .ticket-status span.ticket-off { color: #ff0000; }
+			#em-tickets-form .em-tickets-row .ticket-status span.ticket_new { color: #808080; }
+			#em-tickets-form.em-tickets-sortable .em-tickets-row .ticket-status span.dashicons { cursor:move; }
+			#em-tickets-form .em-ticket-sortable-placeholder { border:2px dashed #dedede; background:#efefef; }
+			#em-tickets-form .ui-sortable-helper { cursor:move; }
+			#em-tickets-form input[type="checkbox"][indeterminate]:not(:checked) { -webkit-appearance: checkbox; } /* allow indeterminate to work */
+			#em-tickets-form .ticket-roles label { font-weight: normal; }
+			#em-tickets-form .ticket-required .ticket_required-default { display: none; }
+			#em-tickets-form .ticket-required:has(input:indeterminate) .ticket_required-default { display: inline-block; font-style: italic; }
+			#em-tickets-form .em-ticket-form-parent-warning { margin: 0 0 15px; font-style: italic; }
+			#em-tickets-form .ticket-deleted { display: none; visibility: hidden; }
+	/* Ticket Forms */
+				.em-ticket-form .ticket-options { margin-top:10px; }
+ 				#em-tickets-form .ticket-roles div { margin-left:110px; }
+	/* The editor */
+		#wp-em-editor-content-wrap table { margin-bottom:0px; }
+	/* Location form */
+		#event-form .em-location-types-single { display:none; visibility: hidden; }
+		#event-form .em-location-type { border-top: 1px solid #dedede; margin-top:20px; padding-top:20px; }
+		#event-form .em-location-type-single .em-location-type { border-top:0; margin-top:0; padding-top:0; }
+		#event-form .em-location-type.em-location-type-single { border:none; }
+		#event-form .em-location-type p:first-child { margin-top:0; }
+		#event-form div.em-location-data table { float:left; margin:0px 15px 0px 0px; }
+		#event-form .em-event-location-data h4 { padding-bottom:5px; border-bottom:1px solid #dedede; margin-bottom:15px; }
+		#event-form .em-input-field { margin-bottom:10px; }
+		#event-form .em-input-field label { display: block; margin-bottom:5px; }
+		#event-form .em-input-field.em-input-field-boolean label { display: inline-block; }
+		#event-form .em-input-field em { display: block; margin-top:2px; }
+		#event-form .em-location-type-delete-active-alert { display:none; visibility: hidden; }
+/* Booking Admin */
+	/* Generic Table Info */
+	table.em-form-fields td, table.em-form-fields th { text-align:left; vertical-align:top; }
+	table.em-form-fields th { padding:0px 20px 5px 0px; }
+	/* Single Booking Edit View */
+		#em-bookings-admin-booking .em-booking-single-info { display:none; }
+		#em-bookings-admin-booking .em-booking-single-form { padding-right:20px; }		
+		
+/* Printable stuff */
+	body#printable { font-family: Gill Sans, Helvetica, Arial, sans-serif; text-align: center; }  
+	body#printable #container { margin: 0 auto; width: 780px; text-align: left; }
+	body#printable table#bookings-table { width: 600px; border-spacing: 0px; }
+	body#printable table#bookings-table td { padding: 5px 0; }
+	body#printable table#bookings-table td.spaces-number { text-align: right; padding-right: 20px; }
+	body#printable table#bookings-table th { text-align: left; margin-left: 5px; }   
+	body#printable table#bookings-table tr#booked-spaces td{ border-top: 2px solid #999; }
+	body#printable table#bookings-table td.total-label { text-align: right; }                                  
+	body#printable table#bookings-table tr#booked-spaces td.spaces-number, table#bookings-table tr#available-spaces td.spaces-number { font-weight: bold; }
+
+/* Calendar Styles */
+	table.em-calendar td { padding: 2px 4px; text-align: center; }
+	table.em-calendar.table tr.days-names { font-weight: bold; } 
+	table.em-calendar td.eventless-pre, .em-calendar td.eventless-post { color: #ccc; }
+	table.em-calendar td.eventful-pre a, table.em-calendar td.eventful-post a{ color: #aaa; text-decoration:underline; }
+	table.em-calendar td.eventful a, table.em-calendar td.eventful-today a { color: #FD7E29; }
+	table.em-calendar td.eventful-today a { font-weight: bold; }
+	table.em-calendar td.eventless-today, table.em-calendar td.eventful-today { background-color: #CFCFCF; }
+	table.em-calendar thead { font-size: 120%; font-weight: bold; }
+	table.fullcalendar { border-collapse: collapse; }
+	table.fullcalendar td { text-align: left; border: 1px solid #888; }
+	div.em-calendar-wrapper { position:relative; width:100% !important; max-width:100% !important; }

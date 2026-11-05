@@ -1,0 +1,457 @@
+# Copyright (C) 2026 Koha.Nexus contributors
+# This file is distributed under the GPL-3.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Nexus Eventos para Tainacan 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/nexus-eventos\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-11-05T14:26:18+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: nexus-eventos\n"
+
+#. Plugin Name of the plugin
+#: nexus-eventos.php
+msgid "Nexus Eventos para Tainacan"
+msgstr ""
+
+#. Description of the plugin
+#: nexus-eventos.php
+msgid "Agenda, acervos relacionados, presença e comprovantes de participação sobre o Events Manager gratuito."
+msgstr ""
+
+#. Author of the plugin
+#: nexus-eventos.php
+msgid "Koha.Nexus contributors"
+msgstr ""
+
+#: includes/class-admin.php:22
+#: includes/class-admin.php:129
+msgid "Nexus Eventos"
+msgstr ""
+
+#: includes/class-admin.php:27
+msgid "Nexus: acervo e participação"
+msgstr ""
+
+#: includes/class-admin.php:33
+msgid "Permitir comprovante após o evento para inscrições individuais com presença confirmada."
+msgstr ""
+
+#: includes/class-admin.php:34
+msgid "Carga horária declarada (opcional)"
+msgstr ""
+
+#: includes/class-admin.php:35
+msgid "O comprovante registra a declaração da organização e não equivale a assinatura digital qualificada. Reservas de grupo e horários fracionados não recebem passes individuais nesta versão."
+msgstr ""
+
+#: includes/class-admin.php:37
+msgid "Ative o Tainacan para vincular coleções. Agenda e inscrições continuam disponíveis sem ele."
+msgstr ""
+
+#: includes/class-admin.php:44
+msgid "Coleções públicas relacionadas (até 200 listadas)"
+msgstr ""
+
+#: includes/class-admin.php:49
+msgid "Os vínculos apontam ao acervo original. Não são criadas cópias dos itens ou dos arquivos."
+msgstr ""
+
+#: includes/class-admin.php:77
+msgid "Use o formulário de confirmação."
+msgstr ""
+
+#: includes/class-admin.php:82
+msgid "Operação inválida."
+msgstr ""
+
+#: includes/class-admin.php:91
+msgid "Você não pode administrar este evento."
+msgstr ""
+
+#: includes/class-admin.php:103
+msgid "Não foi possível concluir a operação. Tente novamente."
+msgstr ""
+
+#: includes/class-admin.php:129
+msgid "Agenda e inscrições usam o Events Manager. Aqui você integra coleções, confirma presença e acompanha comprovantes."
+msgstr ""
+
+#: includes/class-admin.php:130
+msgid "Criar evento"
+msgstr ""
+
+#: includes/class-admin.php:130
+msgid "Gerenciar eventos e reservas"
+msgstr ""
+
+#: includes/class-admin.php:131
+msgid "Agenda pública com filtros."
+msgstr ""
+
+#: includes/class-admin.php:131
+msgid "Agenda de uma coleção."
+msgstr ""
+
+#: includes/class-admin.php:131
+msgid "Área do participante autenticado."
+msgstr ""
+
+#: includes/class-admin.php:131
+msgid "Consulta pública pelo código."
+msgstr ""
+
+#: includes/class-admin.php:133
+msgid "Tainacan não está ativo. Você pode usar a agenda, mas os vínculos com acervos ficam indisponíveis."
+msgstr ""
+
+#: includes/class-admin.php:136
+msgid "Identificação da instituição"
+msgstr ""
+
+#: includes/class-admin.php:138
+msgid "Nome que aparecerá nos novos comprovantes"
+msgstr ""
+
+#: includes/class-admin.php:138
+msgid "Salvar"
+msgstr ""
+
+#: includes/class-admin.php:140
+msgid "Presença e comprovantes"
+msgstr ""
+
+#: includes/class-admin.php:140
+msgid "ID do evento no Events Manager"
+msgstr ""
+
+#: includes/class-admin.php:140
+msgid "Abrir participantes"
+msgstr ""
+
+#: includes/class-admin.php:142
+msgid "Informe um evento que você pode gerenciar. O ID aparece na listagem do Events Manager."
+msgstr ""
+
+#: includes/class-admin.php:145
+msgid "Exportar participantes e presença (CSV)"
+msgstr ""
+
+#: includes/class-admin.php:150
+msgid "Inscrição"
+msgstr ""
+
+#: includes/class-admin.php:150
+msgid "Participante"
+msgstr ""
+
+#: includes/class-admin.php:150
+msgid "Estado"
+msgstr ""
+
+#: includes/class-admin.php:150
+msgid "Ações"
+msgstr ""
+
+#: includes/class-admin.php:153
+msgid "Presença registrada"
+msgstr ""
+
+#: includes/class-admin.php:153
+msgid "Sem presença"
+msgstr ""
+
+#: includes/class-admin.php:155
+msgid "Abrir passe"
+msgstr ""
+
+#: includes/class-admin.php:156
+#: includes/class-public.php:190
+msgid "Confirmar presença"
+msgstr ""
+
+#: includes/class-admin.php:158
+msgid "Passe exige reserva aprovada de uma pessoa e sem horário fracionado."
+msgstr ""
+
+#: includes/class-admin.php:160
+msgid "Desfazer presença"
+msgstr ""
+
+#: includes/class-admin.php:161
+msgid "Revogar comprovante"
+msgstr ""
+
+#: includes/class-admin.php:165
+#: includes/class-public.php:86
+#: includes/class-public.php:131
+msgid "Anterior"
+msgstr ""
+
+#: includes/class-admin.php:166
+#: includes/class-public.php:87
+#: includes/class-public.php:132
+msgid "Próxima"
+msgstr ""
+
+#: includes/class-core.php:13
+msgid "Ative Nexus Eventos individualmente em cada site, não para toda a rede."
+msgstr ""
+
+#: includes/class-core.php:114
+msgid "Seu passe e comprovante de participação:"
+msgstr ""
+
+#: includes/class-core.php:143
+msgid "Esta inscrição está sendo atualizada. Tente novamente."
+msgstr ""
+
+#: includes/class-core.php:150
+msgid "É necessário gerenciar o evento e ter uma reserva individual aprovada, sem horário fracionado."
+msgstr ""
+
+#: includes/class-core.php:155
+msgid "A presença pode ser registrada a partir de 24 horas antes do evento."
+msgstr ""
+
+#: includes/class-core.php:163
+msgid "Não foi possível gravar a presença."
+msgstr ""
+
+#: includes/class-core.php:190
+msgid "Acesso negado."
+msgstr ""
+
+#: includes/class-core.php:202
+msgid "A emissão exige inscrição individual aprovada e presença registrada."
+msgstr ""
+
+#: includes/class-core.php:206
+msgid "A emissão precisa estar habilitada e o evento deve ter terminado."
+msgstr ""
+
+#: includes/class-core.php:210
+#: includes/class-public.php:200
+msgid "Comprovante revogado. Procure a organização."
+msgstr ""
+
+#: includes/class-core.php:225
+msgid "Não foi possível emitir o comprovante."
+msgstr ""
+
+#: includes/class-dependency.php:34
+msgid "Nexus Eventos usa o Events Manager gratuito para agenda e reservas. O pacote original 7.4.13 está incluído; nenhuma extensão paga é necessária para os recursos Nexus."
+msgstr ""
+
+#: includes/class-dependency.php:36
+msgid "Atualize o Events Manager pelo procedimento normal do WordPress. Uma instalação existente não será substituída automaticamente."
+msgstr ""
+
+#: includes/class-dependency.php:40
+msgid "Preparar base gratuita: instalar se ausente e ativar Events Manager"
+msgstr ""
+
+#: includes/class-dependency.php:42
+msgid "Se preferir, instale e ative Events Manager manualmente em Plugins. Os dados existentes são preservados."
+msgstr ""
+
+#: includes/class-dependency.php:54
+msgid "O pacote incluído não passou na verificação de integridade. Instale Events Manager manualmente."
+msgstr ""
+
+#: includes/class-dependency.php:59
+msgid "Este servidor exige instalação manual de plugins pelo administrador. Instale Events Manager em Plugins e ative-o."
+msgstr ""
+
+#: includes/class-dependency.php:62
+msgid "Outra preparação está em andamento. Aguarde e tente novamente."
+msgstr ""
+
+#: includes/class-dependency.php:82
+msgid "Não foi possível preparar a base. Nenhuma instalação existente foi substituída. Instale Events Manager manualmente."
+msgstr ""
+
+#: includes/class-dependency.php:87
+msgid "Já existe uma versão antiga. Atualize-a manualmente; seus arquivos não foram substituídos."
+msgstr ""
+
+#: includes/class-public.php:46
+msgid "Coleção pública não encontrada."
+msgstr ""
+
+#: includes/class-public.php:51
+msgid "Nenhum evento vinculado a esta coleção."
+msgstr ""
+
+#: includes/class-public.php:58
+msgid "Agenda de eventos"
+msgstr ""
+
+#: includes/class-public.php:61
+msgid "Pesquisar eventos"
+msgstr ""
+
+#: includes/class-public.php:62
+msgid "Período"
+msgstr ""
+
+#: includes/class-public.php:62
+msgid "Próximos eventos"
+msgstr ""
+
+#: includes/class-public.php:62
+msgid "Eventos anteriores"
+msgstr ""
+
+#: includes/class-public.php:64
+msgid "Categoria"
+msgstr ""
+
+#: includes/class-public.php:64
+msgid "Todas"
+msgstr ""
+
+#: includes/class-public.php:68
+msgid "Filtrar"
+msgstr ""
+
+#: includes/class-public.php:79
+msgid "Detalhes e inscrição"
+msgstr ""
+
+#: includes/class-public.php:79
+msgid "Adicionar à agenda"
+msgstr ""
+
+#: includes/class-public.php:84
+msgid "Nenhum evento encontrado."
+msgstr ""
+
+#: includes/class-public.php:85
+msgid "Páginas da agenda"
+msgstr ""
+
+#: includes/class-public.php:102
+msgid "Conheça o acervo relacionado"
+msgstr ""
+
+#: includes/class-public.php:109
+msgid "Eventos desta coleção"
+msgstr ""
+
+#: includes/class-public.php:116
+msgid "Entre para consultar suas inscrições."
+msgstr ""
+
+#: includes/class-public.php:126
+msgid "Passe e comprovante"
+msgstr ""
+
+#: includes/class-public.php:130
+msgid "Alterações e cancelamentos são feitos na área de reservas do Events Manager."
+msgstr ""
+
+#: includes/class-public.php:138
+msgid "Código do comprovante"
+msgstr ""
+
+#: includes/class-public.php:139
+msgid "Verificar"
+msgstr ""
+
+#: includes/class-public.php:176
+msgid "Passe indisponível. Confira a inscrição ou entre com uma conta autorizada."
+msgstr ""
+
+#: includes/class-public.php:183
+msgid "Passe de participação"
+msgstr ""
+
+#: includes/class-public.php:186
+msgid "Inscrição aprovada. A leitura do QR não registra presença automaticamente; a equipe confirma após autenticar."
+msgstr ""
+
+#: includes/class-public.php:187
+msgid "Não compartilhe este endereço ou QR: ele dá acesso ao seu passe."
+msgstr ""
+
+#: includes/class-public.php:188
+msgid "Presença registrada."
+msgstr ""
+
+#: includes/class-public.php:188
+msgid "Presença ainda não registrada."
+msgstr ""
+
+#: includes/class-public.php:191
+msgid "Desfazer presença e revogar comprovante"
+msgstr ""
+
+#: includes/class-public.php:193
+msgid "Acesso da equipe"
+msgstr ""
+
+#: includes/class-public.php:196
+msgid "Abrir comprovante"
+msgstr ""
+
+#: includes/class-public.php:198
+msgid "Emitir comprovante após o evento"
+msgstr ""
+
+#: includes/class-public.php:202
+#: includes/class-public.php:240
+msgid "Imprimir ou salvar como PDF"
+msgstr ""
+
+#: includes/class-public.php:215
+msgid "Verificação de comprovante"
+msgstr ""
+
+#: includes/class-public.php:220
+msgid "Comprovante válido"
+msgstr ""
+
+#: includes/class-public.php:220
+msgid "Comprovante não encontrado ou inválido"
+msgstr ""
+
+#: includes/class-public.php:226
+msgid "A identidade do participante não é publicada nesta consulta. Confira o documento apresentado com a organização."
+msgstr ""
+
+#: includes/class-public.php:228
+msgid "Esta verificação não equivale a assinatura digital qualificada."
+msgstr ""
+
+#: includes/class-public.php:233
+#: includes/class-public.php:235
+msgid "Comprovante de participação"
+msgstr ""
+
+#: includes/class-public.php:235
+msgid "Certificamos a participação de"
+msgstr ""
+
+#. translators: %s: hours declared by the event organizer, formatted in the site locale.
+#: includes/class-public.php:238
+#, php-format
+msgid "Carga horária declarada pela organização: %s horas."
+msgstr ""
+
+#: includes/class-public.php:240
+msgid "Verificar autenticidade"
+msgstr ""
+
+#: includes/class-public.php:240
+msgid "Emitido em (UTC): "
+msgstr ""
+
+#: nexus-eventos.php:29
+msgid "Nexus Eventos não suporta tabelas globais do Events Manager em multisite. Use eventos locais de cada site."
+msgstr ""

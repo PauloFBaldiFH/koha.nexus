@@ -1,0 +1,1071 @@
+/// Styles the em-list-tables classes used both in front and backend, providing a consistent UI on both sides.
+
+/// Whether stylesheet is intended for front-end use or WP Admin area, in which case different styling is loaded.
+/// @param {boolean} $frontend
+$frontend: true !default;
+
+.em-list-table {
+	position: relative; // for spinners to load correctly
+	margin: 15px 0;
+
+	.em-list-table-triggers {
+		margin-right: 5px;
+		.em-list-table-trigger {
+			float: left;
+			display: block;
+			margin: 2px 5px 0 5px;
+			width: 24px;
+			height: 36px;
+			background-position: 50% 50%;
+			background-size: 24px;
+
+			&:hover, &:focus {
+				outline: none;
+				box-shadow: none;
+			}
+		}
+	}
+
+	.em-list-table-error-notice {
+		clear: both;
+	}
+
+	// Table styling is mainly on the front-end, in the backend we let WP take over and apply its WP_List_Table CSS to allow a consistent looking UI
+	&.frontend {
+		// Sorting elements, alternate table colors and styling are front-end only
+		div.table-wrap {
+		}
+
+		// Pagination elements only modified in front-end, let WP do it's thing backend
+		div.tablenav {
+			.tablenav-pages {
+				float:right;
+				grid-area: pagination;
+				text-wrap: nowrap;
+				text-align: right;
+				margin: 0 0 15px;
+
+				&.no-pages, &.one-page {
+					@if $frontend {
+						padding-top: 18px;
+					}
+					.pagination-links {
+						display: none;
+						visibility: hidden;
+					}
+				}
+
+				.button {
+					padding: 0 12px !important;
+					margin: 0 !important;
+					&.disabled {
+						display: none;
+					}
+				}
+				input.current-page {
+					width: auto !important;
+					margin: 0 !important;
+				}
+			}
+		}
+	}
+
+	// WP Admin area-specific styling
+	&.backend {
+		div.tablenav {
+			> .actions {
+				.actions {
+					vertical-align: middle;
+				}
+			}
+		}
+	}
+
+	&.has-filter {
+		div.tablenav {
+			margin-bottom: 0;
+			.actions.filters {
+				margin-bottom: 15px;
+			}
+		}
+	}
+
+	div.tablenav {
+		clear: both;
+		width: 100%;
+		margin-bottom: 12px;
+
+		> br.clear {
+			display: none;
+			visibility: hidden;
+		}
+
+		> .actions {
+			display: block;
+			float: left;
+			margin: 0 0 15px;
+			text-align: left;
+
+			&:last-child {
+				margin-bottom: 0;
+			}
+
+			&.filters {
+				clear: left;
+			}
+
+			.actions {
+				display: inline-block;
+				float: none;
+				margin-right: 0;
+				padding-right: 0;
+				vertical-align: top;
+				&:not(:last-child, :first-child) {
+					margin-left: 10px;
+					padding-left: 10px;
+					border-left: 1px solid var(--border-color-softer);
+				}
+				&:last-child {
+					margin-left: 10px;
+				}
+				:last-of-type {
+					margin-right: 0;
+				}
+				&.bulkactions-input {
+					text-wrap: nowrap;
+				}
+			}
+			input, select, button {
+				max-width: 12.5rem;
+				min-height: auto;
+				margin: 0 6px 0 0 !important;
+			}
+
+			button.filters-trigger, button.small-expand-trigger {
+				width: 25px;
+				height: 25px;
+				background-size: 25px;
+				padding: 0 12.5px !important;
+				margin: 0 !important;
+				background-repeat: no-repeat;
+				background-position: center center;
+				background-color: transparent !important;
+				text-indent: -10000px !important;
+				border: 0 !important;
+				background-image: var(--icon-filter-hide);
+				opacity: 0.5;
+				&.hidden {
+					display: inline-block !important;
+					visibility: visible !important;
+					background-image: var(--icon-filter);
+					opacity: 1;
+				}
+				&:active, &:focus {
+					border: none !important;
+					box-shadow: none !important;
+					outline: none !important;
+				}
+			}
+
+			button.small-expand-trigger {
+				display: none;
+				visibility: hidden;
+			}
+		}
+
+		select {
+			width: auto !important;
+			padding-right: 30px !important;
+		}
+
+		// special bottom stuff
+		&.bottom {
+			margin-top: 15px;
+			align-items: start;
+
+			.tablenav-pages {
+				&.no-pages, &.one-page {
+					padding-top: 0;
+				}
+			}
+		}
+
+		@if $frontend {
+
+		} @else {
+			.em-list-table-trigger {
+				height: 25px;
+				margin-top: 0;
+			}
+		}
+
+	}
+
+	div.table-wrap {
+		overflow-x: auto;
+		border: 1px solid var(--border-color);
+		margin: 0;
+		clear: both;
+		margin-top:5px;
+		font-size: 14px;
+
+		.check-column {
+			text-wrap: nowrap;
+			padding: 10px 0 10px 10px !important;
+
+			button.em-tooltip-ddm {
+				font-family: "Arial", sans-serif !important;
+				transform: rotate(-90deg) !important;
+				border: 0 !important;
+				background: none !important;
+				width: 22px !important;
+				height: 1px !important;
+				font-size: 16px !important;
+				line-height: 3px !important;
+				font-weight: bold !important;
+				color: #aaa !important;
+				padding: 0 0 10px 6px !important;
+				cursor: pointer !important;
+
+				&:active, &:focus {
+					border: none !important;
+					box-shadow: none !important;
+				}
+			}
+		}
+
+		thead {
+			.check-column {
+				padding: 0 0 0 3px;
+			}
+		}
+
+		table {
+			width: 100%;
+			margin: 0 !important;
+			border: 0 !important;
+		}
+
+		.toggle-row {
+			display: none;
+			visibility: hidden;
+		}
+
+		tr {
+			transition: opacity 800ms ease-out;
+
+			&.loading {
+				pointer-events: none;
+				cursor: not-allowed;
+
+				:is(td,th):not(.check-column) {
+					opacity: 0.5;
+				}
+
+				.check-column {
+					input {
+						opacity: 0.3;
+					}
+
+					button {
+						background: var(--icon-spinner) 3px 0 no-repeat;
+						background-size: 16px;
+						text-indent: -99999px;
+						overflow: hidden;
+					}
+				}
+			}
+
+			&.faded-out {
+				opacity: 0;
+			}
+		}
+
+		:is(td,th).column-primary {
+			.em-list-table-row-responsive-meta {
+				display: none;
+				visibility: hidden;
+			}
+			.primary-column-content {
+				display: inline-block;
+			}
+		}
+
+		@if $frontend {
+			thead, tfoot {
+				td.manage-column {
+					vertical-align: middle;
+
+					label {
+						position: absolute;
+					}
+				}
+				th {
+					vertical-align: center;
+				}
+			}
+
+			tbody {
+				td {
+					vertical-align: top;
+				}
+
+				> :nth-child(odd) {
+					background-color: #fafafa;
+				}
+
+				> .selected {
+					background-color: #f6f6f6;
+				}
+			}
+
+			tfoot {
+				display: none;
+
+				td, th {
+					border-bottom: 0 !important;
+				}
+			}
+
+			th {
+				font-weight: normal;
+				vertical-align: top;
+				padding: 10px 12px !important;
+
+				&.sortable, &.sorted {
+					a {
+						display: grid;
+						grid-gap: 10px;
+						grid-template-columns: auto 15px;
+						align-items: center;
+						color: var(--text-color-normal) !important;
+
+						&:hover {
+							color: var(--text-color-normal);
+							text-decoration: none;
+						}
+
+						.sorting-indicators {
+							display: grid;
+							grid-template-columns: 1fr;
+							grid-template-rows: min-content;
+
+							.sorting-indicator {
+								display: block;
+								width: 12px;
+								height: 12px;
+								background-size: 12px;
+								background-repeat: no-repeat;
+
+								&.asc {
+									background-image: var(--icon-chevron-up);
+								}
+
+								&.desc {
+									background-image: var(--icon-chevron-down);
+								}
+							}
+						}
+					}
+
+					&:hover {
+						&.asc .sorting-indicator.asc, &.desc .sorting-indicator.desc {
+							opacity: 0.2;
+						}
+
+						&.asc .sorting-indicator.desc, &.desc .sorting-indicator.asc {
+							opacity: 1 !important;
+						}
+					}
+
+					&.sorted {
+						&.asc .sorting-indicator.desc, &.desc .sorting-indicator.asc {
+							opacity: 0.2;
+						}
+					}
+				}
+			}
+
+			td, tbody th.column-primary {
+				padding: 11px 12px !important;
+			}
+
+			td.column-primary, tbody th.column-primary {
+				text-wrap: nowrap;
+			}
+		} @else {
+			// WP 7.1 renders the primary cell as th, which wp-admin only sizes when it is a td.
+			tbody th.column-primary {
+				font-size: 13px;
+				line-height: 1.5em;
+			}
+		}
+
+		.em-icon {
+			width: 18px;
+			height: 18px;
+			margin-right: 5px;
+			background-size: 18px;
+			&.em-icon-updated { background : green; -webkit-mask-image: var(--icon-updated); mask-image: var(--icon-updated); }
+			&.em-icon-cross-circle { background : red; -webkit-mask-image: var(--icon-cross-circle); mask-image: var(--icon-cross-circle); }
+			&.em-icon-trash { background : red; -webkit-mask-image: var(--icon-trash); mask-image: var(--icon-trash); }
+		}
+
+		.em-list-table-col-tooltip {
+			.em-tooltip-content {
+				padding: 10px;
+
+				section {
+					margin: 0 0 12px !important;
+
+					&:last-of-type { margin-bottom: 0 !important; }
+					header {
+						padding-bottom: 2px;
+						border-bottom: 1px solid #dedede;
+						margin-bottom: 10px;
+					}
+					footer {
+						margin-top: 5px;
+
+						p {
+							margin: 0 0 5px !important;
+							padding: 0 !important;
+						}
+					}
+					dl {
+						display: grid;
+						grid-template-columns: max-content max-content;
+						margin: 0 0 10px !important;
+						padding: 0 !important;
+
+						&:last-child { margin-bottom: 0 !important; }
+						dt, dd {
+							margin: 0 !important;
+							padding: 3px 0 !important;
+						}
+						dd { padding-left: 15px !important; }
+						dt { font-weight: bold; }
+
+						&.tabular-data {
+							dt {
+								font-weight: normal;
+								padding: 8px 0 !important;
+							}
+							dd {
+								padding: 8px 0 0 15px !important;
+							}
+							dt, dd {
+								border-bottom : 1px solid #dedede;
+								&:first-of-type {
+									border-top: 0 !important;
+									padding-top: 0 !important;
+								}
+								&:last-of-type {
+									border-bottom: 0 !important;
+									padding-bottom: 0 !important;
+								}
+							}
+						}
+					}
+					div.general-data {
+						margin: 0 0 10px !important;
+						&:last-child { margin-bottom: 0 !important; }
+					}
+				}
+			}
+			.tippy-box {
+				max-width: none !important;
+			}
+			a.em-tooltip {
+				color: var(--text-color-softer) !important;
+				border-bottom: 2px dotted #ccc;
+				padding-bottom: 2px;
+				text-wrap: nowrap;
+				&:hover {
+					cursor: pointer;
+					text-decoration: none !important;
+				}
+			}
+		}
+
+
+		/* Special Pricing Rules */
+		td.booking_price, td.ticket_price, td.ticket_total, td.total_paid, td.price-col {
+			text-wrap: nowrap;
+		}
+	}
+
+	&.no-checkboxes {
+		div.tablenav {
+			> .actions {
+				margin-right: 15px;
+				.actions {
+					margin-right: 5px;
+				}
+				&.filters {
+					clear: none;
+				}
+			}
+		}
+		.em-list-table-triggers {
+
+		}
+	}
+
+	/*
+		Handle small and medium sized list boxes, with mixins to allow for optimal sizes in admin area
+	 */
+	@mixin size-medium-nav {
+		div.tablenav {
+			// spread filter out across whole screen, on one or more lines, with center alignment
+			> .actions, > .tablenav-pages {
+				display: flex;
+				float: none;
+				text-align: center;
+				justify-content: center;
+				justify-items: center;
+				align-items: center;
+			}
+
+			> .filters {
+				border-width: 1px 0;
+				border-style: solid;
+				border-color: var(--border-color);
+				padding: 10px 0;
+
+				> * {
+					width : 100% !important;
+					max-width: none !important;
+					float: none;
+				}
+
+				> button, .button {
+					width: auto !important;
+				}
+			}
+
+			// navigation pages go on their own line
+			> .tablenav-pages {
+				gap: 8px;
+
+				&.no-pages, &.one-page {
+					padding-top: 0;
+				}
+			}
+		}
+	}
+
+	@mixin size-small-nav {
+		div.tablenav {
+			> .actions.filters {
+				display: block;
+
+				> * {
+					width: 90% !important;
+					max-width: none;
+					margin: 5px 5% !important;
+				}
+			}
+		}
+	}
+
+	@mixin size-small-table {
+		button.small-expand-trigger {
+			display: inline-block !important;
+			visibility: visible !important;
+			width: 15px;
+
+			background-image: var(--icon-expand) !important;
+			opacity: 0.5;
+
+			&.expanded {
+				background-image: var(--icon-collapse) !important;
+				opacity: 1;
+			}
+		}
+
+		&.no-checkboxes {
+			.wp-list-table {
+				thead th:not(:nth-child(-n+1)) {
+					display: none !important;
+					overflow: hidden;
+				}
+			}
+			tbody {
+				td:not(.check-column) {
+					&:not(:nth-child(-n+1))::before {
+						display: inline-block;
+						overflow: hidden;
+						width: 35%;
+						content: attr(data-colname);
+						white-space: nowrap;
+						text-overflow: ellipsis;
+						border: 0;
+						vertical-align: middle;
+					}
+				}
+			}
+		}
+
+		&.has-checkboxes {
+			.wp-list-table {
+				thead th:not(:nth-child(-n+2)) {
+					display: none !important;
+					overflow: hidden;
+				}
+			}
+			tbody {
+				td:not(.check-column) {
+					&:not(:nth-child(-n+2))::before {
+						display: inline-block;
+						overflow: hidden;
+						width: 35%;
+						content: attr(data-colname);
+						white-space: nowrap;
+						text-overflow: ellipsis;
+						border: 0;
+						vertical-align: middle;
+					}
+				}
+			}
+		}
+
+		.wp-list-table {
+			tr:not(.inline-edit-row):not(.no-items) td:not(.check-column),
+			tbody tr:not(.inline-edit-row):not(.no-items) th.column-primary {
+				position: relative;
+				clear: both;
+				width: auto !important;
+			}
+
+			thead th.column-primary {
+				content: '';
+			}
+
+			// table-layout is fixed, so column width comes from the header cell, not the one below. EM renders both as td, not th, so neither may be qualified by element. 96px is what the checkbox, the row-actions trigger and the edit icon need side by side at 400px.
+			thead .check-column {
+				width: 96px;
+			}
+
+			// WP 7.1 lays narrow list table rows out as flex and makes every td of an expanded row a block, whereas this layout relies on table rows with the check column kept as a cell.
+			tr:not(.hidden) {
+				display: table-row;
+			}
+
+			tbody {
+				.check-column {
+					display: table-cell !important;
+					width: 96px;
+				}
+				:is(td,th):not(.check-column) {
+					display: block !important;
+					overflow: hidden;
+
+					&:not(.column-primary) {
+						display: none !important;
+					}
+
+					&:not(.column-primary, :last-child) {
+						border: 0 !important;
+						padding-top: 5px !important;
+						padding-bottom: 5px !important;
+					}
+					&:last-child {
+						padding-top: 5px !important;
+						padding-bottom: 10px !important;
+					}
+				}
+
+				td, th {
+					vertical-align: top;
+				}
+
+				tr.expanded {
+					:is(td,th).column-primary {
+						// primary col border shouldn't be shown if there's no responsive meta
+						&:not(:has(.em-list-table-row-responsive-meta)) {
+							margin-bottom: 0 !important;
+							padding-bottom: 0 !important;
+							border-bottom: 0 !important;
+						}
+					}
+				}
+
+				:is(td,th).column-primary {
+
+					&:not(:has(.em-list-table-row-responsive-meta)) {
+						.primary-column-content {
+							border-bottom: 0;
+						}
+					}
+
+					button.toggle-row {
+						display: inline-block !important;
+						visibility: visible !important;
+						float: right;
+						width: 10px !important;
+						height: 15px !important;
+						background-size: 15px;
+						padding: 0 5px !important;
+						margin: 0 0 0 5px !important;
+						background-repeat: no-repeat;
+						background-position: center center;
+						background-color: transparent !important;
+						text-indent: -10000px !important;
+						border: 0 !important;
+						background-image: var(--icon-chevron-down);
+						&.expanded {
+							background-image: var(--icon-chevron-up);
+						}
+						&:active, &:focus {
+							border: none !important;
+							box-shadow: none !important;
+							outline: none !important;
+						}
+						:focus:before {
+							box-shadow: none;
+							outline: none;
+						}
+					}
+
+					.em-list-table-row-responsive-meta {
+						float: left;
+						clear: left;
+						display: block;
+						visibility: visible;
+					}
+
+					.primary-column-content {
+						float: left;
+						clear: left;
+						margin-bottom: 8px;
+						border-bottom: 1px solid var(--border-color-softer);
+						padding-bottom: 5px;
+					}
+				}
+
+				tr.expanded {
+					td:not(:first-child, .column-primary) {
+						display: block !important;
+					}
+					:is(td,th).column-primary {
+						margin: 0 13px 10px 11px !important;
+						padding-left: 0 !important;
+						padding-right: 0 !important;
+					}
+				}
+			}
+		}
+	}
+
+	@mixin size-xsmall-nav {
+		// break up the bulk action and buttons
+		div.tablenav {
+			> .actions, > .tablenav-pages {
+				display: block;
+				.bulkactions-input {
+					display: block;
+					margin-top: 15px;
+					select {
+						float: none;
+					}
+				}
+			}
+		}
+	}
+
+	@if $frontend {
+		&.size-medium, &.size-small, &.size-xsmall {
+			@include size-medium-nav;
+		}
+		&.size-small, &.size-xsmall {
+			@include size-small-table;
+			@include size-small-nav;
+		}
+		&.size-xsmall {
+			@include size-xsmall-nav;
+		}
+	} @else {
+		a.em-list-table-trigger {
+			&:last-of-type {
+				margin-right: 5px !important;
+			}
+		}
+
+		div.tablenav {
+			> .actions {
+				button.filters-trigger, button.small-expand-trigger {
+				}
+			}
+		}
+
+		// This is the key to making the list tables responsive in an EM-fashioned way
+		@media screen and (max-width: 782px) {
+			@include size-medium-nav;
+			@include size-small-table;
+
+			&.size-small, &.size-xsmall {
+				@include size-small-nav;
+			}
+		}
+		@media screen and (max-width: 480px ) {
+			@include size-xsmall-nav;
+		}
+	}
+}
+
+.em-list-table-cols {
+	display: grid;
+	width:  100%;
+	grid-template-columns: 1fr 1fr;
+	grid-gap: 20px;
+
+	p {
+		margin-bottom: 15px !important;
+	}
+
+	.em-list-table-cols-selected {
+		.item {
+			width: 100%;
+			display: flex;
+			flex-wrap: nowrap;
+			flex-direction: row-reverse;
+			align-items: center;
+			cursor: pointer;
+			margin: 0 0 8px 0;
+			padding: 5px 0 5px 8px;
+			border-radius: calc(0.25rem - 1px);
+			background: #dff4fd;
+			border: 1px solid #97dbf9;
+			color: #0095c3;
+
+			&.sortable-ghost {
+				// remove contents and make barder dotted
+				border-style: dotted;
+				opacity: 0.4;
+			}
+
+			> span {
+				flex: 1 1 auto;
+			}
+
+			.remove {
+				flex: 0 0 auto;
+				color: inherit !important;
+				background-color: inherit !important;
+				text-decoration: none;
+				vertical-align: middle;
+				display: inline-block;
+				padding: 0;
+				border: none;
+				box-sizing: border-box;
+				margin-right: 10px;
+			}
+		}
+	}
+
+	.em-list-table-cols-select{
+		.selectize-input.items {
+			.item {
+				display: none !important;
+			}
+			input {
+				margin-top: 0 !important;
+			}
+		}
+		.selectize-dropdown {
+			.optgroup:before {
+				display:none;
+			}
+			.optgroup-header {
+				display: block;
+				width: 95%;
+				padding: 0 0 6px;
+				margin: 10px auto 6px;
+				border-bottom: 1px solid #ddd;
+			}
+			.optgroup:first-child {
+				.optgroup-header {
+					margin-top: 5px;
+				}
+			}
+		}
+	}
+}
+
+.em-bookings-table {
+	@if $frontend {
+		.em-bookings-table-views-selection + .actions {
+			margin-left: 5px !important;
+		}
+	}
+
+	.em-bookings-table-views {
+		display: inline-block;
+
+		[data-view="bookings"] {
+			background-image: var(--icon-tickets) !important;
+			background-size: 30px !important;
+		}
+		[data-view="tickets"] {
+			background-image: var(--icon-ticket) !important;
+		}
+		[data-view="attendees"] {
+			background-image: var(--icon-attendees) !important;
+		}
+		[data-view="multiple-bookings"] {
+		 	background-image: var(--icon-multiple) !important;
+		}
+
+		.em-bookings-table-views-trigger {
+			display: block;
+			width: 42px;
+			background: var(--icon-point-down) 30px 6px no-repeat;
+			background-size: 14px;
+			padding: 0 15px 0 0;
+			margin: 0;
+			cursor: pointer;
+
+			.em-bookings-table-view-option {
+				display: block;
+				width: 25px;
+				height: 25px;
+				background-size: 25px;
+				background-repeat: no-repeat;
+				background-position: center center;
+				background-color: transparent !important;
+				text-indent: -10000px !important;
+				padding: 0 !important;
+				border: 0 !important;
+			}
+		}
+
+		.em-bookings-table-views-options {
+			display:none;
+		}
+		.tippy-content .em-bookings-table-views-options {
+			display: block;
+		}
+		.em-bookings-table-views-options-list {
+			display: block !important;
+			padding: 0 !important;
+			margin: 5px 0 !important;
+			border: none !important;
+			background: transparent !important;
+			cursor: pointer !important;
+			overflow: visible !important;
+
+			label.em-bookings-table-view-option {
+				display: block !important;
+				padding: 5px 10px 5px 40px !important;
+				margin: 0 !important;
+				background-repeat: no-repeat !important;
+				background-size: 18px !important;
+				background-position: 10px center !important;
+				background-color: transparent !important;
+
+				&:hover, &.focused {
+					background-color: #efefef !important;
+				}
+				&:checked, &.checked {
+					background-color: #cee0ea !important;
+				}
+				input[type="radio"] {
+					@include screen-reader-only();
+				}
+				&[data-view="bookings"], &[data-view="mulitple-bookings"] {
+					background-size: 24px !important;
+					background-position: 6px center !important;
+				}
+			}
+
+			&:focus {
+				border: none !important;
+				outline: none !important;
+			}
+		}
+	}
+
+	@if $frontend {
+
+	} @else {
+		.em-bookings-table-views-trigger {
+			padding-top: 3px;
+		}
+	}
+
+	td.column-actions {
+		text-wrap: nowrap;
+		a {
+			display: inline-block;
+			text-indent: -9999px;
+			background-size : 18px;
+			width: 18px;
+			height: 18px;
+			margin: 0 6px 0 0;
+
+			&:last-of-type {
+				margin-right: 0;
+			}
+			:focus {
+				box-shadow: none;
+				outline: none;
+			}
+
+			&[data-row_action="delete"] {
+				background: var(--icon-trash) no-repeat;
+			}
+			&[data-row_action="approve"] {
+				background: var(--icon-checkmark-circle) no-repeat;
+			}
+			&[data-row_action="unapprove"] {
+				background: var(--icon-undo) no-repeat;
+			}
+			&[data-row_action="reject"], &[data-row_action="cancel"] {
+				background: var(--icon-cross-circle) no-repeat;
+			}
+			&[data-row_action="checkin"] {
+				background: var(--icon-enter) no-repeat;
+			}
+			&[data-row_action="checkout"] {
+				background: var(--icon-exit) no-repeat;
+			}
+			&.em-list-table-row-edit {
+				background: var(--icon-edit) no-repeat;
+			}
+		}
+	}
+}
+
+/* The selection modal of columns for the bookings table */
+&.em-list-table-settings {
+	.em-list-table-settings-remember {
+		text-align: right;
+
+		input[type="checkbox"] {
+			margin-left: 10px;
+		}
+		[data-tippy-root] {
+			text-align: center;
+		}
+	}
+}
+
+
+// Stop cols for booking cols selector for very small screens only
+@media only screen and (max-width: 800px) {
+	.em-list-table-cols-selected {
+		.item {
+			display: block;
+		}
+	}
+}
+
+// Stop cols for booking cols selector for very small screens only
+@media only screen and (max-width: 380px) {
+	.em-list-table-cols-selected {
+		.item {
+			display: block;
+		}
+	}
+}

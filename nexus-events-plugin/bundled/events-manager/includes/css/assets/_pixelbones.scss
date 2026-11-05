@@ -1,0 +1,594 @@
+/*
+* PXL Bones v1
+* Based off barebones v3, pixelated and localized for better theme compatibility in a WordPress environment
+* Copyright 2022 Pixelite SL
+* Based of Skeleton by Dave Gamache
+* Free to use under the MIT license.
+*/
+
+/* ENV Variables
+–––––––––––––––––––––––––––––––––––––––––––––––––– */
+/* Media breakpoint variables for use in media queries
+* 	Note: this section is currently commented out pending release of final CSS env() spec
+*  Breakpoints based on
+*	 https://medium.freecodecamp.org/the-100-correct-way-to-do-css-breakpoints-88d6a5ba1862
+*/
+&.pixelbones {
+    @import "normalize";
+
+	--button-padding: 0 30px;
+	--input-padding: 6px 10px;
+
+    /* Base Styles
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    scroll-behavior: smooth !important;
+    font-size: var(--font-size) !important;		/* changed from 15px in orig skeleton */
+    line-height: var(--line-height) !important;
+    font-weight: var(--font-weight) !important;
+    font-family: var(--font-family) !important;
+    color: var(--text-color-normal) !important;
+    background-color: var(--background-color) !important;
+
+	* {
+		box-sizing: border-box !important;
+	}
+
+
+    /* Grid
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    /* CSS Grid depends much more on CSS than HTML, so there is less boilerplate
+         than with skeleton. Only basic 1-4 column grids are included.
+         Any additional needs should be made using custom CSS directives */
+
+    .grid-container {
+        position: relative !important;
+        max-width: var(--grid-max-width) !important;
+        margin: 0 auto !important;
+        padding: 0px !important;
+        text-align: left !important;
+        display: grid !important;
+        grid-gap: 20px !important;
+        gap: 20px !important;
+
+        /* by default use min 200px wide columns auto-fit into width */
+        grid-template-columns: minmax(200px, 1fr) !important;
+    }
+
+    /* grids to 3 columns above mobile sizes */
+    @media (min-width: 600px) {
+        .grid-container {
+            grid-template-columns: repeat(3, 1fr) !important;
+            padding: 0 !important;
+        }
+
+        /* basic grids */
+        .grid-container.fifths {
+            grid-template-columns: repeat(5, 1fr) !important;
+        }
+        .grid-container.quarters {
+            grid-template-columns: repeat(4, 1fr) !important;
+        }
+        .grid-container.thirds {
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+        .grid-container.halves {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        .grid-container.full {
+            grid-template-columns: 1fr !important;
+        }
+
+    }
+
+
+    /* Typography
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    h1, h2, h3, h4, h5, h6 {
+        margin-top: 0 !important;
+        margin-bottom: 20px !important;
+        font-weight: 300 !important;
+    }
+    h1 { font-size: calc(var(--font-size) + 24px) !important; line-height: 1.2 !important;  letter-spacing: -1px !important;}
+    h2 { font-size: calc(var(--font-size) + 20px) !important; line-height: 1.25 !important; letter-spacing: -1px !important; }
+    h3 { font-size: calc(var(--font-size) + 14px) !important; line-height: 1.3 !important;  letter-spacing: -1px !important; }
+    h4 { font-size: calc(var(--font-size) + 8px) !important; line-height: 1.35 !important; letter-spacing: -0.8px !important; }
+    h5 { font-size: calc(var(--font-size) + 2px) !important; line-height: 1.5 !important;  letter-spacing: -0.5px !important; }
+    h6 { font-size: var(--font-size) !important; line-height: 1.6 !important;  letter-spacing: 0 !important; }
+
+    /* Larger than phablet */
+    @media (min-width: 600px) {
+        h1 { font-size: calc(var(--font-size) + 34px) !important; }
+        h2 { font-size: calc(var(--font-size) + 26px) !important; }
+        h3 { font-size: calc(var(--font-size) + 20px) !important; }
+        h4 { font-size: calc(var(--font-size) + 14px) !important; }
+        h5 { font-size: calc(var(--font-size) + 8px) !important; }
+        h6 { font-size: var(--font-size) !important; }
+    }
+
+    p {
+        margin: 0 0 5px !important;
+        line-height: var(--line-height) !important;
+    }
+
+
+    /* Links
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    a {
+      color: var(--accent-color) !important;
+      background-color: transparent !important;
+	  -webkit-box-shadow: none !important;
+	  box-shadow: none !important;
+      :hover {
+        color: var(--accent-color-hover) !important;
+        background-color: transparent !important;
+      }
+      :focus {
+        background-color: transparent !important;
+      }
+    }
+
+
+    /* Buttons
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    .button.input, button.input, input[type="submit"].input, input[type="reset"].input, input[type="button"].input,
+    &.input .button, &.input button, &.input input[type="submit"], &.input input[type="reset"], &.input input[type="button"],
+	.input .button, .input button, .input input[type="submit"], .input input[type="reset"], .input input[type="button"] {
+	    &:not([data-nostyle]) {
+		    display: inline-block;
+		    height: 38px !important;
+		    padding: var(--button-padding) !important;
+		    color: var(--text-color-softer) !important;
+		    text-align: center !important;
+		    font-size: 11px !important;
+		    font-weight: 600 !important;
+		    line-height: 38px !important;
+		    letter-spacing: 1px !important;
+		    text-transform: uppercase !important;
+		    text-decoration: none !important;
+		    white-space: nowrap !important;
+		    background-color: transparent !important;
+		    border-radius: 4px !important;
+		    border: 1px solid var(--border-color) !important;
+		    cursor: pointer !important;
+		    box-sizing: border-box !important;
+
+		    &.disabled {
+			    pointer-events: none !important;
+			    opacity: 0.5 !important;
+		    }
+	    }
+    }
+	.button.input, button.input,
+	&.input .button, &.input button,
+	.input .button, .input button {
+		&[data-nostyle] {
+			background-color: transparent;
+			border: none;
+			cursor: pointer;
+		}
+	}
+
+	.input {
+		.button, button, input[type="submit"], input[type="reset"], input[type="button"], &.button,
+		button#{&}, input[type="submit"]#{&}, input[type="reset"]#{&}, input[type="button"]#{&} {
+			&:not([data-nostyle]) {
+				&:hover, &:focus {
+					color: var(--text-color-normal) !important;
+					border-color: var(--text-color-softer) !important;
+					outline: 0 !important;
+				}
+			}
+		}
+	}
+	&.input {
+		.button, button, input[type="submit"], input[type="reset"], input[type="button"], &.button {
+			&:not([data-nostyle]) {
+				&:hover, &:focus {
+					color: var(--text-color-normal) !important;
+					border-color: var(--text-color-softer) !important;
+					outline: 0 !important;
+				}
+			}
+		}
+	}
+
+	&.input .button.button-primary, &.input button.button-primary, &.input input[type="submit"].button-primary, &.input input[type="reset"].button-primary, &.input input[type="button"].button-primary,
+	.input .button.button-primary, .input button.button-primary, .input input[type="submit"].button-primary, .input input[type="reset"].button-primary, .input input[type="button"].button-primary,
+    .button.button-primary.input, button.button-primary.input, input[type="submit"].button-primary.input, input[type="reset"].button-primary.input, input[type="button"].button-primary.input {
+        color: var(--button-primary-color) !important;
+        background-color: var(--accent-color) !important;
+        border-color: var(--accent-color) !important;
+    }
+	&.input .button.button-primary:hover, &.input button.button-primary:hover, &.input input[type="submit"].button-primary:hover, &.input input[type="reset"].button-primary:hover, &.input input[type="button"].button-primary:hover,
+	.input .button.button-primary:hover, .input button.button-primary:hover, .input input[type="submit"].button-primary:hover, .input input[type="reset"].button-primary:hover, .input input[type="button"].button-primary:hover,
+    .button.button-primary.input:focus, button.button-primary.input:focus, input[type="submit"].button-primary.input:focus, input[type="reset"].button-primary.input:focus, input[type="button"].button-primary.input:focus {
+        color: var(--button-primary-color) !important;
+        background-color: var(--accent-color-hover) !important;
+        border-color: var(--accent-color-hover) !important;
+    }
+	&.input button, &.input .button,
+	.input button, .input .button,
+	button.input, .button.input {
+		&:not([data-nostyle]) {
+			margin-bottom: 10px !important;
+		}
+	}
+
+	/* 3rd party compat */
+	&.input [data-lastpass-icon-root] {
+		display:none;
+	}
+
+
+    /* Forms
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    @mixin reset-input ( $background : var(--background-color) ) {
+      background-color: $background !important;
+      box-shadow: none !important;
+      box-sizing: border-box !important;
+      border: 1px solid var(--border-color-softer) !important;
+    }
+
+    form {
+      border: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-weight: normal !important;
+      overflow: visible;
+      background: var(--background-color) !important;
+      box-sizing: border-box !important;
+      box-shadow: none !important;
+    }
+
+	.input, &.input {
+		input, textarea, select, fieldset, div.input-wrap {
+			margin-bottom: 15px !important;
+		}
+
+		div.input-wrap,
+	    input[type="email"],
+	    input[type="number"],
+	    input[type="search"],
+	    input[type="text"],
+		input[type="select-one"],
+	    input[type="tel"],
+	    input[type="url"],
+	    input[type="password"],
+		input[type="select-type"],
+	    textarea,
+	    select:not([multiple]) {
+	        width: 100% !important;
+	        height: 38px !important;
+	        padding: var(--input-padding) !important; /* The 6px vertically centers text on FF, ignored by Webkit */
+	        border-radius: 4px !important;
+	        @include reset-input( var(--background-color-inputs) );
+
+		    &.inline {
+			    width: auto !important;
+			    margin-bottom: 0 !important;
+			    display: inline-block !important;
+		    }
+	    }
+
+		select.inline {
+			padding-right: 30px !important;
+		}
+
+		/* Create standard dropdown arrow (like WP admin) */
+		select:not([multiple]), input.select-toggle {
+			-webkit-appearance: none !important;
+			background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 15 15'%3E%3Cpath stroke='%23555' stroke-linecap='square' d='m4.5 6.5 3 3 3-3'/%3E%3C/svg%3E") no-repeat right 0 top 55% !important;
+			background-position-x: calc(100% - 5px) !important;
+			background-size: 20px 20px !important;
+			cursor: pointer !important;
+			vertical-align: top !important;
+			&:focus {
+				background-image : url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 15 15'%3E%3Cpath stroke='%23000' stroke-linecap='square' d='m10.5 8.5-3-3-3 3'/%3E%3C/svg%3E") !important;
+			}
+			padding-right: 30px !important;
+		}
+
+	    /* Removes awkward default styles on some inputs for iOS */
+	    input[type="email"],
+	    input[type="number"],
+	    input[type="search"],
+	    input[type="text"],
+		input[type="select-one"],
+	    input[type="tel"],
+	    input[type="url"],
+	    input[type="password"],
+	    input[type="button"],
+	    input[type="submit"],
+	    textarea {
+	        -webkit-appearance: none !important;
+	        -moz-appearance: none !important;
+	        appearance: none !important;
+	    }
+
+	    textarea {
+	        min-height: 65px !important;
+	        padding-top: 6px !important;
+	        padding-bottom: 6px !important;
+	    }
+
+		div.input-wrap:focus,
+	    input[type="email"]:focus,
+	    input[type="number"]:focus,
+	    input[type="search"]:focus,
+	    input[type="text"]:focus,
+		input[type="select-one"]:focus,
+	    input[type="tel"]:focus,
+	    input[type="url"]:focus,
+	    input[type="password"]:focus,
+	    textarea:focus,
+	    select:focus {
+	        border: 1px solid var(--accent-color) !important;
+	        outline: 0 !important;
+	    }
+
+		div.input-wrap {
+			padding: 0 !important; /* The 7px vertically centers text on FF, ignored by Webkit */
+		}
+		div.input-wrap > input, div.input-wrap > input:focus, , div.input-wrap > input:hover {
+			width: 100% !important;
+			margin: 0 !important;
+			border: none !important;
+			outline: 0 !important;
+			background-color : transparent !important;
+			box-shadow: none !important;
+			box-sizing: border-box !important;
+		}
+
+	    label,
+	    legend {
+	        &:not([data-nostyle]) {
+		        display: block !important;
+		        margin-bottom: 8px !important;
+		        font-weight: normal !important;
+		        font-size: var(--font-size);
+		        line-height: var(--line-height);
+	        }
+	    }
+
+		label, fieldset {
+			&.inline, &.inline-left, &.inline-right {
+				display: inline-block !important;
+			}
+			&.inline-left {
+				margin-right: 10px !important;
+			}
+			&.inline-right {
+				margin-left: 10px !important;
+			}
+		}
+		.inline-inputs {
+			label, legend, input:not([type="radio"]):not([type="checkbox"]), select:not([mutiple]){
+				&:not([data-nostyle]) {
+					width: auto !important;
+					display: inline-block !important;
+					margin: 0 !important;
+				}
+			}
+			> div {
+				display: inline-block;
+			}
+		}
+
+	    fieldset {
+	        padding: 0 !important;
+	        border-width: 0 !important;
+	    }
+
+	    input[type="checkbox"] {
+	        -webkit-appearance: none !important;
+	        width: 15px !important;
+	        height: 15px !important;
+	        position: relative !important;
+	        top: 2px !important;
+	    }
+
+	    input[type="checkbox"]:focus {
+	        outline: 0 !important;
+	    }
+	    input[type="checkbox"]:before {
+	      content:"" !important;
+	      display:none !important;
+	    }
+	    input[type="checkbox"]:checked:after {
+	      opacity:1 !important;
+	    }
+	    input[type="checkbox"]:after {
+	      content: "" !important;
+	      opacity: 0 !important;
+	      display: block !important;
+	      left: 4px !important;
+	      top: 1px !important;
+	      position: absolute !important;
+	      width: 6px !important;
+	      height: 10px !important;
+	      border: 2px solid #666 !important;
+	      border-top: 0 !important;
+	      border-left: 0 !important;
+	      transform: rotate(30deg) !important;
+	      box-sizing: border-box !important;
+	    }
+
+	    input[type="checkbox"],
+	    input[type="radio"] {
+		    &:not([data-nostyle]) {
+			    margin-bottom: 0 !important;
+			    display: inline-block !important;
+		    }
+	    }
+
+	    // Radios have no :after replacement indicator, so resetting their border and background would leave the control with no visible ring.
+	    input[type="checkbox"] {
+		    &:not([data-nostyle]) {
+			    background-color: var(--background-color-checkboxes) !important;
+			    text-align: start !important;
+			    @include reset-input( $background:var(--background-color-checkboxes) );
+		    }
+	    }
+
+	    label > .label-body {
+	        display: inline-block !important;
+	        margin-left: 5px !important;
+	        font-weight: normal !important;
+	    }
+
+		input:disabled, select:disabled, textarea:disabled {
+			opacity: 0.5;
+			background-color:#efefef;
+		}
+	}
+
+
+	/* Lists
+	–––––––––––––––––––––––––––––––––––––––––––––––––– */
+    ul {
+        list-style: circle inside !important;
+    }
+    ol {
+        list-style: decimal inside !important;
+    }
+    ol, ul {
+        padding-left: 0 !important;
+        margin-top: 0 !important;
+    }
+    ul ul, ul ol, ol ol, ol ul {
+        font-size: 100% !important;
+        margin: 10px 0 10px 30px !important;
+        color: var(--text-color-softer) !important;
+    }
+    li {
+        margin-bottom: 05px !important;
+    }
+
+
+    /* Code
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    code {
+        padding: 2px 5px !important;
+        margin: 0 2px !important;
+        font-size: 90% !important;
+        white-space: nowrap !important;
+        background: var(--code-background) !important;
+        border: 1px solid var(--border-color-softer) !important;
+        border-radius: 4px !important; }
+    pre > code {
+        display: block !important;
+        padding: 10px 15px !important;
+        white-space: pre !important;
+        overflow: auto !important; }
+
+
+    /* Tables
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+	table {
+		width: 100%;
+	}
+    th, td {
+        padding: 12px 15px !important;
+        text-align: left !important;
+	    border : 0 !important;
+        border-bottom: 1px solid var(--border-color-softer) !important;
+    }
+    th:first-child, td:first-child {
+        padding-left: 0 !important;
+    }
+    th:last-child, td:last-child {
+        padding-right: 0 !important;
+    }
+
+
+    /* Spacing
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    pre, blockquote, dl, figure, table, p, ul, ol {
+        margin-bottom: 25px !important;
+    }
+
+
+    /* Utilities
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+	.screen-reader-text {
+		border: 0;
+		padding: 0;
+		margin: 0;
+		position: absolute !important;
+		height: 1px;
+		width: 1px;
+		overflow: hidden;
+		clip: rect(1px 1px 1px 1px); /* IE6, IE7 - a 0 height clip, off to the bottom right of the visible 1px box */
+		clip: rect(1px, 1px, 1px, 1px); /*maybe deprecated but we need to support legacy browsers */
+		clip-path: inset(50%); /*modern browsers, clip-path works inwards from each corner*/
+		white-space: nowrap; /* added line to stop words getting smushed together (as they go onto seperate lines and some screen readers do not understand line feeds as a space */
+	}
+
+    .u-full-width {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .u-max-full-width {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .u-pull-right {
+        float: right !important;
+    }
+    .u-pull-left {
+        float: left !important;
+    }
+    .u-align-left {
+        text-align: left !important;
+    }
+    .u-align-right {
+        text-align: right !important;
+    }
+
+
+    /* Misc
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    hr {
+        margin-top: 30px !important;
+        margin-bottom: 35px !important;
+        border-width: 0 !important;
+        border-top: 1px solid var(--border-color-softer) !important;
+    }
+	section {
+		padding: 0;
+		margin: 0;
+	}
+
+
+    /* Clearing
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+
+    /* Self Clearing Goodness */
+    .container:after, .row:after, .u-cf {
+        content: "" !important;
+        display: table !important;
+        clear: both !important;
+    }
+
+
+    /* Media Queries
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+    /*
+    Note: The best way to structure the use of media queries is to create the queries
+    near the relevant code. For example, if you wanted to change the styles for buttons
+    on small devices, paste the mobile query code up in the buttons section and style it
+    there.
+    */
+
+
+    /* Larger than mobile (default point when grid becomes active) */
+    @media (min-width: 600px) {}
+
+    /* Larger than phablet */
+    @media (min-width: 900px) {}
+
+    /* Larger than tablet */
+    @media (min-width: 1200px) {}
+
+
+}

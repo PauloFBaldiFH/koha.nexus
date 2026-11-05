@@ -1,0 +1,94 @@
+/*
+For other event list and single event display CSS, see the _items.scss file
+ */
+
+&.em-event.em-event-single {
+	.em-event-meta-line.em-event-location {
+		line-height: 24px !important;
+	}
+}
+
+&.em-event, &.em-events-list, &.em-events-widget {
+	.em-item-image {
+		.em-item-image-placeholder {
+			div.date {
+				display: grid;
+				grid-template-rows: 7fr 4fr;
+				justify-content: center;
+				align-items: start;
+				height: 100%;
+				min-width: 125px;
+
+				span {
+					text-align: center;
+					display: block;
+					font-size: 30px;
+					line-height: 30px;
+				}
+
+				span.day {
+					font-size: 45px;
+					line-height: 45px;
+					align-self: end;
+				}
+			}
+		}
+	}
+	&.em-event-cancelled, .em-event-cancelled {
+		.em-event-meta-datetime {
+			text-decoration: line-through;
+		}
+	}
+}
+
+&.em-events-widget {
+	.em-item {
+		.em-item-image-placeholder {
+			div.date {
+				padding-top : 15%;
+				min-width: 60px;
+				span.day {
+					font-size: 30px !important;
+					line-height: 30px !important;
+					margin-bottom: 1px;
+				}
+				span.month {
+					font-size: 16px !important;
+					line-height: 16px !important;
+				}
+			}
+		}
+	}
+}
+
+// Add to calendar
+button.input.em-event-add-to-calendar {
+	padding-left: 20px !important;
+	.em-icon-calendar {
+		margin-right: 10px;
+	}
+}
+.em-add-to-calendar-tooltip {
+
+	margin-top: -5px !important; //tippy fix
+}
+.em-event-add-to-calendar-content {
+	a {
+		display: inline-block;
+		width: calc(100% - 18px );
+		padding: 8px 10px 5px 35px !important;
+		color: var(--default-color) !important;
+		text-decoration: none !important;
+		&:focus, &:hover {
+			outline: none !important;
+			background-color: #f3f3f3 !important;
+		}
+		background: var(--icon-download) 5px 50% no-repeat;
+		background-size: 18px;
+	}
+	a.em-a2c-download { background-image: var(--icon-download); }
+	a.em-a2c-google { background-image: var(--icon-logo-google-calendar); }
+	a.em-a2c-apple { background-image: var(--icon-logo-apple); }
+	a.em-a2c-office { background-image: var(--icon-logo-office365); }
+	a.em-a2c-outlook { background-image: var(--icon-logo-outlook); }
+}

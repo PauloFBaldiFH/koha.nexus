@@ -1,0 +1,862 @@
+&.em-calendar {
+
+	--nav-color : #777;
+	--nav-border : 1px solid #dedede;
+	--nav-background : none;
+	--event-border-color : #ccc;
+	--event-background-color : #dedede;
+	--event-color : #fff;
+	--header-border : 1px solid #dedede;
+	--header-background : transparent;
+	--header-color : #888;
+	--date-box-border : 1px solid #dedede;
+	--date-color : #999;
+	--date-background : #fff;
+	--date-border-color : #cdcdcd;
+	--date-border : 1px solid var(--date-border-color);
+	--date-today-color : #999;
+	--date-today-background : #ededed;
+	--date-today-border : 1px solid var(--date-today-background);
+	--date-more-color: var(--nav-color);
+	--calendar-background : #fff;
+	--counter-background : #F36752;
+
+	display: block;
+	width: 100%;
+
+	section {
+		display: grid;
+		width: 100%;
+		padding: 0;
+		margin: 0;
+
+		div {
+			text-align: center;
+			display: block;
+		}
+
+		> div {
+			width: 100%;
+		}
+
+		&.em-cal-days {
+			grid-template-columns: repeat(7, 1fr);
+		}
+
+	}
+
+	.em-cal-nav {
+		grid-template-columns: 1fr auto;
+		justify-items: center;
+		align-items: center;
+
+		&.em-cal-nav-centered {
+			grid-template-columns: 1fr;
+			.month-nav {
+				display: grid;
+				gap: 20px;
+				width: max-content;
+				grid-template-columns: 22px 1fr 22px;
+				align-items: center;
+				justify-items: center;
+
+				.em-calnav {
+					svg {
+						height: 22px;
+						width: 22px;
+					}
+				}
+			}
+		}
+
+		> div {
+			margin:10px 0;
+		}
+
+		.em-search-advanced-trigger {
+			display: none;
+			visibility: hidden;
+		}
+
+		.month {
+			margin-left: 10px;
+			text-align: left;
+
+			form { display: inline-block; }
+
+			input, span.marker {
+				border: 0 !important;
+				margin: 0 !important;
+				padding: 10px !important;
+				font-size: 22px;
+
+				&:hover, &:focus {
+					border: 0 !important;
+				}
+			}
+			span.marker { /* temp element used to measure width dynamically, hidden to prevent jank, shown enough to generate width  */
+				display: inline-block;
+				position: absolute;
+				left: -100%;
+			}
+			input[type="month"] {
+				position: relative;
+
+				&::-webkit-calendar-picker-indicator {
+					position: absolute;
+					left: 0;
+					top: 0;
+					width: 100%;
+					height: 100%;
+					margin: 0;
+					padding: 0;
+					cursor: pointer;
+					background: transparent;
+				}
+			}
+			input[type="text"]{
+				background-color: transparent !important;
+			}
+		}
+
+		.button {
+			padding : 0 10px !important;
+			margin : 0 !important;
+			display: inline-block;
+		}
+
+		.month-nav {
+			margin: 5px 0 15px;
+
+			.em-calnav {
+				background: var(--nav-background) !important;
+				color: var(--nav-color) !important;
+				width: 38px;
+				height: 18px;
+				display: inline-block;
+				padding: 0;
+				margin: 0;
+
+				&.em-calnav-prev {
+					padding-right: 0;
+				}
+				&.em-calnav-next {
+					padding-left: 0;
+				}
+
+				&:hover, &:hover svg, &:hover path {
+					color: var(--nav-color) !important;
+					filter: brightness(0.5) !important;
+				}
+				&:focus {
+					outline: none;
+				}
+
+				&[data-disabled="1"] {
+					&, &:hover, &:hover svg, , &:hover path {
+					cursor: not-allowed !important;
+					filter: brightness(1) !important;
+				}
+				}
+
+				svg {
+					height: 28px;
+					width:28px;
+					display: block;
+					margin: 0 auto;
+					transition: all ease-in-out;
+					fill: none;
+					stroke: var(--nav-color);
+				}
+			}
+
+			.em-calnav-today.is-today {
+				opacity : 0.3;
+
+				&:hover {
+					cursor:default !important;
+				}
+			}
+		}
+	}
+
+	.em-cal-head {
+
+		border : var(--header-border);
+		background : var(--calendar-background);
+		border-bottom: 0;
+		border-radius : 8px 8px 0 0;
+
+		> div {
+			background: var(--header-background);
+			color: var(--header-color);
+			margin: 10px 0;
+			padding: 0 10px;
+			border-left: var(--header-border);
+			text-transform: uppercase;
+			overflow-x: hidden;
+			text-overflow: ellipsis;
+		}
+
+		> div:first-child {
+			border-left: none;
+		}
+
+		/*
+		> div:first-child {
+			border-top-left-radius: 5px;
+		}
+
+		> div:last-child {
+			border-top-right-radius: 5px;
+		}*/
+	}
+
+	.em-cal-body {
+
+		border-bottom: var(--date-box-border);
+		background-color: var(--calendar-background);
+
+		--grid-auto-rows : auto;
+		&:not(.auto-aspect) {
+			grid-auto-rows: var(--grid-auto-rows); // we'll adjust this one depending on size of calendar via @media and CSS/JS class flags
+		}
+
+		.em-cal-day {
+			text-align: right;
+
+			.em-cal-day-date {
+				display: inline-block;
+				text-align: center;
+				position: relative;
+				margin : 0 0 10px;
+
+				&.em-cal-day-date {
+					a, span {
+						color: var(--date-color) !important;
+						text-decoration: none !important;
+						display: inline-block;
+						margin: 0;
+						padding: 5px 6px;
+						width: 34px;
+						height: 34px;
+						font-size: 16px;
+						background: var(--date-background);
+						border-radius: 50%;
+						box-sizing: border-box;
+					}
+				}
+			}
+
+			&.eventless-pre, &.eventless-post, &.eventful-pre, &.eventful-post {
+				.em-cal-day-date {
+					opacity: 50%;
+				}
+			}
+
+			&.eventful .em-cal-day-date, &.eventful-pre .em-cal-day-date, &.eventful-post .em-cal-day-date {
+				a {
+					border: var(--date-border) !important;
+				}
+			}
+
+			&.eventful-today, &.eventless-today {
+				.em-cal-day-date {
+					a, span {
+						border-radius: 50%;
+						font-weight: bold !important;
+						font-size: 16px;
+						line-height: 18px;
+						border-width: 2px !important;
+						padding-top: 4px;
+					}
+				}
+			}
+
+			/* The clicked/selected day gets a bold date number, in every calendar style */
+			.em-cal-day-date.selected {
+				a, span {
+					font-weight: bold !important;
+				}
+			}
+
+			span.date-day-colors {
+				display: none;
+				visibility: hidden;
+			}
+
+			/* WP block style undo */
+			.ring {
+				border-style: none;
+			}
+		}
+
+		> div  {
+			border: var(--date-box-border);
+			border-right-width: 0;
+			border-bottom: none;
+			padding: 10px;
+		}
+
+		> div:nth-child(7n) {
+			border-right-width:1px;
+		}
+
+		.em-cal-day-limit a {
+			margin-top: 10px;
+			line-height: 14px !important;
+			height: 14px !important;
+			padding: 0;
+			width: 100%;
+			outline: none !important;
+			border: none !important;
+			color: var(--date-more-color) !important;
+			font-size: 14px;
+		}
+
+		/*
+		--- Display Option Flags ---
+		*/
+
+		/* Display date cells with even height, taking the highest cell as the minimum height */
+		&.even-height {
+			grid-template-rows: 1fr;
+			grid-auto-rows: 1fr;
+		}
+		&.even-aspect .em-cal-day {
+			// previously used aspect-ratio, changed to use JS minmax sizing for grid-auto-rows, otherwise high cells will cause an overflow page widths
+			//aspect-ratio: 1/1;
+		}
+
+		/* Event Items in Pill Form */
+		&.event-style-pill {
+
+			.em-cal-event {
+
+				text-align: left;
+				position: relative;
+				height: 28px;
+				padding: 0;
+				margin: 5px 0;
+				cursor: pointer;
+				font-size:14px;
+				border-style:none; /* anti wp style */
+
+				> div {
+					text-align: left;
+					background-color: var(--event-background-color);
+					border: 1px solid var(--event-border-color);
+					color : var(--event-color);
+					position: absolute;
+					width: calc(100% + 10px);
+					height: 28px;
+					margin: 0;
+					padding: 5px 8px;
+					left: -5px;
+					border-radius: 5px;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				}
+
+				> div:hover {
+					filter: brightness(95%);
+				}
+
+				> div a {
+					color : var(--event-text-color) !important;
+					text-decoration: none !important;
+				}
+
+				&.multiday {
+
+					> div {
+						left: -10px;
+						border-radius: 0;
+					}
+
+					@mixin days($days, $offset) {
+						@for $i from 2 to $days + 1 {
+							$width : $i * 100%;
+							$padding : $i * 22px;
+							@if( $offset > 0px ) {
+								&.days-#{$i} > div { width: calc(#{$width} + #{$padding} - #{$offset}); }
+							}@else {
+								&.days-#{$i} > div { width: calc(#{$width} + #{$padding}); }
+							}
+						}
+					}
+
+					&.has-end.has-start {
+						@include days(7, 15px);
+					}
+
+					&.has-end, &.has-start {
+						@include days(7, 10px);
+					}
+
+					&.has-start {
+						> div {
+							border-top-left-radius: 5px;
+							border-bottom-left-radius: 5px;
+							border-right: 1px !important;
+							border-left: 0;
+							left: -5px;
+						}
+					}
+
+					&.has-end {
+						> div {
+							border-top-right-radius: 5px;
+							border-bottom-right-radius: 5px;
+							border-left: 1px !important;
+							border-right: 0;
+						}
+					}
+
+					&.days-7 > div { width: calc( 700% + 146px ); }
+
+					/* (10) + ((20+1) * x) - 5 */ /* if has-end */
+					/* (10) + ((20+1) * x) */ /* if no has-end */
+
+				}
+			}
+		}
+
+		/* Event Items as Dots — coloured dots tucked just below the date number. event-style-dot = a single dot (no overflow +); event-style-dots = one dot per event up to the limit, then a +. */
+		&.event-style-dot, &.event-style-dots {
+
+			.em-cal-event { display: none; visibility: hidden; }
+
+			.em-cal-day {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				text-align: center;
+			}
+
+			.em-cal-day-date .em-cal-day-dots {
+				position: absolute;
+				top: var(--dots-top, 30px); // tuck just below the date link; per-size value set on the .size-* calendar
+				left: 50%;
+				transform: translateX(-50%);
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				gap: 4px;
+				margin: 0;
+				padding: 0;
+				line-height: 1;
+				white-space: nowrap;
+
+				.em-cal-dot {
+					width: var(--dot-size, 7px);
+					height: var(--dot-size, 7px);
+					border-radius: 50%;
+					background: var(--dot-color, var(--event-background-color));
+					display: inline-block;
+					padding: 0;
+				}
+
+				.em-cal-dot-more {
+					font-size: 12px;
+					line-height: var(--dot-size, 7px);
+					color: var(--date-more-color);
+					background: transparent;
+				}
+			}
+		}
+	}
+
+	@mixin small-calendar(){
+
+		--header-border : none;
+		--header-background : none;
+		--header-color : #888;
+		--date-box-border : 0;
+
+		.size-large:not(.size-small), .size-medium:not(.size-small) {
+			display:none !important;
+			visibility: hidden;
+		}
+		.em-cal-nav:not(.em-cal-nav-centered) {
+			padding : 0 0.5% 0 1%;
+			margin : 0 0 10px;
+
+			> div {
+				margin:0;
+			}
+
+			.month {
+				input {
+					font-size: 20px !important;
+					padding-left:0 !important;
+				}
+			}
+			.em-calnav {
+				width: 26px;
+				height: 26px;
+				padding:2px;
+
+				svg {
+					height: 22px;
+					width: 22px;
+					margin: 0 auto;
+				}
+			}
+
+			.em-calnav-today.size-small {
+				display: inline-block;
+				width: 12px;
+				height: 12px;
+				background: var(--nav-color) !important;
+				border: 0;
+				border-radius: 50%;
+				margin-bottom: 3px;
+
+				&:hover {
+					filter: brightness(0.8);
+				}
+			}
+		}
+
+		.em-cal-body {
+			.em-cal-day {
+				.em-cal-day-date {
+					a, span {
+						padding: 6px;
+						width: 36px;
+						height: 36px;
+						font-size: 16px;
+					}
+				}
+				&.eventful-today, &.eventless-today {
+					.em-cal-day-date a {
+						width: 38px;
+						height: 38px;
+					}
+				}
+			}
+			&.eventful {
+				a, span {
+					line-height: 16px;
+				}
+			}
+		}
+
+		&.with-advanced {
+			.em-cal-nav {
+				&:not(.em-cal-nav-centered){
+					.month input {
+						padding-left: 10px !important;
+					}
+				}
+			}
+		}
+	}
+
+	@mixin small-medium-calendar(){
+
+		.em-cal-body {
+
+			justify-items: center;
+			align-items: center;
+
+			> div {
+				padding: 0;
+			}
+
+			.em-cal-day {
+
+				aspect-ratio: 1/1;
+				text-align: center;
+				display: grid;
+				justify-items: center;
+				align-items: center;
+
+				.em-cal-day-date {
+					position: relative;
+					display: inline-block;
+					text-align: center;
+					margin:0;
+
+					a, span {
+						margin: 0;
+					}
+					.limited-icon {
+						color: var(--date-color) !important;
+						display: block;
+						position: absolute;
+						top: -2px;
+						right: -2px;
+						width: 14px;
+						height: 14px;
+						border: none;
+						border-radius: 50%;
+						background: #fff;
+						font-size: 14px;
+						padding: 0px;
+						margin: 0px;
+						line-height: 15px;
+					}
+				}
+
+				.em-cal-event {
+					display: none;
+				}
+
+				&.eventful {
+
+					.em-cal-day-date {
+						&.colored {
+							--date-border-color-top: none;
+							--date-border-color-right: none;
+							--date-border-color-bottom: none;
+							--date-border-color-left: none;
+							--date-border-color: #fefefe;
+							--date-border: 1px solid var(--date-border-color);
+
+							$clip_path_two: polygon(0 0, 75% 0, 75% 25%, 100% 25%, 100% 100%, 25% 100%, 25% 75%, 0 75%);
+							$clip_path: polygon(0px 25%, 25% 25%, 25% 0%, 75% 0, 75% 25%, 100% 25%, 100% 75%, 75% 75%, 75% 100%, 25% 100%, 25% 75%, 0 75%);
+
+							a {
+								border: none;
+							}
+
+							div.ring {
+								border-radius: 50%;
+								padding: 1px;
+								display: inline-block;
+								border: var(--date-border) !important;
+
+								&.one {
+									border-color: var(--date-border-color) !important;
+								}
+
+								&.two {
+									border-top-color: var(--date-border-color-top) !important;
+									border-left-color: var(--date-border-color-top) !important;
+									border-right-color: var(--date-border-color-bottom) !important;
+									border-bottom-color: var(--date-border-color-bottom) !important;
+									background-clip: content-box;
+									clip-path: $clip_path_two;
+									-webkit-clip-path: $clip_path_two;
+								}
+
+								&.three {
+									border-top-color: var(--date-border-color-top) !important;
+									border-right-color: var(--date-border-color-bottom) !important;
+									border-bottom-color: var(--date-border-color-bottom) !important;
+									background-clip: content-box;
+									clip-path: $clip_path;
+									-webkit-clip-path: $clip_path;
+								}
+
+								&.four {
+									border-top-color: var(--date-border-color-top) !important;
+									border-right-color: var(--date-border-color-right) !important;
+									border-bottom-color: var(--date-border-color-bottom) !important;
+									border-left-color: var(--date-border-color-left) !important;
+									background-clip: content-box;
+									clip-path: $clip_path;
+									-webkit-clip-path: $clip_path;
+								}
+							}
+
+							&.selected {
+								div.ring {
+									border-width: 3px !important;
+									font-weight: bold !important;
+								}
+							}
+						}
+					}
+				}
+				.em-cal-day-limit {
+					display: none;
+					visibility: hidden;
+				}
+
+				&.eventful-today, &.eventless-today {
+					.em-cal-day-date a, .em-cal-day-date span {
+						text-decoration: underline !important;
+						text-underline-offset: 6px;
+					}
+				}
+			}
+		}
+	}
+
+	@mixin medium-calendar(){
+		.size-small:not(.size-medium), .size-large:not(.size-medium) {
+			display:none !important;
+			visibility: hidden;
+		}
+	}
+
+	@mixin large-calendar(){
+		.size-small:not(.size-large), .size-medium:not(.size-large) {
+			display:none !important;
+			visibility: hidden;
+		}
+
+		.event-style-pill {
+			.eventful-today, .eventless-today {
+				.em-cal-day-date {
+					margin-bottom: 6px;
+					a {
+						width: 38px;
+						height: 38px;
+					}
+				}
+			}
+		}
+	}
+
+	&.size-large {
+		--dots-top: 45px; // dot row sits just below the larger date link
+		--dot-size: 7px;
+		@include large-calendar();
+	}
+
+	&.size-medium {
+		--dots-top: 34px;
+		--dot-size: 7px;
+		@include medium-calendar();
+	}
+
+	&.size-medium, &.size-small {
+		@include small-medium-calendar();
+	}
+
+	&.size-small {
+		--dots-top: calc(100% - 4px);
+		--dot-size: 5px;
+		@include small-calendar();
+		// dots are smaller on compact calendars
+		.em-cal-body.event-style-dot, .em-cal-body.event-style-dots {
+			.em-cal-dot { width: 5px; height: 5px; }
+		}
+	}
+
+	/* Removed, JS will handle sizing, this will interfere
+	@include media("<tablet") {
+		@include small-calendar();
+		@include small-medium-calendar();
+	}
+	*/
+
+	&.with-advanced {
+		.em-cal-nav {
+			&:not(.em-cal-nav-centered) {
+				grid-template-columns: 25px 1fr auto;
+			}
+			&.em-cal-nav-centered {
+				grid-template-columns: 25px 1fr;
+			}
+			.em-search-advanced-trigger {
+				display: block;
+				visibility: visible;
+				background-size: 22px;
+			}
+		}
+	}
+}
+
+// Preview Modes
+&.em-calendar {
+	// Tooltips
+	&.preview-tooltips {
+
+		.tippy-box { width: 330px; }
+
+		section.em-cal-events-content {
+			display: none;
+			visibility: hidden;
+		}
+
+		.em-cal-event-content {
+
+			margin:5px 2px 12px;
+
+			> div {
+				margin-bottom: 8px;
+				text-align: left;
+			}
+
+			> div:last-of-type {
+				margin-bottom: 0;
+			}
+
+			div {
+				text-align: left;
+			}
+
+			.em-item-title {
+				font-weight: bold;
+				margin: 10px 0 15px;
+				font-size: calc( var(--font-size) + 2px );
+				a, a:hover {
+					color:#555555 !important;
+				}
+			}
+
+			.em-item-desc {
+				text-align:justify;
+				margin:15px 0 10px;
+			}
+
+			.em-item-actions {
+				font-size: 14px;
+				text-align: center;
+
+				.button {
+					padding: 0 20px !important;
+					border: none !important;
+					margin-bottom: 0 !important;
+				}
+			}
+		}
+	}
+}
+/* Resize the loading spinner */
+&.size-small {
+	div.em-loading {
+		background-size: 18% 18%;
+	}
+}
+&.size-medium {
+	div.em-loading {
+		background-size: 12% 12%;
+	}
+}
+&.size-large {
+	div.em-loading {
+		background-size: 10% 10%;
+	}
+}
+
+// modal specifics
+&.em-modal {
+	/* This is already targeted to screen view */
+	&.em-cal-date-content {
+		.em-modal-content {
+			padding: 0 0 25px;
+			margin : 25px 0 !important;
+			border-bottom: 1px solid #dedede;
+
+			&:first-of-type {
+				margin-top: 0 !important;
+			}
+			&:last-of-type {
+				margin-bottom: 0 !important;
+				border-bottom: 0 !important;
+			}
+		}
+		.em-cal-day-limit, .button {
+			text-align: center;
+			margin-bottom: 0 !important;
+		}
+	}
+}

@@ -1,0 +1,133 @@
+&.pixelbones {
+	.iti {
+		input.iti__search-input {
+			width: 100% !important;
+			border-width: 0 !important;
+			margin: 0 !important;
+			padding-left: 30px !important;
+			border: none !important;
+		}
+		button.iti__search-clear {
+			border: 0 !important;
+			border-radius: 3px !important;
+			padding: 4px !important;
+			display: flex !important;
+			width: 24px !important;
+			height: 24px !important;
+		}
+	}
+}
+
+.iti {
+
+	display: block !important;
+
+	&.phone-error {
+		border-color: red;
+	}
+
+	ul {
+		list-style: none !important;
+	}
+
+	.iti__selected-flag {
+		//height: calc(100% - 12px);
+	}
+
+	.iti__country-container button.iti__selected-country[type="button"] {
+		display: flex !important;
+		cursor: pointer !important;
+		box-sizing: border-box !important;
+		z-index: 1 !important;
+		position: relative !important;
+		display: flex !important;
+		align-items: center !important;
+		height: 100% !important;
+		background: none !important;
+		border: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		font-family: inherit !important;
+		font-size: inherit !important;
+		color: inherit !important;
+		border-radius: 0 !important;
+		font-weight: inherit !important;
+		line-height: inherit !important;
+		text-decoration: none !important;
+	}
+
+	.iti__country-list {
+		margin-bottom: 0 !important;
+	}
+
+	/* Optionally we can add some space to the selector and grey it all out on hero including the dial code
+	.iti__country-container:not(:has(+ input[disabled])):not(:has(+ input[readonly])) {
+		button {
+			padding-right: 7px !important;
+			&:hover {
+				background-color: var(--iti-hover-color) !important;
+			}
+		}
+		.iti__selected-country-primary {
+			background-color: transparent !important;
+		}
+		& .iti__selected-country:has(+ .iti__dropdown-content:hover) {
+			button {
+				background-color: var(--iti-hover-color) !important;
+			}
+			.iti__selected-country-primary {
+				background-color: transparent !important;
+			}
+		}
+	}
+	 */
+
+	&.invalid-number {
+		input[type=tel] {
+			border-color: darkred !important;
+		}
+	}
+
+	& + .em-inline-error {
+		margin: 10px 0;
+		color: darkred;
+		.em-icon {
+			background-color: darkred;
+		}
+	}
+
+	input[type=tel], &.iti--allow-dropdown > input, &.iti--allow-dropdown input[type=tel], &.iti--allow-dropdown > input[type=text], &.iti--separate-dial-code > input, &.iti--separate-dial-code > input[type=tel], &.iti--separate-dial-code > input[type=text] {
+		padding-right: 6px !important;
+		margin-left: 0 !important;
+		--input-padding : 6px 10px 6px 90px !important;
+	}
+
+	--iti-path-flags-1x: url('../external/intl-tel-input/img/flags.webp') !important;
+	--iti-path-flags-2x: url('../external/intl-tel-input/img/flags@2x.webp') !important;
+	--iti-path-globe-1x: url('../external/intl-tel-input/img/globe.webp') !important;
+	--iti-path-globe-2x: url('../external/intl-tel-input/img/globe@2x.webp') !important;
+
+	@media (min-resolution: 2x) {
+		.iti__flag {
+			background-image: var(--iti-path-flags-2x);
+			&.iti__globe {
+				background-image: var(--icon-phone);
+			}
+		}
+	}
+
+	/*
+	.iti__flag {background-image: url("../external/intl-tel-input/img/flags.webp");}
+
+	@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+		.iti__flag {background-image: url("../external/intl-tel-input/img/flags@2x.webp");}
+	}
+
+	 */
+
+	input.iti__search-input {
+		padding-top: 5px;
+		padding-bottom: 5px;
+		font-size: 14px;
+	}
+}
