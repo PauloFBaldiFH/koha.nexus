@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, diagnostics, install, search, security, settings, tools
+from . import backup, database, diagnostics, install, platforms, search, security, settings, tools
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -55,6 +55,26 @@ ROUTINES: dict[str, Routine] = {
     "mc": tools.mc,
     "user-folder": tools.user_folder,
     "terminal": tools.terminal,
+    # Docker, Tainacan and the platform backups (menus.PLATFORM_TASKS).
+    "docker-install": platforms.install_docker,
+    "docker-remove": platforms.remove_docker,
+    "tainacan-install": platforms.tainacan_install,
+    "tainacan-status": platforms.tainacan_status,
+    "tainacan-logs": platforms.tainacan_logs,
+    "tainacan-credentials": platforms.tainacan_credentials,
+    "tainacan-uninstall": platforms.tainacan_uninstall,
+    "tainacan-backup": platforms.tainacan_backup,
+    "tainacan-restore-test": platforms.tainacan_restore_test,
+    "tainacan-restore": platforms.tainacan_restore,
+    "events-on": platforms.events_on,
+    "events-off": platforms.events_off,
+    "events-status": platforms.events_status,
+    "pbackup-setup": platforms.backup_setup,
+    "pbackup-kit": platforms.backup_kit,
+    "pbackup-configure": platforms.backup_configure,
+    "pbackup-schedule": platforms.backup_schedule,
+    "pbackup-verify": platforms.backup_verify,
+    "pbackup-incomplete": platforms.backup_incomplete,
 }
 
 # The rest run their classic routine with `--task run ACTION`; the title is
@@ -98,6 +118,9 @@ def has(action: str) -> bool:
 
 def task_of(action: str) -> str:
     """The `--task` the routine needs from the installer ("" = its own)."""
+    from ..menus import PLATFORM_TASKS
+    if action in PLATFORM_TASKS:
+        return PLATFORM_TASKS[action]
     if action in GENERIC or action in ("languages", "lang-activate", "update-panel"):
         return "run"
     if action in ("monitor", "mc"):

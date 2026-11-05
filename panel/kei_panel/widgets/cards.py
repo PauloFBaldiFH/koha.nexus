@@ -75,14 +75,16 @@ class ActionCard(Static, can_focus=True):
 
     BINDINGS = [("enter", "choose", "Open"), ("space", "choose", "Open")]
 
-    def __init__(self, entry: Entry):
+    def __init__(self, entry: Entry, tag: str = ""):
         super().__init__(classes="action-card")
         self.entry = entry
+        # The platform a card of a shared section only serves ("Koha").
+        self.tag = tag
 
     def compose(self) -> ComposeResult:
         icon, text = split_icon(t(self.entry.label))
         yield Label(icon or ">", classes="action-icon")
-        yield Label(text, classes="action-text")
+        yield Label(f"{text} ({t('only ${name}', name=self.tag)})" if self.tag else text, classes="action-text")
         yield Marquee(t(description(self.entry)), classes="action-hint")
 
     # The hint scrolls while the card has the mouse or the focus (Enter and

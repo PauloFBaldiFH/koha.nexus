@@ -40,9 +40,9 @@
    "summary": "O Painel de Controle é a tela inicial do painel: num relance você vê se o Koha está funcionando, quando foi feito o último backup, quanto disco resta e em quais endereços o catálogo responde.",
    "overview": [
     "Abra com `sudo config.sh` no Linux ou pelo ícone Koha no Windows. Na tela principal, **d** abre o Painel de Controle. A consulta de estado não executa a instalação.",
-    "Ele tem abas: Geral (diagnóstico, um cartão por plataforma, espaço em disco e a saúde do servidor), Koha (como antes) e Tainacan (o resumo da seção dele). Uma aba só aparece com a plataforma instalada; num servidor sem nenhuma, fica só Geral.",
+    "É o único lugar do estado, dos endereços e dos indicadores. Ele tem abas: Geral (o servidor e as plataformas: um cartão por plataforma, espaço em disco, CPU, memória e atualizações do painel), Koha (estado, backup, endereços, componentes e indicadores) e Tainacan (o resumo dele). As ferramentas de cada plataforma ficam no grupo dela na lateral. Uma aba só aparece com a plataforma instalada; num servidor sem nenhuma, fica só Geral.",
     "Os cartões mostram estado geral, último backup e espaço livre; em seguida vêm os endereços e os componentes MariaDB, Apache, RabbitMQ, Memcached e Koha, com a resposta HTTP.",
-    "**Atualizar** consulta novamente. **Reiniciar Koha** e **Exportar diagnóstico** executam tarefas próprias; podem ficar indisponíveis quando o instalador não oferece a tarefa correspondente."
+    "**Atualizar** consulta novamente. **Reiniciar Koha** executa uma tarefa própria e pode ficar indisponível quando o instalador não a oferece. **Exportar diagnóstico** fica em Diagnóstico do servidor."
    ],
    "steps": [
     "Abra o painel e leia os indicadores de estado, último backup e espaço.",
@@ -54,7 +54,7 @@
     "O indicador de backup usa uma referência de dois dias e o resultado da última execução noturna. Ele não substitui testar o arquivo.",
     "Planeje reinícios de serviços considerando os usuários conectados."
    ],
-   "_en": "990cf86aee"
+   "_en": "5685cbb056"
   },
   "dash-status": {
    "title": "Cartões de status",
@@ -146,7 +146,7 @@
    "related": [
     "dash-status",
     "dash-components",
-    "dash-export"
+    "export-diagnostics"
    ]
   },
   "dash-restart": {
@@ -163,21 +163,6 @@
     "Reinicie num momento tranquilo: quem estiver no meio de um empréstimo terá de repetir o último clique."
    ],
    "_en": "d618850497"
-  },
-  "dash-export": {
-   "title": "Exportar diagnóstico",
-   "summary": "Reúne os logs e o estado do sistema numa pasta que você pode enviar a quem dá suporte à sua biblioteca, com senhas, tokens e chaves trocados por [REDACTED].",
-   "steps": [
-    "Pressione **Exportar diagnóstico** no Painel de Controle.",
-    "Aguarde enquanto o painel reúne os logs do Koha, do Apache, do MariaDB e do painel, além do estado do sistema.",
-    "Anote a pasta mostrada no final. No Windows (WSL), o painel oferece abri-la no Explorador de Arquivos.",
-    "Compacte a pasta e envie com uma descrição curta do problema e de quando começou."
-   ],
-   "tips": [
-    "Exporte logo depois que o problema acontecer: os logs são rotacionados e as linhas úteis podem sumir em poucos dias.",
-    "Mesmo com as senhas removidas, os logs podem conter nomes de leitores: envie apenas a pessoas de confiança e apague a cópia depois."
-   ],
-   "_en": "5be686fb44"
   },
   "install": {
    "summary": "Instala o servidor Koha por um fluxo guiado com verificações iniciais e finais. Leia os avisos antes de autorizar cada etapa.",
@@ -1317,23 +1302,22 @@
    "_en": "121920821b"
   },
   "sec-security": {
-   "summary": "Segurança, acesso remoto e firewall numa só central: VPN WireGuard, Túnel Cloudflare, regras de firewall, a porta da intranet, HTTPS gratuito, Fail2ban, troca da senha do banco e Google Search Console.",
+   "summary": "Segurança e acesso remoto do servidor: VPN WireGuard, regras do firewall, Fail2ban, e o Túnel Cloudflare e o HTTPS gratuito, que por enquanto só atendem o Koha.",
    "overview": [
-    "A central (tecla **x**) reúne tudo o que decide quem alcança o seu Koha e como. Um padrão seguro para a maioria das bibliotecas: OPAC publicado por um Túnel Cloudflare, porta 8080 da intranet fechada para a Internet, equipe trabalhando de fora pela VPN WireGuard, Fail2ban ligado e a senha do banco trocada depois da instalação.",
-    "Os cartões: **VPN WireGuard** (abre a sua própria tela, tecla **v**), **Gerenciador do Túnel Cloudflare**, **Mostrar as regras ativas do UFW**, **Firewall do Staff**, **Certificado SSL gratuito**, **Status do Fail2ban**, **Trocar a senha do banco de dados** e **Assistente do Google Search Console**."
+    "A central (tecla **x**) reúne o que decide quem alcança este servidor e como. Um padrão seguro para a maioria das bibliotecas: OPAC publicado por um Túnel Cloudflare, equipe trabalhando de fora pela VPN WireGuard e Fail2ban ligado.",
+    "Os cartões: **VPN WireGuard** (abre a sua própria tela, tecla **v**), **Mostrar as regras ativas do UFW**, **Status do Fail2ban** e, marcados *somente Koha* e mostrados só com o Koha instalado, **Gerenciador do Túnel Cloudflare** e **Certificado SSL gratuito**. O Tainacan ainda não tem túnel nem HTTPS próprios. A porta da equipe, a senha do banco e o Google Search Console ficam em **Koha › Segurança do Koha**."
    ],
    "steps": [
     "Publique o OPAC com o **Gerenciador do Túnel Cloudflare** (ou com o seu próprio domínio e o **Certificado SSL gratuito**).",
-    "Feche a porta da intranet para a Internet com o **Firewall do Staff**.",
+    "Feche a porta da intranet para a Internet em **Koha › Segurança do Koha**.",
     "Configure a **VPN WireGuard** para a equipe que trabalha de casa ou de outras unidades.",
-    "Confira o **Status do Fail2ban** e as **regras ativas do UFW** uma vez por mês.",
-    "Ajude o Google a encontrar o catálogo com o **Assistente do Google Search Console**."
+    "Confira o **Status do Fail2ban** e as **regras ativas do UFW** uma vez por mês."
    ],
    "tips": [
     "Revise a cada poucos meses quem tem perfil na VPN e revogue os que não são mais necessários.",
     "Anote qual método de publicação você escolheu (túnel ou domínio próprio): é a primeira pergunta que o suporte vai fazer."
    ],
-   "_en": "fe67b1d7fd"
+   "_en": "cf9ea241a8"
   },
   "cloudflare": {
    "summary": "Publica o OPAC (e, se você quiser, a intranet) na Internet por um Túnel Cloudflare: HTTPS incluído e nenhuma porta aberta no roteador.",
@@ -1545,19 +1529,19 @@
    "_en": "bfacc203ab"
   },
   "sec-diagnostics": {
-   "summary": "Ferramentas para entender e consertar o servidor: status, a verificação completa, o relatório dela, logs ao vivo, manutenção do banco, as tabelas do banco e reparo dos serviços.",
+   "summary": "Diagnóstico e manutenção do Koha: a verificação completa, logs do Apache ao vivo, manutenção do banco, as tabelas do banco e o reparo dos serviços.",
    "overview": [
-    "A Central de diagnóstico e manutenção é para onde ir quando algo está errado, ou para evitar que fique. Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Status detalhado do servidor e do Koha** é um retrato rápido; **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
+    "Diagnóstico e manutenção do Koha é para onde ir quando o Koha está com problema, ou para evitar que fique (o status e o relatório do servidor ficam em Diagnóstico do servidor). Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
    ],
    "steps": [
     "Rode a **Verificação completa do sistema**.",
-    "Abra **Ver o último relatório de validação** e leia primeiro as falhas, depois os avisos.",
+    "Abra **Ver o último relatório de validação** (Diagnóstico do servidor) e leia primeiro as falhas, depois os avisos.",
     "Corrija o que ele apontar (serviços, índice de busca, disco) e rode a verificação de novo."
    ],
    "tips": [
-    "Exporte o diagnóstico pelo Painel de Controle antes de pedir ajuda: isso poupa uma rodada de perguntas."
+    "Exporte o diagnóstico (Diagnóstico do servidor) antes de pedir ajuda: isso poupa uma rodada de perguntas."
    ],
-   "_en": "35f32d890a"
+   "_en": "5bc4a13850"
   },
   "status": {
    "summary": "Mostra um retrato detalhado do servidor e do Koha: serviços, motor de busca, disco e o último backup.",
@@ -1628,16 +1612,15 @@
    "_en": "ad15da7891"
   },
   "sec-settings": {
-   "summary": "Parâmetros básicos do Koha: dimensionamento do servidor, o primeiro superbibliotecário e o relógio.",
+   "summary": "Parâmetros básicos do Koha: dimensionamento do servidor e o primeiro superbibliotecário.",
    "overview": [
-    "Alguns parâmetros que o Instalador Web não cobre e que importam desde o primeiro dia: quanta memória cada parte do Koha pode usar, a sua primeira conta pessoal da equipe com todas as permissões, e o relógio e o fuso horário do servidor. Os avisos por e-mail são configurados na central Mensagens e interoperabilidade."
+    "Alguns parâmetros que o Instalador Web não cobre e que importam desde o primeiro dia: quanta memória cada parte do Koha pode usar e a sua primeira conta pessoal da equipe com todas as permissões. O relógio e o fuso do servidor ficam em Ferramentas gerais. Os avisos por e-mail são configurados na central Mensagens e interoperabilidade."
    ],
    "steps": [
     "Rode o **Dimensionamento do servidor** logo depois da instalação.",
-    "Crie o seu **superbibliotecário** depois do Instalador Web.",
-    "Confira o **Relógio e fuso horário** uma vez."
+    "Crie o seu **superbibliotecário** depois do Instalador Web."
    ],
-   "_en": "033d5553ad"
+   "_en": "4f2e40a4a0"
   },
   "sizing": {
    "summary": "Ajusta os workers do Plack, o Memcached e o buffer InnoDB do MariaDB à RAM do servidor, com um perfil recomendado e volta automática se o MariaDB não iniciar.",
@@ -1931,14 +1914,14 @@
    "_en": "c02e200155"
   },
   "sec-tools": {
-   "summary": "Ferramentas de terminal instaladas sob demanda: monitoramento de recursos ao vivo e um explorador de arquivos.",
+   "summary": "Ferramentas do servidor: sua pasta, um terminal, monitoramento de recursos ao vivo, um explorador de arquivos, e o relógio e o fuso horário.",
    "overview": [
     "Dois programas clássicos de terminal, instalados por trás da animação na primeira vez que você os abre: htop/nethogs para ver o que está usando a máquina, e o Midnight Commander para navegar pelos arquivos. Saia de cada programa com a tecla dele (F10 ou q) para voltar ao painel."
    ],
    "tips": [
     "Deixe esses programas abertos só enquanto precisar: o próprio htop usa um pouco de CPU."
    ],
-   "_en": "180a35bef4"
+   "_en": "1f5839a863"
   },
   "monitor": {
    "summary": "Acompanha ao vivo CPU, memória e processos (htop) ou o uso de rede por processo (nethogs); instala-os quando faltam.",
@@ -2091,31 +2074,15 @@
    ],
    "_en": "67cb85a0dc"
   },
-  "sec-platforms": {
-   "summary": "Mostra as plataformas que este painel conhece e o que foi encontrado neste servidor. O Koha é opcional.",
-   "overview": [
-    "Um cartão por plataforma mantém quatro fatos separados: se esta versão do painel dá suporte a ela, se uma instalação foi encontrada, se os serviços estão rodando e a saúde funcional. Um arquivo de configuração ou um serviço ativo não prova que a plataforma funciona, então a saúde fica *não verificada* até existir uma verificação real.",
-    "Num servidor sem Koha o painel abre do mesmo jeito: as telas e rotinas do Koha ficam ocultas ou dizem por que não estão disponíveis, e idiomas, atualização do painel e as ferramentas do servidor continuam funcionando. O Tainacan é instalado, copiado e removido por aqui; a seção própria dele (tecla g) aparece depois de instalado. AtoM e DSpace estão planejados."
-   ],
-   "tips": [
-    "Instale o Koha com **Instalar servidor Koha** quando precisar; as telas dele voltam assim que a instalação termina.",
-    "Pressione **Atualizar** para ler o estado de novo."
-   ],
-   "_en": "8b1a482453"
-  },
   "sec-tainacan": {
-   "summary": "A seção própria do Tainacan: os endereços do acervo e da administração do WordPress, um resumo do estado, o diagnóstico, os logs, o administrador e os eventos opcionais.",
+   "summary": "O início do Tainacan (tecla g): a instalação quando ele não existe, as ferramentas depois de instalado e, primeiro, o problema com o diagnóstico adequado quando algo está parado.",
    "overview": [
-    "A seção só aparece com o Tainacan instalado. O resumo mostra o que já se sabe, sem uma nova checagem: estado, eventos, coleções e itens, versões e espaço, o último backup e o último teste de restauração. Abrir a seção nunca liga, para nem reinicia nada.",
-    "**Diagnóstico** lê tudo de novo (coleções, itens, anexos, versões, espaço). O resultado fica guardado com a hora da leitura; se uma leitura falhar, o resumo mantém a anterior, com a hora dela, e avisa que a última falhou.",
-    "**Administrador** é a conta do WordPress do Tainacan. As contas do Koha, inclusive o superlibrarian, não são contas do WordPress e não têm acesso aqui.",
-    "Os eventos (Nexus Eventos sobre o Events Manager) ficam desligados até você ligá-los: o plano aparece antes e nada muda sem o Sim. Desligar mantém os dados."
+    "Ausente: **Instalar Tainacan** pergunta o endereço, mostra o plano do instalador e espera o Sim. O Tainacan roda em contêineres: sem o Docker, primeiro aparece o plano do próprio Docker e, depois do Sim, a instalação do Tainacan continua no mesmo fluxo.",
+    "Instalado: **Diagnóstico e manutenção**, **Eventos** e **Backups**, com **Desinstalar o Tainacan** à parte, em Remoção.",
+    "Algo parado: o início diz o quê (Docker parado, contêineres fora do ar, última verificação com falha) e oferece primeiro o diagnóstico e os logs. Contêiner parado nunca leva a uma restauração: restaurar fica só nos Backups do Tainacan. Uma instalação interrompida é feita de novo e continua de onde parou.",
+    "Estado, endereços e indicadores ficam no Painel de Controle, aba Tainacan (**Estado e endereços**)."
    ],
-   "tips": [
-    "Instalar, fazer backup, testar a restauração e remover o Tainacan continuam em Plataformas.",
-    "Rode o Diagnóstico depois de grandes mudanças no acervo para atualizar o resumo."
-   ],
-   "_en": "9c79422345"
+   "_en": "572e9cef89"
   },
   "update-system": {
    "summary": "Atualiza os pacotes do sistema e do Koha e aplica as migrações do banco do Koha, depois de um backup de segurança verificado; em seguida reinicia os serviços e valida o sistema.",
@@ -2393,6 +2360,152 @@
     "sec-z3950",
     "marc-undo"
    ]
+  },
+  "export-diagnostics": {
+   "summary": "Reúne os logs e o estado do sistema numa pasta que você pode enviar a quem dá suporte à sua biblioteca, com senhas, tokens e chaves trocados por [REDACTED].",
+   "steps": [
+    "Abra **Diagnóstico do servidor** e escolha **Exportar diagnóstico**.",
+    "Aguarde enquanto o painel reúne os logs do Koha, do Apache, do MariaDB e do painel, além do estado do sistema.",
+    "Anote a pasta mostrada no final. No Windows (WSL), o painel oferece abri-la no Explorador de Arquivos.",
+    "Compacte a pasta e envie com uma descrição curta do problema e de quando começou."
+   ],
+   "tips": [
+    "Exporte logo depois que o problema acontecer: os logs são rotacionados e as linhas úteis podem sumir em poucos dias.",
+    "Mesmo com as senhas removidas, os logs podem conter nomes de leitores: envie apenas a pessoas de confiança e apague a cópia depois."
+   ],
+   "_en": "adeb5a2327"
+  },
+  "open-diagnostics": {
+   "summary": "Lê no próprio painel um relatório de diagnóstico guardado neste servidor (os cinco mais novos são mantidos) ou um que lhe enviaram.",
+   "tips": [
+    "Abra o mais novo depois de **Exportar diagnóstico** para conferir o conteúdo antes de enviar."
+   ],
+   "_en": "68a389b437"
+  },
+  "sec-server-diagnostics": {
+   "summary": "O diagnóstico do próprio servidor, seja qual for a plataforma instalada: o status detalhado, o último relatório de validação e o relatório de diagnóstico para enviar a quem ajuda você.",
+   "overview": [
+    "As verificações do Koha (verificação completa, log do Apache, manutenção do banco, reinício dos serviços) ficam em **Koha (biblioteca) › Diagnóstico e manutenção do Koha**; as do Tainacan, em **Tainacan › Diagnóstico e manutenção**."
+   ],
+   "_en": "c4c820e9f6"
+  },
+  "sec-koha": {
+   "summary": "O início do Koha (tecla k): a instalação quando ele não existe, as ferramentas depois de instalado e, primeiro, diagnóstico e recuperação quando os serviços estão parados.",
+   "overview": [
+    "O grupo **Koha (biblioteca)** na lateral reúne só as telas do Koha: backups, importação, ferramentas da biblioteca, Z39.50/SRU, IA, aparência, mensagens, busca, agendamentos, configurações, diagnóstico e segurança do Koha. → e ← expandem e recolhem o grupo; a linha dele abre este início.",
+    "Sem o Koha, o início oferece **Instalar servidor Koha** e o grupo não tem telas. Com o Koha instalado e funcionando, mostra um cartão por tela do grupo e as credenciais de primeiro acesso. Quando MariaDB, Apache, Memcached ou Koha estão parados, diz quais e coloca primeiro o status, a verificação completa, o reparo dos serviços e o log do Apache.",
+    "Estado, endereços e indicadores não se repetem aqui: **Estado e endereços** abre o Painel de Controle na aba Koha."
+   ],
+   "_en": "08f5bbf315"
+  },
+  "sec-koha-security": {
+   "summary": "As proteções próprias do Koha: a porta 8080 da equipe, a senha do banco e o Google Search Console do OPAC.",
+   "overview": [
+    "As proteções do servidor (VPN, regras do firewall, Fail2ban, o Túnel Cloudflare e o HTTPS) continuam em **Segurança e acesso**."
+   ],
+   "_en": "63bd49cd44"
+  },
+  "tainacan-install": {
+   "summary": "Instala o WordPress e o plugin Tainacan em contêineres próprios: o endereço, o plano do instalador e depois o Sim. Sem o Docker, ele vem antes, depois do plano próprio.",
+   "_en": "72268536fc"
+  },
+  "tainacan-status": {
+   "summary": "Lê tudo de novo: contêineres, WordPress, plugin, coleções, itens e anexos, versões e espaço. O resultado fica guardado com a hora da leitura e aparece no Painel de Controle.",
+   "_en": "8b29eed66e"
+  },
+  "tainacan-logs": {
+   "summary": "As últimas linhas dos logs dos contêineres do Tainacan, com senhas e chaves ocultadas.",
+   "_en": "8c958954c9"
+  },
+  "tainacan-credentials": {
+   "summary": "O endereço da administração do WordPress e a conta do administrador do Tainacan. As contas do Koha, inclusive o superlibrarian, não são contas do WordPress.",
+   "_en": "839206560c"
+  },
+  "tainacan-uninstall": {
+   "summary": "Remove o Tainacan. Você escolhe antes: manter os dados (uma nova instalação os usa) ou apagá-los, depois de um último backup que fica guardado.",
+   "_en": "e9817aaddd"
+  },
+  "events-on": {
+   "summary": "Mostra o plano e liga o Nexus Eventos sobre o Events Manager. Coleções e itens não mudam.",
+   "_en": "85cb57d09b"
+  },
+  "events-off": {
+   "summary": "Desliga os eventos e mantém os dados. Um Events Manager que já estava neste WordPress continua ligado, a menos que você diga o contrário.",
+   "_en": "23da5bf1ba"
+  },
+  "events-status": {
+   "summary": "Se os eventos estão ligados, os dois plugins e os dados guardados (eventos, inscrições, presenças, certificados).",
+   "_en": "4968d2afe8"
+  },
+  "tainacan-backup": {
+   "summary": "Um backup completo agora: banco, arquivos e configuração, num pacote dos backups das plataformas.",
+   "_en": "3c345328f5"
+  },
+  "tainacan-restore-test": {
+   "summary": "Restaura um backup numa cópia isolada e compara coleções, itens e anexos. O Tainacan em uso não muda.",
+   "_en": "4db887e1f8"
+  },
+  "tainacan-restore": {
+   "summary": "Substitui o Tainacan em uso por um backup, depois de testá-lo numa cópia isolada e guardar o estado atual num backup de segurança.",
+   "_en": "f8c362ad0e"
+  },
+  "pbackup-schedule": {
+   "summary": "Um backup diário no horário escolhido, manutenção aos domingos e um teste de restauração de um backup mais antigo no dia 1º de cada mês. Digite off para parar.",
+   "_en": "95fa45d228"
+  },
+  "pbackup-configure": {
+   "summary": "Para onde vão os arquivos (um repositório restic neste servidor ou na nuvem, ou pacotes completos) e se cada pacote é copiado para a nuvem.",
+   "_en": "6460c86cc7"
+  },
+  "pbackup-verify": {
+   "summary": "Confere agora os backups e o repositório restic.",
+   "_en": "15c5f42377"
+  },
+  "pbackup-incomplete": {
+   "summary": "Um backup que parou antes do fim: retome ou descarte quando ele não puder ser restaurado.",
+   "_en": "d47fb605c9"
+  },
+  "docker-install": {
+   "summary": "Instala o Docker pelo repositório oficial depois de mostrar o plano; nada mais é instalado junto e ninguém entra no grupo docker.",
+   "_en": "0330e890ad"
+  },
+  "docker-remove": {
+   "summary": "Remove um Docker que o Koha.Nexus instalou, só quando não sobrou contêiner, rede ou plataforma nele. Um Docker que já existia nunca é removido.",
+   "_en": "04ad30986c"
+  },
+  "pbackup-setup": {
+   "summary": "Cria a chave do servidor que criptografa a configuração em todos os backups das plataformas, com uma frase de recuperação que você anota.",
+   "_en": "5ed1bab277"
+  },
+  "pbackup-kit": {
+   "summary": "Salva o kit de recuperação: com a frase de recuperação, um servidor novo lê os backups criptografados e os repositórios restic.",
+   "_en": "c3b5b427a0"
+  },
+  "sec-tainacan-maintenance": {
+   "summary": "O diagnóstico do Tainacan, os logs e a conta de administrador do WordPress.",
+   "overview": [
+    "O diagnóstico só roda quando você pede; o resultado fica guardado com a hora da leitura e aparece no Painel de Controle, aba Tainacan."
+   ],
+   "_en": "01a563fbf7"
+  },
+  "sec-tainacan-events": {
+   "summary": "Eventos opcionais no Tainacan (Nexus Eventos sobre o Events Manager): desligados até você ligar, depois do plano e do Sim.",
+   "_en": "6f272f85dd"
+  },
+  "sec-tainacan-backups": {
+   "summary": "Os backups do Tainacan: fazer agora, testar a restauração numa cópia isolada, restaurar, agendar, repositório e cópia na nuvem, verificar e backups incompletos.",
+   "overview": [
+    "O que é criptografado: a configuração, com a chave do servidor; os arquivos, só num repositório restic; o banco não é criptografado, nem no pacote nem na cópia na nuvem."
+   ],
+   "_en": "fd421b6069"
+  },
+  "sec-infra": {
+   "summary": "O que as plataformas em contêineres compartilham (tecla p): o servidor web na frente delas, o Docker e a chave dos backups.",
+   "overview": [
+    "**Proxy web**, **Docker** e **Chave dos backups** são cartões só de leitura. **Instalar o Docker** mostra o plano antes; **Remover o Docker**, em Remoção, só remove um Docker que o Koha.Nexus instalou e que ficou vazio.",
+    "O que os backups das plataformas criptografam: a configuração, com a chave deste servidor (a frase de recuperação a abre); os arquivos, só num repositório restic; o banco, nada, nem no pacote nem na cópia na nuvem. Proteja a pasta de backups e a conta na nuvem."
+   ],
+   "_en": "60fa191e62"
   }
  }
 }

@@ -494,8 +494,10 @@ class Bridge:
                 status = status | _DEMO_NO_KOHA
             if os.environ.get("KEI_PANEL_DEMO_TAINACAN", "0") == "1":
                 # Demo of a server with Tainacan (KEI_PANEL_DEMO_TAINACAN=1).
+                # Tainacan runs in Docker, so the demo's Docker is there too.
                 status = status | {"platforms": [_DEMO_TAINACAN if p["id"] == "tainacan" else p
-                                                 for p in status["platforms"]]}
+                                                 for p in status["platforms"]],
+                                   "docker": _DEMO_DOCKER}
             return status | {"generated_at": int(time.time())}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
@@ -597,6 +599,11 @@ _DEMO_NO_KOHA = {
     "proxy": {"mode": "none", "server": "", "sites": 0},
     "docker": _DEMO_STATUS["docker"],
 }
+
+# Docker installed by koha.nexus for Tainacan (KEI_PANEL_DEMO_TAINACAN=1).
+_DEMO_DOCKER = _DEMO_STATUS["docker"] | {"installed": True, "package": "docker.io", "engine": "27.3",
+                                         "compose": "2.29", "running": True, "installed_by": "koha-nexus",
+                                         "platform_networks": 1}
 
 # Tainacan installed and checked (KEI_PANEL_DEMO_TAINACAN=1).
 _DEMO_TAINACAN = {

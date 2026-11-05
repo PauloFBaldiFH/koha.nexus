@@ -1,12 +1,16 @@
 """DashboardView: the server at a glance, read from --status-json, in tabs.
 
-General: export and open diagnostics (screens/diagnostics.py), the disk,
-one card per platform and the server's health (read by the panel itself,
-see health.py). Koha (only with Koha installed): restart Koha, its state,
-its last backup, the addresses it answers on (Open / Copy) and its
-components. Tainacan (only with Tainacan installed): the summary of its
-section (views/tainacan.py), read from what is already known; the full
-diagnosis never runs here by itself.
+The only place of the state, addresses and indicators of the server and of
+each platform (the platform groups of the sidebar hold their tools).
+General: the server and the set of platforms: one card per platform this
+panel can install (Koha, Tainacan; the planned ones are not shown here),
+the disk, and the server's own health (CPU, memory, panel updates; read by
+the panel itself, see health.py). Koha (only with Koha installed): restart
+Koha, its state, its last backup, the addresses it answers on (Open /
+Copy), its components and its indicators (database, backup folder, errors,
+Koha updates, Cloudflare Tunnel, SRU gateway, Z39.50 servers). Tainacan
+(only with Tainacan installed): its summary (views/tainacan.py), read from
+what is already known; the full diagnosis never runs here by itself.
 
 The status is loaded in a worker with a one-line Pac-Man inside the view
 (the same PacmanLoader as the modal, compact): a quick read does not need
@@ -170,11 +174,14 @@ def access_links(s: dict) -> dict[tuple[str, str], tuple[str, str, str]]:
 # Health: one card per fact, (value, note, state) like backup_card. A fact
 # the panel could not read is "-" with a quiet note, never red.
 # ----------------------------------------------------------------------
-HEALTH_CARDS = (
-    ("cpu", "CPU"), ("memory", "Memory"), ("db", "Database"),
-    ("backup-dir", "Backup folder"), ("errors", "Errors (last 24 h)"), ("updates", "Updates"),
-    ("tunnel", "Cloudflare Tunnel"), ("sru", "SRU gateway (sru.koha.nexus)"), ("z3950", "Z39.50 servers"),
+# The server's own (General tab) and Koha's (Koha tab).
+SERVER_HEALTH = (("cpu", "CPU"), ("memory", "Memory"), ("updates", "Panel updates"))
+KOHA_HEALTH_CARDS = (
+    ("db", "Database"), ("backup-dir", "Backup folder"), ("errors", "Errors (last 24 h)"),
+    ("koha-updates", "Koha updates"), ("tunnel", "Cloudflare Tunnel"), ("sru", "SRU gateway (sru.koha.nexus)"),
+    ("z3950", "Z39.50 servers"),
 )
+HEALTH_CARDS = SERVER_HEALTH + KOHA_HEALTH_CARDS
 UNREAD = ("-", "Could not read", "")
 
 
@@ -184,7 +191,7 @@ def _unread() -> tuple[str, str, str]:
 
 # Cards about Koha alone: on a server without Koha they say so, and nothing
 # behind them is read (health.collect koha=False).
-KOHA_HEALTH = ("db", "sru", "z3950")
+KOHA_HEALTH = ("db", "sru", "z3950", "koha-updates")
 
 
 def koha_absent_card() -> tuple[str, str, str]:
@@ -295,6 +302,17 @@ def updates_card(current: str, latest: str | None, koha: tuple[str, str] | None)
     return (t("Update available") if newer else t("Up to date")), " · ".join(parts), "warn" if newer else "ok"
 
 
+def koha_updates_card(koha: tuple[str, str] | None) -> tuple[str, str, str]:
+    """Koha's version and whether a newer package is there (the panel's own
+    updates are the General tab's)."""
+    if not koha:
+        return _unread()
+    installed, candidate = koha
+    if candidate not in ("", "(none)") and candidate != installed:
+        return t("Update available"), t("Koha ${old} → ${new}", old=installed, new=candidate), "warn"
+    return t("Up to date"), t("Koha ${v}", v=installed), "ok"
+
+
 class DashboardView(SectionView):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="view-head"):
@@ -305,21 +323,20 @@ class DashboardView(SectionView):
                            id="status-loader")
         with TabbedContent(id="dash-tabs", initial="dash-tab-general"):
             with TabPane(t("General"), id="dash-tab-general"):
-                with Horizontal(classes="quick-actions"):
-                    yield Button(t("Export diagnostics"), id="export-diagnostics", classes="small")
-                    yield Button(t("Open diagnostics"), id="open-diagnostics", classes="small")
                 yield Label(t("Platforms"), classes="view-prompt")
                 with Grid(classes="status-grid", id="dash-platforms"):
                     for p in platforms.CATALOG:
-                        yield StatusCard(p.name, id=f"dash-platform-{p.id}")
+                        if p.supported:
+                            yield StatusCard(p.name, id=f"dash-platform-{p.id}")
                     yield StatusCard(t("Disk free"), id="card-disk")
                 yield Label(t("Server health"), classes="view-prompt")
                 with Grid(classes="status-grid", id="health"):
-                    for key, title in HEALTH_CARDS:
+                    for key, title in SERVER_HEALTH:
                         yield StatusCard(t(title), id=f"health-{key}")
             with TabPane("Koha", id="dash-tab-koha"):
                 with Horizontal(classes="quick-actions"):
                     yield Button(t("Restart Koha"), id="restart-koha", classes="small")
+                    yield Button(t("Koha tools"), id="dash-open-koha", classes="small")
                 with Grid(classes="status-grid"):
                     yield StatusCard(t("Koha"), id="card-state")
                     yield StatusCard(t("Last backup"), id="card-backup")
@@ -333,9 +350,13 @@ class DashboardView(SectionView):
                     for unit, name in COMPONENTS:
                         yield StatusCard(t(name), id=f"card-{unit}")
                     yield StatusCard(t("HTTP response"), id="card-http")
+                yield Label(t("Koha health"), classes="view-prompt koha-only")
+                with Grid(classes="status-grid koha-only", id="koha-health"):
+                    for key, title in KOHA_HEALTH_CARDS:
+                        yield StatusCard(t(title), id=f"health-{key}")
             with TabPane("Tainacan", id="dash-tab-tainacan"):
                 with Horizontal(classes="quick-actions"):
-                    yield Button(t("Open the Tainacan section"), id="dash-open-tainacan", classes="small")
+                    yield Button(t("Tainacan tools"), id="dash-open-tainacan", classes="small")
                 yield Label("", classes="view-prompt", id="dash-tn-read")
                 yield TainacanSummary("dash-tn", id="dash-tainacan")
 
@@ -347,13 +368,10 @@ class DashboardView(SectionView):
         """Buttons and blocks that only mean something with Koha installed."""
         koha = self.app.koha_installed
         # An installer older than the panel has no such task: the button stays off.
-        for action in ("restart-koha", "export-diagnostics"):
-            task = "repair-services" if action == "restart-koha" else action
-            ok = self.app.env.demo or (self.app.bridge.supports_tasks() and self.app.bridge.has_task(task))
-            button = self.query_one(f"#{action}", Button)
-            button.disabled = not ok or (action == "restart-koha" and not koha)
-            if action == "restart-koha":
-                button.tooltip = None if koha else platforms.missing_reason(platforms.KOHA)
+        ok = self.app.env.demo or (self.app.bridge.supports_tasks() and self.app.bridge.has_task("repair-services"))
+        button = self.query_one("#restart-koha", Button)
+        button.disabled = not ok or not koha
+        button.tooltip = None if koha else platforms.missing_reason(platforms.KOHA)
         for widget in self.query(".koha-only"):
             widget.display = koha
         # A tab only for an installed platform; without any, General alone.
@@ -370,10 +388,10 @@ class DashboardView(SectionView):
         bid = event.button.id
         if bid == "refresh":
             self.refresh_data()
-        elif bid in ("restart-koha", "export-diagnostics", "open-diagnostics"):
-            self.app.run_native(bid, after=self.refresh_data if bid == "restart-koha" else None)
-        elif bid == "dash-open-tainacan":
-            self.app.screen.action_show("tainacan")
+        elif bid == "restart-koha":
+            self.app.run_native(bid, after=self.refresh_data)
+        elif bid in ("dash-open-koha", "dash-open-tainacan"):
+            self.app.screen.action_show(bid.removeprefix("dash-open-"))
 
     @on(LinkCard.Pressed)
     def _link(self, event: LinkCard.Pressed) -> None:
@@ -427,7 +445,8 @@ class DashboardView(SectionView):
             "db": db_card(h.db_size, self.app.env.instance),
             "backup-dir": backup_dir_card(h.backups, s.get("disk"), int((s.get("backup") or {}).get("last_size") or 0)),
             "errors": errors_card(h.apache_errors, h.koha_errors),
-            "updates": updates_card(str(s.get("panel_version") or ""), h.panel_latest, h.koha),
+            "updates": updates_card(str(s.get("panel_version") or ""), h.panel_latest, None),
+            "koha-updates": koha_updates_card(h.koha),
             "tunnel": tunnel_card(h.tunnel, s),
             "sru": sru_card(h.sru),
             "z3950": z3950_card(h.z3950),
@@ -439,7 +458,13 @@ class DashboardView(SectionView):
 
     def show(self, s: dict) -> None:
         for p in platforms.from_status(s):
-            self.query_one(f"#dash-platform-{p.id}", StatusCard).set(*platforms.describe(p))
+            if not p.supported:
+                continue
+            if p.id == platforms.TAINACAN and platforms.tainacan_from_status(s).known:
+                values = platforms.describe_tainacan(platforms.tainacan_from_status(s), platforms.docker_from_status(s))
+            else:
+                values = platforms.describe(p)
+            self.query_one(f"#dash-platform-{p.id}", StatusCard).set(*values)
         text, state = OVERALL.get(s.get("state", ""), ("Unknown", "bad"))
         m = s.get("memory", {})
         self.query_one("#card-state", StatusCard).set(
