@@ -38,8 +38,38 @@ python3 -m kei_panel --demo        # simulated installer: no root, no Koha
 ```
 
 Keys: arrows / Tab / Enter everywhere, `d` dashboard, `b` backup, `t` database
-tables, `a` AI cataloguing, `l` library tools, `q` exit, `ctrl+p` command palette. Every card
+tables, `a` AI cataloguing, `l` library tools, `p` platforms, `q` exit, `ctrl+p` command palette. Every card
 and button also takes mouse clicks, and lists scroll with the wheel.
+
+## A server without Koha (platforms)
+
+Koha is optional: the panel opens and stays usable on a server that does not
+have it. `platforms.py` lists the platforms the panel knows (Koha supported;
+Tainacan, AtoM and DSpace planned) and keeps four facts apart for each one:
+supported by this panel, installation detected, services, functional health.
+Health stays "not verified" until a real check exists: a configuration file
+or a running service is no proof that a platform works.
+
+- Detection is a file test only (`/etc/koha/sites/library/koha-conf.xml`,
+  the installer's `is_koha_installed`); the panel never opens Koha's database
+  to decide what to show.
+- Sections, entries and buttons that need Koha carry `requires="koha"`
+  (`menus.py`). Without Koha they leave the sidebar; a key or link that
+  leads there shows the reason, and every way into a routine (cards, keys,
+  buttons, dropped files) passes `KohaPanelApp.refuse_missing`.
+- The installer refuses the same actions and tasks by itself
+  (`KEI_KOHA_ACTIONS`, `kei_task_needs_koha`), so `--run` and `--task` do not
+  depend on the panel's check. `panel/tests/test_platforms.py` checks both
+  lists agree.
+- The first run of the installer installs `sudo config.sh`, not only the end
+  of a Koha installation.
+- `config.sh --status-json` adds a `platforms` array; every older field is
+  unchanged.
+- The Platforms screen (`p`) shows one card per platform. Nothing is
+  installed from it.
+
+`KEI_PANEL_DEMO_KOHA=0 python3 -m kei_panel --demo` shows the panel of a
+server without Koha.
 
 ## How it talks to bash
 

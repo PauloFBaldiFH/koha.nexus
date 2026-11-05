@@ -17,7 +17,7 @@ from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal
 from textual.widgets import Button, Label
 
-from .. import health
+from .. import health, platforms
 from ..i18n import t
 from ..widgets.cards import LinkCard, StatusCard
 from ..widgets.pacman import PacmanLoader
@@ -91,7 +91,7 @@ OVERALL = {
     "running": ("Running", "ok"),
     "degraded": ("Attention", "warn"),
     "stopped": ("Stopped", "bad"),
-    "not_installed": ("not installed", "warn"),
+    "not_installed": ("not installed", ""),   # Koha is optional: not an alarm
 }
 
 
@@ -174,6 +174,15 @@ UNREAD = ("-", "Could not read", "")
 
 def _unread() -> tuple[str, str, str]:
     return UNREAD[0], t(UNREAD[1]), UNREAD[2]
+
+
+# Cards about Koha alone: on a server without Koha they say so, and nothing
+# behind them is read (health.collect koha=False).
+KOHA_HEALTH = ("db", "sru", "z3950")
+
+
+def koha_absent_card() -> tuple[str, str, str]:
+    return "-", t("Koha is not installed"), ""
 
 
 def cpu_card(cpu: dict | None) -> tuple[str, str, str]:
@@ -296,13 +305,17 @@ class DashboardView(SectionView):
             yield StatusCard(t("Koha"), id="card-state")
             yield StatusCard(t("Last backup"), id="card-backup")
             yield StatusCard(t("Disk free"), id="card-disk")
-        yield Label(t("Addresses"), classes="view-prompt")
-        with Grid(classes="status-grid", id="addresses"):
+        yield Label(t("Platforms"), classes="view-prompt")
+        with Grid(classes="status-grid", id="dash-platforms"):
+            for p in platforms.CATALOG:
+                yield StatusCard(p.name, id=f"dash-platform-{p.id}")
+        yield Label(t("Addresses"), classes="view-prompt koha-only")
+        with Grid(classes="status-grid koha-only", id="addresses"):
             for page in PAGES:
                 for where in WHERES:
                     yield LinkCard(t(LINK_TITLES[where, page]), id=f"link-{where}-{page}")
-        yield Label(t("Components"), classes="view-prompt")
-        with Grid(classes="status-grid", id="components"):
+        yield Label(t("Components"), classes="view-prompt koha-only")
+        with Grid(classes="status-grid koha-only", id="components"):
             for unit, name in COMPONENTS:
                 yield StatusCard(t(name), id=f"card-{unit}")
             yield StatusCard(t("HTTP response"), id="card-http")
@@ -312,12 +325,22 @@ class DashboardView(SectionView):
                 yield StatusCard(t(title), id=f"health-{key}")
 
     def on_mount(self) -> None:
+        self.koha_layout()
+        self.refresh_data()
+
+    def koha_layout(self) -> None:
+        """Buttons and blocks that only mean something with Koha installed."""
+        koha = self.app.koha_installed
         # An installer older than the panel has no such task: the button stays off.
         for action in ("restart-koha", "export-diagnostics"):
             task = "repair-services" if action == "restart-koha" else action
             ok = self.app.env.demo or (self.app.bridge.supports_tasks() and self.app.bridge.has_task(task))
-            self.query_one(f"#{action}", Button).disabled = not ok
-        self.refresh_data()
+            button = self.query_one(f"#{action}", Button)
+            button.disabled = not ok or (action == "restart-koha" and not koha)
+            if action == "restart-koha":
+                button.tooltip = None if koha else platforms.missing_reason(platforms.KOHA)
+        for widget in self.query(".koha-only"):
+            widget.display = koha
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
@@ -346,6 +369,8 @@ class DashboardView(SectionView):
         finally:
             self.query_one("#status-loader").display = False
         if status:
+            self.app.platforms_seen(status)
+            self.koha_layout()
             self.show(status)
             self.run_worker(self._load_health(status), exclusive=True, group="health", exit_on_error=False)
 
@@ -354,7 +379,7 @@ class DashboardView(SectionView):
         if env.demo:
             h = health.demo_health()
         else:
-            h = await health.collect(status, env.instance, env.installer)
+            h = await health.collect(status, env.instance, env.installer, koha=self.app.koha_installed)
         self.show_health(status, h)
 
     def show_health(self, s: dict, h: "health.Health") -> None:
@@ -369,10 +394,14 @@ class DashboardView(SectionView):
             "sru": sru_card(h.sru),
             "z3950": z3950_card(h.z3950),
         }
+        if not self.app.koha_installed:
+            cards |= {key: koha_absent_card() for key in KOHA_HEALTH}
         for key, values in cards.items():
             self.query_one(f"#health-{key}", StatusCard).set(*values)
 
     def show(self, s: dict) -> None:
+        for p in platforms.from_status(s):
+            self.query_one(f"#dash-platform-{p.id}", StatusCard).set(*platforms.describe(p))
         text, state = OVERALL.get(s.get("state", ""), ("Unknown", "bad"))
         m = s.get("memory", {})
         self.query_one("#card-state", StatusCard).set(

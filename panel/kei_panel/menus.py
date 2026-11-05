@@ -34,6 +34,9 @@ class Entry:
     # Dormant: not drawn (the routine and its code stay; Paulo, 2026-10-08:
     # the cataloguing aids do not work yet, so their cards are hidden).
     hidden: bool = False
+    # The platform this entry works on ("koha"), when its section is shared
+    # by every platform (platforms.py). "" = it works on any server.
+    requires: str = ""
 
 
 @dataclass(frozen=True)
@@ -48,13 +51,14 @@ class Section:
     icon: str = ""        # drawn before a label that has no icon of its own
     sidebar: bool = True  # False: reached from a hub entry (and its key) only
     parent: str = ""      # the hub highlighted in the sidebar while it is shown
+    requires: str = ""    # platform the whole section works on ("koha"); "" = any server
 
 
 SECTIONS: tuple[Section, ...] = (
     Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
     Section("install", "📦  Install Koha server", entries=(
         Entry("📦  Install Koha server", "install", kind="native"),)),
-    Section("credentials", "🔑  View first-access credentials", entries=(
+    Section("credentials", "🔑  View first-access credentials", requires="koha", entries=(
         Entry("🔑  View first-access credentials", "credentials", kind="native"),)),
     # The cards are the only place of the backup actions (Paulo, 2026-10-15:
     # no buttons above the status cards any more).
@@ -65,17 +69,17 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📥  Restore database", "restore", kind="native"),
         Entry("📤  Configure cloud backup", "backup-cloud", kind="native"),
         Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
-    ), view="backup", key="b"),
+    ), view="backup", key="b", requires="koha"),
     # Every import in one place, right under the backups (Paulo, 2026-10-09).
     Section("import", "🪄  Magic Import Tool",
             prompt="Imports bibliographic records, authority records and patron (reader) data from other systems: "
                    "MARC, ISIS, CSV and spreadsheets, and old-system backups.", entries=(
-        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i"),
+        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i", requires="koha"),
     # New screen: Koha's tables at a glance (no bash menu of its own), opened
     # from Diagnostics & maintenance (Paulo, 2026-10-15: not on the sidebar;
     # maintenance and the reports pack have their own cards elsewhere).
     Section("database", "📑  Database tables", "📑  Database tables", view="database", key="t",
-            sidebar=False, parent="diagnostics"),
+            sidebar=False, parent="diagnostics", requires="koha"),
     # New screen: both AI tools on one page (views/ai.py). AI cataloguing
     # (Module 1: MARC Replace, which opens the routine below) and the AI
     # assistant (Module 2: the chat on the Koha staff home page) share the
@@ -83,14 +87,14 @@ SECTIONS: tuple[Section, ...] = (
     Section("ai", "🤖  AI", "🤖  AI", entries=(
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
-    ), view="ai", key="a"),
+    ), view="ai", key="a", requires="koha"),
     # New screen: this Koha's Z39.50/SRU server (on/off), the koha.nexus
     # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
     # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
-    Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z"),
+    Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z", requires="koha"),
     # New screen: the look of the public catalogue and the staff interface (textures, wallpaper, dark mode,
     # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
-    Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o"),
+    Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o", requires="koha"),
     # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
     # Z39.50 on one screen (views/hub.py); its buttons run these routines.
     # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:
@@ -99,7 +103,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📧  Configure email and circulation notices", "email", kind="native"),
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native", hidden=True),
-    ), view="hub", key="m"),
+    ), view="hub", key="m", requires="koha"),
     # WireGuard VPN for the staff interface and SSH (views/vpn.py), opened
     # from the Security & access hub (or its key).
     Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v", sidebar=False,
@@ -110,31 +114,31 @@ SECTIONS: tuple[Section, ...] = (
     Section("security", "🔒  Security & access hub", "🔒 Security & Access Hub",
             "Choose a security or remote-access tool:", (
         Entry("🔐  WireGuard VPN", "vpn", kind="view"),
-        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
+        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native", requires="koha"),
         Entry("🧱  Show active UFW rules", "ufw", kind="native"),
-        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
-        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
+        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native", requires="koha"),
+        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native", requires="koha"),
         Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
-        Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
-        Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
+        Entry("🔐  Rotate database password", "rotate-db-password", kind="native", requires="koha"),
+        Entry("🔎  Google Search Console Assistant", "search-console", kind="native", requires="koha"),
     ), key="x"),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
-    )),
+    ), requires="koha"),
     Section("diagnostics", "🩺  Diagnostics & maintenance center", "🩺 Diagnostics & Maintenance Center",
             "Choose a tool:", (
         Entry("📡  Detailed server & Koha status", "status", kind="native"),
-        Entry("🏥  Full system health check", "health", kind="native"),
+        Entry("🏥  Full system health check", "health", kind="native", requires="koha"),
         Entry("📄  View latest validation report", "validation-report", kind="native"),
-        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
-        Entry("📑  Database tables", "database", kind="view"),
-        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
+        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native", requires="koha"),
+        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native", requires="koha"),
+        Entry("📑  Database tables", "database", kind="view", requires="koha"),
+        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native", requires="koha"),
     )),
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
-        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
-        Entry("👑  Create super librarian", "superlibrarian", kind="native"),
+        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native", requires="koha"),
+        Entry("👑  Create super librarian", "superlibrarian", kind="native", requires="koha"),
         Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
     )),
     # Enrichment jobs (views/enrich.py), opened from Library tools (or its key).
@@ -142,11 +146,11 @@ SECTIONS: tuple[Section, ...] = (
     # "Enrich from world catalogues" (on-demand enrichment) replaces it. Its view and installer tasks stay in the
     # code, but no key, card or sidebar row opens it.
     Section("enrich", "✨  Enrich bibliographic catalog", "✨  Enrich bibliographic catalog", view="enrich",
-            sidebar=False, parent="library"),
+            sidebar=False, parent="library", requires="koha"),
     Section("enrich-auth", "📇  Enrich & standardize authorities", "📇  Enrich & standardize authorities",
-            view="enrich-auth", key="h", sidebar=False, parent="library"),
+            view="enrich-auth", key="h", sidebar=False, parent="library", requires="koha"),
     Section("ondemand", "🌐  Enrich from world catalogues", "🌐  Enrich from world catalogues", view="ondemand",
-            key="n", sidebar=False, parent="library"),
+            key="n", sidebar=False, parent="library", requires="koha"),
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("✨  Enrich bibliographic catalog", "enrich", kind="view", hidden=True),
@@ -167,7 +171,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
         Entry("📂  Staff access to server files", "access-files", kind="native"),
         Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
-    ), key="l"),
+    ), key="l", requires="koha"),
     Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
         Entry("📂  Open user folder", "user-folder", kind="native"),
         Entry("💻  Open Debian terminal", "terminal", kind="native"),
@@ -176,17 +180,22 @@ SECTIONS: tuple[Section, ...] = (
     )),
     # The visual cron manager (views/crons.py); the entry is the classic routine.
     Section("crons", "⏰  Schedules & cron tasks", entries=(
-        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s"),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s", requires="koha"),
     Section("languages", "🌍  Koha languages", "🌍 Koha & Panel Languages", "Choose an action:", (
         Entry("🌍  Download & activate a language", "languages", kind="native"),
-        Entry("📥  Download a language pack only", "lang-download", kind="native"),
-        Entry("✅  Set an installed language as active", "lang-activate", kind="native"),
-        Entry("📋  Installed languages & active one", "lang-list", kind="native"),
+        Entry("📥  Download a language pack only", "lang-download", kind="native", requires="koha"),
+        Entry("✅  Set an installed language as active", "lang-activate", kind="native", requires="koha"),
+        Entry("📋  Installed languages & active one", "lang-list", kind="native", requires="koha"),
     )),
     Section("update", "🔄  Update center", "🔄 Update Center", "Choose what to update:", (
         Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
         Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
     )),
+    # The platforms this panel knows (platforms.py): what is supported, what
+    # is installed here, whether its services run. Read only for now.
+    Section("platforms", "🧩  Platforms", "🧩  Platforms",
+            "Koha is optional: the panel works on a server without it. Other platforms are planned.",
+            view="platforms", key="p"),
     Section("about", "💡  About the program & support", entries=(
         Entry("💡  About the program & support", "about", kind="native"),)),
     Section("reboot", "🔁  Reboot server", entries=(
@@ -203,6 +212,31 @@ def section(section_id: str) -> Section:
 
 # Panel routines with no installer routine of their own (routines/).
 PANEL_ONLY = frozenset({"backup-download", "user-folder", "terminal"})
+
+# Routines started from a button rather than a menu card, with the
+# platform they work on (the dashboard's "Restart Koha").
+BUTTON_REQUIRES: dict[str, str] = {"restart-koha": "koha"}
+
+
+def requires_of(action: str) -> str:
+    """The platform a routine or a view works on ("" = any server): the
+    entry's own `requires`, else its section's. A "view" entry names a
+    section: that section's requirement."""
+    if action in BUTTON_REQUIRES:
+        return BUTTON_REQUIRES[action]
+    for s in SECTIONS:
+        if s.id == action and s.requires:
+            return s.requires
+        for e in s.entries:
+            if e.action == action and (e.requires or s.requires):
+                return e.requires or s.requires
+    return ""
+
+
+def platform_actions(platform: str) -> set[str]:
+    """Installer actions (--run) that need `platform`: the list the
+    installer keeps too (KEI_KOHA_ACTIONS), checked by tests/test_menus.py."""
+    return {a for a in all_actions() if requires_of(a) == platform}
 
 
 def all_actions() -> set[str]:

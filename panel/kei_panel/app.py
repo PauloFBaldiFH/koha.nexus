@@ -14,7 +14,8 @@ from textual.binding import Binding
 from .bridge import Bridge, BridgeError
 from .env import PanelEnv, log_error
 from .i18n import Translator, install, t
-from .menus import Entry
+from . import platforms
+from .menus import Entry, requires_of
 from .screens.dialogs import ConfirmScreen, ResultScreen
 from .screens.main import MainScreen
 from .tasks import TaskResult, run_with_loader, verb_job
@@ -44,6 +45,8 @@ class KohaPanelApp(App):
         super().__init__()
         self.env = env
         self.bridge = Bridge(env)
+        # Koha is optional (platforms.py): a file test, never its database.
+        self.koha_installed = platforms.koha_detected(env)
 
     def _handle_exception(self, error: Exception) -> None:
         # Textual shows the traceback on the terminal after it exits; config.sh
@@ -168,13 +171,61 @@ class KohaPanelApp(App):
         task = routines.task_of(entry.action)
         return not task or self.bridge.has_task(task)
 
+    # ------------------------------------------------------------------
+    # Platforms: what this server has (Koha is optional)
+    # ------------------------------------------------------------------
+    def platform_ready(self, platform: str) -> bool:
+        """Can a screen or routine of `platform` run here? "" = any server."""
+        if not platform:
+            return True
+        if platform == platforms.KOHA:
+            return self.koha_installed
+        return False
+
+    def refuse_missing(self, action: str) -> bool:
+        """True (after saying why) when `action` needs a platform this
+        server does not have. Every way into a routine passes here: menu
+        cards, keys, buttons and dropped files."""
+        needed = requires_of(action)
+        if self.platform_ready(needed):
+            return False
+        self.notify(platforms.missing_reason(needed), severity="warning", timeout=8)
+        return True
+
+    def check_platforms(self) -> None:
+        """After a routine: Koha may have just been installed (or removed)."""
+        self._set_koha(platforms.koha_detected(self.env))
+
+    def platforms_seen(self, status: dict | None) -> None:
+        """What --status-json said (dashboard, Platforms screen)."""
+        if self.env.demo or not isinstance(status, dict):
+            return
+        for state in platforms.from_status(status):
+            if state.id == platforms.KOHA and state.detected is not None:
+                self._set_koha(state.detected)
+
+    def _set_koha(self, installed: bool) -> None:
+        if installed == self.koha_installed:
+            return
+        self.koha_installed = installed
+        if isinstance(self.screen, MainScreen):
+            self.screen.platforms_changed()
+        else:
+            for screen in self.screen_stack:
+                if isinstance(screen, MainScreen):
+                    screen.platforms_changed()
+
     def run_native(self, action: str, after: Callable[[], None] | None = None) -> None:
         from . import routines
+
+        if self.refuse_missing(action):
+            return
 
         async def flow() -> None:
             try:
                 await routines.ROUTINES[action](self)
             finally:
+                self.check_platforms()
                 if after:
                     after()
 
@@ -194,6 +245,9 @@ class KohaPanelApp(App):
         name = Path(path).name or path
         kind = path_kind(Path(path))
         if kind == "file" and transfer.is_backup_name(path):
+            if self.refuse_missing("restore"):
+                return
+
             async def flow() -> None:
                 await backup.restore(self, file=path)
             self.notify(t("Backup dropped: ${name}", name=name), timeout=4)
@@ -205,6 +259,9 @@ class KohaPanelApp(App):
             self.notify(t("This file cannot be read: no permission to open it."),
                         severity="error", timeout=8)
         elif transfer.where() == "ssh":
+            if self.refuse_missing("restore"):
+                return
+
             # The path of the person's own computer: the file itself comes
             # through their browser, then the restore goes on with it.
             async def receive() -> None:
@@ -221,6 +278,8 @@ class KohaPanelApp(App):
 
     def run_entry(self, entry: Entry, after: Callable[[], None] | None = None) -> None:
         label = t(entry.label)
+        if self.refuse_missing(entry.action):
+            return
         if self.is_native(entry):
             self.run_native(entry.action, after)
             return
@@ -232,6 +291,7 @@ class KohaPanelApp(App):
                 return
             if rc not in (0, None):
                 self.notify(f"{label}: exit {rc}", severity="warning")
+            self.check_platforms()
             if after:
                 after()
             return

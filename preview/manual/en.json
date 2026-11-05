@@ -2466,6 +2466,17 @@
     "Read Koha's release notes before a major version upgrade."
    ]
   },
+  "sec-platforms": {
+   "summary": "Shows the platforms this panel knows and what was found on this server. Koha is optional.",
+   "overview": [
+    "One card per platform keeps four facts apart: whether this version of the panel supports it, whether an installation was found, whether its services are running, and its functional health. A configuration file or a running service is no proof that a platform works, so health stays *not verified* until a real check exists.",
+    "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan, AtoM and DSpace are planned and nothing of them is installed from here."
+   ],
+   "tips": [
+    "Install Koha with **Install Koha server** when you need it; its screens come back as soon as the installation ends.",
+    "Press **Refresh** to read the state again."
+   ]
+  },
   "update-system": {
    "summary": "Updates the system and Koha packages and applies Koha's database migrations, after a verified safety backup, then restarts the services and validates the system.",
    "warnings": [
