@@ -191,6 +191,12 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
         Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
     )),
+    # Tainacan's own section (only with Tainacan installed): its summary,
+    # addresses, events and diagnosis. Installing, removing and its backups
+    # stay in Platforms.
+    Section("tainacan", "🏺  Tainacan", "🏺  Tainacan",
+            "Your digital collections: their state, addresses, events and diagnosis.",
+            view="tainacan", key="g", requires="tainacan"),
     # The platforms this panel knows (platforms.py): what is supported, what
     # is installed here, whether its services run. Read only for now.
     Section("platforms", "🧩  Platforms", "🧩  Platforms",

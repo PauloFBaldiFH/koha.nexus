@@ -1,8 +1,11 @@
-# The panel's Platforms screen (panel/kei_panel/views/platforms.py) against
-# the installer's tasks: Docker, Tainacan, the platform backups and the
-# optional events in Tainacan (buttons, what each one shows, the plan and
-# the Yes before anything, cancelling, the installer's failure messages).
-# The panel runs in its demo mode; the installer is only read.
+# The panel's Platforms screen (panel/kei_panel/views/platforms.py) and
+# Tainacan's section (views/tainacan.py) against the installer's tasks:
+# Docker, Tainacan, the platform backups and the optional events in
+# Tainacan (buttons, what each one shows, the plan and the Yes before
+# anything, cancelling, the installer's failure messages), and the sidebar
+# and the dashboard's tabs on four servers (no platform, Koha only,
+# Tainacan only, both). The panel runs in its demo mode; the installer is
+# only read.
 name: Platforms panel
 
 on:
@@ -12,6 +15,8 @@ on:
       - "lang/pt.cache"
       - "panel/kei_panel/**"
       - "panel/tests/test_platforms.py"
+      - "panel/tests/test_tainacan_view.py"
+      - "panel/tests/test_dashboard.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -21,6 +26,8 @@ on:
       - "lang/pt.cache"
       - "panel/kei_panel/**"
       - "panel/tests/test_platforms.py"
+      - "panel/tests/test_tainacan_view.py"
+      - "panel/tests/test_dashboard.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -46,6 +53,6 @@ jobs:
           cache: pip
           cache-dependency-path: panel/requirements.txt
       - run: python -m pip install pytest -r panel/requirements.txt
-      - name: Platforms screen, with Koha and without
+      - name: Platforms screen, Tainacan section and dashboard tabs, on four servers
         working-directory: panel
-        run: python -m pytest -q tests/test_platforms.py
+        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py

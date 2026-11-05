@@ -488,10 +488,15 @@ class Bridge:
         """config.sh --status-json, the same JSON the Windows window reads."""
         if self.env.demo:
             await asyncio.sleep(1.2)
+            status = _DEMO_STATUS
             if os.environ.get("KEI_PANEL_DEMO_KOHA", "1") == "0":
                 # Demo of a server without Koha (KEI_PANEL_DEMO_KOHA=0).
-                return _DEMO_STATUS | _DEMO_NO_KOHA | {"generated_at": int(time.time())}
-            return _DEMO_STATUS | {"generated_at": int(time.time())}
+                status = status | _DEMO_NO_KOHA
+            if os.environ.get("KEI_PANEL_DEMO_TAINACAN", "0") == "1":
+                # Demo of a server with Tainacan (KEI_PANEL_DEMO_TAINACAN=1).
+                status = status | {"platforms": [_DEMO_TAINACAN if p["id"] == "tainacan" else p
+                                                 for p in status["platforms"]]}
+            return status | {"generated_at": int(time.time())}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=self.env.child_env())
@@ -591,6 +596,17 @@ _DEMO_NO_KOHA = {
                    "health": "unknown"}] + _DEMO_STATUS["platforms"][1:],
     "proxy": {"mode": "none", "server": "", "sites": 0},
     "docker": _DEMO_STATUS["docker"],
+}
+
+# Tainacan installed and checked (KEI_PANEL_DEMO_TAINACAN=1).
+_DEMO_TAINACAN = {
+    "id": "tainacan", "supported": True, "detected": True, "services": "active",
+    "units": {"db": "running", "wordpress": "running"}, "health": "healthy",
+    "status": "installed", "url": "http://192.168.0.20:8090/", "admin_url": "http://192.168.0.20:8090/wp-admin/",
+    "events": "off", "events_dependency": "",
+    "checked": {"checked_at": "1793872800", "collections": "4", "items": "1250", "attachments": "3110",
+                "attachments_missing": "0", "wordpress_version": "6.8.3", "tainacan_version": "1.0.1",
+                "disk_db": "84.2MB", "disk_wp": "2.1GB", "lang": "pt_BR"},
 }
 
 _DEMO_TABLES = [

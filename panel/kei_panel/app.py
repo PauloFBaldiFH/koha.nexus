@@ -47,6 +47,8 @@ class KohaPanelApp(App):
         self.bridge = Bridge(env)
         # Koha is optional (platforms.py): a file test, never its database.
         self.koha_installed = platforms.koha_detected(env)
+        # Tainacan too: its state file says "installed" (no Docker call).
+        self.tainacan_installed = platforms.tainacan_detected(env)
 
     def _handle_exception(self, error: Exception) -> None:
         # Textual shows the traceback on the terminal after it exits; config.sh
@@ -180,6 +182,8 @@ class KohaPanelApp(App):
             return True
         if platform == platforms.KOHA:
             return self.koha_installed
+        if platform == platforms.TAINACAN:
+            return self.tainacan_installed
         return False
 
     def refuse_missing(self, action: str) -> bool:
@@ -195,6 +199,7 @@ class KohaPanelApp(App):
     def check_platforms(self) -> None:
         """After a routine: Koha may have just been installed (or removed)."""
         self._set_koha(platforms.koha_detected(self.env))
+        self._set_tainacan(platforms.tainacan_detected(self.env))
 
     def platforms_seen(self, status: dict | None) -> None:
         """What --status-json said (dashboard, Platforms screen)."""
@@ -203,11 +208,23 @@ class KohaPanelApp(App):
         for state in platforms.from_status(status):
             if state.id == platforms.KOHA and state.detected is not None:
                 self._set_koha(state.detected)
+        tainacan = platforms.tainacan_from_status(status)
+        if tainacan.known:
+            self._set_tainacan(platforms.tainacan_installed(tainacan))
+
+    def _set_tainacan(self, installed: bool) -> None:
+        if installed == self.tainacan_installed:
+            return
+        self.tainacan_installed = installed
+        self._platforms_changed()
 
     def _set_koha(self, installed: bool) -> None:
         if installed == self.koha_installed:
             return
         self.koha_installed = installed
+        self._platforms_changed()
+
+    def _platforms_changed(self) -> None:
         if isinstance(self.screen, MainScreen):
             self.screen.platforms_changed()
         else:

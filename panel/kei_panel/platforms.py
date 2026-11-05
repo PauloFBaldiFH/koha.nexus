@@ -32,6 +32,7 @@ from pathlib import Path
 from .i18n import t
 
 KOHA = "koha"
+TAINACAN = "tainacan"
 
 SERVICES = ("active", "partial", "inactive", "unknown", "none")
 HEALTH = ("unknown", "healthy", "failing")
@@ -82,6 +83,28 @@ def koha_detected(env) -> bool:
     if getattr(env, "demo", False):
         return os.environ.get("KEI_PANEL_DEMO_KOHA", "1") != "0"
     return koha_conf(getattr(env, "instance", "library")).is_file()
+
+
+def tainacan_state_file() -> Path:
+    """Tainacan's state file (installer: KEI_TAINACAN_DIR/state). Its
+    status=installed line means "Tainacan is installed here"."""
+    base = os.environ.get("KEI_TAINACAN_DIR") or \
+        os.path.join(os.environ.get("KEI_OWNED_DIR") or "/var/lib/koha-nexus", "platforms", "tainacan")
+    return Path(base) / "state"
+
+
+def tainacan_detected(env) -> bool:
+    """Is Tainacan installed here? A file test, as for Koha: the status line
+    of its state file. Demo mode pretends it is not, unless
+    KEI_PANEL_DEMO_TAINACAN=1."""
+    if getattr(env, "demo", False):
+        return os.environ.get("KEI_PANEL_DEMO_TAINACAN", "0") == "1"
+    try:
+        lines = tainacan_state_file().read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    status = [ln.partition("=")[2] for ln in lines if ln.startswith("status=")]
+    return bool(status) and status[-1] == "installed"
 
 
 def _norm(value: object, allowed: tuple[str, ...], default: str) -> str:
@@ -249,19 +272,59 @@ class TainacanState:
     health: str = "unknown"
     events: str = "off"          # Nexus Eventos: "on" only after the plan and a Yes
     events_dependency: str = ""  # Events Manager: "ours" (Koha.Nexus put it there), "preexisting", ""
+    admin_url: str = ""
+    checked: tuple[tuple[str, str], ...] = ()   # the last diagnosis kept (installer: last-status)
+
+    def check(self, key: str) -> str:
+        return dict(self.checked).get(key, "")
+
+    @property
+    def checked_at(self) -> int:
+        value = self.check("checked_at")
+        return int(value) if value.isdigit() else 0
+
+    @property
+    def failed_at(self) -> int:
+        """When the last diagnosis failed, if after the last good one."""
+        value = self.check("failed_at")
+        return int(value) if value.isdigit() and int(value) > self.checked_at else 0
+
+
+# The fields of the last diagnosis the summary shows, and what each may hold.
+CHECKED_FIELDS = {
+    "checked_at": r"[0-9]{1,12}", "failed_at": r"[0-9]{1,12}",
+    "collections": r"[0-9]{1,9}", "items": r"[0-9]{1,9}", "attachments": r"[0-9]{1,9}",
+    "attachments_missing": r"[0-9]{1,9}",
+    "wordpress_version": r"[0-9][0-9A-Za-z.+-]{0,30}", "tainacan_version": r"[0-9][0-9A-Za-z.+-]{0,30}",
+    "disk_db": r"[0-9][0-9.]{0,9} ?[kKMGT]?i?B", "disk_wp": r"[0-9][0-9.]{0,9} ?[kKMGT]?i?B",
+    "lang": r"[a-z]{2,3}(_[A-Z]{2})?",
+}
+
+
+def _checked(raw: object) -> tuple[tuple[str, str], ...]:
+    import re
+    if not isinstance(raw, dict):
+        return ()
+    return tuple((k, raw[k]) for k, pattern in CHECKED_FIELDS.items()
+                 if isinstance(raw.get(k), str) and re.fullmatch(pattern, raw[k]))
+
+
+def _web_url(value: object) -> str:
+    return value[:200] if isinstance(value, str) and value.startswith(("http://", "https://")) \
+        and not any(c.isspace() for c in value) else ""
 
 
 def tainacan_from_status(status: dict | None) -> TainacanState:
     for raw in (status or {}).get("platforms") or []:
         if isinstance(raw, dict) and raw.get("id") == "tainacan" and raw.get("supported") is True:
-            url = raw.get("url") if isinstance(raw.get("url"), str) else ""
             return TainacanState(
                 known=True, status=_norm(raw.get("status"), TAINACAN_STATUS, "absent"),
-                url=url[:200] if url.startswith(("http://", "https://")) else "",
+                url=_web_url(raw.get("url")),
                 services=_norm(raw.get("services"), SERVICES, "none"),
                 health=_norm(raw.get("health"), HEALTH, "unknown"),
                 events=_norm(raw.get("events"), ("off", "on"), "off"),
-                events_dependency=_norm(raw.get("events_dependency"), ("ours", "preexisting"), ""))
+                events_dependency=_norm(raw.get("events_dependency"), ("ours", "preexisting"), ""),
+                admin_url=_web_url(raw.get("admin_url")), checked=_checked(raw.get("checked")))
     return TainacanState()
 
 
@@ -329,7 +392,64 @@ def missing_reason(platform: str) -> str:
     if platform == KOHA:
         return t("Koha is not installed on this server, so this is not available. "
                  "Install it with \"Install Koha server\" when you need it.")
+    if platform == TAINACAN:
+        return t("Tainacan is not installed on this server, so this is not available. "
+                 "Install it in Platforms when you need it.")
     return t("This needs a platform that is not installed on this server.")
+
+
+# The Tainacan summary (its section and the dashboard's tab): what
+# --status-json and the backup engine already say, and the last diagnosis
+# kept, with the time it was read. Nothing here reads the server.
+def when(epoch: int) -> str:
+    """"2026-11-05 14:30" in local time, or "" for 0."""
+    import time
+    if not epoch:
+        return ""
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(epoch))
+
+
+def tainacan_summary(state: TainacanState, docker: "DockerState", backups: "BackupState") -> dict[str, tuple[str, str, str]]:
+    """Card id -> (value, note, card state) for the summary."""
+    cards: dict[str, tuple[str, str, str]] = {"state": describe_tainacan(state, docker)}
+    cards["events"] = (t("Turned on"), t("Nexus Eventos and Events Manager"), "ok") if state.events == "on" else \
+        (t("Turned off"), t("Optional: turn them on in the Tainacan section"), "")
+    if not backups.known:
+        cards["backup"] = (t("Not checked"), "", "")
+    elif backups.last:
+        name, _sep, rest = backups.last.partition("|")
+        created = rest.partition("|")[0]
+        cards["backup"] = (created or name, t("${n} complete backups", n=backups.count), "ok")
+    else:
+        cards["backup"] = (t("None yet"), t("Back up in Platforms"), "warn")
+    if backups.verified:
+        bits = backups.verified.split()
+        cards["restore-test"] = ((t("Passed") if bits[-1:] == ["ok"] else t("Failed")), " ".join(bits[:2]),
+                                 "ok" if bits[-1:] == ["ok"] else "bad")
+    else:
+        cards["restore-test"] = (t("Not yet"), t("Test a restore in Platforms"), "warn" if backups.count else "")
+    failed = t("The diagnosis at ${when} failed: run it again", when=when(state.failed_at)) \
+        if state.failed_at else ""
+    if state.checked_at:
+        missing = state.check("attachments_missing")
+        read = t("read at ${when}", when=when(state.checked_at))
+        cards["content"] = (t("${c} collections · ${i} items · ${a} attachments", c=state.check("collections") or "?",
+                              i=state.check("items") or "?", a=state.check("attachments") or "?"), f"{read} · {failed}" if failed else read,
+                            "warn" if failed or (missing and missing != "0") else "ok")
+        versions = []
+        if state.check("wordpress_version"):
+            versions.append(f"WordPress {state.check('wordpress_version')}")
+        if state.check("tainacan_version"):
+            versions.append(f"Tainacan {state.check('tainacan_version')}")
+        disk = " + ".join(v for v in (state.check("disk_db"), state.check("disk_wp")) if v)
+        cards["versions"] = (" · ".join(versions) or t("Not read"),
+                             (t("Space") + f" {disk} · " if disk else "") + t("read at ${when}", when=when(state.checked_at)),
+                             "")
+    else:
+        cards["content"] = (t("Not read yet"), failed or t("Run Diagnosis to read collections, items and attachments"),
+                            "warn" if failed else "")
+        cards["versions"] = (t("Not read yet"), t("Run Diagnosis to read the versions"), "")
+    return cards
 
 
 # Backups of the platforms (installer: kei_backup_*, the common engine):

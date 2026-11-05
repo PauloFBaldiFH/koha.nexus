@@ -40,6 +40,7 @@
    "summary": "The Control Dashboard is the panel's home screen: one look tells you whether Koha is running, when the last backup was made, how much disk is left and at which addresses the catalogue answers.",
    "overview": [
     "The dashboard opens with sudo config.sh and is available through d. Reading its status does not itself change the server.",
+    "It has tabs: General (diagnostics, one card per platform, disk space and the server's health), Koha (as before) and Tainacan (the summary of its section). A tab only appears when its platform is installed; on a server without any, General is the only one.",
     "It shows overall state, backup age, disk space, access addresses and components including MariaDB, Apache, RabbitMQ, Memcached and Koha, plus HTTP checks.",
     "Restart Koha requests the service repair routine. Export diagnostics prepares a support package with redaction; review its contents before sharing."
    ],
@@ -2470,11 +2471,28 @@
    "summary": "Shows the platforms this panel knows and what was found on this server. Koha is optional.",
    "overview": [
     "One card per platform keeps four facts apart: whether this version of the panel supports it, whether an installation was found, whether its services are running, and its functional health. A configuration file or a running service is no proof that a platform works, so health stays *not verified* until a real check exists.",
-    "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan, AtoM and DSpace are planned and nothing of them is installed from here."
+    "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan is installed, backed up and removed from here; its own section (key g) appears once it is installed. AtoM and DSpace are planned."
    ],
    "tips": [
     "Install Koha with **Install Koha server** when you need it; its screens come back as soon as the installation ends.",
     "Press **Refresh** to read the state again."
+   ]
+  },
+  "sec-tainacan": {
+   "summary": "Tainacan's own section: the addresses of the collections and of the WordPress administration, a summary of its state, the diagnosis, the logs, the administrator and the optional events.",
+   "overview": [
+    "The section appears only with Tainacan installed. The summary shows what is already known, without a new check: state, events, collections and items, versions and space, the last backup and the last restore test. Opening it never starts, stops or restarts anything.",
+    "**Diagnosis** reads everything again (collections, items, attachments, versions, space). The result is kept with the time it was read; if a reading fails, the summary keeps the one before, with its time, and says the last one failed.",
+    "**Administrator** is the WordPress account of Tainacan. Koha's accounts, the superlibrarian included, are not WordPress accounts and get no access here.",
+    "Events (Nexus Eventos over Events Manager) are off until you turn them on: the plan is shown first and nothing changes without Yes. Turning them off keeps their data."
+   ],
+   "tips": [
+    "Installing, backing up, testing a restore and removing Tainacan stay in Platforms.",
+    "Run Diagnosis after big changes in the collections to update the summary."
+   ],
+   "related": [
+    "sec-platforms",
+    "sec-dashboard"
    ]
   },
   "update-system": {

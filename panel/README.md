@@ -38,7 +38,7 @@ python3 -m kei_panel --demo        # simulated installer: no root, no Koha
 ```
 
 Keys: arrows / Tab / Enter everywhere, `d` dashboard, `b` backup, `t` database
-tables, `a` AI cataloguing, `l` library tools, `p` platforms, `q` exit, `ctrl+p` command palette. Every card
+tables, `a` AI cataloguing, `l` library tools, `g` Tainacan, `p` platforms, `q` exit, `ctrl+p` command palette. Every card
 and button also takes mouse clicks, and lists scroll with the wheel.
 
 ## A server without Koha (platforms)
@@ -72,14 +72,31 @@ or a running service is no proof that a platform works.
   and that holds nothing of anyone.
 - Tainacan (WordPress, the Tainacan plugin and MariaDB in containers, images
   pinned by digest, the plugin checked file by file against wordpress.org's
-  published checksums) has its own row of buttons: install (address asked,
-  then the plan, then Yes), diagnosis, logs with secrets blanked, back up
-  now, test a restore in an isolated copy, restore, administrator password
-  and uninstall (keep or delete the data; deleting makes a last backup
-  first). Every action is an installer task (`--task tainacan-*`).
+  published checksums) has a row of buttons in Platforms: install (address
+  asked, then the plan, then Yes), open the Tainacan section, back up now,
+  test a restore in an isolated copy, restore and uninstall (keep or delete
+  the data; deleting makes a last backup first). Every action is an
+  installer task (`--task tainacan-*`).
+- With Tainacan installed (its state file says `status=installed`, a file
+  test like Koha's) the sidebar gains a Tainacan section (`g`,
+  `requires="tainacan"`): the addresses of the collections and of the
+  WordPress administration, and a summary (state, events, collections and
+  items, versions and space, last backup, last restore test) from
+  `--status-json` and the backup engine, never from a new check. The full
+  diagnosis (`--task tainacan-status`) runs only from its button; the
+  installer keeps the last good one in `last-status` (600, no secret) with
+  the time it was read, and a failed one only adds when it failed, so the
+  summary never shows old data as current. The section also has the logs
+  (secrets blanked), the WordPress administrator (Koha's accounts are never
+  WordPress accounts) and the events. Without Tainacan a key or link to the
+  section shows the reason and loads nothing.
+- The dashboard has tabs: General (diagnostics, one card per platform, the
+  disk and the server's health), Koha (as before: restart, state, last
+  backup, addresses, components) and Tainacan (the section's summary). A
+  tab only appears with its platform installed.
 - Events in Tainacan (Nexus Eventos over Events Manager, `--task
   tainacan-events`) are optional and off until turned on. Once Tainacan is
-  installed its card gains "Turn events on" (the installer's plan, then
+  installed its section gains "Turn events on" (the installer's plan, then
   Yes), "Turn events off" (asks what happens to Events Manager: one that
   was in the site before stays on unless the person picks otherwise; no
   data is deleted) and "Events" (both plugins and the data counts). The
