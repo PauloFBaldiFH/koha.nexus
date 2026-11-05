@@ -369,6 +369,8 @@ PY
     run lib 'kei_backup_schedule tainacan 02:30'
     [ "$status" -eq 0 ]
     f=/etc/cron.d/koha-nexus-platform-backups
+    command -v cron
+    systemctl is-active --quiet cron
     [ "$(stat -c %a "$f")" = 644 ]
     grep -q '^30 2 \* \* \* root .* --task platform-backup-run tainacan scheduled' "$f"
     grep -q '^30 3 \* \* 0 root .* --task platform-backup-maintain tainacan' "$f"

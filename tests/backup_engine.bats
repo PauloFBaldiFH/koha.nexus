@@ -12,7 +12,7 @@
 setup() {
     REPO="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     T="$BATS_TEST_TMPDIR"
-    export KEI_OWNED_DIR="$T/owned" KEI_BK_ROOT="$T/backups" KEI_BK_CRON="$T/cron.d/koha-nexus-platform-backups"
+    export KEI_OWNED_DIR="$T/owned" KEI_BK_ROOT="$T/backups" KEI_BK_CRON="$T/cron.d/koha-nexus-platform-backups" KEI_BK_NEED_CRON=0
     export RCLONE_CONFIG="$T/rclone.conf" KEI_PANEL_COMMAND=/usr/local/bin/config.sh
     export DEMO="$T/demo"
     mkdir -p "$DEMO/data/sub" "$T/cron.d"

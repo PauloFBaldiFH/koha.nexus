@@ -13482,6 +13482,7 @@ kei_tainacan_uninstall() {
     kei_platform_release "$KEI_TAINACAN_ID" >/dev/null || failed=1
     kei_owned_del package apache2 "$KEI_TAINACAN_ID"
     [ -n "$(_kei_bk_get schedule_tainacan)" ] && kei_backup_schedule tainacan off >/dev/null 2>&1
+    kei_owned_del package cron "$KEI_TAINACAN_ID"
     if [ "$data" = delete ]; then
         rm -rf -- "$KEI_TAINACAN_DIR"
     else
@@ -14404,6 +14405,15 @@ kei_backup_schedule() {
             _kei_bk_set "schedule_$p" "$v" ;;
         *) echo "$(t "Use HH:MM (00:00 to 23:59) or off.")" >&2; return 2 ;;
     esac
+    # A schedule needs cron (a minimal Debian has none): installed and
+    # registered for the platform, never removed by Koha.Nexus
+    # (KEI_BK_NEED_CRON=0: the unit tests, with their own cron directory).
+    if [ "$v" != off ] && [ "${KEI_BK_NEED_CRON:-1}" = 1 ] && { ! command -v cron >/dev/null 2>&1 || [ ! -d "${KEI_BK_CRON%/*}" ]; }; then
+        apt_install cron >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron >/dev/null 2>&1 \
+            || { echo "$(t "cron could not be installed: backups cannot be scheduled.")" >&2; _kei_bk_set "schedule_$p" ""; return 1; }
+        kei_owned_add package cron "$p" no || true
+        systemctl enable --now cron >/dev/null 2>&1 || true
+    fi
     tmp=$(mktemp) || return 1
     {
         printf '# Managed by Koha.Nexus: backups of the platforms. config.sh writes it again.\n'
