@@ -33,6 +33,8 @@ ingress:
     service: http://localhost:8080
   - hostname: acervo.example.org
     service: http://localhost:8091
+  - hostname: wiki.example.org
+    service: http://localhost:80
   - service: http_status:404
 EOF
     printf '#!/bin/bash\n' > /usr/local/bin/config.sh
@@ -43,6 +45,8 @@ EOF
     fake_server
     printf 'apache-site\tzz-koha-nexus-acervo.conf\ttainacan\tno\t-\t-\ningress\tacervo.example.org\ttainacan\tno\t-\thttp://localhost:8091\n' \
         > /var/lib/koha-nexus/owned.tsv
+    printf 'ingress\tcatalog.example.org\tkoha\tno\t-\thttp://localhost:80\ningress\tadmin.example.org\tkoha\tno\t-\thttp://localhost:8080\n' \
+        >> /var/lib/koha-nexus/owned.tsv
     run bash "$REPO/uninstall.sh" --full --yes
     [[ "$output" == *"Apache e cloudflared mantidos"* ]]
     dpkg-query -W -f='${Status}' apache2 | grep -q 'ok installed'
@@ -53,7 +57,11 @@ EOF
     [[ "$output" == *"acervo.example.org"* ]]
     [[ "$output" != *"catalog.example.org"* ]] && [[ "$output" != *"localhost:8080"* ]]
     [[ "$output" == *"http_status:404"* ]]
+    # An entry added by hand stays, even on Koha's port.
+    [[ "$output" == *"wiki.example.org"* ]]
     grep -q '^ingress	acervo.example.org	tainacan' /var/lib/koha-nexus/owned.tsv
+    run grep -c '	koha	' /var/lib/koha-nexus/owned.tsv
+    [ "$output" = 0 ]
 }
 
 @test "with no other platform, --full removes Apache as before" {
@@ -61,7 +69,8 @@ EOF
     rm -f /var/lib/koha-nexus/owned.tsv
     run bash "$REPO/uninstall.sh" --full --yes
     [[ "$output" != *"mantidos"* ]]
-    ! dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q 'ok installed'
+    run dpkg-query -W -f='${Status}' apache2
+    [[ "$output" != *"ok installed"* ]]
     [ ! -e /usr/local/bin/config.sh ]
     [ ! -e /etc/cloudflared ]
     [ ! -e /var/lib/koha-nexus ]

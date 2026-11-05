@@ -279,13 +279,25 @@ else
 fi
 rm -rf /var/backups/koha_sql /var/backups/koha_marc
 if keep_shared; then
-    # Só as duas linhas do Koha (portas 80 e 8080) saem do ingress.
+    # Só as entradas do Koha saem do ingress: as que o registro dá ao Koha
+    # ou, num arquivo anterior ao registro, a primeira em localhost:80 e a
+    # primeira em localhost:8080. Entradas feitas à mão ficam.
+    koha_hosts=" $(awk -F'\t' '$1 == "ingress" && $3 == "koha" { printf "%s ", $2 }' "$OWNED_FILE")"
     for conf in /etc/cloudflared/config.yml; do
         [ -f "$conf" ] || continue
-        awk '/^[[:space:]]*- hostname:/ { held = $0; next }
-             held != "" { if ($0 ~ /service:[[:space:]]*http:\/\/localhost:(80|8080)[[:space:]]*$/) { held = ""; next }
-                          print held; held = "" }
-             { print }' "$conf" > "$conf.tmp" && mv -f "$conf.tmp" "$conf"
+        awk -v koha="$koha_hosts" '
+            /^[[:space:]]*- hostname:/ { held = $0; h = $0; sub(/.*hostname:[[:space:]]*/, "", h); gsub(/["\047[:space:]]/, "", h); next }
+            held != "" {
+                drop = 0
+                if (koha != " ") drop = index(koha, " " h " ") > 0
+                else if ($0 ~ /service:[[:space:]]*http:\/\/localhost:80[[:space:]]*$/ && !k80) drop = k80 = 1
+                else if ($0 ~ /service:[[:space:]]*http:\/\/localhost:8080[[:space:]]*$/ && !k8080) drop = k8080 = 1
+                held_line = held; held = ""
+                if (drop) next
+                print held_line
+            }
+            { print }' "$conf" > "$conf.tmp" && cat "$conf.tmp" > "$conf"
+        rm -f "$conf.tmp"
     done
     systemctl try-restart cloudflared >/dev/null 2>&1 || true
     awk -F'\t' '$3 != "koha"' "$OWNED_FILE" > "$OWNED_FILE.tmp" && mv -f "$OWNED_FILE.tmp" "$OWNED_FILE"
