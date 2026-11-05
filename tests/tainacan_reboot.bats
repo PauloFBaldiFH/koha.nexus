@@ -37,6 +37,31 @@ SYS_LANG=en
 $1" 3>&-
 }
 
+# seed_php NAME TITLE: PHP that creates a published collection and a
+# published item through the plugin's REST routes, called from inside
+# WordPress (rest_do_request), the way Tainacan's own admin does it: the item
+# is created as a draft and then published with PATCH (Tainacan 1.4.1
+# refuses a POST that publishes an item directly: "Entities must be
+# validated before you can save them"). A refused call stops with its
+# answer on stderr. Prints "COLLECTION_ID ITEM_ID".
+seed_php() {
+    cat <<PHP
+<?php
+function kn_rest(\$m, \$path, \$body) {
+    \$r = new WP_REST_Request(\$m, \$path);
+    \$r->set_header("content-type", "application/json");
+    \$r->set_body(json_encode(\$body));
+    \$res = rest_do_request(\$r);
+    if (\$res->get_status() >= 300) { fwrite(STDERR, \$m . " " . \$path . ": " . json_encode(\$res->get_data()) . "\n"); exit(1); }
+    return \$res->get_data();
+}
+\$c = kn_rest("POST", "/tainacan/v2/collections", ["name" => "$1", "status" => "publish"]);
+\$i = kn_rest("POST", "/tainacan/v2/collection/" . \$c["id"] . "/items", ["title" => "$2", "status" => "draft"]);
+kn_rest("PATCH", "/tainacan/v2/items/" . \$i["id"], ["status" => "publish"]);
+echo \$c["id"], " ", \$i["id"];
+PHP
+}
+
 counts() { lib '_kei_tn_counts' | awk '{ print $1, $2, $3 }'; }
 api() { curl -s --max-time 20 --resolve "$NAME:80:127.0.0.1" "http://$NAME/?rest_route=/tainacan/v2/collections"; }
 json_len() { python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d) if isinstance(d, list) else -1)'; }
@@ -57,15 +82,7 @@ mono() { systemctl show -p "$2" --value "$1"; }
     run lib "kei_tainacan_install confirm http://$NAME"
     echo "$output" >&3
     [ "$status" -eq 0 ]
-    printf '%s\n' '<?php
-$r = new WP_REST_Request("POST", "/tainacan/v2/collections");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["name" => "Antes de reiniciar", "status" => "publish"]));
-$c = rest_do_request($r)->get_data();
-$r = new WP_REST_Request("POST", "/tainacan/v2/collection/" . $c["id"] . "/items");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["title" => "Item", "status" => "publish"]));
-rest_do_request($r);' > "$TN/work/r.php"
+    printf '%s\n' "$(seed_php "Antes de reiniciar" "Item")" > "$TN/work/r.php"
     chmod 644 "$TN/work/r.php"
     lib '_kei_tn_wp eval-file /work/r.php --user=knadmin'
     [ "$(api | json_len)" = 1 ]

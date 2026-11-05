@@ -109,6 +109,31 @@ koha_answers_as_before() {
     diff <(lib 'kei_apache_vhost_map' | grep -v 'zz-koha-nexus-tainacan') "$S/apache_before"
 }
 
+# seed_php NAME TITLE: PHP that creates a published collection and a
+# published item through the plugin's REST routes, called from inside
+# WordPress (rest_do_request), the way Tainacan's own admin does it: the item
+# is created as a draft and then published with PATCH (Tainacan 1.4.1
+# refuses a POST that publishes an item directly: "Entities must be
+# validated before you can save them"). A refused call stops with its
+# answer on stderr. Prints "COLLECTION_ID ITEM_ID".
+seed_php() {
+    cat <<PHP
+<?php
+function kn_rest(\$m, \$path, \$body) {
+    \$r = new WP_REST_Request(\$m, \$path);
+    \$r->set_header("content-type", "application/json");
+    \$r->set_body(json_encode(\$body));
+    \$res = rest_do_request(\$r);
+    if (\$res->get_status() >= 300) { fwrite(STDERR, \$m . " " . \$path . ": " . json_encode(\$res->get_data()) . "\n"); exit(1); }
+    return \$res->get_data();
+}
+\$c = kn_rest("POST", "/tainacan/v2/collections", ["name" => "$1", "status" => "publish"]);
+\$i = kn_rest("POST", "/tainacan/v2/collection/" . \$c["id"] . "/items", ["title" => "$2", "status" => "draft"]);
+kn_rest("PATCH", "/tainacan/v2/items/" . \$i["id"], ["status" => "publish"]);
+echo \$c["id"], " ", \$i["id"];
+PHP
+}
+
 tn() { lib "$1"; }
 counts() { lib '_kei_tn_counts' | awk '{ print $1, $2, $3 }'; }
 wp_cid() { docker ps -q --filter label=com.docker.compose.project=kn-tainacan --filter label=com.docker.compose.service=wordpress; }
@@ -179,16 +204,7 @@ wp_php() {
 @test "real data: a collection, an item and an attachment, seen by the API" {
     python3 -c 'import base64,sys; open(sys.argv[1],"wb").write(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))' "$TN/work/sample.png"
     chmod 644 "$TN/work/sample.png"
-    run wp_php '<?php
-$r = new WP_REST_Request("POST", "/tainacan/v2/collections");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["name" => "Acervo de teste", "status" => "publish"]));
-$c = rest_do_request($r)->get_data();
-$r = new WP_REST_Request("POST", "/tainacan/v2/collection/" . $c["id"] . "/items");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["title" => "Item 1", "status" => "publish"]));
-$i = rest_do_request($r)->get_data();
-echo $c["id"], " ", $i["id"];'
+    run wp_php "$(seed_php "Acervo de teste" "Item 1")"
     echo "$output" >&3
     [ "$status" -eq 0 ]
     read -r cid iid <<< "${lines[-1]}"
@@ -256,16 +272,7 @@ echo $c["id"], " ", $i["id"];'
 }
 
 @test "the data changes after the backup" {
-    run wp_php '<?php
-$r = new WP_REST_Request("POST", "/tainacan/v2/collections");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["name" => "Segunda", "status" => "publish"]));
-$c = rest_do_request($r)->get_data();
-$r = new WP_REST_Request("POST", "/tainacan/v2/collection/" . $c["id"] . "/items");
-$r->set_header("content-type", "application/json");
-$r->set_body(json_encode(["title" => "Item 2", "status" => "publish"]));
-rest_do_request($r);
-echo "ok";'
+    run wp_php "$(seed_php "Segunda" "Item 2")"
     [ "$status" -eq 0 ]
     [ "$(counts)" = "2 2 1" ]
 }
