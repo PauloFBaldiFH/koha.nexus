@@ -14,21 +14,20 @@ STEP:
           the admin page), then opens them in the admin.
   public  without a login: the published collection and item can be found
           from the home page and by search; the private ones cannot.
+  direct  the pages Tainacan serves (/colecoes/, /itens/, the collection,
+          its search, the item) opened by their address, not from the home.
 
 The administrator's user and password come from KN_USER and KN_PASS (the
 test machine's own, never printed). Each screenshot is written to OUTDIR
-and also printed as base64 between "@@shot NAME" and "@@end" lines, so
-the CI log carries it. Facts are printed as "fact NAME=VALUE" lines; a
+(the workflow publishes them for review). Facts are printed as "fact NAME=VALUE" lines; a
 failed check prints "FAIL ..." and the script exits 1 at the end.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import sys
-import textwrap
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -50,13 +49,10 @@ def check(ok: bool, what: str) -> None:
 
 
 def shot(page, name: str, full: bool = True) -> None:
-    path = OUT / f"{name}.png"
-    page.screenshot(path=str(path), full_page=full)
-    data = base64.b64encode(path.read_bytes()).decode()
-    print(f"@@shot {name}")
-    for line in textwrap.wrap(data, 8000):
-        print(line)
-    print("@@end", flush=True)
+    """A screenshot in OUT (the workflow keeps them and publishes them for
+    review); never printed in the log."""
+    page.screenshot(path=str(OUT / f"{name}.png"), full_page=full)
+    print(f"shot {name}.png", flush=True)
 
 
 def visible_text(page) -> str:
@@ -219,7 +215,64 @@ def step_public(page) -> None:
 def rest_anonymous(page, path: str):
     return page.evaluate(
         """async (path) => { const r = await fetch("/wp-json" + path, {credentials: "omit"});
-            return {status: r.status}; }""", path)
+            let body = null; try { body = await r.json(); } catch (e) {}
+            return {status: r.status, body}; }""", path)
+
+
+def step_direct(page) -> None:
+    """The public pages Tainacan itself serves, opened by their address
+    (not from the home page): do they work when the address is known?"""
+    seed = json.loads(STATE.read_text())
+    page.goto(f"{URL}/", wait_until="networkidle")
+    col = rest_anonymous(page, f"/tainacan/v2/collections/{seed['public_collection']}")
+    col_url = (col.get("body") or {}).get("url") or ""
+    fact("direct.collection_api_status", col["status"])
+    fact("direct.collection_url", col_url)
+    items = rest_anonymous(page, f"/tainacan/v2/collection/{seed['public_collection']}/items?fetch_only=title,url")
+    body = items.get("body") or {}
+    rows = body.get("items") if isinstance(body, dict) else body
+    item_url = ""
+    for row in rows or []:
+        if isinstance(row, dict) and "Mapa" in str(row.get("title")):
+            item_url = row.get("url") or ""
+    fact("direct.item_url", item_url)
+    for name, path in (("10-collections-archive", "/colecoes/"), ("11-items-repository", "/itens/")):
+        resp = page.goto(f"{URL}{path}", wait_until="networkidle")
+        page.wait_for_timeout(4000)
+        shot(page, name)
+        text = visible_text(page)
+        fact(f"direct.{name}.http", resp.status if resp else 0)
+        fact(f"direct.{name}.text", text[:400])
+        if name.startswith("10"):
+            check("Acervo E2E Público" in text, "the collections page (/colecoes/) lists the public collection")
+            check("Acervo E2E Restrito" not in text, "the collections page hides the private collection")
+        else:
+            check("Mapa antigo" in text, "the items page (/itens/) lists the published item")
+            check("Documento interno" not in text, "the items page hides the private item")
+    if col_url:
+        page.goto(col_url, wait_until="networkidle")
+        page.wait_for_timeout(5000)
+        shot(page, "12-collection-page")
+        text = visible_text(page)
+        fact("direct.collection_text", text[:400])
+        check("Mapa antigo" in text, "the collection page lists the published item")
+        search = page.locator("input[type=search], input[placeholder*=usca], input[placeholder*=earch]")
+        fact("direct.collection_search_boxes", search.count())
+        if search.count():
+            search.first.fill("cartografia")
+            search.first.press("Enter")
+            page.wait_for_timeout(5000)
+            shot(page, "13-collection-search")
+            check("Mapa antigo" in visible_text(page), "the collection's own search finds the item by its description")
+    if item_url:
+        page.goto(item_url, wait_until="networkidle")
+        page.wait_for_timeout(4000)
+        shot(page, "14-item-page")
+        text = visible_text(page)
+        fact("direct.item_text", text[:400])
+        check("Mapa antigo" in text, "the item page opens without a login")
+        imgs = page.eval_on_selector_all("img", "els => els.map(e => e.currentSrc || e.src)")
+        check(any("e2e-capa" in i for i in imgs), "the item's image is shown on its page")
 
 
 def main() -> int:
@@ -227,7 +280,7 @@ def main() -> int:
         browser = p.chromium.launch()
         context = browser.new_context(viewport={"width": 1366, "height": 900}, locale="pt-BR")
         page = context.new_page()
-        {"look": step_look, "seed": step_seed, "public": step_public}[STEP](page)
+        {"look": step_look, "seed": step_seed, "public": step_public, "direct": step_direct}[STEP](page)
         browser.close()
     for f in FAILS:
         print(f"FAILED: {f}")

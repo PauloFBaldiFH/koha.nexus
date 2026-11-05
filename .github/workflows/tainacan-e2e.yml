@@ -3,7 +3,10 @@
 # panel's tasks, log in, create a collection and an item with an image,
 # find them without a login, keep private content private, survive a
 # Docker restart and a reboot, back up and restore in isolation. The
-# screenshots are kept as an artifact and printed in the log.
+# screenshots are kept as an artifact and, outside pull requests, also
+# committed to the claude/project-thread-evltj0-evidence branch (only
+# PNG files and the read-only probe's facts, never a password) so they can
+# be reviewed without downloading the artifact.
 name: Tainacan end to end
 
 on:
@@ -22,7 +25,7 @@ on:
       - ".github/workflows/tainacan-e2e.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   e2e:
@@ -54,6 +57,27 @@ jobs:
           name: tainacan-e2e-${{ strategy.job-index }}
           path: ${{ runner.temp }}/e2e
           if-no-files-found: ignore
+      - name: Publish the screenshots for review
+        if: always() && github.event_name != 'pull_request'
+        env:
+          BRANCH: claude/project-thread-evltj0-evidence
+          TOKEN: ${{ github.token }}
+        run: |
+          src="$RUNNER_TEMP/e2e"
+          [ -d "$src" ] || exit 0
+          dir="$RUNNER_TEMP/evidence"
+          rm -rf "$dir" && mkdir -p "$dir" && cd "$dir"
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth 1 origin "$BRANCH"; then git checkout -q -b evidence FETCH_HEAD; else git checkout -q --orphan evidence; fi
+          rm -rf tainacan-e2e && mkdir tainacan-e2e
+          cp "$src"/*.png "$src"/probe-*.txt tainacan-e2e/ 2>/dev/null || true
+          echo "commit ${GITHUB_SHA} run ${GITHUB_RUN_ID}" > tainacan-e2e/RUN.txt
+          git add -A tainacan-e2e
+          git commit -q -m "Tainacan e2e screenshots, run ${GITHUB_RUN_ID}"
+          git push -q origin "HEAD:refs/heads/${BRANCH}"
       - name: Stop
         if: always()
         run: tests/system/container.sh stop kn-e2e

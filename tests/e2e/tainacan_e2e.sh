@@ -69,6 +69,7 @@ section "3-5. browser: collections and items"
 B seed || fail "browser seed"
 section "6-7. browser: public and private"
 B public || fail "browser public"
+B direct || fail "browser direct addresses"
 
 section "8. persistence: Docker restart"
 counts_before=$(in_vm 'bash -c "source /usr/local/bin/config.sh >/dev/null 2>&1; _kei_tn_counts"' 2>/dev/null)
@@ -87,9 +88,12 @@ B public || fail "browser public after the reboot"
 
 section "9. backup and isolated restore test"
 if task tainacan-backup; then ok "backup"; else fail "backup"; fi
-rt=$(task tainacan-restore-test latest)
+# The message is in the installer's language: the exit status and the
+# counts it compared ("(ok COLLECTIONS ITEMS ATTACHMENTS)") are what count.
+if rt=$(task tainacan-restore-test latest); then rt_ok=1; else rt_ok=0; fi
 echo "$rt"
-printf '%s' "$rt" | grep -q 'passed\|Restore test passed' && ok "isolated restore test" || fail "isolated restore test"
+[ "$rt_ok" = 1 ] && printf '%s' "$rt" | grep -q '(ok [0-9]* [0-9]* [0-9]*)' && ok "isolated restore test" \
+    || fail "isolated restore test"
 
 section "probe at the end"
 in_vm kn-probe | tee "$out/probe-end.txt"
