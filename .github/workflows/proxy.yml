@@ -103,7 +103,7 @@ jobs:
           tests/system/container.sh start "${{ matrix.image }}" kn-system
       - name: cloudflared (its own validation of the tunnel file)
         run: |
-          curl -fsSL -o cloudflared.deb \
+          curl -fsSL --retry 5 --retry-all-errors -o cloudflared.deb \
             https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           # Not /tmp: Debian 13 mounts a tmpfs over it.
           docker cp cloudflared.deb kn-system:/root/cloudflared.deb

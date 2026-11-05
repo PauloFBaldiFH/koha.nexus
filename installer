@@ -13924,7 +13924,7 @@ _kei_bk_capture() {
                     printf '  "snapshot": %s,\n' "$(json_str "$snap")"
                     printf '  "path": %s,\n' "$(json_str "$path")"
                     printf '  "files": %s,\n' "$(json_num "$(wc -l < "$dir/.files.list.full")")"
-                    printf '  "bytes": %s,\n' "$(json_num "$(awk -F'\t' '{ s += $2 } END { printf "%d", s }' "$dir/.files.list.full")")"
+                    printf '  "bytes": %s,\n' "$(json_num "$(awk -F'\t' '{ s += $2 } END { printf "%.0f", s }' "$dir/.files.list.full")")"
                     printf '  "list_sha256": %s\n' "$(json_str "$(_kei_bk_sha "$dir/.files.list.full")")"
                     printf '}\n'
                 } > "$dir/files.ref.json.part" && mv -f "$dir/files.ref.json.part" "$dir/files.ref.json" || rc=1
@@ -14164,7 +14164,7 @@ _kei_bk_free_bytes() {
     local d paths=()
     for d in "$KEI_BK_DIR" "$KEI_OWNED_DIR" /var/lib/docker "$KEI_BK_ROOT"; do [ -d "$d" ] && paths+=("$d"); done
     [ "${#paths[@]}" -gt 0 ] || { echo 0; return; }
-    df -PB1 "${paths[@]}" 2>/dev/null | awk 'NR > 1 && (m == "" || $4 < m) { m = $4 } END { print m + 0 }'
+    df -PB1 "${paths[@]}" 2>/dev/null | awk 'NR > 1 && (m == "" || $4 < m) { m = $4 } END { printf "%.0f\n", m + 0 }'
 }
 
 # kei_backup_check DIR [PLATFORM]: complete, valid manifest and checksums,
