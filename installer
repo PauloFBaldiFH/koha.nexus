@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.167"
+PANEL_VERSION=" 1.5.168"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -11302,13 +11302,25 @@ kei_apache_http_probe() {
     done <<< "$1"
 }
 
+# _kei_proxy_view SITE: the map (stdin) without the ports only SITE uses.
+# A platform may get a port of its own (Listen in its site, for access by
+# address on the local network); every port another site uses is still
+# compared line by line, so SITE can never become the default server of a
+# port that already exists.
+_kei_proxy_view() {
+    awk -v site="${1:-}" '
+        function base(s,  n, a) { n = split(s, a, "/"); return a[n] }
+        { line[NR] = $0; port[NR] = $2; if (base($NF) != site) shared[$2] = 1 }
+        END { for (i = 1; i <= NR; i++) if (port[i] in shared) print line[i] }'
+}
+
 # _kei_proxy_settled MAP HTTP SKIP: after a reload, the configuration and
 # the answers of the other sites are back to MAP and HTTP (a graceful reload
 # takes a moment to reach every worker).
 _kei_proxy_settled() {
     local i now
     for i in 1 2 3 4 5 6; do
-        now=$(kei_apache_vhost_map "$3")
+        now=$(kei_apache_vhost_map "$3" | _kei_proxy_view "$3")
         [ "$now" = "$1" ] && [ "$(kei_apache_http_probe "$now")" = "$2" ] && return 0
         sleep 1
     done
@@ -11380,7 +11392,9 @@ _kei_proxy_check_owner() {
 #  3. Apache's view of the other sites (apache2ctl -S) must be the same as
 #     before: same default server on every port, same names in the same
 #     files, and the new site may not claim a name already served;
-#     otherwise previous state back, no reload;
+#     otherwise previous state back, no reload. A port only the new site
+#     uses (its own Listen) is left out of the comparison
+#     (_kei_proxy_view);
 #  4. graceful reload; the other sites must answer as before (HTTP status),
 #     otherwise previous state back and reloaded;
 #  5. the registry gets the new sha256.
@@ -11395,7 +11409,7 @@ kei_proxy_apply_site() {
     _kei_proxy_check_owner "$platform" "$name"; rc=$?
     [ "$rc" = 0 ] || return "$rc"
     [ -L "$KEI_APACHE_DIR/sites-enabled/$name" ] && was_enabled=yes
-    map=$(kei_apache_vhost_map "$name")
+    map=$(kei_apache_vhost_map "$name" | _kei_proxy_view "$name")
     http=$(kei_apache_http_probe "$map")
     if [ -e "$file" ]; then
         backup=$(mktemp) && cp -p "$file" "$backup" || return 1
@@ -11409,7 +11423,7 @@ kei_proxy_apply_site() {
         log "proxy: $name refused by configtest; previous state kept"
         return 5
     fi
-    after=$(kei_apache_vhost_map "$name")
+    after=$(kei_apache_vhost_map "$name" | _kei_proxy_view "$name")
     if [ "$after" != "$map" ] \
        || [ -n "$(comm -12 <(kei_apache_site_names "$name") <(awk '$1 != "default" { print $2, $3 }' <<< "$map" | sort -u))" ]; then
         _kei_proxy_put "$name" "$backup" "$was_enabled"; rm -f "$backup"
@@ -11453,7 +11467,7 @@ kei_proxy_remove_site() {
     fi
     command -v apache2ctl >/dev/null 2>&1 || return 3
     [ -L "$KEI_APACHE_DIR/sites-enabled/$name" ] && was_enabled=yes
-    map=$(kei_apache_vhost_map "$name")
+    map=$(kei_apache_vhost_map "$name" | _kei_proxy_view "$name")
     http=$(kei_apache_http_probe "$map")
     backup=$(mktemp) && cp -p "$file" "$backup" || return 1
     _kei_proxy_disable "$name"
@@ -11463,7 +11477,7 @@ kei_proxy_remove_site() {
         printf '%s\n' "$err" >&2
         return 5
     fi
-    after=$(kei_apache_vhost_map "$name")
+    after=$(kei_apache_vhost_map "$name" | _kei_proxy_view "$name")
     if [ "$after" != "$map" ]; then
         _kei_proxy_put "$name" "$backup" "$was_enabled"; rm -f "$backup"
         echo "Removing the site would change how Apache serves the other sites: it was put back." >&2
@@ -12360,6 +12374,1230 @@ kei_docker_audit() {
 }
 
 # ======================================================================
+# TAINACAN (WordPress + the Tainacan plugin + MariaDB, in containers)
+# ----------------------------------------------------------------------
+# The first platform in containers. It lives on the network kn-tainacan
+# (isolated by the Docker block above) and nothing of Koha's is touched:
+# its own database server, its own volumes, and the web through Apache's
+# safe site functions (or the block for another web server).
+#
+#   /var/lib/koha-nexus/platforms/tainacan/   (700)
+#     compose.yml  generated; the images fixed by digest
+#     .env         passwords and WordPress salts (600), never in compose.yml
+#     state        key=value: status, url, port, access...
+#     php.ini      upload limits
+#     work/        the plugin package, after its checksums are checked
+#   volumes kn-tainacan-db and kn-tainacan-wp (labelled; never "down -v")
+#   /var/backups/koha-nexus/tainacan/knx-tainacan-<date>/   the backups
+#
+# Versions are fixed: WordPress and the plugin are never updated by
+# themselves (AUTOMATIC_UPDATER_DISABLED). The plugin is downloaded on the
+# host and each of its files is checked against the checksums wordpress.org
+# publishes before it is installed.
+#
+# Backup: the wordpress container is stopped (a graceful stop: requests in
+# progress finish), so every writer stops with it: the web, the REST API,
+# WP-Cron and Tainacan's background jobs. WordPress's maintenance mode is
+# not enough (it only turns away ordinary web requests). Then the database
+# dump and the copy of the whole WordPress tree; the container always comes
+# back. A backup without manifest.json is never offered for restore.
+#
+# Restore: first in an isolated copy (an internal Docker network, no port,
+# e-mail intercepted, WP-Cron off) where the data is checked against the
+# manifest; only then, after a safety backup of what is there, on the real
+# installation, which goes back to the safety backup if the check fails.
+# ======================================================================
+KEI_TAINACAN_ID="tainacan"
+KEI_TAINACAN_DIR="${KEI_TAINACAN_DIR:-$KEI_OWNED_DIR/platforms/tainacan}"
+KEI_TAINACAN_BACKUPS="${KEI_TAINACAN_BACKUPS:-/var/backups/koha-nexus/tainacan}"
+KEI_TAINACAN_PROJECT="kn-tainacan"
+KEI_TAINACAN_RT="kn-tainacan-rt"
+# Registry the images come from; tests behind a mirror change it. The
+# digest is what is checked, whatever the registry.
+KEI_TAINACAN_REGISTRY="${KEI_TAINACAN_REGISTRY:-docker.io}"
+KEI_TAINACAN_WP_IMAGE="library/wordpress:7.1.4-php8.3-apache@sha256:1f59452d2ceed177ad383d17b3a6a7a5c8225d89e34adb36880af8603ac244c2"
+KEI_TAINACAN_DB_IMAGE="library/mariadb:11.8.9-noble@sha256:c4124d1afa875e47f2892edf26b482fa54f796e2f342d3717a04ca091a22a9bd"
+KEI_TAINACAN_CLI_IMAGE="library/wordpress:cli-2.12.0-php8.3@sha256:6bcc7bb91f5157c4b915e74ee131873e99c1c1ff48f602e4a6f6cd17827305cb"
+KEI_TAINACAN_WP_VERSION="7.1.4"
+KEI_TAINACAN_PLUGIN_VERSION="1.4.1"
+KEI_TAINACAN_PLUGIN_URL="${KEI_TAINACAN_PLUGIN_URL:-https://downloads.wordpress.org/plugin/tainacan.$KEI_TAINACAN_PLUGIN_VERSION.zip}"
+KEI_TAINACAN_CHECKSUMS_URL="${KEI_TAINACAN_CHECKSUMS_URL:-https://downloads.wordpress.org/plugin-checksums/tainacan/$KEI_TAINACAN_PLUGIN_VERSION.json}"
+KEI_TAINACAN_KEEP="${KEI_TAINACAN_KEEP:-7}"
+KEI_TAINACAN_MIN_RAM_MB="${KEI_TAINACAN_MIN_RAM_MB:-768}"
+KEI_TAINACAN_MIN_DISK_MB="${KEI_TAINACAN_MIN_DISK_MB:-3072}"
+KEI_TAINACAN_LAN_PORTS="${KEI_TAINACAN_LAN_PORTS:-8090 8091 8092 8093 8094 8095 8096 8097 8098 8099}"
+KEI_TAINACAN_LOCAL_PORTS="${KEI_TAINACAN_LOCAL_PORTS:-18090 18091 18092 18093 18094 18095 18096 18097 18098 18099}"
+
+_kei_tn_image() {
+    case "$1" in
+        wp)  printf '%s/%s' "$KEI_TAINACAN_REGISTRY" "$KEI_TAINACAN_WP_IMAGE" ;;
+        db)  printf '%s/%s' "$KEI_TAINACAN_REGISTRY" "$KEI_TAINACAN_DB_IMAGE" ;;
+        cli) printf '%s/%s' "$KEI_TAINACAN_REGISTRY" "$KEI_TAINACAN_CLI_IMAGE" ;;
+    esac
+}
+
+_kei_tn_state_file() { printf '%s/state' "$KEI_TAINACAN_DIR"; }
+_kei_tn_get() { local f; f=$(_kei_tn_state_file); [ -f "$f" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "$f"; }
+_kei_tn_set() {
+    local f tmp
+    f=$(_kei_tn_state_file)
+    mkdir -p "$KEI_TAINACAN_DIR" && chmod 700 "$KEI_TAINACAN_DIR" || return 1
+    tmp=$(mktemp "$f.XXXXXX") || return 1
+    { [ -f "$f" ] && awk -F= -v k="$1" '$1 != k' "$f"; printf '%s=%s\n' "$1" "${2//$'\n'/ }"; } > "$tmp"
+    chmod 600 "$tmp" && mv -f "$tmp" "$f"
+}
+# A value of .env (KEY=VALUE, no quotes).
+_kei_tn_env() { [ -f "${2:-$KEI_TAINACAN_DIR}/.env" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "${2:-$KEI_TAINACAN_DIR}/.env"; }
+
+# _kei_tn_random N: N letters and digits (passwords and salts: no quote, $
+# or space, so .env and the YAML need no escaping).
+_kei_tn_random() {
+    local s=""
+    while [ "${#s}" -lt "$1" ]; do
+        s+=$(head -c 96 /dev/urandom | tr -dc 'A-Za-z0-9')
+    done
+    printf '%s' "${s:0:$1}"
+}
+
+# kei_tainacan_parse_url URL: "SCHEME HOST PORT" for http(s)://HOST[:PORT]
+# with no path; returns 2 otherwise. The host may be an IPv4 address.
+kei_tainacan_parse_url() {
+    local u="${1:-}" scheme rest host port=""
+    [[ "$u" =~ ^(https?)://([a-z0-9.-]+)(:([0-9]{1,5}))?/?$ ]] || return 2
+    scheme="${BASH_REMATCH[1]}"; host="${BASH_REMATCH[2]}"; port="${BASH_REMATCH[4]}"
+    if ! kei_valid_host "$host" && ! lan_ip_usable "$host" && [ "$host" != localhost ]; then return 2; fi
+    [ -n "$port" ] || { [ "$scheme" = https ] && port=443 || port=80; }
+    [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || return 2
+    rest="$scheme $host $port"
+    printf '%s\n' "$rest"
+}
+
+# The Host header WordPress sees for URL (host, plus the port when it is
+# not the scheme's own).
+_kei_tn_hostport() {
+    local scheme host port
+    read -r scheme host port < <(kei_tainacan_parse_url "$1") || return 2
+    if { [ "$scheme" = http ] && [ "$port" = 80 ]; } || { [ "$scheme" = https ] && [ "$port" = 443 ]; }; then
+        printf '%s' "$host"
+    else
+        printf '%s:%s' "$host" "$port"
+    fi
+}
+
+# _kei_tn_port_free PORT: nobody listens on it, Apache does not name it and
+# the registry does not hold it.
+_kei_tn_port_free() {
+    local p="$1"
+    ss -Hltn 2>/dev/null | awk '{ n = split($4, a, ":"); print a[n] }' | grep -qx "$p" && return 1
+    grep -rqsE "^[[:space:]]*Listen[[:space:]]+([0-9.]+:)?$p([[:space:]]|$)" "$KEI_APACHE_DIR"/ports.conf "$KEI_APACHE_DIR"/sites-enabled/ 2>/dev/null && return 1
+    [ -n "$(kei_owned_users ufw-port "$p")" ] && [ "$(kei_owned_users ufw-port "$p")" != "$KEI_TAINACAN_ID" ] && return 1
+    return 0
+}
+_kei_tn_pick_port() {
+    local p
+    for p in $1; do _kei_tn_port_free "$p" && { printf '%s' "$p"; return 0; }; done
+    return 1
+}
+
+# kei_tainacan_access URL: how the site is reached, from the URL and the
+# web server found (kei_proxy_detect):
+#   host      a name of its own: an Apache site on 80
+#   lan       no name (the server's address): an Apache site on a port of
+#             its own, opened in the firewall
+#   external  another web server owns 80/443: its configuration block
+#   none      no Apache: it would be installed first (apache2)
+kei_tainacan_access() {
+    local mode _s scheme host port
+    read -r mode _s < <(kei_proxy_detect)
+    read -r scheme host port < <(kei_tainacan_parse_url "$1") || return 2
+    case "$mode" in
+        external) echo external ;;
+        none)     if lan_ip_usable "$host"; then echo "none-lan"; else echo "none-host"; fi ;;
+        *)        if lan_ip_usable "$host"; then echo lan; else echo host; fi ;;
+    esac
+}
+
+# kei_tainacan_default_url: the address used when none is given: the
+# server's address on the first free LAN port.
+kei_tainacan_default_url() {
+    local p
+    p=$(_kei_tn_get lan_port)
+    [ -n "$p" ] || p=$(_kei_tn_pick_port "$KEI_TAINACAN_LAN_PORTS") || return 1
+    printf 'http://%s:%s' "$(get_server_ip)" "$p"
+}
+
+# ----------------------------------------------------------------------
+# Files: compose.yml (no secret in it), .env (600), php.ini.
+# ----------------------------------------------------------------------
+# _kei_tn_compose prod|rt: the compose file. "rt" is the isolated copy of a
+# restore test: other names, no port, an internal network, the e-mail
+# intercepted and WP-Cron off.
+_kei_tn_compose() {
+    local mode="${1:-prod}" project net vdb vwp ports="" extra_mount="" rtenv=""
+    if [ "$mode" = rt ]; then
+        project="$KEI_TAINACAN_RT"; net="$KEI_TAINACAN_RT"; vdb="kn-tainacan-rt-db"; vwp="kn-tainacan-rt-wp"
+        extra_mount="      - ./kn-restore-test.php:/var/www/html/wp-content/mu-plugins/kn-restore-test.php:ro"
+        rtenv="      KN_RESTORE_TEST: \"1\""
+    else
+        project="$KEI_TAINACAN_PROJECT"; net="kn-tainacan"; vdb="kn-tainacan-db"; vwp="kn-tainacan-wp"
+        ports=$'    ports:\n      - "127.0.0.1:${KN_PORT}:80"'
+    fi
+    cat <<EOF
+# Managed by Koha.Nexus: tainacan. Do not edit: config.sh writes it again.
+# Passwords and salts are in .env (600) next to this file.
+name: $project
+x-kn: &kn
+  security_opt: ["no-new-privileges:true"]
+  labels:
+    $KEI_DOCKER_LABEL.managed: "true"
+    $KEI_DOCKER_LABEL.platform: "$KEI_TAINACAN_ID"
+  networks: [kn]
+x-wpenv: &wpenv
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: \${KN_DB_PASSWORD}
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_AUTH_KEY: \${KN_AUTH_KEY}
+  WORDPRESS_SECURE_AUTH_KEY: \${KN_SECURE_AUTH_KEY}
+  WORDPRESS_LOGGED_IN_KEY: \${KN_LOGGED_IN_KEY}
+  WORDPRESS_NONCE_KEY: \${KN_NONCE_KEY}
+  WORDPRESS_AUTH_SALT: \${KN_AUTH_SALT}
+  WORDPRESS_SECURE_AUTH_SALT: \${KN_SECURE_AUTH_SALT}
+  WORDPRESS_LOGGED_IN_SALT: \${KN_LOGGED_IN_SALT}
+  WORDPRESS_NONCE_SALT: \${KN_NONCE_SALT}
+  WORDPRESS_CONFIG_EXTRA: |
+    define('AUTOMATIC_UPDATER_DISABLED', true);
+    define('WP_AUTO_UPDATE_CORE', false);
+    if (isset(\$\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$\$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { \$\$_SERVER['HTTPS'] = 'on'; }
+    if (getenv('KN_RESTORE_TEST')) { define('DISABLE_WP_CRON', true); define('WP_HTTP_BLOCK_EXTERNAL', true); }
+services:
+  db:
+    <<: *kn
+    image: $(_kei_tn_image db)
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: \${KN_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: \${KN_DB_ROOT_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+  wordpress:
+    <<: *kn
+    image: $(_kei_tn_image wp)
+    restart: unless-stopped
+    stop_grace_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+$ports
+    environment:
+      <<: *wpenv
+$rtenv
+    volumes:
+      - wp:/var/www/html
+      - ./php.ini:/usr/local/etc/php/conf.d/zz-koha-nexus.ini:ro
+$extra_mount
+  cli:
+    <<: *kn
+    image: $(_kei_tn_image cli)
+    profiles: ["tools"]
+    user: "33:33"
+    environment:
+      <<: *wpenv
+      HOME: /tmp
+$rtenv
+    volumes:
+      - wp:/var/www/html
+      - ./work:/work:ro
+$extra_mount
+volumes:
+  db:
+    name: $vdb
+    labels:
+      $KEI_DOCKER_LABEL.managed: "true"
+      $KEI_DOCKER_LABEL.platform: "$KEI_TAINACAN_ID"
+  wp:
+    name: $vwp
+    labels:
+      $KEI_DOCKER_LABEL.managed: "true"
+      $KEI_DOCKER_LABEL.platform: "$KEI_TAINACAN_ID"
+networks:
+  kn:
+    name: $net
+    external: true
+EOF
+}
+
+# The e-mail interceptor of the restore test: wp_mail() sends nothing and
+# says so in the PHP log.
+_kei_tn_nomail_plugin() {
+    cat <<'EOF'
+<?php
+/* Koha.Nexus restore test: no e-mail leaves this copy. */
+add_filter('pre_wp_mail', function ($return, $atts) {
+    error_log('koha-nexus restore test: e-mail intercepted: ' . (is_array($atts['to']) ? implode(',', $atts['to']) : $atts['to']));
+    return false;
+}, 1, 2);
+EOF
+}
+
+_kei_tn_php_ini() {
+    cat <<'EOF'
+; Koha.Nexus: room for the digital objects of a collection.
+upload_max_filesize = 512M
+post_max_size = 512M
+memory_limit = 512M
+max_execution_time = 300
+max_input_time = 300
+EOF
+}
+
+# _kei_tn_write_env DIR PORT: a new .env (only when there is none: a kept
+# installation keeps its passwords, the database knows them).
+_kei_tn_write_env() {
+    local dir="$1" port="$2" k
+    [ -f "$dir/.env" ] && return 0
+    (
+        umask 077
+        {
+            printf 'KN_PORT=%s\n' "$port"
+            printf 'KN_DB_PASSWORD=%s\n' "$(_kei_tn_random 32)"
+            printf 'KN_DB_ROOT_PASSWORD=%s\n' "$(_kei_tn_random 32)"
+            for k in AUTH_KEY SECURE_AUTH_KEY LOGGED_IN_KEY NONCE_KEY AUTH_SALT SECURE_AUTH_SALT LOGGED_IN_SALT NONCE_SALT; do
+                printf 'KN_%s=%s\n' "$k" "$(_kei_tn_random 64)"
+            done
+            printf 'KN_ADMIN_USER=%s\n' "knadmin"
+            printf 'KN_ADMIN_PASSWORD=%s\n' "$(_kei_tn_random 24)"
+        } > "$dir/.env.tmp" && mv -f "$dir/.env.tmp" "$dir/.env"
+    )
+}
+
+# _kei_tn_set_env_port DIR PORT: the local port, kept in .env.
+_kei_tn_set_env_port() {
+    local f="$1/.env"
+    [ -f "$f" ] || return 1
+    if grep -q '^KN_PORT=' "$f"; then sed -i "s/^KN_PORT=.*/KN_PORT=$2/" "$f"; else printf 'KN_PORT=%s\n' "$2" >> "$f"; fi
+}
+
+# kei_tainacan_write_files: compose.yml, php.ini and work/ in the
+# platform's directory (700); .env only if missing.
+kei_tainacan_write_files() {
+    local dir="$KEI_TAINACAN_DIR" port
+    mkdir -p "$dir/work" && chmod 700 "$dir" || return 1
+    port=$(_kei_tn_env KN_PORT)
+    [ -n "$port" ] || port=$(_kei_tn_pick_port "$KEI_TAINACAN_LOCAL_PORTS") || {
+        echo "$(t "No free local port was found for Tainacan.")" >&2; return 5; }
+    _kei_tn_write_env "$dir" "$port" || return 1
+    chmod 600 "$dir/.env"
+    _kei_tn_compose prod > "$dir/compose.yml.tmp" && mv -f "$dir/compose.yml.tmp" "$dir/compose.yml" || return 1
+    _kei_tn_php_ini > "$dir/php.ini" || return 1
+    chmod 644 "$dir/compose.yml" "$dir/php.ini"
+    chmod 755 "$dir/work"
+}
+
+# _kei_tn_dc [rt|prod] ARGS: docker compose on the platform's project (rt:
+# the isolated copy of a restore test).
+_kei_tn_dc() {
+    local dir="$KEI_TAINACAN_DIR"
+    case "${1:-}" in
+        rt) shift; dir="$KEI_TAINACAN_DIR/rt" ;;
+        prod) shift ;;
+    esac
+    timeout "${KEI_TAINACAN_TIMEOUT:-900}" docker compose --project-directory "$dir" -f "$dir/compose.yml" "$@"
+}
+_kei_tn_cid() { _kei_tn_dc "${2:-prod}" ps -aq "$1" 2>/dev/null | head -n 1; }
+_kei_tn_wp() {
+    # wp-cli in a throwaway container on the platform's network.
+    local which=prod
+    [ "${1:-}" = rt ] && { which=rt; shift; }
+    if [ "$which" = rt ]; then _kei_tn_dc rt run --rm -T --no-deps cli wp "$@"
+    else _kei_tn_dc run --rm -T --no-deps cli wp "$@"; fi
+}
+# _kei_tn_sql [rt] QUERY: one query on the WordPress database, as root.
+_kei_tn_sql() {
+    local which=prod dir="$KEI_TAINACAN_DIR" cid
+    case "${1:-}" in
+        rt) which=rt; dir="$KEI_TAINACAN_DIR/rt"; shift ;;
+        prod) shift ;;
+    esac
+    cid=$(_kei_tn_cid db "$which") || return 1
+    [ -n "$cid" ] || return 1
+    _kei_docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" \
+        mariadb -uroot -N -B wordpress -e "$1"
+}
+
+# ----------------------------------------------------------------------
+# The plugin: downloaded on the host, checked file by file against the
+# checksums published by wordpress.org, before WordPress sees it.
+# ----------------------------------------------------------------------
+# kei_tainacan_verify_plugin ZIP CHECKSUMS_JSON VERSION: 0 when every file
+# of the package is in the list with the same sha256 and every listed file
+# is in the package; nothing outside tainacan/, no absolute path or "..".
+kei_tainacan_verify_plugin() {
+    command -v python3 >/dev/null 2>&1 || { echo "python3 is needed to check the plugin." >&2; return 3; }
+    python3 -I - "$1" "$2" "$3" <<'PYEOF'
+import hashlib, json, sys, zipfile
+zpath, jpath, version = sys.argv[1:4]
+try:
+    data = json.load(open(jpath, encoding="utf-8"))
+except Exception as exc:
+    print("checksums: unreadable (%s)" % exc); sys.exit(1)
+if data.get("plugin") != "tainacan" or str(data.get("version")) != version:
+    print("checksums: not for tainacan %s" % version); sys.exit(1)
+files = data.get("files") or {}
+if not files:
+    print("checksums: empty list"); sys.exit(1)
+try:
+    z = zipfile.ZipFile(zpath)
+except Exception as exc:
+    print("package: not a zip file (%s)" % exc); sys.exit(1)
+seen, bad = set(), []
+for info in z.infolist():
+    name = info.filename
+    if name.startswith("/") or "\\" in name or ".." in name.split("/"):
+        bad.append("unsafe path: " + name); continue
+    if not name.startswith("tainacan/"):
+        bad.append("outside tainacan/: " + name); continue
+    if info.is_dir():
+        continue
+    rel = name[len("tainacan/"):]
+    want = files.get(rel)
+    if want is None:
+        bad.append("not in the published list: " + rel); continue
+    want = want.get("sha256") if isinstance(want, dict) else None
+    if isinstance(want, list):
+        want = want
+    got = hashlib.sha256(z.read(info)).hexdigest()
+    if (isinstance(want, list) and got not in want) or (isinstance(want, str) and got != want) or want is None:
+        bad.append("checksum differs: " + rel)
+    seen.add(rel)
+missing = [f for f in files if f not in seen]
+for f in missing[:20]:
+    bad.append("missing from the package: " + f)
+if bad:
+    print("\n".join(bad[:30])); sys.exit(1)
+print("ok %d files" % len(seen))
+PYEOF
+}
+
+# _kei_tn_fetch_plugin: the package in work/ (checked), or an error.
+_kei_tn_fetch_plugin() {
+    local work="$KEI_TAINACAN_DIR/work" zip json out
+    zip="$work/tainacan.$KEI_TAINACAN_PLUGIN_VERSION.zip"
+    json="$work/tainacan.$KEI_TAINACAN_PLUGIN_VERSION.checksums.json"
+    if [ -f "$zip" ] && [ -f "$json" ] && kei_tainacan_verify_plugin "$zip" "$json" "$KEI_TAINACAN_PLUGIN_VERSION" >/dev/null 2>&1; then
+        return 0
+    fi
+    rm -f "$zip" "$json"
+    curl -fsSL --max-time 300 -o "$zip.part" "$KEI_TAINACAN_PLUGIN_URL" \
+        && curl -fsSL --max-time 60 -o "$json.part" "$KEI_TAINACAN_CHECKSUMS_URL" || {
+        rm -f "$zip.part" "$json.part"
+        echo "$(t "The Tainacan plugin could not be downloaded from wordpress.org.")" >&2; return 1; }
+    if ! out=$(kei_tainacan_verify_plugin "$zip.part" "$json.part" "$KEI_TAINACAN_PLUGIN_VERSION"); then
+        rm -f "$zip.part" "$json.part"
+        echo "$(t "The Tainacan plugin did not match the checksums published by wordpress.org: it was not installed.")" >&2
+        printf '%s\n' "$out" >&2
+        return 1
+    fi
+    mv -f "$zip.part" "$zip" && mv -f "$json.part" "$json" && chmod 644 "$zip" "$json"
+}
+
+# ----------------------------------------------------------------------
+# Plan and installation.
+# ----------------------------------------------------------------------
+_kei_tn_mem_mb() { awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null; }
+_kei_tn_disk_mb() { df -Pm "$1" 2>/dev/null | awk 'NR == 2 { print $4 }'; }
+
+# kei_tainacan_plan [URL]: what an installation would do, "key<TAB>text"
+# lines; plan = install | refuse. Returns 3 on refuse.
+kei_tainacan_plan() {
+    local url="${1:-}" access mem disk dockerdir status mode _s port
+    status=$(_kei_tn_get status)
+    if [ "$status" = installed ]; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(t "Tainacan is already installed.")"
+        return 3
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(t "Docker is not installed. Install Docker first (Platforms, Install Docker), then come back here.")"
+        return 3
+    fi
+    if ! _kei_docker_running || ! _kei_docker compose version >/dev/null 2>&1; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(t "Docker is not running, or has no Compose v2.")"
+        return 3
+    fi
+    mem=$(_kei_tn_mem_mb); dockerdir=$(_kei_docker info --format '{{.DockerRootDir}}' 2>/dev/null); dockerdir="${dockerdir:-/var/lib/docker}"
+    disk=$(_kei_tn_disk_mb "$dockerdir")
+    if [ -n "$mem" ] && [ "$mem" -lt "$KEI_TAINACAN_MIN_RAM_MB" ]; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(a="$mem"; b="$KEI_TAINACAN_MIN_RAM_MB"; t "Not enough free memory for Tainacan: \${a} MB available, \${b} MB needed.")"
+        return 3
+    fi
+    if [ -n "$disk" ] && [ "$disk" -lt "$KEI_TAINACAN_MIN_DISK_MB" ]; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(a="$disk"; b="$KEI_TAINACAN_MIN_DISK_MB"; t "Not enough free disk for Tainacan: \${a} MB free, \${b} MB needed.")"
+        return 3
+    fi
+    [ -n "$url" ] || url=$(_kei_tn_get url)
+    [ -n "$url" ] || url=$(kei_tainacan_default_url) || {
+        printf 'plan\trefuse\n'; printf 'note\t%s\n' "$(t "No free port was found for the local address.")"; return 3; }
+    if ! access=$(kei_tainacan_access "$url"); then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(u="$url"; t "Invalid address: \${u}. Use http://name or https://name, with no path.")"
+        return 3
+    fi
+    read -r mode _s < <(kei_proxy_detect)
+    printf 'plan\tinstall\n'
+    printf 'address\t%s\n' "$url"
+    case "$access" in
+        host|none-host) printf 'web\t%s\n' "$(n="$(kei_proxy_site_name tainacan)"; t "Apache site \${n} for this name, checked before Apache reloads; the other sites stay as they are.")" ;;
+        lan|none-lan)   read -r _s _s port < <(kei_tainacan_parse_url "$url")
+                        printf 'web\t%s\n' "$(p="$port"; t "Apache site on its own port \${p}, opened in the firewall; the other sites stay as they are.")" ;;
+        external)       printf 'web\t%s\n' "$(s="$_s"; t "Another web server (\${s}) answers on 80/443: Koha.Nexus does not change it and shows the block to add to it.")" ;;
+    esac
+    case "$access" in none-*) printf 'apache\t%s\n' "$(t "Apache is not installed: the apache2 package will be installed to serve the site.")" ;; esac
+    printf 'images\t%s\n' "WordPress $KEI_TAINACAN_WP_VERSION (PHP 8.3), MariaDB 11.8, WP-CLI 2.12 ($(t "fixed by digest"))"
+    printf 'plugin\t%s\n' "Tainacan $KEI_TAINACAN_PLUGIN_VERSION ($(t "checked against the checksums published by wordpress.org"))"
+    printf 'network\t%s\n' "$(t "Docker network kn-tainacan, isolated from the host, the VPN and the other platforms")"
+    printf 'data\t%s\n' "$(t "Docker volumes kn-tainacan-db and kn-tainacan-wp")"
+    if [ -f "$KEI_TAINACAN_DIR/.env" ]; then
+        printf 'reuse\t%s\n' "$(t "Data kept from an earlier installation is used again.")"
+    fi
+    printf 'updates\t%s\n' "$(t "Automatic updates of WordPress and plugins are off: updates only after a backup.")"
+    printf 'kept\t%s\n' "$(t "Not changed: Koha, its database and its sites, Docker's configuration and anything of other programs.")"
+    printf 'undo\t%s\n' "$(t "Uninstall keeping or deleting the data, from the panel.")"
+    return 0
+}
+
+_kei_tn_wait() {
+    # _kei_tn_wait SECONDS COMMAND...: until the command succeeds.
+    local n="$1" i; shift
+    for ((i = 0; i < n; i++)); do "$@" >/dev/null 2>&1 && return 0; sleep 1; done
+    return 1
+}
+_kei_tn_wp_ready() {
+    local cid code
+    cid=$(_kei_tn_cid wordpress "${1:-prod}")
+    [ -n "$cid" ] || return 1
+    _kei_docker exec "$cid" test -f /var/www/html/wp-config.php || return 1
+    code=$(_kei_docker exec "$cid" curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost/wp-login.php 2>/dev/null)
+    case "$code" in 200|302|301) return 0 ;; esac
+    return 1
+}
+_kei_tn_db_ready() {
+    local cid
+    cid=$(_kei_tn_cid db "${1:-prod}")
+    [ -n "$cid" ] || return 1
+    [ "$(_kei_docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null)" = healthy ]
+}
+
+# _kei_tn_apache_site URL ACCESS PORT: the <VirtualHost> block.
+_kei_tn_apache_site() {
+    local url="$1" access="$2" local_port="$3" scheme host port
+    read -r scheme host port < <(kei_tainacan_parse_url "$url")
+    case "$access" in
+        lan|none-lan)
+            printf 'Listen %s\n<VirtualHost *:%s>\n' "$port" "$port" ;;
+        *)
+            printf '<VirtualHost *:80>\n    ServerName %s\n' "$host" ;;
+    esac
+    cat <<EOF
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:$local_port/
+    ProxyPassReverse / http://127.0.0.1:$local_port/
+    ErrorLog \${APACHE_LOG_DIR}/koha-nexus-tainacan-error.log
+    CustomLog \${APACHE_LOG_DIR}/koha-nexus-tainacan-access.log combined
+</VirtualHost>
+EOF
+}
+
+# kei_tainacan_web_apply URL: the way in for URL (Apache site and modules,
+# firewall port, tunnel address) or the block for another web server.
+kei_tainacan_web_apply() {
+    local url="$1" access scheme host port local_port tmp rc
+    access=$(kei_tainacan_access "$url") || return 2
+    read -r scheme host port < <(kei_tainacan_parse_url "$url")
+    local_port=$(_kei_tn_env KN_PORT)
+    case "$access" in
+        external)
+            _kei_tn_set access external
+            echo "$(t "Another web server answers on 80/443. Add this block to it:")"
+            kei_proxy_external_snippet nginx "$host" "$local_port" 2>/dev/null || true
+            return 0 ;;
+        none-*)
+            echo "$(t "Installing Apache to serve Tainacan...")" >&2
+            apt_install apache2 >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apache2 >/dev/null 2>&1 || {
+                echo "$(t "Apache could not be installed.")" >&2; return 1; }
+            kei_owned_add package apache2 "$KEI_TAINACAN_ID" no || true
+            access="${access#none-}" ;;
+    esac
+    _kei_tn_set access "$access"
+    kei_proxy_module_use "$KEI_TAINACAN_ID" proxy || return 1
+    kei_proxy_module_use "$KEI_TAINACAN_ID" proxy_http || return 1
+    tmp=$(mktemp) || return 1
+    _kei_tn_apache_site "$url" "$access" "$local_port" > "$tmp"
+    kei_proxy_apply_site "$KEI_TAINACAN_ID" "$KEI_TAINACAN_ID" "$tmp"; rc=$?
+    rm -f "$tmp"
+    [ "$rc" = 0 ] || return "$rc"
+    if [ "$access" = lan ]; then
+        _kei_tn_set lan_port "$port"
+        kei_proxy_port_open "$KEI_TAINACAN_ID" "$port" || true
+    else
+        kei_proxy_port_open "$KEI_TAINACAN_ID" 80 || true
+        if [ "$scheme" = https ] && [ -f "$KEI_TUNNEL_CONFIG" ]; then
+            kei_tunnel_ingress_add "$KEI_TAINACAN_ID" "$host" "http://localhost:80" \
+                || echo "$(h="$host"; t "The address \${h} could not be added to the tunnel: add it in Cloudflare.")" >&2
+        fi
+    fi
+    return 0
+}
+
+# kei_tainacan_install confirm [URL] [LANG]: installs with the person's
+# "yes" (the word confirm) after the plan. Each step can be repeated: a
+# failure leaves status=failed and running it again goes on.
+kei_tainacan_install() {
+    local ans="${1:-}" url="${2:-}" lang="${3:-}" out rc version
+    if [ "$ans" != confirm ]; then
+        kei_tainacan_plan "$url"
+        echo "$(t "Nothing was installed: the plan needs a yes (confirm).")" >&2
+        return 3
+    fi
+    [ -n "$url" ] || url=$(_kei_tn_get url)
+    [ -n "$url" ] || url=$(kei_tainacan_default_url)
+    out=$(kei_tainacan_plan "$url"); rc=$?
+    if [ "$rc" != 0 ]; then printf '%s\n' "$out" | awk -F'\t' '$1 == "note" { print $2 }' >&2; return 3; fi
+    case "$lang" in
+        "") [ "${SYS_LANG:-en}" = pt ] && lang=pt_BR || lang=en_US ;;
+        [a-z][a-z]|[a-z][a-z]_[A-Z][A-Z]|[a-z][a-z][a-z]) ;;
+        *) echo "$(t "Invalid language code.")" >&2; return 2 ;;
+    esac
+    _kei_tn_set status installing; _kei_tn_set url "$url"; _kei_tn_set lang "$lang"
+    _kei_tn_fail() { _kei_tn_set status failed; log "tainacan: install failed: $1"; echo "$1" >&2; return 1; }
+    kei_tainacan_write_files || { _kei_tn_fail "$(t "The platform files could not be written.")"; return 1; }
+    kei_docker_network_create "$KEI_TAINACAN_ID" >/dev/null || { _kei_tn_fail "$(t "The Docker network of the platform could not be created.")"; return 1; }
+    echo "$(t "Downloading the images (this can take a few minutes)...")" >&2
+    _kei_tn_dc pull -q db wordpress >/dev/null 2>&1 && timeout 900 docker pull -q "$(_kei_tn_image cli)" >/dev/null 2>&1 \
+        || { _kei_tn_fail "$(t "The images could not be downloaded.")"; return 1; }
+    _kei_tn_fetch_plugin || { _kei_tn_fail "$(t "The Tainacan plugin was not installed.")"; return 1; }
+    _kei_tn_dc up -d --remove-orphans db wordpress >/dev/null 2>&1 || { _kei_tn_fail "$(t "The containers did not start.")"; return 1; }
+    _kei_tn_wait 300 _kei_tn_db_ready || { _kei_tn_fail "$(t "The database did not start.")"; return 1; }
+    _kei_tn_wait 300 _kei_tn_wp_ready || { _kei_tn_fail "$(t "WordPress did not start.")"; return 1; }
+    if ! _kei_tn_wp core is-installed >/dev/null 2>&1; then
+        _kei_tn_wp core install --url="$url" --title="Tainacan" --admin_user="$(_kei_tn_env KN_ADMIN_USER)" \
+            --admin_password="$(_kei_tn_env KN_ADMIN_PASSWORD)" --admin_email="admin@$(hostname -f 2>/dev/null || echo localhost).invalid" \
+            --skip-email >/dev/null 2>&1 || { _kei_tn_fail "$(t "WordPress could not be set up.")"; return 1; }
+    fi
+    version=$(_kei_tn_wp plugin get tainacan --field=version 2>/dev/null)
+    if [ "$version" != "$KEI_TAINACAN_PLUGIN_VERSION" ]; then
+        _kei_tn_wp plugin install "/work/tainacan.$KEI_TAINACAN_PLUGIN_VERSION.zip" --force >/dev/null 2>&1 \
+            || { _kei_tn_fail "$(t "The Tainacan plugin could not be installed in WordPress.")"; return 1; }
+    fi
+    _kei_tn_wp plugin activate tainacan >/dev/null 2>&1 || { _kei_tn_fail "$(t "The Tainacan plugin could not be activated.")"; return 1; }
+    _kei_tn_wp rewrite structure '/%postname%/' --hard >/dev/null 2>&1 || true
+    if [ "$lang" != en_US ]; then
+        if _kei_tn_wp language core install "$lang" --activate >/dev/null 2>&1; then
+            _kei_tn_wp language plugin install tainacan "$lang" >/dev/null 2>&1 || true
+        else
+            echo "$(l="$lang"; t "The language \${l} could not be downloaded: WordPress stays in English. Try again later from the panel.")" >&2
+        fi
+    fi
+    if ! out=$(kei_docker_audit "$KEI_TAINACAN_ID"); then
+        _kei_tn_fail "$(t "The containers do not follow the isolation rules:") $out"; return 1
+    fi
+    if ! out=$(kei_tainacan_health); then
+        _kei_tn_fail "$(t "Tainacan did not pass the functional check:") $out"; return 1
+    fi
+    kei_tainacan_web_apply "$url" || { _kei_tn_fail "$(t "Tainacan works, but the web address could not be set up.")"; return 1; }
+    _kei_tn_set status installed
+    _kei_tn_set installed_at "$(date '+%Y-%m-%d %H:%M:%S')"
+    _kei_tn_set wordpress "$KEI_TAINACAN_WP_VERSION"
+    _kei_tn_set plugin "$KEI_TAINACAN_PLUGIN_VERSION"
+    log "tainacan: installed at $url"
+    echo "$(u="$url"; a="$(_kei_tn_env KN_ADMIN_USER)"; t "Tainacan is installed at \${u}. Administrator: \${a} (password: Platforms, Tainacan, Administrator).")"
+}
+
+# ----------------------------------------------------------------------
+# Diagnosis.
+# ----------------------------------------------------------------------
+# _kei_tn_counts [rt]: "collections items attachments posts".
+_kei_tn_counts() {
+    _kei_tn_sql "${1:-prod}" "SELECT
+        (SELECT COUNT(*) FROM wp_posts WHERE post_type = 'tainacan-collection' AND post_status NOT IN ('auto-draft')),
+        (SELECT COUNT(*) FROM wp_posts WHERE post_type REGEXP '^tnc_col_[0-9]+_item\$' AND post_status NOT IN ('auto-draft')),
+        (SELECT COUNT(*) FROM wp_postmeta WHERE meta_key = '_wp_attached_file'),
+        (SELECT COUNT(*) FROM wp_posts)" 2>/dev/null | awk 'NF == 4 { print $1, $2, $3, $4 }'
+}
+
+# _kei_tn_missing_files [rt]: attachments the database names that are not
+# on disk (one per line).
+_kei_tn_missing_files() {
+    local which="${1:-prod}" cid
+    cid=$(_kei_tn_cid wordpress "$which")
+    [ -n "$cid" ] || return 1
+    _kei_tn_sql "$which" "SELECT meta_value FROM wp_postmeta WHERE meta_key = '_wp_attached_file'" \
+        | _kei_docker exec -i "$cid" sh -c 'cd /var/www/html/wp-content/uploads 2>/dev/null || exit 0; while IFS= read -r f; do [ -f "$f" ] || printf "%s\n" "$f"; done'
+}
+
+# kei_tainacan_health [rt]: the functional check. The collections API
+# answers with JSON and lists as many published collections as the
+# database has. Prints the reason when it fails.
+kei_tainacan_health() {
+    local which="${1:-prod}" cid url hp body n_api n_db
+    cid=$(_kei_tn_cid wordpress "$which")
+    [ -n "$cid" ] || { echo "wordpress: no container"; return 1; }
+    url=$(_kei_tn_get url); hp=$(_kei_tn_hostport "$url" 2>/dev/null) || hp=localhost
+    [ "$which" = rt ] && [ -n "${KEI_TN_RT_URL:-}" ] && hp=$(_kei_tn_hostport "$KEI_TN_RT_URL")
+    body=$(_kei_docker exec "$cid" curl -s --max-time 20 -H "Host: $hp" \
+        "http://localhost/?rest_route=/tainacan/v2/collections&perpage=200&per_page=100" 2>/dev/null)
+    n_api=$(printf '%s' "$body" | python3 -I -c 'import json,sys
+d = json.load(sys.stdin)
+print(len(d) if isinstance(d, list) else -1)' 2>/dev/null)
+    [ -n "$n_api" ] && [ "$n_api" -ge 0 ] || { echo "API tainacan/v2/collections: $(t "no valid JSON")"; return 1; }
+    n_db=$(_kei_tn_sql "$which" "SELECT COUNT(*) FROM wp_posts WHERE post_type = 'tainacan-collection' AND post_status = 'publish'" 2>/dev/null)
+    [ -n "$n_db" ] || { echo "$(t "the database did not answer")"; return 1; }
+    if [ "$n_db" -le 100 ] && [ "$n_api" != "$n_db" ]; then
+        echo "API: $n_api, $(t "database"): $n_db"; return 1
+    fi
+    echo "ok $n_api"
+}
+
+_kei_tn_container_state() {
+    local cid
+    cid=$(_kei_tn_cid "$1")
+    [ -n "$cid" ] || { echo none; return 0; }
+    _kei_docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || echo unknown
+}
+
+# kei_tainacan_installed: there is something of Tainacan here (any status).
+kei_tainacan_installed() { [ -f "$(_kei_tn_state_file)" ] && [ -n "$(_kei_tn_get status)" ]; }
+
+# kei_tainacan_status: "key=value" lines for the panel (read only).
+kei_tainacan_status() {
+    local status db wp health="unknown" reason="" c i a p audit="-" last n wpv plv imgs="-" cid out
+    status=$(_kei_tn_get status); status="${status:-absent}"
+    printf 'status=%s\n' "$status"
+    [ "$status" = absent ] && return 0
+    printf 'url=%s\naccess=%s\nlang=%s\nport=%s\ninstalled_at=%s\n' "$(_kei_tn_get url)" "$(_kei_tn_get access)" \
+        "$(_kei_tn_get lang)" "$(_kei_tn_env KN_PORT)" "$(_kei_tn_get installed_at)"
+    if ! _kei_docker_running; then
+        printf 'docker=down\nhealth=unknown\n'
+        return 0
+    fi
+    db=$(_kei_tn_container_state db); wp=$(_kei_tn_container_state wordpress)
+    printf 'db=%s\nwordpress=%s\n' "$db" "$wp"
+    if [ "$db" = running ] && [ "$wp" = running ]; then
+        if reason=$(kei_tainacan_health); then health=healthy; reason=""; else health=failing; fi
+        read -r c i a p < <(_kei_tn_counts)
+        printf 'collections=%s\nitems=%s\nattachments=%s\n' "${c:-?}" "${i:-?}" "${a:-?}"
+        cid=$(_kei_tn_cid wordpress)
+        wpv=$(_kei_docker exec "$cid" sh -c "sed -n \"s/^\\\$wp_version = '\\(.*\\)';/\\1/p\" /var/www/html/wp-includes/version.php" 2>/dev/null)
+        plv=$(_kei_docker exec "$cid" sh -c "sed -n 's/^[ *]*Version:[ ]*//p' /var/www/html/wp-content/plugins/tainacan/tainacan.php | head -n 1" 2>/dev/null)
+        printf 'wordpress_version=%s\ntainacan_version=%s\n' "${wpv:-?}" "${plv:-?}"
+        n=$(_kei_tn_missing_files | grep -c .)
+        printf 'attachments_missing=%s\n' "${n:-0}"
+    elif [ "$db" != none ] || [ "$wp" != none ]; then
+        health=failing; reason="$(t "containers not running")"
+    fi
+    imgs=yes
+    for p in db wordpress; do
+        cid=$(_kei_tn_cid "$p")
+        [ -n "$cid" ] || continue
+        case "$p" in db) a=$(_kei_tn_image db) ;; *) a=$(_kei_tn_image wp) ;; esac
+        [ "$(_kei_docker inspect -f '{{.Config.Image}}' "$cid" 2>/dev/null)" = "$a" ] || imgs=no
+    done
+    printf 'images_pinned=%s\n' "$imgs"
+    if out=$(kei_docker_audit "$KEI_TAINACAN_ID" 2>/dev/null); then audit=ok; else audit=$(printf '%s' "$out" | tr '\n\t' '; '); fi
+    printf 'audit=%s\n' "$audit"
+    printf 'health=%s\n' "$health"
+    [ -n "$reason" ] && printf 'reason=%s\n' "$reason"
+    last=$(kei_tainacan_backups | head -n 1 | cut -f1)
+    printf 'last_backup=%s\nbackups=%s\n' "${last:+${last##*/}}" "$(kei_tainacan_backups | grep -c .)"
+    printf 'apache_site=%s\n' "$([ -e "$KEI_APACHE_DIR/sites-enabled/$(kei_proxy_site_name tainacan)" ] && echo yes || echo no)"
+    for p in db wp; do
+        a=$(_kei_docker system df -v --format '{{range .Volumes}}{{.Name}} {{.Size}}{{"\n"}}{{end}}' 2>/dev/null | awk -v v="kn-tainacan-$p" '$1 == v { print $2 }')
+        printf 'disk_%s=%s\n' "$p" "${a:-?}"
+    done
+    return 0
+}
+
+# kei_tainacan_logs [LINES]: the last lines of each container, with the
+# passwords of .env blanked out.
+kei_tainacan_logs() {
+    local n="${1:-200}" secrets s
+    [[ "$n" =~ ^[0-9]{1,5}$ ]] || n=200
+    secrets=$(awk -F= '/^KN_.*(PASSWORD|KEY|SALT)=/ { print substr($0, index($0, "=") + 1) }' "$KEI_TAINACAN_DIR/.env" 2>/dev/null)
+    _kei_tn_dc logs --no-color --tail "$n" db wordpress 2>&1 | while IFS= read -r line; do
+        while IFS= read -r s; do [ -n "$s" ] && line="${line//"$s"/********}"; done <<< "$secrets"
+        printf '%s\n' "$line"
+    done
+}
+
+# kei_tainacan_json: the "tainacan" entry of the platforms array (status
+# read from the state file and Docker, never slow: one container listing).
+kei_tainacan_json() {
+    local status detected=false services=none units="" db wp health=unknown
+    status=$(_kei_tn_get status)
+    if [ -n "$status" ] && [ "$status" != kept ]; then
+        detected=true
+        if _kei_docker_running; then
+            db=$(_kei_tn_container_state db); wp=$(_kei_tn_container_state wordpress)
+            units="$(json_str db):$(json_str "$db"),$(json_str wordpress):$(json_str "$wp")"
+            services=$(kei_services_summary "$( [ "$db" = running ] && echo active || echo inactive)" "$( [ "$wp" = running ] && echo active || echo inactive)")
+            if [ "$services" = active ]; then
+                if kei_tainacan_health >/dev/null 2>&1; then health=healthy; else health=failing; fi
+            fi
+        else
+            services=unknown
+        fi
+    fi
+    printf '{"id":"tainacan","supported":true,"detected":%s,"services":%s,"units":{%s},"health":%s,"status":%s,"url":%s}' \
+        "$detected" "$(json_str "$services")" "$units" "$(json_str "$health")" "$(json_str "${status:-absent}")" "$(json_str "$(_kei_tn_get url)")"
+}
+
+# ----------------------------------------------------------------------
+# Backup.
+# ----------------------------------------------------------------------
+_kei_tn_journal() {
+    # _kei_tn_journal DIR STEP [KEY VALUE]...
+    local dir="$1" step="$2" line
+    shift 2
+    line="{\"at\":$(json_str "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"),\"step\":$(json_str "$step")"
+    while [ $# -ge 2 ]; do line+=",$(json_str "$1"):$(json_str "$2")"; shift 2; done
+    printf '%s}\n' "$line" >> "$dir/journal.jsonl"
+}
+_kei_tn_sha() { sha256sum "$1" | awk '{ print $1 }'; }
+_kei_tn_size() { stat -c %s "$1" 2>/dev/null || echo 0; }
+
+# _kei_tn_manifest_get DIR KEY: a value of manifest.json (one key per line).
+_kei_tn_manifest_get() {
+    [ -f "$1/manifest.json" ] || return 1
+    sed -n -e "s/^  \"$2\": \"\\(.*\\)\",\\{0,1\\}\$/\\1/p" -e "s/^  \"$2\": \\([^\",]*\\),\\{0,1\\}\$/\\1/p" "$1/manifest.json" | head -n 1
+}
+
+# kei_tainacan_backups: complete backups, newest first: "DIR<TAB>created<TAB>label".
+kei_tainacan_backups() {
+    local d
+    [ -d "$KEI_TAINACAN_BACKUPS" ] || return 0
+    for d in "$KEI_TAINACAN_BACKUPS"/knx-tainacan-*/; do
+        d="${d%/}"
+        [ -f "$d/manifest.json" ] || continue
+        [ "$(_kei_tn_manifest_get "$d" complete)" = true ] || continue
+        printf '%s\t%s\t%s\n' "$d" "$(_kei_tn_manifest_get "$d" created)" "$(_kei_tn_manifest_get "$d" label)"
+    done | sort -t$'\t' -k2,2r -k1,1r
+}
+
+# kei_tainacan_backup [LABEL]: a complete backup; prints its directory.
+kei_tainacan_backup() {
+    local label="${1:-manual}" ts dir n wpc dbc t0 t1 rc=0 c i a p wpv plv need free sz_db sz_wp missing url ps
+    [[ "$label" =~ ^[a-z0-9-]{1,20}$ ]] || label=manual
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    dbc=$(_kei_tn_cid db); wpc=$(_kei_tn_cid wordpress)
+    [ -n "$dbc" ] && [ -n "$wpc" ] && [ "$(_kei_tn_container_state db)" = running ] || {
+        echo "$(t "The Tainacan database is not running.")" >&2; return 3; }
+    mkdir -p "$KEI_TAINACAN_BACKUPS" && chmod 700 "$KEI_TAINACAN_BACKUPS" "${KEI_TAINACAN_BACKUPS%/*}" 2>/dev/null
+    sz_db=$(_kei_docker exec "$dbc" du -sm /var/lib/mysql 2>/dev/null | awk '{ print $1 }')
+    sz_wp=$(timeout 600 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+        --security-opt no-new-privileges -v kn-tainacan-wp:/data:ro --entrypoint du "$(_kei_tn_image wp)" -sm /data 2>/dev/null | awk '{ print $1 }')
+    need=$(( (${sz_db:-0} + ${sz_wp:-0}) * 12 / 10 + 50 ))
+    free=$(_kei_tn_disk_mb "$KEI_TAINACAN_BACKUPS")
+    if [ -n "$free" ] && [ "$free" -lt "$need" ]; then
+        echo "$(a="$free"; b="$need"; t "Not enough free disk for the backup: \${a} MB free, about \${b} MB needed.")" >&2; return 5
+    fi
+    ts=$(date '+%Y%m%d-%H%M%S'); dir="$KEI_TAINACAN_BACKUPS/knx-tainacan-$ts"; n=1
+    while [ -e "$dir" ]; do dir="$KEI_TAINACAN_BACKUPS/knx-tainacan-$ts-$n"; n=$((n + 1)); done
+    mkdir -m 700 "$dir" || return 1
+    _kei_tn_journal "$dir" start label "$label"
+    chmod 600 "$dir/journal.jsonl"
+    wpv=$(_kei_docker exec "$wpc" sh -c "sed -n \"s/^\\\$wp_version = '\\(.*\\)';/\\1/p\" /var/www/html/wp-includes/version.php" 2>/dev/null)
+    plv=$(_kei_docker exec "$wpc" sh -c "sed -n 's/^[ *]*Version:[ ]*//p' /var/www/html/wp-content/plugins/tainacan/tainacan.php | head -n 1" 2>/dev/null)
+    # The window: every writer (web, REST, WP-Cron, Tainacan's jobs) runs in
+    # the wordpress container; a graceful stop lets requests finish.
+    t0=$(date +%s)
+    _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1 || { _kei_tn_journal "$dir" error what stop; echo "$(t "WordPress could not be stopped for the backup.")" >&2; return 1; }
+    _kei_tn_journal "$dir" writes-stopped
+    {
+        read -r c i a p < <(_kei_tn_counts)
+        timeout 7200 docker exec -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD)" "$dbc" mariadb-dump -uroot --single-transaction \
+            --routines --triggers --events --default-character-set=utf8mb4 wordpress 2>"$dir/.dump.err" | gzip -6 > "$dir/db.sql.gz.part"
+        ps=("${PIPESTATUS[@]}")
+        [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/db.sql.gz.part" "$dir/db.sql.gz" || rc=1
+        [ "$rc" = 0 ] && _kei_tn_journal "$dir" db file db.sql.gz bytes "$(_kei_tn_size "$dir/db.sql.gz")" sha256 "$(_kei_tn_sha "$dir/db.sql.gz")"
+        if [ "$rc" = 0 ]; then
+            timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+                --security-opt no-new-privileges -v kn-tainacan-wp:/data:ro --entrypoint tar "$(_kei_tn_image wp)" \
+                -C /data -cf - . 2>"$dir/.tar.err" | gzip -6 > "$dir/files.tar.gz.part"
+            ps=("${PIPESTATUS[@]}")
+            [ "${ps[0]}" = 0 ] && [ "${ps[1]}" = 0 ] && mv -f "$dir/files.tar.gz.part" "$dir/files.tar.gz" || rc=1
+            [ "$rc" = 0 ] && _kei_tn_journal "$dir" files file files.tar.gz bytes "$(_kei_tn_size "$dir/files.tar.gz")" sha256 "$(_kei_tn_sha "$dir/files.tar.gz")"
+        fi
+    }
+    _kei_tn_dc start wordpress >/dev/null 2>&1 || _kei_tn_dc up -d wordpress >/dev/null 2>&1
+    t1=$(date +%s)
+    _kei_tn_journal "$dir" writes-resumed seconds "$((t1 - t0))"
+    if [ "$rc" != 0 ]; then
+        _kei_tn_journal "$dir" error what "$(cat "$dir/.dump.err" "$dir/.tar.err" 2>/dev/null | tail -n 3 | tr '\n' ' ')"
+        rm -f "$dir"/*.part
+        echo "$(t "The backup failed; WordPress was started again.") $(cat "$dir/.dump.err" "$dir/.tar.err" 2>/dev/null | tail -n 3)" >&2
+        return 1
+    fi
+    rm -f "$dir/.dump.err" "$dir/.tar.err"
+    missing=$(awk 'NR == FNR { have[$0] = 1; next } $0 != "" { if (!(("./wp-content/uploads/" $0) in have)) n++ } END { print n + 0 }' \
+        <(gzip -dc "$dir/files.tar.gz" | tar -tf - 2>/dev/null) \
+        <(_kei_tn_sql "SELECT meta_value FROM wp_postmeta WHERE meta_key = '_wp_attached_file'" 2>/dev/null))
+    mkdir -m 700 "$dir/secrets" && ( umask 077; cp "$KEI_TAINACAN_DIR/.env" "$KEI_TAINACAN_DIR/compose.yml" "$(_kei_tn_state_file)" "$dir/secrets/" ) \
+        && chmod 600 "$dir/secrets/.env" "$dir/secrets/compose.yml" "$dir/secrets/state" || { echo "$(t "The configuration could not be copied.")" >&2; return 1; }
+    _kei_tn_journal "$dir" secrets
+    url=$(_kei_tn_get url)
+    {
+        printf '{\n'
+        printf '  "format": 1,\n'
+        printf '  "platform": "tainacan",\n'
+        printf '  "created": %s,\n' "$(json_str "$(date '+%Y-%m-%d %H:%M:%S')")"
+        printf '  "label": %s,\n' "$(json_str "$label")"
+        printf '  "host": %s,\n' "$(json_str "$(hostname 2>/dev/null)")"
+        printf '  "url": %s,\n' "$(json_str "$url")"
+        printf '  "wordpress_version": %s,\n' "$(json_str "${wpv:-?}")"
+        printf '  "tainacan_version": %s,\n' "$(json_str "${plv:-?}")"
+        printf '  "wp_image": %s,\n' "$(json_str "$KEI_TAINACAN_WP_IMAGE")"
+        printf '  "db_image": %s,\n' "$(json_str "$KEI_TAINACAN_DB_IMAGE")"
+        printf '  "count_collections": %s,\n' "$(json_num "$c")"
+        printf '  "count_items": %s,\n' "$(json_num "$i")"
+        printf '  "count_attachments": %s,\n' "$(json_num "$a")"
+        printf '  "count_posts": %s,\n' "$(json_num "$p")"
+        printf '  "attachments_missing": %s,\n' "$(json_num "${missing:-0}")"
+        printf '  "window_seconds": %s,\n' "$(json_num "$((t1 - t0))")"
+        printf '  "db_bytes": %s,\n' "$(json_num "$(_kei_tn_size "$dir/db.sql.gz")")"
+        printf '  "files_bytes": %s,\n' "$(json_num "$(_kei_tn_size "$dir/files.tar.gz")")"
+        printf '  "complete": true\n'
+        printf '}\n'
+    } > "$dir/manifest.json.part"
+    ( cd "$dir" && sha256sum db.sql.gz files.tar.gz secrets/.env secrets/compose.yml secrets/state manifest.json.part | sed 's/manifest.json.part$/manifest.json/' > SHA256SUMS ) || return 1
+    mv -f "$dir/manifest.json.part" "$dir/manifest.json"
+    _kei_tn_journal "$dir" done
+    chmod 600 "$dir"/*.gz "$dir"/*.json "$dir"/*.jsonl "$dir/SHA256SUMS"
+    # Retention: the newest KEI_TAINACAN_KEEP complete backups.
+    kei_tainacan_backups | tail -n +"$((KEI_TAINACAN_KEEP + 1))" | cut -f1 | while IFS= read -r old; do
+        [ -n "$old" ] && [ "$old" != "$dir" ] && case "$old" in "$KEI_TAINACAN_BACKUPS"/knx-tainacan-*) rm -rf -- "$old" ;; esac
+    done
+    log "tainacan: backup $dir ($((t1 - t0)) s without writes)"
+    printf '%s\n' "$dir"
+}
+
+# ----------------------------------------------------------------------
+# Restore.
+# ----------------------------------------------------------------------
+# kei_tainacan_check_tar FILE: 0 when the archive only has regular files,
+# directories and links that stay inside it, with no absolute path or "..".
+kei_tainacan_check_tar() {
+    python3 -I - "$1" <<'PYEOF'
+import posixpath, sys, tarfile
+bad = []
+try:
+    with tarfile.open(sys.argv[1], "r:*") as tf:
+        for m in tf:
+            n = m.name
+            parts = n.split("/")
+            if n.startswith("/") or ".." in parts:
+                bad.append("unsafe path: " + n); continue
+            if m.isdev() or m.isfifo() or m.islnk():
+                bad.append("special file: " + n); continue
+            if m.issym():
+                target = m.linkname
+                if target.startswith("/"):
+                    bad.append("link outside: " + n); continue
+                full = posixpath.normpath(posixpath.join(posixpath.dirname(n), target))
+                if full.startswith("..") or full.startswith("/"):
+                    bad.append("link outside: " + n); continue
+            elif not (m.isfile() or m.isdir()):
+                bad.append("unknown type: " + n)
+except Exception as exc:
+    print("unreadable archive: %s" % exc); sys.exit(1)
+if bad:
+    print("\n".join(bad[:20])); sys.exit(1)
+PYEOF
+}
+
+# _kei_tn_vercmp A B: true when A is newer than B.
+_kei_tn_newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]; }
+
+# kei_tainacan_backup_check DIR: the backup can be restored here.
+kei_tainacan_backup_check() {
+    local dir="$1" out wpv plv
+    [ -f "$dir/manifest.json" ] && [ "$(_kei_tn_manifest_get "$dir" complete)" = true ] \
+        || { echo "$(t "This backup is not complete (no manifest): it cannot be restored.")" >&2; return 4; }
+    [ "$(_kei_tn_manifest_get "$dir" platform)" = tainacan ] || { echo "$(t "This is not a Tainacan backup.")" >&2; return 4; }
+    ( cd "$dir" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ) || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
+    if ! out=$(kei_tainacan_check_tar "$dir/files.tar.gz"); then
+        echo "$(t "The backup archive has unsafe entries:") $out" >&2; return 4
+    fi
+    gzip -t "$dir/db.sql.gz" 2>/dev/null || { echo "$(t "The database dump is damaged.")" >&2; return 4; }
+    wpv=$(_kei_tn_manifest_get "$dir" wordpress_version); plv=$(_kei_tn_manifest_get "$dir" tainacan_version)
+    if _kei_tn_newer "$wpv" "$KEI_TAINACAN_WP_VERSION" || _kei_tn_newer "$plv" "$KEI_TAINACAN_PLUGIN_VERSION"; then
+        echo "$(a="$wpv/$plv"; b="$KEI_TAINACAN_WP_VERSION/$KEI_TAINACAN_PLUGIN_VERSION"; t "This backup is from a newer version (\${a}) than the one installed (\${b}): update Koha.Nexus first.")" >&2
+        return 6
+    fi
+    return 0
+}
+
+# _kei_tn_resolve NAME: a backup directory from a path or a name.
+_kei_tn_resolve() {
+    case "${1:-}" in
+        "") return 2 ;;
+        /*) [ -d "$1" ] && printf '%s' "${1%/}" ;;
+        knx-tainacan-*) [ -d "$KEI_TAINACAN_BACKUPS/$1" ] && printf '%s' "$KEI_TAINACAN_BACKUPS/$1" ;;
+        latest) kei_tainacan_backups | head -n 1 | cut -f1 ;;
+        *) return 2 ;;
+    esac
+}
+
+# _kei_tn_fill VOLUME DUMP|FILES BACKUP_DIR: the WordPress tree of the
+# backup into an emptied volume (a throwaway container, no network).
+_kei_tn_fill_files() {
+    local vol="$1" bdir="$2"
+    timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+        --security-opt no-new-privileges -v "$vol":/data -v "$bdir/files.tar.gz":/backup/files.tar.gz:ro --entrypoint sh \
+        "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && tar -C /data -xzpf /backup/files.tar.gz' >/dev/null 2>&1
+}
+_kei_tn_load_db() {
+    local which="$1" bdir="$2" cid dir="$KEI_TAINACAN_DIR"
+    [ "$which" = rt ] && dir="$KEI_TAINACAN_DIR/rt"
+    cid=$(_kei_tn_cid db "$which")
+    [ -n "$cid" ] || return 1
+    _kei_docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" mariadb -uroot \
+        -e "DROP DATABASE IF EXISTS wordpress; CREATE DATABASE wordpress CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL ON wordpress.* TO 'wordpress'@'%';" || return 1
+    gzip -dc "$bdir/db.sql.gz" | timeout 7200 docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" mariadb -uroot wordpress
+}
+
+# _kei_tn_validate [rt] BACKUP_DIR: the data matches the manifest:
+# collections, items and attachments counted, the API answers, every
+# attachment named in the database is on disk (or was already missing
+# when the backup was made).
+_kei_tn_validate() {
+    local which=prod c i a p mc mi ma missing want_missing h
+    [ "${1:-}" = rt ] && { which=rt; shift; }
+    read -r c i a p < <(_kei_tn_counts "$which")
+    mc=$(_kei_tn_manifest_get "$1" count_collections); mi=$(_kei_tn_manifest_get "$1" count_items); ma=$(_kei_tn_manifest_get "$1" count_attachments)
+    [ "$c" = "$mc" ] && [ "$i" = "$mi" ] && [ "$a" = "$ma" ] || {
+        echo "$(t "counts differ from the backup") ($(t "collections") $c/$mc, $(t "items") $i/$mi, $(t "attachments") $a/$ma)"; return 1; }
+    missing=$(_kei_tn_missing_files "$which" | grep -c .)
+    want_missing=$(_kei_tn_manifest_get "$1" attachments_missing)
+    [ "${missing:-0}" -le "${want_missing:-0}" ] || { echo "$(t "attachments missing on disk:") $missing"; return 1; }
+    if [ "$which" = rt ]; then h=$(KEI_TN_RT_URL="$(_kei_tn_manifest_get "$1" url)" kei_tainacan_health rt) || { echo "$h"; return 1; }
+    else h=$(kei_tainacan_health) || { echo "$h"; return 1; }; fi
+    echo "ok $c $i $a"
+}
+
+# _kei_tn_rt_down: the isolated copy goes, whatever state it is in.
+_kei_tn_rt_down() {
+    local id
+    if [ -f "$KEI_TAINACAN_DIR/rt/compose.yml" ]; then _kei_tn_dc rt down --remove-orphans >/dev/null 2>&1; fi
+    for id in $(_kei_docker ps -aq --filter "label=$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" --filter "label=com.docker.compose.project=$KEI_TAINACAN_RT" 2>/dev/null); do
+        _kei_docker rm -f "$id" >/dev/null 2>&1
+    done
+    for id in kn-tainacan-rt-db kn-tainacan-rt-wp; do
+        [ "$(_kei_docker volume inspect -f "{{index .Labels \"$KEI_DOCKER_LABEL.platform\"}}" "$id" 2>/dev/null)" = "$KEI_TAINACAN_ID" ] \
+            && _kei_docker volume rm "$id" >/dev/null 2>&1
+    done
+    if [ "$(_kei_docker network inspect -f "{{index .Labels \"$KEI_DOCKER_LABEL.platform\"}}" "$KEI_TAINACAN_RT" 2>/dev/null)" = "$KEI_TAINACAN_ID" ]; then
+        _kei_docker network rm "$KEI_TAINACAN_RT" >/dev/null 2>&1
+    fi
+    if kei_owned_users docker-network "$KEI_TAINACAN_RT" | grep -qx "$KEI_TAINACAN_ID"; then
+        kei_owned_del docker-network "$KEI_TAINACAN_RT" "$KEI_TAINACAN_ID"
+        kei_docker_isolation_apply >/dev/null 2>&1
+    fi
+    rm -rf "$KEI_TAINACAN_DIR/rt"
+}
+
+# kei_tainacan_restore_test BACKUP: the backup brought up in an isolated
+# copy and checked; the copy goes afterwards (KEI_TAINACAN_KEEP_RT=1 keeps
+# it, for tests). The installation in use is not touched.
+kei_tainacan_restore_test() {
+    local bdir rc out subnet rt="$KEI_TAINACAN_DIR/rt"
+    bdir=$(_kei_tn_resolve "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    [ -n "$bdir" ] || { echo "$(t "Backup not found.")" >&2; return 2; }
+    kei_tainacan_backup_check "$bdir" || return $?
+    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    _kei_tn_rt_down
+    mkdir -p "$rt/work" && chmod 700 "$rt" || return 1
+    ( umask 077; cp "$bdir/secrets/.env" "$rt/.env" ) || return 1
+    _kei_tn_compose rt > "$rt/compose.yml" && _kei_tn_php_ini > "$rt/php.ini" && _kei_tn_nomail_plugin > "$rt/kn-restore-test.php" || return 1
+    chmod 644 "$rt/compose.yml" "$rt/php.ini" "$rt/kn-restore-test.php"
+    # An internal network (no way out), isolated like the platform's own.
+    subnet=$(kei_docker_pick_subnet) || { echo "$(t "No free /24 network was found for Docker.")" >&2; return 5; }
+    _kei_docker network create --internal --driver bridge --subnet "$subnet" --gateway "${subnet%.0/24}.1" \
+        --opt "com.docker.network.bridge.name=$KEI_TAINACAN_RT" \
+        --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+        --label "$KEI_DOCKER_LABEL.role=restore-test" "$KEI_TAINACAN_RT" >/dev/null || { _kei_tn_rt_down; return 1; }
+    kei_owned_add docker-network "$KEI_TAINACAN_RT" "$KEI_TAINACAN_ID" no "" "$subnet" && kei_docker_isolation_apply >/dev/null \
+        || { _kei_tn_rt_down; echo "$(t "The network could not be isolated, so it was removed.")" >&2; return 5; }
+    rc=0
+    _kei_tn_dc rt up -d --no-start >/dev/null 2>&1 || rc=1
+    [ "$rc" = 0 ] && { _kei_tn_fill_files kn-tainacan-rt-wp "$bdir" || rc=1; }
+    [ "$rc" = 0 ] && { _kei_tn_dc rt up -d db >/dev/null 2>&1 && _kei_tn_wait 300 _kei_tn_db_ready rt || rc=1; }
+    [ "$rc" = 0 ] && { _kei_tn_load_db rt "$bdir" >/dev/null 2>&1 || rc=1; }
+    [ "$rc" = 0 ] && { _kei_tn_dc rt up -d wordpress >/dev/null 2>&1 && _kei_tn_wait 300 _kei_tn_wp_ready rt || rc=1; }
+    if [ "$rc" != 0 ]; then
+        echo "$(t "The isolated copy could not be started.")" >&2
+        [ "${KEI_TAINACAN_KEEP_RT:-}" = 1 ] || _kei_tn_rt_down
+        return 1
+    fi
+    if out=$(_kei_tn_validate rt "$bdir"); then rc=0; else rc=1; fi
+    if [ "$rc" = 0 ] && [ "$(_kei_tn_wp rt eval 'echo (has_filter("pre_wp_mail") && !wp_mail("check@example.invalid", "t", "t")) ? "blocked" : "sent";' 2>/dev/null)" != blocked ]; then
+        out="$(t "the e-mail of the isolated copy was not intercepted")"; rc=1
+    fi
+    [ "${KEI_TAINACAN_KEEP_RT:-}" = 1 ] || _kei_tn_rt_down
+    if [ "$rc" != 0 ]; then
+        echo "$(t "The restore test failed:") $out" >&2
+        log "tainacan: restore test of $bdir failed: $out"
+        return 1
+    fi
+    log "tainacan: restore test of $bdir passed ($out)"
+    echo "$(b="${bdir##*/}"; t "Restore test passed for \${b}: the isolated copy had the same collections, items and attachments, and answered through the API.") ($out)"
+}
+
+# kei_tainacan_restore BACKUP: test first; then a safety backup of what is
+# there, the backup on the real installation, and the check; when the
+# check fails, the safety backup goes back.
+kei_tainacan_restore() {
+    local bdir safety out old new rc
+    bdir=$(_kei_tn_resolve "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
+    [ -n "$bdir" ] || { echo "$(t "Backup not found.")" >&2; return 2; }
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    if [ "${_KEI_TN_ROLLBACK:-}" != 1 ]; then
+        kei_tainacan_restore_test "$bdir" >/dev/null || return $?
+        safety=$(kei_tainacan_backup pre-restore) || { echo "$(t "The safety backup failed: nothing was restored.")" >&2; return 1; }
+    fi
+    _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1
+    rc=0
+    _kei_tn_load_db prod "$bdir" >/dev/null 2>&1 || rc=1
+    [ "$rc" = 0 ] && { _kei_tn_fill_files kn-tainacan-wp "$bdir" || rc=1; }
+    _kei_tn_dc up -d wordpress >/dev/null 2>&1
+    _kei_tn_wait 300 _kei_tn_wp_ready || rc=1
+    old=$(_kei_tn_manifest_get "$bdir" url); new=$(_kei_tn_get url)
+    if [ "$rc" = 0 ] && [ -n "$old" ] && [ "$old" != "$new" ]; then
+        _kei_tn_wp search-replace "$old" "$new" --all-tables --skip-columns=guid >/dev/null 2>&1 || rc=1
+    fi
+    if [ "$rc" = 0 ]; then out=$(_kei_tn_validate "$bdir") || rc=1; else out="$(t "loading failed")"; fi
+    if [ "$rc" != 0 ]; then
+        if [ "${_KEI_TN_ROLLBACK:-}" != 1 ] && [ -n "$safety" ]; then
+            _KEI_TN_ROLLBACK=1 kei_tainacan_restore "$safety" >/dev/null 2>&1
+            echo "$(t "The restore did not pass the check, so the previous state was put back:") $out" >&2
+        else
+            echo "$(t "The restore did not pass the check:") $out" >&2
+        fi
+        log "tainacan: restore of $bdir failed: $out"
+        return 1
+    fi
+    log "tainacan: restored $bdir"
+    [ "${_KEI_TN_ROLLBACK:-}" = 1 ] && return 0
+    echo "$(b="${bdir##*/}"; s="${safety##*/}"; t "Restored \${b}. The state before is in the safety backup \${s}.") ($out)"
+}
+
+# ----------------------------------------------------------------------
+# Address, language, credentials.
+# ----------------------------------------------------------------------
+kei_tainacan_address() {
+    local url="${1:-}" old rc
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    kei_tainacan_parse_url "$url" >/dev/null || { echo "$(u="$url"; t "Invalid address: \${u}. Use http://name or https://name, with no path.")" >&2; return 2; }
+    old=$(_kei_tn_get url)
+    [ "$old" = "$url" ] && { echo "$(t "The address is the same.")"; return 0; }
+    kei_platform_release_web "$KEI_TAINACAN_ID" || { echo "$(t "The old web address could not be taken out; nothing changed.")" >&2; return 1; }
+    _kei_tn_wp search-replace "$old" "$url" --all-tables --skip-columns=guid >/dev/null 2>&1 || {
+        kei_tainacan_web_apply "$old" >/dev/null 2>&1; echo "$(t "WordPress could not change its address; nothing changed.")" >&2; return 1; }
+    _kei_tn_set url "$url"
+    kei_tainacan_web_apply "$url"; rc=$?
+    log "tainacan: address $old -> $url ($rc)"
+    [ "$rc" = 0 ] && echo "$(u="$url"; t "Tainacan now answers at \${u}.")"
+    return "$rc"
+}
+
+# kei_platform_release_web PLATFORM: the web part of kei_platform_release
+# (site, tunnel address, modules, firewall ports), the network stays.
+kei_platform_release_web() {
+    local platform="$1" kind name failed=0
+    for kind in apache-site ingress apache-module ufw-port; do
+        while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            case "$kind" in
+                apache-site)   kei_proxy_remove_site "$platform" "$(basename "${name#"$KEI_PROXY_PREFIX"}" .conf)" ;;
+                ingress)       kei_tunnel_ingress_del "$platform" "$name" ;;
+                apache-module) kei_proxy_module_release "$platform" "$name" ;;
+                ufw-port)      kei_proxy_port_release "$platform" "$name" ;;
+            esac || failed=1
+        done < <(kei_owned_list "$kind" "$platform" | awk -F'\t' '{ print $2 }')
+    done
+    return "$failed"
+}
+
+kei_tainacan_language() {
+    local lang="${1:-}"
+    [[ "$lang" =~ ^[a-z]{2,3}(_[A-Z]{2})?$ ]] || { echo "$(t "Invalid language code.")" >&2; return 2; }
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    if [ "$lang" != en_US ]; then
+        _kei_tn_wp language core install "$lang" --activate >/dev/null 2>&1 || {
+            echo "$(l="$lang"; t "The language \${l} could not be downloaded: WordPress stays in English. Try again later from the panel.")" >&2; return 1; }
+        _kei_tn_wp language plugin install tainacan "$lang" >/dev/null 2>&1 || true
+    else
+        _kei_tn_wp site switch-language en_US >/dev/null 2>&1 || return 1
+    fi
+    _kei_tn_set lang "$lang"
+    echo "$(l="$lang"; t "Language set: \${l}.")"
+}
+
+kei_tainacan_credentials() {
+    [ -f "$KEI_TAINACAN_DIR/.env" ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    printf '%s\n%s: %s\n%s: %s\n%s: %s\n' "$(t "Tainacan administrator")" "$(t "Address")" "$(_kei_tn_get url)/wp-admin/" \
+        "$(t "User")" "$(_kei_tn_env KN_ADMIN_USER)" "$(t "Password")" "$(_kei_tn_env KN_ADMIN_PASSWORD)"
+}
+
+# ----------------------------------------------------------------------
+# Uninstall.
+# ----------------------------------------------------------------------
+# kei_tainacan_uninstall keep|delete: keep leaves the volumes and .env (a
+# new installation uses them); delete makes a last backup first (refused
+# if it fails) and deletes them. The backups, Docker and Apache stay.
+kei_tainacan_uninstall() {
+    local data="${1:-}" out failed=0
+    case "$data" in keep|delete) ;; *) echo "$(t "Choose keep or delete for the data.")" >&2; return 2 ;; esac
+    kei_tainacan_installed || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    _kei_tn_rt_down
+    if [ "$data" = delete ] && [ "$(_kei_tn_get status)" = installed ]; then
+        out=$(kei_tainacan_backup final) || { echo "$(t "The last backup failed, so nothing was deleted.")" >&2; return 1; }
+    fi
+    [ -f "$KEI_TAINACAN_DIR/compose.yml" ] && _kei_tn_dc down --remove-orphans >/dev/null 2>&1
+    kei_docker_platform_remove "$KEI_TAINACAN_ID" "$data" || failed=1
+    kei_platform_release "$KEI_TAINACAN_ID" >/dev/null || failed=1
+    kei_owned_del package apache2 "$KEI_TAINACAN_ID"
+    if [ "$data" = delete ]; then
+        rm -rf -- "$KEI_TAINACAN_DIR"
+    else
+        _kei_tn_set status kept
+    fi
+    log "tainacan: uninstalled ($data, failed=$failed)"
+    if [ "$failed" != 0 ]; then
+        echo "$(t "Tainacan was uninstalled, but something was kept: see the registry (Platforms).")" >&2
+        return 1
+    fi
+    if [ "$data" = delete ]; then
+        echo "$(b="${out##*/}"; t "Tainacan was uninstalled and its data deleted. The last backup is \${b}.")"
+    else
+        echo "$(t "Tainacan was uninstalled. Its data was kept: installing it again uses it.")"
+    fi
+}
+
+# ======================================================================
 # PLATFORMS (Koha is optional)
 # ----------------------------------------------------------------------
 # The panel works on a server without Koha. For every platform it knows,
@@ -12374,7 +13612,7 @@ kei_docker_audit() {
 #              configuration file or a running service proves nothing.
 # Nothing here opens a database.
 # ======================================================================
-KEI_PLATFORMS_PLANNED="tainacan atom dspace"
+KEI_PLATFORMS_PLANNED="atom dspace"
 # The Koha services the platform card counts (the same ones as
 # kei_overall_state, plus Memcached).
 KEI_KOHA_UNITS="apache2 mariadb memcached koha-common"
@@ -12411,6 +13649,7 @@ kei_platforms_json() {
     fi
     printf '[{"id":"koha","supported":true,"detected":%s,"services":%s,"units":{%s},"health":"unknown"}' \
         "$detected" "$(json_str "$services")" "$units"
+    printf ','; kei_tainacan_json
     for id in $KEI_PLATFORMS_PLANNED; do
         printf ',{"id":%s,"supported":false,"detected":null,"services":"none","units":{},"health":"unknown"}' "$(json_str "$id")"
     done
@@ -41221,6 +42460,27 @@ kei_task() {
         docker-install)  _kei_docker_task kei_docker_install "${1:-}" ;;
         docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
+        tainacan-status)
+            local k v
+            while IFS='=' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_status)
+            return 0 ;;
+        tainacan-plan)
+            local k v
+            while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_plan "${1:-}"; echo "rc	$?")
+            return 0 ;;
+        tainacan-install)   _kei_docker_task kei_tainacan_install "${1:-}" "${2:-}" "${3:-}" ;;
+        tainacan-logs)      _kei_docker_task kei_tainacan_logs "${1:-200}" ;;
+        tainacan-backup)    _kei_docker_task kei_tainacan_backup manual ;;
+        tainacan-backups)
+            local d c l
+            while IFS=$'\t' read -r d c l; do [ -n "$d" ] && kei_result backup "${d##*/}|$c|$l"; done < <(kei_tainacan_backups)
+            return 0 ;;
+        tainacan-restore-test) _kei_docker_task kei_tainacan_restore_test "${1:-latest}" ;;
+        tainacan-restore)   _kei_docker_task kei_tainacan_restore "${1:-}" ;;
+        tainacan-address)   _kei_docker_task kei_tainacan_address "${1:-}" ;;
+        tainacan-language)  _kei_docker_task kei_tainacan_language "${1:-}" ;;
+        tainacan-credentials) _kei_docker_task kei_tainacan_credentials ;;
+        tainacan-uninstall) _kei_docker_task kei_tainacan_uninstall "${1:-}" ;;
         cf-status)       cf_status ;;
         cf-check)        cf_check ;;
         cf-service)      cf_service "${1:-}" ;;

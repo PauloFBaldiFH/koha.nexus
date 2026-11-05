@@ -5,15 +5,17 @@ Four facts are kept apart for every platform, never folded into one
 "operational" flag:
 
   supported  this version of the panel can install and administer it
-             (Koha only, for now; Tainacan, AtoM and DSpace are planned)
+             (Koha and Tainacan; AtoM and DSpace are planned)
   detected   an installation was found (Koha: its koha-conf.xml exists,
              the installer's is_koha_installed); None = not looked for
   services   its system services: active, partial, inactive, unknown, or
              none (nothing installed)
   health     a functional check (a search answers, a page shows records):
-             unknown, healthy or failing. Nothing checks it yet, so it is
-             always "unknown" (not verified): a configuration file or a
+             unknown, healthy or failing. Koha's is not checked yet, so it
+             stays "unknown" (not verified): a configuration file or a
              running service is no proof that the platform works.
+             Tainacan's is: its collections API answers with JSON and
+             lists as many published collections as its database has.
 
 The installer reports the same facts in `config.sh --status-json` under
 "platforms"; an older installer without that key still says
@@ -45,7 +47,7 @@ class Platform:
 
 CATALOG: tuple[Platform, ...] = (
     Platform(KOHA, "Koha", "Library management: catalogue, patrons and circulation", True),
-    Platform("tainacan", "Tainacan", "Digital collections and museum holdings", False),
+    Platform("tainacan", "Tainacan", "Digital collections and museum holdings", True),
     Platform("atom", "AtoM", "Archival description and access", False),
     Platform("dspace", "DSpace", "Institutional repository", False),
 )
@@ -230,6 +232,66 @@ def docker_can_remove(state: DockerState) -> bool:
     no platform network and no container of anyone (the installer checks
     again, volumes and networks included)."""
     return state.installed_by_nexus and state.running and not state.networks and not state.others
+
+
+# Tainacan (installer: kei_tainacan_*; its entry of "platforms" carries
+# "status" and "url" too). Installed in containers, only after the plan
+# and a Yes; its data is backed up and restored by the installer.
+TAINACAN_STATUS = ("absent", "installing", "installed", "failed", "kept")
+
+
+@dataclass(frozen=True)
+class TainacanState:
+    known: bool = False          # False = not reported (an older installer)
+    status: str = "absent"
+    url: str = ""
+    services: str = "none"
+    health: str = "unknown"
+
+
+def tainacan_from_status(status: dict | None) -> TainacanState:
+    for raw in (status or {}).get("platforms") or []:
+        if isinstance(raw, dict) and raw.get("id") == "tainacan" and raw.get("supported") is True:
+            url = raw.get("url") if isinstance(raw.get("url"), str) else ""
+            return TainacanState(
+                known=True, status=_norm(raw.get("status"), TAINACAN_STATUS, "absent"),
+                url=url[:200] if url.startswith(("http://", "https://")) else "",
+                services=_norm(raw.get("services"), SERVICES, "none"),
+                health=_norm(raw.get("health"), HEALTH, "unknown"))
+    return TainacanState()
+
+
+def describe_tainacan(state: TainacanState, docker: DockerState) -> tuple[str, str, str]:
+    """(value, note, card state) for the Tainacan card."""
+    if not state.known:
+        return t("Planned"), t("Not available in this version of the panel"), ""
+    if state.status == "kept":
+        return t("Not installed"), t("Its data was kept: installing it again uses it"), ""
+    if state.status == "failed":
+        return t("Installation incomplete"), t("Install again: it goes on where it stopped"), "warn"
+    if state.status in ("absent", "installing"):
+        if not docker.installed:
+            return t("Not installed"), t("Needs Docker: install Docker first"), ""
+        return t("Not installed"), t("Optional: install it when you need it"), ""
+    services = {
+        "active": t("services running"), "partial": t("some services stopped"),
+        "inactive": t("services stopped"), "unknown": t("services not read"),
+    }.get(state.services, t("services not read"))
+    health = {"healthy": t("healthy"), "failing": t("failing")}.get(state.health, t("health not verified"))
+    card = "ok" if state.services == "active" and state.health == "healthy" else (
+        "bad" if state.services == "inactive" or state.health == "failing" else "warn")
+    note = f"{services} · {health}"
+    if state.url:
+        note += f" · {state.url}"
+    return t("Installed"), note, card
+
+
+def tainacan_can_install(state: TainacanState, docker: DockerState) -> bool:
+    return state.known and state.status != "installed" and docker.installed and docker.running
+
+
+def tainacan_installed(state: TainacanState) -> bool:
+    return state.known and state.status == "installed"
 
 
 def missing_reason(platform: str) -> str:

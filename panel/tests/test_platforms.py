@@ -16,9 +16,9 @@ TEXT = INSTALLER.read_text(encoding="utf-8")
 # ----------------------------------------------------------------------
 # The registry: four facts, never one "operational" flag
 # ----------------------------------------------------------------------
-def test_catalog_knows_four_platforms_and_supports_only_koha():
+def test_catalog_knows_four_platforms_and_supports_koha_and_tainacan():
     assert [p.id for p in platforms.CATALOG] == ["koha", "tainacan", "atom", "dspace"]
-    assert [p.id for p in platforms.CATALOG if p.supported] == ["koha"]
+    assert [p.id for p in platforms.CATALOG if p.supported] == ["koha", "tainacan"]
 
 
 def test_status_json_platforms_are_read():
@@ -301,7 +301,7 @@ def test_platforms_screen_shows_a_card_per_platform(no_koha):
             return {p.id: str(view.query_one(f"#platform-{p.id}", StatusCard).query_one(".card-value").render())
                     for p in platforms.CATALOG}
 
-    assert asyncio.run(main()) == {"koha": "Not installed", "tainacan": "Planned", "atom": "Planned",
+    assert asyncio.run(main()) == {"koha": "Not installed", "tainacan": "Not installed", "atom": "Planned",
                                    "dspace": "Planned"}
 
 
@@ -413,3 +413,128 @@ def test_docker_is_installed_only_after_the_plan_and_a_yes(no_koha):
     *_, names, ran = asyncio.run(main("yes"))
     assert names == ["docker-plan", "docker-install"]
     assert ("docker-install", ("confirm",)) in ran
+
+
+# ----------------------------------------------------------------------
+# Tainacan (installer: kei_tainacan_*; its entry of "platforms")
+# ----------------------------------------------------------------------
+def test_tainacan_status_is_read_and_unknown_values_are_not_trusted():
+    st = platforms.tainacan_from_status({"platforms": [
+        {"id": "tainacan", "supported": True, "detected": True, "services": "active", "health": "healthy",
+         "status": "installed", "url": "http://acervo.example.org"}]})
+    assert st == platforms.TainacanState(True, "installed", "http://acervo.example.org", "active", "healthy")
+    odd = platforms.tainacan_from_status({"platforms": [
+        {"id": "tainacan", "supported": True, "status": "rm -rf", "url": "javascript:x", "health": "great"}]})
+    assert (odd.status, odd.url, odd.health) == ("absent", "", "unknown")
+    # An installer that does not support it yet: planned.
+    assert not platforms.tainacan_from_status({"platforms": [{"id": "tainacan", "supported": False}]}).known
+    assert platforms.describe_tainacan(platforms.TainacanState(), platforms.DockerState())[0] == "Planned"
+
+
+def test_tainacan_card_and_buttons_follow_the_installer():
+    docker = platforms.DockerState(True, True, "docker-ce", "29.9.3", "2.40", True)
+    absent = platforms.TainacanState(True)
+    assert platforms.tainacan_can_install(absent, docker)
+    assert not platforms.tainacan_can_install(absent, platforms.DockerState(True))     # no Docker yet
+    assert platforms.describe_tainacan(absent, platforms.DockerState(True))[1] == "Needs Docker: install Docker first"
+    up = platforms.TainacanState(True, "installed", "http://x.org", "active", "healthy")
+    assert platforms.describe_tainacan(up, docker)[2] == "ok"
+    assert "http://x.org" in platforms.describe_tainacan(up, docker)[1]
+    # Running is not healthy: the API check decides.
+    assert platforms.describe_tainacan(platforms.TainacanState(True, "installed", "", "active", "unknown"),
+                                       docker)[2] == "warn"
+    assert platforms.describe_tainacan(platforms.TainacanState(True, "installed", "", "active", "failing"),
+                                       docker)[2] == "bad"
+    assert platforms.tainacan_installed(up) and not platforms.tainacan_can_install(up, docker)
+    kept = platforms.TainacanState(True, "kept")
+    assert platforms.tainacan_can_install(kept, docker)
+    assert "kept" in platforms.describe_tainacan(kept, docker)[1]
+
+
+def _with_docker(status: dict) -> dict:
+    status = dict(status)
+    status["docker"] = {**status["docker"], "installed": True, "running": True, "engine": "29.9.3",
+                        "compose": "2.40", "package": "docker-ce"}
+    return status
+
+
+def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen, InputScreen
+
+    async def main(answer: str):
+        app = make_app()
+        ran: list[tuple[str, tuple[str, ...]]] = []
+        real_task, real_status = app.bridge.task, app.bridge.status
+
+        async def task(name, *args, **kwargs):
+            ran.append((name, args))
+            return await real_task(name, *args, **kwargs)
+
+        async def status(*args, **kwargs):
+            return _with_docker(await real_status(*args, **kwargs))
+        app.bridge.task, app.bridge.status = task, status
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            button = app.screen.query_one("#tainacan-install")
+            shown = button.display
+            hidden = [b for b in ("status", "backup", "restore", "uninstall")
+                      if not app.screen.query_one(f"#tainacan-{b}").display]
+            button.press()
+            await pilot.pause(1.0)
+            asked = isinstance(app.screen, InputScreen)
+            await pilot.click("#ok")              # empty: the server's own address
+            await pilot.pause(1.0)
+            preview = isinstance(app.screen, ConfirmScreen) and "wordpress.org" in app.screen._preview
+            await pilot.click(f"#{answer}")
+            await pilot.pause(2.0)
+            return shown, hidden, asked, preview, [r for r in ran if r[0].startswith("tainacan-")]
+
+    shown, hidden, asked, preview, ran = asyncio.run(main("no"))
+    assert (shown, asked, preview) == (True, True, True)
+    assert hidden == ["status", "backup", "restore", "uninstall"]
+    assert ran == [("tainacan-plan", ())]                                   # "No": nothing installed
+    *_, ran = asyncio.run(main("yes"))
+    assert ran == [("tainacan-plan", ()), ("tainacan-install", ("confirm", "http://192.168.0.10:8090"))]
+
+
+def test_tainacan_uninstall_asks_what_happens_to_the_data(no_koha):
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen
+
+    async def main():
+        app = make_app()
+        ran: list[tuple[str, tuple[str, ...]]] = []
+        real_task, real_status = app.bridge.task, app.bridge.status
+
+        async def task(name, *args, **kwargs):
+            ran.append((name, args))
+            return await real_task(name, *args, **kwargs)
+
+        async def status(*args, **kwargs):
+            st = _with_docker(await real_status(*args, **kwargs))
+            st["platforms"] = [p if p["id"] != "tainacan" else
+                               {**p, "detected": True, "status": "installed", "services": "active",
+                                "health": "healthy", "url": "http://192.168.0.10:8090"} for p in st["platforms"]]
+            return st
+        app.bridge.task, app.bridge.status = task, status
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            assert not app.screen.query_one("#tainacan-install").display
+            app.screen.query_one("#tainacan-uninstall").press()
+            await pilot.pause(1.0)
+            choice = isinstance(app.screen, ChoiceScreen)
+            app.screen.dismiss("delete")
+            await pilot.pause(1.0)
+            danger = isinstance(app.screen, ConfirmScreen) and app.screen._danger and "DELETE" in app.screen._question
+            await pilot.click("#yes")
+            await pilot.pause(2.0)
+            return choice, danger, [r for r in ran if r[0] == "tainacan-uninstall"]
+
+    choice, danger, ran = asyncio.run(main())
+    assert (choice, danger) == (True, True)
+    assert ran == [("tainacan-uninstall", ("delete",))]
