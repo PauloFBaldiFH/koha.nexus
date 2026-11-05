@@ -303,3 +303,40 @@ def test_platforms_screen_shows_a_card_per_platform(no_koha):
 
     assert asyncio.run(main()) == {"koha": "Not installed", "tainacan": "Planned", "atom": "Planned",
                                    "dspace": "Planned"}
+
+
+# ----------------------------------------------------------------------
+# The web proxy (installer: kei_proxy_detect, the "proxy" of --status-json)
+# ----------------------------------------------------------------------
+def test_proxy_status_is_read_and_unknown_values_are_not_trusted():
+    p = platforms.proxy_from_status({"proxy": {"mode": "external", "server": "nginx", "sites": 2}})
+    assert (p.mode, p.server, p.sites) == ("external", "nginx", 2)
+    assert platforms.proxy_from_status({}).mode is None                       # an older installer
+    bad = platforms.proxy_from_status({"proxy": {"mode": "operational", "server": 3, "sites": -1}})
+    assert (bad.mode, bad.server, bad.sites) == (None, "", 0)
+
+
+def test_proxy_card_never_promises_a_change():
+    assert platforms.describe_proxy(platforms.ProxyState())[0] == "Unknown"
+    assert platforms.describe_proxy(platforms.ProxyState("none"))[0] == "No web server"
+    assert platforms.describe_proxy(platforms.ProxyState("apache-nexus", "apache2", 1))[2] == "ok"
+    shared = platforms.describe_proxy(platforms.ProxyState("apache-shared", "apache2"))
+    assert shared[2] == "warn" and "never changed" in shared[1]
+    external = platforms.describe_proxy(platforms.ProxyState("external", "caddy"))
+    assert external[0] == "caddy" and external[2] == "warn"
+
+
+def test_platforms_screen_shows_the_proxy_card(no_koha):
+    from kei_panel.widgets.cards import StatusCard
+
+    async def main():
+        app = make_app()
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            card = app.screen.query_one("#view-platforms #platform-proxy", StatusCard)
+            return str(card.query_one(".card-value").render())
+
+    assert asyncio.run(main()) == "No web server"

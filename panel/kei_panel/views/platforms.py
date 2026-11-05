@@ -32,6 +32,7 @@ class PlatformsView(SectionView):
         with Grid(classes="status-grid", id="platform-cards"):
             for p in platforms.CATALOG:
                 yield StatusCard(f"{p.name}: {t(p.role)}", id=f"platform-{p.id}")
+            yield StatusCard(t("Web proxy"), id="platform-proxy")
 
     def on_mount(self) -> None:
         self.refresh_data()
@@ -53,6 +54,8 @@ class PlatformsView(SectionView):
         finally:
             self.query_one("#platforms-loader").display = False
         self.show(platforms.from_status(status))
+        self.query_one("#platform-proxy", StatusCard).set(
+            *platforms.describe_proxy(platforms.proxy_from_status(status)))
         self.app.platforms_seen(status)
 
     def show(self, states: list[platforms.PlatformState]) -> None:

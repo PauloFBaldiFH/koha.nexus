@@ -128,6 +128,43 @@ def describe(state: PlatformState) -> tuple[str, str, str]:
     return t("Installed"), f"{services} · {health}", card
 
 
+# The web server in front of the platforms (installer: kei_proxy_detect).
+PROXY_MODES = ("none", "apache-nexus", "apache-shared", "external")
+
+
+@dataclass(frozen=True)
+class ProxyState:
+    mode: str | None = None     # None = not reported (an older installer)
+    server: str = ""
+    sites: int = 0
+
+
+def proxy_from_status(status: dict | None) -> ProxyState:
+    """The "proxy" object of --status-json; unknown values are not trusted."""
+    raw = (status or {}).get("proxy")
+    if not isinstance(raw, dict):
+        return ProxyState()
+    mode = raw.get("mode") if raw.get("mode") in PROXY_MODES else None
+    server = raw.get("server") if isinstance(raw.get("server"), str) else ""
+    sites = raw.get("sites") if isinstance(raw.get("sites"), int) and raw.get("sites") >= 0 else 0
+    return ProxyState(mode, server[:40], sites)
+
+
+def describe_proxy(state: ProxyState) -> tuple[str, str, str]:
+    """(value, note, card state) for the web proxy card. Read only: this
+    version installs nothing in front of the platforms."""
+    if state.mode is None:
+        return t("Unknown"), t("Not checked"), ""
+    if state.mode == "none":
+        return t("No web server"), t("Nothing answers on ports 80 and 443"), ""
+    if state.mode == "apache-nexus":
+        return "Apache", t("Koha's sites only, plus ${n} of other platforms", n=state.sites), "ok"
+    if state.mode == "apache-shared":
+        return "Apache", t("Also serves other sites: they are never changed"), "warn"
+    return state.server or t("Another web server"), \
+        t("Another web server answers on 80/443: Koha.Nexus would only print its configuration block"), "warn"
+
+
 def missing_reason(platform: str) -> str:
     """Why a routine or a screen of `platform` cannot open on this server."""
     if platform == KOHA:
