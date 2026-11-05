@@ -232,9 +232,15 @@ final class Core {
 
     public static function booking_deleted($booking) {
         global $wpdb;
-        self::revoke($booking->booking_id);
-        $wpdb->update(self::table('certificates'), array('participant' => '', 'subject_email' => ''), array('booking_id' => $booking->booking_id));
-        $wpdb->delete(self::table('attendance'), array('booking_id' => $booking->booking_id));
+        $id = (int) $booking->booking_id;
+        if ($id < 1) { return; }
+        self::revoke($id);
+        $wpdb->update(self::table('certificates'), array('participant' => '', 'subject_email' => ''), array('booking_id' => $id));
+        $wpdb->delete(self::table('attendance'), array('booking_id' => $id));
+        // The history of a deleted booking goes with it (who checked it in,
+        // issued, undid or revoked). The anonymous, revoked certificate row
+        // stays, so its public code keeps answering "revoked".
+        $wpdb->delete(self::table('log'), array('booking_id' => $id));
     }
 
     public static function csv_cell($value) {

@@ -2,7 +2,14 @@
 namespace Nexus_Eventos;
 defined('ABSPATH') || exit;
 
-/** Install the original, unmodified dependency only after an administrator's POST. */
+/**
+ * Events Manager is a separate plugin. The production package (built by
+ * tools/nexus-eventos-package.py) does not carry a copy of it: it is
+ * installed from wordpress.org, checked file by file against the published
+ * checksums (Koha.Nexus: config.sh --task tainacan-events enable), or by an
+ * administrator in Plugins. A development checkout that still has
+ * bundled/events-manager can copy it, only after an administrator's POST.
+ */
 final class Dependency {
     public static function verify_bundle() {
         $root = NXEV_DIR . '/bundled/events-manager';
@@ -23,6 +30,10 @@ final class Dependency {
         return $actual === $manifest;
     }
 
+    public static function has_bundle() {
+        return is_dir(NXEV_DIR . '/bundled/events-manager') && is_readable(NXEV_DIR . '/bundled/events-manager.sha256.json');
+    }
+
     public static function boot() {
         add_action('admin_post_nxev_prepare', array(__CLASS__, 'prepare'));
         if (!defined('EM_VERSION') || version_compare(EM_VERSION, '7.4.13', '<')) {
@@ -31,15 +42,17 @@ final class Dependency {
     }
 
     public static function notice() {
-        echo '<div class="notice notice-warning"><p>' . esc_html__('Nexus Eventos usa o Events Manager gratuito para agenda e reservas. O pacote original 7.4.13 está incluído; nenhuma extensão paga é necessária para os recursos Nexus.', 'nexus-eventos') . '</p>';
+        echo '<div class="notice notice-warning"><p>' . esc_html__('Nexus Eventos usa o Events Manager gratuito (7.4.13 ou mais novo) para agenda e reservas. Nenhuma extensão paga é necessária para os recursos Nexus.', 'nexus-eventos') . '</p>';
         if (defined('EM_VERSION') && version_compare(EM_VERSION, '7.4.13', '<')) {
             echo '<p>' . esc_html__('Atualize o Events Manager pelo procedimento normal do WordPress. Uma instalação existente não será substituída automaticamente.', 'nexus-eventos') . '</p>';
-        } elseif (current_user_can('install_plugins') && current_user_can('activate_plugins')) {
+        } elseif (self::has_bundle() && current_user_can('install_plugins') && current_user_can('activate_plugins')) {
             echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="nxev_prepare">';
             wp_nonce_field('nxev-prepare');
             echo '<p><button class="button button-primary">' . esc_html__('Preparar base gratuita: instalar se ausente e ativar Events Manager', 'nexus-eventos') . '</button></p></form>';
+        } else {
+            echo '<p>' . esc_html__('Instale e ative o Events Manager em Plugins, Adicionar novo, a partir do diretório oficial do WordPress. No Koha.Nexus, a ativação dos eventos do Tainacan baixa o pacote oficial e confere cada arquivo antes de instalar.', 'nexus-eventos') . '</p>';
         }
-        echo '<p>' . esc_html__('Se preferir, instale e ative Events Manager manualmente em Plugins. Os dados existentes são preservados.', 'nexus-eventos') . '</p></div>';
+        echo '<p>' . esc_html__('Os dados existentes são preservados.', 'nexus-eventos') . '</p></div>';
     }
 
     public static function prepare() {
@@ -50,7 +63,7 @@ final class Dependency {
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
         $main = WP_PLUGIN_DIR . '/events-manager/events-manager.php';
         if (!file_exists($main)) {
-            if (!self::verify_bundle()) {
+            if (!self::has_bundle() || !self::verify_bundle()) {
                 wp_die(esc_html__('O pacote incluído não passou na verificação de integridade. Instale Events Manager manualmente.', 'nexus-eventos'), '', array('response' => 400));
             }
             require_once ABSPATH . 'wp-admin/includes/file.php';

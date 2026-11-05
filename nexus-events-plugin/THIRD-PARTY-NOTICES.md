@@ -7,7 +7,9 @@ Projeto: https://wp-events-plugin.com/
 Código original: https://wordpress.org/plugins/events-manager/
 Licença declarada: GPLv2; o cabeçalho permite versão 2 ou posterior.
 
-O diretório bundled/events-manager contém os arquivos extraídos do ZIP fornecido pelo usuário, sem alterações de conteúdo. O manifesto bundled/events-manager.sha256.json registra os checksums por arquivo. O texto GPLv2 também acompanha a base em bundled/LICENSE.events-manager. Contém o código-fonte, os cabeçalhos e materiais de terceiros originais. É instalado como plugin independente, somente após confirmação administrativa. Não é apresentado como código desenvolvido pelo Koha.Nexus.
+O pacote de produção (tools/nexus-eventos-package.py) não contém o Events Manager. Ele é um plugin independente, instalado a partir do diretório oficial do WordPress; no Koha.Nexus, cada arquivo do pacote baixado é conferido contra as somas publicadas pelo wordpress.org antes de instalar. Não é apresentado como código desenvolvido pelo Koha.Nexus.
+
+No repositório, o diretório bundled/events-manager guarda os arquivos extraídos do ZIP fornecido para análise, sem alterações de conteúdo, com o manifesto bundled/events-manager.sha256.json e o texto GPLv2 em bundled/LICENSE.events-manager. Ele serve só ao desenvolvimento e não vai para produção.
 
 SHA-256 do ZIP original analisado (não incluído no repositório): 1e55d8f8492b6439b1e956850faab2d975ab444d8b218802db4037dc1c21c6d1
 

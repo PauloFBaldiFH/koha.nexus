@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.169"
+PANEL_VERSION=" 1.5.170"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12744,20 +12744,21 @@ _kei_tn_sql() {
 # The plugin: downloaded on the host, checked file by file against the
 # checksums published by wordpress.org, before WordPress sees it.
 # ----------------------------------------------------------------------
-# kei_tainacan_verify_plugin ZIP CHECKSUMS_JSON VERSION: 0 when every file
-# of the package is in the list with the same sha256 and every listed file
-# is in the package; nothing outside tainacan/, no absolute path or "..".
-kei_tainacan_verify_plugin() {
+# kei_wp_verify_plugin SLUG ZIP CHECKSUMS_JSON VERSION: 0 when every file
+# of the package is in the list wordpress.org publishes for that plugin and
+# version, with the same sha256, and every listed file is in the package;
+# nothing outside SLUG/, no absolute path or "..".
+kei_wp_verify_plugin() {
     command -v python3 >/dev/null 2>&1 || { echo "python3 is needed to check the plugin." >&2; return 3; }
-    python3 -I - "$1" "$2" "$3" <<'PYEOF'
+    python3 -I - "$1" "$2" "$3" "$4" <<'PYEOF'
 import hashlib, json, sys, zipfile
-zpath, jpath, version = sys.argv[1:4]
+slug, zpath, jpath, version = sys.argv[1:5]
 try:
     data = json.load(open(jpath, encoding="utf-8"))
 except Exception as exc:
     print("checksums: unreadable (%s)" % exc); sys.exit(1)
-if data.get("plugin") != "tainacan" or str(data.get("version")) != version:
-    print("checksums: not for tainacan %s" % version); sys.exit(1)
+if data.get("plugin") != slug or str(data.get("version")) != version:
+    print("checksums: not for %s %s" % (slug, version)); sys.exit(1)
 files = data.get("files") or {}
 if not files:
     print("checksums: empty list"); sys.exit(1)
@@ -12770,11 +12771,11 @@ for info in z.infolist():
     name = info.filename
     if name.startswith("/") or "\\" in name or ".." in name.split("/"):
         bad.append("unsafe path: " + name); continue
-    if not name.startswith("tainacan/"):
-        bad.append("outside tainacan/: " + name); continue
+    if not name.startswith(slug + "/"):
+        bad.append("outside %s/: %s" % (slug, name)); continue
     if info.is_dir():
         continue
-    rel = name[len("tainacan/"):]
+    rel = name[len(slug) + 1:]
     want = files.get(rel)
     if want is None:
         bad.append("not in the published list: " + rel); continue
@@ -12793,6 +12794,8 @@ if bad:
 print("ok %d files" % len(seen))
 PYEOF
 }
+# kei_tainacan_verify_plugin ZIP CHECKSUMS_JSON VERSION: the Tainacan plugin.
+kei_tainacan_verify_plugin() { kei_wp_verify_plugin tainacan "$@"; }
 
 # _kei_tn_fetch_plugin: the package in work/ (checked), or an error.
 _kei_tn_fetch_plugin() {
@@ -13137,7 +13140,8 @@ kei_tainacan_status() {
 }
 
 # kei_tainacan_logs [LINES]: the last lines of each container, with the
-# passwords of .env blanked out.
+# passwords of .env blanked out and the rest through kei_redact (event pass
+# keys and certificate codes in the access log lines among them).
 kei_tainacan_logs() {
     local n="${1:-200}" secrets s
     [[ "$n" =~ ^[0-9]{1,5}$ ]] || n=200
@@ -13145,7 +13149,7 @@ kei_tainacan_logs() {
     _kei_tn_dc logs --no-color --tail "$n" db wordpress 2>&1 | while IFS= read -r line; do
         while IFS= read -r s; do [ -n "$s" ] && line="${line//"$s"/********}"; done <<< "$secrets"
         printf '%s\n' "$line"
-    done
+    done | kei_redact
 }
 
 # kei_tainacan_json: the "tainacan" entry of the platforms array (status
@@ -13252,12 +13256,20 @@ _kei_tn_load_db() {
 # attachment named in the database is on disk (or was already missing
 # when the backup was made).
 _kei_tn_validate() {
-    local which=prod c i a p mc mi ma missing want_missing h
+    local which=prod c i a p mc mi ma missing want_missing h ev k m n
     [ "${1:-}" = rt ] && { which=rt; shift; }
     read -r c i a p < <(_kei_tn_counts "$which")
     mc=$(_kei_tn_manifest_get "$1" count_collections); mi=$(_kei_tn_manifest_get "$1" count_items); ma=$(_kei_tn_manifest_get "$1" count_attachments)
     [ "$c" = "$mc" ] && [ "$i" = "$mi" ] && [ "$a" = "$ma" ] || {
         echo "$(t "counts differ from the backup") ($(t "collections") $c/$mc, $(t "items") $i/$mi, $(t "attachments") $a/$ma)"; return 1; }
+    # Event data, when the backup counted it (events on or off).
+    ev=$(_kei_ev_counts "$which")
+    for k in events bookings passes attendance certificates; do
+        m=$(_kei_tn_manifest_get "$1" "count_$k")
+        [ -n "$m" ] || continue
+        n=$(printf '%s\n' "$ev" | awk -F'\t' -v k="count_$k" '$1 == k { print $2 }')
+        [ "${n:-absent}" = "$m" ] || { echo "$(t "event data differs from the backup") ($k ${n:-absent}/$m)"; return 1; }
+    done
     missing=$(_kei_tn_missing_files "$which" | grep -c .)
     want_missing=$(_kei_tn_manifest_get "$1" attachments_missing)
     [ "${missing:-0}" -le "${want_missing:-0}" ] || { echo "$(t "attachments missing on disk:") $missing"; return 1; }
@@ -13353,7 +13365,7 @@ kei_tainacan_restore_test() {
 # there, the backup on the real installation, and the check; when the
 # check fails, the safety backup goes back.
 kei_tainacan_restore() {
-    local bdir safety out old new rc sec src k v conf
+    local bdir safety out old new rc sec src k v conf note=""
     _kei_bk_lock tainacan || return $?
     bdir=$(_kei_tn_resolve "${1:-}") || { echo "$(t "Backup not found.")" >&2; return 2; }
     [ -n "$bdir" ] || { echo "$(t "Backup not found.")" >&2; return 2; }
@@ -13366,6 +13378,8 @@ kei_tainacan_restore() {
     # opens; the database passwords stay those of this installation.
     sec=$(_kei_bk_secrets_open "$bdir"); src=$?
     conf="$(t "Configuration kept from this installation (no recovery phrase).")"
+    [ "$src" = 0 ] || note=$(kei_tainacan_restore_notes "$bdir" nophrase)
+    [ -n "$note" ] && echo "$note" >&2
     ( umask 077; cp -p "$KEI_TAINACAN_DIR/.env" "$KEI_TAINACAN_DIR/.env.before-restore" ) || return 1
     if [ "$src" = 0 ]; then
         for k in KN_AUTH_KEY KN_SECURE_AUTH_KEY KN_LOGGED_IN_KEY KN_NONCE_KEY KN_AUTH_SALT KN_SECURE_AUTH_SALT KN_LOGGED_IN_SALT KN_NONCE_SALT; do
@@ -13401,7 +13415,7 @@ kei_tainacan_restore() {
     rm -f "$KEI_TAINACAN_DIR/.env.before-restore"
     log "tainacan: restored $bdir"
     [ "${_KEI_TN_ROLLBACK:-}" = 1 ] && return 0
-    echo "$(b="${bdir##*/}"; s="${safety##*/}"; t "Restored \${b}. The state before is in the safety backup \${s}.") ($out) $conf"
+    echo "$(b="${bdir##*/}"; s="${safety##*/}"; t "Restored \${b}. The state before is in the safety backup \${s}.") ($out) $conf${note:+ $note}"
 }
 
 # ----------------------------------------------------------------------
@@ -13498,6 +13512,378 @@ kei_tainacan_uninstall() {
     else
         echo "$(t "Tainacan was uninstalled. Its data was kept: installing it again uses it.")"
     fi
+}
+
+# ----------------------------------------------------------------------
+# Events for Tainacan (optional): Events Manager plus the Nexus Eventos
+# plugin of this repository (nexus-events-plugin/). Off by default: a
+# Tainacan installation works the same without them, and nothing here runs
+# unless someone asks (--task tainacan-events enable confirm).
+#
+#   Events Manager  downloaded from wordpress.org at a fixed version, each
+#                   file checked against the checksums wordpress.org
+#                   publishes, before WordPress sees it. One already in the
+#                   site is kept as it is: never replaced, never downgraded,
+#                   and never turned off without an explicit "dependency".
+#   Nexus Eventos   the production package (no bundled/, no development/):
+#                   each file checked against the list below, which is the
+#                   one tools/nexus-eventos-package.py prints. A copy put in
+#                   the site by hand is kept and the plan says so.
+#
+# State (the Tainacan state file): events=on|off, events_em=ours|preexisting
+# (who put Events Manager there), events_em_file, events_plugin=VERSION.
+# Their data (tables wp_em_*, wp_nxev_*, options, post meta, uploads) is in
+# the WordPress database and volume, so the platform backup has it whether
+# events are on or off; the manifest counts it (_kei_ev_counts).
+# ----------------------------------------------------------------------
+KEI_EVENTS_EM_VERSION="7.4.13"
+KEI_EVENTS_EM_URL="${KEI_EVENTS_EM_URL:-https://downloads.wordpress.org/plugin/events-manager.$KEI_EVENTS_EM_VERSION.zip}"
+KEI_EVENTS_EM_CHECKSUMS_URL="${KEI_EVENTS_EM_CHECKSUMS_URL:-https://downloads.wordpress.org/plugin-checksums/events-manager/$KEI_EVENTS_EM_VERSION.json}"
+KEI_EVENTS_PLUGIN_VERSION="0.1.1"
+# Where the files of the plugin come from: a folder (a checkout of the
+# repository, tests) or, by default, the same commit of GitHub the panel
+# updates from. Either way each file is checked against the list.
+KEI_EVENTS_SRC="${KEI_EVENTS_SRC:-}"
+
+# _kei_ev_package_files: "sha256  path" of each file of the production
+# package (tools/nexus-eventos-package.py list).
+_kei_ev_package_files() {
+    cat <<'EOF'
+e8ba4c30f66e2dcd0a8ddaecb9e2c488ef794a8a8fa7c13cef3c8b7711913650  LEIA-ME.md
+8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  LICENSE
+e92f839fd705f53a5a56b5ef0b0c7cce743d2668a07f75445376adefbfe0ebf0  THIRD-PARTY-NOTICES.md
+f14757adad440ed836afc5623159f5216d282a35af67949f44d0f7d6b65e828c  assets/documents.js
+da7169facf2d35949cb0a0fa575425ef91de5e71c4360fc2f67e97d2351d616a  assets/events.css
+3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c  assets/vendor/LICENSE.qrcode
+18ae399f81182bc9de916e9c77b195df20cc58d6f2d55a62b085a299f1bf1780  assets/vendor/qrcode.js
+d8a7b922d8220e14aa0c7870292d76a8e23fc7d75e7e8ddea5e7d9e3e560ea64  includes/class-admin.php
+1e654733fe90ff6c54612fd717327008fc82e08ff864eba97230a34a809ed268  includes/class-core.php
+a83baf593d715c482ed258e341bb472361851df784b5db86ed71d5ca46a36898  includes/class-dependency.php
+8a82b6186686ea95385cd334989a325f871c97d2d44397f62147fb7d14fd273f  includes/class-public.php
+719642da462f42529560cf2111c8f184767f08bd140a57947750f083f4bc965f  languages/nexus-eventos.pot
+92fcbf72cd72f14b9870ab4019b2be64b575aaa9734d7ade711015d7dcdeb837  nexus-eventos.php
+cb2a250e2759e6d1acbf4bf858f78afdb3b9f489e86b7d52b0b19f3818f588db  readme.txt
+03684b137f9bb925797cf6f0d2312b37c087257faa6b0e0ac52e6f6ced847cb8  uninstall.php
+EOF
+}
+
+# _kei_ev_fetch_em: the Events Manager package in work/ (checked), or an error.
+_kei_ev_fetch_em() {
+    local work="$KEI_TAINACAN_DIR/work" zip json out v="$KEI_EVENTS_EM_VERSION"
+    zip="$work/events-manager.$v.zip"; json="$work/events-manager.$v.checksums.json"
+    if [ -f "$zip" ] && [ -f "$json" ] && kei_wp_verify_plugin events-manager "$zip" "$json" "$v" >/dev/null 2>&1; then
+        return 0
+    fi
+    rm -f "$zip" "$json"
+    curl -fsSL --retry 3 --max-time 300 -o "$zip.part" "$KEI_EVENTS_EM_URL" \
+        && curl -fsSL --retry 3 --max-time 60 -o "$json.part" "$KEI_EVENTS_EM_CHECKSUMS_URL" || {
+        rm -f "$zip.part" "$json.part"
+        echo "$(t "Events Manager could not be downloaded from wordpress.org.")" >&2; return 1; }
+    if ! out=$(kei_wp_verify_plugin events-manager "$zip.part" "$json.part" "$v"); then
+        rm -f "$zip.part" "$json.part"
+        echo "$(t "Events Manager did not match the checksums published by wordpress.org: it was not installed.")" >&2
+        printf '%s\n' "$out" >&2
+        return 1
+    fi
+    mv -f "$zip.part" "$zip" && mv -f "$json.part" "$json" && chmod 644 "$zip" "$json"
+}
+
+# _kei_ev_build_package OUT_ZIP: the production package of Nexus Eventos,
+# every file checked against _kei_ev_package_files; folder nexus-eventos/.
+_kei_ev_build_package() {
+    local out="$1" tmp sum rel base got bad=""
+    tmp=$(mktemp -d) || return 1
+    if [ -z "$KEI_EVENTS_SRC" ]; then
+        update_resolve
+        base="${UPDATE_BASE}nexus-events-plugin/"
+    fi
+    while read -r sum rel; do
+        [ -n "$rel" ] || continue
+        case "$rel" in /*|*..*|bundled/*|development/*) bad="$rel"; break ;; esac
+        [[ "$rel" =~ ^[A-Za-z0-9._/-]+$ ]] || { bad="$rel"; break; }
+        mkdir -p "$tmp/nexus-eventos/$(dirname "$rel")"
+        if [ -n "$KEI_EVENTS_SRC" ]; then
+            [ -f "$KEI_EVENTS_SRC/$rel" ] && [ ! -L "$KEI_EVENTS_SRC/$rel" ] && cp "$KEI_EVENTS_SRC/$rel" "$tmp/nexus-eventos/$rel" || { bad="$rel"; break; }
+        else
+            curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 -H 'Cache-Control: no-cache' \
+                -o "$tmp/nexus-eventos/$rel" "$base$rel" || {
+                rm -rf "$tmp"; echo "$(t "Nexus Eventos could not be downloaded from GitHub.")" >&2; return 1; }
+        fi
+        got=$(sha256sum "$tmp/nexus-eventos/$rel" | awk '{ print $1 }')
+        [ "$got" = "$sum" ] || { bad="$rel"; break; }
+    done < <(_kei_ev_package_files)
+    if [ -n "$bad" ]; then
+        rm -rf "$tmp"
+        echo "$(f="$bad"; t "Nexus Eventos did not match the list of this Koha.Nexus (\${f}): it was not installed. Update Koha.Nexus and try again.")" >&2
+        return 1
+    fi
+    python3 -I - "$tmp" "$out.part" <<'PYEOF' || { rm -rf "$tmp" "$out.part"; return 1; }
+import os, sys, zipfile
+root, out = sys.argv[1:3]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        for f in sorted(filenames):
+            path = os.path.join(dirpath, f)
+            info = zipfile.ZipInfo(os.path.relpath(path, root), date_time=(2026, 1, 1, 0, 0, 0))
+            info.external_attr = 0o644 << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(info, open(path, "rb").read())
+PYEOF
+    rm -rf "$tmp"
+    mv -f "$out.part" "$out" && chmod 644 "$out"
+}
+
+# _kei_ev_scan: what the WordPress of Tainacan has, one line each:
+#   em<TAB>FILE<TAB>VERSION<TAB>active|inactive   (each events-manager.php)
+#   nx<TAB>FILE<TAB>VERSION<TAB>active|inactive   (each nexus-eventos.php)
+#   dir<TAB>events-manager|nexus-eventos<TAB>0|1  (the folder exists)
+_kei_ev_scan() {
+    _kei_tn_wp eval '
+require_once ABSPATH . "wp-admin/includes/plugin.php";
+foreach (get_plugins() as $f => $d) {
+    $b = basename($f);
+    $k = $b === "events-manager.php" ? "em" : ($b === "nexus-eventos.php" ? "nx" : "");
+    if ($k) { echo $k, "\t", $f, "\t", $d["Version"], "\t", is_plugin_active($f) ? "active" : "inactive", "\n"; }
+}
+foreach (array("events-manager", "nexus-eventos") as $d) {
+    $p = WP_PLUGIN_DIR . "/" . $d;
+    echo "dir\t", $d, "\t", (file_exists($p) || is_link($p)) ? 1 : 0, "\n";
+}' 2>/dev/null
+}
+
+_kei_ev_refuse() { printf 'plan\trefuse\nnote\t%s\n' "$1"; }
+
+# _kei_ev_decide SCAN_FILE: the plan from a scan and the state, as
+# "key<TAB>value" lines: plan enable|refuse, em_action install|activate|keep,
+# em_origin ours|preexisting, em_file, nx_action install|update|keep, and
+# note lines. Returns 3 on refuse. (Kept free of Docker: tests call it.)
+_kei_ev_decide() {
+    local scan="$1" em_n nx_n em_file em_ver em_st em_dir nx_file nx_ver nx_st nx_dir origin ours
+    em_n=$(awk -F'\t' '$1 == "em"' "$scan" | grep -c .)
+    nx_n=$(awk -F'\t' '$1 == "nx"' "$scan" | grep -c .)
+    IFS=$'\t' read -r _ em_file em_ver em_st < <(awk -F'\t' '$1 == "em"' "$scan" | head -n 1)
+    IFS=$'\t' read -r _ nx_file nx_ver nx_st < <(awk -F'\t' '$1 == "nx"' "$scan" | head -n 1)
+    em_dir=$(awk -F'\t' '$1 == "dir" && $2 == "events-manager" { print $3 }' "$scan")
+    nx_dir=$(awk -F'\t' '$1 == "dir" && $2 == "nexus-eventos" { print $3 }' "$scan")
+    origin=$(_kei_tn_get events_em); ours=$(_kei_tn_get events_plugin)
+    if [ "$em_n" -gt 1 ]; then _kei_ev_refuse "$(t "There is more than one copy of Events Manager in this WordPress. Keep one (Plugins) and try again.")"; return 3; fi
+    if [ "$nx_n" -gt 1 ]; then _kei_ev_refuse "$(t "There is more than one copy of Nexus Eventos in this WordPress. Keep one (Plugins) and try again.")"; return 3; fi
+    if [ -z "$em_file" ] && [ "$em_dir" = 1 ]; then
+        _kei_ev_refuse "$(t "The folder events-manager exists without a working plugin. It was left as it is: check it in Plugins.")"; return 3
+    fi
+    if [ -n "$em_file" ] && { [ -z "$em_ver" ] || _kei_tn_newer "$KEI_EVENTS_EM_VERSION" "$em_ver"; }; then
+        _kei_ev_refuse "$(a="$em_ver"; b="$KEI_EVENTS_EM_VERSION"; t "Events Manager \${a} is installed; Nexus Eventos needs \${b} or newer. It was not replaced: update it in WordPress (Plugins) after a backup.")"; return 3
+    fi
+    if [ -n "$nx_file" ] && [ "$nx_file" != "nexus-eventos/nexus-eventos.php" ]; then
+        _kei_ev_refuse "$(f="${nx_file%%/*}"; t "A copy of Nexus Eventos put in by hand (folder \${f}) is in this WordPress. It was left as it is: remove it in Plugins first if Koha.Nexus should manage events.")"; return 3
+    fi
+    if [ -n "$nx_file" ] && [ -z "$ours" ]; then
+        _kei_ev_refuse "$(t "Nexus Eventos was put in this WordPress by hand. It was left as it is: remove it in Plugins first if Koha.Nexus should manage events.")"; return 3
+    fi
+    if [ -z "$nx_file" ] && [ "$nx_dir" = 1 ]; then
+        _kei_ev_refuse "$(t "The folder nexus-eventos exists without a working plugin. It was left as it is: check it in Plugins.")"; return 3
+    fi
+    printf 'plan\tenable\n'
+    if [ -z "$em_file" ]; then
+        printf 'em_action\tinstall\nem_origin\tours\nem_file\tevents-manager/events-manager.php\n'
+        printf 'dependency\t%s\n' "Events Manager $KEI_EVENTS_EM_VERSION ($(t "downloaded from wordpress.org, checked against the published checksums"))"
+    else
+        [ "$origin" = ours ] || origin=preexisting
+        printf 'em_origin\t%s\nem_file\t%s\n' "$origin" "$em_file"
+        if [ "$em_st" = active ]; then printf 'em_action\tkeep\n'; else printf 'em_action\tactivate\n'; fi
+        if [ "$origin" = preexisting ]; then
+            printf 'dependency\t%s\n' "$(a="$em_ver"; t "Events Manager \${a}, already in this WordPress: kept as it is (activated if needed); turning events off later does not turn it off.")"
+        else
+            printf 'dependency\t%s\n' "Events Manager $em_ver ($(t "installed by Koha.Nexus"))"
+        fi
+    fi
+    if [ -z "$nx_file" ]; then printf 'nx_action\tinstall\n'
+    elif [ "$nx_ver" != "$KEI_EVENTS_PLUGIN_VERSION" ]; then printf 'nx_action\tupdate\n'
+    else printf 'nx_action\tkeep\n'; fi
+    printf 'plugin\t%s\n' "Nexus Eventos $KEI_EVENTS_PLUGIN_VERSION ($(t "production package, each file checked"))"
+    printf 'data\t%s\n' "$(t "Tables wp_em_* and wp_nxev_* in the WordPress database: in the Tainacan backups, also with events off.")"
+    printf 'undo\t%s\n' "$(t "Turning events off keeps their data; it never deletes events, bookings or certificates.")"
+    return 0
+}
+
+# _kei_ev_ready: Tainacan installed and running, or the reason.
+_kei_ev_ready() {
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")"; return 3; }
+    _kei_docker_running || { echo "$(t "Docker is not running.")"; return 3; }
+    [ "$(_kei_tn_container_state db)" = running ] && [ "$(_kei_tn_container_state wordpress)" = running ] \
+        || { echo "$(t "The Tainacan containers are not running.")"; return 3; }
+}
+
+# kei_tainacan_events_plan: what enable would do ("key<TAB>text" lines).
+kei_tainacan_events_plan() {
+    local why scan rc
+    if ! why=$(_kei_ev_ready); then printf 'plan\trefuse\nnote\t%s\n' "$why"; return 3; fi
+    scan=$(mktemp) || return 1
+    _kei_ev_scan > "$scan" || { rm -f "$scan"; printf 'plan\trefuse\nnote\t%s\n' "$(t "WordPress did not answer.")"; return 3; }
+    _kei_ev_decide "$scan"; rc=$?
+    rm -f "$scan"
+    return "$rc"
+}
+
+# _kei_ev_get PLAN KEY: a value of a plan.
+_kei_ev_get() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1 == k { print $2; exit }'; }
+
+# kei_tainacan_events_enable confirm: events on.
+kei_tainacan_events_enable() {
+    local plan rc em_action em_origin em_file nx_action work="$KEI_TAINACAN_DIR/work" v="$KEI_EVENTS_PLUGIN_VERSION" chk emv
+    if [ "${1:-}" != confirm ]; then
+        kei_tainacan_events_plan
+        echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2
+        return 3
+    fi
+    _kei_bk_lock tainacan || return $?
+    plan=$(kei_tainacan_events_plan); rc=$?
+    if [ "$rc" != 0 ]; then printf '%s\n' "$plan" | awk -F'\t' '$1 == "note" { print $2 }' >&2; return 3; fi
+    em_action=$(_kei_ev_get "$plan" em_action); em_origin=$(_kei_ev_get "$plan" em_origin)
+    em_file=$(_kei_ev_get "$plan" em_file); nx_action=$(_kei_ev_get "$plan" nx_action)
+    if [ "$em_action" = install ]; then _kei_ev_fetch_em || return 1; fi
+    _kei_ev_build_package "$work/nexus-eventos.$v.zip" || return 1
+    # Who put Events Manager there is written before anything changes, so a
+    # later "disable" knows it even when this run stops half way.
+    if [ "$em_action" = install ] || [ -z "$(_kei_tn_get events_em)" ]; then _kei_tn_set events_em "$em_origin"; fi
+    _kei_tn_set events_em_file "$em_file"
+    if [ "$em_action" = install ]; then
+        # No --force: an existing folder is never overwritten.
+        _kei_tn_wp plugin install "/work/events-manager.$KEI_EVENTS_EM_VERSION.zip" >/dev/null 2>&1 \
+            || { echo "$(t "Events Manager could not be installed in WordPress.")" >&2; return 1; }
+    fi
+    if [ "$em_action" != keep ]; then
+        _kei_tn_wp plugin activate "${em_file%%/*}" >/dev/null 2>&1 \
+            || { echo "$(t "Events Manager could not be activated.")" >&2; return 1; }
+    fi
+    # Events Manager creates its tables and roles on its first page load by
+    # an administrator (or a WP-Cron run): done now, the same function.
+    _kei_tn_wp eval 'if (function_exists("em_upgrade_plugin_check")) { em_upgrade_plugin_check(); }' >/dev/null 2>&1
+    case "$nx_action" in
+        install) _kei_tn_wp plugin install "/work/nexus-eventos.$v.zip" >/dev/null 2>&1 ;;
+        update)  _kei_tn_wp plugin install "/work/nexus-eventos.$v.zip" --force >/dev/null 2>&1 ;;
+        *) true ;;
+    esac || { echo "$(t "Nexus Eventos could not be installed in WordPress.")" >&2; return 1; }
+    _kei_tn_set events_plugin "$v"
+    _kei_tn_wp plugin activate nexus-eventos >/dev/null 2>&1 || { echo "$(t "Nexus Eventos could not be activated.")" >&2; return 1; }
+    chk=$(_kei_tn_wp eval 'global $wpdb; echo (class_exists("Nexus_Eventos\\Admin") && defined("EM_VERSION") && get_option("nxev_schema") === "2" && get_option("dbem_version") && $wpdb->get_var("SHOW TABLES LIKE \x27" . $wpdb->prefix . "em_events\x27")) ? "ok " . EM_VERSION : "missing";' 2>/dev/null)
+    case "$chk" in ok\ *) emv="${chk#ok }" ;; *) echo "$(t "Events did not pass the check after activation.") ($chk)" >&2; return 1 ;; esac
+    if ! chk=$(kei_tainacan_health); then echo "$(t "Tainacan did not pass the functional check:") $chk" >&2; return 1; fi
+    _kei_tn_set events on
+    log "tainacan: events on (Events Manager $emv, $em_origin; Nexus Eventos $v)"
+    echo "$(a="$KEI_EVENTS_PLUGIN_VERSION"; t "Events are on: Nexus Eventos \${a} and Events Manager (Plugins, Events).")"
+}
+
+# _kei_ev_turn_off_em ORIGIN HOW: 0 when disable may turn Events Manager
+# off: one Koha.Nexus installed, unless HOW is keep-dependency; one that was
+# there before, only when HOW is dependency (an explicit authorization).
+_kei_ev_turn_off_em() {
+    case "${2:-}" in
+        dependency) return 0 ;;
+        keep-dependency) return 1 ;;
+    esac
+    [ "${1:-}" = ours ]
+}
+
+# kei_tainacan_events_disable [keep-dependency|dependency]: events off. No
+# data is deleted; the plugins stay installed (turning them on again is
+# enable).
+kei_tainacan_events_disable() {
+    local how="${1:-}" why scan nx_file em_file em_st origin msg
+    case "$how" in ""|keep-dependency|dependency) ;; *) echo "$(t "Use: disable, disable keep-dependency or disable dependency.")" >&2; return 2 ;; esac
+    why=$(_kei_ev_ready) || { echo "$why" >&2; return 3; }
+    _kei_bk_lock tainacan || return $?
+    scan=$(mktemp) || return 1
+    _kei_ev_scan > "$scan" || { rm -f "$scan"; echo "$(t "WordPress did not answer.")" >&2; return 1; }
+    IFS=$'\t' read -r _ nx_file _ _ < <(awk -F'\t' '$1 == "nx" && $4 == "active"' "$scan" | head -n 1)
+    IFS=$'\t' read -r _ em_file _ em_st < <(awk -F'\t' '$1 == "em"' "$scan" | head -n 1)
+    rm -f "$scan"
+    if [ -n "$nx_file" ]; then
+        _kei_tn_wp plugin deactivate "${nx_file%%/*}" >/dev/null 2>&1 || { echo "$(t "Nexus Eventos could not be turned off.")" >&2; return 1; }
+    fi
+    origin=$(_kei_tn_get events_em)
+    msg="$(t "Events are off. Their data was kept.")"
+    if [ -n "$em_file" ] && [ "$em_st" = active ]; then
+        if _kei_ev_turn_off_em "$origin" "$how"; then
+            _kei_tn_wp plugin deactivate "${em_file%%/*}" >/dev/null 2>&1 || { echo "$(t "Events Manager could not be turned off.")" >&2; return 1; }
+            msg="$msg $(t "Events Manager was turned off too.")"
+        elif [ "$origin" = ours ]; then
+            msg="$msg $(t "Events Manager stays on, as asked.")"
+        else
+            msg="$msg $(t "Events Manager stays on: it was in this WordPress before. To turn it off too: disable dependency.")"
+        fi
+    fi
+    _kei_tn_set events off
+    log "tainacan: events off ($how)"
+    echo "$msg"
+}
+
+# _kei_ev_counts [rt|prod]: "count_<what><TAB>N" for the event data the
+# database has, whether events are on or off: events and bookings (Events
+# Manager), passes (approved one-person bookings of published events, the
+# ones whose pass link Nexus Eventos sends), attendance and certificates
+# (Nexus Eventos). A table that is not there gives no line.
+_kei_ev_counts() {
+    local which="${1:-prod}" have q="" sep="" pass
+    have=$(_kei_tn_sql "$which" "SELECT table_name FROM information_schema.tables WHERE table_schema = 'wordpress'
+            AND table_name IN ('wp_em_events', 'wp_em_bookings', 'wp_nxev_attendance', 'wp_nxev_certificates')
+        UNION ALL SELECT CONCAT('col:', column_name) FROM information_schema.columns WHERE table_schema = 'wordpress'
+            AND ((table_name = 'wp_em_bookings' AND column_name = 'timeslot_id') OR (table_name = 'wp_em_events' AND column_name = 'event_active_status'))" 2>/dev/null) || return 1
+    _h() { printf '%s\n' "$have" | grep -qx "$1"; }
+    _h wp_em_events && { q="${q}${sep}SELECT 'count_events', COUNT(*) FROM wp_em_events"; sep=" UNION ALL "; }
+    _h wp_em_bookings && { q="${q}${sep}SELECT 'count_bookings', COUNT(*) FROM wp_em_bookings"; sep=" UNION ALL "; }
+    if _h wp_em_events && _h wp_em_bookings && _h wp_nxev_attendance; then
+        pass="SELECT 'count_passes', COUNT(*) FROM wp_em_bookings b JOIN wp_em_events e ON e.event_id = b.event_id
+              WHERE b.booking_status = 1 AND b.booking_spaces = 1 AND e.event_status = 1"
+        _h col:timeslot_id && pass="$pass AND (b.timeslot_id IS NULL OR b.timeslot_id = 0)"
+        _h col:event_active_status && pass="$pass AND e.event_active_status = 1"
+        q="${q}${sep}${pass}"; sep=" UNION ALL "
+    fi
+    _h wp_nxev_attendance && { q="${q}${sep}SELECT 'count_attendance', COUNT(*) FROM wp_nxev_attendance"; sep=" UNION ALL "; }
+    _h wp_nxev_certificates && { q="${q}${sep}SELECT 'count_certificates', COUNT(*) FROM wp_nxev_certificates"; sep=" UNION ALL "; }
+    [ -n "$q" ] || return 0
+    _kei_tn_sql "$which" "$q" 2>/dev/null | awk -F'\t' 'NF == 2 && $2 ~ /^[0-9]+$/'
+}
+
+# _kei_ev_keys_fp [DIR]: a fingerprint of the keys pass links are signed
+# with (WordPress's AUTH_KEY and AUTH_SALT, in DIR/.env): 16 hex digits of
+# a sha256, which says whether two installations share them without
+# revealing them.
+_kei_ev_keys_fp() {
+    local k s
+    k=$(_kei_tn_env KN_AUTH_KEY "${1:-}"); s=$(_kei_tn_env KN_AUTH_SALT "${1:-}")
+    [ -n "$k" ] && [ -n "$s" ] || return 1
+    printf 'koha-nexus-pass-keys-v1|%s%s' "$k" "$s" | sha256sum | cut -c1-16
+}
+
+# kei_tainacan_restore_notes BACKUP [phrase|nophrase]: what a restore
+# without the recovery phrase changes for events: the pass links already
+# sent stop working when the backup was signed with other keys than this
+# installation has. Prints nothing when nothing is lost.
+kei_tainacan_restore_notes() {
+    local bdir="$1" mode="${2:-nophrase}" passes fp now
+    [ "$mode" = phrase ] && return 0
+    passes=$(_kei_tn_manifest_get "$bdir" count_passes)
+    [ -n "$passes" ] && [ "$passes" -gt 0 ] 2>/dev/null || return 0
+    fp=$(_kei_tn_manifest_get "$bdir" pass_keys_fingerprint)
+    now=$(_kei_ev_keys_fp)
+    [ -n "$fp" ] && [ "$fp" = "$now" ] && return 0
+    echo "$(n="$passes"; t "Without the recovery phrase, the \${n} event pass links already sent stop working (they were signed with the keys of the backup). Restore with the phrase to keep them, or send the passes again from Events Manager.")"
+}
+
+# kei_tainacan_events_status: key=value lines.
+kei_tainacan_events_status() {
+    local why scan em nx line
+    printf 'events=%s\n' "$(_kei_tn_get events || true)"
+    printf 'dependency_origin=%s\n' "$(_kei_tn_get events_em)"
+    why=$(_kei_ev_ready) || { printf 'reason=%s\n' "$why"; return 0; }
+    scan=$(mktemp) || return 1
+    _kei_ev_scan > "$scan"
+    em=$(awk -F'\t' '$1 == "em" { print $3 "|" $4; exit }' "$scan"); nx=$(awk -F'\t' '$1 == "nx" { print $3 "|" $4; exit }' "$scan")
+    rm -f "$scan"
+    printf 'dependency=%s\nplugin=%s\n' "${em:-absent}" "${nx:-absent}"
+    while IFS=$'\t' read -r line n; do printf '%s=%s\n' "$line" "$n"; done < <(_kei_ev_counts)
 }
 
 # ======================================================================
@@ -14485,7 +14871,7 @@ _kei_bk_tainacan_size() {
 _kei_bk_tainacan_stop() { _kei_tn_dc stop -t 60 wordpress >/dev/null 2>&1; }
 _kei_bk_tainacan_start() { _kei_tn_dc start wordpress >/dev/null 2>&1 || _kei_tn_dc up -d wordpress >/dev/null 2>&1; }
 _kei_bk_tainacan_meta() {
-    local c i a p wpv plv
+    local c i a p wpv plv k n
     read -r c i a p < <(_kei_tn_counts)
     [ -n "$c" ] || return 1
     # The wordpress container is stopped: versions are read from its volume.
@@ -14500,6 +14886,9 @@ _kei_bk_tainacan_meta() {
     printf 'count_items\t%s\n' "$(json_num "$i")"
     printf 'count_attachments\t%s\n' "$(json_num "$a")"
     printf 'count_posts\t%s\n' "$(json_num "$p")"
+    # Events (whether they are on or off) and the keys pass links are signed with.
+    _kei_ev_counts | while IFS=$'\t' read -r k n; do printf '%s\t%s\n' "$k" "$(json_num "$n")"; done
+    printf 'pass_keys_fingerprint\t%s\n' "$(json_str "$(_kei_ev_keys_fp)")"
 }
 _kei_bk_tainacan_dump() {
     timeout 7200 docker exec -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD)" "$(_kei_tn_cid db)" mariadb-dump -uroot --single-transaction \
@@ -14626,6 +15015,7 @@ kei_status_json() {
 # API keys (AIza..., e.g. the Gemini key of the AI cataloguing).
 kei_redact() {
     sed -E \
+        -e "s#(nxev_(key|verify)[\"']?[[:space:]]*(=|%3D|:)[[:space:]]*[\"']?)[A-Za-z0-9]+#\1${KEI_DIAG_REDACT}#Ig" \
         -e "s#(<(pass|password|user_pass|encryption_key|api_key)>)[^<]*(</[a-z_]+>)#\1${KEI_DIAG_REDACT}\3#Ig" \
         -e "s#([a-z_-]*(pass(word)?|passwd|pwd|secret|token|api[_-]?key)[a-z_-]*[\"']?[[:space:]]*[:=][[:space:]]*[\"']?)[^\"'[:space:],;&}]+#\1${KEI_DIAG_REDACT}#Ig" \
         -e "s#((proxy-)?authorization:[[:space:]]*[a-z]+)[[:space:]]+[^[:space:]]+#\1 ${KEI_DIAG_REDACT}#Ig" \
@@ -43392,6 +43782,20 @@ kei_task() {
             return 0 ;;
         tainacan-install)   _kei_docker_task kei_tainacan_install "${1:-}" "${2:-}" "${3:-}" ;;
         tainacan-logs)      _kei_docker_task kei_tainacan_logs "${1:-200}" ;;
+        tainacan-events)
+            local k v
+            case "${1:-}" in
+                plan) while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_events_plan; echo "rc	$?") ;;
+                status) while IFS='=' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_events_status) ;;
+                enable) _kei_docker_task kei_tainacan_events_enable "${2:-}"; return ;;
+                disable) _kei_docker_task kei_tainacan_events_disable "${2:-}"; return ;;
+                *) msg_error "" "tainacan-events plan|status|enable confirm|disable [keep-dependency|dependency]"; return 2 ;;
+            esac
+            return 0 ;;
+        tainacan-restore-notes)
+            local line
+            while IFS= read -r line; do [ -n "$line" ] && kei_result note "$line"; done < <(kei_tainacan_restore_notes "$(_kei_tn_resolve "${1:-latest}")" "${2:-nophrase}")
+            return 0 ;;
         platform-backup-plan)
             local k v
             while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_backup_plan)

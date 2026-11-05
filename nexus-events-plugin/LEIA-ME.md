@@ -1,16 +1,16 @@
-# Nexus Eventos para Tainacan 0.1.0
+# Nexus Eventos para Tainacan 0.1.1
 
 Extensão gratuita para WordPress, construída para funcionar ao lado do Tainacan. Usa o Events Manager gratuito como motor de eventos e reservas, preservando seu código e seu caminho normal de atualização.
 
 ## Instalação
 
 1. Faça backup do WordPress e teste primeiro em uma cópia do site.
-2. Copie a pasta `nexus-events-plugin` deste repositório para o diretório de plugins do WordPress e ative Nexus Eventos para Tainacan em Plugins. Para enviar pela interface web, compacte essa pasta localmente antes do envio.
-3. Se Events Manager não estiver ativo, um aviso oferece preparar a base gratuita. Essa ação, confirmada por um administrador, instala os arquivos originais incluídos quando ausente e ativa o plugin. Não substitui uma instalação existente. Se o servidor não permitir instalação direta, instale Events Manager manualmente pela interface do WordPress.
+2. Instale o Events Manager gratuito (7.4.13 ou mais novo) a partir do diretório oficial do WordPress, em Plugins, Adicionar novo. No Koha.Nexus, `config.sh --task tainacan-events enable confirm` faz isso: baixa a versão fixada, confere cada arquivo contra as somas publicadas pelo wordpress.org e instala. Um Events Manager já instalado é preservado.
+3. Instale o pacote de produção (pasta `nexus-eventos/`, gerada por `tools/nexus-eventos-package.py`) e ative Nexus Eventos para Tainacan em Plugins. Não copie a pasta `nexus-events-plugin` do repositório: ela tem `development/` e `bundled/`, que não vão para produção.
 4. Acesse a área de eventos do Events Manager para concluir sua configuração de reservas, permissões, política de privacidade e e-mails.
 5. O menu Nexus Eventos reúne os atalhos, a identificação da instituição e a presença. Tainacan ativo habilita os vínculos com coleções.
 
-A pasta é copiada uma vez, mas o WordPress mantém dois plugins separados: Events Manager e Nexus Eventos. Isso é intencional: correções e atualizações da base não dependem de um fork. Os arquivos em `bundled/events-manager/` são os arquivos originais extraídos do ZIP fornecido para análise. O manifesto verifica cada arquivo e recusa arquivos adicionais, mas não certifica ausência de vulnerabilidades. Antes da produção, confira atualizações de segurança da base.
+O WordPress mantém dois plugins separados: Events Manager e Nexus Eventos. Isso é intencional: correções e atualizações da base não dependem de um fork. A pasta `bundled/events-manager/` do repositório guarda os arquivos usados na análise e não faz parte do pacote de produção.
 
 Tainacan não é instalado automaticamente. Não há arquivos compactados nesta pasta do repositório. Não é necessário instalar Event Tickets ou The Events Calendar. Esta extensão não exige edições Pro para suas próprias funções.
 
@@ -100,12 +100,12 @@ No momento, não suportamos ativação em rede nem o modo de tabelas globais do 
 
 Inclua o banco inteiro do WordPress, wp-content, os dois plugins e a configuração protegida do site no procedimento de backup. As tabelas próprias têm os sufixos `nxev_attendance`, `nxev_certificates` e `nxev_log`; os vínculos com coleções ficam nos metadados dos eventos.
 
-Atualize Events Manager pelo procedimento normal de plugins, após backup e teste em cópia. Não reinstale a base incluída para tentar fazer downgrade. A extensão não muda a política de atualização automática do servidor.
+Atualize Events Manager pelo procedimento normal de plugins, após backup e teste em cópia. Não reinstale uma versão antiga da base para tentar fazer downgrade. A extensão não muda a política de atualização automática do servidor.
 
 Desativar ou excluir Nexus Eventos preserva seus registros. Para apagamento definitivo, o administrador pode definir `NXEV_DELETE_DATA` como `true` na configuração do WordPress e então excluir o plugin. Isso remove somente as tabelas/opções/metadados Nexus, não eventos, reservas ou acervos. A remoção destrutiva não é executada em multisite.
 
 ## Licença e estágio
 
-Nexus Eventos: GPL-3.0-or-later. A base Events Manager é redistribuída sem alterações sob sua própria licença GPL-2.0-or-later. A biblioteca QR local é MIT. Consulte THIRD-PARTY-NOTICES.md e os textos das licenças.
+Nexus Eventos: GPL-3.0-or-later. A base Events Manager é um plugin separado, sob sua própria licença GPL-2.0-or-later, e não vai no pacote de produção. A biblioteca QR local é MIT. Consulte THIRD-PARTY-NOTICES.md e os textos das licenças.
 
-Esta é a versão 0.1.0 para piloto e revisão. Consulte VALIDACAO.md para o ambiente, os testes executados e as limitações. A instalação conjunta com o servidor de produção do Koha.Nexus não foi realizada nesta entrega.
+Esta é a versão 0.1.1 para piloto e revisão. VALIDACAO.md descreve a validação da 0.1.0. A 0.1.1 é testada também no conjunto de versões do instalador do Koha.Nexus (tests/tainacan_events_system.bats na raiz do repositório). Um servidor de produção com Koha real ainda não foi testado.

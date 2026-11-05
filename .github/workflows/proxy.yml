@@ -21,6 +21,15 @@
 #           (local and through rclone), the encrypted configuration and the
 #           recovery phrase, the recovery kit, the cloud copy, the schedule.
 #           Its unit tests (backup_engine.bats, no Docker) run in apache.
+#   events  the same machines: events for Tainacan (tainacan_events_system.bats)
+#           with the real Tainacan and Events Manager from wordpress.org
+#           (mandatory here): an Events Manager already in the site kept, the
+#           event edit screen drawn whole with Tainacan active, passes,
+#           attendance, certificates, backup with events off, restore with and
+#           without the recovery phrase. Its unit tests (tainacan_events.bats:
+#           the production package, the checksums, the plan, the redaction, and
+#           the copy in nexus-events-plugin/bundled against wordpress.org) run
+#           in apache.
 name: proxy
 
 on:
@@ -39,6 +48,11 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_engine_system.bats"
+      - "tests/tainacan_events.bats"
+      - "tests/tainacan_events_system.bats"
+      - "tests/system/events-fixture.php"
+      - "tools/nexus-eventos-package.py"
+      - "nexus-events-plugin/**"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
   pull_request:
@@ -56,6 +70,11 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_engine_system.bats"
+      - "tests/tainacan_events.bats"
+      - "tests/tainacan_events_system.bats"
+      - "tests/system/events-fixture.php"
+      - "tools/nexus-eventos-package.py"
+      - "nexus-events-plugin/**"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
 
@@ -82,6 +101,7 @@ jobs:
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
               bats tests/backup_engine.bats
+              KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
 
   system:
@@ -156,6 +176,26 @@ jobs:
         run: tests/system/container.sh start "${{ matrix.image }}" kn-system
       - name: Backup engine with a real Tainacan; Koha and third parties preserved
         run: tests/system/container.sh run kn-system bats tests/backup_engine_system.bats
+      - name: Stop
+        if: always()
+        run: tests/system/container.sh stop kn-system
+
+  events:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12", "debian:13"]
+    env:
+      KEI_REQUIRE_REAL_TAINACAN: "1"
+      KEI_REQUIRE_REAL_EVENTS: "1"
+      KEI_TAINACAN_REGISTRY: docker.io
+    steps:
+      - uses: actions/checkout@v4
+      - name: A machine with systemd
+        run: tests/system/container.sh start "${{ matrix.image }}" kn-system
+      - name: Events with the real Tainacan and Events Manager; Koha and third parties preserved
+        run: tests/system/container.sh run kn-system bats tests/tainacan_events_system.bats
       - name: Stop
         if: always()
         run: tests/system/container.sh stop kn-system
