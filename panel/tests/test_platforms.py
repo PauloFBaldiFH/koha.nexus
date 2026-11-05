@@ -930,6 +930,8 @@ def test_a_failed_enable_shows_the_installers_reason(no_koha):
 
 
 def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
+    from textual.widgets import Button
+
     from kei_panel.screens.dialogs import ConfirmScreen, MessageScreen
     from kei_panel.screens.loading import LoadingScreen
 
@@ -939,10 +941,11 @@ def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
         async with app.run_test() as pilot:
             await _open_events(app, pilot)
             _press(app, "events-on")
-            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen))   # the plan comes first
-            await pilot.click("#yes")
-            loading = await _until(pilot, lambda: isinstance(app.screen, LoadingScreen))
-            await pilot.click("#cancel")
+            # Each screen comes after the one before, on a slow machine later than a fixed pause.
+            await _until(pilot, lambda: isinstance(app.screen, ConfirmScreen) and bool(app.screen.query("#yes")))
+            app.screen.query_one("#yes", Button).press()
+            loading = await _until(pilot, lambda: isinstance(app.screen, LoadingScreen) and bool(app.screen.query("#cancel")))
+            app.screen.query_one("#cancel", Button).press()
             await _until(pilot, lambda: isinstance(app.screen, MessageScreen))
             screen = app.screen
             said = isinstance(screen, MessageScreen) and screen._kind == "info" and "stay off" in screen._body and "turn events on again" in screen._body
