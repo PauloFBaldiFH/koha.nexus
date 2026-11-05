@@ -261,7 +261,7 @@ wp_php() {
     [ "$(lib "_kei_tn_manifest_get '$B' attachments_missing")" = 0 ]
     echo "window without writes: $(lib "_kei_tn_manifest_get '$B' window_seconds") s" >&3
     # The journal: writes stopped before the dump, resumed after the files.
-    [ "$(grep -o '"step":"[a-z-]*"' "$B/journal.jsonl" | tr '\n' ' ')" = '"step":"start" "step":"writes-stopped" "step":"db" "step":"files" "step":"writes-resumed" "step":"secrets" "step":"done" ' ]
+    [ "$(grep -o '"step":"[a-z-]*"' "$B/journal.jsonl" | cut -d'"' -f4 | tr '\n' ' ')" = 'start capture writes-stopped db files writes-resumed capture-done secrets manifest done ' ]
     run lib 'kei_tainacan_health'
     [ "$status" -eq 0 ]
     # A directory without manifest.json is never offered.

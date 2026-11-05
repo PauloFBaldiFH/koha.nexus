@@ -77,6 +77,15 @@ or a running service is no proof that a platform works.
   now, test a restore in an isolated copy, restore, administrator password
   and uninstall (keep or delete the data; deleting makes a last backup
   first). Every action is an installer task (`--task tainacan-*`).
+- Platform backups (installer `kei_backup_*`, the common engine for the
+  platforms in containers; Koha's own backup is unchanged): a "Platform
+  backups" card with the backup key, the restic repository, the cloud
+  copy, the schedule and the last restore test, and buttons to set up
+  encrypted backups, choose the repository and the cloud copy, save the
+  recovery kit, schedule, verify now and resume or discard an incomplete
+  backup (`--task platform-backup-*`). Restoring Tainacan asks for the
+  recovery phrase (optional); the panel passes it in `KEI_BACKUP_PHRASE`,
+  never on the command line.
 - Resource ownership (installer `kei_owned_*`): what Koha.Nexus creates for
   a platform (an Apache site `zz-koha-nexus-<id>.conf`, a module, a UFW
   port, a tunnel address) is written in `/var/lib/koha-nexus/owned.tsv`,

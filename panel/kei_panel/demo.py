@@ -490,6 +490,35 @@ _SCRIPTS: dict[str, list[str]] = {
                          "backup knx-tainacan-20261105-143500. (ok 3 128 117)"],
     "tainacan-credentials": ["@@msg ok OK\tTainacan administrator\nAddress: http://192.168.0.10:8090/wp-admin/\n"
                              "User: knadmin\nPassword: demo-password-123"],
+    # The common backup engine of the platforms (views/platforms.py, "Platform backups").
+    "platform-backup-status": ["@@result key=3F2A9C0E5B7D1A4C8E6F0B2D4A6C8E0F1A3B5C7D",
+                               "@@result gpg=yes", "@@result restic=0.16.4",
+                               "@@result kit=/var/lib/koha-nexus/backup/recovery-kit.txt",
+                               "@@result tainacan.repo=/var/backups/koha-nexus/restic/tainacan",
+                               "@@result tainacan.copy=gdrive:koha-nexus", "@@result tainacan.schedule=02:30",
+                               "@@result tainacan.last=knx-tainacan-20261105-023000|2026-11-05 02:30:00|ref",
+                               "@@result tainacan.count=9", "@@result tainacan.incomplete=1",
+                               "@@result tainacan.verified=2026-11-01 04:30:12 knx-tainacan-20261002-023000 ok",
+                               "@@result tainacan.maintained=2026-11-02 03:30:40 ok"],
+    "platform-backup-plan": ["@@result plan=setup", "@@result key=", "@@result package=restic",
+                             "@@result phrase=A recovery phrase is shown once: write it down and keep it away from "
+                             "this server. Without it, the encrypted configuration of a backup cannot be read."],
+    "platform-backup-setup": ["@@note Installing restic...",
+                              "@@msg ok OK\tRecovery phrase (write it down now; it is not saved on this server): "
+                              "K7QD-M2XP-9WRT-4HNC-V8BZ-3LFA\nEncrypted backups are set up."],
+    "platform-backup-repo": ["@@msg ok OK\tFiles of this platform now go to the restic repository "
+                             "/var/backups/koha-nexus/restic/tainacan. Save the recovery kit again."],
+    "platform-backup-copy": ["@@msg ok OK\tEach new package will also be copied to gdrive:koha-nexus."],
+    "platform-backup-kit": ["@@msg ok OK\t/var/lib/koha-nexus/backup/recovery-kit.txt"],
+    "platform-backup-schedule": ["@@msg ok OK\tDaily backup at 02:30; maintenance on Sundays and a restore test of "
+                                 "an older backup on the 1st of each month."],
+    "platform-backup-verify": ["@@note Checking the restic repository...", "@@note Restoring in an isolated copy...",
+                               "@@msg ok OK\tVerified: the backup knx-tainacan-20261006-023000 was restored in "
+                               "isolation and matched its manifest. Restore test passed. (ok 3 128 117)"],
+    "platform-backup-incomplete": ["@@result incomplete=knx-tainacan-20261105-143000|db|no"],
+    "platform-backup-resume": ["@@note Doing the capture again...",
+                               "@@msg ok OK\t/var/backups/koha-nexus/tainacan/knx-tainacan-20261105-143000"],
+    "platform-backup-discard": ["@@msg ok OK\tThe incomplete backup knx-tainacan-20261105-143000 was discarded."],
     "tainacan-uninstall": ["@@msg ok OK\tTainacan was uninstalled. Its data was kept: installing it again uses it."],
     "docker-remove": ["@@msg ok OK\tDocker was removed. /var/lib/docker (images) was kept: delete it yourself if "
                       "you do not need it."],
@@ -668,7 +697,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
-                            "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups") \
+                            "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
+                            "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete") \
         else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
