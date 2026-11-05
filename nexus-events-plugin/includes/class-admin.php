@@ -40,7 +40,6 @@ final class Admin {
         $selected = Core::collection_ids($post->ID);
         $collections = get_posts(array('post_type' => 'tainacan-collection', 'post_status' => 'publish', 'numberposts' => 200,
             'orderby' => 'title', 'order' => 'ASC'));
-        $rows = iterator_to_array($rows);
         echo '<input type="hidden" name="nxev_collections_present" value="1"><p><label for="nxev-collections">' . esc_html__('Coleções públicas relacionadas (até 200 listadas)', 'nexus-eventos') . '</label></p><select id="nxev-collections" name="nxev_collections[]" multiple size="6" style="width:100%;max-width:600px">';
         foreach ($collections as $collection) {
             if (!Core::collection($collection->ID)) { continue; }
@@ -180,7 +179,7 @@ final class Admin {
         for ($offset = 0; ; $offset += 100) {
             $rows = \EM_Bookings::get(array('event' => $event->event_id, 'owner' => false, 'status' => false,
                 'scope' => 'all', 'limit' => 100, 'offset' => $offset, 'orderby' => 'booking_id', 'order' => 'ASC'));
-        $rows = iterator_to_array($rows);
+            $rows = iterator_to_array($rows);
             foreach ($rows as $booking) {
                 $attendance = Core::attendance($booking->booking_id);
                 $cert = Core::certificate($booking->booking_id);
