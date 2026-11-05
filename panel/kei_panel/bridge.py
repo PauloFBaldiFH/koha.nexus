@@ -488,6 +488,9 @@ class Bridge:
         """config.sh --status-json, the same JSON the Windows window reads."""
         if self.env.demo:
             await asyncio.sleep(1.2)
+            if os.environ.get("KEI_PANEL_DEMO_KOHA", "1") == "0":
+                # Demo of a server without Koha (KEI_PANEL_DEMO_KOHA=0).
+                return _DEMO_STATUS | _DEMO_NO_KOHA | {"generated_at": int(time.time())}
             return _DEMO_STATUS | {"generated_at": int(time.time())}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
@@ -563,6 +566,24 @@ _DEMO_STATUS = {
                "tunnel_mode": "free", "public_opac": "biblioteca.koha.nexus", "public_staff": ""},
     "disk": {"total": 64_000_000_000, "free": 41_500_000_000},
     "memory": {"total": 8_000_000_000, "available": 5_200_000_000},
+    "platforms": [
+        {"id": "koha", "supported": True, "detected": True, "services": "active",
+         "units": {"apache2": "active", "mariadb": "active", "memcached": "active", "koha-common": "active"},
+         "health": "unknown"},
+        {"id": "tainacan", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
+        {"id": "atom", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
+        {"id": "dspace", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
+    ],
+}
+_DEMO_NO_KOHA = {
+    "state": "not_installed", "koha_installed": False,
+    "services": {"apache2": "inactive", "mariadb": "inactive", "memcached": "inactive",
+                 "rabbitmq-server": "inactive", "koha-common": "inactive", "cron": "active",
+                 "elasticsearch": "inactive", "cloudflared": "inactive"},
+    "plack": False, "http": {"staff": 0, "opac": 0},
+    "backup": {"last_file": "", "last_epoch": 0, "last_size": 0, "last_result": "", "log_epoch": 0},
+    "platforms": [{"id": "koha", "supported": True, "detected": False, "services": "none", "units": {},
+                   "health": "unknown"}] + _DEMO_STATUS["platforms"][1:],
 }
 
 _DEMO_TABLES = [

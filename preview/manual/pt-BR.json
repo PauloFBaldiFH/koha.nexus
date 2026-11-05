@@ -2090,6 +2090,18 @@
    ],
    "_en": "67cb85a0dc"
   },
+  "sec-platforms": {
+   "summary": "Mostra as plataformas que este painel conhece e o que foi encontrado neste servidor. O Koha é opcional.",
+   "overview": [
+    "Um cartão por plataforma mantém quatro fatos separados: se esta versão do painel dá suporte a ela, se uma instalação foi encontrada, se os serviços estão rodando e a saúde funcional. Um arquivo de configuração ou um serviço ativo não prova que a plataforma funciona, então a saúde fica *não verificada* até existir uma verificação real.",
+    "Num servidor sem Koha o painel abre do mesmo jeito: as telas e rotinas do Koha ficam ocultas ou dizem por que não estão disponíveis, e idiomas, atualização do painel e as ferramentas do servidor continuam funcionando. Tainacan, AtoM e DSpace estão planejados e nada deles é instalado por aqui."
+   ],
+   "tips": [
+    "Instale o Koha com **Instalar servidor Koha** quando precisar; as telas dele voltam assim que a instalação termina.",
+    "Pressione **Atualizar** para ler o estado de novo."
+   ],
+   "_en": "9736a50754"
+  },
   "update-system": {
    "summary": "Atualiza os pacotes do sistema e do Koha e aplica as migrações do banco do Koha, depois de um backup de segurança verificado; em seguida reinicia os serviços e valida o sistema.",
    "overview": [

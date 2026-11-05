@@ -307,20 +307,25 @@ class Health:
     koha: tuple[str, str] | None = None
 
 
-async def collect(status: dict, instance: str, installer: Path | None) -> Health:
-    """Every Health fact at once, each in its own thread."""
+async def collect(status: dict, instance: str, installer: Path | None, koha: bool = True) -> Health:
+    """Every Health fact at once, each in its own thread. koha=False (Koha
+    not installed): nothing of Koha is read: no koha-mysql (its database),
+    no Koha logs, no Z39.50/SRU checks, no koha-common version."""
     host = tunnel_host(status)
     jobs = {
         "cpu": asyncio.to_thread(read_cpu),
-        "db_size": asyncio.to_thread(read_db_size, instance),
         "backups": asyncio.to_thread(read_backup_dirs),
         "apache_errors": asyncio.to_thread(count_errors, apache_logs()),
-        "koha_errors": asyncio.to_thread(count_errors, koha_logs(instance)),
-        "sru": asyncio.to_thread(http_check, SRU_GATEWAY_URL),
-        "z3950": asyncio.to_thread(read_z3950),
         "panel_latest": asyncio.to_thread(latest_panel_version, update_url(installer)),
-        "koha": asyncio.to_thread(read_koha_versions),
     }
+    if koha:
+        jobs |= {
+            "db_size": asyncio.to_thread(read_db_size, instance),
+            "koha_errors": asyncio.to_thread(count_errors, koha_logs(instance)),
+            "sru": asyncio.to_thread(http_check, SRU_GATEWAY_URL),
+            "z3950": asyncio.to_thread(read_z3950),
+            "koha": asyncio.to_thread(read_koha_versions),
+        }
     if host:
         jobs["tunnel"] = asyncio.to_thread(http_check, f"https://{host}/")
     values = await asyncio.gather(*jobs.values(), return_exceptions=True)

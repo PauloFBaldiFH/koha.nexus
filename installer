@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.164"
+PANEL_VERSION=" 1.5.165"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -5473,12 +5473,14 @@ kei_banner_refresh() {
 }
 
 # Copies the panel (and its dictionaries) to /usr/local/bin/config.sh.
+# Where "sudo config.sh" lives (KEI_PANEL_COMMAND: tests only).
+KEI_PANEL_COMMAND="${KEI_PANEL_COMMAND:-/usr/local/bin/config.sh}"
 install_panel_copy() {
     local src="$_SCRIPT_PATH"
     install_linux_launcher
     [ -f "$src" ] || return 0
-    if [ "$(readlink -f "$src")" != "$(readlink -f /usr/local/bin/config.sh 2>/dev/null)" ]; then
-        install -m 755 "$src" /usr/local/bin/config.sh 2>/dev/null || true
+    if [ "$(readlink -f "$src")" != "$(readlink -f "$KEI_PANEL_COMMAND" 2>/dev/null)" ]; then
+        install -m 755 "$src" "$KEI_PANEL_COMMAND" 2>/dev/null || true
     fi
     if [ -d "${_SCRIPT_DIR}/lang" ] && [ "$(readlink -f "${_SCRIPT_DIR}/lang")" != "$(readlink -f "${CONFIG_DIR}/lang" 2>/dev/null)" ]; then
         mkdir -p "${CONFIG_DIR}/lang"
@@ -5488,6 +5490,20 @@ install_panel_copy() {
     if [ -n "$_SCRIPT_DIR" ] && kei_panel_src_ok "${_SCRIPT_DIR}/panel"; then
         kei_panel_install_src "${_SCRIPT_DIR}/panel" 2>/dev/null || true
     fi
+}
+
+# kei_first_run_panel_copy: the panel was never installed as a command
+# (no Koha installation has copied it yet) and this run comes from a real
+# file: copy it now, so "sudo config.sh" opens it again on a server that
+# has no Koha. install_panel_copy needs only this script's own variables
+# (_SCRIPT_PATH, _SCRIPT_DIR, CONFIG_DIR, REAL_USER/REAL_HOME for the
+# desktop launcher), never Koha. Returns 1 when nothing was done. A run
+# from a pipe (bash <(curl ...)) has no file to copy and is left alone.
+kei_first_run_panel_copy() {
+    [ -e "$KEI_PANEL_COMMAND" ] && return 1
+    [ -f "$_SCRIPT_PATH" ] || return 1
+    install_panel_copy
+    [ -f "$KEI_PANEL_COMMAND" ]
 }
 
 # ----------------------------------------------------------------------
@@ -11085,14 +11101,73 @@ kei_events_json() {
     printf '],'
 }
 
+# ======================================================================
+# PLATFORMS (Koha is optional)
+# ----------------------------------------------------------------------
+# The panel works on a server without Koha. For every platform it knows,
+# four facts are kept apart (panel/kei_panel/platforms.py reads them):
+#   supported  this panel can install and administer it (Koha; Tainacan,
+#              AtoM and DSpace are planned: supported=false)
+#   detected   an installation was found (Koha: is_koha_installed, a file
+#              test); null = not looked for
+#   services   active | partial | inactive | unknown | none
+#   health     unknown | healthy | failing: a functional check. Nothing
+#              checks it yet, so it stays "unknown" (not verified): a
+#              configuration file or a running service proves nothing.
+# Nothing here opens a database.
+# ======================================================================
+KEI_PLATFORMS_PLANNED="tainacan atom dspace"
+# The Koha services the platform card counts (the same ones as
+# kei_overall_state, plus Memcached).
+KEI_KOHA_UNITS="apache2 mariadb memcached koha-common"
+
+# kei_services_summary STATE...: active when all are active, inactive when
+# none is, unknown when systemd could not say, else partial.
+kei_services_summary() {
+    local st active=0 total=0 unknown=0
+    for st in "$@"; do
+        total=$((total + 1))
+        case "$st" in active) active=$((active + 1)) ;; unknown|"") unknown=$((unknown + 1)) ;; esac
+    done
+    if [ "$total" -eq 0 ]; then printf 'none'
+    elif [ "$unknown" -eq "$total" ]; then printf 'unknown'
+    elif [ "$active" -eq "$total" ]; then printf 'active'
+    elif [ "$active" -eq 0 ]; then printf 'inactive'
+    else printf 'partial'
+    fi
+}
+
+# kei_platforms_json UNIT=STATE...: the "platforms" array of --status-json.
+# The states come from the caller (kei_status_json already asked systemd).
+kei_platforms_json() {
+    local pair unit st units="" states=() detected=false services=none id
+    if is_koha_installed; then
+        detected=true
+        for unit in $KEI_KOHA_UNITS; do
+            st="unknown"
+            for pair in "$@"; do [ "${pair%%=*}" = "$unit" ] && st="${pair#*=}"; done
+            states+=("$st")
+            units+="${units:+,}$(json_str "$unit"):$(json_str "$st")"
+        done
+        services=$(kei_services_summary "${states[@]}")
+    fi
+    printf '[{"id":"koha","supported":true,"detected":%s,"services":%s,"units":{%s},"health":"unknown"}' \
+        "$detected" "$(json_str "$services")" "$units"
+    for id in $KEI_PLATFORMS_PLANNED; do
+        printf ',{"id":%s,"supported":false,"detected":null,"services":"none","units":{},"health":"unknown"}' "$(json_str "$id")"
+    done
+    printf ']'
+}
+
 kei_status_json() {
-    local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false
+    local svc state json="" first=1 apache="" db="" koha="" staff opac plack=false svc_states=()
     local b_epoch b_size b_result b_kind b_file df_line d_total d_free mem_total mem_avail
     local r_epoch r_state r_finished r_db r_backup r_index
     for svc in apache2 mariadb memcached rabbitmq-server koha-common cron elasticsearch cloudflared; do
         state=$(systemctl is-active "$svc" 2>/dev/null | head -n1)
         [ -n "$state" ] || state="unknown"
         case "$svc" in apache2) apache="$state" ;; mariadb) db="$state" ;; koha-common) koha="$state" ;; esac
+        svc_states+=("$svc=$state")
         [ "$first" = 1 ] || json+=","
         first=0
         json+="$(json_str "$svc"):$(json_str "$state")"
@@ -11118,7 +11193,10 @@ kei_status_json() {
     kei_access_json
     kei_events_json
     printf '"disk":{"total":%s,"free":%s},' "$(json_num "$d_total")" "$(json_num "$d_free")"
-    printf '"memory":{"total":%s,"available":%s}}\n' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
+    printf '"memory":{"total":%s,"available":%s},' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
+    # Added after the fields above (schema 1 unchanged): readers that do not
+    # know "platforms" ignore it.
+    printf '"platforms":%s}\n' "$(kei_platforms_json "${svc_states[@]}")"
 }
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key
@@ -11295,6 +11373,7 @@ apache_error_log() {
 
 function_view_logs() {
     local opc
+    require_koha || return 1
     opc=$(whiptail --title "$(t "Apache Log Auditing")" \
         --menu "$(t "Select the log for continuous monitoring:\n\n(Press CTRL+C to stop viewing and return to the menu)")" 14 76 2 \
         "1" "$(t "Staff / Intranet Errors (intranet-error.log)")" \
@@ -11489,6 +11568,7 @@ function_vpn_classic() {
 }
 
 function_staff_firewall() {
+    require_koha || return 1
     if ! host_can firewall; then
         windows_firewall_notice
         return 0
@@ -39280,6 +39360,40 @@ ai_helper_remove() {
     msg_ok "$(t "The server helper was removed. Its log is kept: \${log}")"
 }
 
+# Actions that work on Koha alone. On a server without Koha (the panel is
+# usable without it) they stop with the reason, however they are started:
+# --run, the Textual panel (--task run) or its keys. The Textual panel marks
+# the same ones requires="koha" (panel/kei_panel/menus.py);
+# panel/tests/test_platforms.py checks both lists agree.
+KEI_KOHA_ACTIONS="access-files ai-assistant apache-log authority-match authority-sync backup-cloud
+ backup-manual backup-marc backup-test brazil cataloguing cdd cloudflare credentials crons cutter
+ data-quality db-maintenance email health interoperability lang-activate lang-download lang-list
+ library-tools magic-import marc-replace marc-undo messaging patron-category plugins
+ privacy-anonymise privacy-delete repair-services reports restore rotate-db-password search-console
+ search-repair search-toggle sizing ssl staff-firewall superlibrarian tool-logs"
+kei_action_needs_koha() {
+    local a
+    for a in $KEI_KOHA_ACTIONS; do [ "$a" = "${1:-}" ] && return 0; done
+    return 1
+}
+
+# Panel tasks that read or change Koha (its database, its configuration,
+# its services). Same rule as above for the tasks the panel's own screens
+# run directly. Tasks of the whole server (info, install*, timezones,
+# validation-report, ufw, fail2ban, vpn-*, clock, status, cloud-*, cf-*,
+# export-diagnostics, ai-helper-*, ollama-install, tool-install, reboot) are
+# not listed.
+kei_task_needs_koha() {
+    case "${1:-}" in
+        backup-manual|backup-test|backup-marc|marc-info|restore-check|restore|db-maintenance|\
+        reports-install|reports-remove|credentials|search-toggle|search-repair|staff-firewall|\
+        rotate-db-password|sizing|email|superlibrarian|interoperability|z3950-*|enrich-*|\
+        sru-bridge|pergamum-bridge|catalog-network|opac-theme-*|opac-carousel-refresh|cron-apply|\
+        hub-status|sip-apply|health|repair-services|apache-log) return 0 ;;
+    esac
+    return 1
+}
+
 # Loaded with "source installer" (tests/): functions only, no menu.
 (return 0 2>/dev/null) && return 0
 
@@ -39790,6 +39904,8 @@ kei_task() {
     log "panel task: $name"
     # The cloud tasks use root's rclone file, the one the nightly backups read.
     [[ "$name" == cloud-* ]] && [ -z "${RCLONE_CONFIG:-}" ] && [ "$(id -u)" = 0 ] && export RCLONE_CONFIG="$CLOUD_RCLONE_CONF"
+    # Koha is optional: a Koha task on a server without it says why and stops.
+    if kei_task_needs_koha "$name"; then require_koha || return 1; fi
     case "$name" in
         info)            kei_task_info ;;
         backup-manual)   [ -n "${1:-}" ] || return 2; function_manual_backup "$1" ;;
@@ -39958,8 +40074,7 @@ kei_task() {
             }
             restore_apt_timers
             if [ "${1:-}" != "about" ]; then require_systemd || return 1; fi
-            case "$fn" in lt_*|function_brazil_tools|function_messaging|function_cataloguing|function_cdd|\
-                          function_koha_plugins|function_access_files|function_cutter) require_koha || return 1 ;; esac
+            if kei_action_needs_koha "${1:-}"; then require_koha || return 1; fi
             "$fn" ;;
         ollama-install)
             # Ollama's own install script (AI cataloguing > Local Ollama),
@@ -40032,12 +40147,15 @@ fi
 # If a newer copy of the installer is run, refresh that copy too, so that
 # "sudo config.sh" never keeps running an old version.
 # ======================================================================
-if [ -f /usr/local/bin/config.sh ] && [ -f "$_SCRIPT_PATH" ] \
-   && [ "$(readlink -f "$_SCRIPT_PATH")" != "$(readlink -f /usr/local/bin/config.sh)" ] \
-   && ! cmp -s "$_SCRIPT_PATH" /usr/local/bin/config.sh; then
+if [ -f "$KEI_PANEL_COMMAND" ] && [ -f "$_SCRIPT_PATH" ] \
+   && [ "$(readlink -f "$_SCRIPT_PATH")" != "$(readlink -f "$KEI_PANEL_COMMAND")" ] \
+   && ! cmp -s "$_SCRIPT_PATH" "$KEI_PANEL_COMMAND"; then
     install_panel_copy
     log "config.sh refreshed from $_SCRIPT_PATH"
 fi
+# Koha is optional: the first run of the installer installs the panel as a
+# command ("sudo config.sh"), not only the end of the Koha installation.
+kei_first_run_panel_copy && log "config.sh installed from $_SCRIPT_PATH (first run, Koha installed: $(is_koha_installed && echo yes || echo no))"
 
 # Schedules written by older versions of the panel (see upgrade_cron_tasks).
 is_koha_installed && upgrade_cron_tasks
@@ -40092,6 +40210,7 @@ if [ "${1:-}" = "--run" ]; then
     restore_apt_timers
     # As in the main menu: only About works without systemd.
     if [ "${2:-}" != "about" ]; then require_systemd || exit 1; fi
+    if kei_action_needs_koha "${2:-}"; then require_koha || exit 1; fi
     "$_run_fn"
     clear
     exit 0

@@ -720,6 +720,22 @@
    "single": ""
   },
   {
+   "id": "platforms",
+   "item": "sec-platforms",
+   "label": "🧩  Platforms",
+   "title": "🧩  Platforms",
+   "prompt": "Koha is optional: the panel works on a server without it. Other platforms are planned.",
+   "icon": "",
+   "key": "p",
+   "view": "platforms",
+   "sidebar": true,
+   "parent": "",
+   "entries": [],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
    "id": "about",
    "item": "sec-about",
    "label": "💡  About the program & support",
@@ -1540,6 +1556,16 @@
    "label": "🔄  Update center",
    "description": "Choose what to update:",
    "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "sec-platforms": {
+   "id": "sec-platforms",
+   "type": "section",
+   "section": "platforms",
+   "label": "🧩  Platforms",
+   "description": "Koha is optional: the panel works on a server without it. Other platforms are planned.",
+   "kind": "view",
    "status": "available",
    "media": []
   },
@@ -7232,6 +7258,56 @@
    "zh": "下载此面板的最新版本",
    "ja": "このパネルの最新版をダウンロードします",
    "ko": "이 패널의 최신 버전을 다운로드합니다"
+  },
+  "🧩  Platforms": {
+   "en": "🧩  Platforms",
+   "pt-BR": "🧩  Plataformas",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Koha is optional: the panel works on a server without it. Other platforms are planned.": {
+   "en": "Koha is optional: the panel works on a server without it. Other platforms are planned.",
+   "pt-BR": "O Koha é opcional: o painel funciona em um servidor sem ele. Outras plataformas estão planejadas.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "💡  About the program & support": {
    "en": "💡  About the program & support",
@@ -16868,6 +16944,31 @@
     ]
    }
   },
+  "sec-platforms": {
+   "en": {
+    "summary": "Shows the platforms this panel knows and what was found on this server. Koha is optional.",
+    "overview": [
+     "One card per platform keeps four facts apart: whether this version of the panel supports it, whether an installation was found, whether its services are running, and its functional health. A configuration file or a running service is no proof that a platform works, so health stays *not verified* until a real check exists.",
+     "On a server without Koha the panel still opens: Koha's screens and routines are hidden or say why they are not available, and languages, panel updates and the server tools keep working. Tainacan, AtoM and DSpace are planned and nothing of them is installed from here."
+    ],
+    "tips": [
+     "Install Koha with **Install Koha server** when you need it; its screens come back as soon as the installation ends.",
+     "Press **Refresh** to read the state again."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Mostra as plataformas que este painel conhece e o que foi encontrado neste servidor. O Koha é opcional.",
+    "overview": [
+     "Um cartão por plataforma mantém quatro fatos separados: se esta versão do painel dá suporte a ela, se uma instalação foi encontrada, se os serviços estão rodando e a saúde funcional. Um arquivo de configuração ou um serviço ativo não prova que a plataforma funciona, então a saúde fica *não verificada* até existir uma verificação real.",
+     "Num servidor sem Koha o painel abre do mesmo jeito: as telas e rotinas do Koha ficam ocultas ou dizem por que não estão disponíveis, e idiomas, atualização do painel e as ferramentas do servidor continuam funcionando. Tainacan, AtoM e DSpace estão planejados e nada deles é instalado por aqui."
+    ],
+    "tips": [
+     "Instale o Koha com **Instalar servidor Koha** quando precisar; as telas dele voltam assim que a instalação termina.",
+     "Pressione **Atualizar** para ler o estado de novo."
+    ]
+   }
+  },
   "about": {
    "en": {
     "summary": "The panel's version, license, official repository and website, and how to support the project.",
@@ -18964,15 +19065,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 113,
-   "manual_total": 113,
+   "manual": 114,
+   "manual_total": 114,
    "manual_outdated": [],
-   "strings": 411,
-   "strings_total": 411
+   "strings": 413,
+   "strings_total": 413
   },
   "pt-BR": {
-   "manual": 113,
-   "manual_total": 113,
+   "manual": 114,
+   "manual_total": 114,
    "manual_outdated": [
     "sec-dashboard",
     "install",
@@ -18988,155 +19089,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 403,
-   "strings_total": 411
+   "strings": 405,
+   "strings_total": 413
   },
   "es": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 411
+   "strings_total": 413
   },
   "fr": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 411
+   "strings_total": 413
   },
   "it": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 404,
-   "strings_total": 411
+   "strings_total": 413
   },
   "de": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 403,
-   "strings_total": 411
+   "strings_total": 413
   },
   "nl": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "sv": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "pl": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "cs": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "ru": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "uk": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "tr": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "tl": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "id": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "ar": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "fa": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "hi": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "bn": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "vi": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "zh": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "ja": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   },
   "ko": {
    "manual": 0,
-   "manual_total": 113,
+   "manual_total": 114,
    "manual_outdated": [],
    "strings": 368,
-   "strings_total": 411
+   "strings_total": 413
   }
  }
 }
