@@ -2213,6 +2213,34 @@ get_server_ip() {
     printf '%s' "$ip"
 }
 
+# Interfaces whose address is never offered for the local network: VPNs,
+# tunnels, container and virtual machine bridges.
+KEI_VIRTUAL_IFACES='^(tun|tap|wg|ppp|tailscale|zt|nordlynx|proton|ipsec|utun|docker|br-|veth|kn-|virbr|vnet|lxc|lxd|cni|flannel|cali|vmnet|vboxnet)'
+kei_iface_virtual() { [[ "${1:-}" =~ $KEI_VIRTUAL_IFACES ]]; }
+
+# kei_ip_interface IP: the interface that has IP ("" when none here).
+kei_ip_interface() {
+    ip -4 -o addr show 2>/dev/null | awk -v ip="$1" '{ a = $4; sub(/\/.*/, "", a); if (a == ip) { print $2; exit } }'
+}
+
+# kei_lan_address: "IP INTERFACE" of this server on the local network: the
+# interface of the route to the internet when it is a real one; else the
+# first real interface with a usable address; else get_server_ip's. A
+# default route through a VPN (OpenVPN's tun0, WireGuard's wg0...) gives
+# the VPN's address, which the local network cannot reach.
+kei_lan_address() {
+    local dev src ifc a
+    read -r dev src < <(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) { if ($i == "dev") d = $(i + 1); if ($i == "src") s = $(i + 1) } } END { print d, s }')
+    if [ -n "$dev" ] && ! kei_iface_virtual "$dev" && lan_ip_usable "$src"; then
+        printf '%s %s\n' "$src" "$dev"; return 0
+    fi
+    while read -r ifc a; do
+        kei_iface_virtual "$ifc" && continue
+        lan_ip_usable "$a" && { printf '%s %s\n' "$a" "$ifc"; return 0; }
+    done < <(ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $2, $4 }')
+    printf '%s %s\n' "$(get_server_ip)" "-"
+}
+
 # lan_ip_usable TEXT: 0 for a dotted IPv4 address another machine could
 # use: not 0.x, 127.x, 169.254.x (link-local) nor a broadcast or multicast.
 lan_ip_usable() {
@@ -12525,12 +12553,36 @@ kei_tainacan_access() {
 }
 
 # kei_tainacan_default_url: the address used when none is given: the
-# server's address on the first free LAN port.
+# server's address on the local network (kei_lan_address) on the first
+# free LAN port. An installation keeps the address it has: this is only
+# for a new one.
 kei_tainacan_default_url() {
-    local p
+    local p ip _i
     p=$(_kei_tn_get lan_port)
     [ -n "$p" ] || p=$(_kei_tn_pick_port "$KEI_TAINACAN_LAN_PORTS") || return 1
-    printf 'http://%s:%s' "$(get_server_ip)" "$p"
+    read -r ip _i < <(kei_lan_address)
+    printf 'http://%s:%s' "$ip" "$p"
+}
+
+# _kei_tn_address_origin URL: where the address of URL comes from (the
+# plan's "from" line and, when the route to the internet goes through a
+# VPN or a tunnel, why its address was not used).
+_kei_tn_address_origin() {
+    local host ifc rdev
+    read -r _ host _ < <(kei_tainacan_parse_url "$1") || return 0
+    lan_ip_usable "$host" || return 0
+    ifc=$(kei_ip_interface "$host")
+    if [ -n "$ifc" ]; then
+        if kei_iface_virtual "$ifc"; then
+            printf 'from\t%s\n' "$(i="$ifc"; t "Interface \${i}: a VPN, tunnel or virtual network. Machines of the local network may not reach this address.")"
+        else
+            printf 'from\t%s\n' "$(i="$ifc"; t "Interface \${i} (local network).")"
+        fi
+    fi
+    rdev=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+    if [ -n "$rdev" ] && [ "$rdev" != "$ifc" ] && kei_iface_virtual "$rdev"; then
+        printf 'route\t%s\n' "$(i="$rdev"; t "The route to the internet goes through \${i} (a VPN or tunnel): its address was not used.")"
+    fi
 }
 
 # ----------------------------------------------------------------------
@@ -12837,7 +12889,7 @@ kei_tainacan_plan() {
     fi
     if ! command -v docker >/dev/null 2>&1; then
         printf 'plan\trefuse\n'
-        printf 'note\t%s\n' "$(t "Docker is not installed. Install Docker first (Platforms, Install Docker), then come back here.")"
+        printf 'note\t%s\n' "$(t "Docker is not installed. Installing Tainacan from the panel prepares Docker first, after its own plan and a yes.")"
         return 3
     fi
     if ! _kei_docker_running || ! _kei_docker compose version >/dev/null 2>&1; then
@@ -12868,6 +12920,7 @@ kei_tainacan_plan() {
     read -r mode _s < <(kei_proxy_detect)
     printf 'plan\tinstall\n'
     printf 'address\t%s\n' "$url"
+    _kei_tn_address_origin "$url"
     case "$access" in
         host|none-host) printf 'web\t%s\n' "$(n="$(kei_proxy_site_name tainacan)"; t "Apache site \${n} for this name, checked before Apache reloads; the other sites stay as they are.")" ;;
         lan|none-lan)   read -r _s _s port < <(kei_tainacan_parse_url "$url")
@@ -12881,6 +12934,8 @@ kei_tainacan_plan() {
     printf 'data\t%s\n' "$(t "Docker volumes kn-tainacan-db and kn-tainacan-wp")"
     if [ -f "$KEI_TAINACAN_DIR/.env" ]; then
         printf 'reuse\t%s\n' "$(t "Data kept from an earlier installation is used again.")"
+    else
+        printf 'site\t%s\n' "$(t "Home page: a page with the search of the collection and links to the collections and to all the items; Tainacan's faceted search in its collection and items pages. WordPress's sample post and page go to the trash.")"
     fi
     printf 'updates\t%s\n' "$(t "Automatic updates of WordPress and plugins are off: updates only after a backup.")"
     printf 'kept\t%s\n' "$(t "Not changed: Koha, its database and its sites, Docker's configuration and anything of other programs.")"
@@ -13005,6 +13060,11 @@ kei_tainacan_install() {
         _kei_tn_wp core install --url="$url" --title="Tainacan" --admin_user="$(_kei_tn_env KN_ADMIN_USER)" \
             --admin_password="$(_kei_tn_env KN_ADMIN_PASSWORD)" --admin_email="admin@$(hostname -f 2>/dev/null || echo localhost).invalid" \
             --skip-email >/dev/null 2>&1 || { _kei_tn_fail "$(t "WordPress could not be set up.")"; return 1; }
+        # WordPress's own sample post and page, made just now: their ids
+        # (never their titles) let the home page step send them to the
+        # trash if nobody edits them first.
+        _kei_tn_set site_samples "$(_kei_tn_wp post list --post_type=post,page --post_status=publish --format=ids 2>/dev/null | tr -cd '0-9 ')"
+        _kei_tn_set site_fresh 1
     fi
     version=$(_kei_tn_wp plugin get tainacan --field=version 2>/dev/null)
     if [ "$version" != "$KEI_TAINACAN_PLUGIN_VERSION" ]; then
@@ -13016,9 +13076,17 @@ kei_tainacan_install() {
     if [ "$lang" != en_US ]; then
         if _kei_tn_wp language core install "$lang" --activate >/dev/null 2>&1; then
             _kei_tn_wp language plugin install tainacan "$lang" >/dev/null 2>&1 || true
+            _kei_tn_wp language theme install --all "$lang" >/dev/null 2>&1 || true
         else
             echo "$(l="$lang"; t "The language \${l} could not be downloaded: WordPress stays in English. Try again later from the panel.")" >&2
         fi
+    fi
+    # The public home of the collection (a new WordPress only: one kept
+    # from an earlier installation is never changed here).
+    if [ "$(_kei_tn_get site_fresh)" = 1 ]; then
+        kei_tainacan_site_apply fresh >&2 \
+            || echo "$(t "Tainacan works, but its home page was not prepared: prepare it from the panel (Tainacan).")" >&2
+        _kei_tn_set site_fresh done
     fi
     if ! out=$(kei_docker_audit "$KEI_TAINACAN_ID"); then
         _kei_tn_fail "$(t "The containers do not follow the isolation rules:") $out"; return 1
@@ -13032,7 +13100,7 @@ kei_tainacan_install() {
     _kei_tn_set wordpress "$KEI_TAINACAN_WP_VERSION"
     _kei_tn_set plugin "$KEI_TAINACAN_PLUGIN_VERSION"
     log "tainacan: installed at $url"
-    echo "$(u="$url"; a="$(_kei_tn_env KN_ADMIN_USER)"; t "Tainacan is installed at \${u}. Administrator: \${a} (password: Platforms, Tainacan, Administrator).")"
+    echo "$(u="$url"; a="$(_kei_tn_env KN_ADMIN_USER)"; t "Tainacan is installed at \${u}. Administrator: \${a} (the password is in the panel: Tainacan, Diagnosis and maintenance, Administrator).")"
 }
 
 # ----------------------------------------------------------------------
@@ -13098,6 +13166,9 @@ kei_tainacan_status() {
     [ "$status" = absent ] && return 0
     printf 'url=%s\naccess=%s\nlang=%s\nport=%s\ninstalled_at=%s\n' "$(_kei_tn_get url)" "$(_kei_tn_get access)" \
         "$(_kei_tn_get lang)" "$(_kei_tn_env KN_PORT)" "$(_kei_tn_get installed_at)"
+    _kei_tn_address_origin "$(_kei_tn_get url)" | awk -F'\t' '$1 == "from" { print "address_from=" $2 } $1 == "route" { print "address_route=" $2 }'
+    a=$(kei_tainacan_parse_url "$(_kei_tn_get url)" 2>/dev/null | awk '{ print $2 }')
+    [ -n "$a" ] && lan_ip_usable "$a" && printf 'address_interface=%s\n' "$(kei_ip_interface "$a")"
     if ! _kei_docker_running; then
         printf 'docker=down\nhealth=unknown\n'
         return 0
@@ -13114,6 +13185,11 @@ kei_tainacan_status() {
         printf 'wordpress_version=%s\ntainacan_version=%s\n' "${wpv:-?}" "${plv:-?}"
         n=$(_kei_tn_missing_files | grep -c .)
         printf 'attachments_missing=%s\n' "${n:-0}"
+        # The public side: a prepared home page, or WordPress's blog.
+        if [ "$status" = installed ]; then
+            out=$(_kei_tn_site status)
+            printf '%s\n' "$out" | awk -F'\t' '$1 == "site" || $1 == "facets" || $1 == "theme" || $1 == "plugin" { print $1 "=" $2 }'
+        fi
     elif [ "$db" != none ] || [ "$wp" != none ]; then
         health=failing; reason="$(t "containers not running")"
     fi
@@ -13147,7 +13223,7 @@ kei_tainacan_status() {
 # and only adds failed_at, so the summary never shows old data as current.
 # It holds only what the diagnosis prints (addresses, states, versions,
 # counts, sizes): no password, key, token or pass link.
-KEI_TN_LAST_KEYS='status|url|lang|db|wordpress|health|reason|collections|items|attachments|attachments_missing|wordpress_version|tainacan_version|last_backup|backups|disk_db|disk_wp|docker'
+KEI_TN_LAST_KEYS='status|url|lang|db|wordpress|health|reason|collections|items|attachments|attachments_missing|wordpress_version|tainacan_version|last_backup|backups|disk_db|disk_wp|docker|site|facets|address_interface'
 kei_tainacan_check() {
     local out now f tmp result=failed
     out=$(kei_tainacan_status) || { printf '%s\n' "$out"; return 1; }
@@ -13216,7 +13292,7 @@ kei_tainacan_json() {
     url=$(_kei_tn_get url)
     [ "$detected" = true ] && [ -n "$url" ] && admin="${url%/}/wp-admin/"
     if [ "$detected" = true ] && [ -f "$KEI_TAINACAN_DIR/last-status" ]; then
-        for k in checked_at collections items attachments attachments_missing wordpress_version tainacan_version disk_db disk_wp lang failed_at; do
+        for k in checked_at collections items attachments attachments_missing wordpress_version tainacan_version disk_db disk_wp lang failed_at site facets address_interface; do
             checked="$checked${checked:+,}$(json_str "$k"):$(json_str "$(_kei_tn_last "$k")")"
         done
     fi
@@ -13526,6 +13602,292 @@ kei_tainacan_credentials() {
     [ -f "$KEI_TAINACAN_DIR/.env" ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
     printf '%s\n%s: %s\n%s: %s\n%s: %s\n' "$(t "Tainacan administrator")" "$(t "Address")" "$(_kei_tn_get url)/wp-admin/" \
         "$(t "User")" "$(_kei_tn_env KN_ADMIN_USER)" "$(t "Password")" "$(_kei_tn_env KN_ADMIN_PASSWORD)"
+}
+
+# ----------------------------------------------------------------------
+# The public home of the collection. WordPress starts as a blog ("Hello
+# world!", "Sample Page"); Tainacan does not change that by itself. The
+# home made here is a page with the collection's search (Tainacan's
+# [tainacan-search]) and links to the collections and to all the items,
+# set as the home page, and Tainacan's own faceted search turned on in its
+# collection and items pages (its settings, "Theme default templates"), so
+# the pages a visitor reaches have a search too. Only WordPress's and
+# Tainacan's supported options and blocks: the theme is not changed.
+#
+# A new installation does it (its plan says so) and sends WordPress's own
+# sample post and page to the trash, but only the ones this installation
+# made and that were never edited (their ids are kept at install time,
+# never found by their titles). An existing one only after its plan and a
+# yes, and nothing of it is removed: its theme, menus, posts and pages stay.
+# Undo puts the previous home page and settings back.
+# ----------------------------------------------------------------------
+_kei_tn_site_php() {
+    cat <<'PHP'
+<?php
+// Managed by Koha.Nexus (config.sh writes it again): the public home of the
+// collection. wp eval-file kn-site.php MODE KIND PAGE SAMPLES UNDO
+//   MODE    status | apply | undo
+//   KIND    fresh (a new installation) | existing
+//   PAGE    the id of the page made before ("" = none)
+//   SAMPLES the ids of WordPress's sample post and page, kept at install
+//   UNDO    what apply printed as "undo" (base64 JSON)
+// Prints "key<TAB>value" lines; the words are config.sh's.
+$mode = $args[0] ?? 'status';
+$kind = ($args[1] ?? '') === 'fresh' ? 'fresh' : 'existing';
+$ours = (int) ($args[2] ?? 0);
+$samples = array_filter(array_map('intval', explode(',', $args[3] ?? '')));
+$undo_in = json_decode((string) base64_decode($args[4] ?? '', true), true);
+$opts = array('tainacan_option_override_collection_items_archive_template',
+              'tainacan_option_override_taxonomy_term_items_archive_template',
+              'tainacan_option_override_repository_items_archive_template');
+
+function kn_out($k, $v) { echo $k, "\t", str_replace(array("\t", "\r", "\n"), ' ', (string) $v), "\n"; }
+function kn_page_ok($id) {
+    $p = $id ? get_post($id) : null;
+    return $p && $p->post_type === 'page' && $p->post_status === 'publish';
+}
+function kn_untouched($p) { return $p && $p->post_modified_gmt === $p->post_date_gmt; }
+
+$tainacan = class_exists('\Tainacan\Theme_Helper');
+$pt = strpos(get_locale(), 'pt') === 0;
+$words = $pt
+    ? array('title' => 'Acervo', 'intro' => 'Pesquise o acervo ou navegue pelas coleções.',
+            'collections' => 'Coleções', 'items' => 'Todos os itens', 'nav' => 'Navegação')
+    : array('title' => 'Collection', 'intro' => 'Search the collection or browse its collections.',
+            'collections' => 'Collections', 'items' => 'All items', 'nav' => 'Navigation');
+$col_url = $tainacan ? (string) get_post_type_archive_link('tainacan-collection') : '';
+$items_url = '';
+if ($tainacan) {
+    $items_url = get_option('permalink_structure')
+        ? home_url('/' . \Tainacan\Theme_Helper::get_instance()->get_items_list_slug() . '/')
+        : home_url('/?tainacan_repository_archive=1');
+}
+$front = get_option('show_on_front');
+$pof = (int) get_option('page_on_front');
+$on = 0;
+foreach ($opts as $o) { if (get_option($o)) { $on++; } }
+$theme = wp_get_theme();
+
+if ($mode === 'status') {
+    kn_out('plugin', $tainacan ? 'active' : 'inactive');
+    kn_out('site', ($front === 'page' && $pof) ? ((kn_page_ok($ours) && $pof === $ours) ? 'ready' : 'custom') : 'blog');
+    kn_out('front', ($front === 'page' && $pof) ? get_the_title($pof) : '');
+    kn_out('facets', $on === count($opts) ? 'on' : ($on ? 'partial' : 'off'));
+    kn_out('theme', trim($theme->get('Name') . ' ' . $theme->get('Version')));
+    kn_out('ours', kn_page_ok($ours) ? $ours : '');
+    $n = 0;
+    foreach ($samples as $id) { $p = get_post($id); if ($p && $p->post_status === 'publish') { $n++; } }
+    kn_out('samples', $n);
+    kn_out('posts', (int) wp_count_posts('post')->publish);
+    kn_out('collections_url', $col_url);
+    kn_out('items_url', $items_url);
+    exit(0);
+}
+
+if ($mode === 'apply') {
+    if (!$tainacan) { kn_out('error', 'tainacan-inactive'); exit(3); }
+    $undo = array('show_on_front' => $front, 'page_on_front' => $pof, 'opts' => array(),
+                  'page' => 0, 'trashed' => array(), 'nav' => null);
+    foreach ($opts as $o) { $undo['opts'][$o] = get_option($o, null); }
+    if (!kn_page_ok($ours)) {
+        $content = '<!-- wp:paragraph --><p>' . esc_html($words['intro']) . '</p><!-- /wp:paragraph -->' . "\n"
+            . '<!-- wp:buttons --><div class="wp-block-buttons">'
+            . '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="'
+            . esc_url($col_url) . '">' . esc_html($words['collections']) . '</a></div><!-- /wp:button -->'
+            . '<!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline">'
+            . '<a class="wp-block-button__link wp-element-button" href="' . esc_url($items_url) . '">'
+            . esc_html($words['items']) . '</a></div><!-- /wp:button --></div><!-- /wp:buttons -->' . "\n"
+            . '<!-- wp:shortcode -->[tainacan-search]<!-- /wp:shortcode -->';
+        $ours = wp_insert_post(array('post_type' => 'page', 'post_status' => 'publish', 'post_title' => $words['title'],
+                                     'post_content' => $content, 'comment_status' => 'closed', 'ping_status' => 'closed'), true);
+        if (is_wp_error($ours)) { kn_out('error', $ours->get_error_message()); exit(1); }
+        $undo['page'] = $ours;
+    }
+    foreach ($opts as $o) { update_option($o, true); }
+    update_option('page_on_front', $ours);
+    update_option('show_on_front', 'page');
+    if ($kind === 'fresh') {
+        foreach ($samples as $id) {
+            $p = get_post($id);
+            if ($p && in_array($p->post_type, array('post', 'page'), true) && $p->post_status === 'publish' && kn_untouched($p)) {
+                wp_trash_post($p->ID);
+                $undo['trashed'][] = $p->ID;
+                kn_out('trashed', $p->post_title);
+            }
+        }
+        $links = '';
+        foreach (array(array($words['collections'], $col_url), array($words['items'], $items_url)) as $l) {
+            $links .= '<!-- wp:navigation-link ' . wp_json_encode(array('label' => $l[0], 'url' => $l[1], 'kind' => 'custom',
+                      'isTopLevelLink' => true), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ' /-->';
+        }
+        $navs = get_posts(array('post_type' => 'wp_navigation', 'post_status' => 'publish', 'numberposts' => 2));
+        if (!$navs) {
+            $id = wp_insert_post(array('post_type' => 'wp_navigation', 'post_status' => 'publish',
+                                       'post_title' => $words['nav'], 'post_content' => '<!-- wp:page-list /-->' . $links));
+            if ($id && !is_wp_error($id)) { $undo['nav'] = array('id' => $id, 'new' => true); }
+        } elseif (count($navs) === 1 && trim($navs[0]->post_content) === '<!-- wp:page-list /-->') {
+            $undo['nav'] = array('id' => $navs[0]->ID, 'content' => $navs[0]->post_content);
+            wp_update_post(array('ID' => $navs[0]->ID, 'post_content' => '<!-- wp:page-list /-->' . $links));
+        }
+    }
+    flush_rewrite_rules(false);
+    kn_out('page', $ours);
+    kn_out('undo', base64_encode(wp_json_encode($undo)));
+    exit(0);
+}
+
+if ($mode === 'undo') {
+    if (!is_array($undo_in)) { kn_out('error', 'nothing-to-undo'); exit(3); }
+    update_option('show_on_front', $undo_in['show_on_front'] === 'page' ? 'page' : 'posts');
+    update_option('page_on_front', (int) $undo_in['page_on_front']);
+    foreach ((array) $undo_in['opts'] as $o => $v) {
+        if (!in_array($o, $opts, true)) { continue; }
+        if ($v === null) { delete_option($o); } else { update_option($o, $v); }
+    }
+    add_filter('wp_untrash_post_status', 'wp_untrash_post_set_previous_status', 10, 3);
+    foreach ((array) $undo_in['trashed'] as $id) { if (get_post((int) $id)) { wp_untrash_post((int) $id); kn_out('restored', get_the_title((int) $id)); } }
+    $nav = $undo_in['nav'] ?? null;
+    if (is_array($nav) && !empty($nav['id']) && ($p = get_post((int) $nav['id'])) && $p->post_type === 'wp_navigation') {
+        if (!empty($nav['new'])) { wp_trash_post($p->ID); }
+        elseif (isset($nav['content'])) { wp_update_post(array('ID' => $p->ID, 'post_content' => $nav['content'])); }
+    }
+    $page = (int) ($undo_in['page'] ?? 0);
+    if ($page && ($p = get_post($page)) && $p->post_type === 'page') {
+        if (kn_untouched($p)) { wp_trash_post($page); kn_out('page', 'trashed'); }
+        else { kn_out('page', 'kept'); }
+    }
+    flush_rewrite_rules(false);
+    exit(0);
+}
+kn_out('error', 'mode');
+exit(2);
+PHP
+}
+
+# _kei_tn_site MODE [KIND]: runs the script with what the state file keeps.
+_kei_tn_site() {
+    local work="$KEI_TAINACAN_DIR/work"
+    mkdir -p "$work" && chmod 755 "$work" && _kei_tn_site_php > "$work/kn-site.php" && chmod 644 "$work/kn-site.php" || return 1
+    _kei_tn_wp eval-file /work/kn-site.php "$1" "${2:-existing}" "$(_kei_tn_get site_page)" \
+        "$(_kei_tn_get site_samples | tr ' ' ',')" "$(cat "$KEI_TAINACAN_DIR/site-undo" 2>/dev/null)" 2>/dev/null
+}
+
+# kei_tainacan_site_status: "key=value" lines: site=ready|blog|custom,
+# facets=on|partial|off, the theme, the home page, the addresses.
+kei_tainacan_site_status() {
+    local k v
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    while IFS=$'\t' read -r k v; do [ -n "$k" ] && printf '%s=%s\n' "$k" "$v"; done < <(_kei_tn_site status)
+}
+
+# kei_tainacan_site_plan: what preparing the home page changes here.
+kei_tainacan_site_plan() {
+    local st site front facets theme ours posts
+    st=$(kei_tainacan_site_status) || { printf 'plan\trefuse\nnote\t%s\n' "$(t "Tainacan is not installed.")"; return 3; }
+    _kei_tn_st() { printf '%s\n' "$st" | sed -n "s/^$1=//p" | head -n 1; }
+    site=$(_kei_tn_st site); front=$(_kei_tn_st front); facets=$(_kei_tn_st facets); theme=$(_kei_tn_st theme); ours=$(_kei_tn_st ours); posts=$(_kei_tn_st posts)
+    if [ "$(_kei_tn_st plugin)" != active ]; then
+        printf 'plan\trefuse\nnote\t%s\n' "$(t "The Tainacan plugin is not active in this WordPress: activate it first (Plugins).")"; return 3
+    fi
+    if [ "$site" = ready ] && [ "$facets" = on ]; then
+        printf 'plan\tready\nnote\t%s\n' "$(t "The home page of the collection is already prepared.")"; return 0
+    fi
+    printf 'plan\tapply\n'
+    if [ -n "$ours" ]; then
+        printf 'page\t%s\n' "$(t "The page of the collection made before is used again.")"
+    else
+        printf 'page\t%s\n' "$(t "A new page with the search of the collection and links to the collections and to all the items.")"
+    fi
+    case "$site" in
+        blog)   printf 'front\t%s\n' "$(t "Home page: from the list of blog posts to that page.")" ;;
+        custom) printf 'front\t%s\n' "$(p="$front"; t "Home page: from the page \"\${p}\" to that page.")" ;;
+    esac
+    [ "$site" = blog ] && [ "${posts:-0}" -gt 0 ] && printf 'posts\t%s\n' "$(n="$posts"; t "The \${n} published posts stay published, at their own addresses; the home page stops listing them.")"
+    [ "$facets" = on ] || printf 'facets\t%s\n' "$(t "Tainacan's faceted search in its collection and items pages (Tainacan, Settings, Theme default templates).")"
+    printf 'kept\t%s\n' "$(th="$theme"; t "Not changed: the theme (\${th}), the menus, the posts, the pages and the rest of the settings. Nothing is deleted.")"
+    printf 'undo\t%s\n' "$(t "Undo puts the previous home page and settings back.")"
+    return 0
+}
+
+# kei_tainacan_site_apply confirm|fresh: with the person's yes (confirm) on
+# an existing installation, or as a step of a new one (fresh).
+kei_tainacan_site_apply() {
+    local how="${1:-}" out page undo k v trashed=""
+    case "$how" in
+        confirm|fresh) ;;
+        *) kei_tainacan_site_plan; echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2; return 3 ;;
+    esac
+    [ "$(_kei_tn_get status)" = installed ] || [ "$how" = fresh ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    out=$(_kei_tn_site apply "$([ "$how" = fresh ] && echo fresh || echo existing)") || {
+        echo "$(t "The home page of the collection could not be prepared; nothing else was changed.")" >&2; return 1; }
+    while IFS=$'\t' read -r k v; do
+        case "$k" in
+            page) page="$v" ;;
+            undo) undo="$v" ;;
+            trashed) trashed="$trashed${trashed:+, }\"$v\"" ;;
+        esac
+    done <<< "$out"
+    [[ "$page" =~ ^[0-9]+$ ]] || { echo "$(t "The home page of the collection could not be prepared; nothing else was changed.")" >&2; return 1; }
+    _kei_tn_set site_page "$page"
+    if [ -n "$undo" ]; then
+        ( umask 077; printf '%s' "$undo" > "$KEI_TAINACAN_DIR/site-undo" )
+    fi
+    log "tainacan: home page prepared ($how, page $page)"
+    echo "$(u="$(_kei_tn_get url)"; t "The home page of the collection is ready at \${u}: search, collections and all the items.")"
+    [ -n "$trashed" ] && echo "$(s="$trashed"; t "WordPress's sample content went to the trash: \${s}.")"
+    return 0
+}
+
+# kei_tainacan_site_undo confirm: the previous home page and settings back.
+kei_tainacan_site_undo() {
+    [ "${1:-}" = confirm ] || { echo "$(t "Nothing was changed: undoing needs a yes (confirm).")" >&2; return 3; }
+    [ -s "$KEI_TAINACAN_DIR/site-undo" ] || { echo "$(t "There is nothing to undo.")" >&2; return 3; }
+    _kei_tn_site undo >/dev/null || { echo "$(t "The previous home page could not be put back.")" >&2; return 1; }
+    rm -f "$KEI_TAINACAN_DIR/site-undo"
+    _kei_tn_set site_page ""
+    log "tainacan: home page undone"
+    echo "$(t "The previous home page and settings are back.")"
+}
+
+# ----------------------------------------------------------------------
+# A stopped Tainacan: start Docker (when it is the one stopped) and the
+# two containers again, with the data volumes as they are. Never a restore.
+# ----------------------------------------------------------------------
+kei_tainacan_start_plan() {
+    local db wp
+    [ "$(_kei_tn_get status)" = installed ] || { printf 'plan\trefuse\nnote\t%s\n' "$(t "Tainacan is not installed.")"; return 3; }
+    command -v docker >/dev/null 2>&1 || { printf 'plan\trefuse\nnote\t%s\n' "$(t "Docker is not installed on this server.")"; return 3; }
+    printf 'plan\tstart\n'
+    if ! _kei_docker_running; then
+        printf 'docker\t%s\n' "$(t "Docker is stopped: its service is started (systemctl start docker). Other programs' containers start only if they are set to.")"
+    else
+        db=$(_kei_tn_container_state db); wp=$(_kei_tn_container_state wordpress)
+        if [ "$db" = running ] && [ "$wp" = running ]; then
+            printf 'plan\tready\nnote\t%s\n' "$(t "The Tainacan containers are already running.")"; return 0
+        fi
+        printf 'containers\t%s\n' "$(d="$db"; w="$wp"; t "Containers: database \${d}, WordPress \${w}.")"
+    fi
+    printf 'start\t%s\n' "$(t "The database and WordPress containers start again with their data as they are; nothing is restored or deleted.")"
+    printf 'check\t%s\n' "$(t "Then the functional check runs again.")"
+    return 0
+}
+
+kei_tainacan_start() {
+    local out
+    [ "${1:-}" = confirm ] || { kei_tainacan_start_plan; echo "$(t "Nothing was started: the plan needs a yes (confirm).")" >&2; return 3; }
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    if ! _kei_docker_running; then
+        systemctl start docker >/dev/null 2>&1 || service docker start >/dev/null 2>&1 || true
+        _kei_tn_wait 60 _kei_docker_running || { echo "$(t "Docker did not start. See: journalctl -u docker")" >&2; return 1; }
+    fi
+    _kei_tn_dc up -d db wordpress >/dev/null 2>&1 || { echo "$(t "The containers did not start.")" >&2; return 1; }
+    _kei_tn_wait 180 _kei_tn_db_ready || { echo "$(t "The database did not start.")" >&2; return 1; }
+    _kei_tn_wait 180 _kei_tn_wp_ready || { echo "$(t "WordPress did not start.")" >&2; return 1; }
+    if ! out=$(kei_tainacan_health); then
+        echo "$(t "The containers are running, but Tainacan did not pass the functional check:") $out" >&2; return 1
+    fi
+    log "tainacan: started again"
+    echo "$(t "Tainacan is running again, with its data as it was.")"
 }
 
 # ----------------------------------------------------------------------
@@ -43905,6 +44267,21 @@ kei_task() {
         tainacan-restore-test) _kei_docker_task kei_tainacan_restore_test "${1:-latest}" ;;
         tainacan-restore)   _kei_docker_task kei_tainacan_restore "${1:-}" ;;
         tainacan-address)   _kei_docker_task kei_tainacan_address "${1:-}" ;;
+        tainacan-site)
+            local k v
+            case "${1:-}" in
+                plan) while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_site_plan; echo "rc	$?") ;;
+                status) while IFS='=' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_site_status) ;;
+                apply) _kei_docker_task kei_tainacan_site_apply "${2:-}"; return ;;
+                undo) _kei_docker_task kei_tainacan_site_undo "${2:-}"; return ;;
+                *) msg_error "" "tainacan-site plan|status|apply confirm|undo confirm"; return 2 ;;
+            esac
+            return 0 ;;
+        tainacan-start)
+            local k v
+            if [ "${1:-}" = confirm ]; then _kei_docker_task kei_tainacan_start confirm; return; fi
+            while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_start_plan; echo "rc	$?")
+            return 0 ;;
         tainacan-language)  _kei_docker_task kei_tainacan_language "${1:-}" ;;
         tainacan-credentials) _kei_docker_task kei_tainacan_credentials ;;
         tainacan-uninstall) _kei_docker_task kei_tainacan_uninstall "${1:-}" ;;

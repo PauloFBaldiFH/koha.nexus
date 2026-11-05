@@ -14,6 +14,12 @@
 #   8. Docker restarted and the machine rebooted: everything still there
 #   9. a backup and an isolated restore test with the same data
 #
+# The home page of the collection: a new installation prepares it (checked
+# in the browser at step 2). Then the case of an existing installation is
+# made by undoing it (WordPress's blog again, its sample post and page
+# back): its plan, a Yes, and nothing of the blog deleted; undo again and
+# prepare again, so the rest runs on a prepared home page.
+#
 #   tests/e2e/tainacan_e2e.sh IMAGE OUTDIR
 #
 # Read-only facts of each level (tests/e2e/tainacan_probe.sh) are printed
@@ -65,6 +71,24 @@ B() { python3 "$here/tainacan_browser.py" "$1" "$url" "$out"; }
 
 section "2. browser: look and log in"
 B look || fail "browser look"
+
+section "home page: an existing installation"
+st() { task tainacan-site status | sed -n "s/^@@result $1=//p" | head -n 1; }
+[ "$(st site)" = ready ] && [ "$(st facets)" = on ] && ok "new installation: home page of the collection ready, faceted search on" \
+    || fail "new installation home page: site=$(st site) facets=$(st facets)"
+[ "$(st samples)" = 0 ] && ok "new installation: WordPress's sample post and page in the trash" || fail "samples left: $(st samples)"
+if task tainacan-site undo confirm >/dev/null; then ok "undo"; else fail "undo"; fi
+[ "$(st site)" = blog ] && [ "$(st samples)" = 2 ] && ok "after undo: WordPress's blog and its sample post and page are back" \
+    || fail "after undo: site=$(st site) samples=$(st samples)"
+B blog || true
+plan=$(task tainacan-site plan); echo "$plan"
+printf '%s\n' "$plan" | grep -q '^@@result plan=apply' && printf '%s\n' "$plan" | grep -q '^@@result front=' \
+    && ok "existing installation: the plan says what changes" || fail "existing installation plan"
+if task tainacan-site apply >/dev/null 2>&1; then fail "applied without a yes"; else ok "nothing applied without a yes"; fi
+[ "$(st site)" = blog ] || fail "changed without a yes: $(st site)"
+if task tainacan-site apply confirm; then ok "existing installation: prepared after the plan and a yes"; else fail "existing apply"; fi
+[ "$(st site)" = ready ] && [ "$(st samples)" = 2 ] && ok "existing installation: home page ready, the blog's posts and pages kept" \
+    || fail "existing apply: site=$(st site) samples=$(st samples)"
 section "3-5. browser: collections and items"
 B seed || fail "browser seed"
 section "6-7. browser: public and private"

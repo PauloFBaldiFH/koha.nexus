@@ -16,6 +16,8 @@ STEP:
           from the home page and by search; the private ones cannot.
   direct  the pages Tainacan serves (/colecoes/, /itens/, the collection,
           its search, the item) opened by their address, not from the home.
+  blog    without a login: the home page is WordPress's blog (an existing
+          installation whose home page was not prepared). Screenshot only.
 
 The administrator's user and password come from KN_USER and KN_PASS (the
 test machine's own, never printed). Each screenshot is written to OUTDIR
@@ -102,13 +104,37 @@ def upload_image(page) -> dict:
     )
 
 
+SEARCH_BOX = ("#tainacan-items-page input[type=search], #tainacan-items-page input[type=text], "
+              "[data-module=faceted-search] input[type=search], [data-module=faceted-search] input[type=text]")
+
+
+def faceted_search(page, words: str) -> str:
+    """Types WORDS in Tainacan's faceted search of this page and returns
+    the visible text after it answers ("" when the page has no search)."""
+    box = page.locator(SEARCH_BOX)
+    fact("search.boxes", box.count())
+    if not box.count():
+        return ""
+    box.first.fill(words)
+    box.first.press("Enter")
+    page.wait_for_timeout(6000)
+    return visible_text(page)
+
+
 def step_look(page) -> None:
     page.goto(f"{URL}/", wait_until="networkidle")
+    page.wait_for_timeout(4000)
     fact("home.title", page.title())
     fact("home.text", visible_text(page)[:400])
     shot(page, "01-home-anonymous")
     links = page.eval_on_selector_all("a", "els => els.map(e => e.textContent.trim() + ' -> ' + e.href)")
     fact("home.links", " | ".join(links[:40]))
+    # A new installation: the home page of the collection, not the blog.
+    text = visible_text(page)
+    check("Olá, mundo!" not in text and "Hello world!" not in text, "the home page is not WordPress's sample blog")
+    check(any(n in " ".join(links) for n in ("Coleções", "Collections")), "the home page links to the collections")
+    check(any(n in " ".join(links) for n in ("Todos os itens", "All items")), "the home page links to all the items")
+    check(page.locator(SEARCH_BOX).count() > 0, "the home page has the search of the collection")
     login(page)
     fact("admin.after_login_url", page.url)
     shot(page, "02-admin-dashboard", full=False)
@@ -196,10 +222,20 @@ def step_public(page) -> None:
     check(item["status"] in (401, 403, 404), f"private item refused by the API without a login ({item['status']})")
     col = rest_anonymous(page, f"/tainacan/v2/collections/{seed['private_collection']}")
     check(col["status"] in (401, 403, 404), f"private collection refused by the API without a login ({col['status']})")
+    # The search of the home page (Tainacan's faceted search): by a word of
+    # the description, the published item only.
+    page.goto(f"{URL}/", wait_until="networkidle")
+    page.wait_for_timeout(4000)
+    found_text = faceted_search(page, "cartografia")
+    shot(page, "08-search")
+    fact("public.search_text", found_text[:400])
+    check("Mapa antigo" in found_text, "the search of the home page finds the published item by its description")
+    restricted = faceted_search(page, "interno")
+    check("Documento interno" not in restricted, "the search of the home page does not show the private item")
+    # WordPress's own search (?s=) does not search Tainacan's items: a fact.
     page.goto(f"{URL}/?s=cartografia", wait_until="networkidle")
     page.wait_for_timeout(2000)
-    shot(page, "08-search")
-    fact("public.search_text", visible_text(page)[:400])
+    fact("public.wp_search_text", visible_text(page)[:300])
     link = page.get_by_role("link", name="Mapa antigo", exact=False)
     if link.count():
         link.first.click()
@@ -256,14 +292,11 @@ def step_direct(page) -> None:
         text = visible_text(page)
         fact("direct.collection_text", text[:400])
         check("Mapa antigo" in text, "the collection page lists the published item")
-        search = page.locator("input[type=search], input[placeholder*=usca], input[placeholder*=earch]")
-        fact("direct.collection_search_boxes", search.count())
-        if search.count():
-            search.first.fill("cartografia")
-            search.first.press("Enter")
-            page.wait_for_timeout(5000)
+        found_text = faceted_search(page, "cartografia")
+        check(bool(found_text), "the collection page has Tainacan's faceted search")
+        if found_text:
             shot(page, "13-collection-search")
-            check("Mapa antigo" in visible_text(page), "the collection's own search finds the item by its description")
+            check("Mapa antigo" in found_text, "the collection's own search finds the item by its description")
     if item_url:
         page.goto(item_url, wait_until="networkidle")
         page.wait_for_timeout(4000)
@@ -275,12 +308,19 @@ def step_direct(page) -> None:
         check(any("e2e-capa" in i for i in imgs), "the item's image is shown on its page")
 
 
+def step_blog(page) -> None:
+    page.goto(f"{URL}/", wait_until="networkidle")
+    fact("blog.text", visible_text(page)[:300])
+    shot(page, "00-home-existing-blog")
+
+
 def main() -> int:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(viewport={"width": 1366, "height": 900}, locale="pt-BR")
         page = context.new_page()
-        {"look": step_look, "seed": step_seed, "public": step_public, "direct": step_direct}[STEP](page)
+        {"look": step_look, "seed": step_seed, "public": step_public, "direct": step_direct,
+         "blog": step_blog}[STEP](page)
         browser.close()
     for f in FAILS:
         print(f"FAILED: {f}")
