@@ -59,7 +59,9 @@ EOF
     rm -f /etc/apache2/sites-*/zz-koha-nexus-*
     a2dismod -q -f info >/dev/null 2>&1 || true
     # 3>&-: a daemon that keeps bats' descriptor 3 open makes bats wait for ever.
-    if [ -d /run/systemd/system ]; then systemctl restart apache2; else apache2ctl restart 3>&-; fi
+    # reset-failed: one restart per test hits systemd's start limit.
+    if [ -d /run/systemd/system ]; then systemctl reset-failed apache2 2>/dev/null; systemctl restart apache2
+    else apache2ctl restart 3>&-; fi
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         [ "$(curl -s http://127.0.0.1/)" = OPAC ] && return 0
         sleep 1

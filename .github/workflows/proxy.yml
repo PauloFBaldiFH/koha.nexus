@@ -1,7 +1,14 @@
-# Resource ownership and the web proxy (installer: kei_owned_*, kei_proxy_*,
-# kei_tunnel_config; uninstall.sh). The Apache tests use a real Apache in
-# a throwaway Ubuntu container; the uninstall test purges packages, so it
-# runs there too and never on the runner itself.
+# Resource ownership, the web proxy and Docker (installer: kei_owned_*,
+# kei_proxy_*, kei_tunnel_*, kei_docker_*; uninstall.sh). Everything that
+# changes a machine runs in a throwaway container, never on the runner:
+#   apache  Ubuntu 24.04, Debian 12 and 13 containers with a real Apache:
+#           the registry, proxy and Docker unit tests, then uninstall.sh.
+#   system  the same systems as a machine with systemd as PID 1, its own
+#           firewall, UFW, cloudflared and WireGuard (the runner's kernel):
+#           Apache reloaded by systemd, UFW active, cloudflared's own
+#           validation (proxy_system.bats), and Docker installed from its
+#           official repository with the isolation tests
+#           (docker_isolation.bats).
 name: proxy
 
 on:
@@ -10,16 +17,24 @@ on:
       - "installer"
       - "uninstall.sh"
       - "tests/proxy.bats"
+      - "tests/proxy_system.bats"
+      - "tests/docker.bats"
+      - "tests/docker_isolation.bats"
       - "tests/uninstall_registry.bats"
       - "tests/platforms.bats"
+      - "tests/system/**"
       - ".github/workflows/proxy.yml"
   pull_request:
     paths:
       - "installer"
       - "uninstall.sh"
       - "tests/proxy.bats"
+      - "tests/proxy_system.bats"
+      - "tests/docker.bats"
+      - "tests/docker_isolation.bats"
       - "tests/uninstall_registry.bats"
       - "tests/platforms.bats"
+      - "tests/system/**"
       - ".github/workflows/proxy.yml"
 
 permissions:
@@ -28,15 +43,45 @@ permissions:
 jobs:
   apache:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12", "debian:13"]
     steps:
       - uses: actions/checkout@v4
-      - name: Apache, proxy and uninstall tests in a throwaway container
+      - name: Apache, proxy, Docker and uninstall tests in a throwaway container
         run: |
           docker run --rm -v "$PWD":/src:ro -e KEI_DESTRUCTIVE_TESTS=1 -e DEBIAN_FRONTEND=noninteractive \
-            ubuntu:24.04 bash -c '
+            "${{ matrix.image }}" bash -c '
               set -e
               apt-get update -qq
               apt-get install -y -qq apache2 bats curl python3 iproute2 >/dev/null
               cd /src
-              bats tests/platforms.bats tests/proxy.bats
+              bats tests/platforms.bats tests/proxy.bats tests/docker.bats
               bats tests/uninstall_registry.bats'
+
+  system:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12", "debian:13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: A machine with systemd
+        run: |
+          sudo modprobe wireguard || echo "no WireGuard module: the VPN test uses a plain link"
+          tests/system/container.sh start "${{ matrix.image }}" kn-system
+      - name: cloudflared (its own validation of the tunnel file)
+        run: |
+          curl -fsSL -o cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          docker cp cloudflared.deb kn-system:/tmp/cloudflared.deb
+          docker exec kn-system dpkg -i /tmp/cloudflared.deb
+      - name: Apache with systemd, UFW active, cloudflared
+        run: tests/system/container.sh run kn-system bats tests/proxy_system.bats
+      - name: Docker installed with consent, isolation tests
+        run: tests/system/container.sh run kn-system bats tests/docker_isolation.bats
+      - name: Stop
+        if: always()
+        run: tests/system/container.sh stop kn-system

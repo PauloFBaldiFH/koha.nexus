@@ -340,3 +340,76 @@ def test_platforms_screen_shows_the_proxy_card(no_koha):
             return str(card.query_one(".card-value").render())
 
     assert asyncio.run(main()) == "No web server"
+
+
+# ----------------------------------------------------------------------
+# Docker (installer: kei_docker_*, the "docker" of --status-json)
+# ----------------------------------------------------------------------
+def test_docker_status_is_read_and_unknown_values_are_not_trusted():
+    d = platforms.docker_from_status({"docker": {
+        "installed": True, "package": "docker-ce", "engine": "29.9.3", "compose": "5.7.0", "running": True,
+        "installed_by": "koha-nexus", "others": {"containers": 2}, "platform_networks": 1}})
+    assert (d.known, d.installed, d.running, d.installed_by_nexus, d.others, d.networks) == (
+        True, True, True, True, 2, 1)
+    assert platforms.docker_from_status({}).known is False                    # an older installer
+    bad = platforms.docker_from_status({"docker": {"installed": "yes", "running": 1, "engine": 5,
+                                                   "others": {"containers": -3}, "platform_networks": True}})
+    assert (bad.installed, bad.running, bad.engine, bad.others, bad.networks) == (False, False, "", 0, 0)
+
+
+def test_docker_card_and_install_button():
+    absent = platforms.DockerState(known=True)
+    assert platforms.describe_docker(absent)[0] == "Not installed"
+    assert platforms.docker_can_install(absent)
+    assert not platforms.docker_can_install(platforms.DockerState())          # not reported: no button
+    found = platforms.DockerState(True, True, "docker.io", "24.0.7", "2.24.6", True, False, 3)
+    value, note, card = platforms.describe_docker(found)
+    assert (value, card) == ("Docker 24.0.7", "ok")
+    assert "never changed" in note and "3 containers of other programs" in note
+    assert not platforms.docker_can_install(found)
+    assert not platforms.docker_can_remove(found)                              # found here: never removed
+    ours = platforms.DockerState(True, True, "docker-ce", "29.9.3", "5.7.0", True, True)
+    assert platforms.docker_can_remove(ours)
+    assert not platforms.docker_can_remove(platforms.DockerState(True, True, "docker-ce", "29", "5", True, True, 1))
+    assert not platforms.docker_can_remove(platforms.DockerState(True, True, "docker-ce", "29", "5", True, True, 0, 1))
+    assert platforms.describe_docker(platforms.DockerState(True, True, "docker-ce", "29.9.3", "", True))[2] == "warn"
+    assert platforms.describe_docker(platforms.DockerState(True, True, "docker-ce", "", "", False))[1] == \
+        "Installed, but not running"
+
+
+def test_docker_is_installed_only_after_the_plan_and_a_yes(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen
+    from kei_panel.widgets.cards import StatusCard
+
+    async def main(answer: str):
+        app = make_app()
+        ran: list[tuple[str, tuple[str, ...]]] = []
+        real_task = app.bridge.task
+
+        async def task(name, *args, **kwargs):
+            ran.append((name, args))
+            return await real_task(name, *args, **kwargs)
+        app.bridge.task = task
+        async with app.run_test() as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            await pilot.press("p")
+            await pilot.pause(2.0)
+            card = app.screen.query_one("#view-platforms #platform-docker", StatusCard)
+            value = str(card.query_one(".card-value").render())
+            button = app.screen.query_one("#platforms-docker-install")
+            shown = button.display
+            button.press()
+            await pilot.pause(1.0)
+            dialog = app.screen
+            preview = isinstance(dialog, ConfirmScreen) and "download.docker.com" in dialog._preview
+            await pilot.click(f"#{answer}")
+            await pilot.pause(2.0)
+            return value, shown, preview, [name for name, _ in ran if name.startswith("docker-")], ran
+
+    value, shown, preview, names, _ = asyncio.run(main("no"))
+    assert (value, shown, preview) == ("Not installed", True, True)
+    assert names == ["docker-plan"]                                            # "No": nothing installed
+    *_, names, ran = asyncio.run(main("yes"))
+    assert names == ["docker-plan", "docker-install"]
+    assert ("docker-install", ("confirm",)) in ran

@@ -448,6 +448,20 @@ _SCRIPTS: dict[str, list[str]] = {
                      "@@msg ok OK\t✅ Device added with the address 10.66.0.4. Scan its QR code with the "
                      "WireGuard app, or copy its profile to a computer."],
     "vpn-peer-revoke": ["@@msg ok OK\tDevice revoked: it can no longer connect."],
+    "docker-plan": ["@@result plan=install",
+                    "@@result repository=https://download.docker.com/linux/debian bookworm stable (amd64)",
+                    "@@result key=/etc/apt/keyrings/docker.asc (new)",
+                    "@@result source=/etc/apt/sources.list.d/docker.list (new)",
+                    "@@result packages=docker-ce docker-ce-cli containerd.io docker-buildx-plugin "
+                    "docker-compose-plugin",
+                    "@@result service=docker started and enabled at boot",
+                    "@@result kept=Not changed: /etc/docker/daemon.json, the docker group (nobody is added) and "
+                    "Docker's address pools.",
+                    "@@result undo=Docker installed here can be removed from the panel while no container, volume "
+                    "or network exists.", "@@result rc=0"],
+    "docker-install": ["@@note Installing Docker...", "@@msg ok OK\tDocker is installed."],
+    "docker-remove": ["@@msg ok OK\tDocker was removed. /var/lib/docker (images) was kept: delete it yourself if "
+                      "you do not need it."],
     "vpn-stop": ["@@msg ok OK\tThe VPN is off. The devices and keys are kept: Set up turns it on again."],
     "cloud-provider": ["@@note Registering the connection in rclone...", "@@note Testing the real cloud upload...",
                        "@@msg ok OK\tCloud enabled and tested successfully."],
@@ -622,7 +636,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         out.rc = 2
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
-                            "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check") \
+                            "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
+                            "docker-plan") \
         else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).

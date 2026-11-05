@@ -15,6 +15,8 @@
 #
 # Com outras plataformas no registro (/var/lib/koha-nexus/owned.tsv), o
 # Apache, o cloudflared, o túnel e o painel são mantidos; só o Koha sai.
+# O Docker nunca é removido por aqui, nem quando foi o Koha.Nexus que o
+# instalou (o registro dessa instalação, docker.state, também fica).
 # ======================================================================
 
 # Copyright (C) 2026 Paulo F. Baldi FH
@@ -41,7 +43,7 @@ for arg in "$@"; do
         -y|--yes)  ASSUME_YES="yes" ;;
         -f|--full) FULL="yes" ;;
         -h|--help)
-            sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "Opção desconhecida: $arg (use --full, --yes ou --help)"; exit 1 ;;
     esac
@@ -304,7 +306,14 @@ if keep_shared; then
     echo "    [i] Túnel e registro mantidos para: $OTHER_PLATFORMS"
 else
     rm -rf /etc/cloudflared /root/.cloudflared /home/*/.cloudflared
-    rm -rf "$(dirname "$OWNED_FILE")"
+    # docker.state (Docker instalado pelo Koha.Nexus) fica: o Docker não é
+    # removido aqui, e o registro diz que ele pode ser removido depois.
+    if [ -f "$(dirname "$OWNED_FILE")/docker.state" ]; then
+        find "$(dirname "$OWNED_FILE")" -mindepth 1 ! -name docker.state -delete
+        echo "    [i] Docker mantido (instalado pelo Koha.Nexus): para removê-lo, use o painel ou apt-get purge docker-ce."
+    else
+        rm -rf "$(dirname "$OWNED_FILE")"
+    fi
 fi
 rm -f /root/koha_credentials.txt /root/credenciais_koha.txt /root/koha_patrons_template.csv
 rm -f /var/run/koha_panel.lock /var/run/koha_backup.pid /var/run/koha_es_watchdog.pid \
