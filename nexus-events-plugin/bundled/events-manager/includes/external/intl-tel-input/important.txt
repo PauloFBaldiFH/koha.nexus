@@ -1,0 +1,1 @@
+we rename window.intlTelInput to EM.intlTelInput to avoid conflicts

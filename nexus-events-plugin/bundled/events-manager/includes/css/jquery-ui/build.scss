@@ -1,0 +1,84 @@
+.em {
+	@import "jquery-ui";
+
+	@mixin active_state(){
+		border: 1px solid #007fff;
+		border-radius: 50%;
+		background: #007fff;
+		font-weight: normal;
+		color: #ffffff;
+	}
+
+	.ui-datepicker {
+		font-size:16px !important;
+
+		.ui-datepicker-header {
+			border:0;
+			background: none;
+
+			select.ui-datepicker-month, select.ui-datepicker-year {
+				width: auto;
+				border: none;
+				cursor: pointer;
+			}
+
+			.ui-state-hover {
+				border: none;
+				background: none;
+				color: #ccc;
+				cursor:pointer;
+			}
+		}
+
+		.ui-state-default {
+			background: none;
+			border: 1px solid #fff;
+
+			&.ui-state-hover, &:hover {
+				border:1px solid #ddd;;
+				background: none;
+				border-radius: 50%;
+			}
+			&.ui-state-hover:active, &:active {
+				@include active_state();
+			}
+		}
+
+		.ui-state-highlight {
+			border: 1px solid #fff;
+			background: #fff;
+			color: #222;
+			font-weight: bold;
+		}
+
+		th {
+			padding: 5px 0.3em;
+		}
+
+		td span, td a {
+			padding: 7px;
+			line-height : 20px;
+			text-align: center;
+			text-decoration: none;
+		}
+
+		.ui-state-active {
+			@include active_state();
+			&:hover {
+				background: #003eff !important;
+			}
+		}
+	}
+}
+// wrapper hack
+#em-jquery-ui {
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	pointer-events: none !important;
+	> * {
+		pointer-events: all !important;
+	}
+}

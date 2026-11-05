@@ -1,0 +1,26 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "events-manager/calendar",
+	"title": "Events Calendar",
+	"category": "events-manager",
+	"icon": "calendar-alt",
+	"description": "Display events in a monthly calendar grid.",
+	"keywords": [ "events", "calendar", "schedule" ],
+	"textdomain": "events-manager",
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ]
+	},
+	"attributes": {
+		"title": { "type": "string", "default": "" },
+		"long_events": { "type": "boolean", "default": false },
+		"category": { "type": "string", "default": "0" },
+		"scope": { "type": "string", "default": "all" },
+		"calendar_size": { "type": "string", "default": "auto" },
+		"calendar_event_style": { "type": "string", "default": "" },
+		"limit": { "type": "string", "default": "" },
+		"event_archetype": { "type": "string", "default": "" }
+	},
+	"editorScript": "file:./index.js"
+}

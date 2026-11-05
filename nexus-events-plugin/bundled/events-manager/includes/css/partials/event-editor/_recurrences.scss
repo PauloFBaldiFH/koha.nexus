@@ -1,0 +1,673 @@
+form.em-is-recurring {
+	.single-event-data {
+		display: none;
+		visibility: hidden;
+	}
+
+	// Show normal ticket dates and hide recurring ticket dates
+	#em-tickets-form .ticket-dates-from-normal,
+	#em-tickets-form .ticket-dates-to-normal,
+	#event-rsvp-options .em-booking-date-normal {
+		display: none;
+		visibility: hidden;
+	}
+
+	// adding this to prevent some drawing issues experienced in Chrome (possibly others) in classic editor
+	.recurring-event-editor, .recurring-event-data, .postbox#em-event-recurring {
+		display: block;
+		visibility: visible;
+	}
+}
+
+form:not(.em-is-recurring) {
+	.recurring-event-editor, .recurring-event-data, .postbox#em-event-recurring {
+		display: none;
+		visibility: hidden;
+	}
+
+	// Show recurring ticket dates and hide normal ticket dates
+	#em-tickets-form .ticket-dates-from-recurring,
+	#em-tickets-form .ticket-dates-to-recurring,
+	#event-rsvp-options .em-booking-date-recurring {
+		display: none;
+		visibility: hidden;
+	}
+}
+
+/* Recurring Summary Dates Styling */
+.em-recurring-summary {
+	margin-bottom: 15px;
+	.recurring-summary-missing {
+		font-style: italic;
+	}
+}
+.recurring-summary-dates {
+
+	display: grid;
+	grid-template-columns: 1fr; // Default single column
+	width: 100%;
+
+	// Base grid for regular view
+	grid-template-areas:
+			"start-label"
+			"start-datetime"
+			"end-label"
+			"end-datetime"
+			"timezone";
+
+	.label-start-time { grid-area: start-label; }
+	.label-end-time { grid-area: end-label; }
+	.label-start-day { grid-area: start-label; }
+	.label-end-day { grid-area: end-label; }
+
+	.recurring-datetime-start { grid-area: start-datetime; }
+	.recurring-datetime-end { grid-area: end-datetime; }
+	.recurring-timezone { grid-area: timezone; margin-top: 8px; }
+	.recurring-all-day { grid-area: all-day; margin-top: 10px; }
+
+	> * {
+		margin-bottom: 10px;
+	}
+
+	.label {
+		display: block;
+		font-weight: bold;
+		margin-bottom: 5px;
+		&:not(:first-child){
+			margin-top: 8px;
+		}
+	}
+
+	.recurring-all-day {
+		font-style: italic;
+		margin-top: 8px;
+	}
+
+	// Handle all-day vs time-specific label visibility
+	&:not(.is-all-day):not(.has-all-day) {
+		.all-day {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	// Large size layout with special handling
+	&.size-large {
+		display: block;
+		* {
+			display: inline-block;
+		}
+		.label-start-day, .recurring-all-day {
+			margin: 8px 0;
+			display: block;
+		}
+		.recurring-datetime, .label-end-day, .recurring-timezone {
+			margin: 0 8px 0 0;
+		}
+		.recurring-timezone {
+			.label { display: none; visibility: hidden; }
+			.timezone-varied {
+				font-size: 0.8rem;
+				font-style: italic;
+			}
+		}
+		.label-start-day { display: block !important; visibility: visible !important; }
+		.label-end-day { display: inline-block !important; visibility: visible !important; }
+		.label-time { display: none; visibility: hidden; }
+	}
+
+	&.is-all-day:not(.size-large) {
+		width: max-content;
+		grid-template-columns: min-content 25px minmax(auto, 1fr);
+		grid-template-areas:
+		"start-label start-label start-label"
+		"start-datetime end-label end-datetime"
+		"all-day all-day all-day"
+		"timezone timezone timezone";
+
+		// Hide time-specific labels/times
+		.label-time, .time {
+			display: none;
+			visibility: hidden;
+		}
+		.recurring-datetime, .label-end-day {
+			margin: 0;
+		}
+
+		.label-end-day {
+			justify-self: center;
+			align-self: center;
+			white-space: nowrap;
+			width: auto;
+		}
+	}
+
+	// For has-all-day class (displays times + all-day text)
+	&.has-all-day {
+		grid-template-areas:
+		    "start-label"
+		    "start-datetime"
+		    "end-label"
+		    "end-datetime"
+		    "timezone"
+		    "all-day";
+		.label.all-day {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	// Hide timezone-varied unless specifically shown
+	&:not(.has-multiple-timezones) {
+		.timezone-varied {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	.timezone-varied {
+		margin: 0;
+		font-style: italic;
+	}
+}
+
+/*
+Recurrence Sets and Set styling, out here to reduce selector length, and allow draggable styling
+ */
+
+.em-recurrence-sets {
+	margin-bottom: 20px;
+
+	.em-recurrence-set-template {
+		display: none;
+		visibility: hidden;
+	}
+
+	.em-recurrence-type {
+		margin-bottom: 20px;
+
+		.em-recurrence-advanced-description-primary {
+			display:none;
+			visibility: hidden;
+		}
+	}
+
+	/* CSS for showing a placeholder during drag-and-drop ordering */
+	.drop-placeholder {
+		background-color: #f0f0f0;
+		border: 1px dotted #ccc;
+		margin: 5px 0;
+	}
+
+	&:not([data-exclude-count="0"]) {
+		.em-recurrence-type-include {
+			.em-add-recurrence-set[data-type="exclude"] {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+
+	.em-recurrence-type-include {
+		&[data-count="1"] {
+			.em-recurrence-set {
+				display: block;
+				.em-recurrence-set-actions {
+					display: none;
+					visibility: hidden;
+				}
+				.em-recurrence-set-data {
+					border-left: none;
+					padding: 15px;
+					.em-recurrence-advanced {
+						padding-left: 5px;
+					}
+				}
+			}
+		}
+		// expand actions so they're one line if advanced isn't showing
+		&:not([data-count="1"]) {
+			.em-recurrence-set {
+				grid-template-columns: 105px 1fr;
+				&:first-child {
+					grid-template-columns: 75px 1fr;
+				}
+				.em-recurrence-set-actions button {
+					margin-right: 4px;
+					&.em-recurrence-set-action-advanced {
+						margin-left: 2px;
+					}
+				}
+			}
+		}
+		.em-recurrence-set:first-child {
+			// hide advanced icon since we can't close it
+			.em-recurrence-set-action-advanced, .em-recurrence-advanced-description {
+				display:none;
+				visibility: hidden;
+			}
+			.em-recurrence-advanced-description-primary {
+				margin-top: 0;
+				display: block;
+				visibility: visible;
+			}
+		}
+	}
+	.em-recurrence-type-exclude {
+		&[data-count="0"] {
+			display: none;
+			visibility: hidden;
+		}
+		// expand actions so they're one line if advanced isn't showing
+		&:not([data-count="0"]) {
+			.em-recurrence-set {
+				grid-template-columns: 72px 1fr;
+				.em-recurrence-set-action-advanced {
+					margin-left: 7px; // only one button
+				}
+			}
+		}
+		.em-recurrence-set:not(.has-advanced-value) {
+			.advanced-summary {
+				display: none;
+				visibility: hidden;
+			}
+		}
+		.advanced-summary {
+			.duration-days {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+
+	button[data-nostyle] {
+		background-color: transparent;
+		border: none;
+		cursor: pointer;
+		&:focus {
+			outline: none;
+		}
+		&.em-add-recurrence-set {
+			color: var(--accent-color);
+			font-weight: bold;
+		}
+	}
+
+	// rescheduling warning
+	.recurrence-reschedule-action {
+		color: #c46200;
+		line-height: 38px;
+		margin-bottom: 5px;
+		.em-icon-warning { background : #c46200; -webkit-mask-image: var(--icon-warning); mask-image: var(--icon-warning); }
+		label {
+			margin-bottom: 0 !important;
+			select {
+				border-color: #dedede;
+				color: #c46200;
+			}
+		}
+		.em-icon-undo {
+			width: 22px;
+			height: 22px;
+			background-size: 22px;
+			vertical-align: middle;
+			margin-left: 5px;
+		}
+	}
+
+	.em-recurrence-type {
+		> .recurrence-reschedule-action {
+			margin-bottom: 10px;
+		}
+		&.em-recurrence-type-new {
+			.em-icon-undo {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+
+	// Show warning if corresponding primary recurrence date affects a subsequent recurrence set
+	&:has(.em-recurrence-set[data-primary][data-rescheduled].has-modified-date-range) {
+		.em-recurrence-set:not([data-primary]):not(.has-date-range) {
+			.primary-reschedule-override-warning {
+				display: inline-block;
+				visibility: visible;
+			}
+		}
+	}
+	&:has(.em-recurrence-set[data-primary][data-rescheduled].has-modified-date-range-end) {
+		.em-recurrence-set:not([data-primary]):not(.has-date-range):not(.has-date-range-end) {
+			.primary-reschedule-override-warning {
+				display: inline-block;
+				visibility: visible;
+			}
+		}
+	}
+	&:has(.em-recurrence-set[data-primary][data-rescheduled].has-modified-date-range-start) {
+		.em-recurrence-set:not([data-primary]):not(.has-date-range):not(.has-date-range-start) {
+			.primary-reschedule-override-warning {
+				display: inline-block;
+				visibility: visible;
+			}
+		}
+	}
+}
+
+.em-recurrence-set {
+
+	box-shadow: 0 0 0 transparent;
+	border-radius: 4px;
+	border: 1px solid #dedede;
+	background-color: #fff;
+
+	display: grid;
+	grid-template-columns: 38px 1fr;
+	margin-bottom: 10px;
+	align-items: start;
+
+	label[data-nostyle], legend[data-nostyle] {
+		width: auto;
+		margin: 0 0 10px 0;
+		padding: 0;
+		line-height: 1;
+		display: block;
+		&.inline {
+			margin: 0;
+			display: inline-block;
+		}
+	}
+
+	input[type="checkbox"]:indeterminate {
+		-webkit-appearance: checkbox !important;
+	}
+
+	input:placeholder-shown {
+		opacity: 0.8;
+	}
+
+	&:last-child {
+		margin-bottom: 10px;
+	}
+
+	&[data-type="exclude"] {
+		grid-template-columns: 105px 1fr;
+		.em-recurrence-set-action-order {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	.em-recurrence-set-actions {
+		padding: 10px;
+		background: #F9FBFC;
+		height: 100%;
+		text-align: right;
+		button.em-icon {
+			margin-top: 5px;
+		}
+		button.em-icon-drag {
+			cursor: move;
+		}
+		.em-icon { opacity: 0.6; } // lighter gray
+		button.undo, button.primary-reschedule-override-warning {
+			display: none;
+			visibility: hidden;
+			margin-top: 10px;
+		}
+	}
+
+	&.has-advanced-value {
+		.em-recurrence-set-action-advanced {
+			position: relative;
+			&::after {
+				content: '';
+				position: absolute;
+				bottom: -5px;
+				right: -5px;
+				width: 8px;
+				height: 8px;
+				background-color: #4CAF50; /* green circle */
+				border: 1px solid white; /* optional: gives a border to stand out */
+				border-radius: 50%;
+				box-shadow: 0 0 0 1px rgba(0,0,0,0.1); /* optional shadow */
+			}
+		}
+		&[data-rescheduled], &.advanced-modified {
+			&:not(.new-recurrence-set) {
+				button.undo {
+					display: inline-block;
+					visibility: visible;
+				}
+			}
+			.em-recurrence-set-action-advanced::after {
+				background-color: #c46200;
+			}
+		}
+		&.advanced-modified-primary {
+			.em-recurrence-set-action-advanced::after {
+				background-color: #c46200;
+			}
+		}
+	}
+
+	.em-recurrence-set-data {
+		border-left: 1px solid #dedede;
+		padding: 10px 20px 10px 20px;
+		height: 100%;
+		.em-datepicker-dates {
+			margin-bottom: 0;
+		}
+	}
+
+	.em-recurrence-pattern {
+
+		select, input[type="text"] {
+			width: auto !important;
+		}
+		select {
+			padding-right: 30px !important;
+		}
+		div.alternate-selector:not(.em-selectize) {
+			margin-top: 15px;
+		}
+		.em-on-selector.em-datepicker-multiple {
+			display: inline;
+			label.em-date-input {
+				display: inline-block !important;
+			}
+			.em-datepicker-dates {
+				margin-bottom: 0;
+			}
+		}
+		input.hidden {
+			display: none !important;
+			visibility: hidden !important;
+		}
+		.em-weekly-selector {
+			display: inline-block;
+			width: max-content;
+			margin: 0 !important;
+
+			.selectize-control.em-selectize:not(.negated) {
+				display: inline-block;
+				width: max-content;
+				margin-bottom: 0 !important;
+
+				.selectize-input {
+					& > input {
+						width: 40px !important;
+					}
+
+					.item {
+						margin-bottom: 0 !important;
+					}
+				}
+			}
+		}
+	}
+
+	// advanced summary display logic
+	.advanced-summary {
+		display: block;
+		visibility: visible;
+		margin: 10px 0 0;
+		font-style: italic;
+		opacity: 0.7;
+		font-size: 0.9em;
+		.all-day {
+			display: none;
+			visibility: hidden;
+		}
+		.is-set {
+			font-weight: bold;
+		}
+	}
+	&:has( input.em-time-all-day[type="checkbox"]:checked ), &:has( input.em-time-all-day[type="checkbox"]:indeterminate )  {
+		.advanced-summary {
+			.all-day {
+				display: inline;
+				visibility: visible;
+			}
+			.times {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+	&:has( select.em-recurrence-frequency option[value="on"]:checked ) {
+		.advanced-summary {
+			.dates {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+	&:has( .em-recurrence-status select[data-default="0"] ), &:has( .em-recurrence-status select option[value="0"]:checked ) {
+		.advanced-summary {
+			text-decoration: line-through;
+			color: #563c3c;
+		}
+	}
+
+	// advanced section display logic
+	.em-recurrence-advanced {
+		border-top: 1px solid #dedede;
+
+		max-height: 0;
+		overflow: hidden;
+		opacity: 0;
+		transition: max-height 0.3s ease, opacity 0.3s ease;
+
+		::placeholder {
+			opacity: 0.7;
+		}
+
+		legend, label[for] {
+			font-size: 1em;
+		}
+
+		> p {
+			font-style: italic;
+			margin: 5px 0 15px;
+		}
+
+		> div {
+			margin-bottom: 18px;
+			&:last-child {
+				margin-bottom: 0;
+				.em-selectize.selectize-control {
+					margin-bottom: 0 !important;
+				}
+			}
+		}
+	}
+
+	&.show-advanced, &[data-type="include"]:first-child:not(.reordering) {
+		.em-recurrence-advanced {
+			padding : 18px 0 10px 10px;
+			max-height: 1000px; // Adjust as necessary to fit content
+			opacity: 1;
+			overflow: visible;
+		}
+
+		.em-recurrence-set-actions {
+			grid-template-columns: auto; // Adjust as necessary
+			.em-icon.em-icon-filter {
+				background-image: var(--icon-filter-hide);
+			}
+		}
+		.em-recurrence-pattern {
+			margin-bottom: 18px;
+		}
+		.advanced-summary {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	.em-recurrence-set-actions {
+		grid-template-columns: 69px;
+		transition: grid-template-columns 0.3s ease;
+	}
+
+	.reschedule-trigger {
+		width: 15px;
+		height: 15px;
+		background-size: 15px;
+		margin-left: 5px;
+
+		&[disabled] {
+			display: none;
+			visibility: hidden;
+		}
+	}
+	&.new-recurrence-set {
+		.reschedule-trigger {
+			display: none;
+			visibility: hidden;
+		}
+	}
+
+	// timerange logic
+	&:not([data-primary]) {
+		.em-recurrence-timeranges {
+			.recurrence-timeranges-editor {
+				display: none;
+				visibility: hidden;
+			}
+
+			&:has( input.recurrences-timeranges-default-trigger:checked ) {
+				.recurrence-timeranges-editor {
+					display: block;
+					visibility: visible;
+				}
+			}
+		}
+	}
+	&[data-primary] {
+		.em-recurrence-timeranges {
+			.recurrence-timeranges-default {
+				display: none;
+				visibility: hidden;
+			}
+		}
+	}
+	fieldset.em-recurrence-timeranges {
+		.em-timeranges-editor legend {
+			display: none;
+			visibility: hidden;
+		}
+		margin-bottom: 18px !important;
+	}
+}
+.em-modal-content {
+	.recurrence-reschedule-action {
+		line-height: 38px;
+		.reschedule-warning, .undo {
+			display: none;
+			visibility: hidden;
+		}
+	}
+}

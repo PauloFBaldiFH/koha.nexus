@@ -1,0 +1,42 @@
+/*
+For other event list and single event display CSS, see the _items.scss file
+ */
+&.em-search-advanced.em-locations-search-advanced {
+	.em-search-section-location.em-search-advanced-section {
+		background: none !important;
+		header {
+			display: none !important;
+			visibility: hidden !important;
+		}
+		.em-search-section-content {
+			display: block !important;
+			visibility: visible !important;
+		}
+		div.em-search-eventful {
+			margin: 15px 3px;
+		}
+		.em-search-geo-units {
+			label {
+				padding-left: 3px !important;
+			}
+		}
+	}
+}
+&.em-location {
+	.em-item-meta-line.em-location-address {
+		line-height: 24px !important;
+	}
+}
+&.em-location, &.em-locations-list {
+	.em-location-events {
+		p {
+			margin: 0 0 8px !important;
+		}
+	}
+	.em-item-image {
+		.em-item-image-placeholder {
+			min-width: 100px;
+			background-image: var(--icon-location) !important;
+		}
+	}
+}

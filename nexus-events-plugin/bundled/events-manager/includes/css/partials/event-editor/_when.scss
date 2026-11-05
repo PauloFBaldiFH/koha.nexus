@@ -1,0 +1,70 @@
+.event-form-when {
+
+	.em-event-datetimes > * {
+		margin-bottom: 15px !important;
+
+		&:last-child {
+			margin-bottom: 0 !important;
+		}
+	}
+
+	.em-event-dates {
+		label {
+			width: 100%;
+			display:block;
+		}
+		.em-date-start-end {
+			width: 100% !important;
+			max-width: 250px !important;
+		}
+		&.em-datepicker-range {
+			fieldset {
+				width: 100%;
+			}
+		}
+		&.em-datepicker-until .em-datepicker-until-fields {
+			display: grid;
+			grid-template-columns: minmax(100px, 150px) min-content minmax(100px, 150px);
+			grid-column-gap: 8px;
+			justify-items: center;
+			align-items: center;
+
+			> * {
+				margin-bottom: 0 !important;
+				width:100%;
+			}
+			.em-range-description {
+				margin-top: 15px;
+			}
+			[disabled] {
+				color: #777; // slightly darker
+			}
+		}
+	}
+
+	.em-event-type label:has( select ){
+		line-height: 38px;
+		vertical-align: middle;
+	}
+}
+
+.event-form-when, .em-recurrence-sets {
+	> * {
+		margin-bottom: 15px !important;
+	}
+
+	> p {
+		margin-bottom: 20px !important;
+	}
+
+	fieldset {
+		margin-bottom: 0 !important;
+	}
+
+	.em-recurrence-dates.em-datepicker-range {
+		fieldset {
+			width: 100%;
+			max-width: 250px !important;
+		}
+	}
+}

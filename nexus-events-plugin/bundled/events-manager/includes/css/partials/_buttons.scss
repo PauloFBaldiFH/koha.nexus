@@ -1,0 +1,59 @@
+// button with icons
+& {
+	--button-icon-padding : 20px;
+}
+
+button.input, .button.input,
+.input button, .input .button {
+
+	&.with-icon {
+		padding-left : var(--button-icon-padding) !important;
+		.em-icon {
+			margin-right: 6px;
+		}
+	}
+	&.with-icon-right {
+		padding-right : var(--button-icon-padding) !important;
+		.em-icon {
+			margin-left: 6px;
+		}
+	}
+	.em-icon {
+		width: 18px;
+		height: 18px;
+		background-size: 18px;
+	}
+	&.em-icon {
+		border: 0; // remove border
+		padding: 0;
+		background-color: transparent;
+	}
+}
+
+button.em-clickable, form.em-ajax-form {
+	&.loading {
+		.loaded {
+			display: none;
+			visibility: hidden;
+		}
+		.loading-content {
+			display: inline-block;
+			visibility: visible;
+		}
+	}
+	&.load-successful{
+		.loaded {
+			display: none;
+			visibility: hidden;
+		}
+		.loaded-success{
+			display: inline-block;
+			visibility: visible;
+		}
+	}
+	.loading-content, .loaded-success {
+		display: none;
+		visibility: hidden;
+	}
+
+}

@@ -1,0 +1,161 @@
+&.em-bookings-admin-single {
+	.input {
+		select {
+			width: auto !important;
+			padding-right : 30px !important;
+			margin: 0 5px !important;
+		}
+		.em-button, input[type="submit"], input[type="button"] {
+			margin : 0 0 0 10px !important;
+		}
+
+		.em-booking-single-status-info, .em-booking-single-rsvp-status-info {
+			line-height:38px;
+			margin-bottom:30px !important;
+		}
+		.em-booking-single-status-edit, .em-booking-single-rsvp-status-edit {
+			margin-bottom:30px !important;
+			em:last-child {
+				margin: 10px 0;
+			}
+		}
+		.em-booking-single-rsvp-status {
+			display: block;
+			margin: 15px 0;
+			.button-secondary {
+				vertical-align : initial;
+			}
+		}
+	}
+	table.em-tickets-bookings-table {
+		td , th {
+			border-top:1px solid #dedede !important;
+			border-bottom: 0 !important;
+		}
+		:not(tfoot) tr:first-child th {
+			border-top: 0 !important;
+		}
+
+		td.em-attendee-form-admin {
+			border: 0 !important;
+			border-bottom: 1px solid #dedede;
+			.em-attendee-details {
+				td, th {
+					border: 0 !important;
+				}
+			}
+		}
+	}
+
+	.metabox-holder .postbox {  //single booking admin
+		margin-bottom:40px;
+	}
+}
+.em-bookings-stats.wrap {
+	margin-bottom: 30px;
+}
+
+&.em-events-admin-list {
+	.subsubsub > div {
+		margin: 10px 0;
+	}
+	.input {
+		.search-box {
+			float:left;
+			width:50%;
+			input {
+				width: auto !important;
+				margin-bottom: 10px !important;
+			}
+		}
+		.tablenav {
+			width: 50% !important;
+		}
+	}
+}
+
+&.em-event-editor, &.em-location-editor {
+	section {
+		margin-bottom: 40px;
+	}
+	.input {
+		&.em-location-data {
+			> div {
+				margin-bottom: 15px;
+
+				&.em-location-data-name {
+					margin-bottom: 25px;
+				}
+			}
+		}
+	}
+}
+
+&.em-event-editor {
+	.event-extra-details {
+		margin-top: 25px;
+	}
+	.input {
+		&.em-location-data {
+			.em-selectize-autocomplete {
+				margin-bottom: 5px !important;
+			}
+		}
+	}
+	.em-ticket-form {
+		.em-ticket-form-main, .em-ticket-form-advanced {
+			> div {
+				margin-bottom: 10px;
+
+				&.inline-inputs, .inline-inputs {
+					margin-bottom: 25px;
+					&:last-child {
+						margin-bottom: 20px;
+					}
+				}
+			}
+		}
+	}
+}
+
+@import 'event-editor/when';
+
+.em-location-map-container {
+	width : 100%;
+	height: 100%;
+}
+
+.reschedule-hidden {
+	display: none !important;
+	visibility: hidden !important;
+}
+
+&.em-location-where.has-map {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 30px;
+	.em-location-data, .em-location-map-container {
+		width: 100%;
+		flex: 1 1 450px;
+	}
+	.em-location-map-container, div.em-location-data .em-location-map-404, div.em-location-data .em-location-map-content {
+		max-width: 800px;
+		aspect-ratio: 3/2;
+	}
+	.em-location-data-maps-tip {
+		width : 100%;
+		flex: 0 0 100%;
+	}
+}
+
+/* Bookings Table (originally from events-manager.css) */
+.em_obj {
+	position:relative;
+
+	&:not(.em-list-table) {
+		.alignleft.actions {
+			padding-bottom: 15px;
+		}
+	}
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "em/event-when",
+  "version": "1.1.0",
+  "title": "Event Details",
+  "category": "events-manager",
+  "icon": "calendar-alt",
+  "description": "Inline date, time, recurrence, and booking controls in a tabbed panel. Pinned below the event title; not rendered on the front end.",
+  "keywords": [
+    "event",
+    "date",
+    "time",
+    "when",
+    "recurrence",
+    "bookings",
+    "tickets"
+  ],
+  "supports": {
+    "html": false,
+    "reusable": false,
+    "customClassName": false,
+    "inserter": false
+  },
+  "textdomain": "events-manager",
+  "editorScript": "file:./index.js"
+}

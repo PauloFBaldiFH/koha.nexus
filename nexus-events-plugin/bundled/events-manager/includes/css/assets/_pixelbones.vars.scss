@@ -1,0 +1,37 @@
+& {
+    /* CSS Variables
+    –––––––––––––––––––––––––––––––––––––––––––––––––– */
+
+	/* default theme: light background, dark text, blue accent */
+	--theme-hue: 0;					/* white */
+	--accent-hue: 220;			    /* blue */
+	--accent-s: 86%;
+	--accent-l: 57%;
+
+	--text-color-richer: hsl(var(--theme-hue), 0%, 5%);			/* #0d0d0d		*/
+	--text-color-normal: hsl(var(--theme-hue), 0%, 13%);		/* #222222 		text color; button:hover:focus color */
+	--text-color-softer: hsl(var(--theme-hue), 0%, 33%);		/* #555555 		button color; button:hover border */
+
+	--accent-color: hsl(var(--accent-hue), var(--accent-s), var(--accent-l));			/* #33C3F0 		link; button-primary bg+border; textarea,select:focus border */
+	--accent-color-hover: hsl(var(--accent-hue), calc(var(--accent-s) - 10%), calc(var(--accent-l) - 8%));	    /* #1EAEDB 		link hover; button-primary:hover:focus bg+border */
+
+	--border-color: hsl(var(--theme-hue), 0%, 73%);				/* #bbbbbb		button border */
+	--border-color-softer: hsl(var(--theme-hue), 0%, 82%);	    /* #d1d1d1		textarea,select,code,td,hr border	 */
+
+	--background-color: transparent;							/* transparent body background; textarea,select background */
+	--background-color-softer: hsl(var(--theme-hue), 0%, 95%);
+	--background-color-checkboxes: white;
+    --background-color-inputs: white;
+	--background-color-skeleton : #ededed;
+	--background-color-skeleton-softer: hsl(var(--theme-hue), 0%, 95%);
+	--code-background: hsl(var(--theme-hue), 0%, 95%);			/* #f1f1f1 		code background*/
+	--button-primary-color: white;
+
+	--font-size: 16px;
+    --line-height: 20px;
+	--font-weight : 400;
+	--font-family : "Raleway", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+	/* Grid Defaults - default to match orig skeleton settings */
+	--grid-max-width: 960px;
+}

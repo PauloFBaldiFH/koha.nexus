@@ -1,0 +1,4 @@
+# Preserve upstream sources as supplied, including their original line endings.
+bundled/events-manager/** -text -whitespace linguist-vendored=true
+# Upstream Markdown has a seven-equals heading, not an unresolved conflict.
+bundled/events-manager/includes/php/symfony/polyfill-mbstring/README.md conflict-marker-size=32

@@ -1,0 +1,208 @@
+$frontend: false; // used in list-tables and possibly other partials
+
+.wp-admin .em.pixelbones{
+	--font-size: inherit;
+	--line-height: inherit;
+	--font-weight : inherit;
+	--font-family : inherit;
+}
+/* New Stuff **/
+@import "partials/mixins";
+.wp-admin {
+	@import 'partials/admin';
+	@import "partials/event-editor";
+	@import 'partials/icons';
+	@import 'partials/tooltips';
+	@import 'partials/libraries';
+	@import 'partials/buttons';
+	@import "partials/charts";
+	.em {
+		* {
+			box-sizing: border-box;
+		}
+		@import "assets/pixelbones.vars";
+		@import "assets/pixelbones";
+		@import 'partials/modal';
+		@import "partials/list-tables";
+		@import "partials/phone";
+		@import 'partials/selectize';
+
+		.selectize-dropdown {
+			margin-top: -1px;
+		}
+	}
+
+	--button-icon-padding : 10px !important;
+
+	button.input.em-tooltip-ddm {
+		background-position: calc(100% - 5px) 50% !important;
+		padding-right: 25px !important;
+	}
+	.em-tooltip-ddm-display {
+		margin-top: -7px !important;
+		padding-top: 5px !important;
+		top : -5px !important;
+		a {
+			margin-bottom: 5px;
+			display: inline-block;
+		}
+		a:focus {
+			outline: 0;
+			box-shadow: none;
+		}
+	}
+	.em {
+		.hidden {
+			display:none !important;
+			visibility: hidden !important;
+		}
+	}
+
+	/* Selectize-specific stuff for WP Admin styling area */
+	.selectize-control {
+		&.em-selectize:not(.always-open), &.em-selectize-autocomplete:not(.always-open) {
+			.selectize-input {
+				min-height: calc(1.5em + 0.75rem + 2px) !important;
+				border: 1px solid #8c8f94 !important; // match WP Admin select boxes
+				&.focus {
+					border: 1px solid #8c8f94 !important;
+				}
+			}
+		}
+	}
+	// specific recurrence styling for WP Admin
+	.em-recurrence-set {
+
+		.em-recurrence-set-data {
+			label {
+				margin-bottom: 8px;
+			}
+
+			.em-recurrence-duration {
+				margin-top: 0;
+			}
+
+			.em-datepicker .em-date-input.button {
+				height: 30px;
+				border: 1px solid #cdcdcd;
+				color: #777;
+			}
+
+			.em-weekly-selector {
+				.em-selectize:not(.always-open).selectize-control {
+					& > .selectize-input {
+						min-height: 30px !important;
+						padding: 3px 30px 3px 10px !important;
+
+						.item {
+							font-size: 12px;
+						}
+
+						@media screen and (max-width: 782px) {
+							min-height: 40px !important;
+							padding: 6px 30px 6px 10px !important;
+
+							.item {
+								font-size: 14px;
+							}
+						}
+					}
+
+					.selectize-dropdown {
+						top: calc(100% - 2px) !important;
+					}
+				}
+			}
+		}
+
+		@media screen and (max-width: 782px) {
+			line-height: 50px;
+		}
+	}
+	.em-recurrence-sets {
+		fieldset.inline {
+			display: inline-block;
+		}
+	}
+
+	.event-form-when, .em-recurrence-sets {
+		label, legend {
+			display: block;
+			width: 100%;
+			margin-bottom: 8px;
+
+			&.inline-left {
+				width: auto;
+				display: inline-block;
+				padding-right: 5px;
+				padding-left: 3px;
+			}
+		}
+		.em-time-range fieldset {
+			margin-bottom: 10px;
+		}
+		> * {
+			margin-bottom: 15px !important;
+		}
+		> p {
+			margin-bottom: 20px !important;
+		}
+		input.em-date-start-end {
+			width: 100%;
+			background: #fff;
+		}
+	}
+	&.post-type-event {
+		.wp-list-table {
+			.event-cancelled {
+				text-decoration: line-through;
+			}
+		}
+	}
+
+	.em-booking-recurring {
+		margin-top: 50px;
+		.em-calendar {
+			background-color: #fff !important;
+			border: 1px solid #ddd;
+			.em-month-picker {
+				--border-color-softer: transparent;
+				--accent-color: transparent;
+				font-size: 20px !important;
+			}
+		}
+	}
+
+	.skeleton {
+		--background-color-skeleton: #d6d6d6;
+		--background-color-skeleton-softer: #d6d6d6;
+	}
+}
+
+:not(.em-location-where) .em-location-data {
+	> div:first-child {
+		margin-bottom: 20px;
+	}
+}
+
+.em-working {
+	opacity : 0.3;
+	div.em-loading, div#em-loading {
+		background-color: transparent !important;
+		opacity: 1;
+	}
+}
+div.em-loading {
+	position:absolute;
+	width:100%;
+	height:100%;
+	background:#FFFFFF url("data:image/svg+xml,%3C%3Fxml version='1.0' encoding='utf-8'%3F%3E%3Csvg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' style='margin: auto%3B background: none%3B display: block%3B shape-rendering: auto%3B' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid'%3E%3Cg transform='rotate(0 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.9166666666666666s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(30 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.8333333333333334s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(60 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.75s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(90 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.6666666666666666s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(120 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.5833333333333334s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(150 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.5s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(180 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.4166666666666667s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(210 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.3333333333333333s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(240 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.25s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(270 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.16666666666666666s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(300 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='-0.08333333333333333s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3Cg transform='rotate(330 50 50)'%3E%3Crect x='46.5' y='7.5' rx='0' ry='0' width='7' height='21' fill='%2385a2b6'%3E%3Canimate attributeName='opacity' values='1%3B0' keyTimes='0%3B1' dur='1s' begin='0s' repeatCount='indefinite'%3E%3C/animate%3E%3C/rect%3E%3C/g%3E%3C!-- %5Bldio%5D generated by https://loading.io/ --%3E%3C/svg%3E") 50% 50% no-repeat;
+	left:0;
+	top:0;
+	opacity:0.8;
+	filter:alpha(opacity=80);
+	z-index:99998;
+	background-size:100px;
+}
+
+@import 'events_manager_admin.css';

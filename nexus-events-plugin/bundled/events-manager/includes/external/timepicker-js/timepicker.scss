@@ -1,0 +1,129 @@
+// TimePickerJS - Native JavaScript implementation
+// Based on jonthornton/jquery-timepicker
+
+// Variables
+$timepicker-background: #fff;
+$timepicker-border-color: #ddd;
+$timepicker-box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+$timepicker-item-hover-bg: #f0f0f0;
+$timepicker-selected-bg: #1980EC;
+$timepicker-selected-color: #fff;
+$timepicker-disabled-color: #888;
+$timepicker-disabled-bg: #f2f2f2;
+$timepicker-duration-color: #888;
+$timepicker-duration-selected-color: #ccc;
+
+// Main wrapper
+.timepickerjs-wrapper {
+	overflow-y: auto;
+	max-height: 150px;
+	width: 6.5em;
+	background: $timepicker-background;
+	border: 1px solid $timepicker-border-color;
+	box-shadow: $timepicker-box-shadow;
+	outline: none;
+	z-index: 10052;
+	margin: 0;
+	position: absolute;
+
+	// When showing duration
+	&.timepickerjs-with-duration {
+		width: 13em;
+
+		&.timepickerjs-step-30,
+		&.timepickerjs-step-60 {
+			width: 11em;
+		}
+	}
+}
+
+// List container
+.timepickerjs-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	background: $timepicker-background;
+	border: 1px solid $timepicker-border-color;
+	border-radius: 4px;
+	box-shadow: $timepicker-box-shadow;
+	max-height: 200px;
+	overflow-y: auto;
+	width: 100%;
+	z-index: 10000;
+	box-sizing: border-box;
+
+	// List items
+	.timepickerjs-item {
+		padding: 3px 0 3px 5px;
+		cursor: pointer;
+		white-space: nowrap;
+		color: #000;
+		list-style: none;
+		margin: 0;
+
+		&:hover {
+			background-color: $timepicker-item-hover-bg;
+		}
+
+		&.active {
+			background-color: $timepicker-selected-bg;
+			color: $timepicker-selected-color;
+		}
+
+		&:hover {
+			background-color: $timepicker-selected-bg;
+			color: $timepicker-selected-color;
+		}
+
+		&.disabled,
+		&.disabled:hover,
+		&.active.disabled {
+			color: $timepicker-disabled-color;
+			cursor: default;
+			background: $timepicker-disabled-bg;
+		}
+
+		// Duration text
+		.timepickerjs-duration {
+			margin-left: 5px;
+			color: $timepicker-duration-color;
+		}
+
+		&:hover .timepickerjs-duration,
+		&.active .timepickerjs-duration {
+			color: $timepicker-duration-selected-color;
+		}
+	}
+}
+
+// Mobile-specific styles
+@media screen and (max-width: 768px) {
+	.timepickerjs-wrapper {
+		max-height: 200px;
+		width: 100%;
+	}
+
+	.timepickerjs-list {
+		max-height: 250px;
+
+		.timepickerjs-item {
+			padding: 8px 10px;
+			font-size: 16px; // Better for touch targets
+		}
+	}
+}
+
+// Native time input (hidden visually but accessible)
+.timepickerjs-native-input {
+	position: absolute;
+	height: 1px;
+	width: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+
+// Used to indicate errors in time selection
+.em-time-input.error {
+	border-color: #cc0000;
+	background-color: rgba(255, 0, 0, 0.05);
+}

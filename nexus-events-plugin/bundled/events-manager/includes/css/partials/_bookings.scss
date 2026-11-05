@@ -1,0 +1,720 @@
+/* Booking Form */
+&.em-event-booking-form {
+	width: 100%;
+	position: relative;
+
+	div#em-loading {
+		background-color: #ffffff;
+		opacity: 50%;
+	}
+	.em-booking-message {
+		// Note that this is a span, allowing something like a DIV to enjoy JS functionality without the styling like in AJAXify
+		padding: 15px !important;
+		margin-bottom: 20px !important;
+		border: 1px solid transparent !important;
+		border-radius: 2.5px !important;
+		display: block !important;
+		color: #084298 !important;
+		background-color: #cfe2ff !important;
+		border-color: #b6d4fe !important;
+
+		p { margin:10px 0px !important; padding:0px; }
+
+		&.em-booking-message-error {
+			color: #842029 !important;
+			background-color: #f8d7da !important;
+			border-color: #f5c2c7 !important;
+		}
+
+		&.em-booking-message-success {
+			color: #0f5132 !important;
+			background-color: #d1e7dd !important;
+			border-color: #badbcc !important;
+		}
+	}
+
+	.em-booking-form {
+		border: 1px solid var(--main-border-color);
+
+		.input-user-field, .input-group, .input-type {
+			display: block !important; /* bootstrap and others interfere with this */
+			margin-bottom: 25px !important;
+
+			&.hidden {
+				display:none !important;
+			}
+			input:not([type="checkbox"],[type="radio"]), select, .input-group, .input-group-checkboxes, button {
+				margin-bottom : 0 !important;
+			}
+		}
+
+		> section {
+			margin: 0;
+			padding: 0;
+		}
+	}
+
+	&.em-hide-dynamic .em-booking-form[data-spaces="0"] section:not(.em-booking-form-section-tickets) {
+		display : none;
+		visibility : hidden;
+	}
+
+	h3.em-booking-section-title {
+		width: auto;
+		background-color: var(--main-bg);
+		color: var(--main-h3-color);
+		font-size: 24px !important;
+		font-weight: bold;
+		padding: 15px 15px;
+		border-width: 1px 0 0 3px;
+		border-style: solid;
+		border-color: var(--main-border-color);
+		margin: 0;
+	}
+
+	.em-button.em-booking-submit {
+		width: 100% !important;
+		padding: 15px;
+		font-size: var(--font-size);
+		font-weight: bold;
+
+		&:disabled, &.disabled {
+			opacity : 1 !important;
+		}
+	}
+
+	.em-booking-section {
+		position: relative;
+		width: auto;
+		float: none;
+		padding: 20px 15px;
+		margin: 0;
+
+		&.em-booking-form-buttons {
+			z-index: 100000000;
+		}
+	}
+
+	/* Tickets Table */
+	.em-tickets {
+		border: 0;
+		padding: 0;
+		width: calc(100% - 20px);
+
+		&.widefat {
+			background-color: transparent;
+		}
+
+		thead {
+			position: absolute;
+			left: -10000px;
+			top: auto;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+		}
+
+		tr td, tr th {
+			border: 0;
+		}
+
+		tr td {
+			padding: 15px 15px;
+			border: 0 !important;
+		}
+
+		tr td:first-child {
+			padding-left: 30px;
+		}
+
+		tr td:last-child {
+			padding-right: 30px;
+		}
+
+		tr th {
+			background-color: var(--palette-1-bg);
+			color: var(--palette-1-color);
+			padding: 10px 15px;
+		}
+
+		tr {
+			padding: 0 20px;
+			border-top:1px solid #dedede;
+
+			&:first-child {
+				border-top: 0;
+			}
+		}
+
+		/* Attendee Info i.e. Ticket Bookings */
+		.em-ticket-bookings {
+			&.hidden {
+				display: none !important;
+				visibility: hidden !important;
+			}
+			padding: 0 15px 20px !important;
+			border: 0;
+			text-align: left;
+
+			td:last-child {
+				text-align: left;
+			}
+
+			.em-ticket-booking {
+				margin: 0 0 25px;
+				padding: 20px 0 0;
+				border-top: 1px solid #dedede;
+
+				> strong {
+					display: block;
+					margin-bottom: 15px;
+				}
+				&:first-child {
+					border-top: none;
+				}
+			}
+
+			.em-ticket-booking-template {
+				display: none;
+				visibility: hidden;
+			}
+		}
+
+		/* Attendee Info - Legacy */
+		tr.em-attendee-details {
+			border: 0;
+
+			.em-attendee-fieldset {
+				margin: 0 20px 20px;
+			}
+
+			.em-attendee-fieldset p.input-group {
+				padding-bottom: 0;
+			}
+
+			.em-attendee-fields {
+				margin: 0 0 25px;
+				padding: 20px 0 0;
+				border-top: 1px solid #dedede;
+
+				> strong {
+					display: block;
+					margin-bottom: 15px;
+				}
+				&:first-child {
+					border-top: none;
+				}
+			}
+		}
+
+		.em-bookings-ticket-table-spaces {
+			width: 5%;
+
+			select{
+				width: calc(3ch + 30px) !important;
+				padding: 5px 5px 5px 10px !important;
+				margin: 0 !important;
+			}
+		}
+
+	}
+
+	.em-booking-form-details {
+		.em-login-trigger {
+			margin-bottom : 30px;
+		}
+	}
+
+	/* Login Form */
+	.em-login {
+		margin: 10px 0 20px;
+		padding: 0;
+		border: 0;
+
+		.em-login-trigger {
+			font-style: italic;
+		}
+
+		.em-login-content {
+			display: none;
+			margin-bottom: 10px;
+
+			p:first-of-type {
+				margin-bottom: 20px;
+				font-weight: bold;
+			}
+		}
+
+		.em-login-actions {
+			display: flex;
+			align-items: normal;
+			font-size: 15px;
+
+			.em-login-meta {
+				padding-left: 15px;
+			}
+
+			.em-login-rememberme {
+				width: auto;
+				margin-bottom: 8px;
+
+				input {
+					margin: 0 8px 0 0;
+					padding: 0;
+				}
+			}
+
+			.em-login-links a {
+				text-decoration: none;
+
+				a:hover {
+					text-decoration: underline;
+				}
+			}
+		}
+
+		// mobile view
+		&.size-small {
+			.em-login-buttons {
+				max-width: 30%;
+				min-width: 120px;
+				button {
+					width: 100%;
+				}
+			}
+			.em-login-links {
+				span {
+					display: none;
+				}
+				a {
+					display: inline-block;
+					width: 100%;
+					margin-bottom: 5px;
+				}
+			}
+
+		}
+	}
+
+	/* Temp Fixes for Pro */
+	.em-booking-form-confirm {
+		.em-booking-gateway-form {
+			margin-bottom: 20px;
+		}
+		.em-bookings-form-gateway-expiry select {
+			width : auto !important;
+			min-width: 100px;
+		}
+	}
+
+
+	@media ( max-width: 768px ) {
+		.em-booking-section {
+			padding: 20px 5px;
+		}
+		.em-tickets .em-ticket-bookings {
+			padding: 0 0 20px 8px !important;
+		}
+	}
+
+}
+.em-booking-form-summary {
+
+	&.em-booking-section {
+		padding-bottom: 30px;
+
+		&.no-booking {
+			padding-bottom: 40px;
+			.em-loading {
+				background-position-y: calc(50% - 10px) !important;
+			}
+		}
+	}
+
+	.em-bs-section {
+		display: grid;
+		grid-template-rows: 1fr;
+		grid-template-columns: none;
+		grid-gap: 10px;
+
+		&:not(:first-child) {
+			margin-top: 20px;
+			padding-top: 20px;
+			border-top: 1px solid #dedede;
+		}
+
+		.em-bs-row {
+			display: grid;
+			grid-template-rows: none;
+			grid-template-columns: auto max-content;
+			grid-gap: 10px;
+			align-items: center;
+			justify-items: start;
+
+			&.em-bs-row-item { // i.e. tickets, not subtotals/totals
+				grid-template-columns: max-content auto max-content;
+			}
+		}
+
+		.em-bs-subtitle {
+			width: 100%;
+			align-self: center;
+			justify-self: start;
+			justify-content: start;
+			grid-column: 1 / -1;
+
+			margin: 20px 14px 0 10px;
+			padding-bottom: 5px;
+			border-bottom: 1px solid #dedede;
+			font-weight: 500;
+		}
+
+	}
+
+	.em-loading {
+		opacity: 85% !important;
+		background-size: 55px !important;
+	}
+
+	.em-bs-section-total {
+		font-weight: bold;
+		font-size: 1.2rem;
+		.em-bs-total-taxes-inc {
+			display: block;
+			font-size: 0.8rem;
+			font-weight: normal;
+			font-style: italic;
+		}
+	}
+
+	.em-bs-cell-price {
+		justify-self: end;
+		justify-content: end;
+		text-align: right;
+	}
+	.em-bs-cell-desc {
+		.em-icon {
+			font-size: 15px;
+			line-height: 17px;
+			width: 15px;
+			height: 17px;
+			background-size: 13px
+		}
+	}
+	.em-bs-subsection {
+		.em-bs-cell-desc {
+			padding-left: 20px;
+		}
+	}
+	.em-bs-qty-x {
+		display: inline-block;
+		padding-right: 5px;
+	}
+
+	.skeleton {
+		.item {
+			margin-bottom: 0;
+		}
+		.em-bs-row {
+			grid-template-columns: 8fr 2fr;
+			&.em-bs-row-item {
+				grid-template-columns: 7fr 1fr 2fr;
+			}
+		}
+	}
+}
+
+/* Timeslots picker */
+.em-booking-timeslot-picker.mode-buttons {
+	--original-accent-color: var(--accent-color);
+	--selected-border: var(--original-accent-color);
+
+	.em-booking-timeslots-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		gap: 5px;
+		text-align: center;
+	}
+
+	// Individual recurrence date buttons
+	.em-booking-timeslot {
+		--accent-color: var(--text-color-softer);
+		--accent-color-hover: var(--text-color-normal);
+		margin: 0;
+		padding: 10px;
+		border-radius: 4px;
+		transition: all 0.2s ease-in-out;
+		line-height: 20px;
+		display: grid;
+		gap: 4px;
+
+		&.selected {
+			border: 2px solid var(--accent-color) !important;
+		}
+
+		&:not(.selected) {
+			opacity: 0.5;
+		}
+
+		&:not(.skeleton-item) {
+			border: 1px solid var(--border-color);
+			background-color: var(--background-color-inputs, #fff);
+			text-decoration: none;
+			color: var(--text-color-normal);
+			cursor: pointer;
+		}
+		&.skeleton-item {
+			height: auto;
+		}
+
+		// Hover and active states
+		&:not([disabled]) {
+			&:hover {
+				border-color: var(--accent-color) !important;
+				transform: translateY(-2px);
+			}
+		}
+
+		* {
+			padding: 0 !important;
+			margin: 0 !important;
+			vertical-align: middle;
+		}
+
+		// Icon styling
+		.em-icon {
+			margin-right: 8px !important;
+		}
+
+		&[disabled] {
+			opacity: 0.7;
+			cursor: not-allowed;
+			background-color: var(--background-color-softer);
+		}
+
+		// Ensure spaces column is always positioned last
+		.em-booking-timeslot-spaces {
+			font-size: 80%;
+			font-style: italic;
+		}
+	}
+}
+
+/* Booking Calendar */
+.em-booking-recurrence-picker.mode-calendar {
+	// Change to grid-based layout
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 40px;
+	align-items: start;
+	width: 100%;
+
+	&.size-xsmall {
+		// For xsmall: Calendar and recurring dates stacked full width
+		grid-template-columns: 1fr;
+
+		.em-view-container[data-view="calendar"] {
+			width: 100%;
+			max-width: 425px;
+			margin: 0 auto;
+		}
+		.em-booking-recurrences {
+			width: 100%;
+		}
+	}
+
+	&.size-small {
+		// For small: Side by side with specific width ratios
+		grid-template-columns: 1fr minmax(200px, 1fr);
+		align-items: start;
+
+		.em-view-container[data-view="calendar"] {
+			width: 100%;
+		}
+
+		.em-booking-recurrences {
+			width: 100%;
+			padding-right: 5px;
+		}
+	}
+
+	&.size-medium {
+		.em-booking-recurrence {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 10px;
+			align-items: center;
+
+		}
+	}
+
+
+	&.size-medium, &.size-large {
+		// For medium and large: Side by side with responsive sizing
+		grid-template-columns: minmax(325px, 450px) minmax(300px, 1fr);
+
+		.em-view-container[data-view="calendar"] {
+			width: 100%;
+		}
+
+		.em-booking-recurrences {
+			width: 100%;
+		}
+	}
+
+	&.size-large, &.size-xsmall {
+		.em-booking-recurrence {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 5px;
+			align-items: center;
+
+			// Ensure spaces column is always positioned last
+			.em-booking-recurrence-time {
+				padding-left: 10px !important;
+			}
+			.em-booking-recurrence-spaces {
+				grid-column: 1 / -1;
+			}
+		}
+
+		.em-booking-recurrences:not(.has-dates) {
+			.em-booking-recurrence {
+				.em-booking-recurrence-time {
+					padding-left: 0px !important;
+				}
+			}
+		}
+	}
+
+	// Recurrence section styling
+	.em-booking-recurrences {
+		display: grid;
+		gap : 10px;
+		grid-template-columns: 1fr;
+		--original-accent-color: var(--accent-color);
+		--selected-border: var(--original-accent-color);
+
+		&.selected {
+			.em-booking-recurrence:not(.selected) {
+				opacity: 0.5;
+			}
+			.em-booking-recurrence.selected, .em-booking-recurrence.selected:focus, .em-booking-recurrence.selected:hover {
+				border: 2px solid var(--selected-border) !important;
+			}
+		}
+
+		h3 {
+			font-size: 22px !important;
+			margin-top: 6px !important;
+			margin-bottom: 10px !important;
+		}
+
+		p.em-timezone {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			margin: 0 !important;
+			// The selectize input inside the timezone picker can retain its typed width after a keyboard selection because `width:auto !important` in _selectize.scss beats selectize's own `width:4px` collapse. Switching to flex layout on the control prevents the input from ever growing the container: the input is pinned to a 1px flex basis (collapses to zero in practice) and `min-width:0` lets it shrink below any browser default.
+			.selectize-input {
+				display: flex !important;
+				align-items: center;
+				flex-wrap: nowrap;
+				overflow: hidden;
+				> input {
+					flex: 0 1 1px !important
+				}
+			}
+		}
+
+		.em-booking-timeslots-list {
+			display: grid;
+			gap: 10px;
+			grid-template-columns: 1fr;
+		}
+
+		// Individual recurrence date buttons
+		.em-booking-recurrence {
+			--accent-color: var(--text-color-softer);
+			--accent-color-hover: var(--text-color-normal);
+			margin: 0;
+			padding: 15px;
+			border-radius: 4px;
+			transition: all 0.2s ease-in-out;
+			width: 100%;
+			line-height: 20px;
+
+			&:not(.skeleton-item) {
+				border: 1px solid var(--border-color);
+				background-color: var(--background-color-inputs, #fff);
+				text-decoration: none;
+				color: var(--text-color-normal);
+				cursor: pointer;
+			}
+			&.skeleton-item {
+				height: auto;
+			}
+
+			// Hover and active states
+			&:not([disabled]) {
+				&:hover, &:focus {
+					border-color: var(--accent-color) !important;
+					transform: translateY(-2px);
+				}
+			}
+
+			* {
+				padding: 0 !important;
+				margin: 0 !important;
+				vertical-align: middle;
+			}
+
+			// Icon styling
+			.em-icon {
+				margin-right: 8px !important;
+			}
+
+			&[disabled] {
+				opacity: 0.7;
+				cursor: not-allowed;
+				background-color: var(--background-color-softer);
+			}
+
+			// Ensure spaces column is always positioned last
+			.em-booking-recurrence-spaces {
+				font-size: 80%;
+				font-style: italic;
+			}
+		}
+
+		&:not(.has-dates) {
+			.em-booking-recurrence-date {
+				display: none;
+				visibility: hidden;
+			}
+		}
+
+		p.more-recurrenes {
+			font-size: 80%;
+			font-style: italic;
+		}
+	}
+}
+
+.em-booking-recurrence-form {
+	margin-top: 40px;
+
+}
+
+/* My Bookings Page */
+.em-my-bookings-actions-content {
+	a.em-bookings-rsvp-confirm {
+		color : #198754 !important;
+	}
+	a.em-bookings-rsvp-cancel {
+		color : #dc3545 !important;
+	}
+	a.em-bookings-rsvp-maybe {
+		color : #6c757d !important;
+	}
+}

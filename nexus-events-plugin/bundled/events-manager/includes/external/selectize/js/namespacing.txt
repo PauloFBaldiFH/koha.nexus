@@ -1,0 +1,4 @@
+To namespace selectize into EM, we search/replace the following:
+
+root.Selectize > root.EM_Selectize
+fn.selectize > fn.em_selectize

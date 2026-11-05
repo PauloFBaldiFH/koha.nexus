@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "events-manager/locations",
+  "title": "Event Locations",
+  "category": "events-manager",
+  "icon": "location-alt",
+  "description": "Display a list of event locations.",
+  "keywords": [
+    "locations",
+    "venues",
+    "places"
+  ],
+  "textdomain": "events-manager",
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "default": ""
+    },
+    "scope": {
+      "type": "string",
+      "default": "future"
+    },
+    "order": {
+      "type": "string",
+      "default": "ASC"
+    },
+    "orderby": {
+      "type": "string",
+      "default": "event_start_date,event_start_time,location_name"
+    },
+    "limit": {
+      "type": "number",
+      "default": 5
+    },
+    "no_locations_text": {
+      "type": "string",
+      "default": ""
+    },
+    "format_header": {
+      "type": "string",
+      "default": ""
+    },
+    "format": {
+      "type": "string",
+      "default": ""
+    },
+    "format_footer": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js"
+}

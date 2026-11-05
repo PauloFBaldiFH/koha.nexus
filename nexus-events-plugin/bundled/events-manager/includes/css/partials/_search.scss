@@ -1,0 +1,675 @@
+/** The Search Box **/
+&.em-search, &.em-search-advanced, & .em-search-advanced {
+	--border-color : #dedede;
+
+	margin: 10px 0 25px;
+
+	form {
+		--background-color : #fff;
+	}
+	.em-search-main {
+
+		&.em-search-main-bar {
+			border: 1px solid var(--border-color);
+			padding: 10px;
+			width: 100%;
+			display: flex;
+			-webkit-flex-direction: row;
+			flex-direction: row;
+			flex-wrap: nowrap;
+			align-items : center;
+			justify-items: stretch;
+
+			& > .em-search-field {
+				border-right: 1px solid var(--border-color) !important;
+
+				input {
+					margin: 0 !important;
+					text-overflow: ellipsis;
+					overflow: hidden;
+				}
+				&:not(:first-child) input {
+					border : none !important;
+					border-radius: 0 !important;
+					padding-left: 50px !important;
+					background-position-x : 15px !important;
+					background-size: 20px !important;
+				}
+				&:first-child input {
+					border: none !important;
+					margin-left: 0;
+					padding-left: 50px !important;
+					background-position-x : 15px !important;
+					background-size: 20px !important;
+				}
+				&.em-selectized {
+					max-height: 38px;
+					overflow: visible;
+					z-index: 10000;
+					.em-selectize {
+						.em-selectize-placeholder {
+							height : 36px;
+							padding-top : 6px;
+						}
+					}
+				}
+			}
+
+			& > div {
+				flex: none;
+			}
+
+			& > .em-search-text, & > .em-search-geo {
+				flex : auto;
+				width: 100%;
+			}
+
+			& > .em-search-scope {
+				flex : 1 0 180px;
+
+				.em-datepicker-data {
+					width: 100%;
+					overflow: hidden;
+					@include input-icon( var(--icon-calendar) );
+					background-position-x: 14px !important; // overwrite the above
+
+					input {
+						position: relative;
+						display: inline-block !important;
+						width: 130px !important;
+						padding: 0 0 0 10px !important;
+						margin: 0 !important;
+						font-size: 14px;
+						color: #777;
+
+						&::-webkit-calendar-picker-indicator {
+							position: absolute;
+							left: 0;
+							top: 0;
+							width: 100%;
+							height: 100%;
+							margin: 0;
+							padding: 0;
+							cursor: pointer;
+							background: transparent;
+						}
+					}
+					.separator {
+						display: none;
+					}
+				}
+			}
+
+			& > .em-search-submit button {
+				padding: 0 20px !important;
+				line-height: 34px !important;
+				height: 34px !important;
+				margin: 0 !important;
+			}
+		}
+
+		input.em-search-text {
+			@include input-icon( var(--icon-magnifying-glass) );
+		}
+		input.em-search-geo {
+			@include input-icon( var(--icon-location) );
+			&.on {
+				background-image : var(--icon-location-on) !important;
+			}
+			&.off {
+				background-image : var(--icon-location-off) !important;
+			}
+		}
+		input.em-search-scope {
+			@include input-icon( var(--icon-calendar) );
+		}
+
+		/* More work needed here for autocomplete messing up icons */
+		input:-webkit-autofill,
+		input:-webkit-autofill:focus {
+			transition: background-color 600000s 0s, color 600000s 0s;
+		}
+		input[data-autocompleted] {
+			background-color: transparent !important
+		}
+	}
+
+	button[type="submit"].disabled:hover{
+		cursor: not-allowed !important;
+		pointer-events : auto !important;
+	}
+
+	.em-search-advanced-trigger {
+		width: 55px;
+		padding: 0 15px;
+	}
+
+	.em-search-views {
+		width: 52px;
+		height: 25px;
+		padding: 0 15px;
+
+		[data-view="list"] {
+			background-image: var(--icon-list) !important;
+		}
+		[data-view="list-grouped"] {
+			background-image: var(--icon-list-grouped) !important;
+		}
+		[data-view="calendar"] {
+			background-image: var(--icon-calendar) !important;
+		}
+		[data-view="map"] {
+			background-image: var(--icon-map) !important;
+		}
+		[data-view="grid"] {
+			background-image: var(--icon-list-grid) !important;
+		}
+		button[data-view="map"] {
+			background-size : 28px;
+			width: 28px;
+			height: 28px;
+		}
+
+		.em-search-views-trigger {
+			display: block;
+			width: 42px;
+			height: 25px;
+			background: var(--icon-point-down) 30px 6px no-repeat;
+			background-size: 14px;
+			padding: 0 15px 0 0;
+			margin: 0;
+			cursor: pointer;
+
+			.em-search-view-option {
+				display: block;
+				width: 25px;
+				height: 25px;
+				background-size: 25px;
+				background-repeat: no-repeat;
+				background-position: center center;
+				background-color: transparent !important;
+				text-indent: -10000px !important;
+			}
+		}
+
+		.em-search-views-options {
+			display:none;
+		}
+		.tippy-content .em-search-views-options {
+			display: block;
+		}
+		.em-search-views-options-list {
+			display: block !important;
+			padding: 0 !important;
+			margin: 5px 0 !important;
+			border: none !important;
+			background: transparent !important;
+			cursor: pointer !important;
+			overflow: visible !important;
+
+			label.em-search-view-option {
+				display: block !important;
+				padding: 5px 10px 5px 40px !important;
+				margin: 0 !important;
+				background-repeat: no-repeat !important;
+				background-size: 18px !important;
+				background-position: 10px center !important;
+				background-color: transparent !important;
+
+				&:hover, &.focused {
+					background-color: #efefef !important;
+				}
+				&:checked, &.checked {
+					background-color: #cee0ea !important;
+				}
+				input[type="radio"] {
+					@include screen-reader-only();
+				}
+			}
+
+			&:focus {
+				border: none !important;
+				outline: none !important;
+			}
+		}
+	}
+
+	.em-search-sort {
+		width: 52px;
+		height: 25px;
+		padding: 0 15px;
+
+		[data-sort="ASC"] {
+			background-image: var(--icon-sort-asc) !important;
+		}
+		[data-sort="DESC"] {
+			background-image: var(--icon-sort-desc) !important;
+		}
+
+		.em-search-sort-trigger {
+			display: block;
+			width: 42px;
+			height: 25px;
+			margin: 0;
+			cursor: pointer;
+		}
+
+		.em-search-sort-option {
+			display: block;
+			width: 25px;
+			height: 25px;
+			background-size: 25px;
+			background-repeat: no-repeat;
+			background-position: center center;
+			background-color: transparent !important;
+			text-indent: -10000px !important;
+		}
+	}
+	&[data-view="calendar"] {
+		.em-search-scope {
+			display: none;
+			visibility: hidden;
+		}
+	}
+}
+
+&.em-search {
+	&.is-hidden {
+		display: none;
+		visibility: hidden;
+	}
+
+	&.has-advanced.has-views, &.has-sorting.has-views {
+		.em-search-views {
+			width: 72px;
+			border-left : 1px solid var(--border-color);
+			padding-left : 15px;
+			flex: 0 0 42px;
+		}
+	}
+
+	&.has-advanced.has-sorting {
+		.em-search-sort {
+			width: 48px;
+			border-left : 1px solid var(--border-color);
+			padding-left : 10px;
+			flex: 0 0 42px;
+		}
+	}
+
+	&.advanced-mode-inline.advanced-visible.no-advanced-trigger {
+		// hide search button if always visible, since it'll be at bottom
+		.em-search-main .em-search-submit {
+			display : none;
+			visibility : hidden;
+		}
+	}
+
+	&.has-search-main {
+		.em-search-advanced-inline {
+			margin-top : 20px;
+		}
+	}
+
+	&.size-medium, &.size-small {
+		&.multi-line {
+			.em-search-main-bar {
+				padding: 10px 15px 15px 10px;
+				flex-wrap: wrap;
+
+				.em-search-field {
+					flex: 1 0 100% !important;
+					border-bottom: 1px solid var(--border-color) !important;
+					border-right: 0 !important;
+					padding-bottom: 5px;
+					margin-bottom: 5px;
+
+					&:nth-last-child(1 of .em-search-field) {
+						padding-bottom: 8px;
+						margin-bottom: 18px;
+					}
+				}
+
+				.em-search-submit {
+					flex: 1;
+
+					button {
+						width: 100%;
+					}
+				}
+			}
+		}
+		&.multi-line[data-view="calendar"] {
+			.em-search-main-bar {
+				.em-search-field:nth-last-child(2 of .em-search-field) {
+					padding-bottom: 8px;
+					margin-bottom: 18px;
+				}
+			}
+		}
+	}
+
+	&.size-small {
+
+		.hide-small {
+			display : none;
+			visibility : hidden;
+		}
+
+		.one-line {
+			padding: 5px !important;
+
+			.em-search-main-bar {
+				> .em-search-field:not(:first-child) {
+					display: none;
+					visibility: hidden;
+				}
+
+				> .em-search-field:first-child input {
+					padding-left: 30px !important;
+					padding-right: 5px !important;
+					background-position-x: 3px !important;
+					background-size: 16px !important;
+				}
+
+				.em-search-scope {
+					flex: auto;
+				}
+			}
+
+			.em-search-advanced-trigger {
+				width: 45px;
+				padding: 0 10px;
+				flex: 0 0 25px !important;
+			}
+
+			&.has-advanced.has-sorting .em-search-sort {
+				width: 36px;
+				padding: 0 5px;
+				flex: 0 0 36px !important;
+			}
+
+			&.has-advanced.has-views .em-search-views {
+				width: 62px !important;
+				padding-left: 10px !important;
+			}
+		}
+	}
+
+	&.size-medium {
+
+		.hide-medium {
+			display : none;
+			visibility : hidden;
+		}
+
+		& .one-line {
+			.em-search-main-bar {
+				> .em-search-field:first-child input {
+					padding-left: 40px !important;
+					padding-right: 10px !important;
+					background-position-x: 8px !important;
+				}
+			}
+		}
+	}
+}
+
+
+button.em-clickable.em-search-advanced-trigger {
+	display: block !important;
+	visibility: visible !important;
+	width: 25px !important;
+	height: 25px !important;
+	background: var(--icon-filter) 0 center no-repeat !important;
+	background-size: 25px !important;
+	position: relative !important;
+
+	span.total-count {
+		position: absolute;
+		border: 1px solid var(--counter-background);
+		border-radius: 50%;
+		color: var(--counter-color);
+		background: var(--counter-background);
+		width: 15px;
+		height: 15px;
+		font-size: 11px;
+		top: -8px;
+		right: -8px;
+		padding: 0;
+		line-height: 11px;
+		text-align: center;
+
+		&.tentative {
+			background: var(--counter-background-tentative);
+			color: var(--counter-color-tentative);
+			border-color: var(--counter-background-tentative)
+		}
+	}
+}
+
+/* Advanced Search Sepcifics */
+&.em-search-advanced {
+
+	section.em-search-main > .em-search-field {
+		margin: 0 !important;
+	}
+
+	/* Modal Structure */
+	.em-modal-content {
+		flex: 1 1 auto;
+
+		section > div {
+			margin: 0;
+		}
+
+		/* Selectize MultiDropdown needs some special styling so it doesn't look wierd when overflowing */
+		.selectize-control.em-selectize.multidropdown {
+			margin-bottom: 15px;
+			max-height: none;
+			.selectize-dropdown {
+				display: none !important;
+				position: relative;
+			}
+			&.dropdown-active {
+				height: auto;
+				.selectize-dropdown {
+					display: block !important;
+				}
+			}
+		}
+	}
+
+	&.em-search-advanced-inline {
+		footer {
+			text-align: right;
+
+			.em-search-views {
+				width: auto !important;
+				height: auto !important;
+				border: none !important;
+				border-right: 1px solid var(--border-color);
+				padding-left: 0 !important;
+				padding: 0 !important;
+				text-align: left;
+
+				.em-search-views-trigger {
+					width: auto !important;
+					height: auto !important;
+					background-position: calc(100% - 8px) center;
+					padding: 0 !important;
+
+					button {
+						width: auto !important;
+						padding: 0 40px 0 25px !important;
+						background-position: calc(50% - 8px) center;
+						background-size: 22px;
+					}
+				}
+			}
+
+			div {
+				display: inline-block;
+			}
+		}
+	}
+
+	@media only screen and (max-width: 39.99rem) {
+		&.em-modal footer {
+			> div {
+				padding : 10px 15px;
+			}
+			button.button {
+				padding: 0 20px !important;
+			}
+		}
+	}
+
+	.em-search-advanced-sections{
+
+		section.em-search-advanced-section {
+			span.total-count {
+				border: 1px solid var(--counter-background);
+				border-radius: 50%;
+				color: #fff;
+				background: var(--counter-background);
+				width: 24px;
+				height: 24px;
+				font-size: 12px;
+				padding: 2px 0 0;
+				margin: 0 0 0 10px;
+				display: inline-block;
+				text-align: center;
+				top: -4px;
+				position: relative;
+				line-height: 16px;
+			}
+		}
+
+		&.em-search-advanced-style-accordion {
+
+			& > section.em-search-advanced-section {
+
+				background: var(--icon-options-v) 0 15px no-repeat;
+				background-size: 18px 18px;
+				border-bottom: 1px solid #dedede;
+
+				&:last-of-type {
+					border-bottom: 0;
+				}
+
+				header {
+					width: 100%;
+					font-size: 18px;
+					padding: 16px 0 14px 28px;
+					margin: 0;
+					background: var(--icon-plus) right 50% no-repeat;
+					background-size: 18px 18px;
+
+					&:hover {
+						cursor: pointer;
+					}
+				}
+
+				div.em-search-section-content {
+					display: none;
+					visibility: hidden;
+				}
+
+				&.active {
+					header {
+						background-image: var(--icon-minus);
+						margin-bottom: 10px;
+					}
+
+					div.em-search-section-content {
+						display: block;
+						visibility: visible;
+						padding: 0 0 20px;
+					}
+
+					&:last-of-type header, &:last-of-type div.em-search-section-content {
+						border-bottom: 0;
+					}
+				}
+
+				&.em-search-section-location {
+					background-image: var(--icon-compass);
+				}
+
+				&.em-search-section-categories {
+					background-image: var(--icon-folder);
+
+					.em-search-section-content {
+						margin : 0 0 15px;
+					}
+				}
+
+				&.em-search-section-tags {
+					background-image: var(--icon-tag);
+				}
+
+				&.em-search-section-categories, &.em-search-section-tags {
+					&.active {
+						header {
+							margin-bottom: 0;
+						}
+					}
+				}
+			}
+		}
+
+		&.em-search-advanced-style-headings {
+			& > section.em-search-advanced-section {
+
+				padding-bottom : 10px;
+
+				header {
+					width: 100%;
+					font-size: 16px;
+					padding: 0 0 8px 0;
+					border : 0;
+				}
+
+				& > div {
+					margin: 0;
+				}
+			}
+		}
+
+		.em-search-geo-units {
+			display: flex;
+			flex-direction: row;
+			gap: 5px;
+
+			select {
+				display: inline-block !important;
+				padding-right: 30px !important;
+			}
+
+			label {
+				display: inline-block !important;
+				vertical-align: top !important;
+				padding: 9px 15px 9px !important;
+			}
+			.em-search-geo-distance {
+				width: auto !important;
+				border-top-right-radius: 0 !important;
+				border-bottom-right-radius: 0 !important;
+				margin-right : 0 !important;
+			}
+			.em-search-geo-unit {
+				width: auto !important;
+				border-top-left-radius: 0 !important;
+				border-bottom-left-radius: 0 !important;
+				margin-left : 0 !important;
+			}
+		}
+	}
+}
+&.em-modal.em-search-advanced {
+	/* remove border for headers in modal */
+	& section > header {
+		border-bottom: 0 !important;
+	}
+}

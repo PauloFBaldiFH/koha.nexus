@@ -1,0 +1,25 @@
+/*!
+* FilePondPluginImageThumbnail 1.0.0
+* Author: Pixelite SL
+* Licensed under MIT, https://opensource.org/licenses/MIT/
+* Please visit https://pqina.nl/filepond/ for details.
+*/
+.filepond--file-info.has-thumbnail {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: start;
+	gap: 10px;
+
+	.filepond--image-thumbnail {
+		object-fit: cover;
+		position: relative !important;
+		display: block !important;
+	}
+
+	.filepond--file-info-main-container {
+		display:  flex;
+		flex-direction: column;
+		justify-content: flex-start;
+		gap : 4px;
+	}
+}
