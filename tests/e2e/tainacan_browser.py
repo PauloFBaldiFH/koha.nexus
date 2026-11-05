@@ -230,6 +230,8 @@ def step_public(page) -> None:
     shot(page, "08-search")
     fact("public.search_text", found_text[:400])
     check("Mapa antigo" in found_text, "the search of the home page finds the published item by its description")
+    nothing = faceted_search(page, "palavrainexistente")
+    check("Mapa antigo" not in nothing, "the search of the home page filters: a word in no item shows no item")
     restricted = faceted_search(page, "interno")
     check("Documento interno" not in restricted, "the search of the home page does not show the private item")
     # WordPress's own search (?s=) does not search Tainacan's items: a fact.
