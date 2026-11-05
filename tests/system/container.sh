@@ -65,7 +65,7 @@ start)
     ;;
 run)
     name="$1"; shift
-    docker exec -e KEI_DESTRUCTIVE_TESTS=1 -w /src "$name" "$@"
+    docker exec -e KEI_DESTRUCTIVE_TESTS=1 -e KEI_REQUIRE_WIREGUARD="${KEI_REQUIRE_WIREGUARD:-}" -w /src "$name" "$@"
     ;;
 stop)
     docker rm -f -v "$1" >/dev/null 2>&1 || true

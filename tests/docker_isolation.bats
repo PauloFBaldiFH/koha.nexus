@@ -53,6 +53,7 @@ teardown_file() {
     pkill -f 'http.server' 2>/dev/null || true
     ip netns del knpeer 2>/dev/null || true
     ip netns del knlan 2>/dev/null || true
+    rm -f /etc/wireguard/kn-test-s.key /etc/wireguard/kn-test-p.key
 }
 
 setup() {
@@ -113,28 +114,44 @@ vpn_up() {
     ip link set knul1 netns knpeer
     ip addr add 198.51.100.1/24 dev knul0; ip link set knul0 up
     ip -n knpeer addr add 198.51.100.2/24 dev knul1; ip -n knpeer link set knul1 up; ip -n knpeer link set lo up
-    if ip link add wg0 type wireguard 2>/dev/null; then
-        wg genkey > "$S/s.key"; wg pubkey < "$S/s.key" > "$S/s.pub"
-        wg genkey > "$S/p.key"; wg pubkey < "$S/p.key" > "$S/p.pub"
-        wg set wg0 private-key "$S/s.key" listen-port 51820 peer "$(cat "$S/p.pub")" allowed-ips 10.66.0.2/32
-        ip addr add 10.66.0.1/24 dev wg0; ip link set wg0 up
-        ip -n knpeer link add wg1 type wireguard
-        ip netns exec knpeer wg set wg1 private-key "$S/p.key" peer "$(cat "$S/s.pub")" \
-            allowed-ips 10.66.0.0/24 endpoint 198.51.100.1:51820 persistent-keepalive 5
-        ip -n knpeer addr add 10.66.0.2/24 dev wg1; ip -n knpeer link set wg1 up
+    if ip link add wg0 type wireguard 2>/dev/null && wg_up 2>"$S/wg.err"; then
         echo wireguard > "$S/vpn"
     else
-        # No WireGuard in this kernel: a plain link named wg0, same rules.
+        # Where the kernel has WireGuard (CI sets KEI_REQUIRE_WIREGUARD=1
+        # after modprobe), a failure here fails the test: no silent fallback.
+        if [ "${KEI_REQUIRE_WIREGUARD:-}" = 1 ]; then
+            echo "WireGuard required but not set up: $(cat "$S/wg.err" 2>/dev/null)" >&2
+            return 1
+        fi
+        # No WireGuard in this kernel (or it could not be set up, said in
+        # the test output): a plain link named wg0, with the same rules.
+        [ -s "$S/wg.err" ] && echo "link without WireGuard ($(tr '\n' ' ' < "$S/wg.err"))" > "$S/vpn" \
+            || echo "link without WireGuard" > "$S/vpn"
+        ip link del wg0 2>/dev/null || true; ip -n knpeer link del wg1 2>/dev/null || true
         ip link add wg0 type veth peer name wg1
         ip link set wg1 netns knpeer
         ip addr add 10.66.0.1/24 dev wg0; ip link set wg0 up
         ip -n knpeer addr add 10.66.0.2/24 dev wg1; ip -n knpeer link set wg1 up
-        echo "link without WireGuard" > "$S/vpn"
     fi
     sysctl -q -w net.ipv4.ip_forward=1
     iptables -A FORWARD -i wg0 -j ACCEPT
     iptables -A FORWARD -o wg0 -j ACCEPT
     ip netns exec knpeer setsid python3 -m http.server 8000 --bind 10.66.0.2 >/dev/null 2>&1 3>&- &
+}
+
+# Keys in /etc/wireguard, mode 600, where a real server keeps them. On the
+# CI runner wg refused key files under /tmp ("fopen: Permission denied"),
+# most likely the host's AppArmor profile for wg.
+wg_up() {
+    local d=/etc/wireguard sp pp
+    ( umask 077; mkdir -p "$d" && wg genkey > "$d/kn-test-s.key" && wg genkey > "$d/kn-test-p.key" ) || return 1
+    sp=$(wg pubkey < "$d/kn-test-s.key") && pp=$(wg pubkey < "$d/kn-test-p.key") || return 1
+    wg set wg0 private-key "$d/kn-test-s.key" listen-port 51820 peer "$pp" allowed-ips 10.66.0.2/32 || return 1
+    ip addr add 10.66.0.1/24 dev wg0 && ip link set wg0 up || return 1
+    ip -n knpeer link add wg1 type wireguard || return 1
+    ip netns exec knpeer wg set wg1 private-key "$d/kn-test-p.key" peer "$sp" \
+        allowed-ips 10.66.0.0/24 endpoint 198.51.100.1:51820 persistent-keepalive 5 || return 1
+    ip -n knpeer addr add 10.66.0.2/24 dev wg1 && ip -n knpeer link set wg1 up
 }
 
 vpn_works() {
