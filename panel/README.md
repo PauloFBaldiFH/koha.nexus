@@ -66,7 +66,10 @@ or a running service is no proof that a platform works.
 - `config.sh --status-json` adds a `platforms` array; every older field is
   unchanged.
 - The Platforms screen (`p`) shows one card per platform, plus the web
-  proxy. Nothing is installed from it.
+  proxy and Docker. Only Docker can be installed from it: the installer's
+  plan (`--task docker-plan`) is shown first and nothing happens without a
+  Yes; "Remove Docker" appears only for a Docker that Koha.Nexus installed
+  and that holds nothing of anyone.
 - Resource ownership (installer `kei_owned_*`): what Koha.Nexus creates for
   a platform (an Apache site `zz-koha-nexus-<id>.conf`, a module, a UFW
   port, a tunnel address) is written in `/var/lib/koha-nexus/owned.tsv`,
@@ -84,6 +87,17 @@ or a running service is no proof that a platform works.
   cloudflared, the tunnel and the panel while another platform is
   registered. No platform uses this yet: Koha's own configuration is left
   as it is (`tests/proxy.bats`).
+- Docker (installer `kei_docker_*`): a Docker found on the server is used as
+  it is (daemon.json, its pools and the docker group are never changed, and
+  it is never removed); a missing one comes from Docker's official
+  repository, never on top of docker.io or podman-docker. Each platform
+  gets a network `kn-<id>` with its own /24 and the labels
+  `com.koha-nexus.managed` / `com.koha-nexus.platform`. Chains of our own
+  (KN-INPUT, KN-FORWARD from DOCKER-USER) keep its containers away from the
+  host's services, the VPN devices and the other platforms; a systemd unit
+  puts them back before Docker starts. Removal touches only what carries the
+  labels and is registered (`tests/docker.bats`, and on a throwaway machine
+  `tests/docker_isolation.bats`).
 
 `KEI_PANEL_DEMO_KOHA=0 python3 -m kei_panel --demo` shows the panel of a
 server without Koha.

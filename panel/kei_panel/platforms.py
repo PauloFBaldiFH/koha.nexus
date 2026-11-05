@@ -165,6 +165,73 @@ def describe_proxy(state: ProxyState) -> tuple[str, str, str]:
         t("Another web server answers on 80/443: Koha.Nexus would only print its configuration block"), "warn"
 
 
+# Docker, for the platforms in containers (installer: kei_docker_detect, the
+# "docker" of --status-json). Optional: installed only when the person
+# accepts the plan the installer shows (config.sh --task docker-plan).
+@dataclass(frozen=True)
+class DockerState:
+    known: bool = False          # False = not reported (an older installer)
+    installed: bool = False
+    package: str = ""
+    engine: str = ""
+    compose: str = ""
+    running: bool = False
+    installed_by_nexus: bool = False
+    others: int = 0              # containers of other programs
+    networks: int = 0            # the platforms' networks
+
+
+def _count(value) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+
+
+def _text(value, limit: int = 40) -> str:
+    return value[:limit] if isinstance(value, str) else ""
+
+
+def docker_from_status(status: dict | None) -> DockerState:
+    """The "docker" object of --status-json; unknown values are not trusted."""
+    raw = (status or {}).get("docker")
+    if not isinstance(raw, dict):
+        return DockerState()
+    others = raw.get("others") if isinstance(raw.get("others"), dict) else {}
+    return DockerState(
+        known=True, installed=raw.get("installed") is True, package=_text(raw.get("package")),
+        engine=_text(raw.get("engine")), compose=_text(raw.get("compose")), running=raw.get("running") is True,
+        installed_by_nexus=raw.get("installed_by") == "koha-nexus", others=_count(others.get("containers")),
+        networks=_count(raw.get("platform_networks")))
+
+
+def describe_docker(state: DockerState) -> tuple[str, str, str]:
+    """(value, note, card state) for the Docker card."""
+    if not state.known:
+        return t("Unknown"), t("Not checked"), ""
+    if not state.installed:
+        return t("Not installed"), t("Optional: only the platforms in containers need it"), ""
+    value = f"Docker {state.engine}" if state.engine else "Docker"
+    if not state.running:
+        return value, t("Installed, but not running"), "warn"
+    if not state.compose:
+        return value, t("Without Compose v2, which the platforms need"), "warn"
+    origin = t("Installed by Koha.Nexus") if state.installed_by_nexus else \
+        t("Found on this server: used as it is, never changed")
+    if state.others:
+        origin += " · " + t("${n} containers of other programs", n=state.others)
+    return value, origin, "ok"
+
+
+def docker_can_install(state: DockerState) -> bool:
+    """The install button: only when the installer says Docker is absent."""
+    return state.known and not state.installed
+
+
+def docker_can_remove(state: DockerState) -> bool:
+    """The remove button: only a Docker Koha.Nexus installed, running, with
+    no platform network and no container of anyone (the installer checks
+    again, volumes and networks included)."""
+    return state.installed_by_nexus and state.running and not state.networks and not state.others
+
+
 def missing_reason(platform: str) -> str:
     """Why a routine or a screen of `platform` cannot open on this server."""
     if platform == KOHA:

@@ -26,7 +26,7 @@ valid_json() { printf '%s' "$1" | python3 -c 'import json,sys; json.load(sys.std
     run lib 'kei_platforms_json apache2=active mariadb=active'
     [ "$status" -eq 0 ]
     valid_json "$output"
-    run python3 -c 'import json,sys; p=json.loads(sys.argv[1]); print(" ".join(f"{x["id"]}:{x["supported"]}:{x["detected"]}:{x["services"]}:{x["health"]}" for x in p))' "$output"
+    run python3 -c 'import json,sys; p=json.loads(sys.argv[1]); print(" ".join("%s:%s:%s:%s:%s" % (x["id"], x["supported"], x["detected"], x["services"], x["health"]) for x in p))' "$output"
     [ "$output" = "koha:True:False:none:unknown tainacan:False:None:none:unknown atom:False:None:none:unknown dspace:False:None:none:unknown" ]
 }
 

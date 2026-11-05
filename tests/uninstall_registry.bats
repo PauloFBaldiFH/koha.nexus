@@ -75,3 +75,14 @@ EOF
     [ ! -e /etc/cloudflared ]
     [ ! -e /var/lib/koha-nexus ]
 }
+
+@test "Docker is never removed; the record of an install made here stays" {
+    fake_server
+    rm -f /var/lib/koha-nexus/owned.tsv
+    printf 'installed_by=koha-nexus\nstatus=installed\n' > /var/lib/koha-nexus/docker.state
+    run bash "$REPO/uninstall.sh" --yes
+    [[ "$output" == *"Docker mantido"* ]]
+    grep -qx 'installed_by=koha-nexus' /var/lib/koha-nexus/docker.state
+    [ "$(ls -A /var/lib/koha-nexus)" = docker.state ]
+    rm -rf /var/lib/koha-nexus
+}

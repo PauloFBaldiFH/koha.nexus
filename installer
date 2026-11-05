@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.166"
+PANEL_VERSION=" 1.5.167"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -11112,7 +11112,7 @@ kei_events_json() {
 #
 # Registry (KEI_OWNED_FILE), tab separated:
 #   kind  name  platform  preexisting(yes|no)  sha256|-  detail|-
-# kinds: apache-site, apache-module, ufw-port, ingress.
+# kinds: apache-site, apache-module, ufw-port, ingress, docker-network.
 # A TSV, not JSON: the installer is Bash and a server without Koha may have
 # no Python; awk reads it and flock + rename write it.
 # ======================================================================
@@ -11748,14 +11748,16 @@ kei_tunnel_ingress_del() {
 # Recovery: kei_platform_release PLATFORM undoes everything the registry
 # gives to PLATFORM, each through its own function, so a shared resource
 # (a module or port another platform still uses, or one that existed
-# before) stays: sites, tunnel addresses, modules, firewall ports. What
-# cannot be undone safely (a site changed by hand, a module Apache still
-# needs) stays in the registry and is printed; the return code is then 1.
+# before) stays: sites, tunnel addresses, modules, firewall ports, then the
+# Docker network (refused while a container still uses it: the platform
+# decides first what happens to its data). What cannot be undone safely (a
+# site changed by hand, a module Apache still needs) stays in the registry
+# and is printed; the return code is then 1.
 # ----------------------------------------------------------------------
 kei_platform_release() {
     local platform="${1:-}" kind name failed=0
     kei_proxy_valid_id "$platform" || return 2
-    for kind in apache-site ingress apache-module ufw-port; do
+    for kind in apache-site ingress apache-module ufw-port docker-network; do
         while IFS= read -r name; do
             [ -n "$name" ] || continue
             case "$kind" in
@@ -11763,10 +11765,598 @@ kei_platform_release() {
                 ingress)       kei_tunnel_ingress_del "$platform" "$name" ;;
                 apache-module) kei_proxy_module_release "$platform" "$name" ;;
                 ufw-port)      kei_proxy_port_release "$platform" "$name" ;;
+                docker-network) kei_docker_network_remove "$platform" ;;
             esac || { failed=1; printf 'kept: %s %s\n' "$kind" "$name"; }
         done < <(kei_owned_list "$kind" "$platform" | awk -F'\t' '{ print $2 }')
     done
     return "$failed"
+}
+
+# ======================================================================
+# DOCKER (optional, installed only with consent)
+# ----------------------------------------------------------------------
+# The platforms in containers (planned: Tainacan first) need Docker. This
+# block finds out what is on the server, installs Docker only when the
+# person agrees, and gives each platform a network of its own, isolated
+# from the host and from the other platforms. No platform is installed
+# here and nothing runs by itself.
+#
+# Rules:
+# - A Docker found on the server is used as it is: daemon.json, the daemon,
+#   its address pools and the docker group are never changed, and
+#   Koha.Nexus never removes it.
+# - Docker is installed from Docker's official repository, never on top of
+#   docker.io, podman-docker or the other packages Docker's instructions
+#   say to remove first.
+# - Everything created carries the labels com.koha-nexus.managed=true and
+#   com.koha-nexus.platform=<id>, and is in the registry (kind
+#   docker-network); removal needs both. Never "docker system prune".
+# - Each platform network, kn-<id> (also the bridge's name), gets its own
+#   /24, chosen after reading the routes, the addresses, the Docker
+#   networks and the VPN: Docker's address pools are not touched.
+# - Isolation, in chains of our own (KN-INPUT from INPUT, KN-FORWARD from
+#   DOCKER-USER), rebuilt from the registry by kei_docker_isolation_apply,
+#   also at boot and whenever Docker (re)starts, before it starts the
+#   containers (unit koha-nexus-docker-isolation):
+#     a container cannot open a connection to the host (Koha's MariaDB,
+#     Memcached, Elasticsearch, RabbitMQ, Ollama, the panel's services)
+#     except DNS (53), nor to the VPN devices, nor to another platform's
+#     network; replies to connections the host opens still pass.
+#   Docker itself keeps two bridge networks apart.
+# - The state of an installation made here is in KEI_DOCKER_STATE
+#   (installed_by=koha-nexus): only then can Docker be removed from the
+#   panel, and only when no container, volume or network of anyone is left.
+# ======================================================================
+KEI_DOCKER_STATE="$KEI_OWNED_DIR/docker.state"
+KEI_DOCKER_LABEL="com.koha-nexus"
+KEI_DOCKER_NET_PREFIX="kn-"
+KEI_DOCKER_POOLS="${KEI_DOCKER_POOLS:-10.213 172.30 192.168}"
+KEI_DOCKER_PACKAGES="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+KEI_DOCKER_CONFLICTS="docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
+KEI_DOCKER_REPO="${KEI_DOCKER_REPO:-https://download.docker.com/linux}"
+KEI_DOCKER_APT_SOURCE="${KEI_DOCKER_APT_SOURCE:-/etc/apt/sources.list.d/docker.list}"
+KEI_DOCKER_KEYRING="${KEI_DOCKER_KEYRING:-/etc/apt/keyrings/docker.asc}"
+KEI_DOCKER_UNIT="koha-nexus-docker-isolation.service"
+KEI_DOCKER_UNIT_DIR="${KEI_DOCKER_UNIT_DIR:-/etc/systemd/system}"
+KEI_OS_RELEASE="${KEI_OS_RELEASE:-/etc/os-release}"
+
+_kei_dpkg_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'; }
+# Every docker call has a time limit: a stuck daemon never stops the panel.
+_kei_docker() { timeout "${KEI_DOCKER_TIMEOUT:-20}" docker "$@"; }
+_kei_docker_running() { command -v docker >/dev/null 2>&1 && _kei_docker info >/dev/null 2>&1; }
+kei_docker_net_name() { printf '%s%s' "$KEI_DOCKER_NET_PREFIX" "$1"; }
+# A platform id that also fits a bridge name (15 characters with "kn-").
+kei_docker_valid_platform() { kei_proxy_valid_id "${1:-}" && [ "${#1}" -le 12 ] && [ "$1" != koha ]; }
+
+_kei_docker_state_get() { [ -f "$KEI_DOCKER_STATE" ] && awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { print v }' "$KEI_DOCKER_STATE"; }
+_kei_docker_state_set() {
+    local tmp
+    mkdir -p "$KEI_OWNED_DIR" || return 1
+    tmp=$(mktemp "$KEI_DOCKER_STATE.XXXXXX") || return 1
+    { [ -f "$KEI_DOCKER_STATE" ] && awk -F= -v k="$1" '$1 != k' "$KEI_DOCKER_STATE"; printf '%s=%s\n' "$1" "$2"; } > "$tmp"
+    chmod 644 "$tmp" && mv -f "$tmp" "$KEI_DOCKER_STATE"
+}
+
+# kei_docker_package: the package Docker came from (docker-ce, docker.io,
+# moby-engine, podman-docker, snap, other) or "-".
+kei_docker_package() {
+    local p
+    for p in docker-ce docker.io moby-engine podman-docker; do
+        _kei_dpkg_installed "$p" && { printf '%s\n' "$p"; return 0; }
+    done
+    if command -v snap >/dev/null 2>&1 && snap list docker >/dev/null 2>&1; then echo snap; return 0; fi
+    command -v docker >/dev/null 2>&1 && { echo other; return 0; }
+    echo -
+}
+
+# kei_docker_conflicts: installed packages that Docker's instructions say
+# to remove before installing docker-ce (space separated).
+kei_docker_conflicts() {
+    local p out=""
+    for p in $KEI_DOCKER_CONFLICTS; do _kei_dpkg_installed "$p" && out+="${out:+ }$p"; done
+    printf '%s' "$out"
+}
+
+# The top-level keys of /etc/docker/daemon.json (read only), or "-".
+_kei_docker_daemon_keys() {
+    local f="${KEI_DOCKER_DAEMON_JSON:-/etc/docker/daemon.json}"
+    [ -s "$f" ] || { echo -; return 0; }
+    tr -d '\n' < "$f" | awk '{
+        s = $0; n = length(s); d = 0; instr = 0; out = ""
+        for (i = 1; i <= n; i++) {
+            c = substr(s, i, 1)
+            if (instr) { if (c == "\\") { i++; continue } if (c == "\"") { instr = 0; last = buf } else buf = buf c; continue }
+            if (c == "\"") { instr = 1; buf = ""; continue }
+            if (c == "{" || c == "[") d++
+            else if (c == "}" || c == "]") d--
+            else if (c == ":" && d == 1) out = out (out == "" ? "" : ",") last
+        }
+        print (out == "" ? "-" : out) }'
+}
+
+# kei_docker_detect: what is on the server, "key=value" lines, read only.
+#   package engine compose running installed_by conflicts daemon_json
+#   containers_other networks_other volumes_other platform_networks
+#   group_members forward_policy docker_user ip_forward
+kei_docker_detect() {
+    local pkg engine=- compose=- running=no by members fwd duser=no cnt_c=0 cnt_n=0 cnt_v=0
+    pkg=$(kei_docker_package)
+    if command -v docker >/dev/null 2>&1; then
+        engine=$(_kei_docker version --format '{{.Server.Version}}' 2>/dev/null)
+        if [ -n "$engine" ]; then running=yes; else engine=-; fi
+        compose=$(_kei_docker compose version --short 2>/dev/null) || compose=""
+        [ -n "$compose" ] || compose=-
+    fi
+    if [ "$running" = yes ]; then
+        cnt_c=$(_kei_docker ps -a --format "{{.Label \"$KEI_DOCKER_LABEL.managed\"}}" 2>/dev/null | grep -cvx true)
+        cnt_n=$(_kei_docker network ls --format "{{.Name}} {{.Label \"$KEI_DOCKER_LABEL.managed\"}}" 2>/dev/null \
+            | awk '$1 != "bridge" && $1 != "host" && $1 != "none" && $2 != "true"' | grep -c .)
+        cnt_v=$(_kei_docker volume ls --format "{{.Label \"$KEI_DOCKER_LABEL.managed\"}}" 2>/dev/null | grep -cvx true)
+    fi
+    by=$(_kei_docker_state_get installed_by); [ -n "$by" ] || by=-
+    members=$(getent group docker 2>/dev/null | cut -d: -f4); [ -n "$members" ] || members=-
+    fwd=$(iptables -w 5 -S FORWARD 2>/dev/null | awk '$1 == "-P" { print $3; exit }'); [ -n "$fwd" ] || fwd="?"
+    iptables -w 5 -S DOCKER-USER >/dev/null 2>&1 && duser=yes
+    printf 'package=%s\nengine=%s\ncompose=%s\nrunning=%s\ninstalled_by=%s\n' "$pkg" "$engine" "$compose" "$running" "$by"
+    printf 'conflicts=%s\ndaemon_json=%s\n' "$(c=$(kei_docker_conflicts); printf '%s' "${c:--}")" "$(_kei_docker_daemon_keys)"
+    printf 'containers_other=%s\nnetworks_other=%s\nvolumes_other=%s\n' "$cnt_c" "$cnt_n" "$cnt_v"
+    printf 'platform_networks=%s\ngroup_members=%s\n' "$(kei_owned_list docker-network | awk 'END { print NR }')" "$members"
+    printf 'forward_policy=%s\ndocker_user=%s\nip_forward=%s\n' "$fwd" "$duser" "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo '?')"
+}
+
+# kei_docker_json: the "docker" object of --status-json.
+kei_docker_json() {
+    local k v pkg=- engine=- compose=- running=no by=- oc=0 on=0 ov=0 pn=0 fwd="?" members=-
+    while IFS='=' read -r k v; do
+        case "$k" in
+            package) pkg="$v" ;; engine) engine="$v" ;; compose) compose="$v" ;; running) running="$v" ;;
+            installed_by) by="$v" ;; containers_other) oc="$v" ;; networks_other) on="$v" ;;
+            volumes_other) ov="$v" ;; platform_networks) pn="$v" ;; forward_policy) fwd="$v" ;;
+            group_members) members="$v" ;;
+        esac
+    done < <(kei_docker_detect)
+    [ "$pkg" = - ] && pkg=""; [ "$engine" = - ] && engine=""; [ "$compose" = - ] && compose=""; [ "$by" = - ] && by=""
+    [ "$members" = - ] && members=""
+    printf '{"installed":%s,"package":%s,"engine":%s,"compose":%s,"running":%s,"installed_by":%s,' \
+        "$([ -n "$pkg" ] && echo true || echo false)" "$(json_str "$pkg")" "$(json_str "$engine")" \
+        "$(json_str "$compose")" "$([ "$running" = yes ] && echo true || echo false)" "$(json_str "$by")"
+    printf '"others":{"containers":%s,"networks":%s,"volumes":%s},"platform_networks":%s,' \
+        "$(json_num "$oc")" "$(json_num "$on")" "$(json_num "$ov")" "$(json_num "$pn")"
+    printf '"group_members":%s,"forward_policy":%s}' \
+        "$(json_num "$(printf '%s' "$members" | awk -F, 'NF { print NF; exit } END { if (!NF) print 0 }')")" "$(json_str "$fwd")"
+}
+
+# _kei_os: "ID CODENAME ARCH" of this system.
+_kei_os() {
+    local id codename
+    read -r id codename < <( . "$KEI_OS_RELEASE" 2>/dev/null; printf '%s %s\n' "${ID:-}" "${VERSION_CODENAME:-}")
+    printf '%s %s %s\n' "${id:--}" "${codename:--}" "$(dpkg --print-architecture 2>/dev/null || echo -)"
+}
+
+# kei_docker_plan: what installing Docker would change. Lines "KEY<TAB>TEXT";
+# the first is "plan<TAB>use|install|refuse". Returns 3 when refused.
+kei_docker_plan() {
+    local pkg conflicts id codename arch
+    pkg=$(kei_docker_package)
+    if [ "$pkg" != - ]; then
+        if command -v docker >/dev/null 2>&1 && _kei_docker compose version >/dev/null 2>&1; then
+            printf 'plan\tuse\n'
+            printf 'note\t%s\n' "$(p="$pkg"; t "Docker is already installed (\${p}): it is used as it is. Nothing is installed or changed.")"
+            return 0
+        fi
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(p="$pkg"; t "Docker is installed (\${p}) without Compose v2. Koha.Nexus does not install on top of it: add the Compose plugin to it, or remove it yourself and come back here.")"
+        return 3
+    fi
+    conflicts=$(kei_docker_conflicts)
+    if [ -n "$conflicts" ]; then
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(p="$conflicts"; t "Packages that conflict with Docker's are installed: \${p}. Docker's instructions say to remove them first; Koha.Nexus does not remove them for you.")"
+        return 3
+    fi
+    read -r id codename arch < <(_kei_os)
+    case "$id" in debian|ubuntu) ;; *)
+        printf 'plan\trefuse\n'
+        printf 'note\t%s\n' "$(s="$id"; t "Docker can be installed here only on Debian or Ubuntu (this system: \${s}).")"
+        return 3 ;;
+    esac
+    if [ "$codename" = - ] || [ "$arch" = - ]; then
+        printf 'plan\trefuse\n'; printf 'note\t%s\n' "$(t "The system version could not be read.")"; return 3
+    fi
+    printf 'plan\tinstall\n'
+    printf 'repository\t%s/%s %s stable (%s)\n' "$KEI_DOCKER_REPO" "$id" "$codename" "$arch"
+    if [ -e "$KEI_DOCKER_KEYRING" ]; then printf 'key\t%s (%s)\n' "$KEI_DOCKER_KEYRING" "$(t "already there, kept")"
+    else printf 'key\t%s (%s)\n' "$KEI_DOCKER_KEYRING" "$(t "new")"; fi
+    if [ -e "$KEI_DOCKER_APT_SOURCE" ]; then printf 'source\t%s (%s)\n' "$KEI_DOCKER_APT_SOURCE" "$(t "already there, kept")"
+    else printf 'source\t%s (%s)\n' "$KEI_DOCKER_APT_SOURCE" "$(t "new")"; fi
+    printf 'packages\t%s\n' "$KEI_DOCKER_PACKAGES"
+    printf 'service\t%s\n' "$(t "docker started and enabled at boot")"
+    printf 'kept\t%s\n' "$(t "Not changed: /etc/docker/daemon.json, the docker group (nobody is added) and Docker's address pools.")"
+    if [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" != 1 ]; then
+        printf 'firewall\t%s\n' "$(t "Docker turns IP forwarding on and sets the FORWARD policy to DROP. The WireGuard VPN keeps working: its rules accept its own traffic.")"
+    fi
+    printf 'undo\t%s\n' "$(t "Docker installed here can be removed from the panel while no container, volume or network exists.")"
+    return 0
+}
+
+# kei_docker_install confirm: installs Docker as kei_docker_plan says. The
+# word "confirm" stands for the person's consent, given after reading the
+# plan. A Docker found on the server is used as it is.
+kei_docker_install() {
+    local plan id codename arch url rc
+    [ "${1:-}" = confirm ] || { echo "kei_docker_install: the plan must be read and accepted first (argument: confirm)." >&2; return 2; }
+    plan=$(kei_docker_plan); rc=$?
+    case "$(printf '%s\n' "$plan" | awk -F'\t' '$1 == "plan" { print $2; exit }')" in
+        use) printf '%s\n' "$plan" | awk -F'\t' '$1 == "note" { print $2 }'; return 0 ;;
+        install) ;;
+        *) printf '%s\n' "$plan" | awk -F'\t' '$1 == "note" { print $2 }' >&2; return 3 ;;
+    esac
+    [ "$rc" = 0 ] || return 3
+    read -r id codename arch < <(_kei_os)
+    url="$KEI_DOCKER_REPO/$id"
+    _kei_docker_state_set installed_by koha-nexus || return 1
+    _kei_docker_state_set status installing
+    _kei_docker_state_set installed_at "$(date -u +%FT%TZ)"
+    _kei_docker_state_set ip_forward_before "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo '?')"
+    _kei_docker_state_set forward_policy_before "$(iptables -w 5 -S FORWARD 2>/dev/null | awk '$1 == "-P" { print $3; exit }')"
+    install -m 0755 -d "$(dirname "$KEI_DOCKER_KEYRING")" || return 1
+    if [ ! -e "$KEI_DOCKER_KEYRING" ]; then
+        curl -fsSL --retry 3 "$url/gpg" -o "$KEI_DOCKER_KEYRING.part" && mv -f "$KEI_DOCKER_KEYRING.part" "$KEI_DOCKER_KEYRING" \
+            || { rm -f "$KEI_DOCKER_KEYRING.part"; _kei_docker_state_set status failed; echo "$(t "Docker's key could not be downloaded.")" >&2; return 1; }
+        chmod a+r "$KEI_DOCKER_KEYRING"
+        _kei_docker_state_set keyring_created yes
+    fi
+    if [ ! -e "$KEI_DOCKER_APT_SOURCE" ]; then
+        printf 'deb [arch=%s signed-by=%s] %s %s stable\n' "$arch" "$KEI_DOCKER_KEYRING" "$url" "$codename" > "$KEI_DOCKER_APT_SOURCE" || return 1
+        _kei_docker_state_set source_created yes
+    fi
+    if ! DEBIAN_FRONTEND=noninteractive apt-get update -q >/dev/null \
+       || ! DEBIAN_FRONTEND=noninteractive apt-get install -y -q $KEI_DOCKER_PACKAGES >/dev/null; then
+        _kei_docker_state_set status failed
+        echo "$(t "Docker's packages could not be installed. What was installed can be removed from the panel (Remove Docker).")" >&2
+        return 1
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl enable --now docker.service >/dev/null 2>&1
+    fi
+    if ! _kei_docker_running || ! _kei_docker compose version >/dev/null 2>&1; then
+        _kei_docker_state_set status failed
+        echo "$(t "Docker was installed but is not answering. Check: systemctl status docker")" >&2
+        return 1
+    fi
+    _kei_docker_state_set status installed
+    log "docker: installed from $url ($codename, $arch)"
+    return 0
+}
+
+# kei_docker_remove_engine confirm: removes a Docker that Koha.Nexus
+# installed, only when no container, volume or network of anyone is left.
+# A Docker found on the server is never removed.
+kei_docker_remove_engine() {
+    local n
+    [ "${1:-}" = confirm ] || return 2
+    if [ "$(_kei_docker_state_get installed_by)" != koha-nexus ]; then
+        echo "$(t "Docker was not installed by Koha.Nexus: it stays.")" >&2
+        return 4
+    fi
+    if [ -n "$(kei_owned_list docker-network)" ]; then
+        echo "$(t "Platforms still have networks in Docker: it stays.")" >&2
+        return 4
+    fi
+    if command -v docker >/dev/null 2>&1; then
+        if ! _kei_docker_running; then
+            echo "$(t "Docker is not running, so it cannot be checked that no container is left: it stays.")" >&2
+            return 4
+        fi
+        n=$(_kei_docker ps -aq 2>/dev/null | grep -c .)
+        [ "$n" -eq 0 ] || { echo "$(n="$n"; t "There are \${n} containers on this server: Docker stays.")" >&2; return 4; }
+        n=$(_kei_docker volume ls -q 2>/dev/null | grep -c .)
+        [ "$n" -eq 0 ] || { echo "$(n="$n"; t "There are \${n} volumes on this server: Docker stays.")" >&2; return 4; }
+        n=$(_kei_docker network ls --format '{{.Name}}' 2>/dev/null | grep -cvxE 'bridge|host|none')
+        [ "$n" -eq 0 ] || { echo "$(n="$n"; t "There are \${n} networks of other programs in Docker: it stays.")" >&2; return 4; }
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now docker.socket docker.service containerd.service >/dev/null 2>&1
+    fi
+    DEBIAN_FRONTEND=noninteractive apt-get purge -y -q $KEI_DOCKER_PACKAGES >/dev/null 2>&1 || return 1
+    [ "$(_kei_docker_state_get source_created)" = yes ] && rm -f "$KEI_DOCKER_APT_SOURCE"
+    [ "$(_kei_docker_state_get keyring_created)" = yes ] && rm -f "$KEI_DOCKER_KEYRING"
+    rm -f "$KEI_DOCKER_STATE"
+    log "docker: removed (installed by Koha.Nexus, nothing left in it)"
+    echo "$(t "Docker was removed. /var/lib/docker (images) was kept: delete it yourself if you do not need it.")"
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Platform networks: kn-<id>, a /24 of its own.
+# ----------------------------------------------------------------------
+_kei_ip2int() { local IFS=.; set -- $1; printf '%s' $(( ($1 << 24) + ($2 << 16) + ($3 << 8) + $4 )); }
+# _kei_cidr_overlap A/n B/m: the two ranges share an address.
+_kei_cidr_overlap() {
+    local a="${1%/*}" am="${1#*/}" b="${2%/*}" bm="${2#*/}" m mask
+    [ "$am" = "$1" ] && am=32; [ "$bm" = "$2" ] && bm=32
+    m=$(( am < bm ? am : bm ))
+    mask=$(( m == 0 ? 0 : (0xFFFFFFFF << (32 - m)) & 0xFFFFFFFF ))
+    [ $(( $(_kei_ip2int "$a") & mask )) -eq $(( $(_kei_ip2int "$b") & mask )) ]
+}
+
+# kei_docker_used_nets: IPv4 ranges already in use: routes (all tables),
+# addresses, Docker networks, the registry and the VPN.
+kei_docker_used_nets() {
+    {
+        ip -4 route show table all 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) { print $i; break } }'
+        ip -4 -o addr show 2>/dev/null | awk '{ print $4 }'
+        if _kei_docker_running; then
+            _kei_docker network inspect $(_kei_docker network ls -q) --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' 2>/dev/null | tr ' ' '\n'
+        fi
+        kei_owned_list docker-network | awk -F'\t' '{ print $6 }'
+        printf '%s.0/24\n' "${WG_NET:-10.66.0}"
+    } | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$' | sort -u
+}
+
+# kei_docker_pick_subnet: the first free /24 of KEI_DOCKER_POOLS.
+kei_docker_pick_subnet() {
+    local used pool n cand u ok
+    used=$(kei_docker_used_nets)
+    for pool in $KEI_DOCKER_POOLS; do
+        for n in $(seq 1 254); do
+            cand="$pool.$n.0/24"; ok=1
+            for u in $used; do _kei_cidr_overlap "$cand" "$u" && { ok=0; break; }; done
+            [ "$ok" = 1 ] && { printf '%s\n' "$cand"; return 0; }
+        done
+    done
+    return 1
+}
+
+_kei_docker_net_labels() {
+    _kei_docker network inspect -f "{{index .Labels \"$KEI_DOCKER_LABEL.managed\"}} {{index .Labels \"$KEI_DOCKER_LABEL.platform\"}}" "$1" 2>/dev/null
+}
+
+# kei_docker_network_create PLATFORM: the platform's network, registered
+# and isolated. A network of that name that is not the platform's (no
+# labels) is left alone (code 4). Prints the subnet.
+kei_docker_network_create() {
+    local platform="${1:-}" name subnet
+    kei_docker_valid_platform "$platform" || return 2
+    _kei_docker_running || { echo "$(t "Docker is not running.")" >&2; return 3; }
+    name=$(kei_docker_net_name "$platform")
+    if _kei_docker network inspect "$name" >/dev/null 2>&1; then
+        if [ "$(_kei_docker_net_labels "$name")" != "true $platform" ]; then
+            echo "$(n="$name"; t "A Docker network named \${n} exists and is not this platform's: left as it is.")" >&2
+            return 4
+        fi
+        subnet=$(_kei_docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$name")
+    else
+        subnet=$(kei_docker_pick_subnet) || { echo "$(t "No free /24 network was found for Docker.")" >&2; return 5; }
+        _kei_docker network create --driver bridge --subnet "$subnet" --gateway "${subnet%.0/24}.1" \
+            --opt "com.docker.network.bridge.name=$name" \
+            --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$platform" \
+            "$name" >/dev/null || return 1
+    fi
+    kei_owned_add docker-network "$name" "$platform" no "" "$subnet" || return 1
+    if ! kei_docker_isolation_apply; then
+        # Never a platform network without its isolation.
+        _kei_docker network rm "$name" >/dev/null 2>&1
+        kei_owned_del docker-network "$name" "$platform"
+        kei_docker_isolation_apply >/dev/null 2>&1
+        echo "$(t "The network could not be isolated, so it was removed.")" >&2
+        return 5
+    fi
+    log "docker: network $name ($subnet) for $platform"
+    printf '%s\n' "$subnet"
+}
+
+# kei_docker_network_remove PLATFORM: removes the platform's network when
+# it is registered for it, still has its labels and no container uses it.
+kei_docker_network_remove() {
+    local platform="${1:-}" name n
+    kei_docker_valid_platform "$platform" || return 2
+    name=$(kei_docker_net_name "$platform")
+    kei_owned_users docker-network "$name" | grep -qx "$platform" || return 0
+    if ! command -v docker >/dev/null 2>&1; then
+        :   # no Docker any more: the network went with it
+    elif _kei_docker network inspect "$name" >/dev/null 2>&1; then
+        if [ "$(_kei_docker_net_labels "$name")" != "true $platform" ]; then
+            echo "$(n="$name"; t "The network \${n} no longer has this platform's labels: left as it is.")" >&2
+            return 7
+        fi
+        # Stopped containers count too: they would not start again.
+        n=$(_kei_docker ps -aq --filter "network=$name" 2>/dev/null | grep -c .)
+        if [ "${n:-0}" != 0 ]; then
+            echo "$(n="$name"; t "Containers still use the network \${n}: left as it is.")" >&2
+            return 4
+        fi
+        _kei_docker network rm "$name" >/dev/null || return 1
+    elif ! _kei_docker_running; then
+        echo "$(t "Docker is not running.")" >&2
+        return 3
+    fi
+    kei_owned_del docker-network "$name" "$platform"
+    kei_docker_isolation_apply
+}
+
+# kei_docker_platform_remove PLATFORM keep|delete: the platform's
+# containers (by its labels), its volumes only with "delete", then its
+# network. Nothing without both labels is touched; never prune.
+kei_docker_platform_remove() {
+    local platform="${1:-}" data="${2:-}" filter id
+    kei_docker_valid_platform "$platform" || return 2
+    case "$data" in keep|delete) ;; *) return 2 ;; esac
+    _kei_docker_running || return 3
+    filter=(--filter "label=$KEI_DOCKER_LABEL.managed=true" --filter "label=$KEI_DOCKER_LABEL.platform=$platform")
+    for id in $(_kei_docker ps -aq "${filter[@]}"); do _kei_docker rm -f "$id" >/dev/null || return 1; done
+    if [ "$data" = delete ]; then
+        for id in $(_kei_docker volume ls -q "${filter[@]}"); do _kei_docker volume rm "$id" >/dev/null || return 1; done
+    fi
+    kei_docker_network_remove "$platform"
+}
+
+# ----------------------------------------------------------------------
+# Isolation: rebuilt from the registry each time (idempotent). With no
+# platform network left, the chains and their jumps are removed.
+# ----------------------------------------------------------------------
+_kei_ipt() { "$@" 2>/dev/null; }
+_kei_docker_chains_drop() {
+    local tool
+    for tool in iptables ip6tables; do
+        command -v "$tool" >/dev/null 2>&1 || continue
+        while _kei_ipt "$tool" -w 10 -D INPUT -j KN-INPUT; do :; done
+        _kei_ipt "$tool" -w 10 -F KN-INPUT; _kei_ipt "$tool" -w 10 -X KN-INPUT
+    done
+    while _kei_ipt iptables -w 10 -D DOCKER-USER -j KN-FORWARD; do :; done
+    while _kei_ipt iptables -w 10 -D FORWARD -j KN-FORWARD; do :; done
+    _kei_ipt iptables -w 10 -F KN-FORWARD; _kei_ipt iptables -w 10 -X KN-FORWARD
+    return 0
+}
+
+# _kei_docker_firewall: Docker's firewall backend, iptables (the default)
+# or nftables (daemon.json "firewall-backend", Docker 28 and later).
+_kei_docker_firewall() {
+    local d
+    d=$(_kei_docker info --format '{{.FirewallBackend.Driver}}' 2>/dev/null)
+    # Docker not running yet (the unit runs before it): its configuration.
+    [ -n "$d" ] || d=$(grep -oE '"firewall-backend"[[:space:]]*:[[:space:]]*"[a-z]+"' \
+        "${KEI_DOCKER_DAEMON_JSON:-/etc/docker/daemon.json}" 2>/dev/null | grep -oE '[a-z]+"$')
+    case "$d" in nftables*) echo nftables ;; *) echo iptables ;; esac
+}
+
+kei_docker_isolation_apply() {
+    local nets name subnet tool c vpn
+    command -v iptables >/dev/null 2>&1 || { echo "$(t "iptables is missing: the Docker networks cannot be isolated.")" >&2; return 3; }
+    nets=$(kei_owned_list docker-network | awk -F'\t' '{ print $2 "\t" $6 }')
+    if [ -z "$nets" ]; then
+        _kei_docker_chains_drop
+        kei_docker_isolation_unit remove
+        return 0
+    fi
+    vpn="${WG_NET:-10.66.0}.0/24"
+    for tool in iptables ip6tables; do
+        command -v "$tool" >/dev/null 2>&1 || continue
+        _kei_ipt "$tool" -w 10 -N KN-INPUT
+        "$tool" -w 10 -F KN-INPUT || return 1
+        _kei_ipt "$tool" -w 10 -C INPUT -j KN-INPUT || "$tool" -w 10 -I INPUT 1 -j KN-INPUT || return 1
+    done
+    _kei_ipt iptables -w 10 -N KN-FORWARD
+    iptables -w 10 -F KN-FORWARD || return 1
+    if [ "$(_kei_docker_firewall)" = nftables ]; then
+        # Docker's nftables backend has no DOCKER-USER: its rules live in a
+        # table of their own, and a reject in any table wins, so the jump
+        # goes straight in FORWARD.
+        while _kei_ipt iptables -w 10 -D DOCKER-USER -j KN-FORWARD; do :; done
+        _kei_ipt iptables -w 10 -C FORWARD -j KN-FORWARD || iptables -w 10 -I FORWARD 1 -j KN-FORWARD || return 1
+    else
+        while _kei_ipt iptables -w 10 -D FORWARD -j KN-FORWARD; do :; done
+        # iptables backend: DOCKER-USER runs before Docker's own rules,
+        # whatever order Docker puts its jumps in when it starts.
+        _kei_ipt iptables -w 10 -N DOCKER-USER
+        _kei_ipt iptables -w 10 -C DOCKER-USER -j KN-FORWARD || iptables -w 10 -I DOCKER-USER 1 -j KN-FORWARD || return 1
+    fi
+    while IFS=$'\t' read -r name subnet; do
+        [ -n "$name" ] || continue
+        c=(-m comment --comment "koha-nexus:${name#"$KEI_DOCKER_NET_PREFIX"}")
+        for tool in iptables ip6tables; do
+            command -v "$tool" >/dev/null 2>&1 || continue
+            "$tool" -w 10 -A KN-INPUT -i "$name" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN "${c[@]}" || return 1
+            "$tool" -w 10 -A KN-INPUT -i "$name" -p udp --dport 53 -j RETURN "${c[@]}" || return 1
+            "$tool" -w 10 -A KN-INPUT -i "$name" -p tcp --dport 53 -j RETURN "${c[@]}" || return 1
+            "$tool" -w 10 -A KN-INPUT -i "$name" -p tcp -j REJECT --reject-with tcp-reset "${c[@]}" || return 1
+            "$tool" -w 10 -A KN-INPUT -i "$name" -j REJECT "${c[@]}" || return 1
+        done
+        iptables -w 10 -A KN-FORWARD -i "$name" -o "$name" -j RETURN "${c[@]}" || return 1
+        iptables -w 10 -A KN-FORWARD -i "$name" -o "${KEI_DOCKER_NET_PREFIX}+" -j REJECT "${c[@]}" || return 1
+        iptables -w 10 -A KN-FORWARD -i "$name" -d "$vpn" -m conntrack --ctstate NEW -j REJECT "${c[@]}" || return 1
+    done <<< "$nets"
+    kei_docker_isolation_unit install
+    return 0
+}
+
+# kei_docker_isolation_unit install|remove: re-applies the rules at boot
+# and whenever Docker (re)starts. Nothing to do without systemd.
+kei_docker_isolation_unit() {
+    local unit="$KEI_DOCKER_UNIT_DIR/$KEI_DOCKER_UNIT" tmp
+    [ -d /run/systemd/system ] || [ -n "${KEI_DOCKER_UNIT_FORCE:-}" ] || return 0
+    if [ "${1:-}" = remove ]; then
+        [ -f "$unit" ] || return 0
+        systemctl disable "$KEI_DOCKER_UNIT" >/dev/null 2>&1
+        systemctl stop --no-block "$KEI_DOCKER_UNIT" >/dev/null 2>&1
+        rm -f "$unit"
+        systemctl daemon-reload >/dev/null 2>&1
+        return 0
+    fi
+    tmp=$(mktemp) || return 1
+    cat > "$tmp" <<EOF
+# Managed by Koha.Nexus: isolation of the platforms' Docker networks.
+# Removed with the last platform network. Do not edit.
+[Unit]
+Description=Koha.Nexus: isolation of the platforms' Docker networks
+# Before Docker starts the containers, after the firewalls load theirs.
+Before=docker.service
+After=network-pre.target ufw.service netfilter-persistent.service firewalld.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=${KEI_DOCKER_ISOLATION_CMD:-$KEI_PANEL_COMMAND --task docker-isolation}
+
+[Install]
+WantedBy=multi-user.target docker.service
+EOF
+    if ! cmp -s "$tmp" "$unit"; then
+        mkdir -p "$KEI_DOCKER_UNIT_DIR" && cp "$tmp" "$unit" && chmod 644 "$unit"
+        systemctl daemon-reload >/dev/null 2>&1
+        # --no-block: its own run comes back here and finds the file unchanged.
+        systemctl enable "$KEI_DOCKER_UNIT" >/dev/null 2>&1
+        systemctl start --no-block "$KEI_DOCKER_UNIT" >/dev/null 2>&1
+    fi
+    rm -f "$tmp"
+    return 0
+}
+
+# _kei_docker_task FUNCTION ARGS: a panel task; what the function says on
+# stderr becomes the error box, its stdout the closing box.
+_kei_docker_task() {
+    local out err rc
+    err=$(mktemp) || return 1
+    out=$("$@" 2>"$err"); rc=$?
+    if [ "$rc" != 0 ]; then
+        msg_error "" "$(cat "$err")"
+    elif [ -n "$out" ]; then
+        msg_ok "$out"
+    fi
+    rm -f "$err"
+    return "$rc"
+}
+
+# kei_docker_audit PLATFORM: checks the platform's containers against the
+# rules (not privileged, not on the host's network or PID space, no Docker
+# socket, no-new-privileges, ports only on 127.0.0.1, only its network).
+# Prints "NAME<TAB>problem" lines; returns 1 when any is found.
+kei_docker_audit() {
+    local platform="${1:-}" id info name priv netmode pid secopt ports mounts nets managed bad=0 p ip
+    kei_docker_valid_platform "$platform" || return 2
+    _kei_docker_running || return 3
+    for id in $(_kei_docker ps -aq --filter "label=$KEI_DOCKER_LABEL.platform=$platform"); do
+        info=$(_kei_docker inspect -f '{{.Name}}|{{.HostConfig.Privileged}}|{{.HostConfig.NetworkMode}}|{{.HostConfig.PidMode}}|{{json .HostConfig.SecurityOpt}}|{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}{{$p}}@{{.HostIp}} {{end}}{{end}}|{{range .Mounts}}{{.Source}} {{end}}|{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}|{{index .Config.Labels "'"$KEI_DOCKER_LABEL"'.managed"}}' "$id") || continue
+        IFS='|' read -r name priv netmode pid secopt ports mounts nets managed <<< "$info"
+        name="${name#/}"
+        [ "$priv" = true ] && { printf '%s\tprivileged\n' "$name"; bad=1; }
+        [ "$netmode" = host ] && { printf '%s\thost network\n' "$name"; bad=1; }
+        [ "$pid" = host ] && { printf '%s\thost PID namespace\n' "$name"; bad=1; }
+        [[ "$secopt" == *no-new-privileges* ]] || { printf '%s\tno-new-privileges missing\n' "$name"; bad=1; }
+        [ "$managed" = true ] || { printf '%s\tlabel %s.managed missing\n' "$name" "$KEI_DOCKER_LABEL"; bad=1; }
+        for p in $ports; do
+            ip="${p#*@}"
+            [ "$ip" = 127.0.0.1 ] || { printf '%s\tport %s published on %s\n' "$name" "${p%@*}" "${ip:-0.0.0.0}"; bad=1; }
+        done
+        for p in $mounts; do
+            case "$p" in /var/run/docker.sock|/run/docker.sock|/) printf '%s\tmounts %s\n' "$name" "$p"; bad=1 ;; esac
+        done
+        for p in $nets; do
+            [ "$p" = "$(kei_docker_net_name "$platform")" ] || { printf '%s\ton network %s\n' "$name" "$p"; bad=1; }
+        done
+    done
+    return "$bad"
 }
 
 # ======================================================================
@@ -11863,9 +12453,10 @@ kei_status_json() {
     printf '"disk":{"total":%s,"free":%s},' "$(json_num "$d_total")" "$(json_num "$d_free")"
     printf '"memory":{"total":%s,"available":%s},' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
     # Added after the fields above (schema 1 unchanged): readers that do not
-    # know "platforms" or "proxy" ignore them.
+    # know "platforms", "proxy" or "docker" ignore them.
     printf '"platforms":%s,' "$(kei_platforms_json "${svc_states[@]}")"
-    printf '"proxy":%s}\n' "$(kei_proxy_json)"
+    printf '"proxy":%s,' "$(kei_proxy_json)"
+    printf '"docker":%s}\n' "$(kei_docker_json)"
 }
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key
@@ -40050,8 +40641,8 @@ kei_action_needs_koha() {
 # its services). Same rule as above for the tasks the panel's own screens
 # run directly. Tasks of the whole server (info, install*, timezones,
 # validation-report, ufw, fail2ban, vpn-*, clock, status, cloud-*, cf-*,
-# export-diagnostics, ai-helper-*, ollama-install, tool-install, reboot) are
-# not listed.
+# export-diagnostics, ai-helper-*, ollama-install, tool-install, docker-*,
+# reboot) are not listed.
 kei_task_needs_koha() {
     case "${1:-}" in
         backup-manual|backup-test|backup-marc|marc-info|restore-check|restore|db-maintenance|\
@@ -40619,6 +41210,17 @@ kei_task() {
         cloud-plan-save) cloud_plan_save "${1:-}" "${2:-}" "${3:-}" "${4:-0}" "${5:-}" ;;
         cloud-plan-delete) cloud_plan_delete "${1:-}" ;;
         cloud-rclone-official) cloud_rclone_official ;;
+        docker-status)
+            local k v
+            while IFS='=' read -r k v; do kei_result "$k" "$v"; done < <(kei_docker_detect)
+            return 0 ;;
+        docker-plan)
+            local k v rc
+            while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_docker_plan; echo "rc	$?")
+            return 0 ;;
+        docker-install)  _kei_docker_task kei_docker_install "${1:-}" ;;
+        docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
+        docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
         cf-status)       cf_status ;;
         cf-check)        cf_check ;;
         cf-service)      cf_service "${1:-}" ;;

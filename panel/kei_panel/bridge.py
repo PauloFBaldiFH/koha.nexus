@@ -575,6 +575,9 @@ _DEMO_STATUS = {
         {"id": "dspace", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
     ],
     "proxy": {"mode": "apache-nexus", "server": "apache2", "sites": 0},
+    "docker": {"installed": False, "package": "", "engine": "", "compose": "", "running": False, "installed_by": "",
+               "others": {"containers": 0, "networks": 0, "volumes": 0}, "platform_networks": 0,
+               "group_members": 0, "forward_policy": "ACCEPT"},
 }
 _DEMO_NO_KOHA = {
     "state": "not_installed", "koha_installed": False,
@@ -586,6 +589,7 @@ _DEMO_NO_KOHA = {
     "platforms": [{"id": "koha", "supported": True, "detected": False, "services": "none", "units": {},
                    "health": "unknown"}] + _DEMO_STATUS["platforms"][1:],
     "proxy": {"mode": "none", "server": "", "sites": 0},
+    "docker": _DEMO_STATUS["docker"],
 }
 
 _DEMO_TABLES = [
