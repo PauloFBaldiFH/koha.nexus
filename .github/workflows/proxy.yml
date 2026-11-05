@@ -9,6 +9,12 @@
 #           validation (proxy_system.bats), and Docker installed from its
 #           official repository with the isolation tests
 #           (docker_isolation.bats).
+#   tainacan  the same machines: Tainacan installed the way the panel does
+#           it, with the real plugin from wordpress.org (mandatory here) and
+#           the images from Docker Hub by digest; data, isolation,
+#           persistence, backup, isolated restore test, restore, address,
+#           uninstall (tainacan_system.bats), then a real reboot of the
+#           machine between two phases (tainacan_reboot.bats).
 name: proxy
 
 on:
@@ -22,6 +28,9 @@ on:
       - "tests/docker_isolation.bats"
       - "tests/uninstall_registry.bats"
       - "tests/platforms.bats"
+      - "tests/tainacan.bats"
+      - "tests/tainacan_system.bats"
+      - "tests/tainacan_reboot.bats"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
   pull_request:
@@ -34,6 +43,9 @@ on:
       - "tests/docker_isolation.bats"
       - "tests/uninstall_registry.bats"
       - "tests/platforms.bats"
+      - "tests/tainacan.bats"
+      - "tests/tainacan_system.bats"
+      - "tests/tainacan_reboot.bats"
       - "tests/system/**"
       - ".github/workflows/proxy.yml"
 
@@ -57,7 +69,7 @@ jobs:
               apt-get update -qq
               apt-get install -y -qq apache2 bats curl python3 iproute2 >/dev/null
               cd /src
-              bats tests/platforms.bats tests/proxy.bats tests/docker.bats
+              bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
               bats tests/uninstall_registry.bats'
 
   system:
@@ -88,6 +100,31 @@ jobs:
         run: tests/system/container.sh run kn-system bats tests/proxy_system.bats
       - name: Docker installed with consent, isolation tests
         run: tests/system/container.sh run kn-system bats tests/docker_isolation.bats
+      - name: Stop
+        if: always()
+        run: tests/system/container.sh stop kn-system
+
+  tainacan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12", "debian:13"]
+    env:
+      KEI_REQUIRE_REAL_TAINACAN: "1"
+      KEI_TAINACAN_REGISTRY: docker.io
+    steps:
+      - uses: actions/checkout@v4
+      - name: A machine with systemd
+        run: tests/system/container.sh start "${{ matrix.image }}" kn-system
+      - name: Tainacan, real plugin, Koha and third parties preserved
+        run: tests/system/container.sh run kn-system bats tests/tainacan_system.bats
+      - name: Before the reboot
+        run: KEI_REBOOT_PHASE=before tests/system/container.sh run kn-system bats tests/tainacan_reboot.bats
+      - name: Reboot
+        run: tests/system/container.sh reboot kn-system
+      - name: After the reboot
+        run: KEI_REBOOT_PHASE=after tests/system/container.sh run kn-system bats tests/tainacan_reboot.bats
       - name: Stop
         if: always()
         run: tests/system/container.sh stop kn-system

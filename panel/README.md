@@ -44,8 +44,8 @@ and button also takes mouse clicks, and lists scroll with the wheel.
 ## A server without Koha (platforms)
 
 Koha is optional: the panel opens and stays usable on a server that does not
-have it. `platforms.py` lists the platforms the panel knows (Koha supported;
-Tainacan, AtoM and DSpace planned) and keeps four facts apart for each one:
+have it. `platforms.py` lists the platforms the panel knows (Koha and Tainacan
+supported; AtoM and DSpace planned) and keeps four facts apart for each one:
 supported by this panel, installation detected, services, functional health.
 Health stays "not verified" until a real check exists: a configuration file
 or a running service is no proof that a platform works.
@@ -70,6 +70,13 @@ or a running service is no proof that a platform works.
   plan (`--task docker-plan`) is shown first and nothing happens without a
   Yes; "Remove Docker" appears only for a Docker that Koha.Nexus installed
   and that holds nothing of anyone.
+- Tainacan (WordPress, the Tainacan plugin and MariaDB in containers, images
+  pinned by digest, the plugin checked file by file against wordpress.org's
+  published checksums) has its own row of buttons: install (address asked,
+  then the plan, then Yes), diagnosis, logs with secrets blanked, back up
+  now, test a restore in an isolated copy, restore, administrator password
+  and uninstall (keep or delete the data; deleting makes a last backup
+  first). Every action is an installer task (`--task tainacan-*`).
 - Resource ownership (installer `kei_owned_*`): what Koha.Nexus creates for
   a platform (an Apache site `zz-koha-nexus-<id>.conf`, a module, a UFW
   port, a tunnel address) is written in `/var/lib/koha-nexus/owned.tsv`,

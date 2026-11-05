@@ -460,6 +460,37 @@ _SCRIPTS: dict[str, list[str]] = {
                     "@@result undo=Docker installed here can be removed from the panel while no container, volume "
                     "or network exists.", "@@result rc=0"],
     "docker-install": ["@@note Installing Docker...", "@@msg ok OK\tDocker is installed."],
+    "tainacan-plan": ["@@result plan=install", "@@result address=http://192.168.0.10:8090",
+                      "@@result web=Apache site on its own port 8090, opened in the firewall; the other sites stay "
+                      "as they are.",
+                      "@@result images=WordPress 7.1.4 (PHP 8.3), MariaDB 11.8, WP-CLI 2.12 (fixed by digest)",
+                      "@@result plugin=Tainacan 1.4.1 (checked against the checksums published by wordpress.org)",
+                      "@@result network=Docker network kn-tainacan, isolated from the host, the VPN and the other "
+                      "platforms",
+                      "@@result data=Docker volumes kn-tainacan-db and kn-tainacan-wp",
+                      "@@result kept=Not changed: Koha, its database and its sites, Docker's configuration and "
+                      "anything of other programs.", "@@result rc=0"],
+    "tainacan-install": ["@@note Downloading the images (this can take a few minutes)...",
+                         "@@msg ok OK\tTainacan is installed at http://192.168.0.10:8090. Administrator: knadmin "
+                         "(password: Platforms, Tainacan, Administrator)."],
+    "tainacan-status": ["@@result status=installed", "@@result url=http://192.168.0.10:8090",
+                        "@@result db=running", "@@result wordpress=running", "@@result health=healthy",
+                        "@@result collections=3", "@@result items=128", "@@result attachments=117",
+                        "@@result attachments_missing=0", "@@result wordpress_version=7.1.4",
+                        "@@result tainacan_version=1.4.1", "@@result images_pinned=yes", "@@result audit=ok",
+                        "@@result last_backup=knx-tainacan-20261105-020000", "@@result backups=3"],
+    "tainacan-logs": ["@@msg ok OK\twordpress-1  | AH00094: Command line: 'apache2 -D FOREGROUND'"],
+    "tainacan-backup": ["@@msg ok OK\t/var/backups/koha-nexus/tainacan/knx-tainacan-20261105-143000"],
+    "tainacan-backups": ["@@result backup=knx-tainacan-20261105-020000|2026-11-05 02:00:00|manual",
+                         "@@result backup=knx-tainacan-20261104-020000|2026-11-04 02:00:00|manual"],
+    "tainacan-restore-test": ["@@msg ok OK\tRestore test passed for knx-tainacan-20261105-020000: the isolated copy "
+                              "had the same collections, items and attachments, and answered through the API. "
+                              "(ok 3 128 117)"],
+    "tainacan-restore": ["@@msg ok OK\tRestored knx-tainacan-20261105-020000. The state before is in the safety "
+                         "backup knx-tainacan-20261105-143500. (ok 3 128 117)"],
+    "tainacan-credentials": ["@@msg ok OK\tTainacan administrator\nAddress: http://192.168.0.10:8090/wp-admin/\n"
+                             "User: knadmin\nPassword: demo-password-123"],
+    "tainacan-uninstall": ["@@msg ok OK\tTainacan was uninstalled. Its data was kept: installing it again uses it."],
     "docker-remove": ["@@msg ok OK\tDocker was removed. /var/lib/docker (images) was kept: delete it yourself if "
                       "you do not need it."],
     "vpn-stop": ["@@msg ok OK\tThe VPN is off. The devices and keys are kept: Set up turns it on again."],
@@ -637,7 +668,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
-                            "docker-plan") \
+                            "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups") \
         else 0.05 if name == "install" else 0.15
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
