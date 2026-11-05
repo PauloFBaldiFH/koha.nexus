@@ -574,6 +574,7 @@ _DEMO_STATUS = {
         {"id": "atom", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
         {"id": "dspace", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
     ],
+    "proxy": {"mode": "apache-nexus", "server": "apache2", "sites": 0},
 }
 _DEMO_NO_KOHA = {
     "state": "not_installed", "koha_installed": False,
@@ -584,6 +585,7 @@ _DEMO_NO_KOHA = {
     "backup": {"last_file": "", "last_epoch": 0, "last_size": 0, "last_result": "", "log_epoch": 0},
     "platforms": [{"id": "koha", "supported": True, "detected": False, "services": "none", "units": {},
                    "health": "unknown"}] + _DEMO_STATUS["platforms"][1:],
+    "proxy": {"mode": "none", "server": "", "sites": 0},
 }
 
 _DEMO_TABLES = [

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.165"
+PANEL_VERSION=" 1.5.166"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9038,17 +9038,9 @@ function_cloudflare_setup() {
     fi
 
     mkdir -p /etc/cloudflared
-    cat > /etc/cloudflared/config.yml <<EOF
-tunnel: ${tunnel_id}
-credentials-file: ${cred_file}
-
-ingress:
-  - hostname: ${opac_sub}.${dominio}
-    service: http://localhost:80
-  - hostname: ${staff_sub}.${dominio}
-    service: http://localhost:8080
-  - service: http_status:404
-EOF
+    # Koha's two addresses plus those other platforms registered.
+    kei_tunnel_config "$tunnel_id" "$cred_file" "${opac_sub}.${dominio}" "${staff_sub}.${dominio}" \
+        > /etc/cloudflared/config.yml
 
     tui_run "$(t "Registering the catalog address")" cloudflare_route_dns "$tunnel_name" "${opac_sub}.${dominio}"
     tui_run "$(t "Registering the staff address")" cloudflare_route_dns "$tunnel_name" "${staff_sub}.${dominio}"
@@ -11102,6 +11094,441 @@ kei_events_json() {
 }
 
 # ======================================================================
+# RESOURCE OWNERSHIP AND THE WEB PROXY
+# ----------------------------------------------------------------------
+# What Koha.Nexus creates for a platform is written in a registry, one line
+# per resource; anything that is not in it is never changed or removed.
+# Nothing here runs by itself: the platforms that will publish an address
+# (planned) call these functions. Koha's own Apache site, ports.conf,
+# modules, UFW rules and tunnel are left exactly as they are.
+#
+# Registry (KEI_OWNED_FILE), tab separated:
+#   kind  name  platform  preexisting(yes|no)  sha256|-  detail|-
+# kinds: apache-site, apache-module, ufw-port, ingress.
+# A TSV, not JSON: the installer is Bash and a server without Koha may have
+# no Python; awk reads it and flock + rename write it.
+# ======================================================================
+KEI_OWNED_DIR="${KEI_OWNED_DIR:-/var/lib/koha-nexus}"
+KEI_OWNED_FILE="$KEI_OWNED_DIR/owned.tsv"
+KEI_APACHE_DIR="${KEI_APACHE_DIR:-/etc/apache2}"
+KEI_PROXY_PREFIX="zz-koha-nexus-"
+KEI_PROXY_HEADER="# Managed by Koha.Nexus:"
+
+# One registry column: no tab, no newline, "-" when empty.
+_kei_owned_col() {
+    local v="${1:-}"
+    v="${v//$'\t'/ }"; v="${v//$'\n'/ }"
+    printf '%s' "${v:--}"
+}
+
+# _kei_owned_rewrite KIND NAME PLATFORM [LINE]: drops that resource's line
+# and appends LINE, under a lock, by an atomic rename.
+_kei_owned_rewrite() {
+    local kind="$1" name="$2" platform="$3" line="${4:-}"
+    mkdir -p "$KEI_OWNED_DIR" || return 1
+    (
+        flock -w 30 9 || exit 1
+        tmp=$(mktemp "$KEI_OWNED_FILE.XXXXXX") || exit 1
+        if [ -f "$KEI_OWNED_FILE" ]; then
+            awk -F'\t' -v k="$kind" -v n="$name" -v p="$platform" '!($1 == k && $2 == n && $3 == p)' \
+                "$KEI_OWNED_FILE" > "$tmp" || { rm -f "$tmp"; exit 1; }
+        fi
+        if [ -n "$line" ]; then printf '%s\n' "$line" >> "$tmp" || { rm -f "$tmp"; exit 1; }; fi
+        chmod 644 "$tmp" && mv -f "$tmp" "$KEI_OWNED_FILE"
+    ) 9>"$KEI_OWNED_FILE.lock"
+}
+
+# kei_owned_add KIND NAME PLATFORM PREEXISTING [SHA256] [DETAIL]
+kei_owned_add() {
+    local kind name platform pre
+    kind=$(_kei_owned_col "${1:-}"); name=$(_kei_owned_col "${2:-}"); platform=$(_kei_owned_col "${3:-}")
+    pre="${4:-}"
+    [ "$kind" != - ] && [ "$name" != - ] && [ "$platform" != - ] || return 2
+    case "$pre" in yes|no) ;; *) return 2 ;; esac
+    _kei_owned_rewrite "$kind" "$name" "$platform" \
+        "$(printf '%s\t%s\t%s\t%s\t%s\t%s' "$kind" "$name" "$platform" "$pre" "$(_kei_owned_col "${5:-}")" "$(_kei_owned_col "${6:-}")")"
+}
+
+# kei_owned_del KIND NAME PLATFORM
+kei_owned_del() {
+    [ -n "${1:-}" ] && [ -n "${2:-}" ] && [ -n "${3:-}" ] || return 2
+    [ -f "$KEI_OWNED_FILE" ] || return 0
+    _kei_owned_rewrite "$1" "$2" "$3"
+}
+
+# kei_owned_list [KIND] [PLATFORM]: the matching registry lines.
+kei_owned_list() {
+    [ -f "$KEI_OWNED_FILE" ] || return 0
+    awk -F'\t' -v k="${1:-}" -v p="${2:-}" 'NF >= 4 && (k == "" || $1 == k) && (p == "" || $3 == p)' "$KEI_OWNED_FILE"
+}
+
+# kei_owned_users KIND NAME: the platforms that use that resource.
+kei_owned_users() {
+    kei_owned_list "${1:-}" | awk -F'\t' -v n="${2:-}" '$2 == n { print $3 }' | sort -u
+}
+
+# kei_owned_was_preexisting KIND NAME: it existed before Koha.Nexus used it.
+kei_owned_was_preexisting() {
+    kei_owned_list "${1:-}" | awk -F'\t' -v n="${2:-}" '$2 == n && $4 == "yes" { f = 1 } END { exit !f }'
+}
+
+# kei_owned_platforms: every platform with at least one resource.
+kei_owned_platforms() { kei_owned_list | awk -F'\t' '{ print $3 }' | sort -u; }
+
+# ----------------------------------------------------------------------
+# Which web server answers on this machine (read only).
+# ----------------------------------------------------------------------
+# kei_web_listeners: "PORT PROGRAM" for every TCP listener on 80 and 443.
+kei_web_listeners() {
+    ss -Hltnp 2>/dev/null | awk '{
+        n = split($4, a, ":"); port = a[n]
+        if (port != "80" && port != "443") next
+        prog = "?"
+        if (match($0, /users:\(\("[^"]+"/)) prog = substr($0, RSTART + 9, RLENGTH - 10)
+        print port, prog }' | sort -u
+}
+
+# kei_apache_foreign_sites: enabled Apache sites that are neither Koha's
+# (<instance>.conf, one per /etc/koha/sites/<instance>) nor Koha.Nexus's
+# own (zz-koha-nexus-*). Debian's 000-default counts as foreign: it may
+# serve someone's pages.
+kei_apache_foreign_sites() {
+    local f base inst ours
+    for f in "$KEI_APACHE_DIR"/sites-enabled/*; do
+        [ -e "$f" ] || continue
+        base="${f##*/}"
+        case "$base" in "$KEI_PROXY_PREFIX"*) continue ;; esac
+        ours=0
+        for inst in "${KEI_KOHA_SITES_DIR:-/etc/koha/sites}"/*/; do
+            [ -d "$inst" ] || continue
+            inst="${inst%/}"; inst="${inst##*/}"
+            [ "$base" = "$inst.conf" ] && ours=1
+        done
+        [ "$ours" = 1 ] || printf '%s\n' "$base"
+    done
+}
+
+# kei_proxy_detect: "MODE SERVER", MODE being one of
+#   none           nothing on 80/443 and no Apache
+#   apache-nexus   Apache with only Koha's and Koha.Nexus's sites
+#   apache-shared  Apache that also serves other sites
+#   external       another web server (Nginx, Caddy, Traefik...) on 80/443
+kei_proxy_detect() {
+    local listeners port prog other="" apache=0
+    listeners=$(kei_web_listeners)
+    if command -v apache2ctl >/dev/null 2>&1 || [ -f "$KEI_APACHE_DIR/apache2.conf" ]; then apache=1; fi
+    while read -r port prog; do
+        [ -n "$prog" ] || continue
+        case "$prog" in apache2|httpd) ;; *) other="$prog" ;; esac
+    done <<< "$listeners"
+    if [ -n "$other" ]; then printf 'external %s\n' "$other"
+    elif [ "$apache" = 0 ]; then
+        if [ -n "$listeners" ]; then printf 'external ?\n'; else printf 'none -\n'; fi
+    elif [ -n "$(kei_apache_foreign_sites)" ]; then printf 'apache-shared apache2\n'
+    else printf 'apache-nexus apache2\n'
+    fi
+}
+
+# kei_proxy_json: the "proxy" object of --status-json.
+kei_proxy_json() {
+    local mode server sites
+    read -r mode server < <(kei_proxy_detect)
+    sites=$(kei_owned_list apache-site | awk 'END { print NR }')
+    [ "$server" = "-" ] && server=""
+    printf '{"mode":%s,"server":%s,"sites":%s}' "$(json_str "$mode")" "$(json_str "$server")" "$(json_num "$sites")"
+}
+
+# ----------------------------------------------------------------------
+# Apache sites of the platforms: applied without bringing down what exists.
+# ----------------------------------------------------------------------
+kei_proxy_valid_id() { [[ "${1:-}" =~ ^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$ ]]; }
+kei_proxy_site_name() { printf '%s%s.conf' "$KEI_PROXY_PREFIX" "$1"; }
+
+kei_apache_reload() {
+    if [ -d /run/systemd/system ] && systemctl is-active --quiet apache2 2>/dev/null; then
+        systemctl reload apache2
+    else
+        apache2ctl graceful
+    fi
+}
+
+# kei_apache_snapshot [SKIP_SITE]: what must not change when a site is
+# added or removed: the default server of every port (the first vhost
+# loaded answers a request by IP) and the HTTP status of every name-based
+# vhost, the ones of SKIP_SITE left out.
+kei_apache_snapshot() {
+    local skip="${1:-}" port name code
+    apache2ctl -S 2>/dev/null | awk -v skip="$skip" '
+        function file(s,  n, a) { sub(/^\(/, "", s); sub(/:[0-9]+\)$/, "", s); n = split(s, a, "/"); return a[n] }
+        /^[^ \t]+:[0-9]+[ \t]+is a NameVirtualHost/ { n = split($1, a, ":"); port = a[n]; next }
+        $1 == "default" && $2 == "server" { print "default", port, file($4); next }
+        $1 == "port" && $3 == "namevhost" { if (file($5) != skip) print "vhost", $2, $4; next }
+        $1 ~ /:[0-9]+$/ && $2 != "is" { n = split($1, a, ":"); print "default", a[n], file($3)
+                                         if (file($3) != skip) print "vhost", a[n], $2 }' \
+    | sort -u | while read -r kind port name; do
+        if [ "$kind" = vhost ]; then
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 --resolve "$name:$port:127.0.0.1" \
+                   "http://$name:$port/" 2>/dev/null)
+            printf 'vhost %s %s %s\n' "$port" "$name" "${code:-000}"
+        else
+            printf 'default %s %s\n' "$port" "$name"
+        fi
+    done
+}
+
+# _kei_proxy_settled BEFORE SKIP: the snapshot is back to BEFORE (a
+# graceful reload takes a moment to reach every worker).
+_kei_proxy_settled() {
+    local i
+    for i in 1 2 3 4 5 6; do
+        [ "$(kei_apache_snapshot "$2")" = "$1" ] && return 0
+        sleep 1
+    done
+    return 1
+}
+
+_kei_proxy_enable() {
+    a2ensite -q "${1%.conf}" >/dev/null 2>&1 \
+        || ln -sfn "../sites-available/$1" "$KEI_APACHE_DIR/sites-enabled/$1"
+}
+
+_kei_proxy_disable() {
+    a2dissite -q "${1%.conf}" >/dev/null 2>&1 || true
+    rm -f "$KEI_APACHE_DIR/sites-enabled/$1"
+}
+
+# _kei_proxy_put NAME BACKUP: puts back the previous state of a site (the
+# BACKUP copy, or no site at all when BACKUP is empty).
+_kei_proxy_put() {
+    local name="$1" backup="$2" file="$KEI_APACHE_DIR/sites-available/$1"
+    if [ -n "$backup" ] && [ -f "$backup" ]; then
+        cp -p "$backup" "$file" && _kei_proxy_enable "$name"
+    else
+        _kei_proxy_disable "$name"
+        rm -f "$file"
+    fi
+}
+
+# _kei_proxy_owned_by NAME PLATFORM: the file carries this platform's header.
+_kei_proxy_owned_by() {
+    head -n1 "$KEI_APACHE_DIR/sites-available/$1" 2>/dev/null | grep -qF "$KEI_PROXY_HEADER $2/"
+}
+
+# kei_proxy_apply_site PLATFORM ID FILE: installs FILE (a <VirtualHost>
+# block) as sites-available/zz-koha-nexus-ID.conf. The "zz-" prefix loads
+# it after Koha's site, so it never becomes the default server of an IP.
+# Order: configtest (fails: previous state back, no reload), graceful
+# reload, the existing sites must answer as before (else previous state
+# back and reloaded), then the registry. Returns 2 bad arguments, 3 no
+# Apache, 4 a file that is not this platform's, 5 configtest, 6 existing
+# sites changed.
+kei_proxy_apply_site() {
+    local platform="${1:-}" id="${2:-}" src="${3:-}" name file backup="" before err sha
+    kei_proxy_valid_id "$platform" && kei_proxy_valid_id "$id" && [ -f "$src" ] || return 2
+    command -v apache2ctl >/dev/null 2>&1 || { echo "Apache is not installed." >&2; return 3; }
+    name=$(kei_proxy_site_name "$id")
+    file="$KEI_APACHE_DIR/sites-available/$name"
+    if [ -e "$file" ] && ! _kei_proxy_owned_by "$name" "$platform"; then
+        echo "$file exists and is not this platform's: left as it is." >&2
+        return 4
+    fi
+    before=$(kei_apache_snapshot "$name")
+    if [ -e "$file" ]; then
+        backup=$(mktemp) && cp -p "$file" "$backup" || return 1
+    fi
+    { printf '%s %s/%s. Do not edit.\n' "$KEI_PROXY_HEADER" "$platform" "$id"; cat "$src"; } > "$file.new" \
+        && chmod 644 "$file.new" && mv -f "$file.new" "$file" || { rm -f "$file.new" "$backup"; return 1; }
+    _kei_proxy_enable "$name"
+    if ! err=$(apache2ctl configtest 2>&1); then
+        _kei_proxy_put "$name" "$backup"; rm -f "$backup"
+        printf '%s\n' "$err" >&2
+        log "proxy: $name refused by configtest; previous state kept"
+        return 5
+    fi
+    kei_apache_reload >/dev/null 2>&1
+    if ! _kei_proxy_settled "$before" "$name"; then
+        _kei_proxy_put "$name" "$backup"; rm -f "$backup"
+        kei_apache_reload >/dev/null 2>&1
+        echo "The existing sites stopped answering as before: previous state restored." >&2
+        log "proxy: $name changed the existing sites; rolled back"
+        return 6
+    fi
+    rm -f "$backup"
+    sha=$(sha256sum "$file" | awk '{ print $1 }')
+    kei_owned_add apache-site "$name" "$platform" no "$sha"
+    log "proxy: $name applied for $platform"
+    return 0
+}
+
+# kei_proxy_remove_site PLATFORM ID: removes a site of that platform only,
+# with the same checks. Return codes as kei_proxy_apply_site.
+kei_proxy_remove_site() {
+    local platform="${1:-}" id="${2:-}" name file backup before err
+    kei_proxy_valid_id "$platform" && kei_proxy_valid_id "$id" || return 2
+    name=$(kei_proxy_site_name "$id")
+    file="$KEI_APACHE_DIR/sites-available/$name"
+    if ! kei_owned_users apache-site "$name" | grep -qx "$platform"; then
+        echo "$name is not registered for $platform: left as it is." >&2
+        return 4
+    fi
+    if [ ! -e "$file" ]; then kei_owned_del apache-site "$name" "$platform"; return 0; fi
+    _kei_proxy_owned_by "$name" "$platform" || { echo "$file is not this platform's: left as it is." >&2; return 4; }
+    command -v apache2ctl >/dev/null 2>&1 || return 3
+    before=$(kei_apache_snapshot "$name")
+    backup=$(mktemp) && cp -p "$file" "$backup" || return 1
+    _kei_proxy_disable "$name"
+    rm -f "$file"
+    if ! err=$(apache2ctl configtest 2>&1); then
+        _kei_proxy_put "$name" "$backup"; rm -f "$backup"
+        printf '%s\n' "$err" >&2
+        return 5
+    fi
+    kei_apache_reload >/dev/null 2>&1
+    if ! _kei_proxy_settled "$before" "$name"; then
+        _kei_proxy_put "$name" "$backup"; rm -f "$backup"
+        kei_apache_reload >/dev/null 2>&1
+        echo "The existing sites stopped answering as before: the site was put back." >&2
+        return 6
+    fi
+    rm -f "$backup"
+    kei_owned_del apache-site "$name" "$platform"
+    log "proxy: $name removed for $platform"
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Apache modules: counted per platform. One is disabled only when no
+# platform uses it any more and it was not enabled before.
+# ----------------------------------------------------------------------
+kei_apache_module_enabled() { [ -e "$KEI_APACHE_DIR/mods-enabled/$1.load" ]; }
+
+kei_proxy_module_use() {
+    local platform="${1:-}" mod="${2:-}" pre=no
+    kei_proxy_valid_id "$platform" && [[ "$mod" =~ ^[a-z0-9_]+$ ]] || return 2
+    if [ -n "$(kei_owned_users apache-module "$mod")" ]; then
+        kei_owned_was_preexisting apache-module "$mod" && pre=yes
+    elif kei_apache_module_enabled "$mod"; then
+        pre=yes
+    fi
+    if ! kei_apache_module_enabled "$mod"; then
+        a2enmod -q "$mod" >/dev/null 2>&1 || return 1
+    fi
+    kei_owned_add apache-module "$mod" "$platform" "$pre"
+}
+
+kei_proxy_module_release() {
+    local platform="${1:-}" mod="${2:-}" pre=no
+    kei_proxy_valid_id "$platform" && [[ "$mod" =~ ^[a-z0-9_]+$ ]] || return 2
+    kei_owned_users apache-module "$mod" | grep -qx "$platform" || return 0
+    kei_owned_was_preexisting apache-module "$mod" && pre=yes
+    kei_owned_del apache-module "$mod" "$platform"
+    [ "$pre" = no ] && [ -z "$(kei_owned_users apache-module "$mod")" ] && kei_apache_module_enabled "$mod" || return 0
+    a2dismod -q -f "$mod" >/dev/null 2>&1 || return 1
+    if ! apache2ctl configtest >/dev/null 2>&1; then
+        # Something still needs it (a site outside the registry): back on.
+        a2enmod -q "$mod" >/dev/null 2>&1
+        echo "Apache still needs the module $mod: left enabled." >&2
+        return 5
+    fi
+    kei_apache_reload >/dev/null 2>&1
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Firewall: a port a platform opens is counted the same way. A rule that
+# already existed (Koha's 80, 443 and 8080, configure_firewall) is never
+# deleted. Without UFW, or under WSL, nothing is done.
+# ----------------------------------------------------------------------
+kei_ufw_allows() { ufw status 2>/dev/null | grep -qE "^${1}/tcp[[:space:]]+ALLOW"; }
+
+kei_proxy_port_open() {
+    local platform="${1:-}" port="${2:-}" pre=no
+    kei_proxy_valid_id "$platform" && [[ "$port" =~ ^[0-9]{1,5}$ ]] || return 2
+    host_can firewall || return 0
+    command -v ufw >/dev/null 2>&1 || return 0
+    if [ -n "$(kei_owned_users ufw-port "$port")" ]; then
+        kei_owned_was_preexisting ufw-port "$port" && pre=yes
+    elif kei_ufw_allows "$port"; then
+        pre=yes
+    fi
+    if ! kei_ufw_allows "$port"; then
+        ufw allow "${port}/tcp" >/dev/null 2>&1 || return 1
+    fi
+    kei_owned_add ufw-port "$port" "$platform" "$pre"
+}
+
+kei_proxy_port_release() {
+    local platform="${1:-}" port="${2:-}" pre=no
+    kei_proxy_valid_id "$platform" && [[ "$port" =~ ^[0-9]{1,5}$ ]] || return 2
+    kei_owned_users ufw-port "$port" | grep -qx "$platform" || return 0
+    kei_owned_was_preexisting ufw-port "$port" && pre=yes
+    kei_owned_del ufw-port "$port" "$platform"
+    [ "$pre" = no ] && [ -z "$(kei_owned_users ufw-port "$port")" ] || return 0
+    command -v ufw >/dev/null 2>&1 || return 0
+    ufw delete allow "${port}/tcp" >/dev/null 2>&1 || true
+}
+
+# ----------------------------------------------------------------------
+# "External proxy" mode: another web server owns 80/443. Koha.Nexus never
+# writes its configuration; it prints the block the administrator adds.
+# ----------------------------------------------------------------------
+kei_valid_host() {
+    [[ "${1:-}" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]
+}
+
+# kei_proxy_external_snippet nginx|caddy HOSTNAME PORT
+kei_proxy_external_snippet() {
+    local kind="${1:-}" host="${2:-}" port="${3:-}"
+    kei_valid_host "$host" && [[ "$port" =~ ^[0-9]{1,5}$ ]] || return 2
+    case "$kind" in
+        nginx)
+            cat <<EOF
+# Koha.Nexus: ${host} -> 127.0.0.1:${port}
+server {
+    listen 80;
+    server_name ${host};
+    location / {
+        proxy_pass http://127.0.0.1:${port};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+            ;;
+        caddy)
+            printf '# Koha.Nexus: %s -> 127.0.0.1:%s\n%s {\n\treverse_proxy 127.0.0.1:%s\n}\n' "$host" "$port" "$host" "$port" ;;
+        *) return 2 ;;
+    esac
+}
+
+# ----------------------------------------------------------------------
+# Own-domain tunnel: config.yml is generated. Koha's two addresses first,
+# then the ones other platforms registered (kind "ingress"), then the 404
+# catch-all. With no other platform the file is the same as before, byte
+# for byte; reconfiguring Koha's domain keeps the other addresses.
+# ----------------------------------------------------------------------
+kei_tunnel_ingress_add() {
+    local platform="${1:-}" host="${2:-}" service="${3:-}"
+    kei_proxy_valid_id "$platform" && [ "$platform" != koha ] && kei_valid_host "$host" || return 2
+    [[ "$service" =~ ^https?://(localhost|127\.0\.0\.1):[0-9]{1,5}$ ]] || return 2
+    kei_owned_add ingress "$host" "$platform" no "" "$service"
+}
+
+kei_tunnel_ingress_del() { kei_owned_del ingress "${2:-}" "${1:-}"; }
+
+# kei_tunnel_config TUNNEL_ID CREDENTIALS OPAC_HOST STAFF_HOST
+kei_tunnel_config() {
+    printf 'tunnel: %s\ncredentials-file: %s\n\ningress:\n' "$1" "$2"
+    printf '  - hostname: %s\n    service: http://localhost:80\n' "$3"
+    printf '  - hostname: %s\n    service: http://localhost:8080\n' "$4"
+    kei_owned_list ingress | awk -F'\t' -v a="$3" -v b="$4" \
+        '$3 != "koha" && $6 != "-" && $2 != a && $2 != b { printf "  - hostname: %s\n    service: %s\n", $2, $6 }'
+    printf '  - service: http_status:404\n'
+}
+
+# ======================================================================
 # PLATFORMS (Koha is optional)
 # ----------------------------------------------------------------------
 # The panel works on a server without Koha. For every platform it knows,
@@ -11195,8 +11622,9 @@ kei_status_json() {
     printf '"disk":{"total":%s,"free":%s},' "$(json_num "$d_total")" "$(json_num "$d_free")"
     printf '"memory":{"total":%s,"available":%s},' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
     # Added after the fields above (schema 1 unchanged): readers that do not
-    # know "platforms" ignore it.
-    printf '"platforms":%s}\n' "$(kei_platforms_json "${svc_states[@]}")"
+    # know "platforms" or "proxy" ignore them.
+    printf '"platforms":%s,' "$(kei_platforms_json "${svc_states[@]}")"
+    printf '"proxy":%s}\n' "$(kei_proxy_json)"
 }
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key

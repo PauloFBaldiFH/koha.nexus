@@ -65,8 +65,19 @@ or a running service is no proof that a platform works.
   of a Koha installation.
 - `config.sh --status-json` adds a `platforms` array; every older field is
   unchanged.
-- The Platforms screen (`p`) shows one card per platform. Nothing is
-  installed from it.
+- The Platforms screen (`p`) shows one card per platform, plus the web
+  proxy. Nothing is installed from it.
+- Resource ownership (installer `kei_owned_*`): what Koha.Nexus creates for
+  a platform (an Apache site `zz-koha-nexus-<id>.conf`, a module, a UFW
+  port, a tunnel address) is written in `/var/lib/koha-nexus/owned.tsv`;
+  nothing outside it is changed or removed. `kei_proxy_detect` tells the
+  four cases apart (no web server, Apache with only our sites, Apache shared
+  with other sites, another web server); `kei_proxy_apply_site` runs
+  `configtest`, reloads gracefully and checks that the existing sites
+  answer as before, or puts the previous state back. `uninstall.sh` keeps
+  Apache, cloudflared, the tunnel and the panel while another platform is
+  registered. No platform uses this yet: Koha's own configuration is left
+  as it is (`tests/proxy.bats`).
 
 `KEI_PANEL_DEMO_KOHA=0 python3 -m kei_panel --demo` shows the panel of a
 server without Koha.

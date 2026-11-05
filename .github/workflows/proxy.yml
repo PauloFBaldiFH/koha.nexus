@@ -1,0 +1,42 @@
+# Resource ownership and the web proxy (installer: kei_owned_*, kei_proxy_*,
+# kei_tunnel_config; uninstall.sh). The Apache tests use a real Apache in
+# a throwaway Ubuntu container; the uninstall test purges packages, so it
+# runs there too and never on the runner itself.
+name: proxy
+
+on:
+  push:
+    paths:
+      - "installer"
+      - "uninstall.sh"
+      - "tests/proxy.bats"
+      - "tests/uninstall_registry.bats"
+      - "tests/platforms.bats"
+      - ".github/workflows/proxy.yml"
+  pull_request:
+    paths:
+      - "installer"
+      - "uninstall.sh"
+      - "tests/proxy.bats"
+      - "tests/uninstall_registry.bats"
+      - "tests/platforms.bats"
+      - ".github/workflows/proxy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  apache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apache, proxy and uninstall tests in a throwaway container
+        run: |
+          docker run --rm -v "$PWD":/src:ro -e KEI_DESTRUCTIVE_TESTS=1 -e DEBIAN_FRONTEND=noninteractive \
+            ubuntu:24.04 bash -c '
+              set -e
+              apt-get update -qq
+              apt-get install -y -qq apache2 bats curl python3 iproute2 >/dev/null
+              cd /src
+              bats tests/platforms.bats tests/proxy.bats
+              bats tests/uninstall_registry.bats'

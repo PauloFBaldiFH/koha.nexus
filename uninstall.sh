@@ -12,6 +12,9 @@
 #                                     cloudflared, rclone e o SWAP criado
 #                                     (volta ao estado de antes da instalação)
 #   --yes                             não pede confirmação (automação)
+#
+# Com outras plataformas no registro (/var/lib/koha-nexus/owned.tsv), o
+# Apache, o cloudflared, o túnel e o painel são mantidos; só o Koha sai.
 # ======================================================================
 
 # Copyright (C) 2026 Paulo F. Baldi FH
@@ -38,11 +41,28 @@ for arg in "$@"; do
         -y|--yes)  ASSUME_YES="yes" ;;
         -f|--full) FULL="yes" ;;
         -h|--help)
-            sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "Opção desconhecida: $arg (use --full, --yes ou --help)"; exit 1 ;;
     esac
 done
+
+# Registro de propriedade (installer: kei_owned_*). Recursos de outra
+# plataforma além do Koha (um site zz-koha-nexus-*, um endereço do túnel)
+# continuam: o Apache, o cloudflared, o túnel e o painel ficam, e só o que é
+# do Koha sai. Sem outras plataformas, nada muda.
+OWNED_FILE="${KEI_OWNED_DIR:-/var/lib/koha-nexus}/owned.tsv"
+OTHER_PLATFORMS=""
+if [ -f "$OWNED_FILE" ]; then
+    OTHER_PLATFORMS=$(awk -F'\t' 'NF >= 4 && $3 != "koha" { print $3 }' "$OWNED_FILE" | sort -u | tr '\n' ' ')
+    OTHER_PLATFORMS="${OTHER_PLATFORMS% }"
+fi
+keep_shared() { [ -n "$OTHER_PLATFORMS" ]; }
+# other_site NAME: um site do Apache registrado para outra plataforma.
+other_site() {
+    [ -f "$OWNED_FILE" ] || return 1
+    awk -F'\t' -v n="$1" '$1 == "apache-site" && $2 == n && $3 != "koha" { f = 1 } END { exit !f }' "$OWNED_FILE"
+}
 
 if [ "$ASSUME_YES" != "yes" ]; then
     echo "======================================================================"
@@ -53,6 +73,12 @@ if [ "$ASSUME_YES" != "yes" ]; then
     if [ "$FULL" = "yes" ]; then
         echo "  - MODO --full: também MariaDB (TODOS os bancos), Apache, Memcached,"
         echo "    Elasticsearch, RabbitMQ, cloudflared, rclone e o /swapfile"
+    fi
+    if keep_shared; then
+        echo ""
+        echo " Outras plataformas registradas neste servidor: $OTHER_PLATFORMS"
+        echo " O Apache, o cloudflared, o túnel e o painel são mantidos para elas;"
+        echo " só o que é do Koha é removido."
     fi
     echo ""
     echo " Se quiser guardar os dados, copie os backups para outro lugar ANTES."
@@ -124,13 +150,18 @@ FULL_PACKAGES=(elasticsearch rabbitmq-server cloudflared rclone
 
 # ----------------------------------------------------------------------
 step "[1/9] Parando serviços do Koha, indexadores e túnel..."
-systemctl stop 'koha-*' 'koha-es-indexer@*' 'koha-zebra-daemon@*' cloudflared 2>/dev/null || true
-systemctl disable 'koha-es-indexer@*' 'koha-zebra-daemon@*' cloudflared 2>/dev/null || true
-command -v cloudflared >/dev/null 2>&1 && cloudflared service uninstall >/dev/null 2>&1
+if keep_shared; then
+    systemctl stop 'koha-*' 'koha-es-indexer@*' 'koha-zebra-daemon@*' 2>/dev/null || true
+    systemctl disable 'koha-es-indexer@*' 'koha-zebra-daemon@*' 2>/dev/null || true
+else
+    systemctl stop 'koha-*' 'koha-es-indexer@*' 'koha-zebra-daemon@*' cloudflared 2>/dev/null || true
+    systemctl disable 'koha-es-indexer@*' 'koha-zebra-daemon@*' cloudflared 2>/dev/null || true
+    command -v cloudflared >/dev/null 2>&1 && cloudflared service uninstall >/dev/null 2>&1
+fi
 pkill -f 'zebrasrv|rebuild_zebra|es_indexer_daemon|koha-worker|background_jobs_worker|starman.*koha|z3950_responder|SIPServer' 2>/dev/null
 sleep 2
 pkill -9 -f 'zebrasrv|rebuild_zebra|es_indexer_daemon|koha-worker|background_jobs_worker|starman.*koha|z3950_responder|SIPServer' 2>/dev/null
-pkill -f 'cloudflared tunnel' 2>/dev/null
+keep_shared || pkill -f 'cloudflared tunnel' 2>/dev/null
 
 # ----------------------------------------------------------------------
 step "[2/9] Removendo as instâncias do Koha..."
@@ -166,8 +197,18 @@ dpkg --configure -a >/dev/null 2>&1 || true
 apt-get install -f -y >/dev/null 2>&1 || true
 purge_packages force "${KOHA_PACKAGES[@]}"
 if [ "$FULL" = "yes" ]; then
-    systemctl stop mariadb apache2 memcached elasticsearch rabbitmq-server 2>/dev/null || true
-    purge_packages "${FULL_PACKAGES[@]}"
+    if keep_shared; then
+        echo "    [i] Apache e cloudflared mantidos: outras plataformas os usam ($OTHER_PLATFORMS)."
+        full=()
+        for p in "${FULL_PACKAGES[@]}"; do
+            case "$p" in apache2*|libapache2-*|cloudflared) ;; *) full+=("$p") ;; esac
+        done
+        systemctl stop mariadb memcached elasticsearch rabbitmq-server 2>/dev/null || true
+        purge_packages "${full[@]}"
+    else
+        systemctl stop mariadb apache2 memcached elasticsearch rabbitmq-server 2>/dev/null || true
+        purge_packages "${FULL_PACKAGES[@]}"
+    fi
 fi
 apt-get autoremove -y --purge >/dev/null 2>&1 || true
 
@@ -176,6 +217,7 @@ step "[5/9] Restaurando o Apache e as portas padrão..."
 if [ -d /etc/apache2 ]; then
     for site in /etc/apache2/sites-enabled/*; do
         [ -e "$site" ] || continue
+        other_site "$(basename "$site")" && continue
         grep -qsi 'koha' "$site" && { a2dissite "$(basename "$site")" >/dev/null 2>&1 || rm -f "$site"; }
     done
     rm -f /etc/apache2/sites-available/library.conf /etc/apache2/sites-enabled/library.conf
@@ -189,8 +231,12 @@ step "[6/9] Removendo tarefas agendadas, scripts, unidades e repositórios..."
 rm -f /etc/cron.d/koha_* /etc/cron.d/koha-common
 rm -f /root/backup_sql.sh /root/backup_marc.sh /usr/local/bin/koha-es-watchdog.sh
 rm -f /usr/local/bin/koha-zebra-watchdog.sh /usr/local/bin/koha-wait-services.sh
-rm -f /usr/local/bin/config.sh /usr/local/bin/config.sh.bak-* /usr/local/bin/.config.sh.*
-rm -f /usr/local/bin/koha-nexus /etc/koha-nexus /usr/local/lib/koha-nexus
+if keep_shared; then
+    echo "    [i] Painel (config.sh) mantido para as outras plataformas."
+else
+    rm -f /usr/local/bin/config.sh /usr/local/bin/config.sh.bak-* /usr/local/bin/.config.sh.*
+    rm -f /usr/local/bin/koha-nexus /etc/koha-nexus /usr/local/lib/koha-nexus
+fi
 rm -f /usr/local/bin/koha-foreach /tmp/koha-foreach
 systemctl disable --now koha-stop-guard-recover.service koha-stop-guard.service >/dev/null 2>&1 || true
 rm -f /usr/local/sbin/koha-stop-guard /etc/systemd/system/koha-stop-guard.service /etc/systemd/system/koha-stop-guard-recover.service
@@ -198,8 +244,9 @@ rm -f /etc/systemd/system/koha-es-indexer@.service
 rm -rf /etc/systemd/system/multi-user.target.wants/koha-* /etc/systemd/system/koha-*.service.d
 rm -f /etc/systemd/system/apache2.service.d/koha-easy-install.conf
 rmdir /etc/systemd/system/apache2.service.d 2>/dev/null
-rm -f /etc/apt/sources.list.d/koha.list /etc/apt/sources.list.d/elastic*.list /etc/apt/sources.list.d/cloudflared.list
-rm -f /usr/share/keyrings/koha-keyring.gpg /usr/share/keyrings/elasticsearch-keyring.gpg /etc/apt/keyrings/cloudflare-main.gpg
+rm -f /etc/apt/sources.list.d/koha.list /etc/apt/sources.list.d/elastic*.list
+rm -f /usr/share/keyrings/koha-keyring.gpg /usr/share/keyrings/elasticsearch-keyring.gpg
+keep_shared || rm -f /etc/apt/sources.list.d/cloudflared.list /etc/apt/keyrings/cloudflare-main.gpg
 rm -f /etc/fail2ban/jail.d/koha-easy-install.local
 rm -f /etc/mysql/mariadb.conf.d/99-koha-tuning.cnf /etc/mysql/mariadb.conf.d/98-koha-durability.cnf
 rm -f /etc/systemd/journald.conf.d/00-koha-limits.conf /etc/logrotate.d/koha-easy-install
@@ -225,9 +272,28 @@ step "[7/9] Apagando diretórios, credenciais, backups e caches..."
 # instalado) era o que fazia o koha-create falhar na reinstalação.
 rm -rf /etc/koha /var/lib/koha /var/log/koha /var/run/koha /run/koha /var/lock/koha \
        /var/cache/koha /var/spool/koha /usr/share/koha
-rm -rf /etc/koha-easy-install /var/log/koha-easy-install /run/koha-easy-install /var/lib/koha-easy-install
+if keep_shared; then
+    rm -rf /run/koha-easy-install /var/lib/koha-easy-install
+else
+    rm -rf /etc/koha-easy-install /var/log/koha-easy-install /run/koha-easy-install /var/lib/koha-easy-install
+fi
 rm -rf /var/backups/koha_sql /var/backups/koha_marc
-rm -rf /etc/cloudflared /root/.cloudflared /home/*/.cloudflared
+if keep_shared; then
+    # Só as duas linhas do Koha (portas 80 e 8080) saem do ingress.
+    for conf in /etc/cloudflared/config.yml; do
+        [ -f "$conf" ] || continue
+        awk '/^[[:space:]]*- hostname:/ { held = $0; next }
+             held != "" { if ($0 ~ /service:[[:space:]]*http:\/\/localhost:(80|8080)[[:space:]]*$/) { held = ""; next }
+                          print held; held = "" }
+             { print }' "$conf" > "$conf.tmp" && mv -f "$conf.tmp" "$conf"
+    done
+    systemctl try-restart cloudflared >/dev/null 2>&1 || true
+    awk -F'\t' '$3 != "koha"' "$OWNED_FILE" > "$OWNED_FILE.tmp" && mv -f "$OWNED_FILE.tmp" "$OWNED_FILE"
+    echo "    [i] Túnel e registro mantidos para: $OTHER_PLATFORMS"
+else
+    rm -rf /etc/cloudflared /root/.cloudflared /home/*/.cloudflared
+    rm -rf "$(dirname "$OWNED_FILE")"
+fi
 rm -f /root/koha_credentials.txt /root/credenciais_koha.txt /root/koha_patrons_template.csv
 rm -f /var/run/koha_panel.lock /var/run/koha_backup.pid /var/run/koha_es_watchdog.pid \
       /var/lock/koha_backup.lock /var/lock/koha_es_rebuild.lock /run/lock/koha_zebra_watchdog.lock
@@ -268,14 +334,16 @@ check() {
 }
 check "pacote koha-common removido"          "dpkg-query -W -f='\${Status}' koha-common | grep -qE 'install|config-files|half'"
 check "diretório /etc/koha apagado"          "[ -e /etc/koha ]"
-check "painel (config.sh) removido"          "[ -e /usr/local/bin/config.sh ]"
-check "configuração do painel apagada"       "[ -e /etc/koha-easy-install ]"
+if ! keep_shared; then
+    check "painel (config.sh) removido"      "[ -e /usr/local/bin/config.sh ]"
+    check "configuração do painel apagada"   "[ -e /etc/koha-easy-install ]"
+fi
 check "tarefas cron do Koha removidas"       "ls /etc/cron.d/koha_* "
 check "bancos koha_* removidos"              "mysql -Nse \"SELECT 1 FROM information_schema.schemata WHERE schema_name LIKE 'koha%'\" | grep -q 1"
 check "porta 8080 livre"                     "ss -lnt | awk '{print \$4}' | grep -Eq '[.:]8080\$'"
 if [ "$FULL" = "yes" ]; then
     check "MariaDB removido"                 "dpkg-query -W -f='\${Status}' mariadb-server | grep -q 'ok installed'"
-    check "porta 80 livre"                   "ss -lnt | awk '{print \$4}' | grep -Eq '[.:]80\$'"
+    keep_shared || check "porta 80 livre"    "ss -lnt | awk '{print \$4}' | grep -Eq '[.:]80\$'"
 fi
 
 check "sistema de pacotes consistente"      "! apt-get check"
