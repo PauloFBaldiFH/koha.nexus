@@ -689,3 +689,327 @@ def test_an_incomplete_backup_is_resumed_or_discarded(no_koha):
     options, ran = asyncio.run(main())
     assert options == ["resume", "discard"]
     assert ran == [("platform-backup-resume", ("knx-tainacan-20261105-143000",))]
+
+
+# ----------------------------------------------------------------------
+# Events in Tainacan (installer: --task tainacan-events): optional, off by
+# default, the plan before anything, a dependency that was there before
+# kept, data kept when turned off.
+# ----------------------------------------------------------------------
+def test_events_state_is_read_and_unknown_values_are_not_trusted():
+    def state(**kw):
+        return platforms.tainacan_from_status({"platforms": [
+            {"id": "tainacan", "supported": True, "status": "installed", **kw}]})
+
+    assert (state().events, state().events_dependency) == ("off", "")        # an installer without events
+    on = state(events="on", events_dependency="preexisting")
+    assert (on.events, on.events_dependency) == ("on", "preexisting")
+    odd = state(events="yes; rm -rf /", events_dependency="theirs")
+    assert (odd.events, odd.events_dependency) == ("off", "")
+    docker = platforms.DockerState(True, True, "29.9.3", "2.40", "docker-ce")
+    assert "events on" in platforms.describe_tainacan(on, docker)[1]
+    assert "events" not in platforms.describe_tainacan(state(), docker)[1]
+
+
+def test_events_buttons_only_with_tainacan_installed_and_an_installer_that_has_them():
+    installed = platforms.TainacanState(True, "installed")
+    none = {"on": False, "off": False, "status": False}
+    assert platforms.events_buttons(platforms.TainacanState(True), True) == none          # Tainacan absent
+    assert platforms.events_buttons(platforms.TainacanState(True, "failed"), True) == none
+    assert platforms.events_buttons(platforms.TainacanState(), True) == none              # older installer
+    assert platforms.events_buttons(installed, False) == none                             # no events tasks
+    assert platforms.events_buttons(installed, True) == {"on": True, "off": False, "status": True}
+    on = platforms.TainacanState(True, "installed", events="on", events_dependency="ours")
+    assert platforms.events_buttons(on, True) == {"on": False, "off": True, "status": True}
+
+
+def test_turning_events_off_keeps_a_preexisting_events_manager_unless_asked():
+    pre = platforms.events_off_choices(platforms.TainacanState(True, "installed", events="on",
+                                                               events_dependency="preexisting"))
+    assert [k for k, _v in pre] == ["default", "dependency"] and "Keep" in pre[0][1]
+    # Not recorded (an older state file): treated as someone else's.
+    assert [k for k, _v in platforms.events_off_choices(platforms.TainacanState(True, "installed", events="on"))] \
+        == ["default", "dependency"]
+    ours = platforms.events_off_choices(platforms.TainacanState(True, "installed", events="on",
+                                                                events_dependency="ours"))
+    assert [k for k, _v in ours] == ["default", "keep-dependency"] and "off too" in ours[0][1]
+
+
+def test_the_installer_knows_the_events_tasks_and_arguments_the_panel_uses():
+    import pathlib
+    from kei_panel.bridge import installer_tasks
+    tasks = installer_tasks(INSTALLER)
+    assert {"tainacan-events", "tainacan-restore-notes"} <= tasks
+    body = re.search(r"^        tainacan-events\)(.*?);;\n        tainacan-restore-notes", TEXT, re.S | re.M).group(1)
+    for sub in ("plan)", "status)", "enable)", "disable)"):
+        assert sub in body, sub
+    view = pathlib.Path(platforms.__file__).with_name("views").joinpath("platforms.py").read_text(encoding="utf-8")
+    assert '"tainacan-events", "enable", "confirm"' in view
+    # The default disable (no argument) and the two explicit ones are the installer's.
+    assert re.search(r'case "\$how" in ""\|keep-dependency\|dependency\)', TEXT)
+    # --status-json carries what the buttons follow.
+    assert '"events":%s,"events_dependency":%s' in TEXT
+
+
+def _events_app(ran, events="off", dependency="", tainacan="installed", fail=None, results=None):
+    """The demo panel with Tainacan in the given state; fail = {(task,
+    first argument): the installer's error}, which then fails as bash does."""
+    app = make_app()
+    real_task, real_status = app.bridge.task, app.bridge.status
+
+    async def task(name, *args, **kwargs):
+        ran.append((name, args, dict(kwargs.get("env") or {})))
+        out = await real_task(name, *args, **kwargs)
+        key = (name, args[0] if args else "")
+        if fail and key in fail:
+            out.messages.clear()
+            out.results.clear()
+            out.feed(f"@@msg error Error\t{fail[key]}")
+            out.rc = 1
+        if results and key in results:
+            out.results.clear()
+            out.results.update(results[key])
+        return out
+
+    async def status(*args, **kwargs):
+        st = _with_docker(await real_status(*args, **kwargs))
+        st["platforms"] = [p if p["id"] != "tainacan" else
+                           {**p, "detected": tainacan == "installed", "status": tainacan, "services": "active",
+                            "health": "healthy", "url": "http://192.168.0.10:8090", "events": events,
+                            "events_dependency": dependency} for p in st["platforms"]]
+        return st
+    app.bridge.task, app.bridge.status = task, status
+    return app
+
+
+async def _open_platforms(app, pilot):
+    await pilot.pause(0.3)
+    app.screen.query_one("#sidebar").blur()
+    await pilot.press("p")
+    await pilot.pause(2.0)
+
+
+def _events_ran(ran):
+    return [r[:2] for r in ran if r[0] == "tainacan-events"]
+
+
+def test_events_are_off_by_default_and_their_buttons_follow_the_card(no_koha):
+    async def main(**kw):
+        ran: list = []
+        app = _events_app(ran, **kw)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            shown = {k: app.screen.query_one(f"#events-{k}").display for k in ("on", "off", "status")}
+            return shown, _events_ran(ran)
+
+    # Nothing is asked of the installer while the card is drawn.
+    assert asyncio.run(main()) == ({"on": True, "off": False, "status": True}, [])
+    assert asyncio.run(main(events="on", dependency="ours"))[0] == {"on": False, "off": True, "status": True}
+    # Tainacan not installed: no events buttons at all.
+    assert asyncio.run(main(tainacan="absent"))[0] == {"on": False, "off": False, "status": False}
+
+
+def test_events_are_turned_on_only_after_the_plan_and_a_yes(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen
+
+    async def main(answer: str):
+        ran: list = []
+        app = _events_app(ran)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-on").press()
+            await pilot.pause(1.0)
+            screen = app.screen
+            preview = screen._preview if isinstance(screen, ConfirmScreen) else ""
+            await pilot.click(f"#{answer}")
+            await pilot.pause(2.5)
+            return preview, _events_ran(ran)
+
+    preview, ran = asyncio.run(main("no"))
+    assert "wordpress.org" in preview and "Nexus Eventos 0.1.1" in preview and "keeps their data" in preview
+    assert ran == [("tainacan-events", ("plan",))]                       # "No": nothing changed
+    _preview, ran = asyncio.run(main("yes"))
+    assert ran == [("tainacan-events", ("plan",)), ("tainacan-events", ("enable", "confirm"))]
+
+
+def test_a_refused_plan_is_said_and_nothing_is_turned_on(no_koha):
+    from kei_panel.screens.dialogs import MessageScreen
+
+    refused = {("tainacan-events", "plan"): {
+        "plan": "refuse", "note": "Events Manager 6.4.0 is installed; Nexus Eventos needs 7.4.13 or newer. It was "
+                                  "not replaced: update it in WordPress (Plugins) after a backup.", "rc": "3"}}
+
+    async def main():
+        ran: list = []
+        app = _events_app(ran, results=refused)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-on").press()
+            await pilot.pause(1.0)
+            screen = app.screen
+            said = isinstance(screen, MessageScreen) and screen._kind == "error" and "6.4.0" in screen._body
+            return said, _events_ran(ran)
+
+    said, ran = asyncio.run(main())
+    assert said and ran == [("tainacan-events", ("plan",))]
+
+
+def test_a_failed_enable_shows_the_installers_reason(no_koha):
+    from kei_panel.screens.dialogs import MessageScreen
+
+    reason = "Events Manager did not match the checksums published by wordpress.org: it was not installed."
+
+    async def main():
+        ran: list = []
+        app = _events_app(ran, fail={("tainacan-events", "enable"): reason})
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-on").press()
+            await pilot.pause(1.0)
+            await pilot.click("#yes")
+            await pilot.pause(2.5)
+            screen = app.screen
+            return isinstance(screen, MessageScreen) and screen._kind == "error" and screen._body == reason
+
+    assert asyncio.run(main())
+
+
+def test_cancelling_a_running_enable_says_how_to_finish(no_koha):
+    from kei_panel.screens.dialogs import MessageScreen
+    from kei_panel.screens.loading import LoadingScreen
+
+    async def main():
+        ran: list = []
+        app = _events_app(ran)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-on").press()
+            await pilot.pause(1.0)
+            await pilot.click("#yes")
+            await pilot.pause(0.2)
+            loading = isinstance(app.screen, LoadingScreen)
+            await pilot.click("#cancel")
+            await pilot.pause(1.5)
+            screen = app.screen
+            said = isinstance(screen, MessageScreen) and screen._kind == "info" and "stay off" in screen._body and "turn events on again" in screen._body
+            return loading, said, _events_ran(ran)
+
+    loading, said, ran = asyncio.run(main())
+    assert loading and said
+    assert ran == [("tainacan-events", ("plan",)), ("tainacan-events", ("enable", "confirm"))]
+
+
+def test_turning_events_off_keeps_the_data_and_a_preexisting_dependency(no_koha):
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen
+
+    async def main(dependency, choice, answer="yes"):
+        ran: list = []
+        app = _events_app(ran, events="on", dependency=dependency)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-off").press()
+            await pilot.pause(1.0)
+            options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
+            prompt = app.screen._prompt if isinstance(app.screen, ChoiceScreen) else ""
+            app.screen.dismiss(choice)
+            await pilot.pause(1.0)
+            confirm = app.screen if isinstance(app.screen, ConfirmScreen) else None
+            danger = bool(confirm and confirm._danger)
+            question = confirm._question if confirm else ""
+            if confirm:
+                await pilot.click(f"#{answer}")
+                await pilot.pause(2.0)
+            return options, prompt, danger, question, _events_ran(ran)
+
+    options, prompt, danger, question, ran = asyncio.run(main("preexisting", "default"))
+    assert options == ["default", "dependency"] and "kept" in prompt
+    assert not danger and "No data is deleted" in question
+    assert ran == [("tainacan-events", ("disable",))]                    # the installer keeps it on
+    *_, danger, question, ran = asyncio.run(main("preexisting", "dependency"))
+    assert danger and "was in this WordPress before" in question
+    assert ran == [("tainacan-events", ("disable", "dependency"))]       # only with the explicit choice
+    *_, ran = asyncio.run(main("preexisting", "dependency", answer="no"))
+    assert ran == []                                                     # "No" at the warning
+    *_, ran = asyncio.run(main("preexisting", None))
+    assert ran == []                                                     # "Back" at the choice
+    options, *_, ran = asyncio.run(main("ours", "keep-dependency"))
+    assert options == ["default", "keep-dependency"]
+    assert ran == [("tainacan-events", ("disable", "keep-dependency"))]
+
+
+def test_a_failed_disable_shows_the_installers_reason(no_koha):
+    from kei_panel.screens.dialogs import MessageScreen
+
+    reason = "Another backup action of this platform is running. Try again when it ends."
+
+    async def main():
+        ran: list = []
+        app = _events_app(ran, events="on", dependency="ours", fail={("tainacan-events", "disable"): reason})
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-off").press()
+            await pilot.pause(1.0)
+            app.screen.dismiss("default")
+            await pilot.pause(1.0)
+            await pilot.click("#yes")
+            await pilot.pause(2.0)
+            screen = app.screen
+            return isinstance(screen, MessageScreen) and screen._kind == "error" and screen._body == reason
+
+    assert asyncio.run(main())
+
+
+def test_the_events_state_screen_lists_both_plugins_and_the_data(no_koha):
+    from kei_panel.screens.dialogs import TextScreen
+
+    async def main(fail=None):
+        ran: list = []
+        app = _events_app(ran, events="on", dependency="ours", fail=fail)
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#events-status").press()
+            await pilot.pause(1.0)
+            return app.screen._text if isinstance(app.screen, TextScreen) else ""
+
+    text = asyncio.run(main())
+    assert "Events are on." in text and "Events Manager: 7.4.13 (active), installed by Koha.Nexus" in text
+    assert "Nexus Eventos: 0.1.1 (active)" in text and "Bookings with a pass: 9" in text and "Certificates: 5" in text
+    failed = asyncio.run(main({("tainacan-events", "status"): "The Tainacan containers are not running."}))
+    assert "The Tainacan containers are not running." in failed
+
+
+def test_restore_without_the_phrase_warns_about_event_passes_first(no_koha):
+    from kei_panel.screens.dialogs import ConfirmScreen
+
+    async def main(backup: str, answer: str, phrase: str = ""):
+        from textual.widgets import Input
+        ran: list = []
+        app = _events_app(ran, events="on")
+        async with app.run_test() as pilot:
+            await _open_platforms(app, pilot)
+            app.screen.query_one("#tainacan-restore").press()
+            await pilot.pause(1.0)
+            app.screen.dismiss(backup)
+            await pilot.pause(1.0)
+            await pilot.click("#yes")                                  # restore over the one in use
+            await pilot.pause(1.0)
+            app.screen.query_one("#value", Input).value = phrase
+            await pilot.click("#ok")
+            await pilot.pause(1.0)
+            note = app.screen._question if isinstance(app.screen, ConfirmScreen) else ""
+            if note:
+                await pilot.click(f"#{answer}")
+            await pilot.pause(2.0)
+            return note, [r[:2] for r in ran if r[0] in ("tainacan-restore", "tainacan-restore-notes")]
+
+    note, ran = asyncio.run(main("knx-tainacan-20261105-020000", "no"))
+    assert "9 event pass links" in note
+    assert ran == [("tainacan-restore-notes", ("knx-tainacan-20261105-020000", "nophrase"))]   # not restored
+    _note, ran = asyncio.run(main("knx-tainacan-20261105-020000", "yes"))
+    assert ran[-1] == ("tainacan-restore", ("knx-tainacan-20261105-020000",))
+    # Nothing to lose (no passes, or the same keys): no question.
+    note, ran = asyncio.run(main("knx-tainacan-20261104-020000", "yes"))
+    assert note == "" and ran[-1] == ("tainacan-restore", ("knx-tainacan-20261104-020000",))
+    # With the phrase the links keep working: not even asked.
+    note, ran = asyncio.run(main("knx-tainacan-20261105-020000", "yes", phrase="MY-SECRET-RECOVERY-PHRASE"))
+    assert note == "" and ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",))]

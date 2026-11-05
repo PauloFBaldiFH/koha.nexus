@@ -26,7 +26,7 @@
 #           (mandatory here): an Events Manager already in the site kept, the
 #           event edit screen drawn whole with Tainacan active, passes,
 #           attendance, certificates, backup with events off, restore with and
-#           without the recovery phrase. Its unit tests (tainacan_events.bats:
+#           without the recovery phrase, an enable cut half way that goes on. Its unit tests (tainacan_events.bats:
 #           the production package, the checksums, the plan, the redaction, and
 #           the copy in nexus-events-plugin/bundled against wordpress.org) run
 #           in apache.
