@@ -73,7 +73,14 @@ field() { sed -n "s/^$1=//p" <<<"$2" | tail -n 1; }
 # instance has no usable key, one is set the way koha-create would.
 koha_instance() {
     local key state
-    koha-create --create-db "$INST" >/dev/null 2>&1 3>&- || [ -f "$CONF" ] || return 1
+    # koha-create right after koha-remove failed once in CI with its output
+    # hidden: it is shown now, and tried once more after the services settle.
+    if ! koha-create --create-db "$INST" > "$S/koha-create.log" 2>&1 3>&- && [ ! -f "$CONF" ]; then
+        sed 's/^/  koha-create: /' "$S/koha-create.log" | tail -n 20 >&3
+        koha-remove "$INST" >/dev/null 2>&1 3>&- || true     
+        koha-create --create-db "$INST" > "$S/koha-create.log" 2>&1 3>&- || [ -f "$CONF" ] \
+            || { sed 's/^/  koha-create (2): /' "$S/koha-create.log" | tail -n 20 >&3; return 1; }
+    fi
     case "$(conf encryption_key)" in
         "") state=none ;; __ENCRYPTION_KEY__) state=placeholder ;; *) state=set ;;
     esac
