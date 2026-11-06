@@ -205,7 +205,13 @@ class ChoiceScreen(FitsScreen, CopyValues, ModalScreen[Optional[str]]):
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog -wide"):
             yield Label(self._title, classes="dialog-title", markup=False)
-            yield from self.text_with_copies(self._prompt)
+            if self._prompt.count("\n") >= 8:
+                # A long text (a backup's summary) scrolls, so the options
+                # and Back stay on a short terminal.
+                with VerticalScroll(classes="dialog-scroll"):
+                    yield from self.text_with_copies(self._prompt)
+            else:
+                yield from self.text_with_copies(self._prompt)
             yield OptionList(*[Option(Content(label), id=key) for key, label in self._options], classes="dialog-options")
             if self._note:
                 yield Static(self._note, classes="dialog-note", markup=False)

@@ -149,7 +149,8 @@ def transfer_help(info) -> str:
     ])
 
 
-async def restore(app, file: str | None = None) -> None:
+async def restore(app, file: str | None = None) -> bool:
+    """True when the database was restored (a set then offers Koha's files and secrets)."""
     info = await facts(app)
     title = t("📥  Restore database")
     if not file and transfer.where() in ("ssh", "server"):
@@ -160,11 +161,11 @@ async def restore(app, file: str | None = None) -> None:
             ("browser", t("🌐 On my computer: send it through the browser")),
             ("server", t("🗄  Already on this server: choose the file"))]))
         if choice is None:
-            return
+            return False
         if choice == "browser":
             received = await receive_from_browser(app, info, title)
             if received is None:
-                return
+                return False
             file = str(received)
     if not file:
         picked = await app.push_screen_wait(PathPickerScreen(
@@ -172,7 +173,7 @@ async def restore(app, file: str | None = None) -> None:
             help_text=transfer_help(info), commands=[send_command(info, "backup_file.sql")],
             send_command=lambda path: send_command(info, path)))
         if picked is None:
-            return
+            return False
         file = str(picked)
 
     staged = None
@@ -181,10 +182,10 @@ async def restore(app, file: str | None = None) -> None:
         # copied in first: the restore then reads a local, stable copy.
         staged = await _copy_in(app, title, Path(file), Path(info.get("dir_sql", "/var/backups/koha_sql")))
         if staged is None:
-            return
+            return False
         file = str(staged)
     try:
-        await _restore_file(app, title, file)
+        return await _restore_file(app, title, file)
     finally:
         if staged is not None:
             staged.unlink(missing_ok=True)
@@ -218,27 +219,27 @@ async def _copy_failed(app, title: str, result) -> None:
     await app.push_screen_wait(MessageScreen(title, result.error or t("Unknown error."), kind="error"))
 
 
-async def _restore_file(app, title: str, file: str) -> None:
+async def _restore_file(app, title: str, file: str) -> bool:
     check = await run_task(app, tx("Checking the backup file..."), "restore-check", file)
     if failed(check):
         await show_failure(app, title, check)
-        return
+        return False
     out = check.value
     if out.get("has_sql") != "yes":
         question = ("No SQL statements found at the start of the file.\nIt may not be a Koha backup.\n\n"
                     "Continue anyway?") if file.endswith((".gz", ".bz2", ".xz", ".zst")) else \
             "No SQL statements found at the start of the file.\n\nContinue anyway?"
         if not await app.push_screen_wait(ConfirmScreen(t("Suspicious file"), tx(question))):
-            return
+            return False
     if out.get("complete") != "yes":
         if not await app.push_screen_wait(ConfirmScreen(t("Suspicious file"), tx(
                 "The file does not end with the mysqldump completion line (-- Dump completed): it may be "
                 "truncated.\n\nContinue anyway? It will still be tested in a temporary database first."))):
-            return
+            return False
     question = tx("File:\n$file\n\nWARNING: the current catalog will be REPLACED.\n\nContinue?", file=file)
     question += f"\n\n{t('Size:')} {out.get('size_mb')} MB · {t('Free')}: {out.get('free_mb')} MB"
     if not await app.push_screen_wait(ConfirmScreen(t("Confirm Restore"), question, danger=True)):
-        return
+        return False
 
     result = await run_task(app, t("Restoring the catalog"), "restore", file,
                             cancellable=False, total_steps=RESTORE_STEPS)
@@ -248,7 +249,7 @@ async def _restore_file(app, title: str, file: str) -> None:
     app.restores = getattr(app, "restores", 0) + 1
     if failed(result):
         await show_failure(app, title, result)
-        return
+        return False
     done = result.value
     details = [(t("Search engine"), done.get("engine")), (t("Tables"), done.get("tables"))]
     if done.get("safety_backup"):
@@ -256,6 +257,7 @@ async def _restore_file(app, title: str, file: str) -> None:
     await app.push_screen_wait(MessageScreen(
         tx("Catalog restored and indexed successfully!\n\nSearch engine: ${engine}\nTables: ${tables}",
            engine=done.get("engine"), tables=done.get("tables")).splitlines()[0], "", details=details))
+    return True
 
 
 # ----------------------------------------------------------------------

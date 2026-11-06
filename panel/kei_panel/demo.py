@@ -158,6 +158,10 @@ _Z_HEALTH = [
 
 # Answers that depend on the first argument (the job): the authority job.
 _BY_ARG: dict[tuple[str, str], list[str]] = {
+    ("set-koha-extras", "apply"): ["@@result secrets=open",
+                                   "@@result safety=/var/backups/koha-nexus/koha-before-files-20261106-101500.tar.gz",
+                                   "@@result item=uploads\trestore\t/var/lib/koha/library/uploads",
+                                   "@@result item=encryption_key\tapply\t/etc/koha/sites/library/koha-conf.xml"],
     # The home page of the collection (installer: --task tainacan-site).
     ("tainacan-site", "plan"): [
         "@@result plan=apply",
@@ -576,6 +580,30 @@ _SCRIPTS: dict[str, list[str]] = {
     "vpn-stop": ["@@msg ok OK\tThe VPN is off. The devices and keys are kept: Set up turns it on again."],
     "cloud-provider": ["@@note Registering the connection in rclone...", "@@note Testing the real cloud upload...",
                        "@@msg ok OK\tCloud enabled and tested successfully."],
+    # The joint package and the assisted restore (routines/backup_set.py).
+    "set-backup": ["@@note Backing up koha...",
+                   "@@result platform=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tkoha/koha_library_set_2026-11-06_10h00.sql.gz\tfull",
+                   "@@note Backing up tainacan...",
+                   "@@result platform=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\ttainacan/knx-tainacan-20261106-100041/\tfull",
+                   "@@result size=212M", "@@result complete=yes", "@@result recoverability=full", "@@result file={0}/knx-set-20261106-100000.tar"],
+    "set-inspect": ["@@result kind=koha-nexus-set", "@@result id=4b1f0c9e-2d55-4f0a-9a43-6c1d1f0e9a10",
+                    "@@result created=2026-11-06 10:01:31", "@@result host=biblioteca",
+                    "@@result panel_version=1.5.176", "@@result complete=yes", "@@result integrity=ok",
+                    "@@result platforms=koha tainacan", "@@result recoverability=full", "@@result koha_files=yes",
+                    "@@result part=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tgpg\t\tfull",
+                    "@@result part=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\tgpg\t\tfull"],
+    "set-unpack": ["@@result stage=/var/backups/koha-nexus/.set-restore.demo",
+                   "@@result koha=/var/backups/koha-nexus/.set-restore.demo/koha/koha_library_set_2026-11-06_10h00.sql.gz",
+                   "@@result tainacan=/var/backups/koha-nexus/.set-restore.demo/tainacan/knx-tainacan-20261106-100041"],
+    "set-cleanup": [],
+    # Koha's files and secrets after its database: paths and states, never a value.
+    "set-koha-extras": ["@@result secrets=open",
+                        "@@result item=uploads\trestore\t/var/lib/koha/library/uploads",
+                        "@@result item=plugins\trestore\t/var/lib/koha/library/plugins",
+                        "@@result item=opac-custom\trestore\t/usr/share/koha/opac/htdocs/images/custom",
+                        "@@result item=encryption_key\tapply\t/etc/koha/sites/library/koha-conf.xml",
+                        "@@result item=SIPconfig.xml\tbeside\t/etc/koha/sites/library/SIPconfig.xml.from-backup",
+                        "@@result item=kei-messaging.conf\tadd\t/etc/koha/sites/library/kei-messaging.conf"],
     # The automatic cloud backup screen (screens/cloud_backup.py).
     "cloud-status": [
         "@@result plan=gdrive\tgdrive\t\t30", "@@result plan=wasabi-weekly\twasabi\tkoha-library\t90",
@@ -734,6 +762,16 @@ _RUN: dict[str, list[str]] = {
 _RUN_DEFAULT = ["@@step Working", "@@done 0 Working", "@@say ok OK\tDone (demo)."]
 
 
+def _set_conflicts() -> list[str]:
+    """What kei_set_conflicts says, in the panel's language as the installer would."""
+    from .i18n import t
+    return ["@@result conflict=koha\t" + t(
+                "The Koha in use (database ${d}) is replaced; a safety backup is made first.", d="koha_library"),
+            "@@result conflict=tainacan\t" + t(
+                "The Tainacan in use (${u}) is replaced after a test in an isolated copy; its address and ports "
+                "stay those of this server.", u="http://192.0.2.10:8090")]
+
+
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
@@ -742,6 +780,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         args = ()
     else:
         lines = _BY_ARG.get((name, args[0] if args else ""), _SCRIPTS.get(name))
+        if name == "set-inspect":
+            lines = lines + _set_conflicts()
     if lines is None:
         out.feed(f"@@msg error Error\tUnknown panel action: {name}", reporter)
         out.rc = 2
@@ -750,7 +790,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
                             "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
-                            "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete") \
+                            "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete",
+                            "set-inspect", "set-cleanup") \
         else 0.05 if name == "install" else 0.15
     if name in ("tainacan-events", "tainacan-site") and args[:1] in (("plan",), ("status",)) \
             or (name == "tainacan-start" and not args):

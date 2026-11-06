@@ -19,8 +19,16 @@
 #           with a real Tainacan (backup_engine_system.bats): crashes inside
 #           and after the window without writes, resume, restic repositories
 #           (local and through rclone), the encrypted configuration and the
-#           recovery phrase, the recovery kit, the cloud copy, the schedule.
-#           Its unit tests (backup_engine.bats, no Docker) run in apache.
+#           recovery phrase, the recovery kit, the cloud copy, the joint
+#           package, the schedule. Its unit tests (backup_engine.bats,
+#           backup_set.bats, no Docker) run in apache.
+#   koha-set  Debian 12 with a real Koha (koha-common from the official
+#           repository) and a real Tainacan (koha_set_system.bats): the
+#           joint package, the instance recreated with another key and
+#           database password, Koha restored alone from the set, a staff
+#           two-factor secret that opens again only after the key comes
+#           back, nothing else of koha-conf.xml changed, an uploaded file
+#           and a plugin back, Tainacan restored on its own.
 #   events  the same machines: events for Tainacan (tainacan_events_system.bats)
 #           with the real Tainacan and Events Manager from wordpress.org
 #           (mandatory here): an Events Manager already in the site kept, the
@@ -47,7 +55,9 @@ on:
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
+      - "tests/backup_set.bats"
       - "tests/backup_engine_system.bats"
+      - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
       - "tests/tainacan_events_system.bats"
       - "tests/system/events-fixture.php"
@@ -69,7 +79,9 @@ on:
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
+      - "tests/backup_set.bats"
       - "tests/backup_engine_system.bats"
+      - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
       - "tests/tainacan_events_system.bats"
       - "tests/system/events-fixture.php"
@@ -100,7 +112,7 @@ jobs:
               restic version
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
-              bats tests/backup_engine.bats
+              bats tests/backup_engine.bats tests/backup_set.bats
               KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
 
@@ -176,6 +188,25 @@ jobs:
         run: tests/system/container.sh start "${{ matrix.image }}" kn-system
       - name: Backup engine with a real Tainacan; Koha and third parties preserved
         run: tests/system/container.sh run kn-system bats tests/backup_engine_system.bats
+      - name: Stop
+        if: always()
+        run: tests/system/container.sh stop kn-system
+
+  koha-set:
+    # Debian 12: the system the official Koha packages are built for.
+    runs-on: ubuntu-latest
+    # A run takes about ten minutes; a hang must not hold a runner for hours.
+    timeout-minutes: 45
+    env:
+      KEI_REQUIRE_REAL_TAINACAN: "1"
+      KEI_REQUIRE_REAL_KOHA: "1"
+      KEI_TAINACAN_REGISTRY: docker.io
+    steps:
+      - uses: actions/checkout@v4
+      - name: A machine with systemd
+        run: tests/system/container.sh start debian:12 kn-system
+      - name: Joint package with a real Koha and a real Tainacan; Koha's key recovered without overwriting the target
+        run: tests/system/container.sh run kn-system bats tests/koha_set_system.bats
       - name: Stop
         if: always()
         run: tests/system/container.sh stop kn-system

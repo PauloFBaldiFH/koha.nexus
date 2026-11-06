@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.175",
+ "panel_version": "1.5.176",
  "languages": [
   {
    "code": "en",
@@ -712,6 +712,8 @@
     "pbackup-incomplete",
     "pbackup-setup",
     "pbackup-kit",
+    "set-backup",
+    "restore-assisted",
     "cloud-connections"
    ],
    "features": [
@@ -1713,6 +1715,26 @@
    "section": "backups",
    "label": "🧰  Recovery kit",
    "description": "Saves the recovery kit to copy away from this server",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "set-backup": {
+   "id": "set-backup",
+   "type": "entry",
+   "section": "backups",
+   "label": "📦  Joint backup (Koha + Tainacan)",
+   "description": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "restore-assisted": {
+   "id": "restore-assisted",
+   "type": "entry",
+   "section": "backups",
+   "label": "♻  Assisted restore",
+   "description": "Recognises any backup by its content, shows where it came from and restores what you choose",
    "kind": "native",
    "status": "available",
    "media": []
@@ -7740,6 +7762,106 @@
   "Saves the recovery kit to copy away from this server": {
    "en": "Saves the recovery kit to copy away from this server",
    "pt-BR": "Salva o kit de recuperação para guardar longe deste servidor",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📦  Joint backup (Koha + Tainacan)": {
+   "en": "📦  Joint backup (Koha + Tainacan)",
+   "pt-BR": "📦  Backup conjunto (Koha + Tainacan)",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums": {
+   "en": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
+   "pt-BR": "Um arquivo com os dados do Koha e do Tainacan, cada um capturado na sua vez, com as somas de verificação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "♻  Assisted restore": {
+   "en": "♻  Assisted restore",
+   "pt-BR": "♻  Restauração assistida",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Recognises any backup by its content, shows where it came from and restores what you choose": {
+   "en": "Recognises any backup by its content, shows where it came from and restores what you choose",
+   "pt-BR": "Reconhece qualquer backup pelo conteúdo, mostra de onde ele veio e restaura o que você escolher",
    "es": null,
    "fr": null,
    "it": null,
@@ -18308,6 +18430,62 @@
     "summary": "Salva o kit de recuperação: com a frase de recuperação, um servidor novo lê os backups criptografados e os repositórios restic."
    }
   },
+  "set-backup": {
+   "en": {
+    "summary": "One file (knx-set-<date>.tar) with the data of Koha and of Tainacan, a manifest and the checksums of every file.",
+    "overview": [
+     "Shown in the Backup center when Koha and Tainacan are both installed, under **Koha and Tainacan**. It asks for a folder of this server and says what it does before starting.",
+     "Koha is captured with the same checked dump as the safety backups; Tainacan with a complete package of its own (the files go into the set, never only into a restic repository). Each platform is captured in turn, and the manifest records when each capture started and ended: they are never taken at the same instant.",
+     "If a platform fails, the set is not reported as done: the file is named -partial, its manifest says it is incomplete, the part that worked stays in it and the reason is shown for each platform.",
+     "Koha's files outside its database go in too: uploaded files, plugins, the OPAC and staff images, the panel's MARC rules and import profiles. Its secrets (the encryption key in koha-conf.xml, the SIP2 logins, the panel's messaging, AI and Z39.50 logins) go in only encrypted with the backup key, never in clear.",
+     "Without a backup key the panel asks first: set the key up now, or make the package without Koha's secrets. A package without them is marked data only and is never called complete: what Koha encrypted (staff two-factor secrets) cannot be read on another installation.",
+     "Never in any package: the Koha program (koha-common), the cloud accounts, the Cloudflare tunnel or free address. The search index is rebuilt from the database."
+    ],
+    "related": [
+     "restore-assisted",
+     "sec-backups"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Um arquivo (knx-set-<data>.tar) com os dados do Koha e do Tainacan, um manifesto e as somas de verificação de cada arquivo.",
+    "overview": [
+     "Aparece na Central de backups quando o Koha e o Tainacan estão instalados, em **Koha e Tainacan**. Ele pede uma pasta deste servidor e diz o que vai fazer antes de começar.",
+     "O Koha é capturado com o mesmo dump verificado dos backups de segurança; o Tainacan, com um pacote completo próprio (os arquivos vão para o conjunto, nunca só para um repositório restic). Cada plataforma é capturada na sua vez, e o manifesto registra quando cada captura começou e terminou: elas nunca são feitas no mesmo instante.",
+     "Se uma plataforma falhar, o conjunto não é dado como feito: o arquivo recebe -partial no nome, o manifesto diz que ele está incompleto, a parte que funcionou fica nele e o motivo aparece para cada plataforma.",
+     "Os arquivos do Koha fora do banco também vão: arquivos enviados, plugins, as imagens do OPAC e da equipe, as regras MARC e os perfis de importação do painel. Os segredos (a chave de criptografia em koha-conf.xml, os logins do SIP2, os logins de mensagens, IA e Z39.50 do painel) só entram cifrados com a chave dos backups, nunca em claro.",
+     "Sem a chave dos backups o painel pergunta antes: configurar a chave agora, ou gerar o pacote sem os segredos do Koha. Um pacote sem eles fica marcado como só dados e nunca é chamado de completo: o que o Koha cifrou (segredos do segundo fator da equipe) não poderá ser lido em outra instalação.",
+     "Nunca vão em nenhum pacote: o programa do Koha (koha-common), as contas de nuvem, o túnel da Cloudflare ou o endereço gratuito. O índice de busca é refeito a partir do banco."
+    ],
+    "outdated": true
+   }
+  },
+  "restore-assisted": {
+   "en": {
+    "summary": "One entry for any backup: a Koha database backup of any version, a Tainacan package or a joint package, recognised by its content and not by its name.",
+    "overview": [
+     "Before anything is applied it shows where the backup came from, its date, its platforms, the result of the checksum check and what it would replace on this server; with a joint package you choose Koha, Tainacan or both.",
+     "An archive is untrusted: paths out of it, links, special files, unknown members, a sum that does not match or a size larger than the free disk make it refused before anything is extracted, and nothing a manifest says is ever run.",
+     "The restore itself is the one each platform already had: Koha's restore check and safety backup, Tainacan's test in an isolated copy and safety backup. Without the recovery phrase the data comes back and this installation keeps its own configuration.",
+     "After Koha's database, the panel offers Koha's files and secrets with a plan first. From koha-conf.xml only the encryption key comes back (the old file is kept beside it); the database password, paths, Zebra and memcached of this server stay. Another secret file is added only when this server has none; otherwise the one of the backup is saved beside it as .from-backup for you to compare. No value is ever shown. On another server, the recovery kit of the server that made the backup is imported first."
+    ],
+    "related": [
+     "restore",
+     "tainacan-restore",
+     "set-backup",
+     "sec-backups"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Uma entrada para qualquer backup: um backup do banco do Koha de qualquer versão, um pacote do Tainacan ou um pacote conjunto, reconhecido pelo conteúdo e não pelo nome.",
+    "overview": [
+     "Antes de aplicar qualquer coisa, ela mostra de onde o backup veio, a data, as plataformas, o resultado da verificação das somas e o que ele substituiria neste servidor; num pacote conjunto você escolhe o Koha, o Tainacan ou os dois.",
+     "Um arquivo compactado é tratado como não confiável: caminhos para fora dele, links, arquivos especiais, membros desconhecidos, uma soma que não confere ou um tamanho maior que o disco livre fazem com que ele seja recusado antes de qualquer extração, e nada do que um manifesto diz é executado.",
+     "A restauração em si é a que cada plataforma já tinha: a verificação e o backup de segurança do Koha, o teste numa cópia isolada e o backup de segurança do Tainacan. Sem a frase de recuperação os dados voltam e esta instalação mantém a sua própria configuração.",
+     "Depois do banco do Koha, o painel oferece os arquivos e segredos do Koha, com um plano antes. Do koha-conf.xml só volta a chave de criptografia (o arquivo anterior fica guardado ao lado); a senha do banco, os caminhos, o Zebra e o memcached deste servidor ficam. Outro arquivo de segredo só é acrescentado quando este servidor não tem o seu; se tiver, o do backup fica ao lado como .from-backup para você comparar. Nenhum valor aparece. Em outro servidor, importe antes o kit de recuperação do servidor que fez o backup."
+    ],
+    "outdated": true
+   }
+  },
   "cloud-connections": {
    "en": {
     "summary": "The cloud accounts this server can send backups to, for any platform: add, edit, test or remove a connection.",
@@ -21278,15 +21456,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 144,
-   "manual_total": 144,
+   "manual": 146,
+   "manual_total": 146,
    "manual_outdated": [],
-   "strings": 470,
-   "strings_total": 470
+   "strings": 474,
+   "strings_total": 474
   },
   "pt-BR": {
-   "manual": 144,
-   "manual_total": 144,
+   "manual": 146,
+   "manual_total": 146,
    "manual_outdated": [
     "install",
     "apache-log",
@@ -21295,160 +21473,162 @@
     "sec-opac",
     "backup-manual",
     "restore",
+    "set-backup",
+    "restore-assisted",
     "backup-compression",
     "backup-safety",
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 464,
-   "strings_total": 470
+   "strings": 468,
+   "strings_total": 474
   },
   "es": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 470
+   "strings_total": 474
   },
   "fr": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 470
+   "strings_total": 474
   },
   "it": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 470
+   "strings_total": 474
   },
   "de": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 470
+   "strings_total": 474
   },
   "nl": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "sv": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "pl": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "cs": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "ru": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "uk": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "tr": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "tl": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "id": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "ar": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "fa": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "hi": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "bn": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "vi": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "zh": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "ja": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   },
   "ko": {
    "manual": 0,
-   "manual_total": 144,
+   "manual_total": 146,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 470
+   "strings_total": 474
   }
  }
 }

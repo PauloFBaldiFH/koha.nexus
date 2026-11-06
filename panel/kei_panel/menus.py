@@ -46,6 +46,8 @@ class Entry:
     # A "view" entry can open its screen already filtered: the Backup center
     # opened from Koha's group shows Koha's backups ("koha"), from
     # Tainacan's group Tainacan's ("tainacan"). "" = as the screen was left.
+    # On a card of the Backup center itself, the platform view it is shown
+    # in ("both": the joint backup, only with Koha and Tainacan as a set).
     scope: str = ""
 
 
@@ -258,6 +260,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("⏯  Incomplete backup", "pbackup-incomplete", kind="native", requires="tainacan"),
         Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native", requires="tainacan"),
         Entry("🧰  Recovery kit", "pbackup-kit", kind="native", requires="tainacan"),
+        Entry("📦  Joint backup (Koha + Tainacan)", "set-backup", kind="native", scope="both"),
+        Entry("♻  Assisted restore", "restore-assisted", kind="native"),
         Entry("🔌  Cloud connections", "cloud-connections", kind="native"),
     ), view="backups", key="b"),
     # Security, remote access and the firewall in one hub: VPN, Cloudflare
@@ -334,6 +338,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "pbackup-kit": "platform-backup-kit", "pbackup-configure": "platform-backup-repo",
     "pbackup-schedule": "platform-backup-schedule", "pbackup-verify": "platform-backup-verify",
     "pbackup-incomplete": "platform-backup-incomplete", "cloud-connections": "cloud-list",
+    "set-backup": "set-backup", "restore-assisted": "set-inspect",
 }
 
 # Panel routines with no installer routine of their own (routines/).
@@ -493,6 +498,8 @@ DESCRIPTIONS: dict[str, str] = {
     "pbackup-setup": "Makes the server key that encrypts the configuration in the backups",
     "pbackup-kit": "Saves the recovery kit to copy away from this server",
     "cloud-connections": "The cloud accounts this server can send backups to, for any platform",
+    "set-backup": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
+    "restore-assisted": "Recognises any backup by its content, shows where it came from and restores what you choose",
     "export-diagnostics": "Saves a report of this server to send to whoever helps you",
     "open-diagnostics": "Reads a diagnostics report saved here or sent to you",
 }

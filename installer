@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.175"
+PANEL_VERSION=" 1.5.176"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -14720,8 +14720,10 @@ kei_backup_run() {
 
 # _kei_bk_capture PLATFORM DIR: the window without writes.
 _kei_bk_capture() {
-    local p="$1" dir="$2" repo t0 t1 rc=0 ps err="" path snap out
-    repo=$(_kei_bk_get "repo_$p")
+    local p="$1" dir="$2" repo="" t0 t1 rc=0 ps err="" path snap out
+    # KEI_BK_SELF=1 (the joint package): the files go into the package
+    # itself, never only into the restic repository.
+    [ "${KEI_BK_SELF:-}" = 1 ] || repo=$(_kei_bk_get "repo_$p")
     _kei_bk_journal "$dir" capture mode "$([ -n "$repo" ] && echo ref || echo self)"
     t0=$(date +%s)
     if ! "_kei_bk_${p}_stop"; then
@@ -14837,7 +14839,9 @@ _kei_bk_post() {
         chmod 600 "$dir"/*.gz "$dir"/*.json "$dir"/*.gpg "$dir/SHA256SUMS" 2>/dev/null
         _kei_bk_journal "$dir" manifest file manifest.json sha256 "$(_kei_bk_sha "$dir/manifest.json")"
     fi
-    dest=$(_kei_bk_get "copy_$p")
+    dest=""
+    # KEI_BK_NO_COPY=1 (the joint package): the set itself is the copy.
+    [ "${KEI_BK_NO_COPY:-}" = 1 ] || dest=$(_kei_bk_get "copy_$p")
     if [ -n "$dest" ] && ! _kei_bk_has "$dir" copy; then
         name="${dir##*/}"
         if [ -d "$dir/secrets" ]; then
@@ -15289,6 +15293,641 @@ kei_backup_status() {
         printf '%s.verified=%s\n' "$p" "$(_kei_bk_get "verified_$p")"
         printf '%s.maintained=%s\n' "$p" "$(_kei_bk_get "maintained_$p")"
     done
+}
+
+# ----------------------------------------------------------------------
+# The joint package (Koha + Tainacan): knx-set-<ts>.tar
+# ----------------------------------------------------------------------
+# One transportable file with the data of each platform, never a
+# reference: Koha's dump made by create_safety_backup (mysqldump
+# --single-transaction, checked) and a self-contained Tainacan package
+# made by kei_backup_run (its own window without writes; a restic
+# repository is not used for it). Each capture keeps its own times: the
+# platforms are captured one after the other, never at the same instant.
+#
+#   manifest.json   kind koha-nexus-set, format 1, id, created, host,
+#                   panel_version, complete, consistency per-platform,
+#                   platforms [{id, result, error, path, started, finished,
+#                   bytes, sha256, secrets}]
+#   SHA256SUMS      every file of the package
+#   koha/<db>_set_<ts>.sql.gz            (and koha-conf.xml.gpg with the backup key)
+#   tainacan/knx-tainacan-<ts>/          a complete format 2 package
+#
+# A platform that fails does not make the set "done": the file is named
+# knx-set-<ts>-partial.tar, complete is false and the valid part stays in
+# it; the task ends with 9.
+KEI_SET_KIND="koha-nexus-set"
+KEI_SET_FORMAT=1
+# The members a set may hold (anything else is refused before extracting).
+KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
+
+# kei_set_platforms: the platforms of this server a set can hold.
+kei_set_platforms() {
+    local out=""
+    is_koha_installed && out="koha"
+    [ "$(_kei_tn_get status 2>/dev/null)" = installed ] && out="${out:+$out }tainacan"
+    printf '%s' "$out"
+}
+
+# ----------------------------------------------------------------------
+# Koha beyond its database (document V). The dump holds the catalogue,
+# patrons, circulation, preferences and the images Koha keeps in the
+# database; the files below live on disk and the secrets in configuration
+# files. Each item has a label, so a restore puts it where the TARGET
+# installation keeps it (its own instance name and koha-conf.xml).
+#
+#   koha/files.tar.gz     data files: uploads, plugins, the panel's own
+#                         images and rules (never a secret)
+#   koha/secrets.tar.gpg  koha-conf.xml (its <encryption_key>), SIPconfig,
+#                         the panel's messaging, AI and Z39.50 logins;
+#                         only encrypted with the backup key, never in clear
+# ----------------------------------------------------------------------
+# _kei_koha_conf_value FILE TAG: a simple tag of the main <config> section
+# of a koha-conf.xml. The Zebra <server> sections before it have <config>
+# elements of their own (a path): the file is read as XML and only the
+# <config> child of the root counts.
+_kei_koha_conf_value() {
+    python3 -I - "$1" "$2" <<'PYEOF' 2>/dev/null
+import re, sys
+import xml.etree.ElementTree as ET
+tag = sys.argv[2]
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except OSError:
+    sys.exit(1)
+except ET.ParseError:
+    # Not well-formed: the last <config> section, comments left out.
+    try:
+        text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+    except OSError:
+        sys.exit(1)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    blocks = re.findall(r"<config>(.*?)</config>", text, re.S)
+    m = re.search(r"<%s>\s*([^<]*?)\s*</%s>" % (re.escape(tag), re.escape(tag)), blocks[-1] if blocks else "")
+    if not m or not m.group(1):
+        sys.exit(1)
+    print(m.group(1))
+    sys.exit(0)
+cfg = root if root.tag == "config" else root.find("config")
+el = cfg.find(tag) if cfg is not None else None
+if el is None or not (el.text or "").strip():
+    sys.exit(1)
+print(el.text.strip())
+PYEOF
+}
+
+_kei_set_koha_items() {
+    local up pl
+    up=$(_kei_koha_conf_value "$KOHA_CONF" upload_path); up=${up:-/var/lib/koha/${INSTANCE}/uploads}
+    pl=$(_kei_koha_conf_value "$KOHA_CONF" pluginsdir); pl=${pl:-/var/lib/koha/${INSTANCE}/plugins}
+    printf 'uploads\t%s\tdata\n' "$up"
+    printf 'plugins\t%s\tdata\n' "$pl"
+    printf 'opac-custom\t%s\tdata\n' "$OPAC_CUSTOM_DIR"
+    printf 'staff-custom\t%s\tdata\n' "$STAFF_CUSTOM_DIR"
+    printf 'marc-replace\t%s\tdata\n' "$MR_DIR"
+    printf 'import-profiles\t%s\tdata\n' "${CONF_DIR}/import-profiles"
+    printf 'theme-settings.json\t%s\tdata\n' "$THEME_STATE"
+    printf 'koha-conf.xml\t%s\tsecret\n' "$KOHA_CONF"
+    printf 'SIPconfig.xml\t%s\tsecret\n' "$SIP_CONF"
+    printf 'kei-messaging.conf\t%s\tsecret\n' "$MSG_CONF"
+    printf 'vision.conf\t%s\tsecret\n' "$MR_DIR/vision.conf"
+    printf 'panel.env\t%s\tsecret\n' "${CONF_DIR}/.env"
+}
+
+# _kei_set_koha_pack WORKDIR [no-secrets]: koha/files.tar.gz and, with the
+# backup key, koha/secrets.tar.gpg. Prints "SECRETS RECOVERABILITY"
+# (gpg full | none data-only). The secret vision.conf never goes with the
+# data files of marc-replace.
+_kei_set_koha_pack() {
+    local work="$1" stage label path class fpr n=0
+    stage=$(mktemp -d "$work/.koha.XXXXXX") && chmod 700 "$stage" || return 1
+    mkdir -m 700 "$stage/data" "$stage/secret"
+    while IFS=$'\t' read -r label path class; do
+        [ -e "$path" ] || continue
+        [ -d "$path" ] && [ -z "$(ls -A "$path" 2>/dev/null)" ] && continue
+        if [ "$class" = data ]; then
+            if [ -d "$path" ]; then
+                mkdir -p "$stage/data/$label"
+                tar -C "$path" --exclude=./vision.conf -cf - . 2>/dev/null | tar -C "$stage/data/$label" -xf - || return 1
+            else
+                cp -p "$path" "$stage/data/$label" || return 1
+            fi
+            n=$((n + 1))
+        else
+            cp -p "$path" "$stage/secret/$label" || return 1
+        fi
+    done < <(_kei_set_koha_items)
+    if [ "$n" -gt 0 ]; then
+        tar -C "$stage/data" --owner=0 --group=0 --numeric-owner -czf "$work/koha/files.tar.gz" . || return 1
+    fi
+    fpr=$(_kei_bk_fpr 2>/dev/null)
+    if [ "${2:-}" != no-secrets ] && [ -n "$(ls -A "$stage/secret")" ] && [ -n "$fpr" ] && _kei_bk_has_key \
+        && tar -C "$stage/secret" --owner=0 --group=0 --numeric-owner -czf - . \
+            | _kei_bk_gpg -r "$fpr" --encrypt > "$work/koha/secrets.tar.gpg" 2>/dev/null \
+        && [ -s "$work/koha/secrets.tar.gpg" ]; then
+        rm -rf "$stage"
+        echo "gpg full"
+    else
+        rm -f "$work/koha/secrets.tar.gpg"
+        rm -rf "$stage"
+        echo "none data-only"
+    fi
+}
+
+# kei_set_needs_choice PLATFORMS: 0 (and the reason) when a joint backup
+# with Koha would leave its secrets out because there is no backup key.
+# The person then chooses (set the key up, or a backup without them):
+# they are never left out in silence.
+kei_set_needs_choice() {
+    case " ${1:-$(kei_set_platforms)} " in *" koha "*) ;; *) return 1 ;; esac
+    is_koha_installed && [ -f "$KOHA_CONF" ] || return 1
+    _kei_bk_has_key && return 1
+    t "There is no backup key on this server, so Koha's secrets (its encryption key in koha-conf.xml, the SIP2 logins and the panel's logins) cannot go into the package: they never go in clear. Without them the package has the data only: what Koha encrypted (staff two-factor secrets, other stored passwords) cannot be read on another installation. Set up the backup key first, or make the package without the secrets."
+    echo
+    return 0
+}
+
+# kei_set_backup DIR [PLATFORMS] [no-secrets]: the joint package in DIR;
+# prints KEY=VALUE lines: platform=ID<TAB>ok|failed<TAB>START<TAB>END<TAB>
+# PATH|WHY<TAB>RECOVERABILITY for each platform, then size, complete,
+# recoverability and file. With Koha and no backup key it stops with 7
+# (nothing captured) unless "no-secrets" says the person chose a package
+# without Koha's secrets.
+kei_set_backup() {
+    local dest="${1:-}" want="${2:-}" mode="${3:-}" work rc why
+    [ -n "$dest" ] && [ -d "$dest" ] && [ -w "$dest" ] || { echo "$(t "The folder does not exist or cannot be written:") $dest" >&2; return 2; }
+    case "$mode" in ""|no-secrets) ;; *) return 2 ;; esac
+    if [ "$mode" != no-secrets ] && why=$(kei_set_needs_choice "${want//,/ }"); then
+        echo "$why" >&2
+        echo "needs=key"
+        return 7
+    fi
+    work=$(mktemp -d "${dest%/}/.knx-set.XXXXXX") && chmod 700 "$work" || return 1
+    KEI_SET_MODE="$mode" _kei_set_make "$dest" "$want" "$work"
+    rc=$?
+    rm -rf "$work"
+    return "$rc"
+}
+_kei_set_make() {
+    local dest="$1" want="$2" work="$3" ts p rc=0 t0 t1 out err file name bytes sha secrets recov packed
+    local -a rows=()
+    [ -n "$want" ] || want=$(kei_set_platforms)
+    want=${want//,/ }
+    [ -n "$want" ] || { echo "$(t "No platform is installed: there is nothing to back up.")" >&2; return 3; }
+    for p in $want; do
+        case "$p" in koha|tainacan) ;; *) echo "$(t "Unknown platform.")" >&2; return 2 ;; esac
+    done
+    ts=$(date '+%Y%m%d-%H%M%S')
+    mkdir -m 700 "$work/koha" "$work/tainacan" 2>/dev/null
+    for p in $want; do
+        t0=$(date '+%Y-%m-%d %H:%M:%S'); err=""; file=""; bytes=0; sha=""; secrets=none; recov=data-only
+        declare -F kei_emit >/dev/null && [ -n "${KEI_TASK:-}" ] && kei_emit note "$(n="$p"; t "Backing up \${n}...")"
+        case "$p" in
+            koha)
+                if ! is_koha_installed; then
+                    err=$(t "Koha is not installed.")
+                elif ! backup_lock_acquire; then
+                    err=$(t "Another backup or restore is already running. Try again later.")
+                else
+                    name="${DB_NAME}_set_$(date +%Y-%m-%d_%Hh%M).sql.gz"
+                    if create_safety_backup "$work/koha/$name"; then
+                        # Its files and, only encrypted with the backup key, its secrets.
+                        if packed=$(_kei_set_koha_pack "$work" "${KEI_SET_MODE:-}"); then
+                            file="koha/$name"
+                            read -r secrets recov <<<"$packed"
+                        else
+                            err=$(t "Koha's files could not be copied into the set.")
+                            rm -f "$work/koha/"*
+                        fi
+                    else
+                        err=${SAFETY_BACKUP_ERROR:-$(t "The database backup failed.")}
+                        rm -f "$work/koha/$name" "$work/koha/$name.part"
+                    fi
+                    backup_lock_release
+                fi ;;
+            tainacan)
+                if out=$(KEI_BK_SELF=1 KEI_BK_NO_COPY=1 kei_backup_run tainacan set 2>"$work/.tn.err"); then
+                    out=$(printf '%s\n' "$out" | tail -n 1)
+                    if [ -d "$out" ] && cp -a "$out" "$work/tainacan/" 2>"$work/.tn.err"; then
+                        file="tainacan/${out##*/}/"
+                        secrets=$(_kei_bk_mget "$out" secrets)
+                        # Its configuration is in the package (encrypted or, without a key, readable by root only).
+                        case "$secrets" in gpg|plain) recov=full ;; esac
+                    else
+                        err=$(tail -n 1 "$work/.tn.err" 2>/dev/null)
+                        err=${err:-$(t "The Tainacan package could not be copied into the set.")}
+                    fi
+                else
+                    err=$(grep -v '^[[:space:]]*$' "$work/.tn.err" 2>/dev/null | tail -n 1)
+                    err=${err:-$(t "The Tainacan backup failed.")}
+                fi
+                rm -f "$work/.tn.err" ;;
+        esac
+        t1=$(date '+%Y-%m-%d %H:%M:%S')
+        if [ -n "$file" ]; then
+            if [ "$p" = koha ]; then bytes=$(_kei_bk_size "$work/$file"); sha=$(_kei_bk_sha "$work/$file")
+            else bytes=$(du -sb "$work/$file" | awk '{ print $1 }'); sha=$(_kei_bk_sha "$work/${file}manifest.json"); fi
+            printf 'platform=%s\tok\t%s\t%s\t%s\t%s\n' "$p" "$t0" "$t1" "$file" "$recov"
+        else
+            rc=9
+            printf 'platform=%s\tfailed\t%s\t%s\t%s\t\n' "$p" "$t0" "$t1" "${err//$'\n'/ }"
+        fi
+        rows+=("$p"$'\t'"$([ -n "$file" ] && echo ok || echo failed)"$'\t'"${err//$'\t'/ }"$'\t'"$file"$'\t'"$t0"$'\t'"$t1"$'\t'"$bytes"$'\t'"$sha"$'\t'"$secrets"$'\t'"$recov")
+    done
+    if [ "$rc" != 0 ] && ! grep -q . < <(find "$work/koha" "$work/tainacan" -mindepth 1 -maxdepth 1 2>/dev/null); then
+        echo "$(t "No platform could be backed up: no set was written.")" >&2
+        return 9
+    fi
+    printf '%s\n' "${rows[@]}" | python3 -I -c '
+import json, sys, uuid
+kind, fmt, host, version, created = sys.argv[1:6]
+rows = []
+for line in sys.stdin:
+    p, result, error, path, start, end, size, sha, secrets, recov = line.rstrip("\n").split("\t")
+    rows.append({"id": p, "result": result, "error": error, "path": path, "started": start, "finished": end,
+                 "bytes": int(size or 0), "sha256": sha, "secrets": secrets,
+                 "recoverability": recov if result == "ok" else "none"})
+complete = all(r["result"] == "ok" for r in rows)
+json.dump({"kind": kind, "format": int(fmt), "id": str(uuid.uuid4()), "created": created, "host": host,
+           "panel_version": version, "complete": complete,
+           "recoverability": "full" if complete and all(r["recoverability"] == "full" for r in rows) else "partial",
+           "consistency": "per-platform",
+           "external": ["koha-common package", "cloud accounts (rclone)", "Cloudflare tunnel or free address",
+                        "search index (rebuilt from the database)"], "platforms": rows}, sys.stdout, indent=1)
+print()' "$KEI_SET_KIND" "$KEI_SET_FORMAT" "$(hostname 2>/dev/null)" "${PANEL_VERSION// /}" "$(date '+%Y-%m-%d %H:%M:%S')" \
+        > "$work/manifest.json" || return 1
+    # Only the files of the package (a leftover work file of the engine is not one).
+    find "$work/tainacan" -mindepth 2 -maxdepth 2 -name '.*' -exec rm -rf {} + 2>/dev/null
+    ( cd "$work" && find . -type f ! -path ./SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs -r -d '\n' sha256sum > SHA256SUMS ) || return 1
+    name="knx-set-$ts$([ "$rc" = 0 ] || echo -partial).tar"
+    out="${dest%/}/$name"
+    bytes=$(du -sb "$work" | awk '{ print $1 }')
+    if [ "$(df -PB1 "$dest" | awk 'NR == 2 { print $4 }')" -lt "$((bytes + bytes / 20 + 1048576))" ]; then
+        echo "$(d="$dest"; t "Not enough free disk in \${d} to write the set: the backups of each platform stay in their own folders.")" >&2
+        return 5
+    fi
+    ( umask 077; tar -C "$work" --owner=0 --group=0 --numeric-owner -cf "$out.part" manifest.json SHA256SUMS koha tainacan ) \
+        && mv -f "$out.part" "$out" || { rm -f "$out.part"; echo "$(t "The set could not be written.")" >&2; return 1; }
+    log "backup set: $out"
+    printf 'size=%s\ncomplete=%s\nrecoverability=%s\nfile=%s\n' "$(du -h "$out" | cut -f1)" "$([ "$rc" = 0 ] && echo yes || echo no)" \
+        "$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["recoverability"])' "$work/manifest.json" 2>/dev/null)" "$out"
+    return "$rc"
+}
+
+# kei_set_inspect FILE: what a file is, from its content (never its name):
+#   kind=koha-sql|koha-nexus-set|tainacan-package|unknown and, for a set,
+#   its manifest checked, every member's checksum read from the archive
+#   itself (nothing extracted) and the conflicts with this server. Nothing
+#   of the file is run; an archive with an unsafe entry is refused.
+kei_set_inspect() {
+    local f="${1:-}"
+    [ -n "$f" ] && { [ -f "$f" ] || [ -d "$f" ]; } || { echo "$(t "File not found.")" >&2; return 2; }
+    if [ -d "$f" ]; then
+        if [ -f "$f/manifest.json" ] && [ "$(_kei_bk_mget "$f" platform 2>/dev/null)" = tainacan ]; then
+            printf 'kind=tainacan-package\npath=%s\ncreated=%s\nhost=%s\nplatforms=tainacan\n' \
+                "${f%/}" "$(_kei_bk_mget "$f" created)" "$(_kei_bk_mget "$f" host)"
+            printf 'part=tainacan\tok\t%s\t\t%s\t\n' "$(_kei_bk_mget "$f" created)" "$(_kei_bk_mget "$f" secrets)"
+            kei_backup_check "$f" tainacan >/dev/null 2>&1 && echo integrity=ok || echo integrity=failed
+            kei_set_conflicts tainacan
+            return 0
+        fi
+        echo kind=unknown; return 0
+    fi
+    local info plats
+    info=$(_kei_set_read "$f") || return 1
+    printf '%s\n' "$info" | grep -v '^why='
+    _kei_set_why "$(printf '%s\n' "$info" | sed -n 's/^why=//p' | head -n 1)"
+    plats=$(printf '%s\n' "$info" | sed -n 's/^platforms=//p' | head -n 1)
+    [ -n "$plats" ] && kei_set_conflicts "$plats"
+    return 0
+}
+# _kei_set_why "CODE<TAB>DETAIL": why a file was refused, in the person's
+# language (the reader says it in codes; the detail is the file's own text).
+_kei_set_why() {
+    local code="${1%%$'\t'*}" detail="" text
+    [ -n "$1" ] || return 0
+    case "$1" in *$'\t'*) detail="${1#*$'\t'}" ;; esac
+    case "$code" in
+        entry) text="$(t "a member goes out of the folder or is a link or a special file:") $detail" ;;
+        space) text="$(t "it is larger than the free space of the disk")" ;;
+        tn-member) text="$(t "the Tainacan package has a member it should not have")" ;;
+        tn-manifest) text="$(t "the manifest of the Tainacan package is not valid")" ;;
+        member) text="$(t "the set has a member it should not have:") $detail" ;;
+        manifest) text="$(t "the manifest cannot be read")" ;;
+        set-manifest) text="$(t "the manifest is not a valid joint package manifest")" ;;
+        sums) text="$(t "the checksum list is not valid")" ;;
+        unreadable) text="$(t "the file cannot be read")" ;;
+        *) text="$1" ;;
+    esac
+    printf 'why=%s\n' "$(printf '%s' "$text" | tr '\t\n' '  ')"
+}
+_kei_set_read() {
+    python3 -I - "$1" "$KEI_SET_KIND" "$KEI_SET_MEMBERS" "$(_kei_bk_free_bytes)" <<'PYEOF'
+import gzip, hashlib, io, json, lzma, posixpath, re, sys, tarfile
+path, kind_set, members_re, free = sys.argv[1], sys.argv[2], re.compile(sys.argv[3]), int(sys.argv[4] or 0)
+pkg_re = re.compile(r"^knx-tainacan-[0-9-]{1,40}/((db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/(\.env|compose\.yml|state))|secrets/)?$")
+def out(k, v): print("%s=%s" % (k, str(v).replace("\n", " ")))
+with open(path, "rb") as fh:
+    head = fh.read(4096)
+def sqlish(text):
+    t = text.lstrip()
+    return t.startswith((b"-- MariaDB dump", b"-- MySQL dump", b"/*!", b"-- Server version", b"SET ", b"CREATE ", b"DROP "))
+plain = head
+try:
+    if head[:2] == b"\x1f\x8b":
+        plain = gzip.open(path).read(4096); comp = "gzip"
+    elif head[:6] == b"\xfd7zXZ\x00":
+        plain = lzma.open(path).read(4096); comp = "xz"
+    elif head[:4] == b"\x28\xb5\x2f\xfd":
+        comp = "zstd"; plain = b""
+    else:
+        comp = "none"
+except Exception as e:
+    out("kind", "unknown"); out("why", "unreadable\t%s" % e); sys.exit(0)
+if comp == "zstd" or sqlish(plain):
+    # A Koha dump (zstd is read by the restore check itself).
+    out("kind", "koha-sql"); out("compression", comp); out("platforms", "koha"); sys.exit(0)
+if len(plain) < 262 or plain[257:262] != b"ustar":
+    out("kind", "unknown"); sys.exit(0)
+try:
+    tf = tarfile.open(path, "r:*")
+    names = []
+    total = 0
+    for m in tf:
+        n = m.name[2:] if m.name.startswith("./") else m.name
+        n = n + "/" if m.isdir() and not n.endswith("/") else n
+        if n.startswith("/") or ".." in n.split("/") or not (m.isfile() or m.isdir()):
+            out("kind", "unsafe"); out("why", "entry\t%s" % m.name[:200]); sys.exit(0)
+        total += m.size
+        if free and total > free:
+            out("kind", "unsafe"); out("why", "space\t"); sys.exit(0)
+        names.append((n, m))
+except Exception as e:
+    out("kind", "unknown"); out("why", "unreadable\t%s" % e); sys.exit(0)
+top = {n for n, _m in names}
+if "manifest.json" not in top:
+    pk = [n for n in top if re.fullmatch(r"knx-tainacan-[0-9-]{1,40}/manifest\.json", n)]
+    if not pk:
+        out("kind", "unknown"); sys.exit(0)
+    if len(pk) != 1 or any(not pkg_re.match(n) or not n.startswith(pk[0].split("/")[0] + "/") for n in top):
+        out("kind", "unsafe"); out("why", "tn-member\t"); sys.exit(0)
+    try:
+        man = json.loads(tf.extractfile(dict(names)[pk[0]]).read(4 << 20))
+    except Exception:
+        man = {}
+    if not isinstance(man, dict) or man.get("platform") != "tainacan":
+        out("kind", "unsafe"); out("why", "tn-manifest\t"); sys.exit(0)
+    out("kind", "tainacan-archive"); out("created", man.get("created", "")); out("host", man.get("host", ""))
+    out("platforms", "tainacan"); out("integrity", "unchecked")
+    print("part=tainacan\tok\t%s\t\t%s\t" % (man.get("created", ""), man.get("secrets", "")))
+    sys.exit(0)
+bad = [n for n in top if not members_re.match(n)]
+if bad:
+    out("kind", "unsafe"); out("why", "member\t%s" % bad[0][:200]); sys.exit(0)
+def read(n):
+    m = dict(names)[n]
+    if m.size > 4 << 20:
+        raise ValueError("manifest too large")
+    return tf.extractfile(m).read()
+try:
+    man = json.loads(read("manifest.json"))
+    sums = read("SHA256SUMS").decode()
+except Exception as e:
+    out("kind", "unsafe"); out("why", "manifest\t%s" % e); sys.exit(0)
+ok = isinstance(man, dict) and man.get("kind") == kind_set and man.get("format") == 1 \
+    and isinstance(man.get("platforms"), list) and isinstance(man.get("complete"), bool)
+plats = []
+if ok:
+    for p in man["platforms"]:
+        if not (isinstance(p, dict) and p.get("id") in ("koha", "tainacan") and p.get("result") in ("ok", "failed")
+                and isinstance(p.get("path", ""), str)):
+            ok = False; break
+        path_ok = p["result"] != "ok" or (members_re.match(p["path"]) and p["path"].startswith(p["id"] + "/")
+                                          and p["path"] != p["id"] + "/")
+        if not path_ok:
+            ok = False; break
+        plats.append(p)
+if not ok:
+    out("kind", "unsafe"); out("why", "set-manifest\t"); sys.exit(0)
+want = {}
+for line in sums.splitlines():
+    mm = re.fullmatch(r"([0-9a-f]{64})  (\S.{0,300})", line)
+    if not mm or not members_re.match(mm.group(2)):
+        out("kind", "unsafe"); out("why", "sums\t"); sys.exit(0)
+    want[mm.group(2)] = mm.group(1)
+files = {n: m for n, m in names if m.isfile() and n != "SHA256SUMS"}
+integrity = "ok" if set(files) == set(want) else "failed"
+if integrity == "ok":
+    for n, m in files.items():
+        h = hashlib.sha256()
+        src = tf.extractfile(m)
+        for chunk in iter(lambda: src.read(1 << 20), b""):
+            h.update(chunk)
+        if h.hexdigest() != want[n]:
+            integrity = "failed"; out("bad_member", n); break
+out("kind", "koha-nexus-set")
+out("id", man.get("id", "")); out("created", man.get("created", "")); out("host", man.get("host", ""))
+out("panel_version", man.get("panel_version", "")); out("complete", "yes" if man["complete"] else "no")
+out("integrity", integrity)
+out("platforms", " ".join(p["id"] for p in plats if p["result"] == "ok"))
+# Sets made before the recoverability field: Koha had its database only.
+def recov(p):
+    r = p.get("recoverability")
+    if r in ("full", "data-only", "none"):
+        return r
+    if p["result"] != "ok":
+        return "none"
+    return "full" if p["id"] == "tainacan" and p.get("secrets") in ("gpg", "plain") else "data-only"
+out("recoverability", "full" if man["complete"] and all(recov(p) == "full" for p in plats) else "partial")
+out("koha_files", "yes" if "koha/files.tar.gz" in files else "no")
+for p in plats:
+    print("part=%s\t%s\t%s\t%s\t%s\t%s\t%s" % (p["id"], p["result"], p.get("started", ""), p.get("finished", ""),
+                                         p.get("secrets", ""), str(p.get("error", ""))[:300].replace("\t", " ").replace("\n", " "),
+                                         recov(p)))
+PYEOF
+}
+
+# kei_set_conflicts PLATFORMS: what restoring would replace on this server.
+kei_set_conflicts() {
+    local p
+    for p in $1; do
+        case "$p" in
+            koha)
+                if is_koha_installed; then printf 'conflict=koha\t%s\n' "$(d="$DB_NAME"; t "The Koha in use (database \${d}) is replaced; a safety backup is made first.")"
+                else printf 'conflict=koha\t%s\n' "$(t "Koha is not installed here: install it first, then restore.")"; fi ;;
+            tainacan)
+                if [ "$(_kei_tn_get status 2>/dev/null)" = installed ]; then
+                    printf 'conflict=tainacan\t%s\n' "$(u="$(_kei_tn_get url)"; t "The Tainacan in use (\${u}) is replaced after a test in an isolated copy; its address and ports stay those of this server.")"
+                else printf 'conflict=tainacan\t%s\n' "$(t "Tainacan is not installed here: install it first, then restore.")"; fi ;;
+        esac
+    done
+}
+
+# kei_set_unpack FILE: a checked set (or Tainacan package archive)
+# extracted into a staging folder (700); prints stage=, koha= and
+# tainacan= (or tainacan_bad=, a package that fails its own check). Only after
+# kei_set_inspect said it is safe, with no owner or mode from the archive;
+# the tree is checked again and every checksum verified.
+kei_set_unpack() {
+    local f="${1:-}" info kind stage
+    info=$(kei_set_inspect "$f" 2>/dev/null) || return 4
+    kind=$(printf '%s\n' "$info" | sed -n 's/^kind=//p' | head -n 1)
+    case "$kind" in
+        koha-nexus-set)
+            [ "$(printf '%s\n' "$info" | sed -n 's/^integrity=//p')" = ok ] || { echo "$(t "The set files do not match their checksums.")" >&2; return 4; } ;;
+        tainacan-archive) ;;
+        *) echo "$(t "This file is not a joint package of Koha.Nexus.")" >&2; return 4 ;;
+    esac
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+    if ! tar -C "$stage" -xf "$f" --no-same-owner --no-same-permissions --no-overwrite-dir 2>/dev/null \
+        || ! kei_bk_check_tree "$stage" >/dev/null \
+        || { [ "$kind" = koha-nexus-set ] && ! ( cd "$stage" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ); }; then
+        rm -rf "$stage"
+        echo "$(t "The set could not be extracted safely.")" >&2
+        return 4
+    fi
+    chmod -R go-rwx "$stage"
+    echo "stage=$stage"
+    find "$stage/koha" -maxdepth 1 -type f -name '*.sql.*' -printf 'koha=%p\n' 2>/dev/null | head -n 1
+    find "$stage/tainacan" "$stage" -mindepth 1 -maxdepth 1 -type d -name 'knx-tainacan-*' 2>/dev/null | head -n 1 | while read -r p; do
+        # The package is checked as a package too (its own manifest and checksums).
+        if kei_backup_check "$p" tainacan >/dev/null 2>&1; then echo "tainacan=$p"; else echo "tainacan_bad=$p"; fi
+    done
+    return 0
+}
+
+# kei_set_koha_extras plan|apply STAGE [confirm]: Koha's files and secrets
+# from an extracted set (kei_set_unpack), after its database was restored.
+# Data files go back where THIS installation keeps them (a safety copy of
+# what was there first). Secrets need the recovery phrase
+# (KEI_BACKUP_PHRASE) and never overwrite the target blindly: from
+# koha-conf.xml only <encryption_key> comes back (the target keeps its
+# database password, paths, Zebra and memcached); another secret file is
+# added when the target has none, else the packaged one is saved beside it
+# (FILE.from-backup, 600). Values are never printed: the plan says only
+# same, different, absent. Plan lines: item=LABEL<TAB>ACTION<TAB>WHERE.
+kei_set_koha_extras() {
+    local action="${1:-}" stage="${2:-}" ok="${3:-}" dir sec="" label path class rc=0 ts safety key_src key_dst
+    case "$action" in plan|apply) ;; *) return 2 ;; esac
+    case "$stage" in "$KEI_BK_ROOT"/.set-restore.*) [ -d "$stage/koha" ] || return 2 ;; *) return 2 ;; esac
+    [ "$action" = plan ] || [ "$ok" = confirm ] || { echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2; return 3; }
+    is_koha_installed || { echo "$(t "Koha is not installed.")" >&2; return 3; }
+    dir=$(mktemp -d) && chmod 700 "$dir" || return 1
+    mkdir -m 700 "$dir/data" "$dir/secret"
+    if [ -f "$stage/koha/files.tar.gz" ]; then
+        kei_bk_check_tar "$stage/koha/files.tar.gz" 0 >/dev/null 2>&1 && tar -C "$dir/data" -xzf "$stage/koha/files.tar.gz" --no-same-owner 2>/dev/null \
+            || { rm -rf "$dir"; echo "$(t "Koha's files in the set could not be read safely.")" >&2; return 4; }
+    fi
+    if [ -f "$stage/koha/secrets.tar.gpg" ]; then
+        # On another server the backup key comes first, from the recovery kit.
+        if ! _kei_bk_has_key; then sec=nokey
+        elif [ -z "${KEI_BACKUP_PHRASE:-}" ]; then sec=missing
+        elif _kei_bk_gpg_phrase "$KEI_BACKUP_PHRASE" --decrypt "$stage/koha/secrets.tar.gpg" > "$dir/s.tgz" 2>/dev/null \
+            && kei_bk_check_tar "$dir/s.tgz" 0 >/dev/null 2>&1 && tar -C "$dir/secret" -xzf "$dir/s.tgz" --no-same-owner 2>/dev/null; then
+            sec=open
+        else sec=wrong; fi
+        rm -f "$dir/s.tgz"
+        echo "secrets=$sec"
+    else
+        echo "secrets=none"
+    fi
+    ts=$(date '+%Y%m%d-%H%M%S')
+    if [ "$action" = apply ] && [ -n "$(ls -A "$dir/data")" ]; then
+        mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT"
+        safety="$KEI_BK_ROOT/koha-before-files-$ts.tar.gz"
+        local -a keep=()
+        while IFS=$'\t' read -r label path class; do
+            [ "$class" = data ] && [ -e "$dir/data/$label" ] && [ -e "$path" ] && keep+=("${path#/}")
+        done < <(_kei_set_koha_items)
+        if [ "${#keep[@]}" -gt 0 ]; then
+            ( umask 077; tar -C / -czf "$safety" "${keep[@]}" 2>/dev/null ) || { rm -rf "$dir"; echo "$(t "The safety copy of Koha's files could not be made: nothing was changed.")" >&2; return 1; }
+            echo "safety=$safety"
+        fi
+    fi
+    while IFS=$'\t' read -r label path class; do
+        if [ "$class" = data ]; then
+            [ -e "$dir/data/$label" ] || continue
+            printf 'item=%s\trestore\t%s\n' "$label" "$path"
+            [ "$action" = apply ] || continue
+            if [ -d "$dir/data/$label" ]; then
+                mkdir -p "$path" && cp -a "$dir/data/$label/." "$path/" || rc=1
+            else
+                mkdir -p "${path%/*}" && cp -p "$dir/data/$label" "$path" || rc=1
+            fi
+            case "$path" in /var/lib/koha/"$INSTANCE"/*)
+                id "${INSTANCE}-koha" >/dev/null 2>&1 && chown -R "${INSTANCE}-koha:${INSTANCE}-koha" "$path" 2>/dev/null ;; esac
+            continue
+        fi
+        [ "$sec" = open ] || continue
+        [ -f "$dir/secret/$label" ] || continue
+        if [ "$label" = koha-conf.xml ]; then
+            key_src=$(_kei_koha_conf_value "$dir/secret/$label" encryption_key)
+            key_dst=$(_kei_koha_conf_value "$KOHA_CONF" encryption_key)
+            if [ -z "$key_src" ]; then printf 'item=encryption_key\tabsent\t%s\n' "$KOHA_CONF"
+            elif [ "$key_src" = "$key_dst" ]; then printf 'item=encryption_key\tsame\t%s\n' "$KOHA_CONF"
+            else
+                printf 'item=encryption_key\tapply\t%s\n' "$KOHA_CONF"
+                [ "$action" = apply ] && { _kei_koha_set_key "$KOHA_CONF" "$dir/secret/$label" "$ts" || rc=1; }
+            fi
+            key_src="" key_dst=""
+            continue
+        fi
+        if [ ! -e "$path" ]; then
+            printf 'item=%s\tadd\t%s\n' "$label" "$path"
+            [ "$action" = apply ] && { mkdir -p "${path%/*}" && install -m 600 "$dir/secret/$label" "$path" || rc=1; }
+        elif cmp -s "$dir/secret/$label" "$path"; then
+            printf 'item=%s\tsame\t%s\n' "$label" "$path"
+        else
+            printf 'item=%s\tbeside\t%s\n' "$label" "$path.from-backup"
+            [ "$action" = apply ] && { install -m 600 "$dir/secret/$label" "$path.from-backup" || rc=1; }
+        fi
+    done < <(_kei_set_koha_items)
+    rm -rf "$dir"
+    [ "$action" = apply ] && log "backup set: Koha files and secrets applied from $stage (rc $rc)"
+    return "$rc"
+}
+
+# _kei_koha_set_key CONF FROM TS: only <encryption_key> of CONF takes the
+# value in FROM (the old file kept as CONF.kei-before-secrets-TS, 600), then
+# Koha reads it again. Nothing else of CONF changes.
+_kei_koha_set_key() {
+    local conf="$1" from="$2" ts="$3" tmp
+    cp -p "$conf" "$conf.kei-before-secrets-$ts" && chmod 600 "$conf.kei-before-secrets-$ts" || return 1
+    tmp=$(mktemp "$conf.XXXXXX") || return 1
+    python3 -I - "$conf" "$from" > "$tmp" <<'PYEOF' || { rm -f "$tmp"; return 1; }
+import re, sys
+dst = open(sys.argv[1], encoding="utf-8").read()
+src = open(sys.argv[2], encoding="utf-8").read()
+src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
+m = re.search(r"<encryption_key>\s*([^<]*?)\s*</encryption_key>", src)
+if not m or not re.fullmatch(r"[A-Za-z0-9+/=_.:-]{8,512}", m.group(1)):
+    sys.exit(1)
+key = m.group(1)
+pat = re.compile(r"(<encryption_key>)[^<]*(</encryption_key>)")
+if pat.search(dst):
+    dst = pat.sub(lambda x: x.group(1) + key + x.group(2), dst, count=1)
+elif "</config>" in dst:
+    # The main section is closed by the LAST </config> (Zebra's <server>
+    # sections before it have <config> elements too).
+    head, _, tail = dst.rpartition("</config>")
+    dst = head + " <encryption_key>%s</encryption_key>\n</config>" % key + tail
+else:
+    sys.exit(1)
+sys.stdout.write(dst)
+PYEOF
+    chmod --reference="$conf" "$tmp" 2>/dev/null; chown --reference="$conf" "$tmp" 2>/dev/null
+    mv -f "$tmp" "$conf" || return 1
+    [ -x /usr/sbin/koha-plack ] && /usr/sbin/koha-plack --restart "$INSTANCE" >/dev/null 2>&1
+    systemctl is-active --quiet memcached 2>/dev/null && systemctl restart memcached >/dev/null 2>&1
+    log "backup set: Koha encryption key restored (previous koha-conf.xml: $conf.kei-before-secrets-$ts)"
+    return 0
+}
+
+# kei_set_cleanup STAGE: the staging folder of kei_set_unpack removed.
+kei_set_cleanup() {
+    local s="${1:-}"
+    case "$s" in "$KEI_BK_ROOT"/.set-restore.*) [ -d "$s" ] && rm -rf "$s" ;; *) return 2 ;; esac
 }
 
 # ----------------------------------------------------------------------
@@ -44294,6 +44933,35 @@ kei_task() {
             while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < <(kei_backup_status "$@")
             return 0 ;;
         platform-backup-run)      _kei_docker_task kei_backup_run "${1:-}" "${2:-manual}" ;;
+        # The joint package (Koha + Tainacan) and the assisted restore.
+        set-backup|set-inspect|set-unpack)
+            # Their KEY=VALUE lines become results; what went wrong, an error box.
+            local line out err rc
+            [ -n "${1:-}" ] || return 2
+            out=$(mktemp) && err=$(mktemp) || return 1
+            case "$name" in
+                set-backup)  kei_set_backup "$1" "${2:-}" "${3:-}" > "$out" 2>"$err" ;;
+                set-inspect) kei_set_inspect "$1" > "$out" 2>"$err" ;;
+                set-unpack)  kei_set_unpack "$1" > "$out" 2>"$err" ;;
+            esac
+            rc=$?
+            while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < "$out"
+            [ "$rc" != 0 ] && [ -s "$err" ] && msg_error "" "$(grep -v '^[[:space:]]*$' "$err" | tail -n 4)"
+            rm -f "$out" "$err"
+            return "$rc" ;;
+        set-cleanup)      kei_set_cleanup "${1:-}" ;;
+        set-koha-extras)
+            # The recovery phrase only as a shell variable: no program started
+            # from here finds it in its environment (gpg reads it on a descriptor).
+            local _ph="${KEI_BACKUP_PHRASE:-}" line out err rc
+            unset KEI_BACKUP_PHRASE
+            out=$(mktemp) && err=$(mktemp) || return 1
+            KEI_BACKUP_PHRASE="$_ph" kei_set_koha_extras "${1:-}" "${2:-}" "${3:-}" > "$out" 2>"$err"; rc=$?
+            _ph=""
+            while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < "$out"
+            [ "$rc" != 0 ] && [ -s "$err" ] && msg_error "" "$(grep -v '^[[:space:]]*$' "$err" | tail -n 4)"
+            rm -f "$out" "$err"
+            return "$rc" ;;
         platform-backup-incomplete)
             local d l r
             while IFS=$'\t' read -r d l r; do [ -n "$d" ] && kei_result incomplete "${d##*/}|$l|$r"; done < <(kei_backup_incomplete "$@")
