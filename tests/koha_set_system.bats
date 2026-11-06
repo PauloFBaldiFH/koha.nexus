@@ -78,6 +78,7 @@ koha_instance() {
         "") state=none ;; __ENCRYPTION_KEY__) state=placeholder ;; *) state=set ;;
     esac
     echo "koha-create: $(grep -c '<encryption_key>' "$CONF") <encryption_key> line(s) in koha-conf.xml, key $state" >&3
+    grep -n -B1 -A1 '<encryption_key>' "$CONF" | sed -E 's/(<encryption_key>)[^<]+/\1(value hidden)/; s/^/  /' >&3
     key=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
     case "$state" in
         placeholder)
@@ -99,7 +100,7 @@ koha_schema() {
     local v
     koha-mysql "$INST" < /usr/share/koha/intranet/cgi-bin/installer/data/mysql/kohastructure.sql || return 1
     if [ -f /usr/share/koha/intranet/cgi-bin/kohaversion.pl ]; then
-        v=$(perl -e 'require "/usr/share/koha/intranet/cgi-bin/kohaversion.pl"; my @v = split /\./, kohaversion(); print "$v[0]." . join("", @v[1 .. $#v])')
+        v=$(PERL5LIB=/usr/share/koha/lib perl -e 'require "/usr/share/koha/intranet/cgi-bin/kohaversion.pl"; my @v = split /\./, kohaversion(); print "$v[0]." . join("", @v[1 .. $#v])')
     else
         v=$(dpkg-query -W -f '${Version}' koha-common | sed 's/-.*//' | awk -F. '{ printf "%s.%s%s000", $1, $2, $3 }')
     fi
@@ -153,13 +154,13 @@ PHP
     sql "INSERT INTO borrowers (cardnumber, surname, branchcode, categorycode, userid, flags, secret) VALUES ('kn1', 'Teste', 'MAIN', 'S', 'kn-staff', 1, '$cipher')"
     [ "$(decrypt)" = "$TOTP" ]
     # An uploaded file (Upload tool): the database keeps its name and hash only.
-    up=$(conf upload_path); up=${up:-/var/lib/koha/$INST/uploads}
+    up=$(conf upload_path || true); up=${up:-/var/lib/koha/$INST/uploads}
     mkdir -p "$up/kn" && printf 'scanned page\n' > "$up/kn/sample.pdf"
     chown -R "$INST-koha:$INST-koha" "$up"
     sql "INSERT INTO uploaded_files (hashvalue, filename, dir, filesize, uploadcategorycode, public, permanent) VALUES ('$(sha1sum < "$up/kn/sample.pdf" | cut -c1-40)', 'sample.pdf', 'kn', 13, 'kn', 1, 1)"
     printf '%s\n' "$up" > "$S/upload_path"
     # A plugin (its code is not in the database).
-    pl=$(conf pluginsdir); pl=${pl:-/var/lib/koha/$INST/plugins}
+    pl=$(conf pluginsdir || true); pl=${pl:-/var/lib/koha/$INST/plugins}
     mkdir -p "$pl/Koha/Plugin" && printf 'package Koha::Plugin::KnTest;\n1;\n' > "$pl/Koha/Plugin/KnTest.pm"
     printf '%s\n' "$pl" > "$S/plugins"
     # SIP2 logins of this library.
@@ -208,7 +209,7 @@ PHP
     koha_instance
     [ "$(conf encryption_key)" != "$(cat "$S/old_key")" ]
     [ "$(conf pass)" != "$(cat "$S/old_pass")" ]
-    conf pass > "$S/new_pass"; conf upload_path > "$S/new_upload_conf"
+    conf pass > "$S/new_pass"; { conf upload_path || true; } > "$S/new_upload_conf"
     cp -p "$CONF" "$S/new-koha-conf.xml"
     [ ! -e "$(cat "$S/upload_path")/kn/sample.pdf" ]
 }
