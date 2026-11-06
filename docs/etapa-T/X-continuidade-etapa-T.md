@@ -18,12 +18,12 @@ Cada etapa é uma branch remota, montada sobre a anterior. Nenhuma foi mesclada.
 
 | Etapa | Versão | Branch remota | Commits (do mais antigo ao mais novo) | PR |
 |---|---|---|---|---|
-| U1 | 1.5.175 | `claude/project-thread-evltj0` | `5691fc1` central de backups e nuvem sem Koha; `de2c191` telas de nuvem em Python 3.9 | #341, aberto, CI verde |
-| U2 | 1.5.176 | `claude/etapa-T-u2` (ponta `60b1ae6`) | `09217e6` pacote conjunto e restauração assistida; `52ec636` negativos do bats falham de verdade; `69a863e` arquivos e segredos do Koha; `c857252` job `koha-set`; correções achadas pelo Koha real: `14b979a`, `fea6d88`, `7c42b40` (instalador: seção `<config>` certa do `koha-conf.xml`), `60b1ae6` | abrir depois do #341 |
-| U3 | 1.5.177 | `claude/etapa-T-u3` (ponta `8ea9dcd`) | `c9591d0` central de agendamentos; `8ea9dcd` merge das correções do U2 | depois do U2 |
-| U4 | 1.5.178 | `claude/etapa-T-u4` (ponta `4288144`) | `c490351` acesso administrativo e assistente pós-instalação; `4288144` merge | depois do U3 |
-| U5 | 1.5.179 | `claude/etapa-T-u5` (ponta `e67ec19`) | `9b4751a` endereço gratuito do acervo (Tainacan); `e67ec19` merge | depois do U4 |
-| U6 | 1.5.180 | `claude/etapa-T-u6` (ponta `bbc939a`) | `4c05abf` backup conjunto agendado; `b2235ad` merge; `bbc939a` passo agendado do `koha-set` | depois do U5 |
+| U1 | 1.5.175 | `claude/project-thread-evltj0` | `5691fc1` central de backups e nuvem sem Koha; `de2c191` telas de nuvem em Python 3.9 | #341, **mesclado** em 06/11 |
+| U2 | 1.5.176 | `claude/etapa-T-u2` (ponta `c7a71f4`) | `09217e6` pacote conjunto e restauração assistida; `52ec636` negativos do bats falham de verdade; `69a863e` arquivos e segredos do Koha; `c857252` job `koha-set`; correções achadas pelo Koha real: `14b979a`, `fea6d88`, `7c42b40` (instalador: seção `<config>` certa do `koha-conf.xml`), `60b1ae6`; `fc31d5e`, `c969b55` (testes do painel), `9a38ad9` (painel sem root), `991cc13`, `c7a71f4` (koha-create mostrado e repetido) | **PR #342**, aberto |
+| U3 | 1.5.177 | `claude/etapa-T-u3` (ponta `521edc7`) | `c9591d0` central de agendamentos; `8ea9dcd` merge das correções do U2 | depois do U2 |
+| U4 | 1.5.178 | `claude/etapa-T-u4` (ponta `dc4860c`) | `c490351` acesso administrativo e assistente pós-instalação; `70c6000` acesso administrativo do Tainacan por `wp eval-file`; merges das correções do U2 | depois do U3 |
+| U5 | 1.5.179 | `claude/etapa-T-u5` (ponta `73656be`) | `9b4751a` endereço gratuito do acervo (Tainacan); `e67ec19` merge | depois do U4 |
+| U6 | 1.5.180 | `claude/etapa-T-u6` (ponta `2862835`) | `4c05abf` backup conjunto agendado; `b2235ad` merge; `bbc939a` passo agendado do `koha-set` | depois do U5 |
 | Documentos | (sem versão) | `claude/etapa-T-docs` | `2a963e6` e seguintes | sem PR; pode ir junto do U2 ou à parte |
 
 Para conferir: `git fetch origin && git log --oneline origin/main..origin/claude/etapa-T-u6`.
@@ -85,6 +85,9 @@ Rodaram e passaram:
 2. O `kohastructure.sql` sozinho não grava a preferência `Version`, que a restauração do painel exige. O teste grava a versão como o instalador web faria.
 3. `koha-remove` mantém os arquivos da instância em `/var/lib/koha`. O teste apaga as pastas de uploads e plugins para fazer o papel de um servidor novo.
 4. Um processo iniciado pelas tarefas (Zebra) prendia a saída do bats e o job não terminava. As tarefas rodam sem esse descritor (`3>&-`), e o job tem limite de 45 minutos.
+5. **Erro real do U4, corrigido em `70c6000`:** o acesso administrativo do Tainacan usava `wp eval CÓDIGO LOGIN`, mas `wp eval` não entrega argumentos ao código (só `wp eval-file` preenche `$args`). A conta inicial nunca aparecia como tal e não dava para trocar a senha nem criar outro administrador. Agora o código vai num arquivo da pasta de trabalho, sem segredo; a senha continua só na entrada padrão. O dublê do WordPress em `admin_access.bats` imitava o erro e passou a se comportar como o wp-cli (A05 a A07 falham com o código antigo). Desinstalar o Tainacan também apaga os passos pós-instalação dele.
+6. **Painel sem root, corrigido em `9a38ad9`:** a CI roda o painel como usuário comum; `Path("/root/backups").is_dir()` dava `PermissionError` e a rotina do backup conjunto terminava em silêncio. Agora uma pasta ilegível cai na pasta pessoal. Os testes da central guardam o erro de uma rotina e o mostram quando uma tela não chega. Conferido aqui como usuário comum (162 testes).
+7. Um `koha-create` logo depois do `koha-remove` falhou uma vez (branch do U5), com a saída escondida. O teste agora mostra a saída e tenta de novo uma vez, depois de limpar o que sobrou.
 
 ### Comandos
 
@@ -108,14 +111,14 @@ Não rodar duas suítes do painel ao mesmo tempo.
 
 Atualizado a cada execução acompanhada.
 
-| Branch e commit | Workflow `proxy` (inclui `koha-set`) | Observação |
+| Branch e commit | Resultado | Observação |
 |---|---|---|
-| `claude/etapa-T-u2` `c857252` | falhou (run 42255933667) | 1ª execução: chave da instância nova e `Version` |
-| `claude/etapa-T-u2` `14b979a` | falhou (run 42260265675) | caminho do Koha para ler a versão |
-| `claude/etapa-T-u2` `fea6d88` | cancelada (run 42262359611) | todos os testes rodaram, mas o bats não terminava (descritor preso) |
-| `claude/etapa-T-u2` `7c42b40` | falhou (run 42268564245) | erro real do `<config>` corrigido; faltavam dois ajustes do teste |
-| `claude/etapa-T-u2` `60b1ae6` | **verde, 16 de 16 jobs** (run 42270862044) | `koha-set` 8 de 8 |
-| `claude/etapa-T-u3` a `u6` | em execução (runs 42271314751, 42271319434, 42271324914, 42271328590) | o U6 inclui o 9º passo, do backup agendado |
+| U2 `c857252` a `7c42b40` | falhou (4 rodadas) | ajustes do teste e o erro real do `<config>` (ver acima) |
+| U2 `60b1ae6` | `proxy` verde, 16 de 16; `koha-set` 8 de 8 | Platforms panel vermelho: painel sem root (corrigido em `9a38ad9`) |
+| U3 a U6, merges das correções | `koha-set` verde nos quatro, com o 9º passo (backup agendado) no U6 | Tainacan real vermelho do U4 em diante: `wp eval` (corrigido em `70c6000`, verde no U4 e no U6) |
+| U5 `c81fe35` | `koha-set` falhou uma vez no `koha-create` | mesma etapa passou no U4 e no U6; saída e nova tentativa em `991cc13`/`c7a71f4` |
+| PR #342 (U2), `9a38ad9` | `koha-set` verde; Platforms panel: 1 teste clicava antes da janela montar | corrigido em `c969b55` |
+| Pontas atuais | em execução | a conferir |
 
 Todos os outros jobs do `proxy` (apache, system, tainacan, engine, events, nos três sistemas) passaram em todas as execuções do U2.
 
@@ -127,8 +130,8 @@ Do Paulo:
 3. Rodar `roteiro-teste-etapa-T.sh antes` no servidor, atualizar o painel e rodar `roteiro-teste-etapa-T.sh depois`. O roteiro só lê, e os arquivos que ele gera ficam com permissão 600.
 
 De quem continuar:
-1. Conferir o resultado do `koha-set` no U6 (9º passo, backup agendado) e corrigir se falhar. Correções seguem a regra do merge da seção 1.
-2. Abrir os PRs U2 a U6 na ordem da seção 2.
+1. Acompanhar a CI do #342 e das pontas U3 a U6; corrigir na branch mais baixa e levar adiante por merge (seção 1).
+2. Quando o #342 entrar, abrir o U3 (`claude/etapa-T-u3`, texto em `prs/pr_u3.md`), e assim por diante, um de cada vez.
 3. Nada de servidor real foi testado. Nenhum teste destrutivo deve rodar no servidor do Paulo.
 
 Fora do escopo: Portal Nexus, DSpace e AtoM.
