@@ -98,7 +98,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🎨  OPAC and Staff Appearance", "opac", kind="view"),
         Entry("📨  Messaging & interoperability", "hub", kind="view"),
         Entry("🔍  Search engine & indexing", "search", kind="view"),
-        Entry("⏰  Schedules & cron tasks", "crons", kind="view"),
+        Entry("⏰  Koha schedules", "schedules", kind="view", scope="koha"),
         Entry("🔧  Koha settings & parameters", "settings", kind="view"),
         Entry("🩺  Koha diagnostics & maintenance", "diagnostics", kind="view"),
         Entry("🛡  Koha security", "koha-security", kind="view"),
@@ -173,10 +173,11 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
     ), requires="koha", group="koha"),
-    # The visual cron manager (views/crons.py); the entry is the classic routine.
+    # The visual cron manager of koha_tasks (views/crons.py); the entry is the
+    # classic routine. Reached from the Schedules center (Paulo, 2026-11-06).
     Section("crons", "⏰  Schedules & cron tasks", entries=(
-        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s", requires="koha",
-        group="koha"),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", requires="koha",
+        sidebar=False, parent="schedules"),
     # Koha's own parameters (the clock and timezone are the server's: General tools).
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
         Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
@@ -264,6 +265,12 @@ SECTIONS: tuple[Section, ...] = (
         Entry("♻  Assisted restore", "restore-assisted", kind="native"),
         Entry("🔌  Cloud connections", "cloud-connections", kind="native"),
     ), view="backups", key="b"),
+    # Every scheduled job of the server, from every source, read only
+    # (views/schedules.py); the cards are the editors (Paulo, 2026-11-06).
+    Section("schedules", "⏰  Schedules", "⏰ Schedules", entries=(
+        Entry("✏  Koha's scheduled jobs", "crons", kind="view", requires="koha"),
+        Entry("⏰  Schedule backups", "pbackup-schedule", kind="native", requires="tainacan"),
+    ), view="schedules", key="s"),
     # Security, remote access and the firewall in one hub: VPN, Cloudflare
     # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
     # internet" and "Security center"). The Tunnel and HTTPS only serve
@@ -448,6 +455,8 @@ DESCRIPTIONS: dict[str, str] = {
     "user-folder": "Opens your home folder in Windows Explorer or the file manager",
     "terminal": "A Debian command line: its own window on Windows, this window elsewhere",
     "crons": "Turns Koha's scheduled jobs on or off",
+    "schedules": "Every scheduled job of this server, its last and next run",
+    "schedules:koha": "Koha's scheduled jobs: when they run, the last and the next run",
     "languages": "Downloads a language and makes it the OPAC, staff and panel one",
     "lang-download": "Downloads a Koha language pack and changes nothing else",
     "lang-activate": "Makes an installed language the active one, no download",

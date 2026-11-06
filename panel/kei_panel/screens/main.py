@@ -158,7 +158,7 @@ class MainScreen(Screen):
         sec = section(section_id)
         # A card can open a shared screen already filtered (the Backup
         # center from a platform group: menus.Entry.scope).
-        if scope:
+        if scope and section_id == "backups":
             self.app.backup_scope = scope
         ready = self.app.platform_ready(sec.requires)
         # A section whose platform is not installed gets its own stand-in

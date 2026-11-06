@@ -762,6 +762,71 @@ _RUN: dict[str, list[str]] = {
 _RUN_DEFAULT = ["@@step Working", "@@done 0 Working", "@@say ok OK\tDone (demo)."]
 
 
+# The cron files of the demo server, for the Schedules center
+# (schedules.read_files reads /etc/cron.d on a real one).
+_DEMO_KOHA_TASKS = """# ======================================================================
+# Koha.Nexus scheduled jobs (Schedules & cron tasks)
+# ======================================================================
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# Database backup (compressed SQL) - Daily at 23:00
+0 23 * * * root /bin/bash /root/backup_sql.sh >/dev/null 2>&1
+
+# MARC21 records backup - Weekly, Sunday at 03:00
+0 3 * * 0 root /bin/bash /root/backup_marc.sh >/dev/null 2>&1
+
+# Cloud backup gdrive: sql+marc - Daily at 23:30
+30 23 * * * root /bin/bash /root/cloud_plan.sh gdrive sql+marc >/dev/null 2>&1
+
+# Cloud backup wasabi-weekly: sql - Weekly, Sunday at 02:00
+0 2 * * 0 root /bin/bash /root/cloud_plan.sh wasabi-weekly sql >/dev/null 2>&1
+
+# Full search index rebuild - Weekly, Saturday at 02:00
+#off# 0 2 * * 6 root /usr/local/bin/koha-kei-reindex library >/dev/null 2>&1
+
+# Clear old sessions and the Zebra queue - Daily at 01:30
+30 1 * * * root /usr/sbin/koha-shell library -c "/usr/share/koha/bin/cronjobs/cleanup_database.pl --confirm --sessions --sessdays 2 --zebraqueue 10" >/dev/null 2>&1
+
+# Plack restart (frees memory) - Daily at 05:00
+0 5 * * * root /usr/sbin/koha-plack --restart library >/dev/null 2>&1
+
+# System log cleanup (keeps 14 days) - Daily at 00:30
+30 0 * * * root /usr/bin/journalctl --vacuum-time=14d >/dev/null 2>&1
+
+# Database table check - Monthly, day 5 at 01:00
+0 1 5 * * root /usr/bin/mysqlcheck --check --databases koha_library >/dev/null 2>&1
+
+# Copy of the reports folder (written by hand)
+15 6 * * 1-5 root rsync -a /var/lib/koha/library/reports/ /srv/reports/ >/dev/null 2>&1
+"""
+_DEMO_CRON = {
+    "koha_es_watchdog": "# Elasticsearch indexer watchdog (every 5 minutes)\n"
+                        "*/5 * * * * root /usr/local/bin/koha-es-watchdog.sh >/dev/null 2>&1\n",
+    "koha_sitemap": "SHELL=/bin/bash\n17 3 * * * root /usr/local/bin/config.sh --opac-sitemap >/dev/null 2>&1\n",
+    "koha-common": "*/15 * * * * root koha-foreach --chdir --enabled --email "
+                   "/usr/share/koha/bin/cronjobs/process_message_queue.pl\n"
+                   "0 1 * * * root koha-foreach --chdir --enabled /usr/share/koha/bin/cronjobs/cleanup_database.pl "
+                   "--sessions --zebraqueue 10\n",
+}
+_DEMO_PLATFORM_BACKUPS = (
+    "# koha.nexus: backups of the platforms (kei_backup_schedule)\n"
+    "30 2 * * * root /usr/local/bin/config.sh --task platform-backup-run tainacan scheduled >/dev/null 2>&1\n"
+    "30 3 * * 0 root /usr/local/bin/config.sh --task platform-backup-maintain tainacan >/dev/null 2>&1\n"
+    "30 4 1 * * root /usr/local/bin/config.sh --task platform-backup-verify tainacan 30 >/dev/null 2>&1\n")
+
+
+def demo_cron_files(koha: bool, tainacan: bool) -> dict[str, str]:
+    """The demo server's cron files, by name (schedules.read_files)."""
+    files: dict[str, str] = {}
+    if koha:
+        files["koha_tasks"] = _DEMO_KOHA_TASKS
+        files.update(_DEMO_CRON)
+    if tainacan:
+        files["koha-nexus-platform-backups"] = _DEMO_PLATFORM_BACKUPS
+    return files
+
+
 def _set_conflicts() -> list[str]:
     """What kei_set_conflicts says, in the panel's language as the installer would."""
     from .i18n import t
