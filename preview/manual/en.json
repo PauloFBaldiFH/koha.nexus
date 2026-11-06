@@ -2953,7 +2953,9 @@
     "Shown in the Backup center when Koha and Tainacan are both installed, under **Koha and Tainacan**. It asks for a folder of this server and says what it does before starting.",
     "Koha is captured with the same checked dump as the safety backups; Tainacan with a complete package of its own (the files go into the set, never only into a restic repository). Each platform is captured in turn, and the manifest records when each capture started and ended: they are never taken at the same instant.",
     "If a platform fails, the set is not reported as done: the file is named -partial, its manifest says it is incomplete, the part that worked stays in it and the reason is shown for each platform.",
-    "Koha's configuration (koha-conf.xml) goes in only encrypted with the backup key, and a restore never applies it."
+    "Koha's files outside its database go in too: uploaded files, plugins, the OPAC and staff images, the panel's MARC rules and import profiles. Its secrets (the encryption key in koha-conf.xml, the SIP2 logins, the panel's messaging, AI and Z39.50 logins) go in only encrypted with the backup key, never in clear.",
+    "Without a backup key the panel asks first: set the key up now, or make the package without Koha's secrets. A package without them is marked data only and is never called complete: what Koha encrypted (staff two-factor secrets) cannot be read on another installation.",
+    "Never in any package: the Koha program (koha-common), the cloud accounts, the Cloudflare tunnel or free address. The search index is rebuilt from the database."
    ],
    "related": [
     "restore-assisted",
@@ -2965,7 +2967,8 @@
    "overview": [
     "Before anything is applied it shows where the backup came from, its date, its platforms, the result of the checksum check and what it would replace on this server; with a joint package you choose Koha, Tainacan or both.",
     "An archive is untrusted: paths out of it, links, special files, unknown members, a sum that does not match or a size larger than the free disk make it refused before anything is extracted, and nothing a manifest says is ever run.",
-    "The restore itself is the one each platform already had: Koha's restore check and safety backup, Tainacan's test in an isolated copy and safety backup. Without the recovery phrase the data comes back and this installation keeps its own configuration."
+    "The restore itself is the one each platform already had: Koha's restore check and safety backup, Tainacan's test in an isolated copy and safety backup. Without the recovery phrase the data comes back and this installation keeps its own configuration.",
+    "After Koha's database, the panel offers Koha's files and secrets with a plan first. From koha-conf.xml only the encryption key comes back (the old file is kept beside it); the database password, paths, Zebra and memcached of this server stay. Another secret file is added only when this server has none; otherwise the one of the backup is saved beside it as .from-backup for you to compare. No value is ever shown. On another server, the recovery kit of the server that made the backup is imported first."
    ],
    "related": [
     "restore",

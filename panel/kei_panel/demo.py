@@ -158,6 +158,10 @@ _Z_HEALTH = [
 
 # Answers that depend on the first argument (the job): the authority job.
 _BY_ARG: dict[tuple[str, str], list[str]] = {
+    ("set-koha-extras", "apply"): ["@@result secrets=open",
+                                   "@@result safety=/var/backups/koha-nexus/koha-before-files-20261106-101500.tar.gz",
+                                   "@@result item=uploads\trestore\t/var/lib/koha/library/uploads",
+                                   "@@result item=encryption_key\tapply\t/etc/koha/sites/library/koha-conf.xml"],
     # The home page of the collection (installer: --task tainacan-site).
     ("tainacan-site", "plan"): [
         "@@result plan=apply",
@@ -578,20 +582,28 @@ _SCRIPTS: dict[str, list[str]] = {
                        "@@msg ok OK\tCloud enabled and tested successfully."],
     # The joint package and the assisted restore (routines/backup_set.py).
     "set-backup": ["@@note Backing up koha...",
-                   "@@result platform=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tkoha/koha_library_set_2026-11-06_10h00.sql.gz",
+                   "@@result platform=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tkoha/koha_library_set_2026-11-06_10h00.sql.gz\tfull",
                    "@@note Backing up tainacan...",
-                   "@@result platform=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\ttainacan/knx-tainacan-20261106-100041/",
-                   "@@result size=212M", "@@result complete=yes", "@@result file={0}/knx-set-20261106-100000.tar"],
+                   "@@result platform=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\ttainacan/knx-tainacan-20261106-100041/\tfull",
+                   "@@result size=212M", "@@result complete=yes", "@@result recoverability=full", "@@result file={0}/knx-set-20261106-100000.tar"],
     "set-inspect": ["@@result kind=koha-nexus-set", "@@result id=4b1f0c9e-2d55-4f0a-9a43-6c1d1f0e9a10",
                     "@@result created=2026-11-06 10:01:31", "@@result host=biblioteca",
                     "@@result panel_version=1.5.176", "@@result complete=yes", "@@result integrity=ok",
-                    "@@result platforms=koha tainacan",
-                    "@@result part=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tnone\t",
-                    "@@result part=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\tgpg\t"],
+                    "@@result platforms=koha tainacan", "@@result recoverability=full", "@@result koha_files=yes",
+                    "@@result part=koha\tok\t2026-11-06 10:00:02\t2026-11-06 10:00:41\tgpg\t\tfull",
+                    "@@result part=tainacan\tok\t2026-11-06 10:00:41\t2026-11-06 10:01:30\tgpg\t\tfull"],
     "set-unpack": ["@@result stage=/var/backups/koha-nexus/.set-restore.demo",
                    "@@result koha=/var/backups/koha-nexus/.set-restore.demo/koha/koha_library_set_2026-11-06_10h00.sql.gz",
                    "@@result tainacan=/var/backups/koha-nexus/.set-restore.demo/tainacan/knx-tainacan-20261106-100041"],
     "set-cleanup": [],
+    # Koha's files and secrets after its database: paths and states, never a value.
+    "set-koha-extras": ["@@result secrets=open",
+                        "@@result item=uploads\trestore\t/var/lib/koha/library/uploads",
+                        "@@result item=plugins\trestore\t/var/lib/koha/library/plugins",
+                        "@@result item=opac-custom\trestore\t/usr/share/koha/opac/htdocs/images/custom",
+                        "@@result item=encryption_key\tapply\t/etc/koha/sites/library/koha-conf.xml",
+                        "@@result item=SIPconfig.xml\tbeside\t/etc/koha/sites/library/SIPconfig.xml.from-backup",
+                        "@@result item=kei-messaging.conf\tadd\t/etc/koha/sites/library/kei-messaging.conf"],
     # The automatic cloud backup screen (screens/cloud_backup.py).
     "cloud-status": [
         "@@result plan=gdrive\tgdrive\t\t30", "@@result plan=wasabi-weekly\twasabi\tkoha-library\t90",

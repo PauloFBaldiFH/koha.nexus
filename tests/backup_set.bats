@@ -20,7 +20,21 @@ setup() {
     printf 'CREATE TABLE t (x int);\nINSERT INTO t VALUES (1);\n' > "$DEMO/db.sql"
     printf 'one\n' > "$DEMO/data/a.txt"; printf 'two\n' > "$DEMO/data/sub/b.txt"
     printf 'KN_SECRET=s3cr3t\n' > "$DEMO/.env"; chmod 600 "$DEMO/.env"
-    printf '<yazgfs><config><pass>koha-db-pass</pass></config></yazgfs>\n' > "$T/koha-conf.xml"
+    # A Koha installation's files and secrets, under T (paths as the installer names them).
+    K="$T/koha"; mkdir -p "$K/etc" "$K/uploads/ab" "$K/plugins/Koha/Plugin" "$K/opac-custom" "$K/staff-custom" "$K/mr" "$K/conf/import-profiles"
+    cat > "$T/koha-conf.xml" <<XML
+<yazgfs><config>
+ <pass>koha-db-pass</pass>
+ <upload_path>$K/uploads</upload_path>
+ <pluginsdir>$K/plugins</pluginsdir>
+ <encryption_key>OLD-key-0123456789abcdef</encryption_key>
+</config></yazgfs>
+XML
+    printf 'scan\n' > "$K/uploads/ab/scan.pdf"; printf 'package X;\n' > "$K/plugins/Koha/Plugin/X.pm"
+    printf 'logo\n' > "$K/opac-custom/logo.png"; printf 'rule\n' > "$K/mr/rules.tsv"
+    printf 'VISION_KEY=vision-secret\n' > "$K/mr/vision.conf"; chmod 600 "$K/mr/vision.conf"
+    printf '<sip><login id="m1" password="sip-secret"/></sip>\n' > "$K/etc/SIPconfig.xml"
+    printf 'KEI_Z3950_LOGIN=z-secret\n' > "$K/conf/.env"
 }
 
 lib() {
@@ -28,7 +42,11 @@ lib() {
 log() { :; }
 SYS_LANG=en
 DB_NAME=koha_library
+INSTANCE=library
 KOHA_CONF='$T/koha-conf.xml'
+K='$T/koha'
+SIP_CONF=\$K/etc/SIPconfig.xml MSG_CONF=\$K/etc/kei-messaging.conf MR_DIR=\$K/mr CONF_DIR=\$K/conf
+OPAC_CUSTOM_DIR=\$K/opac-custom STAFF_CUSTOM_DIR=\$K/staff-custom THEME_STATE=\$K/conf/theme-settings.json
 KEI_BK_PLATFORMS=tainacan
 is_koha_installed() { [ \"\$FAKE_KOHA\" = yes ]; }
 _kei_tn_get() { [ \"\$1\" = status ] && [ \"\$FAKE_TN\" = yes ] && echo installed; [ \"\$1\" = url ] && echo http://acervo.local; return 0; }
@@ -51,11 +69,12 @@ _kei_bk_tainacan_secrets() { printf '%s\n' \"\$DEMO/.env\"; }
 $1" 3>&-
 }
 
+never() { ! "$@"; }
 field() { sed -n "s/^$1=//p" <<<"$2" | head -n 1; }
 manifest() { tar -xOf "$1" manifest.json; }
 
 @test "S01 the set holds both platforms' data, each with its own capture times, and says per-platform" {
-    run lib "kei_set_backup '$OUT'"
+    run lib "kei_set_backup '$OUT' '' no-secrets"
     [ "$status" -eq 0 ]
     SET=$(field file "$output")
     [[ "$output" == *$'platform=koha\tok\t'* ]] && [[ "$output" == *$'platform=tainacan\tok\t'* ]]
@@ -82,7 +101,7 @@ PY
 }
 
 @test "S02 a platform that fails leaves a partial set, never 'done', with the valid part in it" {
-    FAKE_TN_DUMP=fail run lib "kei_set_backup '$OUT'"
+    FAKE_TN_DUMP=fail run lib "kei_set_backup '$OUT' '' no-secrets"
     [ "$status" -eq 9 ]
     [ "$(field complete "$output")" = no ]
     [[ "$output" == *$'platform=tainacan\tfailed\t'*"not running"* ]]
@@ -97,17 +116,17 @@ PY
 }
 
 @test "S03 nothing backed up: no set; not enough space: no set and nothing left behind" {
-    FAKE_TN_DUMP=fail FAKE_KOHA_DUMP=fail run lib "kei_set_backup '$OUT'"
+    FAKE_TN_DUMP=fail FAKE_KOHA_DUMP=fail run lib "kei_set_backup '$OUT' '' no-secrets"
     [ "$status" -eq 9 ]
     [ -z "$(ls -A "$OUT")" ]
-    run lib "df() { printf 'Filesystem 1B-blocks Used Available Use%% Mounted\nx 1 1 10 99%% /\n'; }; kei_set_backup '$OUT' koha"
+    run lib "df() { printf 'Filesystem 1B-blocks Used Available Use%% Mounted\nx 1 1 10 99%% /\n'; }; kei_set_backup '$OUT' koha no-secrets"
     [ "$status" -eq 5 ]
     [[ "$output" == *"Not enough free disk"* ]]
     [ -z "$(ls -A "$OUT")" ]
 }
 
 @test "S04 a backup is recognised by its content, not by its name" {
-    lib "kei_set_backup '$OUT'" >/dev/null
+    lib "kei_set_backup '$OUT' '' no-secrets" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
     cp "$SET" "$T/backup.sql.gz"
     printf -- '-- MariaDB dump 10.19\nCREATE TABLE x (y int);\n' | gzip > "$T/photo.jpg"
@@ -126,7 +145,7 @@ PY
 }
 
 @test "S05 unpack: checked and verified in a private staging folder; a selective part is usable alone" {
-    lib "kei_set_backup '$OUT'" >/dev/null
+    lib "kei_set_backup '$OUT' '' no-secrets" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
     run lib "kei_set_unpack '$SET'"
     [ "$status" -eq 0 ]
@@ -144,7 +163,7 @@ PY
 }
 
 @test "S06 a tampered set is refused before anything is extracted" {
-    lib "kei_set_backup '$OUT'" >/dev/null
+    lib "kei_set_backup '$OUT' '' no-secrets" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
     mkdir "$T/x" && tar -C "$T/x" -xf "$SET"
     printf -- '-- MariaDB dump\nDROP DATABASE koha_library;\n' | gzip > "$(ls "$T"/x/koha/*.sql.gz)"
@@ -192,22 +211,52 @@ PY
     [ ! -e "$T/pwned" ] && [ ! -e "$T/pwned2" ] && [ ! -e "$T/../escape.txt" ] && [ ! -e "$T/escape.txt" ]
 }
 
-@test "S08 the Koha configuration goes into the set only encrypted, with the backup key" {
-    lib "kei_set_backup '$OUT' koha" >/dev/null
+@test "S08 Koha's secrets never in clear: without a key the person chooses first; data-only is never 'full'" {
+    clear_secrets() {   # SET: no secret value readable anywhere in it, nor in its files archive
+        local all; all=$(tar -xOf "$1"; tar -xOf "$1" koha/files.tar.gz 2>/dev/null | tar -xzOf - 2>/dev/null)
+        never grep -aqE 'koha-db-pass|sip-secret|vision-secret|z-secret|OLD-key' <<<"$all"
+    }
+    # No key: nothing is captured, the reason is said, and a choice is asked for.
+    run lib "kei_set_backup '$OUT'"
+    [ "$status" -eq 7 ] && [ "$(field needs "$output")" = key ]
+    [[ "$output" == *"Set up the backup key first, or make the package without the secrets"* ]]
+    [ -z "$(ls -A "$OUT")" ]
+    # The person chose a package without the secrets: the data files go, marked data-only.
+    run lib "kei_set_backup '$OUT' koha no-secrets"
+    [ "$status" -eq 0 ] && [ "$(field recoverability "$output")" = partial ]
+    [[ "$output" == *$'platform=koha\tok\t'*$'\tdata-only'* ]]
     SET=$(ls "$OUT"/knx-set-*.tar)
-    [ -z "$(tar -tf "$SET" | grep koha-conf)" ]
-    [ -z "$(tar -xOf "$SET" | grep -a koha-db-pass)" ]
+    tar -tf "$SET" | grep -qx 'koha/files.tar.gz'
+    [ -z "$(tar -tf "$SET" | grep 'secrets\|koha-conf')" ]
+    files=$(tar -xOf "$SET" koha/files.tar.gz | tar -tzf -)
+    for f in ./uploads/ab/scan.pdf ./plugins/Koha/Plugin/X.pm ./opac-custom/logo.png ./marc-replace/rules.tsv; do
+        grep -qx "$f" <<<"$files" || { echo "missing $f"; false; }
+    done
+    never grep -q vision.conf <<<"$files"
+    clear_secrets "$SET"
+    m=$(manifest "$SET")
+    python3 -I - "$m" <<'PY'
+import json, sys
+m = json.loads(sys.argv[1])
+assert m["recoverability"] == "partial" and "koha-common package" in m["external"]
+k = m["platforms"][0]
+assert k["id"] == "koha" and k["secrets"] == "none" and k["recoverability"] == "data-only"
+PY
+    run lib "kei_set_inspect '$SET'"
+    [ "$(field recoverability "$output")" = partial ] && [ "$(field koha_files "$output")" = yes ]
+    # With the backup key: the secrets go, encrypted only, and the package is full.
     lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
     rm -f "$OUT"/*.tar
-    lib "kei_set_backup '$OUT' koha" >/dev/null
+    run lib "kei_set_backup '$OUT' koha"
+    [ "$status" -eq 0 ] && [ "$(field recoverability "$output")" = full ]
     SET=$(ls "$OUT"/knx-set-*.tar)
-    tar -tf "$SET" | grep -qx 'koha/koha-conf.xml.gpg'
-    [ -z "$(tar -xOf "$SET" | grep -a koha-db-pass)" ]
+    tar -tf "$SET" | grep -qx 'koha/secrets.tar.gpg'
+    clear_secrets "$SET"
     [[ "$(manifest "$SET")" == *'"secrets": "gpg"'* ]]
 }
 
 @test "S09 the conflicts with this server are said before a restore" {
-    lib "kei_set_backup '$OUT'" >/dev/null
+    lib "kei_set_backup '$OUT' '' no-secrets" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
     run lib "kei_set_inspect '$SET'"
     [[ "$output" == *$'conflict=koha\tThe Koha in use (database koha_library) is replaced'* ]]
@@ -218,9 +267,61 @@ PY
 }
 
 @test "S10 the set tasks are not Koha tasks and are in the dispatcher" {
-    for task in set-backup set-inspect set-unpack set-cleanup; do
+    for task in set-backup set-inspect set-unpack set-cleanup set-koha-extras; do
         run lib "kei_task_needs_koha $task"
         [ "$status" -eq 1 ]
         grep -E "^        [a-z|-]+\)" "$REPO/installer" | grep -q -- "$task"
     done
+}
+
+@test "S11 Koha's secrets come back without overwriting the target blindly: only the encryption key, never a value shown" {
+    PH=TEST-PHRA-SE12-3456-7890-ABCD
+    lib "KEI_BACKUP_PHRASE=$PH kei_backup_setup confirm" >/dev/null
+    lib "kei_set_backup '$OUT' koha" >/dev/null
+    SET=$(ls "$OUT"/knx-set-*.tar)
+    # The target: another installation (its own database password and key),
+    # no uploads, its own SIP2 logins, no AI key.
+    sed -i 's/koha-db-pass/NEW-db-pass/; s/OLD-key-0123456789abcdef/NEW-key-fedcba9876543210/' "$T/koha-conf.xml"
+    chmod 640 "$T/koha-conf.xml"
+    rm -rf "$K/uploads" "$K/mr/vision.conf"
+    printf '<sip><login id="m9" password="target-sip"/></sip>\n' > "$K/etc/SIPconfig.xml"
+    STAGE=$(field stage "$(lib "kei_set_unpack '$SET'")")
+    shown() { never grep -qE 'koha-db-pass|NEW-db-pass|sip-secret|target-sip|vision-secret|z-secret|OLD-key|NEW-key' <<<"$1"; }
+    # The plan: what would change, with no value in it; nothing changes.
+    before=$(sha256sum "$T/koha-conf.xml" "$K/etc/SIPconfig.xml")
+    run lib "KEI_BACKUP_PHRASE=$PH kei_set_koha_extras plan '$STAGE'"
+    [ "$status" -eq 0 ] && shown "$output"
+    [ "$(field secrets "$output")" = open ]
+    [[ "$output" == *$'item=uploads\trestore\t'"$K/uploads"* ]]
+    [[ "$output" == *$'item=encryption_key\tapply\t'"$T/koha-conf.xml"* ]]
+    [[ "$output" == *$'item=SIPconfig.xml\tbeside\t'"$K/etc/SIPconfig.xml.from-backup"* ]]
+    [[ "$output" == *$'item=vision.conf\tadd\t'"$K/mr/vision.conf"* ]]
+    [[ "$output" == *$'item=panel.env\tsame\t'* ]]
+    [ "$before" = "$(sha256sum "$T/koha-conf.xml" "$K/etc/SIPconfig.xml")" ] && [ ! -e "$K/uploads" ]
+    # No phrase, a wrong phrase, no key here: the secrets are not opened.
+    run lib "kei_set_koha_extras plan '$STAGE'"; [ "$(field secrets "$output")" = missing ]
+    run lib "KEI_BACKUP_PHRASE=WRONG-PHRA-SE00 kei_set_koha_extras plan '$STAGE'"; [ "$(field secrets "$output")" = wrong ]
+    never grep -q 'item=encryption_key' <<<"$output"
+    run lib "_kei_bk_has_key() { return 1; }; KEI_BACKUP_PHRASE=$PH kei_set_koha_extras plan '$STAGE'"; [ "$(field secrets "$output")" = nokey ]
+    # Apply needs a yes; then only <encryption_key> changes in koha-conf.xml.
+    run lib "KEI_BACKUP_PHRASE=$PH kei_set_koha_extras apply '$STAGE'"
+    [ "$status" -eq 3 ] && [ "$before" = "$(sha256sum "$T/koha-conf.xml" "$K/etc/SIPconfig.xml")" ]
+    run lib "KEI_BACKUP_PHRASE=$PH kei_set_koha_extras apply '$STAGE' confirm"
+    [ "$status" -eq 0 ] && shown "$output"
+    grep -q '<encryption_key>OLD-key-0123456789abcdef</encryption_key>' "$T/koha-conf.xml"
+    grep -q '<pass>NEW-db-pass</pass>' "$T/koha-conf.xml"
+    grep -q "<upload_path>$K/uploads</upload_path>" "$T/koha-conf.xml"
+    [ "$(stat -c %a "$T/koha-conf.xml")" = 640 ]
+    old=$(ls "$T"/koha-conf.xml.kei-before-secrets-*)
+    [ "$(stat -c %a "$old")" = 600 ] && grep -q NEW-key "$old"
+    # The data files are back; the target's own secrets are kept, the packaged one beside.
+    [ "$(cat "$K/uploads/ab/scan.pdf")" = scan ]
+    grep -q target-sip "$K/etc/SIPconfig.xml"
+    grep -q sip-secret "$K/etc/SIPconfig.xml.from-backup" && [ "$(stat -c %a "$K/etc/SIPconfig.xml.from-backup")" = 600 ]
+    grep -q vision-secret "$K/mr/vision.conf" && [ "$(stat -c %a "$K/mr/vision.conf")" = 600 ]
+    # What the files replaced was kept first.
+    safety=$(field safety "$output")
+    [[ "$safety" == "$KEI_BK_ROOT"/koha-before-files-*.tar.gz ]] && tar -tzf "$safety" | grep -q 'opac-custom/logo.png'
+    # Only its own staging folders.
+    run lib "kei_set_koha_extras plan '$T'"; [ "$status" -eq 2 ]
 }

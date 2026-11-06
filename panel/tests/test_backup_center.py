@@ -307,15 +307,22 @@ def test_the_inspection_is_read_as_data():
     from kei_panel.routines import backup_set
     out = _outcome(["@@result kind=koha-nexus-set", "@@result created=2026-11-06 10:01:31", "@@result host=bib",
                     "@@result complete=no", "@@result integrity=ok", "@@result platforms=koha",
-                    "@@result part=koha\tok\t10:00\t10:01\tgpg\t",
+                    "@@result recoverability=partial", "@@result koha_files=yes",
+                    "@@result part=koha\tok\t10:00\t10:01\tgpg\t\tfull",
                     "@@result part=tainacan\tfailed\t10:01\t10:02\t\tThe Tainacan database is not running.",
                     "@@result conflict=koha\tKoha is not installed here: install it first, then restore."])
     info = backup_set.parse_inspect(out)
     assert info.kind == "koha-nexus-set" and not info.complete and info.platforms == ["koha"]
-    assert [(p.id, p.ok) for p in info.parts] == [("koha", True), ("tainacan", False)]
+    assert [(p.id, p.ok, p.recov) for p in info.parts] == [("koha", True, "full"), ("tainacan", False, "")]
+    assert info.recoverability == "partial" and info.koha_files
     text = backup_set.summary(info)
     assert "Made on: bib" in text and "Incomplete set" in text and "not at the same instant" in text
-    assert "Koha configuration encrypted with this server's key (never applied by a restore)" in text
+    assert "its secrets (encryption key, SIP2 and panel logins) encrypted with the backup key" in text
+    # Never "complete" when a part is missing or has no secrets; the outside dependencies are said.
+    assert "NOT recoverable in full" in text and "koha-common" in text and "Cloudflare" in text
+    # A Koha part without its secrets says what that means.
+    data_only = backup_set.Part("koha", True, secrets="none", recov="data-only")
+    assert "WITHOUT its secrets" in backup_set.secrets_text(data_only)
     assert "Tainacan: not in the set (The Tainacan database is not running.)" in text
     assert "Koha is not installed here" in text
 
@@ -413,3 +420,132 @@ def test_the_assisted_restore_recognises_the_backup_and_uses_the_existing_restor
         assert calls == [("koha", "/root/backups/knx-set-20261106-100000.tar")]
     if kind == "unsafe":
         assert "refused before anything was extracted" in shown and "../../etc/cron.d/x" in shown
+
+
+# ----------------------------------------------------------------------
+# Koha's secrets (document V): asked before, never in clear, recovered with a plan
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+@pytest.mark.parametrize("answer", ["data", "key", None])
+def test_without_a_backup_key_the_person_chooses_before_the_joint_backup(server, tmp_path, monkeypatch, answer):
+    from kei_panel.routines import platforms as tn
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
+    from kei_panel.screens.files import PathPickerScreen
+
+    keys = {"key": ""}
+    setups: list = []
+
+    async def state(app):
+        return platforms.BackupState(known=True, key=keys["key"])
+
+    async def setup(app):
+        setups.append(1)
+        keys["key"] = "3F2A"
+    monkeypatch.setattr(tn, "backup_state", state)
+    monkeypatch.setattr(tn, "backup_setup", setup)
+
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        real = app.bridge.task
+
+        async def task(name, *args, **kwargs):
+            out = await real(name, *args, **kwargs)
+            if name == "set-backup" and "no-secrets" in args:     # what the installer says for data only
+                out.results["recoverability"] = "partial"
+                out.lists["platform"][0] = out.lists["platform"][0].replace("\tfull", "\tdata-only")
+            return out
+        app.bridge.task = task
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.run_native("set-backup")
+            await until(pilot, lambda: isinstance(app.screen, PathPickerScreen))
+            app.screen.dismiss(tmp_path)
+            await until(pilot, lambda: isinstance(app.screen, ChoiceScreen))
+            prompt = app.screen._prompt
+            app.screen.dismiss(answer)
+            body = ""
+            if answer:
+                await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+                await pilot.click("#yes")
+                await until(pilot, lambda: isinstance(app.screen, MessageScreen), 15)
+                body = app.screen._body
+            await pilot.pause(0.3)
+            return prompt, body, [(n, a) for n, a in ran if n == "set-backup"]
+
+    prompt, body, ran = asyncio.run(main())
+    assert "never go in clear" in prompt and "two-factor" in prompt and "not complete" in prompt
+    if answer is None:
+        assert ran == [] and setups == []
+    elif answer == "data":
+        assert ran == [("set-backup", (str(tmp_path), "", "no-secrets"))]
+        assert "data only for the platform marked" in body and "data without its secrets" in body
+        assert "NOT recoverable in full" in body and "Joint backup done." not in body
+    else:
+        assert setups == [1] and ran == [("set-backup", (str(tmp_path),))]
+        assert "✅ Joint backup done." in body and "Recoverable in full" in body
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+@pytest.mark.parametrize("confirm", [True, False])
+def test_koha_secrets_come_back_with_a_plan_after_its_database_and_no_value_is_shown(server, monkeypatch, confirm):
+    from kei_panel.routines import backup, platforms as tn
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
+    from kei_panel.screens.files import PathPickerScreen
+
+    async def koha_restore(app, file=None):
+        return True
+
+    async def tainacan_restore(app, name=None):
+        return None
+    monkeypatch.setattr(backup, "restore", koha_restore)
+    monkeypatch.setattr(tn, "tainacan_restore", tainacan_restore)
+    envs: list = []
+
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        real = app.bridge.task
+
+        async def task(name, *args, **kwargs):
+            if name == "set-koha-extras":
+                envs.append((args, kwargs.get("env")))
+            return await real(name, *args, **kwargs)
+        app.bridge.task = task
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.run_native("restore-assisted")
+            await until(pilot, lambda: isinstance(app.screen, ChoiceScreen))
+            app.screen.dismiss("file")
+            await until(pilot, lambda: isinstance(app.screen, PathPickerScreen))
+            app.screen.dismiss("/root/backups/knx-set-20261106-100000.tar")
+            await until(pilot, lambda: isinstance(app.screen, ChoiceScreen) and "Made on" in app.screen._prompt)
+            app.screen.dismiss("koha")
+            await until(pilot, lambda: isinstance(app.screen, InputScreen))
+            app.screen.dismiss("RECO-VERY-PHRA-SE01")
+            await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            plan = app.screen._question
+            await pilot.click("#yes" if confirm else "#no")
+            done = ""
+            if confirm:
+                await until(pilot, lambda: isinstance(app.screen, MessageScreen), 15)
+                done = app.screen._body
+                app.screen.dismiss(None)
+            await pilot.pause(0.5)
+            return plan, done, [n for n, _a in ran]
+
+    plan, done, names = asyncio.run(main())
+    assert "the rest of koha-conf.xml (database password, paths, Zebra, memcached) stays as it is" in plan
+    assert "SIPconfig.xml: this server keeps its own" in plan and "SIPconfig.xml.from-backup" in plan
+    assert "kei-messaging.conf: added (this server has none)" in plan
+    assert "uploads: back to /var/lib/koha/library/uploads" in plan
+    # The phrase only in the environment, never on the command line.
+    assert all("RECO-VERY-PHRA-SE01" not in " ".join(a) for a, _e in envs)
+    assert all(e == {"KEI_BACKUP_PHRASE": "RECO-VERY-PHRA-SE01"} for _a, e in envs)
+    actions = [a[0] for a, _e in envs]
+    if confirm:
+        assert actions == ["plan", "apply"] and envs[1][0][2] == "confirm"
+        assert "koha-before-files-20261106-101500.tar.gz" in done
+    else:
+        assert actions == ["plan"]
+    assert names.count("set-cleanup") == 1

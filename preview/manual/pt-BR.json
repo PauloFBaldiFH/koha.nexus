@@ -2528,7 +2528,9 @@
     "Aparece na Central de backups quando o Koha e o Tainacan estão instalados, em **Koha e Tainacan**. Ele pede uma pasta deste servidor e diz o que vai fazer antes de começar.",
     "O Koha é capturado com o mesmo dump verificado dos backups de segurança; o Tainacan, com um pacote completo próprio (os arquivos vão para o conjunto, nunca só para um repositório restic). Cada plataforma é capturada na sua vez, e o manifesto registra quando cada captura começou e terminou: elas nunca são feitas no mesmo instante.",
     "Se uma plataforma falhar, o conjunto não é dado como feito: o arquivo recebe -partial no nome, o manifesto diz que ele está incompleto, a parte que funcionou fica nele e o motivo aparece para cada plataforma.",
-    "A configuração do Koha (koha-conf.xml) só entra criptografada com a chave dos backups, e uma restauração nunca a aplica."
+    "Os arquivos do Koha fora do banco também vão: arquivos enviados, plugins, as imagens do OPAC e da equipe, as regras MARC e os perfis de importação do painel. Os segredos (a chave de criptografia em koha-conf.xml, os logins do SIP2, os logins de mensagens, IA e Z39.50 do painel) só entram cifrados com a chave dos backups, nunca em claro.",
+    "Sem a chave dos backups o painel pergunta antes: configurar a chave agora, ou gerar o pacote sem os segredos do Koha. Um pacote sem eles fica marcado como só dados e nunca é chamado de completo: o que o Koha cifrou (segredos do segundo fator da equipe) não poderá ser lido em outra instalação.",
+    "Nunca vão em nenhum pacote: o programa do Koha (koha-common), as contas de nuvem, o túnel da Cloudflare ou o endereço gratuito. O índice de busca é refeito a partir do banco."
    ],
    "_en": "46007ebc68"
   },
@@ -2537,7 +2539,8 @@
    "overview": [
     "Antes de aplicar qualquer coisa, ela mostra de onde o backup veio, a data, as plataformas, o resultado da verificação das somas e o que ele substituiria neste servidor; num pacote conjunto você escolhe o Koha, o Tainacan ou os dois.",
     "Um arquivo compactado é tratado como não confiável: caminhos para fora dele, links, arquivos especiais, membros desconhecidos, uma soma que não confere ou um tamanho maior que o disco livre fazem com que ele seja recusado antes de qualquer extração, e nada do que um manifesto diz é executado.",
-    "A restauração em si é a que cada plataforma já tinha: a verificação e o backup de segurança do Koha, o teste numa cópia isolada e o backup de segurança do Tainacan. Sem a frase de recuperação os dados voltam e esta instalação mantém a sua própria configuração."
+    "A restauração em si é a que cada plataforma já tinha: a verificação e o backup de segurança do Koha, o teste numa cópia isolada e o backup de segurança do Tainacan. Sem a frase de recuperação os dados voltam e esta instalação mantém a sua própria configuração.",
+    "Depois do banco do Koha, o painel oferece os arquivos e segredos do Koha, com um plano antes. Do koha-conf.xml só volta a chave de criptografia (o arquivo anterior fica guardado ao lado); a senha do banco, os caminhos, o Zebra e o memcached deste servidor ficam. Outro arquivo de segredo só é acrescentado quando este servidor não tem o seu; se tiver, o do backup fica ao lado como .from-backup para você comparar. Nenhum valor aparece. Em outro servidor, importe antes o kit de recuperação do servidor que fez o backup."
    ],
    "_en": "1f79fd1bca"
   }
