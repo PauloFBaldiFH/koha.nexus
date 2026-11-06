@@ -104,6 +104,8 @@ be granted; this tool does not bypass it.
 backend, UI and Solr separately on amd64 runners. It runs disposable, non-public
 smoke containers and records build metadata, image configuration and SPDX SBOM.
 It does **not** push images to any registry or deploy to a user's server.
+The separate production-dependency audit job blocks high/critical advisories;
+the original upstream lock currently needs fixes/review before that gate passes.
 
 Smoke checks deliberately have different meanings:
 

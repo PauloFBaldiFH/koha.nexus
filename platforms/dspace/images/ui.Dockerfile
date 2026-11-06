@@ -36,6 +36,7 @@ COPY --chmod=0555 ui-entrypoint.sh /usr/local/bin/nexus-dspace-ui
 RUN mkdir -p /app/log && chown -R node:node /app/log /app/dist/browser
 ENV NODE_ENV=production \
     DSPACE_UI_HOST=0.0.0.0 \
+    DSPACE_UI_SSL=false \
     DSPACE_UI_PORT=4000 \
     NODE_OPTIONS=--max-old-space-size=1024
 USER node

@@ -9,7 +9,7 @@ on:
       - 'tests/test_dspace_images.py'
       - '.github/workflows/dspace-images.yml'
   push:
-    branches: [main]
+    branches: [main, 'feat/dspace-*']
     paths:
       - 'platforms/dspace/**'
       - 'tools/dspace_images.py'
@@ -88,5 +88,31 @@ jobs:
         with:
           name: dspace-${{ matrix.image }}-build-record
           path: ${{ runner.temp }}/dspace-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependencies:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/dspace_images.py prepare "$RUNNER_TEMP/dspace-audit-sources"
+      - name: Audit production dependency graph (blocks high/critical advisories)
+        run: >-
+          npm audit --package-lock-only --omit=dev --audit-level=high --json
+          --prefix "$RUNNER_TEMP/dspace-audit-sources/ui-source"
+          > "$RUNNER_TEMP/dspace-ui-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dspace-ui-dependency-audit
+          path: ${{ runner.temp }}/dspace-ui-audit.json
           if-no-files-found: ignore
           retention-days: 7

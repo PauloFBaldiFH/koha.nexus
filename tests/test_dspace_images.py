@@ -123,6 +123,16 @@ class DSpaceInputs(unittest.TestCase):
             self.assertEqual(root.findtext("proxies/proxy/nonProxyHosts"), "localhost|127.0.0.1")
             self.assertEqual(target.stat().st_mode & 0o777, 0o600)
 
+    def test_ui_rejects_upstream_self_signed_fallback(self):
+        entry = images.BASE / "images/ui-entrypoint.sh"
+        for variable in ("DSPACE_UI_SSL", "DSPACE_SSL"):
+            with self.subTest(variable=variable), patch.dict(os.environ, {
+                "PATH": os.defpath, variable: "true"
+            }, clear=True):
+                result = subprocess.run(["sh", str(entry)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 78)
+                self.assertIn("reverse proxy", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
