@@ -62,17 +62,50 @@ $1" 3>&-
 never() { ! "$@"; }
 conf() { lib "_kei_koha_conf_value '$CONF' '$1'"; }
 sql() { koha-mysql "$INST" -N -e "$1"; }
-koha_perl() { koha-shell "$INST" -c "perl -MKoha::Encryption -e '$1' '${2:-}'" 2>/dev/null; }
+# Koha's own code, as root with the instance's configuration; errors stay
+# visible in the test output.
+koha_perl() { env PERL5LIB=/usr/share/koha/lib KOHA_CONF="$CONF" perl -MKoha::Encryption -e "$1" "${2:-}"; }
 decrypt() { koha_perl 'print Koha::Encryption->new->decrypt_hex(shift)' "$(sql "SELECT secret FROM borrowers WHERE userid = 'kn-staff'")"; }
 field() { sed -n "s/^$1=//p" <<<"$2" | tail -n 1; }
 
-# koha_instance: koha-create and the schema (the web installer's
-# kohastructure.sql), with an encryption key of its own.
+# koha_instance: koha-create, with an encryption key of its own. What
+# koha-create wrote about the key is reported (never its value); when the
+# instance has no usable key, one is set the way koha-create would.
 koha_instance() {
+    local key state
     koha-create --create-db "$INST" >/dev/null 2>&1 || [ -f "$CONF" ] || return 1
-    case "$(conf encryption_key)" in ""|__ENCRYPTION_KEY__)
-        sed -i "s|<encryption_key>[^<]*</encryption_key>|<encryption_key>$(head -c 24 /dev/urandom | base64 | tr -d '/+=')</encryption_key>|" "$CONF" ;;
+    case "$(conf encryption_key)" in
+        "") state=none ;; __ENCRYPTION_KEY__) state=placeholder ;; *) state=set ;;
     esac
+    echo "koha-create: $(grep -c '<encryption_key>' "$CONF") <encryption_key> line(s) in koha-conf.xml, key $state" >&3
+    key=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+    case "$state" in
+        placeholder)
+            sed -i "s|<encryption_key>__ENCRYPTION_KEY__</encryption_key>|<encryption_key>$key</encryption_key>|" "$CONF" ;;
+        none)
+            if grep -qE '<encryption_key>[[:space:]]*</encryption_key>' "$CONF"; then
+                sed -i -E "s|<encryption_key>[[:space:]]*</encryption_key>|<encryption_key>$key</encryption_key>|" "$CONF"
+            else
+                sed -i "0,/<\/config>/s|</config>| <encryption_key>$key</encryption_key>\n</config>|" "$CONF"
+            fi ;;
+    esac
+    case "$(conf encryption_key)" in ""|__ENCRYPTION_KEY__) return 1 ;; esac
+}
+
+# koha_schema: the tables (the web installer's kohastructure.sql) and the
+# Version preference the web installer records, which the panel's restore
+# requires of a Koha database.
+koha_schema() {
+    local v
+    koha-mysql "$INST" < /usr/share/koha/intranet/cgi-bin/installer/data/mysql/kohastructure.sql || return 1
+    if [ -f /usr/share/koha/intranet/cgi-bin/kohaversion.pl ]; then
+        v=$(perl -e 'require "/usr/share/koha/intranet/cgi-bin/kohaversion.pl"; my @v = split /\./, kohaversion(); print "$v[0]." . join("", @v[1 .. $#v])')
+    else
+        v=$(dpkg-query -W -f '${Version}' koha-common | sed 's/-.*//' | awk -F. '{ printf "%s.%s%s000", $1, $2, $3 }')
+    fi
+    [ -n "$v" ] || return 1
+    sql "INSERT INTO systempreferences (variable, value) VALUES ('Version', '$v')"
+    echo "Koha schema: Version $v" >&3
 }
 
 wp_php() {
@@ -104,7 +137,7 @@ PHP
     grep -qE '^Listen 8080$' /etc/apache2/ports.conf || echo 'Listen 8080' >> /etc/apache2/ports.conf
     a2enmod rewrite cgi headers proxy_http >/dev/null 2>&1 || true
     koha_instance
-    koha-mysql "$INST" < /usr/share/koha/intranet/cgi-bin/installer/data/mysql/kohastructure.sql
+    koha_schema
     echo "Koha: $(dpkg-query -W -f '${Version}' koha-common)" >&3
     # Where this Koha uses its encryption key (document V: "a conferir").
     grep -rl 'Koha::Encryption' /usr/share/koha/lib /usr/share/koha/intranet/cgi-bin /usr/share/koha/opac/cgi-bin 2>/dev/null \
