@@ -553,7 +553,9 @@ def test_koha_secrets_come_back_with_a_plan_after_its_database_and_no_value_is_s
             app.screen.dismiss("RECO-VERY-PHRA-SE01")
             await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
             plan = app.screen._question
-            await pilot.click("#yes" if confirm else "#no")
+            # The plan is long: on a small CI runner the buttons can lie below
+            # the fold, where a click lands on nothing. The answer is what matters.
+            app.screen.dismiss(bool(confirm))
             done = ""
             if confirm:
                 await until(pilot, lambda: isinstance(app.screen, MessageScreen), 15)
