@@ -10,6 +10,7 @@ from .database import DatabaseView
 from .hub import HubView
 from .ondemand import OnDemandView
 from .opac import OpacView
+from .schedules import SchedulesView
 from .platform import PlatformHomeView, PlatformSectionView
 from .vpn import VpnView
 from .z3950 import Z3950View
@@ -27,10 +28,11 @@ VIEWS = {
     "opac": OpacView,
     "hub": HubView,
     "crons": CronView,
+    "schedules": SchedulesView,
     "vpn": VpnView,
     "platform-home": PlatformHomeView,
     "platform-section": PlatformSectionView,
 }
 
 __all__ = ["VIEWS", "SectionView", "DashboardView", "BackupCenterView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OnDemandView", "OpacView",
-           "HubView", "CronView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]
+           "HubView", "CronView", "SchedulesView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]

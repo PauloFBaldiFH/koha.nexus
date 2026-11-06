@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.176",
+ "panel_version": "1.5.177",
  "languages": [
   {
    "code": "en",
@@ -261,7 +261,7 @@
     "sec-opac",
     "sec-hub",
     "sec-search",
-    "sec-crons",
+    "sec-schedules",
     "sec-settings",
     "sec-diagnostics",
     "sec-koha-security"
@@ -524,10 +524,10 @@
    "title": "",
    "prompt": "",
    "icon": "",
-   "key": "s",
+   "key": "",
    "view": "crons",
-   "sidebar": true,
-   "parent": "",
+   "sidebar": false,
+   "parent": "schedules",
    "entries": [
     "crons"
    ],
@@ -721,6 +721,25 @@
     "backup-compression",
     "backup-safety"
    ],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "schedules",
+   "item": "sec-schedules",
+   "label": "⏰  Schedules",
+   "title": "⏰ Schedules",
+   "prompt": "",
+   "icon": "",
+   "key": "s",
+   "view": "schedules",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "sec-crons",
+    "pbackup-schedule"
+   ],
+   "features": [],
    "media": [],
    "single": ""
   },
@@ -1755,6 +1774,16 @@
    "section": "backups",
    "label": "💾  Backup center",
    "description": "Choose a backup routine:",
+   "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "sec-schedules": {
+   "id": "sec-schedules",
+   "type": "section",
+   "section": "schedules",
+   "label": "⏰  Schedules",
+   "description": "",
    "kind": "view",
    "status": "available",
    "media": []
@@ -7912,6 +7941,56 @@
   "The cloud accounts this server can send backups to, for any platform": {
    "en": "The cloud accounts this server can send backups to, for any platform",
    "pt-BR": "As contas de nuvem para onde este servidor pode enviar backups, de qualquer plataforma",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "⏰  Schedules": {
+   "en": "⏰  Schedules",
+   "pt-BR": "⏰  Agendamentos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "⏰ Schedules": {
+   "en": "⏰ Schedules",
+   "pt-BR": "⏰ Agendamentos",
    "es": null,
    "fr": null,
    "it": null,
@@ -17418,7 +17497,7 @@
      "The default jobs include the nightly backup (23:00), the weekly MARC export (Sundays 03:00), the session and queue clean-up (01:30), the Plack restart (05:00) and the indexer watchdogs. Presets add a full index rebuild, fines and authority linking. Lines written by hand are kept as they are."
     ],
     "steps": [
-     "Open **Schedules & cron tasks** (key **s**).",
+     "Open **Schedules** (key **s**) and choose **Koha's scheduled jobs**.",
      "Switch jobs on or off and choose daily, weekly or monthly and the time (HH:MM).",
      "Press **Preview**, then **Save**. **Defaults** puts the default schedules on the screen."
     ],
@@ -17442,6 +17521,7 @@
      "**Reader alerts & daily digest** can run daily, weekly or monthly: a weekly or monthly run reminds of every loan that falls due before the next run, and the summary is titled weekly or monthly."
     ],
     "related": [
+     "sec-schedules",
      "sec-backups",
      "authority-sync",
      "clock"
@@ -17453,7 +17533,7 @@
      "As tarefas padrão incluem o backup noturno (23:00), a exportação MARC semanal (domingos às 03:00), a limpeza de sessões e da fila (01:30), o reinício do Plack (05:00) e os vigias do indexador. Predefinições adicionam a reconstrução completa do índice, as multas e a vinculação de autoridades. Linhas escritas à mão são preservadas como estão."
     ],
     "steps": [
-     "Abra **Tarefas agendadas e automações** (tecla **s**).",
+     "Abra **Agendamentos** (tecla **s**) e escolha **Tarefas agendadas do Koha**.",
      "Ligue ou desligue tarefas e escolha diária, semanal ou mensal e a hora (HH:MM).",
      "Pressione **Prévia** e depois **Salvar**. **Padrões** põe os agendamentos padrão na tela."
     ],
@@ -18548,6 +18628,31 @@
     "tips": [
      "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma fora do local (um backup ou cópia na nuvem cobre isso).",
      "Backup nunca testado é esperança, não backup: teste uma restauração uma vez por mês."
+    ]
+   }
+  },
+  "sec-schedules": {
+   "en": {
+    "summary": "Every job this server runs by itself, from every file that holds a schedule, in one list of the main menu (key s): when it runs, its last and next run and where it is changed.",
+    "overview": [
+     "It only reads. The rows come from Koha's jobs (koha_tasks, with the cloud backups and the lines written by hand), the backups of the platforms (Tainacan), the jobs the installer keeps in files of their own (search watchdogs, messaging, the OPAC sitemap, the free address heartbeat, the local AI) and Koha's own package. Each line of these files is one row: nothing is listed twice, and a command scheduled in two lines says it runs twice.",
+     "**Platform** and **Type** filter the list; the **Koha schedules** card of the Koha group opens it already on Koha. The next run is computed from the line in the server's time zone; the last run comes only from a reliable record (the backup logs, the newest Tainacan package, the restore test), otherwise the row says **No run recorded**.",
+     "WP-Cron is WordPress's own scheduler inside Tainacan: it runs when the site gets visits, so it is shown as such and never as a server schedule.",
+     "The cards are the editors: **Koha's scheduled jobs** opens Schedules & cron tasks, and **Schedule backups** sets the Tainacan backups. Rows that the installer keeps say which screen changes them."
+    ],
+    "related": [
+     "crons",
+     "sec-backups",
+     "pbackup-schedule"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Tudo o que este servidor roda sozinho, de todos os arquivos que guardam um agendamento, numa lista do menu principal (tecla s): quando roda, a última e a próxima execução e onde é alterado.",
+    "overview": [
+     "Ela só lê. As linhas vêm das tarefas do Koha (koha_tasks, com os backups na nuvem e as linhas escritas à mão), dos backups das plataformas (Tainacan), das tarefas que o instalador guarda em arquivos próprios (vigias da busca, mensagens, mapa do site do OPAC, sinal de vida do endereço gratuito, IA local) e do próprio pacote do Koha. Cada linha desses arquivos é uma linha da lista: nada aparece duas vezes, e um comando agendado em duas linhas avisa que roda duas vezes.",
+     "**Plataforma** e **Tipo** filtram a lista; o cartão **Agendamentos do Koha** do grupo Koha abre a lista já no Koha. A próxima execução é calculada a partir da linha, no fuso horário do servidor; a última execução vem só de um registro confiável (os logs de backup, o pacote mais novo do Tainacan, o teste de restauração), senão a linha diz **Sem registro**.",
+     "O WP-Cron é o agendador interno do WordPress dentro do Tainacan: ele roda quando o site recebe visitas, então aparece assim e nunca como um agendamento do servidor.",
+     "Os cartões são os editores: **Tarefas agendadas do Koha** abre Tarefas agendadas e automações, e **Agendar backups** define os backups do Tainacan. As linhas que o instalador guarda dizem qual tela as altera."
     ]
    }
   },
@@ -21456,15 +21561,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 146,
-   "manual_total": 146,
+   "manual": 147,
+   "manual_total": 147,
    "manual_outdated": [],
-   "strings": 474,
-   "strings_total": 474
+   "strings": 476,
+   "strings_total": 476
   },
   "pt-BR": {
-   "manual": 146,
-   "manual_total": 146,
+   "manual": 147,
+   "manual_total": 147,
    "manual_outdated": [
     "install",
     "apache-log",
@@ -21480,155 +21585,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 468,
-   "strings_total": 474
+   "strings": 470,
+   "strings_total": 476
   },
   "es": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 474
+   "strings_total": 476
   },
   "fr": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 474
+   "strings_total": 476
   },
   "it": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 474
+   "strings_total": 476
   },
   "de": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 474
+   "strings_total": 476
   },
   "nl": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "sv": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "pl": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "cs": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "ru": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "uk": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "tr": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "tl": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "id": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "ar": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "fa": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "hi": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "bn": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "vi": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "zh": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "ja": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   },
   "ko": {
    "manual": 0,
-   "manual_total": 146,
+   "manual_total": 147,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 474
+   "strings_total": 476
   }
  }
 }

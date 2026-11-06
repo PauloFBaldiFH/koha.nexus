@@ -49,7 +49,7 @@ def test_switch_schedule_preview_and_save(tmp_path, monkeypatch):
         app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False, demo=True))
         async with app.run_test(size=(160, 60)) as pilot:
             await pilot.pause(0.2)
-            await pilot.press("s")
+            app.screen.action_show("crons")        # from the Schedules center's card
             await pilot.pause(0.3)
             view = app.screen.query_one("#view-crons")
             await _until(pilot, lambda: view.drawn)

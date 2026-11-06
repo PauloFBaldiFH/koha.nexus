@@ -99,12 +99,12 @@ def choose(view, action) -> None:
 # ----------------------------------------------------------------------
 # Four servers: the sidebar, the dashboard's tabs, the platform homes
 # ----------------------------------------------------------------------
-KOHA_SCREENS = ["import", "library", "z3950", "ai", "opac", "hub", "search", "crons", "settings",
+KOHA_SCREENS = ["import", "library", "z3950", "ai", "opac", "hub", "search", "settings",
                 "diagnostics", "koha-security"]
 TAINACAN_SCREENS = ["tainacan-maintenance", "tainacan-events"]
-# The Backup center is shared (main menu, Paulo 2026-11-06): each platform
-# home has a card that opens it already filtered.
-SERVER_SCREENS = ["backups", "security", "infra", "server-diagnostics", "languages", "update", "tools", "about",
+# The Backup center and the Schedules center are shared (main menu, Paulo
+# 2026-11-06): a platform home has a card that opens them already filtered.
+SERVER_SCREENS = ["backups", "schedules", "security", "infra", "server-diagnostics", "languages", "update", "tools", "about",
                   "reboot"]
 
 
@@ -158,7 +158,10 @@ def test_each_platform_home_follows_its_state(server):
     kid, kcards, kproblem, kdash = homes["k"]
     assert kid == "view-koha"
     if koha:
-        assert kcards == ["credentials", "backups"] + KOHA_SCREENS and kproblem == "" and kdash
+        # The Schedules center's card sits where the editor was, after indexing.
+        cards = KOHA_SCREENS[:KOHA_SCREENS.index("search") + 1] + ["schedules"] + \
+            KOHA_SCREENS[KOHA_SCREENS.index("search") + 1:]
+        assert kcards == ["credentials", "backups"] + cards and kproblem == "" and kdash
     else:
         assert kcards == ["install"] and "not installed" in kproblem and not kdash
     tid, tcards, tproblem, tdash = homes["g"]
@@ -234,7 +237,7 @@ def test_groups_expand_and_collapse_with_the_arrows_and_keys_keep_their_screens(
     from textual.widgets import ContentSwitcher, OptionList
 
     keys = {"d": "dashboard", "k": "koha", "b": "backups", "i": "import", "l": "library", "h": "enrich-auth",
-            "n": "ondemand", "z": "z3950", "a": "ai", "o": "opac", "m": "hub", "s": "crons", "t": "database",
+            "n": "ondemand", "z": "z3950", "a": "ai", "o": "opac", "m": "hub", "s": "schedules", "t": "database",
             "g": "tainacan", "x": "security", "v": "vpn", "p": "infra"}
 
     async def main():

@@ -2303,11 +2303,12 @@
     "The default jobs include the nightly backup (23:00), the weekly MARC export (Sundays 03:00), the session and queue clean-up (01:30), the Plack restart (05:00) and the indexer watchdogs. Presets add a full index rebuild, fines and authority linking. Lines written by hand are kept as they are."
    ],
    "steps": [
-    "Open **Schedules & cron tasks** (key **s**).",
+    "Open **Schedules** (key **s**) and choose **Koha's scheduled jobs**.",
     "Switch jobs on or off and choose daily, weekly or monthly and the time (HH:MM).",
     "Press **Preview**, then **Save**. **Defaults** puts the default schedules on the screen."
    ],
    "related": [
+    "sec-schedules",
     "sec-backups",
     "authority-sync",
     "clock"
@@ -2975,6 +2976,20 @@
     "tainacan-restore",
     "set-backup",
     "sec-backups"
+   ]
+  },
+  "sec-schedules": {
+   "summary": "Every job this server runs by itself, from every file that holds a schedule, in one list of the main menu (key s): when it runs, its last and next run and where it is changed.",
+   "overview": [
+    "It only reads. The rows come from Koha's jobs (koha_tasks, with the cloud backups and the lines written by hand), the backups of the platforms (Tainacan), the jobs the installer keeps in files of their own (search watchdogs, messaging, the OPAC sitemap, the free address heartbeat, the local AI) and Koha's own package. Each line of these files is one row: nothing is listed twice, and a command scheduled in two lines says it runs twice.",
+    "**Platform** and **Type** filter the list; the **Koha schedules** card of the Koha group opens it already on Koha. The next run is computed from the line in the server's time zone; the last run comes only from a reliable record (the backup logs, the newest Tainacan package, the restore test), otherwise the row says **No run recorded**.",
+    "WP-Cron is WordPress's own scheduler inside Tainacan: it runs when the site gets visits, so it is shown as such and never as a server schedule.",
+    "The cards are the editors: **Koha's scheduled jobs** opens Schedules & cron tasks, and **Schedule backups** sets the Tainacan backups. Rows that the installer keeps say which screen changes them."
+   ],
+   "related": [
+    "crons",
+    "sec-backups",
+    "pbackup-schedule"
    ]
   }
  }

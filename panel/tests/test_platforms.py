@@ -215,8 +215,8 @@ def test_without_koha_the_panel_opens_with_the_shared_sections(no_koha):
                  "settings", "diagnostics", "koha-security"):
         assert gone not in ids
     # The group's own row stays: it is where Koha is installed.
-    # The Backup center is shared (Koha, Tainacan, cloud connections).
-    for kept in ("dashboard", "koha", "tainacan", "backups", "security", "infra", "server-diagnostics", "tools",
+    # The Backup and Schedules centers are shared (Koha, Tainacan, the server).
+    for kept in ("dashboard", "koha", "tainacan", "backups", "schedules", "security", "infra", "server-diagnostics", "tools",
                  "languages", "update", "about", "reboot"):
         assert kept in ids
 
