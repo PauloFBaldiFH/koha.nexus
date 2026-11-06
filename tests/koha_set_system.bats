@@ -77,7 +77,8 @@ koha_instance() {
     # hidden: it is shown now, and tried once more after the services settle.
     if ! koha-create --create-db "$INST" > "$S/koha-create.log" 2>&1 3>&- && [ ! -f "$CONF" ]; then
         sed 's/^/  koha-create: /' "$S/koha-create.log" | tail -n 20 >&3
-        koha-remove "$INST" >/dev/null 2>&1 3>&- || true     
+        koha-remove "$INST" >/dev/null 2>&1 3>&- || true      # what the failed attempt left
+        sleep 10
         koha-create --create-db "$INST" > "$S/koha-create.log" 2>&1 3>&- || [ -f "$CONF" ] \
             || { sed 's/^/  koha-create (2): /' "$S/koha-create.log" | tail -n 20 >&3; return 1; }
     fi
