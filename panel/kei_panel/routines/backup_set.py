@@ -149,8 +149,12 @@ async def set_backup(app) -> None:
     info = await facts(app)
     home = info.get("real_home") or "/root"
     start = Path(home) / "backups"
+    try:
+        usable = start.is_dir()
+    except OSError:          # a home this user cannot read (not root)
+        usable = False
     folder = await app.push_screen_wait(PathPickerScreen(
-        title, start if start.is_dir() else home, mode="dir",
+        title, start if usable else home, mode="dir",
         help_text=t("Choose the folder of this server where the joint package is saved.")))
     if folder is None:
         return
