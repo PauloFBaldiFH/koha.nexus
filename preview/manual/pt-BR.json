@@ -2506,6 +2506,18 @@
     "O que os backups das plataformas criptografam: a configuração, com a chave deste servidor (a frase de recuperação a abre); os arquivos, só num repositório restic; o banco, nada, nem no pacote nem na cópia na nuvem. Proteja a pasta de backups e a conta na nuvem."
    ],
    "_en": "60fa191e62"
+  },
+  "tainacan-start": {
+   "summary": "Inicia de novo um Tainacan parado: o serviço do Docker, quando é ele que está parado, e depois os contêineres do banco e do WordPress, com os dados como estão. O plano vem antes e nada é restaurado nem apagado.",
+   "_en": "b447ea0a7f"
+  },
+  "tainacan-site": {
+   "summary": "Faz o endereço público abrir o acervo em vez do blog de exemplo do WordPress: uma página com a busca do acervo e links para as coleções e para todos os itens, como página inicial, e a busca facetada do Tainacan nas páginas de coleção e de itens. O plano diz o que muda; tema, menus, posts e páginas ficam, e nada é apagado.",
+   "_en": "03288c5f3a"
+  },
+  "tainacan-site-undo": {
+   "summary": "Recoloca a página inicial e as configurações do Tainacan que existiam antes de a página inicial ser preparada. A página do acervo só vai para a lixeira se ninguém a editou.",
+   "_en": "4552b5e66b"
   }
  }
 }

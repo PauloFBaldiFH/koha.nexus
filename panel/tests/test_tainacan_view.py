@@ -194,8 +194,10 @@ def test_a_stopped_or_incomplete_tainacan_shows_the_problem_and_the_diagnosis_ne
 
     cards, problem, titles = asyncio.run(main())
     assert why in problem
-    assert cards[:2] == ["tainacan-status", "tainacan-logs"] or cards[:3] == \
-        ["tainacan-install", "tainacan-status", "tainacan-logs"]
+    # Stopped: start it again (plan and Yes) first; incomplete: install again.
+    assert cards[:3] in (["tainacan-start", "tainacan-status", "tainacan-logs"],
+                         ["tainacan-install", "tainacan-status", "tainacan-logs"])
+    assert ("tainacan-start" in cards) is ("stopped before the end" not in why)
     assert not {"tainacan-restore", "tainacan-restore-test", "tainacan-backup"} & set(cards)
     assert "zone-recovery-title" in titles and "zone-removal-title" in titles
     assert ("infra" in cards) is bool(docker)
@@ -310,7 +312,9 @@ def test_the_tainacan_screens_have_their_tools_and_no_second_summary(server):
             return out, ran
 
     out, ran = asyncio.run(main())
-    assert out["tainacan-maintenance"][0] == ["tainacan-status", "tainacan-logs", "tainacan-credentials"]
+    # The demo home page is prepared, so maintenance offers to undo it.
+    assert out["tainacan-maintenance"][0] == ["tainacan-status", "tainacan-logs", "tainacan-credentials",
+                                              "tainacan-site-undo"]
     assert out["tainacan-events"][0] == ["events-on", "events-status"]         # off: no "turn off"
     assert out["tainacan-backups"][0] == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore",
                                           "pbackup-schedule", "pbackup-configure", "pbackup-verify",

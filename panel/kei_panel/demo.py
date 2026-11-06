@@ -158,6 +158,28 @@ _Z_HEALTH = [
 
 # Answers that depend on the first argument (the job): the authority job.
 _BY_ARG: dict[tuple[str, str], list[str]] = {
+    # The home page of the collection (installer: --task tainacan-site).
+    ("tainacan-site", "plan"): [
+        "@@result plan=apply",
+        "@@result page=A new page with the search of the collection and links to the collections and to all the "
+        "items.",
+        "@@result front=Home page: from the list of blog posts to that page.",
+        "@@result facets=Tainacan's faceted search in its collection and items pages (Tainacan, Settings, Theme "
+        "default templates).",
+        "@@result kept=Not changed: the theme (Twenty Twenty-Five 1.5), the menus, the posts, the pages and the "
+        "rest of the settings. Nothing is deleted.",
+        "@@result undo=Undo puts the previous home page and settings back.", "@@result rc=0"],
+    ("tainacan-site", "status"): ["@@result site=blog", "@@result facets=off", "@@result plugin=active"],
+    ("tainacan-site", "apply"): ["@@msg ok OK\tThe home page of the collection is ready at "
+                                 "http://192.168.0.20:8090: search, collections and all the items."],
+    ("tainacan-site", "undo"): ["@@msg ok OK\tThe previous home page and settings are back."],
+    ("tainacan-start", ""): [
+        "@@result plan=start",
+        "@@result containers=Containers: database exited, WordPress exited.",
+        "@@result start=The database and WordPress containers start again with their data as they are; nothing "
+        "is restored or deleted.",
+        "@@result check=Then the functional check runs again.", "@@result rc=0"],
+    ("tainacan-start", "confirm"): ["@@msg ok OK\tTainacan is running again, with its data as it was."],
     # Events in Tainacan (installer: --task tainacan-events, tainacan-restore-notes).
     ("tainacan-events", "plan"): [
         "@@result plan=enable", "@@result em_action=install", "@@result em_origin=ours",
@@ -729,7 +751,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                             "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete") \
         else 0.05 if name == "install" else 0.15
-    if name == "tainacan-events" and args[:1] in (("plan",), ("status",)):
+    if name in ("tainacan-events", "tainacan-site") and args[:1] in (("plan",), ("status",)) \
+            or (name == "tainacan-start" and not args):
         pause = 0.0
     for line in lines:
         # "~": an optional step, whose "no" or cancel goes on (the field mapping).
