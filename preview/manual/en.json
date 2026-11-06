@@ -2946,6 +2946,33 @@
     "backup-cloud",
     "sec-backups"
    ]
+  },
+  "set-backup": {
+   "summary": "One file (knx-set-<date>.tar) with the data of Koha and of Tainacan, a manifest and the checksums of every file.",
+   "overview": [
+    "Shown in the Backup center when Koha and Tainacan are both installed, under **Koha and Tainacan**. It asks for a folder of this server and says what it does before starting.",
+    "Koha is captured with the same checked dump as the safety backups; Tainacan with a complete package of its own (the files go into the set, never only into a restic repository). Each platform is captured in turn, and the manifest records when each capture started and ended: they are never taken at the same instant.",
+    "If a platform fails, the set is not reported as done: the file is named -partial, its manifest says it is incomplete, the part that worked stays in it and the reason is shown for each platform.",
+    "Koha's configuration (koha-conf.xml) goes in only encrypted with the backup key, and a restore never applies it."
+   ],
+   "related": [
+    "restore-assisted",
+    "sec-backups"
+   ]
+  },
+  "restore-assisted": {
+   "summary": "One entry for any backup: a Koha database backup of any version, a Tainacan package or a joint package, recognised by its content and not by its name.",
+   "overview": [
+    "Before anything is applied it shows where the backup came from, its date, its platforms, the result of the checksum check and what it would replace on this server; with a joint package you choose Koha, Tainacan or both.",
+    "An archive is untrusted: paths out of it, links, special files, unknown members, a sum that does not match or a size larger than the free disk make it refused before anything is extracted, and nothing a manifest says is ever run.",
+    "The restore itself is the one each platform already had: Koha's restore check and safety backup, Tainacan's test in an isolated copy and safety backup. Without the recovery phrase the data comes back and this installation keeps its own configuration."
+   ],
+   "related": [
+    "restore",
+    "tainacan-restore",
+    "set-backup",
+    "sec-backups"
+   ]
   }
  }
 }

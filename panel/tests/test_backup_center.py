@@ -22,6 +22,7 @@ SERVERS = {"none": ("0", "0"), "koha": ("1", "0"), "tainacan": ("0", "1"), "both
 # What the center may call while it is drawn: reads only.
 READS = {"platform-backup-status", "info", "cloud-status", "cloud-list"}
 KOHA_CARDS = ["backup-download", "backup-manual", "backup-marc", "restore", "backup-cloud", "backup-test"]
+SHARED = ["restore-assisted", "cloud-connections"]
 TAINACAN_CARDS = ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
                   "pbackup-configure", "pbackup-verify", "pbackup-incomplete", "pbackup-kit"]
 
@@ -33,7 +34,7 @@ def test_only_the_installed_platforms_are_offered_koha_first():
     assert backup_center.scopes(False, False) == []
     assert backup_center.scopes(True, False) == ["koha"]
     assert backup_center.scopes(False, True) == ["tainacan"]
-    assert backup_center.scopes(True, True) == ["koha", "tainacan"]
+    assert backup_center.scopes(True, True) == ["koha", "tainacan", "both"]     # the set only with both
     assert backup_center.pick_scope("tainacan", ["koha", "tainacan"]) == "tainacan"
     assert backup_center.pick_scope("tainacan", ["koha"]) == "koha"         # asked for, not installed
     assert backup_center.pick_scope("", []) == ""
@@ -184,16 +185,16 @@ def test_the_center_follows_what_is_installed_and_only_reads(server):
     assert vid == "view-backups"
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
     assert st["none"] is (not koha and not tainacan)
-    assert st["buttons"] == (["koha", "tainacan"] if koha and tainacan else [])
+    assert st["buttons"] == (["koha", "tainacan", "both"] if koha and tainacan else [])
     if koha:            # Koha first
         assert st["scope"] == "koha" and st["koha"] and not st["tainacan"]
-        assert st["cards"] == KOHA_CARDS + ["cloud-connections"]
+        assert st["cards"] == KOHA_CARDS + SHARED
         names = [r[0] for r in st["rows"]]
         assert names[:2] == ["Database backup (SQL)", "MARC21 package"]
         assert names[2:] == ["Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)"]
     elif tainacan:
         assert st["scope"] == "tainacan" and st["tainacan"] and not st["koha"]
-        assert st["cards"] == TAINACAN_CARDS + ["cloud-connections"]
+        assert st["cards"] == TAINACAN_CARDS + SHARED
         assert [r[0] for r in st["rows"]] == ["Tainacan backup"]
     else:
         assert st["scope"] == "" and st["cards"] == ["cloud-connections"] and st["rows"] == []
@@ -231,9 +232,9 @@ def test_the_platform_groups_open_the_center_already_filtered(server):
             return from_tainacan, from_koha, chosen
 
     from_tainacan, from_koha, chosen = asyncio.run(main())
-    assert from_tainacan["scope"] == "tainacan" and from_tainacan["buttons"] == ["koha", "tainacan"]
-    assert from_tainacan["cards"] == TAINACAN_CARDS + ["cloud-connections"]
-    assert from_koha["scope"] == "koha" and from_koha["cards"] == KOHA_CARDS + ["cloud-connections"]
+    assert from_tainacan["scope"] == "tainacan" and from_tainacan["buttons"] == ["koha", "tainacan", "both"]
+    assert from_tainacan["cards"] == TAINACAN_CARDS + SHARED
+    assert from_koha["scope"] == "koha" and from_koha["cards"] == KOHA_CARDS + SHARED
     assert chosen["scope"] == "tainacan" and chosen["rows"][0][0] == "Tainacan backup"
 
 
@@ -265,3 +266,150 @@ def test_cloud_connections_work_without_koha_and_keep_the_one_tainacan_uses(serv
     assert hidden == ["cb-tab-plan", "cb-tab-files", "cb-tab-hist"] and not use_button
     assert "Tainacan copy" in uses["gdrive"]
     assert not {n for n, _a in ran} & {"cloud-remote", "cloud-plan-save", "cloud-token", "cloud-authorize"}
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+def test_koha_and_tainacan_as_a_set_offer_the_joint_backup_and_both_plans(server):
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.screen.query_one("#sidebar").blur()
+            app.screen.action_show("backups", scope="both")
+            await pilot.pause(0.3)
+            await until(pilot, loaded(app))
+            view = current_view(app)
+            return state(view), bool(view.query_one("#bk-both").display), ran
+
+    st, note, ran = asyncio.run(main())
+    assert st["scope"] == "both" and note and not st["koha"] and not st["tainacan"]
+    # The platform cards stay in each platform's view; the set has its own.
+    assert st["cards"] == ["set-backup", "restore-assisted", "cloud-connections"]
+    assert [r[0] for r in st["rows"]] == ["Database backup (SQL)", "MARC21 package",
+                                          "Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)",
+                                          "Tainacan backup"]
+    assert {name for name, _a in ran} <= READS
+
+
+# ----------------------------------------------------------------------
+# The joint backup and the assisted restore (routines/backup_set.py)
+# ----------------------------------------------------------------------
+def _outcome(lines):
+    from kei_panel.bridge import TaskOutcome
+    out = TaskOutcome()
+    for line in lines:
+        out.feed(line)
+    return out
+
+
+def test_the_inspection_is_read_as_data():
+    from kei_panel.routines import backup_set
+    out = _outcome(["@@result kind=koha-nexus-set", "@@result created=2026-11-06 10:01:31", "@@result host=bib",
+                    "@@result complete=no", "@@result integrity=ok", "@@result platforms=koha",
+                    "@@result part=koha\tok\t10:00\t10:01\tgpg\t",
+                    "@@result part=tainacan\tfailed\t10:01\t10:02\t\tThe Tainacan database is not running.",
+                    "@@result conflict=koha\tKoha is not installed here: install it first, then restore."])
+    info = backup_set.parse_inspect(out)
+    assert info.kind == "koha-nexus-set" and not info.complete and info.platforms == ["koha"]
+    assert [(p.id, p.ok) for p in info.parts] == [("koha", True), ("tainacan", False)]
+    text = backup_set.summary(info)
+    assert "Made on: bib" in text and "Incomplete set" in text and "not at the same instant" in text
+    assert "Koha configuration encrypted with this server's key (never applied by a restore)" in text
+    assert "Tainacan: not in the set (The Tainacan database is not running.)" in text
+    assert "Koha is not installed here" in text
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+def test_the_joint_backup_asks_the_folder_says_it_is_not_simultaneous_and_reports_each_platform(server, tmp_path):
+    from kei_panel.screens.dialogs import ConfirmScreen, MessageScreen
+    from kei_panel.screens.files import PathPickerScreen
+
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.run_native("set-backup")
+            await until(pilot, lambda: isinstance(app.screen, PathPickerScreen))
+            app.screen.dismiss(tmp_path)
+            await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            question = app.screen._question
+            await pilot.click("#yes")
+            await until(pilot, lambda: isinstance(app.screen, MessageScreen), 15)
+            return question, app.screen._body, ran
+
+    question, body, ran = asyncio.run(main())
+    assert "not taken at the same instant" in question
+    assert "Joint backup done" in body and "Koha: 2026-11-06 10:00:02" in body and "Tainacan: 2026-11-06" in body
+    assert ("set-backup", (str(tmp_path),)) in ran
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+@pytest.mark.parametrize("kind,choice,restored", [
+    ("koha-nexus-set", "tainacan", "tainacan"),
+    ("koha-nexus-set", "both", "koha tainacan"),
+    ("koha-sql", None, "koha"),
+    ("unsafe", None, ""),
+])
+def test_the_assisted_restore_recognises_the_backup_and_uses_the_existing_restores(
+        server, monkeypatch, kind, choice, restored):
+    from kei_panel.routines import backup, platforms as tn
+    from kei_panel.screens.dialogs import ChoiceScreen, MessageScreen
+    from kei_panel.screens.files import PathPickerScreen
+
+    calls: list = []
+
+    async def koha_restore(app, file=None):
+        calls.append(("koha", file))
+
+    async def tainacan_restore(app, name=None):
+        calls.append(("tainacan", name))
+    monkeypatch.setattr(backup, "restore", koha_restore)
+    monkeypatch.setattr(tn, "tainacan_restore", tainacan_restore)
+
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        real = app.bridge.task
+
+        async def task(name, *args, **kwargs):
+            out = await real(name, *args, **kwargs)
+            if name == "set-inspect" and kind != "koha-nexus-set":
+                out.results.clear(); out.lists.clear()
+                out.feed(f"@@result kind={kind}")
+                if kind == "unsafe":
+                    out.feed("@@result why=entry ../../etc/cron.d/x")
+            return out
+        app.bridge.task = task
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.run_native("restore-assisted")
+            await until(pilot, lambda: isinstance(app.screen, ChoiceScreen))
+            app.screen.dismiss("file")
+            await until(pilot, lambda: isinstance(app.screen, PathPickerScreen))
+            app.screen.dismiss("/root/backups/knx-set-20261106-100000.tar")
+            shown = ""
+            if choice:
+                await until(pilot, lambda: isinstance(app.screen, ChoiceScreen) and "Made on" in app.screen._prompt)
+                shown = app.screen._prompt
+                app.screen.dismiss(choice)
+            elif kind == "unsafe":
+                await until(pilot, lambda: isinstance(app.screen, MessageScreen))
+                shown = app.screen._body
+            await pilot.pause(1.0)
+            return shown, [n for n, _a in ran]
+
+    shown, names = asyncio.run(main())
+    assert " ".join(c[0] for c in calls) == restored
+    if kind == "koha-nexus-set":
+        assert "Made on: biblioteca" in shown and "not at the same instant" in shown
+        assert "The Tainacan in use" in shown
+        assert names.count("set-unpack") == 1 and names.count("set-cleanup") == 1
+        assert all(c[1].startswith("/var/backups/koha-nexus/.set-restore.demo/") for c in calls)
+    else:
+        assert "set-unpack" not in names
+    if kind == "koha-sql":
+        assert calls == [("koha", "/root/backups/knx-set-20261106-100000.tar")]
+    if kind == "unsafe":
+        assert "refused before anything was extracted" in shown and "../../etc/cron.d/x" in shown

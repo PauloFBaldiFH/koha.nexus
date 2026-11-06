@@ -7,8 +7,8 @@
 # referenced package restored in isolation, an older backup restored by the
 # monthly check, a restore with and without the phrase, the recovery kit on
 # a server that lost its backup key, the copy to a cloud remote resumed, the
-# schedule, and Koha's Apache (a stand-in) and someone else's Docker
-# resources as they were.
+# joint package (its checks: tests/backup_set.bats), the schedule, and Koha's
+# Apache (a stand-in) and someone else's Docker resources as they were.
 #
 # The cloud remote is a local rclone remote (type local): the same rclone
 # copy and check, without an account.
@@ -363,6 +363,61 @@ PY
     nope grep -rq "$(lib '_kei_tn_env KN_DB_PASSWORD')" "/srv/cloud/${B##*/}"
     grep -q '"step":"copy"' "$B/journal.jsonl"
     lib 'kei_backup_copy tainacan none' >/dev/null
+}
+
+@test "joint package: Tainacan captured in its window, whole inside the set, inspected unopened, restored in isolation" {
+    # A restic repository and a cloud copy are configured: the set must not
+    # depend on either (the files go inside it, nothing is sent).
+    lib 'kei_backup_repo tainacan local' >/dev/null
+    lib 'kei_backup_copy tainacan loc:/srv/cloud' >/dev/null
+    before_cloud=$(ls /srv/cloud | sort)
+    mkdir -p "$S/sets"
+    run lib "kei_set_backup '$S/sets'"
+    echo "$output" >&3
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"complete=yes"* ]]
+    SET=$(ls "$S"/sets/knx-set-*.tar)
+    [[ "$SET" != *-partial.tar ]]
+    [ -z "$(ls -A "$S/sets" | grep '^\.knx-set')" ]
+    [ "$(ls /srv/cloud | sort)" = "$before_cloud" ]
+    healthy
+    # Checked by content, without extracting.
+    run lib "kei_set_inspect '$SET'"
+    echo "$output" >&3
+    [[ "$output" == *"kind=koha-nexus-set"* ]]
+    [[ "$output" == *"integrity=ok"* ]]
+    [[ "$output" == *"platforms=tainacan"* ]]
+    # The data changes after the set.
+    want=$(counts)
+    run wp_php "$(seed_php "Depois do conjunto" "Item novo")"
+    [ "$status" -eq 0 ]
+    now=$(counts)
+    [ "$now" != "$want" ]
+    run lib "kei_set_unpack '$SET'"
+    echo "$output" >&3
+    [ "$status" -eq 0 ]
+    STAGE=$(printf '%s\n' "$output" | sed -n 's/^stage=//p' | tail -n 1)
+    P=$(printf '%s\n' "$output" | sed -n 's/^tainacan=//p' | tail -n 1)
+    [ -d "$P" ]
+    # Self-contained: the files are in the package, not a restic reference;
+    # captured inside the window without writes.
+    [ -f "$P/files.tar.gz" ] && [ ! -f "$P/files.ref.json" ]
+    python3 - "$P/journal.jsonl" <<'PY'
+import json, sys
+steps = [json.loads(l)["step"] for l in open(sys.argv[1])]
+assert steps.index("writes-stopped") < steps.index("db") < steps.index("files") < steps.index("writes-resumed"), steps
+assert "copy" not in steps, steps
+PY
+    run lib "KEI_BACKUP_PHRASE='$PHRASE' kei_tainacan_restore_test '$P'"
+    echo "$output" >&3
+    [ "$status" -eq 0 ]
+    [ "$(counts)" = "$now" ]
+    run lib "kei_set_cleanup '$STAGE'"
+    [ "$status" -eq 0 ]
+    [ ! -e "$STAGE" ]
+    lib 'kei_backup_copy tainacan none' >/dev/null
+    lib 'kei_backup_repo tainacan none' >/dev/null
+    koha_answers_as_before
 }
 
 @test "schedule: one cron file, in the registry; the task runs a scheduled package" {

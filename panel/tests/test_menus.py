@@ -159,7 +159,8 @@ def test_every_card_says_what_it_does():
     plain = {k for k in DESCRIPTIONS if ":" not in k}
     scoped = {k for k in DESCRIPTIONS if ":" in k}
     assert plain == {e.action for s in SECTIONS for e in s.entries}
-    assert scoped == {f"{e.action}:{e.scope}" for s in SECTIONS for e in s.entries if e.scope}
+    # A view card opened already filtered has its own description.
+    assert scoped == {f"{e.action}:{e.scope}" for s in SECTIONS for e in s.entries if e.scope and e.kind == "view"}
     assert "Step by step, in this panel" not in pt
 
 

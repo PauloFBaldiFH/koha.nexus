@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, database, diagnostics, install, platforms, search, security, settings, tools
+from . import backup, backup_set, database, diagnostics, install, platforms, search, security, settings, tools
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -23,6 +23,8 @@ ROUTINES: dict[str, Routine] = {
     "backup-marc": backup.marc_backup,
     "backup-cloud": backup.cloud_backup,
     "cloud-connections": backup.cloud_connections,      # Backup center, any platform
+    "set-backup": backup_set.set_backup,                # Backup center, Koha and Tainacan
+    "restore-assisted": backup_set.restore_assisted,    # Backup center, any backup
     "restore": backup.restore,
     "backup-download": backup.download_latest,           # backup view
     "db-maintenance": database.deep_maintenance,

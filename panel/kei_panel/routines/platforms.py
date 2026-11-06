@@ -196,12 +196,14 @@ async def tainacan_restore_test(app) -> None:
     await show_done(app, title, result)
 
 
-async def tainacan_restore(app) -> None:
+async def tainacan_restore(app, name: str | None = None) -> None:
+    """name: a package already chosen (the assisted restore: a folder, or a
+    package extracted from a joint package); else one is picked here."""
     from .common import run_task, show_done
     from ..screens.dialogs import ConfirmScreen
 
     title = t("Restore Tainacan")
-    name = await _pick_backup(app, title)
+    name = name or await _pick_backup(app, title)
     if not name:
         return
     if not await app.push_screen_wait(ConfirmScreen(title, t(

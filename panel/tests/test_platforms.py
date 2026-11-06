@@ -692,7 +692,7 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
     # Only Tainacan here: the center shows its cards, then the shared cloud connections.
     assert shown == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
                      "pbackup-configure", "pbackup-verify", "pbackup-incomplete", "pbackup-kit",
-                     "cloud-connections"]
+                     "restore-assisted", "cloud-connections"]
     assert ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",),
                     {"KEI_BACKUP_PHRASE": "MY-SECRET-RECOVERY-PHRASE"})]
     assert all("MY-SECRET" not in " ".join(r[1]) for r in ran)

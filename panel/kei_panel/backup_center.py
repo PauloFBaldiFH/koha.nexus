@@ -2,7 +2,8 @@
 backups ("plans") of each, from what the installer already reports.
 
 The center (views/backups.py) shows one platform at a time: Koha,
-Tainacan (only the installed ones). Each automatic backup is a row with
+Tainacan, or both as a set (only the installed ones; the set only when
+both are). Each automatic backup is a row with
 its own destination, frequency, retention, what is encrypted and its last
 run; nothing here invents a run: with no reliable record the row says
 "No record".
@@ -23,16 +24,17 @@ from dataclasses import dataclass
 from . import cloud, cron
 from .i18n import t
 
-KOHA, TAINACAN = "koha", "tainacan"
-SCOPES = (KOHA, TAINACAN)
-SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan"}
+KOHA, TAINACAN, BOTH = "koha", "tainacan", "both"
+SCOPES = (KOHA, TAINACAN, BOTH)
+SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan"}
 
 NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 
 
 def scopes(koha: bool, tainacan: bool) -> list[str]:
-    """The platforms the center offers: the installed ones, Koha first."""
-    return [s for s, on in ((KOHA, koha), (TAINACAN, tainacan)) if on]
+    """The platforms the center offers: the installed ones, Koha first,
+    and the two as a set when both are installed."""
+    return [s for s, on in ((KOHA, koha), (TAINACAN, tainacan), (BOTH, koha and tainacan)) if on]
 
 
 def pick_scope(wanted: str, offered: list[str]) -> str:

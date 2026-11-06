@@ -64,7 +64,7 @@ class BackupCenterView(PlatformSectionView):
         with Horizontal(id="bk-scopes", classes="sb-card-buttons"):
             yield Label(t("Platform:"), classes="form-label")
             for scope in backup_center.SCOPES:
-                yield Button(backup_center.SCOPE_LABELS[scope], id=f"scope-{scope}", classes="small")
+                yield Button(t(backup_center.SCOPE_LABELS[scope]), id=f"scope-{scope}", classes="small")
         yield Static(t("No platform is installed yet: install Koha or Tainacan to back it up. Cloud connections "
                        "can already be added."), id="bk-none", classes="view-prompt", markup=False)
         with Vertical(id="bk-koha"):
@@ -78,6 +78,10 @@ class BackupCenterView(PlatformSectionView):
                     yield Select([(t(v), k) for k, v in CODECS.items()], value="gz", allow_blank=False,
                                  id="bk-codec", disabled=True)
                 yield Label(t(CODEC_NOTE), id="bk-codec-note", classes="ai-note")
+        yield Static(t("Koha and Tainacan as a set: the joint backup makes one file with the data of both, each "
+                       "captured in turn with its own consistent copy (not at the same instant), and the assisted "
+                       "restore brings back one of them or both. The automatic backups of each are below."),
+                     id="bk-both", classes="view-prompt", markup=False)
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
@@ -128,6 +132,7 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-none").display = not offered
         self.query_one("#bk-koha").display = self.scope == backup_center.KOHA
         self.query_one("#bk-tainacan").display = self.scope == backup_center.TAINACAN
+        self.query_one("#bk-both").display = self.scope == backup_center.BOTH
         self.query_one("#bk-plans-title").display = bool(self.scope)
         self.query_one("#bk-plans").display = bool(self.scope)
         if self.facts is not None:
@@ -143,11 +148,17 @@ class BackupCenterView(PlatformSectionView):
         super().on_button_pressed(event)
 
     def needs_backups(self) -> bool:
-        return self.scope == backup_center.TAINACAN
+        return self.scope in (backup_center.TAINACAN, backup_center.BOTH)
 
     # --- which cards ----------------------------------------------------------
     def card_shown(self, entry, facts: platforms.Facts) -> bool:
+        # A platform's cards in its view; the set's in "both"; the assisted
+        # restore wherever a platform is; the cloud connections always.
         if entry.requires and entry.requires != self.scope:
+            return False
+        if entry.scope and entry.scope != self.scope:
+            return False
+        if entry.action == "restore-assisted" and not self.scope:
             return False
         return platforms.entry_shown(entry.action, entry.zone, "installed", facts)
 
@@ -177,6 +188,8 @@ class BackupCenterView(PlatformSectionView):
                 rows = await self._load_koha()
             elif self.scope == backup_center.TAINACAN:
                 rows = await self._load_tainacan(facts)
+            elif self.scope == backup_center.BOTH:
+                rows = await self._load_koha() + await self._load_tainacan(facts)
         finally:
             self.query_one("#platform-loader").display = False
         self.facts = facts
