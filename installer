@@ -15342,24 +15342,40 @@ kei_set_platforms() {
 #                         the panel's messaging, AI and Z39.50 logins;
 #                         only encrypted with the backup key, never in clear
 # ----------------------------------------------------------------------
-# _kei_koha_conf_value FILE TAG: a simple tag of <config> in a koha-conf.xml.
+# _kei_koha_conf_value FILE TAG: a simple tag of the main <config> section
+# of a koha-conf.xml. The Zebra <server> sections before it have <config>
+# elements of their own (a path): the file is read as XML and only the
+# <config> child of the root counts.
 _kei_koha_conf_value() {
     python3 -I - "$1" "$2" <<'PYEOF' 2>/dev/null
 import re, sys
+import xml.etree.ElementTree as ET
+tag = sys.argv[2]
 try:
-    text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+    root = ET.parse(sys.argv[1]).getroot()
 except OSError:
     sys.exit(1)
-text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
-m = re.search(r"<config>(.*?)</config>", text, re.S)
-m = re.search(r"<%s>\s*([^<]*?)\s*</%s>" % (re.escape(sys.argv[2]), re.escape(sys.argv[2])), m.group(1) if m else text)
-if not m:
+except ET.ParseError:
+    # Not well-formed: the last <config> section, comments left out.
+    try:
+        text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+    except OSError:
+        sys.exit(1)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    blocks = re.findall(r"<config>(.*?)</config>", text, re.S)
+    m = re.search(r"<%s>\s*([^<]*?)\s*</%s>" % (re.escape(tag), re.escape(tag)), blocks[-1] if blocks else "")
+    if not m or not m.group(1):
+        sys.exit(1)
+    print(m.group(1))
+    sys.exit(0)
+cfg = root if root.tag == "config" else root.find("config")
+el = cfg.find(tag) if cfg is not None else None
+if el is None or not (el.text or "").strip():
     sys.exit(1)
-print(m.group(1))
+print(el.text.strip())
 PYEOF
 }
 
-# _kei_set_koha_items: LABEL<TAB>PATH<TAB>data|secret for this installation.
 _kei_set_koha_items() {
     local up pl
     up=$(_kei_koha_conf_value "$KOHA_CONF" upload_path); up=${up:-/var/lib/koha/${INSTANCE}/uploads}
@@ -15892,7 +15908,10 @@ pat = re.compile(r"(<encryption_key>)[^<]*(</encryption_key>)")
 if pat.search(dst):
     dst = pat.sub(lambda x: x.group(1) + key + x.group(2), dst, count=1)
 elif "</config>" in dst:
-    dst = dst.replace("</config>", " <encryption_key>%s</encryption_key>\n</config>" % key, 1)
+    # The main section is closed by the LAST </config> (Zebra's <server>
+    # sections before it have <config> elements too).
+    head, _, tail = dst.rpartition("</config>")
+    dst = head + " <encryption_key>%s</encryption_key>\n</config>" % key + tail
 else:
     sys.exit(1)
 sys.stdout.write(dst)

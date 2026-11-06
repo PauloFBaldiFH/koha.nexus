@@ -73,7 +73,7 @@ field() { sed -n "s/^$1=//p" <<<"$2" | tail -n 1; }
 # instance has no usable key, one is set the way koha-create would.
 koha_instance() {
     local key state
-    koha-create --create-db "$INST" >/dev/null 2>&1 || [ -f "$CONF" ] || return 1
+    koha-create --create-db "$INST" >/dev/null 2>&1 3>&- || [ -f "$CONF" ] || return 1
     case "$(conf encryption_key)" in
         "") state=none ;; __ENCRYPTION_KEY__) state=placeholder ;; *) state=set ;;
     esac
@@ -87,7 +87,7 @@ koha_instance() {
             if grep -qE '<encryption_key>[[:space:]]*</encryption_key>' "$CONF"; then
                 sed -i -E "s|<encryption_key>[[:space:]]*</encryption_key>|<encryption_key>$key</encryption_key>|" "$CONF"
             else
-                sed -i "0,/<\/config>/s|</config>| <encryption_key>$key</encryption_key>\n</config>|" "$CONF"
+                perl -0pi -e "s|(.*)</config>|\$1 <encryption_key>$key</encryption_key>\n</config>|s" "$CONF"   # the LAST </config>: the main section
             fi ;;
     esac
     case "$(conf encryption_key)" in ""|__ENCRYPTION_KEY__) return 1 ;; esac
@@ -187,7 +187,7 @@ PHP
 
 @test "the joint package: full, Koha's files in it, its secrets only encrypted" {
     mkdir -p "$S/sets"
-    run config.sh --task set-backup "$S/sets" </dev/null
+    run config.sh --task set-backup "$S/sets" </dev/null 3>&-
     echo "$output" | grep '@@result' >&3
     [ "$status" -eq 0 ]
     [[ "$output" == *"recoverability=full"* ]]
@@ -204,7 +204,7 @@ PHP
 }
 
 @test "a new installation of the library: another key, another database password" {
-    koha-remove "$INST" >/dev/null 2>&1 || true
+    koha-remove "$INST" >/dev/null 2>&1 3>&- || true
     [ ! -f "$CONF" ]
     koha_instance
     [ "$(conf encryption_key)" != "$(cat "$S/old_key")" ]
@@ -220,7 +220,7 @@ PHP
     [ "$status" -eq 0 ]
     field stage "$output" > "$S/stage"
     KOHA_FILE=$(field koha "$output")
-    run config.sh --task restore "$KOHA_FILE" </dev/null
+    run config.sh --task restore "$KOHA_FILE" </dev/null 3>&-
     echo "$output" | grep -E '@@(msg|result)' | tail -n 5 >&3
     [ "$status" -eq 0 ]
     [ "$(sql "SELECT COUNT(*) FROM borrowers WHERE userid = 'kn-staff'")" = 1 ]
@@ -232,7 +232,7 @@ PHP
 
 @test "Koha's files and secrets: a plan without values, then only the key changes in koha-conf.xml" {
     STAGE=$(cat "$S/stage")
-    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras plan "$STAGE" </dev/null
+    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras plan "$STAGE" </dev/null 3>&-
     [ "$status" -eq 0 ]
     echo "$output" | grep '@@result' >&3
     [[ "$output" == *"secrets=open"* ]]
@@ -240,7 +240,7 @@ PHP
     [[ "$output" == *"item=uploads"$'\t'"restore"* ]]
     never grep -qF -e "$(cat "$S/old_key")" -e "$(cat "$S/old_pass")" -e "$(cat "$S/new_pass")" -e sip-secret-1 -e "$PHRASE" <<<"$output"
     cmp -s "$CONF" "$S/new-koha-conf.xml"                              # the plan changed nothing
-    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras apply "$STAGE" confirm </dev/null
+    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras apply "$STAGE" confirm </dev/null 3>&-
     [ "$status" -eq 0 ]
     never grep -qF -e "$(cat "$S/old_key")" -e sip-secret-1 -e "$PHRASE" <<<"$output"
     # Only <encryption_key> changed: the database password and the paths are the new installation's.
