@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import backup, backup_set, database, diagnostics, install, platforms, search, security, settings, tools
+from . import (admin_access, backup, backup_set, database, diagnostics, install, platforms, search, security, setup,
+               settings, tools)
 
 Routine = Callable[[object], Awaitable[None]]
 
@@ -81,6 +82,12 @@ ROUTINES: dict[str, Routine] = {
     "pbackup-schedule": platforms.backup_schedule,
     "pbackup-verify": platforms.backup_verify,
     "pbackup-incomplete": platforms.backup_incomplete,
+    "tainacan-address": platforms.tainacan_address,
+    # Administrative access and the steps after a new installation.
+    "admin-koha": admin_access.koha_admin,
+    "admin-tainacan": admin_access.tainacan_admin,
+    "setup-koha": setup.koha_setup,
+    "setup-tainacan": setup.tainacan_setup,
 }
 
 # The rest run their classic routine with `--task run ACTION`; the title is

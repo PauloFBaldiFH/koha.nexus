@@ -2991,6 +2991,67 @@
     "sec-backups",
     "pbackup-schedule"
    ]
+  },
+  "admin-koha": {
+   "summary": "Who manages Koha: whether the web installer was finished (a superlibrarian exists), a new superlibrarian, a new password for one, and the first-access credentials.",
+   "overview": [
+    "Until the web installer is finished Koha has no superlibrarian: open the staff interface with the first-access credentials and finish it, or create a superlibrarian here.",
+    "**Change the password of a superlibrarian** asks which account and the new password twice, in protected fields, then a Yes. Koha itself sets it, with the password rules of the user's category; only that account changes, and Koha's encryption key is never touched.",
+    "The password goes to the installer only for that task and on standard input: it is never on a command line, in a log, in the status or on a screen afterwards, and the panel does not keep it."
+   ],
+   "related": [
+    "credentials",
+    "superlibrarian",
+    "setup-koha"
+   ]
+  },
+  "admin-tainacan": {
+   "summary": "Tainacan's administrators (WordPress accounts): your own password for the account made at the installation, a new password for an administrator, another administrator.",
+   "overview": [
+    "The installation makes an account with a generated password, kept on this server so the panel can show it. While it is still that password the screen says so: **Set my password** replaces it, and the generated one stops working and is no longer kept.",
+    "**Create another administrator** refuses a user name or e-mail that already belongs to an account: no account is recreated, removed or changed without being chosen by name. Only administrators can get a new password here.",
+    "Passwords are typed twice in protected fields and go to WordPress on standard input, never on a command line or in a log. WordPress's keys and salts are not changed."
+   ],
+   "related": [
+    "tainacan-credentials",
+    "setup-tainacan"
+   ]
+  },
+  "setup-koha": {
+   "summary": "The steps after a new installation of Koha: administrative access, public access and backup in the cloud, each with Set up now or Do it later, then where everything is.",
+   "overview": [
+    "It opens by itself after a new installation from the panel, and this card stays on Koha's screen while a step is left. An update of the panel never starts it, and an existing library never gets it.",
+    "It has no settings of its own: each step opens the usual screen (Administrative access, Cloudflare Tunnel, Configure cloud backup), which shows what already exists before proposing anything. A step done from the menus counts as done here too; nothing is created twice.",
+    "**Do it later** only records the step. After the assistant everything stays in the menus, to check, change or turn off with the confirmations of each screen."
+   ],
+   "related": [
+    "admin-koha",
+    "cloudflare",
+    "backup-cloud"
+   ]
+  },
+  "setup-tainacan": {
+   "summary": "The steps after a new installation of Tainacan: administrative access, the address of the collection and encrypted backups, each with Set up now or Do it later, then where everything is.",
+   "overview": [
+    "It opens by itself after a new installation from the panel, and this card stays on Tainacan's screen while a step is left. Reinstalling over an existing WordPress or updating the panel never starts it.",
+    "Each step opens the usual screen (Administrative access, Tainacan address, the backup key and Schedule backups); a step done from the menus counts as done here too, and nothing is created twice.",
+    "**Do it later** only records the step; the generated password keeps working until you set your own, so the account is never left without one."
+   ],
+   "related": [
+    "admin-tainacan",
+    "tainacan-address",
+    "pbackup-schedule"
+   ]
+  },
+  "tainacan-address": {
+   "summary": "The address Tainacan answers at: keep it, this server on the local network, or a domain of your own.",
+   "overview": [
+    "Changing it updates WordPress's links and the web proxy after a Yes; the collections, items and accounts do not change. Your own domain must already point to this server.",
+    "To reach Tainacan from the internet without opening ports, see Security & access hub > Cloudflare Tunnel Manager."
+   ],
+   "related": [
+    "setup-tainacan"
+   ]
   }
  }
 }

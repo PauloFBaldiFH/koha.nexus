@@ -565,6 +565,7 @@ _SCRIPTS: dict[str, list[str]] = {
                              "/var/backups/koha-nexus/restic/tainacan. Save the recovery kit again."],
     "platform-backup-copy": ["@@msg ok OK\tEach new package will also be copied to gdrive:koha-nexus."],
     "platform-backup-kit": ["@@msg ok OK\t/var/lib/koha-nexus/backup/recovery-kit.txt"],
+    "tainacan-address": ["@@msg ok OK\tTainacan now answers at {0}."],
     "platform-backup-schedule": ["@@msg ok OK\tDaily backup at 02:30; maintenance on Sundays and a restore test of "
                                  "an older backup on the 1st of each month."],
     "platform-backup-verify": ["@@note Checking the restic repository...", "@@note Restoring in an isolated copy...",
@@ -837,6 +838,56 @@ def _set_conflicts() -> list[str]:
                 "stay those of this server.", u="http://192.0.2.10:8090")]
 
 
+# The steps after a new installation in the demo: none unless
+# KEI_PANEL_DEMO_SETUP=1 (then both platforms have every step to do). Kept
+# for the session, as the installer keeps its file.
+_DEMO_SETUP: dict[str, dict[str, str]] = {}
+_DEMO_ADMINS = {"koha": ["admin", "bibliotecaria"], "tainacan": ["kn_7f3a"]}
+
+
+def _demo_setup(platform: str) -> dict[str, str] | None:
+    import os
+    if platform not in _DEMO_SETUP and os.environ.get("KEI_PANEL_DEMO_SETUP") == "1":
+        _DEMO_SETUP[platform] = {"admin": "pending", "public": "pending", "backup": "pending"}
+    return _DEMO_SETUP.get(platform)
+
+
+def _admin_lines(name: str, args: tuple[str, ...]) -> list[str] | None:
+    """Administrative access and the setup steps (never a password)."""
+    from .i18n import t
+    platform = args[0] if args else ""
+    if platform not in ("koha", "tainacan"):
+        return None
+    if name == "admin-status":
+        state = "ready" if platform == "koha" else "initial"
+        return [f"@@result state={state}", "@@result initial=" + ("kn_7f3a" if platform == "tainacan" else "")] \
+            + [f"@@result admin={a}" for a in _DEMO_ADMINS[platform]]
+    if name == "admin-password":
+        user = args[1] if len(args) > 1 else ""
+        if platform in _DEMO_SETUP:
+            _DEMO_SETUP[platform]["admin"] = "done"
+        return ["@@msg ok OK\t" + t("The password of ${u} was changed. The other accounts and the site's keys were "
+                                    "not touched.", u=user)]
+    if name == "admin-create":
+        return ["@@msg ok OK\t" + t("Administrator ${u} created.", u=args[1] if len(args) > 1 else "")]
+    steps = _demo_setup(platform)
+    if name == "setup-mark":
+        if steps is None:
+            return []
+        if len(args) > 2:
+            steps[args[1]] = args[2]
+        return []
+    if name == "setup-close":
+        _DEMO_SETUP.pop(platform, None)
+        import os
+        os.environ.pop("KEI_PANEL_DEMO_SETUP", None)
+        return []
+    if steps is None:
+        return ["@@result setup=none"]
+    return ["@@result setup=open"] + [f"@@result step={k}|{v}|" for k, v in steps.items()] \
+        + [f"@@result pending={sum(1 for v in steps.values() if v != 'done')}"]
+
+
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
@@ -845,6 +896,9 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         args = ()
     else:
         lines = _BY_ARG.get((name, args[0] if args else ""), _SCRIPTS.get(name))
+        if name in ("admin-status", "admin-password", "admin-create", "setup-status", "setup-mark",
+                    "setup-close"):
+            lines = _admin_lines(name, args)
         if name == "set-inspect":
             lines = lines + _set_conflicts()
     if lines is None:
@@ -856,7 +910,8 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                             "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete",
-                            "set-inspect", "set-cleanup") \
+                            "set-inspect", "set-cleanup", "admin-status", "setup-status", "setup-mark",
+                            "setup-close") \
         else 0.05 if name == "install" else 0.15
     if name in ("tainacan-events", "tainacan-site") and args[:1] in (("plan",), ("status",)) \
             or (name == "tainacan-start" and not args):

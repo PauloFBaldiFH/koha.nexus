@@ -371,6 +371,51 @@ assert t["checked"]["checked_at"].isdigit() and t["checked"]["failed_at"] == "",
     koha_answers_as_before
 }
 
+@test "administrative access: your own password on stdin only, another administrator, the keys unchanged" {
+    # A new installation started the steps after it.
+    [ -f /var/lib/koha-nexus/setup/tainacan.state ]
+    [ "$(stat -c %a /var/lib/koha-nexus/setup/tainacan.state)" = 600 ]
+    run lib 'kei_tainacan_admin_status'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *state=initial* ]]
+    user=$(lib '_kei_tn_env KN_ADMIN_USER')
+    keys=$(lib "_kei_tn_wp eval 'echo md5(AUTH_KEY . SECURE_AUTH_KEY . LOGGED_IN_SALT . NONCE_SALT);'")
+    PW='Sys-Test-Pass-2026'
+    printf '%s\n' "$PW" > "$S/pw"
+    # While it runs, no process may carry the password on its command line.
+    ( for _ in $(seq 1 600); do grep -a -l -F -f "$S/pw" /proc/[0-9]*/cmdline 2>/dev/null; sleep 0.05; done ) > "$S/seen" &
+    watch=$!
+    export KEI_ADMIN_PASSWORD="$PW"
+    run lib "kei_tainacan_admin_password '$user'"
+    unset KEI_ADMIN_PASSWORD
+    kill "$watch" 2>/dev/null || true; wait "$watch" 2>/dev/null || true
+    echo "$output" >&3
+    [ "$status" -eq 0 ]
+    [ ! -s "$S/seen" ] || { cat "$S/seen" >&3; false; }
+    [[ "$output" != *"$PW"* ]]
+    nope grep -rqF -f "$S/pw" /var/log/koha-easy-install "$TN/.env" 2>/dev/null
+    nope grep -q KN_ADMIN_PASSWORD "$TN/.env"
+    # The password and the login on the standard input, never as arguments.
+    printf '%s\n' '<?php $pw = rtrim((string) fgets(STDIN), "\n"); $u = get_user_by("login", rtrim((string) fgets(STDIN), "\n")); echo ($u && wp_check_password($pw, $u->user_pass, $u->ID)) ? "yes" : "no";' > "$TN/work/check-pw.php"
+    chmod 644 "$TN/work/check-pw.php"
+    [ "$(printf '%s\n%s\n' "$PW" "$user" | lib '_kei_tn_wp eval-file /work/check-pw.php' | tail -n 1)" = yes ]
+    [ "$(lib "_kei_tn_wp eval 'echo md5(AUTH_KEY . SECURE_AUTH_KEY . LOGGED_IN_SALT . NONCE_SALT);'")" = "$keys" ]
+    run lib 'kei_tainacan_admin_status'
+    [[ "$output" == *state=own* ]]
+    run lib 'kei_setup_status tainacan'
+    [[ "$output" == *"step=admin|done|"* ]]
+    # Another administrator; never over an existing name.
+    export KEI_ADMIN_PASSWORD="$PW"
+    run lib "kei_tainacan_admin_create ana ana@kei.test"
+    [ "$status" -eq 0 ]
+    run lib "kei_tainacan_admin_create '$user' other@kei.test"
+    unset KEI_ADMIN_PASSWORD
+    [ "$status" -eq 5 ]
+    [ "$(lib "_kei_tn_wp user get ana --field=roles")" = administrator ]
+    run lib 'kei_setup_close tainacan'
+    [ ! -e /var/lib/koha-nexus/setup/tainacan.state ]
+}
+
 @test "uninstall keeping the data, then install again with the same data" {
     pw=$(lib '_kei_tn_env KN_ADMIN_PASSWORD')
     run lib 'kei_tainacan_uninstall keep'
@@ -386,6 +431,8 @@ assert t["checked"]["checked_at"].isdigit() and t["checked"]["failed_at"] == "",
     [ "$status" -eq 0 ]
     [ "$(counts)" = "1 1 1" ]
     [ "$(lib '_kei_tn_env KN_ADMIN_PASSWORD')" = "$pw" ]
+    # An existing WordPress is not a new installation: no steps after it.
+    [ ! -e /var/lib/koha-nexus/setup/tainacan.state ]
 }
 
 @test "uninstall deleting the data: a last backup first; Koha and the others stay" {

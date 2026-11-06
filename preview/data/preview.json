@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.177",
+ "panel_version": "1.5.178",
  "languages": [
   {
    "code": "en",
@@ -252,7 +252,9 @@
     "health",
     "repair-services",
     "apache-log",
+    "setup-koha",
     "credentials",
+    "admin-koha",
     "sec-backups",
     "sec-import",
     "sec-library",
@@ -633,6 +635,9 @@
     "tainacan-status",
     "tainacan-logs",
     "sec-infra",
+    "setup-tainacan",
+    "admin-tainacan",
+    "tainacan-address",
     "tainacan-site",
     "sec-tainacan-maintenance",
     "sec-tainacan-events",
@@ -988,12 +993,32 @@
    "status": "available",
    "media": []
   },
+  "setup-koha": {
+   "id": "setup-koha",
+   "type": "entry",
+   "section": "koha",
+   "label": "🧭  Continue the setup",
+   "description": "The steps left after the installation: access, address, backup",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "credentials": {
    "id": "credentials",
    "type": "entry",
    "section": "koha",
    "label": "🔑  View first-access credentials",
    "description": "Shows the logins and passwords of the first access",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "admin-koha": {
+   "id": "admin-koha",
+   "type": "entry",
+   "section": "koha",
+   "label": "🔐  Administrative access",
+   "description": "Superlibrarians: the web installer, a new one, a new password",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1484,6 +1509,36 @@
    "section": "tainacan",
    "label": "📜  Tainacan logs",
    "description": "The latest lines of the containers' logs, secrets blanked",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "setup-tainacan": {
+   "id": "setup-tainacan",
+   "type": "entry",
+   "section": "tainacan",
+   "label": "🧭  Continue the setup",
+   "description": "The steps left after the installation: access, address, backup",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "admin-tainacan": {
+   "id": "admin-tainacan",
+   "type": "entry",
+   "section": "tainacan",
+   "label": "🔐  Administrative access",
+   "description": "Administrators: your own password, a new password, another administrator",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "tainacan-address": {
+   "id": "tainacan-address",
+   "type": "entry",
+   "section": "tainacan",
+   "label": "🌐  Tainacan address",
+   "description": "The address of the collection: local network or your own domain",
    "kind": "native",
    "status": "available",
    "media": []
@@ -4238,6 +4293,56 @@
    "ja": "職員用インターフェースまたは OPAC のエラーログをリアルタイムで追跡します",
    "ko": "직원 인터페이스 또는 OPAC 오류 로그를 실시간으로 추적합니다"
   },
+  "🧭  Continue the setup": {
+   "en": "🧭  Continue the setup",
+   "pt-BR": "🧭  Continuar a configuração",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The steps left after the installation: access, address, backup": {
+   "en": "The steps left after the installation: access, address, backup",
+   "pt-BR": "As etapas que faltam depois da instalação: acesso, endereço, backup",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "🔑  View first-access credentials": {
    "en": "🔑  View first-access credentials",
    "pt-BR": "🔑  Visualizar credenciais de primeiro acesso",
@@ -4287,6 +4392,56 @@
    "zh": "显示首次访问的登录名和密码",
    "ja": "初回アクセス用のログイン名とパスワードを表示します",
    "ko": "최초 접근용 로그인 이름과 비밀번호를 표시합니다"
+  },
+  "🔐  Administrative access": {
+   "en": "🔐  Administrative access",
+   "pt-BR": "🔐  Acesso administrativo",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Superlibrarians: the web installer, a new one, a new password": {
+   "en": "Superlibrarians: the web installer, a new one, a new password",
+   "pt-BR": "Superbibliotecários: o instalador da web, um novo, uma nova senha",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🪄  Magic Import Tool": {
    "en": "🪄  Magic Import Tool",
@@ -6516,6 +6671,81 @@
   "The latest lines of the containers' logs, secrets blanked": {
    "en": "The latest lines of the containers' logs, secrets blanked",
    "pt-BR": "As últimas linhas dos logs dos contêineres, com segredos ocultados",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Administrators: your own password, a new password, another administrator": {
+   "en": "Administrators: your own password, a new password, another administrator",
+   "pt-BR": "Administradores: a sua senha, uma nova senha, outro administrador",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🌐  Tainacan address": {
+   "en": "🌐  Tainacan address",
+   "pt-BR": "🌐  Endereço do Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The address of the collection: local network or your own domain": {
+   "en": "The address of the collection: local network or your own domain",
+   "pt-BR": "O endereço do acervo: rede local ou o seu próprio domínio",
    "es": null,
    "fr": null,
    "it": null,
@@ -16211,6 +16441,29 @@
     "outdated": true
    }
   },
+  "setup-koha": {
+   "en": {
+    "summary": "The steps after a new installation of Koha: administrative access, public access and backup in the cloud, each with Set up now or Do it later, then where everything is.",
+    "overview": [
+     "It opens by itself after a new installation from the panel, and this card stays on Koha's screen while a step is left. An update of the panel never starts it, and an existing library never gets it.",
+     "It has no settings of its own: each step opens the usual screen (Administrative access, Cloudflare Tunnel, Configure cloud backup), which shows what already exists before proposing anything. A step done from the menus counts as done here too; nothing is created twice.",
+     "**Do it later** only records the step. After the assistant everything stays in the menus, to check, change or turn off with the confirmations of each screen."
+    ],
+    "related": [
+     "admin-koha",
+     "cloudflare",
+     "backup-cloud"
+    ]
+   },
+   "pt-BR": {
+    "summary": "As etapas depois de uma instalação nova do Koha: acesso administrativo, acesso público e backup na nuvem, cada uma com Configurar agora ou Fazer depois, e no fim onde fica cada coisa.",
+    "overview": [
+     "Abre sozinho depois de uma instalação nova feita pelo painel, e este cartão fica na tela do Koha enquanto faltar alguma etapa. Atualizar o painel nunca o inicia, e uma biblioteca que já existe não o recebe.",
+     "Não tem configuração própria: cada etapa abre a tela de sempre (Acesso administrativo, Cloudflare Tunnel, Configurar backup na nuvem), que mostra o que já existe antes de propor algo. Uma etapa feita pelos menus também conta como feita aqui; nada é criado duas vezes.",
+     "**Fazer depois** só registra a etapa. Depois do assistente tudo continua nos menus, para consultar, alterar ou desligar com as confirmações de cada tela."
+    ]
+   }
+  },
   "credentials": {
    "en": {
     "summary": "Shows every address and login you need on the first day: the OPAC and staff links (local, network and Internet), the SSH access and the database user and password for Koha's Web Installer.",
@@ -16256,6 +16509,29 @@
     ],
     "warnings": [
      "Nunca entregue o login do banco à equipe como conta do dia a dia: ele passa por cima das permissões do Koha e o seu uso não fica ligado a uma pessoa."
+    ]
+   }
+  },
+  "admin-koha": {
+   "en": {
+    "summary": "Who manages Koha: whether the web installer was finished (a superlibrarian exists), a new superlibrarian, a new password for one, and the first-access credentials.",
+    "overview": [
+     "Until the web installer is finished Koha has no superlibrarian: open the staff interface with the first-access credentials and finish it, or create a superlibrarian here.",
+     "**Change the password of a superlibrarian** asks which account and the new password twice, in protected fields, then a Yes. Koha itself sets it, with the password rules of the user's category; only that account changes, and Koha's encryption key is never touched.",
+     "The password goes to the installer only for that task and on standard input: it is never on a command line, in a log, in the status or on a screen afterwards, and the panel does not keep it."
+    ],
+    "related": [
+     "credentials",
+     "superlibrarian",
+     "setup-koha"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Quem administra o Koha: se o instalador da web foi concluído (existe superbibliotecário), um novo superbibliotecário, uma nova senha para um deles e as credenciais de primeiro acesso.",
+    "overview": [
+     "Enquanto o instalador da web não for concluído, o Koha não tem superbibliotecário: abra a interface da equipe com as credenciais de primeiro acesso e conclua, ou crie um superbibliotecário aqui.",
+     "**Trocar a senha de um superbibliotecário** pergunta qual conta e a nova senha duas vezes, em campos protegidos, e depois pede um Sim. Quem grava é o próprio Koha, com as regras de senha da categoria do usuário; só aquela conta muda, e a chave de criptografia do Koha nunca é tocada.",
+     "A senha vai para o instalador só naquela tarefa e pela entrada padrão: nunca aparece numa linha de comando, num log, no status ou numa tela depois, e o painel não a guarda."
     ]
    }
   },
@@ -18004,6 +18280,70 @@
    },
    "pt-BR": {
     "summary": "As últimas linhas dos logs dos contêineres do Tainacan, com senhas e chaves ocultadas."
+   }
+  },
+  "setup-tainacan": {
+   "en": {
+    "summary": "The steps after a new installation of Tainacan: administrative access, the address of the collection and encrypted backups, each with Set up now or Do it later, then where everything is.",
+    "overview": [
+     "It opens by itself after a new installation from the panel, and this card stays on Tainacan's screen while a step is left. Reinstalling over an existing WordPress or updating the panel never starts it.",
+     "Each step opens the usual screen (Administrative access, Tainacan address, the backup key and Schedule backups); a step done from the menus counts as done here too, and nothing is created twice.",
+     "**Do it later** only records the step; the generated password keeps working until you set your own, so the account is never left without one."
+    ],
+    "related": [
+     "admin-tainacan",
+     "tainacan-address",
+     "pbackup-schedule"
+    ]
+   },
+   "pt-BR": {
+    "summary": "As etapas depois de uma instalação nova do Tainacan: acesso administrativo, endereço do acervo e backups criptografados, cada uma com Configurar agora ou Fazer depois, e no fim onde fica cada coisa.",
+    "overview": [
+     "Abre sozinho depois de uma instalação nova feita pelo painel, e este cartão fica na tela do Tainacan enquanto faltar alguma etapa. Reinstalar sobre um WordPress que já existe ou atualizar o painel nunca o inicia.",
+     "Cada etapa abre a tela de sempre (Acesso administrativo, Endereço do Tainacan, a chave dos backups e Agendar backups); uma etapa feita pelos menus também conta como feita aqui, e nada é criado duas vezes.",
+     "**Fazer depois** só registra a etapa; a senha gerada continua funcionando até você definir a sua, então a conta nunca fica sem senha."
+    ]
+   }
+  },
+  "admin-tainacan": {
+   "en": {
+    "summary": "Tainacan's administrators (WordPress accounts): your own password for the account made at the installation, a new password for an administrator, another administrator.",
+    "overview": [
+     "The installation makes an account with a generated password, kept on this server so the panel can show it. While it is still that password the screen says so: **Set my password** replaces it, and the generated one stops working and is no longer kept.",
+     "**Create another administrator** refuses a user name or e-mail that already belongs to an account: no account is recreated, removed or changed without being chosen by name. Only administrators can get a new password here.",
+     "Passwords are typed twice in protected fields and go to WordPress on standard input, never on a command line or in a log. WordPress's keys and salts are not changed."
+    ],
+    "related": [
+     "tainacan-credentials",
+     "setup-tainacan"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Os administradores do Tainacan (contas do WordPress): a sua senha para a conta criada na instalação, uma nova senha para um administrador, outro administrador.",
+    "overview": [
+     "A instalação cria uma conta com uma senha gerada, guardada neste servidor para o painel poder mostrar. Enquanto a senha for essa, a tela avisa: **Definir minha senha** troca a senha, e a gerada deixa de funcionar e não fica mais guardada.",
+     "**Criar outro administrador** recusa um nome de usuário ou e-mail que já pertence a uma conta: nenhuma conta é recriada, apagada ou alterada sem ser escolhida pelo nome. Só administradores podem receber uma nova senha aqui.",
+     "As senhas são digitadas duas vezes em campos protegidos e vão para o WordPress pela entrada padrão, nunca numa linha de comando ou num log. As chaves e os salts do WordPress não mudam."
+    ]
+   }
+  },
+  "tainacan-address": {
+   "en": {
+    "summary": "The address Tainacan answers at: keep it, this server on the local network, or a domain of your own.",
+    "overview": [
+     "Changing it updates WordPress's links and the web proxy after a Yes; the collections, items and accounts do not change. Your own domain must already point to this server.",
+     "To reach Tainacan from the internet without opening ports, see Security & access hub > Cloudflare Tunnel Manager."
+    ],
+    "related": [
+     "setup-tainacan"
+    ]
+   },
+   "pt-BR": {
+    "summary": "O endereço em que o Tainacan responde: manter, este servidor na rede local ou um domínio seu.",
+    "overview": [
+     "Trocar o endereço atualiza os links do WordPress e o proxy web depois de um Sim; as coleções, os itens e as contas não mudam. O seu domínio já precisa apontar para este servidor.",
+     "Para chegar ao Tainacan pela internet sem abrir portas, veja Central de segurança e acesso > Gerenciador do Túnel Cloudflare."
+    ]
    }
   },
   "tainacan-site": {
@@ -21561,15 +21901,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 147,
-   "manual_total": 147,
+   "manual": 152,
+   "manual_total": 152,
    "manual_outdated": [],
-   "strings": 476,
-   "strings_total": 476
+   "strings": 483,
+   "strings_total": 483
   },
   "pt-BR": {
-   "manual": 147,
-   "manual_total": 147,
+   "manual": 152,
+   "manual_total": 152,
    "manual_outdated": [
     "install",
     "apache-log",
@@ -21585,155 +21925,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 470,
-   "strings_total": 476
+   "strings": 477,
+   "strings_total": 483
   },
   "es": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 476
+   "strings_total": 483
   },
   "fr": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 476
+   "strings_total": 483
   },
   "it": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 476
+   "strings_total": 483
   },
   "de": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 476
+   "strings_total": 483
   },
   "nl": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "sv": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "pl": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "cs": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "ru": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "uk": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "tr": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "tl": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "id": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "ar": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "fa": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "hi": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "bn": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "vi": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "zh": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "ja": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   },
   "ko": {
    "manual": 0,
-   "manual_total": 147,
+   "manual_total": 152,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 476
+   "strings_total": 483
   }
  }
 }

@@ -21,7 +21,10 @@
 #           (local and through rclone), the encrypted configuration and the
 #           recovery phrase, the recovery kit, the cloud copy, the joint
 #           package, the schedule. Its unit tests (backup_engine.bats,
-#           backup_set.bats, no Docker) run in apache.
+#           backup_set.bats, no Docker) run in apache, with
+#           admin_access.bats (administrative access and the steps after
+#           a new installation, no Docker; the real WordPress part is in
+#           tainacan_system.bats).
 #   koha-set  Debian 12 with a real Koha (koha-common from the official
 #           repository) and a real Tainacan (koha_set_system.bats): the
 #           joint package, the instance recreated with another key and
@@ -56,6 +59,7 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
+      - "tests/admin_access.bats"
       - "tests/backup_engine_system.bats"
       - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
@@ -80,6 +84,7 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
+      - "tests/admin_access.bats"
       - "tests/backup_engine_system.bats"
       - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
@@ -112,7 +117,7 @@ jobs:
               restic version
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
-              bats tests/backup_engine.bats tests/backup_set.bats
+              bats tests/backup_engine.bats tests/backup_set.bats tests/admin_access.bats
               KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
 
