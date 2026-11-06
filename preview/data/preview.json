@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.173",
+ "panel_version": "1.5.174",
  "languages": [
   {
    "code": "en",
@@ -658,9 +658,11 @@
    "parent": "",
    "entries": [
     "tainacan-install",
+    "tainacan-start",
     "tainacan-status",
     "tainacan-logs",
     "sec-infra",
+    "tainacan-site",
     "sec-tainacan-maintenance",
     "sec-tainacan-events",
     "sec-tainacan-backups",
@@ -684,7 +686,9 @@
    "entries": [
     "tainacan-status",
     "tainacan-logs",
-    "tainacan-credentials"
+    "tainacan-credentials",
+    "tainacan-site",
+    "tainacan-site-undo"
    ],
    "features": [],
    "media": [],
@@ -1523,6 +1527,16 @@
    "status": "available",
    "media": []
   },
+  "tainacan-start": {
+   "id": "tainacan-start",
+   "type": "entry",
+   "section": "tainacan",
+   "label": "▶  Start Tainacan",
+   "description": "Starts Docker and Tainacan's containers again, with the data as it is; nothing is restored",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "tainacan-status": {
    "id": "tainacan-status",
    "type": "entry",
@@ -1539,6 +1553,16 @@
    "section": "tainacan",
    "label": "📜  Tainacan logs",
    "description": "The latest lines of the containers' logs, secrets blanked",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "tainacan-site": {
+   "id": "tainacan-site",
+   "type": "entry",
+   "section": "tainacan",
+   "label": "🏠  Prepare the home page",
+   "description": "A home page with the search of the collection and links to the collections and items",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1569,6 +1593,16 @@
    "section": "tainacan-maintenance",
    "label": "👤  WordPress administrator",
    "description": "The WordPress account of Tainacan's administrators",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "tainacan-site-undo": {
+   "id": "tainacan-site-undo",
+   "type": "entry",
+   "section": "tainacan-maintenance",
+   "label": "↩  Undo the home page",
+   "description": "Puts back the home page and settings that were there before",
    "kind": "native",
    "status": "available",
    "media": []
@@ -6698,6 +6732,56 @@
    "ja": null,
    "ko": null
   },
+  "▶  Start Tainacan": {
+   "en": "▶  Start Tainacan",
+   "pt-BR": "▶  Iniciar o Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Starts Docker and Tainacan's containers again, with the data as it is; nothing is restored": {
+   "en": "Starts Docker and Tainacan's containers again, with the data as it is; nothing is restored",
+   "pt-BR": "Inicia de novo o Docker e os contêineres do Tainacan, com os dados como estão; nada é restaurado",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "🩺  Tainacan diagnosis": {
    "en": "🩺  Tainacan diagnosis",
    "pt-BR": "🩺  Diagnóstico do Tainacan",
@@ -6776,6 +6860,56 @@
   "The latest lines of the containers' logs, secrets blanked": {
    "en": "The latest lines of the containers' logs, secrets blanked",
    "pt-BR": "As últimas linhas dos logs dos contêineres, com segredos ocultados",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🏠  Prepare the home page": {
+   "en": "🏠  Prepare the home page",
+   "pt-BR": "🏠  Preparar a página inicial",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "A home page with the search of the collection and links to the collections and items": {
+   "en": "A home page with the search of the collection and links to the collections and items",
+   "pt-BR": "Uma página inicial com a busca do acervo e links para as coleções e os itens",
    "es": null,
    "fr": null,
    "it": null,
@@ -6926,6 +7060,56 @@
   "The WordPress account of Tainacan's administrators": {
    "en": "The WordPress account of Tainacan's administrators",
    "pt-BR": "A conta do WordPress dos administradores do Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "↩  Undo the home page": {
+   "en": "↩  Undo the home page",
+   "pt-BR": "↩  Desfazer a página inicial",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Puts back the home page and settings that were there before": {
+   "en": "Puts back the home page and settings that were there before",
+   "pt-BR": "Recoloca a página inicial e as configurações que existiam antes",
    "es": null,
    "fr": null,
    "it": null,
@@ -17975,6 +18159,15 @@
     "summary": "Instala o WordPress e o plugin Tainacan em contêineres próprios: o endereço, o plano do instalador e depois o Sim. Sem o Docker, ele vem antes, depois do plano próprio."
    }
   },
+  "tainacan-start": {
+   "en": {
+    "summary": "Starts a stopped Tainacan again: Docker's service when it is the one stopped, then the database and WordPress containers, with their data as it is. The plan comes first and nothing is restored or deleted.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Inicia de novo um Tainacan parado: o serviço do Docker, quando é ele que está parado, e depois os contêineres do banco e do WordPress, com os dados como estão. O plano vem antes e nada é restaurado nem apagado."
+   }
+  },
   "tainacan-status": {
    "en": {
     "summary": "Reads everything again: containers, WordPress, the plugin, the collections, items and attachments, versions and space. The result is kept with the time it was read and shown in the Control Dashboard.",
@@ -17991,6 +18184,15 @@
    },
    "pt-BR": {
     "summary": "As últimas linhas dos logs dos contêineres do Tainacan, com senhas e chaves ocultadas."
+   }
+  },
+  "tainacan-site": {
+   "en": {
+    "summary": "Makes the public address open the collection instead of WordPress's sample blog: a page with the search of the collection and links to the collections and to all the items, set as the home page, and Tainacan's faceted search in its collection and items pages. The plan says what changes; the theme, menus, posts and pages stay, and nothing is deleted.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Faz o endereço público abrir o acervo em vez do blog de exemplo do WordPress: uma página com a busca do acervo e links para as coleções e para todos os itens, como página inicial, e a busca facetada do Tainacan nas páginas de coleção e de itens. O plano diz o que muda; tema, menus, posts e páginas ficam, e nada é apagado."
    }
   },
   "tainacan-uninstall": {
@@ -18036,6 +18238,15 @@
    },
    "pt-BR": {
     "summary": "O endereço da administração do WordPress e a conta do administrador do Tainacan. As contas do Koha, inclusive o superlibrarian, não são contas do WordPress."
+   }
+  },
+  "tainacan-site-undo": {
+   "en": {
+    "summary": "Puts back the home page and the Tainacan settings that were there before the home page was prepared. The page of the collection goes to the trash only if nobody edited it.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Recoloca a página inicial e as configurações do Tainacan que existiam antes de a página inicial ser preparada. A página do acervo só vai para a lixeira se ninguém a editou."
    }
   },
   "sec-tainacan-maintenance": {
@@ -21105,15 +21316,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 141,
-   "manual_total": 141,
+   "manual": 144,
+   "manual_total": 144,
    "manual_outdated": [],
-   "strings": 465,
-   "strings_total": 465
+   "strings": 471,
+   "strings_total": 471
   },
   "pt-BR": {
-   "manual": 141,
-   "manual_total": 141,
+   "manual": 144,
+   "manual_total": 144,
    "manual_outdated": [
     "install",
     "apache-log",
@@ -21128,155 +21339,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 459,
-   "strings_total": 465
+   "strings": 465,
+   "strings_total": 471
   },
   "es": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 401,
-   "strings_total": 465
+   "strings_total": 471
   },
   "fr": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 401,
-   "strings_total": 465
+   "strings_total": 471
   },
   "it": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 401,
-   "strings_total": 465
+   "strings_total": 471
   },
   "de": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 465
+   "strings_total": 471
   },
   "nl": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "sv": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "pl": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "cs": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "ru": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "uk": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "tr": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "tl": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "id": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "ar": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "fa": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "hi": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "bn": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "vi": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "zh": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "ja": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   },
   "ko": {
    "manual": 0,
-   "manual_total": 141,
+   "manual_total": 144,
    "manual_outdated": [],
    "strings": 366,
-   "strings_total": 465
+   "strings_total": 471
   }
  }
 }
