@@ -152,6 +152,12 @@ class SchedulesView(SectionView):
         plans: list = []
         history: list = []
         tn = None
+        joint = ""
+        if koha and tainacan and bridge.has_task("set-schedule-status"):
+            try:
+                joint = (await bridge.task("set-schedule-status")).results.get("last", "")
+            except Exception:  # noqa: BLE001
+                pass
         if koha:
             try:
                 backup = (await bridge.status()).get("backup", {}) or {}
@@ -171,7 +177,7 @@ class SchedulesView(SectionView):
                     tn = platforms.backup_from_results(out.results)
             except Exception:  # noqa: BLE001
                 pass
-        return schedules.last_runs(backup, plans, history, tn)
+        return schedules.last_runs(backup, plans, history, tn, joint)
 
     def _draw(self) -> None:
         box = self.query_one("#sc-rows", Vertical)

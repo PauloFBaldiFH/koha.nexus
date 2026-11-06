@@ -222,6 +222,101 @@ async def _secrets_choice(app, title: str) -> str | None:
 
 
 # ----------------------------------------------------------------------
+# The scheduled joint backup (installer: kei_set_schedule, kei_set_run)
+# ----------------------------------------------------------------------
+async def set_schedule(app) -> None:
+    """The same joint backup every day: its folder, the sets kept, an
+    encrypted cloud copy. Written only here, never by an update."""
+    import re
+
+    from . import platforms as tn
+    from ..screens.dialogs import InputScreen
+    from .common import show_done
+
+    title = t("⏰  Schedule the joint backup")
+    if not app.bridge.has_task("set-schedule"):
+        await app.push_screen_wait(MessageScreen(title, t(
+            "The installer on this server is older than the panel: update it to schedule the joint backup."),
+            kind="error"))
+        return
+    try:
+        status = dict((await app.bridge.task("set-schedule-status")).results)
+    except Exception:  # noqa: BLE001 - then as if nothing was scheduled
+        status = {}
+    if status.get("schedule"):
+        what = await app.push_screen_wait(ChoiceScreen(title, t(
+            "The joint backup runs every day at ${time} in ${dest}; the newest ${keep} sets are kept.",
+            time=status["schedule"], dest=status.get("dest", ""), keep=status.get("keep", "")), [
+            ("change", t("Change the schedule")), ("off", t("Turn the scheduled joint backup off"))]))
+        if what is None:
+            return
+        if what == "off":
+            if not await app.push_screen_wait(ConfirmScreen(title, t(
+                    "Turn the scheduled joint backup off? The sets already made are kept."))):
+                return
+            result = await run_task(app, title, "set-schedule", "time=off")
+            await show_done(app, title, result)
+            return
+    mode = await _secrets_choice(app, title)
+    if mode is None:
+        return
+    has_key = bool((await tn.backup_state(app)).key)
+    info = await facts(app)
+    home = info.get("real_home") or "/root"
+    start = Path(status.get("dest") or Path(home) / "backups")
+    folder = await app.push_screen_wait(PathPickerScreen(
+        title, start if start.is_dir() else home, mode="dir",
+        help_text=t("Choose the folder of this server where the scheduled joint packages are saved.")))
+    if folder is None:
+        return
+
+    def check_time(value: str) -> str:
+        return "" if re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", value) else t("Use HH:MM (00:00 to 23:59).")
+
+    when = await app.push_screen_wait(InputScreen(title, t(
+        "At what time, every day? Choose a time when the library is closed: Tainacan stops writing for a "
+        "moment while it is captured."), "HH:MM", validate=check_time, value=status.get("schedule") or "01:30"))
+    if not when:
+        return
+
+    def check_keep(value: str) -> str:
+        return "" if value.isdigit() and 1 <= int(value) <= 365 else t("From 1 to 365.")
+
+    keep = await app.push_screen_wait(InputScreen(title, t(
+        "How many complete sets to keep in that folder? Older ones made by this schedule are removed after a "
+        "complete set; sets made by hand are never removed."), t("Sets kept"), validate=check_keep,
+        value=status.get("keep") or "7"))
+    if not keep:
+        return
+    copy = "none"
+    if has_key:
+        def check_copy(value: str) -> str:
+            return "" if not value or (re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,31}:[A-Za-z0-9_./-]*", value)
+                                       and ".." not in value) \
+                else t("Use REMOTE:PATH, with a cloud connection of the panel.")
+
+        typed = await app.push_screen_wait(InputScreen(title, t(
+            "Also copy each set to the cloud? It goes whole, encrypted with the backup key (.tar.gpg). Type a "
+            "cloud connection of the panel and a folder (such as gdrive:koha-nexus-sets), or leave it empty."),
+            "REMOTE:PATH", validate=check_copy, value=status.get("copy", "")))
+        if typed is None:
+            return
+        copy = typed or "none"
+    lines = [t("Every day at ${time}", time=when), t("Folder: ${dest}", dest=str(folder)),
+             t("The newest ${n} sets kept", n=keep),
+             t("Cloud copy: ${copy}", copy=copy) if copy != "none" else t("No cloud copy"),
+             t("Koha without its secrets (data only)") if mode else t("Koha's secrets encrypted with the backup key")]
+    if not await app.push_screen_wait(ConfirmScreen(title, t(
+            "The same joint backup as by hand, on a schedule: each platform in turn, a line in its history, "
+            "never two at the same time.") + "\n\n" + "\n".join("• " + line for line in lines)
+            + "\n\n" + t("Schedule it?"))):
+        return
+    result = await run_task(app, title, "set-schedule", f"time={when}", f"dest={folder}", f"keep={keep}",
+                            f"copy={copy}", "secrets=no" if mode else "secrets=yes")
+    await show_done(app, title, result)
+
+
+# ----------------------------------------------------------------------
 # Assisted restore
 # ----------------------------------------------------------------------
 async def restore_assisted(app) -> None:

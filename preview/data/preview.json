@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.179",
+ "panel_version": "1.5.180",
  "languages": [
   {
    "code": "en",
@@ -718,6 +718,7 @@
     "pbackup-setup",
     "pbackup-kit",
     "set-backup",
+    "set-schedule",
     "restore-assisted",
     "cloud-connections"
    ],
@@ -742,7 +743,8 @@
    "parent": "",
    "entries": [
     "sec-crons",
-    "pbackup-schedule"
+    "pbackup-schedule",
+    "set-schedule"
    ],
    "features": [],
    "media": [],
@@ -1799,6 +1801,16 @@
    "section": "backups",
    "label": "📦  Joint backup (Koha + Tainacan)",
    "description": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "set-schedule": {
+   "id": "set-schedule",
+   "type": "entry",
+   "section": "backups",
+   "label": "⏰  Schedule the joint backup",
+   "description": "The joint backup every day: its folder, how many sets are kept and an encrypted cloud copy",
    "kind": "native",
    "status": "available",
    "media": []
@@ -8071,6 +8083,56 @@
   "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums": {
    "en": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
    "pt-BR": "Um arquivo com os dados do Koha e do Tainacan, cada um capturado na sua vez, com as somas de verificação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "⏰  Schedule the joint backup": {
+   "en": "⏰  Schedule the joint backup",
+   "pt-BR": "⏰  Agendar o backup conjunto",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The joint backup every day: its folder, how many sets are kept and an encrypted cloud copy": {
+   "en": "The joint backup every day: its folder, how many sets are kept and an encrypted cloud copy",
+   "pt-BR": "O backup conjunto todo dia: a pasta, quantos pacotes guardar e uma cópia cifrada na nuvem",
    "es": null,
    "fr": null,
    "it": null,
@@ -18882,6 +18944,31 @@
     "outdated": true
    }
   },
+  "set-schedule": {
+   "en": {
+    "summary": "The joint backup of Koha and Tainacan every day, with its folder, how many sets are kept and an optional encrypted cloud copy.",
+    "overview": [
+     "Shown in the Backup center under **Koha and Tainacan** and in Schedules. It runs the same joint backup as by hand, with one line in /etc/cron.d/koha-nexus-backup-sets, written only when you schedule it: updating the panel never creates it.",
+     "Each run is recorded in a history with the result of each platform. A platform that fails makes the run incomplete, never done; a run that finds another one still going is skipped and recorded.",
+     "Retention removes only the sets made by this schedule, and only after a complete set; sets made by hand are never removed.",
+     "Without a backup key the panel asks first, as for the manual joint backup: set the key up, or schedule a package without Koha's secrets (data only). The cloud copy needs the key: the whole set goes encrypted with it (.tar.gpg), never in clear."
+    ],
+    "related": [
+     "set-backup",
+     "restore-assisted",
+     "sec-backups"
+    ]
+   },
+   "pt-BR": {
+    "summary": "O backup conjunto do Koha e do Tainacan todo dia, com a pasta, quantos pacotes guardar e uma cópia cifrada opcional na nuvem.",
+    "overview": [
+     "Aparece na Central de backups, em **Koha e Tainacan**, e em Agendamentos. Ele roda o mesmo backup conjunto feito à mão, com uma linha em /etc/cron.d/koha-nexus-backup-sets, escrita só quando você agenda: atualizar o painel nunca a cria.",
+     "Cada execução fica num histórico, com o resultado de cada plataforma. Uma plataforma que falha deixa a execução incompleta, nunca concluída; uma execução que encontra outra ainda em andamento é pulada e registrada.",
+     "A retenção apaga só os pacotes feitos por este agendamento, e só depois de um pacote completo; pacotes feitos à mão nunca são apagados.",
+     "Sem a chave dos backups o painel pergunta antes, como no backup conjunto manual: configurar a chave, ou agendar um pacote sem os segredos do Koha (só dados). A cópia na nuvem precisa da chave: o pacote inteiro vai cifrado com ela (.tar.gpg), nunca em claro."
+    ]
+   }
+  },
   "restore-assisted": {
    "en": {
     "summary": "One entry for any backup: a Koha database backup of any version, a Tainacan package or a joint package, recognised by its content and not by its name.",
@@ -21904,15 +21991,15 @@
  },
  "coverage": {
   "en": {
-   "manual": 152,
-   "manual_total": 152,
+   "manual": 153,
+   "manual_total": 153,
    "manual_outdated": [],
-   "strings": 483,
-   "strings_total": 483
+   "strings": 485,
+   "strings_total": 485
   },
   "pt-BR": {
-   "manual": 152,
-   "manual_total": 152,
+   "manual": 153,
+   "manual_total": 153,
    "manual_outdated": [
     "install",
     "apache-log",
@@ -21928,155 +22015,155 @@
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 477,
-   "strings_total": 483
+   "strings": 479,
+   "strings_total": 485
   },
   "es": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 483
+   "strings_total": 485
   },
   "fr": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 483
+   "strings_total": 485
   },
   "it": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 483
+   "strings_total": 485
   },
   "de": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 483
+   "strings_total": 485
   },
   "nl": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "sv": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "pl": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "cs": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "ru": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "uk": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "tr": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "tl": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "id": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "ar": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "fa": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "hi": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "bn": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "vi": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "zh": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "ja": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   },
   "ko": {
    "manual": 0,
-   "manual_total": 152,
+   "manual_total": 153,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 483
+   "strings_total": 485
   }
  }
 }

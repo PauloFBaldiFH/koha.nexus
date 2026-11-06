@@ -7,6 +7,8 @@ Sources, each read as it is (nothing is written here):
   Schedules & cron tasks (views/crons.py);
 - /etc/cron.d/koha-nexus-platform-backups: the backups of the platforms
   in containers (kei_backup_schedule), changed by "Schedule backups";
+- /etc/cron.d/koha-nexus-backup-sets: the joint package of Koha and
+  Tainacan (kei_set_schedule), changed by "Schedule the joint backup";
 - the files the installer keeps for one job each (Elasticsearch and Zebra
   watchdogs, messaging, the OPAC sitemap, the free address heartbeat, the
   local AI at startup), and Koha's own package file: read only, each says
@@ -35,7 +37,7 @@ from .i18n import t
 CRON_DIR = "/etc/cron.d"
 # KOHA, TAINACAN and SERVER are the platform filter's values; "" is all.
 KOHA, TAINACAN, SERVER = "koha", "tainacan", "server"
-PLATFORM_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", SERVER: "Server"}
+PLATFORM_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", SERVER: "Server", "koha+tainacan": "Koha and Tainacan"}
 BACKUP, MAINTENANCE, OTHER = "backup", "maintenance", "other"
 KIND_LABELS = {BACKUP: "Backups", MAINTENANCE: "Maintenance and indexing", OTHER: "Other"}
 NO_RECORD = "No run recorded"          # the same key as the Backup center: "Sem registro"
@@ -53,6 +55,9 @@ SYSTEM_FILES: dict[str, tuple[str, str, str, str]] = {
 }
 KOHA_PACKAGE = "koha-common"          # Debian's koha-common: Koha's own jobs
 PLATFORM_FILE = "koha-nexus-platform-backups"
+SET_FILE = "koha-nexus-backup-sets"
+BOTH = "koha+tainacan"                 # a row of both platforms: shown under each filter
+_SET_TASK = re.compile(r"--task\s+set-run\b")
 TASKS_FILE = "koha_tasks"
 _PLATFORM_TASK = re.compile(r"--task\s+platform-backup-(run|maintain|verify)\s+([a-z][a-z0-9-]*)")
 PLATFORM_JOBS = {"run": "Backup", "maintain": "Backup upkeep (old packages and repository)",
@@ -285,6 +290,14 @@ def platform_rows(text: str) -> list[Row]:
     return rows
 
 
+def set_rows(text: str) -> list[Row]:
+    """The scheduled joint package (kei_set_schedule): one line."""
+    editor = screen("backups") + " > " + t("Schedule the joint backup")
+    return [Row(BOTH, BACKUP, t("Joint backup (Koha + Tainacan)"), describe(sched), "on" if on else "off", SET_FILE,
+                sched, hide_secrets(cmd), editor, "set:run")
+            for on, sched, cmd in _lines(text) if _SET_TASK.search(cmd)]
+
+
 def system_rows(name: str, text: str) -> list[Row]:
     platform, kind, label, section_id = SYSTEM_FILES[name]
     rows = []
@@ -317,7 +330,7 @@ def read_files(cron_dir: str | Path = "") -> dict[str, str]:
     KEI_CRON_DIR in the tests); a missing file is left out."""
     base = Path(cron_dir or os.environ.get("KEI_CRON_DIR") or CRON_DIR)
     out: dict[str, str] = {}
-    for name in (TASKS_FILE, PLATFORM_FILE, KOHA_PACKAGE, *SYSTEM_FILES):
+    for name in (TASKS_FILE, PLATFORM_FILE, SET_FILE, KOHA_PACKAGE, *SYSTEM_FILES):
         path = base / name
         if name == TASKS_FILE and os.environ.get("KEI_CRON_FILE") and not cron_dir:
             path = Path(os.environ["KEI_CRON_FILE"])      # the editor's own file
@@ -333,6 +346,7 @@ def collect(files: dict[str, str], instance: str, tainacan: bool) -> list[Row]:
     the installer's own files, Koha's package, WP-Cron."""
     rows = koha_task_rows(files.get(TASKS_FILE, ""), instance)
     rows += platform_rows(files.get(PLATFORM_FILE, ""))
+    rows += set_rows(files.get(SET_FILE, ""))
     for name in SYSTEM_FILES:
         if name in files:
             rows += system_rows(name, files[name])
@@ -379,7 +393,20 @@ def fill_times(rows: list[Row], now: dt.datetime, last: dict[str, tuple[str, str
         row.next = when.strftime("%Y-%m-%d %H:%M") if when else "—"
 
 
-def last_runs(backup: dict, plans, history, tainacan_backups) -> dict[str, tuple[str, str]]:
+def set_last_run(value: str) -> tuple[str, str] | None:
+    """kei_set_schedule_status's last=FINISHED|RESULT|RECOVERABILITY|COPY|FAILURES."""
+    bits = (value or "").split("|")
+    if len(bits) < 2 or not bits[0]:
+        return None
+    labels = {"ok": (t("OK"), "ok"), "partial": (t("INCOMPLETE"), "bad"), "failed": (t("FAILED"), "bad"),
+              "busy": (t("Skipped (busy)"), "warn")}
+    text, state = labels.get(bits[1], (bits[1], "warn"))
+    if bits[1] == "ok" and len(bits) > 3 and bits[3] in ("failed", "refused"):
+        text, state = t("OK, cloud copy FAILED"), "bad"
+    return f"{bits[0][:16]} · {text}", state
+
+
+def last_runs(backup: dict, plans, history, tainacan_backups, joint: str = "") -> dict[str, tuple[str, str]]:
     """The runs a reliable record says happened: the nightly SQL backup's
     log, each cloud backup's lines in the backup logs, the newest complete
     Tainacan package and the monthly restore test."""
@@ -397,6 +424,8 @@ def last_runs(backup: dict, plans, history, tainacan_backups) -> dict[str, tuple
         if h is not None:
             out["koha:" + cron.CLOUD_PREFIX + plan.id] = (f"{h.when} · " + (t("OK") if h.ok else t("FAILED")),
                                                          "ok" if h.ok else "bad")
+    if set_last_run(joint):
+        out["set:run"] = set_last_run(joint)
     last = getattr(tainacan_backups, "last", "") or ""
     verified = getattr(tainacan_backups, "verified", "") or ""
     maintained = getattr(tainacan_backups, "maintained", "") or ""
@@ -420,4 +449,4 @@ def platforms_offered(koha: bool, tainacan: bool) -> list[str]:
 
 
 def shown(rows: list[Row], platform: str = "", kind: str = "") -> list[Row]:
-    return [r for r in rows if (not platform or r.platform == platform) and (not kind or r.kind == kind)]
+    return [r for r in rows if (not platform or platform in r.platform.split("+")) and (not kind or r.kind == kind)]

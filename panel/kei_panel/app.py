@@ -180,6 +180,8 @@ class KohaPanelApp(App):
         """Can a screen or routine of `platform` run here? "" = any server."""
         if not platform:
             return True
+        if "+" in platform:              # "koha+tainacan": both installed
+            return all(self.platform_ready(p) for p in platform.split("+"))
         if platform == platforms.KOHA:
             return self.koha_installed
         if platform == platforms.TAINACAN:

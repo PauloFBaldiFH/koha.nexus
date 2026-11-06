@@ -14,7 +14,7 @@ setup() {
     REPO="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     T="$BATS_TEST_TMPDIR"
     export KEI_OWNED_DIR="$T/owned" KEI_BK_ROOT="$T/backups" KEI_TAINACAN_BACKUPS="$T/backups/tainacan"
-    export KEI_BK_CRON="$T/cron.d/koha-nexus-platform-backups" KEI_BK_NEED_CRON=0 RCLONE_CONFIG="$T/rclone.conf"
+    export KEI_BK_CRON="$T/cron.d/koha-nexus-platform-backups" KEI_SET_CRON="$T/cron.d/koha-nexus-backup-sets" KEI_BK_NEED_CRON=0 RCLONE_CONFIG="$T/rclone.conf"
     export DEMO="$T/demo" OUT="$T/out" FAKE_KOHA=yes FAKE_TN=yes
     mkdir -p "$DEMO/data/sub" "$T/cron.d" "$OUT"
     printf 'CREATE TABLE t (x int);\nINSERT INTO t VALUES (1);\n' > "$DEMO/db.sql"
@@ -267,7 +267,7 @@ PY
 }
 
 @test "S10 the set tasks are not Koha tasks and are in the dispatcher" {
-    for task in set-backup set-inspect set-unpack set-cleanup set-koha-extras; do
+    for task in set-backup set-inspect set-unpack set-cleanup set-koha-extras set-schedule set-schedule-status set-run; do
         run lib "kei_task_needs_koha $task"
         [ "$status" -eq 1 ]
         grep -E "^        [a-z|-]+\)" "$REPO/installer" | grep -q -- "$task"
@@ -324,4 +324,119 @@ PY
     [[ "$safety" == "$KEI_BK_ROOT"/koha-before-files-*.tar.gz ]] && tar -tzf "$safety" | grep -q 'opac-custom/logo.png'
     # Only its own staging folders.
     run lib "kei_set_koha_extras plan '$T'"; [ "$status" -eq 2 ]
+}
+
+# ----------------------------------------------------------------------
+# The scheduled joint package (U6)
+# ----------------------------------------------------------------------
+history() { cat "$KEI_BK_ROOT/sets-history.jsonl"; }
+runs() { grep -c . "$KEI_BK_ROOT/sets-history.jsonl"; }
+
+@test "S12 a schedule is written only when asked; without a key the person chooses; off keeps the sets" {
+    # Loading the installer and reading the status write nothing.
+    run lib "kei_set_schedule_status"
+    [ "$(field cron "$output")" = no ] && [ ! -e "$KEI_SET_CRON" ]
+    # No key and Koha here: not scheduled until the person chooses.
+    run lib "kei_set_schedule time=02:15 dest='$OUT' keep=3"
+    [ "$status" -eq 7 ] && [ "$(field needs "$output")" = key ] && [ ! -e "$KEI_SET_CRON" ]
+    for bad in "time=25:00 dest='$OUT'" "time=02:15 dest=relative" "time=02:15 dest='$T/none'" "time=02:15 dest='$OUT' keep=0" "time=02:15 dest='$OUT' secrets=no copy=nope:x"; do
+        run lib "kei_set_schedule $bad"
+        [ "$status" -ne 0 ] && [ ! -e "$KEI_SET_CRON" ] || { echo "$bad: $status"; false; }
+    done
+    # A cloud copy needs the backup key: never in clear.
+    printf '[loc]\ntype = local\n' > "$RCLONE_CONFIG"
+    run lib "kei_set_schedule time=02:15 dest='$OUT' secrets=no copy=loc:$T/cloud"
+    [ "$status" -eq 6 ] && [ ! -e "$KEI_SET_CRON" ]
+    run lib "kei_set_schedule time=02:15 dest='$OUT' keep=3 secrets=no"
+    [ "$status" -eq 0 ]
+    [ "$(grep -c -- '--task set-run scheduled' "$KEI_SET_CRON")" = 1 ]
+    [ "$(grep -vc '^#\|^[A-Z]*=\|^$' "$KEI_SET_CRON")" = 1 ]
+    grep -q '^15 2 \* \* \* root ' "$KEI_SET_CRON"
+    [ "$(grep -c "koha-nexus-backup-sets" "$KEI_OWNED_DIR/owned.tsv")" = 2 ]
+    # Asked again: still one line (never a second schedule).
+    lib "kei_set_schedule time=03:00 secrets=no" >/dev/null
+    [ "$(grep -c -- '--task set-run' "$KEI_SET_CRON")" = 1 ] && grep -q '^0 3 ' "$KEI_SET_CRON"
+    run lib "kei_set_schedule_status"
+    [ "$(field schedule "$output")" = 03:00 ] && [ "$(field dest "$output")" = "$OUT" ] && [ "$(field keep "$output")" = 3 ]
+    [ "$(field secrets "$output")" = no ]
+    lib "kei_set_run scheduled" >/dev/null
+    run lib "kei_set_schedule time=off"
+    [ "$status" -eq 0 ] && [ ! -e "$KEI_SET_CRON" ]
+    [ -z "$(grep koha-nexus-backup-sets "$KEI_OWNED_DIR/owned.tsv")" ]
+    [ -n "$(ls "$OUT"/knx-set-*.tar)" ]
+}
+
+@test "S13 scheduled runs: the same joint package, a history line each, retention only of its own sets" {
+    lib "kei_set_backup '$OUT' '' no-secrets" >/dev/null           # a set made by hand
+    manual=$(ls "$OUT"/knx-set-*.tar)
+    lib "kei_set_schedule time=02:15 dest='$OUT' keep=2 secrets=no" >/dev/null
+    for i in 1 2 3; do
+        sleep 1
+        run lib "kei_set_run scheduled"
+        [ "$status" -eq 0 ] || { echo "$output"; false; }
+    done
+    [ "$(runs)" = 3 ]
+    [ -f "$manual" ]                                                   # never removed
+    [ "$(ls "$OUT"/knx-set-*.tar | grep -vc "$manual")" = 2 ]
+    python3 -I - "$(history)" <<'PY'
+import json, os, sys
+runs = [json.loads(l) for l in sys.argv[1].splitlines()]
+assert [r["result"] for r in runs] == ["ok", "ok", "ok"], runs
+assert [r["removed"] for r in runs] == [0, 0, 1], runs
+assert not os.path.exists(runs[0]["file"]) and all(os.path.exists(r["file"]) for r in runs[1:])
+for r in runs:
+    assert r["trigger"] == "scheduled" and r["recoverability"] == "partial" and r["copy"] == "none"
+    assert [p["id"] for p in r["platforms"]] == ["koha", "tainacan"] and all(p["result"] == "ok" for p in r["platforms"])
+PY
+    run lib "kei_set_schedule_status"
+    [[ "$(field last "$output")" == *"|ok|partial|none|" ]] && [ "$(field runs "$output")" = 3 ]
+}
+
+@test "S14 a platform that fails: partial, said per platform, nothing removed; busy: skipped and recorded" {
+    lib "kei_set_schedule time=02:15 dest='$OUT' keep=1 secrets=no" >/dev/null
+    lib "kei_set_run scheduled" >/dev/null
+    sleep 1
+    FAKE_TN_DUMP=fail run lib "kei_set_run scheduled"
+    [ "$status" -eq 9 ]
+    [ "$(ls "$OUT"/knx-set-*.tar | wc -l)" = 2 ]                       # retention waits for a complete set
+    run lib "kei_set_schedule_status"
+    [[ "$(field last "$output")" == *"|partial|"*"tainacan: The Tainacan database is not running."* ]]
+    FAKE_TN_DUMP=fail FAKE_KOHA_DUMP=fail run lib "kei_set_run scheduled"
+    [ "$status" -eq 9 ]
+    [[ "$(history | tail -n 1)" == *'"result": "failed"'* ]]
+    # Another run holds the lock: this one is skipped, recorded, and makes nothing.
+    n=$(ls "$OUT" | wc -l)
+    ( exec 8>"$KEI_BK_ROOT/.sets.lock"; flock 8; sleep 5 ) &
+    sleep 1
+    run lib "kei_set_run scheduled"
+    [ "$status" -eq 9 ] && [[ "$output" == *"Another joint backup is running"* ]]
+    [[ "$(history | tail -n 1)" == *'"result": "busy"'* ]] && [ "$(ls "$OUT" | wc -l)" = "$n" ]
+    wait
+}
+
+@test "S15 the cloud copy is the whole set encrypted with the backup key, never in clear" {
+    printf '[loc]\ntype = local\n' > "$RCLONE_CONFIG"
+    mkdir -p "$T/cloud"
+    lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
+    run lib "kei_set_schedule time=02:15 dest='$OUT' keep=2 copy=loc:$T/cloud"
+    [ "$status" -eq 0 ]
+    run lib "kei_set_run scheduled"
+    [ "$status" -eq 0 ] && [ "$(field copy "$output")" = ok ]
+    up=$(ls "$T"/cloud/knx-set-*.tar.gpg)
+    [ -z "$(ls "$T/cloud" | grep -v '\.tar\.gpg$')" ]
+    never tar -tf "$up"
+    never grep -aqE 'koha-db-pass|sip-secret|vision-secret|z-secret|OLD-key|CREATE TABLE|s3cr3t' "$up"
+    [ -z "$(ls -A "$OUT" | grep '^\.')" ]                             # no clear or encrypted leftovers
+    [[ "$(history | tail -n 1)" == *'"copy": "ok"'* ]] && [[ "$(history | tail -n 1)" == *'"recoverability": "full"'* ]]
+    # The key is gone afterwards: the copy cannot be rescheduled without it,
+    # and the scheduled run stops (Koha's secrets would be left out): failed,
+    # never "done", and nothing goes to the cloud.
+    rm -rf "$KEI_OWNED_DIR/backup/gnupg"
+    run lib "kei_set_schedule time=02:15 secrets=no"
+    [ "$status" -eq 6 ]
+    sleep 1
+    run lib "kei_set_run scheduled"
+    [ "$status" -ne 0 ]
+    [[ "$(history | tail -n 1)" == *'"result": "failed"'*"backup key"* ]]
+    [ "$(ls "$T"/cloud/ | wc -l)" = 1 ]
 }

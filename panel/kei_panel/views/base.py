@@ -23,7 +23,7 @@ from ..widgets.cards import ActionCard
 # Zones in the order they are drawn, with their titles.
 ZONE_ORDER = ("setup", "recovery", "", "removal")
 ZONE_TITLES = {"setup": "", "recovery": "Diagnosis and recovery", "": "Tools", "removal": "Removal"}
-PLATFORM_NAMES = {"koha": "Koha", "tainacan": "Tainacan"}
+PLATFORM_NAMES = {"koha": "Koha", "tainacan": "Tainacan", "koha+tainacan": "Koha and Tainacan"}
 
 
 def zone_id(zone: str) -> str:
@@ -58,7 +58,7 @@ class SectionView(VerticalScroll):
     def tag(self, entry: Entry) -> str:
         """"Koha" on a card of a shared section that only serves Koha."""
         if entry.requires and not self.section.requires and self.section.view != "platform-home":
-            return PLATFORM_NAMES.get(entry.requires, entry.requires)
+            return t(PLATFORM_NAMES.get(entry.requires, entry.requires))
         return ""
 
     def cards(self) -> ComposeResult:

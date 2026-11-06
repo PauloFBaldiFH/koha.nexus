@@ -25,6 +25,7 @@ ROUTINES: dict[str, Routine] = {
     "backup-cloud": backup.cloud_backup,
     "cloud-connections": backup.cloud_connections,      # Backup center, any platform
     "set-backup": backup_set.set_backup,                # Backup center, Koha and Tainacan
+    "set-schedule": backup_set.set_schedule,            # Backup center and Schedules, Koha and Tainacan
     "restore-assisted": backup_set.restore_assisted,    # Backup center, any backup
     "restore": backup.restore,
     "backup-download": backup.download_latest,           # backup view

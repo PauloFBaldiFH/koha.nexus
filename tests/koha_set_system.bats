@@ -238,3 +238,23 @@ PHP
     [ "$(decrypt)" = "$TOTP" ]
     lib "kei_set_cleanup '$STAGE'"
 }
+
+@test "the scheduled joint backup with the real platforms: one line, one run, its history" {
+    mkdir -p "$S/scheduled"
+    run config.sh --task set-schedule time=03:10 dest="$S/scheduled" keep=2 </dev/null
+    [ "$status" -eq 0 ]
+    [ "$(grep -c -- '--task set-run scheduled' /etc/cron.d/koha-nexus-backup-sets)" = 1 ]
+    # What cron runs, run now.
+    run config.sh --task set-run scheduled </dev/null
+    echo "$output" | grep '@@result' >&3
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"recoverability=full"* ]]
+    python3 -I - /var/backups/koha-nexus/sets-history.jsonl <<'PY'
+import json, sys
+r = [json.loads(l) for l in open(sys.argv[1])][-1]
+assert r["result"] == "ok" and r["recoverability"] == "full", r
+assert [(p["id"], p["result"]) for p in r["platforms"]] == [("koha", "ok"), ("tainacan", "ok")], r
+PY
+    run config.sh --task set-schedule time=off </dev/null
+    [ "$status" -eq 0 ] && [ ! -e /etc/cron.d/koha-nexus-backup-sets ]
+}

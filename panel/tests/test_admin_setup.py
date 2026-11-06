@@ -253,3 +253,27 @@ def test_one_admin_card_per_group_and_the_setup_card_only_while_pending():
     facts = platforms.Facts(status={}, koha=True, has_task=lambda n: True, setup={"koha": 2})
     assert platforms.entry_shown("setup-koha", "", "installed", facts)
     assert not platforms.entry_shown("setup-tainacan", "", "installed", facts)
+
+
+@pytest.mark.parametrize("setup_state", [{}, {"koha": 2, "tainacan": 1}, {"koha": 0, "tainacan": 0}])
+def test_the_permanent_screens_stay_in_the_menu_whether_the_assistant_was_done_deferred_or_never_shown(setup_state):
+    """Paulo, 2026-11-06: the assistant only opens the permanent screens;
+    after it is finished or put off ("Fazer depois"), domain, accounts,
+    cloud and schedules are still reached the usual way."""
+    permanent = {
+        "cloudflare": "security",            # Koha's domain and Cloudflare
+        "tainacan-address": "tainacan",      # Tainacan's address (domain, free address)
+        "admin-koha": "koha", "admin-tainacan": "tainacan",          # accounts
+        "backup-cloud": "backups", "cloud-connections": "backups",   # cloud
+        "pbackup-schedule": "schedules",     # schedules (the backup key card shows while there is no key)
+        "set-schedule": "schedules", "crons": "schedules",
+    }
+    facts = platforms.Facts(status={}, koha=True, has_task=lambda n: True, setup=setup_state)
+    for action, section_id in permanent.items():
+        entries = [e for e in menus.section(section_id).entries if e.action == action]
+        assert entries, f"{action} is not in {section_id}"
+        assert action in ROUTINES or entries[0].kind == "view", action
+        assert platforms.entry_shown(action, entries[0].zone, "installed", facts), (action, setup_state)
+    # Only the assistant's own card depends on it.
+    pending = bool(setup_state.get("koha"))
+    assert platforms.entry_shown("setup-koha", "", "installed", facts) is pending

@@ -138,6 +138,28 @@ def tainacan_encryption(key: str, repo: str, copy_crypt: bool = False) -> str:
     return "; ".join(parts)
 
 
+def set_plans(status: dict) -> list[PlanRow]:
+    """The scheduled joint package (kei_set_schedule_status): its folder,
+    the cloud copy, the sets kept, what is encrypted, its last run."""
+    from .schedules import set_last_run
+    if not status:
+        return []
+    where = t("This server") + (f" ({status['dest']})" if status.get("dest") else "")
+    if status.get("copy"):
+        where += " + " + t("copy to") + f" {status['copy']}"
+    schedule = t("Daily at ${time}", time=status["schedule"]) if status.get("schedule") else t("Not scheduled")
+    keep = t("the newest ${n} sets", n=status["keep"]) if status.get("keep") else "-"
+    if status.get("secrets") == "no":
+        encrypted = t("Koha without its secrets (data only, chosen by you); the set on this server is readable by root only")
+    else:
+        encrypted = t("Koha's and Tainacan's secrets encrypted with the backup key; the set on this server is readable by root only")
+    if status.get("copy"):
+        encrypted += "; " + t("the cloud copy is the whole set encrypted with the backup key")
+    last = set_last_run(status.get("last", ""))
+    text, state = last if last else (t(NO_RECORD), "")
+    return [PlanRow(t("Joint backup (Koha + Tainacan)"), where, schedule, keep, encrypted, text, state)]
+
+
 def tainacan_plans(backups, keep: str = "", remotes: list[cloud.Remote] | None = None) -> list[PlanRow]:
     """Tainacan's automatic backup: the engine's daily backup, its
     destination (this server, a restic repository, a cloud copy) and its

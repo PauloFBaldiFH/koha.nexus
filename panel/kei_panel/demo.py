@@ -612,6 +612,14 @@ _SCRIPTS: dict[str, list[str]] = {
                    "@@result koha=/var/backups/koha-nexus/.set-restore.demo/koha/koha_library_set_2026-11-06_10h00.sql.gz",
                    "@@result tainacan=/var/backups/koha-nexus/.set-restore.demo/tainacan/knx-tainacan-20261106-100041"],
     "set-cleanup": [],
+    # The scheduled joint package (U6).
+    "set-schedule-status": ["@@result schedule=01:15", "@@result dest=/root/backups", "@@result keep=7",
+                            "@@result copy=gdrive:koha-nexus-sets", "@@result secrets=yes", "@@result cron=yes",
+                            "@@result last=2026-11-06 01:16:52|ok|full|ok|", "@@result runs=12"],
+    "set-schedule": ["@@msg ok OK\tJoint backup every day at 01:15 in /root/backups, the newest 7 kept."],
+    "set-run": ["@@result platform=koha\tok\t2026-11-06 01:15:02\t2026-11-06 01:15:41\tkoha/x.sql.gz\tfull",
+                "@@result platform=tainacan\tok\t2026-11-06 01:15:41\t2026-11-06 01:16:30\ttainacan/knx-tainacan-1/\tfull",
+                "@@result complete=yes", "@@result recoverability=full", "@@result copy=ok", "@@result removed=1"],
     # Koha's files and secrets after its database: paths and states, never a value.
     "set-koha-extras": ["@@result secrets=open",
                         "@@result item=uploads\trestore\t/var/lib/koha/library/uploads",
@@ -832,6 +840,12 @@ _DEMO_PLATFORM_BACKUPS = (
     "30 4 1 * * root /usr/local/bin/config.sh --task platform-backup-verify tainacan 30 >/dev/null 2>&1\n")
 
 
+_DEMO_SETS = (
+    "# Managed by Koha.Nexus: the scheduled joint backup (Koha + Tainacan). config.sh writes it again.\n"
+    "SHELL=/bin/bash\n"
+    "15 1 * * * root /usr/local/bin/config.sh --task set-run scheduled >/dev/null 2>&1\n")
+
+
 def demo_cron_files(koha: bool, tainacan: bool) -> dict[str, str]:
     """The demo server's cron files, by name (schedules.read_files)."""
     files: dict[str, str] = {}
@@ -840,6 +854,8 @@ def demo_cron_files(koha: bool, tainacan: bool) -> dict[str, str]:
         files.update(_DEMO_CRON)
     if tainacan:
         files["koha-nexus-platform-backups"] = _DEMO_PLATFORM_BACKUPS
+    if koha and tainacan:
+        files["koha-nexus-backup-sets"] = _DEMO_SETS
     return files
 
 
@@ -925,7 +941,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                             "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete",
-                            "set-inspect", "set-cleanup", "admin-status", "setup-status", "setup-mark",
+                            "set-inspect", "set-cleanup", "set-schedule-status", "admin-status", "setup-status", "setup-mark",
                             "setup-close") \
         else 0.05 if name == "install" else 0.15
     if name in ("tainacan-events", "tainacan-site") and args[:1] in (("plan",), ("status",)) \

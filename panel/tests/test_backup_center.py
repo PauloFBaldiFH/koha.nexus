@@ -20,7 +20,7 @@ from kei_panel.env import PanelEnv
 
 SERVERS = {"none": ("0", "0"), "koha": ("1", "0"), "tainacan": ("0", "1"), "both": ("1", "1")}
 # What the center may call while it is drawn: reads only.
-READS = {"platform-backup-status", "info", "cloud-status", "cloud-list"}
+READS = {"platform-backup-status", "info", "cloud-status", "cloud-list", "set-schedule-status"}
 KOHA_CARDS = ["backup-download", "backup-manual", "backup-marc", "restore", "backup-cloud", "backup-test"]
 SHARED = ["restore-assisted", "cloud-connections"]
 TAINACAN_CARDS = ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
@@ -285,10 +285,14 @@ def test_koha_and_tainacan_as_a_set_offer_the_joint_backup_and_both_plans(server
     st, note, ran = asyncio.run(main())
     assert st["scope"] == "both" and note and not st["koha"] and not st["tainacan"]
     # The platform cards stay in each platform's view; the set has its own.
-    assert st["cards"] == ["set-backup", "restore-assisted", "cloud-connections"]
+    assert st["cards"] == ["set-backup", "set-schedule", "restore-assisted", "cloud-connections"]
     assert [r[0] for r in st["rows"]] == ["Database backup (SQL)", "MARC21 package",
                                           "Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)",
-                                          "Tainacan backup"]
+                                          "Tainacan backup", "Joint backup (Koha + Tainacan)"]
+    joint = st["rows"][-1]
+    assert joint[1] == "This server (/root/backups) + copy to gdrive:koha-nexus-sets"
+    assert joint[2] == "Daily at 01:15" and joint[3] == "the newest 7 sets" and joint[5] == "2026-11-06 01:16 · OK"
+    assert "the cloud copy is the whole set encrypted with the backup key" in joint[4]
     assert {name for name, _a in ran} <= READS
 
 
@@ -549,3 +553,44 @@ def test_koha_secrets_come_back_with_a_plan_after_its_database_and_no_value_is_s
     else:
         assert actions == ["plan"]
     assert names.count("set-cleanup") == 1
+
+
+def test_the_joint_backup_row_says_data_only_and_no_record():
+    row, = backup_center.set_plans({"schedule": "", "secrets": "no"})
+    assert row.when == "Not scheduled" and row.last == "No run recorded" and row.state == ""
+    assert row.encrypted.startswith("Koha without its secrets (data only, chosen by you)")
+    assert backup_center.set_plans({}) == []
+
+
+@pytest.mark.parametrize("server", ["both"], indirect=True)
+def test_scheduling_the_joint_backup_asks_everything_then_writes_one_schedule(server, tmp_path):
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen
+    from kei_panel.screens.files import PathPickerScreen
+
+    async def main():
+        ran: list = []
+        app = make_app(ran)
+        async with app.run_test(size=(160, 48)) as pilot:
+            await pilot.pause(0.3)
+            app.run_native("set-schedule")
+            await until(pilot, lambda: isinstance(app.screen, ChoiceScreen))
+            current = app.screen._prompt
+            app.screen.dismiss("change")
+            await until(pilot, lambda: isinstance(app.screen, PathPickerScreen))
+            app.screen.dismiss(tmp_path)
+            answers = ["02:40", "5", "gdrive:sets"]
+            asked = []
+            for value in answers:
+                await until(pilot, lambda: isinstance(app.screen, InputScreen) and app.screen._prompt not in asked)
+                asked.append(app.screen._prompt)
+                app.screen.dismiss(value)
+            await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            question = app.screen._question
+            await pilot.click("#yes")
+            await pilot.pause(1.0)
+            return current, question, [(n, a) for n, a in ran if n == "set-schedule"]
+
+    current, question, ran = asyncio.run(main())
+    assert "every day at 01:15 in /root/backups" in current
+    assert "never two at the same time" in question and "Cloud copy: gdrive:sets" in question
+    assert ran == [("set-schedule", ("time=02:40", f"dest={tmp_path}", "keep=5", "copy=gdrive:sets", "secrets=yes"))]
