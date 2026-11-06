@@ -1,4 +1,4 @@
-"""Backup center: the compression of new backups, saved by the installer."""
+"""Backup center (Koha): the compression of new backups, saved by the installer."""
 
 import asyncio
 import time
@@ -32,7 +32,7 @@ def test_compression_choice_runs_the_task():
         async with app.run_test(size=(140, 50)) as pilot:
             await pilot.pause(0.2)
             await pilot.press("b")
-            view = app.screen.query_one("#view-backup")
+            view = app.screen.query_one("#view-backups")
             select = view.query_one("#bk-codec", Select)
             await _until(pilot, lambda: not select.disabled)          # the installer said: gz
             assert select.value == "gz" and view.codec == "gz"
@@ -67,7 +67,7 @@ def test_the_cards_are_the_only_backup_actions(tmp_path, monkeypatch):
         async with app.run_test(size=(140, 50)) as pilot:
             await pilot.pause(0.2)
             await pilot.press("b")
-            view = app.screen.query_one("#view-backup")
+            view = app.screen.query_one("#view-backups")
             assert not view.query(".quick-actions") and not view.query("#backup-restore")
             cards = {c.entry.action: c for c in view.query(ActionCard)}
             assert list(cards)[:5] == ["backup-download", "backup-manual", "backup-marc", "restore", "backup-cloud"]

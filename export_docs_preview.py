@@ -185,13 +185,13 @@ FEATURES: tuple[Feature, ...] = (
     ]),
     Feature("dash-restart", "dashboard", "views/dashboard.py", "Restart Koha", [button("Restart Koha", True)]),
     # Backup center
-    Feature("backup-status", "backup", "views/backup.py", "Last backup", [
+    Feature("backup-status", "backups", "views/backups.py", "Last backup", [
         status("Last backup", "${age} ago"), status("Size", "184 MB"), status("Result", "OK"),
     ], extra_sources=("views/dashboard.py",)),
-    Feature("backup-compression", "backup", "views/backup.py", "Backup compression type", [
+    Feature("backup-compression", "backups", "views/backup.py", "Backup compression type", [
         select("Compression", "CODECS", 1), note("CODEC_NOTE"),
-    ]),
-    Feature("backup-safety", "backup", "routines/backup.py", "Safety backup:", [
+    ], extra_sources=("views/backups.py",)),
+    Feature("backup-safety", "backups", "routines/backup.py", "Safety backup:", [
         status("Safety backup:", "pre_restore_safety_backup_2026-10-10_14h07m33.sql.zst"),
         status("Search engine", "Zebra"), status("Tables", "312"),
     ]),

@@ -433,13 +433,13 @@ def tainacan_summary(state: TainacanState, docker: "DockerState", backups: "Back
         created = rest.partition("|")[0]
         cards["backup"] = (created or name, t("${n} complete backups", n=backups.count), "ok")
     else:
-        cards["backup"] = (t("None yet"), t("Back up in Tainacan, Backups"), "warn")
+        cards["backup"] = (t("None yet"), t("Back up in the Backup center"), "warn")
     if backups.verified:
         bits = backups.verified.split()
         cards["restore-test"] = ((t("Passed") if bits[-1:] == ["ok"] else t("Failed")), " ".join(bits[:2]),
                                  "ok" if bits[-1:] == ["ok"] else "bad")
     else:
-        cards["restore-test"] = (t("Not yet"), t("Test a restore in Tainacan, Backups"),
+        cards["restore-test"] = (t("Not yet"), t("Test a restore in the Backup center"),
                                  "warn" if backups.count else "")
     failed = t("The diagnosis at ${when} failed: run it again", when=when(state.failed_at)) \
         if state.failed_at else ""
@@ -511,7 +511,7 @@ def backup_from_results(results: dict | None, platform: str = "tainacan") -> Bac
 
 
 def describe_vault(state: BackupState) -> tuple[str, str, str]:
-    """(value, note, card state) for the backup key of Shared infrastructure:
+    """(value, note, card state) for the backup key (Backup center, Tainacan):
     the key every platform's backups use, and its recovery kit."""
     if not state.known:
         return t("Not checked"), t("Not available in this version of the panel"), ""

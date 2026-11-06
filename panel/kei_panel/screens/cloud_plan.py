@@ -21,6 +21,8 @@ Schedules & cron tasks shows the same row. The screen closes with a dict
 
 from __future__ import annotations
 
+from typing import Optional
+
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -36,7 +38,7 @@ CUSTOM = -1
 WHATS = (("SQL + MARC21", "sql+marc"), ("Database only (SQL)", "sql"), ("MARC21 only", "marc"))
 
 
-class PlanFormScreen(ModalScreen[dict | None]):
+class PlanFormScreen(ModalScreen[Optional[dict]]):
     BINDINGS = [Binding("escape", "cancel", t("Cancel"))]
 
     def __init__(self, remotes: list[cloud.Remote], taken: list[str], plan: cloud.Plan | None = None,

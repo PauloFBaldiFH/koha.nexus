@@ -22,6 +22,7 @@ ROUTINES: dict[str, Routine] = {
     "backup-test": backup.test_backup,
     "backup-marc": backup.marc_backup,
     "backup-cloud": backup.cloud_backup,
+    "cloud-connections": backup.cloud_connections,      # Backup center, any platform
     "restore": backup.restore,
     "backup-download": backup.download_latest,           # backup view
     "db-maintenance": database.deep_maintenance,

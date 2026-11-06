@@ -35,6 +35,7 @@ the routine (routines/backup.cloud_backup) then opens Restore database.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from rich.text import Text
 from textual import on, work
@@ -85,12 +86,21 @@ def _when(job: cron.Job | None) -> str:
     return job.raw
 
 
-class CloudBackupScreen(ModalScreen[tuple | None]):
+class CloudBackupScreen(ModalScreen[Optional[tuple]]):
     BINDINGS = [Binding("escape", "close", t("Close"))]
 
-    def __init__(self, info: dict):
+    def __init__(self, info: dict, connections_only: bool = False, uses: dict[str, list[str]] | None = None,
+                 koha: bool = True):
+        """connections_only: the shared "Cloud connections" of the Backup
+        center (any platform, Koha not needed): only the connections tab,
+        no Koha cloud backup. uses: what else sends to each connection
+        (the Tainacan backup copy), shown in the Use column. koha=False:
+        Koha is not installed, so no Koha cloud backup is listed."""
         super().__init__()
         self.info = info
+        self.connections_only = connections_only
+        self.uses = uses or {}
+        self.koha = koha
         self.status: dict[str, str] = {}
         self.history: list[cloud.History] = []
         self.remotes: list[cloud.Remote] = []
@@ -147,7 +157,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
                             yield Button(t("🧪 Test"), id="cb-test")
                             yield Button(t("🗑 Remove"), id="cb-remove", variant="error")
                         yield Label(t("Folder in the cloud where the backup folders go (empty = the top):"),
-                                    classes="sb-prompt", markup=False)
+                                    classes="sb-prompt", markup=False, id="cb-base-label")
                         yield Input(id="cb-base", placeholder=t("for example: koha/my-library"))
                         yield Static("", id="cb-base-dest", classes="sb-hint", markup=False)
                         yield Tree(t("Choose a connection above"), id="cb-tree")
@@ -251,6 +261,15 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
                                                            t("Kept in the cloud"))
         self.query_one("#cb-busy").display = False
         self.query_one("#cb-r-buttons").display = False
+        if self.connections_only:
+            tabs = self.query_one("#cb-tabs", TabbedContent)
+            for pane in ("cb-tab-plan", "cb-tab-files", "cb-tab-hist"):
+                tabs.hide_tab(pane)
+            # The folder of Koha's cloud backups is chosen in its own screen.
+            for widget in ("#cb-use", "#cb-where", "#cb-state", "#cb-pill", "#cb-base-label", "#cb-base",
+                           "#cb-base-dest"):
+                self.query_one(widget).display = False
+            self.query_one("#cb-title", Label).update(t("🔌 Cloud connections"))
         self._load_cron()
         self._start()
 
@@ -309,7 +328,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         if status is not None:
             self.status = dict(status.results)
             self.history = cloud.parse_history(status.lists.get("history", []))
-            self.plans = cloud.parse_plans(status.lists.get("plan", []))
+            self.plans = cloud.parse_plans(status.lists.get("plan", [])) if self.koha else []
         self._load_cron()
         listed = await self.task(t("Reading the connections..."), "cloud-list", quiet=True)
         if listed is not None:
@@ -320,7 +339,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         self._draw_side()
         self._draw_history()
         self._draw_files_plans()
-        if self.plans:
+        if self.plans and not self.connections_only:
             self.query_one("#cb-base", Input).value = self.plans[0].base
             self._about(self.plans[0].remote)
             self._load_files()
@@ -348,7 +367,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         keep = table.cursor_row or 0
         table.clear()
         for r in self.remotes:
-            uses = [p.id for p in self.plans if p.remote == r.name]
+            uses = [p.id for p in self.plans if p.remote == r.name] + self.uses.get(r.name, [])
             service = self._service(r)
             table.add_row("⭐" if uses else "", r.name,
                           service if len(service) <= 36 else service[:35] + "…", ", ".join(uses))
@@ -602,6 +621,12 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
 
     async def _remove(self, remote: cloud.Remote) -> None:
         warn = ""
+        others = self.uses.get(remote.name, [])
+        if others:
+            await self._say(t("🗑 Remove"), t("${name} is still used by: ${names}. Change that backup to another "
+                                             "connection first.", name=remote.name, names=", ".join(others)),
+                            "error")
+            return
         uses = [p.id for p in self.plans if p.remote == remote.name]
         if uses:
             warn = "\n\n" + t("⚠ These cloud backups send to it and are removed with it: ${names}",
@@ -654,14 +679,7 @@ class CloudBackupScreen(ModalScreen[tuple | None]):
         text = "" if self.app.env.demo else cron.read()
         self.cron = cron.parse(text, self._instance()) if text else cron.defaults(self._instance())
         if self.app.env.demo:
-            # The demo has no cron file: its cloud backups get a schedule here.
-            for i, p in enumerate(self.plans):
-                if self.cron.job(cron.CLOUD_PREFIX + p.id) is None:
-                    job = cron.cloud_job(p.id, "sql+marc" if i == 0 else "sql", hour=23 if i == 0 else 2,
-                                         minute=30 if i == 0 else 0)
-                    if i:
-                        job.freq, job.day = "weekly", 0
-                    self.cron.jobs.append(job)
+            cron.demo_cloud_jobs(self.cron, [p.id for p in self.plans])
 
     def _draw_plans(self) -> None:
         table = self.query_one("#cb-plans", DataTable)

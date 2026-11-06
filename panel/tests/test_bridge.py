@@ -19,7 +19,7 @@ def test_verbs_are_read_from_the_installer():
 def test_unsupported_verb_falls_back_to_the_routine():
     from kei_panel.app import KohaPanelApp
     app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang="en", plain=False))
-    backup = section("backup").entries[0]
+    backup = section("backups").entries[0]
     # No menu entry uses a verb now (search repair is a native routine).
     rebuild = Entry("🔨  Repair / rebuild indexing", "search-repair", verb=("--rebuild-search-index",))
     assert not app.runs_in_background(backup)

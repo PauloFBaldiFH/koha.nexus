@@ -84,7 +84,7 @@ class SectionView(VerticalScroll):
     def _chosen(self, event: ActionCard.Chosen) -> None:
         event.stop()
         if event.entry.kind == "view":
-            self.screen.action_show(event.entry.action)
+            self.screen.action_show(event.entry.action, scope=event.entry.scope)
             return
         self.panel.run_entry(event.entry, after=self.refresh_data)
 

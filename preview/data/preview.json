@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.174",
+ "panel_version": "1.5.175",
  "languages": [
   {
    "code": "en",
@@ -253,7 +253,7 @@
     "repair-services",
     "apache-log",
     "credentials",
-    "sec-backup",
+    "sec-backups",
     "sec-import",
     "sec-library",
     "sec-z3950",
@@ -287,35 +287,6 @@
    "features": [],
    "media": [],
    "single": "credentials"
-  },
-  {
-   "id": "backup",
-   "item": "sec-backup",
-   "label": "💾  Backup center",
-   "title": "💾 Backup Center",
-   "prompt": "Choose a backup routine:",
-   "icon": "",
-   "key": "b",
-   "view": "backup",
-   "sidebar": true,
-   "parent": "",
-   "entries": [
-    "backup-download",
-    "backup-manual",
-    "backup-marc",
-    "restore",
-    "backup-cloud",
-    "backup-test"
-   ],
-   "features": [
-    "backup-status",
-    "backup-compression",
-    "backup-safety"
-   ],
-   "media": [
-    "docs/images/panel/backup.webp"
-   ],
-   "single": ""
   },
   {
    "id": "import",
@@ -665,7 +636,7 @@
     "tainacan-site",
     "sec-tainacan-maintenance",
     "sec-tainacan-events",
-    "sec-tainacan-backups",
+    "sec-backups",
     "tainacan-uninstall"
    ],
    "features": [],
@@ -715,26 +686,39 @@
    "single": ""
   },
   {
-   "id": "tainacan-backups",
-   "item": "sec-tainacan-backups",
-   "label": "💾  Tainacan backups",
-   "title": "💾  Tainacan backups",
-   "prompt": "A restore is always tested first in an isolated copy, and what is there now is kept in a safety backup.",
+   "id": "backups",
+   "item": "sec-backups",
+   "label": "💾  Backup center",
+   "title": "💾 Backup Center",
+   "prompt": "Choose a backup routine:",
    "icon": "",
-   "key": "",
-   "view": "platform-section",
+   "key": "b",
+   "view": "backups",
    "sidebar": true,
    "parent": "",
    "entries": [
+    "backup-download",
+    "backup-manual",
+    "backup-marc",
+    "restore",
+    "backup-cloud",
+    "backup-test",
     "tainacan-backup",
     "tainacan-restore-test",
     "tainacan-restore",
     "pbackup-schedule",
     "pbackup-configure",
     "pbackup-verify",
-    "pbackup-incomplete"
+    "pbackup-incomplete",
+    "pbackup-setup",
+    "pbackup-kit",
+    "cloud-connections"
    ],
-   "features": [],
+   "features": [
+    "backup-status",
+    "backup-compression",
+    "backup-safety"
+   ],
    "media": [],
    "single": ""
   },
@@ -786,7 +770,7 @@
    "item": "sec-infra",
    "label": "🧱  Shared infrastructure",
    "title": "🧱  Shared infrastructure",
-   "prompt": "What the platforms in containers use together: the web server in front of them, Docker and the key of their backups.",
+   "prompt": "What the platforms in containers use together: the web server in front of them and Docker.",
    "icon": "",
    "key": "p",
    "view": "platform-section",
@@ -794,8 +778,6 @@
    "parent": "",
    "entries": [
     "docker-install",
-    "pbackup-setup",
-    "pbackup-kit",
     "docker-remove"
    ],
    "features": [],
@@ -1004,78 +986,6 @@
    "kind": "view",
    "status": "available",
    "media": []
-  },
-  "backup-download": {
-   "id": "backup-download",
-   "type": "entry",
-   "section": "backup",
-   "label": "📥 Download latest backup",
-   "description": "Copies the newest backup to this computer's Downloads folder",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "backup-manual": {
-   "id": "backup-manual",
-   "type": "entry",
-   "section": "backup",
-   "label": "💾  Generate manual backup and download to PC",
-   "description": "Makes a full backup and shows how to copy it to a PC",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "backup-marc": {
-   "id": "backup-marc",
-   "type": "entry",
-   "section": "backup",
-   "label": "📚  Export MARC21 records now",
-   "description": "Exports the catalogue and the authorities in MARC21 now",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "restore": {
-   "id": "restore",
-   "type": "entry",
-   "section": "backup",
-   "label": "📥  Restore database",
-   "description": "Replaces Koha's database with a backup, tested first",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "backup-cloud": {
-   "id": "backup-cloud",
-   "type": "entry",
-   "section": "backup",
-   "label": "📤  Configure cloud backup",
-   "description": "Automates backups uploaded to cloud storage services",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "backup-test": {
-   "id": "backup-test",
-   "type": "entry",
-   "section": "backup",
-   "label": "🧾  Test integrity of latest backup",
-   "description": "Imports a backup into a test database to check it",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "sec-backup": {
-   "id": "sec-backup",
-   "type": "section",
-   "section": "backup",
-   "label": "💾  Backup center",
-   "description": "Choose a backup routine:",
-   "kind": "view",
-   "status": "available",
-   "media": [
-    "docs/images/panel/backup.webp"
-   ]
   },
   "magic-import": {
    "id": "magic-import",
@@ -1657,10 +1567,70 @@
    "status": "available",
    "media": []
   },
+  "backup-download": {
+   "id": "backup-download",
+   "type": "entry",
+   "section": "backups",
+   "label": "📥 Download latest backup",
+   "description": "Copies the newest backup to this computer's Downloads folder",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "backup-manual": {
+   "id": "backup-manual",
+   "type": "entry",
+   "section": "backups",
+   "label": "💾  Generate manual backup and download to PC",
+   "description": "Makes a full backup and shows how to copy it to a PC",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "backup-marc": {
+   "id": "backup-marc",
+   "type": "entry",
+   "section": "backups",
+   "label": "📚  Export MARC21 records now",
+   "description": "Exports the catalogue and the authorities in MARC21 now",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "restore": {
+   "id": "restore",
+   "type": "entry",
+   "section": "backups",
+   "label": "📥  Restore database",
+   "description": "Replaces Koha's database with a backup, tested first",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "backup-cloud": {
+   "id": "backup-cloud",
+   "type": "entry",
+   "section": "backups",
+   "label": "📤  Configure cloud backup",
+   "description": "Automates backups uploaded to cloud storage services",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "backup-test": {
+   "id": "backup-test",
+   "type": "entry",
+   "section": "backups",
+   "label": "🧾  Test integrity of latest backup",
+   "description": "Imports a backup into a test database to check it",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "tainacan-backup": {
    "id": "tainacan-backup",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "💾  Back up Tainacan now",
    "description": "A full backup of Tainacan now: database, files and configuration",
    "kind": "native",
@@ -1670,7 +1640,7 @@
   "tainacan-restore-test": {
    "id": "tainacan-restore-test",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "🧪  Test a restore",
    "description": "Restores a backup in an isolated copy and compares it, nothing else changes",
    "kind": "native",
@@ -1680,7 +1650,7 @@
   "tainacan-restore": {
    "id": "tainacan-restore",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "📥  Restore Tainacan",
    "description": "Replaces the Tainacan in use with a backup, tested first",
    "kind": "native",
@@ -1690,7 +1660,7 @@
   "pbackup-schedule": {
    "id": "pbackup-schedule",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "⏰  Schedule backups",
    "description": "A daily backup, weekly upkeep and a monthly restore test",
    "kind": "native",
@@ -1700,7 +1670,7 @@
   "pbackup-configure": {
    "id": "pbackup-configure",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "☁  Repository and cloud copy",
    "description": "Where the files go (restic repository) and the copy in the cloud",
    "kind": "native",
@@ -1710,7 +1680,7 @@
   "pbackup-verify": {
    "id": "pbackup-verify",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "🧾  Verify backups",
    "description": "Checks the backups and the repository now",
    "kind": "native",
@@ -1720,19 +1690,49 @@
   "pbackup-incomplete": {
    "id": "pbackup-incomplete",
    "type": "entry",
-   "section": "tainacan-backups",
+   "section": "backups",
    "label": "⏯  Incomplete backup",
    "description": "Resumes or discards a backup that stopped before the end",
    "kind": "native",
    "status": "available",
    "media": []
   },
-  "sec-tainacan-backups": {
-   "id": "sec-tainacan-backups",
+  "pbackup-setup": {
+   "id": "pbackup-setup",
+   "type": "entry",
+   "section": "backups",
+   "label": "🔐  Set up encrypted backups",
+   "description": "Makes the server key that encrypts the configuration in the backups",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "pbackup-kit": {
+   "id": "pbackup-kit",
+   "type": "entry",
+   "section": "backups",
+   "label": "🧰  Recovery kit",
+   "description": "Saves the recovery kit to copy away from this server",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "cloud-connections": {
+   "id": "cloud-connections",
+   "type": "entry",
+   "section": "backups",
+   "label": "🔌  Cloud connections",
+   "description": "The cloud accounts this server can send backups to, for any platform",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-backups": {
+   "id": "sec-backups",
    "type": "section",
-   "section": "tainacan-backups",
-   "label": "💾  Tainacan backups",
-   "description": "A restore is always tested first in an isolated copy, and what is there now is kept in a safety backup.",
+   "section": "backups",
+   "label": "💾  Backup center",
+   "description": "Choose a backup routine:",
    "kind": "view",
    "status": "available",
    "media": []
@@ -1809,26 +1809,6 @@
    "status": "available",
    "media": []
   },
-  "pbackup-setup": {
-   "id": "pbackup-setup",
-   "type": "entry",
-   "section": "infra",
-   "label": "🔐  Set up encrypted backups",
-   "description": "Makes the server key that encrypts the configuration in the backups",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "pbackup-kit": {
-   "id": "pbackup-kit",
-   "type": "entry",
-   "section": "infra",
-   "label": "🧰  Recovery kit",
-   "description": "Saves the recovery kit to copy away from this server",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
   "docker-remove": {
    "id": "docker-remove",
    "type": "entry",
@@ -1844,7 +1824,7 @@
    "type": "section",
    "section": "infra",
    "label": "🧱  Shared infrastructure",
-   "description": "What the platforms in containers use together: the web server in front of them, Docker and the key of their backups.",
+   "description": "What the platforms in containers use together: the web server in front of them and Docker.",
    "kind": "view",
    "status": "available",
    "media": []
@@ -2241,12 +2221,12 @@
   "backup-status": {
    "id": "backup-status",
    "type": "feature",
-   "section": "backup",
+   "section": "backups",
    "label": "Last backup",
    "description": "",
    "kind": "screen",
    "status": "available",
-   "source": "panel/kei_panel/views/backup.py",
+   "source": "panel/kei_panel/views/backups.py",
    "controls": [
     {
      "type": "status",
@@ -2272,7 +2252,7 @@
   "backup-compression": {
    "id": "backup-compression",
    "type": "feature",
-   "section": "backup",
+   "section": "backups",
    "label": "Backup compression type",
    "description": "",
    "kind": "screen",
@@ -2305,7 +2285,7 @@
   "backup-safety": {
    "id": "backup-safety",
    "type": "feature",
-   "section": "backup",
+   "section": "backups",
    "label": "Safety backup:",
    "description": "",
    "kind": "screen",
@@ -4256,381 +4236,6 @@
    "zh": "显示首次访问的登录名和密码",
    "ja": "初回アクセス用のログイン名とパスワードを表示します",
    "ko": "최초 접근용 로그인 이름과 비밀번호를 표시합니다"
-  },
-  "💾  Backup center": {
-   "en": "💾  Backup center",
-   "pt-BR": "💾  Central de backups e restauração",
-   "es": "💾  Centro de copias de seguridad",
-   "fr": "💾  Centre de sauvegarde",
-   "it": "💾  Centro backup",
-   "de": "💾  Sicherungszentrale",
-   "nl": "💾  Back-upcentrum",
-   "sv": "💾  Säkerhetskopieringscenter",
-   "pl": "💾  Centrum kopii zapasowych",
-   "cs": "💾  Centrum záloh",
-   "ru": "💾  Центр резервного копирования",
-   "uk": "💾  Центр резервного копіювання",
-   "tr": "💾  Yedekleme merkezi",
-   "tl": "💾  Sentro ng backup",
-   "id": "💾  Pusat cadangan",
-   "ar": "💾  مركز النسخ الاحتياطي",
-   "fa": "💾  مرکز پشتیبان‌گیری",
-   "hi": "💾  बैकअप केंद्र",
-   "bn": "💾  ব্যাকআপ কেন্দ্র",
-   "vi": "💾  Trung tâm sao lưu",
-   "zh": "💾  备份中心",
-   "ja": "💾  バックアップセンター",
-   "ko": "💾  백업 센터"
-  },
-  "💾 Backup Center": {
-   "en": "💾 Backup Center",
-   "pt-BR": "💾 Central de backups e restauração",
-   "es": "💾 Centro de copias de seguridad",
-   "fr": "💾 Centre de sauvegarde",
-   "it": "💾 Centro backup",
-   "de": "💾 Sicherungszentrale",
-   "nl": "💾 Back-upcentrum",
-   "sv": "💾 Säkerhetskopieringscenter",
-   "pl": "💾 Centrum kopii zapasowych",
-   "cs": "💾 Centrum záloh",
-   "ru": "💾 Центр резервного копирования",
-   "uk": "💾 Центр резервного копіювання",
-   "tr": "💾 Yedekleme merkezi",
-   "tl": "💾 Sentro ng backup",
-   "id": "💾 Pusat cadangan",
-   "ar": "💾 مركز النسخ الاحتياطي",
-   "fa": "💾 مرکز پشتیبان‌گیری",
-   "hi": "💾 बैकअप केंद्र",
-   "bn": "💾 ব্যাকআপ কেন্দ্র",
-   "vi": "💾 Trung tâm sao lưu",
-   "zh": "💾 备份中心",
-   "ja": "💾 バックアップセンター",
-   "ko": "💾 백업 센터"
-  },
-  "Choose a backup routine:": {
-   "en": "Choose a backup routine:",
-   "pt-BR": "Escolha uma rotina de backup:",
-   "es": "Elija una rutina de copia de seguridad:",
-   "fr": "Choisissez une routine de sauvegarde :",
-   "it": "Scegli una routine di backup:",
-   "de": "Sicherungsroutine wählen:",
-   "nl": "Kies een back-uproutine:",
-   "sv": "Välj en säkerhetskopieringsrutin:",
-   "pl": "Wybierz procedurę kopii zapasowej:",
-   "cs": "Vyberte rutinu zálohování:",
-   "ru": "Выберите процедуру резервного копирования:",
-   "uk": "Виберіть процедуру резервного копіювання:",
-   "tr": "Bir yedekleme rutini seçin:",
-   "tl": "Pumili ng routine sa backup:",
-   "id": "Pilih rutinitas cadangan:",
-   "ar": "اختر إجراء النسخ الاحتياطي:",
-   "fa": "یک روال پشتیبان‌گیری انتخاب کنید:",
-   "hi": "बैकअप प्रक्रिया चुनें:",
-   "bn": "একটি ব্যাকআপ প্রক্রিয়া বেছে নিন:",
-   "vi": "Chọn tác vụ sao lưu:",
-   "zh": "请选择备份操作：",
-   "ja": "バックアップの操作を選んでください:",
-   "ko": "백업 작업을 선택하세요:"
-  },
-  "📥 Download latest backup": {
-   "en": "📥 Download latest backup",
-   "pt-BR": "📥 Baixar Backup Recente",
-   "es": "📥 Descargar la copia más reciente",
-   "fr": "📥 Télécharger la dernière sauvegarde",
-   "it": "📥 Scarica l'ultimo backup",
-   "de": "📥 Neueste Sicherung herunterladen",
-   "nl": "📥 Nieuwste back-up downloaden",
-   "sv": "📥 Hämta senaste säkerhetskopian",
-   "pl": "📥 Pobierz najnowszą kopię zapasową",
-   "cs": "📥 Stáhnout nejnovější zálohu",
-   "ru": "📥 Скачать последнюю резервную копию",
-   "uk": "📥 Завантажити останню резервну копію",
-   "tr": "📥 En son yedeği indir",
-   "tl": "📥 I-download ang pinakabagong backup",
-   "id": "📥 Unduh cadangan terbaru",
-   "ar": "📥 تنزيل أحدث نسخة احتياطية",
-   "fa": "📥 دانلود آخرین نسخه پشتیبان",
-   "hi": "📥 नवीनतम बैकअप डाउनलोड करें",
-   "bn": "📥 সর্বশেষ ব্যাকআপ ডাউনলোড করুন",
-   "vi": "📥 Tải bản sao lưu mới nhất",
-   "zh": "📥 下载最新备份",
-   "ja": "📥 最新のバックアップをダウンロード",
-   "ko": "📥 최신 백업 다운로드"
-  },
-  "Copies the newest backup to this computer's Downloads folder": {
-   "en": "Copies the newest backup to this computer's Downloads folder",
-   "pt-BR": "Copia o backup mais recente para a pasta Downloads deste computador",
-   "es": "Copia el backup más reciente a la carpeta Descargas de este equipo",
-   "fr": "Copie la sauvegarde la plus récente dans le dossier Téléchargements de cet ordinateur",
-   "it": "Copia l'ultimo backup nella cartella Download di questo computer",
-   "de": "Kopiert das neueste Backup in den Downloads-Ordner dieses Computers",
-   "nl": "Kopieert de nieuwste backup naar de map Downloads van deze computer",
-   "sv": "Kopierar senaste backup till mappen Hämtade filer på den här datorn",
-   "pl": "Kopiuje najnowszy backup do folderu Pobrane na tym komputerze",
-   "cs": "Zkopíruje nejnovější backup do složky Stažené soubory tohoto počítače",
-   "ru": "Копирует последний backup в папку «Загрузки» этого компьютера",
-   "uk": "Копіює найновіший backup до теки «Завантаження» цього комп’ютера",
-   "tr": "En yeni backup dosyasını bu bilgisayarın İndirilenler klasörüne kopyalar",
-   "tl": "Kinokopya ang pinakabagong backup sa folder na Downloads ng computer na ito",
-   "id": "Menyalin backup terbaru ke folder Unduhan komputer ini",
-   "ar": "ينسخ أحدث backup إلى مجلد التنزيلات على هذا الجهاز",
-   "fa": "جدیدترین backup را در پوشهٔ بارگیری‌های این رایانه کپی می‌کند",
-   "hi": "सबसे नया backup इस कंप्यूटर के डाउनलोड फ़ोल्डर में कॉपी करता है",
-   "bn": "সর্বশেষ backup এই কম্পিউটারের ডাউনলোড ফোল্ডারে অনুলিপি করে",
-   "vi": "Sao chép backup mới nhất vào thư mục Tải xuống của máy tính này",
-   "zh": "将最新 backup 复制到此计算机的下载文件夹",
-   "ja": "最新の backup をこのコンピューターのダウンロードフォルダーにコピーします",
-   "ko": "최신 backup을 이 컴퓨터의 다운로드 폴더로 복사합니다"
-  },
-  "💾  Generate manual backup and download to PC": {
-   "en": "💾  Generate manual backup and download to PC",
-   "pt-BR": "💾  Gerar backup manual e baixar no computador",
-   "es": "💾  Generar copia manual y descargarla al PC",
-   "fr": "💾  Créer une sauvegarde manuelle et la télécharger",
-   "it": "💾  Crea un backup manuale e scaricalo sul PC",
-   "de": "💾  Manuelle Sicherung erstellen und auf den PC laden",
-   "nl": "💾  Handmatige back-up maken en naar pc downloaden",
-   "sv": "💾  Skapa manuell säkerhetskopia och ladda ner till datorn",
-   "pl": "💾  Utwórz ręczną kopię i pobierz na komputer",
-   "cs": "💾  Vytvořit ruční zálohu a stáhnout do PC",
-   "ru": "💾  Создать резервную копию и скачать на ПК",
-   "uk": "💾  Створити резервну копію та завантажити на ПК",
-   "tr": "💾  Elle yedek al ve bilgisayara indir",
-   "tl": "💾  Gumawa ng manual na backup at i-download sa PC",
-   "id": "💾  Buat cadangan manual dan unduh ke PC",
-   "ar": "💾  إنشاء نسخة احتياطية يدوية وتنزيلها إلى الحاسوب",
-   "fa": "💾  تهیه پشتیبان دستی و دانلود روی رایانه",
-   "hi": "💾  मैनुअल बैकअप बनाएँ और PC पर डाउनलोड करें",
-   "bn": "💾  ম্যানুয়াল ব্যাকআপ তৈরি করে কম্পিউটারে ডাউনলোড করুন",
-   "vi": "💾  Tạo bản sao lưu thủ công và tải về máy tính",
-   "zh": "💾  生成手动备份并下载到电脑",
-   "ja": "💾  手動バックアップを作成して PC にダウンロード",
-   "ko": "💾  수동 백업 생성 후 PC로 내려받기"
-  },
-  "Makes a full backup and shows how to copy it to a PC": {
-   "en": "Makes a full backup and shows how to copy it to a PC",
-   "pt-BR": "Gera um backup completo e mostra como baixá-lo no PC",
-   "es": "Hace un backup completo y muestra cómo copiarlo a un PC",
-   "fr": "Fait une sauvegarde complète et montre comment la copier sur un PC",
-   "it": "Crea un backup completo e mostra come copiarlo su un PC",
-   "de": "Erstellt ein vollständiges Backup und zeigt, wie es auf einen PC kopiert wird",
-   "nl": "Maakt een volledige backup en toont hoe u deze naar een PC kopieert",
-   "sv": "Skapar en fullständig backup och visar hur den kopieras till en PC",
-   "pl": "Tworzy pełny backup i pokazuje, jak skopiować go na PC",
-   "cs": "Vytvoří úplný backup a ukáže, jak jej zkopírovat do PC",
-   "ru": "Создаёт полный backup и показывает, как скопировать его на PC",
-   "uk": "Створює повний backup і показує, як скопіювати його на PC",
-   "tr": "Tam backup oluşturur ve PC'ye nasıl kopyalanacağını gösterir",
-   "tl": "Gumagawa ng kumpletong backup at ipinapakita kung paano kopyahin sa PC",
-   "id": "Membuat backup lengkap dan menunjukkan cara menyalinnya ke PC",
-   "ar": "ينشئ backup كاملًا ويعرض كيفية نسخه إلى PC",
-   "fa": "یک backup کامل می‌سازد و روش کپی آن در PC را نشان می‌دهد",
-   "hi": "पूरा backup बनाता है और उसे PC पर कॉपी करने का तरीका दिखाता है",
-   "bn": "সম্পূর্ণ backup তৈরি করে এবং PC-তে অনুলিপি করার উপায় দেখায়",
-   "vi": "Tạo backup đầy đủ và hướng dẫn sao chép về PC",
-   "zh": "创建完整 backup，并说明如何复制到 PC",
-   "ja": "完全な backup を作成し、PC にコピーする方法を表示します",
-   "ko": "전체 backup을 만들고 PC로 복사하는 방법을 표시합니다"
-  },
-  "📚  Export MARC21 records now": {
-   "en": "📚  Export MARC21 records now",
-   "pt-BR": "📚  Exportar registros MARC21 agora",
-   "es": "📚  Exportar ahora los registros MARC21",
-   "fr": "📚  Exporter maintenant les notices MARC21",
-   "it": "📚  Esporta ora i record MARC21",
-   "de": "📚  MARC21-Datensätze jetzt exportieren",
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "Exports the catalogue and the authorities in MARC21 now": {
-   "en": "Exports the catalogue and the authorities in MARC21 now",
-   "pt-BR": "Exporta agora o catálogo e as autoridades em MARC21",
-   "es": "Exporta ya el catálogo y las autoridades en MARC21",
-   "fr": "Exporte maintenant le catalogue et les autorités en MARC21",
-   "it": "Esporta ora il catalogo e le autorità in MARC21",
-   "de": "Exportiert jetzt Katalog und Normdaten in MARC21",
-   "nl": "Exporteert de catalogus en autoriteiten nu in MARC21",
-   "sv": "Exporterar katalogen och auktoritetsposterna i MARC21 nu",
-   "pl": "Eksportuje teraz katalog i rekordy wzorcowe w MARC21",
-   "cs": "Nyní exportuje katalog a autoritní záznamy v MARC21",
-   "ru": "Экспортирует каталог и авторитетные записи в MARC21 сейчас",
-   "uk": "Експортує каталог та авторитетні записи в MARC21 зараз",
-   "tr": "Kataloğu ve otorite kayıtlarını şimdi MARC21 olarak dışa aktarır",
-   "tl": "Ini-export ngayon ang katalogo at mga rekord ng awtoridad sa MARC21",
-   "id": "Mengekspor katalog dan rekaman otoritas dalam MARC21 sekarang",
-   "ar": "يصدّر الفهرس وسجلات الاستناد بتنسيق MARC21 الآن",
-   "fa": "فهرست و رکوردهای مستند را اکنون با قالب MARC21 صادر می‌کند",
-   "hi": "अभी सूची और प्राधिकरण रिकॉर्ड MARC21 में निर्यात करता है",
-   "bn": "এখন ক্যাটালগ ও প্রামাণ্য রেকর্ড MARC21-এ রপ্তানি করে",
-   "vi": "Xuất mục lục và biểu ghi tiêu đề chuẩn ở dạng MARC21 ngay",
-   "zh": "立即以 MARC21 导出目录和规范记录",
-   "ja": "目録と典拠レコードを今すぐ MARC21 でエクスポートします",
-   "ko": "지금 목록과 전거 레코드를 MARC21로 내보냅니다"
-  },
-  "📥  Restore database": {
-   "en": "📥  Restore database",
-   "pt-BR": "📥  Restaurar base de dados",
-   "es": "📥  Restaurar base de datos",
-   "fr": "📥  Restaurer la base de données",
-   "it": "📥  Ripristina il database",
-   "de": "📥  Datenbank wiederherstellen",
-   "nl": "📥  Database herstellen",
-   "sv": "📥  Återställ databasen",
-   "pl": "📥  Przywróć bazę danych",
-   "cs": "📥  Obnovit databázi",
-   "ru": "📥  Восстановить базу данных",
-   "uk": "📥  Відновити базу даних",
-   "tr": "📥  Veritabanını geri yükle",
-   "tl": "📥  Ibalik ang database",
-   "id": "📥  Pulihkan basis data",
-   "ar": "📥  استعادة قاعدة البيانات",
-   "fa": "📥  بازیابی پایگاه داده",
-   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
-   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
-   "vi": "📥  Khôi phục cơ sở dữ liệu",
-   "zh": "📥  恢复数据库",
-   "ja": "📥  データベースを復元",
-   "ko": "📥  데이터베이스 복원"
-  },
-  "Replaces Koha's database with a backup, tested first": {
-   "en": "Replaces Koha's database with a backup, tested first",
-   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
-   "es": "Reemplaza la base de datos de Koha por un backup, probado antes",
-   "fr": "Remplace la base de Koha par une sauvegarde, testée au préalable",
-   "it": "Sostituisce il database di Koha con un backup, prima verificato",
-   "de": "Ersetzt die Datenbank von Koha durch ein Backup, vorher geprüft",
-   "nl": "Vervangt de database van Koha door een backup, die eerst wordt getest",
-   "sv": "Ersätter databasen i Koha med en backup som testas först",
-   "pl": "Zastępuje bazę danych Koha plikiem backup, wcześniej go sprawdzając",
-   "cs": "Nahradí databázi Koha souborem backup, který se nejprve otestuje",
-   "ru": "Заменяет базу данных Koha предварительно проверенной копией backup",
-   "uk": "Замінює базу даних Koha попередньо перевіреною копією backup",
-   "tr": "Önce test edilen bir backup ile Koha veritabanını değiştirir",
-   "tl": "Pinapalitan ang database ng Koha ng backup na sinusubukan muna",
-   "id": "Mengganti basis data Koha dengan backup yang diuji terlebih dahulu",
-   "ar": "يستبدل قاعدة بيانات Koha بملف backup بعد اختباره أولًا",
-   "fa": "پایگاه دادهٔ Koha را با backup جایگزین می‌کند، پس از آزمایش آن",
-   "hi": "पहले जाँचे गए backup से Koha का डेटाबेस बदलता है",
-   "bn": "আগে পরীক্ষা করা backup দিয়ে Koha-এর ডেটাবেস প্রতিস্থাপন করে",
-   "vi": "Thay cơ sở dữ liệu Koha bằng backup được kiểm tra trước",
-   "zh": "使用先行测试的 backup 替换 Koha 数据库",
-   "ja": "先にテストした backup で Koha のデータベースを置き換えます",
-   "ko": "먼저 검사한 backup으로 Koha 데이터베이스를 교체합니다"
-  },
-  "📤  Configure cloud backup": {
-   "en": "📤  Configure cloud backup",
-   "pt-BR": "📤  Configurar backup na nuvem",
-   "es": "📤  Configurar copia en la nube",
-   "fr": "📤  Configurer la sauvegarde cloud",
-   "it": "📤  Configura il backup nel cloud",
-   "de": "📤  Cloud-Sicherung einrichten",
-   "nl": "📤  Cloudback-up instellen",
-   "sv": "📤  Konfigurera molnsäkerhetskopia",
-   "pl": "📤  Skonfiguruj kopię w chmurze",
-   "cs": "📤  Nastavit zálohu do cloudu",
-   "ru": "📤  Настроить резервное копирование в облако",
-   "uk": "📤  Налаштувати резервне копіювання в хмару",
-   "tr": "📤  Bulut yedeklemeyi yapılandır",
-   "tl": "📤  I-configure ang cloud backup",
-   "id": "📤  Atur cadangan cloud",
-   "ar": "📤  إعداد النسخ الاحتياطي السحابي",
-   "fa": "📤  پیکربندی پشتیبان ابری",
-   "hi": "📤  क्लाउड बैकअप कॉन्फ़िगर करें",
-   "bn": "📤  ক্লাউড ব্যাকআপ কনফিগার করুন",
-   "vi": "📤  Cấu hình sao lưu đám mây",
-   "zh": "📤  配置云备份",
-   "ja": "📤  クラウドバックアップの設定",
-   "ko": "📤  클라우드 백업 설정"
-  },
-  "Automates backups uploaded to cloud storage services": {
-   "en": "Automates backups uploaded to cloud storage services",
-   "pt-BR": "Automatizar backups para upload em serviços de armazenamento em nuvem",
-   "es": "Automatiza los backups subidos a servicios de almacenamiento en la nube",
-   "fr": "Automatise les sauvegardes envoyées vers des services de stockage cloud",
-   "it": "Automatizza i backup caricati sui servizi di archiviazione cloud",
-   "de": "Automatisiert Backups, die in Cloud-Speicherdienste hochgeladen werden",
-   "nl": "Automatiseert backups die naar cloudopslagdiensten worden geüpload",
-   "sv": "Automatiserar backup som laddas upp till molnlagringstjänster",
-   "pl": "Automatyzuje pliki backup wysyłane do usług przechowywania w chmurze",
-   "cs": "Automatizuje odesílání souborů backup do cloudových úložišť",
-   "ru": "Автоматизирует отправку копий backup в облачные хранилища",
-   "uk": "Автоматизує надсилання копій backup до хмарних сховищ",
-   "tr": "Bulut depolama hizmetlerine yüklenen backup işlemlerini otomatikleştirir",
-   "tl": "Ginagawang awtomatiko ang mga backup na ina-upload sa mga serbisyo ng cloud storage",
-   "id": "Mengotomatiskan backup yang diunggah ke layanan penyimpanan cloud",
-   "ar": "يؤتمت ملفات backup المرفوعة إلى خدمات التخزين السحابي",
-   "fa": "backupهای ارسالی به سرویس‌های ذخیره‌سازی ابری را خودکار می‌کند",
-   "hi": "क्लाउड भंडारण सेवाओं पर अपलोड होने वाले backup स्वचालित करता है",
-   "bn": "ক্লাউড সংরক্ষণ সেবায় আপলোড করা backup স্বয়ংক্রিয় করে",
-   "vi": "Tự động hóa các backup tải lên dịch vụ lưu trữ đám mây",
-   "zh": "自动执行上传到云存储服务的 backup",
-   "ja": "クラウドストレージサービスにアップロードする backup を自動化します",
-   "ko": "클라우드 저장소 서비스로 업로드하는 backup을 자동화합니다"
-  },
-  "🧾  Test integrity of latest backup": {
-   "en": "🧾  Test integrity of latest backup",
-   "pt-BR": "🧾  Testar a integridade do último backup",
-   "es": "🧾  Probar la integridad de la última copia",
-   "fr": "🧾  Tester l'intégrité de la dernière sauvegarde",
-   "it": "🧾  Verifica l'integrità dell'ultimo backup",
-   "de": "🧾  Integrität der letzten Sicherung testen",
-   "nl": "🧾  Integriteit van de laatste back-up testen",
-   "sv": "🧾  Testa integriteten i senaste säkerhetskopian",
-   "pl": "🧾  Sprawdź integralność ostatniej kopii",
-   "cs": "🧾  Otestovat integritu poslední zálohy",
-   "ru": "🧾  Проверить целостность последней копии",
-   "uk": "🧾  Перевірити цілісність останньої копії",
-   "tr": "🧾  Son yedeğin bütünlüğünü test et",
-   "tl": "🧾  Subukan ang integridad ng pinakabagong backup",
-   "id": "🧾  Uji integritas cadangan terakhir",
-   "ar": "🧾  اختبار سلامة آخر نسخة احتياطية",
-   "fa": "🧾  آزمون سلامت آخرین پشتیبان",
-   "hi": "🧾  नवीनतम बैकअप की अखंडता जाँचें",
-   "bn": "🧾  সর্বশেষ ব্যাকআপের অখণ্ডতা পরীক্ষা",
-   "vi": "🧾  Kiểm tra tính toàn vẹn của bản sao lưu gần nhất",
-   "zh": "🧾  测试最新备份的完整性",
-   "ja": "🧾  最新バックアップの整合性をテスト",
-   "ko": "🧾  최근 백업 무결성 테스트"
-  },
-  "Imports a backup into a test database to check it": {
-   "en": "Imports a backup into a test database to check it",
-   "pt-BR": "Importa um backup num banco de teste para validá-lo",
-   "es": "Importa un backup en una base de datos de prueba para comprobarlo",
-   "fr": "Importe une sauvegarde dans une base de test pour la vérifier",
-   "it": "Importa un backup in un database di prova per verificarlo",
-   "de": "Importiert ein Backup zur Prüfung in eine Testdatenbank",
-   "nl": "Importeert een backup in een testdatabase om deze te controleren",
-   "sv": "Importerar en backup till en testdatabas för att kontrollera den",
-   "pl": "Importuje backup do testowej bazy danych, aby go sprawdzić",
-   "cs": "Importuje backup do testovací databáze a zkontroluje jej",
-   "ru": "Импортирует backup в тестовую базу данных для проверки",
-   "uk": "Імпортує backup до тестової бази даних для перевірки",
-   "tr": "Backup dosyasını denetlemek için test veritabanına aktarır",
-   "tl": "Ini-import ang backup sa pansubok na database upang suriin ito",
-   "id": "Mengimpor backup ke basis data uji untuk memeriksanya",
-   "ar": "يستورد backup إلى قاعدة بيانات اختبار لفحصه",
-   "fa": "backup را برای بررسی به پایگاه دادهٔ آزمایشی وارد می‌کند",
-   "hi": "जाँचने के लिए backup को परीक्षण डेटाबेस में आयात करता है",
-   "bn": "পরীক্ষা করতে backup পরীক্ষামূলক ডেটাবেসে আমদানি করে",
-   "vi": "Nhập backup vào cơ sở dữ liệu thử nghiệm để kiểm tra",
-   "zh": "将 backup 导入测试数据库以进行检查",
-   "ja": "backup をテスト用データベースにインポートして検証します",
-   "ko": "backup을 테스트 데이터베이스로 가져와 검사합니다"
   },
   "🪄  Magic Import Tool": {
    "en": "🪄  Magic Import Tool",
@@ -7332,13 +6937,188 @@
    "ja": null,
    "ko": null
   },
-  "💾  Tainacan backups": {
-   "en": "💾  Tainacan backups",
-   "pt-BR": "💾  Backups do Tainacan",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
+  "💾  Backup center": {
+   "en": "💾  Backup center",
+   "pt-BR": "💾  Central de backups e restauração",
+   "es": "💾  Centro de copias de seguridad",
+   "fr": "💾  Centre de sauvegarde",
+   "it": "💾  Centro backup",
+   "de": "💾  Sicherungszentrale",
+   "nl": "💾  Back-upcentrum",
+   "sv": "💾  Säkerhetskopieringscenter",
+   "pl": "💾  Centrum kopii zapasowych",
+   "cs": "💾  Centrum záloh",
+   "ru": "💾  Центр резервного копирования",
+   "uk": "💾  Центр резервного копіювання",
+   "tr": "💾  Yedekleme merkezi",
+   "tl": "💾  Sentro ng backup",
+   "id": "💾  Pusat cadangan",
+   "ar": "💾  مركز النسخ الاحتياطي",
+   "fa": "💾  مرکز پشتیبان‌گیری",
+   "hi": "💾  बैकअप केंद्र",
+   "bn": "💾  ব্যাকআপ কেন্দ্র",
+   "vi": "💾  Trung tâm sao lưu",
+   "zh": "💾  备份中心",
+   "ja": "💾  バックアップセンター",
+   "ko": "💾  백업 센터"
+  },
+  "💾 Backup Center": {
+   "en": "💾 Backup Center",
+   "pt-BR": "💾 Central de backups e restauração",
+   "es": "💾 Centro de copias de seguridad",
+   "fr": "💾 Centre de sauvegarde",
+   "it": "💾 Centro backup",
+   "de": "💾 Sicherungszentrale",
+   "nl": "💾 Back-upcentrum",
+   "sv": "💾 Säkerhetskopieringscenter",
+   "pl": "💾 Centrum kopii zapasowych",
+   "cs": "💾 Centrum záloh",
+   "ru": "💾 Центр резервного копирования",
+   "uk": "💾 Центр резервного копіювання",
+   "tr": "💾 Yedekleme merkezi",
+   "tl": "💾 Sentro ng backup",
+   "id": "💾 Pusat cadangan",
+   "ar": "💾 مركز النسخ الاحتياطي",
+   "fa": "💾 مرکز پشتیبان‌گیری",
+   "hi": "💾 बैकअप केंद्र",
+   "bn": "💾 ব্যাকআপ কেন্দ্র",
+   "vi": "💾 Trung tâm sao lưu",
+   "zh": "💾 备份中心",
+   "ja": "💾 バックアップセンター",
+   "ko": "💾 백업 센터"
+  },
+  "Choose a backup routine:": {
+   "en": "Choose a backup routine:",
+   "pt-BR": "Escolha uma rotina de backup:",
+   "es": "Elija una rutina de copia de seguridad:",
+   "fr": "Choisissez une routine de sauvegarde :",
+   "it": "Scegli una routine di backup:",
+   "de": "Sicherungsroutine wählen:",
+   "nl": "Kies een back-uproutine:",
+   "sv": "Välj en säkerhetskopieringsrutin:",
+   "pl": "Wybierz procedurę kopii zapasowej:",
+   "cs": "Vyberte rutinu zálohování:",
+   "ru": "Выберите процедуру резервного копирования:",
+   "uk": "Виберіть процедуру резервного копіювання:",
+   "tr": "Bir yedekleme rutini seçin:",
+   "tl": "Pumili ng routine sa backup:",
+   "id": "Pilih rutinitas cadangan:",
+   "ar": "اختر إجراء النسخ الاحتياطي:",
+   "fa": "یک روال پشتیبان‌گیری انتخاب کنید:",
+   "hi": "बैकअप प्रक्रिया चुनें:",
+   "bn": "একটি ব্যাকআপ প্রক্রিয়া বেছে নিন:",
+   "vi": "Chọn tác vụ sao lưu:",
+   "zh": "请选择备份操作：",
+   "ja": "バックアップの操作を選んでください:",
+   "ko": "백업 작업을 선택하세요:"
+  },
+  "📥 Download latest backup": {
+   "en": "📥 Download latest backup",
+   "pt-BR": "📥 Baixar Backup Recente",
+   "es": "📥 Descargar la copia más reciente",
+   "fr": "📥 Télécharger la dernière sauvegarde",
+   "it": "📥 Scarica l'ultimo backup",
+   "de": "📥 Neueste Sicherung herunterladen",
+   "nl": "📥 Nieuwste back-up downloaden",
+   "sv": "📥 Hämta senaste säkerhetskopian",
+   "pl": "📥 Pobierz najnowszą kopię zapasową",
+   "cs": "📥 Stáhnout nejnovější zálohu",
+   "ru": "📥 Скачать последнюю резервную копию",
+   "uk": "📥 Завантажити останню резервну копію",
+   "tr": "📥 En son yedeği indir",
+   "tl": "📥 I-download ang pinakabagong backup",
+   "id": "📥 Unduh cadangan terbaru",
+   "ar": "📥 تنزيل أحدث نسخة احتياطية",
+   "fa": "📥 دانلود آخرین نسخه پشتیبان",
+   "hi": "📥 नवीनतम बैकअप डाउनलोड करें",
+   "bn": "📥 সর্বশেষ ব্যাকআপ ডাউনলোড করুন",
+   "vi": "📥 Tải bản sao lưu mới nhất",
+   "zh": "📥 下载最新备份",
+   "ja": "📥 最新のバックアップをダウンロード",
+   "ko": "📥 최신 백업 다운로드"
+  },
+  "Copies the newest backup to this computer's Downloads folder": {
+   "en": "Copies the newest backup to this computer's Downloads folder",
+   "pt-BR": "Copia o backup mais recente para a pasta Downloads deste computador",
+   "es": "Copia el backup más reciente a la carpeta Descargas de este equipo",
+   "fr": "Copie la sauvegarde la plus récente dans le dossier Téléchargements de cet ordinateur",
+   "it": "Copia l'ultimo backup nella cartella Download di questo computer",
+   "de": "Kopiert das neueste Backup in den Downloads-Ordner dieses Computers",
+   "nl": "Kopieert de nieuwste backup naar de map Downloads van deze computer",
+   "sv": "Kopierar senaste backup till mappen Hämtade filer på den här datorn",
+   "pl": "Kopiuje najnowszy backup do folderu Pobrane na tym komputerze",
+   "cs": "Zkopíruje nejnovější backup do složky Stažené soubory tohoto počítače",
+   "ru": "Копирует последний backup в папку «Загрузки» этого компьютера",
+   "uk": "Копіює найновіший backup до теки «Завантаження» цього комп’ютера",
+   "tr": "En yeni backup dosyasını bu bilgisayarın İndirilenler klasörüne kopyalar",
+   "tl": "Kinokopya ang pinakabagong backup sa folder na Downloads ng computer na ito",
+   "id": "Menyalin backup terbaru ke folder Unduhan komputer ini",
+   "ar": "ينسخ أحدث backup إلى مجلد التنزيلات على هذا الجهاز",
+   "fa": "جدیدترین backup را در پوشهٔ بارگیری‌های این رایانه کپی می‌کند",
+   "hi": "सबसे नया backup इस कंप्यूटर के डाउनलोड फ़ोल्डर में कॉपी करता है",
+   "bn": "সর্বশেষ backup এই কম্পিউটারের ডাউনলোড ফোল্ডারে অনুলিপি করে",
+   "vi": "Sao chép backup mới nhất vào thư mục Tải xuống của máy tính này",
+   "zh": "将最新 backup 复制到此计算机的下载文件夹",
+   "ja": "最新の backup をこのコンピューターのダウンロードフォルダーにコピーします",
+   "ko": "최신 backup을 이 컴퓨터의 다운로드 폴더로 복사합니다"
+  },
+  "💾  Generate manual backup and download to PC": {
+   "en": "💾  Generate manual backup and download to PC",
+   "pt-BR": "💾  Gerar backup manual e baixar no computador",
+   "es": "💾  Generar copia manual y descargarla al PC",
+   "fr": "💾  Créer une sauvegarde manuelle et la télécharger",
+   "it": "💾  Crea un backup manuale e scaricalo sul PC",
+   "de": "💾  Manuelle Sicherung erstellen und auf den PC laden",
+   "nl": "💾  Handmatige back-up maken en naar pc downloaden",
+   "sv": "💾  Skapa manuell säkerhetskopia och ladda ner till datorn",
+   "pl": "💾  Utwórz ręczną kopię i pobierz na komputer",
+   "cs": "💾  Vytvořit ruční zálohu a stáhnout do PC",
+   "ru": "💾  Создать резервную копию и скачать на ПК",
+   "uk": "💾  Створити резервну копію та завантажити на ПК",
+   "tr": "💾  Elle yedek al ve bilgisayara indir",
+   "tl": "💾  Gumawa ng manual na backup at i-download sa PC",
+   "id": "💾  Buat cadangan manual dan unduh ke PC",
+   "ar": "💾  إنشاء نسخة احتياطية يدوية وتنزيلها إلى الحاسوب",
+   "fa": "💾  تهیه پشتیبان دستی و دانلود روی رایانه",
+   "hi": "💾  मैनुअल बैकअप बनाएँ और PC पर डाउनलोड करें",
+   "bn": "💾  ম্যানুয়াল ব্যাকআপ তৈরি করে কম্পিউটারে ডাউনলোড করুন",
+   "vi": "💾  Tạo bản sao lưu thủ công và tải về máy tính",
+   "zh": "💾  生成手动备份并下载到电脑",
+   "ja": "💾  手動バックアップを作成して PC にダウンロード",
+   "ko": "💾  수동 백업 생성 후 PC로 내려받기"
+  },
+  "Makes a full backup and shows how to copy it to a PC": {
+   "en": "Makes a full backup and shows how to copy it to a PC",
+   "pt-BR": "Gera um backup completo e mostra como baixá-lo no PC",
+   "es": "Hace un backup completo y muestra cómo copiarlo a un PC",
+   "fr": "Fait une sauvegarde complète et montre comment la copier sur un PC",
+   "it": "Crea un backup completo e mostra come copiarlo su un PC",
+   "de": "Erstellt ein vollständiges Backup und zeigt, wie es auf einen PC kopiert wird",
+   "nl": "Maakt een volledige backup en toont hoe u deze naar een PC kopieert",
+   "sv": "Skapar en fullständig backup och visar hur den kopieras till en PC",
+   "pl": "Tworzy pełny backup i pokazuje, jak skopiować go na PC",
+   "cs": "Vytvoří úplný backup a ukáže, jak jej zkopírovat do PC",
+   "ru": "Создаёт полный backup и показывает, как скопировать его на PC",
+   "uk": "Створює повний backup і показує, як скопіювати його на PC",
+   "tr": "Tam backup oluşturur ve PC'ye nasıl kopyalanacağını gösterir",
+   "tl": "Gumagawa ng kumpletong backup at ipinapakita kung paano kopyahin sa PC",
+   "id": "Membuat backup lengkap dan menunjukkan cara menyalinnya ke PC",
+   "ar": "ينشئ backup كاملًا ويعرض كيفية نسخه إلى PC",
+   "fa": "یک backup کامل می‌سازد و روش کپی آن در PC را نشان می‌دهد",
+   "hi": "पूरा backup बनाता है और उसे PC पर कॉपी करने का तरीका दिखाता है",
+   "bn": "সম্পূর্ণ backup তৈরি করে এবং PC-তে অনুলিপি করার উপায় দেখায়",
+   "vi": "Tạo backup đầy đủ và hướng dẫn sao chép về PC",
+   "zh": "创建完整 backup，并说明如何复制到 PC",
+   "ja": "完全な backup を作成し、PC にコピーする方法を表示します",
+   "ko": "전체 backup을 만들고 PC로 복사하는 방법을 표시합니다"
+  },
+  "📚  Export MARC21 records now": {
+   "en": "📚  Export MARC21 records now",
+   "pt-BR": "📚  Exportar registros MARC21 agora",
+   "es": "📚  Exportar ahora los registros MARC21",
+   "fr": "📚  Exporter maintenant les notices MARC21",
+   "it": "📚  Esporta ora i record MARC21",
+   "de": "📚  MARC21-Datensätze jetzt exportieren",
    "nl": null,
    "sv": null,
    "pl": null,
@@ -7357,30 +7137,180 @@
    "ja": null,
    "ko": null
   },
-  "A restore is always tested first in an isolated copy, and what is there now is kept in a safety backup.": {
-   "en": "A restore is always tested first in an isolated copy, and what is there now is kept in a safety backup.",
-   "pt-BR": "Uma restauração é sempre testada antes numa cópia isolada, e o que existe agora fica guardado num backup de segurança.",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+  "Exports the catalogue and the authorities in MARC21 now": {
+   "en": "Exports the catalogue and the authorities in MARC21 now",
+   "pt-BR": "Exporta agora o catálogo e as autoridades em MARC21",
+   "es": "Exporta ya el catálogo y las autoridades en MARC21",
+   "fr": "Exporte maintenant le catalogue et les autorités en MARC21",
+   "it": "Esporta ora il catalogo e le autorità in MARC21",
+   "de": "Exportiert jetzt Katalog und Normdaten in MARC21",
+   "nl": "Exporteert de catalogus en autoriteiten nu in MARC21",
+   "sv": "Exporterar katalogen och auktoritetsposterna i MARC21 nu",
+   "pl": "Eksportuje teraz katalog i rekordy wzorcowe w MARC21",
+   "cs": "Nyní exportuje katalog a autoritní záznamy v MARC21",
+   "ru": "Экспортирует каталог и авторитетные записи в MARC21 сейчас",
+   "uk": "Експортує каталог та авторитетні записи в MARC21 зараз",
+   "tr": "Kataloğu ve otorite kayıtlarını şimdi MARC21 olarak dışa aktarır",
+   "tl": "Ini-export ngayon ang katalogo at mga rekord ng awtoridad sa MARC21",
+   "id": "Mengekspor katalog dan rekaman otoritas dalam MARC21 sekarang",
+   "ar": "يصدّر الفهرس وسجلات الاستناد بتنسيق MARC21 الآن",
+   "fa": "فهرست و رکوردهای مستند را اکنون با قالب MARC21 صادر می‌کند",
+   "hi": "अभी सूची और प्राधिकरण रिकॉर्ड MARC21 में निर्यात करता है",
+   "bn": "এখন ক্যাটালগ ও প্রামাণ্য রেকর্ড MARC21-এ রপ্তানি করে",
+   "vi": "Xuất mục lục và biểu ghi tiêu đề chuẩn ở dạng MARC21 ngay",
+   "zh": "立即以 MARC21 导出目录和规范记录",
+   "ja": "目録と典拠レコードを今すぐ MARC21 でエクスポートします",
+   "ko": "지금 목록과 전거 레코드를 MARC21로 내보냅니다"
+  },
+  "📥  Restore database": {
+   "en": "📥  Restore database",
+   "pt-BR": "📥  Restaurar base de dados",
+   "es": "📥  Restaurar base de datos",
+   "fr": "📥  Restaurer la base de données",
+   "it": "📥  Ripristina il database",
+   "de": "📥  Datenbank wiederherstellen",
+   "nl": "📥  Database herstellen",
+   "sv": "📥  Återställ databasen",
+   "pl": "📥  Przywróć bazę danych",
+   "cs": "📥  Obnovit databázi",
+   "ru": "📥  Восстановить базу данных",
+   "uk": "📥  Відновити базу даних",
+   "tr": "📥  Veritabanını geri yükle",
+   "tl": "📥  Ibalik ang database",
+   "id": "📥  Pulihkan basis data",
+   "ar": "📥  استعادة قاعدة البيانات",
+   "fa": "📥  بازیابی پایگاه داده",
+   "hi": "📥  डेटाबेस पुनर्स्थापित करें",
+   "bn": "📥  ডাটাবেস পুনরুদ্ধার করুন",
+   "vi": "📥  Khôi phục cơ sở dữ liệu",
+   "zh": "📥  恢复数据库",
+   "ja": "📥  データベースを復元",
+   "ko": "📥  데이터베이스 복원"
+  },
+  "Replaces Koha's database with a backup, tested first": {
+   "en": "Replaces Koha's database with a backup, tested first",
+   "pt-BR": "Substitui o banco do Koha por um backup, testado antes",
+   "es": "Reemplaza la base de datos de Koha por un backup, probado antes",
+   "fr": "Remplace la base de Koha par une sauvegarde, testée au préalable",
+   "it": "Sostituisce il database di Koha con un backup, prima verificato",
+   "de": "Ersetzt die Datenbank von Koha durch ein Backup, vorher geprüft",
+   "nl": "Vervangt de database van Koha door een backup, die eerst wordt getest",
+   "sv": "Ersätter databasen i Koha med en backup som testas först",
+   "pl": "Zastępuje bazę danych Koha plikiem backup, wcześniej go sprawdzając",
+   "cs": "Nahradí databázi Koha souborem backup, který se nejprve otestuje",
+   "ru": "Заменяет базу данных Koha предварительно проверенной копией backup",
+   "uk": "Замінює базу даних Koha попередньо перевіреною копією backup",
+   "tr": "Önce test edilen bir backup ile Koha veritabanını değiştirir",
+   "tl": "Pinapalitan ang database ng Koha ng backup na sinusubukan muna",
+   "id": "Mengganti basis data Koha dengan backup yang diuji terlebih dahulu",
+   "ar": "يستبدل قاعدة بيانات Koha بملف backup بعد اختباره أولًا",
+   "fa": "پایگاه دادهٔ Koha را با backup جایگزین می‌کند، پس از آزمایش آن",
+   "hi": "पहले जाँचे गए backup से Koha का डेटाबेस बदलता है",
+   "bn": "আগে পরীক্ষা করা backup দিয়ে Koha-এর ডেটাবেস প্রতিস্থাপন করে",
+   "vi": "Thay cơ sở dữ liệu Koha bằng backup được kiểm tra trước",
+   "zh": "使用先行测试的 backup 替换 Koha 数据库",
+   "ja": "先にテストした backup で Koha のデータベースを置き換えます",
+   "ko": "먼저 검사한 backup으로 Koha 데이터베이스를 교체합니다"
+  },
+  "📤  Configure cloud backup": {
+   "en": "📤  Configure cloud backup",
+   "pt-BR": "📤  Configurar backup na nuvem",
+   "es": "📤  Configurar copia en la nube",
+   "fr": "📤  Configurer la sauvegarde cloud",
+   "it": "📤  Configura il backup nel cloud",
+   "de": "📤  Cloud-Sicherung einrichten",
+   "nl": "📤  Cloudback-up instellen",
+   "sv": "📤  Konfigurera molnsäkerhetskopia",
+   "pl": "📤  Skonfiguruj kopię w chmurze",
+   "cs": "📤  Nastavit zálohu do cloudu",
+   "ru": "📤  Настроить резервное копирование в облако",
+   "uk": "📤  Налаштувати резервне копіювання в хмару",
+   "tr": "📤  Bulut yedeklemeyi yapılandır",
+   "tl": "📤  I-configure ang cloud backup",
+   "id": "📤  Atur cadangan cloud",
+   "ar": "📤  إعداد النسخ الاحتياطي السحابي",
+   "fa": "📤  پیکربندی پشتیبان ابری",
+   "hi": "📤  क्लाउड बैकअप कॉन्फ़िगर करें",
+   "bn": "📤  ক্লাউড ব্যাকআপ কনফিগার করুন",
+   "vi": "📤  Cấu hình sao lưu đám mây",
+   "zh": "📤  配置云备份",
+   "ja": "📤  クラウドバックアップの設定",
+   "ko": "📤  클라우드 백업 설정"
+  },
+  "Automates backups uploaded to cloud storage services": {
+   "en": "Automates backups uploaded to cloud storage services",
+   "pt-BR": "Automatizar backups para upload em serviços de armazenamento em nuvem",
+   "es": "Automatiza los backups subidos a servicios de almacenamiento en la nube",
+   "fr": "Automatise les sauvegardes envoyées vers des services de stockage cloud",
+   "it": "Automatizza i backup caricati sui servizi di archiviazione cloud",
+   "de": "Automatisiert Backups, die in Cloud-Speicherdienste hochgeladen werden",
+   "nl": "Automatiseert backups die naar cloudopslagdiensten worden geüpload",
+   "sv": "Automatiserar backup som laddas upp till molnlagringstjänster",
+   "pl": "Automatyzuje pliki backup wysyłane do usług przechowywania w chmurze",
+   "cs": "Automatizuje odesílání souborů backup do cloudových úložišť",
+   "ru": "Автоматизирует отправку копий backup в облачные хранилища",
+   "uk": "Автоматизує надсилання копій backup до хмарних сховищ",
+   "tr": "Bulut depolama hizmetlerine yüklenen backup işlemlerini otomatikleştirir",
+   "tl": "Ginagawang awtomatiko ang mga backup na ina-upload sa mga serbisyo ng cloud storage",
+   "id": "Mengotomatiskan backup yang diunggah ke layanan penyimpanan cloud",
+   "ar": "يؤتمت ملفات backup المرفوعة إلى خدمات التخزين السحابي",
+   "fa": "backupهای ارسالی به سرویس‌های ذخیره‌سازی ابری را خودکار می‌کند",
+   "hi": "क्लाउड भंडारण सेवाओं पर अपलोड होने वाले backup स्वचालित करता है",
+   "bn": "ক্লাউড সংরক্ষণ সেবায় আপলোড করা backup স্বয়ংক্রিয় করে",
+   "vi": "Tự động hóa các backup tải lên dịch vụ lưu trữ đám mây",
+   "zh": "自动执行上传到云存储服务的 backup",
+   "ja": "クラウドストレージサービスにアップロードする backup を自動化します",
+   "ko": "클라우드 저장소 서비스로 업로드하는 backup을 자동화합니다"
+  },
+  "🧾  Test integrity of latest backup": {
+   "en": "🧾  Test integrity of latest backup",
+   "pt-BR": "🧾  Testar a integridade do último backup",
+   "es": "🧾  Probar la integridad de la última copia",
+   "fr": "🧾  Tester l'intégrité de la dernière sauvegarde",
+   "it": "🧾  Verifica l'integrità dell'ultimo backup",
+   "de": "🧾  Integrität der letzten Sicherung testen",
+   "nl": "🧾  Integriteit van de laatste back-up testen",
+   "sv": "🧾  Testa integriteten i senaste säkerhetskopian",
+   "pl": "🧾  Sprawdź integralność ostatniej kopii",
+   "cs": "🧾  Otestovat integritu poslední zálohy",
+   "ru": "🧾  Проверить целостность последней копии",
+   "uk": "🧾  Перевірити цілісність останньої копії",
+   "tr": "🧾  Son yedeğin bütünlüğünü test et",
+   "tl": "🧾  Subukan ang integridad ng pinakabagong backup",
+   "id": "🧾  Uji integritas cadangan terakhir",
+   "ar": "🧾  اختبار سلامة آخر نسخة احتياطية",
+   "fa": "🧾  آزمون سلامت آخرین پشتیبان",
+   "hi": "🧾  नवीनतम बैकअप की अखंडता जाँचें",
+   "bn": "🧾  সর্বশেষ ব্যাকআপের অখণ্ডতা পরীক্ষা",
+   "vi": "🧾  Kiểm tra tính toàn vẹn của bản sao lưu gần nhất",
+   "zh": "🧾  测试最新备份的完整性",
+   "ja": "🧾  最新バックアップの整合性をテスト",
+   "ko": "🧾  최근 백업 무결성 테스트"
+  },
+  "Imports a backup into a test database to check it": {
+   "en": "Imports a backup into a test database to check it",
+   "pt-BR": "Importa um backup num banco de teste para validá-lo",
+   "es": "Importa un backup en una base de datos de prueba para comprobarlo",
+   "fr": "Importe une sauvegarde dans une base de test pour la vérifier",
+   "it": "Importa un backup in un database di prova per verificarlo",
+   "de": "Importiert ein Backup zur Prüfung in eine Testdatenbank",
+   "nl": "Importeert een backup in een testdatabase om deze te controleren",
+   "sv": "Importerar en backup till en testdatabas för att kontrollera den",
+   "pl": "Importuje backup do testowej bazy danych, aby go sprawdzić",
+   "cs": "Importuje backup do testovací databáze a zkontroluje jej",
+   "ru": "Импортирует backup в тестовую базу данных для проверки",
+   "uk": "Імпортує backup до тестової бази даних для перевірки",
+   "tr": "Backup dosyasını denetlemek için test veritabanına aktarır",
+   "tl": "Ini-import ang backup sa pansubok na database upang suriin ito",
+   "id": "Mengimpor backup ke basis data uji untuk memeriksanya",
+   "ar": "يستورد backup إلى قاعدة بيانات اختبار لفحصه",
+   "fa": "backup را برای بررسی به پایگاه دادهٔ آزمایشی وارد می‌کند",
+   "hi": "जाँचने के लिए backup को परीक्षण डेटाबेस में आयात करता है",
+   "bn": "পরীক্ষা করতে backup পরীক্ষামূলক ডেটাবেসে আমদানি করে",
+   "vi": "Nhập backup vào cơ sở dữ liệu thử nghiệm để kiểm tra",
+   "zh": "将 backup 导入测试数据库以进行检查",
+   "ja": "backup をテスト用データベースにインポートして検証します",
+   "ko": "backup을 테스트 데이터베이스로 가져와 검사합니다"
   },
   "💾  Back up Tainacan now": {
    "en": "💾  Back up Tainacan now",
@@ -7732,6 +7662,156 @@
    "ja": null,
    "ko": null
   },
+  "🔐  Set up encrypted backups": {
+   "en": "🔐  Set up encrypted backups",
+   "pt-BR": "🔐  Configurar backups criptografados",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Makes the server key that encrypts the configuration in the backups": {
+   "en": "Makes the server key that encrypts the configuration in the backups",
+   "pt-BR": "Cria a chave do servidor que criptografa a configuração nos backups",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🧰  Recovery kit": {
+   "en": "🧰  Recovery kit",
+   "pt-BR": "🧰  Kit de recuperação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Saves the recovery kit to copy away from this server": {
+   "en": "Saves the recovery kit to copy away from this server",
+   "pt-BR": "Salva o kit de recuperação para guardar longe deste servidor",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔌  Cloud connections": {
+   "en": "🔌  Cloud connections",
+   "pt-BR": "🔌  Conexões de nuvem",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The cloud accounts this server can send backups to, for any platform": {
+   "en": "The cloud accounts this server can send backups to, for any platform",
+   "pt-BR": "As contas de nuvem para onde este servidor pode enviar backups, de qualquer plataforma",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "🔒  Security & access hub": {
    "en": "🔒  Security & access hub",
    "pt-BR": "🔒  Central de Segurança & Acesso",
@@ -8057,9 +8137,9 @@
    "ja": null,
    "ko": null
   },
-  "What the platforms in containers use together: the web server in front of them, Docker and the key of their backups.": {
-   "en": "What the platforms in containers use together: the web server in front of them, Docker and the key of their backups.",
-   "pt-BR": "O que as plataformas em contêineres usam juntas: o servidor web na frente delas, o Docker e a chave dos backups.",
+  "What the platforms in containers use together: the web server in front of them and Docker.": {
+   "en": "What the platforms in containers use together: the web server in front of them and Docker.",
+   "pt-BR": "O que as plataformas em contêineres usam juntas: o servidor web na frente delas e o Docker.",
    "es": null,
    "fr": null,
    "it": null,
@@ -8110,106 +8190,6 @@
   "Installs Docker after its plan and a Yes; nothing else changes": {
    "en": "Installs Docker after its plan and a Yes; nothing else changes",
    "pt-BR": "Instala o Docker depois do plano e de um Sim; nada mais muda",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "🔐  Set up encrypted backups": {
-   "en": "🔐  Set up encrypted backups",
-   "pt-BR": "🔐  Configurar backups criptografados",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "Makes the server key that encrypts the configuration in the backups": {
-   "en": "Makes the server key that encrypts the configuration in the backups",
-   "pt-BR": "Cria a chave do servidor que criptografa a configuração nos backups",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "🧰  Recovery kit": {
-   "en": "🧰  Recovery kit",
-   "pt-BR": "🧰  Kit de recuperação",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "Saves the recovery kit to copy away from this server": {
-   "en": "Saves the recovery kit to copy away from this server",
-   "pt-BR": "Salva o kit de recuperação para guardar longe deste servidor",
    "es": null,
    "fr": null,
    "it": null,
@@ -10231,31 +10211,6 @@
    "zh": "结果",
    "ja": "結果",
    "ko": "결과"
-  },
-  "OK": {
-   "en": "OK",
-   "pt-BR": "OK",
-   "es": "OK",
-   "fr": "Très bien.",
-   "it": "Ok.",
-   "de": "OK",
-   "nl": "OK",
-   "sv": "OK",
-   "pl": "OK",
-   "cs": "OK",
-   "ru": "Хорошо.",
-   "uk": "OK",
-   "tr": "Tamam tamam",
-   "tl": "OK",
-   "id": "OK",
-   "ar": "حسنا",
-   "fa": "OK",
-   "hi": "ठीक",
-   "bn": "OK",
-   "vi": "OK",
-   "zh": "",
-   "ja": "お問い合わせ",
-   "ko": "이름 *"
   },
   "Compression": {
    "en": "Compression",
@@ -15843,7 +15798,7 @@
      "dash-status",
      "dash-addresses",
      "dash-components",
-     "sec-backup",
+     "sec-backups",
      "sec-diagnostics"
     ]
    },
@@ -16125,343 +16080,6 @@
      "Sem o Koha, o início oferece **Instalar servidor Koha** e o grupo não tem telas. Com o Koha instalado e funcionando, mostra um cartão por tela do grupo e as credenciais de primeiro acesso. Quando MariaDB, Apache, Memcached ou Koha estão parados, diz quais e coloca primeiro o status, a verificação completa, o reparo dos serviços e o log do Apache.",
      "Estado, endereços e indicadores não se repetem aqui: **Estado e endereços** abre o Painel de Controle na aba Koha."
     ]
-   }
-  },
-  "backup-download": {
-   "en": {
-    "title": "Download latest backup",
-    "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
-    "overview": [
-     "Under WSL the file goes to the Windows Downloads folder; on a Linux desktop to your own Downloads. When the panel runs over SSH from another computer it cannot write there, so it shows the `scp` command to paste on your computer instead, with a Copy button."
-    ],
-    "steps": [
-     "Open the Backup center (key **b**).",
-     "Press the **Download latest backup** card (the first card of the screen).",
-     "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
-    ],
-    "tips": [
-     "Use it weekly to keep an off-server copy even without a cloud account.",
-     "Move the downloaded file to an external drive or a different building: a copy on the same desk does not protect against theft or fire."
-    ],
-    "related": [
-     "backup-manual",
-     "backup-cloud",
-     "backup-status"
-    ]
-   },
-   "pt-BR": {
-    "title": "Baixar Backup Recente",
-    "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
-    "overview": [
-     "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
-    ],
-    "steps": [
-     "Abra a Central de backups e restauração (tecla **b**).",
-     "Pressione o cartão **Baixar Backup Recente** (o primeiro cartão da tela).",
-     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
-    ],
-    "tips": [
-     "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
-     "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
-    ]
-   }
-  },
-  "backup-manual": {
-   "en": {
-    "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
-    "overview": [
-     "The default destination is the backups subdirectory of the home directory identified by the panel, not necessarily the automatic SQL backup directory.",
-     "New manual backups use the selected compression. A shared lock prevents overlap with protected backup/restore operations."
-    ],
-    "steps": [
-     "Open Generate manual backup and download to PC in Backup center.",
-     "Check the proposed server folder or choose a writable destination.",
-     "Use Save backup and wait for generation and verification.",
-     "Check the filename, size and path. Under WSL, use the Windows copy buttons; remotely, run the displayed transfer command on your own computer.",
-     "Check the received file and use Finish and exit."
-    ],
-    "tips": [
-     "Make a manual backup before any big change: an update, a mass import, a change of search engine.",
-     "Keep at least one copy off the server (a PC, a USB drive kept elsewhere, or the cloud): a backup on the same disk does not survive a disk failure.",
-     "Name the copies you keep by date and purpose, for example `before-update-2026-10.sql.zst`."
-    ],
-    "related": [
-     "backup-download",
-     "backup-cloud",
-     "backup-test",
-     "backup-compression"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
-    "overview": [
-     "A tela usa por padrão a subpasta backups da pasta do usuário identificado pelo painel. Você pode escolher outro destino gravável. A compressão é a escolhida na central.",
-     "O arquivo é gerado e verificado antes da cópia. A rotina compartilha a trava com outros backups e restaurações. Os botões de pasta Windows existem somente no WSL."
-    ],
-    "steps": [
-     "Abra **Gerar backup manual e baixar no computador** na central.",
-     "Confira a pasta no servidor e pressione **Salvar backup**.",
-     "Aguarde a geração e a verificação; confira arquivo e tamanho.",
-     "No WSL, use **Baixar na pasta Downloads** ou **Escolher pasta no Windows**. Em acesso remoto, execute no seu computador o comando de transferência mostrado.",
-     "Confira a cópia no destino e pressione **Concluir e sair**."
-    ],
-    "tips": [
-     "Recomendação operacional: gere uma cópia atual antes de alterações importantes.",
-     "Mantenha uma cópia fora do servidor e teste o arquivo que pretende usar para recuperação."
-    ],
-    "outdated": true
-   }
-  },
-  "backup-marc": {
-   "en": {
-    "summary": "Exports every bibliographic and authority record in MARC21 right now, the same package the weekly backup makes, and shows how to copy it to your computer.",
-    "overview": [
-     "The export runs Koha's own `export_records.pl` for the bibliographic records and for the authorities and packs both files into `koha_marc_<date>.tar.gz` in the MARC backup folder (`/var/backups/koha_marc`). When a cloud backup is set up, the package is also sent there.",
-     "The records are written straight into `biblios_<date>.mrc` and `authorities_<date>.mrc` (ISO 2709) inside the package; Koha's messages go to `backup_marc_export_errors.log` in the panel's log folder. A finished export shows a success box with the file and what it contains; when it fails, the box quotes only the last error message, never the records.",
-     "Koha keeps working while it runs. If another backup or a restore is running, the export waits for another time and says so."
-    ],
-    "steps": [
-     "Open the Backup center (key **b**).",
-     "Press the **Export MARC21 records now** card and confirm.",
-     "Wait for the export: the result shows the file, its size and the `.mrc` files inside it. Press **Download to computer** to copy the `.tar.gz` package straight into your Downloads folder (WSL or a Linux desktop); over SSH, paste the `scp` command shown on your computer instead."
-    ],
-    "tips": [
-     "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
-     "The weekly export runs every Sunday at 03:00; change its day and time in **Schedules & cron tasks**."
-    ],
-    "related": [
-     "sec-backup",
-     "backup-manual",
-     "restore"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Exporta agora todos os registros bibliográficos e de autoridade em MARC21, o mesmo pacote que o backup semanal gera, e mostra como copiá-lo para o seu computador.",
-    "overview": [
-     "A exportação usa o próprio `export_records.pl` do Koha para os registros bibliográficos e para as autoridades e junta os dois arquivos em `koha_marc_<data>.tar.gz` na pasta de backups MARC (`/var/backups/koha_marc`). Quando o backup na nuvem está configurado, o pacote também é enviado para lá.",
-     "Os registros são gravados direto em `biblios_<data>.mrc` e `authorities_<data>.mrc` (ISO 2709) dentro do pacote; as mensagens do Koha vão para `backup_marc_export_errors.log` na pasta de logs do painel. Uma exportação concluída mostra uma caixa de sucesso com o arquivo e o que ele contém; quando falha, a caixa cita só a última mensagem de erro, nunca os registros.",
-     "O Koha continua funcionando durante a exportação. Se outro backup ou uma restauração estiver rodando, a exportação não começa e o painel avisa."
-    ],
-    "steps": [
-     "Abra a Central de backups e restauração (tecla **b**).",
-     "Pressione o cartão **Exportar registros MARC21 agora** e confirme.",
-     "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e os arquivos `.mrc` dentro dele. Pressione **Baixar no computador** para copiar o pacote `.tar.gz` direto para a sua pasta Downloads (WSL ou desktop Linux); por SSH, cole no seu computador o comando `scp` mostrado."
-    ],
-    "tips": [
-     "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
-     "A exportação semanal roda todo domingo às 03:00; mude o dia e o horário em **Agendamentos e tarefas cron**."
-    ]
-   }
-  },
-  "restore": {
-   "en": {
-    "summary": "Replaces the current Koha database after checks and a temporary import test. A safety copy protects an existing database, but recovery after a failure is not guaranteed.",
-    "overview": [
-     "Open Restore database from its card in Backup center. There is no top restore button or separate restore action in the current main menu.",
-     "The flow recognises supported SQL backups and checks content, compression, space and essential tables through a temporary import. An extension alone does not prove valid content.",
-     "When the current database has tables, the flow creates and validates a safety copy before replacement. An empty database can skip that copy.",
-     "It then recreates and imports the database, upgrades its schema, synchronises search, rebuilds indexes and restarts services. It attempts to reapply saved theme state when available.",
-     "Recovery of the previous database is attempted for certain failures, depending on stage and available safety copy. Recovery itself can fail. An indexing error may occur after database restoration has already completed."
-    ],
-    "steps": [
-     "Open Restore database in Backup center.",
-     "Choose the file accessible to the server, following on-screen transfer guidance when needed.",
-     "Investigate warnings about suspicious or incomplete content.",
-     "Read the replacement confirmation carefully: the current database will be replaced.",
-     "After authorising, wait without closing the window; the panel marks this operation non-cancellable.",
-     "Read the full result and logs, then verify records, patrons and searches."
-    ],
-    "tips": [
-     "Test an unfamiliar backup first with Test integrity of latest backup.",
-     "Allow space for the temporary database and safety copy.",
-     "Keep the safety copy until you have checked the restored catalogue.",
-     "Consult restore.log, restore-import.log and the indexing log identified by the error."
-    ],
-    "warnings": [
-     "Restore replaces the database, including patrons and circulation. Changes since the selected backup are not in that backup.",
-     "Do not assume an error means the previous catalogue was recovered automatically. Check the failed stage and current database state."
-    ],
-    "related": [
-     "backup-safety",
-     "backup-test",
-     "backup-compression",
-     "magic-import"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Substitui o banco do Koha pelo backup escolhido, depois de verificações e teste em base temporária. Para um banco atual com tabelas, exige criar e validar uma cópia de segurança antes de substituí-lo.",
-    "overview": [
-     "Abra o cartão **Restaurar base de dados** dentro da **Central de backups e restauração**. Não há um botão superior de restauração nem uma entrada própria no menu principal atual.",
-     "O fluxo aceita SQL simples e compressões suportadas. Para o procedimento básico, use .sql, .sql.gz, .sql.zst ou .sql.xz. A validação do conteúdo continua necessária.",
-     "Um arquivo do disco Windows pode ser copiado para o Linux antes do trabalho. Por SSH, transfira o arquivo ao servidor conforme a orientação da própria tela.",
-     "Antes de substituir o banco, o processo importa em uma base temporária e verifica as tabelas essenciais. Para o banco atual com tabelas, cria um backup de segurança verificado; um banco vazio pode dispensá-lo.",
-     "A execução é não cancelável. O processo recria e importa o banco, atualiza o esquema, sincroniza a busca, reconstrói os índices e reinicia os serviços. O reaproveitamento da aparência salva é tentado quando há estado de tema."
-    ],
-    "steps": [
-     "Abra a central e escolha o cartão **Restaurar base de dados**.",
-     "Selecione o arquivo correto no servidor ou no disco Windows acessível ao WSL.",
-     "Leia as verificações e investigue avisos de arquivo suspeito ou incompleto.",
-     "Confira o arquivo, o tamanho e o espaço na confirmação. Autorizar essa tela permite substituir o banco atual.",
-     "Aguarde sem fechar a janela.",
-     "Leia o resultado e preserve o caminho do backup de segurança informado. Confira depois o catálogo e as buscas."
-    ],
-    "tips": [
-     "Use **Testar a integridade do último backup** para testar o arquivo sem substituir a produção.",
-     "Confira o espaço necessário apresentado pelo fluxo. Não estime apenas pelo tamanho compactado.",
-     "Mantenha a cópia de segurança e uma cópia fora do servidor até conferir o resultado."
-    ],
-    "warnings": [
-     "A restauração substitui dados pelo estado do backup: alterações posteriores não estarão nesse arquivo.",
-     "Em falhas de recriação, importação ou atualização do esquema, o código pode tentar recuperar o banco anterior. Essa recuperação também pode falhar; leia a mensagem final.",
-     "Uma falha de indexação pode acontecer depois de o banco já ter sido restaurado. Não suponha que toda falha recoloca automaticamente o banco anterior."
-    ],
-    "outdated": true
-   }
-  },
-  "backup-cloud": {
-   "en": {
-    "summary": "Connects a cloud storage to the nightly backup with rclone, so every backup also goes off the server: Google Drive in two express ways, or OneDrive, MEGA and S3-compatible storage step by step.",
-    "steps": [
-     "Open the Backup center and choose **Configure cloud backup**.",
-     "Choose how to connect (see the options).",
-     "Sign in with the library's own account, not a personal one.",
-     "Wait for the real upload test: the panel sends a small file to the cloud and checks it arrived.",
-     "If the test fails, choose **Try the test again** or **Edit the token**."
-    ],
-    "options": [
-     {
-      "name": "Express: Generate token on another PC (SSH / Headless)",
-      "text": "For a server without a browser: you run one rclone command on your own computer, sign in to Google there and paste the token (a JSON text starting with `{` and ending with `}`) back into the panel."
-     },
-     {
-      "name": "Express: Authenticate directly on this server",
-      "text": "When the server has a browser, or through an SSH tunnel to port 53682: the panel opens the Google sign-in and captures the token by itself."
-     },
-     {
-      "name": "Other services: OneDrive, MEGA or S3 (step by step)",
-      "text": "The panel asks only what each service needs: a OneDrive sign-in (copy the link, then paste back the address the browser ended on), the MEGA e-mail and password, or an S3 access key, region, endpoint and bucket (AWS, Cloudflare R2, Wasabi, MinIO). Nobody types an rclone command."
-     }
-    ],
-    "tips": [
-     "Use an account owned by the library and shared with at least two people, so the backups do not depend on one person.",
-     "Check the cloud folder once a month: the nightly log says whether each upload worked.",
-     "Combine the cloud copy with **XZ** or **Zstandard** compression to save upload time and space."
-    ],
-    "warnings": [
-     "The token and keys are stored only in rclone's private file on the server. Anyone with root access to the server can use them: protect the server accordingly."
-    ],
-    "related": [
-     "backup-manual",
-     "backup-compression",
-     "crons"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
-    "steps": [
-     "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem**.",
-     "Escolha como conectar (veja as opções).",
-     "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
-     "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
-     "Se o teste falhar, escolha **Testar de novo** ou **Editar o token**."
-    ],
-    "options": [
-     {
-      "name": "Expresso: gerar o token em outro computador (SSH / sem tela)",
-      "text": "Para um servidor sem navegador: você roda um comando do rclone no seu próprio computador, entra na conta Google ali e cola o token (um texto JSON que começa com `{` e termina com `}`) de volta no painel."
-     },
-     {
-      "name": "Expresso: autenticar diretamente neste servidor",
-      "text": "Quando o servidor tem navegador, ou por um túnel SSH até a porta 53682: o painel abre o login do Google e captura o token sozinho."
-     },
-     {
-      "name": "Outros serviços: OneDrive, MEGA ou S3 (passo a passo)",
-      "text": "O painel pergunta só o que cada serviço precisa: o login do OneDrive (copie o link e depois cole de volta o endereço em que o navegador terminou), o e-mail e a senha do MEGA, ou a chave de acesso, a região, o endpoint e o bucket do S3 (AWS, Cloudflare R2, Wasabi, MinIO). Ninguém digita comandos do rclone."
-     }
-    ],
-    "tips": [
-     "Use uma conta da biblioteca, compartilhada com pelo menos duas pessoas, para que os backups não dependam de uma só pessoa.",
-     "Confira a pasta na nuvem uma vez por mês: o log noturno diz se cada envio funcionou.",
-     "Combine a cópia na nuvem com a compressão **XZ** ou **Zstandard** para economizar tempo de envio e espaço."
-    ],
-    "warnings": [
-     "O token e as chaves ficam guardados só no arquivo privado do rclone no servidor. Quem tiver acesso root ao servidor pode usá-los: proteja o servidor à altura."
-    ]
-   }
-  },
-  "backup-test": {
-   "en": {
-    "summary": "Proves that a backup really restores: the newest file is imported into a temporary database and checked, while the production data is not touched.",
-    "steps": [
-     "Open the Backup center and choose **Test integrity of latest backup**.",
-     "Check the file and date shown, or press **Choose another file** to test a different one.",
-     "Confirm **Run the test now?**.",
-     "Read the result: *BACKUP IS INTACT AND RESTORABLE* with the number of tables, bibliographic records and patrons, or the reason it failed."
-    ],
-    "tips": [
-     "Test a backup at least once a month and always before relying on one for a restore or a migration.",
-     "Compare the counts of records and patrons with what you expect: a backup that restores but has far fewer records points at a problem upstream."
-    ],
-    "warnings": [
-     "*The backup DID NOT restore* is urgent: make a new manual backup right away and find out why the nightly one is broken."
-    ],
-    "related": [
-     "restore",
-     "backup-manual",
-     "backup-status"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
-    "steps": [
-     "Abra a Central de backups e restauração e escolha **Testar a integridade do último backup**.",
-     "Confira o arquivo e a data mostrados, ou pressione **Escolher outro arquivo** para testar outro.",
-     "Confirme **Executar o teste agora?**.",
-     "Leia o resultado: *O BACKUP ESTÁ ÍNTEGRO E PODE SER RESTAURADO*, com o número de tabelas, registros bibliográficos e leitores, ou o motivo da falha."
-    ],
-    "tips": [
-     "Teste um backup pelo menos uma vez por mês e sempre antes de depender dele para uma restauração ou migração.",
-     "Compare o número de registros e de leitores com o que você espera: um backup que restaura mas tem bem menos registros aponta para um problema na origem."
-    ],
-    "warnings": [
-     "*O backup NÃO foi restaurado* é urgente: faça um novo backup manual na hora e descubra por que o noturno está quebrado."
-    ]
-   }
-  },
-  "sec-backup": {
-   "en": {
-    "summary": "Brings together backup status, compression and the cards for download, manual SQL backup, MARC export, restore, cloud upload and testing.",
-    "overview": [
-     "The newest backup and the last nightly result may refer to different runs. Read all three indicators.",
-     "SQL backups recover the database; MARC exports exchange bibliographic and authority records and do not replace a full SQL backup.",
-     "Restore database is available as a card in this centre. Compression is saved when selected and applies to new backups."
-    ],
-    "tips": [
-     "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
-     "A backup you never tested is a hope, not a backup: schedule a monthly integrity test."
-    ],
-    "related": [
-     "backup-status",
-     "backup-compression",
-     "backup-download",
-     "backup-safety",
-     "backup-cloud",
-     "backup-marc",
-     "restore"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
-    "overview": [
-     "A central reúne os cartões de operação de backup e restauração. A tecla **b** abre essa tela principal.",
-     "O instalador grava por padrão backup SQL diário às 23:00 e exportação MARC aos domingos às 03:00, no horário do servidor. Os agendamentos podem ter sido personalizados.",
-     "A data e o tamanho descrevem o arquivo mais recente encontrado; o resultado descreve a última execução noturna. São indicadores distintos. Depois do seletor de compressão ficam os cartões de download, backup manual, MARC21, restauração, nuvem e teste."
-    ],
-    "tips": [
-     "Recomendação operacional: mantenha uma cópia fora do servidor e verifique se consegue recuperá-la.",
-     "Teste o arquivo em banco temporário antes de contar com ele para restauração."
-    ],
-    "outdated": true
    }
   },
   "magic-import": {
@@ -17702,7 +17320,7 @@
      "**Reader alerts & daily digest** can run daily, weekly or monthly: a weekly or monthly run reminds of every loan that falls due before the next run, and the summary is titled weekly or monthly."
     ],
     "related": [
-     "sec-backup",
+     "sec-backups",
      "authority-sync",
      "clock"
     ]
@@ -18216,7 +17834,7 @@
     "related": [
      "tainacan-install",
      "sec-tainacan-maintenance",
-     "sec-tainacan-backups",
+     "sec-backups",
      "sec-infra",
      "sec-dashboard"
     ]
@@ -18308,6 +17926,307 @@
     "summary": "Eventos opcionais no Tainacan (Nexus Eventos sobre o Events Manager): desligados até você ligar, depois do plano e do Sim."
    }
   },
+  "backup-download": {
+   "en": {
+    "title": "Download latest backup",
+    "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
+    "overview": [
+     "Under WSL the file goes to the Windows Downloads folder; on a Linux desktop to your own Downloads. When the panel runs over SSH from another computer it cannot write there, so it shows the `scp` command to paste on your computer instead, with a Copy button."
+    ],
+    "steps": [
+     "Open the Backup center (key **b**).",
+     "Press the **Download latest backup** card (the first card of the screen).",
+     "Wait for the copy, then open your Downloads folder: the file name and size are shown at the end."
+    ],
+    "tips": [
+     "Use it weekly to keep an off-server copy even without a cloud account.",
+     "Move the downloaded file to an external drive or a different building: a copy on the same desk does not protect against theft or fire."
+    ],
+    "related": [
+     "backup-manual",
+     "backup-cloud",
+     "backup-status"
+    ]
+   },
+   "pt-BR": {
+    "title": "Baixar Backup Recente",
+    "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
+    "overview": [
+     "No WSL, o arquivo vai para a pasta Downloads do Windows; num desktop Linux, para a sua própria pasta Downloads. Quando o painel roda por SSH a partir de outro computador, ele não consegue gravar lá; então mostra o comando `scp` para colar no seu computador, com um botão Copiar."
+    ],
+    "steps": [
+     "Abra a Central de backups e restauração (tecla **b**).",
+     "Pressione o cartão **Baixar Backup Recente** (o primeiro cartão da tela).",
+     "Aguarde a cópia e abra a sua pasta Downloads: o nome e o tamanho do arquivo aparecem no final."
+    ],
+    "tips": [
+     "Use toda semana para ter uma cópia fora do servidor, mesmo sem conta na nuvem.",
+     "Leve o arquivo baixado para um disco externo ou para outro prédio: uma cópia na mesma mesa não protege contra roubo ou incêndio."
+    ]
+   }
+  },
+  "backup-manual": {
+   "en": {
+    "summary": "Makes a full, verified backup of Koha's database right now, in the folder you choose, and shows the exact command to copy it to your own computer.",
+    "overview": [
+     "The default destination is the backups subdirectory of the home directory identified by the panel, not necessarily the automatic SQL backup directory.",
+     "New manual backups use the selected compression. A shared lock prevents overlap with protected backup/restore operations."
+    ],
+    "steps": [
+     "Open Generate manual backup and download to PC in Backup center.",
+     "Check the proposed server folder or choose a writable destination.",
+     "Use Save backup and wait for generation and verification.",
+     "Check the filename, size and path. Under WSL, use the Windows copy buttons; remotely, run the displayed transfer command on your own computer.",
+     "Check the received file and use Finish and exit."
+    ],
+    "tips": [
+     "Make a manual backup before any big change: an update, a mass import, a change of search engine.",
+     "Keep at least one copy off the server (a PC, a USB drive kept elsewhere, or the cloud): a backup on the same disk does not survive a disk failure.",
+     "Name the copies you keep by date and purpose, for example `before-update-2026-10.sql.zst`."
+    ],
+    "related": [
+     "backup-download",
+     "backup-cloud",
+     "backup-test",
+     "backup-compression"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
+    "overview": [
+     "A tela usa por padrão a subpasta backups da pasta do usuário identificado pelo painel. Você pode escolher outro destino gravável. A compressão é a escolhida na central.",
+     "O arquivo é gerado e verificado antes da cópia. A rotina compartilha a trava com outros backups e restaurações. Os botões de pasta Windows existem somente no WSL."
+    ],
+    "steps": [
+     "Abra **Gerar backup manual e baixar no computador** na central.",
+     "Confira a pasta no servidor e pressione **Salvar backup**.",
+     "Aguarde a geração e a verificação; confira arquivo e tamanho.",
+     "No WSL, use **Baixar na pasta Downloads** ou **Escolher pasta no Windows**. Em acesso remoto, execute no seu computador o comando de transferência mostrado.",
+     "Confira a cópia no destino e pressione **Concluir e sair**."
+    ],
+    "tips": [
+     "Recomendação operacional: gere uma cópia atual antes de alterações importantes.",
+     "Mantenha uma cópia fora do servidor e teste o arquivo que pretende usar para recuperação."
+    ],
+    "outdated": true
+   }
+  },
+  "backup-marc": {
+   "en": {
+    "summary": "Exports every bibliographic and authority record in MARC21 right now, the same package the weekly backup makes, and shows how to copy it to your computer.",
+    "overview": [
+     "The export runs Koha's own `export_records.pl` for the bibliographic records and for the authorities and packs both files into `koha_marc_<date>.tar.gz` in the MARC backup folder (`/var/backups/koha_marc`). When a cloud backup is set up, the package is also sent there.",
+     "The records are written straight into `biblios_<date>.mrc` and `authorities_<date>.mrc` (ISO 2709) inside the package; Koha's messages go to `backup_marc_export_errors.log` in the panel's log folder. A finished export shows a success box with the file and what it contains; when it fails, the box quotes only the last error message, never the records.",
+     "Koha keeps working while it runs. If another backup or a restore is running, the export waits for another time and says so."
+    ],
+    "steps": [
+     "Open the Backup center (key **b**).",
+     "Press the **Export MARC21 records now** card and confirm.",
+     "Wait for the export: the result shows the file, its size and the `.mrc` files inside it. Press **Download to computer** to copy the `.tar.gz` package straight into your Downloads folder (WSL or a Linux desktop); over SSH, paste the `scp` command shown on your computer instead."
+    ],
+    "tips": [
+     "Export the MARC21 records before a big catalogue change (a mass import, a MARC replace, an authority clean-up): the file can be imported again with the Magic Import Tool.",
+     "The weekly export runs every Sunday at 03:00; change its day and time in **Schedules & cron tasks**."
+    ],
+    "related": [
+     "sec-backups",
+     "backup-manual",
+     "restore"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Exporta agora todos os registros bibliográficos e de autoridade em MARC21, o mesmo pacote que o backup semanal gera, e mostra como copiá-lo para o seu computador.",
+    "overview": [
+     "A exportação usa o próprio `export_records.pl` do Koha para os registros bibliográficos e para as autoridades e junta os dois arquivos em `koha_marc_<data>.tar.gz` na pasta de backups MARC (`/var/backups/koha_marc`). Quando o backup na nuvem está configurado, o pacote também é enviado para lá.",
+     "Os registros são gravados direto em `biblios_<data>.mrc` e `authorities_<data>.mrc` (ISO 2709) dentro do pacote; as mensagens do Koha vão para `backup_marc_export_errors.log` na pasta de logs do painel. Uma exportação concluída mostra uma caixa de sucesso com o arquivo e o que ele contém; quando falha, a caixa cita só a última mensagem de erro, nunca os registros.",
+     "O Koha continua funcionando durante a exportação. Se outro backup ou uma restauração estiver rodando, a exportação não começa e o painel avisa."
+    ],
+    "steps": [
+     "Abra a Central de backups e restauração (tecla **b**).",
+     "Pressione o cartão **Exportar registros MARC21 agora** e confirme.",
+     "Aguarde a exportação: o resultado mostra o arquivo, o tamanho e os arquivos `.mrc` dentro dele. Pressione **Baixar no computador** para copiar o pacote `.tar.gz` direto para a sua pasta Downloads (WSL ou desktop Linux); por SSH, cole no seu computador o comando `scp` mostrado."
+    ],
+    "tips": [
+     "Exporte os registros MARC21 antes de uma grande mudança no catálogo (uma importação em massa, uma substituição de MARC, uma limpeza de autoridades): o arquivo pode ser importado de novo pela Ferramenta Mágica de Importação.",
+     "A exportação semanal roda todo domingo às 03:00; mude o dia e o horário em **Agendamentos e tarefas cron**."
+    ]
+   }
+  },
+  "restore": {
+   "en": {
+    "summary": "Replaces the current Koha database after checks and a temporary import test. A safety copy protects an existing database, but recovery after a failure is not guaranteed.",
+    "overview": [
+     "Open Restore database from its card in Backup center. There is no top restore button or separate restore action in the current main menu.",
+     "The flow recognises supported SQL backups and checks content, compression, space and essential tables through a temporary import. An extension alone does not prove valid content.",
+     "When the current database has tables, the flow creates and validates a safety copy before replacement. An empty database can skip that copy.",
+     "It then recreates and imports the database, upgrades its schema, synchronises search, rebuilds indexes and restarts services. It attempts to reapply saved theme state when available.",
+     "Recovery of the previous database is attempted for certain failures, depending on stage and available safety copy. Recovery itself can fail. An indexing error may occur after database restoration has already completed."
+    ],
+    "steps": [
+     "Open Restore database in Backup center.",
+     "Choose the file accessible to the server, following on-screen transfer guidance when needed.",
+     "Investigate warnings about suspicious or incomplete content.",
+     "Read the replacement confirmation carefully: the current database will be replaced.",
+     "After authorising, wait without closing the window; the panel marks this operation non-cancellable.",
+     "Read the full result and logs, then verify records, patrons and searches."
+    ],
+    "tips": [
+     "Test an unfamiliar backup first with Test integrity of latest backup.",
+     "Allow space for the temporary database and safety copy.",
+     "Keep the safety copy until you have checked the restored catalogue.",
+     "Consult restore.log, restore-import.log and the indexing log identified by the error."
+    ],
+    "warnings": [
+     "Restore replaces the database, including patrons and circulation. Changes since the selected backup are not in that backup.",
+     "Do not assume an error means the previous catalogue was recovered automatically. Check the failed stage and current database state."
+    ],
+    "related": [
+     "backup-safety",
+     "backup-test",
+     "backup-compression",
+     "magic-import"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Substitui o banco do Koha pelo backup escolhido, depois de verificações e teste em base temporária. Para um banco atual com tabelas, exige criar e validar uma cópia de segurança antes de substituí-lo.",
+    "overview": [
+     "Abra o cartão **Restaurar base de dados** dentro da **Central de backups e restauração**. Não há um botão superior de restauração nem uma entrada própria no menu principal atual.",
+     "O fluxo aceita SQL simples e compressões suportadas. Para o procedimento básico, use .sql, .sql.gz, .sql.zst ou .sql.xz. A validação do conteúdo continua necessária.",
+     "Um arquivo do disco Windows pode ser copiado para o Linux antes do trabalho. Por SSH, transfira o arquivo ao servidor conforme a orientação da própria tela.",
+     "Antes de substituir o banco, o processo importa em uma base temporária e verifica as tabelas essenciais. Para o banco atual com tabelas, cria um backup de segurança verificado; um banco vazio pode dispensá-lo.",
+     "A execução é não cancelável. O processo recria e importa o banco, atualiza o esquema, sincroniza a busca, reconstrói os índices e reinicia os serviços. O reaproveitamento da aparência salva é tentado quando há estado de tema."
+    ],
+    "steps": [
+     "Abra a central e escolha o cartão **Restaurar base de dados**.",
+     "Selecione o arquivo correto no servidor ou no disco Windows acessível ao WSL.",
+     "Leia as verificações e investigue avisos de arquivo suspeito ou incompleto.",
+     "Confira o arquivo, o tamanho e o espaço na confirmação. Autorizar essa tela permite substituir o banco atual.",
+     "Aguarde sem fechar a janela.",
+     "Leia o resultado e preserve o caminho do backup de segurança informado. Confira depois o catálogo e as buscas."
+    ],
+    "tips": [
+     "Use **Testar a integridade do último backup** para testar o arquivo sem substituir a produção.",
+     "Confira o espaço necessário apresentado pelo fluxo. Não estime apenas pelo tamanho compactado.",
+     "Mantenha a cópia de segurança e uma cópia fora do servidor até conferir o resultado."
+    ],
+    "warnings": [
+     "A restauração substitui dados pelo estado do backup: alterações posteriores não estarão nesse arquivo.",
+     "Em falhas de recriação, importação ou atualização do esquema, o código pode tentar recuperar o banco anterior. Essa recuperação também pode falhar; leia a mensagem final.",
+     "Uma falha de indexação pode acontecer depois de o banco já ter sido restaurado. Não suponha que toda falha recoloca automaticamente o banco anterior."
+    ],
+    "outdated": true
+   }
+  },
+  "backup-cloud": {
+   "en": {
+    "summary": "Connects a cloud storage to the nightly backup with rclone, so every backup also goes off the server: Google Drive in two express ways, or OneDrive, MEGA and S3-compatible storage step by step.",
+    "steps": [
+     "Open the Backup center and choose **Configure cloud backup**.",
+     "Choose how to connect (see the options).",
+     "Sign in with the library's own account, not a personal one.",
+     "Wait for the real upload test: the panel sends a small file to the cloud and checks it arrived.",
+     "If the test fails, choose **Try the test again** or **Edit the token**."
+    ],
+    "options": [
+     {
+      "name": "Express: Generate token on another PC (SSH / Headless)",
+      "text": "For a server without a browser: you run one rclone command on your own computer, sign in to Google there and paste the token (a JSON text starting with `{` and ending with `}`) back into the panel."
+     },
+     {
+      "name": "Express: Authenticate directly on this server",
+      "text": "When the server has a browser, or through an SSH tunnel to port 53682: the panel opens the Google sign-in and captures the token by itself."
+     },
+     {
+      "name": "Other services: OneDrive, MEGA or S3 (step by step)",
+      "text": "The panel asks only what each service needs: a OneDrive sign-in (copy the link, then paste back the address the browser ended on), the MEGA e-mail and password, or an S3 access key, region, endpoint and bucket (AWS, Cloudflare R2, Wasabi, MinIO). Nobody types an rclone command."
+     }
+    ],
+    "tips": [
+     "Use an account owned by the library and shared with at least two people, so the backups do not depend on one person.",
+     "Check the cloud folder once a month: the nightly log says whether each upload worked.",
+     "Combine the cloud copy with **XZ** or **Zstandard** compression to save upload time and space."
+    ],
+    "warnings": [
+     "The token and keys are stored only in rclone's private file on the server. Anyone with root access to the server can use them: protect the server accordingly."
+    ],
+    "related": [
+     "backup-manual",
+     "backup-compression",
+     "crons"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
+    "steps": [
+     "Abra a Central de backups e restauração e escolha **Configurar backup na nuvem**.",
+     "Escolha como conectar (veja as opções).",
+     "Entre com a conta da própria biblioteca, não com uma conta pessoal.",
+     "Aguarde o teste real de envio: o painel manda um arquivo pequeno para a nuvem e confere se ele chegou.",
+     "Se o teste falhar, escolha **Testar de novo** ou **Editar o token**."
+    ],
+    "options": [
+     {
+      "name": "Expresso: gerar o token em outro computador (SSH / sem tela)",
+      "text": "Para um servidor sem navegador: você roda um comando do rclone no seu próprio computador, entra na conta Google ali e cola o token (um texto JSON que começa com `{` e termina com `}`) de volta no painel."
+     },
+     {
+      "name": "Expresso: autenticar diretamente neste servidor",
+      "text": "Quando o servidor tem navegador, ou por um túnel SSH até a porta 53682: o painel abre o login do Google e captura o token sozinho."
+     },
+     {
+      "name": "Outros serviços: OneDrive, MEGA ou S3 (passo a passo)",
+      "text": "O painel pergunta só o que cada serviço precisa: o login do OneDrive (copie o link e depois cole de volta o endereço em que o navegador terminou), o e-mail e a senha do MEGA, ou a chave de acesso, a região, o endpoint e o bucket do S3 (AWS, Cloudflare R2, Wasabi, MinIO). Ninguém digita comandos do rclone."
+     }
+    ],
+    "tips": [
+     "Use uma conta da biblioteca, compartilhada com pelo menos duas pessoas, para que os backups não dependam de uma só pessoa.",
+     "Confira a pasta na nuvem uma vez por mês: o log noturno diz se cada envio funcionou.",
+     "Combine a cópia na nuvem com a compressão **XZ** ou **Zstandard** para economizar tempo de envio e espaço."
+    ],
+    "warnings": [
+     "O token e as chaves ficam guardados só no arquivo privado do rclone no servidor. Quem tiver acesso root ao servidor pode usá-los: proteja o servidor à altura."
+    ]
+   }
+  },
+  "backup-test": {
+   "en": {
+    "summary": "Proves that a backup really restores: the newest file is imported into a temporary database and checked, while the production data is not touched.",
+    "steps": [
+     "Open the Backup center and choose **Test integrity of latest backup**.",
+     "Check the file and date shown, or press **Choose another file** to test a different one.",
+     "Confirm **Run the test now?**.",
+     "Read the result: *BACKUP IS INTACT AND RESTORABLE* with the number of tables, bibliographic records and patrons, or the reason it failed."
+    ],
+    "tips": [
+     "Test a backup at least once a month and always before relying on one for a restore or a migration.",
+     "Compare the counts of records and patrons with what you expect: a backup that restores but has far fewer records points at a problem upstream."
+    ],
+    "warnings": [
+     "*The backup DID NOT restore* is urgent: make a new manual backup right away and find out why the nightly one is broken."
+    ],
+    "related": [
+     "restore",
+     "backup-manual",
+     "backup-status"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Prova que um backup restaura de verdade: o arquivo mais novo é importado num banco temporário e conferido, sem tocar nos dados de produção.",
+    "steps": [
+     "Abra a Central de backups e restauração e escolha **Testar a integridade do último backup**.",
+     "Confira o arquivo e a data mostrados, ou pressione **Escolher outro arquivo** para testar outro.",
+     "Confirme **Executar o teste agora?**.",
+     "Leia o resultado: *O BACKUP ESTÁ ÍNTEGRO E PODE SER RESTAURADO*, com o número de tabelas, registros bibliográficos e leitores, ou o motivo da falha."
+    ],
+    "tips": [
+     "Teste um backup pelo menos uma vez por mês e sempre antes de depender dele para uma restauração ou migração.",
+     "Compare o número de registros e de leitores com o que você espera: um backup que restaura mas tem bem menos registros aponta para um problema na origem."
+    ],
+    "warnings": [
+     "*O backup NÃO foi restaurado* é urgente: faça um novo backup manual na hora e descubra por que o noturno está quebrado."
+    ]
+   }
+  },
   "tainacan-backup": {
    "en": {
     "summary": "A full backup now: database, files and configuration, as a package of the platform backups.",
@@ -18371,23 +18290,86 @@
     "summary": "Um backup que parou antes do fim: retome ou descarte quando ele não puder ser restaurado."
    }
   },
-  "sec-tainacan-backups": {
+  "pbackup-setup": {
    "en": {
-    "summary": "Tainacan's backups: back up now, test a restore in an isolated copy, restore, schedule, repository and cloud copy, verify and incomplete backups.",
+    "summary": "Makes the server key that encrypts the configuration in every platform backup, with a recovery phrase you write down.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Cria a chave do servidor que criptografa a configuração em todos os backups das plataformas, com uma frase de recuperação que você anota."
+   }
+  },
+  "pbackup-kit": {
+   "en": {
+    "summary": "Saves the recovery kit: with the recovery phrase, a new server reads the encrypted backups and the restic repositories.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Salva o kit de recuperação: com a frase de recuperação, um servidor novo lê os backups criptografados e os repositórios restic."
+   }
+  },
+  "cloud-connections": {
+   "en": {
+    "summary": "The cloud accounts this server can send backups to, for any platform: add, edit, test or remove a connection.",
     "overview": [
-     "What is encrypted: the configuration with the server key; the files only in a restic repository; the database is not encrypted, in the package nor in its cloud copy."
+     "Only the connections: Koha's cloud backups are made in **Configure cloud backup**, and the Tainacan copy in **Repository and cloud copy**, each with its own folder, schedule and retention.",
+     "The **Use** column says what sends to each connection. A connection the Tainacan backup still uses cannot be removed here; removing another one keeps the files already in the cloud."
     ],
     "related": [
-     "tainacan-backup",
-     "tainacan-restore-test",
-     "tainacan-restore",
-     "sec-infra"
+     "backup-cloud",
+     "sec-backups"
     ]
    },
    "pt-BR": {
-    "summary": "Os backups do Tainacan: fazer agora, testar a restauração numa cópia isolada, restaurar, agendar, repositório e cópia na nuvem, verificar e backups incompletos.",
+    "summary": "As contas de nuvem para onde este servidor pode enviar backups, de qualquer plataforma: adicionar, editar, testar ou remover uma conexão.",
     "overview": [
-     "O que é criptografado: a configuração, com a chave do servidor; os arquivos, só num repositório restic; o banco não é criptografado, nem no pacote nem na cópia na nuvem."
+     "Só as conexões: os backups do Koha na nuvem são feitos em **Configurar backup na nuvem**, e a cópia do Tainacan em **Repositório e cópia na nuvem**, cada um com a sua pasta, agendamento e retenção.",
+     "A coluna **Uso** diz o que envia para cada conexão. Uma conexão ainda usada pelo backup do Tainacan não pode ser removida aqui; remover outra mantém os arquivos que já estão na nuvem."
+    ]
+   }
+  },
+  "sec-backups": {
+   "en": {
+    "summary": "Every backup of this server in one screen of the main menu (key b): Koha's and Tainacan's, their automatic backups and the cloud connections they share.",
+    "overview": [
+     "**Platform** offers only what is installed, Koha first; the choice appears only when both are. The **Koha backups** card in the Koha group and the **Tainacan backups** card in the Tainacan group open this same screen, already on that platform. With no platform installed it says so, and the cloud connections can already be added.",
+     "Koha: the newest backup, its size and the last nightly result (three indicators that may refer to different runs), the compression of new backups, and the cards for manual backup, download, MARC21 export, restore, cloud backup and integrity test. Tainacan: its packages, the backup key and what is encrypted, and the cards for backup, restore test, restore, schedule, repository and cloud copy, verification, incomplete backups, encrypted backups and the recovery kit.",
+     "**Automatic backups** lists each one in its own row: destination, frequency, how long it is kept, what is encrypted and its last run. A row says **No run recorded** when there is no reliable record; nothing is invented. What is encrypted is said part by part: a Tainacan package encrypts its configuration with the server key and its files only in a restic repository, never its database; a Koha backup is encrypted only when it goes through an encrypted (rclone crypt) connection.",
+     "**Cloud connections** is shared and needs no Koha: the rclone accounts (Google Drive and every other service rclone supports). With only Tainacan installed a connection is tested in its own folder (Koha.Nexus) and no Koha backup is created. A connection the Tainacan copy or repository still uses is marked and cannot be removed until that backup goes elsewhere.",
+     "Opening the center only reads: nothing is scheduled, sent or changed until a card is chosen."
+    ],
+    "tips": [
+     "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (a cloud backup or copy covers that).",
+     "A backup you never tested is a hope, not a backup: test a restore once a month."
+    ],
+    "related": [
+     "backup-status",
+     "backup-compression",
+     "backup-download",
+     "backup-safety",
+     "backup-cloud",
+     "backup-marc",
+     "restore",
+     "tainacan-backup",
+     "tainacan-restore-test",
+     "tainacan-restore",
+     "pbackup-setup",
+     "pbackup-kit",
+     "cloud-connections"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Todos os backups deste servidor numa tela do menu principal (tecla b): os do Koha e os do Tainacan, os backups automáticos de cada um e as conexões de nuvem que eles compartilham.",
+    "overview": [
+     "**Plataforma** oferece só o que está instalado, o Koha primeiro; a escolha aparece só quando os dois estão. O cartão **Backups do Koha**, no grupo do Koha, e o cartão **Backups do Tainacan**, no grupo do Tainacan, abrem esta mesma tela, já na plataforma certa. Sem nenhuma plataforma instalada ela avisa, e as conexões de nuvem já podem ser adicionadas.",
+     "Koha: o backup mais recente, o tamanho e o resultado da última execução noturna (três indicadores que podem se referir a execuções diferentes), a compressão dos novos backups e os cartões de backup manual, download, exportação MARC21, restauração, backup na nuvem e teste de integridade. Tainacan: os pacotes, a chave dos backups e o que é criptografado, e os cartões de backup, teste de restauração, restauração, agendamento, repositório e cópia na nuvem, verificação, backups incompletos, backups criptografados e kit de recuperação.",
+     "**Backups automáticos** mostra cada um na sua linha: destino, frequência, por quanto tempo fica guardado, o que é criptografado e a última execução. A linha diz **Sem registro** quando não há registro confiável; nada é inventado. O que é criptografado é dito parte por parte: um pacote do Tainacan criptografa a configuração com a chave do servidor e os arquivos só num repositório restic, nunca o banco; um backup do Koha só é criptografado quando vai por uma conexão criptografada (rclone crypt).",
+     "**Conexões de nuvem** é compartilhada e não precisa do Koha: as contas do rclone (Google Drive e qualquer outro serviço que o rclone aceite). Só com o Tainacan instalado, a conexão é testada numa pasta própria (Koha.Nexus) e nenhum backup do Koha é criado. Uma conexão ainda usada pela cópia ou pelo repositório do Tainacan aparece marcada e não pode ser removida até esse backup ir para outro lugar.",
+     "Abrir a central só lê: nada é agendado, enviado ou alterado até um cartão ser escolhido."
+    ],
+    "tips": [
+     "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma fora do local (um backup ou cópia na nuvem cobre isso).",
+     "Backup nunca testado é esperança, não backup: teste uma restauração uma vez por mês."
     ]
    }
   },
@@ -18691,24 +18673,6 @@
     "summary": "Instala o Docker pelo repositório oficial depois de mostrar o plano; nada mais é instalado junto e ninguém entra no grupo docker."
    }
   },
-  "pbackup-setup": {
-   "en": {
-    "summary": "Makes the server key that encrypts the configuration in every platform backup, with a recovery phrase you write down.",
-    "related": []
-   },
-   "pt-BR": {
-    "summary": "Cria a chave do servidor que criptografa a configuração em todos os backups das plataformas, com uma frase de recuperação que você anota."
-   }
-  },
-  "pbackup-kit": {
-   "en": {
-    "summary": "Saves the recovery kit: with the recovery phrase, a new server reads the encrypted backups and the restic repositories.",
-    "related": []
-   },
-   "pt-BR": {
-    "summary": "Salva o kit de recuperação: com a frase de recuperação, um servidor novo lê os backups criptografados e os repositórios restic."
-   }
-  },
   "docker-remove": {
    "en": {
     "summary": "Removes a Docker that Koha.Nexus installed, only when no container, network or platform is left in it. A Docker that was here before is never removed.",
@@ -18720,24 +18684,22 @@
   },
   "sec-infra": {
    "en": {
-    "summary": "What the platforms in containers share (key p): the web server in front of them, Docker and the key of their backups.",
+    "summary": "What the platforms in containers share (key p): the web server in front of them and Docker.",
     "overview": [
-     "**Web proxy**, **Docker** and **Backup key** are read-only cards. **Install Docker** shows its plan first; **Remove Docker**, under Removal, only removes a Docker Koha.Nexus installed and left empty.",
-     "What the platform backups encrypt: the configuration with this server's key (the recovery phrase opens it); the files only in a restic repository; the database not at all, in the package nor in its cloud copy. Keep the backup folder and the cloud account protected."
+     "**Web proxy** and **Docker** are read-only cards. **Install Docker** shows its plan first; **Remove Docker**, under Removal, only removes a Docker Koha.Nexus installed and left empty.",
+     "The backup key, the recovery kit and what the platform backups encrypt are in the Backup center."
     ],
     "related": [
      "docker-install",
-     "pbackup-setup",
-     "pbackup-kit",
      "docker-remove",
-     "sec-tainacan-backups"
+     "sec-backups"
     ]
    },
    "pt-BR": {
-    "summary": "O que as plataformas em contêineres compartilham (tecla p): o servidor web na frente delas, o Docker e a chave dos backups.",
+    "summary": "O que as plataformas em contêineres compartilham (tecla p): o servidor web na frente delas e o Docker.",
     "overview": [
-     "**Proxy web**, **Docker** e **Chave dos backups** são cartões só de leitura. **Instalar o Docker** mostra o plano antes; **Remover o Docker**, em Remoção, só remove um Docker que o Koha.Nexus instalou e que ficou vazio.",
-     "O que os backups das plataformas criptografam: a configuração, com a chave deste servidor (a frase de recuperação a abre); os arquivos, só num repositório restic; o banco, nada, nem no pacote nem na cópia na nuvem. Proteja a pasta de backups e a conta na nuvem."
+     "**Proxy web** e **Docker** são cartões só de leitura. **Instalar o Docker** mostra o plano antes; **Remover o Docker**, em Remoção, só remove um Docker que o Koha.Nexus instalou e que ficou vazio.",
+     "A chave dos backups, o kit de recuperação e o que os backups das plataformas criptografam ficam na Central de backups."
     ]
    }
   },
@@ -19632,7 +19594,7 @@
      "Keep gzip when the backups are opened by people outside the library who may not have other tools."
     ],
     "related": [
-     "sec-backup",
+     "sec-backups",
      "backup-safety",
      "restore",
      "backup-cloud"
@@ -21319,8 +21281,8 @@
    "manual": 144,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 471,
-   "strings_total": 471
+   "strings": 470,
+   "strings_total": 470
   },
   "pt-BR": {
    "manual": 144,
@@ -21328,166 +21290,165 @@
    "manual_outdated": [
     "install",
     "apache-log",
-    "backup-manual",
-    "restore",
-    "sec-backup",
     "magic-import",
     "sec-ai",
     "sec-opac",
+    "backup-manual",
+    "restore",
     "backup-compression",
     "backup-safety",
     "ai-ollama",
     "opac-material"
    ],
-   "strings": 465,
-   "strings_total": 471
+   "strings": 464,
+   "strings_total": 470
   },
   "es": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 401,
-   "strings_total": 471
+   "strings": 400,
+   "strings_total": 470
   },
   "fr": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 401,
-   "strings_total": 471
+   "strings": 400,
+   "strings_total": 470
   },
   "it": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 401,
-   "strings_total": 471
+   "strings": 400,
+   "strings_total": 470
   },
   "de": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 400,
-   "strings_total": 471
+   "strings": 399,
+   "strings_total": 470
   },
   "nl": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "sv": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "pl": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "cs": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "ru": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "uk": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "tr": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "tl": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "id": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "ar": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "fa": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "hi": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "bn": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "vi": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "zh": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "ja": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   },
   "ko": {
    "manual": 0,
    "manual_total": 144,
    "manual_outdated": [],
-   "strings": 366,
-   "strings_total": 471
+   "strings": 365,
+   "strings_total": 470
   }
  }
 }

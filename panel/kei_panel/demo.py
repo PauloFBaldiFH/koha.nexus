@@ -546,6 +546,7 @@ _SCRIPTS: dict[str, list[str]] = {
                                "@@result kit=/var/lib/koha-nexus/backup/recovery-kit.txt",
                                "@@result tainacan.repo=/var/backups/koha-nexus/restic/tainacan",
                                "@@result tainacan.copy=gdrive:koha-nexus", "@@result tainacan.schedule=02:30",
+                               "@@result tainacan.keep=7 7 4 6",
                                "@@result tainacan.last=knx-tainacan-20261105-023000|2026-11-05 02:30:00|ref",
                                "@@result tainacan.count=9", "@@result tainacan.incomplete=1",
                                "@@result tainacan.verified=2026-11-01 04:30:12 knx-tainacan-20261002-023000 ok",

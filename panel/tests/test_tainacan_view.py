@@ -99,10 +99,13 @@ def choose(view, action) -> None:
 # ----------------------------------------------------------------------
 # Four servers: the sidebar, the dashboard's tabs, the platform homes
 # ----------------------------------------------------------------------
-KOHA_SCREENS = ["backup", "import", "library", "z3950", "ai", "opac", "hub", "search", "crons", "settings",
+KOHA_SCREENS = ["import", "library", "z3950", "ai", "opac", "hub", "search", "crons", "settings",
                 "diagnostics", "koha-security"]
-TAINACAN_SCREENS = ["tainacan-maintenance", "tainacan-events", "tainacan-backups"]
-SERVER_SCREENS = ["security", "infra", "server-diagnostics", "languages", "update", "tools", "about", "reboot"]
+TAINACAN_SCREENS = ["tainacan-maintenance", "tainacan-events"]
+# The Backup center is shared (main menu, Paulo 2026-11-06): each platform
+# home has a card that opens it already filtered.
+SERVER_SCREENS = ["backups", "security", "infra", "server-diagnostics", "languages", "update", "tools", "about",
+                  "reboot"]
 
 
 @pytest.mark.parametrize("server", list(SERVERS), indirect=True)
@@ -155,13 +158,13 @@ def test_each_platform_home_follows_its_state(server):
     kid, kcards, kproblem, kdash = homes["k"]
     assert kid == "view-koha"
     if koha:
-        assert kcards == ["credentials"] + KOHA_SCREENS and kproblem == "" and kdash
+        assert kcards == ["credentials", "backups"] + KOHA_SCREENS and kproblem == "" and kdash
     else:
         assert kcards == ["install"] and "not installed" in kproblem and not kdash
     tid, tcards, tproblem, tdash = homes["g"]
     assert tid == "view-tainacan"
     if tainacan:
-        assert tcards == TAINACAN_SCREENS + ["tainacan-uninstall"] and tproblem == "" and tdash
+        assert tcards == TAINACAN_SCREENS + ["backups", "tainacan-uninstall"] and tproblem == "" and tdash
     else:
         assert tcards == ["tainacan-install"] and "not installed" in tproblem and not tdash
     # Opening the homes only reads.
@@ -223,14 +226,14 @@ def test_a_stopped_koha_puts_the_diagnosis_first(server):
     cards, problem = asyncio.run(main())
     assert "MariaDB, Apache" in problem
     assert cards[:4] == ["status", "health", "repair-services", "apache-log"]
-    assert "backup" in cards and "install" not in cards and "restore" not in cards
+    assert "backups" in cards and "install" not in cards and "restore" not in cards
 
 
 @pytest.mark.parametrize("server", ["both"], indirect=True)
 def test_groups_expand_and_collapse_with_the_arrows_and_keys_keep_their_screens(server):
     from textual.widgets import ContentSwitcher, OptionList
 
-    keys = {"d": "dashboard", "k": "koha", "b": "backup", "i": "import", "l": "library", "h": "enrich-auth",
+    keys = {"d": "dashboard", "k": "koha", "b": "backups", "i": "import", "l": "library", "h": "enrich-auth",
             "n": "ondemand", "z": "z3950", "a": "ai", "o": "opac", "m": "hub", "s": "crons", "t": "database",
             "g": "tainacan", "x": "security", "v": "vpn", "p": "infra"}
 
@@ -261,7 +264,7 @@ def test_groups_expand_and_collapse_with_the_arrows_and_keys_keep_their_screens(
             # A key of a screen of a collapsed group opens it and expands the group.
             app.screen.set_group("koha", False)
             await pilot.pause(0.1)
-            await pilot.press("b")
+            await pilot.press("i")
             await pilot.pause(0.3)
             return collapsed, highlighted, expanded, current, opened, sidebar_ids(app), \
                 sidebar.get_option_at_index(sidebar.highlighted).id
@@ -271,7 +274,7 @@ def test_groups_expand_and_collapse_with_the_arrows_and_keys_keep_their_screens(
     assert set(TAINACAN_SCREENS) <= set(expanded)
     assert current == "view-dashboard"                   # the arrows never change the screen
     assert opened == {k: f"view-{v}" for k, v in keys.items()}
-    assert "backup" in after_b and hl_b == "backup"
+    assert "import" in after_b and hl_b == "import"
 
 
 @pytest.mark.parametrize("server", ["none", "koha"], indirect=True)
@@ -283,13 +286,13 @@ def test_without_tainacan_its_screens_show_the_reason_and_load_nothing(server):
         app = make_app(ran)
         async with app.run_test() as pilot:
             await pilot.pause(0.3)
-            app.screen.action_show("tainacan-backups")
+            app.screen.action_show("tainacan-events")
             await pilot.pause(0.5)
             view = current_view(app)
             return view.id, str(view.query_one("#unavailable-reason", Label).render()), ran
 
     vid, reason, ran = asyncio.run(main())
-    assert vid == "view-tainacan-backups-off"
+    assert vid == "view-tainacan-events-off"
     assert "Tainacan is not installed" in reason and "Tainacan (collections and museums)" in reason
     assert ran == []
 
@@ -316,9 +319,6 @@ def test_the_tainacan_screens_have_their_tools_and_no_second_summary(server):
     assert out["tainacan-maintenance"][0] == ["tainacan-status", "tainacan-logs", "tainacan-credentials",
                                               "tainacan-site-undo"]
     assert out["tainacan-events"][0] == ["events-on", "events-status"]         # off: no "turn off"
-    assert out["tainacan-backups"][0] == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore",
-                                          "pbackup-schedule", "pbackup-configure", "pbackup-verify",
-                                          "pbackup-incomplete"]
     assert all(links == 0 for _c, links in out.values())         # addresses: the dashboard only
     assert {name for name, _a in ran} <= READS
 

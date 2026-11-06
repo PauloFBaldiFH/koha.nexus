@@ -264,6 +264,13 @@ nope() { ! "$@"; }
     [ "$status" -eq 0 ]
     run lib 'kei_backup_copy demo nowhere:x'
     [ "$status" -eq 3 ]
+    # Never inside the folders of a Koha cloud backup: each plan its own destination.
+    run lib "kei_backup_copy demo loc:$T/Backup_SQL_Koha"
+    [ "$status" -eq 2 ]
+    run lib "kei_backup_copy demo loc:$T/k/Backup_MARC_Koha/x"
+    [ "$status" -eq 2 ]
+    run lib "kei_backup_copy demo loc:$T/cloud"
+    [ "$status" -eq 0 ]
     run lib '_KEI_BK_CRASH_AFTER=manifest kei_backup_run demo'
     [ "$status" -eq 137 ]
     B=$(ls -d "$KEI_BK_ROOT"/demo/knx-demo-*)
@@ -352,6 +359,7 @@ nope() { ! "$@"; }
     run lib 'kei_backup_status demo'
     [[ "$output" == *"demo.verified="*"${A##*/} ok"* ]]
     [[ "$output" == *"demo.count=2"* ]]
+    [[ "$output" == *"demo.keep=7 7 4 6"* ]]
 }
 
 @test "schedule: daily package, weekly maintenance, monthly verification; off removes the file" {

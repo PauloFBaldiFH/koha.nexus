@@ -43,6 +43,10 @@ class Entry:
     # (removing, kept apart from the rest). A platform's home shows each
     # zone by the platform's state (platforms.home_zones).
     zone: str = ""
+    # A "view" entry can open its screen already filtered: the Backup center
+    # opened from Koha's group shows Koha's backups ("koha"), from
+    # Tainacan's group Tainacan's ("tainacan"). "" = as the screen was left.
+    scope: str = ""
 
 
 @dataclass(frozen=True)
@@ -84,7 +88,7 @@ SECTIONS: tuple[Section, ...] = (
               zone="recovery", requires="koha"),
         Entry("📜  Real-time Apache log auditing", "apache-log", kind="native", zone="recovery", requires="koha"),
         Entry("🔑  View first-access credentials", "credentials", kind="native", requires="koha"),
-        Entry("💾  Backup center", "backup", kind="view"),
+        Entry("💾  Koha backups", "backups", kind="view", scope="koha"),
         Entry("🪄  Magic Import Tool", "import", kind="view"),
         Entry("📚  Library tools", "library", kind="view"),
         Entry("📡  Z39.50 / SRU servers", "z3950", kind="view"),
@@ -100,16 +104,6 @@ SECTIONS: tuple[Section, ...] = (
     Section("credentials", "🔑  View first-access credentials", requires="koha", entries=(
         Entry("🔑  View first-access credentials", "credentials", kind="native"),), sidebar=False, parent="koha",
         group="koha"),
-    # The cards are the only place of the backup actions (Paulo, 2026-10-15:
-    # no buttons above the status cards any more).
-    Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
-        Entry("📥 Download latest backup", "backup-download", kind="native"),
-        Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native"),
-        Entry("📚  Export MARC21 records now", "backup-marc", kind="native"),
-        Entry("📥  Restore database", "restore", kind="native"),
-        Entry("📤  Configure cloud backup", "backup-cloud", kind="native"),
-        Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
-    ), view="backup", key="b", requires="koha", group="koha"),
     # Every import in one place, right under the backups (Paulo, 2026-10-09).
     Section("import", "🪄  Magic Import Tool",
             prompt="Imports bibliographic records, authority records and patron (reader) data from other systems: "
@@ -222,7 +216,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🏠  Prepare the home page", "tainacan-site", kind="native", requires="tainacan"),
         Entry("🩺  Tainacan diagnosis & maintenance", "tainacan-maintenance", kind="view"),
         Entry("🎟  Tainacan events", "tainacan-events", kind="view"),
-        Entry("💾  Tainacan backups", "tainacan-backups", kind="view"),
+        Entry("💾  Tainacan backups", "backups", kind="view", scope="tainacan"),
         Entry("🗑  Uninstall Tainacan", "tainacan-uninstall", kind="native", zone="removal", requires="tainacan"),
     ), view="platform-home", key="g", group="tainacan"),
     Section("tainacan-maintenance", "🩺  Tainacan diagnosis & maintenance", "🩺  Tainacan diagnosis & maintenance",
@@ -241,19 +235,31 @@ SECTIONS: tuple[Section, ...] = (
         Entry("⏸  Turn events off", "events-off", kind="native"),
         Entry("📋  Events state", "events-status", kind="native"),
     ), view="platform-section", requires="tainacan", group="tainacan"),
-    Section("tainacan-backups", "💾  Tainacan backups", "💾  Tainacan backups",
-            "A restore is always tested first in an isolated copy, and what is there now is kept in a safety "
-            "backup.", (
-        Entry("💾  Back up Tainacan now", "tainacan-backup", kind="native"),
-        Entry("🧪  Test a restore", "tainacan-restore-test", kind="native"),
-        Entry("📥  Restore Tainacan", "tainacan-restore", kind="native"),
-        Entry("⏰  Schedule backups", "pbackup-schedule", kind="native"),
-        Entry("☁  Repository and cloud copy", "pbackup-configure", kind="native"),
-        Entry("🧾  Verify backups", "pbackup-verify", kind="native"),
-        Entry("⏯  Incomplete backup", "pbackup-incomplete", kind="native"),
-    ), view="platform-section", requires="tainacan", group="tainacan"),
-
     # ---------------- Server: shared by every platform ----------------
+    # Every backup in one place (Paulo, 2026-11-06): the platform is chosen
+    # at the top (Koha, Tainacan; only the installed ones), each card shows
+    # only for the platform it works on, and the platform groups open it
+    # already filtered. Cloud connections are the server's: any platform
+    # (or none yet) can add one; what each platform sends, where, when and
+    # for how long is its own plan.
+    Section("backups", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
+        Entry("📥 Download latest backup", "backup-download", kind="native", requires="koha"),
+        Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native", requires="koha"),
+        Entry("📚  Export MARC21 records now", "backup-marc", kind="native", requires="koha"),
+        Entry("📥  Restore database", "restore", kind="native", requires="koha"),
+        Entry("📤  Configure cloud backup", "backup-cloud", kind="native", requires="koha"),
+        Entry("🧾  Test integrity of latest backup", "backup-test", kind="native", requires="koha"),
+        Entry("💾  Back up Tainacan now", "tainacan-backup", kind="native", requires="tainacan"),
+        Entry("🧪  Test a restore", "tainacan-restore-test", kind="native", requires="tainacan"),
+        Entry("📥  Restore Tainacan", "tainacan-restore", kind="native", requires="tainacan"),
+        Entry("⏰  Schedule backups", "pbackup-schedule", kind="native", requires="tainacan"),
+        Entry("☁  Repository and cloud copy", "pbackup-configure", kind="native", requires="tainacan"),
+        Entry("🧾  Verify backups", "pbackup-verify", kind="native", requires="tainacan"),
+        Entry("⏯  Incomplete backup", "pbackup-incomplete", kind="native", requires="tainacan"),
+        Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native", requires="tainacan"),
+        Entry("🧰  Recovery kit", "pbackup-kit", kind="native", requires="tainacan"),
+        Entry("🔌  Cloud connections", "cloud-connections", kind="native"),
+    ), view="backups", key="b"),
     # Security, remote access and the firewall in one hub: VPN, Cloudflare
     # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
     # internet" and "Security center"). The Tunnel and HTTPS only serve
@@ -270,14 +276,11 @@ SECTIONS: tuple[Section, ...] = (
     # from the Security & access hub (or its key).
     Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v", sidebar=False,
             parent="security"),
-    # What the platforms in containers share: the web proxy, Docker and the
-    # backup vault (the key and the recovery kit of every platform's backups).
+    # What the platforms in containers share: the web proxy and Docker (the
+    # key and the recovery kit of their backups live in the Backup center).
     Section("infra", "🧱  Shared infrastructure", "🧱  Shared infrastructure",
-            "What the platforms in containers use together: the web server in front of them, Docker and the "
-            "key of their backups.", (
+            "What the platforms in containers use together: the web server in front of them and Docker.", (
         Entry("🐳  Install Docker", "docker-install", kind="native"),
-        Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native"),
-        Entry("🧰  Recovery kit", "pbackup-kit", kind="native"),
         Entry("🗑  Remove Docker", "docker-remove", kind="native", zone="removal"),
     ), view="platform-section", key="p"),
     Section("server-diagnostics", "🩺  Server diagnostics", "🩺  Server diagnostics", "Choose a tool:", (
@@ -330,7 +333,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "events-status": "tainacan-events", "pbackup-setup": "platform-backup-setup",
     "pbackup-kit": "platform-backup-kit", "pbackup-configure": "platform-backup-repo",
     "pbackup-schedule": "platform-backup-schedule", "pbackup-verify": "platform-backup-verify",
-    "pbackup-incomplete": "platform-backup-incomplete",
+    "pbackup-incomplete": "platform-backup-incomplete", "cloud-connections": "cloud-list",
 }
 
 # Panel routines with no installer routine of their own (routines/).
@@ -448,8 +451,11 @@ DESCRIPTIONS: dict[str, str] = {
     "update-panel": "Downloads the newest version of this panel",
     "about": "Version, license and where to get help",
     "reboot": "Restarts the whole server",
-    # The cards of the platform homes that open a screen of the group.
-    "backup": "Backups of Koha's database, MARC21 exports, restore and cloud copies",
+    # The cards of the platform homes that open a screen of the group (or,
+    # for a card with a scope, the shared screen filtered: "ACTION:SCOPE").
+    "backups": "Every backup of this server: Koha, Tainacan, cloud connections and plans",
+    "backups:koha": "Backups of Koha's database, MARC21 exports, restore and cloud copies",
+    "backups:tainacan": "Back up, test a restore, restore, schedule and cloud copy",
     "import": "Imports records and patrons from other systems, with checks first",
     "library": "Enrichment, authorities, reports, privacy and other catalogue tools",
     "z3950": "Koha's Z39.50/SRU server and the catalogues for copy cataloguing",
@@ -460,10 +466,9 @@ DESCRIPTIONS: dict[str, str] = {
     "settings": "Server sizing and the super librarian account",
     "diagnostics": "Health check, Apache log, database upkeep and Koha's services",
     "koha-security": "Staff port, database password and Google Search Console",
-    "infra": "Docker, the web proxy and the key of the platform backups",
+    "infra": "Docker and the web proxy in front of the platforms",
     "tainacan-maintenance": "Diagnosis, logs and the WordPress administrator",
     "tainacan-events": "Events, bookings and certificates in Tainacan: optional",
-    "tainacan-backups": "Back up, test a restore, restore, schedule and cloud copy",
     # Tainacan, Docker and the platform backups (routines/platforms.py).
     "tainacan-install": "Installs WordPress and Tainacan in containers, after its plan and a Yes",
     "tainacan-status": "Checks the containers, WordPress, the plugin and the collections",
@@ -487,10 +492,13 @@ DESCRIPTIONS: dict[str, str] = {
     "docker-remove": "Removes the Docker Koha.Nexus installed, only when nothing is left in it",
     "pbackup-setup": "Makes the server key that encrypts the configuration in the backups",
     "pbackup-kit": "Saves the recovery kit to copy away from this server",
+    "cloud-connections": "The cloud accounts this server can send backups to, for any platform",
     "export-diagnostics": "Saves a report of this server to send to whoever helps you",
     "open-diagnostics": "Reads a diagnostics report saved here or sent to you",
 }
 
 
 def description(entry: Entry) -> str:
+    if entry.scope:
+        return DESCRIPTIONS.get(f"{entry.action}:{entry.scope}") or DESCRIPTIONS.get(entry.action, "")
     return DESCRIPTIONS.get(entry.action, "")
