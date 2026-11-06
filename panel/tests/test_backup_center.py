@@ -122,7 +122,29 @@ def server(monkeypatch, request):
     return request.param
 
 
+ERRORS: list = []
+
+
+def _traced(fn):
+    # A routine runs in a worker that swallows its errors (exit_on_error=False):
+    # keep them, so a test that waits for a screen can say why it never came.
+    async def run(app):
+        try:
+            return await fn(app)
+        except Exception:
+            import traceback
+            ERRORS.append(traceback.format_exc())
+            raise
+    run.traced = True
+    return run
+
+
 def make_app(ran):
+    from kei_panel import routines
+    for name, fn in list(routines.ROUTINES.items()):
+        if not getattr(fn, "traced", False):
+            routines.ROUTINES[name] = _traced(fn)
+    ERRORS.clear()
     app = KohaPanelApp(PanelEnv(installer=None, lang="en", plain=False, demo=True))
     real_task = app.bridge.task
 
@@ -152,7 +174,9 @@ async def until(pilot, ready, seconds=30.0):
     while not ready() and waited < seconds:
         await pilot.pause(0.25)
         waited += 0.25
-    assert ready(), f"still on {type(pilot.app.screen).__name__} after {seconds:.0f} s"
+    if not ready():
+        raise AssertionError(f"still on {type(pilot.app.screen).__name__} after {seconds:.0f} s; "
+                             f"routine errors: {' | '.join(ERRORS) or 'none'}")
     return True
 
 
