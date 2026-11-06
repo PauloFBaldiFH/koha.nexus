@@ -177,7 +177,7 @@ def test_the_filters():
 # The screen, on four servers
 # ----------------------------------------------------------------------
 SERVERS = {"none": ("0", "0"), "koha": ("1", "0"), "tainacan": ("0", "1"), "both": ("1", "1")}
-READS = {"platform-backup-status", "cloud-status"}
+READS = {"platform-backup-status", "cloud-status", "set-schedule-status"}
 
 
 @pytest.fixture
@@ -243,7 +243,10 @@ def test_the_center_on_four_servers_only_reads(server):
     assert set(ran) <= READS
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
     assert st["platforms"] == [""] + [p for p, on in (("koha", koha), ("tainacan", tainacan), ("server", True)) if on]
-    assert st["cards"] == ["crons"] * koha + ["pbackup-schedule"] * tainacan
+    assert st["cards"] == ["crons"] * koha + ["pbackup-schedule"] * tainacan + ["set-schedule"] * (koha and tainacan)
+    # The scheduled joint backup: one row, only with both platforms, with its last run from its history.
+    joint = [n for p, n in st["rows"] if p == "koha+tainacan"]
+    assert joint == (["Joint backup (Koha + Tainacan)"] if koha and tainacan else [])
     platforms_shown = {p for p, _n in st["rows"]}
     assert ("koha" in platforms_shown) is koha
     assert ("tainacan" in platforms_shown) is tainacan
@@ -268,7 +271,7 @@ def test_the_koha_group_opens_it_filtered_and_its_card_opens_the_editor(server):
             filtered = {p for p, _n in state(view)["rows"]}
             chosen = view.query_one("#sc-platform", Select).value
             view.query_one("#sc-kind", Select).value = "backup"
-            await until(pilot, lambda: view.kind == "backup" and len(view.query("#sc-rows Static")) == 4)
+            await until(pilot, lambda: view.kind == "backup" and len(view.query("#sc-rows Static")) == 5)
             backups = state(view)["rows"]
             from kei_panel.widgets.cards import ActionCard
             card = next(c for c in view.query(ActionCard) if c.entry.action == "crons")
@@ -278,8 +281,25 @@ def test_the_koha_group_opens_it_filtered_and_its_card_opens_the_editor(server):
             return filtered, chosen, backups, current_view(app).id, getattr(app, "backup_scope", "")
 
     filtered, chosen, backups, editor, backup_scope = asyncio.run(main())
-    assert filtered == {"koha"} and chosen == "koha"
+    # Koha's rows, and the joint backup (of both platforms) under the Koha filter too.
+    assert filtered == {"koha", "koha+tainacan"} and chosen == "koha"
     assert [n for _p, n in backups] == ["Database backup (compressed SQL)", "MARC21 records backup",
-                                       "Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)"]
+                                       "Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)",
+                                       "Joint backup (Koha + Tainacan)"]
     assert editor == "view-crons"
     assert backup_scope != "koha"          # the Backup center's own choice is left alone
+
+
+def test_the_joint_backup_row_and_its_last_run():
+    text = "SHELL=/bin/bash\n15 1 * * * root /usr/local/bin/config.sh --task set-run scheduled >/dev/null 2>&1\n"
+    rows = schedules.collect({schedules.SET_FILE: text}, "library", True)
+    joint = [r for r in rows if r.source == schedules.SET_FILE]
+    assert [(r.platform, r.name, r.key) for r in joint] == [("koha+tainacan", "Joint backup (Koha + Tainacan)", "set:run")]
+    assert joint[0].when.startswith("Daily at 01:15")
+    assert schedules.shown(rows, "tainacan") and joint[0] in schedules.shown(rows, "koha")
+    assert joint[0] not in schedules.shown(rows, "server")
+    assert schedules.set_last_run("2026-11-06 01:16:52|ok|full|none|") == ("2026-11-06 01:16 · OK", "ok")
+    assert schedules.set_last_run("2026-11-06 01:16:52|partial|partial|none|tainacan: x")[1] == "bad"
+    assert schedules.set_last_run("2026-11-06 01:16:52|ok|full|failed|") == ("2026-11-06 01:16 · OK, cloud copy FAILED", "bad")
+    assert schedules.set_last_run("2026-11-06 01:16:52|busy|||")[1] == "warn"
+    assert schedules.set_last_run("") is None

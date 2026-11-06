@@ -3054,6 +3054,20 @@
     "setup-tainacan",
     "cloudflare"
    ]
+  },
+  "set-schedule": {
+   "summary": "The joint backup of Koha and Tainacan every day, with its folder, how many sets are kept and an optional encrypted cloud copy.",
+   "overview": [
+    "Shown in the Backup center under **Koha and Tainacan** and in Schedules. It runs the same joint backup as by hand, with one line in /etc/cron.d/koha-nexus-backup-sets, written only when you schedule it: updating the panel never creates it.",
+    "Each run is recorded in a history with the result of each platform. A platform that fails makes the run incomplete, never done; a run that finds another one still going is skipped and recorded.",
+    "Retention removes only the sets made by this schedule, and only after a complete set; sets made by hand are never removed.",
+    "Without a backup key the panel asks first, as for the manual joint backup: set the key up, or schedule a package without Koha's secrets (data only). The cloud copy needs the key: the whole set goes encrypted with it (.tar.gpg), never in clear."
+   ],
+   "related": [
+    "set-backup",
+    "restore-assisted",
+    "sec-backups"
+   ]
   }
  }
 }

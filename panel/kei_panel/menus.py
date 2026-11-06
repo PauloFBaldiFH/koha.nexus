@@ -267,6 +267,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native", requires="tainacan"),
         Entry("🧰  Recovery kit", "pbackup-kit", kind="native", requires="tainacan"),
         Entry("📦  Joint backup (Koha + Tainacan)", "set-backup", kind="native", scope="both"),
+        Entry("⏰  Schedule the joint backup", "set-schedule", kind="native", scope="both"),
         Entry("♻  Assisted restore", "restore-assisted", kind="native"),
         Entry("🔌  Cloud connections", "cloud-connections", kind="native"),
     ), view="backups", key="b"),
@@ -275,6 +276,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("schedules", "⏰  Schedules", "⏰ Schedules", entries=(
         Entry("✏  Koha's scheduled jobs", "crons", kind="view", requires="koha"),
         Entry("⏰  Schedule backups", "pbackup-schedule", kind="native", requires="tainacan"),
+        Entry("⏰  Schedule the joint backup", "set-schedule", kind="native", requires="koha+tainacan"),
     ), view="schedules", key="s"),
     # Security, remote access and the firewall in one hub: VPN, Cloudflare
     # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
@@ -350,7 +352,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "pbackup-kit": "platform-backup-kit", "pbackup-configure": "platform-backup-repo",
     "pbackup-schedule": "platform-backup-schedule", "pbackup-verify": "platform-backup-verify",
     "pbackup-incomplete": "platform-backup-incomplete", "cloud-connections": "cloud-list",
-    "set-backup": "set-backup", "restore-assisted": "set-inspect",
+    "set-backup": "set-backup", "restore-assisted": "set-inspect", "set-schedule": "set-schedule",
     "tainacan-address": "tainacan-address", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
     "setup-koha": "setup-status", "setup-tainacan": "setup-status",
 }
@@ -520,6 +522,7 @@ DESCRIPTIONS: dict[str, str] = {
     "pbackup-kit": "Saves the recovery kit to copy away from this server",
     "cloud-connections": "The cloud accounts this server can send backups to, for any platform",
     "set-backup": "One file with the data of Koha and of Tainacan, each captured in turn, with its checksums",
+    "set-schedule": "The joint backup every day: its folder, how many sets are kept and an encrypted cloud copy",
     "restore-assisted": "Recognises any backup by its content, shows where it came from and restores what you choose",
     "export-diagnostics": "Saves a report of this server to send to whoever helps you",
     "open-diagnostics": "Reads a diagnostics report saved here or sent to you",

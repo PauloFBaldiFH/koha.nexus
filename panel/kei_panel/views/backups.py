@@ -189,7 +189,7 @@ class BackupCenterView(PlatformSectionView):
             elif self.scope == backup_center.TAINACAN:
                 rows = await self._load_tainacan(facts)
             elif self.scope == backup_center.BOTH:
-                rows = await self._load_koha() + await self._load_tainacan(facts)
+                rows = await self._load_koha() + await self._load_tainacan(facts) + await self._load_set()
         finally:
             self.query_one("#platform-loader").display = False
         self.facts = facts
@@ -242,6 +242,15 @@ class BackupCenterView(PlatformSectionView):
             text = cron.read()
             cron_file = cron.parse(text, self.app.env.instance) if text.strip() else None
         return backup_center.koha_plans(cron_file, status, plans, remotes, history, b)
+
+    async def _load_set(self) -> list[backup_center.PlanRow]:
+        bridge = self.app.bridge
+        try:
+            if bridge.has_task("set-schedule-status"):
+                return backup_center.set_plans(dict((await bridge.task("set-schedule-status")).results))
+        except Exception:  # noqa: BLE001 - no row rather than a wrong one
+            pass
+        return []
 
     async def _load_tainacan(self, facts: platforms.Facts) -> list[backup_center.PlanRow]:
         keep = ""

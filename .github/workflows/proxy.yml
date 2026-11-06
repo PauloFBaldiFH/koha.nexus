@@ -33,7 +33,8 @@
 #           database password, Koha restored alone from the set, a staff
 #           two-factor secret that opens again only after the key comes
 #           back, nothing else of koha-conf.xml changed, an uploaded file
-#           and a plugin back, Tainacan restored on its own.
+#           and a plugin back, Tainacan restored on its own; the scheduled
+#           joint backup run once with both platforms.
 #   events  the same machines: events for Tainacan (tainacan_events_system.bats)
 #           with the real Tainacan and Events Manager from wordpress.org
 #           (mandatory here): an Events Manager already in the site kept, the

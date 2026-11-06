@@ -398,6 +398,8 @@ def missing_reason(platform: str) -> str:
     if platform == TAINACAN:
         return t("Tainacan is not installed on this server, so this is not available. "
                  "Install it from Tainacan (collections and museums) when you need it.")
+    if platform == KOHA + "+" + TAINACAN:
+        return t("This needs Koha and Tainacan installed on this server.")
     return t("This needs a platform that is not installed on this server.")
 
 

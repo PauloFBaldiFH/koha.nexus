@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.179"
+PANEL_VERSION=" 1.5.180"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -16174,6 +16174,215 @@ PYEOF
     systemctl is-active --quiet memcached 2>/dev/null && systemctl restart memcached >/dev/null 2>&1
     log "backup set: Koha encryption key restored (previous koha-conf.xml: $conf.kei-before-secrets-$ts)"
     return 0
+}
+
+# ----------------------------------------------------------------------
+# The scheduled joint package (U6): the same kei_set_backup, on a
+# schedule, with its own destination, retention, lock and history.
+# ----------------------------------------------------------------------
+#   config (backup key store): set_schedule HH:MM, set_dest DIR,
+#     set_keep N (complete sets kept), set_copy REMOTE:PATH (optional),
+#     set_secrets yes|no (no = the person chose data only for Koha)
+#   /etc/cron.d/koha-nexus-backup-sets: one line, written only by
+#     kei_set_schedule (an update of the panel never writes it)
+#   $KEI_BK_ROOT/sets-history.jsonl: one line per run: started, finished,
+#     trigger, result (ok | partial | failed | busy), file,
+#     recoverability, platforms [{id, result, error}], copy, removed
+# A cloud copy is the whole set encrypted with the backup key (.tar.gpg):
+# the dump has personal data and passwords; without the key it is refused.
+KEI_SET_CRON="${KEI_SET_CRON:-/etc/cron.d/koha-nexus-backup-sets}"
+_kei_set_history() { printf '%s/sets-history.jsonl' "$KEI_BK_ROOT"; }
+
+# kei_set_schedule time=HH:MM|off [dest=DIR] [keep=N] [copy=REMOTE:PATH|none] [secrets=yes|no]
+kei_set_schedule() {
+    local a k v time="" dest="" keep="" copy="" secrets="" h m tmp p why
+    for a in "$@"; do
+        k=${a%%=*}; v=${a#*=}
+        case "$k" in time) time=$v ;; dest) dest=$v ;; keep) keep=$v ;; copy) copy=$v ;; secrets) secrets=$v ;;
+            *) echo "$(t "Unknown option.")" >&2; return 2 ;; esac
+    done
+    if [ "$time" = off ]; then
+        _kei_bk_set set_schedule ""
+        rm -f "$KEI_SET_CRON"
+        for p in koha tainacan; do kei_owned_del cron-file "${KEI_SET_CRON##*/}" "$p"; done
+        echo "$(t "The scheduled joint backup is off. The sets already made are kept.")"
+        return 0
+    fi
+    [[ "$time" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || { echo "$(t "Use HH:MM (00:00 to 23:59) or off.")" >&2; return 2; }
+    [ -n "$dest" ] || dest=$(_kei_bk_get set_dest)
+    case "$dest" in /*) ;; *) echo "$(t "Choose a folder of this server (a full path).")" >&2; return 2 ;; esac
+    [[ "$dest" != *..* ]] && [ -d "$dest" ] && [ -w "$dest" ] || { echo "$(t "The folder does not exist or cannot be written:") $dest" >&2; return 2; }
+    [ -n "$keep" ] || keep=$(_kei_bk_get set_keep); keep=${keep:-7}
+    [[ "$keep" =~ ^[0-9]{1,3}$ ]] && [ "$keep" -ge 1 ] && [ "$keep" -le 365 ] || { echo "$(t "Keep from 1 to 365 sets.")" >&2; return 2; }
+    [ -n "$secrets" ] || secrets=$(_kei_bk_get set_secrets); secrets=${secrets:-yes}
+    case "$secrets" in yes|no) ;; *) return 2 ;; esac
+    # Koha's secrets are never left out in silence: without the key, the
+    # person said "data only" (secrets=no) when the schedule was made.
+    if [ "$secrets" = yes ] && why=$(kei_set_needs_choice "$(kei_set_platforms)"); then
+        echo "$why" >&2; echo "needs=key"; return 7
+    fi
+    [ -n "$copy" ] || copy=$(_kei_bk_get set_copy)
+    [ "$copy" = none ] && copy=""
+    if [ -n "$copy" ]; then
+        [[ "$copy" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}:[A-Za-z0-9_./-]*$ ]] && [[ "$copy" != *..* ]] \
+            || { echo "$(t "Use REMOTE:PATH, with a cloud connection of the panel.")" >&2; return 2; }
+        _kei_bk_has_key || { echo "$(t "Set up the backup key first: a joint package goes to the cloud only encrypted with it.")" >&2; return 6; }
+        command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "${copy%%:*}:" \
+            || { echo "$(r="${copy%%:*}"; t "There is no cloud connection named \${r}.")" >&2; return 3; }
+        case "/${copy#*:}/" in */Backup_SQL_Koha/*|*/Backup_MARC_Koha/*)
+            echo "$(t "That folder belongs to the Koha cloud backups. Choose a folder of its own for the joint backups.")" >&2; return 2 ;;
+        esac
+    fi
+    # A schedule needs cron (a minimal Debian has none): installed as for the
+    # platform backups, registered, never removed by Koha.Nexus.
+    if [ "${KEI_BK_NEED_CRON:-1}" = 1 ] && { ! command -v cron >/dev/null 2>&1 || [ ! -d "${KEI_SET_CRON%/*}" ]; }; then
+        apt_install cron >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron >/dev/null 2>&1 \
+            || { echo "$(t "cron is not installed: the joint backup cannot be scheduled.")" >&2; return 1; }
+        kei_owned_add package cron koha no || true
+        systemctl enable --now cron >/dev/null 2>&1 || true
+    fi
+    _kei_bk_set set_schedule "$time"; _kei_bk_set set_dest "$dest"; _kei_bk_set set_keep "$keep"
+    _kei_bk_set set_copy "$copy"; _kei_bk_set set_secrets "$secrets"
+    h=$((10#${time%%:*})); m=$((10#${time##*:}))
+    tmp=$(mktemp) || return 1
+    {
+        printf '# Managed by Koha.Nexus: the scheduled joint backup (Koha + Tainacan). config.sh writes it again.\n'
+        printf 'SHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n'
+        printf '%s %s * * * root %s --task set-run scheduled >/dev/null 2>&1\n' "$m" "$h" "$KEI_PANEL_COMMAND"
+    } > "$tmp"
+    install -m 644 "$tmp" "$KEI_SET_CRON" || { rm -f "$tmp"; return 1; }
+    rm -f "$tmp"
+    for p in koha tainacan; do kei_owned_add cron-file "${KEI_SET_CRON##*/}" "$p" no "" "$KEI_SET_CRON"; done
+    echo "$(a="$time" d="$dest" n="$keep"; t "Joint backup every day at \${a} in \${d}, the newest \${n} kept.")"
+}
+
+# kei_set_schedule_status: KEY=VALUE lines (never a secret).
+kei_set_schedule_status() {
+    local h last
+    printf 'schedule=%s\ndest=%s\nkeep=%s\ncopy=%s\nsecrets=%s\n' "$(_kei_bk_get set_schedule)" "$(_kei_bk_get set_dest)" \
+        "$(_kei_bk_get set_keep)" "$(_kei_bk_get set_copy)" "$(_kei_bk_get set_secrets)"
+    printf 'cron=%s\n' "$([ -f "$KEI_SET_CRON" ] && echo yes || echo no)"
+    h=$(_kei_set_history)
+    [ -f "$h" ] || return 0
+    python3 -I - "$h" <<'PYEOF' 2>/dev/null
+import json, sys
+runs = []
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    try:
+        runs.append(json.loads(line))
+    except ValueError:
+        continue
+if runs:
+    r = runs[-1]
+    fails = "; ".join("%s: %s" % (p.get("id", ""), p.get("error", "")) for p in r.get("platforms", []) if p.get("result") != "ok")
+    print("last=%s|%s|%s|%s|%s" % (r.get("finished", ""), r.get("result", ""), r.get("recoverability", ""),
+                                    r.get("copy", ""), fails.replace("\n", " ")[:300]))
+print("runs=%d" % len(runs))
+PYEOF
+}
+
+# kei_set_run [scheduled|manual]: one joint package as configured, then
+# retention and the cloud copy; one history line whatever happens.
+kei_set_run() {
+    local trigger="${1:-scheduled}" dest keep copy mode fd out rc started result file recov copied=none removed=0 fpr enc
+    dest=$(_kei_bk_get set_dest); keep=$(_kei_bk_get set_keep); copy=$(_kei_bk_get set_copy)
+    [ "$(_kei_bk_get set_secrets)" = no ] && mode=no-secrets || mode=""
+    [ -n "$dest" ] || { echo "$(t "The joint backup is not scheduled.")" >&2; return 2; }
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    started=$(date '+%Y-%m-%d %H:%M:%S')
+    exec {fd}>"$KEI_BK_ROOT/.sets.lock" || return 1
+    if ! flock -n "$fd"; then
+        _kei_set_log_run "$trigger" "$started" busy "" "" "" none 0
+        exec {fd}>&-
+        echo "$(t "Another joint backup is running: this one was skipped.")" >&2
+        return 9
+    fi
+    out=$(kei_set_backup "$dest" "" "$mode" 2>"$KEI_BK_ROOT/.sets.err"); rc=$?
+    file=$(printf '%s\n' "$out" | sed -n 's/^file=//p' | tail -n 1)
+    recov=$(printf '%s\n' "$out" | sed -n 's/^recoverability=//p' | tail -n 1)
+    case "$rc" in 0) result=ok ;; 9) [ -n "$file" ] && result=partial || result=failed ;; *) result=failed ;; esac
+    if [ "$result" = failed ] && [ -z "$(printf '%s\n' "$out" | grep '^platform=')" ]; then
+        out="platform=set"$'\t'"failed"$'\t\t\t'"$(grep -v '^[[:space:]]*$' "$KEI_BK_ROOT/.sets.err" | tail -n 1)"
+    fi
+    rm -f "$KEI_BK_ROOT/.sets.err"
+    # The cloud copy: the whole set, encrypted with the backup key, never in clear.
+    if [ -n "$copy" ] && [ -n "$file" ]; then
+        fpr=$(_kei_bk_fpr 2>/dev/null)
+        if [ -z "$fpr" ] || ! _kei_bk_has_key; then copied=refused
+        else
+            enc="${file%/*}/.${file##*/}.gpg"
+            if _kei_bk_gpg -r "$fpr" --encrypt -o "$enc" "$file" 2>/dev/null \
+                && timeout "${KEI_BK_COPY_TIMEOUT:-21600}" rclone copyto "$enc" "${copy%/}/${file##*/}.gpg" >/dev/null 2>&1; then
+                copied=ok
+            else copied=failed; fi
+            rm -f "$enc"
+        fi
+    fi
+    # Retention: only when this run made a complete set, only the sets of
+    # this schedule (from its history), never a set made by hand.
+    [ "$result" = ok ] && removed=$(_kei_set_retention "$keep" "$file")
+    _kei_set_log_run "$trigger" "$started" "$result" "$file" "$recov" "$out" "$copied" "${removed:-0}"
+    flock -u "$fd"; exec {fd}>&-
+    printf '%s\n' "$out"
+    printf 'copy=%s\nremoved=%s\n' "$copied" "${removed:-0}"
+    [ "$copied" = failed ] || [ "$copied" = refused ] && [ "$rc" = 0 ] && rc=8
+    return "$rc"
+}
+
+# _kei_set_retention KEEP NEWFILE: removes the sets of this schedule
+# beyond the newest KEEP complete ones (partial ones older than the
+# oldest kept go too); prints how many were removed.
+_kei_set_retention() {
+    python3 -I - "$(_kei_set_history)" "$1" "$2" <<'PYEOF' 2>/dev/null
+import json, os, sys
+hist, keep, new = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+files = []
+try:
+    for line in open(hist, encoding="utf-8", errors="replace"):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("file") and r.get("result") in ("ok", "partial"):
+            files.append((r["file"], r["result"]))
+except OSError:
+    pass
+files.append((new, "ok"))
+seen, ordered = set(), []
+for f, res in reversed(files):           # newest first
+    if f not in seen:
+        seen.add(f); ordered.append((f, res))
+kept, removed = 0, 0
+for f, res in ordered:
+    if res == "ok" and kept < keep:
+        kept += 1
+        continue
+    if res == "partial" and kept < keep:
+        continue                          # newer than the oldest kept complete set
+    name = os.path.basename(f)
+    if name.startswith("knx-set-") and name.endswith(".tar") and os.path.isfile(f):
+        os.remove(f); removed += 1
+print(removed)
+PYEOF
+}
+
+# _kei_set_log_run TRIGGER STARTED RESULT FILE RECOV PLATFORM-LINES COPY REMOVED
+_kei_set_log_run() {
+    local h
+    h=$(_kei_set_history)
+    mkdir -p "${h%/*}" || return 1
+    printf '%s' "$6" | python3 -I -c '
+import json, sys
+trigger, started, result, file, recov, copy, removed, finished = sys.argv[1:9]
+plats = []
+for line in sys.stdin.read().splitlines():
+    if line.startswith("platform="):
+        cols = (line[len("platform="):].split("\t") + [""] * 6)[:6]
+        plats.append({"id": cols[0], "result": cols[1], "error": "" if cols[1] == "ok" else cols[4][:300]})
+print(json.dumps({"started": started, "finished": finished, "trigger": trigger, "result": result, "file": file,
+                  "recoverability": recov, "platforms": plats, "copy": copy, "removed": int(removed or 0)}))
+' "$1" "$2" "$3" "$4" "$5" "$7" "$8" "$(date '+%Y-%m-%d %H:%M:%S')" >> "$h" && chmod 600 "$h"
+    log "backup set ($1): $3 ${4:-}"
 }
 
 # kei_set_cleanup STAGE: the staging folder of kei_set_unpack removed.
@@ -45478,6 +45687,22 @@ kei_task() {
             rm -f "$out" "$err"
             return "$rc" ;;
         set-cleanup)      kei_set_cleanup "${1:-}" ;;
+        # The scheduled joint package: KEY=VALUE results, what went wrong in an error box.
+        set-schedule|set-schedule-status|set-run)
+            local line out err rc
+            out=$(mktemp) && err=$(mktemp) || return 1
+            case "$name" in
+                set-schedule)        kei_set_schedule "$@" > "$out" 2>"$err" ;;
+                set-schedule-status) kei_set_schedule_status > "$out" 2>"$err" ;;
+                set-run)             kei_set_run "${1:-manual}" > "$out" 2>"$err" ;;
+            esac
+            rc=$?
+            while IFS= read -r line; do
+                case "$line" in *=*) kei_result "${line%%=*}" "${line#*=}" ;; ?*) kei_emit msg "ok OK"$'\t'"$line" ;; esac
+            done < "$out"
+            [ "$rc" != 0 ] && [ -s "$err" ] && msg_error "" "$(grep -v '^[[:space:]]*$' "$err" | tail -n 4)"
+            rm -f "$out" "$err"
+            return "$rc" ;;
         set-koha-extras)
             # The recovery phrase only as a shell variable: no program started
             # from here finds it in its environment (gpg reads it on a descriptor).

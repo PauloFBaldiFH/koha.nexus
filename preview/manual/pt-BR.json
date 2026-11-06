@@ -2598,6 +2598,20 @@
     "**Deixar de usar o endereço gratuito do koha.nexus** traz o Tainacan de volta para a rede local depois de um Sim; o catálogo mantém o endereço dele. Abrir mão do endereço gratuito do catálogo libera também o do acervo."
    ],
    "_en": "59227d260b"
+  },
+  "set-schedule": {
+   "summary": "O backup conjunto do Koha e do Tainacan todo dia, com a pasta, quantos pacotes guardar e uma cópia cifrada opcional na nuvem.",
+   "overview": [
+    "Aparece na Central de backups, em **Koha e Tainacan**, e em Agendamentos. Ele roda o mesmo backup conjunto feito à mão, com uma linha em /etc/cron.d/koha-nexus-backup-sets, escrita só quando você agenda: atualizar o painel nunca a cria.",
+    "Cada execução fica num histórico, com o resultado de cada plataforma. Uma plataforma que falha deixa a execução incompleta, nunca concluída; uma execução que encontra outra ainda em andamento é pulada e registrada.",
+    "A retenção apaga só os pacotes feitos por este agendamento, e só depois de um pacote completo; pacotes feitos à mão nunca são apagados.",
+    "Sem a chave dos backups o painel pergunta antes, como no backup conjunto manual: configurar a chave, ou agendar um pacote sem os segredos do Koha (só dados). A cópia na nuvem precisa da chave: o pacote inteiro vai cifrado com ela (.tar.gpg), nunca em claro."
+   ],
+   "related": [
+    "set-backup",
+    "restore-assisted",
+    "sec-backups"
+   ]
   }
  }
 }
