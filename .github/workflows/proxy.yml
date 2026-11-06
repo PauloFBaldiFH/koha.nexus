@@ -24,7 +24,9 @@
 #           backup_set.bats, no Docker) run in apache, with
 #           admin_access.bats (administrative access and the steps after
 #           a new installation, no Docker; the real WordPress part is in
-#           tainacan_system.bats).
+#           tainacan_system.bats) and tainacan_free.bats (the free
+#           koha.nexus address of the collection, against a stand-in of
+#           the address service).
 #   koha-set  Debian 12 with a real Koha (koha-common from the official
 #           repository) and a real Tainacan (koha_set_system.bats): the
 #           joint package, the instance recreated with another key and
@@ -60,6 +62,8 @@ on:
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
       - "tests/admin_access.bats"
+      - "tests/tainacan_free.bats"
+      - "tests/lib/fake_broker.py"
       - "tests/backup_engine_system.bats"
       - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
@@ -85,6 +89,8 @@ on:
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
       - "tests/admin_access.bats"
+      - "tests/tainacan_free.bats"
+      - "tests/lib/fake_broker.py"
       - "tests/backup_engine_system.bats"
       - "tests/koha_set_system.bats"
       - "tests/tainacan_events.bats"
@@ -113,11 +119,11 @@ jobs:
             "${{ matrix.image }}" bash -c '
               set -e
               apt-get update -qq
-              apt-get install -y -qq apache2 bats curl python3 iproute2 gnupg restic rclone >/dev/null
+              apt-get install -y -qq apache2 bats curl openssl python3 iproute2 gnupg restic rclone >/dev/null
               restic version
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
-              bats tests/backup_engine.bats tests/backup_set.bats tests/admin_access.bats
+              bats tests/backup_engine.bats tests/backup_set.bats tests/admin_access.bats tests/tainacan_free.bats
               KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
 

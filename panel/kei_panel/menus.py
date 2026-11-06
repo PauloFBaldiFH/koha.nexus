@@ -411,7 +411,7 @@ DESCRIPTIONS: dict[str, str] = {
     "admin-tainacan": "Administrators: your own password, a new password, another administrator",
     "setup-koha": "The steps left after the installation: access, address, backup",
     "setup-tainacan": "The steps left after the installation: access, address, backup",
-    "tainacan-address": "The address of the collection: local network or your own domain",
+    "tainacan-address": "The address of the collection: local network, your own domain or a free koha.nexus address",
     "restore": "Replaces Koha's database with a backup, tested first",
     "backup-manual": "Makes a full backup and shows how to copy it to a PC",
     "backup-marc": "Exports the catalogue and the authorities in MARC21 now",

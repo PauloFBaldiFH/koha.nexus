@@ -1,0 +1,38 @@
+# The free address service (broker/, a Cloudflare Worker): types, unit
+# tests against an in-memory fake of the Cloudflare API, and the
+# end-to-end checks in a local workerd (Miniflare). Nothing is deployed:
+# deploying and migrating the production database are done by hand
+# (broker/README.md).
+name: Address service
+
+on:
+  push:
+    paths:
+      - "broker/**"
+      - ".github/workflows/broker.yml"
+  pull_request:
+    paths:
+      - "broker/**"
+      - ".github/workflows/broker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  broker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: broker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: broker/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run test:e2e

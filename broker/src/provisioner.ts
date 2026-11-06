@@ -7,7 +7,7 @@ import { DurableObject } from "cloudflare:workers";
 import { cfApi, holdNameStatement } from "./db";
 import type { Env, LibraryRow } from "./env";
 import { now } from "./env";
-import { hostnamesFor } from "./names";
+import { libraryHosts, parseServices } from "./names";
 import * as steps from "./provision-steps";
 
 export type StepOutcome = { ok: true; skipped?: boolean } | { ok: false; error: string; retryable: boolean };
@@ -41,12 +41,17 @@ export class Provisioner extends DurableObject<Env> {
       const lib = await this.library(libraryId);
       if (!lib || lib.status !== "provisioning") return { ok: true, skipped: true };
       try {
-        const r = await steps.provision(cfApi(this.env), { libraryId, hostnames: hostnamesFor(lib.slug, this.env) });
+        const r = await steps.provision(cfApi(this.env), {
+          libraryId,
+          hostnames: libraryHosts(lib.slug, this.env),
+          services: parseServices(lib.services),
+        });
         await this.env.DB.prepare(
-          `UPDATE libraries SET tunnel_id = ?, opac_record_id = ?, staff_record_id = ?, status = 'active', updated_at = ?
+          `UPDATE libraries SET tunnel_id = ?, opac_record_id = ?, staff_record_id = ?, collection_record_id = ?,
+             status = 'active', updated_at = ?
            WHERE id = ? AND status = 'provisioning'`,
         )
-          .bind(r.tunnelId, r.opacRecordId, r.staffRecordId, now(), libraryId)
+          .bind(r.tunnelId, r.opacRecordId, r.staffRecordId, r.collectionRecordId, now(), libraryId)
           .run();
         return { ok: true };
       } catch (e) {
@@ -64,7 +69,7 @@ export class Provisioner extends DurableObject<Env> {
       try {
         await steps.rollback(cfApi(this.env), {
           libraryId,
-          hostnames: hostnamesFor(lib.slug, this.env),
+          hostnames: libraryHosts(lib.slug, this.env),
           tunnelId: lib.tunnel_id,
         });
       } catch (e) {
@@ -72,7 +77,8 @@ export class Provisioner extends DurableObject<Env> {
         outcome = { ok: false, error: message(e), retryable: true };
       }
       await this.env.DB.prepare(
-        `UPDATE libraries SET status = 'failed', tunnel_id = NULL, opac_record_id = NULL, staff_record_id = NULL, updated_at = ?
+        `UPDATE libraries SET status = 'failed', tunnel_id = NULL, opac_record_id = NULL, staff_record_id = NULL,
+           collection_record_id = NULL, updated_at = ?
          WHERE id = ? AND status = 'provisioning'`,
       )
         .bind(now(), libraryId)
@@ -89,7 +95,7 @@ export class Provisioner extends DurableObject<Env> {
       try {
         await steps.deprovision(cfApi(this.env), {
           libraryId,
-          hostnames: hostnamesFor(lib.slug, this.env),
+          hostnames: libraryHosts(lib.slug, this.env),
           tunnelId: lib.tunnel_id,
         });
       } catch (e) {
@@ -99,6 +105,7 @@ export class Provisioner extends DurableObject<Env> {
       await this.env.DB.batch([
         this.env.DB.prepare(
           `UPDATE libraries SET status = 'deleted', tunnel_id = NULL, opac_record_id = NULL, staff_record_id = NULL,
+             collection_record_id = NULL,
              staff_user = NULL, staff_pass_hash = NULL, staff_pass_salt = NULL, staff_pass_iter = NULL,
              staff_cred_version = staff_cred_version + 1, updated_at = ?
            WHERE id = ? AND status = 'deprovisioning'`,
@@ -129,10 +136,46 @@ export class Provisioner extends DurableObject<Env> {
       if (!lib || lib.status !== from || !lib.tunnel_id) {
         throw new Error(`library is ${lib?.status ?? "unknown"}, expected ${from}`);
       }
-      await steps.setSuspended(cfApi(this.env), lib.tunnel_id, hostnamesFor(lib.slug, this.env), suspended);
+      await steps.setSuspended(cfApi(this.env), lib.tunnel_id, libraryHosts(lib.slug, this.env), suspended, parseServices(lib.services));
       await this.env.DB.prepare("UPDATE libraries SET status = ?, updated_at = ? WHERE id = ? AND status = ?")
         .bind(suspended ? "suspended" : "active", now(), libraryId, from)
         .run();
+    });
+  }
+
+  /**
+   * What a library publishes changed (Tainacan added or taken out): the
+   * ingress and the records follow the new services first, and only then the
+   * row says so. On a failure the old services are applied again, so the
+   * address never points somewhere the row does not say.
+   */
+  async setServices(libraryId: string, services: string): Promise<{ collectionRecordId: string | null }> {
+    return this.serial(async () => {
+      const lib = await this.library(libraryId);
+      if (!lib || !lib.tunnel_id || (lib.status !== "active" && lib.status !== "suspended")) {
+        throw new Error(`library is ${lib?.status ?? "unknown"}`);
+      }
+      const apply = async (text: string) =>
+        steps.provision(cfApi(this.env), {
+          libraryId,
+          hostnames: libraryHosts(lib.slug, this.env),
+          services: parseServices(text),
+          suspended: lib.status === "suspended",
+        });
+      let r: steps.ProvisionResult;
+      try {
+        r = await apply(services);
+      } catch (e) {
+        await apply(lib.services).catch(() => undefined);
+        throw e;
+      }
+      await this.env.DB.prepare(
+        `UPDATE libraries SET services = ?, tunnel_id = ?, opac_record_id = ?, staff_record_id = ?, collection_record_id = ?,
+           updated_at = ? WHERE id = ?`,
+      )
+        .bind(services, r.tunnelId, r.opacRecordId, r.staffRecordId, r.collectionRecordId, now(), libraryId)
+        .run();
+      return { collectionRecordId: r.collectionRecordId };
     });
   }
 }

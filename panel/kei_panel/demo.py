@@ -231,6 +231,19 @@ _BY_ARG: dict[tuple[str, str], list[str]] = {
         "\t\ton\tTurn on or change the password\toff\tTurn off (staff interface only on the local network)",
         "@@msg ok OK\tRemote staff access is off."],
     ("cf-run", "recovery"): ["@@msg ok OK\tRecovery file saved:\n\n  /home/biblioteca/koha-address-biblioteca.key"],
+    # The free koha.nexus address of the collection (routines/platforms.py).
+    ("tainacan-free", "on"): [
+        "@@ask Free address\tThe collection gets the address https://biblioteca-acervo.koha.nexus, in the same "
+        "tunnel as the catalog (https://biblioteca.koha.nexus). WordPress's links change to it; the collections, "
+        "items and accounts do not change.\n\nContinue?",
+        "@@note Adding the collection to the free address...",
+        "@@msg ok OK\tYour collection is online:\n\n  https://biblioteca-acervo.koha.nexus"],
+    ("tainacan-free", "off"): [
+        "@@ask Free address\tThe address https://biblioteca-acervo.koha.nexus is released and Tainacan goes back to "
+        "this server on the local network. The catalog keeps its address (https://biblioteca.koha.nexus)."
+        "\n\nContinue?",
+        "@@note Releasing the address...",
+        "@@msg ok OK\tThe free address was released.\n\nTainacan now answers at http://192.168.0.10:8090."],
 }
 
 _SCRIPTS: dict[str, list[str]] = {
@@ -566,6 +579,8 @@ _SCRIPTS: dict[str, list[str]] = {
     "platform-backup-copy": ["@@msg ok OK\tEach new package will also be copied to gdrive:koha-nexus."],
     "platform-backup-kit": ["@@msg ok OK\t/var/lib/koha-nexus/backup/recovery-kit.txt"],
     "tainacan-address": ["@@msg ok OK\tTainacan now answers at {0}."],
+    "tainacan-free-status": ["@@result host=", "@@result library=koha", "@@result available=yes",
+                             "@@result preview=biblioteca-acervo.koha.nexus"],
     "platform-backup-schedule": ["@@msg ok OK\tDaily backup at 02:30; maintenance on Sundays and a restore test of "
                                  "an older backup on the 1st of each month."],
     "platform-backup-verify": ["@@note Checking the restic repository...", "@@note Restoring in an isolated copy...",

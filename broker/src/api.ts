@@ -13,7 +13,20 @@ import type { Env, JobRow, LibraryRow } from "./env";
 import { now } from "./env";
 import { pbkdf2, randomBytes, randomToken, sha256Hex, toBase64 } from "./crypto";
 import { HttpError, json, parseJson, str } from "./http";
-import { hostnamesFor, maxSlugLength, slugCandidates, slugify, validateSlug } from "./names";
+import {
+  collectionFits,
+  collectionSuffix,
+  hostnamesFor,
+  maxSlugLength,
+  parseServices,
+  publishedHostnames,
+  SERVICE_NAMES,
+  servicesText,
+  slugCandidates,
+  slugify,
+  validateSlug,
+} from "./names";
+import type { Services } from "./names";
 import { parseCidr } from "./netaddr";
 import { checkSignedRequest, isValidPublicKey } from "./signature";
 
@@ -43,6 +56,23 @@ interface StartBody {
   contact_email?: unknown;
   cnpj?: unknown;
   requested_name?: unknown;
+  services?: unknown;
+}
+
+/** ["koha"], ["tainacan"] or both; unset = ["koha"] (installers before Tainacan). */
+export function readServices(value: unknown): Services {
+  if (value === undefined || value === null) return { koha: true, tainacan: false };
+  if (!Array.isArray(value) || !value.length || value.length > SERVICE_NAMES.length ||
+      value.some((v) => typeof v !== "string" || !(SERVICE_NAMES as readonly string[]).includes(v))) {
+    throw new HttpError(400, `services must be a list of ${SERVICE_NAMES.join(", ")}`);
+  }
+  return { koha: value.includes("koha"), tainacan: value.includes("tainacan") };
+}
+
+// What this broker can publish, for the installer to offer (or not) the
+// free address of Tainacan before asking anything.
+export function capabilities(env: Env): Response {
+  return json({ services: [...SERVICE_NAMES], collection_suffix: collectionSuffix(env) });
 }
 
 export async function deviceStart(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
@@ -54,9 +84,10 @@ export async function deviceStart(request: Request, env: Env, body: ArrayBuffer)
   const cnpj = typeof b.cnpj === "string" ? b.cnpj.replace(/\D/g, "") : "";
   if (cnpj && cnpj.length !== 14) throw new HttpError(400, "cnpj must have 14 digits");
   const requested = str(b.requested_name, "requested_name", { max: 100, optional: true });
+  const services = readServices(b.services);
 
-  const opts = { prefix: env.NAME_PREFIX, staffSuffix: env.STAFF_SUFFIX };
-  const max = maxSlugLength(opts.prefix, opts.staffSuffix);
+  const opts = { prefix: env.NAME_PREFIX, staffSuffix: env.STAFF_SUFFIX, collectionSuffix: collectionSuffix(env) };
+  const max = maxSlugLength(opts.prefix, opts.staffSuffix, opts.collectionSuffix);
   let slug = slugify(requested || institution).slice(0, max).replace(/-+$/, "");
 
   const deviceCode = randomToken(32);
@@ -78,8 +109,8 @@ export async function deviceStart(request: Request, env: Env, body: ArrayBuffer)
   }
   await env.DB.prepare(
     `INSERT INTO enrollments (device_code_hash, user_code, status, institution_name, contact_email, cnpj,
-       requested_slug, approved_slug, client_ip_hash, created_at, expires_at, decided_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       requested_slug, approved_slug, services, client_ip_hash, created_at, expires_at, decided_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       await sha256Hex(deviceCode),
@@ -90,13 +121,14 @@ export async function deviceStart(request: Request, env: Env, body: ArrayBuffer)
       cnpj || null,
       slug,
       status === "approved" ? slug : null,
+      servicesText(services),
       await sha256Hex(`${ip}|${env.ZONE_NAME}`),
       t,
       t + ENROLLMENT_TTL_SECONDS,
       status === "approved" ? t : null,
     )
     .run();
-  await audit(env, "public", "enrollment.start", null, { user_code: code, slug, status });
+  await audit(env, "public", "enrollment.start", null, { user_code: code, slug, status, services: servicesText(services) });
 
   return json({
     device_code: deviceCode,
@@ -106,13 +138,15 @@ export async function deviceStart(request: Request, env: Env, body: ArrayBuffer)
     expires_in: ENROLLMENT_TTL_SECONDS,
     interval: POLL_INTERVAL_SECONDS,
     status,
-    ...(status === "approved" ? { hostnames: hostnamesFor(slug, env) } : {}),
+    services: SERVICE_NAMES.filter((n) => services[n]),
+    ...(status === "approved" ? { hostnames: publishedHostnames(slug, env, services) } : {}),
   });
 }
 
 interface EnrollmentRow {
   status: "pending" | "approved" | "denied" | "consumed";
   approved_slug: string | null;
+  services: string;
   expires_at: number;
 }
 
@@ -120,13 +154,15 @@ export async function devicePoll(request: Request, env: Env, body: ArrayBuffer):
   await limit(env.RL_API, clientIp(request));
   const b = parseJson<{ device_code?: unknown }>(body);
   const deviceCode = str(b.device_code, "device_code", { max: 64 });
-  const row = await env.DB.prepare("SELECT status, approved_slug, expires_at FROM enrollments WHERE device_code_hash = ?")
+  const row = await env.DB.prepare("SELECT status, approved_slug, services, expires_at FROM enrollments WHERE device_code_hash = ?")
     .bind(await sha256Hex(deviceCode))
     .first<EnrollmentRow>();
   if (!row) throw new HttpError(404, "unknown device code");
   if (row.expires_at <= now() && row.status !== "consumed") return json({ status: "expired" });
   const out: Record<string, unknown> = { status: row.status, interval: POLL_INTERVAL_SECONDS };
-  if (row.status === "approved" && row.approved_slug) out.hostnames = hostnamesFor(row.approved_slug, env);
+  if (row.status === "approved" && row.approved_slug) {
+    out.hostnames = publishedHostnames(row.approved_slug, env, parseServices(row.services));
+  }
   return json(out);
 }
 
@@ -155,10 +191,10 @@ export async function enroll(request: Request, env: Env, body: ArrayBuffer): Pro
   const enrollment = await env.DB.prepare(
     `UPDATE enrollments SET status = 'consumed', consumed_at = ?1
      WHERE device_code_hash = ?2 AND status = 'approved' AND expires_at > ?1
-     RETURNING institution_name, contact_email, cnpj, approved_slug`,
+     RETURNING institution_name, contact_email, cnpj, approved_slug, services`,
   )
     .bind(t, hash)
-    .first<{ institution_name: string; contact_email: string; cnpj: string | null; approved_slug: string }>();
+    .first<{ institution_name: string; contact_email: string; cnpj: string | null; approved_slug: string; services: string }>();
   if (!enrollment) throw new HttpError(409, "this request is not approved, has expired or was already used");
 
   const libraryId = crypto.randomUUID();
@@ -166,9 +202,19 @@ export async function enroll(request: Request, env: Env, body: ArrayBuffer): Pro
   try {
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO libraries (id, slug, status, institution_name, contact_email, cnpj, public_key, created_at, updated_at)
-         VALUES (?, ?, 'provisioning', ?, ?, ?, ?, ?, ?)`,
-      ).bind(libraryId, enrollment.approved_slug, enrollment.institution_name, enrollment.contact_email, enrollment.cnpj, publicKey, t, t),
+        `INSERT INTO libraries (id, slug, status, institution_name, contact_email, cnpj, public_key, services, created_at, updated_at)
+         VALUES (?, ?, 'provisioning', ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        libraryId,
+        enrollment.approved_slug,
+        enrollment.institution_name,
+        enrollment.contact_email,
+        enrollment.cnpj,
+        publicKey,
+        servicesText(parseServices(enrollment.services)),
+        t,
+        t,
+      ),
       env.DB.prepare(
         "INSERT INTO jobs (id, library_id, kind, state, created_at, updated_at) VALUES (?, ?, 'provision', 'queued', ?, ?)",
       ).bind(jobId, libraryId, t, t),
@@ -181,8 +227,15 @@ export async function enroll(request: Request, env: Env, body: ArrayBuffer): Pro
     throw new HttpError(409, "the approved name is no longer available, ask for a new one");
   }
   await env.PROVISION_QUEUE.send({ jobId });
-  await audit(env, `library:${libraryId}`, "library.enroll", libraryId, { slug: enrollment.approved_slug });
-  return json({ library_id: libraryId, job_id: jobId, hostnames: hostnamesFor(enrollment.approved_slug, env) }, 202);
+  await audit(env, `library:${libraryId}`, "library.enroll", libraryId, { slug: enrollment.approved_slug, services: enrollment.services });
+  return json(
+    {
+      library_id: libraryId,
+      job_id: jobId,
+      hostnames: publishedHostnames(enrollment.approved_slug, env, parseServices(enrollment.services)),
+    },
+    202,
+  );
 }
 
 // Human-facing page behind the QR code: shows the status of the request.
@@ -243,7 +296,8 @@ export async function getLibraryInfo(request: Request, env: Env, body: ArrayBuff
     id: lib.id,
     slug: lib.slug,
     status: lib.status,
-    hostnames: hostnamesFor(lib.slug, env),
+    services: SERVICE_NAMES.filter((n) => parseServices(lib.services)[n]),
+    hostnames: publishedHostnames(lib.slug, env, parseServices(lib.services)),
     staff_remote_access: Boolean(lib.staff_pass_hash),
     staff_allow_cidrs: lib.staff_allow_cidrs ? JSON.parse(lib.staff_allow_cidrs) : [],
     public_listing: lib.public_listing === 1,
@@ -255,6 +309,7 @@ export async function putListing(request: Request, env: Env, body: ArrayBuffer):
   const lib = await signedLibrary(request, env, body);
   const b = parseJson<{ public?: unknown }>(body);
   if (typeof b.public !== "boolean") throw new HttpError(400, "public must be true or false");
+  if (b.public && !parseServices(lib.services).koha) throw new HttpError(409, "the public list is of Koha catalogs");
   await setListing(env, lib.id, b.public, `library:${lib.id}`);
   return json({ public_listing: b.public });
 }
@@ -288,6 +343,7 @@ export async function heartbeat(request: Request, env: Env, body: ArrayBuffer): 
 
 export async function putStaffCredentials(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
   const lib = await signedLibrary(request, env, body);
+  if (!parseServices(lib.services).koha) throw new HttpError(409, "this library does not publish Koha");
   const b = parseJson<{ username?: unknown; password?: unknown; allow_cidrs?: unknown }>(body);
   const username = str(b.username, "username", { min: 3, max: 64, re: /^[A-Za-z0-9._@-]+$/ });
   if (typeof b.password !== "string" || b.password.length < 12 || b.password.length > 256) {
@@ -320,6 +376,32 @@ export async function deleteStaffCredentials(request: Request, env: Env, body: A
     .run();
   await audit(env, `library:${lib.id}`, "staff_access.off", lib.id);
   return json({ staff_remote_access: false });
+}
+
+// The library adds Tainacan to its address, or takes it out. Koha is not
+// changed here: a library that publishes only Tainacan keeps it (removing
+// the address is DELETE /v1/library).
+export async function putServices(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
+  const lib = await signedLibrary(request, env, body);
+  const b = parseJson<{ tainacan?: unknown }>(body);
+  if (typeof b.tainacan !== "boolean") throw new HttpError(400, "tainacan must be true or false");
+  if (lib.status !== "active" && lib.status !== "suspended") throw new HttpError(409, `library is ${lib.status}`);
+  const current = parseServices(lib.services);
+  const next = { ...current, tainacan: b.tainacan };
+  if (!next.koha && !next.tainacan) {
+    throw new HttpError(409, "this address publishes only Tainacan: remove the address instead");
+  }
+  if (next.tainacan && !collectionFits(lib.slug, env)) {
+    throw new HttpError(409, "this library's name is too long for a collection address");
+  }
+  if (servicesText(next) !== servicesText(current)) {
+    await provisioner(env, lib.id).setServices(lib.id, servicesText(next));
+    await audit(env, `library:${lib.id}`, b.tainacan ? "services.tainacan_on" : "services.tainacan_off", lib.id);
+  }
+  return json({
+    services: SERVICE_NAMES.filter((n) => next[n]),
+    hostnames: publishedHostnames(lib.slug, env, next),
+  });
 }
 
 export async function rotateToken(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
@@ -367,7 +449,8 @@ interface PublicLibrary {
 async function publicLibraries(env: Env): Promise<PublicLibrary[]> {
   const rows = await env.DB.prepare(
     `SELECT institution_name, slug FROM libraries
-     WHERE status = 'active' AND public_listing = 1 AND COALESCE(last_heartbeat, created_at) > ?
+     WHERE status = 'active' AND public_listing = 1 AND (',' || services || ',') LIKE '%,koha,%'
+       AND COALESCE(last_heartbeat, created_at) > ?
      ORDER BY institution_name COLLATE NOCASE LIMIT 500`,
   )
     .bind(now() - LISTING_SILENCE_SECONDS)

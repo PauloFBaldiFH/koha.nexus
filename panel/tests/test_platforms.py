@@ -489,7 +489,7 @@ def _with_docker(status: dict) -> dict:
 
 
 def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
-    from kei_panel.screens.dialogs import ConfirmScreen, InputScreen
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen
 
     async def main(answer: str):
         app = make_app()
@@ -508,8 +508,9 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
             shown = _shown(view)
             _choose(view, "tainacan-install")
             await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
-            asked = isinstance(app.screen, InputScreen)
-            await pilot.click("#ok")              # empty: the server's own address
+            # Where it will answer: the local network, a domain, the free address or later.
+            asked = isinstance(app.screen, ChoiceScreen) and [v for v, _l in app.screen._options]
+            app.screen.dismiss("local")           # the server's own address
             await pilot.pause(1.0)
             preview = isinstance(app.screen, ConfirmScreen) and "wordpress.org" in app.screen._preview
             await pilot.click(f"#{answer}")
@@ -518,14 +519,15 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
 
     shown, asked, preview, ran = asyncio.run(main("no"))
     # Absent: its home offers the installation and nothing that needs it.
-    assert (shown, asked, preview) == (["tainacan-install"], True, True)
-    assert ran == [("tainacan-plan", ())]                                   # "No": nothing installed
+    assert (shown, asked, preview) == (["tainacan-install"], ["local", "domain", "free", "later"], True)
+    assert ran == [("tainacan-free-status", ()), ("tainacan-plan", ())]     # "No": nothing installed
     *_, ran = asyncio.run(main("yes"))
-    assert ran == [("tainacan-plan", ()), ("tainacan-install", ("confirm", "http://192.168.0.10:8090"))]
+    assert ran == [("tainacan-free-status", ()), ("tainacan-plan", ()),
+                   ("tainacan-install", ("confirm", "http://192.168.0.10:8090"))]
 
 
 def test_without_docker_the_tainacan_installation_prepares_it_first_and_goes_on(no_koha):
-    from kei_panel.screens.dialogs import ConfirmScreen, InputScreen
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen
 
     async def main(answers):
         app = make_app()
@@ -554,8 +556,8 @@ def test_without_docker_the_tainacan_installation_prepares_it_first_and_goes_on(
                                                         "download.docker.com" in screen._preview else ""))
                 await pilot.click(f"#{answer}")
                 await pilot.pause(1.5)
-            if isinstance(app.screen, InputScreen):
-                screens.append("InputScreen")
+            if isinstance(app.screen, ChoiceScreen):
+                screens.append("ChoiceScreen")
             return screens, [r[0] for r in ran if r[0].startswith(("docker-", "tainacan-"))]
 
     # "No" at the explanation: nothing is asked of the installer.
@@ -563,8 +565,8 @@ def test_without_docker_the_tainacan_installation_prepares_it_first_and_goes_on(
     assert screens == ["ConfirmScreen"] and ran == []
     # "Yes", then Docker's own plan and "Yes": Docker goes in and Tainacan goes on.
     screens, ran = asyncio.run(main(["yes", "yes"]))
-    assert screens == ["ConfirmScreen", "ConfirmScreen:docker", "InputScreen"]
-    assert ran == ["docker-plan", "docker-install"]
+    assert screens == ["ConfirmScreen", "ConfirmScreen:docker", "ChoiceScreen"]
+    assert ran == ["docker-plan", "docker-install", "tainacan-free-status"]
     # "No" at Docker's plan: neither is installed.
     screens, ran = asyncio.run(main(["yes", "no"]))
     assert ran == ["docker-plan"]

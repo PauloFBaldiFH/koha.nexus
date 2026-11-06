@@ -31,6 +31,7 @@ Koha panel (installer)                 Worker (this folder)                     
 - **Optional circuit breaker:** `MAX_LIBRARIES_PER_DAY` above 0 pauses enrollment after that many new libraries in 24 hours. `0` (the default) turns it off.
 - **After the fact:** the admin API can still suspend, restore or remove any library.
 - **Public list of catalogs (opt-in):** a library appears on `/api/public-libraries` (the koha.nexus home page), `/libraries` (plain HTML, so search engines follow the links) and `/libraries/sitemap.xml` only after it says yes in the panel (`PUT /v1/listing`, or the admin's `/listing`). A library with no heartbeat for 30 days leaves the list until its next one. Migration `0002_public_listing.sql` adds the column with every existing library off the list: run `npm run db:migrate` before deploying.
+- **The collection (Tainacan) next to the catalog:** each library has services, `koha` and/or `tainacan`. With `tainacan` it publishes one more name, `<library>-acervo` (`TAINACAN_SUFFIX`), in the same tunnel, to `http://localhost:80` (Apache on the server answers it by name). A library with Koha turns it on or off with `PUT /v1/services`; a server without Koha asks with `"services":["tainacan"]` in `device/start` and publishes only that name (no OPAC, no staff name, no public list, no staff gate). `GET /v1/capabilities` says what this deployment offers, so an installer facing an older broker says so instead of failing. Turning the collection off removes only our record of that name; a record that belongs to someone else is never touched. Migration `0003_services.sql` adds the columns, every existing library as `koha` only (nothing changes for them): run `npm run db:migrate` before deploying.
 - **Moving an address to a new server:** the panel saves a recovery file (the server key and the library id); "I already have an address" on the new server reads it and renews the tunnel token. When the file was lost with the server, `POST /admin/libraries/{id}/recovery-file` (after checking with the library's contact) makes a new key pair, keeps only the public half and returns a new file once; the old key stops working at once. `DELETE /admin/held-names/{slug}` ends the 180-day hold of a name that was given up, so the same library can ask for it again.
 
 ## Files
@@ -40,6 +41,7 @@ Koha panel (installer)                 Worker (this folder)                     
 | `wrangler.toml` | Bindings: D1, Durable Object (SQLite), Queue (+ dead-letter), 3 rate limiters, cron, routes, vars |
 | `package.json`, `package-lock.json`, `tsconfig.json` | Dependencies (wrangler, Miniflare, vitest, TypeScript) and scripts |
 | `migrations/0001_init.sql` | D1 schema |
+| `migrations/0002_public_listing.sql`, `migrations/0003_services.sql` | The public list; the services of each library (Koha, the collection) |
 | `src/index.ts` | Router, queue consumer, cron |
 | `src/api.ts` | Enrollment (device flow) and signed library endpoints |
 | `src/admin.ts` | Approve/deny, suspend/restore, remove |
@@ -119,7 +121,8 @@ curl -s $B/v1/enroll -H 'Content-Type: application/json' \
 
 | Endpoint | Auth | Purpose |
 |---|---|---|
-| `POST /v1/device/start` | rate limit per IP | `{institution_name, contact_email, cnpj?, requested_name?}` → `device_code`, `user_code`, `verification_uri` |
+| `GET /v1/capabilities` | none | `{services, collection_suffix}`: what this deployment publishes |
+| `POST /v1/device/start` | rate limit per IP | `{institution_name, contact_email, cnpj?, requested_name?, services?}` → `device_code`, `user_code`, `verification_uri`; `services` is `["koha"]` (default), `["tainacan"]` or both |
 | `POST /v1/device/poll` | device code | `pending` / `approved` / `denied` / `expired` |
 | `POST /v1/enroll` | device code (single use) | binds the Ed25519 public key, queues provisioning |
 | `GET /join?c=CODE` | none | status page behind the QR code (verification form comes later) |
@@ -129,7 +132,8 @@ curl -s $B/v1/enroll -H 'Content-Type: application/json' \
 | `POST /v1/heartbeat` | signed | Koha and installer versions |
 | `PUT` / `DELETE /v1/staff-credentials` | signed | turn remote staff access on (user, password, optional CIDRs) or off |
 | `DELETE /v1/library` | signed | remove tunnel and records |
-| `PUT /v1/listing` | signed | `{public: true\|false}`: the catalog on or off the public list |
+| `PUT /v1/listing` | signed | `{public: true\|false}`: the catalog on or off the public list (409 without Koha) |
+| `PUT /v1/services` | signed | `{tainacan: true\|false}`: the collection's name on or off; 409 when nothing would be left or the name does not fit a DNS label |
 | `GET /api/public-libraries`, `GET /libraries`, `GET /libraries/sitemap.xml` | none | public list of catalogs as JSON (koha.nexus home page), plain HTML and a sitemap of the catalogs' home pages |
 | `/admin/...` | `Bearer ADMIN_TOKEN` | `GET /admin/enrollments?status=`, `POST /admin/enrollments/{code}/approve` (`{slug?, force?}`) or `/deny`, `GET /admin/libraries`, `POST /admin/libraries/{id}/suspend` or `/restore`, `DELETE /admin/libraries/{id}`, `POST /admin/libraries/{id}/recovery-file`, `POST /admin/libraries/{id}/listing` (`{public}`), `DELETE /admin/held-names/{slug}` |
 
@@ -178,9 +182,21 @@ npm run test:e2e      # bundles the Worker and runs the full flow in local worke
 
 The panel's **Free address** item (menu 6, Cloudflare Tunnel Manager) is the client. It asks for the library name, contact e-mail and wanted name, and connects right away when the broker approves at once (the default). With manual approval it shows the request page as a QR code, browser or link and continues on its own once the request is approved. It creates the server key (`/etc/koha-easy-install/broker.key`, 0600), keeps the tunnel token only in `/etc/cloudflared/koha-broker.env` (0600) and runs `cloudflared tunnel run` as a service. It sends a daily signed heartbeat (`/etc/cron.d/koha_broker`) and has menu items for remote staff access, reconnect, token renewal, sharing the catalog link (QR code on screen, printable PNG, browser, link) and giving the address up. A server uses either a free address or its own domain, never both.
 
+**Tainacan address > Free koha.nexus address** is the collection's side (`kei_tainacan_free_*`): with Koha on a free address it asks `PUT /v1/services {"tainacan":true}` after a yes and points Tainacan at the new name; on a server without Koha it runs the same request with `"services":["tainacan"]`. The name is kept as `TAINACAN_HOST` in `tunnel.conf`. Giving up the catalog's free address brings the collection back to the local network too. `tests/tainacan_free.bats` covers it against a stand-in of this service.
+
 The installer still defaults to the old test broker, `https://koha-broker.bibliotecamunicipalpalotina.org`; change its `KEI_BROKER_URL` default to `https://broker.koha.nexus` once this deployment is live. `KEI_BROKER_URL` overrides it meanwhile.
 
 To run the installer tests: `npm install` here, then `sudo KEI_TEST_SANDBOX=1 tests/run.sh tests/free_address.bats` from the repository root. `npm run test:e2e` runs the Worker-only end-to-end checks.
+
+## Deploying the collection addresses (migration 0003)
+
+Nothing of this reaches production until you run it, in this order, from this folder with your own `wrangler login`:
+
+1. `npm ci && npx tsc --noEmit && npx vitest run && npm run test:e2e`: everything passes locally.
+2. `npm run db:migrate`: applies `0003_services.sql` to the remote D1. It only adds columns (every library stays `koha`), so the Worker in production keeps working before and after it.
+3. Check `TAINACAN_SUFFIX` in `wrangler.toml` (`-acervo`), then `npm run deploy`.
+4. `curl -s https://broker.koha.nexus/v1/capabilities` answers `{"services":["koha","tainacan"],"collection_suffix":"-acervo"}`. Until then the panel shows the option as not available, with the reason.
+5. To undo: deploy the previous version; the columns stay and are ignored. Libraries that turned the collection on keep their `-acervo` record until they turn it off or `DELETE /admin/libraries/{id}`.
 
 ## Next steps
 

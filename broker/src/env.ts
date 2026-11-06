@@ -1,4 +1,4 @@
-// Bindings, configuration and the D1 row shapes (migrations/0001_init.sql).
+// Bindings, configuration and the D1 row shapes (migrations/).
 
 import type { Provisioner } from "./provisioner";
 
@@ -22,6 +22,8 @@ export interface Env {
   BROKER_HOST: string;
   NAME_PREFIX: string;
   STAFF_SUFFIX: string;
+  /** Tainacan's address: <slug><TAINACAN_SUFFIX>; unset = "-acervo". */
+  TAINACAN_SUFFIX?: string;
   AUTO_APPROVE: string;
   MAX_LIBRARIES_PER_DAY: string;
   PBKDF2_ITERATIONS: string;
@@ -53,6 +55,7 @@ export interface EnrollmentRow {
   cnpj: string | null;
   requested_slug: string | null;
   approved_slug: string | null;
+  services: string;
   client_ip_hash: string | null;
   created_at: number;
   expires_at: number;
@@ -71,6 +74,9 @@ export interface LibraryRow {
   tunnel_id: string | null;
   opac_record_id: string | null;
   staff_record_id: string | null;
+  /** "koha", "tainacan" or "koha,tainacan" (migrations/0003_services.sql). */
+  services: string;
+  collection_record_id: string | null;
   staff_user: string | null;
   staff_pass_hash: string | null;
   staff_pass_salt: string | null;

@@ -24,6 +24,7 @@ export const TEST_VARS = {
   BROKER_HOST: "broker.example.org",
   NAME_PREFIX: "t-",
   STAFF_SUFFIX: "-admin",
+  TAINACAN_SUFFIX: "-acervo",
   AUTO_APPROVE: "true",
   MAX_LIBRARIES_PER_DAY: "0",
   PBKDF2_ITERATIONS: "1000",

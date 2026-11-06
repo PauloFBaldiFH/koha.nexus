@@ -1,7 +1,9 @@
 // End-to-end run of the bundled Worker in local workerd (Miniflare) with a
 // fake Cloudflare API: enrollment, provisioning through the queue and the
 // Durable Object, signed calls (signed by scripts/kei-sign.sh), the staff
-// gate, suspension, rotation, reconciliation and removal.
+// gate, suspension, rotation, reconciliation and removal; Tainacan's
+// collection address (a library with only Tainacan, and a Koha library
+// that adds it and takes it out).
 //
 //   npm run test:e2e     (builds first with `npm run build:local`)
 
@@ -15,6 +17,7 @@ import { ADMIN_TOKEN, BROKER_DIR, rawRequest, startBroker } from "./harness.mjs"
 const SIGNER = join(BROKER_DIR, "scripts/kei-sign.sh");
 const tmp = mkdtempSync(join(tmpdir(), "kei-e2e-"));
 const KEY = join(tmp, "lib.key");
+const KEY2 = join(tmp, "museum.key");
 
 let passed = 0;
 async function step(name, fn) {
@@ -48,8 +51,8 @@ async function call(method, path, { body, headers = {} } = {}) {
   return { status: res.status, json, text, headers: res.headers };
 }
 
-function signHeaders(libraryId, method, path, body) {
-  const args = [SIGNER, "headers", KEY, libraryId, method, path];
+function signHeaders(libraryId, method, path, body, key = KEY) {
+  const args = [SIGNER, "headers", key, libraryId, method, path];
   if (body !== undefined) {
     const f = join(tmp, "body.json");
     writeFileSync(f, body);
@@ -65,8 +68,12 @@ function signHeaders(libraryId, method, path, body) {
 }
 
 async function signed(libraryId, method, path, body) {
+  return signedAs(KEY, libraryId, method, path, body);
+}
+
+async function signedAs(key, libraryId, method, path, body) {
   const raw = body === undefined ? undefined : JSON.stringify(body);
-  return call(method, path, { body: raw, headers: signHeaders(libraryId, method, path, raw) });
+  return call(method, path, { body: raw, headers: signHeaders(libraryId, method, path, raw, key) });
 }
 
 const STAFF_HOST = "t-palotina-pr-admin.example.org";
@@ -303,6 +310,85 @@ try {
     const info = await signed(lib, "GET", "/v1/library");
     assert.equal(info.status, 200, info.text);
     assert.equal(info.json.slug, "palotina-pr");
+  });
+
+  await step("capabilities: this broker publishes Koha and Tainacan", async () => {
+    const r = await call("GET", "/v1/capabilities");
+    assert.equal(r.status, 200, r.text);
+    assert.deepEqual(r.json, { services: ["koha", "tainacan"], collection_suffix: "-acervo" });
+  });
+
+  await step("a library with only Tainacan: one collection name, no catalogue or staff address", async () => {
+    const other = { "CF-Connecting-IP": "198.51.100.7" };
+    assert.equal(
+      (await call("POST", "/v1/device/start", { headers: other, body: { institution_name: "Museu X", contact_email: "m@x.org", services: ["wordpress"] } })).status,
+      400,
+    );
+    const st = await call("POST", "/v1/device/start", {
+      headers: other,
+      body: { institution_name: "Museu Histórico de Palotina", contact_email: "museu@palotina.pr.gov.br", requested_name: "museu-palotina", services: ["tainacan"] },
+    });
+    assert.equal(st.status, 200, st.text);
+    assert.deepEqual(st.json.services, ["tainacan"]);
+    assert.deepEqual(st.json.hostnames, { collection: "t-museu-palotina-acervo.example.org" });
+    execFileSync("bash", [SIGNER, "keygen", KEY2]);
+    const pub = execFileSync("bash", [SIGNER, "pubkey", KEY2], { encoding: "utf8" }).trim();
+    const en = await call("POST", "/v1/enroll", { body: { device_code: st.json.device_code, public_key: pub } });
+    assert.equal(en.status, 202, en.text);
+    assert.deepEqual(en.json.hostnames, { collection: "t-museu-palotina-acervo.example.org" });
+    const museum = en.json.library_id;
+    assert.ok(await settle(), "job did not finish");
+    const s = fake.snapshot();
+    const tunnel = s.tunnels.find((t) => t.name === `kei-lib-${museum}`);
+    assert.deepEqual(tunnel.ingress, [
+      { hostname: "t-museu-palotina-acervo.example.org", service: "http://localhost:80" },
+      { service: "http_status:404" },
+    ]);
+    const mine = s.dns_records.filter((r) => r.comment === `kei:lib:${museum}`);
+    assert.deepEqual(mine.map((r) => r.name), ["t-museu-palotina-acervo.example.org"]);
+    const info = await signedAs(KEY2, museum, "GET", "/v1/library");
+    assert.equal(info.status, 200, info.text);
+    assert.deepEqual(info.json.services, ["tainacan"]);
+    // No staff gate, no public catalogue list, and Tainacan cannot be its last service taken out.
+    assert.equal((await signedAs(KEY2, museum, "PUT", "/v1/staff-credentials", { username: "equipe", password: "uma senha bem longa" })).status, 409);
+    assert.equal((await signedAs(KEY2, museum, "PUT", "/v1/listing", { public: true })).status, 409);
+    assert.equal((await signedAs(KEY2, museum, "PUT", "/v1/services", { tainacan: false })).status, 409);
+    const del = await signedAs(KEY2, museum, "DELETE", "/v1/library");
+    assert.equal(del.status, 202, del.text);
+    assert.ok(await settle(), "deprovision job did not finish");
+    assert.ok(!fake.snapshot().dns_records.some((r) => r.comment === `kei:lib:${museum}`));
+    assert.ok(!fake.snapshot().tunnels.some((t) => t.name === `kei-lib-${museum}`));
+  });
+
+  await step("a Koha library adds Tainacan, takes it out and adds it again; Koha's names stay", async () => {
+    const before = fake.snapshot().dns_records.filter((r) => r.comment === `kei:lib:${lib}`).map((r) => r.id).sort();
+    assert.equal((await signed(lib, "PUT", "/v1/services", { tainacan: "yes" })).status, 400);
+    const on = await signed(lib, "PUT", "/v1/services", { tainacan: true });
+    assert.equal(on.status, 200, on.text);
+    assert.deepEqual(on.json.services, ["koha", "tainacan"]);
+    assert.equal(on.json.hostnames.collection, "t-palotina-pr-acervo.example.org");
+    let s = fake.snapshot();
+    assert.deepEqual(s.tunnels[0].ingress.map((x) => x.hostname ?? "*"), [
+      "t-palotina-pr.example.org",
+      "t-palotina-pr-admin.example.org",
+      "t-palotina-pr-acervo.example.org",
+      "*",
+    ]);
+    const mine = s.dns_records.filter((r) => r.comment === `kei:lib:${lib}`);
+    assert.equal(mine.length, 3);
+    for (const id of before) assert.ok(mine.some((r) => r.id === id), "Koha's records kept");
+    const off = await signed(lib, "PUT", "/v1/services", { tainacan: false });
+    assert.equal(off.status, 200, off.text);
+    assert.equal(fake.snapshot().dns_records.filter((r) => r.comment === `kei:lib:${lib}`).length, 2);
+    assert.equal((await signed(lib, "PUT", "/v1/services", { tainacan: true })).status, 200);
+    const info = await signed(lib, "GET", "/v1/library");
+    assert.deepEqual(info.json.services, ["koha", "tainacan"]);
+    assert.equal(info.json.hostnames.collection, "t-palotina-pr-acervo.example.org");
+    // Suspension covers the collection too.
+    assert.equal((await call("POST", `/admin/libraries/${lib}/suspend`, { headers: admin })).status, 200);
+    assert.deepEqual(fake.snapshot().tunnels[0].ingress, [{ service: "http_status:503" }]);
+    assert.equal((await call("POST", `/admin/libraries/${lib}/restore`, { headers: admin })).status, 200);
+    assert.equal(fake.snapshot().tunnels[0].ingress.length, 4);
   });
 
   await step("DELETE /v1/library removes tunnel and records; the key stops working", async () => {

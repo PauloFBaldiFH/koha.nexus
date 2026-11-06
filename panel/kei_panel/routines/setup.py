@@ -78,8 +78,8 @@ def step_text(platform: str, step: str) -> str:
         if platform == "koha":
             return t("How people outside this network reach the catalogue: a Cloudflare tunnel with your own "
                      "domain or a free koha.nexus address. Always in Security & access hub > Cloudflare Tunnel Manager.")
-        return t("The address of the collection: this server on the local network, or your own domain. "
-                 "Always in Tainacan > Tainacan address.")
+        return t("The address of the collection: this server on the local network, your own domain or a free "
+                 "koha.nexus address. Always in Tainacan > Tainacan address.")
     if platform == "koha":
         return t("Koha already makes a local backup every night. Here, a copy in the cloud with its own "
                  "frequency and retention. Always in the Backup center.")
