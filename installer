@@ -14163,6 +14163,8 @@ kei_tainacan_uninstall() {
     kei_owned_del package apache2 "$KEI_TAINACAN_ID"
     [ -n "$(_kei_bk_get schedule_tainacan)" ] && kei_backup_schedule tainacan off >/dev/null 2>&1
     kei_owned_del package cron "$KEI_TAINACAN_ID"
+    # The steps after the installation belong to that installation.
+    rm -f -- "$(_kei_setup_file tainacan)"
     if [ "$data" = delete ]; then
         rm -rf -- "$KEI_TAINACAN_DIR"
     else
@@ -16478,10 +16480,19 @@ _kei_tn_env_unset() {
 }
 
 # _kei_tn_admin_php CODE ARGS...: WordPress code, the password (if any)
-# on its standard input; prints what the code echoes.
+# on its standard input; prints what the code echoes. wp eval takes no
+# arguments of its own (only wp eval-file gives them to the code as
+# $args), so the code goes in a file of the work folder; it holds no
+# secret, the password never leaves the standard input.
 _kei_tn_admin_php() {
-    local code="$1"; shift
-    printf '%s\n' "${_KEI_PW:-}" | _kei_tn_wp eval "$code" "$@" 2>/dev/null | tail -n 1
+    local code="$1" work="$KEI_TAINACAN_DIR/work" f out
+    shift
+    mkdir -p "$work" && chmod 755 "$work" || return 1
+    f=$(mktemp "$work/kn-admin.XXXXXX") || return 1
+    printf '<?php\n%s\n' "$code" > "$f" && chmod 644 "$f" || { rm -f "$f"; return 1; }
+    out=$(printf '%s\n' "${_KEI_PW:-}" | _kei_tn_wp eval-file "/work/${f##*/}" "$@" 2>/dev/null | tail -n 1)
+    rm -f "$f"
+    printf '%s\n' "$out"
 }
 
 # kei_tainacan_admin_status: state=initial (the account made at the

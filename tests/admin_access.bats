@@ -54,8 +54,10 @@ _kei_tn_get() { case \"\$1\" in status) echo installed ;; url) cat '$T/url' 2>/d
 _kei_tn_wp() {
     printf '%s\n' \"\$*\" >> '$T/argv'
     if [ \"\$1 \$2\" = 'user list' ]; then awk -F'|' '\$2 == \"administrator\" { print \$1 }' '$T/wp_users'; return 0; fi
-    [ \"\$1\" = eval ] || return 1
-    local code=\"\$2\" pw; shift 2
+    # As wp-cli: eval takes no arguments for the code (\$args is only
+    # given by eval-file, whose file is in the work folder, /work).
+    [ \"\$1\" = eval-file ] || return 1
+    local code pw; code=\$(cat \"\$KEI_TAINACAN_DIR/work/\${2#/work/}\") || return 1; shift 2
     IFS= read -r pw
     if [[ \"\$code\" == *wp_check_password* ]]; then
         grep -q \"^\$1|[^|]*|\$pw|\" '$T/wp_users' && echo yes || echo no
@@ -165,6 +167,8 @@ no_password_anywhere() {
     [ "$status" -eq 0 ]
     grep -qxF "ana|administrator|$PW|ana@x.org" "$T/wp_users"
     no_password_anywhere "$PW"
+    # The code files given to wp eval-file are removed after each call.
+    [ -z "$(ls -A "$KEI_TAINACAN_DIR/work" 2>/dev/null)" ]
 }
 
 @test "A08 setup: only states in a private file; begin never resets; the real state marks steps done" {
