@@ -23,7 +23,7 @@ Cada etapa é uma branch remota, montada sobre a anterior. Nenhuma foi mesclada.
 | U3 | 1.5.177 | `claude/etapa-T-u3` (ponta `521edc7`) | `c9591d0` central de agendamentos; `8ea9dcd` merge das correções do U2 | #343, **mesclado** em 06/11 |
 | U4 | 1.5.178 | `claude/etapa-T-u4` (ponta `dc4860c`) | `c490351` acesso administrativo e assistente pós-instalação; `70c6000` acesso administrativo do Tainacan por `wp eval-file`; merges das correções do U2 | #344, **mesclado** em 06/11 |
 | U5 | 1.5.179 | `claude/etapa-T-u5` (ponta `73656be`) | `9b4751a` endereço gratuito do acervo (Tainacan); `e67ec19` merge | #345, **mesclado** em 06/11 |
-| U6 | 1.5.180 | `claude/etapa-T-u6` (ponta `2862835`) | `4c05abf` backup conjunto agendado; `b2235ad` merge; `bbc939a` passo agendado do `koha-set`; `553fa2b` pasta inicial ilegível | **PR #346**, aberto |
+| U6 | 1.5.180 | `claude/etapa-T-u6` (ponta `2862835`) | `4c05abf` backup conjunto agendado; `b2235ad` merge; `bbc939a` passo agendado do `koha-set`; `553fa2b` pasta inicial ilegível | #346, **mesclado** em 06/11 |
 | Documentos | (sem versão) | `claude/etapa-T-docs` | `2a963e6` e seguintes | sem PR; pode ir junto do U2 ou à parte |
 
 Para conferir: `git fetch origin && git log --oneline origin/main..origin/claude/etapa-T-u6`.
@@ -122,7 +122,7 @@ Atualizado a cada execução acompanhada.
 | PR #343 (U3), `521edc7` | verde | mesclado em 06/11 |
 | U4 `dc4860c` | 19 de 19 verdes, inclusive `koha-set` e `tainacan` nos três sistemas | PR #344: 47 de 47 verdes, mesclado em 06/11 |
 | U5 `73656be` | 19 de 19 verdes | PR #345: 48 de 48 verdes, mesclado em 06/11 |
-| U6 `2862835` | 19 de 19 verdes, inclusive `koha-set` com o passo agendado | aberto como PR #346 |
+| U6 `2862835` | 19 de 19 verdes, inclusive `koha-set` com o passo agendado | PR #346: 47 de 47 verdes, mesclado em 06/11 |
 | Pontas atuais | em execução | a conferir |
 
 Todos os outros jobs do `proxy` (apache, system, tainacan, engine, events, nos três sistemas) passaram em todas as execuções do U2.
@@ -130,13 +130,13 @@ Todos os outros jobs do `proxy` (apache, system, tainacan, engine, events, nos t
 ## 5. Pendências
 
 Do Paulo:
-1. Mesclar cada PR na ordem (do #341 ao #345 já entraram; falta o #346, o último).
+1. Mesclar cada PR na ordem (feito: do #341 ao #346 estão na `main`, versão 1.5.180, merge `1d34ee8`).
 2. Publicar o serviço de endereços (`broker/`) e aplicar a migração 0003. O procedimento está no README do `broker/`, em "Deploying the collection addresses". Nada é publicado automaticamente.
 3. Rodar `roteiro-teste-etapa-T.sh antes` no servidor, atualizar o painel e rodar `roteiro-teste-etapa-T.sh depois`. O roteiro só lê, e os arquivos que ele gera ficam com permissão 600.
 
 De quem continuar:
-1. Acompanhar a CI do #346; corrigir na própria branch `claude/etapa-T-u6`.
-2. Com o #346 mesclado, a etapa T está toda na `main`. Restam os passos do Paulo abaixo.
+1. U1 a U6 estão todos na `main`. As branches `claude/etapa-T-u2` a `u6` podem ser apagadas quando o Paulo quiser.
+2. Restam os passos do Paulo acima (serviço de endereços, migração 0003 e roteiro no servidor). Nada de servidor real foi testado.
 3. Nada de servidor real foi testado. Nenhum teste destrutivo deve rodar no servidor do Paulo.
 
 Fora do escopo: Portal Nexus, DSpace e AtoM.
