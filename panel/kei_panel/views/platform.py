@@ -18,8 +18,8 @@ Control Dashboard, in the platform's tab ("State and addresses" leads
 there).
 
 PlatformSectionView draws the other screens of the Tainacan group (its
-diagnosis and maintenance, events, backups) and Shared infrastructure
-(Docker, the web proxy, the backup vault): the same cards, shown or not by
+diagnosis and maintenance, events) and Shared infrastructure (Docker, the
+web proxy); the Backup center (views/backups.py) extends it: the same cards, shown or not by
 platforms.entry_shown, plus the read-only status cards a screen needs.
 Every card runs a routine of routines/platforms.py; the installer checks
 everything again.
@@ -40,8 +40,7 @@ from .base import ZONE_ORDER, SectionView, zone_id
 
 # The read-only cards some screens show above their actions: (id, title).
 STATUS_CARDS = {
-    "infra": (("proxy", "Web proxy"), ("docker", "Docker"), ("vault", "Backup key")),
-    "tainacan-backups": (("backups", "Tainacan backups"),),
+    "infra": (("proxy", "Web proxy"), ("docker", "Docker")),
 }
 
 # What is encrypted in the platform backups, said where the key is made.
@@ -71,8 +70,6 @@ class PlatformSectionView(SectionView):
             with Grid(classes="status-grid", id="platform-status"):
                 for key, title in cards:
                     yield StatusCard(t(title), id=f"pstatus-{key}")
-        if self.section.id == "infra":
-            yield Static(t(ENCRYPTION_NOTE), classes="view-prompt", id="encryption-note", markup=False)
 
     def on_mount(self) -> None:
         # Nothing is offered before the state is read: no card that would
@@ -104,7 +101,7 @@ class PlatformSectionView(SectionView):
         self.run_worker(self._load(), exclusive=True, group=f"platform-{self.section.id}", exit_on_error=False)
 
     def needs_backups(self) -> bool:
-        return self.section.id in ("infra", "tainacan-backups", "tainacan")
+        return self.section.id == "tainacan"
 
     async def read_facts(self) -> platforms.Facts:
         app = self.app
@@ -168,9 +165,6 @@ class PlatformSectionView(SectionView):
             self.query_one("#pstatus-proxy", StatusCard).set(
                 *platforms.describe_proxy(platforms.proxy_from_status(facts.status)))
             self.query_one("#pstatus-docker", StatusCard).set(*platforms.describe_docker(facts.docker))
-            self.query_one("#pstatus-vault", StatusCard).set(*platforms.describe_vault(facts.backups))
-        elif self.section.id == "tainacan-backups":
-            self.query_one("#pstatus-backups", StatusCard).set(*platforms.describe_backups(facts.backups))
 
 
 class PlatformHomeView(PlatformSectionView):

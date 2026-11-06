@@ -153,9 +153,13 @@ class MainScreen(Screen):
             self.expanded.discard(group)
         self.redraw_sidebar(highlight=option_id if expand else group)
 
-    def action_show(self, section_id: str, from_sidebar: bool = False) -> None:
+    def action_show(self, section_id: str, from_sidebar: bool = False, scope: str = "") -> None:
         switcher = self.query_one("#views", ContentSwitcher)
         sec = section(section_id)
+        # A card can open a shared screen already filtered (the Backup
+        # center from a platform group: menus.Entry.scope).
+        if scope:
+            self.app.backup_scope = scope
         ready = self.app.platform_ready(sec.requires)
         # A section whose platform is not installed gets its own stand-in
         # ("-off"): nothing of the section is loaded (its view may read
@@ -168,6 +172,10 @@ class MainScreen(Screen):
                 view = UnavailableView(sec, platforms.missing_reason(sec.requires))
                 switcher.mount(view)
         switcher.current = view_id
+        if scope:
+            view = switcher.query_one(f"#{view_id}")
+            if hasattr(view, "set_scope"):
+                view.set_scope(scope)
         self.sub_title = split_icon(t(sec.label))[1]
         # The group of the screen shown is expanded (a key, a card or its row).
         group = group_of(section_id)

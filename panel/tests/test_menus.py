@@ -56,9 +56,12 @@ def test_unique_ids_and_keys():
 
 
 def test_magic_import_is_on_the_main_menu():
-    # Right under the backups (Paulo, 2026-10-09), and only there.
+    # Right under the backups (Paulo, 2026-10-09), and only there. Since
+    # 2026-11-06 the Backup center is in the main menu (shared by Koha and
+    # Tainacan): the Koha group keeps Magic Import where the backups were.
     ids = [s.id for s in SECTIONS]
-    assert ids.index("import") == ids.index("backup") + 1
+    assert ids.index("import") == ids.index("credentials") + 1
+    assert ids.index("backups") > ids.index("tainacan-events")
     places = [s.id for s in SECTIONS for e in s.entries if e.action == "magic-import"]
     assert places == ["import"]
 
@@ -68,7 +71,7 @@ def test_restore_is_only_in_the_backup_center():
     ids = [s.id for s in SECTIONS]
     assert "restore" not in ids
     places = [s.id for s in SECTIONS for e in s.entries if e.action == "restore"]
-    assert places == ["backup"]
+    assert places == ["backups"]
 
 
 def test_security_and_access_hub():
@@ -153,7 +156,10 @@ def test_every_card_says_what_it_does():
             text = description(entry)
             assert text, entry.action
             assert pt.get(text), f"no PT-BR text for {text!r}"
-    assert set(DESCRIPTIONS) == {e.action for s in SECTIONS for e in s.entries}
+    plain = {k for k in DESCRIPTIONS if ":" not in k}
+    scoped = {k for k in DESCRIPTIONS if ":" in k}
+    assert plain == {e.action for s in SECTIONS for e in s.entries}
+    assert scoped == {f"{e.action}:{e.scope}" for s in SECTIONS for e in s.entries if e.scope}
     assert "Step by step, in this panel" not in pt
 
 

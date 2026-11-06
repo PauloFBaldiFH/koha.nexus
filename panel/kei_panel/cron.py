@@ -424,6 +424,19 @@ def with_what(job: Job, what: str) -> Job:
     return replace(job, command=cloud_command(cloud_id(job), what))
 
 
+def demo_cloud_jobs(cf: CronFile, plan_ids: list[str]) -> CronFile:
+    """The demo has no cron file: its cloud backups get a schedule here
+    (the first daily at 23:30 with MARC21, the others weekly at 02:00)."""
+    for i, plan_id in enumerate(plan_ids):
+        if cf.job(CLOUD_PREFIX + plan_id) is None:
+            job = cloud_job(plan_id, "sql+marc" if i == 0 else "sql", hour=23 if i == 0 else 2,
+                            minute=30 if i == 0 else 0)
+            if i:
+                job.freq, job.day = "weekly", 0
+            cf.jobs.append(job)
+    return cf
+
+
 def cloud_jobs(cf: CronFile) -> list[Job]:
     return [j for j in cf.jobs if is_cloud(j)]
 

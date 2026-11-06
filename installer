@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.174"
+PANEL_VERSION=" 1.5.175"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -14679,6 +14679,11 @@ kei_backup_copy() {
     _kei_bk_has_key || { echo "$(t "Set up the backup key first: without it the configuration would go to the cloud unencrypted.")" >&2; return 6; }
     command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "${v%%:*}:" \
         || { echo "$(r="${v%%:*}"; t "There is no cloud connection named \${r}.")" >&2; return 3; }
+    # Each plan its own destination: never inside Koha's cloud backup folders.
+    case "/${v#*:}/" in */Backup_SQL_Koha/*|*/Backup_MARC_Koha/*)
+        echo "$(t "That folder belongs to the Koha cloud backups. Choose a folder of its own for this platform.")" >&2
+        return 2 ;;
+    esac
     _kei_bk_set "copy_$p" "$v"
     _kei_bk_has_key && kei_backup_kit >/dev/null
     echo "$(r="$v"; t "Each new package will also be copied to \${r}.")"
@@ -15277,6 +15282,7 @@ kei_backup_status() {
         printf '%s.repo=%s\n' "$p" "$(_kei_bk_get "repo_$p")"
         printf '%s.copy=%s\n' "$p" "$(_kei_bk_get "copy_$p")"
         printf '%s.schedule=%s\n' "$p" "$(_kei_bk_get "schedule_$p")"
+        printf '%s.keep=%s %s %s %s\n' "$p" "$KEI_BK_KEEP_LAST" "$KEI_BK_KEEP_DAILY" "$KEI_BK_KEEP_WEEKLY" "$KEI_BK_KEEP_MONTHLY"
         printf '%s.last=%s\n' "$p" "$(printf '%s' "$last" | awk -F'\t' '{ n = split($1, a, "/"); print a[n] "|" $2 "|" $4 }')"
         printf '%s.count=%s\n' "$p" "$(kei_backup_list "$p" | grep -c .)"
         printf '%s.incomplete=%s\n' "$p" "$inc"
@@ -42752,7 +42758,8 @@ cloud_plan_delete() {
 
 cloud_status() {
     local f line
-    cloud_plans_migrate
+    # The 1.5.162 destination becomes Koha cloud backups only where Koha is.
+    is_koha_installed && cloud_plans_migrate
     while IFS='|' read -r f line; do
         [ -n "$f" ] && kei_result plan "${f}"$'\t'"${line//|/$'\t'}"
     done 2>/dev/null < "$CLOUD_PLANS_FILE"
@@ -42907,7 +42914,7 @@ cloud_save() {
 
 # cloud-test NAME [BASE]: the upload test only; the destination is not changed.
 cloud_test() {
-    local name="${1:-}" sql_dir marc_dir start
+    local name="${1:-}" sql_dir marc_dir start base
     rclone_prepare || return 1
     if ! cloud_name_ok "$name" || ! cloud_remote_exists "$name"; then
         local remotes
@@ -42915,7 +42922,16 @@ cloud_test() {
         msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"
         return 1
     fi
-    if [ $# -ge 2 ]; then
+    if ! is_koha_installed; then
+        # No Koha: the test goes to a neutral folder, not to Koha's folders.
+        base="Koha.Nexus"
+        if [ $# -ge 2 ]; then
+            cloud_base_clean "$2" || { msg_error "" "$(t "That folder name cannot be used in the cloud. Use letters, digits, spaces, . _ - and / between folders.")"; return 1; }
+            base="${REPLY:-Koha.Nexus}"
+        fi
+        sql_dir=$base
+        marc_dir=$base
+    elif [ $# -ge 2 ]; then
         cloud_base_clean "$2" || { msg_error "" "$(t "That folder name cannot be used in the cloud. Use letters, digits, spaces, . _ - and / between folders.")"; return 1; }
         sql_dir="${REPLY:+$REPLY/}Backup_SQL_Koha"
         marc_dir="${REPLY:+$REPLY/}Backup_MARC_Koha"
@@ -42941,6 +42957,17 @@ cloud_delete() {
         local remotes
         remotes=$(rclone listremotes 2>/dev/null)
         msg_error "" "$(t "There is no rclone remote called '\$name'.\n\nExisting remotes:\n\$remotes")"
+        return 1
+    fi
+    # A connection a platform backup still sends to (its copy or restic
+    # repository) is kept: removing it would break that backup silently.
+    local p used=""
+    for p in $KEI_BK_PLATFORMS; do
+        case "$(_kei_bk_get "copy_$p" 2>/dev/null)" in "${name}:"*) used+="${used:+, }$p" ;; esac
+        case "$(_kei_bk_get "repo_$p" 2>/dev/null)" in "rclone:${name}:"*) used+="${used:+, }$p" ;; esac
+    done
+    if [ -n "$used" ]; then
+        msg_error "" "$(t "The connection '\${name}' is still used by the backup of: \${used}. Choose another destination there first.")"
         return 1
     fi
     rclone config delete "$name" >/dev/null 2>&1
@@ -43963,15 +43990,32 @@ kei_task_marc_info() {
     return 0
 }
 
-# What every cloud set-up needs first: rclone and the backup scripts.
+# What every cloud set-up needs first: rclone, and Koha's backup scripts
+# when Koha is installed (a cloud connection serves any platform: with only
+# Tainacan nothing of Koha is written).
 rclone_prepare() {
     command -v rclone >/dev/null 2>&1 || apt_install rclone >/dev/null 2>&1
     if ! command -v rclone >/dev/null 2>&1; then
         msg_error "" "$(t "Could not install rclone.")" 8 66
         return 1
     fi
-    [ -f /root/backup_sql.sh ] || write_backup_scripts
+    if is_koha_installed && [ ! -f /root/backup_sql.sh ]; then
+        write_backup_scripts
+    fi
     return 0
+}
+
+# cloud_connection_only NAME: with no Koha, a connection made by the
+# Google sign-in is only tested (in the neutral folder Koha.Nexus) and kept:
+# no Koha cloud backup is created. 0 when the cloud took the test file.
+cloud_connection_only() {
+    if ! rclone_upload_test "$1" "Koha.Nexus" "Koha.Nexus"; then
+        msg_error "" "$REPLY" 20 78
+        return 1
+    fi
+    local name="$1"
+    log "rclone: connection ${name} saved (no Koha: no cloud backup created)"
+    msg_ok "$(t "✅ The connection '\${name}' works. Choose it in the backup of each platform.")"
 }
 
 # Cloud backup with a token made on another computer (KEI_RCLONE_TOKEN:
@@ -43979,7 +44023,6 @@ rclone_prepare() {
 kei_task_cloud_token() {
     local token="${KEI_RCLONE_TOKEN:-}"
     unset KEI_RCLONE_TOKEN
-    require_database || return 1
     if ! rclone_token_clean "$token"; then
         msg_error "" "$(t "[ERROR] Provided JSON is corrupt or was truncated when copying. Try again:")" 9 74
         return 1
@@ -43990,6 +44033,8 @@ kei_task_cloud_token() {
         msg_error "" "$(t "Failed to register connection in Rclone.")" 8 66
         return 1
     fi
+    is_koha_installed || { cloud_connection_only "gdrive"; return; }
+    require_database || return 1
     validate_and_register_rclone "gdrive"
 }
 
@@ -43998,7 +44043,6 @@ kei_task_cloud_token() {
 # the task stops rclone too (port 53682 is freed).
 kei_task_cloud_authorize() {
     local out token rc
-    require_database || return 1
     tui_run "$(t "Installing rclone")" rclone_prepare || { msg_error "" "$(t "Could not install rclone.")" 8 66; return 1; }
     out=$(mktemp /root/.kei-rclone-auth.XXXXXX) || return 1
     if ! auth_tool_start "$out" "$RCLONE_AUTH_URL_RE" rclone authorize "drive" --auth-no-open-browser; then
@@ -44027,6 +44071,8 @@ kei_task_cloud_authorize() {
         msg_error "" "$(t "Failed to register gdrive remote in Rclone.")" 8 66
         return 1
     fi
+    is_koha_installed || { cloud_connection_only "gdrive"; return; }
+    require_database || return 1
     validate_and_register_rclone "gdrive"
 }
 
@@ -44168,7 +44214,7 @@ kei_task() {
                 return 1
             fi ;;
         restore)         [ -n "${1:-}" ] || return 2; function_restore_database "$1" ;;
-        cloud-prepare)   require_database && tui_run "$(t "Installing rclone")" rclone_prepare ;;
+        cloud-prepare)   tui_run "$(t "Installing rclone")" rclone_prepare ;;
         cloud-token)     kei_task_cloud_token ;;
         cloud-authorize) kei_task_cloud_authorize ;;
         cloud-remotes)

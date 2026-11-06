@@ -328,3 +328,27 @@ async def cloud_backup(app) -> None:
     file = restore_path(await app.push_screen_wait(CloudBackupScreen(info)))
     if file:
         await restore(app, file)
+
+
+async def cloud_connections(app) -> None:
+    """The Backup center's shared "Cloud connections": the rclone
+    connections of this server, for any platform (Koha not needed). Only
+    the connections tab: Koha's cloud backups stay in its own card, and the
+    Tainacan backup copy is chosen in its card. A connection still used by
+    the Tainacan copy is marked and cannot be removed here."""
+    from ..screens.cloud_backup import CloudBackupScreen
+    info = await facts(app)
+    uses: dict[str, list[str]] = {}
+    bridge = app.bridge
+    try:
+        if bridge.has_task("platform-backup-status"):
+            out = await bridge.task("platform-backup-status", "tainacan")
+            results = out.results if isinstance(out.results, dict) else {}
+            for key, label in (("tainacan.copy", t("Tainacan copy")), ("tainacan.repo", t("Tainacan repository"))):
+                name, sep, _path = (results.get(key) or "").removeprefix("rclone:").partition(":")
+                if sep and name and "/" not in name:
+                    uses.setdefault(name, []).append(label)
+    except Exception:  # noqa: BLE001 - the connections are shown anyway
+        pass
+    await app.push_screen_wait(CloudBackupScreen(info, connections_only=True, uses=uses,
+                                                 koha=app.platform_ready("koha")))

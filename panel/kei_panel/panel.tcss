@@ -880,3 +880,12 @@ App.-plain #picker-drop {
 #diag-body { height: 1fr; }
 #diag-files { width: 34; height: 1fr; margin-right: 1; }
 .-narrow #diag-files { width: 24; }
+
+/* Backup center (views/backups.py): the blocks of the platform shown and
+   one block per automatic backup. */
+#bk-koha, #bk-tainacan, #bk-plans, #bk-scopes { height: auto; }
+#bk-scopes Label { padding-top: 1; }
+.bk-plan { height: auto; padding: 0 1; margin-bottom: 1; border-left: outer $panel-lighten-2; }
+.bk-plan.-ok { border-left: outer $success; }
+.bk-plan.-warn { border-left: outer $warning; }
+.bk-plan.-bad { border-left: outer $error; }

@@ -15,6 +15,8 @@ setup() {
 SYS_LANG=en
 require_database() { return 0; }
 rclone_prepare() { return 0; }
+is_koha_installed() { [ "\${FAKE_KOHA:-yes}" = yes ]; }
+KEI_BK_DIR="$W/bk"
 BACKUP_CONF="$W/backup.conf"
 CONF_DIR="$W"
 CLOUD_PLANS_FILE="$W/cloud_plans.conf"
@@ -456,4 +458,45 @@ answers() { printf '%b' "$1" > "$W/answers.tsv"; chmod 600 "$W/answers.tsv"; }
     grep -q '\[ -e "${CLOUD_PLANS_FILE}" \] && return 0' "$KEI_REPO/installer"
     [ "$(grep -c '\[ -n "\\${KEI_NO_CLOUD:-}" \] && return 0' "$KEI_REPO/installer")" -eq 2 ]
     [ "$(grep -c "grep -q 'KEI_NO_CLOUD' /root/backup_" "$KEI_REPO/installer")" -ge 2 ]
+}
+
+@test "C25 with only Tainacan the connection test goes to a neutral folder, never to Koha's" {
+    fake_rclone
+    FAKE_KOHA=no run_fn cloud_test gdrive
+    [ "$status" -eq 0 ]
+    grep -q 'gdrive:Koha.Nexus/kei-upload-test.txt' "$W/rclone.log"
+    ! grep -q 'Backup_SQL_Koha\|Backup_MARC_Koha' "$W/rclone.log"
+    FAKE_KOHA=no run_fn cloud_test gdrive "acervo/copias"
+    [ "$status" -eq 0 ]
+    grep -q 'gdrive:acervo/copias/kei-upload-test.txt' "$W/rclone.log"
+}
+
+@test "C26 with only Tainacan cloud-status reads the connections and makes no Koha cloud backup" {
+    conf_rclone
+    printf 'gdrive drive\n' > "$W/remotes"
+    printf 'RCLONE_REMOTE="gdrive"\n' > "$W/backup.conf"
+    FAKE_KOHA=no run_fn cloud_status
+    [ "$status" -eq 0 ]
+    [ ! -e "$W/cloud_plans.conf" ]
+    [ ! -e "$W/koha_tasks" ] || ! grep -q cloud_plan.sh "$W/koha_tasks"
+    run_fn cloud_status
+    [ "$status" -eq 0 ]
+    grep -q '^gdrive|gdrive|' "$W/cloud_plans.conf"        # with Koha the old destination migrates as before
+}
+
+@test "C27 cloud-delete keeps a connection the Tainacan backup still sends to" {
+    conf_rclone
+    printf 'gdrive drive\nnas sftp\n' > "$W/remotes"
+    mkdir -p "$W/bk"
+    printf 'copy_tainacan=gdrive:acervo\nrepo_tainacan=rclone:nas:restic\n' > "$W/bk/config"
+    run_fn cloud_delete gdrive
+    [ "$status" -eq 1 ]
+    grep -q '^gdrive ' "$W/remotes"
+    run_fn cloud_delete nas
+    [ "$status" -eq 1 ]
+    grep -q '^nas ' "$W/remotes"
+    printf 'copy_tainacan=\nrepo_tainacan=\n' > "$W/bk/config"
+    run_fn cloud_delete gdrive
+    [ "$status" -eq 0 ]
+    ! grep -q '^gdrive ' "$W/remotes"
 }

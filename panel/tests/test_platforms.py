@@ -211,11 +211,12 @@ def test_without_koha_the_panel_opens_with_the_shared_sections(no_koha):
 
     installed, ids = asyncio.run(main())
     assert installed is False
-    for gone in ("backup", "import", "ai", "z3950", "opac", "hub", "search", "library", "crons", "credentials",
+    for gone in ("import", "ai", "z3950", "opac", "hub", "search", "library", "crons", "credentials",
                  "settings", "diagnostics", "koha-security"):
         assert gone not in ids
     # The group's own row stays: it is where Koha is installed.
-    for kept in ("dashboard", "koha", "tainacan", "security", "infra", "server-diagnostics", "tools",
+    # The Backup center is shared (Koha, Tainacan, cloud connections).
+    for kept in ("dashboard", "koha", "tainacan", "backups", "security", "infra", "server-diagnostics", "tools",
                  "languages", "update", "about", "reboot"):
         assert kept in ids
 
@@ -228,20 +229,23 @@ def test_without_koha_a_key_shows_the_reason_and_loads_nothing(no_koha):
         async with app.run_test() as pilot:
             await pilot.pause(0.3)
             app.screen.query_one("#sidebar").blur()
-            await pilot.press("b")          # Backup center
+            await pilot.press("t")          # Database tables (it would read Koha's database)
             await pilot.pause(0.2)
             switcher = app.screen.query_one("#views", ContentSwitcher)
             current = switcher.current
             reason = str(app.screen.query_one(f"#{current} #unavailable-reason", Label).render())
-            await pilot.press("t")          # Database tables (it would read Koha's database)
-            await pilot.pause(0.2)
-            real_views = [w.id for w in switcher.children if w.id in ("view-backup", "view-database")]
-            return current, reason, switcher.current, real_views
+            await pilot.press("b")          # the Backup center is shared: it opens, with nothing of Koha
+            await _until(pilot, lambda: not app.screen.query_one("#platform-loader").display)
+            view = switcher.query_one(f"#{switcher.current}")
+            real_views = [w.id for w in switcher.children if w.id == "view-database"]
+            return (current, reason, switcher.current, real_views, bool(view.query_one("#bk-none").display),
+                    bool(view.query_one("#bk-koha").display), _shown(view))
 
-    current, reason, after, real_views = asyncio.run(main())
-    assert current == "view-backup-off"
+    current, reason, after, real_views, none, koha, shown = asyncio.run(main())
+    assert current == "view-database-off" and real_views == []
     assert "Koha is not installed" in reason
-    assert after == "view-database-off" and real_views == []
+    assert after == "view-backups" and none and not koha
+    assert shown == ["cloud-connections"]
 
 
 def test_without_koha_routines_are_refused_with_a_reason(no_koha, tmp_path):
@@ -317,8 +321,8 @@ def test_installing_koha_brings_its_sections_back(no_koha, monkeypatch):
             return before, sidebar_ids(app), app.screen.query_one("#views").current
 
     before, after, current = asyncio.run(main())
-    assert "backup" not in before and "backup" in after
-    assert current == "view-backup"
+    assert "import" not in before and "import" in after
+    assert current == "view-backups"
 
 
 def test_the_dashboard_shows_a_card_per_supported_platform_only(no_koha):
@@ -431,8 +435,9 @@ def test_docker_is_installed_only_after_the_plan_and_a_yes(no_koha):
 
     value, shown, preview, names, _ = asyncio.run(main("no"))
     assert (value, preview) == ("Not installed", True)
-    # The demo has a backup key: its kit is offered; removing Docker is not (it is not here).
-    assert shown == ["docker-install", "pbackup-kit"]
+    # Removing Docker is not offered (it is not here); the backup key and its
+    # kit are in the Backup center now.
+    assert shown == ["docker-install"]
     assert names == ["docker-plan"]                                            # "No": nothing installed
     *_, names, ran = asyncio.run(main("yes"))
     assert names == ["docker-plan", "docker-install"]
@@ -667,7 +672,7 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
         ran: list = []
         app = _platforms_app(ran)
         async with app.run_test() as pilot:
-            view = await _open(app, pilot, "tainacan-backups")
+            view = await _open(app, pilot, "backups")
             card = view.query_one("#pstatus-backups").display
             shown = _shown(view)
             _choose(view, "tainacan-restore")
@@ -684,8 +689,10 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
 
     card, shown, asked, ran = asyncio.run(main())
     assert card and asked
+    # Only Tainacan here: the center shows its cards, then the shared cloud connections.
     assert shown == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
-                     "pbackup-configure", "pbackup-verify", "pbackup-incomplete"]
+                     "pbackup-configure", "pbackup-verify", "pbackup-incomplete", "pbackup-kit",
+                     "cloud-connections"]
     assert ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",),
                     {"KEI_BACKUP_PHRASE": "MY-SECRET-RECOVERY-PHRASE"})]
     assert all("MY-SECRET" not in " ".join(r[1]) for r in ran)
@@ -701,7 +708,7 @@ def test_backup_setup_shows_the_plan_and_needs_a_yes(no_koha):
         ran: list = []
         app = _platforms_app(ran, no_key)
         async with app.run_test() as pilot:
-            view = await _open(app, pilot, "infra")
+            view = await _open(app, pilot, "backups")
             shown = _shown(view)
             _choose(view, "pbackup-setup")
             await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
@@ -729,7 +736,7 @@ def test_an_incomplete_backup_is_resumed_or_discarded(no_koha):
         ran: list = []
         app = _platforms_app(ran)
         async with app.run_test() as pilot:
-            view = await _open(app, pilot, "tainacan-backups")
+            view = await _open(app, pilot, "backups")
             _choose(view, "pbackup-incomplete")
             await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             options = [k for k, _v in app.screen._options] if isinstance(app.screen, ChoiceScreen) else []
@@ -1043,7 +1050,7 @@ def test_restore_without_the_phrase_warns_about_event_passes_first(no_koha):
         ran: list = []
         app = _events_app(ran, events="on")
         async with app.run_test() as pilot:
-            view = await _open(app, pilot, "tainacan-backups")
+            view = await _open(app, pilot, "backups")
             _choose(view, "tainacan-restore")
             await pilot.pause(2.0)          # the routine reads the state first (1.2 s in the demo)
             app.screen.dismiss(backup)

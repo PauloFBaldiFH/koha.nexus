@@ -17,6 +17,7 @@ on:
       - "panel/tests/test_platforms.py"
       - "panel/tests/test_tainacan_view.py"
       - "panel/tests/test_dashboard.py"
+      - "panel/tests/test_backup_center.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -28,6 +29,7 @@ on:
       - "panel/tests/test_platforms.py"
       - "panel/tests/test_tainacan_view.py"
       - "panel/tests/test_dashboard.py"
+      - "panel/tests/test_backup_center.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -53,6 +55,6 @@ jobs:
           cache: pip
           cache-dependency-path: panel/requirements.txt
       - run: python -m pip install pytest -r panel/requirements.txt
-      - name: Platforms screen, Tainacan section and dashboard tabs, on four servers
+      - name: Platforms screen, Tainacan section, dashboard tabs and Backup center, on four servers
         working-directory: panel
-        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py
+        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py

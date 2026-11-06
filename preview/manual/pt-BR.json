@@ -309,19 +309,6 @@
    ],
    "_en": "fabc1a7ea1"
   },
-  "sec-backup": {
-   "summary": "Tudo sobre backups e restaurações numa só tela: o estado do backup mais recente, a compressão dos novos backups, o download com um clique, a restauração, a exportação MARC21, os backups manual e na nuvem e o teste de integridade.",
-   "overview": [
-    "A central reúne os cartões de operação de backup e restauração. A tecla **b** abre essa tela principal.",
-    "O instalador grava por padrão backup SQL diário às 23:00 e exportação MARC aos domingos às 03:00, no horário do servidor. Os agendamentos podem ter sido personalizados.",
-    "A data e o tamanho descrevem o arquivo mais recente encontrado; o resultado descreve a última execução noturna. São indicadores distintos. Depois do seletor de compressão ficam os cartões de download, backup manual, MARC21, restauração, nuvem e teste."
-   ],
-   "tips": [
-    "Recomendação operacional: mantenha uma cópia fora do servidor e verifique se consegue recuperá-la.",
-    "Teste o arquivo em banco temporário antes de contar com ele para restauração."
-   ],
-   "_en": "aac9b45396"
-  },
   "backup-download": {
    "title": "Baixar Backup Recente",
    "summary": "Copia o backup mais novo direto para a pasta Downloads do computador que você está usando, com um clique.",
@@ -2251,7 +2238,7 @@
     "A exportação semanal roda todo domingo às 03:00; mude o dia e o horário em **Agendamentos e tarefas cron**."
    ],
    "related": [
-    "sec-backup",
+    "sec-backups",
     "backup-manual",
     "restore"
    ],
@@ -2492,20 +2479,13 @@
    "summary": "Eventos opcionais no Tainacan (Nexus Eventos sobre o Events Manager): desligados até você ligar, depois do plano e do Sim.",
    "_en": "6f272f85dd"
   },
-  "sec-tainacan-backups": {
-   "summary": "Os backups do Tainacan: fazer agora, testar a restauração numa cópia isolada, restaurar, agendar, repositório e cópia na nuvem, verificar e backups incompletos.",
-   "overview": [
-    "O que é criptografado: a configuração, com a chave do servidor; os arquivos, só num repositório restic; o banco não é criptografado, nem no pacote nem na cópia na nuvem."
-   ],
-   "_en": "fd421b6069"
-  },
   "sec-infra": {
-   "summary": "O que as plataformas em contêineres compartilham (tecla p): o servidor web na frente delas, o Docker e a chave dos backups.",
+   "summary": "O que as plataformas em contêineres compartilham (tecla p): o servidor web na frente delas e o Docker.",
    "overview": [
-    "**Proxy web**, **Docker** e **Chave dos backups** são cartões só de leitura. **Instalar o Docker** mostra o plano antes; **Remover o Docker**, em Remoção, só remove um Docker que o Koha.Nexus instalou e que ficou vazio.",
-    "O que os backups das plataformas criptografam: a configuração, com a chave deste servidor (a frase de recuperação a abre); os arquivos, só num repositório restic; o banco, nada, nem no pacote nem na cópia na nuvem. Proteja a pasta de backups e a conta na nuvem."
+    "**Proxy web** e **Docker** são cartões só de leitura. **Instalar o Docker** mostra o plano antes; **Remover o Docker**, em Remoção, só remove um Docker que o Koha.Nexus instalou e que ficou vazio.",
+    "A chave dos backups, o kit de recuperação e o que os backups das plataformas criptografam ficam na Central de backups."
    ],
-   "_en": "60fa191e62"
+   "_en": "70d5fa42dc"
   },
   "tainacan-start": {
    "summary": "Inicia de novo um Tainacan parado: o serviço do Docker, quando é ele que está parado, e depois os contêineres do banco e do WordPress, com os dados como estão. O plano vem antes e nada é restaurado nem apagado.",
@@ -2518,6 +2498,29 @@
   "tainacan-site-undo": {
    "summary": "Recoloca a página inicial e as configurações do Tainacan que existiam antes de a página inicial ser preparada. A página do acervo só vai para a lixeira se ninguém a editou.",
    "_en": "4552b5e66b"
+  },
+  "sec-backups": {
+   "summary": "Todos os backups deste servidor numa tela do menu principal (tecla b): os do Koha e os do Tainacan, os backups automáticos de cada um e as conexões de nuvem que eles compartilham.",
+   "overview": [
+    "**Plataforma** oferece só o que está instalado, o Koha primeiro; a escolha aparece só quando os dois estão. O cartão **Backups do Koha**, no grupo do Koha, e o cartão **Backups do Tainacan**, no grupo do Tainacan, abrem esta mesma tela, já na plataforma certa. Sem nenhuma plataforma instalada ela avisa, e as conexões de nuvem já podem ser adicionadas.",
+    "Koha: o backup mais recente, o tamanho e o resultado da última execução noturna (três indicadores que podem se referir a execuções diferentes), a compressão dos novos backups e os cartões de backup manual, download, exportação MARC21, restauração, backup na nuvem e teste de integridade. Tainacan: os pacotes, a chave dos backups e o que é criptografado, e os cartões de backup, teste de restauração, restauração, agendamento, repositório e cópia na nuvem, verificação, backups incompletos, backups criptografados e kit de recuperação.",
+    "**Backups automáticos** mostra cada um na sua linha: destino, frequência, por quanto tempo fica guardado, o que é criptografado e a última execução. A linha diz **Sem registro** quando não há registro confiável; nada é inventado. O que é criptografado é dito parte por parte: um pacote do Tainacan criptografa a configuração com a chave do servidor e os arquivos só num repositório restic, nunca o banco; um backup do Koha só é criptografado quando vai por uma conexão criptografada (rclone crypt).",
+    "**Conexões de nuvem** é compartilhada e não precisa do Koha: as contas do rclone (Google Drive e qualquer outro serviço que o rclone aceite). Só com o Tainacan instalado, a conexão é testada numa pasta própria (Koha.Nexus) e nenhum backup do Koha é criado. Uma conexão ainda usada pela cópia ou pelo repositório do Tainacan aparece marcada e não pode ser removida até esse backup ir para outro lugar.",
+    "Abrir a central só lê: nada é agendado, enviado ou alterado até um cartão ser escolhido."
+   ],
+   "tips": [
+    "Siga a regra 3-2-1: três cópias, em dois tipos de armazenamento, uma fora do local (um backup ou cópia na nuvem cobre isso).",
+    "Backup nunca testado é esperança, não backup: teste uma restauração uma vez por mês."
+   ],
+   "_en": "fea5400142"
+  },
+  "cloud-connections": {
+   "summary": "As contas de nuvem para onde este servidor pode enviar backups, de qualquer plataforma: adicionar, editar, testar ou remover uma conexão.",
+   "overview": [
+    "Só as conexões: os backups do Koha na nuvem são feitos em **Configurar backup na nuvem**, e a cópia do Tainacan em **Repositório e cópia na nuvem**, cada um com a sua pasta, agendamento e retenção.",
+    "A coluna **Uso** diz o que envia para cada conexão. Uma conexão ainda usada pelo backup do Tainacan não pode ser removida aqui; remover outra mantém os arquivos que já estão na nuvem."
+   ],
+   "_en": "444b14b235"
   }
  }
 }

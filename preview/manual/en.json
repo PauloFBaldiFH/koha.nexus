@@ -60,7 +60,7 @@
     "dash-status",
     "dash-addresses",
     "dash-components",
-    "sec-backup",
+    "sec-backups",
     "sec-diagnostics"
    ]
   },
@@ -362,27 +362,6 @@
     "backup-status"
    ]
   },
-  "sec-backup": {
-   "summary": "Brings together backup status, compression and the cards for download, manual SQL backup, MARC export, restore, cloud upload and testing.",
-   "overview": [
-    "The newest backup and the last nightly result may refer to different runs. Read all three indicators.",
-    "SQL backups recover the database; MARC exports exchange bibliographic and authority records and do not replace a full SQL backup.",
-    "Restore database is available as a card in this centre. Compression is saved when selected and applies to new backups."
-   ],
-   "tips": [
-    "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (the cloud backup covers that).",
-    "A backup you never tested is a hope, not a backup: schedule a monthly integrity test."
-   ],
-   "related": [
-    "backup-status",
-    "backup-compression",
-    "backup-download",
-    "backup-safety",
-    "backup-cloud",
-    "backup-marc",
-    "restore"
-   ]
-  },
   "backup-download": {
    "title": "Download latest backup",
    "summary": "Copies the newest backup straight into the Downloads folder of the computer you are using, with one click.",
@@ -463,7 +442,7 @@
     "Keep gzip when the backups are opened by people outside the library who may not have other tools."
    ],
    "related": [
-    "sec-backup",
+    "sec-backups",
     "backup-safety",
     "restore",
     "backup-cloud"
@@ -2329,7 +2308,7 @@
     "Press **Preview**, then **Save**. **Defaults** puts the default schedules on the screen."
    ],
    "related": [
-    "sec-backup",
+    "sec-backups",
     "authority-sync",
     "clock"
    ],
@@ -2457,7 +2436,7 @@
    "related": [
     "tainacan-install",
     "sec-tainacan-maintenance",
-    "sec-tainacan-backups",
+    "sec-backups",
     "sec-infra",
     "sec-dashboard"
    ]
@@ -2656,7 +2635,7 @@
     "The weekly export runs every Sunday at 03:00; change its day and time in **Schedules & cron tasks**."
    ],
    "related": [
-    "sec-backup",
+    "sec-backups",
     "backup-manual",
     "restore"
    ]
@@ -2907,30 +2886,16 @@
     "events-status"
    ]
   },
-  "sec-tainacan-backups": {
-   "summary": "Tainacan's backups: back up now, test a restore in an isolated copy, restore, schedule, repository and cloud copy, verify and incomplete backups.",
-   "overview": [
-    "What is encrypted: the configuration with the server key; the files only in a restic repository; the database is not encrypted, in the package nor in its cloud copy."
-   ],
-   "related": [
-    "tainacan-backup",
-    "tainacan-restore-test",
-    "tainacan-restore",
-    "sec-infra"
-   ]
-  },
   "sec-infra": {
-   "summary": "What the platforms in containers share (key p): the web server in front of them, Docker and the key of their backups.",
+   "summary": "What the platforms in containers share (key p): the web server in front of them and Docker.",
    "overview": [
-    "**Web proxy**, **Docker** and **Backup key** are read-only cards. **Install Docker** shows its plan first; **Remove Docker**, under Removal, only removes a Docker Koha.Nexus installed and left empty.",
-    "What the platform backups encrypt: the configuration with this server's key (the recovery phrase opens it); the files only in a restic repository; the database not at all, in the package nor in its cloud copy. Keep the backup folder and the cloud account protected."
+    "**Web proxy** and **Docker** are read-only cards. **Install Docker** shows its plan first; **Remove Docker**, under Removal, only removes a Docker Koha.Nexus installed and left empty.",
+    "The backup key, the recovery kit and what the platform backups encrypt are in the Backup center."
    ],
    "related": [
     "docker-install",
-    "pbackup-setup",
-    "pbackup-kit",
     "docker-remove",
-    "sec-tainacan-backups"
+    "sec-backups"
    ]
   },
   "tainacan-start": {
@@ -2941,6 +2906,46 @@
   },
   "tainacan-site-undo": {
    "summary": "Puts back the home page and the Tainacan settings that were there before the home page was prepared. The page of the collection goes to the trash only if nobody edited it."
+  },
+  "sec-backups": {
+   "summary": "Every backup of this server in one screen of the main menu (key b): Koha's and Tainacan's, their automatic backups and the cloud connections they share.",
+   "overview": [
+    "**Platform** offers only what is installed, Koha first; the choice appears only when both are. The **Koha backups** card in the Koha group and the **Tainacan backups** card in the Tainacan group open this same screen, already on that platform. With no platform installed it says so, and the cloud connections can already be added.",
+    "Koha: the newest backup, its size and the last nightly result (three indicators that may refer to different runs), the compression of new backups, and the cards for manual backup, download, MARC21 export, restore, cloud backup and integrity test. Tainacan: its packages, the backup key and what is encrypted, and the cards for backup, restore test, restore, schedule, repository and cloud copy, verification, incomplete backups, encrypted backups and the recovery kit.",
+    "**Automatic backups** lists each one in its own row: destination, frequency, how long it is kept, what is encrypted and its last run. A row says **No run recorded** when there is no reliable record; nothing is invented. What is encrypted is said part by part: a Tainacan package encrypts its configuration with the server key and its files only in a restic repository, never its database; a Koha backup is encrypted only when it goes through an encrypted (rclone crypt) connection.",
+    "**Cloud connections** is shared and needs no Koha: the rclone accounts (Google Drive and every other service rclone supports). With only Tainacan installed a connection is tested in its own folder (Koha.Nexus) and no Koha backup is created. A connection the Tainacan copy or repository still uses is marked and cannot be removed until that backup goes elsewhere.",
+    "Opening the center only reads: nothing is scheduled, sent or changed until a card is chosen."
+   ],
+   "tips": [
+    "Follow the 3-2-1 rule: three copies, on two kinds of storage, one of them off site (a cloud backup or copy covers that).",
+    "A backup you never tested is a hope, not a backup: test a restore once a month."
+   ],
+   "related": [
+    "backup-status",
+    "backup-compression",
+    "backup-download",
+    "backup-safety",
+    "backup-cloud",
+    "backup-marc",
+    "restore",
+    "tainacan-backup",
+    "tainacan-restore-test",
+    "tainacan-restore",
+    "pbackup-setup",
+    "pbackup-kit",
+    "cloud-connections"
+   ]
+  },
+  "cloud-connections": {
+   "summary": "The cloud accounts this server can send backups to, for any platform: add, edit, test or remove a connection.",
+   "overview": [
+    "Only the connections: Koha's cloud backups are made in **Configure cloud backup**, and the Tainacan copy in **Repository and cloud copy**, each with its own folder, schedule and retention.",
+    "The **Use** column says what sends to each connection. A connection the Tainacan backup still uses cannot be removed here; removing another one keeps the files already in the cloud."
+   ],
+   "related": [
+    "backup-cloud",
+    "sec-backups"
+   ]
   }
  }
 }
