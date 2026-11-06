@@ -144,12 +144,16 @@ def shown_cards(view) -> list[str]:
     return [c.entry.action for c in view.query(ActionCard) if c.display]
 
 
-async def until(pilot, ready, seconds=10.0):
+async def until(pilot, ready, seconds=30.0):
+    # A loaded CI runner can take several seconds to push a screen: wait
+    # long enough, and say what never came instead of failing later on the
+    # wrong screen.
     waited = 0.0
     while not ready() and waited < seconds:
         await pilot.pause(0.25)
         waited += 0.25
-    return ready()
+    assert ready(), f"still on {type(pilot.app.screen).__name__} after {seconds:.0f} s"
+    return True
 
 
 def loaded(app):
