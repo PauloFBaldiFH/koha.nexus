@@ -62,17 +62,51 @@ $1" 3>&-
 never() { ! "$@"; }
 conf() { lib "_kei_koha_conf_value '$CONF' '$1'"; }
 sql() { koha-mysql "$INST" -N -e "$1"; }
-koha_perl() { koha-shell "$INST" -c "perl -MKoha::Encryption -e '$1' '${2:-}'" 2>/dev/null; }
+# Koha's own code, as root with the instance's configuration; errors stay
+# visible in the test output.
+koha_perl() { env PERL5LIB=/usr/share/koha/lib KOHA_CONF="$CONF" perl -MKoha::Encryption -e "$1" "${2:-}"; }
 decrypt() { koha_perl 'print Koha::Encryption->new->decrypt_hex(shift)' "$(sql "SELECT secret FROM borrowers WHERE userid = 'kn-staff'")"; }
 field() { sed -n "s/^$1=//p" <<<"$2" | tail -n 1; }
 
-# koha_instance: koha-create and the schema (the web installer's
-# kohastructure.sql), with an encryption key of its own.
+# koha_instance: koha-create, with an encryption key of its own. What
+# koha-create wrote about the key is reported (never its value); when the
+# instance has no usable key, one is set the way koha-create would.
 koha_instance() {
-    koha-create --create-db "$INST" >/dev/null 2>&1 || [ -f "$CONF" ] || return 1
-    case "$(conf encryption_key)" in ""|__ENCRYPTION_KEY__)
-        sed -i "s|<encryption_key>[^<]*</encryption_key>|<encryption_key>$(head -c 24 /dev/urandom | base64 | tr -d '/+=')</encryption_key>|" "$CONF" ;;
+    local key state
+    koha-create --create-db "$INST" >/dev/null 2>&1 3>&- || [ -f "$CONF" ] || return 1
+    case "$(conf encryption_key)" in
+        "") state=none ;; __ENCRYPTION_KEY__) state=placeholder ;; *) state=set ;;
     esac
+    echo "koha-create: $(grep -c '<encryption_key>' "$CONF") <encryption_key> line(s) in koha-conf.xml, key $state" >&3
+    grep -n -B1 -A1 '<encryption_key>' "$CONF" | sed -E 's/(<encryption_key>)[^<]+/\1(value hidden)/; s/^/  /' >&3
+    key=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+    case "$state" in
+        placeholder)
+            sed -i "s|<encryption_key>__ENCRYPTION_KEY__</encryption_key>|<encryption_key>$key</encryption_key>|" "$CONF" ;;
+        none)
+            if grep -qE '<encryption_key>[[:space:]]*</encryption_key>' "$CONF"; then
+                sed -i -E "s|<encryption_key>[[:space:]]*</encryption_key>|<encryption_key>$key</encryption_key>|" "$CONF"
+            else
+                perl -0pi -e "s|(.*)</config>|\$1 <encryption_key>$key</encryption_key>\n</config>|s" "$CONF"   # the LAST </config>: the main section
+            fi ;;
+    esac
+    case "$(conf encryption_key)" in ""|__ENCRYPTION_KEY__) return 1 ;; esac
+}
+
+# koha_schema: the tables (the web installer's kohastructure.sql) and the
+# Version preference the web installer records, which the panel's restore
+# requires of a Koha database.
+koha_schema() {
+    local v
+    koha-mysql "$INST" < /usr/share/koha/intranet/cgi-bin/installer/data/mysql/kohastructure.sql || return 1
+    if [ -f /usr/share/koha/intranet/cgi-bin/kohaversion.pl ]; then
+        v=$(PERL5LIB=/usr/share/koha/lib perl -e 'require "/usr/share/koha/intranet/cgi-bin/kohaversion.pl"; my @v = split /\./, kohaversion(); print "$v[0]." . join("", @v[1 .. $#v])')
+    else
+        v=$(dpkg-query -W -f '${Version}' koha-common | sed 's/-.*//' | awk -F. '{ printf "%s.%s%s000", $1, $2, $3 }')
+    fi
+    [ -n "$v" ] || return 1
+    sql "INSERT INTO systempreferences (variable, value) VALUES ('Version', '$v')"
+    echo "Koha schema: Version $v" >&3
 }
 
 wp_php() {
@@ -104,7 +138,7 @@ PHP
     grep -qE '^Listen 8080$' /etc/apache2/ports.conf || echo 'Listen 8080' >> /etc/apache2/ports.conf
     a2enmod rewrite cgi headers proxy_http >/dev/null 2>&1 || true
     koha_instance
-    koha-mysql "$INST" < /usr/share/koha/intranet/cgi-bin/installer/data/mysql/kohastructure.sql
+    koha_schema
     echo "Koha: $(dpkg-query -W -f '${Version}' koha-common)" >&3
     # Where this Koha uses its encryption key (document V: "a conferir").
     grep -rl 'Koha::Encryption' /usr/share/koha/lib /usr/share/koha/intranet/cgi-bin /usr/share/koha/opac/cgi-bin 2>/dev/null \
@@ -120,13 +154,13 @@ PHP
     sql "INSERT INTO borrowers (cardnumber, surname, branchcode, categorycode, userid, flags, secret) VALUES ('kn1', 'Teste', 'MAIN', 'S', 'kn-staff', 1, '$cipher')"
     [ "$(decrypt)" = "$TOTP" ]
     # An uploaded file (Upload tool): the database keeps its name and hash only.
-    up=$(conf upload_path); up=${up:-/var/lib/koha/$INST/uploads}
+    up=$(conf upload_path || true); up=${up:-/var/lib/koha/$INST/uploads}
     mkdir -p "$up/kn" && printf 'scanned page\n' > "$up/kn/sample.pdf"
     chown -R "$INST-koha:$INST-koha" "$up"
     sql "INSERT INTO uploaded_files (hashvalue, filename, dir, filesize, uploadcategorycode, public, permanent) VALUES ('$(sha1sum < "$up/kn/sample.pdf" | cut -c1-40)', 'sample.pdf', 'kn', 13, 'kn', 1, 1)"
     printf '%s\n' "$up" > "$S/upload_path"
     # A plugin (its code is not in the database).
-    pl=$(conf pluginsdir); pl=${pl:-/var/lib/koha/$INST/plugins}
+    pl=$(conf pluginsdir || true); pl=${pl:-/var/lib/koha/$INST/plugins}
     mkdir -p "$pl/Koha/Plugin" && printf 'package Koha::Plugin::KnTest;\n1;\n' > "$pl/Koha/Plugin/KnTest.pm"
     printf '%s\n' "$pl" > "$S/plugins"
     # SIP2 logins of this library.
@@ -153,7 +187,7 @@ PHP
 
 @test "the joint package: full, Koha's files in it, its secrets only encrypted" {
     mkdir -p "$S/sets"
-    run config.sh --task set-backup "$S/sets" </dev/null
+    run config.sh --task set-backup "$S/sets" </dev/null 3>&-
     echo "$output" | grep '@@result' >&3
     [ "$status" -eq 0 ]
     [[ "$output" == *"recoverability=full"* ]]
@@ -170,12 +204,15 @@ PHP
 }
 
 @test "a new installation of the library: another key, another database password" {
-    koha-remove "$INST" >/dev/null 2>&1 || true
+    koha-remove "$INST" >/dev/null 2>&1 3>&- || true
     [ ! -f "$CONF" ]
+    # koha-remove keeps the instance's files under /var/lib/koha: a new
+    # server has none.
+    rm -rf "$(cat "$S/upload_path")" "$(cat "$S/plugins")"
     koha_instance
     [ "$(conf encryption_key)" != "$(cat "$S/old_key")" ]
     [ "$(conf pass)" != "$(cat "$S/old_pass")" ]
-    conf pass > "$S/new_pass"; conf upload_path > "$S/new_upload_conf"
+    conf pass > "$S/new_pass"; { conf upload_path || true; } > "$S/new_upload_conf"
     cp -p "$CONF" "$S/new-koha-conf.xml"
     [ ! -e "$(cat "$S/upload_path")/kn/sample.pdf" ]
 }
@@ -186,7 +223,7 @@ PHP
     [ "$status" -eq 0 ]
     field stage "$output" > "$S/stage"
     KOHA_FILE=$(field koha "$output")
-    run config.sh --task restore "$KOHA_FILE" </dev/null
+    run config.sh --task restore "$KOHA_FILE" </dev/null 3>&-
     echo "$output" | grep -E '@@(msg|result)' | tail -n 5 >&3
     [ "$status" -eq 0 ]
     [ "$(sql "SELECT COUNT(*) FROM borrowers WHERE userid = 'kn-staff'")" = 1 ]
@@ -198,7 +235,7 @@ PHP
 
 @test "Koha's files and secrets: a plan without values, then only the key changes in koha-conf.xml" {
     STAGE=$(cat "$S/stage")
-    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras plan "$STAGE" </dev/null
+    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras plan "$STAGE" </dev/null 3>&-
     [ "$status" -eq 0 ]
     echo "$output" | grep '@@result' >&3
     [[ "$output" == *"secrets=open"* ]]
@@ -206,7 +243,7 @@ PHP
     [[ "$output" == *"item=uploads"$'\t'"restore"* ]]
     never grep -qF -e "$(cat "$S/old_key")" -e "$(cat "$S/old_pass")" -e "$(cat "$S/new_pass")" -e sip-secret-1 -e "$PHRASE" <<<"$output"
     cmp -s "$CONF" "$S/new-koha-conf.xml"                              # the plan changed nothing
-    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras apply "$STAGE" confirm </dev/null
+    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras apply "$STAGE" confirm </dev/null 3>&-
     [ "$status" -eq 0 ]
     never grep -qF -e "$(cat "$S/old_key")" -e sip-secret-1 -e "$PHRASE" <<<"$output"
     # Only <encryption_key> changed: the database password and the paths are the new installation's.
@@ -222,7 +259,7 @@ PHP
     sip=/etc/koha/sites/$INST/SIPconfig.xml
     grep -q sip-secret-1 "$sip" || grep -q sip-secret-1 "$sip.from-backup"
     # Koha answers with its database.
-    [ "$(koha-shell "$INST" -c "perl -MC4::Context -e 'print C4::Context->dbh->selectrow_array(q{SELECT COUNT(*) FROM borrowers})'" 2>/dev/null)" = 1 ]
+    [ "$(env PERL5LIB=/usr/share/koha/lib KOHA_CONF="$CONF" perl -MC4::Context -e 'print C4::Context->dbh->selectrow_array(q{SELECT COUNT(*) FROM borrowers})')" = 1 ]
 }
 
 @test "Tainacan restored on its own from the set" {
