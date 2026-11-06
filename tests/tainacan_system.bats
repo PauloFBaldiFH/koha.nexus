@@ -395,7 +395,10 @@ assert t["checked"]["checked_at"].isdigit() and t["checked"]["failed_at"] == "",
     [[ "$output" != *"$PW"* ]]
     nope grep -rqF -f "$S/pw" /var/log/koha-easy-install "$TN/.env" 2>/dev/null
     nope grep -q KN_ADMIN_PASSWORD "$TN/.env"
-    [ "$(printf '%s\n' "$PW" | lib "_kei_tn_wp eval '\$pw = rtrim((string) fgets(STDIN), \"\\n\"); \$u = get_user_by(\"login\", \$args[0]); echo wp_check_password(\$pw, \$u->user_pass, \$u->ID) ? \"yes\" : \"no\";' '$user'")" = yes ]
+    # The password and the login on the standard input, never as arguments.
+    printf '%s\n' '<?php $pw = rtrim((string) fgets(STDIN), "\n"); $u = get_user_by("login", rtrim((string) fgets(STDIN), "\n")); echo ($u && wp_check_password($pw, $u->user_pass, $u->ID)) ? "yes" : "no";' > "$TN/work/check-pw.php"
+    chmod 644 "$TN/work/check-pw.php"
+    [ "$(printf '%s\n%s\n' "$PW" "$user" | lib '_kei_tn_wp eval-file /work/check-pw.php' | tail -n 1)" = yes ]
     [ "$(lib "_kei_tn_wp eval 'echo md5(AUTH_KEY . SECURE_AUTH_KEY . LOGGED_IN_SALT . NONCE_SALT);'")" = "$keys" ]
     run lib 'kei_tainacan_admin_status'
     [[ "$output" == *state=own* ]]
