@@ -74,10 +74,10 @@ for p in (koha, tn):
 PY
     # The data itself, never a reference to a restic repository.
     tar -tf "$SET" | grep -q 'tainacan/knx-tainacan-.*/files.tar.gz$'
-    ! tar -tf "$SET" | grep -q 'files.ref.json'
+    [ -z "$(tar -tf "$SET" | grep 'files.ref.json')" ]
     tar -xOf "$SET" "$(tar -tf "$SET" | grep '^koha/.*\.sql\.gz$')" | gzip -dc | grep -q 'CREATE TABLE biblio'
     # Only the files of a set, and their checksums.
-    ! tar -tf "$SET" | grep -vE '^(manifest\.json|SHA256SUMS|koha/.*|tainacan/.*)$'
+    [ -z "$(tar -tf "$SET" | grep -vE '^(manifest\.json|SHA256SUMS|koha/.*|tainacan/.*)$')" ]
     [ ! -e "$OUT"/.knx-set.* ]
 }
 
@@ -195,14 +195,14 @@ PY
 @test "S08 the Koha configuration goes into the set only encrypted, with the backup key" {
     lib "kei_set_backup '$OUT' koha" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
-    ! tar -tf "$SET" | grep -q koha-conf
-    ! tar -xOf "$SET" | grep -aq koha-db-pass
+    [ -z "$(tar -tf "$SET" | grep koha-conf)" ]
+    [ -z "$(tar -xOf "$SET" | grep -a koha-db-pass)" ]
     lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
     rm -f "$OUT"/*.tar
     lib "kei_set_backup '$OUT' koha" >/dev/null
     SET=$(ls "$OUT"/knx-set-*.tar)
     tar -tf "$SET" | grep -qx 'koha/koha-conf.xml.gpg'
-    ! tar -xOf "$SET" | grep -aq koha-db-pass
+    [ -z "$(tar -xOf "$SET" | grep -a koha-db-pass)" ]
     [[ "$(manifest "$SET")" == *'"secrets": "gpg"'* ]]
 }
 
