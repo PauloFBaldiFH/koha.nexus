@@ -15,6 +15,8 @@ import {
   librariesSitemap,
   listPublicLibraries,
   putListing,
+  putServices,
+  capabilities,
   putStaffCredentials,
   rotateToken,
 } from "./api";
@@ -71,6 +73,8 @@ const routes: Route[] = [
   { method: "PUT", pattern: /^\/v1\/staff-credentials$/, handler: (r, e, b) => putStaffCredentials(r, e, b) },
   { method: "DELETE", pattern: /^\/v1\/staff-credentials$/, handler: (r, e, b) => deleteStaffCredentials(r, e, b) },
   { method: "PUT", pattern: /^\/v1\/listing$/, handler: (r, e, b) => putListing(r, e, b) },
+  { method: "PUT", pattern: /^\/v1\/services$/, handler: (r, e, b) => putServices(r, e, b) },
+  { method: "GET", pattern: /^\/v1\/capabilities$/, handler: async (r, e) => capabilities(e) },
 
   { method: "GET", pattern: /^\/admin\/enrollments$/, handler: admin((r, e, b, p, u) => listEnrollments(e, u)) },
   {

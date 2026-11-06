@@ -27,6 +27,8 @@ BROKER_HOST = "broker.koha.nexus"
 # Prefix for every library name. Empty in production; "t-" in a test zone.
 NAME_PREFIX = ""
 STAFF_SUFFIX = "-admin"
+# Tainacan's address: <slug>-acervo.koha.nexus (a library can publish Koha, Tainacan or both).
+TAINACAN_SUFFIX = "-acervo"
 # "true": every request is approved at once under the first free valid name.
 # "false": an admin approves each request (/admin/enrollments).
 AUTO_APPROVE = "true"

@@ -3044,13 +3044,15 @@
    ]
   },
   "tainacan-address": {
-   "summary": "The address Tainacan answers at: keep it, this server on the local network, or a domain of your own.",
+   "summary": "The address Tainacan answers at: keep it, this server on the local network, a domain of your own or a free koha.nexus address.",
    "overview": [
     "Changing it updates WordPress's links and the web proxy after a Yes; the collections, items and accounts do not change. Your own domain must already point to this server.",
-    "To reach Tainacan from the internet without opening ports, see Security & access hub > Cloudflare Tunnel Manager."
+    "**Free koha.nexus address**: with Koha on a free address, the collection gets a name next to the catalog's (for example biblioteca-acervo.koha.nexus), in the same tunnel. A server without Koha asks for an address of the collection only. When the address service cannot give it now (it is not online, it does not offer collection addresses yet, or Koha uses your own domain), the option says why and nothing changes.",
+    "**Stop using the free koha.nexus address** brings Tainacan back to the local network after a Yes; the catalog keeps its address. Giving up the catalog's free address releases the collection's too."
    ],
    "related": [
-    "setup-tainacan"
+    "setup-tainacan",
+    "cloudflare"
    ]
   }
  }

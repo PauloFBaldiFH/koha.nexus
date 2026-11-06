@@ -8,7 +8,7 @@ import type { Env } from "./env";
 import { now } from "./env";
 import { timingSafeEqualStr, toBase64 } from "./crypto";
 import { HttpError, json, parseJson } from "./http";
-import { hostnamesFor, validateSlug } from "./names";
+import { collectionSuffix, hostnamesFor, parseServices, publishedHostnames, validateSlug } from "./names";
 
 export async function requireAdmin(request: Request, env: Env): Promise<void> {
   if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length < 32) throw new HttpError(503, "admin access is not configured");
@@ -28,9 +28,9 @@ export async function listEnrollments(env: Env, url: URL): Promise<Response> {
 }
 
 export async function decideEnrollment(env: Env, userCode: string, approve: boolean, body: ArrayBuffer): Promise<Response> {
-  const row = await env.DB.prepare("SELECT status, requested_slug, expires_at FROM enrollments WHERE user_code = ?")
+  const row = await env.DB.prepare("SELECT status, requested_slug, services, expires_at FROM enrollments WHERE user_code = ?")
     .bind(userCode)
-    .first<{ status: string; requested_slug: string | null; expires_at: number }>();
+    .first<{ status: string; requested_slug: string | null; services: string; expires_at: number }>();
   if (!row) throw new HttpError(404, "request not found");
   if (row.status !== "pending" || row.expires_at <= now()) throw new HttpError(409, `request is ${row.status}`);
 
@@ -42,7 +42,12 @@ export async function decideEnrollment(env: Env, userCode: string, approve: bool
 
   const b = parseJson<{ slug?: unknown; force?: unknown }>(body);
   const slug = typeof b.slug === "string" && b.slug ? b.slug.trim().toLowerCase() : row.requested_slug ?? "";
-  const check = validateSlug(slug, { prefix: env.NAME_PREFIX, staffSuffix: env.STAFF_SUFFIX, allowBlocked: b.force === true });
+  const check = validateSlug(slug, {
+    prefix: env.NAME_PREFIX,
+    staffSuffix: env.STAFF_SUFFIX,
+    collectionSuffix: collectionSuffix(env),
+    allowBlocked: b.force === true,
+  });
   if (!check.ok) throw new HttpError(400, `name "${slug}" rejected: ${check.reason}`);
   if (!(await slugAvailable(env, slug, userCode))) throw new HttpError(409, `name "${slug}" is not available`);
 
@@ -52,12 +57,12 @@ export async function decideEnrollment(env: Env, userCode: string, approve: bool
     .bind(slug, now(), userCode)
     .run();
   await audit(env, "admin", "enrollment.approve", null, { user_code: userCode, slug, forced: b.force === true });
-  return json({ status: "approved", hostnames: hostnamesFor(slug, env) });
+  return json({ status: "approved", hostnames: publishedHostnames(slug, env, parseServices(row.services)) });
 }
 
 export async function listLibraries(env: Env): Promise<Response> {
   const rows = await env.DB.prepare(
-    `SELECT id, slug, status, institution_name, contact_email, cnpj, tunnel_id, staff_pass_hash IS NOT NULL AS staff_remote_access,
+    `SELECT id, slug, status, services, institution_name, contact_email, cnpj, tunnel_id, staff_pass_hash IS NOT NULL AS staff_remote_access,
        koha_version, installer_version, last_heartbeat, public_listing, created_at, updated_at
      FROM libraries WHERE status <> 'deleted' ORDER BY created_at DESC LIMIT 500`,
   ).all();

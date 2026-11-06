@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.178"
+PANEL_VERSION=" 1.5.179"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9358,9 +9358,12 @@ broker_wait_approval() {
     done
 }
 
-# Asks for a new address. Leaves the request in BROKER_ENROLL.
+# Asks for a new address. Leaves the request in BROKER_ENROLL. With
+# "tainacan", the address is for the collection only (a server without
+# Koha): the request says so and only the collection's name is published.
 broker_new_request() {
-    local inst email name body st
+    local inst email name body st services=""
+    [ "${1:-}" = tainacan ] && services=',"services":["tainacan"]'
     inst=$(ui_input "$(t "Free address")" "$(t "Name of the library or institution:")") || return 1
     inst=$(printf '%s' "$inst" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     [ ${#inst} -ge 3 ] || { msg_error "" "$(t "Type the name of the library (at least 3 characters).")" 8 66; return 1; }
@@ -9372,7 +9375,7 @@ broker_new_request() {
 
     clear
     display_explanation "Sending the request..."
-    body="{\"institution_name\":$(json_str "$inst"),\"contact_email\":$(json_str "$email"),\"requested_name\":$(json_str "$name")}"
+    body="{\"institution_name\":$(json_str "$inst"),\"contact_email\":$(json_str "$email"),\"requested_name\":$(json_str "$name")${services}}"
     if ! broker_request POST /v1/device/start no "$body"; then
         msg_error "" "$(t "The request was not accepted:")\n\n$(broker_error)" 10 74
         broker_cleanup
@@ -9414,7 +9417,7 @@ broker_wait_request() {
 # After approval: registers this server's key, waits for the tunnel and
 # installs it.
 broker_complete_request() {
-    local device pub lib job opac staff st i
+    local device pub lib job opac staff collection st i
     broker_ensure_key || { msg_error "" "$(t "Could not create the key of this server (openssl).")" 8 66; return 1; }
     pub=$(broker_public_key)
     device=$(kv_get "$BROKER_ENROLL" DEVICE_CODE)
@@ -9431,11 +9434,12 @@ broker_complete_request() {
     job=$(json_field "$BROKER_BODY" job_id)
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
+    collection=$(json_field "$BROKER_BODY" hostnames collection)
     broker_cleanup
     kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker BROKER_URL "$KEI_BROKER_URL" LIBRARY_ID "$lib" \
-        OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" || return 1
+        OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" TAINACAN_HOST "$collection" || return 1
     rm -f "$BROKER_ENROLL"
-    log "broker: library $lib registered ($opac)"
+    log "broker: library $lib registered (${opac:-$collection})"
 
     display_explanation "Creating the tunnel and the address..."
     st=""
@@ -9454,6 +9458,8 @@ broker_complete_request() {
     broker_connect share
     prompt_yes_no "$(t "Recovery file")" "$(t "Save a recovery file for this address now?\n\nWith it, a new installation (another computer, a reinstalled server) gets this same address back. Without it, a new installation gets a new address.")" 13 76 \
         && broker_save_recovery
+    # The public list is of Koha catalogs: a collection-only address is not on it.
+    [ -n "$opac" ] || return 0
     if prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show this catalog on the public list of the koha.nexus network (koha.nexus and broker.koha.nexus/libraries)?\n\nThe list shows the library's name and the catalog's address, and helps search engines find the catalog. You can change this later in this menu.")" 14 78; then
         broker_set_listing true
     fi
@@ -9518,9 +9524,16 @@ EOF
     systemctl restart cloudflared >/dev/null 2>&1 || true
     broker_install_cron
 
+    # An address of the collection only: no catalog to point Koha at.
+    if [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ]; then
+        kei_tainacan_free_publish
+        return
+    fi
     read -r opac _ < <(tunnel_public_hosts)
     [ "$(tunnel_conf_get STAFF_REMOTE 2>/dev/null)" = "yes" ] && staff_url="https://$(tunnel_conf_get STAFF_HOST)"
     set_koha_public_urls "https://${opac}" "$staff_url"
+    # The collection of the same library follows (a recovery file on a new server).
+    kei_tainacan_free_publish quiet || true
 
     display_explanation "Checking the address from the internet..."
     if tunnel_check_url "https://${opac}"; then
@@ -9605,6 +9618,12 @@ function_cloudflare_free_address() {
         fi
     fi
 
+    broker_follow_request
+}
+
+# The request on screen until it is approved (then the address is made),
+# left for later, or refused.
+broker_follow_request() {
     broker_wait_request
     case $? in
         0) broker_complete_request ;;
@@ -9681,7 +9700,9 @@ function_broker_listing() {
 # ----------------------------------------------------------------------
 broker_save_recovery() {
     local opac file
-    opac=$(tunnel_conf_get OPAC_HOST) && [ -s "$BROKER_KEY" ] || {
+    opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
+    [ -n "$opac" ] || opac=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    [ -n "$opac" ] && [ -s "$BROKER_KEY" ] || {
         msg_error "" "$(t "This server has no free address to save.")" 8 60
         return 1
     }
@@ -9703,7 +9724,7 @@ broker_save_recovery() {
 
 # Reads a recovery file and connects this server under that address.
 broker_restore_address() {
-    local file url lib key bak_conf="" bak_key="" opac staff remote listed
+    local file url lib key bak_conf="" bak_key="" opac staff collection remote listed
     file=$(ui_input "$(t "Free address")" "$(t "Path of the recovery file (koha-address-....key). You can drag the file onto this window:")") || return 1
     file=$(clean_path "$file")
     if [ ! -r "$file" ]; then
@@ -9748,14 +9769,15 @@ broker_restore_address() {
     fi
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
+    collection=$(json_field "$BROKER_BODY" hostnames collection)
     remote=no listed=no
     [ "$(json_field "$BROKER_BODY" staff_remote_access)" = "true" ] && remote=yes
     [ "$(json_field "$BROKER_BODY" public_listing)" = "true" ] && listed=yes
     broker_cleanup
     rm -f "$bak_conf" "$bak_key"
     kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE "$remote" \
-        PUBLIC_LISTING "$listed" || return 1
-    log "broker: address $opac restored from a recovery file (library $lib)"
+        PUBLIC_LISTING "$listed" TAINACAN_HOST "$collection" || return 1
+    log "broker: address ${opac:-$collection} restored from a recovery file (library $lib)"
 
     # A new token: the server that had the address before can no longer connect.
     display_explanation "Renewing the tunnel token..."
@@ -9815,9 +9837,11 @@ function_broker_staff_access() {
 }
 
 function_broker_leave() {
-    local opac
+    local opac collection note=""
     opac=$(tunnel_conf_get OPAC_HOST)
-    prompt_yes_no "$(t "Give up the free address")" "$(t "The address https://\$opac is released and the catalog goes offline to the internet (it stays on the local network).\n\nContinue?")" 11 74 defaultno || return 1
+    collection=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    [ -n "$collection" ] && note="\n\n$(t "The collection's address (https://\$collection) is released too: Tainacan goes back to this server on the local network.")"
+    prompt_yes_no "$(t "Give up the free address")" "$(t "The address https://\$opac is released and the catalog goes offline to the internet (it stays on the local network).")${note}\n\n$(t "Continue?")" 13 76 defaultno || return 1
     clear
     display_explanation "Releasing the address..."
     if ! broker_request DELETE /v1/library yes && [ "$BROKER_STATUS" != "401" ]; then
@@ -9830,6 +9854,7 @@ function_broker_leave() {
     rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
     systemctl daemon-reload >/dev/null 2>&1 || true
     set_koha_public_urls "http://$(get_server_ip)" "http://$(get_server_ip):8080"
+    [ -n "$collection" ] && { kei_tainacan_address local >/dev/null 2>&1 || log "broker: Tainacan kept $collection (no local address)"; }
     log "broker: address $opac released"
     msg_ok "$(t "The free address was released.\nKoha is now only accessible on the local network.")" 10 70
     return 0
@@ -13577,6 +13602,214 @@ kei_tainacan_address() {
     log "tainacan: address $old -> $url ($rc)"
     [ "$rc" = 0 ] && echo "$(u="$url"; t "Tainacan now answers at \${u}.")"
     return "$rc"
+}
+
+# ----------------------------------------------------------------------
+# The free koha.nexus address of the collection. The same service as the
+# catalog's free address (broker/): with Koha on a free address, the
+# collection gets <library>-acervo.<zone> next to it, in the same tunnel.
+# A server without Koha asks for an address of its own, with only the
+# collection. The service must offer it (GET /v1/capabilities): a service
+# without it is said so here and nothing changes. tunnel.conf keeps the
+# name (TAINACAN_HOST); the address of Tainacan changes only through
+# kei_tainacan_address, as from the other choices.
+# ----------------------------------------------------------------------
+KEI_TN_FREE_REASON="" KEI_TN_FREE_SUFFIX=""
+
+# kei_tainacan_free_check: 0 when the collection can get a free address
+# now; otherwise 1, with the reason in KEI_TN_FREE_REASON.
+kei_tainacan_free_check() {
+    local tool st
+    KEI_TN_FREE_REASON="" KEI_TN_FREE_SUFFIX=""
+    for tool in openssl curl; do
+        command -v "$tool" >/dev/null 2>&1 || { KEI_TN_FREE_REASON="$(t "Missing tool:") $tool"; return 1; }
+    done
+    # One tunnel service per server: Koha's own decides.
+    if ! tunnel_mode_is broker && is_koha_installed; then
+        if [ -f /etc/cloudflared/config.yml ]; then
+            KEI_TN_FREE_REASON="$(t "Koha on this server is published with your own domain. Use a name of that domain for the collection too, or the local network.")"
+        else
+            KEI_TN_FREE_REASON="$(t "Koha on this server has no free address yet. Get the catalog's free address first (Security & access hub > Cloudflare Tunnel Manager > Free address): the collection then gets its address next to it.")"
+        fi
+        return 1
+    fi
+    if ! broker_resolves; then
+        KEI_TN_FREE_REASON="$(t "The free address service is not online yet: its address does not exist on the internet, so this server cannot reach it. Your internet connection is fine.")"
+        return 1
+    fi
+    if ! broker_request GET /v1/capabilities no || ! grep -q '"services"[^]]*"tainacan"' "$BROKER_BODY"; then
+        st="$BROKER_STATUS"
+        broker_cleanup
+        if [ "$st" = 000 ]; then
+            KEI_TN_FREE_REASON="$(t "The address service could not be reached. Check the internet connection.")"
+        else
+            KEI_TN_FREE_REASON="$(t "The free address service does not offer addresses for collections yet (its update is not online). Use your own domain or the local network for now.")"
+        fi
+        return 1
+    fi
+    KEI_TN_FREE_SUFFIX=$(json_field "$BROKER_BODY" collection_suffix)
+    [[ "$KEI_TN_FREE_SUFFIX" =~ ^-[a-z0-9-]{1,20}$ ]] || KEI_TN_FREE_SUFFIX=""
+    broker_cleanup
+    return 0
+}
+
+# kei_tainacan_free_status: KEY=VALUE lines for the panel. host (the free
+# name in use, if any), library (koha, tainacan or none: whose address this
+# server has), request=pending, available (yes or no), reason, preview.
+kei_tainacan_free_status() {
+    local host opac
+    host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
+    echo "host=$host"
+    if ! tunnel_mode_is broker; then echo "library=none"
+    elif [ -n "$opac" ]; then echo "library=koha"
+    else echo "library=tainacan"; fi
+    [ -f "$BROKER_ENROLL" ] && ! is_koha_installed && echo "request=pending"
+    [ -n "$host" ] && { echo "available=yes"; return 0; }
+    if kei_tainacan_free_check; then
+        echo "available=yes"
+        [ -n "$opac" ] && [ -n "$KEI_TN_FREE_SUFFIX" ] && echo "preview=${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
+    else
+        echo "available=no"
+        echo "reason=$KEI_TN_FREE_REASON"
+    fi
+    return 0
+}
+
+# kei_tainacan_free_publish [quiet]: Tainacan at https://TAINACAN_HOST,
+# once the name is published. Without Tainacan installed, the name is
+# kept in tunnel.conf for its installation.
+kei_tainacan_free_publish() {
+    local host url out rc
+    host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    [ -n "$host" ] || return 0
+    [ "$(_kei_tn_get status 2>/dev/null)" = installed ] || return 0
+    url="https://$host"
+    if [ "$(_kei_tn_get url)" != "$url" ]; then
+        out=$(kei_tainacan_address "$url" 2>&1); rc=$?
+        if [ "$rc" != 0 ]; then
+            log "tainacan: free address $url not applied ($rc)"
+            [ "${1:-}" = quiet ] || msg_error "" "$(t "The address of the collection could not be changed:")\n\n$out" 12 76
+            return 1
+        fi
+    fi
+    [ "${1:-}" = quiet ] && return 0
+    display_explanation "Checking the address from the internet..."
+    if tunnel_check_url "$url"; then
+        msg_ok "$(t "Your collection is online:")\n\n  $url" 10 70
+    else
+        msg_info "$(t "Free address")" "$(t "The address is set, but it does not answer yet:")\n\n  $url\n\n$(t "It can take a few minutes.")" 12 74
+    fi
+    return 0
+}
+
+# kei_tainacan_free_on: the collection on a free address, after a yes.
+kei_tainacan_free_on() {
+    local host opac preview how
+    [ "$(_kei_tn_get status)" = installed ] || { msg_error "" "$(t "Tainacan is not installed.")" 8 60; return 1; }
+    host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    if [ -n "$host" ]; then
+        # Already given: it is applied again (a repair), nothing is asked.
+        clear
+        kei_tainacan_free_publish
+        return
+    fi
+    if [ -f "$BROKER_ENROLL" ] && ! is_koha_installed; then
+        broker_follow_request
+        return 0
+    fi
+    if ! kei_tainacan_free_check; then
+        msg_error "$(t "Free address")" "$KEI_TN_FREE_REASON" 12 76
+        return 1
+    fi
+    if tunnel_mode_is broker; then
+        opac=$(tunnel_conf_get OPAC_HOST)
+        preview="${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
+        prompt_yes_no "$(t "Free address")" "$(t "The collection gets the address https://\$preview, in the same tunnel as the catalog (https://\$opac). WordPress's links change to it; the collections, items and accounts do not change.")\n\n$(t "Continue?")" 13 76 || return 0
+        clear
+        display_explanation "Adding the collection to the free address..."
+        if ! broker_request PUT /v1/services yes '{"tainacan":true}'; then
+            msg_error "" "$(t "The address service did not confirm:")\n\n$(broker_error)" 10 74
+            broker_cleanup
+            return 1
+        fi
+        host=$(json_field "$BROKER_BODY" hostnames collection)
+        broker_cleanup
+        if ! [[ "$host" =~ ^[a-z0-9.-]+$ ]]; then
+            msg_error "" "$(t "The address service gave an unexpected answer. Try again later.")" 8 70
+            return 1
+        fi
+        kv_write "$TUNNEL_CONF" 644 TAINACAN_HOST "$host" || return 1
+        log "broker: collection address $host added"
+        kei_tainacan_free_publish
+        return
+    fi
+    # A server without Koha: an address of the collection only.
+    how=$(ui_menu "$(t "Free address")" "$(t "Is this a new address, or one this collection already had on another server?")" \
+        "new" "$(t "Get a new free address")" \
+        "restore" "$(t "I already have an address (recovery file)")") || return 0
+    if [ "$how" = restore ]; then
+        broker_restore_address
+        return 0
+    fi
+    msg_info "$(t "Free address")" "$(t "GET A FREE ADDRESS FOR YOUR COLLECTION\n\nNo domain or Cloudflare account is needed. Type the institution's name, a\ncontact e-mail and the name you want: the collection is published at\n<name>-acervo.koha.nexus and this server connects on its own. If the name\nis taken, a close variant is used.")" 15 78
+    broker_new_request tainacan || return 0
+    if [ "$(kv_get "$BROKER_ENROLL" STATUS)" = "approved" ]; then
+        broker_complete_request
+        return 0
+    fi
+    broker_follow_request
+}
+
+# kei_tainacan_free_off: the collection back on the local network, after a
+# yes. With Koha on the same address only the collection's name goes; an
+# address of the collection only is given up.
+kei_tainacan_free_off() {
+    local host opac out
+    host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    [ -n "$host" ] || { msg_info "$(t "Free address")" "$(t "The collection does not use a free address.")" 8 60; return 0; }
+    opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
+    if [ -n "$opac" ]; then
+        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network. The catalog keeps its address (https://\$opac).")\n\n$(t "Continue?")" 12 76 defaultno || return 0
+        clear
+        display_explanation "Releasing the address..."
+        if ! broker_request PUT /v1/services yes '{"tainacan":false}'; then
+            msg_error "" "$(t "The address service did not confirm:")\n\n$(broker_error)" 10 74
+            broker_cleanup
+            return 1
+        fi
+        broker_cleanup
+        kv_write "$TUNNEL_CONF" 644 TAINACAN_HOST "" || return 1
+    else
+        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network.")\n\n$(t "Continue?")" 11 76 defaultno || return 0
+        clear
+        display_explanation "Releasing the address..."
+        if ! broker_request DELETE /v1/library yes && [ "$BROKER_STATUS" != "401" ]; then
+            msg_error "" "$(t "The address service did not confirm:")\n\n$(broker_error)" 10 74
+            broker_cleanup
+            return 1
+        fi
+        broker_cleanup
+        systemctl disable --now cloudflared >/dev/null 2>&1 || true
+        rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    log "broker: collection address $host released"
+    if out=$(kei_tainacan_address local 2>&1); then
+        msg_ok "$(t "The free address was released.")\n\n$out" 10 70
+    else
+        msg_error "" "$(t "The free address was released, but Tainacan could not go back to the local network:")\n\n$out" 12 76
+        return 1
+    fi
+}
+
+# tainacan-free on|off: the wizard, its questions asked by the panel.
+kei_tainacan_free() {
+    case "${1:-}" in
+        on)  kei_tainacan_free_on ;;
+        off) kei_tainacan_free_off ;;
+        *)   return 2 ;;
+    esac
 }
 
 # kei_platform_release_web PLATFORM: the web part of kei_platform_release
@@ -45281,6 +45514,13 @@ kei_task() {
         tainacan-restore-test) _kei_docker_task kei_tainacan_restore_test "${1:-latest}" ;;
         tainacan-restore)   _kei_docker_task kei_tainacan_restore "${1:-}" ;;
         tainacan-address)   _kei_docker_task kei_tainacan_address "${1:-}" ;;
+        tainacan-free-status)
+            local line
+            while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < <(kei_tainacan_free_status)
+            return 0 ;;
+        tainacan-free)
+            require_systemd || return 1
+            kei_tainacan_free "${1:-}" ;;
         tainacan-site)
             local k v
             case "${1:-}" in

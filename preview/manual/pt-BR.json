@@ -2591,12 +2591,13 @@
    "_en": "6b2abbcb58"
   },
   "tainacan-address": {
-   "summary": "O endereço em que o Tainacan responde: manter, este servidor na rede local ou um domínio seu.",
+   "summary": "O endereço em que o Tainacan responde: manter, este servidor na rede local, um domínio seu ou um endereço gratuito do koha.nexus.",
    "overview": [
     "Trocar o endereço atualiza os links do WordPress e o proxy web depois de um Sim; as coleções, os itens e as contas não mudam. O seu domínio já precisa apontar para este servidor.",
-    "Para chegar ao Tainacan pela internet sem abrir portas, veja Central de segurança e acesso > Gerenciador do Túnel Cloudflare."
+    "**Endereço gratuito do koha.nexus**: com o Koha num endereço gratuito, o acervo ganha um nome ao lado do catálogo (por exemplo biblioteca-acervo.koha.nexus), no mesmo túnel. Um servidor sem Koha pede um endereço só do acervo. Quando o serviço de endereços não pode dar agora (não está no ar, ainda não oferece endereços para acervos ou o Koha usa o seu próprio domínio), a opção diz o motivo e nada muda.",
+    "**Deixar de usar o endereço gratuito do koha.nexus** traz o Tainacan de volta para a rede local depois de um Sim; o catálogo mantém o endereço dele. Abrir mão do endereço gratuito do catálogo libera também o do acervo."
    ],
-   "_en": "2b7aa68463"
+   "_en": "59227d260b"
   }
  }
 }

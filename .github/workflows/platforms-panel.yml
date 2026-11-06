@@ -21,6 +21,7 @@ on:
       - "panel/tests/test_backup_center.py"
       - "panel/tests/test_schedules.py"
       - "panel/tests/test_admin_setup.py"
+      - "panel/tests/test_tainacan_free.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -35,6 +36,7 @@ on:
       - "panel/tests/test_backup_center.py"
       - "panel/tests/test_schedules.py"
       - "panel/tests/test_admin_setup.py"
+      - "panel/tests/test_tainacan_free.py"
       - "panel/tests/conftest.py"
       - "panel/requirements.txt"
       - ".github/workflows/platforms-panel.yml"
@@ -62,4 +64,4 @@ jobs:
       - run: python -m pip install pytest -r panel/requirements.txt
       - name: Platforms screen, Tainacan section, dashboard tabs, Backup center, schedules and admin access
         working-directory: panel
-        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_admin_setup.py
+        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_admin_setup.py tests/test_tainacan_free.py

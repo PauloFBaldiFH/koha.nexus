@@ -5,7 +5,14 @@
 
 import type { CloudflareApi, DnsRecord, IngressRule } from "./cloudflare";
 import { randomBytes, toBase64 } from "./crypto";
-import type { Hostnames } from "./names";
+import type { Hostnames, Services } from "./names";
+
+/** A library's names: Koha's two and Tainacan's (published or not, by services). */
+export interface LibraryHosts extends Hostnames {
+  collection: string;
+}
+
+const KOHA_ONLY: Services = { koha: true, tainacan: false };
 
 /** The subset of the Cloudflare client the steps use (a fake in the tests). */
 export type CfClient = Pick<
@@ -58,28 +65,34 @@ export function isRetryable(e: unknown): boolean {
 /**
  * Ingress of an active library: OPAC to Koha's port 80, staff to 8080 (the
  * staff hostname is still behind the Worker gate, closed until the library
- * sets a password). The catch-all answers 404. A suspended library answers
- * 503 for everything.
+ * sets a password), the collection to Apache's port 80, where Tainacan's own
+ * site answers by its name. Only the services the library publishes. The
+ * catch-all answers 404. A suspended library answers 503 for everything.
  */
-export function ingressFor(h: Hostnames, suspended = false): IngressRule[] {
+export function ingressFor(h: Hostnames | LibraryHosts, suspended = false, services: Services = KOHA_ONLY): IngressRule[] {
   if (suspended) return [{ service: "http_status:503" }];
-  return [
-    { hostname: h.opac, service: "http://localhost:80" },
-    { hostname: h.staff, service: "http://localhost:8080" },
-    { service: "http_status:404" },
-  ];
+  const rules: IngressRule[] = [];
+  if (services.koha) {
+    rules.push({ hostname: h.opac, service: "http://localhost:80" }, { hostname: h.staff, service: "http://localhost:8080" });
+  }
+  if (services.tainacan && "collection" in h) rules.push({ hostname: h.collection, service: "http://localhost:80" });
+  rules.push({ service: "http_status:404" });
+  return rules;
 }
 
 export interface ProvisionInput {
   libraryId: string;
-  hostnames: Hostnames;
+  hostnames: Hostnames | LibraryHosts;
   suspended?: boolean;
+  /** Unset: Koha only (libraries made before Tainacan could be published). */
+  services?: Services;
 }
 
 export interface ProvisionResult {
   tunnelId: string;
-  opacRecordId: string;
-  staffRecordId: string;
+  opacRecordId: string | null;
+  staffRecordId: string | null;
+  collectionRecordId: string | null;
 }
 
 export async function ensureTunnel(cf: CfClient, libraryId: string): Promise<string> {
@@ -117,16 +130,46 @@ export async function ensureCname(cf: CfClient, libraryId: string, name: string,
   return (await cf.createCname(name, target, recordComment(libraryId))).id;
 }
 
-export async function provision(cf: CfClient, input: ProvisionInput): Promise<ProvisionResult> {
-  const tunnelId = await ensureTunnel(cf, input.libraryId);
-  await cf.putTunnelIngress(tunnelId, ingressFor(input.hostnames, input.suspended));
-  const opacRecordId = await ensureCname(cf, input.libraryId, input.hostnames.opac, tunnelId);
-  const staffRecordId = await ensureCname(cf, input.libraryId, input.hostnames.staff, tunnelId);
-  return { tunnelId, opacRecordId, staffRecordId };
+/** Removes our records for `name` (a service the library no longer publishes). */
+async function dropOurs(cf: CfClient, libraryId: string, name: string): Promise<void> {
+  for (const r of await cf.findDnsRecords(name)) {
+    if (isOurs(r, libraryId)) await cf.deleteDnsRecord(r.id);
+  }
 }
 
-export async function setSuspended(cf: CfClient, tunnelId: string, hostnames: Hostnames, suspended: boolean): Promise<void> {
-  await cf.putTunnelIngress(tunnelId, ingressFor(hostnames, suspended));
+/**
+ * Tunnel, ingress and one proxied CNAME per published name. Also the way to
+ * change what a library publishes: the names it no longer publishes lose
+ * our records (never someone else's).
+ */
+export async function provision(cf: CfClient, input: ProvisionInput): Promise<ProvisionResult> {
+  const services = input.services ?? KOHA_ONLY;
+  const h = input.hostnames;
+  const tunnelId = await ensureTunnel(cf, input.libraryId);
+  await cf.putTunnelIngress(tunnelId, ingressFor(h, input.suspended, services));
+  const out: ProvisionResult = { tunnelId, opacRecordId: null, staffRecordId: null, collectionRecordId: null };
+  if (services.koha) {
+    out.opacRecordId = await ensureCname(cf, input.libraryId, h.opac, tunnelId);
+    out.staffRecordId = await ensureCname(cf, input.libraryId, h.staff, tunnelId);
+  } else {
+    await dropOurs(cf, input.libraryId, h.opac);
+    await dropOurs(cf, input.libraryId, h.staff);
+  }
+  if ("collection" in h) {
+    if (services.tainacan) out.collectionRecordId = await ensureCname(cf, input.libraryId, h.collection, tunnelId);
+    else await dropOurs(cf, input.libraryId, h.collection);
+  }
+  return out;
+}
+
+export async function setSuspended(
+  cf: CfClient,
+  tunnelId: string,
+  hostnames: Hostnames | LibraryHosts,
+  suspended: boolean,
+  services: Services = KOHA_ONLY,
+): Promise<void> {
+  await cf.putTunnelIngress(tunnelId, ingressFor(hostnames, suspended, services));
 }
 
 /** New tunnel secret: the previous tunnel token stops working. */
@@ -136,16 +179,15 @@ export async function rotate(cf: CfClient, tunnelId: string): Promise<void> {
 
 export interface DeprovisionInput {
   libraryId: string;
-  hostnames: Hostnames;
+  hostnames: Hostnames | LibraryHosts;
   tunnelId?: string | null;
 }
 
-/** Removes our records for the library's names and its tunnel. Safe to repeat. */
+/** Removes our records for every name of the library and its tunnel. Safe to repeat. */
 export async function deprovision(cf: CfClient, input: DeprovisionInput): Promise<void> {
-  for (const name of [input.hostnames.opac, input.hostnames.staff]) {
-    for (const r of await cf.findDnsRecords(name)) {
-      if (isOurs(r, input.libraryId)) await cf.deleteDnsRecord(r.id);
-    }
+  const h = input.hostnames;
+  for (const name of [h.opac, h.staff, ...("collection" in h ? [h.collection] : [])]) {
+    await dropOurs(cf, input.libraryId, name);
   }
   const ids = new Set<string>();
   if (input.tunnelId) ids.add(input.tunnelId);

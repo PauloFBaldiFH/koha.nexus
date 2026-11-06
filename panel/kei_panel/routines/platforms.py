@@ -104,7 +104,7 @@ async def remove_docker(app) -> None:
 async def tainacan_install(app) -> None:
     """An address (or the server's own), the plan, a Yes, the install."""
     from .common import run_task, show_done
-    from ..screens.dialogs import ConfirmScreen, InputScreen, MessageScreen
+    from ..screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
 
     title = t("Install Tainacan")
     # Docker first, when it is missing: its own plan and Yes, then Tainacan
@@ -125,18 +125,31 @@ async def tainacan_install(app) -> None:
             "infrastructure, or start Docker (systemctl start docker) and try again."), kind="error"))
         return
 
-    def check(value: str) -> str:
-        if not value or re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?/?", value):
-            return ""
-        return t("Use http://name or https://name, with no path, or leave it empty.")
-
-    address = await app.push_screen_wait(InputScreen(
-        title, t("Leave it empty to reach Tainacan by this server's address on the local network "
-                 "(a port of its own). Or type the name it will have, such as http://acervo.example.org: "
-                 "the name must point to this server."), t("Address (optional)"), validate=check))
-    if address is None:
-        return
-    address = address.rstrip("/")
+    # Where the collection will answer: the local network now (or later),
+    # a domain of the person's own, or the free koha.nexus address, made
+    # right after the installation by its own wizard.
+    free = await read_free(app)
+    options = [("local", t("This server on the local network")), ("domain", t("Use my own domain"))]
+    if free is not None:
+        options.append(("free", t("Free koha.nexus address") if free.get("available") == "yes"
+                        else t("Free koha.nexus address (not available now)")))
+    options.append(("later", t("Decide later (the local network for now)")))
+    address = ""
+    while True:
+        mode = await app.push_screen_wait(ChoiceScreen(title, t(
+            "Where will the collection answer? Each choice can be changed later in Tainacan > Tainacan "
+            "address."), options))
+        if mode is None:
+            return
+        if mode == "free" and free is not None and free.get("available") != "yes":
+            await app.push_screen_wait(MessageScreen(title, free.get("reason") or t(
+                "The free address cannot be used now."), kind="info"))
+            continue
+        if mode == "domain":
+            address = await ask_domain(app, title)
+            if address is None:
+                continue
+        break
     plan = await app.bridge.task("tainacan-plan", *([address] if address else []))
     if plan.get("plan") != "install":
         await app.push_screen_wait(MessageScreen(
@@ -155,6 +168,12 @@ async def tainacan_install(app) -> None:
     result = await run_task(app, title, "tainacan-install", *args)
     await show_done(app, title, result, t("Tainacan is installed."))
     if _done(result):
+        # The address chosen before: the local network on purpose is the
+        # step done; the free address is made now, by its wizard.
+        if mode in ("local", "domain"):
+            await _setup_done(app, "tainacan", "public")
+        elif mode == "free":
+            await tainacan_free(app, True)
         # A new installation: the steps after it (each can wait).
         from .setup import maybe_start
         await maybe_start(app, "tainacan")
@@ -510,41 +529,46 @@ async def tainacan_start(app) -> None:
 
 async def tainacan_address(app) -> None:
     """The address of the collection: the one in use, then keep it, this
-    server on the local network or a domain of the person's own. Nothing
-    changes before the person's Yes; the installer checks the name again."""
+    server on the local network, a domain of the person's own or the free
+    koha.nexus address. Nothing changes before the person's Yes; the
+    installer checks the name again. The free address is the installer's
+    own wizard (its questions over the panel), shown with the reason when
+    the address service cannot give it now."""
     from .common import run_task, show_done
-    from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen
+    from ..screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
 
     title = t("Tainacan address")
     state = platforms.tainacan_from_status(await _status(app))
     current = state.url or "-"
-    choice = await app.push_screen_wait(ChoiceScreen(title, t(
-        "Tainacan answers at ${url}. Changing it updates WordPress's links and the web proxy; the collections, "
-        "items and accounts do not change.", url=current), [
-        ("keep", t("Keep this address")),
-        ("domain", t("Use my own domain")),
-        ("local", t("This server on the local network")),
-    ]))
+    free = await read_free(app)
+    options = [("keep", t("Keep this address")), ("domain", t("Use my own domain")),
+               ("local", t("This server on the local network"))]
+    prompt = t("Tainacan answers at ${url}. Changing it updates WordPress's links and the web proxy; the "
+               "collections, items and accounts do not change.", url=current)
+    if free is not None:
+        if free.get("host"):
+            options.append(("free-off", t("Stop using the free koha.nexus address")))
+        elif free.get("available") == "yes":
+            options.append(("free", t("Free koha.nexus address")))
+        else:
+            options.append(("free", t("Free koha.nexus address (not available now)")))
+    choice = await app.push_screen_wait(ChoiceScreen(title, prompt, options))
     if choice in (None, "keep"):
         if choice == "keep":
             # Keeping it is a choice too: the step after the installation is done.
             await _setup_done(app, "tainacan", "public")
         return
-    if choice == "local":
-        address = ""
-    else:
-        def check(value: str) -> str:
-            if re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?/?", value or ""):
-                return ""
-            return t("Use http://name or https://name, with no path.")
-
-        address = await app.push_screen_wait(InputScreen(
-            title, t("The name must already point to this server (a DNS record of your domain). For an "
-                     "address reachable from the internet without opening ports, see Security & access "
-                     "hub > Cloudflare Tunnel Manager."), t("Address"), validate=check))
-        if not address:
+    if choice in ("free", "free-off"):
+        if choice == "free" and free is not None and free.get("available") != "yes":
+            await app.push_screen_wait(MessageScreen(title, free.get("reason") or t(
+                "The free address cannot be used now."), kind="info"))
             return
-        address = address.rstrip("/")
+        if await tainacan_free(app, choice == "free"):
+            await _setup_done(app, "tainacan", "public")
+        return
+    address = "" if choice == "local" else await ask_domain(app, title)
+    if address is None:
+        return
     if not await app.push_screen_wait(ConfirmScreen(title, t(
             "Change the address of Tainacan from ${old} to ${new}?", old=current,
             new=address or t("this server on the local network")))):
@@ -554,6 +578,46 @@ async def tainacan_address(app) -> None:
     app.check_platforms()
     if _done(result):
         await _setup_done(app, "tainacan", "public")
+
+
+async def ask_domain(app, title: str) -> str | None:
+    """A name of the person's own domain (http://name or https://name)."""
+    from ..screens.dialogs import InputScreen
+
+    def check(value: str) -> str:
+        if re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?/?", value or ""):
+            return ""
+        return t("Use http://name or https://name, with no path.")
+
+    address = await app.push_screen_wait(InputScreen(
+        title, t("The name must already point to this server (a DNS record of your domain). For an "
+                 "address reachable from the internet without opening ports, see Security & access "
+                 "hub > Cloudflare Tunnel Manager."), t("Address"), validate=check))
+    return address.rstrip("/") if address else None
+
+
+async def read_free(app) -> dict | None:
+    """What the installer says of the free address of the collection (in
+    use, can be given, why not), or None when this installer has no such
+    task."""
+    if not app.bridge.has_task("tainacan-free-status"):
+        return None
+    try:
+        out = await app.bridge.task("tainacan-free-status")
+    except Exception:  # noqa: BLE001 - the option then says it is not available
+        return {"available": "no"}
+    return {key: out.get(key) or "" for key in ("host", "library", "available", "reason", "preview", "request")}
+
+
+async def tainacan_free(app, turn_on: bool = True) -> bool:
+    """The installer's wizard of the free address of the collection: its
+    questions and its Yes over the panel. True when it ended well."""
+    from .common import run_interactive
+
+    title = t("Free koha.nexus address")
+    result = await run_interactive(app, title, "tainacan-free", "on" if turn_on else "off")
+    app.check_platforms()
+    return result is not None and _done(result)
 
 
 def _done(result) -> bool:
