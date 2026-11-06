@@ -206,6 +206,9 @@ PHP
 @test "a new installation of the library: another key, another database password" {
     koha-remove "$INST" >/dev/null 2>&1 3>&- || true
     [ ! -f "$CONF" ]
+    # koha-remove keeps the instance's files under /var/lib/koha: a new
+    # server has none.
+    rm -rf "$(cat "$S/upload_path")" "$(cat "$S/plugins")"
     koha_instance
     [ "$(conf encryption_key)" != "$(cat "$S/old_key")" ]
     [ "$(conf pass)" != "$(cat "$S/old_pass")" ]
@@ -256,7 +259,7 @@ PHP
     sip=/etc/koha/sites/$INST/SIPconfig.xml
     grep -q sip-secret-1 "$sip" || grep -q sip-secret-1 "$sip.from-backup"
     # Koha answers with its database.
-    [ "$(koha-shell "$INST" -c "perl -MC4::Context -e 'print C4::Context->dbh->selectrow_array(q{SELECT COUNT(*) FROM borrowers})'" 2>/dev/null)" = 1 ]
+    [ "$(env PERL5LIB=/usr/share/koha/lib KOHA_CONF="$CONF" perl -MC4::Context -e 'print C4::Context->dbh->selectrow_array(q{SELECT COUNT(*) FROM borrowers})')" = 1 ]
 }
 
 @test "Tainacan restored on its own from the set" {
