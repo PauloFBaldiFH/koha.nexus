@@ -22,8 +22,15 @@ setup() {
     printf 'KN_SECRET=s3cr3t\n' > "$DEMO/.env"; chmod 600 "$DEMO/.env"
     # A Koha installation's files and secrets, under T (paths as the installer names them).
     K="$T/koha"; mkdir -p "$K/etc" "$K/uploads/ab" "$K/plugins/Koha/Plugin" "$K/opac-custom" "$K/staff-custom" "$K/mr" "$K/conf/import-profiles"
+    # As in a real koha-conf.xml, Zebra's <server> sections come first and
+    # have <config> elements of their own (a path, never the main section).
     cat > "$T/koha-conf.xml" <<XML
-<yazgfs><config>
+<yazgfs>
+<server id="biblioserver" listenref="biblioserver">
+ <!-- <encryption_key>commented-key</encryption_key> -->
+ <config>/etc/koha/zebradb/zebra-biblios-dom.cfg</config>
+</server>
+<config>
  <pass>koha-db-pass</pass>
  <upload_path>$K/uploads</upload_path>
  <pluginsdir>$K/plugins</pluginsdir>

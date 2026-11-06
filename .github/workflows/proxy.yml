@@ -200,6 +200,8 @@ jobs:
   koha-set:
     # Debian 12: the system the official Koha packages are built for.
     runs-on: ubuntu-latest
+    # A run takes about ten minutes; a hang must not hold a runner for hours.
+    timeout-minutes: 45
     env:
       KEI_REQUIRE_REAL_TAINACAN: "1"
       KEI_REQUIRE_REAL_KOHA: "1"
