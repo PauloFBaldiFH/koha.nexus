@@ -35,6 +35,7 @@ the routine (routines/backup.cloud_backup) then opens Restore database.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from rich.text import Text
 from textual import on, work
@@ -85,7 +86,7 @@ def _when(job: cron.Job | None) -> str:
     return job.raw
 
 
-class CloudBackupScreen(ModalScreen[tuple | None]):
+class CloudBackupScreen(ModalScreen[Optional[tuple]]):
     BINDINGS = [Binding("escape", "close", t("Close"))]
 
     def __init__(self, info: dict, connections_only: bool = False, uses: dict[str, list[str]] | None = None,
