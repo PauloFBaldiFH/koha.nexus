@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "recipe": 1,
+  "status": "experimental",
+  "architectures": [
+    "linux/amd64"
+  ],
+  "sources": {
+    "backend": {
+      "repository": "https://github.com/DSpace/DSpace.git",
+      "tag": "dspace-10.1",
+      "commit": "a1f5969b3a6a1ac324328bbe2f1d0df8567df9f3",
+      "version": "10.1"
+    },
+    "ui": {
+      "repository": "https://github.com/DSpace/dspace-angular.git",
+      "tag": "dspace-10.1",
+      "commit": "694ed051465faadff20ebdd973720190cbd40b9f",
+      "version": "10.1.0"
+    }
+  },
+  "bases": {
+    "maven": "docker.io/maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237",
+    "java": "docker.io/eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f",
+    "node": "docker.io/node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d",
+    "postgres": "docker.io/postgres:15-bookworm@sha256:19b8449e2187e8a174b40c8832a7ed9da45813b74c2779b1c614e7e7d0ee47f0",
+    "solr": "docker.io/solr:9.8.1@sha256:86a7f3fbec6596b4ee1122b6a862f41eb4b7f41a164abbc169ba9ee03e41525b"
+  },
+  "toolchain": {
+    "java": 21,
+    "node": 22,
+    "postgres": 15,
+    "solr": "9.8.1"
+  },
+  "images": {
+    "backend": {
+      "dockerfile": "backend.Dockerfile",
+      "source": "backend"
+    },
+    "ui": {
+      "dockerfile": "ui.Dockerfile",
+      "source": "ui"
+    },
+    "solr": {
+      "dockerfile": "solr.Dockerfile",
+      "source": "backend"
+    }
+  }
+}
