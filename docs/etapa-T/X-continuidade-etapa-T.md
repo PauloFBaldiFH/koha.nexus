@@ -125,7 +125,7 @@ Todos os outros jobs do `proxy` (apache, system, tainacan, engine, events, nos t
 ## 5. Pendências
 
 Do Paulo:
-1. Mesclar o #341, e depois cada PR na ordem.
+1. Mesclar cada PR na ordem (o #341 já entrou; agora o #342).
 2. Publicar o serviço de endereços (`broker/`) e aplicar a migração 0003. O procedimento está no README do `broker/`, em "Deploying the collection addresses". Nada é publicado automaticamente.
 3. Rodar `roteiro-teste-etapa-T.sh antes` no servidor, atualizar o painel e rodar `roteiro-teste-etapa-T.sh depois`. O roteiro só lê, e os arquivos que ele gera ficam com permissão 600.
 
