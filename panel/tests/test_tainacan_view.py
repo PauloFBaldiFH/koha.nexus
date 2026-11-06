@@ -22,8 +22,9 @@ from kei_panel.env import PanelEnv
 
 TEXT = INSTALLER.read_text(encoding="utf-8")
 SERVERS = {"none": ("0", "0"), "koha": ("1", "0"), "tainacan": ("0", "1"), "both": ("1", "1")}
-# The tasks the section and the tab may call while they are drawn: reads.
-READS = {"platform-backup-status"}
+# The tasks the section and the tab may call while they are drawn: reads
+# (setup-status: whether the "Continue the setup" card is drawn).
+READS = {"platform-backup-status", "setup-status"}
 
 
 @pytest.fixture
@@ -161,13 +162,14 @@ def test_each_platform_home_follows_its_state(server):
         # The Schedules center's card sits where the editor was, after indexing.
         cards = KOHA_SCREENS[:KOHA_SCREENS.index("search") + 1] + ["schedules"] + \
             KOHA_SCREENS[KOHA_SCREENS.index("search") + 1:]
-        assert kcards == ["credentials", "backups"] + cards and kproblem == "" and kdash
+        assert kcards == ["credentials", "admin-koha", "backups"] + cards and kproblem == "" and kdash
     else:
         assert kcards == ["install"] and "not installed" in kproblem and not kdash
     tid, tcards, tproblem, tdash = homes["g"]
     assert tid == "view-tainacan"
     if tainacan:
-        assert tcards == TAINACAN_SCREENS + ["backups", "tainacan-uninstall"] and tproblem == "" and tdash
+        assert tcards == ["admin-tainacan", "tainacan-address"] + TAINACAN_SCREENS + ["backups", "tainacan-uninstall"] \
+            and tproblem == "" and tdash
     else:
         assert tcards == ["tainacan-install"] and "not installed" in tproblem and not tdash
     # Opening the homes only reads.

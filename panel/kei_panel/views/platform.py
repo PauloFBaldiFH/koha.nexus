@@ -118,10 +118,17 @@ class PlatformSectionView(SectionView):
                 backups = platforms.backup_from_results(out.results)
             except Exception:  # "not checked"
                 backups = platforms.BackupState()
+        setup = {}
+        group = self.section.group
+        if self.section.view == "platform-home" and group in (platforms.KOHA, platforms.TAINACAN):
+            from ..routines.setup import read_setup
+            found = await read_setup(app, group, quick=True)
+            if found is not None and found.open:
+                setup[group] = found.pending
         return platforms.Facts(status=status, koha=app.koha_installed,
                                tainacan=platforms.tainacan_from_status(status),
                                docker=platforms.docker_from_status(status), backups=backups,
-                               has_task=app.bridge.has_task)
+                               has_task=app.bridge.has_task, setup=setup)
 
     def mode(self, facts: platforms.Facts) -> str:
         return "installed"

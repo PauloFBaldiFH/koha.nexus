@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 
 from .. import platforms
+from ..bridge import TaskOutcome
 from ..i18n import t
 
 
@@ -153,6 +154,10 @@ async def tainacan_install(app) -> None:
     args = ["confirm"] + ([plan.get("address")] if plan.get("address") else [])
     result = await run_task(app, title, "tainacan-install", *args)
     await show_done(app, title, result, t("Tainacan is installed."))
+    if _done(result):
+        # A new installation: the steps after it (each can wait).
+        from .setup import maybe_start
+        await maybe_start(app, "tainacan")
 
 
 async def tainacan_backup(app) -> None:
@@ -501,6 +506,69 @@ async def tainacan_start(app) -> None:
     result = await run_task(app, title, "tainacan-start", "confirm")
     await show_done(app, title, result, t("Tainacan is running again, with its data as it was."))
     app.check_platforms()
+
+
+async def tainacan_address(app) -> None:
+    """The address of the collection: the one in use, then keep it, this
+    server on the local network or a domain of the person's own. Nothing
+    changes before the person's Yes; the installer checks the name again."""
+    from .common import run_task, show_done
+    from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen
+
+    title = t("Tainacan address")
+    state = platforms.tainacan_from_status(await _status(app))
+    current = state.url or "-"
+    choice = await app.push_screen_wait(ChoiceScreen(title, t(
+        "Tainacan answers at ${url}. Changing it updates WordPress's links and the web proxy; the collections, "
+        "items and accounts do not change.", url=current), [
+        ("keep", t("Keep this address")),
+        ("domain", t("Use my own domain")),
+        ("local", t("This server on the local network")),
+    ]))
+    if choice in (None, "keep"):
+        if choice == "keep":
+            # Keeping it is a choice too: the step after the installation is done.
+            await _setup_done(app, "tainacan", "public")
+        return
+    if choice == "local":
+        address = ""
+    else:
+        def check(value: str) -> str:
+            if re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?/?", value or ""):
+                return ""
+            return t("Use http://name or https://name, with no path.")
+
+        address = await app.push_screen_wait(InputScreen(
+            title, t("The name must already point to this server (a DNS record of your domain). For an "
+                     "address reachable from the internet without opening ports, see Security & access "
+                     "hub > Cloudflare Tunnel Manager."), t("Address"), validate=check))
+        if not address:
+            return
+        address = address.rstrip("/")
+    if not await app.push_screen_wait(ConfirmScreen(title, t(
+            "Change the address of Tainacan from ${old} to ${new}?", old=current,
+            new=address or t("this server on the local network")))):
+        return
+    result = await run_task(app, title, "tainacan-address", *([address] if address else ["local"]))
+    await show_done(app, title, result)
+    app.check_platforms()
+    if _done(result):
+        await _setup_done(app, "tainacan", "public")
+
+
+def _done(result) -> bool:
+    out = result.value if isinstance(result.value, TaskOutcome) else None
+    return bool(out is not None and out.ok)
+
+
+async def _setup_done(app, platform: str, step: str) -> None:
+    """A step of the setup after the installation, when one is open."""
+    if not app.bridge.has_task("setup-mark"):
+        return
+    try:
+        await app.bridge.task("setup-mark", platform, step, "done")
+    except Exception:  # noqa: BLE001 - no setup open: nothing to record
+        pass
 
 
 async def tainacan_site(app) -> None:

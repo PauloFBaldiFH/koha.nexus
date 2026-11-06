@@ -2553,6 +2553,50 @@
     "Os cartões são os editores: **Tarefas agendadas do Koha** abre Tarefas agendadas e automações, e **Agendar backups** define os backups do Tainacan. As linhas que o instalador guarda dizem qual tela as altera."
    ],
    "_en": "007af7c2ef"
+  },
+  "admin-koha": {
+   "summary": "Quem administra o Koha: se o instalador da web foi concluído (existe superbibliotecário), um novo superbibliotecário, uma nova senha para um deles e as credenciais de primeiro acesso.",
+   "overview": [
+    "Enquanto o instalador da web não for concluído, o Koha não tem superbibliotecário: abra a interface da equipe com as credenciais de primeiro acesso e conclua, ou crie um superbibliotecário aqui.",
+    "**Trocar a senha de um superbibliotecário** pergunta qual conta e a nova senha duas vezes, em campos protegidos, e depois pede um Sim. Quem grava é o próprio Koha, com as regras de senha da categoria do usuário; só aquela conta muda, e a chave de criptografia do Koha nunca é tocada.",
+    "A senha vai para o instalador só naquela tarefa e pela entrada padrão: nunca aparece numa linha de comando, num log, no status ou numa tela depois, e o painel não a guarda."
+   ],
+   "_en": "749ba724a2"
+  },
+  "admin-tainacan": {
+   "summary": "Os administradores do Tainacan (contas do WordPress): a sua senha para a conta criada na instalação, uma nova senha para um administrador, outro administrador.",
+   "overview": [
+    "A instalação cria uma conta com uma senha gerada, guardada neste servidor para o painel poder mostrar. Enquanto a senha for essa, a tela avisa: **Definir minha senha** troca a senha, e a gerada deixa de funcionar e não fica mais guardada.",
+    "**Criar outro administrador** recusa um nome de usuário ou e-mail que já pertence a uma conta: nenhuma conta é recriada, apagada ou alterada sem ser escolhida pelo nome. Só administradores podem receber uma nova senha aqui.",
+    "As senhas são digitadas duas vezes em campos protegidos e vão para o WordPress pela entrada padrão, nunca numa linha de comando ou num log. As chaves e os salts do WordPress não mudam."
+   ],
+   "_en": "f57147ccda"
+  },
+  "setup-koha": {
+   "summary": "As etapas depois de uma instalação nova do Koha: acesso administrativo, acesso público e backup na nuvem, cada uma com Configurar agora ou Fazer depois, e no fim onde fica cada coisa.",
+   "overview": [
+    "Abre sozinho depois de uma instalação nova feita pelo painel, e este cartão fica na tela do Koha enquanto faltar alguma etapa. Atualizar o painel nunca o inicia, e uma biblioteca que já existe não o recebe.",
+    "Não tem configuração própria: cada etapa abre a tela de sempre (Acesso administrativo, Cloudflare Tunnel, Configurar backup na nuvem), que mostra o que já existe antes de propor algo. Uma etapa feita pelos menus também conta como feita aqui; nada é criado duas vezes.",
+    "**Fazer depois** só registra a etapa. Depois do assistente tudo continua nos menus, para consultar, alterar ou desligar com as confirmações de cada tela."
+   ],
+   "_en": "0b33bcb0ad"
+  },
+  "setup-tainacan": {
+   "summary": "As etapas depois de uma instalação nova do Tainacan: acesso administrativo, endereço do acervo e backups criptografados, cada uma com Configurar agora ou Fazer depois, e no fim onde fica cada coisa.",
+   "overview": [
+    "Abre sozinho depois de uma instalação nova feita pelo painel, e este cartão fica na tela do Tainacan enquanto faltar alguma etapa. Reinstalar sobre um WordPress que já existe ou atualizar o painel nunca o inicia.",
+    "Cada etapa abre a tela de sempre (Acesso administrativo, Endereço do Tainacan, a chave dos backups e Agendar backups); uma etapa feita pelos menus também conta como feita aqui, e nada é criado duas vezes.",
+    "**Fazer depois** só registra a etapa; a senha gerada continua funcionando até você definir a sua, então a conta nunca fica sem senha."
+   ],
+   "_en": "6b2abbcb58"
+  },
+  "tainacan-address": {
+   "summary": "O endereço em que o Tainacan responde: manter, este servidor na rede local ou um domínio seu.",
+   "overview": [
+    "Trocar o endereço atualiza os links do WordPress e o proxy web depois de um Sim; as coleções, os itens e as contas não mudam. O seu domínio já precisa apontar para este servidor.",
+    "Para chegar ao Tainacan pela internet sem abrir portas, veja Central de segurança e acesso > Gerenciador do Túnel Cloudflare."
+   ],
+   "_en": "2b7aa68463"
   }
  }
 }

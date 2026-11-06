@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.177"
+PANEL_VERSION=" 1.5.178"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -6219,6 +6219,10 @@ function_install_koha() {
     restore_apt_timers
     tui_run "$(t "Checking that everything works")" install_task_check
     log "installation complete (ok=$V_OK warn=$V_WARN fail=$V_FAIL)"
+    # A new library (no superlibrarian yet: the web installer comes next):
+    # the panel offers the steps after the installation. Reinstalling over a
+    # library that has its accounts never starts them.
+    if kei_koha_admin_status 2>/dev/null | grep -qx 'state=web-installer'; then kei_setup_begin koha || true; fi
 
     if [ -n "${KEI_TASK:-}" ]; then
         # The panel shows the addresses, the report and the reboot question.
@@ -13030,7 +13034,7 @@ kei_tainacan_web_apply() {
 # "yes" (the word confirm) after the plan. Each step can be repeated: a
 # failure leaves status=failed and running it again goes on.
 kei_tainacan_install() {
-    local ans="${1:-}" url="${2:-}" lang="${3:-}" out rc version
+    local ans="${1:-}" url="${2:-}" lang="${3:-}" out rc version fresh_wp=0
     if [ "$ans" != confirm ]; then
         kei_tainacan_plan "$url"
         echo "$(t "Nothing was installed: the plan needs a yes (confirm).")" >&2
@@ -13060,6 +13064,7 @@ kei_tainacan_install() {
         _kei_tn_wp core install --url="$url" --title="Tainacan" --admin_user="$(_kei_tn_env KN_ADMIN_USER)" \
             --admin_password="$(_kei_tn_env KN_ADMIN_PASSWORD)" --admin_email="admin@$(hostname -f 2>/dev/null || echo localhost).invalid" \
             --skip-email >/dev/null 2>&1 || { _kei_tn_fail "$(t "WordPress could not be set up.")"; return 1; }
+        fresh_wp=1
         # WordPress's own sample post and page, made just now: their ids
         # (never their titles) let the home page step send them to the
         # trash if nobody edits them first.
@@ -13100,7 +13105,10 @@ kei_tainacan_install() {
     _kei_tn_set wordpress "$KEI_TAINACAN_WP_VERSION"
     _kei_tn_set plugin "$KEI_TAINACAN_PLUGIN_VERSION"
     log "tainacan: installed at $url"
-    echo "$(u="$url"; a="$(_kei_tn_env KN_ADMIN_USER)"; t "Tainacan is installed at \${u}. Administrator: \${a} (the password is in the panel: Tainacan, Diagnosis and maintenance, Administrator).")"
+    # A new WordPress (an earlier one kept is not new): the panel offers the
+    # steps after the installation.
+    if [ "$fresh_wp" = 1 ]; then kei_setup_begin tainacan || true; fi
+    echo "$(u="$url"; a="$(_kei_tn_env KN_ADMIN_USER)"; t "Tainacan is installed at \${u}. Administrator: \${a}, with a generated password: set your own in the panel (Tainacan, Administrative access).")"
 }
 
 # ----------------------------------------------------------------------
@@ -13554,6 +13562,10 @@ kei_tainacan_restore() {
 kei_tainacan_address() {
     local url="${1:-}" old rc
     [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    # local: this server's address on the local network (a port of its own).
+    if [ "$url" = local ]; then
+        url=$(kei_tainacan_default_url) || { echo "$(t "This server's address on the local network was not found.")" >&2; return 1; }
+    fi
     kei_tainacan_parse_url "$url" >/dev/null || { echo "$(u="$url"; t "Invalid address: \${u}. Use http://name or https://name, with no path.")" >&2; return 2; }
     old=$(_kei_tn_get url)
     [ "$old" = "$url" ] && { echo "$(t "The address is the same.")"; return 0; }
@@ -13602,8 +13614,13 @@ kei_tainacan_language() {
 
 kei_tainacan_credentials() {
     [ -f "$KEI_TAINACAN_DIR/.env" ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    local pw
+    pw=$(_kei_tn_env KN_ADMIN_PASSWORD)
+    # After the person set their own password, the generated one is no
+    # longer kept anywhere: it is not shown because it does not exist.
+    [ -n "$pw" ] || pw="$(t "your own (set in the panel; not stored)")"
     printf '%s\n%s: %s\n%s: %s\n%s: %s\n' "$(t "Tainacan administrator")" "$(t "Address")" "$(_kei_tn_get url)/wp-admin/" \
-        "$(t "User")" "$(_kei_tn_env KN_ADMIN_USER)" "$(t "Password")" "$(_kei_tn_env KN_ADMIN_PASSWORD)"
+        "$(t "User")" "$(_kei_tn_env KN_ADMIN_USER)" "$(t "Password")" "$pw"
 }
 
 # ----------------------------------------------------------------------
@@ -15909,6 +15926,273 @@ PYEOF
 kei_set_cleanup() {
     local s="${1:-}"
     case "$s" in "$KEI_BK_ROOT"/.set-restore.*) [ -d "$s" ] && rm -rf "$s" ;; *) return 2 ;; esac
+}
+
+# ======================================================================
+# Administrative access (Paulo, 2026-11-06). A password comes only from
+# the environment (KEI_ADMIN_PASSWORD, set by the panel for one task), is
+# read once and handed to Koha or WordPress on standard input: never on a
+# command line, in a log, in the status or in a result line. An existing
+# account is never recreated, removed or changed without being asked for
+# by name; the signing and encryption keys (Koha's encryption_key, the
+# WordPress salts) are never touched by a password change.
+# ======================================================================
+KEI_ADMIN_MIN=10
+KEI_ADMIN_USER_RE='^[A-Za-z0-9._@-]{1,60}$'
+KEI_KOHA_SHELL="${KEI_KOHA_SHELL:-/usr/sbin/koha-shell}"
+
+# _kei_admin_take_password: the password of this task into _KEI_PW (not
+# exported), the variable removed from the environment.
+_kei_admin_take_password() {
+    _KEI_PW="${KEI_ADMIN_PASSWORD:-}"
+    unset KEI_ADMIN_PASSWORD
+    case "$_KEI_PW" in
+        *$'\n'*|*$'\r'*) _KEI_PW=""; echo "$(t "The password cannot have line breaks.")" >&2; return 2 ;;
+    esac
+    if [ "${#_KEI_PW}" -lt "$KEI_ADMIN_MIN" ]; then
+        _KEI_PW=""
+        echo "$(n="$KEI_ADMIN_MIN"; t "The password needs at least \${n} characters.")" >&2
+        return 2
+    fi
+    return 0
+}
+
+# kei_koha_admin_status: state=web-installer (no superlibrarian yet: the
+# web installer was not finished) or ready, then admin=USERID lines (the
+# superlibrarians).
+kei_koha_admin_status() {
+    is_koha_installed || { echo "$(t "Koha is not installed.")" >&2; return 3; }
+    is_database_ready || { echo "$(t "Koha's database does not answer.")" >&2; return 4; }
+    local users
+    users=$(run_sql "SELECT userid FROM ${DB_NAME}.borrowers WHERE (flags & 1) = 1 AND userid IS NOT NULL AND userid <> '' ORDER BY borrowernumber LIMIT 50;")
+    if [ -n "$users" ]; then echo state=ready; else echo state=web-installer; fi
+    printf '%s\n' "$users" | awk 'NF { print "admin=" $0 }'
+    return 0
+}
+
+# kei_koha_admin_password USERID: a new password for a superlibrarian,
+# through Koha itself (Koha::Patron->set_password: the rules of its
+# category, the login attempts reset), read from standard input.
+kei_koha_admin_password() {
+    local user="${1:-}" script out rc
+    [[ "$user" =~ $KEI_ADMIN_USER_RE ]] || { echo "$(t "Invalid user name.")" >&2; return 2; }
+    is_koha_installed || { echo "$(t "Koha is not installed.")" >&2; return 3; }
+    _kei_admin_take_password || return 2
+    script=$(mktemp /tmp/koha_admin.XXXXXX) || { _KEI_PW=""; return 1; }
+    cat > "$script" <<'PERLEOF'
+use strict; use warnings;
+use Koha::Patrons;
+my $userid = shift @ARGV;
+my $pw = <STDIN>;
+defined $pw or do { print "nopassword\n"; exit 5 };
+chomp $pw;
+my $patron = Koha::Patrons->find({ userid => $userid }) or do { print "nouser\n"; exit 3 };
+$patron->is_superlibrarian or do { print "notsuper\n"; exit 4 };
+my $ok = eval { $patron->set_password({ password => $pw }); 1 };
+unless ($ok) { print "policy\n"; exit 6 }
+print "ok\n";
+PERLEOF
+    chmod 644 "$script"
+    out=$(printf '%s\n' "$_KEI_PW" | "$KEI_KOHA_SHELL" "$INSTANCE" -c "perl $script $user" 2>/dev/null | tail -n 1)
+    rc=$?
+    _KEI_PW=""
+    rm -f "$script"
+    case "$out" in
+        ok) log "koha: password of superlibrarian $user changed from the panel"
+            echo "$(u="$user"; t "The password of \${u} was changed. Koha's encryption key and the other accounts were not touched.")"
+            return 0 ;;
+        nouser) echo "$(u="$user"; t "There is no Koha user \${u}.")" >&2; return 3 ;;
+        notsuper) echo "$(u="$user"; t "\${u} is not a superlibrarian: the panel only changes the password of superlibrarians.")" >&2; return 4 ;;
+        policy) echo "$(t "Koha refused the password: it does not follow the password rules of the user's category (length or strength). Nothing was changed.")" >&2; return 6 ;;
+        *) echo "$(t "The password could not be changed: Koha did not answer. Nothing was changed.")" >&2; return "${rc:-1}" ;;
+    esac
+}
+
+# _kei_tn_env_unset KEY: one value out of the installation's .env.
+_kei_tn_env_unset() {
+    local f="$KEI_TAINACAN_DIR/.env" tmp
+    [ -f "$f" ] || return 1
+    tmp=$(mktemp "$f.XXXXXX") || return 1
+    awk -F= -v k="$1" '$1 != k' "$f" > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$f"
+}
+
+# _kei_tn_admin_php CODE ARGS...: WordPress code, the password (if any)
+# on its standard input; prints what the code echoes.
+_kei_tn_admin_php() {
+    local code="$1"; shift
+    printf '%s\n' "${_KEI_PW:-}" | _kei_tn_wp eval "$code" "$@" 2>/dev/null | tail -n 1
+}
+
+# kei_tainacan_admin_status: state=initial (the account made at the
+# installation still has the password generated then) or own, the initial
+# account's name, then admin=LOGIN lines (WordPress's administrators).
+kei_tainacan_admin_status() {
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    local first users state=own
+    first=$(_kei_tn_env KN_ADMIN_USER)
+    users=$(_kei_tn_wp user list --role=administrator --field=user_login 2>/dev/null) \
+        || { echo "$(t "WordPress did not answer: is Tainacan running?")" >&2; return 4; }
+    if [ -n "$first" ] && [ -n "$(_kei_tn_env KN_ADMIN_PASSWORD)" ] && printf '%s\n' "$users" | grep -qxF "$first"; then
+        local _KEI_PW
+        _KEI_PW=$(_kei_tn_env KN_ADMIN_PASSWORD)
+        [ "$(_kei_tn_admin_php '$pw = rtrim((string) fgets(STDIN), "\n"); $u = get_user_by("login", $args[0]); echo ($u && wp_check_password($pw, $u->user_pass, $u->ID)) ? "yes" : "no";' "$first")" = yes ] \
+            && state=initial
+        _KEI_PW=""
+    fi
+    echo "state=$state"
+    echo "initial=$first"
+    printf '%s\n' "$users" | awk 'NF { print "admin=" $0 }'
+    return 0
+}
+
+# kei_tainacan_admin_password LOGIN: a new password for an administrator
+# (WordPress's wp_set_password: its sessions end; the salts stay). For the
+# initial account, the generated password leaves the .env: it no longer
+# opens the account, and the new one is kept nowhere.
+kei_tainacan_admin_password() {
+    local user="${1:-}" out
+    [[ "$user" =~ $KEI_ADMIN_USER_RE ]] || { echo "$(t "Invalid user name.")" >&2; return 2; }
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    _kei_admin_take_password || return 2
+    out=$(_kei_tn_admin_php '$pw = rtrim((string) fgets(STDIN), "\n"); $u = get_user_by("login", $args[0]); if (!$u) { echo "nouser"; return; } if (!in_array("administrator", (array) $u->roles, true)) { echo "notadmin"; return; } if (strlen($pw) < 1) { echo "nopassword"; return; } wp_set_password($pw, $u->ID); echo "ok";' "$user")
+    _KEI_PW=""
+    case "$out" in
+        ok) [ "$user" = "$(_kei_tn_env KN_ADMIN_USER)" ] && _kei_tn_env_unset KN_ADMIN_PASSWORD
+            log "tainacan: password of administrator $user changed from the panel"
+            echo "$(u="$user"; t "The password of \${u} was changed. The other accounts and the site's keys were not touched.")"
+            return 0 ;;
+        nouser) echo "$(u="$user"; t "There is no WordPress user \${u}.")" >&2; return 3 ;;
+        notadmin) echo "$(u="$user"; t "\${u} is not an administrator: the panel only changes the password of administrators.")" >&2; return 4 ;;
+        *) echo "$(t "The password could not be changed: WordPress did not answer. Nothing was changed.")" >&2; return 1 ;;
+    esac
+}
+
+# kei_tainacan_admin_create LOGIN EMAIL: one more administrator; refused
+# when the name or the e-mail already belong to someone.
+kei_tainacan_admin_create() {
+    local user="${1:-}" email="${2:-}" out
+    [[ "$user" =~ $KEI_ADMIN_USER_RE ]] || { echo "$(t "Invalid user name.")" >&2; return 2; }
+    [[ "$email" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] && [ "${#email}" -le 100 ] \
+        || { echo "$(t "Invalid e-mail address.")" >&2; return 2; }
+    [ "$(_kei_tn_get status)" = installed ] || { echo "$(t "Tainacan is not installed.")" >&2; return 3; }
+    _kei_admin_take_password || return 2
+    out=$(_kei_tn_admin_php '$pw = rtrim((string) fgets(STDIN), "\n"); if (username_exists($args[0]) || email_exists($args[1])) { echo "exists"; return; } $id = wp_insert_user(array("user_login" => $args[0], "user_email" => $args[1], "user_pass" => $pw, "role" => "administrator")); echo is_wp_error($id) ? "error" : "ok";' "$user" "$email")
+    _KEI_PW=""
+    case "$out" in
+        ok) log "tainacan: administrator $user created from the panel"
+            echo "$(u="$user"; t "Administrator \${u} created.")"
+            return 0 ;;
+        exists) echo "$(t "This user name or e-mail already belongs to an account: nothing was created or changed.")" >&2; return 5 ;;
+        *) echo "$(t "The administrator could not be created: WordPress did not answer. Nothing was changed.")" >&2; return 1 ;;
+    esac
+}
+
+# ======================================================================
+# After a new installation: the steps still to do (Paulo, 2026-11-06).
+# The panel's assistant has no settings of its own: each step opens the
+# routine of the center it belongs to. The file keeps only, per step,
+# done, later or pending (never a parameter), and only exists after a new
+# installation: an update never creates it. A step is done as soon as the
+# real state says so, whichever screen configured it.
+# ======================================================================
+KEI_SETUP_DIR="${KEI_SETUP_DIR:-/var/lib/koha-nexus/setup}"
+KEI_SETUP_STEPS="admin public backup"
+
+_kei_setup_file() { printf '%s/%s.state' "$KEI_SETUP_DIR" "$1"; }
+
+# kei_setup_begin PLATFORM: the steps of a platform just installed.
+kei_setup_begin() {
+    local p="${1:-}" f s
+    case "$p" in koha|tainacan) ;; *) return 2 ;; esac
+    f=$(_kei_setup_file "$p")
+    [ -e "$f" ] && return 0
+    mkdir -p "$KEI_SETUP_DIR" && chmod 700 "$KEI_SETUP_DIR" || return 1
+    for s in $KEI_SETUP_STEPS; do printf '%s=pending\n' "$s"; done > "$f" && chmod 600 "$f"
+}
+
+_kei_setup_get() { awk -F= -v k="$2" '$1 == k { v = $2 } END { print v }' "$(_kei_setup_file "$1")" 2>/dev/null; }
+_kei_setup_put() {
+    local f tmp
+    f=$(_kei_setup_file "$1")
+    tmp=$(mktemp "$f.XXXXXX") || return 1
+    { awk -F= -v k="$2" '$1 != k' "$f"; printf '%s=%s\n' "$2" "$3"; } > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$f"
+}
+
+# kei_setup_mark PLATFORM STEP done|later|pending
+kei_setup_mark() {
+    local p="${1:-}" s="${2:-}" v="${3:-}"
+    [ -f "$(_kei_setup_file "$p")" ] || { echo "$(t "There is no setup in progress for this platform.")" >&2; return 3; }
+    case " $KEI_SETUP_STEPS " in *" $s "*) ;; *) echo "$(t "Unknown step.")" >&2; return 2 ;; esac
+    case "$v" in done|later|pending) ;; *) echo "$(t "Unknown state.")" >&2; return 2 ;; esac
+    _kei_setup_put "$p" "$s" "$v"
+}
+
+# _kei_setup_real PLATFORM STEP: "done<TAB>what is configured" when the
+# real state says the step is done, nothing otherwise.
+_kei_setup_real() {
+    local p="$1" s="$2" v
+    case "$p:$s" in
+        koha:admin)
+            v=$(kei_koha_admin_status 2>/dev/null | sed -n 's/^admin=//p' | head -n 3 | paste -sd ' ' -)
+            [ -n "$v" ] && printf 'done\t%s\n' "$(u="$v"; t "superlibrarian: \${u}")" ;;
+        tainacan:admin)
+            kei_tainacan_admin_status 2>/dev/null | grep -qx 'state=own' \
+                && printf 'done\t%s\n' "$(t "the initial password was replaced")" ;;
+        koha:public)
+            if tunnel_mode_is broker 2>/dev/null || [ -f /etc/cloudflared/config.yml ]; then
+                printf 'done\t%s\n' "$(t "Cloudflare tunnel configured")"
+            fi ;;
+        tainacan:public)
+            v=$(_kei_tn_get url)
+            case "$v" in
+                ""|http://localhost*|http://127.*|http://10.*|http://192.168.*|http://172.1[6-9].*|http://172.2[0-9].*|http://172.3[01].*) ;;
+                *) printf 'done\t%s\n' "$v" ;;
+            esac ;;
+        koha:backup)
+            v=$(grep -cE '^[A-Za-z][A-Za-z0-9_-]*[|]' "$CLOUD_PLANS_FILE" 2>/dev/null)
+            [ "${v:-0}" -gt 0 ] 2>/dev/null && printf 'done\t%s\n' "$(n="$v"; t "\${n} cloud backup(s)")" ;;
+        tainacan:backup)
+            v=$(_kei_bk_get schedule_tainacan 2>/dev/null)
+            [ -n "$v" ] && printf 'done\t%s\n' "$(w="$v"; t "daily backup at \${w}")" ;;
+    esac
+    return 0
+}
+
+# kei_setup_status PLATFORM [quick]: setup=none without a setup in
+# progress; otherwise step=STEP|done|later|pending|WHAT lines and
+# pending=N. A step the real state shows done is recorded as done; quick
+# (the platform's screen, for its "Continue the setup" card) reads only the
+# file.
+kei_setup_status() {
+    local p="${1:-}" quick="${2:-}" s rec real what n=0
+    case "$p" in koha|tainacan) ;; *) echo "$(t "Unknown platform.")" >&2; return 2 ;; esac
+    if [ ! -f "$(_kei_setup_file "$p")" ]; then echo setup=none; return 0; fi
+    echo setup=open
+    for s in $KEI_SETUP_STEPS; do
+        rec=$(_kei_setup_get "$p" "$s")
+        real=""
+        [ "$quick" = quick ] || real=$(_kei_setup_real "$p" "$s")
+        what=""
+        if [ -n "$real" ]; then
+            what="${real#*$'\t'}"
+            [ "$rec" = done ] || _kei_setup_put "$p" "$s" done
+            rec=done
+        fi
+        case "$rec" in done|later) ;; *) rec=pending ;; esac
+        [ "$rec" = done ] || n=$((n + 1))
+        printf 'step=%s|%s|%s\n' "$s" "$rec" "${what//|/ }"
+    done
+    echo "pending=$n"
+    return 0
+}
+
+# kei_setup_close PLATFORM: the assistant was finished (every step done or
+# set for later is still offered by the menus): the file goes.
+kei_setup_close() {
+    local f
+    f=$(_kei_setup_file "${1:-}")
+    case "${1:-}" in koha|tainacan) ;; *) return 2 ;; esac
+    rm -f "$f"
 }
 
 # ----------------------------------------------------------------------
@@ -44943,6 +45227,39 @@ kei_task() {
             [ "$rc" != 0 ] && [ -s "$err" ] && msg_error "" "$(grep -v '^[[:space:]]*$' "$err" | tail -n 4)"
             rm -f "$out" "$err"
             return "$rc" ;;
+        # Administrative access and the steps after a new installation. The
+        # password comes only in KEI_ADMIN_PASSWORD (never an argument).
+        admin-status|setup-status)
+            local line out err rc
+            out=$(mktemp) && err=$(mktemp) || return 1
+            case "$name:${1:-}" in
+                admin-status:koha)     kei_koha_admin_status > "$out" 2>"$err" ;;
+                admin-status:tainacan) kei_tainacan_admin_status > "$out" 2>"$err" ;;
+                setup-status:*)        kei_setup_status "${1:-}" "${2:-}" > "$out" 2>"$err" ;;
+                *) echo "$(t "Unknown platform.")" > "$err"; false ;;
+            esac
+            rc=$?
+            while IFS= read -r line; do [ -n "$line" ] && kei_result "${line%%=*}" "${line#*=}"; done < "$out"
+            [ "$rc" != 0 ] && [ -s "$err" ] && msg_error "" "$(grep -v '^[[:space:]]*$' "$err" | tail -n 4)"
+            rm -f "$out" "$err"
+            return "$rc" ;;
+        admin-password|admin-create)
+            # Kept as a shell variable only: no program started from here
+            # (Docker, koha-shell) finds it in its environment.
+            local _pw="${KEI_ADMIN_PASSWORD:-}"
+            unset KEI_ADMIN_PASSWORD
+            KEI_ADMIN_PASSWORD="$_pw"; _pw=""
+            case "$name:${1:-}" in
+                admin-password:koha)     _kei_docker_task kei_koha_admin_password "${2:-}" ;;
+                admin-password:tainacan) _kei_docker_task kei_tainacan_admin_password "${2:-}" ;;
+                admin-create:tainacan)   _kei_docker_task kei_tainacan_admin_create "${2:-}" "${3:-}" ;;
+                *) unset KEI_ADMIN_PASSWORD; return 2 ;;
+            esac
+            local rc=$?
+            unset KEI_ADMIN_PASSWORD
+            return "$rc" ;;
+        setup-mark)       kei_setup_mark "${1:-}" "${2:-}" "${3:-}" ;;
+        setup-close)      kei_setup_close "${1:-}" ;;
         platform-backup-incomplete)
             local d l r
             while IFS=$'\t' read -r d l r; do [ -n "$d" ] && kei_result incomplete "${d##*/}|$l|$r"; done < <(kei_backup_incomplete "$@")

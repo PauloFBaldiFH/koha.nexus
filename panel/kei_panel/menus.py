@@ -89,7 +89,9 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native",
               zone="recovery", requires="koha"),
         Entry("📜  Real-time Apache log auditing", "apache-log", kind="native", zone="recovery", requires="koha"),
+        Entry("🧭  Continue the setup", "setup-koha", kind="native", requires="koha"),
         Entry("🔑  View first-access credentials", "credentials", kind="native", requires="koha"),
+        Entry("🔐  Administrative access", "admin-koha", kind="native", requires="koha"),
         Entry("💾  Koha backups", "backups", kind="view", scope="koha"),
         Entry("🪄  Magic Import Tool", "import", kind="view"),
         Entry("📚  Library tools", "library", kind="view"),
@@ -216,6 +218,9 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🩺  Tainacan diagnosis", "tainacan-status", kind="native", zone="recovery", requires="tainacan"),
         Entry("📜  Tainacan logs", "tainacan-logs", kind="native", zone="recovery", requires="tainacan"),
         Entry("🧱  Shared infrastructure", "infra", kind="view", zone="recovery"),
+        Entry("🧭  Continue the setup", "setup-tainacan", kind="native", requires="tainacan"),
+        Entry("🔐  Administrative access", "admin-tainacan", kind="native", requires="tainacan"),
+        Entry("🌐  Tainacan address", "tainacan-address", kind="native", requires="tainacan"),
         Entry("🏠  Prepare the home page", "tainacan-site", kind="native", requires="tainacan"),
         Entry("🩺  Tainacan diagnosis & maintenance", "tainacan-maintenance", kind="view"),
         Entry("🎟  Tainacan events", "tainacan-events", kind="view"),
@@ -346,6 +351,8 @@ PLATFORM_TASKS: dict[str, str] = {
     "pbackup-schedule": "platform-backup-schedule", "pbackup-verify": "platform-backup-verify",
     "pbackup-incomplete": "platform-backup-incomplete", "cloud-connections": "cloud-list",
     "set-backup": "set-backup", "restore-assisted": "set-inspect",
+    "tainacan-address": "tainacan-address", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
+    "setup-koha": "setup-status", "setup-tainacan": "setup-status",
 }
 
 # Panel routines with no installer routine of their own (routines/).
@@ -400,6 +407,11 @@ def all_actions() -> set[str]:
 DESCRIPTIONS: dict[str, str] = {
     "install": "Installs Koha with MariaDB and Apache on this server",
     "credentials": "Shows the logins and passwords of the first access",
+    "admin-koha": "Superlibrarians: the web installer, a new one, a new password",
+    "admin-tainacan": "Administrators: your own password, a new password, another administrator",
+    "setup-koha": "The steps left after the installation: access, address, backup",
+    "setup-tainacan": "The steps left after the installation: access, address, backup",
+    "tainacan-address": "The address of the collection: local network or your own domain",
     "restore": "Replaces Koha's database with a backup, tested first",
     "backup-manual": "Makes a full backup and shows how to copy it to a PC",
     "backup-marc": "Exports the catalogue and the authorities in MARC21 now",

@@ -26,7 +26,7 @@ only: the panel never opens Koha's database to decide what to show.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .i18n import t
@@ -585,6 +585,9 @@ class Facts:
     docker: DockerState = DockerState()
     backups: BackupState = BackupState()
     has_task: object = None      # the bridge's has_task; None = every task
+    # Steps left after a new installation, per platform ({"koha": 2});
+    # a platform without a setup in progress is not in it.
+    setup: dict = field(default_factory=dict)
 
     def has(self, task: str) -> bool:
         return self.has_task is None or bool(self.has_task(task))
@@ -700,4 +703,6 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
         return state.home != "prepared" and state.check("site") != "ready"
     if action == "tainacan-site-undo":
         return state.home == "prepared"
+    if action in ("setup-koha", "setup-tainacan"):      # only while a step is left
+        return facts.setup.get(action.removeprefix("setup-"), 0) > 0
     return True
