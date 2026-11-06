@@ -35,8 +35,14 @@ class Entry:
     # the cataloguing aids do not work yet, so their cards are hidden).
     hidden: bool = False
     # The platform this entry works on ("koha"), when its section is shared
-    # by every platform (platforms.py). "" = it works on any server.
+    # by every platform (the Server area). "" = it works on any server.
     requires: str = ""
+    # Where the card is drawn in its screen (views/base.py): "" with the
+    # day-to-day tools; "setup" (installing), "recovery" (diagnosis and
+    # recovery, drawn first when something is wrong) and "removal"
+    # (removing, kept apart from the rest). A platform's home shows each
+    # zone by the platform's state (platforms.home_zones).
+    zone: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,14 +58,48 @@ class Section:
     sidebar: bool = True  # False: reached from a hub entry (and its key) only
     parent: str = ""      # the hub highlighted in the sidebar while it is shown
     requires: str = ""    # platform the whole section works on ("koha"); "" = any server
+    # The platform group of the sidebar it belongs to ("koha", "tainacan"):
+    # drawn under that group's row, only while the group is expanded. The
+    # group's own row is the section whose id is the group (its home).
+    group: str = ""
 
+
+# The platform groups of the sidebar, in order: the id of the platform's
+# home section, which is also the group's name.
+GROUPS = ("koha", "tainacan")
 
 SECTIONS: tuple[Section, ...] = (
+    # State, addresses and indicators of the server and of each platform
+    # live here only, in tabs (views/dashboard.py).
     Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
-    Section("install", "📦  Install Koha server", entries=(
-        Entry("📦  Install Koha server", "install", kind="native"),)),
+
+    # ---------------- Koha (library) ----------------
+    # Its home: installing while Koha is absent; its tools once installed;
+    # diagnosis and recovery first when its services are stopped.
+    Section("koha", "📚  Koha (library)", "📚  Koha (library)", entries=(
+        Entry("📦  Install Koha server", "install", kind="native", zone="setup"),
+        Entry("📡  Detailed server & Koha status", "status", kind="native", zone="recovery"),
+        Entry("🏥  Full system health check", "health", kind="native", zone="recovery", requires="koha"),
+        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native",
+              zone="recovery", requires="koha"),
+        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native", zone="recovery", requires="koha"),
+        Entry("🔑  View first-access credentials", "credentials", kind="native", requires="koha"),
+        Entry("💾  Backup center", "backup", kind="view"),
+        Entry("🪄  Magic Import Tool", "import", kind="view"),
+        Entry("📚  Library tools", "library", kind="view"),
+        Entry("📡  Z39.50 / SRU servers", "z3950", kind="view"),
+        Entry("🤖  AI", "ai", kind="view"),
+        Entry("🎨  OPAC and Staff Appearance", "opac", kind="view"),
+        Entry("📨  Messaging & interoperability", "hub", kind="view"),
+        Entry("🔍  Search engine & indexing", "search", kind="view"),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="view"),
+        Entry("🔧  Koha settings & parameters", "settings", kind="view"),
+        Entry("🩺  Koha diagnostics & maintenance", "diagnostics", kind="view"),
+        Entry("🛡  Koha security", "koha-security", kind="view"),
+    ), view="platform-home", key="k", group="koha"),
     Section("credentials", "🔑  View first-access credentials", requires="koha", entries=(
-        Entry("🔑  View first-access credentials", "credentials", kind="native"),)),
+        Entry("🔑  View first-access credentials", "credentials", kind="native"),), sidebar=False, parent="koha",
+        group="koha"),
     # The cards are the only place of the backup actions (Paulo, 2026-10-15:
     # no buttons above the status cards any more).
     Section("backup", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
@@ -69,88 +109,23 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📥  Restore database", "restore", kind="native"),
         Entry("📤  Configure cloud backup", "backup-cloud", kind="native"),
         Entry("🧾  Test integrity of latest backup", "backup-test", kind="native"),
-    ), view="backup", key="b", requires="koha"),
+    ), view="backup", key="b", requires="koha", group="koha"),
     # Every import in one place, right under the backups (Paulo, 2026-10-09).
     Section("import", "🪄  Magic Import Tool",
             prompt="Imports bibliographic records, authority records and patron (reader) data from other systems: "
                    "MARC, ISIS, CSV and spreadsheets, and old-system backups.", entries=(
-        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i", requires="koha"),
-    # New screen: Koha's tables at a glance (no bash menu of its own), opened
-    # from Diagnostics & maintenance (Paulo, 2026-10-15: not on the sidebar;
-    # maintenance and the reports pack have their own cards elsewhere).
-    Section("database", "📑  Database tables", "📑  Database tables", view="database", key="t",
-            sidebar=False, parent="diagnostics", requires="koha"),
-    # New screen: both AI tools on one page (views/ai.py). AI cataloguing
-    # (Module 1: MARC Replace, which opens the routine below) and the AI
-    # assistant (Module 2: the chat on the Koha staff home page) share the
-    # provider, each with its own model; Ollama models download from there.
-    Section("ai", "🤖  AI", "🤖  AI", entries=(
-        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
-        Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
-    ), view="ai", key="a", requires="koha"),
-    # New screen: this Koha's Z39.50/SRU server (on/off), the koha.nexus
-    # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
-    # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
-    Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z", requires="koha"),
-    # New screen: the look of the public catalogue and the staff interface (textures, wallpaper, dark mode,
-    # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
-    Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o", requires="koha"),
-    # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
-    # Z39.50 on one screen (views/hub.py); its buttons run these routines.
-    # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:
-    # the classic "SIP2 and Z39.50" routine stays reachable, but no button runs it.
-    Section("hub", "📨  Messaging & interoperability", "📨  Messaging & interoperability", entries=(
-        Entry("📧  Configure email and circulation notices", "email", kind="native"),
-        Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
-        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native", hidden=True),
-    ), view="hub", key="m", requires="koha"),
-    # WireGuard VPN for the staff interface and SSH (views/vpn.py), opened
-    # from the Security & access hub (or its key).
-    Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v", sidebar=False,
-            parent="security"),
-    # Security, remote access and the firewall in one hub: VPN, Cloudflare
-    # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
-    # internet" and "Security center").
-    Section("security", "🔒  Security & access hub", "🔒 Security & Access Hub",
-            "Choose a security or remote-access tool:", (
-        Entry("🔐  WireGuard VPN", "vpn", kind="view"),
-        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native", requires="koha"),
-        Entry("🧱  Show active UFW rules", "ufw", kind="native"),
-        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native", requires="koha"),
-        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native", requires="koha"),
-        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
-        Entry("🔐  Rotate database password", "rotate-db-password", kind="native", requires="koha"),
-        Entry("🔎  Google Search Console Assistant", "search-console", kind="native", requires="koha"),
-    ), key="x"),
-    Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
-        Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
-        Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
-    ), requires="koha"),
-    Section("diagnostics", "🩺  Diagnostics & maintenance center", "🩺 Diagnostics & Maintenance Center",
-            "Choose a tool:", (
-        Entry("📡  Detailed server & Koha status", "status", kind="native"),
-        Entry("🏥  Full system health check", "health", kind="native", requires="koha"),
-        Entry("📄  View latest validation report", "validation-report", kind="native"),
-        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native", requires="koha"),
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native", requires="koha"),
-        Entry("📑  Database tables", "database", kind="view", requires="koha"),
-        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native", requires="koha"),
-    )),
-    Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
-        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native", requires="koha"),
-        Entry("👑  Create super librarian", "superlibrarian", kind="native", requires="koha"),
-        Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
-    )),
+        Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i", requires="koha",
+        group="koha"),
     # Enrichment jobs (views/enrich.py), opened from Library tools (or its key).
     # The batch "Enrich bibliographic catalog" screen is retired (Paulo, 1.5.94):
     # "Enrich from world catalogues" (on-demand enrichment) replaces it. Its view and installer tasks stay in the
     # code, but no key, card or sidebar row opens it.
     Section("enrich", "✨  Enrich bibliographic catalog", "✨  Enrich bibliographic catalog", view="enrich",
-            sidebar=False, parent="library", requires="koha"),
+            sidebar=False, parent="library", requires="koha", group="koha"),
     Section("enrich-auth", "📇  Enrich & standardize authorities", "📇  Enrich & standardize authorities",
-            view="enrich-auth", key="h", sidebar=False, parent="library", requires="koha"),
+            view="enrich-auth", key="h", sidebar=False, parent="library", requires="koha", group="koha"),
     Section("ondemand", "🌐  Enrich from world catalogues", "🌐  Enrich from world catalogues", view="ondemand",
-            key="n", sidebar=False, parent="library", requires="koha"),
+            key="n", sidebar=False, parent="library", requires="koha", group="koha"),
     Section("library", "📚  Library tools", "📚  Library tools",
             "Changes are always previewed first and protected by a verified backup.", (
         Entry("✨  Enrich bibliographic catalog", "enrich", kind="view", hidden=True),
@@ -171,16 +146,142 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
         Entry("📂  Staff access to server files", "access-files", kind="native"),
         Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
-    ), key="l", requires="koha"),
-    Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
-        Entry("📂  Open user folder", "user-folder", kind="native"),
-        Entry("💻  Open Debian terminal", "terminal", kind="native"),
-        Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
-        Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
-    )),
+    ), key="l", requires="koha", group="koha"),
+    # New screen: this Koha's Z39.50/SRU server (on/off), the koha.nexus
+    # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
+    # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
+    Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z", requires="koha",
+            group="koha"),
+    # New screen: both AI tools on one page (views/ai.py). AI cataloguing
+    # (Module 1: MARC Replace, which opens the routine below) and the AI
+    # assistant (Module 2: the chat on the Koha staff home page) share the
+    # provider, each with its own model; Ollama models download from there.
+    Section("ai", "🤖  AI", "🤖  AI", entries=(
+        Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
+        Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
+    ), view="ai", key="a", requires="koha", group="koha"),
+    # New screen: the look of the public catalogue and the staff interface (textures, wallpaper, dark mode,
+    # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
+    Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o",
+            requires="koha", group="koha"),
+    # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
+    # Z39.50 on one screen (views/hub.py); its buttons run these routines.
+    # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:
+    # the classic "SIP2 and Z39.50" routine stays reachable, but no button runs it.
+    Section("hub", "📨  Messaging & interoperability", "📨  Messaging & interoperability", entries=(
+        Entry("📧  Configure email and circulation notices", "email", kind="native"),
+        Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
+        Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native", hidden=True),
+    ), view="hub", key="m", requires="koha", group="koha"),
+    Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
+        Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
+        Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
+    ), requires="koha", group="koha"),
     # The visual cron manager (views/crons.py); the entry is the classic routine.
     Section("crons", "⏰  Schedules & cron tasks", entries=(
-        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s", requires="koha"),
+        Entry("⏰  Schedules & cron tasks", "crons", kind="native"),), view="crons", key="s", requires="koha",
+        group="koha"),
+    # Koha's own parameters (the clock and timezone are the server's: General tools).
+    Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
+        Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
+        Entry("👑  Create super librarian", "superlibrarian", kind="native"),
+    ), requires="koha", group="koha"),
+    # Koha's diagnosis and maintenance (the server's own: Server diagnostics).
+    Section("diagnostics", "🩺  Koha diagnostics & maintenance", "🩺  Koha diagnostics & maintenance",
+            "Choose a tool:", (
+        Entry("🏥  Full system health check", "health", kind="native"),
+        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
+        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
+        Entry("📑  Database tables", "database", kind="view"),
+        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
+    ), requires="koha", group="koha"),
+    # New screen: Koha's tables at a glance (no bash menu of its own), opened
+    # from Koha diagnostics & maintenance (Paulo, 2026-10-15: not on the sidebar;
+    # maintenance and the reports pack have their own cards elsewhere).
+    Section("database", "📑  Database tables", "📑  Database tables", view="database", key="t",
+            sidebar=False, parent="diagnostics", requires="koha", group="koha"),
+    # Koha's own protections (the server's are in Security & access).
+    Section("koha-security", "🛡  Koha security", "🛡  Koha security", "Choose a tool:", (
+        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
+        Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
+        Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
+    ), requires="koha", group="koha"),
+
+    # ---------------- Tainacan (collections and museums) ----------------
+    # Its home: installing while it is absent (Docker is prepared on the
+    # way, after its own plan and Yes); its tools once installed; the
+    # problem and the right diagnosis first when the installation is
+    # incomplete or its containers or Docker are stopped. Never a restore
+    # by itself: restoring lives in its Backups.
+    Section("tainacan", "🏺  Tainacan (collections and museums)", "🏺  Tainacan (collections and museums)", entries=(
+        Entry("📦  Install Tainacan", "tainacan-install", kind="native", zone="setup"),
+        Entry("🩺  Tainacan diagnosis", "tainacan-status", kind="native", zone="recovery", requires="tainacan"),
+        Entry("📜  Tainacan logs", "tainacan-logs", kind="native", zone="recovery", requires="tainacan"),
+        Entry("🧱  Shared infrastructure", "infra", kind="view", zone="recovery"),
+        Entry("🩺  Tainacan diagnosis & maintenance", "tainacan-maintenance", kind="view"),
+        Entry("🎟  Tainacan events", "tainacan-events", kind="view"),
+        Entry("💾  Tainacan backups", "tainacan-backups", kind="view"),
+        Entry("🗑  Uninstall Tainacan", "tainacan-uninstall", kind="native", zone="removal", requires="tainacan"),
+    ), view="platform-home", key="g", group="tainacan"),
+    Section("tainacan-maintenance", "🩺  Tainacan diagnosis & maintenance", "🩺  Tainacan diagnosis & maintenance",
+            "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown "
+            "in the Control Dashboard, Tainacan tab.", (
+        Entry("🩺  Tainacan diagnosis", "tainacan-status", kind="native"),
+        Entry("📜  Tainacan logs", "tainacan-logs", kind="native"),
+        Entry("👤  WordPress administrator", "tainacan-credentials", kind="native"),
+    ), view="platform-section", requires="tainacan", group="tainacan"),
+    Section("tainacan-events", "🎟  Tainacan events", "🎟  Tainacan events",
+            "Optional and off until you turn them on, after the plan and a Yes. Turning them off keeps "
+            "their data.", (
+        Entry("🎟  Turn events on", "events-on", kind="native"),
+        Entry("⏸  Turn events off", "events-off", kind="native"),
+        Entry("📋  Events state", "events-status", kind="native"),
+    ), view="platform-section", requires="tainacan", group="tainacan"),
+    Section("tainacan-backups", "💾  Tainacan backups", "💾  Tainacan backups",
+            "A restore is always tested first in an isolated copy, and what is there now is kept in a safety "
+            "backup.", (
+        Entry("💾  Back up Tainacan now", "tainacan-backup", kind="native"),
+        Entry("🧪  Test a restore", "tainacan-restore-test", kind="native"),
+        Entry("📥  Restore Tainacan", "tainacan-restore", kind="native"),
+        Entry("⏰  Schedule backups", "pbackup-schedule", kind="native"),
+        Entry("☁  Repository and cloud copy", "pbackup-configure", kind="native"),
+        Entry("🧾  Verify backups", "pbackup-verify", kind="native"),
+        Entry("⏯  Incomplete backup", "pbackup-incomplete", kind="native"),
+    ), view="platform-section", requires="tainacan", group="tainacan"),
+
+    # ---------------- Server: shared by every platform ----------------
+    # Security, remote access and the firewall in one hub: VPN, Cloudflare
+    # Tunnel, UFW, HTTPS and Fail2ban (it replaces "Publish system to
+    # internet" and "Security center"). The Tunnel and HTTPS only serve
+    # Koha for now: their cards say so and show only with Koha installed.
+    Section("security", "🔒  Security & access hub", "🔒 Security & Access Hub",
+            "Choose a security or remote-access tool:", (
+        Entry("🔐  WireGuard VPN", "vpn", kind="view"),
+        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native", requires="koha"),
+        Entry("🧱  Show active UFW rules", "ufw", kind="native"),
+        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native", requires="koha"),
+        Entry("🚨  Fail2ban status (intrusion attempts)", "fail2ban", kind="native"),
+    ), key="x"),
+    # WireGuard VPN for the staff interface and SSH (views/vpn.py), opened
+    # from the Security & access hub (or its key).
+    Section("vpn", "🔐  WireGuard VPN", "🔐  WireGuard VPN", view="vpn", key="v", sidebar=False,
+            parent="security"),
+    # What the platforms in containers share: the web proxy, Docker and the
+    # backup vault (the key and the recovery kit of every platform's backups).
+    Section("infra", "🧱  Shared infrastructure", "🧱  Shared infrastructure",
+            "What the platforms in containers use together: the web server in front of them, Docker and the "
+            "key of their backups.", (
+        Entry("🐳  Install Docker", "docker-install", kind="native"),
+        Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native"),
+        Entry("🧰  Recovery kit", "pbackup-kit", kind="native"),
+        Entry("🗑  Remove Docker", "docker-remove", kind="native", zone="removal"),
+    ), view="platform-section", key="p"),
+    Section("server-diagnostics", "🩺  Server diagnostics", "🩺  Server diagnostics", "Choose a tool:", (
+        Entry("📡  Detailed server & Koha status", "status", kind="native"),
+        Entry("📄  View latest validation report", "validation-report", kind="native"),
+        Entry("📦  Export diagnostics", "export-diagnostics", kind="native"),
+        Entry("🗂  Open diagnostics", "open-diagnostics", kind="native"),
+    )),
     Section("languages", "🌍  Koha languages", "🌍 Koha & Panel Languages", "Choose an action:", (
         Entry("🌍  Download & activate a language", "languages", kind="native"),
         Entry("📥  Download a language pack only", "lang-download", kind="native", requires="koha"),
@@ -191,17 +292,13 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
         Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
     )),
-    # Tainacan's own section (only with Tainacan installed): its summary,
-    # addresses, events and diagnosis. Installing, removing and its backups
-    # stay in Platforms.
-    Section("tainacan", "🏺  Tainacan", "🏺  Tainacan",
-            "Your digital collections: their state, addresses, events and diagnosis.",
-            view="tainacan", key="g", requires="tainacan"),
-    # The platforms this panel knows (platforms.py): what is supported, what
-    # is installed here, whether its services run. Read only for now.
-    Section("platforms", "🧩  Platforms", "🧩  Platforms",
-            "Koha is optional: the panel works on a server without it. Other platforms are planned.",
-            view="platforms", key="p"),
+    Section("tools", "🧰  General tools", "🧰 General Tools", "Choose a tool:", (
+        Entry("📂  Open user folder", "user-folder", kind="native"),
+        Entry("💻  Open Debian terminal", "terminal", kind="native"),
+        Entry("📊  Resource monitoring (Htop / Nethogs)", "monitor", kind="native"),
+        Entry("📂  File explorer (Midnight Commander)", "mc", kind="native"),
+        Entry("🕒  Clock and timezone (NTP)", "clock", kind="native"),
+    )),
     Section("about", "💡  About the program & support", entries=(
         Entry("💡  About the program & support", "about", kind="native"),)),
     Section("reboot", "🔁  Reboot server", entries=(
@@ -216,12 +313,39 @@ def section(section_id: str) -> Section:
     raise KeyError(section_id)
 
 
+# The platform routines of the panel (routines/platforms.py): each runs
+# installer tasks (--task), none is a classic --run routine. The task a card
+# needs from the installer in use, or its card is not drawn.
+PLATFORM_TASKS: dict[str, str] = {
+    "docker-install": "docker-plan", "docker-remove": "docker-remove",
+    "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
+    "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
+    "tainacan-backup": "tainacan-backup", "tainacan-restore-test": "tainacan-restore-test",
+    "tainacan-restore": "tainacan-restore", "events-on": "tainacan-events", "events-off": "tainacan-events",
+    "events-status": "tainacan-events", "pbackup-setup": "platform-backup-setup",
+    "pbackup-kit": "platform-backup-kit", "pbackup-configure": "platform-backup-repo",
+    "pbackup-schedule": "platform-backup-schedule", "pbackup-verify": "platform-backup-verify",
+    "pbackup-incomplete": "platform-backup-incomplete",
+}
+
 # Panel routines with no installer routine of their own (routines/).
-PANEL_ONLY = frozenset({"backup-download", "user-folder", "terminal"})
+PANEL_ONLY = frozenset({"backup-download", "user-folder", "terminal", "export-diagnostics",
+                        "open-diagnostics"} | set(PLATFORM_TASKS))
 
 # Routines started from a button rather than a menu card, with the
 # platform they work on (the dashboard's "Restart Koha").
 BUTTON_REQUIRES: dict[str, str] = {"restart-koha": "koha"}
+
+
+def children(group: str) -> list[Section]:
+    """The sections drawn under a platform group of the sidebar."""
+    return [s for s in SECTIONS if s.group == group and s.id != group and s.sidebar]
+
+
+def group_of(section_id: str) -> str:
+    """The platform group a section belongs to ("" = the Server area)."""
+    sec = section(section_id)
+    return sec.group or (section(sec.parent).group if sec.parent else "")
 
 
 def requires_of(action: str) -> str:
@@ -319,6 +443,44 @@ DESCRIPTIONS: dict[str, str] = {
     "update-panel": "Downloads the newest version of this panel",
     "about": "Version, license and where to get help",
     "reboot": "Restarts the whole server",
+    # The cards of the platform homes that open a screen of the group.
+    "backup": "Backups of Koha's database, MARC21 exports, restore and cloud copies",
+    "import": "Imports records and patrons from other systems, with checks first",
+    "library": "Enrichment, authorities, reports, privacy and other catalogue tools",
+    "z3950": "Koha's Z39.50/SRU server and the catalogues for copy cataloguing",
+    "ai": "AI cataloguing and the AI assistant of the staff interface",
+    "opac": "The look of the public catalogue and of the staff interface",
+    "hub": "E-mail, WhatsApp, Telegram and SMS notices",
+    "search": "Zebra or Elasticsearch, and rebuilding the index",
+    "settings": "Server sizing and the super librarian account",
+    "diagnostics": "Health check, Apache log, database upkeep and Koha's services",
+    "koha-security": "Staff port, database password and Google Search Console",
+    "infra": "Docker, the web proxy and the key of the platform backups",
+    "tainacan-maintenance": "Diagnosis, logs and the WordPress administrator",
+    "tainacan-events": "Events, bookings and certificates in Tainacan: optional",
+    "tainacan-backups": "Back up, test a restore, restore, schedule and cloud copy",
+    # Tainacan, Docker and the platform backups (routines/platforms.py).
+    "tainacan-install": "Installs WordPress and Tainacan in containers, after its plan and a Yes",
+    "tainacan-status": "Checks the containers, WordPress, the plugin and the collections",
+    "tainacan-logs": "The latest lines of the containers' logs, secrets blanked",
+    "tainacan-credentials": "The WordPress account of Tainacan's administrators",
+    "tainacan-uninstall": "Removes Tainacan; you choose whether its data is kept",
+    "events-on": "Shows the plan, then turns on Nexus Eventos over Events Manager",
+    "events-off": "Turns events off and keeps their data",
+    "events-status": "Whether events are on, both plugins and the data kept",
+    "tainacan-backup": "A full backup of Tainacan now: database, files and configuration",
+    "tainacan-restore-test": "Restores a backup in an isolated copy and compares it, nothing else changes",
+    "tainacan-restore": "Replaces the Tainacan in use with a backup, tested first",
+    "pbackup-schedule": "A daily backup, weekly upkeep and a monthly restore test",
+    "pbackup-configure": "Where the files go (restic repository) and the copy in the cloud",
+    "pbackup-verify": "Checks the backups and the repository now",
+    "pbackup-incomplete": "Resumes or discards a backup that stopped before the end",
+    "docker-install": "Installs Docker after its plan and a Yes; nothing else changes",
+    "docker-remove": "Removes the Docker Koha.Nexus installed, only when nothing is left in it",
+    "pbackup-setup": "Makes the server key that encrypts the configuration in the backups",
+    "pbackup-kit": "Saves the recovery kit to copy away from this server",
+    "export-diagnostics": "Saves a report of this server to send to whoever helps you",
+    "open-diagnostics": "Reads a diagnostics report saved here or sent to you",
 }
 
 

@@ -118,6 +118,12 @@ Button.small {
 .action-card .action-text { text-style: bold; color: $text; }
 .action-card .action-hint { color: $text-muted; padding-top: 1; }
 
+/* Platform screens: zone titles, the removal zone apart, the problem line. */
+.zone-title { text-style: bold; color: $text; padding-top: 1; }
+.zone-removal .action-card { border: round $error 60%; }
+.zone-removal .action-card:focus { border: thick $error; }
+.platform-problem.-warn { color: $warning; text-style: bold; }
+
 /* ---- tables & forms ------------------------------------------------ */
 #tables {
     height: 20;
