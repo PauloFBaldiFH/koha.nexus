@@ -39,6 +39,7 @@ separada. Um host vazio precisa preparar a mesma release antes da recuperação.
 Tarefas, sob `config.sh --task dspace-panel`:
 - `backup-create --confirm`
 - `backup-list`
+- `backup-plan PACOTE` (decifra e valida em staging privado; não altera serviços)
 - `backup-test PACOTE --confirm`
 - `backup-restore PACOTE --confirm`
 - `backup-rollback --confirm`
@@ -52,7 +53,7 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## Validação
 
-- 87 testes unitários de imagens/runtime/formato aprovados localmente em Python
+- 89 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
 - Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: em andamento. Nada foi testado no servidor
   de Paulo. Não anunciar recuperação homologada antes da CI real.
@@ -60,3 +61,8 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
   download público com SHA-256, recusa anônima do privado e download autorizado.
 - Reboot completo, Debian/WSL/ARM, acervo grande, destinos externos e integração
   em conjuntos não estão comprovados nesta etapa.
+
+A restauração ativa exige um destino com banco legível para o backup de segurança.
+Para perda/corrupção do banco atual, preparar outra instalação da mesma matriz
+antes de recuperar. Volumes promovidos mantêm o prefixo de recuperação: não
+apagá-los pelo nome; o Compose ativo registra quais estão em uso.

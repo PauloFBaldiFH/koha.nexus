@@ -222,8 +222,10 @@ async def _recovery(app, restore):
     if not path: return
     phrase = await app.push_screen_wait(InputScreen(TITLE, t('Recovery phrase for the existing backup key:'), t('Recovery phrase:'), password=True))
     if not phrase: return
+    plan = await call(app, 'backup-plan', path, env={'KEI_BACKUP_PHRASE':phrase}) if restore else {}
+    if plan is None: return
     question = ('Restore DSpace? A safety backup is made first. Recovery is verified in independent volumes before replacing the active data. Old volumes are kept.' if restore else 'Test DSpace recovery in new volumes on an internal network without public ports? The active repository data are kept.')
-    if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question), danger=restore)): return
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question) + ('\n\n' + json.dumps(plan,ensure_ascii=False,indent=2) if restore else ''), danger=restore)): return
     result = await call(app, 'backup-restore' if restore else 'backup-test', path, '--confirm',
                         env={'KEI_BACKUP_PHRASE':phrase}, cancellable=False)
     phrase = ''

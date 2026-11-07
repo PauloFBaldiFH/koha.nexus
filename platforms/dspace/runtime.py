@@ -755,7 +755,7 @@ def main():
         sub.add_parser(name)
     for name in ('backup-create', 'backup-rollback'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
-    for name in ('backup-test', 'backup-restore'):
+    for name in ('backup-test', 'backup-restore', 'backup-plan'):
         child = sub.add_parser(name)
         child.add_argument('package')
         child.add_argument('--confirm', action='store_true')
@@ -781,6 +781,8 @@ def main():
             try:
                 if args.command == 'backup-list':
                     result = {'packages': [str(p) for p in sorted(recovery.home.glob('knx-dspace-*.tar.gpg'), reverse=True)]}
+                elif args.command == 'backup-plan':
+                    with runtime.lock(): result = recovery.plan(args.package)
                 else:
                     if not args.confirm: raise Refused('Review the recovery scope and use explicit --confirm.')
                     with runtime.lock():

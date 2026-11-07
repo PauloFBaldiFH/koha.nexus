@@ -195,7 +195,8 @@ class Recovery:
             atomic(tree / 'manifest.json', json.dumps(manifest, sort_keys=True))
             archive = work / 'capture.tar'
             with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT) as out:
-                for path in sorted(tree.rglob('*')):
+                for number,path in enumerate(sorted(tree.rglob('*')),1):
+                    if number > 1000000: raise Error('Too many archive entries for this recovery format.')
                     out.add(path, arcname=path.relative_to(tree).as_posix(), recursive=False)
             partial = destination.with_suffix('.part')
             try:
@@ -319,6 +320,20 @@ class Recovery:
             with self.clone(tree, manifest):
                 return {'verified':True, 'database':'all logical records', 'files':'all checksums',
                         'solr':'all cold cores', 'network':'none; shared loopback only', 'public_ports':False}
+
+    def plan(self, package):
+        state, compose = self.checked()
+        with self.opened(package) as (tree, manifest):
+            if manifest['images'] != {k:v['image'] for k,v in compose['services'].items()}:
+                raise Error('Recovery requires the exact installed image matrix.')
+            if manifest['url'] != state['url']:
+                raise Error('Cross-address recovery requires a separate migration.')
+            return {'platform':'dspace', 'release_sha256':manifest['release_sha256'],
+                'source_url':manifest['url'], 'destination_url':state['url'],
+                'files':len(manifest['files']), 'uncompressed_bytes':sum(v['bytes'] for v in manifest['files'].values()),
+                'safety_backup_required':True, 'destination_database_must_be_readable':True,
+                'old_volumes_preserved':True, 'repository_will_pause':True,
+                'isolated_verification_network':'none; shared loopback only'}
 
     def restore(self, package):
         from runtime import atomic, digest

@@ -238,4 +238,34 @@ class IsolatedConfiguration(unittest.TestCase):
         self.assertIn('127.0.0.1:5432',result)
         self.assertIn('mail.server.disabled = true',result)
 
+
+
+class RecoveryPlan(unittest.TestCase):
+    def test_plan_reports_scope_without_stopping_services(self):
+        import contextlib
+        from unittest.mock import Mock
+        rt=Mock(); rt.root=Path('/unused/dspace')
+        recovery=b.Recovery(rt)
+        recovery.checked=Mock(return_value=({'url':'http://repo.test'},{'services':{'postgres':{'image':'pinned'}}}))
+        @contextlib.contextmanager
+        def opened(package):
+            yield Path('/unused'),{'images':{'postgres':'pinned'},'url':'http://repo.test','release_sha256':'release','files':{'file':{'bytes':123}}}
+        recovery.opened=opened
+        plan=recovery.plan('package')
+        self.assertEqual(plan['uncompressed_bytes'],123)
+        self.assertTrue(plan['safety_backup_required'])
+        self.assertTrue(plan['old_volumes_preserved'])
+        rt.compose.assert_not_called(); rt.docker.assert_not_called()
+
+    def test_plan_rejects_another_image_matrix(self):
+        import contextlib
+        from unittest.mock import Mock
+        rt=Mock(); rt.root=Path('/unused/dspace'); recovery=b.Recovery(rt)
+        recovery.checked=Mock(return_value=({'url':'http://repo.test'},{'services':{'postgres':{'image':'pinned'}}}))
+        @contextlib.contextmanager
+        def opened(package): yield Path('/unused'),{'images':{'postgres':'different'}}
+        recovery.opened=opened
+        with self.assertRaises(b.Error): recovery.plan('package')
+        rt.compose.assert_not_called(); rt.docker.assert_not_called()
+
 if __name__ == '__main__': unittest.main()

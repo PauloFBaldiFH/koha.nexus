@@ -231,3 +231,11 @@ def test_dspace_only_backup_center_has_its_own_actions_without_writes(monkeypatc
             assert not cards & {'backup-manual','tainacan-backup','set-backup','restore-assisted'}
             assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-')) for name,args in calls)
     asyncio.run(exercise())
+
+
+def test_declining_recovery_plan_never_stops_the_repository(monkeypatch):
+    package='/var/backups/koha-nexus/dspace/sample.tar.gpg'
+    calls=mock_calls(monkeypatch,{'backup-list':{'packages':[package]},'backup-plan':{'old_volumes_preserved':True}})
+    app=App([package,'test-only recovery phrase',False])
+    asyncio.run(dspace.backup_restore(app))
+    assert [c[:2] for c in calls]==[('dspace-panel',('backup-list',)),('dspace-panel',('backup-plan',package))]
