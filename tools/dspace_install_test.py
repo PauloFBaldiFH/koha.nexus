@@ -77,6 +77,13 @@ def main():
         before = {name: module.digest(root / name) for name in ('db-password', 'local.cfg', 'compose.json')}
         schema = rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                             'SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
+        persistent_files = [('backend', '/dspace/assetstore/nexus-lifecycle-test'),
+                            ('solr', '/var/solr/nexus-lifecycle-test')]
+        for service, path in persistent_files:
+            rt.compose('exec', '-T', service, 'sh', '-ec', 'printf "%s" persistent-file > "$1"', 'nexus-ci', path)
+        def check_files(label):
+            for service, path in persistent_files:
+                check(rt.compose('exec', '-T', service, 'cat', path) == 'persistent-file', label + ': ' + service)
         # A sentinel proves the database is kept; it is a lab-only table, not a fake repository item.
         rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-v', 'ON_ERROR_STOP=1',
                    '-c', 'CREATE TABLE nexus_lifecycle_test(value text); INSERT INTO nexus_lifecycle_test VALUES (\'persistent\');')
@@ -85,6 +92,7 @@ def main():
         rt.control(True)
         check('persistent' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                                          'SELECT value FROM nexus_lifecycle_test'), 'database persists across stop/start')
+        check_files('files persist across stop/start')
         check(before == {name: module.digest(root / name) for name in before}, 'start neither rewrites secrets nor configuration')
         check(rt.state()['migration'] == 'done', 'start preserves completed migration marker')
         check(schema == rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
@@ -118,6 +126,7 @@ def main():
         check(rt.status()['status'] == 'installed', 'containers recover after Docker service restart')
         check('persistent' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                                          'SELECT value FROM nexus_lifecycle_test'), 'data persist after Docker restart')
+        check_files('files persist after Docker service restart')
         (output / 'dspace-acceptance.json').write_text(json.dumps(rt.diagnostic(), indent=2))
     except BaseException as error:
         # Only this disposable lab's generated credentials; never export raw inspect/config.
