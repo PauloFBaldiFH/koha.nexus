@@ -121,11 +121,20 @@ jobs:
       - name: Record resolved local image and inputs
         id: record
         if: success()
+        env:
+          CACHE_RESTORED: ${{ steps.runtime-cache.outputs.cache-hit }}
         run: |
+          mkdir -p "$RUNNER_TEMP/dspace-results"
           cp platforms/dspace/release.json "$RUNNER_TEMP/dspace-results/release.json"
           cp platforms/dspace/contract.json "$RUNNER_TEMP/dspace-results/contract.json"
           echo "tag=$(python tools/dspace_images.py tag '${{ matrix.image }}')" >> "$GITHUB_OUTPUT"
           docker image inspect "$(python tools/dspace_images.py tag '${{ matrix.image }}')" > "$RUNNER_TEMP/dspace-results/image.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          record = {"validation_commit": os.environ["GITHUB_SHA"], "image_archive_restored": os.environ["CACHE_RESTORED"] == "true"}
+          (Path(os.environ["RUNNER_TEMP"]) / "dspace-results" / "validation.json").write_text(json.dumps(record, indent=2))
+          PY
       - name: Generate component inventory
         uses: anchore/sbom-action@v0
         with:
