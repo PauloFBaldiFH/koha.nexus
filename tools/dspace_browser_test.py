@@ -131,6 +131,17 @@ def exercise(rt, output):
         context = browser.new_context(locale='en-US')
         context.route('**/*', lambda route: route.continue_() if urlsplit(route.request.url).hostname in ('repository.kei.test', '127.0.0.1') else route.abort())
         page = context.new_page(); page.set_default_timeout(60000)
+        agreement_observations = []
+        def observe_agreement(response):
+            # Only status and this fixed consent boolean, never account data.
+            if '/api/eperson/epersons/' not in response.url: return
+            try:
+                values = response.json().get('metadata', {}).get('dspace.agreements.end-user', [])
+                agreement_observations.append({'method': response.request.method, 'status': response.status,
+                    'accepted': [v.get('value') == 'true' for v in values]})
+            except Exception:
+                agreement_observations.append({'method': response.request.method, 'status': response.status})
+        page.on('response', observe_agreement)
         try:
             stage = 'browser login'
             page.goto(origin + '/login', wait_until='domcontentloaded')
@@ -231,7 +242,7 @@ def exercise(rt, output):
             try:
                 controls = page.locator('input').evaluate_all('(nodes) => nodes.map(n => ({type:n.type,id:n.id,name:n.name,label:n.getAttribute("aria-label")}))')
                 buttons = page.locator('button[id], button:visible').evaluate_all('(nodes) => nodes.map(n => ({id:n.id,text:n.textContent.trim().slice(0,80),disabled:n.disabled,ariaDisabled:n.getAttribute("aria-disabled")}))')
-                detail = json.dumps({'stage':stage,'buttons':buttons,'inputs':controls})[:4500]
+                detail = json.dumps({'stage':stage,'path':urlsplit(page.url).path,'agreement':agreement_observations[-12:],'buttons':buttons,'inputs':controls})[:4500]
                 print('::notice title=DSpace browser controls::' + detail.replace('%','%25').replace('\n','%0A').replace('\r','%0D'), flush=True)
             except Exception:
                 pass
