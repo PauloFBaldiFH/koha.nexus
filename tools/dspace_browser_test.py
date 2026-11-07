@@ -172,6 +172,25 @@ def exercise(rt, output, recovery_capture=None):
             # is after saving (CI 42411175345). Persistence is proven by REST
             # above; let the save settle, then open the submission.
             page.wait_for_load_state('networkidle', timeout=60000)
+            accepted_data = api.request(urlsplit(accepted.value.url).path)
+            check(any(v.get('value') == 'true' for v in accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])),
+                  'agreement remains saved after browser requests settle')
+            # The upstream submission guard reads the cached authenticated
+            # EPerson from its store. Use a fresh browser login after the
+            # independently verified UI save, rather than navigating with that
+            # old cache. Never set a consent cookie or patch agreement via API.
+            context.close()
+            context = browser.new_context(locale='en-US')
+            context.route('**/*', lambda route: route.continue_() if urlsplit(route.request.url).hostname in ('repository.kei.test', '127.0.0.1') else route.abort())
+            page = context.new_page(); page.set_default_timeout(60000)
+            page.on('response', observe_agreement)
+            stage = 'browser login'
+            page.goto(origin + '/login', wait_until='domcontentloaded')
+            page.locator('input[type=email]').fill(email)
+            page.locator('input[type=password]').fill(replacement)
+            page.locator('[data-test=login-button]').click()
+            page.wait_for_url(lambda url: '/login' not in url, timeout=60000)
+            consent = page.get_by_role('button', name="That's ok", exact=True)
             stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             # Upstream adds a literal ' *' to required field labels.
