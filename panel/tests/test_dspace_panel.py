@@ -123,7 +123,7 @@ def test_admin_password_is_hidden_and_only_sent_in_one_task_environment(monkeypa
     assert secret not in str(saved[:2])
     assert json.loads(saved[2]['env']['KEI_DSPACE_ADMIN_DATA'])['password']==secret
     assert len([s for s in app.screens if isinstance(s,InputScreen) and s._password])==2
-    assert all(secret not in getattr(s,'_text','') for s in app.screens)
+    assert all(secret not in getattr(s,'_body','') for s in app.screens)
 
 
 def test_postpone_and_close_never_configures_cloud_or_backup(monkeypatch):
@@ -164,4 +164,4 @@ def test_external_proxy_instructions_are_shown_before_setup(monkeypatch):
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
-    assert any(note in getattr(s,'_text','') for s in app.screens if isinstance(s,MessageScreen))
+    assert any(note in getattr(s,'_body','') for s in app.screens if isinstance(s,MessageScreen))
