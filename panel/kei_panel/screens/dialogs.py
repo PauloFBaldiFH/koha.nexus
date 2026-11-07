@@ -20,6 +20,20 @@ from ..tasks import TaskResult
 from ..widgets.copy import CopyButton
 
 
+
+def _focus_first(screen, selector):
+    """Focus a dialog's default control.
+
+    A dialog answered before its on_mount runs (a fast answer, or a test
+    answering right after the push) has already lost its children; there
+    is nothing left to focus then, which is not an error.
+    """
+    from textual.css.query import NoMatches
+    try:
+        screen.query_one(selector).focus()
+    except NoMatches:
+        pass
+
 class FitsScreen:
     """Keeps a dialog's buttons whole on a short terminal: its scrolling part
     (long text, log, list of options) gets only the rows left over by the
@@ -147,7 +161,7 @@ class ConfirmScreen(FitsScreen, CopyValues, ModalScreen[bool]):
                 yield Button(t("No"), id="no")
 
     def on_mount(self) -> None:
-        self.query_one("#no").focus()
+        _focus_first(self, "#no")
 
     @on(Button.Pressed, "#yes")
     def action_yes(self) -> None:
@@ -183,7 +197,7 @@ class ResultScreen(FitsScreen, ModalScreen[None]):
         log = self.query_one(RichLog)
         for line in self._result.log[-40:]:
             log.write(line)
-        self.query_one("#ok").focus()
+        _focus_first(self, "#ok")
 
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
@@ -336,7 +350,7 @@ class MessageScreen(FitsScreen, CopyValues, ModalScreen[Optional[str]]):
             log = self.query_one(RichLog)
             for line in self._log[-40:]:
                 log.write(line)
-        self.query_one("#ok").focus()
+        _focus_first(self, "#ok")
 
     @on(Button.Pressed, "#copy")
     def _copy(self) -> None:
@@ -386,7 +400,7 @@ class CredentialsScreen(FitsScreen, CopyValues, ModalScreen[None]):
                 yield Button(t("OK"), id="ok", variant="primary")
 
     def on_mount(self) -> None:
-        self.query_one("#ok").focus()
+        _focus_first(self, "#ok")
 
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
@@ -418,7 +432,7 @@ class TextScreen(FitsScreen, CopyValues, ModalScreen[None]):
                 yield Button(t("OK"), id="ok", variant="primary")
 
     def on_mount(self) -> None:
-        self.query_one("#ok").focus()
+        _focus_first(self, "#ok")
 
     @on(Button.Pressed, "#ok")
     def action_close(self) -> None:
@@ -484,7 +498,7 @@ class EditScreen(ModalScreen[bool]):
                 yield Button(t("Cancel"), id="cancel")
 
     def on_mount(self) -> None:
-        self.query_one("#editor").focus()
+        _focus_first(self, "#editor")
 
     @on(Button.Pressed, "#save")
     def action_save(self) -> None:
