@@ -127,7 +127,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 30 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 33 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
 * Compilação Java 21 e seis verificações do guard passaram localmente: recibo
@@ -149,7 +149,11 @@ ou URL pública funcionando só porque o processo Node iniciou.
   `-Ddspace.dir=/dspace` explícito. A rodada seguinte também revelou uma checagem nossa incorreta: o contrato
   upstream usa `_links.communities`, não `_links.core.communities`. Corrigidos
   o probe e o double, com referência ao teste `RootRestResourceControllerIT` da
-  tag fixada e negociação HAL explícita. Nova validação integrada pendente.
+  tag fixada e negociação HAL explícita. A instalação real chegou a `ready`,
+  API e UI pelo Apache passaram; o teste seguinte exigia `_embedded` numa lista
+  vazia, embora HAL possa omiti-lo. O teste passa a exigir paginação zerada e
+  link canônico da própria coleção. Persistência e reinício ainda aguardam
+  conclusão da rodada inteira.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),

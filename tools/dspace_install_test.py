@@ -55,7 +55,13 @@ def main():
             page = response.read().decode()
         check('<ds-app' in page and 'DSpace' in page, 'public production interface through Apache')
         with module.HTTP.open(public('/server/api/core/communities'), timeout=20) as response:
-            check('_embedded' in json.load(response), 'anonymous real community API')
+            page = json.load(response)
+        # HAL omits _embedded for an empty collection. Require its real
+        # pagination metadata and canonical self link instead of inventing it.
+        count = page.get('page', {}).get('totalElements')
+        href = page.get('_links', {}).get('self', {}).get('href', '')
+        check(count == 0 and href.startswith(origin + '/server/api/core/communities'),
+              'anonymous empty community API: total=%r, self=%r' % (count, href))
         # Simulate a disconnected client: its administrative container can live
         # on. Do not overlap a new install/start/stop with that still-running job.
         pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()

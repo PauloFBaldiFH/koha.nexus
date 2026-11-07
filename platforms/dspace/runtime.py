@@ -175,8 +175,27 @@ class Runtime:
             raise
 
     def state(self):
+        if self.root.name != 'dspace' or self.root.is_symlink():
+            raise Refused('Use a dedicated directory named dspace, not a system directory or symbolic link.')
+        expected_uid = os.geteuid() if self.lab else 0
+        if self.root.exists():
+            info = self.root.stat()
+            if info.st_uid != expected_uid or info.st_mode & 0o022:
+                raise Refused('The platform directory has an untrusted owner or writable group/world permissions.')
         path = self.root / 'state.json'
-        return read_json(path) if path.exists() else {}
+        if path.is_symlink():
+            raise Refused('The DSpace state file cannot be a symbolic link.')
+        if path.exists():
+            info = path.stat()
+            if not path.is_file() or info.st_uid != expected_uid or info.st_mode & 0o022:
+                raise Refused('The DSpace state file is not trusted; it was not adopted.')
+            data = read_json(path)
+            if not isinstance(data, dict) or not data:
+                raise Refused('The existing DSpace state is invalid/incomplete; inspect it before resuming.')
+            return data
+        if self.root.exists() and any(self.root.iterdir()):
+            raise Refused('The directory contains unregistered files without a DSpace journal; nothing was overwritten.')
+        return {}
 
     def mark(self, **changes):
         state = self.state()
@@ -190,6 +209,7 @@ class Runtime:
     def lock(self):
         if os.geteuid() != 0:
             raise Refused('Run this operation locally as root.')
+        self.state()  # validate the dedicated destination before mkdir/chmod
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.root.is_symlink() or self.root.stat().st_uid != 0:
             raise Refused('The DSpace directory must be owned by root and not a symbolic link.')

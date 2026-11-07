@@ -116,6 +116,29 @@ class RuntimeTests(unittest.TestCase):
             self.install()
         self.assertFalse(self.root.exists())
 
+    def test_unregistered_existing_configuration_is_never_overwritten(self):
+        self.root.mkdir()
+        file = self.root / 'local.cfg'
+        file.write_text('existing institutional configuration\n')
+        with self.assertRaisesRegex(ds.Refused, 'unregistered'):
+            self.install()
+        self.assertEqual(file.read_text(), 'existing institutional configuration\n')
+        self.assertFalse((self.root / 'state.json').exists())
+        self.assertEqual(self.rt.calls, [])
+
+    def test_system_directories_cannot_be_used_as_platform_root(self):
+        for root in ('/', '/etc', '/var/lib/koha-nexus'):
+            with self.subTest(root=root), self.assertRaisesRegex(ds.Refused, 'dedicated'):
+                ds.Runtime(root, self.catalog, lab=True).state()
+
+    def test_group_writable_state_directory_is_not_promoted_to_trusted(self):
+        self.root.mkdir()
+        self.root.chmod(0o777)
+        with self.assertRaisesRegex(ds.Refused, 'untrusted owner'):
+            self.install()
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o777)
+        self.assertFalse((self.root / 'state.json').exists())
+
     def test_catalog_rejects_floating_tags_even_in_lab(self):
         doc = json.loads(self.catalog.read_text())
         doc['images']['ui'] = 'nexus-dspace-ui:latest'
