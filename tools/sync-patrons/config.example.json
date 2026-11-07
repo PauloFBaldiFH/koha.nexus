@@ -1,0 +1,15 @@
+{
+  "koha_url": "https://biblioteca.exemplo.edu.br",
+  "library_id": "CENTRAL",
+  "default_category_id": "ALUNO",
+  "category_map": {
+    "Engenharia Civil": "ALUNO_GRAD",
+    "Direito": "ALUNO_GRAD",
+    "Medicina": "ALUNO_GRAD",
+    "Pedagogia": "ALUNO_LIC",
+    "Administração": "ALUNO_GRAD"
+  },
+  "max_restrictions": 50,
+  "log_file": "/var/log/koha-nexus/sync-patrons.log",
+  "lock_file": "/var/lock/koha-nexus-sync-patrons.lock"
+}

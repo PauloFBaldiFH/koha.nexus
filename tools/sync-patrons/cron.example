@@ -1,0 +1,6 @@
+# /etc/cron.d/koha-nexus-sync-patrons
+# Todo dia às 05:30 aplica a sincronização do CSV que o ERP exporta.
+# Use só depois de validar o dry-run (ver README.md).
+# Formato do /etc/cron.d: campo 6 = usuário que roda o comando.
+SHELL=/bin/sh
+30 5 * * * koha-nexus sh -c 'set -a; . /etc/koha-nexus/sync-patrons.env; set +a; exec /usr/bin/python3 /usr/local/share/koha-nexus/sync-patrons/sync_patrons.py /var/lib/koha-nexus/erp/alunos.csv -c /etc/koha-nexus/sync-patrons.json --apply' >> /var/log/koha-nexus/sync-patrons.cron.log 2>&1
