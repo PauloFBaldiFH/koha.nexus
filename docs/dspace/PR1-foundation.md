@@ -20,7 +20,7 @@ assets only. DSpace remains unavailable in the platform catalog.
 ## Local verification
 
 * Source fetch: both official release tags resolved to the locked commits.
-* Input tests: 17 passed on Python 3.9 and 17 passed on Python 3.13, including
+* Input tests: 18 passed on Python 3.9 and 18 passed on Python 3.13, including
   refused patches with wrong source/checksum/path and valid deterministic replay.
 * Existing platform/core regression selection: 148 passed, 1 skipped.
 * Entrypoint shell syntax and workflow YAML parsing passed.
@@ -51,7 +51,7 @@ The independent CI build jobs avoid accumulating all three builds on one runner.
 All three image builds and their smoke checks must pass on the exact PR commit.
 The dependency audit job also blocks high/critical findings. The upstream lock
 failed that gate; the reviewed dependency patch now passes locally with 0 high,
-0 critical, 4 moderate and 2 low findings. Angular framework versions stay on
+0 critical, 6 moderate and 2 low findings. Angular framework versions stay on
 20.3 (20.3.34); the patch and its exact input/output bytes are hashed. No `--force`
 or peer dependency bypass was used. The updated UI must rebuild and smoke-test
 on the exact PR commit before merging; the earlier image smoke is not evidence
@@ -68,6 +68,25 @@ source exporter also preserves tracked executable bits for other scripts.
 The smoke runner now reports stdout/stderr and names the failed assertion, rather
 than hiding the reason inside CalledProcessError. Backend full build remains
 blocked locally by handle.net access; confirm the result of the new CI run.
+
+## Follow-up for the UI compiler failure
+
+The public checks for commit d208624 show backend, Solr and production audit passed.
+The two failures are UI builds from push and pull_request events. Reproducing the
+same locked input locally failed with runtime imports of type-only symbols such
+as SimpleChanges and HttpEvent. Dependency resolution had introduced multiple
+incompatible instances of the Angular build plugin (20.3.34 and 20.3.42).
+
+The new patch preserves more upstream dependencies: 155 lock records change,
+instead of 1057. Framework/compiler security patches remain 20.3.34, while CLI,
+build-angular and ngtools/webpack are all fixed at upstream's 20.3.36, including
+custom-webpack's dependency. No application types, compiler checks, or audit
+thresholds were removed. Source preparation now refuses mixed nested build-tool
+versions, covered by a regression test.
+
+The aligned graph passes the production audit locally (0 high/critical), strict
+lockfile consistency checks and input tests. Its full image build and smoke must
+still pass before merging; do not substitute the earlier unpatched image results.
 
 ## Next implementation step
 

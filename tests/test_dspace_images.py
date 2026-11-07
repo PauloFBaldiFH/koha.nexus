@@ -166,6 +166,19 @@ class DSpaceInputs(unittest.TestCase):
             images.apply_ui_patch(path, changes)
             self.assertEqual(json.loads((path / 'package-lock.json').read_text()), outputs['package-lock.json'])
 
+    def test_preparation_rejects_mixed_nested_build_tools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            tools = ('@angular-devkit/build-angular', '@angular/cli', '@ngtools/webpack')
+            (path / 'package.json').write_text(json.dumps({'devDependencies': dict.fromkeys(tools, '20.3.36')}))
+            packages = {'node_modules/' + tool: {'version': '20.3.36'} for tool in tools}
+            (path / 'package-lock.json').write_text(json.dumps({'packages': packages}))
+            images.validate_ui_toolchain(path)
+            packages['node_modules/other/node_modules/@ngtools/webpack'] = {'version': '20.3.42'}
+            (path / 'package-lock.json').write_text(json.dumps({'packages': packages}))
+            with self.assertRaisesRegex(ValueError, 'Mixed Angular'):
+                images.validate_ui_toolchain(path)
+
 
 if __name__ == "__main__":
     unittest.main()

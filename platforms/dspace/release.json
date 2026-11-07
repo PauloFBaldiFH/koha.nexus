@@ -48,6 +48,6 @@
   },
   "ui_patch": {
     "file": "ui-dependencies.json",
-    "sha256": "039dd49b0c8cfcc6cca84b7c0d1309c94ab053db8d454b08cd34ee2b6db35ce7"
+    "sha256": "fec6e049a1b3ab3d2d90803959e1ecc41283781ec755d06c557feb42d1436855"
   }
 }

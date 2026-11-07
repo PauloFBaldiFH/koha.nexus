@@ -23,8 +23,9 @@ It explicitly says installation, backup and restore are not available yet.
 The backend/UI sources were released together on 2026-09-14. Their tags are
 checked against full commits before exporting tracked files. The reviewed
 `ui-dependencies.json` then updates only package.json/package-lock.json: Angular
-framework patches stay on 20.3, and permitted dependency ranges are resolved into
-a fixed lockfile. Patch bytes, input files and output files are sha256-checked;
+framework patches stay on 20.3, while build-angular, CLI and ngtools/webpack share
+the upstream 20.3.36 toolchain. The original graph is preserved where possible,
+instead of broadly updating unrelated dependencies. Patch bytes, input files and output files are sha256-checked;
 an old prepared source directory must be recreated. No `--force`, peer-dependency
 bypass, application-code patch or live dependency update during image startup.
 Digests were
@@ -112,7 +113,7 @@ smoke containers and records build metadata, image configuration and SPDX SBOM.
 It does **not** push images to any registry or deploy to a user's server.
 The separate production-dependency audit job blocks high/critical advisories;
 the original upstream lock failed that gate. The reviewed patch passes locally
-with 0 high/critical, 4 moderate and 2 low advisories (2026-11-06 client date).
+with 0 high/critical, 6 moderate and 2 low advisories (2026-11-06 client date).
 The dependency graph is still subject to future advisories and runtime review.
 
 Smoke checks deliberately have different meanings:

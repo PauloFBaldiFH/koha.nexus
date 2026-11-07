@@ -96,6 +96,19 @@ def apply_ui_patch(directory: Path, patch: dict) -> None:
         path.write_bytes(result)
 
 
+def validate_ui_toolchain(directory: Path) -> None:
+    package = json.loads((directory / 'package.json').read_text())
+    lock = json.loads((directory / 'package-lock.json').read_text())
+    tools = ('@angular-devkit/build-angular', '@angular/cli', '@ngtools/webpack')
+    versions = {package['devDependencies'][tool] for tool in tools}
+    if len(versions) != 1 or not re.fullmatch(r'\d+\.\d+\.\d+', next(iter(versions))):
+        raise ValueError('Angular build tools must use one exact version')
+    selected = next(iter(versions))
+    for path, entry in lock['packages'].items():
+        if any(path.endswith('/' + tool) for tool in tools) and entry.get('version') != selected:
+            raise ValueError('Mixed Angular build-tool versions in dependency graph')
+
+
 def validate_sources(data: dict, directory: Path) -> None:
     """Check exact exported contents, not an editable checkout with a matching HEAD."""
     stamp = json.loads((directory / "sources.json").read_text(encoding="utf-8"))
@@ -161,6 +174,7 @@ def prepare(data: dict, output: Path) -> None:
                 destination.chmod(0o755 if original.stat().st_mode & 0o111 else 0o644)
             shutil.rmtree(checkout)
         apply_ui_patch(stage / "ui-source", json.loads((BASE / data["ui_patch"]["file"]).read_text()))
+        validate_ui_toolchain(stage / "ui-source")
         (stage / "sources.json").write_text(json.dumps(source_stamp(data), indent=2) + "\n")
         (stage / "checksums.json").write_text(json.dumps(source_checksums(stage), sort_keys=True) + "\n")
         validate_sources(data, stage)
