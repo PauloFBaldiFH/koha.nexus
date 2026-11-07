@@ -158,10 +158,18 @@ ou URL pública funcionando só porque o processo Node iniciou.
   canônico na lista vazia, que pode omitir `_embedded`.
 * As proteções finais de porta pública e de contexto Docker também passaram
   nessa rodada real, no commit `5508297`. Os workflows de proxy, Tainacan real,
-  nexus_core, importação, Windows e site passaram nesse commit. A seleção do
-  painel passou em Python 3.13, mas falhou em Python 3.9; essa pendência ainda
-  está sendo investigada e bloqueia recomendar a mesclagem. A CI agora publica
-  o nome de cada teste falho sem expor o conteúdo completo dos logs.
+  nexus_core, importação, Windows e site passaram nesse commit.
+* A seleção completa do workflow do painel passou localmente em Python 3.9:
+  171 testes, em 483 segundos. A [nova rodada da CI](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42381485150)
+  passou em Python 3.9 e 3.13. Uma rodada anterior falhou apenas em 3.9, sem
+  detalhe disponível nos logs públicos. A falha não se reproduziu localmente ou
+  na nova rodada, sem alterar código/testes do painel; sua causa não foi
+  identificada. A CI agora publica o nome de cada teste falho, sem expor o
+  conteúdo completo dos logs, para permitir investigar uma eventual recorrência.
+* Depois do código validado em `5508297`, os commits seguintes só acrescentam
+  diagnóstico à CI e documentação; não modificam o instalador ou as imagens.
+  A repetição disparada pela atualização do README é a [rodada 42381518138](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42381518138).
+  Conferir também os checks do próprio PR antes de mesclar.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),
