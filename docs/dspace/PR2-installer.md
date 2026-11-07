@@ -146,7 +146,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
   reinício do serviço Docker. Também adultera o histórico Flyway num banco de
   laboratório para exigir recusa do backend sem alterações automáticas.
   Não chamar isso de reboot da máquina.
-* A rodada real [42367863941](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42367863941)
+* A rodada real [42369454536](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42369454536)
   passou por inteiro: instalação, API e interface pelo Apache, volumes de banco,
   assetstore e Solr preservados após recriar contêineres e após reiniciar o Docker,
   além da recusa por histórico de migração alterado. As imagens passaram smoke
@@ -156,8 +156,12 @@ ou URL pública funcionando só porque o processo Node iniciou.
   e exige os arquivos essenciais no build e no smoke. O teste também foi alinhado
   ao contrato HAL upstream: relação `_links.communities` na raiz e paginação/link
   canônico na lista vazia, que pode omitir `_embedded`.
-* As proteções finais de porta pública e de contexto Docker têm testes unitários;
-  a rodada da revisão final deve ser conferida pelo commit antes da mesclagem.
+* As proteções finais de porta pública e de contexto Docker também passaram
+  nessa rodada real, no commit `5508297`. Os workflows de proxy, Tainacan real,
+  nexus_core, importação, Windows e site passaram nesse commit. A seleção do
+  painel passou em Python 3.13, mas falhou em Python 3.9; essa pendência ainda
+  está sendo investigada e bloqueia recomendar a mesclagem. A CI agora publica
+  o nome de cada teste falho sem expor o conteúdo completo dos logs.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),
@@ -165,3 +169,19 @@ domínios/túnel/atualização (PR 6). Ainda não homologados aqui: Debian 12/13
 conjunto DSpace, reboot real, coexistência com Koha e Tainacan reais, WSL, ARM,
 acervo grande, operação prolongada e download público do catálogo promovido.
 Não existe homologação de produção ou validação no servidor do Paulo.
+
+## Continuidade da revisão
+
+Branch remota: `feat/dspace-isolated-installer`, baseada na main após #347 e
+preservando os módulos Koha mesclados depois dele. Título sugerido:
+`Add isolated experimental DSpace installer and lifecycle`.
+[Abrir comparação/PR](https://github.com/PauloFBaldiFH/koha.nexus/compare/main...feat/dspace-isolated-installer?expand=1).
+A API do GitHub recusou a criação automática do PR neste ambiente; a branch e a
+documentação foram enviadas normalmente por Git. Não houve mesclagem automática.
+
+Depois da revisão/mesclagem, a próxima entrega é o PR 3. Além do grupo/aba DSpace,
+ela deve incluir pré-requisitos assistidos, criação segura de administrador,
+assistente agora/depois, integração do cache verificado do adaptador à atualização
+do painel e provas reais de depósito/consulta e acesso privado. Não basta marcar
+o catálogo como suportado porque a tarefa CLI experimental passou. As lacunas de
+reboot, sistemas e coexistência devem continuar explícitas até teste real.
