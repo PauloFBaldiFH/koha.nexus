@@ -146,35 +146,34 @@ def exercise(rt, output):
             page.locator('[data-test=login-button]').click()
             page.wait_for_url(lambda url: '/login' not in url, timeout=60000)
             check(True, 'real browser signs in with the chosen password')
+            # The disposable CI account has never accepted the upstream user
+            # agreement. Open that page directly: reaching it through the
+            # submission guard races (SSR renders the form, then the client
+            # redirects), which skipped the step in CI 42393966821/42408439330.
+            stage = 'disposable account user agreement'
+            consent = page.get_by_role('button', name="That's ok", exact=True)
+            page.goto(origin + '/info/end-user-agreement', wait_until='domcontentloaded')
+            # The upstream checkbox is a styled, visually hidden input.
+            agreement = page.locator('#user-agreement-accept')
+            agreement.wait_for(state='attached', timeout=90000)
+            if consent.is_visible(): consent.click()
+            agreement.check(force=True)
+            save = page.locator('#button-save')
+            expect(save).not_to_have_attribute('aria-disabled', 'true', timeout=30000)
+            with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
+                save.click()
+            check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
+            accepted_data = api.request(urlsplit(accepted.value.url).path)
+            agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
+            check(any(v.get('value') == 'true' for v in agreement_values), 'agreement acceptance is actually saved')
+            # The upstream component performs a hard redirect after PATCH.
+            # Do not cancel it by immediately issuing another page.goto().
+            page.wait_for_url(lambda url: '/end-user-agreement' not in url, timeout=60000)
+            page.wait_for_load_state('domcontentloaded')
             stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             # Upstream adds a literal ' *' to required field labels.
             title_input = page.get_by_label(re.compile(r'^Title\s*\*?$'))
-            agreement = page.locator('#user-agreement-accept')
-            # The upstream agreement checkbox is a styled, visually hidden input,
-            # so it is waited for as attached (not visible) and checked by force.
-            expect(agreement.or_(title_input).first).to_be_attached(timeout=90000)
-            consent = page.get_by_role('button', name="That's ok", exact=True)
-            if consent.is_visible(): consent.click()
-            # Decide by the rendered control, not page.url: the guard can render
-            # the agreement before the router updates the address (CI 42408439330).
-            if agreement.count() > 0 and title_input.count() == 0:
-                stage = 'disposable account user agreement'
-                agreement.wait_for(state='attached', timeout=60000)
-                agreement.check(force=True)
-                save = page.locator('#button-save')
-                expect(save).not_to_have_attribute('aria-disabled', 'true', timeout=30000)
-                with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
-                    save.click()
-                check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
-                accepted_data = api.request(urlsplit(accepted.value.url).path)
-                agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
-                check(any(v.get('value') == 'true' for v in agreement_values), 'agreement acceptance is actually saved')
-                # The upstream component performs a hard redirect after PATCH.
-                # Do not cancel it by immediately issuing another page.goto().
-                page.wait_for_url(lambda url: '/end-user-agreement' not in url, timeout=60000)
-                if '/workspaceitems/' + wid + '/edit' not in page.url:
-                    page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             stage = 'submission title field'
             expect(title_input).to_be_visible(timeout=60000)
             if consent.is_visible(): consent.click()
