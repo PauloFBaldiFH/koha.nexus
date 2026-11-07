@@ -72,7 +72,7 @@ class Section:
 
 # The platform groups of the sidebar, in order: the id of the platform's
 # home section, which is also the group's name.
-GROUPS = ("koha", "tainacan")
+GROUPS = ("koha", "tainacan", "dspace")
 
 SECTIONS: tuple[Section, ...] = (
     # State, addresses and indicators of the server and of each platform
@@ -243,6 +243,24 @@ SECTIONS: tuple[Section, ...] = (
         Entry("⏸  Turn events off", "events-off", kind="native"),
         Entry("📋  Events state", "events-status", kind="native"),
     ), view="platform-section", requires="tainacan", group="tainacan"),
+    Section("dspace", "🏛  DSpace (repository)", "🏛  DSpace (repository)", entries=(
+        Entry("📦  Install or resume DSpace", "dspace-install", kind="native", zone="setup"),
+        Entry("▶  Start DSpace", "dspace-start", kind="native", zone="recovery", requires="dspace"),
+        Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native", zone="recovery", requires="dspace"),
+        Entry("📜  DSpace logs", "dspace-logs", kind="native", zone="recovery", requires="dspace"),
+        Entry("🧭  Continue the setup", "setup-dspace", kind="native", requires="dspace"),
+        Entry("🔐  Administrative access", "dspace-admin", kind="native", requires="dspace"),
+        Entry("🩺  DSpace diagnosis & maintenance", "dspace-maintenance", kind="view"),
+        Entry("📖  DSpace first steps", "dspace-help", kind="native", requires="dspace"),
+    ), view="platform-home", key="j", group="dspace"),
+    Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
+        Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native"),
+        Entry("📜  DSpace logs", "dspace-logs", kind="native"),
+        Entry("▶  Start DSpace", "dspace-start", kind="native"),
+        Entry("⏹  Stop DSpace", "dspace-stop", kind="native"),
+        Entry("📖  DSpace first steps", "dspace-help", kind="native"),
+    ), view="platform-section", requires="dspace", group="dspace"),
+
     # ---------------- Server: shared by every platform ----------------
     # Every backup in one place (Paulo, 2026-11-06): the platform is chosen
     # at the top (Koha, Tainacan; only the installed ones), each card shows
@@ -342,6 +360,7 @@ def section(section_id: str) -> Section:
 # installer tasks (--task), none is a classic --run routine. The task a card
 # needs from the installer in use, or its card is not drawn.
 PLATFORM_TASKS: dict[str, str] = {
+    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace")},
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",

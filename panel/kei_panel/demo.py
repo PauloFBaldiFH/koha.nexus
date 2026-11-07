@@ -922,6 +922,24 @@ def _admin_lines(name: str, args: tuple[str, ...]) -> list[str] | None:
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
+    if name == "dspace-panel":
+        import base64
+        import os
+        command = args[0] if args else "status"
+        data = {"status": "installed" if os.environ.get("KEI_PANEL_DEMO_DSPACE") == "1" else "absent",
+                "phase": "ready", "url": "http://192.168.1.20:8100"}
+        if command == "availability":
+            data = {"available": False, "reason": "Demo: no reviewed production image catalog."}
+        elif command == "setup-status":
+            data = {"setup": "none"}
+        elif command == "admin-status":
+            data = {"state": "own", "admins": ["admin@example.org"]}
+        elif command == "logs":
+            data = {"logs": "Demo: no real logs."}
+        elif command in ("admin-create", "admin-password"):
+            data = {"changed": True}
+        out.feed("@@result payload=" + base64.b64encode(json.dumps(data).encode()).decode(), reporter, on_result)
+        return out
     if name == "run":
         lines = [ln.replace("{tmp}", _demo_tmp()) for ln in _RUN.get(args[0] if args else "", _RUN_DEFAULT)]
         args = ()

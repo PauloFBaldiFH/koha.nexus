@@ -8,6 +8,7 @@ immutable image catalog. Local image IDs require the explicit laboratory flag.
 """
 
 import argparse
+import base64
 import contextlib
 import fcntl
 import hashlib
@@ -768,7 +769,7 @@ def main():
         else:
             result = runtime.status()
         if args.protocol:
-            print('@@result json=' + json.dumps(result, ensure_ascii=True))
+            print('@@result payload=' + base64.b64encode(json.dumps(result, ensure_ascii=True).encode()).decode())
         else:
             print(json.dumps(result, indent=2))
         return 0

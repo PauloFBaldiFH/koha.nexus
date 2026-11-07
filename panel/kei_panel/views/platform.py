@@ -120,7 +120,7 @@ class PlatformSectionView(SectionView):
                 backups = platforms.BackupState()
         setup = {}
         group = self.section.group
-        if self.section.view == "platform-home" and group in (platforms.KOHA, platforms.TAINACAN):
+        if self.section.view == "platform-home" and group in (platforms.KOHA, platforms.TAINACAN, platforms.DSPACE):
             from ..routines.setup import read_setup
             found = await read_setup(app, group, quick=True)
             if found is not None and found.open:
@@ -181,6 +181,8 @@ class PlatformHomeView(PlatformSectionView):
         return platforms.home_mode(self.section.group, facts)
 
     def problem(self, facts: platforms.Facts, mode: str) -> str:
+        if self.section.group == platforms.DSPACE:
+            return platforms.dspace_problem(facts)
         if self.section.group == platforms.KOHA:
             return platforms.koha_problem(facts)
         return platforms.tainacan_problem(facts)

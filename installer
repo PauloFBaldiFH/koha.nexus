@@ -12438,7 +12438,7 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="12a820b02a4e387f47098ce5d5855f66267032f054b1d6807770aba36cac6f8e"
+KEI_DSPACE_RUNTIME_SHA="2621067c61cab724698a065f0c37d30befde71b5d61bac9437b86d91ef855cc3"
 KEI_DSPACE_RELEASE_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 
 kei_dspace_runtime() (
@@ -17292,6 +17292,11 @@ function_autoupdate() {
 
     if mv -f "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target"; then
         log "panel updated from version $PANEL_VERSION to $remote_version (SHA-256 verified, ${UPDATE_COMMIT:-branch})"
+        if [ -f "$KEI_DSPACE_DIR/state.json" ]; then
+            # Run the newly verified script: its own hashes bind the adapter.
+            bash "$target" --task dspace-cache </dev/null >/dev/null 2>&1 \
+                || log "DSpace adapter cache could not be refreshed; connect and retry config.sh --task dspace-cache before offline use. Existing cache/data were preserved."
+        fi
         # Dictionaries are downloaded again on the next start (they are now
         # older than the panel); the bundled copy is dropped to force it.
         rm -f "${CONFIG_DIR}/lang/${SYS_LANG}.cache" 2>/dev/null || true

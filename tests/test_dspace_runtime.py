@@ -401,6 +401,46 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn('Configure the external proxy', result['note'])
         self.assertEqual(self.rt.status()['public_access'], 'not-checked')
 
+    def test_admin_password_is_stdin_only_and_not_stored(self):
+        self.install()
+        request = dict(email='admin@example.org', first='Ada', last='Lovelace', language='pt_BR', password='Private-password-123')
+        with patch.object(self.rt, 'compose', return_value='NEXUS_ADMIN_JSON={"changed":true}\n') as compose:
+            self.rt.admin('create', request)
+            self.assertNotIn(request['password'], str(compose.call_args.args))
+            self.assertIn(request['password'], compose.call_args.kwargs['input_text'])
+            self.assertFalse(compose.call_args.kwargs['log_failure'])
+        for path in self.root.iterdir():
+            if path.is_file():self.assertNotIn(request['password'], path.read_text())
+        self.assertTrue(self.rt.state()['admin_ready'])
+
+    def test_admin_rejects_control_characters_before_container_is_started(self):
+        self.install()
+        with patch.object(self.rt, 'compose') as compose, self.assertRaises(ds.Refused):
+            self.rt.admin('create', dict(email='a@example.org', first='Name', last='Last', language='en', password='longpassword\nInjected'))
+        compose.assert_not_called()
+
+    def test_admin_failure_is_not_saved_as_success(self):
+        self.install()
+        with patch.object(self.rt, 'compose', side_effect=ds.Refused('refused')), self.assertRaises(ds.Refused):
+            self.rt.admin('password', dict(email='a@example.org', password='longpassword'))
+        self.assertFalse(self.rt.state().get('admin_ready'))
+
+    def test_setup_postponement_and_closing_preserve_services_and_configuration(self):
+        self.install()
+        before = {name: ds.digest(self.root / name) for name in ('db-password', 'local.cfg', 'compose.json')}
+        self.assertEqual(self.rt.setup('status')['steps']['admin'], 'pending')
+        self.rt.setup('mark', 'admin', 'later')
+        self.assertEqual(self.rt.setup('status')['steps']['admin'], 'later')
+        self.rt.setup('close')
+        self.assertEqual(self.rt.setup('status'), {'setup':'none'})
+        self.assertEqual(self.rt.state()['status'], 'installed')
+        self.assertEqual(before, {name: ds.digest(self.root / name) for name in before})
+
+    def test_setup_cannot_claim_a_backup_is_configured(self):
+        self.install()
+        with self.assertRaises(ds.Refused):self.rt.setup('mark', 'backup', 'done')
+        self.assertEqual(self.rt.setup('status')['steps']['backup'], 'pending')
+
     def test_installer_adapter_hashes_match_and_task_is_present(self):
         text = (REPO / 'installer').read_text()
         for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json')):
