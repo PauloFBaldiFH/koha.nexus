@@ -139,7 +139,7 @@ def exercise(rt, output):
             page.locator('[data-test=login-button]').click()
             page.wait_for_url(lambda url: '/login' not in url, timeout=60000)
             check(True, 'real browser signs in with the chosen password')
-            stage = 'browser deposit form'
+            stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             # Upstream adds a literal ' *' to required field labels.
             title_input = page.get_by_label(re.compile(r'^Title\s*\*?$'))
@@ -150,10 +150,18 @@ def exercise(rt, output):
             if agreement.is_visible():
                 stage = 'disposable account user agreement'
                 agreement.check()
-                page.locator('#button-save').click()
-                expect(agreement).not_to_be_visible(timeout=60000)
-                page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
-            stage = 'browser deposit form'
+                with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
+                    page.locator('#button-save').click()
+                check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
+                accepted_data = accepted.value.json()
+                agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
+                check(any(v.get('value') == 'true' for v in agreement_values), 'agreement acceptance is actually saved')
+                # The upstream component performs a hard redirect after PATCH.
+                # Do not cancel it by immediately issuing another page.goto().
+                page.wait_for_url(lambda url: '/end-user-agreement' not in url, timeout=60000)
+                if '/workspaceitems/' + wid + '/edit' not in page.url:
+                    page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
+            stage = 'submission title field'
             expect(title_input).to_be_visible(timeout=60000)
             if consent.is_visible(): consent.click()
             stage = 'browser metadata edit'
@@ -228,6 +236,15 @@ def exercise(rt, output):
             except Exception:
                 pass
             # A Playwright fill error can echo its input in the exception text.
+            # Login failures remain opaque. Later fixed-fixture assertions can
+            # expose the failed locator after all known secrets are removed.
+            if stage != 'browser login':
+                reason = str(error)
+                for value in (password, replacement, (rt.root / 'db-password').read_text().strip()):
+                    reason = reason.replace(value, '[redacted]')
+                reason = re.sub(r'(?im)^.*(?:password|authorization|token).*$','[sensitive line omitted]',reason)
+                reason = reason[-4500:].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+                print('::notice title=DSpace fixture failure::' + reason, flush=True)
             raise RuntimeError('DSpace browser acceptance failed at %s (%s)' % (stage, type(error).__name__)) from None
         finally:
             context.close(); browser.close()
