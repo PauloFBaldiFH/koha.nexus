@@ -52,7 +52,7 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## Validação
 
-- 83 testes unitários de imagens/runtime/formato aprovados localmente em Python
+- 84 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
 - Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: em andamento. Nada foi testado no servidor
   de Paulo. Não anunciar recuperação homologada antes da CI real.

@@ -63,10 +63,16 @@ class ArchiveTests(unittest.TestCase):
 
     def test_dump_fingerprint_ignores_only_random_session_markers(self):
         p=self.root/'a'; q=self.root/'b'
-        p.write_text('-- time A\n\\restrict randomA\nINSERT INTO t VALUES (1);\n\\unrestrict randomA\n')
-        q.write_text('-- time B\n\\restrict randomB\nINSERT INTO t VALUES (1);\n\\unrestrict randomB\n')
+        p.write_text('-- header\n\\restrict randomA\nINSERT INTO t VALUES (1);\n\\unrestrict randomA\n')
+        q.write_text('-- header\n\\restrict randomB\nINSERT INTO t VALUES (1);\n\\unrestrict randomB\n')
         self.assertEqual(b.normalized_dump(p),b.normalized_dump(q))
         q.write_text('INSERT INTO t VALUES (2);\n'); self.assertNotEqual(b.normalized_dump(p),b.normalized_dump(q))
+
+    def test_sql_string_lines_that_look_like_comments_are_still_compared(self):
+        p=self.root/'a'; q=self.root/'b'
+        p.write_text("INSERT INTO t VALUES ('first\n-- original data\nlast');\n")
+        q.write_text("INSERT INTO t VALUES ('first\n-- changed data\nlast');\n")
+        self.assertNotEqual(b.normalized_dump(p), b.normalized_dump(q))
 
     def test_corrupt_ciphertext_refused_before_decryption(self):
         class RT: root=self.root

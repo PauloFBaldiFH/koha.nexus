@@ -385,10 +385,14 @@ class Recovery:
 
 
 def normalized_dump(path):
-    """Ignore pg_dump comments/session boilerplate; compare actual SQL data."""
-    h = hashlib.sha256()
+    """Only the random pg_dump restriction key changes; preserve every data byte."""
+    h = hashlib.sha256(); key = None
     with open(path, 'rb') as stream:
         for line in stream:
-            if line.startswith((b'--', b'\\restrict ', b'\\unrestrict ')) or not line.strip(): continue
+            if key is None and line.startswith(b'\\restrict '):
+                key = line[len(b'\\restrict '):].strip()
+                continue
+            if key and line.rstrip(b'\r\n') == b'\\unrestrict ' + key:
+                continue
             h.update(line)
     return h.hexdigest()
