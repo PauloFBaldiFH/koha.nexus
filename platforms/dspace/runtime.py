@@ -133,13 +133,14 @@ def command(args, timeout=60, input_text=None, env=None):
 
 
 class Runtime:
-    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None):
+    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None):
         self.root = Path(root).absolute()
         self.release = read_json(BASE / 'release.json')
         self.release_hash = digest(BASE / 'release.json')
         self.catalog_path = Path(catalog or '/etc/koha-nexus/dspace-images.json')
         self.lab = lab
         self.driver = driver
+        self.progress = progress
 
     def docker(self, *args, timeout=60, input_text=None, log_failure=True):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
@@ -182,6 +183,8 @@ class Runtime:
         state.update(changes)
         state['updated_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         atomic(self.root / 'state.json', json.dumps(state, indent=2) + '\n')
+        if changes.get('phase') and self.progress:
+            self.progress(changes['phase'])
 
     @contextlib.contextmanager
     def lock(self):
@@ -601,7 +604,8 @@ def main():
     for name in ('status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
     args = parser.parse_args()
-    runtime = Runtime(args.root, args.catalog, args.lab, args.driver)
+    runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
+                      progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True))
     def interrupted(signum, _frame):
         raise Refused('Interrupted; data were preserved. Review the saved phase before resuming.')
     signal.signal(signal.SIGTERM, interrupted)

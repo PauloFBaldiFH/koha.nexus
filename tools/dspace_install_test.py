@@ -31,7 +31,8 @@ def main():
     output = Path(os.environ['RUNNER_TEMP'])
     catalog = output / 'dspace-test-images.json'
     catalog.write_text(subprocess.check_output([sys.executable, str(REPO / 'tools/dspace_catalog.py')], text=True))
-    rt = module.Runtime(root, catalog, lab=True, driver=str(REPO / 'installer'))
+    rt = module.Runtime(root, catalog, lab=True, driver=str(REPO / 'installer'),
+                        progress=lambda phase: print('::notice title=DSpace phase::' + phase, flush=True))
     def check(cond, message):
         if not cond:
             raise AssertionError(message)
