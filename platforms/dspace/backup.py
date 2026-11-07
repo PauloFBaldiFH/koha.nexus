@@ -298,10 +298,11 @@ class Recovery:
             # Run only the schema/admin check, never a persistent REST worker in
             # the isolated verification copy.
             dc('run','--rm','--no-deps','-T','backend','admin','status', timeout=240)
-            cores = json.loads(dc('exec','-T','solr','curl','-fsS','--max-time','10',
-                'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
-            if cores.get('initFailures') or not set(manifest['cores']) <= set(cores.get('status',{})):
-                raise Error('Not all restored Solr cores loaded.')
+            def cores_ready():
+                cores = json.loads(dc('exec','-T','solr','curl','-fsS','--max-time','10',
+                    'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
+                return not cores.get('initFailures') and set(manifest['cores']) <= set(cores.get('status',{}))
+            self.rt.wait('All restored Solr cores', cores_ready)
             yield dict(area=area, project=project, compose=compose, manifest=manifest, promoted=promoted)
         finally:
             dc('down', '--timeout','90')
@@ -357,7 +358,7 @@ class Recovery:
                     self.rollback()
                     raise
                 finally:
-                    if self.rt.state().get('phase') == 'ready': shutil.rmtree(rollback)
+                    if json.loads(self.journal.read_text()).get('phase') == 'complete': shutil.rmtree(rollback)
                 return {'restored':True, 'safety_backup':safety['package'], 'old_volumes_preserved':True}
 
     def rollback(self):
