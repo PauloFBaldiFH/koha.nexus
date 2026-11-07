@@ -194,6 +194,10 @@ class RuntimeTests(unittest.TestCase):
         self.assertNotIn('ports', compose['services']['solr'])
         self.assertTrue(compose['networks']['platform']['external'])
         self.assertEqual(compose['services']['ui']['environment']['DSPACE_REST_SSL'], 'true')
+        # Restricting an item must not leave it readable in cached SSR pages.
+        ui_env = compose['services']['ui']['environment']
+        self.assertEqual(ui_env['DSPACE_CACHE_SERVERSIDE_BOTCACHE_MAX'], '0')
+        self.assertEqual(ui_env['DSPACE_CACHE_SERVERSIDE_ANONYMOUSCACHE_MAX'], '0')
         self.assertEqual(compose['services']['ui']['networks']['platform']['ipv4_address'], '172.30.10.10')
         self.assertIn('proxies.trusted.include_ui_ip = false', cfg)
         self.assertIn('proxies.trusted.ipranges = 127.0.0.1, 172.30.10.1, 172.30.10.10', cfg)

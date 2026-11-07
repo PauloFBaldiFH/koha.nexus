@@ -380,6 +380,12 @@ class Runtime:
                             'DSPACE_REST_HOST': u.hostname, 'DSPACE_REST_PORT': str(u.port or (443 if u.scheme == 'https' else 80)),
                             'DSPACE_REST_SSL': str(u.scheme == 'https').lower(), 'DSPACE_REST_NAMESPACE': '/server',
                             'DSPACE_REST_SSRBASEURL': 'http://backend:8080/server',
+                            # Upstream caches server-rendered pages for bots (and,
+                            # if enabled, anonymous users) for up to a day, so an
+                            # item restricted later stayed readable in that HTML
+                            # (CI 42414226228). Never serve cached access decisions.
+                            'DSPACE_CACHE_SERVERSIDE_BOTCACHE_MAX': '0',
+                            'DSPACE_CACHE_SERVERSIDE_ANONYMOUSCACHE_MAX': '0',
                             'NODE_OPTIONS': '--max-old-space-size=1024'},
             'depends_on': {'backend': {'condition': 'service_started'}}})
         compose = {'name': PROJECT, 'services': services,
