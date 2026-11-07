@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -223,6 +224,39 @@ class RuntimeTests(unittest.TestCase):
             self.rt.control(True)
         self.assertFalse(self.root.exists())
 
+    def test_start_cannot_bypass_failed_install_proxy(self):
+        self.rt.failure = 'proxy'
+        with self.assertRaises(ds.Refused):
+            self.install()
+        self.rt.failure = None
+        with self.assertRaisesRegex(ds.Refused, 'resume'):
+            self.rt.control(True)
+
+    def test_failed_migration_can_be_stopped_without_erasing_data(self):
+        self.rt.failure = 'migration'
+        with self.assertRaises(ds.Refused):
+            self.install()
+        self.rt.control(False)
+        self.assertEqual(self.rt.state()['intended'], 'stopped')
+        self.assertEqual(len(self.rt.volumes), len(ds.VOLUMES))
+
+    def test_private_failure_log_redacts_credentials_and_is_not_in_status(self):
+        import subprocess
+        self.install()
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        rt._mutating = True
+        password = (self.root / 'db-password').read_text().strip()
+        failed = ds.OperationFailed('docker', subprocess.CompletedProcess([], 1, 'Safe detail\n' + password, 'password=other\n'))
+        with patch.object(ds, 'command', side_effect=failed), self.assertRaises(ds.Refused):
+            rt.docker('compose', 'run')
+        log = (self.root / 'last-error.log').read_text()
+        self.assertIn('Safe detail', log)
+        self.assertNotIn(password, log)
+        self.assertNotIn('password=other', log)
+        self.assertEqual((self.root / 'last-error.log').stat().st_mode & 0o777, 0o600)
+        with patch.object(rt, 'docker', side_effect=ds.Refused('offline')):
+            self.assertNotIn('Safe detail', json.dumps(rt.status()))
+
     def test_proxy_api_rule_precedes_interface_and_operational_paths_are_denied(self):
         self.install()
         config = self.rt.proxy_config()
@@ -251,6 +285,31 @@ class RuntimeTests(unittest.TestCase):
         for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json')):
             self.assertIn('KEI_DSPACE_' + var + '_SHA="' + ds.digest(ds.BASE / file) + '"', text)
         self.assertIn('dspace) kei_dspace_runtime "$@"', text)
+
+    def bridge_script(self, tail):
+        text = (REPO / 'installer').read_text()
+        section = text[text.index('# DSPACE: experimental lifecycle'):text.index('# TAINACAN (WordPress')]
+        fragment = Path(self.tmp.name) / 'bridge.sh'
+        fragment.write_text(section)
+        env = dict(os.environ, KEI_DSPACE_ADAPTER_DIR=str(Path(self.tmp.name) / 'adapter'),
+                   KEI_DSPACE_DIR=str(self.root), _SCRIPT_DIR=str(REPO), _SCRIPT_PATH=str(REPO / 'installer'))
+        return subprocess.run(['bash', '-c', 'source "$1"; python3() { echo adapter-loaded; }; '
+                               'id() { echo 0; }; curl() { return 88; }; ' + tail,
+                               'bridge-test', str(fragment)], env=env, text=True, capture_output=True)
+
+    def test_installed_adapter_works_offline_without_checkout(self):
+        result = self.bridge_script('kei_dspace_runtime install --confirm || exit; '
+                                    '_SCRIPT_DIR=/missing-checkout; kei_dspace_runtime status')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count('adapter-loaded'), 2)
+
+    def test_tampered_offline_adapter_never_executes(self):
+        result = self.bridge_script('kei_dspace_runtime install --confirm || exit; '
+                                    '_SCRIPT_DIR=/missing-checkout; '
+                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA/runtime.py"; '
+                                    'chmod 600 "$file"; echo tampered > "$file"; kei_dspace_runtime status')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.count('adapter-loaded'), 1)
 
     def test_atomic_write_replaces_and_has_no_leftover_temp_file(self):
         p = Path(self.tmp.name) / 'state.json'

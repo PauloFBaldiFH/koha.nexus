@@ -75,6 +75,8 @@ def main():
     except BaseException:
         # Only this disposable lab's generated credentials; never export raw inspect/config.
         password = (root / 'db-password').read_text().strip() if (root / 'db-password').exists() else ''
+        if (root / 'last-error.log').exists():
+            print('Sanitized disposable operation error:\n' + (root / 'last-error.log').read_text(), flush=True)
         for service in module.SERVICES:
             try:
                 logs = rt.compose('logs', '--no-color', '--tail', '100', service)

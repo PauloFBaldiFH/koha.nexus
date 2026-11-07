@@ -12437,19 +12437,23 @@ kei_docker_audit() {
 # install packages or create persistent platform files.
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
-KEI_DSPACE_RUNTIME_SHA="1e05c57bb6f18655eb091b303805c6d08e14c68bb6e0b4083f8fbe23823f6a37"
+KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
+KEI_DSPACE_RUNTIME_SHA="f9911065bd4bff3d671741d6b318034b412b27b9d2381ce1d08a1570714f03a3"
 KEI_DSPACE_RELEASE_SHA="9ab1db847ac66e276057c31d4dbb21f7ecbe07d00b6bb015d287cdc23c46a8f0"
 
 kei_dspace_runtime() (
-    local tmp src file expected actual rc
+    local tmp src cache file expected actual rc arg install=0 confirm=0
     command -v python3 >/dev/null 2>&1 || { echo 'DSpace requires Python 3.' >&2; return 3; }
     tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
     trap 'rm -rf "$tmp"' EXIT
+    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA"
     for file in runtime.py release.json; do
         case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; esac
         src="${_SCRIPT_DIR}/platforms/dspace/$file"
         if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
             cp "$src" "$tmp/$file" || return 1
+        elif [ -f "$cache/$file" ] && [ ! -L "$cache/$file" ] && [ "$(sha256sum "$cache/$file" | cut -d' ' -f1)" = "$expected" ]; then
+            cp "$cache/$file" "$tmp/$file" || return 1
         else
             curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 \
                 "${UPDATE_BASE:-${UPDATE_URL%installer}}platforms/dspace/$file" -o "$tmp/$file" || return 1
@@ -12457,6 +12461,19 @@ kei_dspace_runtime() (
         actual=$(sha256sum "$tmp/$file" | cut -d' ' -f1)
         [ "$actual" = "$expected" ] || { echo "DSpace adapter checksum mismatch: $file. Update the panel first." >&2; return 5; }
     done
+    for arg in "$@"; do
+        [ "$arg" = install ] && install=1
+        [ "$arg" = --confirm ] && confirm=1
+    done
+    # Keep the checked adapter locally. Later status/start/diagnosis work
+    # offline even when config.sh has no checkout next to it.
+    if [ "$install:$confirm" = 1:1 ] && [ "$(id -u)" = 0 ]; then
+        mkdir -p "$cache" && chmod 700 "$cache" || return 1
+        for file in runtime.py release.json; do
+            cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
+                && mv -f "$cache/$file.new" "$cache/$file" || return 1
+        done
+    fi
     python3 "$tmp/runtime.py" --root "$KEI_DSPACE_DIR" --driver "$(readlink -f "$_SCRIPT_PATH")" "$@"; rc=$?
     return "$rc"
 )

@@ -9,6 +9,8 @@ Adaptador Python 3.9+ em `platforms/dspace/runtime.py`, com ponte pequena no
 instalador Bash. A ponte verifica SHA-256 de **cada** arquivo antes de executar,
 tanto no checkout quanto no download usado pelo `config.sh` independente. O hash
 esperado está dentro do instalador; não vem de um arquivo baixado ao lado do código.
+A instalação confirmada guarda os arquivos verificados em cache privado local:
+início, status e diagnóstico não dependem de download depois de instalados.
 Não há dependência Python nova nem extração geral do instalador.
 
 Comandos experimentais, locais, como root:
@@ -99,7 +101,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 20 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 25 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
 * `tools/dspace_install_test.py --disposable` prepara um conjunto **real** na CI,

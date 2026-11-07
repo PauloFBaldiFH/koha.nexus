@@ -43,6 +43,13 @@ class Refused(Exception):
     pass
 
 
+class OperationFailed(Refused):
+    def __init__(self, program, result):
+        super().__init__('Operation failed (exit %s): %s. Private details: last-error.log.' %
+                         (result.returncode, program))
+        self.output = result.stdout + '\n' + result.stderr
+
+
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -114,8 +121,7 @@ def command(args, timeout=60, input_text=None, env=None):
     except (OSError, subprocess.TimeoutExpired):
         raise Refused('Operation unavailable or timed out: ' + str(args[0]))
     if result.returncode:
-        raise Refused('Operation failed (exit %s): %s. Use the local diagnostic.' %
-                      (result.returncode, str(args[0])))
+        raise OperationFailed(str(args[0]), result)
     return result.stdout
 
 
@@ -130,7 +136,19 @@ class Runtime:
 
     def docker(self, *args, timeout=60, input_text=None):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
-        return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
+        try:
+            return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
+        except OperationFailed as error:
+            # Read-only preflight/status do not create a log. Operational errors
+            # are kept privately, with generated secrets and sensitive lines removed.
+            if getattr(self, '_mutating', False):
+                output = error.output
+                password = self.root / 'db-password'
+                if password.exists():
+                    output = output.replace(password.read_text().strip(), '[redacted]')
+                output = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
+                atomic(self.root / 'last-error.log', output[-32768:])
+            raise
 
     def compose(self, *args, timeout=120):
         return self.docker('compose', '--project-name', PROJECT, '--project-directory', str(self.root),
@@ -166,7 +184,11 @@ class Runtime:
                 fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise Refused('Another DSpace operation is running.')
-            yield
+            self._mutating = True
+            try:
+                yield
+            finally:
+                self._mutating = False
 
     def images(self):
         if not self.catalog_path.is_file():
@@ -408,7 +430,10 @@ class Runtime:
                 raise
 
     def control(self, start):
-        if not self.state().get('prepared') or self.state().get('migration') != 'done':
+        state = self.state()
+        if not state.get('prepared'):
+            raise Refused('DSpace has not been prepared; use the installation procedure.')
+        if start and (state.get('migration') != 'done' or state.get('phase') != 'ready'):
             raise Refused('Installation has not completed its migration; use the installation resume procedure.')
         with self.lock():
             for file, hash_value in self.state()['files'].items():
@@ -448,7 +473,8 @@ class Runtime:
                     if all(label.get(k) == v for k, v in LABELS.items()) and label.get('com.docker.compose.oneoff') != 'True':
                         observed[label.get('com.docker.compose.service')] = obj['State']['Status']
             result['services'] = {s: observed.get(s, 'missing') for s in SERVICES}
-            if not all(x == 'running' for x in result['services'].values()):
+            if (not all(x == 'running' for x in result['services'].values()) and
+                    state.get('status') not in ('failed', 'installing')):
                 result['status'] = 'stopped' if state.get('intended') == 'stopped' else 'degraded'
         except Refused:
             result['status'] = 'unavailable'
@@ -478,6 +504,8 @@ class Runtime:
         listen = '' if port == 80 else 'Listen %s\n' % port
         return (listen + '<VirtualHost *:%s>\n' % port +
                 '  ServerName %s\n  ProxyRequests Off\n  ProxyPreserveHost On\n' % u.hostname +
+                '  RequestHeader unset Forwarded\n  RequestHeader unset X-Forwarded-For\n' +
+                '  RequestHeader unset X-Forwarded-Host\n  RequestHeader unset X-Forwarded-Port\n' +
                 '  RequestHeader set X-Forwarded-Proto "http"\n' +
                 '  ProxyPass /server http://127.0.0.1:%s/server timeout=300\n' % int(state['ports']['backend']) +
                 '  ProxyPassReverse /server http://127.0.0.1:%s/server\n' % int(state['ports']['backend']) +
