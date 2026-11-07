@@ -112,9 +112,14 @@ def main():
         check('persistent' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                                          'SELECT value FROM nexus_lifecycle_test'), 'data persist after Docker restart')
         (output / 'dspace-acceptance.json').write_text(json.dumps(rt.diagnostic(), indent=2))
-    except BaseException:
+    except BaseException as error:
         # Only this disposable lab's generated credentials; never export raw inspect/config.
         password = (root / 'db-password').read_text().strip() if (root / 'db-password').exists() else ''
+        primary = None
+        if not isinstance(error, module.OperationFailed):
+            message = str(error).lower()
+            primary = ('backend' if 'api' in message else 'ui' if 'interface' in message else
+                       'solr' if 'solr' in message else 'postgres' if 'postgresql' in message else None)
         if (root / 'last-error.log').exists():
             print('Sanitized disposable operation error:\n' + (root / 'last-error.log').read_text(), flush=True)
         for service in module.SERVICES:
@@ -122,6 +127,9 @@ def main():
                 logs = rt.compose('logs', '--no-color', '--tail', '100', service)
                 logs = module.redact(logs, password)
                 print('Disposable CI logs: ' + service + '\n' + logs, flush=True)
+                if service == primary:
+                    excerpt = logs[-5000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                    print('::error title=DSpace ' + service + ' startup::' + excerpt, flush=True)
             except module.Refused:
                 pass
         raise
