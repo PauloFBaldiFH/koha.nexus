@@ -85,7 +85,7 @@ class DSpaceInputs(unittest.TestCase):
         (path / "backend-source/pom.xml").write_text(
             '<project xmlns="http://maven.apache.org/POM/4.0.0"><version>10.1</version></project>')
         (path / "ui-source/package.json").write_text('{"version":"10.1.0"}')
-        (path / "sources.json").write_text(json.dumps(self.data["sources"]))
+        (path / "sources.json").write_text(json.dumps(images.source_stamp(self.data)))
         (path / "checksums.json").write_text(json.dumps(images.source_checksums(path)))
 
     def test_refuses_modified_sources_before_building(self):
@@ -132,6 +132,39 @@ class DSpaceInputs(unittest.TestCase):
                 result = subprocess.run(["sh", str(entry)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 78)
                 self.assertIn("reverse proxy", result.stderr)
+
+    def test_dependency_patch_rejects_wrong_source_without_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            (path / "package.json").write_text('{}\n')
+            (path / "package-lock.json").write_text('{}\n')
+            patch_data = json.loads((images.BASE / 'ui-dependencies.json').read_text())
+            with self.assertRaisesRegex(ValueError, 'differs'):
+                images.apply_ui_patch(path, patch_data)
+            self.assertEqual((path / 'package.json').read_text(), '{}\n')
+
+    def test_dependency_patch_rejects_arbitrary_filenames(self):
+        with self.assertRaisesRegex(ValueError, 'Only UI'):
+            images.apply_ui_patch(Path('/tmp'), {'../unwanted': {}})
+
+    def test_dependency_patch_applies_only_reviewed_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            originals = {'package.json': {'version': '10.1.0'},
+                         'package-lock.json': {'packages': {'old': {'version': '1'}}}}
+            outputs = {'package.json': {'version': '10.1.0', 'dependencies': {'example': '2'}},
+                       'package-lock.json': {'packages': {'new': {'version': '2'}}}}
+            changes = {}
+            for filename in originals:
+                before = (json.dumps(originals[filename], indent=2) + '\n').encode()
+                after = (json.dumps(outputs[filename], indent=2, sort_keys=True) + '\n').encode()
+                (path / filename).write_bytes(before)
+                changes[filename] = {'before': images.hashlib.sha256(before).hexdigest(),
+                                     'after': images.hashlib.sha256(after).hexdigest()}
+            changes['package.json']['value'] = outputs['package.json']
+            changes['package-lock.json'].update(remove=['old'], update=outputs['package-lock.json']['packages'])
+            images.apply_ui_patch(path, changes)
+            self.assertEqual(json.loads((path / 'package-lock.json').read_text()), outputs['package-lock.json'])
 
 
 if __name__ == "__main__":

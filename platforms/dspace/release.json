@@ -45,5 +45,9 @@
       "dockerfile": "solr.Dockerfile",
       "source": "backend"
     }
+  },
+  "ui_patch": {
+    "file": "ui-dependencies.json",
+    "sha256": "039dd49b0c8cfcc6cca84b7c0d1309c94ab053db8d454b08cd34ee2b6db35ce7"
   }
 }

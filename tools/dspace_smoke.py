@@ -18,7 +18,11 @@ DOCKER = ["docker", "--host=unix:///var/run/docker.sock"]
 
 
 def docker(*args, check=True):
-    return subprocess.run(DOCKER + list(args), check=check, capture_output=True, text=True)
+    result = subprocess.run(DOCKER + list(args), capture_output=True, text=True)
+    if check and result.returncode:
+        # These are disposable smoke containers with no private configuration.
+        raise RuntimeError(f"Docker smoke command failed ({result.returncode}):\n{result.stdout}\n{result.stderr}")
+    return result
 
 
 def smoke(image, prefix):
@@ -28,9 +32,11 @@ def smoke(image, prefix):
     name = "nexus-dspace-smoke-" + uuid.uuid4().hex[:12]
     if image == "backend":
         docker("run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-ec",
-               'test "$(id -u)" = 10001; test -s /dspace/webapps/server-boot.jar; '
-               'test -x /dspace/bin/dspace; test -s /usr/share/licenses/dspace/LICENSE; '
-               'test ! -e /dspace/config/local.cfg; java -version')
+               'test "$(id -u)" = 10001 || { echo "wrong runtime UID" >&2; exit 1; }; '
+               'test -s /dspace/webapps/server-boot.jar || { echo "missing server JAR" >&2; exit 1; }; '
+               'test -x /dspace/bin/dspace || { echo "CLI not executable by runtime user" >&2; ls -l /dspace/bin/dspace >&2; exit 1; }; '
+               'test -s /usr/share/licenses/dspace/LICENSE || { echo "missing license" >&2; exit 1; }; '
+               'test ! -e /dspace/config/local.cfg || { echo "unexpected local.cfg" >&2; exit 1; }; java -version')
         result = docker("run", "--rm", "--network", "none", tag, check=False)
         if result.returncode != 78 or "Missing DSpace local.cfg" not in result.stderr:
             raise RuntimeError("Backend did not refuse missing installation configuration")

@@ -27,6 +27,7 @@ RUN --mount=type=secret,id=proxy_ca --mount=type=secret,id=maven_settings \
     cd /src/dspace/target/dspace-installer; \
     ant init_installation copy_configs_keep copy_solr_configs_keep update_code update_webapps; \
     test -s /dspace/webapps/server-boot.jar; \
+    chmod 0555 /dspace/bin/*; \
     rm -rf /dspace/webapps/server /dspace/*.bak-* /tmp/build-cacerts; \
     rm -f /dspace/config/local.cfg
 

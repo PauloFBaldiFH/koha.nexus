@@ -20,7 +20,8 @@ assets only. DSpace remains unavailable in the platform catalog.
 ## Local verification
 
 * Source fetch: both official release tags resolved to the locked commits.
-* Input tests: 14 passed on Python 3.9 and 14 passed on Python 3.13.
+* Input tests: 17 passed on Python 3.9 and 17 passed on Python 3.13, including
+  refused patches with wrong source/checksum/path and valid deterministic replay.
 * Existing platform/core regression selection: 148 passed, 1 skipped.
 * Entrypoint shell syntax and workflow YAML parsing passed.
 * Solr image built; real startup smoke passed with all seven expected cores and
@@ -48,10 +49,25 @@ The independent CI build jobs avoid accumulating all three builds on one runner.
 ## Before merge
 
 All three image builds and their smoke checks must pass on the exact PR commit.
-The dependency audit job also blocks high/critical findings. The currently locked
-upstream UI fails that gate: review compatible dependency patches and rebuild/test
-the affected application before promotion. Do not force npm upgrades or suppress
-the audit to make a check green. Until these checks pass, this is a draft.
+The dependency audit job also blocks high/critical findings. The upstream lock
+failed that gate; the reviewed dependency patch now passes locally with 0 high,
+0 critical, 4 moderate and 2 low findings. Angular framework versions stay on
+20.3 (20.3.34); the patch and its exact input/output bytes are hashed. No `--force`
+or peer dependency bypass was used. The updated UI must rebuild and smoke-test
+on the exact PR commit before merging; the earlier image smoke is not evidence
+that the new lockfile builds. Until those checks pass, this is a draft.
+
+## Follow-up for the first CI failures
+
+The backend smoke failed because the root-owned CLI was not executable by UID
+10001: the upstream script is a 0644 source file, and Ant added only owner execute
+(0744). Assembly now explicitly installs bin scripts as 0555. A disposable
+container reproduced the permission distinction for a non-root account. The
+source exporter also preserves tracked executable bits for other scripts.
+
+The smoke runner now reports stdout/stderr and names the failed assertion, rather
+than hiding the reason inside CalledProcessError. Backend full build remains
+blocked locally by handle.net access; confirm the result of the new CI run.
 
 ## Next implementation step
 

@@ -21,7 +21,13 @@ It explicitly says installation, backup and restore are not available yet.
 | Architectures | linux/amd64 only in this first CI |
 
 The backend/UI sources were released together on 2026-09-14. Their tags are
-checked against full commits before exporting tracked files. Digests were
+checked against full commits before exporting tracked files. The reviewed
+`ui-dependencies.json` then updates only package.json/package-lock.json: Angular
+framework patches stay on 20.3, and permitted dependency ranges are resolved into
+a fixed lockfile. Patch bytes, input files and output files are sha256-checked;
+an old prepared source directory must be recreated. No `--force`, peer-dependency
+bypass, application-code patch or live dependency update during image startup.
+Digests were
 resolved on 2026-11-06. Neither a stable tag nor a digest is a security assessment:
 this matrix remains a candidate until integration, vulnerability review and
 recovery testing are complete. ARM64 support is deliberately not advertised.
@@ -105,7 +111,9 @@ backend, UI and Solr separately on amd64 runners. It runs disposable, non-public
 smoke containers and records build metadata, image configuration and SPDX SBOM.
 It does **not** push images to any registry or deploy to a user's server.
 The separate production-dependency audit job blocks high/critical advisories;
-the original upstream lock currently needs fixes/review before that gate passes.
+the original upstream lock failed that gate. The reviewed patch passes locally
+with 0 high/critical, 4 moderate and 2 low advisories (2026-11-06 client date).
+The dependency graph is still subject to future advisories and runtime review.
 
 Smoke checks deliberately have different meanings:
 

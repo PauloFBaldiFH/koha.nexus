@@ -59,13 +59,47 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     for name, image in data["images"].items():
         if image != {"dockerfile": name + ".Dockerfile", "source": "ui" if name == "ui" else "backend"}:
             raise ValueError("Unexpected image recipe")
+    patch = data.get("ui_patch", {})
+    if patch.get("file") != "ui-dependencies.json" or not re.fullmatch(r"[0-9a-f]{64}", patch.get("sha256", "")):
+        raise ValueError("A reviewed UI dependency patch is required")
+    if hashlib.sha256((BASE / patch["file"]).read_bytes()).hexdigest() != patch["sha256"]:
+        raise ValueError("UI dependency patch checksum mismatch")
     return data
+
+
+def source_stamp(data: dict) -> dict:
+    return {"sources": data["sources"], "ui_patch": data["ui_patch"]}
+
+
+def apply_ui_patch(directory: Path, patch: dict) -> None:
+    """Modify only two JSON dependency files, checking both input and output bytes."""
+    if set(patch) != {"package.json", "package-lock.json"}:
+        raise ValueError("Only UI dependency files may be patched")
+    outputs = {}
+    for filename, change in patch.items():
+        path = directory / filename
+        original = path.read_bytes()
+        if hashlib.sha256(original).hexdigest() != change["before"]:
+            raise ValueError("Upstream dependency file differs from reviewed patch")
+        value = json.loads(original)
+        if filename == "package.json":
+            value = change["value"]
+        else:
+            for key in change["remove"]:
+                del value["packages"][key]
+            value["packages"].update(change["update"])
+        result = (json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True) + "\n").encode()
+        if hashlib.sha256(result).hexdigest() != change["after"]:
+            raise ValueError("Dependency patch output checksum mismatch")
+        outputs[path] = result
+    for path, result in outputs.items():
+        path.write_bytes(result)
 
 
 def validate_sources(data: dict, directory: Path) -> None:
     """Check exact exported contents, not an editable checkout with a matching HEAD."""
     stamp = json.loads((directory / "sources.json").read_text(encoding="utf-8"))
-    if stamp != data["sources"]:
+    if stamp != source_stamp(data):
         raise ValueError("Prepared sources do not match this release")
     ns = {"m": "http://maven.apache.org/POM/4.0.0"}
     backend = ET.parse(directory / "backend-source/pom.xml").findtext("m:version", namespaces=ns)
@@ -123,8 +157,11 @@ def prepare(data: dict, output: Path) -> None:
                 destination = exported / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(original, destination)
+                # Preserve Git's executable bit, without copying writable/special modes.
+                destination.chmod(0o755 if original.stat().st_mode & 0o111 else 0o644)
             shutil.rmtree(checkout)
-        (stage / "sources.json").write_text(json.dumps(data["sources"], indent=2) + "\n")
+        apply_ui_patch(stage / "ui-source", json.loads((BASE / data["ui_patch"]["file"]).read_text()))
+        (stage / "sources.json").write_text(json.dumps(source_stamp(data), indent=2) + "\n")
         (stage / "checksums.json").write_text(json.dumps(source_checksums(stage), sort_keys=True) + "\n")
         validate_sources(data, stage)
         # No secrets or untracked content can enter the build through the context.
