@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dspace.core.Context;
+import org.dspace.servicemanager.DSpaceKernelImpl;
+import org.dspace.servicemanager.DSpaceKernelInit;
 import org.dspace.eperson.EPerson;
 import org.dspace.eperson.Group;
 import org.dspace.eperson.factory.EPersonServiceFactory;
@@ -22,6 +24,7 @@ public final class NexusAdmin {
     }
     public static void main(String[] args) {
         Context context = null;
+        DSpaceKernelImpl kernel = null;
         int code = 0;
         try {
             if (args.length != 1 || !List.of("status", "create", "password").contains(args[0]))
@@ -38,6 +41,9 @@ public final class NexusAdmin {
                         !List.of("pt_BR", "en", "es").contains(language)))
                     throw new IllegalArgumentException("Name and supported language are required.");
             }
+            // Match the official ScriptLauncher bootstrap before creating a Context.
+            kernel = DSpaceKernelInit.getKernel(null);
+            if (!kernel.isRunning()) kernel.start();
             context = new Context(operation.equals("status") ? Context.Mode.READ_ONLY : Context.Mode.READ_WRITE);
             EPersonService people = EPersonServiceFactory.getInstance().getEPersonService();
             GroupService groups = EPersonServiceFactory.getInstance().getGroupService();
@@ -81,6 +87,7 @@ public final class NexusAdmin {
             code = 70;
         } finally {
             if (context != null && context.isValid()) context.abort();
+            if (kernel != null) kernel.destroy();
         }
         if (code != 0) System.exit(code);
     }

@@ -51,6 +51,14 @@ def test_independent_dspace_navigation_reads_only(monkeypatch,koha,tainacan,ds,s
             await pilot.pause(1.8)
             tabs=app.screen.query_one('#dash-tabs',TabbedContent)
             assert tabs.get_tab('dash-tab-dspace').display is (ds=='1')
+            if ds == '1':
+                tabs.active = 'dash-tab-dspace'
+                await pilot.pause(0.3)
+                from kei_panel.widgets.cards import LinkCard
+                summary = app.screen.query_one('#dash-dspace')
+                for card in summary.query(LinkCard):
+                    for button in card.query('Button'):
+                        assert button.region.right <= card.content_region.right
             app.screen.action_show('dspace')
             await pilot.pause(1.8)
             view=app.screen.query_one('#view-dspace')
@@ -125,3 +133,23 @@ def test_postpone_and_close_never_configures_cloud_or_backup(monkeypatch):
     assert ('setup-mark','admin','later') in args and ('setup-close',) in args
     assert all(c[0]=='dspace-panel' for c in calls)
     assert not any('install' in a or 'backup' in a[0] for a in args)
+
+@pytest.mark.parametrize('retry',[False,True])
+def test_migration_retry_requires_its_own_confirmation(monkeypatch,retry):
+    calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':False},
+                                'status':{'url':'http://192.168.1.20:8100','migration':'failed'},
+                                'plan':{'url':'http://192.168.1.20:8100'},'install':{'status':'installed'},'setup-status':{'setup':'none'}})
+    app=App([True,retry])
+    async def status():return {'docker':{'installed':True}}
+    app.bridge=SimpleNamespace(status=status)
+    app.check_platforms=lambda: None
+    asyncio.run(dspace.install(app))
+    writes=[args for name,args,kw in calls if name=='dspace-panel' and args[0]=='install']
+    assert bool(writes) is retry
+    if retry:assert writes[0][-1]=='--retry-migration'
+
+
+def test_start_with_docker_stopped_requires_separate_consent(monkeypatch):
+    calls=mock_calls(monkeypatch,{'status':{'status':'unavailable'},'dspace-prerequisites':{'docker_stopped':True}})
+    asyncio.run(dspace.start(App([False])))
+    assert [c[:2] for c in calls]==[('dspace-panel',('status',)),('dspace-prerequisites',('plan',))]

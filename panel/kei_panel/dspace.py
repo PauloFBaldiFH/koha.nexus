@@ -44,6 +44,13 @@ class DSpaceSummary(Grid):
                            ('postgres', 'PostgreSQL'), ('solr', 'Solr'), ('backend', 'DSpace API'), ('ui', 'Public interface')):
             yield StatusCard(t(title), id='ds-' + key)
 
+    def on_resize(self, event) -> None:
+        # Each link needs space for both Open and Copy. Preserve the shared
+        # look while letting this summary fit terminals with a narrow sidebar.
+        columns = max(1, min(3, event.size.width // 30))
+        if self.styles.grid_size_columns != columns:
+            self.styles.grid_size_columns = columns
+
     def show(self, data: dict) -> None:
         url = origin(data.get('url'))
         for key, link in (('site', url), ('login', url + '/login' if url else '')):

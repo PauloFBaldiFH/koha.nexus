@@ -31,7 +31,7 @@ class API:
             path = parts.path + ('?' + parts.query if parts.query else '')
         if not path.startswith('/server/'):
             path = '/server/api' + path
-        headers = {'Host': self.host, 'Origin': self.origin, 'Accept': 'application/hal+json', 'Content-Type': content_type}
+        headers = {'Host': self.host, 'Origin': self.origin, 'Accept': '*/*' if raw else 'application/hal+json', 'Content-Type': content_type}
         if self.csrf: headers['X-XSRF-TOKEN'] = self.csrf
         if self.bearer: headers['Authorization'] = self.bearer
         if data is not None and not isinstance(data, bytes):
@@ -180,6 +180,14 @@ def exercise(rt, output):
             private.close()
             (Path(output) / 'dspace-browser-acceptance.json').write_text(json.dumps({'browser_deposit': True, 'private_access_denied': True, 'download_sha256': expected, 'item_uuid': itemid}, indent=2))
         except Exception as error:
+            # Only control names/types, never values, cookies or page storage.
+            try:
+                controls = page.locator('input').evaluate_all('(nodes) => nodes.map(n => ({type:n.type,id:n.id,name:n.name,label:n.getAttribute("aria-label")}))')
+                buttons = page.locator('button').all_text_contents()
+                detail = json.dumps({'stage':stage,'inputs':controls,'buttons':buttons})[:4500]
+                print('::notice title=DSpace browser controls::' + detail.replace('%','%25').replace('\n','%0A').replace('\r','%0D'), flush=True)
+            except Exception:
+                pass
             # A Playwright fill error can echo its input in the exception text.
             raise RuntimeError('DSpace browser acceptance failed at %s (%s)' % (stage, type(error).__name__)) from None
         finally:

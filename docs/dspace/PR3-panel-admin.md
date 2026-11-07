@@ -24,5 +24,23 @@ menus permanentes. Nenhuma publicação de imagens, broker ou produção é auto
 
 ## Validação
 
-Em andamento. Registrar somente resultados efetivos, distinguindo simulação de
-painel, integração real em CI e o que depende do servidor do Paulo.
+Em andamento. As imagens da receita 3 passaram build/smoke nos três serviços.
+O primeiro teste administrativo real foi recusado; o adaptador passa agora a usar
+o bootstrap oficial de `ScriptLauncher` (`DSpaceKernelInit`, `start` e `destroy`),
+além do guard de esquema anterior. A correção ainda precisa passar na CI real.
+
+Passaram localmente 61 testes de imagens/runtime (Python 3.9), 16 cenários de
+navegação (oito combinações de plataformas, nas duas larguras) e 16 casos de
+confirmação/conta/protocolo. A seleção existente do painel encontrou expectativas
+antigas de dois grupos/cartões: atualizadas para incluir DSpace, mantendo as
+asserções de Koha/Tainacan. Manual e traduções: 27 testes passaram.
+
+As cinco capturas em `pr3-captures/` são simulações explícitas do painel,
+em português; não são prova de instalação real. Em 80 colunas, o resumo do
+DSpace usa uma coluna para preservar os botões Abrir/Copiar. O estado não é
+repetido na tela de ferramentas.
+
+O teste integrado usa contas/documentos descartáveis, login e depósito pelo
+Chromium, download com SHA-256 e acesso anônimo negado após restrição. Não salva
+traces, cookies, armazenamento do navegador ou senha. Só a conclusão efetiva da
+CI pode ser registrada como aprovação desse fluxo.

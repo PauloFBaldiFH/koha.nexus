@@ -434,7 +434,7 @@ def test_the_koha_tab_holds_koha_and_general_holds_the_server(server):
 
     disabled, state, addresses, db, general, koha = asyncio.run(main())
     assert disabled is False and state == "Running" and addresses is True and db != "-"
-    assert general == ["dash-platform-koha", "dash-platform-tainacan", "card-disk", "health-cpu", "health-memory",
+    assert general == ["dash-platform-koha", "dash-platform-tainacan", "dash-platform-dspace", "card-disk", "health-cpu", "health-memory",
                        "health-updates"]
     for koha_only in ("health-db", "health-backup-dir", "health-errors", "health-koha-updates", "health-tunnel",
                       "health-sru", "health-z3950"):

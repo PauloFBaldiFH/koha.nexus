@@ -12499,7 +12499,9 @@ print(json.dumps(dict(id="dspace",supported=True,detected=True,services=services
 }
 
 # Dependencies have their own plan/confirmation, before the platform plan.
-kei_dspace_prerequisites() {
+kei_dspace_prerequisites() (
+    unset DOCKER_CONTEXT DOCKER_TLS DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+    export DOCKER_HOST=unix:///var/run/docker.sock
     local mode action="${1:-plan}" docker_stopped=false apache_missing=false
     read -r mode _ < <(kei_proxy_detect)
     [ "$mode" != none ] || apache_missing=true
@@ -12519,7 +12521,7 @@ kei_dspace_prerequisites() {
             systemctl start docker || return 1 ;;
         *) return 2 ;;
     esac
-}
+)
 
 # These internal tasks are called only by the local Python adapter.
 # They use the exact same isolation, registry and safe Apache operations

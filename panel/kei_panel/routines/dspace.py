@@ -74,8 +74,13 @@ async def install(app):
     text = t('Review the DSpace installation plan. Only its own resources are created; existing repository data are preserved.') + '\n\n' + json.dumps(plan, ensure_ascii=False, indent=2)
     if not await app.push_screen_wait(ConfirmScreen(TITLE, text)):
         return
-    # An interrupted migration is not silently retried by this button.
-    result = await call(app, 'install', '--url', url, '--confirm')
+    # A migration retry is a second, explicit decision, never implied by resume.
+    retry = []
+    if current.get('migration') in ('running', 'failed'):
+        if not await app.push_screen_wait(ConfirmScreen(TITLE, t('An earlier database migration was interrupted or failed. Review the diagnosis and preserved data before another attempt. Explicitly retry the migration?'), danger=True)):
+            return
+        retry = ['--retry-migration']
+    result = await call(app, 'install', '--url', url, '--confirm', *retry)
     if result is not None:
         app.check_platforms()
         await assistant(app)
@@ -85,6 +90,19 @@ async def control(app, start):
     status = await call(app, 'status')
     if status is None:
         return
+    if start and status.get('status') == 'unavailable':
+        pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
+        out = pre.value if isinstance(pre.value, TaskOutcome) else None
+        if pre.cancelled or out is None or not out.ok:
+            await show_failure(app, TITLE, pre)
+            return
+        if payload(out).get('docker_stopped'):
+            if not await app.push_screen_wait(ConfirmScreen(TITLE, t('Start the existing Docker service for DSpace?'))):
+                return
+            result = await run_task(app, TITLE, 'dspace-prerequisites', 'docker-start', 'confirm', cancellable=False)
+            if result.cancelled or not isinstance(result.value, TaskOutcome) or not result.value.ok:
+                await show_failure(app, TITLE, result)
+                return
     question = 'Start DSpace using its current configuration? No migration or restoration is performed.' if start else 'Stop DSpace gracefully? The repository will be unavailable; all volumes and configuration are kept.'
     if await app.push_screen_wait(ConfirmScreen(TITLE, t(question))):
         data = await call(app, 'start' if start else 'stop', '--confirm', cancellable=False)
