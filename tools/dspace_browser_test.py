@@ -166,10 +166,10 @@ def exercise(rt, output):
             accepted_data = api.request(urlsplit(accepted.value.url).path)
             agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
             check(any(v.get('value') == 'true' for v in agreement_values), 'agreement acceptance is actually saved')
-            # The upstream component performs a hard redirect after PATCH.
-            # Do not cancel it by immediately issuing another page.goto().
-            page.wait_for_url(lambda url: '/end-user-agreement' not in url, timeout=60000)
-            page.wait_for_load_state('domcontentloaded')
+            # Opened directly (no redirect parameter), the page can stay where it
+            # is after saving (CI 42411175345). Persistence is proven by REST
+            # above; let the save settle, then open the submission.
+            page.wait_for_load_state('networkidle', timeout=60000)
             stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             # Upstream adds a literal ' *' to required field labels.
