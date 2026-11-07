@@ -81,7 +81,6 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(b.Error):
             with recovery.opened(package): self.fail('must not open')
 
-if __name__ == '__main__': unittest.main()
 
 
 class CaptureFailures(unittest.TestCase):
@@ -164,7 +163,7 @@ class PromotionFailures(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)/'dspace'; root.mkdir()
             tree=Path(temporary)/'tree'; (tree/'private').mkdir(parents=True)
-            for name,value in [('local.cfg','old config'),('db-password','old password'),('compose.json','{"volumes":{}}')]:
+            for name,value in [('local.cfg','old config\nproxies.trusted.ipranges = 127.0.0.1\nproxies.trusted.include_ui_ip = false'),('db-password','old password'),('compose.json','{"volumes":{}}')]:
                 (root/name).write_text(value)
             state={'phase':'ready','url':'http://repo.test','status':'installed',
                    'files':{n:b.sha(root/n) for n in ('local.cfg','db-password','compose.json')}}
@@ -213,3 +212,30 @@ class DecryptionLimit(unittest.TestCase):
                 self.assertLess(len(result.stdout),plain.stat().st_size)
             finally:
                 subprocess.run(['gpgconf','--homedir',str(home),'--kill','gpg-agent'],capture_output=True,timeout=10)
+
+
+class DestinationConfig(unittest.TestCase):
+    def test_destination_trust_is_kept_but_source_keys_are_recovered(self):
+        source='db.password = recovered\nproxies.trusted.ipranges = 172.30.10.1\nproxies.trusted.include_ui_ip = false\n'
+        target='db.password = old\nproxies.trusted.ipranges = 172.30.20.1\nproxies.trusted.include_ui_ip = false\n'
+        actual=b.destination_config(source,target)
+        self.assertIn('db.password = recovered',actual)
+        self.assertIn('172.30.20.1',actual)
+        self.assertNotIn('172.30.10.1',actual)
+
+    def test_missing_destination_trust_refuses_promotion(self):
+        with self.assertRaises(b.Error): b.destination_config('db.password = source','')
+
+
+class IsolatedConfiguration(unittest.TestCase):
+    def test_overrides_do_not_leave_conflicting_properties(self):
+        source='db.url = jdbc:postgresql://postgres/dspace\nsolr.server = http://solr:8983/solr\nmail.server.disabled = false\nuser.registration = true\ndb.password = recovered\n'
+        result=b.isolated_config(source)
+        for key in ('db.url','solr.server','mail.server.disabled','user.registration'):
+            self.assertEqual(sum(line.startswith(key+' =') for line in result.splitlines()),1)
+        self.assertNotIn('//postgres/',result)
+        self.assertIn('db.password = recovered',result)
+        self.assertIn('127.0.0.1:5432',result)
+        self.assertIn('mail.server.disabled = true',result)
+
+if __name__ == '__main__': unittest.main()

@@ -244,7 +244,7 @@ class Recovery:
         project = 'kn-dspace-rt-' + secrets.token_hex(10)
         area = tree.parent / 'runtime'; area.mkdir(mode=0o700)
         cfg = (tree / 'private/local.cfg').read_text()
-        cfg += '\nmail.server.disabled = true\nuser.registration = false\ndb.url = jdbc:postgresql://127.0.0.1:5432/dspace\nsolr.server = http://127.0.0.1:8983/solr\n'
+        cfg = isolated_config(cfg)
         atomic(area / 'local.cfg', cfg, 0o640, gid=10001)
         atomic(area / 'db-password', (tree / 'private/db-password').read_text(), 0o644)
         # Ancestors must permit the container's nonroot backend to reach bind mounts.
@@ -345,7 +345,7 @@ class Recovery:
                 try:
                     # Stop the verification project before any production mounts.
                     self.rt.docker(*self.dc_args(clone['area'], clone['project']), 'down','--timeout','90', timeout=420)
-                    atomic(self.rt.root / 'local.cfg', (tree / 'private/local.cfg').read_text(), 0o640, gid=10001)
+                    atomic(self.rt.root / 'local.cfg', destination_config((tree / 'private/local.cfg').read_text(), (rollback / 'local.cfg').read_text()), 0o640, gid=10001)
                     atomic(self.rt.root / 'db-password', (tree / 'private/db-password').read_text(), 0o644)
                     atomic(self.rt.root / 'compose.json', json.dumps(promoted))
                     self.rt.compose('up','-d','--pull','never','--force-recreate', timeout=420)
@@ -396,3 +396,24 @@ def normalized_dump(path):
                 continue
             h.update(line)
     return h.hexdigest()
+
+
+def destination_config(source, destination):
+    """Proxy trust belongs to the destination network, never the source host."""
+    keys = ('proxies.trusted.ipranges', 'proxies.trusted.include_ui_ip')
+    result = [line for line in source.splitlines() if line.partition('=')[0].strip() not in keys]
+    for key in keys:
+        values = [line for line in destination.splitlines() if line.partition('=')[0].strip() == key]
+        if len(values) != 1: raise Error('Destination proxy trust configuration is ambiguous.')
+        result.extend(values)
+    return '\n'.join(result) + '\n'
+
+
+def isolated_config(source):
+    """Replace properties; duplicate keys can select the old value in Commons Configuration."""
+    overrides = {'mail.server.disabled':'true', 'user.registration':'false',
+                 'db.url':'jdbc:postgresql://127.0.0.1:5432/dspace',
+                 'solr.server':'http://127.0.0.1:8983/solr'}
+    lines = [line for line in source.splitlines() if line.partition('=')[0].strip() not in overrides]
+    lines.extend(key + ' = ' + value for key,value in overrides.items())
+    return '\n'.join(lines) + '\n'

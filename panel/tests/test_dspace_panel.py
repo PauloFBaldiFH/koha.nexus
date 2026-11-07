@@ -207,3 +207,27 @@ def test_cancel_recovery_phrase_never_starts_restore(monkeypatch):
     calls=mock_calls(monkeypatch,{'backup-list':{'packages':[package]}})
     asyncio.run(dspace.backup_restore(App([package,None])))
     assert len(calls)==1
+
+
+@pytest.mark.parametrize('size',[(80,24),(160,48)])
+def test_dspace_only_backup_center_has_its_own_actions_without_writes(monkeypatch,size):
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA','0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN','0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE','1')
+    async def exercise():
+        app=KohaPanelApp(PanelEnv(installer=None,lang='en',plain=True,demo=True))
+        calls=[]; real=app.bridge.task
+        async def task(name,*args,**kwargs):
+            calls.append((name,args)); return await real(name,*args,**kwargs)
+        app.bridge.task=task
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.8)
+            app.backup_scope='dspace'; app.screen.action_show('backups')
+            await pilot.pause(1.8)
+            view=app.screen.query_one('#view-backups')
+            assert view.scope=='dspace'
+            cards={c.entry.action for c in view.query(ActionCard) if c.display}
+            assert {'dspace-backup-create','dspace-backup-test','dspace-backup-restore','dspace-backup-key'} <= cards
+            assert not cards & {'backup-manual','tainacan-backup','set-backup','restore-assisted'}
+            assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-')) for name,args in calls)
+    asyncio.run(exercise())

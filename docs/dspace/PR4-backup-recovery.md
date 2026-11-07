@@ -9,7 +9,7 @@ para abrir. Não amplia agendas nem conjuntos Koha/Tainacan (PR5).
 
 A trava é a mesma do ciclo de serviços (`backup/dspace.lock`). A captura lembra
 os serviços ativos, para UI/backend/Solr, faz o dump lógico, para PostgreSQL e
-copia os arquivos com UID/GID preservados. Retoma os serviços anteriores mesmo
+copia os arquivos com UID/GID preservados. Sessões podem exigir novo login após a manutenção. Retoma os serviços anteriores mesmo
 em erro tratável. O diário só registra retomada após sucesso. Uma captura
 interrompida exige retomar os serviços registrados antes da próxima operação.
 O pacote é publicado por rename somente após cifragem completa; staging privado
@@ -52,7 +52,7 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## Validação
 
-- 84 testes unitários de imagens/runtime/formato aprovados localmente em Python
+- 87 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
 - Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: em andamento. Nada foi testado no servidor
   de Paulo. Não anunciar recuperação homologada antes da CI real.

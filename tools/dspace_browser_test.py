@@ -240,6 +240,9 @@ def exercise(rt, output, recovery_capture=None):
             anon_page.screenshot(path=str(Path(output) / 'dspace-public-item.png'), full_page=True)
             public.close()
             recovered_public = recovery_capture(rt) if recovery_capture else None
+            if recovery_capture:
+                # Maintenance restarts the backend; old JWTs need not survive.
+                api = API(origin); api.login(email, replacement)
             stage = 'restricting published content'
             for uuid in (stream['uuid'], bundle['uuid'], itemid):
                 policies = api.request('/authz/resourcepolicies/search/resource?' + urlencode({'uuid': uuid, 'action': 'READ', 'size': 100})).get('_embedded', {}).get('resourcepolicies', [])
