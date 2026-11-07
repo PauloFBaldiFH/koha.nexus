@@ -33,8 +33,11 @@ RUN --mount=type=secret,id=proxy_ca --mount=type=secret,id=maven_settings \
       -DskipUnitTests=true -DskipIntegrationTests=true \
       -Dcheckstyle.skip=true -Dlicense.skip=true -Dxml.skip=true; \
     cd /src/dspace/target/dspace-installer; \
-    ant init_installation copy_configs_keep copy_solr_configs_keep update_code update_webapps; \
+    ant install_code update_webapps; \
     test -s /dspace/webapps/server-boot.jar; \
+    test -s /dspace/config/config-definition.xml; \
+    test -s /dspace/config/dspace.cfg; \
+    test -s /dspace/config/log4j2-cli.xml; \
     chmod 0555 /dspace/bin/*; \
     rm -rf /dspace/webapps/server /dspace/*.bak-* /tmp/build-cacerts; \
     rm -f /dspace/config/local.cfg
@@ -62,7 +65,8 @@ COPY --from=nexus-license /LICENSE /usr/share/licenses/nexus-dspace/LICENSE
 RUN mkdir -p /dspace/assetstore /dspace/log /dspace/var /dspace/upload \
       /dspace/reports /dspace/exports /dspace/imports /dspace/handle-server \
     && chown -R 10001:10001 /dspace/assetstore /dspace/log /dspace/var \
-      /dspace/upload /dspace/reports /dspace/exports /dspace/imports /dspace/handle-server
+      /dspace/upload /dspace/reports /dspace/exports /dspace/imports /dspace/handle-server \
+      /dspace/solr/search/conf
 ENV dspace__P__dir=/dspace \
     NEXUS_DSPACE_RELEASE_LOCK=${RELEASE_LOCK_SHA256} \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=65.0 -Dfile.encoding=UTF-8" \

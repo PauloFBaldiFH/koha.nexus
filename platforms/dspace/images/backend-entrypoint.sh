@@ -11,10 +11,12 @@ case "${1:-server}" in
         # Refuse before loading it unless the explicit CLI operation recorded
         # this exact release and database history. This also runs after reboot.
         java -cp '/usr/local/lib/nexus-dspace:/dspace/lib/*' NexusSchemaGuard check
-        exec java -jar /dspace/webapps/server-boot.jar "$@"
+        exec java -Ddspace.dir=/dspace -jar /dspace/webapps/server-boot.jar "$@"
         ;;
     cli)
         shift
+        JAVA_OPTS="${JAVA_OPTS:--Xmx512m} -Ddspace.dir=/dspace"
+        export JAVA_OPTS
         exec /dspace/bin/dspace "$@"
         ;;
     schema-record)

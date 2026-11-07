@@ -39,7 +39,8 @@ portas; backend e UI escutam apenas em loopback (18101/18100). O proxy encaminha
 backend e Solr ficam fixados por digest/identidade imutável.
 
 Dados persistentes: PostgreSQL, todos os cores Solr, assetstore e diretórios
-graváveis do backend. Configuração privada e senha aleatória ficam no diretório
+graváveis do backend. O volume `discovery-state` guarda o diretório legado de
+sinalização de reindexação em `/dspace/solr/search/conf`; ele é separado do Solr real. Configuração privada e senha aleatória ficam no diretório
 700 da plataforma; configuração 640 para UID/GID do backend e senha 600. Senha não
 entra em argumentos, Compose, catálogo, status ou diagnóstico. E-mail e cadastro
 público ficam desligados. A criação do primeiro administrador pertence ao PR 3;
@@ -61,7 +62,8 @@ Não existe tarefa de remoção/destruição nesta etapa.
 O `org.dspace.core.Context` chama `DatabaseUtils.updateDatabase()` ao iniciar.
 Somente deixar de executar `database migrate` no entrypoint não impediria isso.
 A receita **2** acrescenta `NexusSchemaGuard`, um programa JDBC pequeno, independente
-do núcleo DSpace: lê o histórico Flyway numa transação somente leitura e confere
+do núcleo DSpace: lê a tabela `public.schema_version` usada por esta release
+numa transação somente leitura e confere
 um recibo do hash da release e das migrações bem-sucedidas. O recibo só é gravado
 por `schema-record`, após a migração explicitamente autorizada. Sem recibo, com
 release diferente ou histórico alterado, o backend recusa iniciar **antes** de
@@ -135,9 +137,12 @@ ou URL pública funcionando só porque o processo Node iniciou.
   laboratório para exigir recusa do backend sem alterações automáticas.
   Não chamar isso de reboot da máquina.
 * A primeira execução integrada falhou, após build/smoke das três imagens e
-  auditoria aprovados. O log completo não é acessível pela API deste ambiente.
-  A nova execução acrescenta anotação pública sanitizada com a fase/causa. Ainda
-  pendente comprovar o conjunto funcionando; não apresentar a CI como verde.
+  auditoria aprovados. A anotação pública sanitizada da rodada seguinte revelou
+  a configuração base ausente: `copy_configs_keep` era pulado pelo padrão
+  `overwrite=true` do Ant. Corrigido para o alvo upstream `install_code` (sem
+  banco) seguido de `update_webapps`; o build e o smoke passam a exigir
+  `config-definition.xml`, `dspace.cfg` e `log4j2-cli.xml`. CLI e servidor recebem
+  `-Ddspace.dir=/dspace` explícito. Nova validação integrada pendente.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),

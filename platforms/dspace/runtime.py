@@ -34,7 +34,7 @@ PROJECT = 'kn-dspace'
 LABELS = {'com.koha-nexus.managed': 'true', 'com.koha-nexus.platform': 'dspace'}
 SERVICES = ('postgres', 'solr', 'backend', 'ui')
 BACKEND_DIRS = ('assetstore', 'log', 'var', 'upload', 'reports', 'exports', 'imports', 'handle-server')
-VOLUMES = ('postgres', 'solr') + BACKEND_DIRS
+VOLUMES = ('postgres', 'solr', 'discovery-state') + BACKEND_DIRS
 CORES = ('authority', 'oai', 'search', 'statistics', 'qaevent', 'suggestion', 'audit')
 HTTP = build_opener(ProxyHandler({}))  # probes are local, never an environment proxy
 
@@ -312,7 +312,7 @@ class Runtime:
         config_mount = {'type': 'bind', 'source': str(self.root / 'local.cfg'),
                         'target': '/dspace/config/local.cfg', 'read_only': True}
         services['backend'].update({
-            'volumes': [config_mount] + [n + ':/dspace/' + n for n in BACKEND_DIRS],
+            'volumes': [config_mount, 'discovery-state:/dspace/solr/search/conf'] + [n + ':/dspace/' + n for n in BACKEND_DIRS],
             'ports': ['127.0.0.1:%s:8080' % plan['ports']['backend']], 'mem_limit': '2g',
             'environment': {'JAVA_TOOL_OPTIONS': '-Xms256m -Xmx1408m -Dfile.encoding=UTF-8'},
             'depends_on': {'postgres': {'condition': 'service_healthy'}, 'solr': {'condition': 'service_started'}}})

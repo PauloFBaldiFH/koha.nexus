@@ -12438,7 +12438,7 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="f47fb385aae3e4c229861d58ba6799f78a19ec3e2c74c2932f5baf0a53e91b34"
+KEI_DSPACE_RUNTIME_SHA="41e7b5a884adcb53ae16d1431455709ba442dc801d6da56a3dda9d1a15ee8465"
 KEI_DSPACE_RELEASE_SHA="fc4c90bc26a0a164b198de4c856cc9c214633811df6774580f0744b26947dd97"
 
 kei_dspace_runtime() (
@@ -12508,7 +12508,7 @@ kei_dspace_resource() {
         network) kei_docker_network_create dspace ;;
         volume)
             case "${1:-}" in
-                kn-dspace-postgres|kn-dspace-solr|kn-dspace-assetstore|kn-dspace-log|kn-dspace-var|kn-dspace-upload|kn-dspace-reports|kn-dspace-exports|kn-dspace-imports|kn-dspace-handle-server)
+                kn-dspace-postgres|kn-dspace-solr|kn-dspace-discovery-state|kn-dspace-assetstore|kn-dspace-log|kn-dspace-var|kn-dspace-upload|kn-dspace-reports|kn-dspace-exports|kn-dspace-imports|kn-dspace-handle-server)
                     kei_owned_add docker-volume "$1" dspace no ;;
                 *) return 2 ;;
             esac ;;

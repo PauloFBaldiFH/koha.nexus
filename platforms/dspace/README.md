@@ -46,7 +46,8 @@ passwords or published database/Solr ports.
 * Backend: Maven/Ant assembly in a build stage, executable server JAR and CLI in
   the runtime, UID/GID 10001. No source checkout, Maven, Ant or build proxy trust
   store in the final image. Application code/config defaults are root-owned;
-  data/work directories have explicit write permissions.
+  data/work directories have explicit write permissions, including the legacy
+  Discovery reindex-flag directory (separate from the remote Solr data volume).
 * Startup requires installation-specific `/dspace/config/local.cfg`. The image
   never silently falls back to the example database credentials. `server` starts
   a JDBC-only schema guard before Java; `cli COMMAND ...` runs DSpace's CLI.
