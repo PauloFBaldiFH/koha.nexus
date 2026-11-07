@@ -89,10 +89,15 @@ def main():
                    '-c', 'CREATE TABLE nexus_lifecycle_test(value text); INSERT INTO nexus_lifecycle_test VALUES (\'persistent\');')
         rt.control(False)
         check(rt.status()['status'] == 'stopped', 'intentional stop distinguished from failure')
+        # Replace containers as an update would. Stop/start alone would also
+        # preserve an accidentally used writable container layer.
+        rt.compose('up', '-d', '--pull', 'never', '--force-recreate', '--renew-anon-volumes', 'postgres', 'solr')
+        rt.dependencies()
+        rt.compose('rm', '-f', 'backend', 'ui')  # stopped containers only; no volume deletion
         rt.control(True)
         check('persistent' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                                          'SELECT value FROM nexus_lifecycle_test'), 'database persists across stop/start')
-        check_files('files persist across stop/start')
+        check_files('files persist across container recreation')
         check(before == {name: module.digest(root / name) for name in before}, 'start neither rewrites secrets nor configuration')
         check(rt.state()['migration'] == 'done', 'start preserves completed migration marker')
         check(schema == rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
