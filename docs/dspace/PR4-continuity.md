@@ -1,7 +1,7 @@
 # Continuidade do PR4 DSpace
 
 Branch: `feat/dspace-backup-restore`, base `9a1da55` (#353 mesclado).
-Código atual: `fff9534` (runtime de recuperação em `8f17a6d`) (versão 1.5.183). Não há mesclagem automática.
+Código atual: `d5b9f4d` (runtime de recuperação em `8f17a6d`) (versão 1.5.183). Não há mesclagem automática.
 
 Entregas e limites estão em PR4-backup-recovery.md. A implementação ainda precisa
 passar na CI integrada antes de ser considerada pronta. Abertura via gh está
@@ -23,8 +23,8 @@ página pública das Actions funcionam. Não há PR confirmado para esta branch.
 
 ## CI integrada e próxima validação
 
-Execução final DSpace (`8f17a6d`), ainda em andamento:
-https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42425421060
+Execução final DSpace (`d5b9f4d`), ainda em andamento:
+https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42426430208
 Último painel (`fff9534`), ainda em andamento:
 https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42425671507
 
@@ -63,3 +63,10 @@ https://github.com/PauloFBaldiFH/koha.nexus/compare/main...feat/dspace-backup-re
 
 Título sugerido: Adiciona backup cifrado e recuperação isolada do DSpace (PR4).
 O relatório PR4-backup-recovery.md contém a descrição e as limitações para revisão.
+
+A execução 42425421060 falhou antes do backup, no campo de título do depósito:
+a conta tinha o aceite salvo via interface e confirmado por REST, mas o guard do
+Angular voltou à tela dos termos. Em d5b9f4d o teste confirma novamente a
+persistência após a rede estabilizar e inicia uma sessão limpa, com login real,
+antes de depositar. Nenhum cookie de aceite nem escrita de termos por API é
+injetado. Falta validar essa alteração no navegador real da nova execução.
