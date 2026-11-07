@@ -357,6 +357,22 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(result['project'], 'kn-dspace')
         self.assertFalse(self.root.exists())
 
+    def test_python_and_bash_resources_use_local_daemon_without_changing_caller(self):
+        rt = ds.Runtime(self.root, self.catalog, lab=True, driver='/test/installer')
+        remote = {'DOCKER_HOST': 'tcp://remote.example:2376', 'DOCKER_CONTEXT': 'remote',
+                  'DOCKER_TLS': '1', 'DOCKER_TLS_VERIFY': '1', 'DOCKER_CERT_PATH': '/remote/certs'}
+        with patch.dict(os.environ, remote), patch.object(ds, 'command', return_value='') as run:
+            rt.docker('info')
+            rt.core('plan')
+            self.assertEqual(len(run.call_args_list), 2)
+            for call in run.call_args_list:
+                env = call.kwargs['env']
+                self.assertEqual(env['DOCKER_HOST'], 'unix:///var/run/docker.sock')
+                for key in remote:
+                    if key != 'DOCKER_HOST':
+                        self.assertNotIn(key, env)
+            self.assertEqual({key: os.environ[key] for key in remote}, remote)
+
     def test_unvalidated_user_namespace_or_rootless_engine_is_refused(self):
         rt = ds.Runtime(self.root, self.catalog, lab=True)
         for option in ('name=rootless', 'name=userns'):

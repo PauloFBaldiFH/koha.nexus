@@ -135,6 +135,15 @@ def command(args, timeout=60, input_text=None, env=None):
     return result.stdout
 
 
+def local_docker_env():
+    """Keep Python and the existing Bash resource helpers on the same daemon."""
+    env = dict(os.environ)
+    for key in ('DOCKER_CONTEXT', 'DOCKER_TLS', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH'):
+        env.pop(key, None)
+    env['DOCKER_HOST'] = 'unix:///var/run/docker.sock'
+    return env
+
+
 class Runtime:
     def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None):
         self.root = Path(root).absolute()
@@ -148,7 +157,7 @@ class Runtime:
     def docker(self, *args, timeout=60, input_text=None, log_failure=True):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
         try:
-            return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
+            return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text, env=local_docker_env())
         except OperationFailed as error:
             if log_failure:
                 self.save_error(error)
@@ -170,7 +179,7 @@ class Runtime:
     def core(self, action, *args):
         if not self.driver:
             raise Refused('The existing installer resource driver is required; use config.sh --task dspace.')
-        env = dict(os.environ, KEI_DSPACE_DIR=str(self.root))
+        env = dict(local_docker_env(), KEI_DSPACE_DIR=str(self.root))
         try:
             return command(['bash', self.driver, '--task', 'dspace-resource', action, *args], timeout=300, env=env)
         except OperationFailed as error:

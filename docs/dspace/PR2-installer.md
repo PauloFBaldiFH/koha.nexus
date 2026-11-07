@@ -1,7 +1,7 @@
 # PR 2 — ciclo de instalação isolado do DSpace
 
 Base: main `9de999b`, após #347. Versão do painel: 1.5.181.
-Estado: experimental, em validação. Não habilita DSpace como disponível no painel.
+Estado: experimental, ciclo real validado na CI; ainda sem homologação de produção. Não habilita DSpace como disponível no painel.
 
 ## O que foi implementado
 
@@ -27,6 +27,9 @@ sudo config.sh --task dspace start --confirm
 Antes de instalar, a prévia verifica catálogo de imagens, arquitetura, Docker e
 Compose (rootful, sem remapeamento de usuários ainda não homologado), colisões, memória disponível, espaço de staging, porta e proxy. Endereço
 explícito nesta etapa: não adivinha uma interface nem seleciona a VPN. Apenas amd64.
+Endereços por IP/localhost exigem porta própria, diferente de 80/443 e das portas
+privadas, para não substituir o site padrão já existente. Python e os helpers
+Bash usam o mesmo socket Docker local, sem herdar contexto remoto do usuário.
 O perfil de laboratório reserva limites de 2 GiB para backend, 1 GiB para Solr,
 1,5 GiB para UI e 1 GiB para PostgreSQL. O gate de 4 GiB disponíveis/8 GiB de disco
 livre é conservador para testes e **não** é dimensionamento garantido de um acervo.
@@ -50,10 +53,12 @@ público ficam desligados. A criação do primeiro administrador pertence ao PR 
 este PR não cria conta padrão nem publica dados de teste em produção.
 
 Diário atômico, fsync e trava por plataforma registram as fases. A trava é o mesmo
-`backup/dspace.lock` do motor existente, para a futura integração não abrir outro
+`backup/dspace.lock` do motor existente, recusando links e donos/permissões
+não confiáveis, para a futura integração não abrir outro
 domínio de concorrência. Comando administrativo ainda ativo no Docker após uma
 desconexão impede uma operação conflitante, mesmo que o cliente tenha terminado.
-Uma falha mantém
+Diretórios sem diário de propriedade, links ou arquivos de estado não confiáveis
+são recusados sem adoção automática. Uma falha mantém
 dados; retomar depois da API falhar não repete migração nem troca a senha.
 Migração interrompida/falha requer investigação e `install --retry-migration
 --confirm` explícito. Início normal não emite o comando de migração. Arquivos editados não são
@@ -108,8 +113,9 @@ em instalação comum.
 
 ## Apache e proxy externo
 
-Nesta etapa, o Apache precisa existir; não é instalado implicitamente. O painel
-já tem instalação de infraestrutura compartilhada. URL HTTPS requer proxy TLS
+Nesta etapa experimental por CLI, o Apache precisa estar instalado previamente
+pelo administrador; não é instalado implicitamente. A instalação assistida dessa
+dependência pertence à integração do PR 3. URL HTTPS requer proxy TLS
 externo configurado; o assistente de domínio/túnel vem no PR 6.
 
 Com proxy externo, o resultado e o estado ficam explicitamente marcados
@@ -127,7 +133,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 33 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 36 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
 * Compilação Java 21 e seis verificações do guard passaram localmente: recibo
@@ -140,20 +146,18 @@ ou URL pública funcionando só porque o processo Node iniciou.
   reinício do serviço Docker. Também adultera o histórico Flyway num banco de
   laboratório para exigir recusa do backend sem alterações automáticas.
   Não chamar isso de reboot da máquina.
-* A primeira execução integrada falhou, após build/smoke das três imagens e
-  auditoria aprovados. A anotação pública sanitizada da rodada seguinte revelou
-  a configuração base ausente: `copy_configs_keep` era pulado pelo padrão
-  `overwrite=true` do Ant. Corrigido para o alvo upstream `install_code` (sem
-  banco) seguido de `update_webapps`; o build e o smoke passam a exigir
-  `config-definition.xml`, `dspace.cfg` e `log4j2-cli.xml`. CLI e servidor recebem
-  `-Ddspace.dir=/dspace` explícito. A rodada seguinte também revelou uma checagem nossa incorreta: o contrato
-  upstream usa `_links.communities`, não `_links.core.communities`. Corrigidos
-  o probe e o double, com referência ao teste `RootRestResourceControllerIT` da
-  tag fixada e negociação HAL explícita. A instalação real chegou a `ready`,
-  API e UI pelo Apache passaram; o teste seguinte exigia `_embedded` numa lista
-  vazia, embora HAL possa omiti-lo. O teste passa a exigir paginação zerada e
-  link canônico da própria coleção. Persistência e reinício ainda aguardam
-  conclusão da rodada inteira.
+* A rodada real [42367863941](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42367863941)
+  passou por inteiro: instalação, API e interface pelo Apache, volumes de banco,
+  assetstore e Solr preservados após recriar contêineres e após reiniciar o Docker,
+  além da recusa por histórico de migração alterado. As imagens passaram smoke
+  novamente mesmo restauradas do cache, e a auditoria de dependências passou.
+* A integração encontrou e permitiu corrigir a montagem incompleta dos arquivos
+  base pelo Ant: agora usa `install_code update_webapps`, sem operação no banco,
+  e exige os arquivos essenciais no build e no smoke. O teste também foi alinhado
+  ao contrato HAL upstream: relação `_links.communities` na raiz e paginação/link
+  canônico na lista vazia, que pode omitir `_embedded`.
+* As proteções finais de porta pública e de contexto Docker têm testes unitários;
+  a rodada da revisão final deve ser conferida pelo commit antes da mesclagem.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),
