@@ -275,6 +275,18 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(all(r.get_header('X-forwarded-proto') == 'https' for r in requests))
         self.assertTrue(all(r.full_url.startswith('http://127.0.0.1:') for r in requests))
 
+    def test_disconnected_running_migration_blocks_another_operation(self):
+        self.install()
+        labels = dict(ds.LABELS, **{'com.docker.compose.oneoff': 'True'})
+        def docker(*args, **kwargs):
+            if args[0] == 'ps':
+                return 'unfinished-migration'
+            if args[0] == 'inspect':
+                return json.dumps([{'Config': {'Labels': labels}, 'State': {'Running': True}}])
+            return ''
+        with patch.object(self.rt, 'docker', side_effect=docker), self.assertRaisesRegex(ds.Refused, 'still running'):
+            self.rt.control(False)
+
     def test_proxy_api_rule_precedes_interface_and_operational_paths_are_denied(self):
         self.install()
         config = self.rt.proxy_config()

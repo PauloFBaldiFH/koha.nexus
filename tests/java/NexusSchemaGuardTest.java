@@ -32,7 +32,7 @@ public final class NexusSchemaGuardTest {
             });
         return (Connection) Proxy.newProxyInstance(NexusSchemaGuardTest.class.getClassLoader(),
             new Class<?>[]{Connection.class}, (p, method, args) -> {
-                if (!method.getName().equals("prepareStatement") || !((String) args[0]).startsWith("SELECT ")) {
+                if (!method.getName().equals("prepareStatement") || (!((String) args[0]).startsWith("SELECT ") || !((String) args[0]).contains("FROM public.schema_version "))) {
                     throw new AssertionError("Guard attempted something other than SELECT");
                 }
                 return query;

@@ -56,9 +56,21 @@ def main():
         check('<ds-app' in page and 'DSpace' in page, 'public production interface through Apache')
         with module.HTTP.open(public('/server/api/core/communities'), timeout=20) as response:
             check('_embedded' in json.load(response), 'anonymous real community API')
+        # Simulate a disconnected client: its administrative container can live
+        # on. Do not overlap a new install/start/stop with that still-running job.
+        pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()
+        try:
+            blocked = False
+            try:
+                rt.control(False)
+            except module.Refused as error:
+                blocked = 'still running' in str(error)
+            check(blocked, 'unfinished administrative container blocks conflicting operation')
+        finally:
+            rt.docker('rm', '-f', pending)
         before = {name: module.digest(root / name) for name in ('db-password', 'local.cfg', 'compose.json')}
         schema = rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
-                            'SELECT installed_rank,version,checksum,success FROM flyway_schema_history ORDER BY installed_rank')
+                            'SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
         # A sentinel proves the database is kept; it is a lab-only table, not a fake repository item.
         rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-v', 'ON_ERROR_STOP=1',
                    '-c', 'CREATE TABLE nexus_lifecycle_test(value text); INSERT INTO nexus_lifecycle_test VALUES (\'persistent\');')
@@ -70,7 +82,7 @@ def main():
         check(before == {name: module.digest(root / name) for name in before}, 'start neither rewrites secrets nor configuration')
         check(rt.state()['migration'] == 'done', 'start preserves completed migration marker')
         check(schema == rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
-                                    'SELECT installed_rank,version,checksum,success FROM flyway_schema_history ORDER BY installed_rank'),
+                                    'SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank'),
               'normal restart does not change real Flyway history')
         # Force a mismatched receipt. The entrypoint must refuse BEFORE DSpace
         # loads its Context (which would itself try to migrate).
@@ -78,8 +90,8 @@ def main():
         rt.compose('up', '-d', '--pull', 'never', 'postgres', 'solr')
         rt.dependencies()
         rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-v', 'ON_ERROR_STOP=1', '-c',
-                   "UPDATE flyway_schema_history SET description=description||'-nexus-guard-test' "
-                   "WHERE installed_rank=(SELECT MAX(installed_rank) FROM flyway_schema_history)")
+                   "UPDATE schema_version SET description=description||'-nexus-guard-test' "
+                   "WHERE installed_rank=(SELECT MAX(installed_rank) FROM schema_version)")
         refused = False
         try:
             rt.compose('run', '--rm', '--no-deps', '-T', 'backend', timeout=120)
@@ -87,11 +99,11 @@ def main():
             refused = True
         check(refused, 'schema mismatch prevents backend startup')
         check('nexus-guard-test' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
-                                              'SELECT description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1'),
+                                              'SELECT description FROM schema_version ORDER BY installed_rank DESC LIMIT 1'),
               'refused startup leaves migration history untouched')
         rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-v', 'ON_ERROR_STOP=1', '-c',
-                   "UPDATE flyway_schema_history SET description=regexp_replace(description,'-nexus-guard-test$','') "
-                   "WHERE installed_rank=(SELECT MAX(installed_rank) FROM flyway_schema_history)")
+                   "UPDATE schema_version SET description=regexp_replace(description,'-nexus-guard-test$','') "
+                   "WHERE installed_rank=(SELECT MAX(installed_rank) FROM schema_version)")
         rt.control(True)
         # Restart Docker itself: not a VM reboot, and report it as such.
         module.command(['systemctl', 'restart', 'docker'], timeout=120)

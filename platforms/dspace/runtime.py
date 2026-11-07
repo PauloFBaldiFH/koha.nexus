@@ -139,16 +139,19 @@ class Runtime:
         try:
             return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
         except OperationFailed as error:
-            # Read-only preflight/status do not create a log. Operational errors
-            # are kept privately, with generated secrets and sensitive lines removed.
-            if getattr(self, '_mutating', False):
-                output = error.output
-                password = self.root / 'db-password'
-                if password.exists() and password.read_text().strip():
-                    output = output.replace(password.read_text().strip(), '[redacted]')
-                output = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
-                atomic(self.root / 'last-error.log', output[-32768:])
+            self.save_error(error)
             raise
+
+    def save_error(self, error):
+        # Read-only preflight/status do not create a log. Operational errors
+        # are kept privately, with generated secrets and sensitive lines removed.
+        if getattr(self, '_mutating', False):
+            output = error.output
+            password = self.root / 'db-password'
+            if password.exists() and password.read_text().strip():
+                output = output.replace(password.read_text().strip(), '[redacted]')
+            output = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
+            atomic(self.root / 'last-error.log', output[-32768:])
 
     def compose(self, *args, timeout=120):
         return self.docker('compose', '--project-name', PROJECT, '--project-directory', str(self.root),
@@ -158,7 +161,11 @@ class Runtime:
         if not self.driver:
             raise Refused('The existing installer resource driver is required; use config.sh --task dspace.')
         env = dict(os.environ, KEI_DSPACE_DIR=str(self.root))
-        return command(['bash', self.driver, '--task', 'dspace-resource', action, *args], timeout=300, env=env)
+        try:
+            return command(['bash', self.driver, '--task', 'dspace-resource', action, *args], timeout=300, env=env)
+        except OperationFailed as error:
+            self.save_error(error)
+            raise
 
     def state(self):
         path = self.root / 'state.json'
@@ -178,7 +185,15 @@ class Runtime:
         if self.root.is_symlink() or self.root.stat().st_uid != 0:
             raise Refused('The DSpace directory must be owned by root and not a symbolic link.')
         self.root.chmod(0o700)
-        with open(self.root / 'operation.lock', 'a') as stream:
+        # Same per-platform flock as _kei_bk_lock: future backup/restore must
+        # serialize with install/start/stop, not introduce a second lock domain.
+        owned = Path(os.environ.get('KEI_OWNED_DIR', '/var/lib/koha-nexus'))
+        lock_dir = Path(os.environ.get('KEI_BK_DIR', str(owned / 'backup')))
+        lock_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if lock_dir.is_symlink() or lock_dir.stat().st_uid != 0:
+            raise Refused('The common backup lock directory must be owned by root.')
+        lock_dir.chmod(0o700)
+        with open(lock_dir / 'dspace.lock', 'a') as stream:
             os.fchmod(stream.fileno(), 0o600)
             try:
                 fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -218,8 +233,13 @@ class Runtime:
         ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
         if ids:
             for obj in json.loads(self.docker('inspect', *ids)):
-                if not self.state().get('prepared') or any(obj['Config'].get('Labels', {}).get(k) != v for k, v in LABELS.items()):
+                labels = obj['Config'].get('Labels') or {}
+                if not self.state().get('prepared') or any(labels.get(k) != v for k, v in LABELS.items()):
                     raise Refused('The Compose project already belongs to another installation.')
+                if str(labels.get('com.docker.compose.oneoff', '')).lower() == 'true' and obj['State'].get('Running'):
+                    # A timed-out/disconnected docker CLI can leave its migration
+                    # container alive. Never start another operation over it.
+                    raise Refused('A DSpace administrative container is still running; inspect it before resuming.')
 
     def plan(self, url=None):
         old = self.state()
@@ -450,6 +470,7 @@ class Runtime:
         if start and (state.get('migration') != 'done' or state.get('phase') != 'ready'):
             raise Refused('Installation has not completed its migration; use the installation resume procedure.')
         with self.lock():
+            self.existing_resources()
             for file, hash_value in self.state()['files'].items():
                 if digest(self.root / file) != hash_value:
                     raise Refused('Private configuration was changed; review it before starting/stopping: ' + file)

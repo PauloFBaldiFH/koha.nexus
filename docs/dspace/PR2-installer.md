@@ -45,7 +45,11 @@ entra em argumentos, Compose, catálogo, status ou diagnóstico. E-mail e cadast
 público ficam desligados. A criação do primeiro administrador pertence ao PR 3;
 este PR não cria conta padrão nem publica dados de teste em produção.
 
-Diário atômico, fsync e trava por plataforma registram as fases. Uma falha mantém
+Diário atômico, fsync e trava por plataforma registram as fases. A trava é o mesmo
+`backup/dspace.lock` do motor existente, para a futura integração não abrir outro
+domínio de concorrência. Comando administrativo ainda ativo no Docker após uma
+desconexão impede uma operação conflitante, mesmo que o cliente tenha terminado.
+Uma falha mantém
 dados; retomar depois da API falhar não repete migração nem troca a senha.
 Migração interrompida/falha requer investigação e `install --retry-migration
 --confirm` explícito. Início normal não emite o comando de migração. Arquivos editados não são
@@ -117,7 +121,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 26 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 27 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
 * Compilação Java 21 e seis verificações do guard passaram localmente: recibo

@@ -15,6 +15,7 @@
   "persistent_data": ["postgres", "assetstore", "solr", "configuration", "secrets"],
   "lifecycle": {
     "migration": "explicit-cli-operation",
+    "startup_schema_guard": "release-and-flyway-history-receipt",
     "backup": "not-implemented",
     "restore": "not-implemented"
   }

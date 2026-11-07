@@ -31,7 +31,7 @@ public final class NexusSchemaGuard {
         int rows = 0;
         try (var sink = new DataOutputStream(new DigestOutputStream(java.io.OutputStream.nullOutputStream(), hash));
              var query = db.prepareStatement("SELECT installed_rank, version, description, type, script, checksum, success " +
-                                            "FROM public.flyway_schema_history ORDER BY installed_rank")) {
+                                            "FROM public.schema_version ORDER BY installed_rank")) {
             sink.writeUTF(lock);
             query.setQueryTimeout(20);
             try (ResultSet data = query.executeQuery()) {
