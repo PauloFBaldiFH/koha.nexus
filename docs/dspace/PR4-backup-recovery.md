@@ -56,7 +56,8 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 - 91 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
-- Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: aceite integrado aprovado em `20e3082` (execução
+- Os 88 testes locais selecionados do painel, menus, manual e traduções passaram.
+  Cancelamentos, frase mascarada, plano de restauração e layouts 80×24/160×48 foram exercitados. Serviços reais: aceite integrado aprovado em `20e3082` (execução
   [42422331580](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42422331580)),
   incluindo restauração pública e privada e histórico Solr não vazio. Ajustes
   finais de preservação de candidatos e metadados exigem nova execução.
@@ -71,3 +72,30 @@ A restauração ativa exige um destino com banco legível para o backup de segur
 Para perda/corrupção do banco atual, preparar outra instalação da mesma matriz
 antes de recuperar. Volumes promovidos mantêm o prefixo de recuperação: não
 apagá-los pelo nome; o Compose ativo registra quais estão em uso.
+
+## Uso e recuperação operacional
+
+Na Central de backups, selecionar DSpace. Configurar a chave pelo fluxo existente
+do Nexus e guardar seu kit fora do servidor antes da primeira captura. Criar o
+backup suspende temporariamente o repositório; depois de retomar, o painel mostra
+o caminho do pacote. Sessões do DSpace podem exigir novo login após essa parada.
+
+Os pacotes ficam em `/var/backups/koha-nexus/dspace/knx-dspace-*.tar.gpg`. Copiar o
+arquivo cifrado para outro armazenamento é possível sem exportar plaintext.
+O `.sha256` ao lado é uma verificação adicional transportável, não substitui a
+integridade GPG nem o inventário interno. O kit/frase não devem ser guardados
+junto dos pacotes. Não há envio ou retenção automáticos do DSpace nesta etapa.
+
+Antes de uma restauração efetiva, usar **Testar recuperação**: o teste usa novos
+volumes e não substitui os dados ativos. Para transportar o pacote a outra
+instalação, preparar a mesma matriz e o mesmo endereço canônico e disponibilizar
+a chave/frase de recuperação do Nexus. Manter o nome do pacote e permissões
+restritas ao colocá-lo no diretório de backups; o seletor do painel lista arquivos
+locais, não faz upload de um backup remoto.
+
+**Restaurar** primeiro valida e mostra o plano. Depois da confirmação faz uma
+cópia de segurança cifrada, verifica a cópia restaurada e promove os volumes.
+Uma falha tenta retornar à configuração anterior. Se a operação for interrompida
+ou o retorno falhar, preservar `backup-operation.json`, `recovery-rollback` e os
+volumes; consultar diagnóstico antes de usar `backup-rollback --confirm`.
+Não apagar recursos pelo prefixo: volumes de recuperação podem estar ativos.
