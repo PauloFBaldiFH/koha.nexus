@@ -35,6 +35,10 @@ def smoke(image, prefix):
                'test "$(id -u)" = 10001 || { echo "wrong runtime UID" >&2; exit 1; }; '
                'test -s /dspace/webapps/server-boot.jar || { echo "missing server JAR" >&2; exit 1; }; '
                'test -x /dspace/bin/dspace || { echo "CLI not executable by runtime user" >&2; ls -l /dspace/bin/dspace >&2; exit 1; }; '
+               'test -s /dspace/config/config-definition.xml || { echo "Missing kernel configuration definition" >&2; exit 1; }; '
+               'test -s /dspace/config/dspace.cfg || { echo "Missing base configuration" >&2; exit 1; }; '
+               'test -s /dspace/config/log4j2-cli.xml || { echo "Missing CLI logging configuration" >&2; exit 1; }; '
+               'test -w /dspace/solr/search/conf || { echo "Discovery flag directory is not writable" >&2; exit 1; }; '
                'test -s /usr/share/licenses/dspace/LICENSE || { echo "missing license" >&2; exit 1; }; '
                'test ! -e /dspace/config/local.cfg || { echo "unexpected local.cfg" >&2; exit 1; }; java -version')
         result = docker("run", "--rm", "--network", "none", tag, check=False)

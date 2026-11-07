@@ -204,20 +204,27 @@ Migrar banco de modo controlado, atualizar schema/configsets Solr quando necess�
 
 Remoção padrão mantém dados; remoção completa só de recursos próprios, com plano, confirmação e opção de backup final. Não remover Docker, Apache, GPG, rclone ou regras usadas por outras plataformas. Desabilitar agendas próprias e atualizar contratos públicos sem apagar Koha/Tainacan ou seus conjuntos.
 
-## 13. Plano de PRs
+## 13. Divisão adotada: seis PRs
 
-| Etapa | Entrega | Critério para concluir |
+A proposta inicial tinha oito blocos técnicos. A execução foi consolidada em seis
+PRs, sem retirar os critérios de aceite: contratos ficam junto da fundação, e
+publicação/atualização/documentação ficam na última etapa. Um PR é revisado antes
+de mesclar; não há mesclagem nem publicação de produção automática.
+
+| PR | Entrega | Critério para concluir |
 |---|---|---|
-| D1 | Contratos, generalização mínima do catálogo/centrals e matriz de release | Koha/Tainacan preservados; formatos antigos lidos; DSpace ainda não anunciado como disponível |
-| D2 | Imagens de produção e CI de artefatos | Builds fixados, produção real, permissões, proveniência e arquitetura testadas |
-| D3 | Instalador/CLI, rede, persistência, proxy local e estado | Instalação limpa e repetida, interrupção/retomada, falhas controladas, nenhum site alheio alterado |
-| D4 | Interface, administrador, assistente, idioma e primeiros passos | Fluxo real de depósito e consulta, privacidade, início/parada e reboot; não só HTTP 200 |
-| D5 | Backup e restauração individual | Recuperação de base vazia com documento privado/público, checksum e dados Solr históricos comprovados |
-| D6 | Conjuntos e agendamentos extensíveis | Subconjuntos e planos antigos corretos, falhas parciais e retenção testadas |
-| D7 | Domínio/HTTPS e extensão gratuita do broker | Mesmo sistema em local e domínio; compatibilidade do broker; implantação externa explícita |
-| D8 | Atualização, manutenção e documentação operacional | Recuperação após falha de migração e atualização homologada; pendências registradas |
+| 1 | Fundação, contrato de release, receitas de imagens e CI (#347, mesclado) | Builds fixados, permissões e smoke reais; DSpace ainda indisponível no painel |
+| 2 | Instalador/CLI isolado, rede, persistência, proxy local e estado | Instalação real, falhas/retomada, ciclo de serviços e dados persistentes; catálogo público ainda sujeito a promoção explícita |
+| 3 | Painel, administrador, assistente e primeiros passos | Fluxo real de depósito/consulta e permissões, idiomas, pré-requisitos assistidos e início/parada; não só HTTP 200 |
+| 4 | Backup e restauração individual | Recuperação de base vazia com documentos privados/públicos, checksums e dados Solr históricos |
+| 5 | Conjuntos e agendamentos extensíveis | Subconjuntos e planos antigos corretos, falhas parciais e retenção testadas |
+| 6 | Domínio/HTTPS/broker, atualização e documentação operacional | Publicação compatível, atualização/recuperação homologadas, reboot e pendências operacionais registradas |
 
-Etapas podem ser combinadas quando pequenas, mas não anunciar instalação pronta para produção antes de backup/recuperação e operação básica aprovados. DSpace experimental deve ser identificado sem ambiguidades até esse marco. Não reabrir os PRs anteriores de Koha/Tainacan para acomodar DSpace.
+Não anunciar instalação pronta para produção antes de backup/recuperação e
+operação básica aprovados. DSpace experimental deve ser identificado sem
+ambiguidades até esse marco. A ausência de teste no servidor do Paulo continua
+explícita; a CI real reduz riscos, mas não equivale a homologar esse servidor.
+Não reabrir os PRs anteriores de Koha/Tainacan para acomodar DSpace.
 
 ## 14. Matriz de testes obrigatórios
 

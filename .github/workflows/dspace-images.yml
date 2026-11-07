@@ -6,6 +6,11 @@ on:
       - 'platforms/dspace/**'
       - 'tools/dspace_images.py'
       - 'tools/dspace_smoke.py'
+      - 'tools/dspace_catalog.py'
+      - 'tools/dspace_install_test.py'
+      - 'tests/test_dspace_runtime.py'
+      - 'tests/java/NexusSchemaGuardTest.java'
+      - 'installer'
       - 'tests/test_dspace_images.py'
       - '.github/workflows/dspace-images.yml'
   push:
@@ -14,9 +19,19 @@ on:
       - 'platforms/dspace/**'
       - 'tools/dspace_images.py'
       - 'tools/dspace_smoke.py'
+      - 'tools/dspace_catalog.py'
+      - 'tools/dspace_install_test.py'
+      - 'tests/test_dspace_runtime.py'
+      - 'tests/java/NexusSchemaGuardTest.java'
+      - 'installer'
       - 'tests/test_dspace_images.py'
       - '.github/workflows/dspace-images.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Explicitly publish tested experimental images to GHCR (main only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,8 +52,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile and test schema guard without loading DSpace/Flyway
+        run: |
+          mkdir -p "$RUNNER_TEMP/schema-guard"
+          javac -d "$RUNNER_TEMP/schema-guard" platforms/dspace/images/NexusSchemaGuard.java tests/java/NexusSchemaGuardTest.java
+          java -cp "$RUNNER_TEMP/schema-guard" NexusSchemaGuardTest
       - run: python tools/dspace_images.py validate
       - run: python -m unittest discover -s tests -p test_dspace_images.py -v
+      - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
+      - run: bash -n installer
       - name: Validate runtime shell scripts
         run: |
           sh -n platforms/dspace/images/backend-entrypoint.sh
@@ -61,23 +87,54 @@ jobs:
       - uses: docker/setup-buildx-action@v3
         with:
           driver: docker
+      - name: Restore identical release image archive when available
+        id: runtime-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/dspace-${{ matrix.image }}.tar.gz
+          key: dspace-runtime-v1-${{ runner.os }}-${{ runner.arch }}-${{ matrix.image }}-${{ hashFiles('platforms/dspace/release.json', 'platforms/dspace/ui-dependencies.json', 'platforms/dspace/images/**', 'tools/dspace_images.py', 'LICENSE') }}
+      - name: Load cached immutable image (smoke and integrated tests still run)
+        if: steps.runtime-cache.outputs.cache-hit == 'true'
+        run: docker load -i "$RUNNER_TEMP/dspace-${{ matrix.image }}.tar.gz"
       - name: Fetch and verify released upstream sources
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
         run: python tools/dspace_images.py prepare "$RUNNER_TEMP/dspace-sources"
       - name: Build locked image without registry publication
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
         run: >-
           python tools/dspace_images.py build "$RUNNER_TEMP/dspace-sources"
           --image '${{ matrix.image }}'
           --metadata "$RUNNER_TEMP/dspace-results/${{ matrix.image }}.json"
       - name: Runtime smoke test (not repository acceptance)
         run: python tools/dspace_smoke.py '${{ matrix.image }}'
+      - name: Export tested image for integrated acceptance
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          docker save "$(python tools/dspace_images.py tag '${{ matrix.image }}')" | gzip -1 > "$RUNNER_TEMP/dspace-${{ matrix.image }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dspace-${{ matrix.image }}-runtime
+          path: ${{ runner.temp }}/dspace-${{ matrix.image }}.tar.gz
+          compression-level: 0
+          retention-days: 1
       - name: Record resolved local image and inputs
         id: record
         if: success()
+        env:
+          CACHE_RESTORED: ${{ steps.runtime-cache.outputs.cache-hit }}
         run: |
+          mkdir -p "$RUNNER_TEMP/dspace-results"
           cp platforms/dspace/release.json "$RUNNER_TEMP/dspace-results/release.json"
           cp platforms/dspace/contract.json "$RUNNER_TEMP/dspace-results/contract.json"
           echo "tag=$(python tools/dspace_images.py tag '${{ matrix.image }}')" >> "$GITHUB_OUTPUT"
           docker image inspect "$(python tools/dspace_images.py tag '${{ matrix.image }}')" > "$RUNNER_TEMP/dspace-results/image.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          record = {"validation_commit": os.environ["GITHUB_SHA"], "image_archive_restored": os.environ["CACHE_RESTORED"] == "true"}
+          (Path(os.environ["RUNNER_TEMP"]) / "dspace-results" / "validation.json").write_text(json.dumps(record, indent=2))
+          PY
       - name: Generate component inventory
         uses: anchore/sbom-action@v0
         with:
@@ -116,3 +173,76 @@ jobs:
           path: ${{ runner.temp }}/dspace-ui-audit.json
           if-no-files-found: ignore
           retention-days: 7
+
+  installation:
+    needs: [images, dependencies]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dspace-*-runtime
+          path: ${{ runner.temp }}/dspace-runtime
+          merge-multiple: true
+      - name: Load the exact images that passed their smoke tests
+        run: |
+          for archive in "$RUNNER_TEMP"/dspace-runtime/*.tar.gz; do docker load -i "$archive"; done
+      - name: Existing resource infrastructure on a disposable runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apache2 iptables iproute2 curl python3
+          sudo systemctl start apache2
+      - name: Real integrated lifecycle (no VM reboot claim)
+        run: >-
+          sudo env RUNNER_TEMP="$RUNNER_TEMP"
+          KEI_DOCKER_ISOLATION_CMD="/bin/bash $GITHUB_WORKSPACE/installer --task docker-isolation"
+          python3 tools/dspace_install_test.py --disposable
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dspace-integrated-acceptance
+          path: ${{ runner.temp }}/dspace-acceptance.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    # A PR/push never publishes packages. Publication is a separate explicit action.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: [installation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dspace-*-runtime
+          path: ${{ runner.temp }}/dspace-runtime
+          merge-multiple: true
+      - name: Load tested images
+        run: |
+          for archive in "$RUNNER_TEMP"/dspace-runtime/*.tar.gz; do docker load -i "$archive"; done
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image identities and generate candidate catalog
+        run: |
+          set -e
+          for image in backend ui solr; do
+            tag=$(python3 tools/dspace_images.py tag "$image")
+            target="ghcr.io/paulofbaldifh/koha.nexus/dspace-$image:${GITHUB_SHA}"
+            docker tag "$tag" "$target"
+            docker push "$target"
+            docker pull "$target"
+          done
+          python3 tools/dspace_catalog.py --published > "$RUNNER_TEMP/dspace-images.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dspace-candidate-published-catalog
+          path: ${{ runner.temp }}/dspace-images.json
+          retention-days: 30

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.180"
+PANEL_VERSION=" 1.5.181"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12428,6 +12428,111 @@ kei_docker_audit() {
         done
     done
     return "$bad"
+}
+
+# ======================================================================
+# DSPACE: experimental lifecycle adapter, separate from the Bash installer.
+# Hashes bind the two small downloaded files to this installer version.
+# No code is executed from an unchecked mutable URL. Plan/status never
+# install packages or create persistent platform files.
+# ======================================================================
+KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
+KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
+KEI_DSPACE_RUNTIME_SHA="b7d84494df121b021767e5f4c62bd37d8815566ed21e566897f6f017e78d1ce9"
+KEI_DSPACE_RELEASE_SHA="fc4c90bc26a0a164b198de4c856cc9c214633811df6774580f0744b26947dd97"
+
+kei_dspace_runtime() (
+    local tmp src cache file expected actual rc arg install=0 confirm=0
+    command -v python3 >/dev/null 2>&1 || { echo 'DSpace requires Python 3.' >&2; return 3; }
+    tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
+    trap 'rm -rf "$tmp"' EXIT
+    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA"
+    for file in runtime.py release.json; do
+        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; esac
+        src="${_SCRIPT_DIR}/platforms/dspace/$file"
+        if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
+            cp "$src" "$tmp/$file" || return 1
+        elif [ -f "$cache/$file" ] && [ ! -L "$cache/$file" ] && [ "$(sha256sum "$cache/$file" | cut -d' ' -f1)" = "$expected" ]; then
+            cp "$cache/$file" "$tmp/$file" || return 1
+        else
+            curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 \
+                "${UPDATE_BASE:-${UPDATE_URL%installer}}platforms/dspace/$file" -o "$tmp/$file" || return 1
+        fi
+        actual=$(sha256sum "$tmp/$file" | cut -d' ' -f1)
+        [ "$actual" = "$expected" ] || { echo "DSpace adapter checksum mismatch: $file. Update the panel first." >&2; return 5; }
+    done
+    for arg in "$@"; do
+        [ "$arg" = install ] && install=1
+        [ "$arg" = --confirm ] && confirm=1
+    done
+    # Keep the checked adapter locally. Later status/start/diagnosis work
+    # offline even when config.sh has no checkout next to it.
+    if [ "$install:$confirm" = 1:1 ] && [ "$(id -u)" = 0 ]; then
+        mkdir -p "$cache" && chmod 700 "$cache" || return 1
+        for file in runtime.py release.json; do
+            cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
+                && mv -f "$cache/$file.new" "$cache/$file" || return 1
+        done
+    fi
+    python3 "$tmp/runtime.py" --root "$KEI_DSPACE_DIR" --driver "$(readlink -f "$_SCRIPT_PATH")" "$@"; rc=$?
+    return "$rc"
+)
+
+# These internal tasks are called only by the local Python adapter.
+# They use the exact same isolation, registry and safe Apache operations
+# as Tainacan; no second firewall/proxy implementation is introduced.
+kei_dspace_resource() {
+    local action="${1:-}" mode scheme host port tmp rc
+    [ "$(id -u)" = 0 ] || return 3
+    shift || return 2
+    case "$action" in
+        plan)
+            kei_tainacan_parse_url "${1:-}" >/dev/null || return 2
+            read -r mode _ < <(kei_proxy_detect)
+            read -r scheme host port < <(kei_tainacan_parse_url "$1")
+            if [ "$mode" = none ]; then
+                echo 'Apache must be installed and reviewed first (shared infrastructure); no package is installed by this experimental task.' >&2
+                return 3
+            fi
+            if [ "$mode" != external ] && [ "$scheme" = https ]; then
+                echo 'Configure an external TLS proxy first; DSpace HTTPS/domain assistance is a later PR.' >&2
+                return 3
+            fi
+            # A new Listen must not collide with an unrelated listener.
+            if [ "$port" != 80 ] && [ "$mode" != external ] && [ ! -f "$KEI_DSPACE_DIR/state.json" ]; then
+                if ss -ltn "sport = :$port" 2>/dev/null | grep -q LISTEN; then
+                    echo "The public port $port is already occupied." >&2; return 4
+                fi
+            fi
+            printf '%s\n' "$mode" ;;
+        network) kei_docker_network_create dspace ;;
+        volume)
+            case "${1:-}" in
+                kn-dspace-postgres|kn-dspace-solr|kn-dspace-discovery-state|kn-dspace-assetstore|kn-dspace-log|kn-dspace-var|kn-dspace-upload|kn-dspace-reports|kn-dspace-exports|kn-dspace-imports|kn-dspace-handle-server)
+                    kei_owned_add docker-volume "$1" dspace no ;;
+                *) return 2 ;;
+            esac ;;
+        audit) kei_docker_audit dspace ;;
+        proxy)
+            read -r mode _ < <(kei_proxy_detect)
+            if [ "$mode" = external ]; then
+                printf 'external\n'
+                return 0
+            fi
+            command -v apache2ctl >/dev/null 2>&1 || return 3
+            tmp=$(mktemp) || return 1
+            kei_dspace_runtime proxy-config > "$tmp" || { rm -f "$tmp"; return 1; }
+            for action in proxy proxy_http headers; do
+                kei_proxy_module_use dspace "$action" || { rm -f "$tmp"; return 1; }
+            done
+            kei_proxy_apply_site dspace dspace "$tmp"; rc=$?
+            port=$(awk '/^Listen / { print $2 }' "$tmp")
+            rm -f "$tmp"
+            [ "$rc" = 0 ] || return "$rc"
+            kei_proxy_port_open dspace "${port:-80}" || return 1
+            printf 'apache-configured\n' ;;
+        *) return 2 ;;
+    esac
 }
 
 # ======================================================================
@@ -45629,6 +45734,8 @@ kei_task() {
         docker-install)  _kei_docker_task kei_docker_install "${1:-}" ;;
         docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
+        dspace) kei_dspace_runtime "$@" ;;
+        dspace-resource) kei_dspace_resource "$@" ;;
         tainacan-status)
             local k v
             local out rc

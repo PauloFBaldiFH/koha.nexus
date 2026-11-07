@@ -31,7 +31,7 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("schema") != 1 or data.get("status") != "experimental":
         raise ValueError("Unsupported release schema or maturity")
-    if data.get("recipe") != 1 or data.get("architectures") != ["linux/amd64"]:
+    if data.get("recipe") != 2 or data.get("architectures") != ["linux/amd64"]:
         raise ValueError("Only the experimental amd64 recipe is currently supported")
     if set(data.get("sources", {})) != set(REPOSITORIES):
         raise ValueError("Expected backend and UI sources")
@@ -223,10 +223,12 @@ def build_command(data: dict, sources: Path, name: str, prefix: str, metadata: P
             "--file", str(BASE / "images" / data["images"][name]["dockerfile"])]
     source = data["images"][name]["source"]
     args += ["--build-context", f"{source}-source={sources / (source + '-source')}"]
+    args += ["--build-context", f"nexus-license={BASE.parents[1]}"]
     for key, value in data["bases"].items():
         args += ["--build-arg", f"{key.upper()}_IMAGE={value}"]
     args += ["--build-arg", f"DSPACE_VERSION={version}", "--build-arg",
-             f"SOURCE_REVISION={data['sources'][source]['commit']}"]
+             f"SOURCE_REVISION={data['sources'][source]['commit']}", "--build-arg",
+             f"RELEASE_LOCK_SHA256={hashlib.sha256((BASE / 'release.json').read_bytes()).hexdigest()}"]
     ca = os.environ.get("CODEX_PROXY_CERT")
     if ca:
         if not Path(ca).is_file():

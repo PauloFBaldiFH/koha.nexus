@@ -1,16 +1,21 @@
-# DSpace foundation (PR 1 of 6)
+# DSpace foundation and experimental lifecycle (PRs 1–2 of 6)
 
 This is an **experimental image recipe and build contract**, not a DSpace
-installer. The existing panel still reports DSpace as unsupported. Nothing in
-this directory is sourced by the installer, starts a service, creates an account,
-publishes an address or changes a Koha/Tainacan backup.
+production installer. The existing panel still reports DSpace as unsupported.
+PR 2 adds an explicit experimental CLI adapter; it does not run unless requested.
+Installation remains blocked until reviewed immutable runtime images are published
+and their catalog is configured. See [PR2-installer.md](../../docs/dspace/PR2-installer.md).
+Nothing automatically starts a service, creates an account, publishes an address
+or changes a Koha/Tainacan backup.
 
 ## Locked inputs
 
 `release.json` records schema/recipe versions, upstream release tags and commits,
 the matching UI release and complete base image references including sha256.
 `contract.json` records internal ports, runtime users, Solr cores and data classes.
-It explicitly says installation, backup and restore are not available yet.
+Public installation, backup and restore capabilities remain disabled in that
+contract until the corresponding delivery gates are met; the PR 2 CLI is an
+explicit engineering interface.
 
 | Component | Candidate for integration tests |
 |---|---|
@@ -43,11 +48,16 @@ passwords or published database/Solr ports.
 * Backend: Maven/Ant assembly in a build stage, executable server JAR and CLI in
   the runtime, UID/GID 10001. No source checkout, Maven, Ant or build proxy trust
   store in the final image. Application code/config defaults are root-owned;
-  data/work directories have explicit write permissions.
+  data/work directories have explicit write permissions, including the legacy
+  Discovery reindex-flag directory (separate from the remote Solr data volume).
 * Startup requires installation-specific `/dspace/config/local.cfg`. The image
   never silently falls back to the example database credentials. `server` starts
-  Java directly; `cli COMMAND ...` runs DSpace's CLI. Database migration is an
-  explicit operation for the later installer, never part of a restart.
+  a JDBC-only schema guard before Java; `cli COMMAND ...` runs DSpace's CLI.
+  Upstream DSpace Context can automatically migrate: recipe 2 therefore requires
+  a receipt of the exact release lock and successful Flyway history, recorded by
+  the explicit installer operation. Missing/changed history refuses startup before
+  loading DSpace, including after a Docker/host restart. The guard performs only
+  SELECT in a read-only transaction; it never calls DSpace or Flyway itself.
 * UI: `npm ci` with upstream lockfile, compiled production SSR bundle, direct
   Node execution as UID 1000. No PM2 cluster with a worker per host CPU and no
   development server/recompilation. Canonical public and internal API settings
@@ -59,7 +69,7 @@ passwords or published database/Solr ports.
   An existing core's configuration is not overwritten during a restart. Later
   upgrades must explicitly migrate configsets. Statistics/audit are not treated
   as disposable search caches.
-* No default credentials, automatic database/schema migration, Docker socket,
+* No default credentials, implicit installation migration, Docker socket,
   host mounts, sudo, systemd or host networking in these recipes. `EXPOSE` only
   documents internal ports; it does not publish them.
 
@@ -110,7 +120,10 @@ be granted; this tool does not bypass it.
 `.github/workflows/dspace-images.yml` checks inputs on Python 3.9/3.13, then builds
 backend, UI and Solr separately on amd64 runners. It runs disposable, non-public
 smoke containers and records build metadata, image configuration and SPDX SBOM.
-It does **not** push images to any registry or deploy to a user's server.
+Push and pull-request jobs do **not** publish images or deploy services. The
+explicit manual publication job, available only on main with `publish=true`,
+can publish the same tested images and a candidate immutable catalog after the
+integrated acceptance job passes. Nothing has been published by this work.
 The separate production-dependency audit job blocks high/critical advisories;
 the original upstream lock failed that gate. The reviewed patch passes locally
 with 0 high/critical, 6 moderate and 2 low advisories (2026-11-06 client date).
@@ -124,9 +137,16 @@ Smoke checks deliberately have different meanings:
   integration or login;
 * Solr: starts as non-root with all expected cores; **not** repository recovery.
 
+The PR 2 integrated acceptance runs PostgreSQL, all seven Solr cores, backend
+and SSR together, through the existing Apache resource helper. It checks API/UI,
+persistent data across container replacement and Docker restart, resumability
+and refusal of altered migration history. See the recorded run and limitations
+in [PR2-installer.md](../../docs/dspace/PR2-installer.md). This does not replace
+administrative/deposit browser acceptance or a real machine reboot.
+
 Only a passing workflow proves those jobs passed. A workflow file or an input
-unit test does not prove a build or a functional repository. This PR must remain
-draft while any build/startup check is unresolved.
+unit test does not prove a build or a functional repository. Any unresolved
+build/startup check blocks acceptance.
 
 Before releasing an installer, later PRs must test PostgreSQL+Solr+backend+UI
 together, configuration/permissions, administrative access, submission/publication,
@@ -135,8 +155,8 @@ successful image build is not a production-readiness declaration.
 
 ## Next PRs
 
-1. This PR: foundation, recipes and CI; keep DSpace unavailable in the panel.
-2. Installer: owned Docker project/network/volumes, generated private config,
+1. Delivered in #347: foundation, recipes and CI; DSpace unavailable in the panel.
+2. Current review: installer, owned Docker project/network/volumes, generated private config,
    explicit migration, proxy, resumable installation and lifecycle diagnostics.
 3. Panel and admin: group, dashboard tab, setup assistant and real browser flow.
 4. Consistent backup and isolated restore, including historical Solr data.

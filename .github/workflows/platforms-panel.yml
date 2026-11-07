@@ -64,4 +64,19 @@ jobs:
       - run: python -m pip install pytest -r panel/requirements.txt
       - name: Platforms screen, Tainacan section, dashboard tabs, Backup center, schedules and admin access
         working-directory: panel
-        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_admin_setup.py tests/test_tainacan_free.py
+        run: python -m pytest -q tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_admin_setup.py tests/test_tainacan_free.py --junitxml="$RUNNER_TEMP/platforms-panel.xml"
+      - name: Identify failing tests without exposing full diagnostic logs
+        if: always()
+        run: |
+          python - <<'PYREPORT'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path(os.environ['RUNNER_TEMP']) / 'platforms-panel.xml'
+          if report.exists():
+              for case in ET.parse(report).iter('testcase'):
+                  if case.find('failure') is not None or case.find('error') is not None:
+                      name = case.get('classname', '') + '.' + case.get('name', '')
+                      name = name.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                      print('::error title=Panel regression::' + name)
+          PYREPORT
