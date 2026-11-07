@@ -215,8 +215,8 @@ de mesclar; não há mesclagem nem publicação de produção automática.
 |---|---|---|
 | 1 | Fundação, contrato de release, receitas de imagens e CI (#347, mesclado) | Builds fixados, permissões e smoke reais; DSpace ainda indisponível no painel |
 | 2 | Instalador/CLI isolado (#352, mesclado), rede, persistência, proxy local e estado | Instalação real, falhas/retomada, ciclo de serviços e dados persistentes; catálogo público ainda sujeito a promoção explícita |
-| 3 | Em revisão: painel, administrador, assistente e primeiros passos | Fluxo real de depósito/consulta e permissões, idiomas, pré-requisitos assistidos e início/parada; não só HTTP 200 |
-| 4 | Backup e restauração individual | Recuperação de base vazia com documentos privados/públicos, checksums e dados Solr históricos |
+| 3 | Painel, administrador, assistente e primeiros passos (#353, mesclado) | Fluxo real de depósito/consulta e permissões, idiomas, pré-requisitos assistidos e início/parada; não só HTTP 200 |
+| 4 | Backup e restauração individual (versão 1.5.183, branch `feat/dspace-backup-restore`; detalhes em [PR4-backup-recovery.md](PR4-backup-recovery.md)) | Recuperação de base vazia com documentos privados/públicos, checksums e dados Solr históricos |
 | 5 | Conjuntos e agendamentos extensíveis | Subconjuntos e planos antigos corretos, falhas parciais e retenção testadas |
 | 6 | Domínio/HTTPS/broker, atualização e documentação operacional | Publicação compatível, atualização/recuperação homologadas, reboot e pendências operacionais registradas |
 

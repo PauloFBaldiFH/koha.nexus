@@ -65,7 +65,7 @@ class BackupCenterView(PlatformSectionView):
             yield Label(t("Platform:"), classes="form-label")
             for scope in backup_center.SCOPES:
                 yield Button(t(backup_center.SCOPE_LABELS[scope]), id=f"scope-{scope}", classes="small")
-        yield Static(t("No platform is installed yet: install Koha or Tainacan to back it up. Cloud connections "
+        yield Static(t("No platform is installed yet: install Koha, Tainacan or DSpace to back it up. Cloud connections "
                        "can already be added."), id="bk-none", classes="view-prompt", markup=False)
         with Vertical(id="bk-koha"):
             with Grid(classes="status-grid"):
