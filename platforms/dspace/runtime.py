@@ -1,0 +1,538 @@
+#!/usr/bin/env python3
+"""Experimental DSpace lifecycle adapter; Python 3.9+, no third-party modules.
+
+The installer supplies the existing resource driver (network/proxy/registry).
+No operation builds images, changes another platform, or deletes a data volume.
+Production installation fails closed until an operator supplies the reviewed
+immutable image catalog. Local image IDs require the explicit laboratory flag.
+"""
+
+import argparse
+import contextlib
+import fcntl
+import hashlib
+import ipaddress
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import secrets
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import urlsplit
+from urllib.request import ProxyHandler, Request, build_opener
+
+BASE = Path(__file__).resolve().parent
+ROOT = Path(os.environ.get('KEI_DSPACE_DIR', '/var/lib/koha-nexus/platforms/dspace'))
+PROJECT = 'kn-dspace'
+LABELS = {'com.koha-nexus.managed': 'true', 'com.koha-nexus.platform': 'dspace'}
+SERVICES = ('postgres', 'solr', 'backend', 'ui')
+BACKEND_DIRS = ('assetstore', 'log', 'var', 'upload', 'reports', 'exports', 'imports', 'handle-server')
+VOLUMES = ('postgres', 'solr') + BACKEND_DIRS
+CORES = ('authority', 'oai', 'search', 'statistics', 'qaevent', 'suggestion', 'audit')
+HTTP = build_opener(ProxyHandler({}))  # probes are local, never an environment proxy
+
+
+class Refused(Exception):
+    pass
+
+
+def digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def read_json(path):
+    return json.loads(Path(path).read_text())
+
+
+def atomic(path, data, mode=0o600, gid=None):
+    path = Path(path)
+    fd, name = tempfile.mkstemp(prefix='.' + path.name + '-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            os.fchmod(stream.fileno(), mode)
+            if gid is not None:
+                os.fchown(stream.fileno(), 0, gid)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+        directory = os.open(str(path.parent), os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def canonical_url(value):
+    """One origin only: no credentials, paths, controls or Apache interpolation."""
+    try:
+        u = urlsplit(value)
+        host = u.hostname or ''
+        port = u.port or (443 if u.scheme == 'https' else 80)
+        if (u.scheme not in ('http', 'https') or u.username or u.password or
+                u.query or u.fragment or u.path not in ('', '/') or
+                not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,252}', host) or
+                not 1 <= port <= 65535 or value != value.strip() or
+                any(ord(c) < 33 for c in value)):
+            raise ValueError()
+        # IPv6 requires matching bind/proxy support; do not silently misconfigure it.
+        if re.fullmatch(r'[0-9.]+', host):
+            ipaddress.IPv4Address(host)
+        elif any(not label or len(label) > 63 or label[0] == '-' or label[-1] == '-'
+                 for label in host.split('.')):
+            raise ValueError()
+        suffix = '' if port == (443 if u.scheme == 'https' else 80) else ':' + str(port)
+        return u.scheme + '://' + host + suffix
+    except ValueError:
+        raise Refused('Provide one HTTP(S) origin, without credentials, path or query (IPv4 or DNS).')
+
+
+def free_port(port):
+    with socket.socket() as probe:
+        try:
+            probe.bind(('127.0.0.1', port))
+            return True
+        except OSError:
+            return False
+
+
+def command(args, timeout=60, input_text=None, env=None):
+    """Never print subprocess output: it can include configuration/credentials."""
+    try:
+        result = subprocess.run([str(x) for x in args], input=input_text, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        raise Refused('Operation unavailable or timed out: ' + str(args[0]))
+    if result.returncode:
+        raise Refused('Operation failed (exit %s): %s. Use the local diagnostic.' %
+                      (result.returncode, str(args[0])))
+    return result.stdout
+
+
+class Runtime:
+    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None):
+        self.root = Path(root)
+        self.release = read_json(BASE / 'release.json')
+        self.release_hash = digest(BASE / 'release.json')
+        self.catalog_path = Path(catalog or '/etc/koha-nexus/dspace-images.json')
+        self.lab = lab
+        self.driver = driver
+
+    def docker(self, *args, timeout=60, input_text=None):
+        # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
+        return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
+
+    def compose(self, *args, timeout=120):
+        return self.docker('compose', '--project-name', PROJECT, '--project-directory', str(self.root),
+                           '-f', str(self.root / 'compose.json'), *args, timeout=timeout)
+
+    def core(self, action, *args):
+        if not self.driver:
+            raise Refused('The existing installer resource driver is required; use config.sh --task dspace.')
+        env = dict(os.environ, KEI_DSPACE_DIR=str(self.root))
+        return command(['bash', self.driver, '--task', 'dspace-resource', action, *args], timeout=300, env=env)
+
+    def state(self):
+        path = self.root / 'state.json'
+        return read_json(path) if path.exists() else {}
+
+    def mark(self, **changes):
+        state = self.state()
+        state.update(changes)
+        state['updated_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        atomic(self.root / 'state.json', json.dumps(state, indent=2) + '\n')
+
+    @contextlib.contextmanager
+    def lock(self):
+        if os.geteuid() != 0:
+            raise Refused('Run this operation locally as root.')
+        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if self.root.is_symlink() or self.root.stat().st_uid != 0:
+            raise Refused('The DSpace directory must be owned by root and not a symbolic link.')
+        self.root.chmod(0o700)
+        with open(self.root / 'operation.lock', 'a') as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            try:
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise Refused('Another DSpace operation is running.')
+            yield
+
+    def images(self):
+        if not self.catalog_path.is_file():
+            raise Refused('Reviewed DSpace images are not published/configured yet; no installation was started.')
+        data = read_json(self.catalog_path)
+        if data.get('schema') != 1 or data.get('release_sha256') != self.release_hash:
+            raise Refused('The image catalog does not match this exact DSpace release lock.')
+        images = data.get('images', {})
+        if set(images) != {'backend', 'ui', 'solr'}:
+            raise Refused('The catalog must contain exactly backend, ui and solr.')
+        for name, ref in images.items():
+            published = isinstance(ref, str) and re.fullmatch(
+                r'ghcr\.io/paulofbaldifh/koha\.nexus/dspace-' + name + r'@sha256:[a-f0-9]{64}', ref)
+            local = self.lab and isinstance(ref, str) and re.fullmatch(r'sha256:[a-f0-9]{64}', ref)
+            if not (published or local):
+                raise Refused('An immutable reviewed image is required for ' + name)
+        return dict(images, postgres=self.release['bases']['postgres'])
+
+    def existing_resources(self):
+        """Refuse collisions before any pull, network, file or database change."""
+        names = self.docker('volume', 'ls', '--format', '{{.Name}}').splitlines()
+        for name in VOLUMES:
+            if PROJECT + '-' + name in names:
+                obj = json.loads(self.docker('volume', 'inspect', PROJECT + '-' + name))[0]
+                if not self.state().get('prepared') or any((obj.get('Labels') or {}).get(k) != v for k, v in LABELS.items()):
+                    raise Refused('An existing data volume is not owned by this installation: ' + name)
+        ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
+        if ids:
+            for obj in json.loads(self.docker('inspect', *ids)):
+                if not self.state().get('prepared') or any(obj['Config'].get('Labels', {}).get(k) != v for k, v in LABELS.items()):
+                    raise Refused('The Compose project already belongs to another installation.')
+
+    def plan(self, url=None):
+        old = self.state()
+        url = canonical_url(url or old.get('url', ''))
+        if old and (old.get('url') != url or old.get('release_sha256') != self.release_hash):
+            raise Refused('Existing data/configuration requires a deliberate update or address change, not installation.')
+        images = self.images()
+        if platform.machine() not in ('x86_64', 'amd64'):
+            raise Refused('Only linux/amd64 has been built and tested; ARM installation is not supported yet.')
+        if not self.lab:
+            os_release = Path('/etc/os-release').read_text()
+            if not any(x in os_release for x in ('ID=debian', 'ID=ubuntu')):
+                raise Refused('Only Debian/Ubuntu are supported by the existing installer.')
+        info = json.loads(self.docker('info', '--format', '{{json .}}'))
+        if info.get('OSType') != 'linux':
+            raise Refused('A local Linux Docker engine is required.')
+        self.docker('compose', 'version')
+        self.existing_resources()
+        ports = old.get('ports') or {'ui': 18100, 'backend': 18101}
+        if not old.get('prepared') and any(not free_port(p) for p in ports.values()):
+            raise Refused('A reserved loopback port is occupied (18100/18101); nothing was changed.')
+        # Conservative engineering gate; explicitly not an upstream sizing guarantee.
+        mem = {}
+        if Path('/proc/meminfo').exists():
+            mem = {x.split(':')[0]: int(x.split()[1]) * 1024 for x in Path('/proc/meminfo').read_text().splitlines()}
+        if mem.get('MemAvailable', 0) < 4 * 1024**3:
+            raise Refused('Less than 4 GiB of currently available host RAM; cannot reserve this laboratory profile safely.')
+        parent = self.root
+        while not parent.exists():
+            parent = parent.parent
+        if shutil.disk_usage(parent).free < 8 * 1024**3:
+            raise Refused('Less than 8 GiB of free staging space; collection storage needs additional capacity.')
+        proxy = self.core('plan', url).strip()
+        return {'schema': 1, 'experimental': True, 'url': url, 'api': url + '/server',
+                'images': images, 'release_sha256': self.release_hash, 'ports': ports,
+                'project': PROJECT, 'volumes': [PROJECT + '-' + n for n in VOLUMES],
+                'proxy': proxy, 'migration': old.get('migration', 'not-started'),
+                'notes': ['No administrator is created in this PR.', 'No backup/restore adapter is available yet.',
+                          'Mail and self-registration stay disabled until explicitly configured.',
+                          'Memory budget: backend 2 GiB, Solr 1 GiB, UI 1.5 GiB, PostgreSQL 1 GiB.',
+                          'A reboot test is distinct from restarting containers.']}
+
+    def render(self, plan, password, gateway):
+        u = urlsplit(plan['url'])
+        cfg = '\n'.join([
+            '# Managed by Koha.Nexus: dspace. Private; never include in diagnostics.',
+            'dspace.dir = /dspace', 'dspace.name = DSpace',
+            'dspace.ui.url = ' + plan['url'], 'dspace.server.url = ' + plan['api'],
+            'dspace.server.ssr.url = http://backend:8080/server',
+            'db.url = jdbc:postgresql://postgres:5432/dspace', 'db.username = dspace',
+            'db.password = ' + password, 'solr.server = http://solr:8983/solr',
+            'proxies.trusted.ipranges = 127.0.0.1, ' + gateway,
+            'rest.cors.allowed-origins = ' + plan['url'],
+            'mail.server.disabled = true', 'user.registration = false', ''])
+        services = {}
+        for name in SERVICES:
+            services[name] = {'image': plan['images'][name], 'restart': 'unless-stopped',
+                              'labels': dict(LABELS), 'security_opt': ['no-new-privileges:true'],
+                              'networks': ['platform'], 'stop_grace_period': '90s'}
+        services['postgres'].update({
+            'environment': {'POSTGRES_DB': 'dspace', 'POSTGRES_USER': 'dspace',
+                            'POSTGRES_PASSWORD_FILE': '/run/secrets/db-password'},
+            'volumes': ['postgres:/var/lib/postgresql/data',
+                        {'type': 'bind', 'source': str(self.root / 'db-password'),
+                         'target': '/run/secrets/db-password', 'read_only': True}],
+            'mem_limit': '1g', 'shm_size': '256m',
+            'healthcheck': {'test': ['CMD-SHELL', 'pg_isready -U dspace -d dspace'], 'interval': '10s', 'timeout': '5s', 'retries': 30}})
+        services['solr'].update({'volumes': ['solr:/var/solr'], 'mem_limit': '1g',
+                                'environment': {'SOLR_HEAP': '512m'}})
+        config_mount = {'type': 'bind', 'source': str(self.root / 'local.cfg'),
+                        'target': '/dspace/config/local.cfg', 'read_only': True}
+        services['backend'].update({
+            'volumes': [config_mount] + [n + ':/dspace/' + n for n in BACKEND_DIRS],
+            'ports': ['127.0.0.1:%s:8080' % plan['ports']['backend']], 'mem_limit': '2g',
+            'environment': {'JAVA_TOOL_OPTIONS': '-Xms256m -Xmx1408m -Dfile.encoding=UTF-8'},
+            'depends_on': {'postgres': {'condition': 'service_healthy'}, 'solr': {'condition': 'service_started'}}})
+        services['ui'].update({
+            'ports': ['127.0.0.1:%s:4000' % plan['ports']['ui']], 'mem_limit': '1536m',
+            'environment': {'DSPACE_UI_BASEURL': plan['url'], 'DSPACE_UI_HOST': '0.0.0.0',
+                            'DSPACE_UI_PORT': '4000', 'DSPACE_UI_SSL': 'false',
+                            'DSPACE_REST_HOST': u.hostname, 'DSPACE_REST_PORT': str(u.port or (443 if u.scheme == 'https' else 80)),
+                            'DSPACE_REST_SSL': str(u.scheme == 'https').lower(), 'DSPACE_REST_NAMESPACE': '/server',
+                            'DSPACE_REST_SSRBASEURL': 'http://backend:8080/server',
+                            'NODE_OPTIONS': '--max-old-space-size=1024'},
+            'depends_on': {'backend': {'condition': 'service_started'}}})
+        compose = {'name': PROJECT, 'services': services,
+                   'networks': {'platform': {'name': PROJECT, 'external': True}},
+                   'volumes': {n: {'name': PROJECT + '-' + n, 'external': True} for n in VOLUMES}}
+        return cfg, compose
+
+    def check_images(self, images):
+        for name, ref in images.items():
+            if not ref.startswith('sha256:'):
+                print('Downloading locked image: ' + name, flush=True)
+                self.docker('pull', ref, timeout=1200)
+            obj = json.loads(self.docker('image', 'inspect', ref))[0]
+            if obj.get('Architecture') != 'amd64' or obj.get('Os') != 'linux':
+                raise Refused('Image architecture mismatch: ' + name)
+            if name != 'postgres':
+                source = self.release['sources']['ui' if name == 'ui' else 'backend']
+                labels = obj['Config'].get('Labels') or {}
+                if labels.get('org.opencontainers.image.revision') != source['commit']:
+                    raise Refused('Image source revision mismatch: ' + name)
+                expected_user = {'backend': '10001:10001', 'ui': 'node', 'solr': '8983:8983'}[name]
+                if obj['Config'].get('User') != expected_user:
+                    raise Refused('Unexpected runtime user: ' + name)
+
+    def wait(self, label, fn, seconds=300):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            try:
+                if fn():
+                    return
+            except (Refused, OSError, ValueError):
+                pass
+            time.sleep(3)
+        raise Refused(label + ' did not become ready. Data were kept; inspect the diagnostic before resuming.')
+
+    def dependencies(self):
+        self.wait('PostgreSQL', lambda: self.compose('exec', '-T', 'postgres', 'pg_isready', '-U', 'dspace', '-d', 'dspace'))
+        # A server replying is insufficient: require every real core to load successfully.
+        def solr_ready():
+            data = json.loads(self.compose('exec', '-T', 'solr', 'curl', '-fsS', '--max-time', '10',
+                                           'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
+            return not data.get('initFailures') and set(CORES) <= set(data.get('status', {}))
+        self.wait('All seven Solr cores', solr_ready)
+
+    def http_json(self, path, port):
+        with HTTP.open(Request('http://127.0.0.1:%s%s' % (port, path), headers={'Accept': 'application/json'}), timeout=15) as stream:
+            return json.load(stream)
+
+    def health(self):
+        state = self.state()
+        ports = state['ports']
+        def api():
+            doc = self.http_json('/server/api', ports['backend'])
+            return (bool(doc.get('_links', {}).get('core.communities', {}).get('href')) and
+                    doc.get('dspaceVersion', '').startswith('DSpace 10.1'))
+        self.wait('DSpace REST API', api, 600)
+        def ui():
+            with HTTP.open('http://127.0.0.1:%s/' % ports['ui'], timeout=30) as response:
+                page = response.read(4 * 1024 * 1024).decode('utf8', errors='replace')
+            return '<ds-app' in page and 'DSpace' in page
+        self.wait('DSpace production interface', ui, 300)
+
+    def install(self, url=None, retry_migration=False):
+        # Preflight first: a missing catalog never creates even the platform directory.
+        plan = self.plan(url)
+        with self.lock():
+            plan = self.plan(plan['url'])  # re-check after acquiring the operation lock
+            state = self.state()
+            if state.get('status') == 'installed':
+                raise Refused('DSpace is already installed; use start or diagnosis, not reinstall.')
+            if state.get('migration') in ('running', 'failed') and not retry_migration:
+                raise Refused('A previous migration was interrupted/failed; review it, then explicitly use --retry-migration.')
+            try:
+                self.mark(status='installing', phase='images', url=plan['url'], ports=plan['ports'],
+                          release_sha256=self.release_hash)
+                self.check_images(plan['images'])
+                self.mark(phase='network')
+                self.core('network')
+                net = json.loads(self.docker('network', 'inspect', PROJECT))[0]
+                if any((net.get('Labels') or {}).get(k) != v for k, v in LABELS.items()):
+                    raise Refused('The platform network is not owned by Koha.Nexus.')
+                gateway = str(ipaddress.IPv4Address(net['IPAM']['Config'][0]['Gateway']))
+                password_path = self.root / 'db-password'
+                if state.get('prepared'):
+                    # Do not silently rotate an existing database password or rewrite edited config.
+                    for file, hash_value in state['files'].items():
+                        if digest(self.root / file) != hash_value:
+                            raise Refused('Private configuration was changed; installation will not overwrite it: ' + file)
+                else:
+                    # An incomplete preparation with no volumes can be safely retried using the same password.
+                    password = password_path.read_text().strip() if password_path.exists() else secrets.token_hex(32)
+                    if not re.fullmatch(r'[a-f0-9]{64}', password):
+                        raise Refused('Unexpected password file; refusing to overwrite it.')
+                    cfg, compose = self.render(plan, password, gateway)
+                    atomic(password_path, password + '\n')
+                    atomic(self.root / 'local.cfg', cfg, 0o640, 10001)
+                    atomic(self.root / 'compose.json', json.dumps(compose, indent=2) + '\n')
+                    self.mark(prepared=True, files={f: digest(self.root / f) for f in ('db-password', 'local.cfg', 'compose.json')})
+                for name in VOLUMES:
+                    v = PROJECT + '-' + name
+                    self.docker('volume', 'create', '--label', 'com.koha-nexus.managed=true',
+                                '--label', 'com.koha-nexus.platform=dspace', v)
+                    self.core('volume', v)
+                self.mark(phase='dependencies')
+                self.compose('up', '-d', '--pull', 'never', 'postgres', 'solr')
+                self.dependencies()
+                if self.state().get('migration') != 'done':
+                    self.mark(phase='migration', migration='running')
+                    try:
+                        self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'cli', 'database', 'migrate', timeout=1200)
+                    except BaseException:
+                        self.mark(migration='failed')
+                        raise
+                    self.mark(migration='done')
+                self.mark(phase='application')
+                self.compose('up', '-d', '--pull', 'never', 'backend', 'ui')
+                self.health()
+                self.core('audit')
+                self.mark(phase='proxy')
+                self.core('proxy')
+                self.mark(status='installed', phase='ready', intended='running')
+                return {'status': 'installed', 'url': plan['url'], 'experimental': True}
+            except BaseException:
+                self.mark(status='failed')
+                raise
+
+    def control(self, start):
+        if not self.state().get('prepared') or self.state().get('migration') != 'done':
+            raise Refused('Installation has not completed its migration; use the installation resume procedure.')
+        with self.lock():
+            for file, hash_value in self.state()['files'].items():
+                if digest(self.root / file) != hash_value:
+                    raise Refused('Private configuration was changed; review it before starting/stopping: ' + file)
+            if start:
+                self.mark(status='starting', intended='running')
+                self.core('network')  # reapply isolation before starting any service
+                self.compose('up', '-d', '--pull', 'never', 'postgres', 'solr')
+                self.dependencies()
+                self.compose('up', '-d', '--pull', 'never', 'backend', 'ui')
+                try:
+                    self.health()
+                    self.core('audit')
+                except BaseException:
+                    self.mark(status='degraded', intended='running')
+                    raise
+                self.mark(status='installed', intended='running')
+            else:
+                # Graceful reverse order, keep all containers, volumes, configuration and proxy.
+                self.compose('stop', '--timeout', '90', 'ui', 'backend', 'solr', 'postgres', timeout=420)
+                self.mark(status='stopped', intended='stopped')
+            return self.status()
+
+    def status(self):
+        state = self.state()
+        if not state:
+            return {'schema': 1, 'platform': 'dspace', 'status': 'absent', 'experimental': True}
+        result = {k: state.get(k) for k in ('status', 'phase', 'url', 'migration', 'intended', 'updated_at')}
+        result.update(schema=1, platform='dspace', experimental=True, health='not-checked')
+        try:
+            ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
+            observed = {}
+            if ids:
+                for obj in json.loads(self.docker('inspect', *ids)):
+                    label = obj['Config'].get('Labels') or {}
+                    if all(label.get(k) == v for k, v in LABELS.items()) and label.get('com.docker.compose.oneoff') != 'True':
+                        observed[label.get('com.docker.compose.service')] = obj['State']['Status']
+            result['services'] = {s: observed.get(s, 'missing') for s in SERVICES}
+            if not all(x == 'running' for x in result['services'].values()):
+                result['status'] = 'stopped' if state.get('intended') == 'stopped' else 'degraded'
+        except Refused:
+            result['status'] = 'unavailable'
+            result['reason'] = 'Local Docker is unavailable; no restoration is implied.'
+        return result
+
+    def diagnostic(self):
+        result = self.status()
+        if result.get('status') == 'installed':
+            try:
+                self.dependencies()
+                self.health()
+                self.core('audit')
+                result['health'] = 'api-ui-dependencies'
+            except Refused as error:
+                result['health'] = 'failed'
+                result['reason'] = str(error)
+        # Never output docker inspect/config, command output, local.cfg, password or environment.
+        return result
+
+    def proxy_config(self):
+        state = self.state()
+        u = urlsplit(canonical_url(state['url']))
+        port = u.port or (443 if u.scheme == 'https' else 80)
+        if u.scheme != 'http':
+            raise Refused('HTTPS must terminate at a configured external proxy in this experimental stage.')
+        listen = '' if port == 80 else 'Listen %s\n' % port
+        return (listen + '<VirtualHost *:%s>\n' % port +
+                '  ServerName %s\n  ProxyRequests Off\n  ProxyPreserveHost On\n' % u.hostname +
+                '  RequestHeader set X-Forwarded-Proto "http"\n' +
+                '  ProxyPass /server http://127.0.0.1:%s/server timeout=300\n' % int(state['ports']['backend']) +
+                '  ProxyPassReverse /server http://127.0.0.1:%s/server\n' % int(state['ports']['backend']) +
+                '  ProxyPass / http://127.0.0.1:%s/ timeout=300\n' % int(state['ports']['ui']) +
+                '  ProxyPassReverse / http://127.0.0.1:%s/\n' % int(state['ports']['ui']) +
+                '  <LocationMatch "^/server/(actuator|config)(/|$)">\n    Require all denied\n  </LocationMatch>\n' +
+                '</VirtualHost>\n')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', type=Path, default=ROOT)
+    parser.add_argument('--catalog', type=Path)
+    parser.add_argument('--lab', action='store_true', help='Explicit engineering-only local immutable image IDs')
+    parser.add_argument('--driver', help='Existing config.sh/installer resource driver')
+    sub = parser.add_subparsers(dest='command', required=True)
+    for name in ('plan', 'install'):
+        cmd = sub.add_parser(name)
+        cmd.add_argument('--url')
+        if name == 'install':
+            cmd.add_argument('--confirm', action='store_true')
+            cmd.add_argument('--retry-migration', action='store_true')
+    for name in ('start', 'stop'):
+        sub.add_parser(name).add_argument('--confirm', action='store_true')
+    for name in ('status', 'diagnose', 'proxy-config'):
+        sub.add_parser(name)
+    args = parser.parse_args()
+    runtime = Runtime(args.root, args.catalog, args.lab, args.driver)
+    def interrupted(signum, _frame):
+        raise Refused('Interrupted; data were preserved. Review the saved phase before resuming.')
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGHUP, interrupted)
+    try:
+        if args.command in ('install', 'start', 'stop') and not args.confirm:
+            raise Refused('Explicit --confirm is required after reviewing the plan.')
+        if args.command == 'plan':
+            result = runtime.plan(args.url)
+        elif args.command == 'install':
+            result = runtime.install(args.url, args.retry_migration)
+        elif args.command in ('start', 'stop'):
+            result = runtime.control(args.command == 'start')
+        elif args.command == 'proxy-config':
+            print(runtime.proxy_config(), end='')
+            return 0
+        elif args.command == 'diagnose':
+            result = runtime.diagnostic()
+        else:
+            result = runtime.status()
+        print(json.dumps(result, indent=2))
+        return 0
+    except (Refused, OSError, ValueError, KeyError, KeyboardInterrupt) as error:
+        # ValueErrors can include input; inputs never contain credentials on this CLI.
+        print('DSpace: ' + str(error), file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
