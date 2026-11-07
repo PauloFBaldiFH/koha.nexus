@@ -5,7 +5,7 @@ Four facts are kept apart for every platform, never folded into one
 "operational" flag:
 
   supported  this version of the panel can install and administer it
-             (Koha and Tainacan; AtoM and DSpace are planned)
+             (Koha, Tainacan and experimental DSpace; AtoM is planned)
   detected   an installation was found (Koha: its koha-conf.xml exists,
              the installer's is_koha_installed); None = not looked for
   services   its system services: active, partial, inactive, unknown, or

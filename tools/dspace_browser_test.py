@@ -5,6 +5,8 @@ Called only by dspace_install_test.py after its explicit disposable-machine gate
 No traces, cookies, authorization headers, passwords or browser storage are saved.
 """
 import hashlib
+import base64
+import subprocess
 import http.cookiejar
 import json
 from pathlib import Path
@@ -68,19 +70,31 @@ def exercise(rt, output):
     def check(value, message):
         if not value: raise AssertionError(message)
         print('PASS: ' + message, flush=True)
-    check(rt.admin('status')['state'] == 'missing', 'no default DSpace administrator')
+    def administrator(operation, request=None):
+        # Exercise the normal installer/checksum loader and protected stdin,
+        # not only the Python adapter called directly by this disposable test.
+        args = ['bash', str(Path(__file__).resolve().parents[1] / 'installer'), '--task', 'dspace-panel', 'admin-' + operation]
+        if operation != 'status': args.append('--confirm')
+        result = subprocess.run(args, input=json.dumps(request) if request is not None else None,
+                                text=True, capture_output=True, timeout=240)
+        if result.returncode:
+            raise RuntimeError('Administrator task refused (' + operation + ')')
+        lines = [line.split('=',1)[1] for line in result.stdout.splitlines() if line.startswith('@@result payload=')]
+        if len(lines) != 1: raise RuntimeError('Administrator task returned no valid protocol result.')
+        return json.loads(base64.b64decode(lines[0], validate=True))
+    check(administrator('status')['state'] == 'missing', 'no default DSpace administrator')
     request = dict(email=email, first='Nexus', last='Acceptance', language='en', password=password)
-    rt.admin('create', request)
-    check(email in rt.admin('status')['admins'], 'administrator created with official DSpace services')
+    administrator('create', request)
+    check(email in administrator('status')['admins'], 'administrator created with official DSpace services')
     try:
-        rt.admin('create', dict(request, password=replacement))
+        administrator('create', dict(request, password=replacement))
     except Exception as error:
-        if error.__class__.__name__ not in ('Refused', 'OperationFailed'): raise
+        if not isinstance(error, RuntimeError): raise
     else:
         raise AssertionError('Existing account was overwritten.')
     api = API(origin); api.login(email, password)
     # Reset is explicit, scoped to this administrator; old password must stop working.
-    rt.admin('password', dict(email=email, password=replacement))
+    administrator('password', dict(email=email, password=replacement))
     try:
         API(origin).login(email, password)
     except RuntimeError:

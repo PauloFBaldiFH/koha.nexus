@@ -688,11 +688,19 @@ class Runtime:
         return self.setup('status')
 
     def logs(self):
-        if not self.state().get('prepared'):
-            raise Refused('No DSpace containers have been prepared.')
-        output = self.compose('logs', '--no-color', '--tail', '80', *SERVICES, timeout=30, log_failure=False)
-        password = (self.root / 'db-password').read_text().strip()
-        return {'logs': redact(output[-65536:], password)}
+        state = self.state()
+        parts = []
+        error_log = self.root / 'last-error.log'
+        if error_log.is_file():
+            parts.append('Last installer error:\n' + error_log.read_text(errors='replace')[-32768:])
+        if state.get('prepared'):
+            try:
+                parts.append(self.compose('logs', '--no-color', '--tail', '80', *SERVICES, timeout=30, log_failure=False))
+            except Refused:
+                parts.append('Container logs unavailable: inspect the local Docker service.')
+        password_file = self.root / 'db-password'
+        password = password_file.read_text().strip() if password_file.is_file() else ''
+        return {'logs': redact('\n\n'.join(parts)[-65536:], password) or 'No local DSpace logs yet.'}
 
     def proxy_config(self):
         state = self.state()

@@ -401,6 +401,50 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn('Configure the external proxy', result['note'])
         self.assertEqual(self.rt.status()['public_access'], 'not-checked')
 
+    def test_cli_removes_account_secret_before_dispatch_and_never_returns_it(self):
+        secret = 'Boundary-password-123'
+        request = json.dumps(dict(email='admin@example.org', password=secret))
+        def admin(operation, data):
+            self.assertNotIn('KEI_DSPACE_ADMIN_DATA', os.environ)
+            self.assertEqual(data['password'], secret)
+            return {'changed':True}
+        output = io.StringIO()
+        with patch.object(ds, 'Runtime', return_value=self.rt), patch.object(self.rt, 'admin', side_effect=admin), \
+                patch.object(ds.sys, 'argv', ['runtime', '--protocol', 'admin-password', '--confirm']), \
+                patch.dict(os.environ, {'KEI_DSPACE_ADMIN_DATA':request}), patch.object(ds.signal, 'signal'), \
+                contextlib.redirect_stdout(output):
+            self.assertEqual(ds.main(), 0)
+        self.assertNotIn(secret, output.getvalue())
+        self.assertTrue(output.getvalue().startswith('@@result payload='))
+
+    def test_malformed_secret_json_is_not_echoed(self):
+        output = io.StringIO()
+        with patch.object(ds, 'Runtime', return_value=self.rt), \
+                patch.object(ds.sys, 'argv', ['runtime', 'admin-password', '--confirm']), \
+                patch.dict(os.environ, {'KEI_DSPACE_ADMIN_DATA':'{"password":"Do-not-echo-this"'}), \
+                patch.object(ds.signal, 'signal'), contextlib.redirect_stderr(output):
+            self.assertEqual(ds.main(), 1)
+        self.assertNotIn('Do-not-echo-this', output.getvalue())
+
+    def test_prerequisite_checks_ignore_remote_context_without_changing_the_caller(self):
+        import re
+        text = (REPO / 'installer').read_text()
+        function = re.search(r'^kei_dspace_prerequisites\(\) \(.*?^\)', text, re.M | re.S).group(0)
+        script = 'kei_proxy_detect() { echo \'apache-nexus apache\'; }\ncommand() { if [ "$*" = \'-v docker\' ]; then return 0; fi; builtin command "$@"; }\n_kei_docker_running() { [ "$DOCKER_HOST" = unix:///var/run/docker.sock ] && [ -z "${DOCKER_CONTEXT+x}" ]; }\nexport DOCKER_HOST=tcp://unrelated DOCKER_CONTEXT=unrelated\n' + function + '\nkei_dspace_prerequisites plan\nprintf "caller=%s:%s" "$DOCKER_HOST" "$DOCKER_CONTEXT"\n'
+        result = subprocess.run(['bash','-c',script], capture_output=True, text=True, check=True)
+        self.assertIn('"docker_stopped":false', result.stdout)
+        self.assertIn('caller=tcp://unrelated:unrelated', result.stdout)
+
+    def test_initial_installer_errors_are_readable_even_before_containers_exist(self):
+        self.root.mkdir()
+        ds.atomic(self.root / 'state.json', json.dumps({'status':'failed','phase':'images'}))
+        ds.atomic(self.root / 'last-error.log', 'Registry is unavailable.\npassword=do-not-show')
+        with patch.object(self.rt, 'compose') as compose:
+            result = self.rt.logs()['logs']
+        self.assertIn('Registry is unavailable', result)
+        self.assertNotIn('do-not-show', result)
+        compose.assert_not_called()
+
     def test_admin_password_is_stdin_only_and_not_stored(self):
         self.install()
         request = dict(email='admin@example.org', first='Ada', last='Lovelace', language='pt_BR', password='Private-password-123')

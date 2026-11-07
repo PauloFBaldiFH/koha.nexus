@@ -176,7 +176,7 @@ async def help(app):
         return
     url = origin(data.get('url'))
     await app.push_screen_wait(MessageScreen(t('DSpace first steps'), t(
-        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Backups arrive in PR 4; shared schedules in PR 5; domains and updates in PR 6. This is an experimental installation.') + '\n\n' + url + '/login'))
+        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Backups, automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
 
 
 async def assistant(app):
