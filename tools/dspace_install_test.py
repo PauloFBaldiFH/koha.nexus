@@ -67,7 +67,9 @@ def main():
         check(ds_status['detected'] and ds_status['services'] == 'active', 'real shared status reports DSpace without requiring Koha')
         check((root / 'db-password').read_text().strip() not in json.dumps(status_json), 'shared dashboard status never contains the database password')
         from dspace_browser_test import exercise
-        exercise(rt, output)
+        from dspace_recovery_test import prepare, verify
+        prepared, fixture = exercise(rt, output, recovery_capture=prepare)
+        verify(rt, prepared, fixture)
         # Simulate a disconnected client: its administrative container can live
         # on. Do not overlap a new install/start/stop with that still-running job.
         pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()

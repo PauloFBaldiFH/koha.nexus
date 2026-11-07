@@ -753,11 +753,19 @@ def main():
     sub.add_parser('setup-status').add_argument('--refresh', action='store_true')
     for name in ('availability', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
+    for name in ('backup-create', 'backup-rollback'):
+        sub.add_parser(name).add_argument('--confirm', action='store_true')
+    for name in ('backup-test', 'backup-restore'):
+        child = sub.add_parser(name)
+        child.add_argument('package')
+        child.add_argument('--confirm', action='store_true')
+    sub.add_parser('backup-list')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
     # Strip it before starting Docker or any resource helper. CLI users may
     # instead supply the same JSON object on protected standard input.
     secret_request = os.environ.pop('KEI_DSPACE_ADMIN_DATA', None)
+    recovery_phrase = os.environ.pop('KEI_BACKUP_PHRASE', None)
     runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
                       progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True))
     def interrupted(signum, _frame):
@@ -767,7 +775,23 @@ def main():
     try:
         if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
-        if args.command == 'availability':
+        if args.command.startswith('backup-'):
+            from backup import Recovery, Error
+            recovery = Recovery(runtime, recovery_phrase)
+            try:
+                if args.command == 'backup-list':
+                    result = {'packages': [str(p) for p in sorted(recovery.home.glob('knx-dspace-*.tar.gpg'), reverse=True)]}
+                else:
+                    if not args.confirm: raise Refused('Review the recovery scope and use explicit --confirm.')
+                    with runtime.lock():
+                        if args.command != 'backup-rollback': recovery.recover_capture()
+                        if args.command == 'backup-create': result = recovery.capture()
+                        elif args.command == 'backup-test': result = recovery.test(args.package)
+                        elif args.command == 'backup-restore': result = recovery.restore(args.package)
+                        else: result = recovery.rollback()
+            except Error as error:
+                raise Refused(str(error)) from None
+        elif args.command == 'availability':
             result = runtime.availability()
         elif args.command == 'plan':
             result = runtime.plan(args.url)
@@ -813,4 +837,5 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.modules['runtime'] = sys.modules[__name__]
     sys.exit(main())

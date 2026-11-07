@@ -82,6 +82,7 @@ class BackupCenterView(PlatformSectionView):
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
                        "restore brings back one of them or both. The automatic backups of each are below."),
                      id="bk-both", classes="view-prompt", markup=False)
+        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Shared schedules and joint packages are configured separately."), id="bk-dspace", classes="view-prompt", markup=False)
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
@@ -108,7 +109,7 @@ class BackupCenterView(PlatformSectionView):
 
     # --- the platform shown -------------------------------------------------------
     def offered(self) -> list[str]:
-        return backup_center.scopes(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"))
+        return backup_center.scopes(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"), self.app.platform_ready("dspace"))
 
     def set_scope(self, scope: str) -> None:
         """Called when a platform group opens the center already filtered."""
@@ -132,6 +133,7 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-none").display = not offered
         self.query_one("#bk-koha").display = self.scope == backup_center.KOHA
         self.query_one("#bk-tainacan").display = self.scope == backup_center.TAINACAN
+        self.query_one("#bk-dspace").display = self.scope == backup_center.DSPACE
         self.query_one("#bk-both").display = self.scope == backup_center.BOTH
         self.query_one("#bk-plans-title").display = bool(self.scope)
         self.query_one("#bk-plans").display = bool(self.scope)
@@ -158,7 +160,7 @@ class BackupCenterView(PlatformSectionView):
             return False
         if entry.scope and entry.scope != self.scope:
             return False
-        if entry.action == "restore-assisted" and not self.scope:
+        if entry.action == "restore-assisted" and (not self.scope or self.scope == backup_center.DSPACE):
             return False
         return platforms.entry_shown(entry.action, entry.zone, "installed", facts)
 

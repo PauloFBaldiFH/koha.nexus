@@ -62,7 +62,7 @@ class API:
             raise RuntimeError('Authentication returned no bearer token.')
 
 
-def exercise(rt, output):
+def exercise(rt, output, recovery_capture=None):
     from playwright.sync_api import sync_playwright, expect
     origin = rt.state()['url']
     email = 'nexus-acceptance@example.org'
@@ -239,6 +239,7 @@ def exercise(rt, output):
             expect(anon_page.get_by_text(title, exact=True).first).to_be_visible(timeout=60000)
             anon_page.screenshot(path=str(Path(output) / 'dspace-public-item.png'), full_page=True)
             public.close()
+            recovered_public = recovery_capture(rt) if recovery_capture else None
             stage = 'restricting published content'
             for uuid in (stream['uuid'], bundle['uuid'], itemid):
                 policies = api.request('/authz/resourcepolicies/search/resource?' + urlencode({'uuid': uuid, 'action': 'READ', 'size': 100})).get('_embedded', {}).get('resourcepolicies', [])
@@ -258,6 +259,8 @@ def exercise(rt, output):
             check(itemid not in json.dumps(search), 'private item absent from anonymous discovery')
             private.close()
             (Path(output) / 'dspace-browser-acceptance.json').write_text(json.dumps({'browser_deposit': True, 'private_access_denied': True, 'download_sha256': expected, 'item_uuid': itemid}, indent=2))
+            return recovered_public, dict(content=content, item=itemid, sha256=expected, email=email, password=replacement)
+
         except Exception as error:
             # Only control names/types, never values, cookies or page storage.
             try:

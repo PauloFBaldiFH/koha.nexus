@@ -538,7 +538,7 @@ class RuntimeTests(unittest.TestCase):
     def test_tampered_offline_adapter_never_executes(self):
         result = self.bridge_script('kei_dspace_runtime install --confirm || exit; '
                                     '_SCRIPT_DIR=/missing-checkout; '
-                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA/runtime.py"; '
+                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA/runtime.py"; '
                                     'chmod 600 "$file"; echo tampered > "$file"; kei_dspace_runtime status')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout.count('adapter-loaded'), 1)

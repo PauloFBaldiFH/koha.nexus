@@ -201,3 +201,39 @@ async def assistant(app):
     if choice == 'close':
         await call(app, 'setup-close')
     await help(app)
+
+
+async def backup_create(app):
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, t('Create an encrypted DSpace backup? The repository pauses while PostgreSQL, files and all Solr cores are captured. The existing backup key must already be configured.'))):
+        return
+    data = await call(app, 'backup-create', '--confirm', cancellable=False)
+    if data is not None:
+        await app.push_screen_wait(MessageScreen(TITLE, str(data.get('package', ''))))
+
+
+async def _recovery(app, restore):
+    data = await call(app, 'backup-list')
+    if data is None: return
+    packages = data.get('packages', [])
+    if not packages:
+        await app.push_screen_wait(MessageScreen(TITLE, t('No encrypted DSpace backup is available yet.')))
+        return
+    path = await app.push_screen_wait(ChoiceScreen(TITLE, t('Choose a DSpace recovery package'), [(p, p.rsplit('/',1)[-1]) for p in packages]))
+    if not path: return
+    phrase = await app.push_screen_wait(InputScreen(TITLE, t('Recovery phrase for the existing backup key:'), t('Recovery phrase:'), password=True))
+    if not phrase: return
+    question = ('Restore DSpace? A safety backup is made first. Recovery is verified in independent volumes before replacing the active data. Old volumes are kept.' if restore else 'Test DSpace recovery in new volumes on an internal network without public ports? The active repository data are kept.')
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question), danger=restore)): return
+    result = await call(app, 'backup-restore' if restore else 'backup-test', path, '--confirm',
+                        env={'KEI_BACKUP_PHRASE':phrase}, cancellable=False)
+    phrase = ''
+    if result is not None:
+        await app.push_screen_wait(MessageScreen(TITLE, json.dumps(result, ensure_ascii=False, indent=2)))
+
+
+async def backup_test(app):
+    await _recovery(app, False)
+
+
+async def backup_restore(app):
+    await _recovery(app, True)

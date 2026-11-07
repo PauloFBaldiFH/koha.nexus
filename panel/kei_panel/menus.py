@@ -251,6 +251,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧭  Continue the setup", "setup-dspace", kind="native", requires="dspace"),
         Entry("🔐  Administrative access", "dspace-admin", kind="native", requires="dspace"),
         Entry("🩺  DSpace diagnosis & maintenance", "dspace-maintenance", kind="view"),
+        Entry("💾  DSpace backups", "backups", kind="view", scope="dspace"),
         Entry("📖  DSpace first steps", "dspace-help", kind="native", requires="dspace"),
     ), view="platform-home", key="j", group="dspace"),
     Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
@@ -269,6 +270,10 @@ SECTIONS: tuple[Section, ...] = (
     # (or none yet) can add one; what each platform sends, where, when and
     # for how long is its own plan.
     Section("backups", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
+        Entry("🔐  Set up the DSpace backup key", "dspace-backup-key", kind="native", requires="dspace"),
+        Entry("💾  Create encrypted DSpace backup", "dspace-backup-create", kind="native", requires="dspace"),
+        Entry("🧪  Test DSpace recovery", "dspace-backup-test", kind="native", requires="dspace"),
+        Entry("📥  Restore DSpace", "dspace-backup-restore", kind="native", requires="dspace"),
         Entry("📥 Download latest backup", "backup-download", kind="native", requires="koha"),
         Entry("💾  Generate manual backup and download to PC", "backup-manual", kind="native", requires="koha"),
         Entry("📚  Export MARC21 records now", "backup-marc", kind="native", requires="koha"),
@@ -360,7 +365,7 @@ def section(section_id: str) -> Section:
 # installer tasks (--task), none is a classic --run routine. The task a card
 # needs from the installer in use, or its card is not drawn.
 PLATFORM_TASKS: dict[str, str] = {
-    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace")},
+    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key")},
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
