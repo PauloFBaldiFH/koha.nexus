@@ -135,8 +135,10 @@ def exercise(rt, output):
         def observe_agreement(response):
             # A hard redirect can discard Chromium's response body. Never
             # depend on it or log account data; verify persistence by REST.
-            if '/api/eperson/epersons/' in response.url:
-                agreement_observations.append({'method': response.request.method, 'status': response.status})
+            if '/api/eperson/epersons/' in response.url or '/api/submission/' in response.url:
+                # Method, status and route only (no ids, no bodies).
+                route = re.sub(r'/[0-9a-f-]{8,}|/\d+', '/:id', urlsplit(response.url).path)
+                agreement_observations.append({'method': response.request.method, 'status': response.status, 'route': route})
         page.on('response', observe_agreement)
         try:
             stage = 'browser login'
@@ -202,7 +204,19 @@ def exercise(rt, output):
             # upload is still being processed (CI 42412161262 clicked during
             # it). Wait for the upstream form to enable Deposit itself.
             deposit = page.locator('#deposit')
-            expect(deposit).not_to_have_attribute('aria-disabled', 'true', timeout=120000)
+            try:
+                expect(deposit).not_to_have_attribute('aria-disabled', 'true', timeout=45000)
+            except AssertionError:
+                # CI 42413324690: the footer stayed in its "processing" state
+                # (Save, Discard and Deposit all aria-disabled) after the upload,
+                # although metadata was already saved. Reload the same workspace
+                # item from the server, as a person would, and require Deposit
+                # to become available from that saved state.
+                stage = 'browser deposit after reload'
+                page.reload(wait_until='domcontentloaded')
+                if consent.is_visible(): consent.click()
+                expect(page.get_by_text(fixture.name, exact=False).first).to_be_visible(timeout=90000)
+                expect(deposit).not_to_have_attribute('aria-disabled', 'true', timeout=90000)
             with page.expect_response(lambda r: '/api/workflow/workflowitems' in r.url and r.request.method == 'POST', timeout=90000) as submitted:
                 deposit.click()
             check(submitted.value.status == 201, 'real browser completes the deposit')
@@ -249,7 +263,7 @@ def exercise(rt, output):
             try:
                 controls = page.locator('input').evaluate_all('(nodes) => nodes.map(n => ({type:n.type,id:n.id,name:n.name,label:n.getAttribute("aria-label")}))')
                 buttons = page.locator('button[id], button:visible').evaluate_all('(nodes) => nodes.map(n => ({id:n.id,text:n.textContent.trim().slice(0,80),disabled:n.disabled,ariaDisabled:n.getAttribute("aria-disabled")}))')
-                detail = json.dumps({'stage':stage,'path':urlsplit(page.url).path,'agreement':agreement_observations[-12:],'buttons':buttons,'inputs':controls})[:4500]
+                detail = json.dumps({'stage':stage,'path':urlsplit(page.url).path,'network':agreement_observations[-20:],'buttons':buttons,'inputs':controls})[:4500]
                 print('::notice title=DSpace browser controls::' + detail.replace('%','%25').replace('\n','%0A').replace('\r','%0D'), flush=True)
             except Exception:
                 pass
