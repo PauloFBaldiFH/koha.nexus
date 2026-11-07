@@ -35,6 +35,8 @@ class LabRuntime(ds.Runtime):
         self.calls.append(('core', action, *args))
         if action == self.failure:
             raise ds.Refused('Injected failure: ' + action)
+        if action == 'proxy':
+            return 'apache-configured'
         return 'apache-nexus'
 
     def docker(self, *args, **kwargs):
@@ -48,7 +50,7 @@ class LabRuntime(ds.Runtime):
         if args[0] == 'ps':
             return ''
         if args[:2] == ('network', 'inspect'):
-            return json.dumps([{'Labels': dict(ds.LABELS), 'IPAM': {'Config': [{'Gateway': '172.30.10.1'}]}}])
+            return json.dumps([{'Labels': dict(ds.LABELS), 'IPAM': {'Config': [{'Gateway': '172.30.10.1', 'Subnet': '172.30.10.0/24'}]}}])
         return ''
 
     def plan(self, url=None):
@@ -148,13 +150,16 @@ class RuntimeTests(unittest.TestCase):
         for name in ds.SERVICES:
             svc = compose['services'][name]
             self.assertIn('no-new-privileges:true', svc['security_opt'])
-            self.assertEqual(svc['networks'], ['platform'])
+            self.assertIn('platform', svc['networks'])
             for port in svc.get('ports', []):
                 self.assertTrue(port.startswith('127.0.0.1:'))
         self.assertNotIn('ports', compose['services']['postgres'])
         self.assertNotIn('ports', compose['services']['solr'])
         self.assertTrue(compose['networks']['platform']['external'])
         self.assertEqual(compose['services']['ui']['environment']['DSPACE_REST_SSL'], 'true')
+        self.assertEqual(compose['services']['ui']['networks']['platform']['ipv4_address'], '172.30.10.10')
+        self.assertIn('proxies.trusted.include_ui_ip = false', cfg)
+        self.assertIn('proxies.trusted.ipranges = 127.0.0.1, 172.30.10.1, 172.30.10.10', cfg)
 
     def test_completed_install_uses_migration_once_and_keeps_secret_private(self):
         self.assertEqual(self.install()['status'], 'installed')
@@ -247,13 +252,14 @@ class RuntimeTests(unittest.TestCase):
         rt = ds.Runtime(self.root, self.catalog, lab=True)
         rt._mutating = True
         password = (self.root / 'db-password').read_text().strip()
-        failed = ds.OperationFailed('docker', subprocess.CompletedProcess([], 1, 'Safe detail\n' + password, 'password=other\n'))
+        failed = ds.OperationFailed('docker', subprocess.CompletedProcess([], 1, 'Safe detail\n' + password, 'password=other\nhttp://operator:credvalue@proxy.example.org\n'))
         with patch.object(ds, 'command', side_effect=failed), self.assertRaises(ds.Refused):
             rt.docker('compose', 'run')
         log = (self.root / 'last-error.log').read_text()
         self.assertIn('Safe detail', log)
         self.assertNotIn(password, log)
         self.assertNotIn('password=other', log)
+        self.assertNotIn('credvalue', log)
         self.assertEqual((self.root / 'last-error.log').stat().st_mode & 0o777, 0o600)
         with patch.object(rt, 'docker', side_effect=ds.Refused('offline')):
             self.assertNotIn('Safe detail', json.dumps(rt.status()))
@@ -309,6 +315,34 @@ class RuntimeTests(unittest.TestCase):
             result = rt.plan('http://192.168.1.20:8100')
         self.assertEqual(result['project'], 'kn-dspace')
         self.assertFalse(self.root.exists())
+
+    def test_unvalidated_user_namespace_or_rootless_engine_is_refused(self):
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        for option in ('name=rootless', 'name=userns'):
+            with patch.object(rt, 'docker', return_value=json.dumps({'OSType': 'linux', 'SecurityOptions': [option]})), \
+                    patch.object(ds.platform, 'machine', return_value='x86_64'), \
+                    self.assertRaisesRegex(ds.Refused, 'Rootless'):
+                rt.plan('http://192.168.1.20:8100')
+        self.assertFalse(self.root.exists())
+
+    def test_cached_immutable_images_can_resume_without_registry_access(self):
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        obj = {'Architecture': 'amd64', 'Os': 'linux', 'Config': {'User': '10001:10001', 'Labels': {
+            'org.opencontainers.image.revision': rt.release['sources']['backend']['commit'],
+            'org.koha-nexus.dspace.release-lock': rt.release_hash}}}
+        def docker(*args, **kwargs):
+            self.assertEqual(args[:2], ('image', 'inspect'), 'No pull/network access with an already cached digest')
+            return json.dumps([obj])
+        with patch.object(rt, 'docker', side_effect=docker):
+            rt.check_images({'backend': 'ghcr.io/paulofbaldifh/koha.nexus/dspace-backend@sha256:' + '1'*64})
+
+    def test_external_proxy_stays_explicitly_pending(self):
+        original = self.rt.core
+        with patch.object(self.rt, 'core', side_effect=lambda action, *a: 'external' if action == 'proxy' else original(action, *a)):
+            result = self.install()
+        self.assertEqual(result['proxy_status'], 'external-configuration-required')
+        self.assertIn('Configure the external proxy', result['note'])
+        self.assertEqual(self.rt.status()['public_access'], 'not-checked')
 
     def test_installer_adapter_hashes_match_and_task_is_present(self):
         text = (REPO / 'installer').read_text()

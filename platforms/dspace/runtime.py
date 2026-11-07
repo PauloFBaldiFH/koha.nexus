@@ -58,6 +58,13 @@ def read_json(path):
     return json.loads(Path(path).read_text())
 
 
+def redact(output, password=''):
+    if password:
+        output = output.replace(password, '[redacted]')
+    output = re.sub(r'([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s:@]+:[^@\s/]+@', r'\1[redacted]@', output)
+    return re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
+
+
 def atomic(path, data, mode=0o600, gid=None):
     path = Path(path)
     fd, name = tempfile.mkstemp(prefix='.' + path.name + '-', dir=path.parent)
@@ -134,12 +141,13 @@ class Runtime:
         self.lab = lab
         self.driver = driver
 
-    def docker(self, *args, timeout=60, input_text=None):
+    def docker(self, *args, timeout=60, input_text=None, log_failure=True):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
         try:
             return command(['docker', '--host=unix:///var/run/docker.sock', *args], timeout, input_text)
         except OperationFailed as error:
-            self.save_error(error)
+            if log_failure:
+                self.save_error(error)
             raise
 
     def save_error(self, error):
@@ -148,9 +156,7 @@ class Runtime:
         if getattr(self, '_mutating', False):
             output = error.output
             password = self.root / 'db-password'
-            if password.exists() and password.read_text().strip():
-                output = output.replace(password.read_text().strip(), '[redacted]')
-            output = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
+            output = redact(output, password.read_text().strip() if password.exists() else '')
             atomic(self.root / 'last-error.log', output[-32768:])
 
     def compose(self, *args, timeout=120):
@@ -256,6 +262,8 @@ class Runtime:
         info = json.loads(self.docker('info', '--format', '{{json .}}'))
         if info.get('OSType') != 'linux':
             raise Refused('A local Linux Docker engine is required.')
+        if any('rootless' in x or 'userns' in x for x in info.get('SecurityOptions', [])):
+            raise Refused('Rootless/user-remapped Docker has not been validated for these private mounts and isolation rules; nothing was installed.')
         self.docker('compose', 'version')
         self.existing_resources()
         ports = old.get('ports') or {'ui': 18100, 'backend': 18101}
@@ -284,6 +292,10 @@ class Runtime:
 
     def render(self, plan, password, gateway):
         u = urlsplit(plan['url'])
+        # The existing network allocator owns /24s with gateway .1. Give only
+        # the managed UI a stable proxy identity; never trust the whole subnet
+        # or depend on resolving the public DNS name from inside the backend.
+        ui_ip = str(ipaddress.IPv4Address(int(ipaddress.IPv4Address(gateway)) + 9))
         cfg = '\n'.join([
             '# Managed by Koha.Nexus: dspace. Private; never include in diagnostics.',
             'dspace.dir = /dspace', 'dspace.name = DSpace',
@@ -291,7 +303,8 @@ class Runtime:
             'dspace.server.ssr.url = http://backend:8080/server',
             'db.url = jdbc:postgresql://postgres:5432/dspace', 'db.username = dspace',
             'db.password = ' + password, 'solr.server = http://solr:8983/solr',
-            'proxies.trusted.ipranges = 127.0.0.1, ' + gateway,
+            'proxies.trusted.ipranges = 127.0.0.1, ' + gateway + ', ' + ui_ip,
+            'proxies.trusted.include_ui_ip = false',
             'rest.cors.allowed-origins = ' + plan['url'],
             'mail.server.disabled = true', 'user.registration = false', ''])
         services = {}
@@ -317,6 +330,7 @@ class Runtime:
             'environment': {'JAVA_TOOL_OPTIONS': '-Xms256m -Xmx1408m -Dfile.encoding=UTF-8'},
             'depends_on': {'postgres': {'condition': 'service_healthy'}, 'solr': {'condition': 'service_started'}}})
         services['ui'].update({
+            'networks': {'platform': {'ipv4_address': ui_ip}},
             'ports': ['127.0.0.1:%s:4000' % plan['ports']['ui']], 'mem_limit': '1536m',
             'environment': {'DSPACE_UI_BASEURL': plan['url'], 'DSPACE_UI_HOST': '0.0.0.0',
                             'DSPACE_UI_PORT': '4000', 'DSPACE_UI_SSL': 'false',
@@ -332,10 +346,18 @@ class Runtime:
 
     def check_images(self, images):
         for name, ref in images.items():
-            if not ref.startswith('sha256:'):
+            try:
+                raw = self.docker('image', 'inspect', ref, log_failure=False)
+            except OperationFailed as error:
+                if ref.startswith('sha256:'):
+                    self.save_error(error)
+                    raise  # laboratory IDs are never resolved through a registry
                 print('Downloading locked image: ' + name, flush=True)
                 self.docker('pull', ref, timeout=1200)
-            obj = json.loads(self.docker('image', 'inspect', ref))[0]
+                raw = self.docker('image', 'inspect', ref)
+            # A cached immutable image is fully checked but does not need a
+            # registry round trip when resuming an interrupted installation.
+            obj = json.loads(raw)[0]
             if obj.get('Architecture') != 'amd64' or obj.get('Os') != 'linux':
                 raise Refused('Image architecture mismatch: ' + name)
             if name != 'postgres':
@@ -415,6 +437,9 @@ class Runtime:
                 if any((net.get('Labels') or {}).get(k) != v for k, v in LABELS.items()):
                     raise Refused('The platform network is not owned by Koha.Nexus.')
                 gateway = str(ipaddress.IPv4Address(net['IPAM']['Config'][0]['Gateway']))
+                subnet = ipaddress.IPv4Network(net['IPAM']['Config'][0]['Subnet'])
+                if subnet.prefixlen != 24 or ipaddress.IPv4Address(gateway) != subnet.network_address + 1:
+                    raise Refused('The existing platform network has an unvalidated custom subnet/gateway; it was kept unchanged.')
                 password_path = self.root / 'db-password'
                 if state.get('prepared'):
                     # Do not silently rotate an existing database password or rewrite edited config.
@@ -456,9 +481,16 @@ class Runtime:
                 self.health()
                 self.core('audit')
                 self.mark(phase='proxy')
-                self.core('proxy')
-                self.mark(status='installed', phase='ready', intended='running')
-                return {'status': 'installed', 'url': plan['url'], 'experimental': True}
+                proxy_output = self.core('proxy').strip().splitlines()
+                proxy = proxy_output[-1] if proxy_output else ''
+                if proxy not in ('external', 'apache-configured'):
+                    raise Refused('The proxy driver returned an unknown result; public access was not assumed.')
+                publication = 'external-configuration-required' if proxy == 'external' else 'apache-configured'
+                self.mark(status='installed', phase='ready', intended='running', proxy_status=publication)
+                result = {'status': 'installed', 'url': plan['url'], 'experimental': True, 'proxy_status': publication}
+                if proxy == 'external':
+                    result['note'] = 'Configure the external proxy /server and / routes; the public address has not been verified. See docs/dspace/PR2-installer.md.'
+                return result
             except BaseException:
                 self.mark(status='failed')
                 raise
@@ -497,8 +529,9 @@ class Runtime:
         state = self.state()
         if not state:
             return {'schema': 1, 'platform': 'dspace', 'status': 'absent', 'experimental': True}
-        result = {k: state.get(k) for k in ('status', 'phase', 'url', 'migration', 'intended', 'updated_at')}
+        result = {k: state.get(k) for k in ('status', 'phase', 'url', 'migration', 'intended', 'updated_at', 'proxy_status')}
         result.update(schema=1, platform='dspace', experimental=True, health='not-checked')
+        result['public_access'] = 'not-checked'
         try:
             ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
             observed = {}

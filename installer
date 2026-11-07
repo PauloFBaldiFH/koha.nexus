@@ -12438,7 +12438,7 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="41e7b5a884adcb53ae16d1431455709ba442dc801d6da56a3dda9d1a15ee8465"
+KEI_DSPACE_RUNTIME_SHA="96b2ab159eb899dda158f397ad544743a78d3bff9f464730fd5fb845cfd0ed6c"
 KEI_DSPACE_RELEASE_SHA="fc4c90bc26a0a164b198de4c856cc9c214633811df6774580f0744b26947dd97"
 
 kei_dspace_runtime() (
@@ -12516,7 +12516,7 @@ kei_dspace_resource() {
         proxy)
             read -r mode _ < <(kei_proxy_detect)
             if [ "$mode" = external ]; then
-                echo 'External proxy: use the /server and / routes documented in docs/dspace/PR2-installer.md. Local services are ready; publication still requires your proxy configuration.'
+                printf 'external\n'
                 return 0
             fi
             command -v apache2ctl >/dev/null 2>&1 || return 3
@@ -12529,7 +12529,8 @@ kei_dspace_resource() {
             port=$(awk '/^Listen / { print $2 }' "$tmp")
             rm -f "$tmp"
             [ "$rc" = 0 ] || return "$rc"
-            kei_proxy_port_open dspace "${port:-80}" ;;
+            kei_proxy_port_open dspace "${port:-80}" || return 1
+            printf 'apache-configured\n' ;;
         *) return 2 ;;
     esac
 }

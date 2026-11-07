@@ -9,7 +9,6 @@ import argparse
 import importlib.util
 import json
 import os
-import re
 from pathlib import Path
 import subprocess
 import sys
@@ -121,9 +120,7 @@ def main():
         for service in module.SERVICES:
             try:
                 logs = rt.compose('logs', '--no-color', '--tail', '100', service)
-                if password:
-                    logs = logs.replace(password, '[redacted]')
-                logs = re.sub(r'(?im)^.*(?:password|secret|token).*$','[sensitive log line omitted]', logs)
+                logs = module.redact(logs, password)
                 print('Disposable CI logs: ' + service + '\n' + logs, flush=True)
             except module.Refused:
                 pass
@@ -155,11 +152,9 @@ if __name__ == '__main__':
         phase = module.read_json(root / 'state.json').get('phase', 'preflight') if (root / 'state.json').exists() else 'preflight'
         detail = 'phase=' + phase + ': ' + str(error)
         if isinstance(error, module.OperationFailed):
-            detail += '\n' + error.output
+            detail += '\n' + error.output[-4500:]
         password = (root / 'db-password').read_text().strip() if (root / 'db-password').exists() else ''
-        if password:
-            detail = detail.replace(password, '[redacted]')
-        detail = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', detail)
-        detail = detail[-6000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+        detail = module.redact(detail, password)
+        detail = detail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
         print('::error title=DSpace integrated acceptance::' + detail, flush=True)
         raise

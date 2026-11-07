@@ -25,7 +25,7 @@ sudo config.sh --task dspace start --confirm
 ```
 
 Antes de instalar, a prévia verifica catálogo de imagens, arquitetura, Docker e
-Compose, colisões, memória disponível, espaço de staging, porta e proxy. Endereço
+Compose (rootful, sem remapeamento de usuários ainda não homologado), colisões, memória disponível, espaço de staging, porta e proxy. Endereço
 explícito nesta etapa: não adivinha uma interface nem seleciona a VPN. Apenas amd64.
 O perfil de laboratório reserva limites de 2 GiB para backend, 1 GiB para Solr,
 1,5 GiB para UI e 1 GiB para PostgreSQL. O gate de 4 GiB disponíveis/8 GiB de disco
@@ -34,7 +34,10 @@ livre é conservador para testes e **não** é dimensionamento garantido de um a
 O projeto `kn-dspace` tem quatro serviços e rede própria. Reutiliza
 `kei_docker_network_create`, isolamento, auditoria, registro `owned.tsv`, módulos,
 firewall e aplicação segura de site do Apache. PostgreSQL e Solr não publicam
-portas; backend e UI escutam apenas em loopback (18101/18100). O proxy encaminha
+portas; backend e UI escutam apenas em loopback (18101/18100). A UI tem identidade
+IP própria na rede gerida, e o backend só confia nela e no gateway do proxy;
+não resolve o domínio público para ampliar a lista de proxies confiáveis. Imagens imutáveis já presentes são verificadas sem novo acesso ao registro,
+permitindo retomar a instalação sem rede. O proxy encaminha
 `/server` antes de `/`. Não altera vhosts do Koha ou Tainacan. As bases, frontend,
 backend e Solr ficam fixados por digest/identidade imutável.
 
@@ -109,8 +112,9 @@ Nesta etapa, o Apache precisa existir; não é instalado implicitamente. O paine
 já tem instalação de infraestrutura compartilhada. URL HTTPS requer proxy TLS
 externo configurado; o assistente de domínio/túnel vem no PR 6.
 
-Com proxy externo, os serviços locais são preparados, mas o administrador ainda
-deve configurar duas rotas, preservar Host/esquema e não cachear respostas privadas:
+Com proxy externo, o resultado e o estado ficam explicitamente marcados
+`external-configuration-required`: serviços locais não equivalem a publicação.
+O administrador ainda deve configurar duas rotas, preservar Host/esquema e não cachear respostas privadas:
 
 | Rota | Destino |
 |---|---|
@@ -123,7 +127,7 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 27 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 30 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
 * Compilação Java 21 e seis verificações do guard passaram localmente: recibo
