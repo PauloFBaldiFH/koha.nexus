@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.182"
+PANEL_VERSION=" 1.5.183"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12439,7 +12439,7 @@ kei_docker_audit() {
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
 KEI_DSPACE_RUNTIME_SHA="906dd6eca5b8dfae336e7bf9fc8f1727482b87e5108b69b573eae6c2b26cd080"
-KEI_DSPACE_BACKUP_SHA="33178c58ab932e425abf04b0f36396ef05ad7d75878792db4471b4b8f60b9880"
+KEI_DSPACE_BACKUP_SHA="5e2d305fd29e34983765a18f7fdd8e603d692ff66649ca77386afe24360a7c06"
 KEI_DSPACE_RELEASE_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 
 kei_dspace_runtime() (
@@ -12553,7 +12553,7 @@ kei_dspace_resource() {
             printf '%s\n' "$mode" ;;
         network) kei_docker_network_create dspace ;;
         recovered-volume)
-            [[ "${1:-}" =~ ^kn-dspace-rt-[0-9a-f]{10}-(postgres|solr|discovery-state|assetstore|log|var|upload|reports|exports|imports|handle-server)$ ]] || return 2
+            [[ "${1:-}" =~ ^kn-dspace-rt-[0-9a-f]{20}-(postgres|solr|discovery-state|assetstore|log|var|upload|reports|exports|imports|handle-server)$ ]] || return 2
             [ "$(_kei_docker volume inspect -f '{{index .Labels "com.koha-nexus.platform"}}' "$1")" = dspace ] || return 3
             kei_owned_add docker-volume "$1" dspace no ;;
         volume)

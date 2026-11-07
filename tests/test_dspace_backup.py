@@ -76,3 +76,68 @@ class ArchiveTests(unittest.TestCase):
             with recovery.opened(package): self.fail('must not open')
 
 if __name__ == '__main__': unittest.main()
+
+
+class CaptureFailures(unittest.TestCase):
+    """Fault injection tests; crypto/Docker are explicit doubles, not homologation."""
+    def setUp(self):
+        from unittest.mock import Mock
+        self.tmp=tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name); (self.root/'source').mkdir()
+        (self.root/'source/data').write_text('persistent')
+        for n in ('local.cfg','db-password','state.json'): (self.root/n).write_text('private')
+        self.rt=Mock(); self.rt.root=self.root; self.rt.release_hash='release'
+        self.rt.compose.return_value='postgres-container'
+        self.r=b.Recovery(self.rt); self.r.home=self.root/'backups'
+        self.r.checked=Mock(return_value=({'url':'http://repo.test'}, {'services':{'postgres':{'image':'exact'}}}))
+        self.r.volumes=Mock(return_value={'postgres':self.root/'source'})
+        self.r.running=Mock(return_value=['postgres','backend'])
+        def binary(args,path,write): path.write_bytes(b'PGDMP' if path.name=='database.dump' else b'INSERT INTO t VALUES(1);\n')
+        self.r.binary=Mock(side_effect=binary)
+        self.r.crypto=Mock()
+
+    def test_missing_key_does_not_stop_services(self):
+        self.r.crypto.side_effect=b.Error('No key')
+        with self.assertRaises(b.Error): self.r.capture()
+        self.r.checked.assert_not_called(); self.rt.compose.assert_not_called()
+
+    def test_dump_failure_resumes_exact_previous_services(self):
+        self.r.binary.side_effect=b.Error('Failed dump')
+        with self.assertRaises(b.Error): self.r.capture()
+        self.assertIn((('start','postgres','backend'), {'timeout':420}),
+            [(c.args,c.kwargs) for c in self.rt.compose.call_args_list])
+        data=json.loads(self.r.journal.read_text()); self.assertEqual(data['phase'],'writes-resumed')
+        self.assertEqual(list(self.r.home.glob('*.gpg')), [])
+
+    def test_failed_restart_never_records_writes_resumed(self):
+        def compose(*args,**kwargs):
+            if args[0]=='start': raise b.Error('Cannot restart')
+            return 'postgres-container'
+        self.rt.compose.side_effect=compose
+        with self.assertRaises(b.Error): self.r.capture()
+        self.assertEqual(json.loads(self.r.journal.read_text())['phase'],'capture')
+        self.assertEqual(list(self.r.home.glob('*.gpg')), [])
+        self.rt.compose.side_effect=None
+        self.r.recover_capture()
+        self.assertEqual(json.loads(self.r.journal.read_text())['phase'],'writes-resumed')
+
+    def test_stop_failure_still_attempts_resume(self):
+        def compose(*args,**kwargs):
+            if args[0]=='stop': raise b.Error('Partially stopped')
+            return 'postgres-container'
+        self.rt.compose.side_effect=compose
+        with self.assertRaises(b.Error): self.r.capture()
+        self.assertEqual(self.rt.compose.call_args_list[-1].args,('start','postgres','backend'))
+
+    def test_encryption_failure_publishes_no_complete_package(self):
+        def crypto(op,*args):
+            if op=='encrypt': raise b.Error('Cannot encrypt')
+        self.r.crypto.side_effect=crypto
+        with self.assertRaises(b.Error): self.r.capture()
+        self.assertEqual(list(self.r.home.iterdir()), [])
+        self.assertEqual(json.loads(self.r.journal.read_text())['phase'],'writes-resumed')
+
+    def test_interrupted_promotion_is_not_auto_resumed_as_capture(self):
+        self.r.record(phase='promoting',services=['postgres'])
+        with self.assertRaises(b.Error): self.r.recover_capture()
+        self.rt.compose.assert_not_called()

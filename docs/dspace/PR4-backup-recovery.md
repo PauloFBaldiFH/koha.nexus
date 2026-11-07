@@ -15,7 +15,7 @@ interrompida exige retomar os serviços registrados antes da próxima operação
 O pacote é publicado por rename somente após cifragem completa; staging privado
 é removido ao sair. SIGKILL pode deixar staging privado para revisão.
 
-Recuperação confere checksum do ciphertext, integridade GPG, formato, release,
+Recuperação confere checksum externo quando presente, integridade GPG, formato, release,
 matriz exata de imagens, inventário com hashes, nomes/tipos de arquivos, limites
 de extração e todos os volumes. Não executa Compose vindo do pacote. O Compose
 é gerado da configuração confiável. Links, dispositivos, caminhos relativos
@@ -52,9 +52,9 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## Validação
 
-- 74 testes unitários de imagens/runtime/formato aprovados localmente em Python
+- 80 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
-- Testes de painel e serviços reais: em andamento. Nada foi testado no servidor
+- Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: em andamento. Nada foi testado no servidor
   de Paulo. Não anunciar recuperação homologada antes da CI real.
 - CI acrescenta captura pública e privada, restauração em volumes novos,
   download público com SHA-256, recusa anônima do privado e download autorizado.

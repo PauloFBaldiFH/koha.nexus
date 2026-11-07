@@ -43,11 +43,13 @@ def extract(archive, dest, budget):
     """Validate the entire archive before writing anything, including duplicates."""
     seen = set(); total = 0
     with tarfile.open(archive, 'r:') as source:
-        members = source.getmembers()
-        if len(members) > 1000000: raise Error('Too many archive entries.')
+        members = []
+        for member in source:
+            members.append(member)
+            if len(members) > 1000000: raise Error('Too many archive entries.')
         for member in members:
             p = PurePosixPath(member.name)
-            if (member.name in seen or not member.name or p.is_absolute() or
+            if (member.name in seen or not p.parts or not member.name or p.is_absolute() or
                     '..' in p.parts or '\\' in member.name or str(p) != member.name or
                     not (member.isfile() or member.isdir())):
                 raise Error('Unsafe or ambiguous archive entry.')
@@ -209,7 +211,7 @@ class Recovery:
         package = Path(package).absolute()
         if package.is_symlink() or not package.is_file(): raise Error('Choose a regular encrypted package.')
         checksum = package.with_suffix('.sha256')
-        if not checksum.is_file() or checksum.read_text().strip() != sha(package):
+        if checksum.exists() and (checksum.is_symlink() or not checksum.is_file() or checksum.read_text().strip() != sha(package)):
             raise Error('Encrypted package checksum mismatch.')
         self.home.mkdir(mode=0o700, parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='.recovery-', dir=self.home) as temporary:
@@ -238,7 +240,7 @@ class Recovery:
         _, original = self.checked()
         if manifest['images'] != {k:v['image'] for k,v in original['services'].items()}:
             raise Error('Recovery requires the exact installed image matrix.')
-        project = 'kn-dspace-rt-' + secrets.token_hex(5)
+        project = 'kn-dspace-rt-' + secrets.token_hex(10)
         area = tree.parent / 'runtime'; area.mkdir(mode=0o700)
         cfg = (tree / 'private/local.cfg').read_text()
         cfg += '\nmail.server.disabled = true\nuser.registration = false\ndb.url = jdbc:postgresql://127.0.0.1:5432/dspace\nsolr.server = http://127.0.0.1:8983/solr\n'
@@ -278,6 +280,11 @@ class Recovery:
                         '--mount', 'type=bind,src=' + str(tree / 'volumes' / key) + ',dst=/source,readonly',
                         '--mount', 'type=volume,src=' + name + ',dst=/target',
                         manifest['images']['backend'], '-a', '/source/.', '/target/', timeout=3600)
+            for key in manifest['volumes']:
+                obj = json.loads(self.rt.docker('volume','inspect',project + '-' + key))[0]
+                actual = entries(Path(obj['Mountpoint']))
+                expected = entries(tree / 'volumes' / key)
+                if actual != expected: raise Error('Restored file/Solr data mismatch: ' + key)
             dc('up', '-d', '--pull', 'never', 'postgres', 'solr')
             self.rt.wait('Recovery PostgreSQL', lambda: dc('exec','-T','postgres','pg_isready','-U','dspace','-d','dspace'))
             self.binary([*args, 'exec', '-T', 'postgres', 'pg_restore', '-U', 'dspace', '-d', 'dspace',
@@ -288,14 +295,8 @@ class Recovery:
             # A deterministic source data fingerprint was saved while writes were stopped.
             if normalized_dump(after) != (tree / 'database-data.sha256').read_text().strip():
                 raise Error('Restored database records differ from the captured database.')
-            for key in manifest['volumes']:
-                obj = json.loads(self.rt.docker('volume','inspect',project + '-' + key))[0]
-                actual = entries(Path(obj['Mountpoint']))
-                expected = entries(tree / 'volumes' / key)
-                if actual != expected: raise Error('Restored file/Solr data mismatch: ' + key)
-            dc('up', '-d', '--pull', 'never', 'backend')
-            # Runtime backend has no curl; use Java schema/admin guard to validate
-            # database compatibility without adding tools to a production image.
+            # Run only the schema/admin check, never a persistent REST worker in
+            # the isolated verification copy.
             dc('run','--rm','--no-deps','-T','backend','admin','status', timeout=240)
             cores = json.loads(dc('exec','-T','solr','curl','-fsS','--max-time','10',
                 'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
@@ -324,6 +325,8 @@ class Recovery:
             if manifest['url'] != state['url']:
                 raise Error('Cross-address restore requires a separate migration; current address was preserved.')
             safety = self.capture()
+            with self.opened(safety['package']):
+                pass  # Verify that the safety copy can actually be decrypted before promotion.
             with self.clone(tree, manifest) as clone:
                 # Persist rollback material outside temporary decrypted staging.
                 rollback = self.rt.root / 'recovery-rollback'

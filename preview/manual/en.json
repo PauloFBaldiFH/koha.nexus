@@ -3098,6 +3098,18 @@
   },
   "sec-dspace-maintenance": {
    "summary": "Diagnosis, logs, safe start/stop and first steps of the DSpace repository."
+  },
+  "dspace-backup-key": {
+   "summary": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages."
+  },
+  "dspace-backup-create": {
+   "summary": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core."
+  },
+  "dspace-backup-test": {
+   "summary": "Recovers into independent volumes with no external network or public ports and checks records and file hashes."
+  },
+  "dspace-backup-restore": {
+   "summary": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data."
   }
  }
 }

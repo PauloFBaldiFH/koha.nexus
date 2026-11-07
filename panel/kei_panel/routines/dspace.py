@@ -178,7 +178,7 @@ async def help(app):
         return
     url = origin(data.get('url'))
     await app.push_screen_wait(MessageScreen(t('DSpace first steps'), t(
-        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Backups, automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
+        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Encrypted individual backups and recovery are in the Backup center. Automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
 
 
 async def assistant(app):
@@ -194,7 +194,7 @@ async def assistant(app):
             await admin(app)
         else:
             await call(app, 'setup-mark', 'admin', 'later')
-    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('Backups and domain assistance are delivered in subsequent stages. Keep the setup reminder for later? The local repository and administrator remain accessible from their menus.'), [('keep', t('Keep the reminder')), ('close', t('Do not remind me again'))]))
+    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('Encrypted backups are available in the Backup center; domain assistance comes later. Keep the setup reminder? The local repository and administrator remain accessible from their menus.'), [('keep', t('Keep the reminder')), ('close', t('Do not remind me again'))]))
     if choice is None:
         return
     await call(app, 'setup-mark', 'backup', 'later')

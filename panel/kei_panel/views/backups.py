@@ -82,7 +82,7 @@ class BackupCenterView(PlatformSectionView):
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
                        "restore brings back one of them or both. The automatic backups of each are below."),
                      id="bk-both", classes="view-prompt", markup=False)
-        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Shared schedules and joint packages are configured separately."), id="bk-dspace", classes="view-prompt", markup=False)
+        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Scheduling and joint packages for DSpace are not available yet."), id="bk-dspace", classes="view-prompt", markup=False)
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Tainacan backups"), id="pstatus-backups")

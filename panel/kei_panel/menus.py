@@ -431,6 +431,11 @@ def all_actions() -> set[str]:
 # few words. English keys like the labels; pt.cache holds the PT-BR texts.
 # tests/test_menus.py checks every entry has one.
 DESCRIPTIONS: dict[str, str] = {
+    "dspace-backup-key": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.",
+    "dspace-backup-create": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.",
+    "dspace-backup-test": "Recovers into independent volumes with no external network or public ports and checks records and file hashes.",
+    "dspace-backup-restore": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data.",
+    "backups:dspace": "Encrypted DSpace backup, isolated recovery verification and guarded restoration",
     "dspace-install": "Checks the reviewed images first, prepares Docker/Apache only with consent, then shows the repository installation plan. An incomplete migration requires explicit investigation before retry.",
     "dspace-start": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history.",
     "dspace-stop": "Stops the repository gracefully, retaining configuration and every data volume.",
