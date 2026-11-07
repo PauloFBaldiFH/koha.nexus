@@ -9,6 +9,7 @@ import base64
 import subprocess
 import http.cookiejar
 import json
+import re
 from pathlib import Path
 import secrets
 import time
@@ -140,7 +141,8 @@ def exercise(rt, output):
             check(True, 'real browser signs in with the chosen password')
             stage = 'browser deposit form'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
-            title_input = page.get_by_label('Title', exact=True)
+            # Upstream adds a literal ' *' to required field labels.
+            title_input = page.get_by_label(re.compile(r'^Title\s*\*?$'))
             agreement = page.locator('#user-agreement-accept')
             expect(agreement.or_(title_input).first).to_be_visible(timeout=90000)
             consent = page.get_by_role('button', name="That's ok", exact=True)
