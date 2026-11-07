@@ -133,13 +133,9 @@ def exercise(rt, output):
         page = context.new_page(); page.set_default_timeout(60000)
         agreement_observations = []
         def observe_agreement(response):
-            # Only status and this fixed consent boolean, never account data.
-            if '/api/eperson/epersons/' not in response.url: return
-            try:
-                values = response.json().get('metadata', {}).get('dspace.agreements.end-user', [])
-                agreement_observations.append({'method': response.request.method, 'status': response.status,
-                    'accepted': [v.get('value') == 'true' for v in values]})
-            except Exception:
+            # A hard redirect can discard Chromium's response body. Never
+            # depend on it or log account data; verify persistence by REST.
+            if '/api/eperson/epersons/' in response.url:
                 agreement_observations.append({'method': response.request.method, 'status': response.status})
         page.on('response', observe_agreement)
         try:
@@ -164,7 +160,7 @@ def exercise(rt, output):
                 with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
                     page.locator('#button-save').click()
                 check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
-                accepted_data = accepted.value.json()
+                accepted_data = api.request(urlsplit(accepted.value.url).path)
                 agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
                 check(any(v.get('value') == 'true' for v in agreement_values), 'agreement acceptance is actually saved')
                 # The upstream component performs a hard redirect after PATCH.
