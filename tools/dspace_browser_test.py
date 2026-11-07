@@ -151,14 +151,19 @@ def exercise(rt, output):
             # Upstream adds a literal ' *' to required field labels.
             title_input = page.get_by_label(re.compile(r'^Title\s*\*?$'))
             agreement = page.locator('#user-agreement-accept')
-            expect(agreement.or_(title_input).first).to_be_visible(timeout=90000)
+            # The upstream agreement checkbox is a styled, visually hidden input,
+            # so it is waited for as attached (not visible) and checked by force.
+            expect(agreement.or_(title_input).first).to_be_attached(timeout=90000)
             consent = page.get_by_role('button', name="That's ok", exact=True)
             if consent.is_visible(): consent.click()
-            if agreement.is_visible():
+            if agreement.count() > 0 and '/end-user-agreement' in urlsplit(page.url).path:
                 stage = 'disposable account user agreement'
-                agreement.check()
+                agreement.wait_for(state='attached', timeout=60000)
+                agreement.check(force=True)
+                save = page.locator('#button-save')
+                expect(save).not_to_have_attribute('aria-disabled', 'true', timeout=30000)
                 with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
-                    page.locator('#button-save').click()
+                    save.click()
                 check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
                 accepted_data = api.request(urlsplit(accepted.value.url).path)
                 agreement_values = accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])
