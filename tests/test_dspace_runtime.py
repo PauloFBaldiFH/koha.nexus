@@ -272,11 +272,15 @@ class RuntimeTests(unittest.TestCase):
         def response(request, **kwargs):
             requests.append(request)
             body = b'<ds-app>DSpace</ds-app>' if request.full_url.endswith('/') else json.dumps(
-                {'dspaceVersion': 'DSpace 10.1', '_links': {'core.communities': {'href': 'http://backend:8080/server/api/core/communities'}}}).encode()
+                {'dspaceVersion': 'DSpace 10.1', '_links': {'communities': {'href': 'http://backend:8080/server/api/core/communities'}}}).encode()
             return io.BytesIO(body)
-        with patch.object(ds.HTTP, 'open', side_effect=response):
+        # RootRestResourceControllerIT in the pinned upstream checks _links.communities.
+        # A stale/invented contract must fail immediately, not poll for ten minutes.
+        with patch.object(ds.HTTP, 'open', side_effect=response), \
+                patch.object(ds.time, 'sleep', side_effect=AssertionError('Known upstream Root contract was rejected')):
             rt.health()
         self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[0].get_header('Accept'), 'application/hal+json')
         self.assertTrue(all(r.get_header('Host') == 'repository.example.org' for r in requests))
         self.assertTrue(all(r.get_header('X-forwarded-proto') == 'https' for r in requests))
         self.assertTrue(all(r.full_url.startswith('http://127.0.0.1:') for r in requests))

@@ -50,7 +50,7 @@ def main():
             return module.Request('http://127.0.0.1:8100' + path, headers={'Host': 'repository.kei.test:8100'})
         with module.HTTP.open(public('/server/api'), timeout=20) as response:
             api = json.load(response)
-        check(api['_links']['core.communities']['href'].startswith(origin + '/server/'), 'public API canonical URL through Apache')
+        check(api['_links']['communities']['href'].startswith(origin + '/server/'), 'public API canonical URL through Apache')
         with module.HTTP.open(public('/'), timeout=60) as response:
             page = response.read().decode()
         check('<ds-app' in page and 'DSpace' in page, 'public production interface through Apache')

@@ -146,7 +146,10 @@ ou URL pública funcionando só porque o processo Node iniciou.
   `overwrite=true` do Ant. Corrigido para o alvo upstream `install_code` (sem
   banco) seguido de `update_webapps`; o build e o smoke passam a exigir
   `config-definition.xml`, `dspace.cfg` e `log4j2-cli.xml`. CLI e servidor recebem
-  `-Ddspace.dir=/dspace` explícito. Nova validação integrada pendente.
+  `-Ddspace.dir=/dspace` explícito. A rodada seguinte também revelou uma checagem nossa incorreta: o contrato
+  upstream usa `_links.communities`, não `_links.core.communities`. Corrigidos
+  o probe e o double, com referência ao teste `RootRestResourceControllerIT` da
+  tag fixada e negociação HAL explícita. Nova validação integrada pendente.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),

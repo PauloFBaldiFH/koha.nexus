@@ -397,7 +397,7 @@ class Runtime:
     def probe(self, path, port):
         origin = urlsplit(canonical_url(self.state()['url']))
         return Request('http://127.0.0.1:%s%s' % (port, path),
-                       headers={'Accept': 'application/json' if path.startswith('/server/api') else 'text/html',
+                       headers={'Accept': 'application/hal+json' if path.startswith('/server/api') else 'text/html',
                                 'Host': origin.netloc, 'X-Forwarded-Proto': origin.scheme})
 
     def http_json(self, path, port):
@@ -409,7 +409,7 @@ class Runtime:
         ports = state['ports']
         def api():
             doc = self.http_json('/server/api', ports['backend'])
-            return (bool(doc.get('_links', {}).get('core.communities', {}).get('href')) and
+            return (bool(doc.get('_links', {}).get('communities', {}).get('href')) and
                     doc.get('dspaceVersion', '').startswith('DSpace 10.1'))
         self.wait('DSpace REST API', api, 600)
         def ui():
