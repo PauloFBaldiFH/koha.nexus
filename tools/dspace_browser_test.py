@@ -198,8 +198,13 @@ def exercise(rt, output):
             check(updated.get('name') == title, 'metadata edited in the browser is persisted')
             stage = 'browser deposit'
             if consent.is_visible(): consent.click()
+            # The footer keeps every action aria-disabled while a save or the
+            # upload is still being processed (CI 42412161262 clicked during
+            # it). Wait for the upstream form to enable Deposit itself.
+            deposit = page.locator('#deposit')
+            expect(deposit).not_to_have_attribute('aria-disabled', 'true', timeout=120000)
             with page.expect_response(lambda r: '/api/workflow/workflowitems' in r.url and r.request.method == 'POST', timeout=90000) as submitted:
-                page.locator('#deposit').click()
+                deposit.click()
             check(submitted.value.status == 201, 'real browser completes the deposit')
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
