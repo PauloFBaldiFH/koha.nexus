@@ -1,0 +1,118 @@
+name: DSpace image foundation
+
+on:
+  pull_request:
+    paths:
+      - 'platforms/dspace/**'
+      - 'tools/dspace_images.py'
+      - 'tools/dspace_smoke.py'
+      - 'tests/test_dspace_images.py'
+      - '.github/workflows/dspace-images.yml'
+  push:
+    branches: [main, 'feat/dspace-*']
+    paths:
+      - 'platforms/dspace/**'
+      - 'tools/dspace_images.py'
+      - 'tools/dspace_smoke.py'
+      - 'tests/test_dspace_images.py'
+      - '.github/workflows/dspace-images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dspace-images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inputs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python tools/dspace_images.py validate
+      - run: python -m unittest discover -s tests -p test_dspace_images.py -v
+      - name: Validate runtime shell scripts
+        run: |
+          sh -n platforms/dspace/images/backend-entrypoint.sh
+          sh -n platforms/dspace/images/ui-entrypoint.sh
+          bash -n platforms/dspace/images/solr-entrypoint.sh
+
+  images:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, ui, solr]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - name: Fetch and verify released upstream sources
+        run: python tools/dspace_images.py prepare "$RUNNER_TEMP/dspace-sources"
+      - name: Build locked image without registry publication
+        run: >-
+          python tools/dspace_images.py build "$RUNNER_TEMP/dspace-sources"
+          --image '${{ matrix.image }}'
+          --metadata "$RUNNER_TEMP/dspace-results/${{ matrix.image }}.json"
+      - name: Runtime smoke test (not repository acceptance)
+        run: python tools/dspace_smoke.py '${{ matrix.image }}'
+      - name: Record resolved local image and inputs
+        id: record
+        if: success()
+        run: |
+          cp platforms/dspace/release.json "$RUNNER_TEMP/dspace-results/release.json"
+          cp platforms/dspace/contract.json "$RUNNER_TEMP/dspace-results/contract.json"
+          echo "tag=$(python tools/dspace_images.py tag '${{ matrix.image }}')" >> "$GITHUB_OUTPUT"
+          docker image inspect "$(python tools/dspace_images.py tag '${{ matrix.image }}')" > "$RUNNER_TEMP/dspace-results/image.json"
+      - name: Generate component inventory
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.record.outputs.tag }}
+          artifact-name: dspace-${{ matrix.image }}-sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dspace-${{ matrix.image }}-build-record
+          path: ${{ runner.temp }}/dspace-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependencies:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python tools/dspace_images.py prepare "$RUNNER_TEMP/dspace-audit-sources"
+      - name: Audit production dependency graph (blocks high/critical advisories)
+        run: >-
+          npm audit --package-lock-only --omit=dev --audit-level=high --json
+          --prefix "$RUNNER_TEMP/dspace-audit-sources/ui-source"
+          > "$RUNNER_TEMP/dspace-ui-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dspace-ui-dependency-audit
+          path: ${{ runner.temp }}/dspace-ui-audit.json
+          if-no-files-found: ignore
+          retention-days: 7

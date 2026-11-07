@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "dspace",
+  "maturity": "experimental",
+  "installable": false,
+  "project": "kn-dspace",
+  "network": "kn-dspace",
+  "services": {
+    "backend": {"port": 8080, "public_path": "/server", "user": "10001:10001"},
+    "ui": {"port": 4000, "public_path": "/", "user": "1000:1000"},
+    "postgres": {"port": 5432, "public_path": null, "user": "postgres"},
+    "solr": {"port": 8983, "public_path": null, "user": "8983:8983"}
+  },
+  "solr_cores": ["authority", "oai", "search", "statistics", "qaevent", "suggestion", "audit"],
+  "persistent_data": ["postgres", "assetstore", "solr", "configuration", "secrets"],
+  "lifecycle": {
+    "migration": "explicit-cli-operation",
+    "backup": "not-implemented",
+    "restore": "not-implemented"
+  }
+}

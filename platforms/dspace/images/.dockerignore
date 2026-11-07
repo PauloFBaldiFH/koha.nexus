@@ -1,0 +1,4 @@
+*
+!backend-entrypoint.sh
+!solr-entrypoint.sh
+!ui-entrypoint.sh
