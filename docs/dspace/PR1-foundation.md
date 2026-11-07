@@ -84,6 +84,12 @@ custom-webpack's dependency. No application types, compiler checks, or audit
 thresholds were removed. Source preparation now refuses mixed nested build-tool
 versions, covered by a regression test.
 
+A second local reproduction exposed Webpack API drift (`parser.getLocation is
+not a function`): the root package had floated from upstream 5.107.2 to 5.112.0,
+while the builder's internal version stayed unchanged. The root Webpack is now
+also fixed at 5.107.2. Preparation rejects a lock whose root Webpack differs from
+that exact manifest version. The old nested builder dependency is preserved.
+
 The aligned graph passes the production audit locally (0 high/critical), strict
 lockfile consistency checks and input tests. Its full image build and smoke must
 still pass before merging; do not substitute the earlier unpatched image results.

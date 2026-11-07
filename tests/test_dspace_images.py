@@ -170,13 +170,21 @@ class DSpaceInputs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)
             tools = ('@angular-devkit/build-angular', '@angular/cli', '@ngtools/webpack')
-            (path / 'package.json').write_text(json.dumps({'devDependencies': dict.fromkeys(tools, '20.3.36')}))
+            dependencies = dict.fromkeys(tools, '20.3.36')
+            dependencies['webpack'] = '5.107.2'
+            (path / 'package.json').write_text(json.dumps({'devDependencies': dependencies}))
             packages = {'node_modules/' + tool: {'version': '20.3.36'} for tool in tools}
+            packages['node_modules/webpack'] = {'version': '5.107.2'}
             (path / 'package-lock.json').write_text(json.dumps({'packages': packages}))
             images.validate_ui_toolchain(path)
             packages['node_modules/other/node_modules/@ngtools/webpack'] = {'version': '20.3.42'}
             (path / 'package-lock.json').write_text(json.dumps({'packages': packages}))
             with self.assertRaisesRegex(ValueError, 'Mixed Angular'):
+                images.validate_ui_toolchain(path)
+            del packages['node_modules/other/node_modules/@ngtools/webpack']
+            packages['node_modules/webpack']['version'] = '5.112.0'
+            (path / 'package-lock.json').write_text(json.dumps({'packages': packages}))
+            with self.assertRaisesRegex(ValueError, 'Root Webpack'):
                 images.validate_ui_toolchain(path)
 
 

@@ -104,6 +104,9 @@ def validate_ui_toolchain(directory: Path) -> None:
     if len(versions) != 1 or not re.fullmatch(r'\d+\.\d+\.\d+', next(iter(versions))):
         raise ValueError('Angular build tools must use one exact version')
     selected = next(iter(versions))
+    webpack = package['devDependencies']['webpack']
+    if not re.fullmatch(r'\d+\.\d+\.\d+', webpack) or lock['packages']['node_modules/webpack']['version'] != webpack:
+        raise ValueError('Root Webpack must be fixed to the compatible exact version')
     for path, entry in lock['packages'].items():
         if any(path.endswith('/' + tool) for tool in tools) and entry.get('version') != selected:
             raise ValueError('Mixed Angular build-tool versions in dependency graph')

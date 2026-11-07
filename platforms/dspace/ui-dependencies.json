@@ -1,7 +1,7 @@
 {
   "package.json": {
     "before": "9322ef3c50ac9b376af1caf3af0824894087c8857a957a6005341d5847c26362",
-    "after": "f996a7ad3c7ed907315a8687a9a27081b2987cb85c539e94041fa74e98196b8c",
+    "after": "f502d9e57e1ba15120a13037ea89f5df68d4507ee076b112269e910ada9ce2af",
     "value": {
       "name": "dspace-angular",
       "version": "10.1.0",
@@ -240,7 +240,7 @@
         "ts-node": "^8.10.2",
         "tsconfig-paths": "^4.2.0",
         "typescript": "~5.9.3",
-        "webpack": "^5.107.2",
+        "webpack": "5.107.2",
         "webpack-cli": "^6.0.1",
         "yaml": "^2.9.0"
       },
@@ -252,7 +252,7 @@
   },
   "package-lock.json": {
     "before": "a5fa7c226ae12b659af4a85f9d8b095111d29d07001180841f61a3657b8dd7ce",
-    "after": "a0c6cdf6ad6f4beb8f40e525afe452a3139c0498bd954597ec66500abed34c1c",
+    "after": "8b0e6e26cfe8abbf11dcf57e7240e79a8d9d8bf838dfd931b7934919de0e17bb",
     "remove": [
       "node_modules/@angular/cli/node_modules/ansi-styles",
       "node_modules/@angular/cli/node_modules/cliui",
@@ -270,9 +270,7 @@
       "node_modules/engine.io/node_modules/ws",
       "node_modules/schema-utils/node_modules/ajv-formats",
       "node_modules/socket.io-adapter/node_modules/debug",
-      "node_modules/webpack-dev-server/node_modules/ws",
-      "node_modules/webpack/node_modules/eslint-scope",
-      "node_modules/webpack/node_modules/estraverse"
+      "node_modules/webpack-dev-server/node_modules/ws"
     ],
     "update": {
       "": {
@@ -428,7 +426,7 @@
           "ts-node": "^8.10.2",
           "tsconfig-paths": "^4.2.0",
           "typescript": "~5.9.3",
-          "webpack": "^5.107.2",
+          "webpack": "5.107.2",
           "webpack-cli": "^6.0.1",
           "yaml": "^2.9.0"
         },
@@ -2584,104 +2582,6 @@
           "markdown-it": "bin/markdown-it.mjs"
         }
       },
-      "node_modules/minimizer-webpack-plugin": {
-        "version": "5.14.0",
-        "resolved": "https://registry.npmjs.org/minimizer-webpack-plugin/-/minimizer-webpack-plugin-5.14.0.tgz",
-        "integrity": "sha512-PnvQXCJxhgH2ZVVO7Lj0sM6q8L1XGxnUvd8wVQIRwi8khMCLq5wg0Ngxe44bcuZL2FSN81RdVE7YHEVzTKsQDQ==",
-        "dev": true,
-        "license": "MIT",
-        "dependencies": {
-          "jest-worker": "^27.4.5",
-          "schema-utils": "^4.6.0",
-          "terser": "^5.51.0"
-        },
-        "engines": {
-          "node": ">= 10.13.0"
-        },
-        "funding": {
-          "type": "opencollective",
-          "url": "https://opencollective.com/webpack"
-        },
-        "peerDependencies": {
-          "webpack": "^5.1.0"
-        },
-        "peerDependenciesMeta": {
-          "@minify-html/node": {
-            "optional": true
-          },
-          "@napi-rs/image": {
-            "optional": true
-          },
-          "@swc/core": {
-            "optional": true
-          },
-          "@swc/css": {
-            "optional": true
-          },
-          "@swc/html": {
-            "optional": true
-          },
-          "clean-css": {
-            "optional": true
-          },
-          "cssnano": {
-            "optional": true
-          },
-          "csso": {
-            "optional": true
-          },
-          "esbuild": {
-            "optional": true
-          },
-          "html-minifier-terser": {
-            "optional": true
-          },
-          "imagemin": {
-            "optional": true
-          },
-          "lightningcss": {
-            "optional": true
-          },
-          "postcss": {
-            "optional": true
-          },
-          "sharp": {
-            "optional": true
-          },
-          "svgo": {
-            "optional": true
-          },
-          "uglify-js": {
-            "optional": true
-          }
-        }
-      },
-      "node_modules/minimizer-webpack-plugin/node_modules/commander": {
-        "version": "2.20.3",
-        "resolved": "https://registry.npmjs.org/commander/-/commander-2.20.3.tgz",
-        "integrity": "sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==",
-        "dev": true,
-        "license": "MIT"
-      },
-      "node_modules/minimizer-webpack-plugin/node_modules/terser": {
-        "version": "5.51.2",
-        "resolved": "https://registry.npmjs.org/terser/-/terser-5.51.2.tgz",
-        "integrity": "sha512-bWnjSNscmuI+GJze6ZupnHP8G/cTcsJF+bXCeQknk2SHQsgbNJnLrqiH9jZ2W4STPVXH2mDKKRX3iwPhc9Cn/Q==",
-        "dev": true,
-        "license": "BSD-2-Clause",
-        "dependencies": {
-          "@jridgewell/source-map": "^0.3.3",
-          "acorn": "^8.15.0",
-          "commander": "^2.20.0",
-          "source-map-support": "~0.5.20"
-        },
-        "bin": {
-          "terser": "bin/terser"
-        },
-        "engines": {
-          "node": ">=10"
-        }
-      },
       "node_modules/morgan": {
         "version": "1.12.1",
         "resolved": "https://registry.npmjs.org/morgan/-/morgan-1.12.1.tgz",
@@ -3085,47 +2985,6 @@
           "node": ">=18.17"
         }
       },
-      "node_modules/webpack": {
-        "version": "5.112.0",
-        "resolved": "https://registry.npmjs.org/webpack/-/webpack-5.112.0.tgz",
-        "integrity": "sha512-NIBpsRuCll036haDDt/CfcTDfsWNR9Z782nMRMI9D377BsGcYzZDTNU5TyzhCJzPIcihAxMBaMAhq2WSaDrH8Q==",
-        "dev": true,
-        "license": "MIT",
-        "dependencies": {
-          "@types/estree": "^1.0.8",
-          "@types/json-schema": "^7.0.15",
-          "@webassemblyjs/ast": "^1.14.1",
-          "@webassemblyjs/wasm-edit": "^1.14.1",
-          "@webassemblyjs/wasm-parser": "^1.14.1",
-          "browserslist": "^4.28.1",
-          "chrome-trace-event": "^1.0.2",
-          "enhanced-resolve": "^5.26.0",
-          "es-module-lexer": "^2.1.0",
-          "events": "^3.2.0",
-          "graceful-fs": "^4.2.11",
-          "mime-db": "^1.54.0",
-          "minimizer-webpack-plugin": "^5.13.0",
-          "schema-utils": "^4.5.0",
-          "tapable": "^2.3.0",
-          "watchpack": "^2.6.1",
-          "webpack-sources": "^3.6.0"
-        },
-        "bin": {
-          "webpack": "bin/webpack.js"
-        },
-        "engines": {
-          "node": ">=10.13.0"
-        },
-        "funding": {
-          "type": "opencollective",
-          "url": "https://opencollective.com/webpack"
-        },
-        "peerDependenciesMeta": {
-          "webpack-cli": {
-            "optional": true
-          }
-        }
-      },
       "node_modules/webpack-sources": {
         "version": "3.7.0",
         "resolved": "https://registry.npmjs.org/webpack-sources/-/webpack-sources-3.7.0.tgz",
@@ -3134,6 +2993,30 @@
         "license": "MIT",
         "engines": {
           "node": ">=10.13.0"
+        }
+      },
+      "node_modules/webpack/node_modules/eslint-scope": {
+        "version": "5.1.1",
+        "resolved": "https://registry.npmjs.org/eslint-scope/-/eslint-scope-5.1.1.tgz",
+        "integrity": "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw==",
+        "dev": true,
+        "license": "BSD-2-Clause",
+        "dependencies": {
+          "esrecurse": "^4.3.0",
+          "estraverse": "^4.1.1"
+        },
+        "engines": {
+          "node": ">=8.0.0"
+        }
+      },
+      "node_modules/webpack/node_modules/estraverse": {
+        "version": "4.3.0",
+        "resolved": "https://registry.npmjs.org/estraverse/-/estraverse-4.3.0.tgz",
+        "integrity": "sha512-39nnKffWz8xN1BU/2c79n9nB9HDzo0niYUqx6xyqUnyoAnQyyWpOTdZEeiCch8BBu515t4wp9ZmgVfVhn9EBpw==",
+        "dev": true,
+        "license": "BSD-2-Clause",
+        "engines": {
+          "node": ">=4.0"
         }
       },
       "node_modules/webpack/node_modules/watchpack": {
