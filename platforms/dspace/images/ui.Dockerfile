@@ -19,11 +19,13 @@ RUN --mount=type=secret,id=proxy_ca \
 FROM ${NODE_IMAGE} AS runtime
 ARG DSPACE_VERSION
 ARG SOURCE_REVISION
+ARG RELEASE_LOCK_SHA256
 LABEL org.opencontainers.image.title="Nexus DSpace interface" \
       org.opencontainers.image.version="${DSPACE_VERSION}" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.koha-nexus.dspace.release-lock="${RELEASE_LOCK_SHA256}" \
       org.opencontainers.image.source="https://github.com/DSpace/dspace-angular" \
-      org.opencontainers.image.licenses="BSD-3-Clause"
+      org.opencontainers.image.licenses="BSD-3-Clause AND GPL-3.0-or-later"
 WORKDIR /app
 COPY --from=build --chown=0:0 /src/dist /app/dist
 COPY --from=ui-source --chown=0:0 /config /app/config
@@ -31,6 +33,7 @@ COPY --from=ui-source /LICENSE /usr/share/licenses/dspace-ui/LICENSE
 COPY --from=ui-source /NOTICE /usr/share/licenses/dspace-ui/NOTICE
 COPY --from=ui-source /LICENSES_THIRD_PARTY /usr/share/licenses/dspace-ui/LICENSES_THIRD_PARTY
 COPY --chmod=0555 ui-entrypoint.sh /usr/local/bin/nexus-dspace-ui
+COPY --from=nexus-license /LICENSE /usr/share/licenses/nexus-dspace/LICENSE
 # Upstream generates hashed browser configuration and index.html at startup.
 # The server bundle and source configuration remain root-owned.
 RUN mkdir -p /app/log && chown -R node:node /app/log /app/dist/browser

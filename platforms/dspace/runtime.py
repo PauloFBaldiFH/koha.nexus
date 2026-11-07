@@ -127,7 +127,7 @@ def command(args, timeout=60, input_text=None, env=None):
 
 class Runtime:
     def __init__(self, root=ROOT, catalog=None, lab=False, driver=None):
-        self.root = Path(root)
+        self.root = Path(root).absolute()
         self.release = read_json(BASE / 'release.json')
         self.release_hash = digest(BASE / 'release.json')
         self.catalog_path = Path(catalog or '/etc/koha-nexus/dspace-images.json')
@@ -144,7 +144,7 @@ class Runtime:
             if getattr(self, '_mutating', False):
                 output = error.output
                 password = self.root / 'db-password'
-                if password.exists():
+                if password.exists() and password.read_text().strip():
                     output = output.replace(password.read_text().strip(), '[redacted]')
                 output = re.sub(r'(?im)^.*(?:password|secret|token|authorization).*$','[sensitive line omitted]', output)
                 atomic(self.root / 'last-error.log', output[-32768:])
@@ -323,6 +323,8 @@ class Runtime:
                 labels = obj['Config'].get('Labels') or {}
                 if labels.get('org.opencontainers.image.revision') != source['commit']:
                     raise Refused('Image source revision mismatch: ' + name)
+                if labels.get('org.koha-nexus.dspace.release-lock') != self.release_hash:
+                    raise Refused('Image recipe/release identity mismatch: ' + name)
                 expected_user = {'backend': '10001:10001', 'ui': 'node', 'solr': '8983:8983'}[name]
                 if obj['Config'].get('User') != expected_user:
                     raise Refused('Unexpected runtime user: ' + name)
@@ -347,8 +349,14 @@ class Runtime:
             return not data.get('initFailures') and set(CORES) <= set(data.get('status', {}))
         self.wait('All seven Solr cores', solr_ready)
 
+    def probe(self, path, port):
+        origin = urlsplit(canonical_url(self.state()['url']))
+        return Request('http://127.0.0.1:%s%s' % (port, path),
+                       headers={'Accept': 'application/json' if path.startswith('/server/api') else 'text/html',
+                                'Host': origin.netloc, 'X-Forwarded-Proto': origin.scheme})
+
     def http_json(self, path, port):
-        with HTTP.open(Request('http://127.0.0.1:%s%s' % (port, path), headers={'Accept': 'application/json'}), timeout=15) as stream:
+        with HTTP.open(self.probe(path, port), timeout=15) as stream:
             return json.load(stream)
 
     def health(self):
@@ -360,7 +368,9 @@ class Runtime:
                     doc.get('dspaceVersion', '').startswith('DSpace 10.1'))
         self.wait('DSpace REST API', api, 600)
         def ui():
-            with HTTP.open('http://127.0.0.1:%s/' % ports['ui'], timeout=30) as response:
+            # The real canonical Host is essential for Angular's allowedHosts
+            # SSR protection; a loopback Host would falsely fail a DNS install.
+            with HTTP.open(self.probe('/', ports['ui']), timeout=30) as response:
                 page = response.read(4 * 1024 * 1024).decode('utf8', errors='replace')
             return '<ds-app' in page and 'DSpace' in page
         self.wait('DSpace production interface', ui, 300)
@@ -405,6 +415,9 @@ class Runtime:
                     v = PROJECT + '-' + name
                     self.docker('volume', 'create', '--label', 'com.koha-nexus.managed=true',
                                 '--label', 'com.koha-nexus.platform=dspace', v)
+                    obj = json.loads(self.docker('volume', 'inspect', v))[0]
+                    if any((obj.get('Labels') or {}).get(k) != value for k, value in LABELS.items()):
+                        raise Refused('A data volume collision occurred; it was not mounted or adopted: ' + v)
                     self.core('volume', v)
                 self.mark(phase='dependencies')
                 self.compose('up', '-d', '--pull', 'never', 'postgres', 'solr')
@@ -413,6 +426,7 @@ class Runtime:
                     self.mark(phase='migration', migration='running')
                     try:
                         self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'cli', 'database', 'migrate', timeout=1200)
+                        self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'schema-record', timeout=90)
                     except BaseException:
                         self.mark(migration='failed')
                         raise

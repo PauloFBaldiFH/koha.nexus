@@ -48,9 +48,25 @@ este PR não cria conta padrão nem publica dados de teste em produção.
 Diário atômico, fsync e trava por plataforma registram as fases. Uma falha mantém
 dados; retomar depois da API falhar não repete migração nem troca a senha.
 Migração interrompida/falha requer investigação e `install --retry-migration
---confirm` explícito. Início normal nunca migra. Arquivos editados não são
+--confirm` explícito. Início normal não emite o comando de migração. Arquivos editados não são
 sobrescritos silenciosamente. `stop` é gracioso e preserva volumes e configuração.
 Não existe tarefa de remoção/destruição nesta etapa.
+
+### Particularidade do upstream: migração na criação de Context
+
+O `org.dspace.core.Context` chama `DatabaseUtils.updateDatabase()` ao iniciar.
+Somente deixar de executar `database migrate` no entrypoint não impediria isso.
+A receita **2** acrescenta `NexusSchemaGuard`, um programa JDBC pequeno, independente
+do núcleo DSpace: lê o histórico Flyway numa transação somente leitura e confere
+um recibo do hash da release e das migrações bem-sucedidas. O recibo só é gravado
+por `schema-record`, após a migração explicitamente autorizada. Sem recibo, com
+release diferente ou histórico alterado, o backend recusa iniciar **antes** de
+carregar o Context. Vale também no reinício automático do Docker.
+
+O recibo fica em `/dspace/var/nexus-schema.sha256`, no volume persistente `var`.
+Não substitui o backup do banco nem valida alterações manuais em todas as tabelas;
+identifica a história de migração aprovada. Atualização/restauração futuras devem
+preservar ou regenerar esse recibo somente após validar o banco de destino.
 
 ## Imagens: condição necessária antes de oferecer a instalação
 
@@ -101,14 +117,23 @@ ou URL pública funcionando só porque o processo Node iniciou.
 
 ## Validação e limites
 
-* 25 testes locais de falha, retomada, identidade das imagens, privacidade de
+* 26 testes locais de falha, retomada, identidade das imagens, privacidade de
   configuração e preservação de dados passaram. São testes com doubles declarados.
 * Os 18 testes da fundação continuam passando localmente.
+* Compilação Java 21 e seis verificações do guard passaram localmente: recibo
+  estável, alteração de histórico, outra release, migração falha, banco vazio e
+  identidade ausente. Estes testes também usam doubles JDBC declarados.
+* Regressão local: 148 testes de plataformas/nexus_core passaram, um foi pulado.
 * `tools/dspace_install_test.py --disposable` prepara um conjunto **real** na CI,
   usando exatamente as imagens construídas pelos jobs de backend, UI e Solr.
   Confere migração, sete cores, API, SSR, proxy, persistência, parada/início e
-  reinício do serviço Docker. Não chamar isso de reboot da máquina.
-* Resultado da execução integrada ainda pendente ao escrever este documento.
+  reinício do serviço Docker. Também adultera o histórico Flyway num banco de
+  laboratório para exigir recusa do backend sem alterações automáticas.
+  Não chamar isso de reboot da máquina.
+* A primeira execução integrada falhou, após build/smoke das três imagens e
+  auditoria aprovados. O log completo não é acessível pela API deste ambiente.
+  A nova execução acrescenta anotação pública sanitizada com a fase/causa. Ainda
+  pendente comprovar o conjunto funcionando; não apresentar a CI como verde.
 
 Permanecem para etapas seguintes: administrador/depósito real e painel (PR 3),
 backup/restauração PostgreSQL+arquivos+Solr (PR 4), conjuntos/agendas (PR 5),

@@ -7,11 +7,19 @@ umask 027
 case "${1:-server}" in
     server)
         [ "$#" -eq 0 ] || shift
+        # Upstream Context checks Flyway and can apply pending migrations.
+        # Refuse before loading it unless the explicit CLI operation recorded
+        # this exact release and database history. This also runs after reboot.
+        java -cp '/usr/local/lib/nexus-dspace:/dspace/lib/*' NexusSchemaGuard check
         exec java -jar /dspace/webapps/server-boot.jar "$@"
         ;;
     cli)
         shift
         exec /dspace/bin/dspace "$@"
+        ;;
+    schema-record)
+        [ "$#" -eq 1 ] || exit 64
+        exec java -cp '/usr/local/lib/nexus-dspace:/dspace/lib/*' NexusSchemaGuard record
         ;;
     *) echo 'Expected server or cli COMMAND [ARGS].' >&2; exit 64 ;;
 esac

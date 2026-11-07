@@ -1,6 +1,7 @@
 """Lifecycle failure tests with explicit doubles; real services run in CI separately."""
 import contextlib
 import hashlib
+import io
 import importlib.util
 import json
 import os
@@ -160,7 +161,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(self.rt.state()['migration'], 'done')
         self.assertEqual((self.root / 'db-password').stat().st_mode & 0o777, 0o600)
         self.assertNotIn((self.root / 'db-password').read_text().strip(), json.dumps(self.rt.status()))
-        self.assertEqual(sum(x[:2] == ('compose', 'run') for x in self.rt.calls), 1)
+        self.assertEqual(sum(x[:2] == ('compose', 'run') and 'migrate' in x for x in self.rt.calls), 1)
 
     def test_failure_preserves_volumes_and_records_phase(self):
         self.rt.failure = 'health'
@@ -179,7 +180,7 @@ class RuntimeTests(unittest.TestCase):
         self.rt.failure = None
         self.install()
         self.assertEqual(secret, (self.root / 'db-password').read_bytes())
-        self.assertEqual(sum(x[:2] == ('compose', 'run') for x in self.rt.calls), 1)
+        self.assertEqual(sum(x[:2] == ('compose', 'run') and 'migrate' in x for x in self.rt.calls), 1)
 
     def test_interrupted_migration_requires_deliberate_retry(self):
         self.rt.failure = 'migration'
@@ -256,6 +257,23 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual((self.root / 'last-error.log').stat().st_mode & 0o777, 0o600)
         with patch.object(rt, 'docker', side_effect=ds.Refused('offline')):
             self.assertNotIn('Safe detail', json.dumps(rt.status()))
+
+    def test_health_uses_canonical_host_for_angular_ssrf_protection(self):
+        self.install()
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        rt.mark(url='https://repository.example.org')
+        requests = []
+        def response(request, **kwargs):
+            requests.append(request)
+            body = b'<ds-app>DSpace</ds-app>' if request.full_url.endswith('/') else json.dumps(
+                {'dspaceVersion': 'DSpace 10.1', '_links': {'core.communities': {'href': 'http://backend:8080/server/api/core/communities'}}}).encode()
+            return io.BytesIO(body)
+        with patch.object(ds.HTTP, 'open', side_effect=response):
+            rt.health()
+        self.assertEqual(len(requests), 2)
+        self.assertTrue(all(r.get_header('Host') == 'repository.example.org' for r in requests))
+        self.assertTrue(all(r.get_header('X-forwarded-proto') == 'https' for r in requests))
+        self.assertTrue(all(r.full_url.startswith('http://127.0.0.1:') for r in requests))
 
     def test_proxy_api_rule_precedes_interface_and_operational_paths_are_denied(self):
         self.install()

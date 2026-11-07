@@ -20,6 +20,8 @@ def catalog(published=False):
         expected = release['sources']['ui' if name == 'ui' else 'backend']['commit']
         if data['Config']['Labels'].get('org.opencontainers.image.revision') != expected:
             raise ValueError('Unexpected source revision: ' + name)
+        if data['Config']['Labels'].get('org.koha-nexus.dspace.release-lock') != hashlib.sha256((BASE / 'release.json').read_bytes()).hexdigest():
+            raise ValueError('Image was built for another recipe/release: ' + name)
         if published:
             refs = [x for x in data.get('RepoDigests', []) if x.startswith(REGISTRY + name + '@sha256:')]
             if len(refs) != 1:
