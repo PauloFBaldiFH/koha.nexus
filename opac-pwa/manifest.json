@@ -1,0 +1,33 @@
+{
+  "name": "Catálogo da Biblioteca",
+  "short_name": "Biblioteca",
+  "description": "Catálogo da biblioteca, com sua carteirinha digital para o balcão.",
+  "id": "/",
+  "start_url": "/cgi-bin/koha/opac-main.pl",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1f4e79",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/koha-nexus-pwa/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/koha-nexus-pwa/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/koha-nexus-pwa/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

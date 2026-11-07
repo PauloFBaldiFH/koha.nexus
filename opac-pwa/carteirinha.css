@@ -1,0 +1,132 @@
+/*
+ * Koha.Nexus - estilo da carteirinha digital e do botão.
+ *
+ * COLAR em: Administração > Preferências do sistema > OpacUserCSS
+ * (cole só o conteúdo abaixo).
+ */
+
+.kn-pwa-open {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9000;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #1f4e79;
+  color: #ffffff;
+  font: 600 15px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.kn-pwa-open:focus-visible,
+.kn-pwa-close:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+.kn-pwa-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.kn-pwa-overlay[hidden] {
+  display: none;
+}
+
+.kn-pwa-dialog {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 24px 20px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #1a1a1a;
+  text-align: center;
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.kn-pwa-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #1a1a1a;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kn-pwa-lib {
+  margin: 0 0 2px;
+  color: #1f4e79;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kn-pwa-title {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.kn-pwa-name {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.kn-pwa-status {
+  margin: 24px 0;
+  color: #444444;
+}
+
+.kn-pwa-barcode {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  background: #ffffff;
+}
+
+.kn-pwa-hint {
+  margin: 14px 0 0;
+  color: #555555;
+  font-size: 14px;
+}
+
+/* Evita rolagem de fundo com o diálogo aberto. */
+body.kn-pwa-lock {
+  overflow: hidden;
+}
+
+/* Tema escuro do sistema: o cartão continua branco, para o scanner ler. */
+@media (prefers-color-scheme: dark) {
+  .kn-pwa-dialog {
+    background: #ffffff;
+    color: #1a1a1a;
+  }
+}
+
+@media (max-width: 480px) {
+  .kn-pwa-open {
+    right: 12px;
+    bottom: 12px;
+  }
+}
