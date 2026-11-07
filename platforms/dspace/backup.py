@@ -87,8 +87,9 @@ class Recovery:
         if not self.rt.driver: raise Error('The existing backup key service is required.')
         env = local_docker_env()
         if self.phrase is not None: env['KEI_BACKUP_PHRASE'] = self.phrase
-        return command(['bash', self.rt.driver, '--task', 'dspace-backup-crypto', operation,
-                        *([str(source), str(target)] if source is not None else [])],
+        arguments = [str(source), str(target)] if source is not None else []
+        if operation == 'decrypt': arguments.append(str(shutil.disk_usage(Path(target).parent).free // 3))
+        return command(['bash', self.rt.driver, '--task', 'dspace-backup-crypto', operation, *arguments],
                        timeout=21600, env=env)
 
     def checked(self):

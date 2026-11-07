@@ -141,3 +141,69 @@ class CaptureFailures(unittest.TestCase):
         self.r.record(phase='promoting',services=['postgres'])
         with self.assertRaises(b.Error): self.r.recover_capture()
         self.rt.compose.assert_not_called()
+
+
+class PromotionFailures(unittest.TestCase):
+    """Exercise actual on-disk configuration rollback with simulated services."""
+    def test_failed_promotion_restores_old_configuration(self):
+        self.exercise(False)
+
+    def test_failed_rollback_keeps_recovery_material(self):
+        self.exercise(True)
+
+    def exercise(self, fail_rollback):
+        import contextlib
+        from unittest.mock import Mock, patch
+        import runtime
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)/'dspace'; root.mkdir()
+            tree=Path(temporary)/'tree'; (tree/'private').mkdir(parents=True)
+            for name,value in [('local.cfg','old config'),('db-password','old password'),('compose.json','{"volumes":{}}')]:
+                (root/name).write_text(value)
+            state={'phase':'ready','url':'http://repo.test','status':'installed',
+                   'files':{n:b.sha(root/n) for n in ('local.cfg','db-password','compose.json')}}
+            (root/'state.json').write_text(json.dumps(state))
+            original={p.name:p.read_bytes() for p in root.iterdir()}
+            (tree/'private/local.cfg').write_text('recovered config')
+            (tree/'private/db-password').write_text('recovered password')
+            rt=Mock(); rt.root=root; rt.driver='installer'
+            rt.state.side_effect=lambda:json.loads((root/'state.json').read_text())
+            def mark(**changes):
+                data=rt.state(); data.update(changes); (root/'state.json').write_text(json.dumps(data))
+            rt.mark.side_effect=mark
+            rt.dependencies.side_effect=[b.Error('Failed new services'),b.Error('Failed previous services') if fail_rollback else None]
+            recovery=b.Recovery(rt)
+            recovery.checked=Mock(return_value=(state,{'volumes':{}}))
+            recovery.capture=Mock(return_value={'package':'safety.tar.gpg'})
+            recovery.running=Mock(return_value=['postgres','solr','backend','ui'])
+            @contextlib.contextmanager
+            def opened(package): yield tree,{'url':state['url']}
+            @contextlib.contextmanager
+            def clone(*args):
+                yield {'area':root/'copy','project':'copy','compose':{'volumes':{'assetstore':{'name':'new-owned-volume'}}},'promoted':{'value':False}}
+            recovery.opened=opened; recovery.clone=clone
+            atomic=runtime.atomic
+            with patch.object(runtime,'atomic',side_effect=lambda p,d,mode=0o600,gid=None:atomic(p,d,mode)):
+                with self.assertRaises(b.Error): recovery.restore('source.tar.gpg')
+            for name,value in original.items(): self.assertEqual((root/name).read_bytes(),value)
+            self.assertEqual((root/'recovery-rollback').exists(),fail_rollback)
+            self.assertEqual(json.loads(recovery.journal.read_text())['phase'],'promoting' if fail_rollback else 'complete')
+            self.assertFalse(any(c.args[:2]==('volume','rm') for c in rt.docker.call_args_list))
+
+
+class DecryptionLimit(unittest.TestCase):
+    @unittest.skipUnless(__import__('shutil').which('gpg'), 'GPG is not installed')
+    def test_gpg_stops_expansion_before_extracting_archive(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); home=root/'gpg'; home.mkdir(mode=0o700)
+            plain=root/'large'; plain.write_bytes(b'0'*1048576)
+            base=['gpg','--homedir',str(home),'--batch','--pinentry-mode','loopback','--passphrase-fd','0']
+            try:
+                encrypted=root/'encrypted'
+                subprocess.run([*base,'--symmetric','--output',str(encrypted),str(plain)],input=b'test-only',capture_output=True,check=True,timeout=30)
+                result=subprocess.run([*base,'--max-output','4096','--decrypt',str(encrypted)],input=b'test-only',capture_output=True,timeout=30)
+                self.assertNotEqual(result.returncode,0)
+                self.assertLess(len(result.stdout),plain.stat().st_size)
+            finally:
+                subprocess.run(['gpgconf','--homedir',str(home),'--kill','gpg-agent'],capture_output=True,timeout=10)
