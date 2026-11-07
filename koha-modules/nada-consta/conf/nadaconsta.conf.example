@@ -1,0 +1,21 @@
+# Koha.Nexus - Nada Consta
+# Copie para /etc/koha/nadaconsta.conf e ajuste. NUNCA versionar o arquivo real.
+#
+# Gerar a chave:  openssl rand -base64 48
+# Permissões:     chown root:www-data /etc/koha/nadaconsta.conf && chmod 640 /etc/koha/nadaconsta.conf
+
+# Obrigatório: segredo do HMAC (mínimo 32 caracteres). Trocá-lo invalida certidões emitidas.
+HMAC_KEY=troque-por-uma-chave-gerada-com-openssl-rand-base64-48
+
+# Dias de validade da certidão (padrão 30).
+VALIDITY_DAYS=30
+
+# Atributo do leitor onde está o CPF (código em Administração > Atributos de leitor).
+CPF_ATTRIBUTE_CODE=CPF
+
+# Opcional: atributo que guarda a matrícula. Vazio = usa o número do cartão.
+ENROLMENT_ATTRIBUTE_CODE=
+
+# Opcional: endereço público da validação (vai no QR Code).
+# Vazio = OPACBaseURL do Koha + /cgi-bin/koha/opac-validar-certidao.pl
+VERIFY_URL=https://biblioteca.exemplo.br/cgi-bin/koha/opac-validar-certidao.pl
