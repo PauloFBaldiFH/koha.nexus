@@ -426,6 +426,16 @@ def all_actions() -> set[str]:
 # few words. English keys like the labels; pt.cache holds the PT-BR texts.
 # tests/test_menus.py checks every entry has one.
 DESCRIPTIONS: dict[str, str] = {
+    "dspace-install": "Checks the reviewed images first, prepares Docker/Apache only with consent, then shows the repository installation plan. An incomplete migration requires explicit investigation before retry.",
+    "dspace-start": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history.",
+    "dspace-stop": "Stops the repository gracefully, retaining configuration and every data volume.",
+    "dspace-diagnose": "Explicitly checks PostgreSQL, all seven Solr cores, API, interface and isolation; process state alone does not establish health.",
+    "dspace-logs": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.",
+    "dspace-admin": "Creates an administrator with an e-mail, chosen password and language, or resets an existing administrator. Creating refuses an e-mail already used by any account.",
+    "setup-dspace": "Offers administrator setup now or later and keeps a reminder for subsequent stages. The permanent menus remain available.",
+    "dspace-help": "Explains communities, collections, deposits and access policies, with the repository login address.",
+    "dspace-maintenance": "Diagnosis, logs, safe start/stop and first steps of the DSpace repository.",
+
     "install": "Installs Koha with MariaDB and Apache on this server",
     "credentials": "Shows the logins and passwords of the first access",
     "admin-koha": "Superlibrarians: the web installer, a new one, a new password",

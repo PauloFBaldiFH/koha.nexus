@@ -425,6 +425,21 @@ class RuntimeTests(unittest.TestCase):
             self.rt.admin('password', dict(email='a@example.org', password='longpassword'))
         self.assertFalse(self.rt.state().get('admin_ready'))
 
+    def test_old_recipe_cannot_run_admin_or_reinstall_over_data(self):
+        self.install()
+        self.rt.mark(release_sha256='0' * 64)
+        with patch.object(self.rt, 'compose') as compose, self.assertRaisesRegex(ds.Refused, 'validated update'):
+            self.rt.admin('status')
+        compose.assert_not_called()
+
+    def test_explicit_setup_refresh_reads_administrators_without_claiming_backup_support(self):
+        self.install()
+        with patch.object(self.rt, 'admin', return_value={'admins':['outside@example.org']}):
+            result = self.rt.setup('status', refresh=True)
+        self.assertEqual(result['steps']['admin'], 'done')
+        self.assertEqual(result['steps']['backup'], 'pending')
+        self.assertFalse(self.rt.state().get('admin_ready'))
+
     def test_setup_postponement_and_closing_preserve_services_and_configuration(self):
         self.install()
         before = {name: ds.digest(self.root / name) for name in ('db-password', 'local.cfg', 'compose.json')}

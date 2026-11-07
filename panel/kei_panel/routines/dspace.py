@@ -35,10 +35,11 @@ async def install(app):
     if not available.get('available'):
         await app.push_screen_wait(MessageScreen(TITLE, t('DSpace needs a reviewed immutable image catalog before installation. No packages were installed.') + '\n\n' + str(available.get('reason', ''))))
         return
-    from .platforms import docker_install
+    from .platforms import install_docker
     status = await app.bridge.status()
     if not (status.get('docker') or {}).get('installed'):
-        await docker_install(app)
+        if not await install_docker(app):
+            return
         status = await app.bridge.status()
         if not (status.get("docker") or {}).get("installed"):
             return
@@ -161,7 +162,7 @@ async def help(app):
 
 
 async def assistant(app):
-    data = await call(app, 'setup-status')
+    data = await call(app, 'setup-status', '--refresh')
     if data is None or data.get('setup') != 'open':
         await help(app)
         return

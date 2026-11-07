@@ -729,6 +729,8 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
         data = dspace_detail(facts.status)
         if action == "dspace-start":
             return data.get("status") in ("stopped", "degraded", "unavailable") and data.get("phase") == "ready"
+        if action == "dspace-admin":
+            return data.get("status") == "installed" and data.get("admin_available", True)
         if action == "dspace-stop":
             return data.get("status") == "installed"
         if action == "setup-dspace":

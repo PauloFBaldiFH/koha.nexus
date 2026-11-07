@@ -62,6 +62,8 @@ def main():
         href = page.get('_links', {}).get('self', {}).get('href', '')
         check(count == 0 and href.startswith(origin + '/server/api/core/communities'),
               'anonymous empty community API: total=%r, self=%r' % (count, href))
+        from dspace_browser_test import exercise
+        exercise(rt, output)
         # Simulate a disconnected client: its administrative container can live
         # on. Do not overlap a new install/start/stop with that still-running job.
         pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()

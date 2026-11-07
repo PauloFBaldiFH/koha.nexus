@@ -575,7 +575,8 @@ class Runtime:
         if not state:
             return {'schema': 1, 'platform': 'dspace', 'status': 'absent', 'experimental': True}
         result = {k: state.get(k) for k in ('status', 'phase', 'url', 'migration', 'intended', 'updated_at', 'proxy_status')}
-        result.update(schema=1, platform='dspace', experimental=True, health='not-checked')
+        result.update(schema=1, platform='dspace', experimental=True, health='not-checked',
+                      admin_available=state.get('release_sha256') == self.release_hash)
         result['public_access'] = 'not-checked'
         try:
             ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
@@ -619,6 +620,8 @@ class Runtime:
     def admin(self, operation, request=None):
         if self.state().get('migration') != 'done':
             raise Refused('Finish the DSpace installation before managing administrators.')
+        if self.state().get('release_sha256') != self.release_hash:
+            raise Refused('This older experimental recipe needs a validated update before administrator management. Do not reinstall over existing data.')
         if operation not in ('status', 'create', 'password'):
             raise Refused('Unknown administrator operation.')
         request = request or {}
@@ -637,8 +640,11 @@ class Runtime:
         # library could include sensitive input in its diagnostic.
         with self.lock():
             self.existing_resources()
-            output = self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'admin', operation,
-                                  timeout=180, input_text=payload, log_failure=False)
+            try:
+                output = self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'admin', operation,
+                                      timeout=180, input_text=payload, log_failure=False)
+            except OperationFailed:
+                raise Refused('DSpace rejected the administrator operation. Check the existing accounts and service state before retrying.') from None
             lines = [line.partition('=')[2] for line in output.splitlines() if line.startswith('NEXUS_ADMIN_JSON=')]
             if len(lines) != 1:
                 raise Refused('The administrator helper returned no valid result; no success was assumed.')
@@ -649,15 +655,20 @@ class Runtime:
                 self.mark(admin_ready=True)
             return result
 
-    def setup(self, operation, step=None, value=None):
+    def setup(self, operation, step=None, value=None, refresh=False):
         state = self.state()
         setup = state.get('setup') or {}
         if operation == 'status':
             if not setup.get('open'):
                 return {'setup': 'none'}
             steps = dict(setup.get('steps') or {})
-            if state.get('admin_ready'):
+            ready = state.get('admin_ready')
+            if refresh:
+                ready = bool(self.admin('status').get('admins'))
+            if ready:
                 steps['admin'] = 'done'
+            elif refresh:
+                steps['admin'] = 'pending'
             if state.get('proxy_status') == 'apache-configured':
                 steps['public'] = 'done'
             return {'setup': 'open', 'steps': steps, 'pending': sum(steps.get(x) != 'done' for x in ('admin', 'public', 'backup'))}
@@ -722,7 +733,8 @@ def main():
     for name in ('admin-create', 'admin-password'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
     sub.add_parser('setup-mark').add_argument('values', nargs=2)
-    for name in ('availability', 'admin-status', 'logs', 'setup-status', 'setup-close', 'status', 'diagnose', 'proxy-config'):
+    sub.add_parser('setup-status').add_argument('--refresh', action='store_true')
+    for name in ('availability', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
@@ -758,7 +770,7 @@ def main():
                     raise Refused('Administrator input must be an object.')
             result = runtime.admin(operation, request)
         elif args.command.startswith('setup-'):
-            result = runtime.setup(args.command.removeprefix('setup-'), *(args.values if args.command == 'setup-mark' else []))
+            result = runtime.setup(args.command.removeprefix('setup-'), *(args.values if args.command == 'setup-mark' else []), refresh=getattr(args, 'refresh', False))
         elif args.command == 'logs':
             result = runtime.logs()
         elif args.command == 'proxy-config':
@@ -775,7 +787,11 @@ def main():
         return 0
     except (Refused, OSError, ValueError, KeyError, KeyboardInterrupt) as error:
         # ValueErrors can include input; inputs never contain credentials on this CLI.
-        print('DSpace: ' + (str(error) if isinstance(error, Refused) else 'Invalid input or unavailable local data; no secret input was logged.'), file=sys.stderr)
+        message = str(error) if isinstance(error, Refused) else 'Invalid input or unavailable local data; no secret input was logged.'
+        if args.protocol:
+            print('@@msg error DSpace\t' + message.replace('\n', ' '), file=sys.stderr)
+        else:
+            print('DSpace: ' + message, file=sys.stderr)
         return 1
 
 
