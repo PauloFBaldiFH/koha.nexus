@@ -53,8 +53,10 @@ class DSpaceSummary(Grid):
 
     def show(self, data: dict) -> None:
         url = origin(data.get('url'))
+        external = data.get('proxy_status') == 'external-configuration-required'
+        note = t('External proxy: verify both routes; the public address has not been checked.') if external else t('Experimental DSpace')
         for key, link in (('site', url), ('login', url + '/login' if url else '')):
-            self.query_one('#ds-' + key, LinkCard).set_url(link, t('Experimental DSpace'), '')
+            self.query_one('#ds-' + key, LinkCard).set_url(link, note, 'warn' if external else '')
         self.query_one('#ds-state', StatusCard).set(
             t(str(data.get('status', 'Unknown'))), t('Process state; health is checked only by Diagnosis'), '')
         self.query_one('#ds-phase', StatusCard).set(str(data.get('phase', '-')), t('Data are preserved after an interrupted operation'), '')

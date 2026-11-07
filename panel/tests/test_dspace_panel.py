@@ -153,3 +153,15 @@ def test_start_with_docker_stopped_requires_separate_consent(monkeypatch):
     calls=mock_calls(monkeypatch,{'status':{'status':'unavailable'},'dspace-prerequisites':{'docker_stopped':True}})
     asyncio.run(dspace.start(App([False])))
     assert [c[:2] for c in calls]==[('dspace-panel',('status',)),('dspace-prerequisites',('plan',))]
+
+
+def test_external_proxy_instructions_are_shown_before_setup(monkeypatch):
+    note='External proxy needs both the /server and / routes; address not verified.'
+    mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':False},
+                           'status':{'url':'http://192.168.1.20:8100'},'plan':{'url':'http://192.168.1.20:8100'},
+                           'install':{'status':'installed','note':note},'setup-status':{'setup':'none'}})
+    app=App([True]);app.check_platforms=lambda:None
+    async def status():return {'docker':{'installed':True}}
+    app.bridge=SimpleNamespace(status=status)
+    asyncio.run(dspace.install(app))
+    assert any(note in getattr(s,'_text','') for s in app.screens if isinstance(s,MessageScreen))

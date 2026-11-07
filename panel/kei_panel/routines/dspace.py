@@ -83,6 +83,8 @@ async def install(app):
     result = await call(app, 'install', '--url', url, '--confirm', *retry)
     if result is not None:
         app.check_platforms()
+        if isinstance(result.get('note'), str) and result['note']:
+            await app.push_screen_wait(MessageScreen(TITLE, t(result['note'])))
         await assistant(app)
 
 
