@@ -165,3 +165,14 @@ def test_external_proxy_instructions_are_shown_before_setup(monkeypatch):
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
     assert any(note in getattr(s,'_body','') for s in app.screens if isinstance(s,MessageScreen))
+
+
+def test_failed_worker_never_continues_even_with_partial_success_payload(monkeypatch):
+    async def failed_worker(*args,**kwargs):
+        partial=response({'available':True})
+        partial.ok=False;partial.error='Worker failed before completing the task'
+        return partial
+    monkeypatch.setattr(dspace,'run_task',failed_worker)
+    app=App();asyncio.run(dspace.install(app))
+    assert len(app.screens)==1 and isinstance(app.screens[0],MessageScreen)
+    assert 'Worker failed' in app.screens[0]._body

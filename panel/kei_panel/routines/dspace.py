@@ -18,7 +18,7 @@ EMAIL = re.compile(r'[^@\s|=]+@[^@\s|=]+\.[^@\s|=]+')
 async def call(app, command, *args, **kwargs):
     result = await run_task(app, TITLE, 'dspace-panel', command, *args, **kwargs)
     out = result.value if isinstance(result.value, TaskOutcome) else None
-    if result.cancelled or out is None or not out.ok:
+    if result.cancelled or not result.ok or out is None or not out.ok:
         await show_failure(app, TITLE, result)
         return None
     data = payload(out)
@@ -46,7 +46,7 @@ async def install(app):
     # Re-read prerequisites; closing any confirmation never continues installing.
     pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
     out = pre.value if isinstance(pre.value, TaskOutcome) else None
-    if pre.cancelled or out is None or not out.ok:
+    if pre.cancelled or not pre.ok or out is None or not out.ok:
         await show_failure(app, TITLE, pre)
         return
     deps = payload(out)
@@ -57,7 +57,7 @@ async def install(app):
             if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question))):
                 return
             result = await run_task(app, TITLE, 'dspace-prerequisites', operation, 'confirm', cancellable=False)
-            if result.cancelled or not isinstance(result.value, TaskOutcome) or not result.value.ok:
+            if result.cancelled or not result.ok or not isinstance(result.value, TaskOutcome) or not result.value.ok:
                 await show_failure(app, TITLE, result)
                 return
     current = await call(app, 'status')
@@ -95,14 +95,14 @@ async def control(app, start):
     if start and status.get('status') == 'unavailable':
         pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
         out = pre.value if isinstance(pre.value, TaskOutcome) else None
-        if pre.cancelled or out is None or not out.ok:
+        if pre.cancelled or not pre.ok or out is None or not out.ok:
             await show_failure(app, TITLE, pre)
             return
         if payload(out).get('docker_stopped'):
             if not await app.push_screen_wait(ConfirmScreen(TITLE, t('Start the existing Docker service for DSpace?'))):
                 return
             result = await run_task(app, TITLE, 'dspace-prerequisites', 'docker-start', 'confirm', cancellable=False)
-            if result.cancelled or not isinstance(result.value, TaskOutcome) or not result.value.ok:
+            if result.cancelled or not result.ok or not isinstance(result.value, TaskOutcome) or not result.value.ok:
                 await show_failure(app, TITLE, result)
                 return
     question = 'Start DSpace using its current configuration? No migration or restoration is performed.' if start else 'Stop DSpace gracefully? The repository will be unavailable; all volumes and configuration are kept.'
