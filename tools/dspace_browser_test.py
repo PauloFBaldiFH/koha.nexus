@@ -156,7 +156,9 @@ def exercise(rt, output):
             expect(agreement.or_(title_input).first).to_be_attached(timeout=90000)
             consent = page.get_by_role('button', name="That's ok", exact=True)
             if consent.is_visible(): consent.click()
-            if agreement.count() > 0 and '/end-user-agreement' in urlsplit(page.url).path:
+            # Decide by the rendered control, not page.url: the guard can render
+            # the agreement before the router updates the address (CI 42408439330).
+            if agreement.count() > 0 and title_input.count() == 0:
                 stage = 'disposable account user agreement'
                 agreement.wait_for(state='attached', timeout=60000)
                 agreement.check(force=True)
