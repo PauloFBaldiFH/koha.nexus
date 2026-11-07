@@ -97,8 +97,8 @@ def exercise(rt, output):
     administrator('password', dict(email=email, password=replacement))
     try:
         API(origin).login(email, password)
-    except RuntimeError:
-        pass
+    except RuntimeError as error:
+        check('(HTTP 401)' in str(error), 'old password is rejected by authentication, not by an unrelated failure')
     else:
         raise AssertionError('Old password remains valid.')
     api = API(origin); api.login(email, replacement)
@@ -141,6 +141,17 @@ def exercise(rt, output):
             stage = 'browser deposit form'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             title_input = page.get_by_label('Title', exact=True)
+            agreement = page.locator('#user-agreement-accept')
+            expect(agreement.or_(title_input).first).to_be_visible(timeout=90000)
+            consent = page.get_by_role('button', name="That's ok", exact=True)
+            if consent.is_visible(): consent.click()
+            if agreement.is_visible():
+                stage = 'disposable account user agreement'
+                agreement.check()
+                page.locator('#button-save').click()
+                expect(agreement).not_to_be_visible(timeout=60000)
+                page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
+            stage = 'browser deposit form'
             title_input.fill(title); title_input.press('Tab')
             page.locator('input[type=file]').first.set_input_files(str(fixture))
             expect(page.get_by_text(fixture.name, exact=False).first).to_be_visible(timeout=90000)
@@ -187,8 +198,9 @@ def exercise(rt, output):
             check(hashlib.sha256(api.request(content, raw=True)).hexdigest() == expected, 'administrator still downloads the restricted file with its original checksum')
             stage = 'anonymous restricted page'
             private = browser.new_context(locale='en-US'); private_page = private.new_page()
-            private_page.goto(origin + '/items/' + itemid, wait_until='networkidle')
-            check(title not in private_page.locator('body').inner_text(), 'anonymous browser cannot see private item metadata')
+            initial_response = private_page.goto(origin + '/items/' + itemid, wait_until='networkidle')
+            initial_html = initial_response.text() if initial_response else ''
+            check(title not in initial_html and title not in private_page.content(), 'anonymous browser and initial SSR payload omit private item metadata')
             search = API(origin).request('/discover/search/objects?' + urlencode({'query': title}))
             check(itemid not in json.dumps(search), 'private item absent from anonymous discovery')
             private.close()

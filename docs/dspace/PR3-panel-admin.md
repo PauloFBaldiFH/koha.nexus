@@ -27,9 +27,15 @@ menus permanentes. Nenhuma publicação de imagens, broker ou produção é auto
 Em andamento. As imagens da receita 3 passaram build/smoke nos três serviços.
 O primeiro teste administrativo real foi recusado; o adaptador passa agora a usar
 o bootstrap oficial de `ScriptLauncher` (`DSpaceKernelInit`, `start` e `destroy`),
-além do guard de esquema anterior. A correção ainda precisa passar na CI real.
+além do guard de esquema anterior. A correção passou pela conta real: leitura de administradores, criação, recusa de
+conta duplicada, nova senha e login no Chromium. A rodada
+[42388469231](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42388469231)
+parou no formulário por uma etapa padrão do upstream: aceitar o termo de uso no
+primeiro acesso. O roteiro passa a aceitar esse termo pela UI **somente** para a
+conta descartável da CI; nada é aceito pelo instalador em nome de uma pessoa real.
+Depósito, download e privacidade ainda aguardam a rodada completa.
 
-Passaram localmente 61 testes de imagens/runtime (Python 3.9), 16 cenários de
+Passaram localmente 65 testes de imagens/runtime (Python 3.9), 16 cenários de
 navegação (oito combinações de plataformas, nas duas larguras) e 16 casos de
 confirmação/conta/protocolo. A seleção existente do painel encontrou expectativas
 antigas de dois grupos/cartões: atualizadas para incluir DSpace, mantendo as
