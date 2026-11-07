@@ -93,7 +93,7 @@ def canonical_url(value):
     try:
         u = urlsplit(value)
         host = u.hostname or ''
-        port = u.port or (443 if u.scheme == 'https' else 80)
+        port = u.port if u.port is not None else (443 if u.scheme == 'https' else 80)
         if (u.scheme not in ('http', 'https') or u.username or u.password or
                 u.query or u.fragment or u.path not in ('', '/') or
                 not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,252}', host) or
@@ -106,6 +106,8 @@ def canonical_url(value):
         elif any(not label or len(label) > 63 or label[0] == '-' or label[-1] == '-'
                  for label in host.split('.')):
             raise ValueError()
+        if (host == 'localhost' or re.fullmatch(r'[0-9.]+', host)) and port in (80, 443):
+            raise Refused('A local/IP address needs its own port, such as 8100; use a DNS name for 80/443 to preserve existing default sites.')
         suffix = '' if port == (443 if u.scheme == 'https' else 80) else ':' + str(port)
         return u.scheme + '://' + host + suffix
     except ValueError:
@@ -296,6 +298,8 @@ class Runtime:
         self.docker('compose', 'version')
         self.existing_resources()
         ports = old.get('ports') or {'ui': 18100, 'backend': 18101}
+        if urlsplit(url).port in ports.values():
+            raise Refused('The public URL port collides with a reserved loopback port (18100/18101); choose a separate public port.')
         if not old.get('prepared') and any(not free_port(p) for p in ports.values()):
             raise Refused('A reserved loopback port is occupied (18100/18101); nothing was changed.')
         # Conservative engineering gate; explicitly not an upstream sizing guarantee.

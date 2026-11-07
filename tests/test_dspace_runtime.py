@@ -105,10 +105,24 @@ class RuntimeTests(unittest.TestCase):
 
     def test_origin_validation_rejects_injection_and_credentials(self):
         for value in ('http://user:secret@x.org', 'http://x.org/path', 'http://x.org?secret=x', 'http://x.org/#x',
-                      'http://x.org\nListen 25', 'http://[::1]:8100', 'http://bad..org', 'http://999.999.0.1', 'ftp://x.org'):
+                      'http://x.org\nListen 25', 'http://[::1]:8100', 'http://bad..org', 'http://999.999.0.1',
+                      'http://x.org:0', 'http://x.org:65536', 'ftp://x.org'):
             with self.subTest(value=value), self.assertRaises(ds.Refused):
                 ds.canonical_url(value)
         self.assertEqual(ds.canonical_url('http://192.168.1.20:8100/'), 'http://192.168.1.20:8100')
+
+    def test_local_addresses_do_not_take_over_existing_default_sites(self):
+        for value in ('http://192.168.1.20', 'http://127.0.0.1:80', 'http://localhost', 'https://192.168.1.20'):
+            with self.subTest(value=value), self.assertRaisesRegex(ds.Refused, 'own port'):
+                ds.canonical_url(value)
+
+    def test_public_port_cannot_conflict_with_private_listeners(self):
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        for port in (18100, 18101):
+            with patch.object(rt, 'docker', side_effect=lambda *a, **kw: json.dumps({'OSType': 'linux'}) if a[0] == 'info' else ''), \
+                    patch.object(ds.platform, 'machine', return_value='x86_64'), \
+                    self.assertRaisesRegex(ds.Refused, 'loopback port'):
+                rt.plan('http://192.168.1.20:' + str(port))
 
     def test_missing_catalog_refuses_without_writes(self):
         self.catalog.unlink()
