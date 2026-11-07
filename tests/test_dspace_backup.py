@@ -33,6 +33,7 @@ class ArchiveTests(unittest.TestCase):
         path = self.archive([('volumes/assetstore/document', tarfile.REGTYPE)])
         self.assertEqual(b.extract(path, self.dest, 4), 4)
         self.assertEqual((self.dest/'volumes/assetstore/document').read_bytes(), b'data')
+        self.assertEqual((self.dest/'volumes/assetstore/document').stat().st_mtime,0)
 
     def test_unsafe_paths_and_types_never_extract(self):
         for name, kind in [('/etc/test',tarfile.REGTYPE),('../escape',tarfile.REGTYPE),
@@ -55,6 +56,10 @@ class ArchiveTests(unittest.TestCase):
 
     def test_inventory_rejects_symlinks(self):
         (self.dest/'link').symlink_to('/etc/passwd')
+        with self.assertRaises(b.Error): b.entries(self.dest)
+
+    def test_unsupported_directory_names_are_refused_by_capture_inventory(self):
+        (self.dest/'bad\\name').mkdir()
         with self.assertRaises(b.Error): b.entries(self.dest)
 
     def test_inventory_detects_same_size_corruption(self):
@@ -100,6 +105,21 @@ class CaptureFailures(unittest.TestCase):
         def binary(args,path,write): path.write_bytes(b'PGDMP' if path.name=='database.dump' else b'INSERT INTO t VALUES(1);\n')
         self.r.binary=Mock(side_effect=binary)
         self.r.crypto=Mock()
+
+    def test_capture_emits_regular_entries_even_for_hardlinked_data(self):
+        import os, shutil
+        assets=self.root/'assets'; assets.mkdir(); (assets/'first').write_bytes(b'data')
+        os.link(assets/'first',assets/'second')
+        self.r.volumes.return_value={'postgres':self.root/'source','assetstore':assets}
+        def crypto(operation,source=None,target=None):
+            if operation=='encrypt': shutil.copyfile(source,target)  # explicit crypto double
+        self.r.crypto.side_effect=crypto
+        package=self.r.capture()['package']
+        with tarfile.open(package) as archive:
+            first=archive.getmember('volumes/assetstore/first')
+            second=archive.getmember('volumes/assetstore/second')
+            self.assertTrue(first.isfile() and second.isfile())
+            self.assertEqual(archive.extractfile(second).read(),b'data')
 
     def test_missing_key_does_not_stop_services(self):
         self.r.crypto.side_effect=b.Error('No key')
@@ -183,9 +203,10 @@ class PromotionFailures(unittest.TestCase):
             recovery.running=Mock(return_value=['postgres','solr','backend','ui'])
             @contextlib.contextmanager
             def opened(package): yield tree,{'url':state['url']}
+            flags={'value':False}
             @contextlib.contextmanager
             def clone(*args):
-                yield {'area':root/'copy','project':'copy','compose':{'volumes':{'assetstore':{'name':'new-owned-volume'}}},'promoted':{'value':False}}
+                yield {'area':root/'copy','project':'copy','compose':{'volumes':{'assetstore':{'name':'new-owned-volume'}}},'promoted':flags}
             recovery.opened=opened; recovery.clone=clone
             atomic=runtime.atomic
             with patch.object(runtime,'atomic',side_effect=lambda p,d,mode=0o600,gid=None:atomic(p,d,mode)):
@@ -194,6 +215,8 @@ class PromotionFailures(unittest.TestCase):
             self.assertEqual((root/'recovery-rollback').exists(),fail_rollback)
             self.assertEqual(json.loads(recovery.journal.read_text())['phase'],'promoting' if fail_rollback else 'complete')
             self.assertFalse(any(c.args[:2]==('volume','rm') for c in rt.docker.call_args_list))
+            self.assertTrue(flags['value'], 'candidate volumes must survive any production exposure')
+            self.assertEqual(json.loads(recovery.journal.read_text())['candidates'],['new-owned-volume'])
 
 
 class DecryptionLimit(unittest.TestCase):

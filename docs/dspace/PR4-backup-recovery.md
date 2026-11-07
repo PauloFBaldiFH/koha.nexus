@@ -1,6 +1,6 @@
 # PR4 — backup individual e recuperação do DSpace
 
-Base: PR3 (#353) mesclado. Implementação em validação; não homologada ainda.
+Base: PR3 (#353) mesclado. Aceite integrado aprovado na CI em `20e3082`; ajustes finais em nova validação.
 
 O formato DSpace 1 é separado do formato 2 do motor Tainacan: usa dump custom do
 PostgreSQL e cópia fria de todos os volumes de arquivos e Solr. O pacote inteiro
@@ -30,7 +30,8 @@ oficial e o carregamento dos cores são exercitados.
 
 Restauração ativa: confirmação, backup de segurança cifrado, clone verificado,
 parada do projeto, troca dos volumes referenciados e validação dos serviços.
-Todos os volumes anteriores são preservados. A configuração anterior fica em
+Todos os volumes anteriores são preservados. Volumes candidatos também são
+preservados assim que podem receber escritas de produção, mesmo após rollback. A configuração anterior fica em
 `recovery-rollback`; falha tratável tenta voltar. Interrupção na promoção mantém
 o diário e bloqueia início normal. A tarefa `backup-rollback --confirm` recoloca
 a configuração anterior sem apagar volumes. URLs diferentes exigem migração
@@ -53,9 +54,13 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## Validação
 
-- 89 testes unitários de imagens/runtime/formato aprovados localmente em Python
+- 91 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
-- Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: em andamento. Nada foi testado no servidor
+- Os 59 testes locais selecionados do painel e seis casos focados de backup/recuperação passaram; 21 verificações de manual, menus e traduções passaram. Serviços reais: aceite integrado aprovado em `20e3082` (execução
+  [42422331580](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42422331580)),
+  incluindo restauração pública e privada e histórico Solr não vazio. Ajustes
+  finais de preservação de candidatos e metadados exigem nova execução.
+  Nada foi testado no servidor
   de Paulo. Não anunciar recuperação homologada antes da CI real.
 - CI acrescenta captura pública e privada, restauração em volumes novos,
   download público com SHA-256, recusa anônima do privado e download autorizado.

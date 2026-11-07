@@ -25,6 +25,12 @@ def sha(path):
     return h.hexdigest()
 
 
+def sync_path(path):
+    descriptor = os.open(str(path), os.O_RDONLY)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+
+
 def entries(root):
     """No links, sockets or devices. Fail instead of silently omitting data."""
     result = {}
@@ -32,10 +38,12 @@ def entries(root):
         for name in dirs + files:
             path = Path(base) / name
             info = path.lstat()
+            name = path.relative_to(root).as_posix()
+            if '\\' in name: raise Error('A file name cannot be represented safely by this recovery format.')
             if not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
                 raise Error('A data tree contains a link or special file; capture refused.')
             if stat.S_ISREG(info.st_mode):
-                result[path.relative_to(root).as_posix()] = {'bytes': info.st_size, 'sha256': sha(path)}
+                result[name] = {'bytes': info.st_size, 'sha256': sha(path)}
     return result
 
 
@@ -68,6 +76,8 @@ def extract(archive, dest, budget):
                     shutil.copyfileobj(src, out, 1024 * 1024)
                 target.chmod(member.mode & 0o777)
                 if os.geteuid() == 0: os.chown(target, member.uid, member.gid)
+        for member in reversed(members):
+            os.utime(dest / member.name, (member.mtime,member.mtime), follow_symlinks=False)
         return total
 
 
@@ -78,9 +88,13 @@ class Recovery:
         self.home = Path(os.environ.get('KEI_DSPACE_BACKUPS', '/var/backups/koha-nexus/dspace'))
         self.journal = rt.root / 'backup-operation.json'
 
+    def notify(self, message):
+        if self.rt.progress: self.rt.progress(message)
+
     def record(self, **data):
         from runtime import atomic
         atomic(self.journal, json.dumps(data) + '\n')
+        self.notify('backup-' + data.get('phase','progress'))
 
     def crypto(self, operation, source=None, target=None):
         from runtime import command, local_docker_env
@@ -194,14 +208,17 @@ class Recovery:
             manifest['window_seconds'] = round(time.time() - start, 3)
             atomic(tree / 'manifest.json', json.dumps(manifest, sort_keys=True))
             archive = work / 'capture.tar'
-            with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT) as out:
+            with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT, dereference=True) as out:
                 for number,path in enumerate(sorted(tree.rglob('*')),1):
                     if number > 1000000: raise Error('Too many archive entries for this recovery format.')
                     out.add(path, arcname=path.relative_to(tree).as_posix(), recursive=False)
             partial = destination.with_suffix('.part')
             try:
+                self.notify('backup-encrypting')
                 self.crypto('encrypt', archive, partial)
+                sync_path(partial)
                 os.replace(partial, destination); destination.chmod(0o600)
+                sync_path(self.home)
                 atomic(destination.with_suffix('.sha256'), sha(destination) + '\n')
             finally:
                 partial.unlink(missing_ok=True)
@@ -218,6 +235,7 @@ class Recovery:
         self.home.mkdir(mode=0o700, parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='.recovery-', dir=self.home) as temporary:
             stage = Path(temporary); archive = stage / 'data.tar'; tree = stage / 'data'
+            self.notify('recovery-decrypting')
             self.crypto('decrypt', package, archive)
             tree.mkdir(mode=0o700)
             extract(archive, tree, shutil.disk_usage(stage).free // 2)
@@ -288,7 +306,8 @@ class Recovery:
                 expected = entries(tree / 'volumes' / key)
                 if actual != expected: raise Error('Restored file/Solr data mismatch: ' + key)
             dc('up', '-d', '--pull', 'never', 'postgres', 'solr')
-            self.rt.wait('Recovery PostgreSQL', lambda: dc('exec','-T','postgres','pg_isready','-U','dspace','-d','dspace'))
+            self.rt.wait('Recovery PostgreSQL', lambda: dc('exec','-T','postgres','pg_isready','-h','127.0.0.1','-U','dspace','-d','dspace'))
+            self.notify('recovery-postgresql')
             self.binary([*args, 'exec', '-T', 'postgres', 'pg_restore', '-U', 'dspace', '-d', 'dspace',
                          '--exit-on-error', '--no-owner'], tree / 'database.dump', False)
             # Compare all logical PostgreSQL data, including UUIDs, policies and handles.
@@ -299,12 +318,14 @@ class Recovery:
                 raise Error('Restored database records differ from the captured database.')
             # Run only the schema/admin check, never a persistent REST worker in
             # the isolated verification copy.
+            self.notify('recovery-schema-and-admin')
             dc('run','--rm','--no-deps','-T','backend','admin','status', timeout=240)
             def cores_ready():
                 cores = json.loads(dc('exec','-T','solr','curl','-fsS','--max-time','10',
                     'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
                 return not cores.get('initFailures') and set(manifest['cores']) <= set(cores.get('status',{}))
             self.rt.wait('All restored Solr cores', cores_ready)
+            self.notify('recovery-copy-verified')
             yield dict(area=area, project=project, compose=compose, manifest=manifest, promoted=promoted)
         finally:
             dc('down', '--timeout','90')
@@ -350,14 +371,21 @@ class Recovery:
                 if rollback.exists(): raise Error('An earlier rollback directory requires review.')
                 rollback.mkdir(mode=0o700)
                 names = ('local.cfg','db-password','compose.json','state.json')
-                for name in names: shutil.copy2(self.rt.root / name, rollback / name)
+                for name in names:
+                    shutil.copy2(self.rt.root / name, rollback / name)
+                    sync_path(rollback / name)
+                sync_path(rollback)
                 running = self.running()
-                self.record(phase='promoting', services=running, safety=safety['package'])
+                self.record(phase='promoting', services=running, safety=safety['package'], candidates=[v['name'] for v in clone['compose']['volumes'].values()])
                 self.rt.mark(phase='restoring')
-                self.rt.compose('stop','--timeout','90', timeout=420)
                 promoted = copy.deepcopy(original)
                 promoted['volumes'] = clone['compose']['volumes']
                 try:
+                    self.rt.compose('stop','--timeout','90', timeout=420)
+                    # Preserve every candidate before production can write to it,
+                    # including a failed health check followed by rollback.
+                    clone['promoted']['value'] = True
+                    for volume in promoted['volumes'].values(): self.rt.core('recovered-volume',volume['name'])
                     # Stop the verification project before any production mounts.
                     self.rt.docker(*self.dc_args(clone['area'], clone['project']), 'down','--timeout','90', timeout=420)
                     atomic(self.rt.root / 'local.cfg', destination_config((tree / 'private/local.cfg').read_text(), (rollback / 'local.cfg').read_text()), 0o640, gid=10001)
@@ -367,8 +395,6 @@ class Recovery:
                     self.rt.dependencies(); self.rt.health(); self.rt.core('audit')
                     self.rt.mark(phase='ready', status='installed', intended='running',
                         files={n:digest(self.rt.root / n) for n in state['files']})
-                    for volume in promoted['volumes'].values(): self.rt.core('recovered-volume',volume['name'])
-                    clone['promoted']['value'] = True
                     self.record(phase='complete', safety=safety['package'], restored=str(package))
                 except BaseException:
                     self.rollback()
@@ -395,7 +421,7 @@ class Recovery:
             self.rt.compose('up','-d','--pull','never','--force-recreate',*data['services'],timeout=420)
             if set(data['services']) == {'postgres','solr','backend','ui'}:
                 self.rt.dependencies(); self.rt.health()
-        self.record(phase='complete', rollback=True)
+        self.record(phase='complete', rollback=True, candidates=data.get('candidates',[]))
         return {'rolled_back':True, 'data_volumes_preserved':True}
 
 
