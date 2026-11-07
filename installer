@@ -12438,7 +12438,7 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="23b579e43aa6d4fde6e02fce4fc9afa7a6aaa10084da8caf2bea3e2ba5b41265"
+KEI_DSPACE_RUNTIME_SHA="acee144d65bee694f24ed894b55287d993cf962fe479b8cca02a176c38f30d78"
 KEI_DSPACE_RELEASE_SHA="fc4c90bc26a0a164b198de4c856cc9c214633811df6774580f0744b26947dd97"
 
 kei_dspace_runtime() (

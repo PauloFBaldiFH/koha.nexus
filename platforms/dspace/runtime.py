@@ -21,6 +21,7 @@ import secrets
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -219,10 +220,15 @@ class Runtime:
         owned = Path(os.environ.get('KEI_OWNED_DIR', '/var/lib/koha-nexus'))
         lock_dir = Path(os.environ.get('KEI_BK_DIR', str(owned / 'backup')))
         lock_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if lock_dir.is_symlink() or lock_dir.stat().st_uid != 0:
-            raise Refused('The common backup lock directory must be owned by root.')
+        lock_info = lock_dir.stat()
+        if lock_dir.is_symlink() or lock_info.st_uid != 0 or lock_info.st_mode & 0o022:
+            raise Refused('The common backup lock directory must be private and owned by root.')
         lock_dir.chmod(0o700)
-        with open(lock_dir / 'dspace.lock', 'a') as stream:
+        fd = os.open(lock_dir / 'dspace.lock', os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'a') as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_nlink != 1 or info.st_mode & 0o022:
+                raise Refused('The existing platform lock is not trusted; it was not changed.')
             os.fchmod(stream.fileno(), 0o600)
             try:
                 fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
