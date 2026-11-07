@@ -31,7 +31,7 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("schema") != 1 or data.get("status") != "experimental":
         raise ValueError("Unsupported release schema or maturity")
-    if data.get("recipe") != 2 or data.get("architectures") != ["linux/amd64"]:
+    if data.get("recipe") != 3 or data.get("architectures") != ["linux/amd64"]:
         raise ValueError("Only the experimental amd64 recipe is currently supported")
     if set(data.get("sources", {})) != set(REPOSITORIES):
         raise ValueError("Expected backend and UI sources")

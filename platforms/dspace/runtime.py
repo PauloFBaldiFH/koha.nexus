@@ -172,9 +172,9 @@ class Runtime:
             output = redact(output, password.read_text().strip() if password.exists() else '')
             atomic(self.root / 'last-error.log', output[-32768:])
 
-    def compose(self, *args, timeout=120):
+    def compose(self, *args, timeout=120, input_text=None, log_failure=True):
         return self.docker('compose', '--project-name', PROJECT, '--project-directory', str(self.root),
-                           '-f', str(self.root / 'compose.json'), *args, timeout=timeout)
+                           '-f', str(self.root / 'compose.json'), *args, timeout=timeout, input_text=input_text, log_failure=log_failure)
 
     def core(self, action, *args):
         if not self.driver:
@@ -532,6 +532,8 @@ class Runtime:
                 result = {'status': 'installed', 'url': plan['url'], 'experimental': True, 'proxy_status': publication}
                 if proxy == 'external':
                     result['note'] = 'Configure the external proxy /server and / routes; the public address has not been verified. See docs/dspace/PR2-installer.md.'
+                if not state.get('setup'):
+                    self.mark(setup={'open': True, 'steps': {x: 'pending' for x in ('admin', 'public', 'backup')}})
                 return result
             except BaseException:
                 self.mark(status='failed')
@@ -605,6 +607,81 @@ class Runtime:
         # Never output docker inspect/config, command output, local.cfg, password or environment.
         return result
 
+    def availability(self):
+        try:
+            images = self.images()
+            return {'available': True, 'experimental': True, 'architecture': 'amd64',
+                    'images': images, 'note': 'Reviewed image catalog present; installation still requires its environment plan.'}
+        except Refused as error:
+            return {'available': False, 'experimental': True, 'reason': str(error)}
+
+    def admin(self, operation, request=None):
+        if self.state().get('migration') != 'done':
+            raise Refused('Finish the DSpace installation before managing administrators.')
+        if operation not in ('status', 'create', 'password'):
+            raise Refused('Unknown administrator operation.')
+        request = request or {}
+        payload = None
+        if operation != 'status':
+            values = [request.get(k, '') for k in ('email', 'first', 'last', 'language', 'password')]
+            if any(not isinstance(x, str) or len(x) > 1024 or any(ord(c) < 32 for c in x) for x in values):
+                raise Refused('Administrator fields cannot contain control characters or exceed 1024 characters.')
+            email, first, last, language, password = values
+            if not re.fullmatch(r'[^@\s|=]+@[^@\s|=]+\.[^@\s|=]+', email) or len(password) < 10:
+                raise Refused('Provide a valid e-mail and a password of at least 10 characters.')
+            if operation == 'create' and (not first.strip() or not last.strip() or language not in ('pt_BR', 'en', 'es')):
+                raise Refused('Provide first name, last name and a supported language.')
+            payload = '\n'.join(values) + '\n'
+        # Do not save subprocess output from account operations: a failed upstream
+        # library could include sensitive input in its diagnostic.
+        with self.lock():
+            self.existing_resources()
+            output = self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'admin', operation,
+                                  timeout=180, input_text=payload, log_failure=False)
+            lines = [line.partition('=')[2] for line in output.splitlines() if line.startswith('NEXUS_ADMIN_JSON=')]
+            if len(lines) != 1:
+                raise Refused('The administrator helper returned no valid result; no success was assumed.')
+            result = json.loads(lines[0])
+            if operation != 'status':
+                if result.get('changed') is not True:
+                    raise Refused('The administrator helper did not confirm the operation.')
+                self.mark(admin_ready=True)
+            return result
+
+    def setup(self, operation, step=None, value=None):
+        state = self.state()
+        setup = state.get('setup') or {}
+        if operation == 'status':
+            if not setup.get('open'):
+                return {'setup': 'none'}
+            steps = dict(setup.get('steps') or {})
+            if state.get('admin_ready'):
+                steps['admin'] = 'done'
+            if state.get('proxy_status') == 'apache-configured':
+                steps['public'] = 'done'
+            return {'setup': 'open', 'steps': steps, 'pending': sum(steps.get(x) != 'done' for x in ('admin', 'public', 'backup'))}
+        if not setup.get('open'):
+            raise Refused('There is no DSpace setup in progress.')
+        if operation == 'mark' and (step not in ('admin', 'public', 'backup') or value not in ('later', 'pending')):
+            raise Refused('Only postpone/reset a known step; completion follows actual configuration.')
+        with self.lock():
+            setup = dict(self.state().get('setup') or {})
+            if operation == 'close':
+                setup['open'] = False
+            elif operation == 'mark':
+                setup['steps'] = dict(setup.get('steps') or {}, **{step: value})
+            else:
+                raise Refused('Unknown setup operation.')
+            self.mark(setup=setup)
+        return self.setup('status')
+
+    def logs(self):
+        if not self.state().get('prepared'):
+            raise Refused('No DSpace containers have been prepared.')
+        output = self.compose('logs', '--no-color', '--tail', '80', *SERVICES, timeout=30, log_failure=False)
+        password = (self.root / 'db-password').read_text().strip()
+        return {'logs': redact(output[-65536:], password)}
+
     def proxy_config(self):
         state = self.state()
         u = urlsplit(canonical_url(state['url']))
@@ -627,6 +704,7 @@ class Runtime:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--protocol', action='store_true', help='Panel result protocol')
     parser.add_argument('--root', type=Path, default=ROOT)
     parser.add_argument('--catalog', type=Path)
     parser.add_argument('--lab', action='store_true', help='Explicit engineering-only local immutable image IDs')
@@ -640,9 +718,16 @@ def main():
             cmd.add_argument('--retry-migration', action='store_true')
     for name in ('start', 'stop'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
-    for name in ('status', 'diagnose', 'proxy-config'):
+    for name in ('admin-create', 'admin-password'):
+        sub.add_parser(name).add_argument('--confirm', action='store_true')
+    sub.add_parser('setup-mark').add_argument('values', nargs=2)
+    for name in ('availability', 'admin-status', 'logs', 'setup-status', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
     args = parser.parse_args()
+    # The bridge's one-task environment carries the password only into Python.
+    # Strip it before starting Docker or any resource helper. CLI users may
+    # instead supply the same JSON object on protected standard input.
+    secret_request = os.environ.pop('KEI_DSPACE_ADMIN_DATA', None)
     runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
                       progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True))
     def interrupted(signum, _frame):
@@ -650,14 +735,31 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
     try:
-        if args.command in ('install', 'start', 'stop') and not args.confirm:
+        if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
-        if args.command == 'plan':
+        if args.command == 'availability':
+            result = runtime.availability()
+        elif args.command == 'plan':
             result = runtime.plan(args.url)
         elif args.command == 'install':
             result = runtime.install(args.url, args.retry_migration)
         elif args.command in ('start', 'stop'):
             result = runtime.control(args.command == 'start')
+        elif args.command.startswith('admin-'):
+            operation = args.command.removeprefix('admin-')
+            request = None
+            if operation != 'status':
+                raw = secret_request if secret_request is not None else sys.stdin.read(16385)
+                if len(raw) > 16384:
+                    raise Refused('Administrator input is too large.')
+                request = json.loads(raw)
+                if not isinstance(request, dict):
+                    raise Refused('Administrator input must be an object.')
+            result = runtime.admin(operation, request)
+        elif args.command.startswith('setup-'):
+            result = runtime.setup(args.command.removeprefix('setup-'), *(args.values if args.command == 'setup-mark' else []))
+        elif args.command == 'logs':
+            result = runtime.logs()
         elif args.command == 'proxy-config':
             print(runtime.proxy_config(), end='')
             return 0
@@ -665,11 +767,14 @@ def main():
             result = runtime.diagnostic()
         else:
             result = runtime.status()
-        print(json.dumps(result, indent=2))
+        if args.protocol:
+            print('@@result json=' + json.dumps(result, ensure_ascii=True))
+        else:
+            print(json.dumps(result, indent=2))
         return 0
     except (Refused, OSError, ValueError, KeyError, KeyboardInterrupt) as error:
         # ValueErrors can include input; inputs never contain credentials on this CLI.
-        print('DSpace: ' + str(error), file=sys.stderr)
+        print('DSpace: ' + (str(error) if isinstance(error, Refused) else 'Invalid input or unavailable local data; no secret input was logged.'), file=sys.stderr)
         return 1
 
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recipe": 2,
+  "recipe": 3,
   "status": "experimental",
   "architectures": [
     "linux/amd64"
