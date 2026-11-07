@@ -445,6 +445,14 @@ class RuntimeTests(unittest.TestCase):
         self.assertNotIn('do-not-show', result)
         compose.assert_not_called()
 
+    def test_edited_private_configuration_cannot_redirect_an_admin_operation(self):
+        self.install()
+        (self.root / 'local.cfg').write_text('db.url = jdbc:postgresql://another-server/dspace\n')
+        with patch.object(self.rt, 'compose') as compose, self.assertRaisesRegex(ds.Refused, 'Private configuration'):
+            self.rt.admin('password', dict(email='admin@example.org', password='Secret-for-the-intended-repository'))
+        compose.assert_not_called()
+        self.assertEqual(self.rt.state()['status'], 'installed')
+
     def test_admin_password_is_stdin_only_and_not_stored(self):
         self.install()
         request = dict(email='admin@example.org', first='Ada', last='Lovelace', language='pt_BR', password='Private-password-123')

@@ -35,7 +35,7 @@ primeiro acesso. O roteiro passa a aceitar esse termo pela UI **somente** para a
 conta descartável da CI; nada é aceito pelo instalador em nome de uma pessoa real.
 Depósito, download e privacidade ainda aguardam a rodada completa.
 
-Passaram localmente 65 testes de imagens/runtime (Python 3.9), 16 cenários de
+Passaram localmente 66 testes de imagens/runtime (Python 3.9), 16 cenários de
 navegação (oito combinações de plataformas, nas duas larguras) e 16 casos de
 confirmação/conta/protocolo. A seleção existente do painel encontrou expectativas
 antigas de dois grupos/cartões: atualizadas para incluir DSpace, mantendo as
@@ -50,3 +50,12 @@ O teste integrado usa contas/documentos descartáveis, login e depósito pelo
 Chromium, download com SHA-256 e acesso anônimo negado após restrição. Não salva
 traces, cookies, armazenamento do navegador ou senha. Só a conclusão efetiva da
 CI pode ser registrada como aprovação desse fluxo.
+
+
+A rodada [42389864883](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42389864883)
+chegou ao formulário com o arquivo enviado. O roteiro deixa de exigir um clique
+em Salvar quando não há alterações pendentes, mas continua exigindo que a API
+confirme o título editado no navegador antes do depósito. Também identifica cada
+fase do navegador e os estados dos botões, sem registrar valores dos campos.
+As operações administrativas recusam configuração privada alterada antes de
+iniciar qualquer contêiner ou transmitir a senha; teste negativo específico passou.

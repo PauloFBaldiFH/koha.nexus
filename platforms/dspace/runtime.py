@@ -639,6 +639,9 @@ class Runtime:
         # Do not save subprocess output from account operations: a failed upstream
         # library could include sensitive input in its diagnostic.
         with self.lock():
+            for file, expected in self.state()['files'].items():
+                if digest(self.root / file) != expected:
+                    raise Refused('Private configuration was changed; review it before managing administrators. No account was modified.')
             self.existing_resources()
             try:
                 output = self.compose('run', '--rm', '--no-deps', '-T', 'backend', 'admin', operation,

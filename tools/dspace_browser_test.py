@@ -154,10 +154,20 @@ def exercise(rt, output):
                 expect(agreement).not_to_be_visible(timeout=60000)
                 page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             stage = 'browser deposit form'
+            expect(title_input).to_be_visible(timeout=60000)
+            if consent.is_visible(): consent.click()
+            stage = 'browser metadata edit'
             title_input.fill(title); title_input.press('Tab')
+            stage = 'browser file upload'
             page.locator('input[type=file]').first.set_input_files(str(fixture))
             expect(page.get_by_text(fixture.name, exact=False).first).to_be_visible(timeout=90000)
-            page.locator('#save').click()
+            stage = 'browser save'
+            if consent.is_visible(): consent.click()
+            save = page.locator('#save')
+            # File upload can already persist pending metadata. A disabled Save
+            # is legitimate only if the independent API check below confirms it.
+            if save.is_enabled(): save.click()
+            stage = 'persisted browser metadata'
             # Saving must actually reach the REST API before final deposit.
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
@@ -166,6 +176,7 @@ def exercise(rt, output):
                 time.sleep(1)
             check(updated.get('name') == title, 'metadata edited in the browser is persisted')
             stage = 'browser deposit'
+            if consent.is_visible(): consent.click()
             with page.expect_response(lambda r: '/api/workflow/workflowitems' in r.url and r.request.method == 'POST', timeout=90000) as submitted:
                 page.locator('#deposit').click()
             check(submitted.value.status == 201, 'real browser completes the deposit')
@@ -211,8 +222,8 @@ def exercise(rt, output):
             # Only control names/types, never values, cookies or page storage.
             try:
                 controls = page.locator('input').evaluate_all('(nodes) => nodes.map(n => ({type:n.type,id:n.id,name:n.name,label:n.getAttribute("aria-label")}))')
-                buttons = page.locator('button').all_text_contents()
-                detail = json.dumps({'stage':stage,'inputs':controls,'buttons':buttons})[:4500]
+                buttons = page.locator('button[id], button:visible').evaluate_all('(nodes) => nodes.map(n => ({id:n.id,text:n.textContent.trim().slice(0,80),disabled:n.disabled,ariaDisabled:n.getAttribute("aria-disabled")}))')
+                detail = json.dumps({'stage':stage,'buttons':buttons,'inputs':controls})[:4500]
                 print('::notice title=DSpace browser controls::' + detail.replace('%','%25').replace('\n','%0A').replace('\r','%0D'), flush=True)
             except Exception:
                 pass
