@@ -3,3 +3,4 @@
 !solr-entrypoint.sh
 !ui-entrypoint.sh
 !NexusSchemaGuard.java
+!NexusAdmin.java

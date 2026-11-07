@@ -18,7 +18,7 @@ TEXT = INSTALLER.read_text(encoding="utf-8")
 # ----------------------------------------------------------------------
 def test_catalog_knows_four_platforms_and_supports_koha_and_tainacan():
     assert [p.id for p in platforms.CATALOG] == ["koha", "tainacan", "atom", "dspace"]
-    assert [p.id for p in platforms.CATALOG if p.supported] == ["koha", "tainacan"]
+    assert [p.id for p in platforms.CATALOG if p.supported] == ["koha", "tainacan", "dspace"]
 
 
 def test_status_json_platforms_are_read():
@@ -61,7 +61,8 @@ def test_installed_and_running_is_not_called_healthy():
 def test_planned_and_not_installed_cards():
     states = {s.id: s for s in platforms.from_status({"koha_installed": False})}
     assert platforms.describe(states["koha"])[0] == "Not installed"
-    assert platforms.describe(states["dspace"])[0] == "Planned"
+    assert platforms.describe(states["atom"])[0] == "Planned"
+    assert platforms.describe(states["dspace"])[0] == "Unknown"
 
 
 def test_koha_detection_is_a_file_test(tmp_path, monkeypatch):
@@ -198,7 +199,7 @@ def test_with_koha_the_sidebar_has_its_group_then_the_server():
     # Tainacan's screens only come with Tainacan installed (not in this demo).
     koha = [s.id for s in menus.children("koha")]
     server = [s.id for s in menus.SECTIONS if s.sidebar and not s.group and s.id != "dashboard"]
-    assert asyncio.run(main()) == ["dashboard", "koha", *koha, "tainacan", "sidebar-server", *server]
+    assert asyncio.run(main()) == ["dashboard", "koha", *koha, "tainacan", "dspace", "sidebar-server", *server]
     assert "platforms" not in server and "infra" in server
 
 
@@ -336,8 +337,8 @@ def test_the_dashboard_shows_a_card_per_supported_platform_only(no_koha):
             return {c.id: str(c.query_one(".card-value").render())
                     for c in view.query_one("#dash-platforms").query(StatusCard) if c.id.startswith("dash-platform-")}
 
-    # AtoM and DSpace are planned: they are said in About, never as a card.
-    assert asyncio.run(main()) == {"dash-platform-koha": "Not installed", "dash-platform-tainacan": "Not installed"}
+    # AtoM remains planned; DSpace now has an experimental operational card.
+    assert asyncio.run(main()) == {"dash-platform-koha": "Not installed", "dash-platform-tainacan": "Not installed", "dash-platform-dspace": "Not installed"}
 
 
 # ----------------------------------------------------------------------

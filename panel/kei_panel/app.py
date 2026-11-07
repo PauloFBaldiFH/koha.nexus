@@ -49,6 +49,7 @@ class KohaPanelApp(App):
         self.koha_installed = platforms.koha_detected(env)
         # Tainacan too: its state file says "installed" (no Docker call).
         self.tainacan_installed = platforms.tainacan_detected(env)
+        self.dspace_installed = platforms.dspace_detected(env)
 
     def _handle_exception(self, error: Exception) -> None:
         # Textual shows the traceback on the terminal after it exits; config.sh
@@ -186,6 +187,8 @@ class KohaPanelApp(App):
             return self.koha_installed
         if platform == platforms.TAINACAN:
             return self.tainacan_installed
+        if platform == platforms.DSPACE:
+            return self.dspace_installed
         return False
 
     def refuse_missing(self, action: str) -> bool:
@@ -202,6 +205,7 @@ class KohaPanelApp(App):
         """After a routine: Koha may have just been installed (or removed)."""
         self._set_koha(platforms.koha_detected(self.env))
         self._set_tainacan(platforms.tainacan_detected(self.env))
+        self._set_dspace(platforms.dspace_detected(self.env))
 
     def platforms_seen(self, status: dict | None) -> None:
         """What --status-json said (dashboard, Platforms screen)."""
@@ -210,9 +214,17 @@ class KohaPanelApp(App):
         for state in platforms.from_status(status):
             if state.id == platforms.KOHA and state.detected is not None:
                 self._set_koha(state.detected)
+        for state in platforms.from_status(status):
+            if state.id == platforms.DSPACE and state.detected is not None:
+                self._set_dspace(state.detected)
         tainacan = platforms.tainacan_from_status(status)
         if tainacan.known:
             self._set_tainacan(platforms.tainacan_installed(tainacan))
+
+    def _set_dspace(self, installed: bool) -> None:
+        if installed != self.dspace_installed:
+            self.dspace_installed = installed
+            self._platforms_changed()
 
     def _set_tainacan(self, installed: bool) -> None:
         if installed == self.tainacan_installed:

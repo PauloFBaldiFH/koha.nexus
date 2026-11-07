@@ -555,7 +555,11 @@ def test_koha_secrets_come_back_with_a_plan_after_its_database_and_no_value_is_s
             app.screen.dismiss("koha")
             await until(pilot, lambda: isinstance(app.screen, InputScreen))
             app.screen.dismiss("RECO-VERY-PHRA-SE01")
-            await until(pilot, lambda: isinstance(app.screen, ConfirmScreen))
+            # Wait until on_mount has focused "#no": dismissing before that
+            # removes the buttons under on_mount (NoMatches on CI 42411175197).
+            await until(pilot, lambda: isinstance(app.screen, ConfirmScreen)
+                        and app.screen.is_mounted and app.focused is not None
+                        and app.focused.id == "no")
             plan = app.screen._question
             # The plan is long: on a small CI runner the buttons can lie below
             # the fold, where a click lands on nothing. The answer is what matters.

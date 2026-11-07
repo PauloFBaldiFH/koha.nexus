@@ -5,7 +5,7 @@ Four facts are kept apart for every platform, never folded into one
 "operational" flag:
 
   supported  this version of the panel can install and administer it
-             (Koha and Tainacan; AtoM and DSpace are planned)
+             (Koha, Tainacan and experimental DSpace; AtoM is planned)
   detected   an installation was found (Koha: its koha-conf.xml exists,
              the installer's is_koha_installed); None = not looked for
   services   its system services: active, partial, inactive, unknown, or
@@ -33,6 +33,7 @@ from .i18n import t
 
 KOHA = "koha"
 TAINACAN = "tainacan"
+DSPACE = "dspace"
 
 SERVICES = ("active", "partial", "inactive", "unknown", "none")
 HEALTH = ("unknown", "healthy", "failing")
@@ -50,7 +51,7 @@ CATALOG: tuple[Platform, ...] = (
     Platform(KOHA, "Koha", "Library management: catalogue, patrons and circulation", True),
     Platform("tainacan", "Tainacan", "Digital collections and museum holdings", True),
     Platform("atom", "AtoM", "Archival description and access", False),
-    Platform("dspace", "DSpace", "Institutional repository", False),
+    Platform(DSPACE, "DSpace", "Institutional repository", True),
 )
 
 
@@ -105,6 +106,51 @@ def tainacan_detected(env) -> bool:
         return False
     status = [ln.partition("=")[2] for ln in lines if ln.startswith("status=")]
     return bool(status) and status[-1] == "installed"
+
+
+def dspace_detected(env) -> bool:
+    if getattr(env, "demo", False):
+        return os.environ.get("KEI_PANEL_DEMO_DSPACE", "0") == "1"
+    import json
+    try:
+        root = Path(os.environ.get("KEI_DSPACE_DIR", "/var/lib/koha-nexus/platforms/dspace"))
+        data = json.loads((root / "state.json").read_text())
+        return isinstance(data, dict) and bool(data.get("status"))
+    except (OSError, ValueError):
+        return False
+
+
+def dspace_detail(status: dict | None) -> dict:
+    for record in (status or {}).get("platforms", []):
+        if isinstance(record, dict) and record.get("id") == DSPACE:
+            if not record.get("supported"):
+                return {}
+            data = record.get("detail")
+            return data if isinstance(data, dict) else {"status": "absent" if record.get("detected") is False else "unknown"}
+    return {}
+
+
+def dspace_mode(facts) -> str:
+    data = dspace_detail(facts.status)
+    state = data.get("status", "unknown")
+    if state == "absent":
+        return "absent"
+    if state in ("installing", "failed") or (state == "starting" and data.get("phase") != "ready"):
+        return "incomplete"
+    if state in ("degraded", "stopped", "unavailable", "starting"):
+        return "failing"
+    return "installed" if state == "installed" else "unknown"
+
+
+def dspace_problem(facts) -> str:
+    mode = dspace_mode(facts)
+    return t({
+        "absent": "DSpace is experimental. Installation needs a reviewed image catalog, Docker and a web proxy; each change has its own plan and confirmation.",
+        "incomplete": "DSpace installation is incomplete. Read the diagnosis before resuming; data and the migration journal are preserved.",
+        "failing": "DSpace is stopped or unavailable. Diagnose first, then start its services; this does not require restoring a backup.",
+        "unknown": "DSpace state is unknown. Refresh or update the panel before changing services.",
+        "installed": "Experimental DSpace: backups and domain assistance arrive in subsequent stages. State and addresses are in the DSpace dashboard tab.",
+    }[mode])
 
 
 def _norm(value: object, allowed: tuple[str, ...], default: str) -> str:
@@ -618,7 +664,7 @@ def tainacan_mode(facts: Facts) -> str:
 
 
 def home_mode(platform: str, facts: Facts) -> str:
-    return koha_mode(facts) if platform == KOHA else tainacan_mode(facts)
+    return dspace_mode(facts) if platform == DSPACE else koha_mode(facts) if platform == KOHA else tainacan_mode(facts)
 
 
 def koha_problem(facts: Facts) -> str:
@@ -679,6 +725,16 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
     task = PLATFORM_TASKS.get(action)
     if task and not facts.has(task):
         return False
+    if action.startswith("dspace-") or action == "setup-dspace":
+        data = dspace_detail(facts.status)
+        if action == "dspace-start":
+            return data.get("status") in ("stopped", "degraded", "unavailable") and data.get("phase") == "ready"
+        if action == "dspace-admin":
+            return data.get("status") == "installed" and data.get("admin_available", True)
+        if action == "dspace-stop":
+            return data.get("status") == "installed"
+        if action == "setup-dspace":
+            return facts.setup.get(DSPACE, 0) > 0
     docker, backups, state = facts.docker, facts.backups, facts.tainacan
     if action == "docker-install":
         return docker_can_install(docker)

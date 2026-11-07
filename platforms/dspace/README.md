@@ -1,10 +1,12 @@
-# DSpace foundation and experimental lifecycle (PRs 1–2 of 6)
+# DSpace foundation, lifecycle and panel (PRs 1–3 of 6)
 
 This is an **experimental image recipe and build contract**, not a DSpace
-production installer. The existing panel still reports DSpace as unsupported.
-PR 2 adds an explicit experimental CLI adapter; it does not run unless requested.
+production installer. PR 2 adds an explicit experimental CLI adapter and PR 3 adds its panel group,
+dashboard tab, safe administrator setup and first steps. The panel support flag
+means these controls exist; it does not certify production readiness.
 Installation remains blocked until reviewed immutable runtime images are published
-and their catalog is configured. See [PR2-installer.md](../../docs/dspace/PR2-installer.md).
+and their catalog is configured. See [PR2-installer.md](../../docs/dspace/PR2-installer.md) and
+[PR3-panel-admin.md](../../docs/dspace/PR3-panel-admin.md).
 Nothing automatically starts a service, creates an account, publishes an address
 or changes a Koha/Tainacan backup.
 
@@ -50,10 +52,15 @@ passwords or published database/Solr ports.
   store in the final image. Application code/config defaults are root-owned;
   data/work directories have explicit write permissions, including the legacy
   Discovery reindex-flag directory (separate from the remote Solr data volume).
+* Explicit administrator operations use the DSpace EPerson/Group services after
+  the schema guard and official service-kernel bootstrap. Input travels over stdin;
+  creating refuses any existing e-mail rather than promoting/replacing an account.
+  Password reset applies only to enabled administrators. The panel can postpone
+  setup, and the regular menus remain available.
 * Startup requires installation-specific `/dspace/config/local.cfg`. The image
   never silently falls back to the example database credentials. `server` starts
   a JDBC-only schema guard before Java; `cli COMMAND ...` runs DSpace's CLI.
-  Upstream DSpace Context can automatically migrate: recipe 2 therefore requires
+  Upstream DSpace Context can automatically migrate: recipe 3 retains the requirement for
   a receipt of the exact release lock and successful Flyway history, recorded by
   the explicit installer operation. Missing/changed history refuses startup before
   loading DSpace, including after a Docker/host restart. The guard performs only
@@ -156,9 +163,9 @@ successful image build is not a production-readiness declaration.
 ## Next PRs
 
 1. Delivered in #347: foundation, recipes and CI; DSpace unavailable in the panel.
-2. Current review: installer, owned Docker project/network/volumes, generated private config,
+2. Delivered in #352: installer, owned Docker project/network/volumes, generated private config,
    explicit migration, proxy, resumable installation and lifecycle diagnostics.
-3. Panel and admin: group, dashboard tab, setup assistant and real browser flow.
+3. Current review: panel and admin, group, dashboard tab, setup assistant and real browser flow.
 4. Consistent backup and isolated restore, including historical Solr data.
 5. Shared backup sets and schedules, preserving existing plan participants.
 6. Publication, broker capability, tested updates and operational documentation.

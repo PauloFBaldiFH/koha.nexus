@@ -49,6 +49,19 @@ class Setup:
 
 async def read_setup(app, platform: str, quick: bool = False) -> Setup | None:
     """None when the installer in use has no such task or did not answer."""
+    if platform == "dspace":
+        from ..dspace import payload
+        if not app.bridge.has_task("dspace-panel"):
+            return None
+        try:
+            out = await app.bridge.task("dspace-panel", "setup-status")
+            data = payload(out) if out.ok else {}
+            if not data:
+                return None
+            return Setup(TaskOutcome(results={"setup": data.get("setup", "none"), "pending": str(data.get("pending", 0))},
+                                     lists={"step": [key + "|" + value + "|" for key, value in data.get("steps", {}).items()]}))
+        except Exception:
+            return None
     if not app.bridge.has_task("setup-status"):
         return None
     try:

@@ -35,6 +35,7 @@ def smoke(image, prefix):
                'test "$(id -u)" = 10001 || { echo "wrong runtime UID" >&2; exit 1; }; '
                'test -s /dspace/webapps/server-boot.jar || { echo "missing server JAR" >&2; exit 1; }; '
                'test -x /dspace/bin/dspace || { echo "CLI not executable by runtime user" >&2; ls -l /dspace/bin/dspace >&2; exit 1; }; '
+               'test -s /dspace/nexus-admin/NexusAdmin.class || { echo "Missing administrator adapter" >&2; exit 1; }; '
                'test -s /dspace/config/config-definition.xml || { echo "Missing kernel configuration definition" >&2; exit 1; }; '
                'test -s /dspace/config/dspace.cfg || { echo "Missing base configuration" >&2; exit 1; }; '
                'test -s /dspace/config/log4j2-cli.xml || { echo "Missing CLI logging configuration" >&2; exit 1; }; '

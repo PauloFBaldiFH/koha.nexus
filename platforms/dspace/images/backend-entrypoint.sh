@@ -19,6 +19,12 @@ case "${1:-server}" in
         export JAVA_OPTS
         exec /dspace/bin/dspace "$@"
         ;;
+    admin)
+        shift
+        [ "$#" -eq 1 ] || exit 64
+        java -cp '/usr/local/lib/nexus-dspace:/dspace/lib/*' NexusSchemaGuard check
+        exec java -Xmx512m -Ddspace.dir=/dspace -cp '/dspace/nexus-admin:/dspace/config:/dspace/lib/*' NexusAdmin "$1"
+        ;;
     schema-record)
         [ "$#" -eq 1 ] || exit 64
         exec java -cp '/usr/local/lib/nexus-dspace:/dspace/lib/*' NexusSchemaGuard record

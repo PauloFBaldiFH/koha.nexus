@@ -31,6 +31,7 @@ from ..i18n import t
 from ..widgets.cards import LinkCard, StatusCard
 from ..widgets.pacman import PacmanLoader
 from .base import SectionView
+from ..dspace import DSpaceSummary
 from .tainacan import TainacanSummary, read_tainacan
 
 
@@ -360,6 +361,11 @@ class DashboardView(SectionView):
                 yield Label("", classes="view-prompt", id="dash-tn-read")
                 yield TainacanSummary("dash-tn", id="dash-tainacan")
 
+            with TabPane("DSpace", id="dash-tab-dspace"):
+                with Horizontal(classes="quick-actions"):
+                    yield Button(t("DSpace tools"), id="dash-open-dspace", classes="small")
+                yield DSpaceSummary(id="dash-dspace")
+
     def on_mount(self) -> None:
         self.koha_layout()
         self.refresh_data()
@@ -376,7 +382,7 @@ class DashboardView(SectionView):
             widget.display = koha
         # A tab only for an installed platform; without any, General alone.
         tabs = self.query_one("#dash-tabs", TabbedContent)
-        for pane, shown in (("dash-tab-koha", koha), ("dash-tab-tainacan", self.app.tainacan_installed)):
+        for pane, shown in (("dash-tab-koha", koha), ("dash-tab-tainacan", self.app.tainacan_installed), ("dash-tab-dspace", self.app.dspace_installed)):
             if shown:
                 tabs.show_tab(pane)
             else:
@@ -390,7 +396,7 @@ class DashboardView(SectionView):
             self.refresh_data()
         elif bid == "restart-koha":
             self.app.run_native(bid, after=self.refresh_data)
-        elif bid in ("dash-open-koha", "dash-open-tainacan"):
+        elif bid in ("dash-open-koha", "dash-open-tainacan", "dash-open-dspace"):
             self.app.screen.action_show(bid.removeprefix("dash-open-"))
 
     @on(LinkCard.Pressed)
@@ -416,6 +422,7 @@ class DashboardView(SectionView):
             self.app.platforms_seen(status)
             self.koha_layout()
             self.show(status)
+            self.query_one("#dash-dspace", DSpaceSummary).show(platforms.dspace_detail(status))
             self.run_worker(self._load_health(status), exclusive=True, group="health", exit_on_error=False)
             if self.app.tainacan_installed:
                 self.run_worker(self._load_tainacan(status), exclusive=True, group="dash-tainacan",

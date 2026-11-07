@@ -498,6 +498,13 @@ class Bridge:
                 status = status | {"platforms": [_DEMO_TAINACAN if p["id"] == "tainacan" else p
                                                  for p in status["platforms"]],
                                    "docker": _DEMO_DOCKER}
+            if os.environ.get("KEI_PANEL_DEMO_DSPACE", "0") == "1":
+                state = os.environ.get("KEI_PANEL_DEMO_DSPACE_STATE", "installed")
+                detail = {"status": state, "phase": "ready", "url": "http://192.168.1.20:8100",
+                          "services": {name: "running" if state == "installed" else "exited" for name in ("postgres", "solr", "backend", "ui")}}
+                status = status | {"platforms": [{"id": "dspace", "supported": True, "detected": True,
+                                      "services": "active" if state == "installed" else "inactive",
+                                      "health": "unknown", "detail": detail} if p["id"] == "dspace" else p for p in status["platforms"]]}
             return status | {"generated_at": int(time.time())}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
@@ -580,7 +587,7 @@ _DEMO_STATUS = {
         {"id": "tainacan", "supported": True, "detected": False, "services": "none", "units": {}, "health": "unknown",
          "status": "absent", "url": "", "events": "off", "events_dependency": ""},
         {"id": "atom", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
-        {"id": "dspace", "supported": False, "detected": None, "services": "none", "units": {}, "health": "unknown"},
+        {"id": "dspace", "supported": True, "detected": False, "services": "none", "units": {}, "health": "unknown", "detail": {"status": "absent"}},
     ],
     "proxy": {"mode": "apache-nexus", "server": "apache2", "sites": 0},
     "docker": {"installed": False, "package": "", "engine": "", "compose": "", "running": False, "installed_by": "",

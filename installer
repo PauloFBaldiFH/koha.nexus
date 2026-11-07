@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.181"
+PANEL_VERSION=" 1.5.182"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12438,8 +12438,8 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="b7d84494df121b021767e5f4c62bd37d8815566ed21e566897f6f017e78d1ce9"
-KEI_DSPACE_RELEASE_SHA="fc4c90bc26a0a164b198de4c856cc9c214633811df6774580f0744b26947dd97"
+KEI_DSPACE_RUNTIME_SHA="88ab3566b8a96a66a283d8cc3487f9cd029ed1fb7d9202822011f9e42b6e52ed"
+KEI_DSPACE_RELEASE_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 
 kei_dspace_runtime() (
     local tmp src cache file expected actual rc arg install=0 confirm=0
@@ -12467,15 +12467,60 @@ kei_dspace_runtime() (
     done
     # Keep the checked adapter locally. Later status/start/diagnosis work
     # offline even when config.sh has no checkout next to it.
-    if [ "$install:$confirm" = 1:1 ] && [ "$(id -u)" = 0 ]; then
+    if { [ "$install:$confirm" = 1:1 ] || [ "${1:-}" = cache ]; } && [ "$(id -u)" = 0 ]; then
         mkdir -p "$cache" && chmod 700 "$cache" || return 1
         for file in runtime.py release.json; do
             cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
                 && mv -f "$cache/$file.new" "$cache/$file" || return 1
         done
     fi
+    [ "${1:-}" != cache ] || return 0
     python3 "$tmp/runtime.py" --root "$KEI_DSPACE_DIR" --driver "$(readlink -f "$_SCRIPT_PATH")" "$@"; rc=$?
     return "$rc"
+)
+
+# Read-only status for the shared dashboard. Missing state does not download
+# an adapter or contact Docker; older/offline adapters fail to unknown, not absent.
+kei_dspace_json() {
+    local data
+    if [ ! -f "$KEI_DSPACE_DIR/state.json" ]; then
+        printf '{"id":"dspace","supported":true,"detected":false,"services":"none","health":"unknown","experimental":true}'
+        return
+    fi
+    data=$(kei_dspace_runtime status 2>/dev/null) || data='{}'
+    printf '%s' "$data" | python3 -c '
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+st=d.get("status","unknown"); units=d.get("services",{})
+values=list(units.values()) if isinstance(units,dict) else []
+services="active" if values and all(v=="running" for v in values) else "partial" if "running" in values else "inactive" if values else "unknown"
+print(json.dumps(dict(id="dspace",supported=True,detected=True,services=services,health="unknown",experimental=True,detail=d)))'
+}
+
+# Dependencies have their own plan/confirmation, before the platform plan.
+kei_dspace_prerequisites() (
+    unset DOCKER_CONTEXT DOCKER_TLS DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+    export DOCKER_HOST=unix:///var/run/docker.sock
+    local mode action="${1:-plan}" docker_stopped=false apache_missing=false
+    read -r mode _ < <(kei_proxy_detect)
+    [ "$mode" != none ] || apache_missing=true
+    command -v docker >/dev/null 2>&1 && ! _kei_docker_running && docker_stopped=true
+    if [ "$action" = plan ]; then
+        printf '@@result json={"apache_missing":%s,"docker_stopped":%s,"proxy_mode":"%s"}\n' "$apache_missing" "$docker_stopped" "$mode"
+        return
+    fi
+    [ "${2:-}" = confirm ] || return 2
+    case "$action" in
+        apache)
+            [ "$mode" = none ] || { echo 'A web server already exists; read a new plan.' >&2; return 3; }
+            apt_install apache2 || return 1
+            kei_owned_add package apache2 dspace no || return 1 ;;
+        docker-start)
+            [ "$docker_stopped" = true ] || return 3
+            systemctl start docker || return 1 ;;
+        *) return 2 ;;
+    esac
 )
 
 # These internal tasks are called only by the local Python adapter.
@@ -16845,7 +16890,7 @@ _kei_bk_tainacan_secrets() { printf '%s\n' "$KEI_TAINACAN_DIR/.env" "$KEI_TAINAC
 #              configuration file or a running service proves nothing.
 # Nothing here opens a database.
 # ======================================================================
-KEI_PLATFORMS_PLANNED="atom dspace"
+KEI_PLATFORMS_PLANNED="atom"
 # The Koha services the platform card counts (the same ones as
 # kei_overall_state, plus Memcached).
 KEI_KOHA_UNITS="apache2 mariadb memcached koha-common"
@@ -16883,6 +16928,7 @@ kei_platforms_json() {
     printf '[{"id":"koha","supported":true,"detected":%s,"services":%s,"units":{%s},"health":"unknown"}' \
         "$detected" "$(json_str "$services")" "$units"
     printf ','; kei_tainacan_json
+    printf ','; kei_dspace_json
     for id in $KEI_PLATFORMS_PLANNED; do
         printf ',{"id":%s,"supported":false,"detected":null,"services":"none","units":{},"health":"unknown"}' "$(json_str "$id")"
     done
@@ -17248,6 +17294,11 @@ function_autoupdate() {
 
     if mv -f "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target"; then
         log "panel updated from version $PANEL_VERSION to $remote_version (SHA-256 verified, ${UPDATE_COMMIT:-branch})"
+        if [ -f "$KEI_DSPACE_DIR/state.json" ]; then
+            # Run the newly verified script: its own hashes bind the adapter.
+            bash "$target" --task dspace-cache </dev/null >/dev/null 2>&1 \
+                || log "DSpace adapter cache could not be refreshed; connect and retry config.sh --task dspace-cache before offline use. Existing cache/data were preserved."
+        fi
         # Dictionaries are downloaded again on the next start (they are now
         # older than the panel); the bundled copy is dropped to force it.
         rm -f "${CONFIG_DIR}/lang/${SYS_LANG}.cache" 2>/dev/null || true
@@ -45735,6 +45786,9 @@ kei_task() {
         docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
         dspace) kei_dspace_runtime "$@" ;;
+        dspace-panel) kei_dspace_runtime --protocol "$@" ;;
+        dspace-cache) kei_dspace_runtime cache ;;
+        dspace-prerequisites) kei_dspace_prerequisites "$@" ;;
         dspace-resource) kei_dspace_resource "$@" ;;
         tainacan-status)
             local k v

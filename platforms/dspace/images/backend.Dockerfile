@@ -12,6 +12,7 @@ COPY --from=schema-guard /guard/ /
 FROM ${MAVEN_IMAGE} AS build
 WORKDIR /src
 COPY --from=backend-source / /src/
+COPY NexusAdmin.java /tmp/NexusAdmin.java
 # The CA is optional for ordinary builders, and never enters the runtime image.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then \
@@ -38,6 +39,8 @@ RUN --mount=type=secret,id=proxy_ca --mount=type=secret,id=maven_settings \
     test -s /dspace/config/config-definition.xml; \
     test -s /dspace/config/dspace.cfg; \
     test -s /dspace/config/log4j2-cli.xml; \
+    mkdir -p /dspace/nexus-admin; \
+    javac -encoding UTF-8 -cp "/dspace/lib/*" -d /dspace/nexus-admin /tmp/NexusAdmin.java; \
     chmod 0555 /dspace/bin/*; \
     rm -rf /dspace/webapps/server /dspace/*.bak-* /tmp/build-cacerts; \
     rm -f /dspace/config/local.cfg
@@ -60,7 +63,7 @@ COPY --from=backend-source /NOTICE /usr/share/licenses/dspace/NOTICE
 COPY --from=backend-source /LICENSES_THIRD_PARTY /usr/share/licenses/dspace/LICENSES_THIRD_PARTY
 COPY --chmod=0555 backend-entrypoint.sh /usr/local/bin/nexus-dspace
 COPY --from=schema-guard /guard/ /usr/local/lib/nexus-dspace/
-COPY NexusSchemaGuard.java /usr/share/licenses/nexus-dspace/NexusSchemaGuard.java
+COPY NexusSchemaGuard.java NexusAdmin.java /usr/share/licenses/nexus-dspace/
 COPY --from=nexus-license /LICENSE /usr/share/licenses/nexus-dspace/LICENSE
 RUN mkdir -p /dspace/assetstore /dspace/log /dspace/var /dspace/upload \
       /dspace/reports /dspace/exports /dspace/imports /dspace/handle-server \

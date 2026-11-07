@@ -147,7 +147,8 @@
     "dash-status",
     "dash-components",
     "export-diagnostics"
-   ]
+   ],
+   "_en": "4efc51cc77"
   },
   "dash-restart": {
    "title": "Reiniciar Koha",
@@ -188,7 +189,7 @@
     "A confirmação REINSTALL é destrutiva. Mantenha uma cópia recuperável dos dados antes de uma reinstalação.",
     "Fechar o aplicativo MSIX antes de instalar o servidor Koha não conclui a preparação do ambiente."
    ],
-   "_en": "dc7cd9ccb0"
+   "_en": "fbe8911918"
   },
   "credentials": {
    "summary": "Mostra todos os endereços e logins de que você precisa no primeiro dia: os links do OPAC e da intranet (local, rede e Internet), o acesso SSH e o usuário e a senha do banco de dados para o Instalador Web do Koha.",
@@ -238,7 +239,7 @@
     "Em falhas de recriação, importação ou atualização do esquema, o código pode tentar recuperar o banco anterior. Essa recuperação também pode falhar; leia a mensagem final.",
     "Uma falha de indexação pode acontecer depois de o banco já ter sido restaurado. Não suponha que toda falha recoloca automaticamente o banco anterior."
    ],
-   "_en": "5911426d59"
+   "_en": "fdf27b03e4"
   },
   "backup-manual": {
    "summary": "Faz agora um backup completo e verificado do banco do Koha, na pasta que você escolher, e mostra o comando exato para copiá-lo para o seu computador.",
@@ -257,7 +258,7 @@
     "Recomendação operacional: gere uma cópia atual antes de alterações importantes.",
     "Mantenha uma cópia fora do servidor e teste o arquivo que pretende usar para recuperação."
    ],
-   "_en": "2235ff5dc0"
+   "_en": "7016de2f28"
   },
   "backup-cloud": {
    "summary": "Conecta um armazenamento em nuvem ao backup noturno com o rclone, para que cada backup também saia do servidor: o Google Drive por dois caminhos expressos, ou OneDrive, MEGA e armazenamento compatível com S3 passo a passo.",
@@ -379,7 +380,7 @@
    "tips": [
     "Escolha considerando o tempo de geração, o espaço e as ferramentas disponíveis para recuperar o arquivo."
    ],
-   "_en": "7c9dda9d5a"
+   "_en": "d8c7bb6325"
   },
   "backup-safety": {
    "title": "Backup de segurança antes da restauração",
@@ -398,7 +399,7 @@
     "Confira a estimativa de espaço do fluxo e mantenha espaço para o teste temporário e a cópia de segurança.",
     "Não exclua a cópia antes de conferir o catálogo restaurado e as buscas."
    ],
-   "_en": "b5819e5c76"
+   "_en": "d08fc761d4"
   },
   "magic-import": {
    "summary": "Prepara registros bibliográficos, exemplares, leitores e autoridades, com detecção de formato, revisão manual, validação e confirmação antes da importação.",
@@ -426,7 +427,7 @@
     "Desfazer uma importação MARC não é uma reversão universal de leitores, empréstimos e reservas.",
     "Exportações e logs podem conter dados pessoais. Não os publique."
    ],
-   "_en": "ece8a76968"
+   "_en": "92ee911a13"
   },
   "sec-database": {
    "summary": "As tabelas do Koha num relance, das maiores para as menores, abertas pela Central de diagnóstico e manutenção.",
@@ -510,7 +511,7 @@
     "Para manter os dados dos leitores dentro da biblioteca, use um provedor local (Ollama ou LM Studio).",
     "Dê ao chat um modelo leve e barato e à catalogação um modelo de visão: as necessidades são diferentes."
    ],
-   "_en": "8fe5074dbb",
+   "_en": "347344c281",
    "warnings": [
     "Não há tempo de resposta garantido para todo hardware.",
     "Um provedor remoto recebe os dados enviados para a solicitação. Confira o provedor e a URL salvos antes de usar dados da biblioteca."
@@ -611,7 +612,7 @@
    "tips": [
     "CPU, RAM e disco precisam ser suficientes para a escolha local; o mínimo do Koha não garante desempenho de IA."
    ],
-   "_en": "e1b554fbcb",
+   "_en": "edb677c3d0",
    "warnings": [
     "Modelos e ferramentas de IA locais são pesados: enquanto trabalham, podem ocupar boa parte do processador e da memória e deixar todo o sistema lento, inclusive o Koha, dependendo do hardware do servidor. A tela de IA avisa isso no topo."
    ]
@@ -828,7 +829,7 @@
     "Mude uma coisa de cada vez e confira o OPAC no celular, além do computador.",
     "Escolha cores com bom contraste: leitores com baixa visão dependem disso."
    ],
-   "_en": "d2422c6434"
+   "_en": "dfd9962281"
   },
   "opac-material": {
    "title": "Material",
@@ -864,7 +865,7 @@
     "As texturas de vidro ficam melhores sobre um papel de parede; sobre uma página lisa, prefira a cor sólida ou o gradiente.",
     "**Blocos**, **Campos** e **Botões** ajustam o arredondamento das bordas (border-radius): mais pixels deixam os cantos mais curvos, 0 deixa os cantos retos. Passe o mouse sobre um controle para ver quais elementos ele arredonda."
    ],
-   "_en": "c0dffa51ec"
+   "_en": "00b7dbaed2"
   },
   "opac-pictures": {
    "title": "Imagens",
@@ -1582,7 +1583,7 @@
    "tips": [
     "Anote a hora do erro: ajuda a achar o mesmo momento nos logs do próprio Koha (`plack-error.log`)."
    ],
-   "_en": "99a73e5c0d"
+   "_en": "52292bf478"
   },
   "repair-services": {
    "summary": "Reinicia o Memcached, o Plack e os serviços do Koha e informa o estado deles.",
@@ -2290,7 +2291,8 @@
     "sec-library",
     "authority-sync",
     "magic-import"
-   ]
+   ],
+   "_en": "deed97eb6f"
   },
   "sec-enrich-auth": {
    "summary": "Liga os nomes e assuntos dos seus registros bibliográficos a registros de autoridade, põe cada cabeçalho na forma autorizada e cria as autoridades que faltam, com um relatório preparado para ler antes de qualquer coisa chegar ao catálogo.",
@@ -2318,7 +2320,8 @@
    "related": [
     "authority-sync",
     "authority-match"
-   ]
+   ],
+   "_en": "40ec67255e"
   },
   "sec-ondemand": {
    "summary": "Pesquisa catálogos públicos só por conexões Z39.50 diretas, para os seus registros (todos, ou os que você listar) ou para um livro que você digita, com o mesmo relatório preparado dos trabalhos em segundo plano e a importação como registro novo de um livro digitado.",
@@ -2346,7 +2349,8 @@
    "related": [
     "sec-z3950",
     "marc-undo"
-   ]
+   ],
+   "_en": "75aa67e08d"
   },
   "export-diagnostics": {
    "summary": "Reúne os logs e o estado do sistema numa pasta que você pode enviar a quem dá suporte à sua biblioteca, com senhas, tokens e chaves trocados por [REDACTED].",
@@ -2532,7 +2536,7 @@
     "Sem a chave dos backups o painel pergunta antes: configurar a chave agora, ou gerar o pacote sem os segredos do Koha. Um pacote sem eles fica marcado como só dados e nunca é chamado de completo: o que o Koha cifrou (segredos do segundo fator da equipe) não poderá ser lido em outra instalação.",
     "Nunca vão em nenhum pacote: o programa do Koha (koha-common), as contas de nuvem, o túnel da Cloudflare ou o endereço gratuito. O índice de busca é refeito a partir do banco."
    ],
-   "_en": "46007ebc68"
+   "_en": "8a522e7e38"
   },
   "restore-assisted": {
    "summary": "Uma entrada para qualquer backup: um backup do banco do Koha de qualquer versão, um pacote do Tainacan ou um pacote conjunto, reconhecido pelo conteúdo e não pelo nome.",
@@ -2542,7 +2546,7 @@
     "A restauração em si é a que cada plataforma já tinha: a verificação e o backup de segurança do Koha, o teste numa cópia isolada e o backup de segurança do Tainacan. Sem a frase de recuperação os dados voltam e esta instalação mantém a sua própria configuração.",
     "Depois do banco do Koha, o painel oferece os arquivos e segredos do Koha, com um plano antes. Do koha-conf.xml só volta a chave de criptografia (o arquivo anterior fica guardado ao lado); a senha do banco, os caminhos, o Zebra e o memcached deste servidor ficam. Outro arquivo de segredo só é acrescentado quando este servidor não tem o seu; se tiver, o do backup fica ao lado como .from-backup para você comparar. Nenhum valor aparece. Em outro servidor, importe antes o kit de recuperação do servidor que fez o backup."
    ],
-   "_en": "1f79fd1bca"
+   "_en": "902427e27d"
   },
   "sec-schedules": {
    "summary": "Tudo o que este servidor roda sozinho, de todos os arquivos que guardam um agendamento, numa lista do menu principal (tecla s): quando roda, a última e a próxima execução e onde é alterado.",
@@ -2611,7 +2615,48 @@
     "set-backup",
     "restore-assisted",
     "sec-backups"
-   ]
+   ],
+   "_en": "2083a3bcd2"
+  },
+  "sec-dspace": {
+   "summary": "Instalação experimental do DSpace, acesso administrativo e manutenção. Exige catálogo revisado de imagens imutáveis; backups e domínios chegam nas próximas etapas.",
+   "_en": "1196a480b0"
+  },
+  "dspace-install": {
+   "summary": "Confere primeiro as imagens revisadas, prepara Docker/Apache só com consentimento e mostra o plano de instalação. Uma migração incompleta exige investigação antes de repetir.",
+   "_en": "b49c567a7b"
+  },
+  "dspace-start": {
+   "summary": "Inicia os serviços existentes do DSpace sem reinstalar, restaurar ou alterar o histórico de migração aprovado.",
+   "_en": "a08d4c712f"
+  },
+  "dspace-stop": {
+   "summary": "Para o repositório de forma controlada, mantendo a configuração e todos os volumes de dados.",
+   "_en": "80cfd9e83f"
+  },
+  "dspace-diagnose": {
+   "summary": "Confere explicitamente PostgreSQL, os sete cores do Solr, API, interface e isolamento; estado de processo sozinho não comprova saúde.",
+   "_en": "5d0f9482b6"
+  },
+  "dspace-logs": {
+   "summary": "Mostra um trecho limitado dos logs, ocultando campos sensíveis. Nunca exporta a configuração privada ou a senha do banco.",
+   "_en": "d443007685"
+  },
+  "dspace-admin": {
+   "summary": "Cria administrador com e-mail, senha e idioma escolhidos, ou troca a senha de um administrador existente. A criação recusa e-mail já usado por qualquer conta.",
+   "_en": "68c1319515"
+  },
+  "setup-dspace": {
+   "summary": "Oferece configurar o administrador agora ou depois e mantém lembrete para as próximas etapas. Os menus permanentes continuam disponíveis.",
+   "_en": "f75075576a"
+  },
+  "dspace-help": {
+   "summary": "Explica comunidades, coleções, depósitos e políticas de acesso, com o endereço de login do repositório.",
+   "_en": "247f05cbf0"
+  },
+  "sec-dspace-maintenance": {
+   "summary": "Diagnóstico, logs, início/parada seguros e primeiros passos do repositório DSpace.",
+   "_en": "1506ecb81b"
   }
  }
 }

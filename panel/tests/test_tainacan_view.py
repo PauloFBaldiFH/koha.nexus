@@ -122,18 +122,18 @@ def test_the_sidebar_and_the_tabs_follow_what_is_installed(server):
             shown = {pane: tabs.get_tab(pane).display for pane in
                      ("dash-tab-general", "dash-tab-koha", "dash-tab-tainacan")}
             dash = app.screen.query_one("#view-dashboard")
-            planned = [c for c in ("atom", "dspace") if dash.query(f"#dash-platform-{c}")]
+            planned = [c for c in ("atom",) if dash.query(f"#dash-platform-{c}")]
             return sidebar_ids(app), shown, tabs.active, ran, planned
 
     ids, shown, active, ran, planned = asyncio.run(main())
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
     expected = ["dashboard", "koha"] + (KOHA_SCREENS if koha else []) + ["tainacan"] + \
-        (TAINACAN_SCREENS if tainacan else []) + ["sidebar-server"] + SERVER_SCREENS
+        (TAINACAN_SCREENS if tainacan else []) + ["dspace", "sidebar-server"] + SERVER_SCREENS
     assert ids == expected
     assert "platforms" not in ids and "install" not in ids
     assert shown == {"dash-tab-general": True, "dash-tab-koha": koha, "dash-tab-tainacan": tainacan}
     assert active == "dash-tab-general"
-    assert planned == []                        # AtoM and DSpace are not in the operational summary
+    assert planned == []                        # AtoM is not in the operational summary
     # The dashboard only reads: --status-json, and the backup engine's state with Tainacan.
     assert {name for name, _a in ran} <= READS
     assert bool(ran) is tainacan
@@ -434,7 +434,7 @@ def test_the_koha_tab_holds_koha_and_general_holds_the_server(server):
 
     disabled, state, addresses, db, general, koha = asyncio.run(main())
     assert disabled is False and state == "Running" and addresses is True and db != "-"
-    assert general == ["dash-platform-koha", "dash-platform-tainacan", "card-disk", "health-cpu", "health-memory",
+    assert general == ["dash-platform-koha", "dash-platform-tainacan", "dash-platform-dspace", "card-disk", "health-cpu", "health-memory",
                        "health-updates"]
     for koha_only in ("health-db", "health-backup-dir", "health-errors", "health-koha-updates", "health-tunnel",
                       "health-sru", "health-z3950"):

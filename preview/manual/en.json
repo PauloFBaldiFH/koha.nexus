@@ -3068,6 +3068,36 @@
     "restore-assisted",
     "sec-backups"
    ]
+  },
+  "sec-dspace": {
+   "summary": "Experimental DSpace installation, administrative access and maintenance. It requires a reviewed immutable image catalog; backups and domains are delivered in later stages."
+  },
+  "dspace-install": {
+   "summary": "Checks the reviewed images first, prepares Docker/Apache only with consent, then shows the repository installation plan. An incomplete migration requires explicit investigation before retry."
+  },
+  "dspace-start": {
+   "summary": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history."
+  },
+  "dspace-stop": {
+   "summary": "Stops the repository gracefully, retaining configuration and every data volume."
+  },
+  "dspace-diagnose": {
+   "summary": "Explicitly checks PostgreSQL, all seven Solr cores, API, interface and isolation; process state alone does not establish health."
+  },
+  "dspace-logs": {
+   "summary": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password."
+  },
+  "dspace-admin": {
+   "summary": "Creates an administrator with an e-mail, chosen password and language, or resets an existing administrator. Creating refuses an e-mail already used by any account."
+  },
+  "setup-dspace": {
+   "summary": "Offers administrator setup now or later and keeps a reminder for subsequent stages. The permanent menus remain available."
+  },
+  "dspace-help": {
+   "summary": "Explains communities, collections, deposits and access policies, with the repository login address."
+  },
+  "sec-dspace-maintenance": {
+   "summary": "Diagnosis, logs, safe start/stop and first steps of the DSpace repository."
   }
  }
 }

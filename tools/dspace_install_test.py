@@ -62,6 +62,12 @@ def main():
         href = page.get('_links', {}).get('self', {}).get('href', '')
         check(count == 0 and href.startswith(origin + '/server/api/core/communities'),
               'anonymous empty community API: total=%r, self=%r' % (count, href))
+        status_json = json.loads(module.command(['bash', str(REPO / 'installer'), '--status-json'], timeout=90))
+        ds_status = next(p for p in status_json['platforms'] if p['id'] == 'dspace')
+        check(ds_status['detected'] and ds_status['services'] == 'active', 'real shared status reports DSpace without requiring Koha')
+        check((root / 'db-password').read_text().strip() not in json.dumps(status_json), 'shared dashboard status never contains the database password')
+        from dspace_browser_test import exercise
+        exercise(rt, output)
         # Simulate a disconnected client: its administrative container can live
         # on. Do not overlap a new install/start/stop with that still-running job.
         pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()
