@@ -149,7 +149,7 @@ def dspace_problem(facts) -> str:
         "incomplete": "DSpace installation is incomplete. Read the diagnosis before resuming; data and the migration journal are preserved.",
         "failing": "DSpace is stopped or unavailable. Diagnose first, then start its services; this does not require restoring a backup.",
         "unknown": "DSpace state is unknown. Refresh or update the panel before changing services.",
-        "installed": "Experimental DSpace: backups and domain assistance arrive in subsequent stages. State and addresses are in the DSpace dashboard tab.",
+        "installed": "Experimental DSpace: encrypted individual backups are in the Backup center. Scheduling and domain assistance arrive in subsequent stages. State and addresses are in the DSpace dashboard tab.",
     }[mode])
 
 

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.182"
+PANEL_VERSION=" 1.5.183"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12438,17 +12438,19 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="88ab3566b8a96a66a283d8cc3487f9cd029ed1fb7d9202822011f9e42b6e52ed"
-KEI_DSPACE_RELEASE_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
+KEI_DSPACE_RUNTIME_SHA="efa17e2f55783ff9621f40027b66696c418e4d20b68374cd29379639778d0e50"
+KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
+KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
+KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 
 kei_dspace_runtime() (
     local tmp src cache file expected actual rc arg install=0 confirm=0
     command -v python3 >/dev/null 2>&1 || { echo 'DSpace requires Python 3.' >&2; return 3; }
     tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
     trap 'rm -rf "$tmp"' EXIT
-    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA"
-    for file in runtime.py release.json; do
-        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; esac
+    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA"
+    for file in runtime.py release.json backup.py release-r3.json; do
+        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; esac
         src="${_SCRIPT_DIR}/platforms/dspace/$file"
         if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
             cp "$src" "$tmp/$file" || return 1
@@ -12469,7 +12471,7 @@ kei_dspace_runtime() (
     # offline even when config.sh has no checkout next to it.
     if { [ "$install:$confirm" = 1:1 ] || [ "${1:-}" = cache ]; } && [ "$(id -u)" = 0 ]; then
         mkdir -p "$cache" && chmod 700 "$cache" || return 1
-        for file in runtime.py release.json; do
+        for file in runtime.py release.json backup.py release-r3.json; do
             cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
                 && mv -f "$cache/$file.new" "$cache/$file" || return 1
         done
@@ -12551,6 +12553,10 @@ kei_dspace_resource() {
             fi
             printf '%s\n' "$mode" ;;
         network) kei_docker_network_create dspace ;;
+        recovered-volume)
+            [[ "${1:-}" =~ ^kn-dspace-rt-[0-9a-f]{20}-(postgres|solr|discovery-state|assetstore|log|var|upload|reports|exports|imports|handle-server)$ ]] || return 2
+            [ "$(_kei_docker volume inspect -f '{{index .Labels "com.koha-nexus.platform"}}' "$1")" = dspace ] || return 3
+            kei_owned_add docker-volume "$1" dspace no ;;
         volume)
             case "${1:-}" in
                 kn-dspace-postgres|kn-dspace-solr|kn-dspace-discovery-state|kn-dspace-assetstore|kn-dspace-log|kn-dspace-var|kn-dspace-upload|kn-dspace-reports|kn-dspace-exports|kn-dspace-imports|kn-dspace-handle-server)
@@ -45786,6 +45792,18 @@ kei_task() {
         docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
         dspace) kei_dspace_runtime "$@" ;;
+        dspace-backup-crypto)
+            case "${1:-}" in
+                check) _kei_bk_has_key ;;
+                encrypt)
+                    _kei_bk_has_key && [ -f "${2:-}" ] && [ ! -e "${3:-}" ] || return 3
+                    ( umask 077; _kei_bk_gpg -r "$(_kei_bk_fpr)" --encrypt < "$2" > "$3" ) ;;
+                decrypt)
+                    [ -n "${KEI_BACKUP_PHRASE:-}" ] && [ -f "${2:-}" ] && [ ! -e "${3:-}" ] || return 7
+                    [[ "${4:-}" =~ ^[0-9]{1,18}$ ]] && [ "$4" -gt 0 ] || return 4
+                    ( umask 077; _kei_bk_gpg_phrase "$KEI_BACKUP_PHRASE" --max-output "$4" --decrypt < "$2" > "$3" ) ;;
+                *) return 2 ;;
+            esac ;;
         dspace-panel) kei_dspace_runtime --protocol "$@" ;;
         dspace-cache) kei_dspace_runtime cache ;;
         dspace-prerequisites) kei_dspace_prerequisites "$@" ;;

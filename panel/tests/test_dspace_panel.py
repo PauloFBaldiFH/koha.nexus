@@ -176,3 +176,66 @@ def test_failed_worker_never_continues_even_with_partial_success_payload(monkeyp
     app=App();asyncio.run(dspace.install(app))
     assert len(app.screens)==1 and isinstance(app.screens[0],MessageScreen)
     assert 'Worker failed' in app.screens[0]._body
+
+
+def test_dspace_only_backup_scope_does_not_create_a_joint_scope():
+    from kei_panel import backup_center
+    assert backup_center.scopes(False,False,True)==['dspace']
+    assert backup_center.scopes(True,True,True)==['koha','tainacan','dspace','both']
+
+
+@pytest.mark.parametrize('answer',[None,False])
+def test_declining_backup_never_stops_the_repository(monkeypatch,answer):
+    calls=mock_calls(monkeypatch,{})
+    asyncio.run(dspace.backup_create(App([answer])))
+    assert calls==[]
+
+
+def test_recovery_phrase_is_masked_and_only_in_task_environment(monkeypatch):
+    package='/var/backups/koha-nexus/dspace/sample.tar.gpg'; phrase='test recovery phrase only'
+    calls=mock_calls(monkeypatch,{'backup-list':{'packages':[package]},'backup-test':{'verified':True}})
+    app=App([package,phrase,True]); asyncio.run(dspace.backup_test(app))
+    call=calls[-1]
+    assert call[:2]==('dspace-panel',('backup-test',package,'--confirm'))
+    assert phrase not in str(call[:2])
+    assert call[2]['env']=={'KEI_BACKUP_PHRASE':phrase}
+    assert any(isinstance(s,InputScreen) and s._password for s in app.screens)
+
+
+def test_cancel_recovery_phrase_never_starts_restore(monkeypatch):
+    package='/var/backups/koha-nexus/dspace/sample.tar.gpg'
+    calls=mock_calls(monkeypatch,{'backup-list':{'packages':[package]}})
+    asyncio.run(dspace.backup_restore(App([package,None])))
+    assert len(calls)==1
+
+
+@pytest.mark.parametrize('size',[(80,24),(160,48)])
+def test_dspace_only_backup_center_has_its_own_actions_without_writes(monkeypatch,size):
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA','0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN','0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE','1')
+    async def exercise():
+        app=KohaPanelApp(PanelEnv(installer=None,lang='en',plain=True,demo=True))
+        calls=[]; real=app.bridge.task
+        async def task(name,*args,**kwargs):
+            calls.append((name,args)); return await real(name,*args,**kwargs)
+        app.bridge.task=task
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.8)
+            app.backup_scope='dspace'; app.screen.action_show('backups')
+            await pilot.pause(1.8)
+            view=app.screen.query_one('#view-backups')
+            assert view.scope=='dspace'
+            cards={c.entry.action for c in view.query(ActionCard) if c.display}
+            assert {'dspace-backup-create','dspace-backup-test','dspace-backup-restore','dspace-backup-key'} <= cards
+            assert not cards & {'backup-manual','tainacan-backup','set-backup','restore-assisted'}
+            assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-')) for name,args in calls)
+    asyncio.run(exercise())
+
+
+def test_declining_recovery_plan_never_stops_the_repository(monkeypatch):
+    package='/var/backups/koha-nexus/dspace/sample.tar.gpg'
+    calls=mock_calls(monkeypatch,{'backup-list':{'packages':[package]},'backup-plan':{'old_volumes_preserved':True}})
+    app=App([package,'test-only recovery phrase',False])
+    asyncio.run(dspace.backup_restore(app))
+    assert [c[:2] for c in calls]==[('dspace-panel',('backup-list',)),('dspace-panel',('backup-plan',package))]

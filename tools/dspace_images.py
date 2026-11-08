@@ -31,7 +31,7 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("schema") != 1 or data.get("status") != "experimental":
         raise ValueError("Unsupported release schema or maturity")
-    if data.get("recipe") != 3 or data.get("architectures") != ["linux/amd64"]:
+    if data.get("recipe") != 4 or data.get("architectures") != ["linux/amd64"]:
         raise ValueError("Only the experimental amd64 recipe is currently supported")
     if set(data.get("sources", {})) != set(REPOSITORIES):
         raise ValueError("Expected backend and UI sources")
@@ -64,11 +64,30 @@ def load_release(path: Path = BASE / "release.json") -> dict:
         raise ValueError("A reviewed UI dependency patch is required")
     if hashlib.sha256((BASE / patch["file"]).read_bytes()).hexdigest() != patch["sha256"]:
         raise ValueError("UI dependency patch checksum mismatch")
+    source_patch = data.get('ui_source_patch', {})
+    if source_patch.get('file') != 'ui-cookie-metadata.patch' or hashlib.sha256((BASE / 'ui-cookie-metadata.patch').read_bytes()).hexdigest() != source_patch.get('sha256'):
+        raise ValueError('UI cookie metadata patch checksum mismatch')
+    previous = data.get('previous_release', {})
+    if previous != {'file':'release-r3.json', 'sha256':'72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608'}:
+        raise ValueError('Unreviewed previous release')
+    if hashlib.sha256((BASE / previous['file']).read_bytes()).hexdigest() != previous['sha256']:
+        raise ValueError('Previous release checksum mismatch')
     return data
 
 
 def source_stamp(data: dict) -> dict:
-    return {"sources": data["sources"], "ui_patch": data["ui_patch"]}
+    return {"sources": data["sources"], "ui_patch": data["ui_patch"], 'ui_source_patch': data['ui_source_patch']}
+
+
+def apply_ui_source_patch(directory: Path, patch: dict) -> None:
+    if patch.get('file') != 'ui-cookie-metadata.patch':
+        raise ValueError('Unexpected UI source patch')
+    path = BASE / patch['file']
+    if hashlib.sha256(path.read_bytes()).hexdigest() != patch.get('sha256'):
+        raise ValueError('UI source patch checksum mismatch')
+    # Only used in the fresh pinned checkout, never in a user's source tree.
+    run('git', '-C', str(directory), 'apply', '--index', '--check', str(path.resolve()))
+    run('git', '-C', str(directory), 'apply', '--index', str(path.resolve()))
 
 
 def apply_ui_patch(directory: Path, patch: dict) -> None:
@@ -162,6 +181,8 @@ def prepare(data: dict, output: Path) -> None:
             if commit != source["commit"]:
                 raise ValueError("Upstream release tag moved; review the lock before building")
             run("git", "-C", str(checkout), "checkout", "-q", "--detach", commit)
+            if name == 'ui':
+                apply_ui_source_patch(checkout, data['ui_source_patch'])
             exported = stage / (name + "-source")
             # Export only tracked regular files. No .git, local credentials or hooks.
             files = run("git", "-C", str(checkout), "ls-files", "-z", capture_output=True).stdout.split(b"\0")

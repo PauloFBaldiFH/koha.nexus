@@ -1,0 +1,32 @@
+--- a/src/app/core/cookies/browser-orejime.service.ts
++++ b/src/app/core/cookies/browser-orejime.service.ts
+@@ -39,6 +39,7 @@
+ import { getFirstCompletedRemoteData } from '../shared/operators';
+ import { MATOMO_ENABLED } from '../statistics/models/matomo-type';
+ import { CookieService } from './cookie.service';
++import { cookieMetadataOperations } from './cookie-metadata-operations';
+ import { OrejimeService } from './orejime.service';
+ import {
+   ANONYMOUS_STORAGE_NAME_OREJIME,
+@@ -413,6 +414,7 @@
+     }
+     this.ePersonService.createPatchFromCache(user)
+       .pipe(
++        map(cookieMetadataOperations),
+         take(1),
+         switchMap((operations: Operation[]) => {
+           if (isNotEmpty(operations)) {
+--- /dev/null
++++ b/src/app/core/cookies/cookie-metadata-operations.ts
+@@ -0,0 +1,11 @@
++/** Koha.Nexus cookie preference isolation. SPDX-License-Identifier: GPL-3.0-or-later */
++import type { Operation } from 'fast-json-patch';
++
++/** A stale user snapshot must never undo unrelated profile updates. */
++export function cookieMetadataOperations(operations: Operation[]): Operation[] {
++  const field = '/metadata/dspace.agreements.cookies';
++  return operations.filter((operation) =>
++    (operation.op === 'add' || operation.op === 'replace' || operation.op === 'remove' || operation.op === 'test') &&
++    (operation.path === field || operation.path.startsWith(field + '/')),
++  );
++}

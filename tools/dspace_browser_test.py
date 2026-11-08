@@ -18,6 +18,36 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPHandler, HTTPCookieProcessor, ProxyHandler, Request, build_opener
 
 
+def agreement_changes(operations):
+    """Return only explicit consent values; never expose other profile fields."""
+    values = []
+    if not isinstance(operations, list): return ()
+    for operation in operations:
+        if not isinstance(operation, dict): continue
+        if operation.get('op') not in ('add', 'replace'): continue
+        path = operation.get('path')
+        value = operation.get('value')
+        if path == '/metadata/dspace.agreements.end-user':
+            candidates = value if isinstance(value, list) else []
+        elif path == '/metadata/dspace.agreements.end-user/0':
+            candidates = [value]
+        else:
+            continue
+        for candidate in candidates:
+            if isinstance(candidate, dict) and candidate.get('value') in ('true', 'false'):
+                values.append(candidate['value'])
+    return tuple(values)
+
+
+def wait_for_client(page):
+    # In the locked upstream AppComponent, ds-social is rendered only when
+    # browserPlatform is true. SSR never includes it. Waiting for this host
+    # proves browser bootstrap/auth initialization, instead of acting on SSR
+    # form controls before Angular has attached its bindings.
+    page.locator('ds-app[ng-version] ds-social').wait_for(state='attached', timeout=90000)
+    page.wait_for_load_state('networkidle', timeout=60000)
+
+
 class API:
     def __init__(self, origin):
         self.origin = origin
@@ -62,7 +92,7 @@ class API:
             raise RuntimeError('Authentication returned no bearer token.')
 
 
-def exercise(rt, output):
+def exercise(rt, output, recovery_capture=None):
     from playwright.sync_api import sync_playwright, expect
     origin = rt.state()['url']
     email = 'nexus-acceptance@example.org'
@@ -138,11 +168,15 @@ def exercise(rt, output):
             if '/api/eperson/epersons/' in response.url or '/api/submission/' in response.url:
                 # Method, status and route only (no ids, no bodies).
                 route = re.sub(r'/[0-9a-f-]{8,}|/\d+', '/:id', urlsplit(response.url).path)
-                agreement_observations.append({'method': response.request.method, 'status': response.status, 'route': route})
+                record = {'method': response.request.method, 'status': response.status, 'route': route}
+                if response.request.method == 'PATCH':
+                    record['agreement'] = agreement_changes(response.request.post_data_json)
+                agreement_observations.append(record)
         page.on('response', observe_agreement)
         try:
             stage = 'browser login'
             page.goto(origin + '/login', wait_until='domcontentloaded')
+            wait_for_client(page)
             page.locator('input[type=email]').fill(email)
             page.locator('input[type=password]').fill(replacement)
             page.locator('[data-test=login-button]').click()
@@ -155,14 +189,19 @@ def exercise(rt, output):
             stage = 'disposable account user agreement'
             consent = page.get_by_role('button', name="That's ok", exact=True)
             page.goto(origin + '/info/end-user-agreement', wait_until='domcontentloaded')
-            # The upstream checkbox is a styled, visually hidden input.
+            wait_for_client(page)
             agreement = page.locator('#user-agreement-accept')
-            agreement.wait_for(state='attached', timeout=90000)
             if consent.is_visible(): consent.click()
-            agreement.check(force=True)
+            page.wait_for_load_state('networkidle', timeout=60000)
             save = page.locator('#button-save')
-            expect(save).not_to_have_attribute('aria-disabled', 'true', timeout=30000)
-            with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH', timeout=60000) as accepted:
+            expect(agreement).not_to_be_checked()
+            expect(save).to_have_attribute('aria-disabled', 'true')
+            # Use the visible label, like a visitor, without forcing a click
+            # on a form which may still be replaced by client initialization.
+            page.locator('label[for="user-agreement-accept"]').click()
+            expect(agreement).to_be_checked()
+            expect(save).to_have_attribute('aria-disabled', 'false', timeout=30000)
+            with page.expect_response(lambda r: '/api/eperson/epersons/' in r.url and r.request.method == 'PATCH' and agreement_changes(r.request.post_data_json) == ('true',), timeout=60000) as accepted:
                 save.click()
             check(accepted.value.status == 200, 'disposable account accepts the agreement through the real UI')
             accepted_data = api.request(urlsplit(accepted.value.url).path)
@@ -172,8 +211,21 @@ def exercise(rt, output):
             # is after saving (CI 42411175345). Persistence is proven by REST
             # above; let the save settle, then open the submission.
             page.wait_for_load_state('networkidle', timeout=60000)
+            accepted_data = api.request(urlsplit(accepted.value.url).path)
+            check(any(v.get('value') == 'true' for v in accepted_data.get('metadata', {}).get('dspace.agreements.end-user', [])),
+                  'agreement remains saved after browser requests settle')
+            changes = [v for record in agreement_observations for v in record.get('agreement', ())]
+            check(changes == ['true'], 'one explicit agreement acceptance with no duplicate or revocation')
+            for unused in range(3):
+                page.reload(wait_until='domcontentloaded')
+                wait_for_client(page)
+                expect(page.locator('#user-agreement-accept')).to_be_checked(timeout=60000)
+            check(True, 'agreement survives three fully initialized browser reloads')
+            # Continue in the same authenticated browser session. The reload
+            # checks above prove the saved consent is also reflected by the UI.
             stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
+            wait_for_client(page)
             # Upstream adds a literal ' *' to required field labels.
             title_input = page.get_by_label(re.compile(r'^Title\s*\*?$'))
             stage = 'submission title field'
@@ -239,6 +291,10 @@ def exercise(rt, output):
             expect(anon_page.get_by_text(title, exact=True).first).to_be_visible(timeout=60000)
             anon_page.screenshot(path=str(Path(output) / 'dspace-public-item.png'), full_page=True)
             public.close()
+            recovered_public = recovery_capture(rt) if recovery_capture else None
+            if recovery_capture:
+                # Maintenance restarts the backend; old JWTs need not survive.
+                api = API(origin); api.login(email, replacement)
             stage = 'restricting published content'
             for uuid in (stream['uuid'], bundle['uuid'], itemid):
                 policies = api.request('/authz/resourcepolicies/search/resource?' + urlencode({'uuid': uuid, 'action': 'READ', 'size': 100})).get('_embedded', {}).get('resourcepolicies', [])
@@ -258,6 +314,8 @@ def exercise(rt, output):
             check(itemid not in json.dumps(search), 'private item absent from anonymous discovery')
             private.close()
             (Path(output) / 'dspace-browser-acceptance.json').write_text(json.dumps({'browser_deposit': True, 'private_access_denied': True, 'download_sha256': expected, 'item_uuid': itemid}, indent=2))
+            return recovered_public, dict(content=content, item=itemid, sha256=expected, email=email, password=replacement)
+
         except Exception as error:
             # Only control names/types, never values, cookies or page storage.
             try:

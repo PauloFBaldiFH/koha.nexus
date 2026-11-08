@@ -2657,6 +2657,18 @@
   "sec-dspace-maintenance": {
    "summary": "Diagnóstico, logs, início/parada seguros e primeiros passos do repositório DSpace.",
    "_en": "1506ecb81b"
+  },
+  "dspace-backup-key": {
+   "summary": "Configura a chave compartilhada e o kit de recuperação existentes para os pacotes cifrados do DSpace."
+  },
+  "dspace-backup-create": {
+   "summary": "Pausa o repositório e cifra PostgreSQL, configuração privada, arquivos e todos os cores do Solr parados."
+  },
+  "dspace-backup-test": {
+   "summary": "Recupera em volumes independentes, sem rede externa ou portas públicas, e confere registros e hashes dos arquivos."
+  },
+  "dspace-backup-restore": {
+   "summary": "Faz um backup de segurança, verifica uma cópia recuperada e troca os volumes ativos preservando os dados anteriores."
   }
  }
 }

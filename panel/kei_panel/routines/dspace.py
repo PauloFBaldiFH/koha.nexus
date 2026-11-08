@@ -178,7 +178,7 @@ async def help(app):
         return
     url = origin(data.get('url'))
     await app.push_screen_wait(MessageScreen(t('DSpace first steps'), t(
-        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Backups, automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
+        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Encrypted individual backups and recovery are in the Backup center. Automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
 
 
 async def assistant(app):
@@ -194,10 +194,48 @@ async def assistant(app):
             await admin(app)
         else:
             await call(app, 'setup-mark', 'admin', 'later')
-    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('Backups and domain assistance are delivered in subsequent stages. Keep the setup reminder for later? The local repository and administrator remain accessible from their menus.'), [('keep', t('Keep the reminder')), ('close', t('Do not remind me again'))]))
+    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('Encrypted backups are available in the Backup center; domain assistance comes later. Keep the setup reminder? The local repository and administrator remain accessible from their menus.'), [('keep', t('Keep the reminder')), ('close', t('Do not remind me again'))]))
     if choice is None:
         return
     await call(app, 'setup-mark', 'backup', 'later')
     if choice == 'close':
         await call(app, 'setup-close')
     await help(app)
+
+
+async def backup_create(app):
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, t('Create an encrypted DSpace backup? The repository pauses while PostgreSQL, files and all Solr cores are captured. The existing backup key must already be configured.'))):
+        return
+    data = await call(app, 'backup-create', '--confirm', cancellable=False)
+    if data is not None:
+        await app.push_screen_wait(MessageScreen(TITLE, str(data.get('package', ''))))
+
+
+async def _recovery(app, restore):
+    data = await call(app, 'backup-list')
+    if data is None: return
+    packages = data.get('packages', [])
+    if not packages:
+        await app.push_screen_wait(MessageScreen(TITLE, t('No encrypted DSpace backup is available yet.')))
+        return
+    path = await app.push_screen_wait(ChoiceScreen(TITLE, t('Choose a DSpace recovery package'), [(p, p.rsplit('/',1)[-1]) for p in packages]))
+    if not path: return
+    phrase = await app.push_screen_wait(InputScreen(TITLE, t('Recovery phrase for the existing backup key:'), t('Recovery phrase:'), password=True))
+    if not phrase: return
+    plan = await call(app, 'backup-plan', path, env={'KEI_BACKUP_PHRASE':phrase}) if restore else {}
+    if plan is None: return
+    question = ('Restore DSpace? A safety backup is made first. Recovery is verified in independent volumes before replacing the active data. Old volumes are kept.' if restore else 'Test DSpace recovery in new volumes on an internal network without public ports? The active repository data are kept.')
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question) + ('\n\n' + json.dumps(plan,ensure_ascii=False,indent=2) if restore else ''), danger=restore)): return
+    result = await call(app, 'backup-restore' if restore else 'backup-test', path, '--confirm',
+                        env={'KEI_BACKUP_PHRASE':phrase}, cancellable=False)
+    phrase = ''
+    if result is not None:
+        await app.push_screen_wait(MessageScreen(TITLE, json.dumps(result, ensure_ascii=False, indent=2)))
+
+
+async def backup_test(app):
+    await _recovery(app, False)
+
+
+async def backup_restore(app):
+    await _recovery(app, True)

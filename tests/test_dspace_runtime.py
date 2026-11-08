@@ -514,7 +514,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_installer_adapter_hashes_match_and_task_is_present(self):
         text = (REPO / 'installer').read_text()
-        for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json')):
+        for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json'), ('PREVIOUS', 'release-r3.json'), ('BACKUP', 'backup.py')):
             self.assertIn('KEI_DSPACE_' + var + '_SHA="' + ds.digest(ds.BASE / file) + '"', text)
         self.assertIn('dspace) kei_dspace_runtime "$@"', text)
 
@@ -538,7 +538,7 @@ class RuntimeTests(unittest.TestCase):
     def test_tampered_offline_adapter_never_executes(self):
         result = self.bridge_script('kei_dspace_runtime install --confirm || exit; '
                                     '_SCRIPT_DIR=/missing-checkout; '
-                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA/runtime.py"; '
+                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA/runtime.py"; '
                                     'chmod 600 "$file"; echo tampered > "$file"; kei_dspace_runtime status')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout.count('adapter-loaded'), 1)
@@ -549,6 +549,72 @@ class RuntimeTests(unittest.TestCase):
         ds.atomic(p, '{"phase":"two"}')
         self.assertEqual(json.loads(p.read_text())['phase'], 'two')
         self.assertFalse(list(p.parent.glob('.state.json-*')))
+
+
+class PreviousReleaseBinding(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / 'dspace'
+        self.previous = ds.digest(ds.BASE / 'release-r3.json')
+
+    def state(self):
+        self.root.mkdir(mode=0o700)
+        data = {'release_sha256':self.previous, 'url':'http://repository.test:8100',
+                'phase':'ready','migration':'done','files':{}}
+        (self.root/'state.json').write_text(json.dumps(data))
+        return data
+
+    def test_new_installation_defaults_to_corrected_recipe_without_writing(self):
+        with patch.object(ds, 'command') as command:
+            rt = ds.Runtime(self.root, lab=True)
+        self.assertEqual(rt.release['recipe'],4)
+        self.assertFalse(self.root.exists())
+        command.assert_not_called()
+
+    def test_existing_recipe_is_selected_without_modifying_any_file(self):
+        self.state(); before=(self.root/'state.json').read_bytes()
+        with patch.object(ds,'command') as command:
+            rt=ds.Runtime(self.root,lab=True)
+        self.assertEqual(rt.release_hash,self.previous)
+        self.assertEqual(rt.release['recipe'],3)
+        self.assertEqual((self.root/'state.json').read_bytes(),before)
+        self.assertEqual([p.name for p in self.root.iterdir()],['state.json'])
+        command.assert_not_called()
+
+    def test_previous_release_can_prepare_a_blank_matching_recovery_target(self):
+        rt=ds.Runtime(self.root,lab=True,release_lock=self.previous)
+        self.assertEqual(rt.release_hash,self.previous)
+        self.assertFalse(self.root.exists())
+
+    def test_unknown_explicit_release_is_refused_without_writes(self):
+        with self.assertRaises(ds.Refused): ds.Runtime(self.root,lab=True,release_lock='0'*64)
+        self.assertFalse(self.root.exists())
+
+    def test_changed_previous_lock_cannot_be_adopted(self):
+        base=Path(self.tmp.name)/'adapter';base.mkdir()
+        (base/'release.json').write_bytes((ds.BASE/'release.json').read_bytes())
+        (base/'release-r3.json').write_text('{}')
+        with patch.object(ds,'BASE',base), self.assertRaisesRegex(ds.Refused,'checksum'):
+            ds.Runtime(self.root,lab=True,release_lock=self.previous)
+        self.assertFalse(self.root.exists())
+
+    def test_selecting_new_release_does_not_upgrade_existing_data(self):
+        self.state()
+        rt=ds.Runtime(self.root,lab=True,release_lock=ds.digest(ds.BASE/'release.json'))
+        with patch.object(rt,'docker') as docker, self.assertRaisesRegex(ds.Refused,'deliberate update'):
+            rt.plan()
+        docker.assert_not_called()
+
+    def test_previous_catalog_remains_bound_to_its_original_matrix(self):
+        self.state(); catalog=Path(self.tmp.name)/'images.json'
+        catalog.write_text(json.dumps({'schema':1,'release_sha256':self.previous,
+            'images':{n:'sha256:'+str(i)*64 for i,n in enumerate(('backend','ui','solr'),1)}}))
+        rt=ds.Runtime(self.root,catalog,lab=True)
+        self.assertEqual(set(rt.images()),{'backend','ui','solr','postgres'})
+        data=json.loads(catalog.read_text());data['release_sha256']=ds.digest(ds.BASE/'release.json')
+        catalog.write_text(json.dumps(data))
+        with self.assertRaises(ds.Refused):rt.images()
 
 
 if __name__ == '__main__':

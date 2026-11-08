@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recipe": 3,
+  "recipe": 4,
   "status": "experimental",
   "architectures": [
     "linux/amd64"
@@ -49,5 +49,13 @@
   "ui_patch": {
     "file": "ui-dependencies.json",
     "sha256": "193737ba9a11b0824b123fc6102f79c4a9f16e4aefa6828ef4cc4e1271fe8ecb"
+  },
+  "ui_source_patch": {
+    "file": "ui-cookie-metadata.patch",
+    "sha256": "b0087fece8554bc7edc5bb1383615cce69095af0837b59265e01a86758e9c2c0"
+  },
+  "previous_release": {
+    "file": "release-r3.json",
+    "sha256": "72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
   }
 }

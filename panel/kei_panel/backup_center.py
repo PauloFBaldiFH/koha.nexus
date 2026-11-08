@@ -25,16 +25,17 @@ from . import cloud, cron
 from .i18n import t
 
 KOHA, TAINACAN, BOTH = "koha", "tainacan", "both"
-SCOPES = (KOHA, TAINACAN, BOTH)
-SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan"}
+DSPACE = "dspace"
+SCOPES = (KOHA, TAINACAN, DSPACE, BOTH)
+SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace"}
 
 NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 
 
-def scopes(koha: bool, tainacan: bool) -> list[str]:
+def scopes(koha: bool, tainacan: bool, dspace: bool = False) -> list[str]:
     """The platforms the center offers: the installed ones, Koha first,
     and the two as a set when both are installed."""
-    return [s for s, on in ((KOHA, koha), (TAINACAN, tainacan), (BOTH, koha and tainacan)) if on]
+    return [s for s, on in ((KOHA, koha), (TAINACAN, tainacan), (DSPACE, dspace), (BOTH, koha and tainacan)) if on]
 
 
 def pick_scope(wanted: str, offered: list[str]) -> str:

@@ -146,7 +146,7 @@ def local_docker_env():
 
 
 class Runtime:
-    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None):
+    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None, release_lock=None):
         self.root = Path(root).absolute()
         self.release = read_json(BASE / 'release.json')
         self.release_hash = digest(BASE / 'release.json')
@@ -154,6 +154,24 @@ class Runtime:
         self.lab = lab
         self.driver = driver
         self.progress = progress
+        # Updating the panel must not silently change an installed image matrix.
+        # Recipe 3 remains available for same-release capture/recovery; only a
+        # deliberate later upgrade may replace its existing containers.
+        try:
+            installed = self.state().get('release_sha256')
+        except (Refused, OSError, ValueError):
+            installed = None  # operations still validate/refuse this state
+        selected = release_lock or installed
+        if selected and selected != self.release_hash:
+            previous = self.release.get('previous_release', {})
+            if selected == previous.get('sha256') and previous.get('file') == 'release-r3.json':
+                path = BASE / 'release-r3.json'
+                if digest(path) != selected:
+                    raise Refused('Previous DSpace release lock checksum mismatch.')
+                self.release = read_json(path)
+                self.release_hash = selected
+            elif release_lock:
+                raise Refused('Only the current and explicitly reviewed previous release locks are supported.')
 
     def docker(self, *args, timeout=60, input_text=None, log_failure=True):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
@@ -738,6 +756,7 @@ def main():
     parser.add_argument('--catalog', type=Path)
     parser.add_argument('--lab', action='store_true', help='Explicit engineering-only local immutable image IDs')
     parser.add_argument('--driver', help='Existing config.sh/installer resource driver')
+    parser.add_argument('--release-lock', help='Explicit reviewed release hash for preparing a matching recovery target')
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('plan', 'install'):
         cmd = sub.add_parser(name)
@@ -753,21 +772,48 @@ def main():
     sub.add_parser('setup-status').add_argument('--refresh', action='store_true')
     for name in ('availability', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
+    for name in ('backup-create', 'backup-rollback'):
+        sub.add_parser(name).add_argument('--confirm', action='store_true')
+    for name in ('backup-test', 'backup-restore', 'backup-plan'):
+        child = sub.add_parser(name)
+        child.add_argument('package')
+        child.add_argument('--confirm', action='store_true')
+    sub.add_parser('backup-list')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
     # Strip it before starting Docker or any resource helper. CLI users may
     # instead supply the same JSON object on protected standard input.
     secret_request = os.environ.pop('KEI_DSPACE_ADMIN_DATA', None)
-    runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
-                      progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True))
+    recovery_phrase = os.environ.pop('KEI_BACKUP_PHRASE', None)
     def interrupted(signum, _frame):
         raise Refused('Interrupted; data were preserved. Review the saved phase before resuming.')
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
     try:
+        runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
+                          progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True),
+                          release_lock=args.release_lock)
         if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
-        if args.command == 'availability':
+        if args.command.startswith('backup-'):
+            from backup import Recovery, Error
+            recovery = Recovery(runtime, recovery_phrase)
+            try:
+                if args.command == 'backup-list':
+                    result = {'packages': [str(p) for p in sorted(recovery.home.glob('knx-dspace-*.tar.gpg'), reverse=True)]}
+                elif args.command == 'backup-plan':
+                    with runtime.lock(): result = recovery.plan(args.package)
+                else:
+                    if not args.confirm: raise Refused('Review the recovery scope and use explicit --confirm.')
+                    with runtime.lock():
+                        if args.command != 'backup-rollback': recovery.recover_capture()
+                        if args.command == 'backup-create': result = recovery.capture()
+                        elif args.command == 'backup-test': result = recovery.test(args.package)
+                        elif args.command == 'backup-restore': result = recovery.restore(args.package)
+                        else: result = recovery.rollback()
+            except Error as error:
+                raise Refused(str(error)) from None
+        elif args.command == 'availability':
             result = runtime.availability()
         elif args.command == 'plan':
             result = runtime.plan(args.url)
@@ -813,4 +859,5 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.modules['runtime'] = sys.modules[__name__]
     sys.exit(main())

@@ -48,6 +48,13 @@ class DSpaceInputs(unittest.TestCase):
         self.assertIsNone(contract["services"]["solr"]["public_path"])
         self.assertIsNone(contract["services"]["postgres"]["public_path"])
 
+    def test_source_patch_and_previous_lock_are_bound_to_checked_files(self):
+        for key in ('ui_source_patch', 'previous_release'):
+            self.assert_bad_lock(lambda data, field=key: data[field].update(sha256='0' * 64))
+
+    def test_source_patch_cannot_select_another_filename(self):
+        self.assert_bad_lock(lambda data: data['ui_source_patch'].update(file='../unreviewed.patch'))
+
     def test_build_has_no_push_or_shell_and_uses_exact_pins(self):
         with patch.dict(os.environ, {}, clear=True):
             cmd = images.build_command(self.data, Path("/tmp/sources"), "backend", "nexus-dspace", Path("/tmp/out.json"))
@@ -56,6 +63,23 @@ class DSpaceInputs(unittest.TestCase):
         self.assertIn("backend-source=/tmp/sources/backend-source", cmd)
         self.assertIn("SOURCE_REVISION=" + self.data["sources"]["backend"]["commit"], cmd)
         self.assertIn("JAVA_IMAGE=" + self.data["bases"]["java"], cmd)
+
+    def test_local_copy_inputs_are_present_in_the_explicit_build_context(self):
+        import shlex
+        directory = images.BASE / 'images'
+        rules = (directory / '.dockerignore').read_text().splitlines()
+        self.assertEqual(rules[0], '*')
+        included = {line[1:] for line in rules if line.startswith('!')}
+        for dockerfile in directory.glob('*.Dockerfile'):
+            for line in dockerfile.read_text().splitlines():
+                if not line.startswith('COPY '): continue
+                tokens = shlex.split(line)[1:]
+                if any(token.startswith('--from=') for token in tokens): continue
+                sources = [token for token in tokens if not token.startswith('--')][:-1]
+                for source in sources:
+                    with self.subTest(image=dockerfile.name,source=source):
+                        self.assertIn(source,included,'COPY source is excluded by .dockerignore')
+                        self.assertTrue((directory/source).is_file())
 
     def test_rejects_tag_or_shell_in_prefix(self):
         for prefix in ("image:latest", "image;touch /tmp/unwanted", "$(id)"):

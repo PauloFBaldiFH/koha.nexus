@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.182",
+ "panel_version": "1.5.183",
  "languages": [
   {
    "code": "en",
@@ -709,6 +709,7 @@
     "setup-dspace",
     "dspace-admin",
     "sec-dspace-maintenance",
+    "sec-backups",
     "dspace-help"
    ],
    "features": [],
@@ -749,6 +750,10 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-backup-key",
+    "dspace-backup-create",
+    "dspace-backup-test",
+    "dspace-backup-restore",
     "backup-download",
     "backup-manual",
     "backup-marc",
@@ -1789,6 +1794,46 @@
    "label": "🩺  DSpace diagnosis & maintenance",
    "description": "",
    "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "dspace-backup-key": {
+   "id": "dspace-backup-key",
+   "type": "entry",
+   "section": "backups",
+   "label": "🔐  Set up the DSpace backup key",
+   "description": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-backup-create": {
+   "id": "dspace-backup-create",
+   "type": "entry",
+   "section": "backups",
+   "label": "💾  Create encrypted DSpace backup",
+   "description": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-backup-test": {
+   "id": "dspace-backup-test",
+   "type": "entry",
+   "section": "backups",
+   "label": "🧪  Test DSpace recovery",
+   "description": "Recovers into independent volumes with no external network or public ports and checks records and file hashes.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-backup-restore": {
+   "id": "dspace-backup-restore",
+   "type": "entry",
+   "section": "backups",
+   "label": "📥  Restore DSpace",
+   "description": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data.",
+   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -7851,6 +7896,206 @@
    "zh": "请选择备份操作：",
    "ja": "バックアップの操作を選んでください:",
    "ko": "백업 작업을 선택하세요:"
+  },
+  "🔐  Set up the DSpace backup key": {
+   "en": "🔐  Set up the DSpace backup key",
+   "pt-BR": "🔐  Configurar a chave de backup do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.": {
+   "en": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.",
+   "pt-BR": "Configura a chave compartilhada e o kit de recuperação existentes para os pacotes cifrados do DSpace.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "💾  Create encrypted DSpace backup": {
+   "en": "💾  Create encrypted DSpace backup",
+   "pt-BR": "💾  Criar backup cifrado do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.": {
+   "en": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.",
+   "pt-BR": "Pausa o repositório e cifra PostgreSQL, configuração privada, arquivos e todos os cores do Solr parados.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🧪  Test DSpace recovery": {
+   "en": "🧪  Test DSpace recovery",
+   "pt-BR": "🧪  Testar recuperação do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Recovers into independent volumes with no external network or public ports and checks records and file hashes.": {
+   "en": "Recovers into independent volumes with no external network or public ports and checks records and file hashes.",
+   "pt-BR": "Recupera em volumes independentes, sem rede externa ou portas públicas, e confere registros e hashes dos arquivos.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📥  Restore DSpace": {
+   "en": "📥  Restore DSpace",
+   "pt-BR": "📥  Restaurar DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data.": {
+   "en": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data.",
+   "pt-BR": "Faz um backup de segurança, verifica uma cópia recuperada e troca os volumes ativos preservando os dados anteriores.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "📥 Download latest backup": {
    "en": "📥 Download latest backup",
@@ -19165,6 +19410,42 @@
     "summary": "Diagnóstico, logs, início/parada seguros e primeiros passos do repositório DSpace."
    }
   },
+  "dspace-backup-key": {
+   "en": {
+    "summary": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Configura a chave compartilhada e o kit de recuperação existentes para os pacotes cifrados do DSpace."
+   }
+  },
+  "dspace-backup-create": {
+   "en": {
+    "summary": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Pausa o repositório e cifra PostgreSQL, configuração privada, arquivos e todos os cores do Solr parados."
+   }
+  },
+  "dspace-backup-test": {
+   "en": {
+    "summary": "Recovers into independent volumes with no external network or public ports and checks records and file hashes.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Recupera em volumes independentes, sem rede externa ou portas públicas, e confere registros e hashes dos arquivos."
+   }
+  },
+  "dspace-backup-restore": {
+   "en": {
+    "summary": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Faz um backup de segurança, verifica uma cópia recuperada e troca os volumes ativos preservando os dados anteriores."
+   }
+  },
   "backup-download": {
    "en": {
     "title": "Download latest backup",
@@ -22615,165 +22896,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 163,
-   "manual_total": 163,
+   "manual": 167,
+   "manual_total": 167,
    "manual_outdated": [],
-   "strings": 501,
-   "strings_total": 501
+   "strings": 509,
+   "strings_total": 509
   },
   "pt-BR": {
-   "manual": 163,
-   "manual_total": 163,
+   "manual": 167,
+   "manual_total": 167,
    "manual_outdated": [],
-   "strings": 495,
-   "strings_total": 501
+   "strings": 503,
+   "strings_total": 509
   },
   "es": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 501
+   "strings_total": 509
   },
   "fr": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 501
+   "strings_total": 509
   },
   "it": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 501
+   "strings_total": 509
   },
   "de": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 501
+   "strings_total": 509
   },
   "nl": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "sv": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "pl": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "cs": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "ru": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "uk": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "tr": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "tl": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "id": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "ar": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "fa": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "hi": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "bn": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "vi": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "zh": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "ja": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   },
   "ko": {
    "manual": 0,
-   "manual_total": 163,
+   "manual_total": 167,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 501
+   "strings_total": 509
   }
  }
 }
