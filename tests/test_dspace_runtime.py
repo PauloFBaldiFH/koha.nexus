@@ -6,15 +6,15 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('runtime', REPO / 'platforms/dspace/runtime.py')
-ds = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ds)
+sys.path.insert(0, str(REPO / 'platforms/dspace'))
+import runtime as ds
 
 
 class LabRuntime(ds.Runtime):
@@ -514,7 +514,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_installer_adapter_hashes_match_and_task_is_present(self):
         text = (REPO / 'installer').read_text()
-        for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json'), ('PREVIOUS', 'release-r3.json'), ('BACKUP', 'backup.py')):
+        for var, file in (('RUNTIME', 'runtime.py'), ('RELEASE', 'release.json'), ('PREVIOUS', 'release-r3.json'), ('BACKUP', 'backup.py'), ('OPERATIONS', 'operations.py')):
             self.assertIn('KEI_DSPACE_' + var + '_SHA="' + ds.digest(ds.BASE / file) + '"', text)
         self.assertIn('dspace) kei_dspace_runtime "$@"', text)
 
@@ -538,7 +538,7 @@ class RuntimeTests(unittest.TestCase):
     def test_tampered_offline_adapter_never_executes(self):
         result = self.bridge_script('kei_dspace_runtime install --confirm || exit; '
                                     '_SCRIPT_DIR=/missing-checkout; '
-                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA/runtime.py"; '
+                                    'file="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA-${KEI_DSPACE_OPERATIONS_SHA:0:16}/runtime.py"; '
                                     'chmod 600 "$file"; echo tampered > "$file"; kei_dspace_runtime status')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout.count('adapter-loaded'), 1)

@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.183",
+ "panel_version": "1.5.184",
  "languages": [
   {
    "code": "en",
@@ -710,7 +710,10 @@
     "dspace-admin",
     "sec-dspace-maintenance",
     "sec-backups",
-    "dspace-help"
+    "dspace-address",
+    "dspace-upgrade",
+    "dspace-help",
+    "dspace-remove"
    ],
    "features": [],
    "media": [],
@@ -750,6 +753,8 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-plan",
+    "dspace-plan-run",
     "dspace-backup-key",
     "dspace-backup-create",
     "dspace-backup-test",
@@ -794,6 +799,7 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-plan",
     "sec-crons",
     "pbackup-schedule",
     "set-schedule"
@@ -1757,12 +1763,42 @@
    "status": "available",
    "media": []
   },
+  "dspace-address": {
+   "id": "dspace-address",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🌐  DSpace address and HTTPS",
+   "description": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-upgrade": {
+   "id": "dspace-upgrade",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🔄  Reviewed DSpace update",
+   "description": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "dspace-help": {
    "id": "dspace-help",
    "type": "entry",
    "section": "dspace",
    "label": "📖  DSpace first steps",
    "description": "Explains communities, collections, deposits and access policies, with the repository login address.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-remove": {
+   "id": "dspace-remove",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🗑  Remove DSpace",
+   "description": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1794,6 +1830,26 @@
    "label": "🩺  DSpace diagnosis & maintenance",
    "description": "",
    "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "dspace-plan": {
+   "id": "dspace-plan",
+   "type": "entry",
+   "section": "backups",
+   "label": "⏰  DSpace and platform-set plans",
+   "description": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-plan-run": {
+   "id": "dspace-plan-run",
+   "type": "entry",
+   "section": "backups",
+   "label": "▶  Run an encrypted backup plan",
+   "description": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.",
+   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -7697,6 +7753,106 @@
    "ja": null,
    "ko": null
   },
+  "🌐  DSpace address and HTTPS": {
+   "en": "🌐  DSpace address and HTTPS",
+   "pt-BR": "🌐  Endereço e HTTPS do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.": {
+   "en": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
+   "pt-BR": "Planeja o endereço local, HTTPS institucional ou gratuito do repositório sem alterar outra plataforma. HTTPS exige certificado/chave existentes ou proxy TLS externo. A mudança de URL faz e testa um backup cifrado antes.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔄  Reviewed DSpace update": {
+   "en": "🔄  Reviewed DSpace update",
+   "pt-BR": "🔄  Atualização homologada do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.": {
+   "en": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
+   "pt-BR": "Atualiza somente a receita 3 para 4 homologada do DSpace 10.1, com catálogo imutável de imagens. Testa o backup de segurança, preserva esquema e volumes e retorna à configuração anterior se a validação falhar.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "📖  DSpace first steps": {
    "en": "📖  DSpace first steps",
    "pt-BR": "📖  Primeiros passos do DSpace",
@@ -7725,6 +7881,56 @@
   "Explains communities, collections, deposits and access policies, with the repository login address.": {
    "en": "Explains communities, collections, deposits and access policies, with the repository login address.",
    "pt-BR": "Explica comunidades, coleções, depósitos e políticas de acesso, com o endereço de login do repositório.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🗑  Remove DSpace": {
+   "en": "🗑  Remove DSpace",
+   "pt-BR": "🗑  Remover DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.": {
+   "en": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",
+   "pt-BR": "Mantém os dados por padrão. Apagar os volumes ativos próprios exige confirmação digitada e backup de segurança testado. Preserva outras plataformas e infraestrutura compartilhada.",
    "es": null,
    "fr": null,
    "it": null,
@@ -7896,6 +8102,106 @@
    "zh": "请选择备份操作：",
    "ja": "バックアップの操作を選んでください:",
    "ko": "백업 작업을 선택하세요:"
+  },
+  "⏰  DSpace and platform-set plans": {
+   "en": "⏰  DSpace and platform-set plans",
+   "pt-BR": "⏰  Planos do DSpace e conjuntos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.": {
+   "en": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.",
+   "pt-BR": "Cria ou edita plano com participantes fixos, horário diário, retenção e conexão de nuvem existente opcional. Planos antigos de Koha/Tainacan nunca passam a incluir DSpace implicitamente.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "▶  Run an encrypted backup plan": {
+   "en": "▶  Run an encrypted backup plan",
+   "pt-BR": "▶  Executar plano de backup cifrado",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.": {
+   "en": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.",
+   "pt-BR": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🔐  Set up the DSpace backup key": {
    "en": "🔐  Set up the DSpace backup key",
@@ -19374,6 +19680,24 @@
     "summary": "Cria administrador com e-mail, senha e idioma escolhidos, ou troca a senha de um administrador existente. A criação recusa e-mail já usado por qualquer conta."
    }
   },
+  "dspace-address": {
+   "en": {
+    "summary": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Planeja o endereço local, HTTPS institucional ou gratuito do repositório sem alterar outra plataforma. HTTPS exige certificado/chave existentes ou proxy TLS externo. A mudança de URL faz e testa um backup cifrado antes."
+   }
+  },
+  "dspace-upgrade": {
+   "en": {
+    "summary": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Atualiza somente a receita 3 para 4 homologada do DSpace 10.1, com catálogo imutável de imagens. Testa o backup de segurança, preserva esquema e volumes e retorna à configuração anterior se a validação falhar."
+   }
+  },
   "dspace-help": {
    "en": {
     "summary": "Explains communities, collections, deposits and access policies, with the repository login address.",
@@ -19381,6 +19705,15 @@
    },
    "pt-BR": {
     "summary": "Explica comunidades, coleções, depósitos e políticas de acesso, com o endereço de login do repositório."
+   }
+  },
+  "dspace-remove": {
+   "en": {
+    "summary": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Mantém os dados por padrão. Apagar os volumes ativos próprios exige confirmação digitada e backup de segurança testado. Preserva outras plataformas e infraestrutura compartilhada."
    }
   },
   "sec-dspace": {
@@ -19408,6 +19741,24 @@
    },
    "pt-BR": {
     "summary": "Diagnóstico, logs, início/parada seguros e primeiros passos do repositório DSpace."
+   }
+  },
+  "dspace-plan": {
+   "en": {
+    "summary": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Cria ou edita plano com participantes fixos, horário diário, retenção e conexão de nuvem existente opcional. Planos antigos de Koha/Tainacan nunca passam a incluir DSpace implicitamente."
+   }
+  },
+  "dspace-plan-run": {
+   "en": {
+    "summary": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos."
    }
   },
   "dspace-backup-key": {
@@ -22896,165 +23247,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 167,
-   "manual_total": 167,
+   "manual": 172,
+   "manual_total": 172,
    "manual_outdated": [],
-   "strings": 509,
-   "strings_total": 509
+   "strings": 519,
+   "strings_total": 519
   },
   "pt-BR": {
-   "manual": 167,
-   "manual_total": 167,
+   "manual": 172,
+   "manual_total": 172,
    "manual_outdated": [],
-   "strings": 503,
-   "strings_total": 509
+   "strings": 513,
+   "strings_total": 519
   },
   "es": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 519
   },
   "fr": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 519
   },
   "it": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 519
   },
   "de": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 509
+   "strings_total": 519
   },
   "nl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "sv": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "pl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "cs": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "ru": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "uk": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "tr": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "tl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "id": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "ar": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "fa": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "hi": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "bn": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "vi": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "zh": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "ja": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   },
   "ko": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 519
   }
  }
 }

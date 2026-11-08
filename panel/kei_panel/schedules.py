@@ -37,7 +37,7 @@ from .i18n import t
 CRON_DIR = "/etc/cron.d"
 # KOHA, TAINACAN and SERVER are the platform filter's values; "" is all.
 KOHA, TAINACAN, SERVER = "koha", "tainacan", "server"
-PLATFORM_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", SERVER: "Server", "koha+tainacan": "Koha and Tainacan"}
+PLATFORM_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", SERVER: "Server", "dspace": "DSpace", "koha+dspace": "Koha + DSpace", "tainacan+dspace": "Tainacan + DSpace", "koha+tainacan+dspace": "Koha + Tainacan + DSpace", "koha+tainacan": "Koha and Tainacan"}
 BACKUP, MAINTENANCE, OTHER = "backup", "maintenance", "other"
 KIND_LABELS = {BACKUP: "Backups", MAINTENANCE: "Maintenance and indexing", OTHER: "Other"}
 NO_RECORD = "No run recorded"          # the same key as the Backup center: "Sem registro"
@@ -338,6 +338,10 @@ def read_files(cron_dir: str | Path = "") -> dict[str, str]:
             out[name] = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+    for path in sorted(base.glob('koha-nexus-plan-*')):
+        if path.is_symlink() or not re.fullmatch(r'koha-nexus-plan-[a-z][a-z0-9-]{0,31}',path.name): continue
+        try: out[path.name]=path.read_text(encoding='utf-8',errors='replace')
+        except OSError: continue
     return out
 
 
@@ -347,6 +351,15 @@ def collect(files: dict[str, str], instance: str, tainacan: bool) -> list[Row]:
     rows = koha_task_rows(files.get(TASKS_FILE, ""), instance)
     rows += platform_rows(files.get(PLATFORM_FILE, ""))
     rows += set_rows(files.get(SET_FILE, ""))
+    for name,text in files.items():
+        if re.fullmatch(r'koha-nexus-plan-[a-z][a-z0-9-]{0,31}',name):
+            match=re.search(r'^# Members=((?:koha,)?(?:tainacan,)?dspace)$',text,re.M)
+            if not match: continue
+            selected=match.group(1).replace(',','+')
+            for on,sched,cmd in _lines(text):
+                if '--task dspace operations plan-run --confirm' not in cmd:continue
+                rows.append(Row(selected,BACKUP,t('Encrypted platform backup')+' · '+name.removeprefix('koha-nexus-plan-'),
+                    describe(sched),'on' if on else 'off',name,sched,hide_secrets(cmd),screen('backups'),'operations:'+name))
     for name in SYSTEM_FILES:
         if name in files:
             rows += system_rows(name, files[name])
@@ -406,6 +419,26 @@ def set_last_run(value: str) -> tuple[str, str] | None:
     return f"{bits[0][:16]} · {text}", state
 
 
+def operation_last_runs(data: dict) -> dict[str, tuple[str, str]]:
+    """The DSpace/platform-set plans' own private history (operations plans):
+    keyed like their cron rows. A partial capture, failed copy or failed
+    retention is never shown as OK."""
+    import time
+    out: dict[str, tuple[str, str]] = {}
+    for plan in (data or {}).get("plans", []) or []:
+        last = plan.get("last") or {}
+        name = plan.get("id")
+        stamp = last.get("finished") or last.get("started")
+        if not isinstance(name, str) or not isinstance(stamp, (int, float)):
+            continue
+        good = (last.get("capture") == "ok" and last.get("copy") in ("ok", "not-requested")
+                and last.get("retention") == "ok")
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(stamp))
+        out["operations:koha-nexus-plan-" + name] = (f"{when} · " + (t("OK") if good else t("FAILED")),
+                                                     "ok" if good else "bad")
+    return out
+
+
 def last_runs(backup: dict, plans, history, tainacan_backups, joint: str = "") -> dict[str, tuple[str, str]]:
     """The runs a reliable record says happened: the nightly SQL backup's
     log, each cloud backup's lines in the backup logs, the newest complete
@@ -443,9 +476,9 @@ def last_runs(backup: dict, plans, history, tainacan_backups, joint: str = "") -
     return out
 
 
-def platforms_offered(koha: bool, tainacan: bool) -> list[str]:
+def platforms_offered(koha: bool, tainacan: bool, dspace: bool = False) -> list[str]:
     """The platform filter's choices (besides All)."""
-    return [p for p, on in ((KOHA, koha), (TAINACAN, tainacan), (SERVER, True)) if on]
+    return [p for p, on in ((KOHA, koha), (TAINACAN, tainacan), ("dspace", dspace), (SERVER, True)) if on]
 
 
 def shown(rows: list[Row], platform: str = "", kind: str = "") -> list[Row]:

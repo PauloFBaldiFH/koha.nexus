@@ -13,6 +13,7 @@ export interface NameOptions {
   staffSuffix: string;
   /** Tainacan's address (TAINACAN_SUFFIX); "" = no such address. */
   collectionSuffix?: string;
+  repositorySuffix?: string;
   allowBlocked?: boolean;
 }
 
@@ -36,14 +37,16 @@ export function hostnamesFor(slug: string, env: HostEnv): Hostnames {
 export interface Services {
   koha: boolean;
   tainacan: boolean;
+  dspace?: boolean;
 }
 
-export const SERVICE_NAMES = ["koha", "tainacan"] as const;
+export const SERVICE_NAMES = ["koha", "tainacan", "dspace"] as const;
 
 /** "koha", "tainacan", "koha,tainacan" (the column); anything else counts as Koha only. */
 export function parseServices(text: string | null | undefined): Services {
   const parts = new Set((text ?? "koha").split(",").map((x) => x.trim()));
   const s = { koha: parts.has("koha"), tainacan: parts.has("tainacan") };
+  if (parts.has("dspace")) return { ...s, dspace:true };
   return s.koha || s.tainacan ? s : { koha: true, tainacan: false };
 }
 
@@ -52,6 +55,7 @@ export function servicesText(s: Services): string {
 }
 
 export interface CollectionEnv extends HostEnv {
+  DSPACE_SUFFIX?: string;
   TAINACAN_SUFFIX?: string;
 }
 
@@ -67,13 +71,13 @@ export function collectionHostname(slug: string, env: CollectionEnv): string {
 }
 
 /** Every name of a library, published or not (the steps keep or drop each by service). */
-export function libraryHosts(slug: string, env: CollectionEnv): Hostnames & { collection: string } {
-  return { ...hostnamesFor(slug, env), collection: collectionHostname(slug, env) };
+export function libraryHosts(slug: string, env: CollectionEnv): Hostnames & { collection: string; repository: string } {
+  return { ...hostnamesFor(slug, env), collection: collectionHostname(slug, env), repository: repositoryHostname(slug,env) };
 }
 
 /** The names a library publishes, by service (the API answers and the DNS records). */
-export function publishedHostnames(slug: string, env: CollectionEnv, s: Services): Partial<Hostnames> & { collection?: string } {
-  return { ...(s.koha ? hostnamesFor(slug, env) : {}), ...(s.tainacan ? { collection: collectionHostname(slug, env) } : {}) };
+export function publishedHostnames(slug: string, env: CollectionEnv, s: Services): Partial<Hostnames> & { collection?: string; repository?:string } {
+  return { ...(s.koha ? hostnamesFor(slug, env) : {}), ...(s.tainacan ? { collection: collectionHostname(slug, env) } : {}), ...(s.dspace ? {repository:repositoryHostname(slug,env)} : {}) };
 }
 
 /** True when the collection label of `slug` still fits one DNS label. */
@@ -85,8 +89,8 @@ const DNS_LABEL_MAX = 63;
 export const MIN_SLUG_LENGTH = 3;
 
 /** Longest slug whose longest label (prefix + slug + a suffix) still fits one DNS label. */
-export function maxSlugLength(prefix: string, staffSuffix: string, collectionSuffix = ""): number {
-  return DNS_LABEL_MAX - prefix.length - Math.max(staffSuffix.length, collectionSuffix.length);
+export function maxSlugLength(prefix: string, staffSuffix: string, collectionSuffix = "", repositorySuffix = ""): number {
+  return DNS_LABEL_MAX - prefix.length - Math.max(staffSuffix.length, collectionSuffix.length, repositorySuffix.length);
 }
 
 /** "Biblioteca Pública de Palotina" -> "biblioteca-publica-de-palotina". */
@@ -174,7 +178,7 @@ export function foldLookalikes(slug: string): string[] {
 export type SlugCheck = { ok: true } | { ok: false; reason: string };
 
 export function validateSlug(slug: string, opts: NameOptions): SlugCheck {
-  const max = maxSlugLength(opts.prefix, opts.staffSuffix, opts.collectionSuffix ?? "");
+  const max = maxSlugLength(opts.prefix, opts.staffSuffix, opts.collectionSuffix ?? "", opts.repositorySuffix ?? "");
   if (slug.length < MIN_SLUG_LENGTH) return { ok: false, reason: `use at least ${MIN_SLUG_LENGTH} characters` };
   if (slug.length > max) return { ok: false, reason: `use at most ${max} characters` };
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) {
@@ -190,6 +194,7 @@ export function validateSlug(slug: string, opts: NameOptions): SlugCheck {
   if (opts.collectionSuffix && slug.endsWith(opts.collectionSuffix)) {
     return { ok: false, reason: `names ending in "${opts.collectionSuffix}" are reserved for collection addresses` };
   }
+  if (opts.repositorySuffix && slug.endsWith(opts.repositorySuffix)) return {ok:false,reason:"names ending in the repository suffix are reserved"};
   if (RESERVED.has(slug)) return { ok: false, reason: "reserved name" };
   if (!opts.allowBlocked) {
     for (const v of foldLookalikes(slug)) {
@@ -198,4 +203,14 @@ export function validateSlug(slug: string, opts: NameOptions): SlugCheck {
     }
   }
   return { ok: true };
+}
+
+
+export const REPOSITORY_SUFFIX = "-repositorio";
+export const DSPACE_ORIGIN_PORT = 18102;
+export function repositoryHostname(slug:string,env:CollectionEnv):string {
+  return `${env.NAME_PREFIX}${slug}${env.DSPACE_SUFFIX ?? REPOSITORY_SUFFIX}.${env.ZONE_NAME}`;
+}
+export function repositoryFits(slug:string,env:CollectionEnv):boolean {
+  return `${env.NAME_PREFIX}${slug}${env.DSPACE_SUFFIX ?? REPOSITORY_SUFFIX}`.length <= DNS_LABEL_MAX;
 }

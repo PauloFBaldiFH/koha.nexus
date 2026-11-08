@@ -95,7 +95,7 @@ class SchedulesView(SectionView):
 
     # --- filters ----------------------------------------------------------
     def _platform_choices(self) -> None:
-        offered = schedules.platforms_offered(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"))
+        offered = schedules.platforms_offered(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"), self.app.platform_ready("dspace"))
         if self.platform not in offered:
             self.platform = ""
         select = self.query_one("#sc-platform", Select)
@@ -177,7 +177,14 @@ class SchedulesView(SectionView):
                     tn = platforms.backup_from_results(out.results)
             except Exception:  # noqa: BLE001
                 pass
-        return schedules.last_runs(backup, plans, history, tn, joint)
+        last = schedules.last_runs(backup, plans, history, tn, joint)
+        if self.app.platform_ready("dspace") and bridge.has_task("dspace-panel"):
+            try:
+                from ..dspace import payload
+                last.update(schedules.operation_last_runs(payload(await bridge.task("dspace-panel", "operations", "plans"))))
+            except Exception:  # noqa: BLE001 - the rows then say "No run recorded"
+                pass
+        return last
 
     def _draw(self) -> None:
         box = self.query_one("#sc-rows", Vertical)

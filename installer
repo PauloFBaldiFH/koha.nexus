@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.183"
+PANEL_VERSION=" 1.5.184"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9364,6 +9364,7 @@ broker_wait_approval() {
 broker_new_request() {
     local inst email name body st services=""
     [ "${1:-}" = tainacan ] && services=',"services":["tainacan"]'
+    [ "${1:-}" = dspace ] && services=',"services":["dspace"]'
     inst=$(ui_input "$(t "Free address")" "$(t "Name of the library or institution:")") || return 1
     inst=$(printf '%s' "$inst" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     [ ${#inst} -ge 3 ] || { msg_error "" "$(t "Type the name of the library (at least 3 characters).")" 8 66; return 1; }
@@ -9417,7 +9418,7 @@ broker_wait_request() {
 # After approval: registers this server's key, waits for the tunnel and
 # installs it.
 broker_complete_request() {
-    local device pub lib job opac staff collection st i
+    local device pub lib job opac staff collection repository st i
     broker_ensure_key || { msg_error "" "$(t "Could not create the key of this server (openssl).")" 8 66; return 1; }
     pub=$(broker_public_key)
     device=$(kv_get "$BROKER_ENROLL" DEVICE_CODE)
@@ -9435,9 +9436,10 @@ broker_complete_request() {
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
     collection=$(json_field "$BROKER_BODY" hostnames collection)
+    repository=$(json_field "$BROKER_BODY" hostnames repository)
     broker_cleanup
     kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker BROKER_URL "$KEI_BROKER_URL" LIBRARY_ID "$lib" \
-        OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" TAINACAN_HOST "$collection" || return 1
+        OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE no JOB_ID "$job" TAINACAN_HOST "$collection" DSPACE_HOST "$repository" || return 1
     rm -f "$BROKER_ENROLL"
     log "broker: library $lib registered (${opac:-$collection})"
 
@@ -9526,6 +9528,7 @@ EOF
 
     # An address of the collection only: no catalog to point Koha at.
     if [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ]; then
+        if [ -n "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ]; then kei_dspace_free_publish || return 1; fi
         kei_tainacan_free_publish
         return
     fi
@@ -9534,6 +9537,7 @@ EOF
     set_koha_public_urls "https://${opac}" "$staff_url"
     # The collection of the same library follows (a recovery file on a new server).
     kei_tainacan_free_publish quiet || true
+    [ -z "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ] || kei_dspace_free_publish || return 1
 
     display_explanation "Checking the address from the internet..."
     if tunnel_check_url "https://${opac}"; then
@@ -9702,6 +9706,7 @@ broker_save_recovery() {
     local opac file
     opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
     [ -n "$opac" ] || opac=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
+    [ -n "$opac" ] || opac=$(tunnel_conf_get DSPACE_HOST 2>/dev/null)
     [ -n "$opac" ] && [ -s "$BROKER_KEY" ] || {
         msg_error "" "$(t "This server has no free address to save.")" 8 60
         return 1
@@ -9724,7 +9729,7 @@ broker_save_recovery() {
 
 # Reads a recovery file and connects this server under that address.
 broker_restore_address() {
-    local file url lib key bak_conf="" bak_key="" opac staff collection remote listed
+    local file url lib key bak_conf="" bak_key="" opac staff collection repository remote listed
     file=$(ui_input "$(t "Free address")" "$(t "Path of the recovery file (koha-address-....key). You can drag the file onto this window:")") || return 1
     file=$(clean_path "$file")
     if [ ! -r "$file" ]; then
@@ -9770,13 +9775,14 @@ broker_restore_address() {
     opac=$(json_field "$BROKER_BODY" hostnames opac)
     staff=$(json_field "$BROKER_BODY" hostnames staff)
     collection=$(json_field "$BROKER_BODY" hostnames collection)
+    repository=$(json_field "$BROKER_BODY" hostnames repository)
     remote=no listed=no
     [ "$(json_field "$BROKER_BODY" staff_remote_access)" = "true" ] && remote=yes
     [ "$(json_field "$BROKER_BODY" public_listing)" = "true" ] && listed=yes
     broker_cleanup
     rm -f "$bak_conf" "$bak_key"
     kv_write "$TUNNEL_CONF" 644 TUNNEL_MODE broker OPAC_HOST "$opac" STAFF_HOST "$staff" STAFF_REMOTE "$remote" \
-        PUBLIC_LISTING "$listed" TAINACAN_HOST "$collection" || return 1
+        PUBLIC_LISTING "$listed" TAINACAN_HOST "$collection" DSPACE_HOST "$repository" || return 1
     log "broker: address ${opac:-$collection} restored from a recovery file (library $lib)"
 
     # A new token: the server that had the address before can no longer connect.
@@ -9837,6 +9843,10 @@ function_broker_staff_access() {
 }
 
 function_broker_leave() {
+    if [ -n "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ]; then
+        msg_error "$(t "Free address")" "$(t "DSpace still uses this shared tunnel. Release only its repository address in the DSpace menu first; no other address was changed.")" 12 76
+        return 1
+    fi
     local opac collection note=""
     opac=$(tunnel_conf_get OPAC_HOST)
     collection=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
@@ -12438,7 +12448,8 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="efa17e2f55783ff9621f40027b66696c418e4d20b68374cd29379639778d0e50"
+KEI_DSPACE_OPERATIONS_SHA="b9a4b980d6f2a5f2e9ef2c35d883ae170bc92cf0f3983ae77d2cfbdecc13cac2"
+KEI_DSPACE_RUNTIME_SHA="3459ce67f12b23758bcf537cb2b47dbeabf95c9151b68ad7fb48128616166a09"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
@@ -12448,9 +12459,9 @@ kei_dspace_runtime() (
     command -v python3 >/dev/null 2>&1 || { echo 'DSpace requires Python 3.' >&2; return 3; }
     tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
     trap 'rm -rf "$tmp"' EXIT
-    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA"
-    for file in runtime.py release.json backup.py release-r3.json; do
-        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; esac
+    cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA-${KEI_DSPACE_OPERATIONS_SHA:0:16}"
+    for file in runtime.py release.json backup.py release-r3.json operations.py; do
+        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; operations.py) expected="$KEI_DSPACE_OPERATIONS_SHA" ;; esac
         src="${_SCRIPT_DIR}/platforms/dspace/$file"
         if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
             cp "$src" "$tmp/$file" || return 1
@@ -12471,7 +12482,7 @@ kei_dspace_runtime() (
     # offline even when config.sh has no checkout next to it.
     if { [ "$install:$confirm" = 1:1 ] || [ "${1:-}" = cache ]; } && [ "$(id -u)" = 0 ]; then
         mkdir -p "$cache" && chmod 700 "$cache" || return 1
-        for file in runtime.py release.json backup.py release-r3.json; do
+        for file in runtime.py release.json backup.py release-r3.json operations.py; do
             cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
                 && mv -f "$cache/$file.new" "$cache/$file" || return 1
         done
@@ -12564,6 +12575,45 @@ kei_dspace_resource() {
                 *) return 2 ;;
             esac ;;
         audit) kei_docker_audit dspace ;;
+        publication-plan)
+            read -r mode _ < <(kei_proxy_detect)
+            [ "$mode" != none ] || return 3
+            printf '%s\n' "$mode" ;;
+        release-web) kei_platform_release_web dspace ;;
+        forget-volume)
+            [[ "${1:-}" =~ ^kn-dspace(-rt-[0-9a-f]{20})?-(postgres|solr|discovery-state|assetstore|log|var|upload|reports|exports|imports|handle-server)$ ]] || return 2
+            kei_owned_del docker-volume "$1" dspace ;;
+        plan-cron)
+            local name="${1:-}" when="${2:-}" members="${3:-}" cronfile h m q oldsha newsha
+            [[ "$name" =~ ^[a-z][a-z0-9-]{0,31}$ ]] || return 2
+            [[ "$members" =~ ^(koha,)?(tainacan,)?dspace$ ]] || return 2
+            cronfile="/etc/cron.d/koha-nexus-plan-$name"
+            if [ -e "$cronfile" ] || [ -L "$cronfile" ]; then
+                [ -f "$cronfile" ] && [ ! -L "$cronfile" ] || return 3
+                oldsha=$(kei_owned_sha cron-file "${cronfile##*/}" dspace)
+                [ -n "$oldsha" ] && [ "$oldsha" = "$(sha256sum "$cronfile" | cut -d' ' -f1)" ] || { echo 'The cron file is foreign or was changed manually; it was preserved.' >&2; return 3; }
+            fi
+            if [ -n "$when" ]; then
+                [[ "$when" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || return 2
+                command -v cron >/dev/null 2>&1 || apt-get install -y cron >/dev/null || return 1
+                h=${when%:*}; m=${when#*:}
+                [[ "$KEI_PANEL_COMMAND" =~ ^/[A-Za-z0-9_./-]+$ ]] || return 2
+                # cron runs this exact command: never schedule a plan that would
+                # fail every night with "command not found" (exit 127).
+                [ -f "$KEI_PANEL_COMMAND" ] && [ ! -L "$KEI_PANEL_COMMAND" ] && [ -x "$KEI_PANEL_COMMAND" ] \
+                    || { echo "The panel command $KEI_PANEL_COMMAND is not installed; open the panel once with sudo config.sh, then save the plan again." >&2; return 3; }
+                tmp=$(mktemp) || return 1
+                printf '# Managed by Koha.Nexus: backup plan %s\n# Members=%s\nSHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' "$name" "$members" > "$tmp"
+                printf '%d %d * * * root KEI_DSPACE_OPERATIONS_DATA=%s %s --task dspace operations plan-run --confirm >/dev/null 2>&1\n' "$((10#$m))" "$((10#$h))" "'{\"id\":\"$name\"}'" "$KEI_PANEL_COMMAND" >> "$tmp"
+                install -o root -g root -m 644 "$tmp" "$cronfile"; rc=$?; rm -f "$tmp"; [ "$rc" = 0 ] || return "$rc"
+                newsha=$(sha256sum "$cronfile" | cut -d' ' -f1)
+                for q in ${members//,/ }; do kei_owned_add cron-file "${cronfile##*/}" "$q" no "$newsha" || return 1; done
+            else
+                # Only a file recorded as ours may be removed.
+                [ ! -e "$cronfile" ] || { kei_owned_list cron-file dspace | cut -f2 | grep -Fxq "${cronfile##*/}" && rm -f "$cronfile"; } || return 3
+                for q in koha tainacan dspace; do kei_owned_del cron-file "${cronfile##*/}" "$q"; done
+            fi ;;
+
         proxy)
             read -r mode _ < <(kei_proxy_detect)
             if [ "$mode" = external ]; then
@@ -12573,14 +12623,20 @@ kei_dspace_resource() {
             command -v apache2ctl >/dev/null 2>&1 || return 3
             tmp=$(mktemp) || return 1
             kei_dspace_runtime proxy-config > "$tmp" || { rm -f "$tmp"; return 1; }
-            for action in proxy proxy_http headers; do
+            local modules="proxy proxy_http headers" loopback=no
+            grep -q 'SSLEngine on' "$tmp" && modules="$modules ssl"
+            grep -q '^Listen 127.0.0.1:' "$tmp" && loopback=yes
+            for action in $modules; do
                 kei_proxy_module_use dspace "$action" || { rm -f "$tmp"; return 1; }
             done
             kei_proxy_apply_site dspace dspace "$tmp"; rc=$?
-            port=$(awk '/^Listen / { print $2 }' "$tmp")
+            port=$(awk '/^<VirtualHost / {sub(/^.*:/,"",$2);gsub(/>/,"",$2);print $2}' "$tmp")
             rm -f "$tmp"
             [ "$rc" = 0 ] || return "$rc"
-            kei_proxy_port_open dspace "${port:-80}" || return 1
+            # A tunnel origin is loopback-only and needs no public UFW rule.
+            if [ "$loopback" != yes ]; then
+                kei_proxy_port_open dspace "${port:-80}" || return 1
+            fi
             printf 'apache-configured\n' ;;
         *) return 2 ;;
     esac
@@ -13880,8 +13936,13 @@ kei_tainacan_free_on() {
     fi
     if tunnel_mode_is broker; then
         opac=$(tunnel_conf_get OPAC_HOST)
-        preview="${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
-        prompt_yes_no "$(t "Free address")" "$(t "The collection gets the address https://\$preview, in the same tunnel as the catalog (https://\$opac). WordPress's links change to it; the collections, items and accounts do not change.")\n\n$(t "Continue?")" 13 76 || return 0
+        if [ -n "$opac" ]; then preview="${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
+        else
+            local repository label
+            repository=$(tunnel_conf_get DSPACE_HOST 2>/dev/null); label=${repository%%.*}; label=${label%-repositorio}
+            preview="${label}${KEI_TN_FREE_SUFFIX}.${repository#*.}"
+        fi
+        prompt_yes_no "$(t "Free address")" "$(t "The collection gets the address https://\$preview, in the existing shared tunnel. WordPress's links change to it; the collections, items and accounts do not change.")\n\n$(t "Continue?")" 13 76 || return 0
         clear
         display_explanation "Adding the collection to the free address..."
         if ! broker_request PUT /v1/services yes '{"tainacan":true}'; then
@@ -13925,8 +13986,8 @@ kei_tainacan_free_off() {
     host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
     [ -n "$host" ] || { msg_info "$(t "Free address")" "$(t "The collection does not use a free address.")" 8 60; return 0; }
     opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
-    if [ -n "$opac" ]; then
-        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network. The catalog keeps its address (https://\$opac).")\n\n$(t "Continue?")" 12 76 defaultno || return 0
+    if [ -n "$opac" ] || [ -n "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ]; then
+        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network. Other platform addresses and the shared tunnel remain.")\n\n$(t "Continue?")" 12 76 defaultno || return 0
         clear
         display_explanation "Releasing the address..."
         if ! broker_request PUT /v1/services yes '{"tainacan":false}'; then
@@ -13966,6 +14027,125 @@ kei_tainacan_free() {
         off) kei_tainacan_free_off ;;
         *)   return 2 ;;
     esac
+}
+
+# DSpace publication uses its own loopback origin, never the Koha default vhost.
+# No request is sent before discovery says this broker has migration 0004 enabled.
+kei_dspace_free_check() {
+    if ! broker_resolves || ! broker_request GET /v1/capabilities no; then broker_cleanup; return 1; fi
+    local good=1
+    if python3 -I - "$BROKER_BODY" <<'PYDS'
+import json,sys
+x=json.load(open(sys.argv[1]))
+assert 'dspace' in x.get('services',[]) and x.get('repository_suffix')=='-repositorio' and x.get('repository_origin_port')==18102
+PYDS
+    then good=0; fi
+    broker_cleanup
+    return "$good"
+}
+
+kei_dspace_free_publish() {
+    local host phrase data out
+    host=$(tunnel_conf_get DSPACE_HOST 2>/dev/null)
+    [[ "$host" =~ ^[a-z0-9][a-z0-9.-]+$ ]] || return 2
+    # A shared recovery file can reserve this name before DSpace is installed.
+    # Reconnecting Koha/Tainacan must not attempt to configure an absent repository.
+    [ -f "$KEI_DSPACE_DIR/state.json" ] || return 0
+    # No passwords or recovery phrases in arguments, status, tunnel.conf or logs.
+    phrase=$(ui_input "DSpace" "$(t "Recovery phrase for the safety backup (required before changing the address):")" "" password) || return 1
+    [ -n "$phrase" ] || return 1
+    data=$(printf '{"url":"https://%s","mode":"tunnel","origin_port":18102}' "$host")
+    out=$(KEI_DSPACE_OPERATIONS_DATA="$data" KEI_BACKUP_PHRASE="$phrase" kei_dspace_runtime operations address --confirm) || { unset phrase; return 1; }
+    unset phrase
+    kei_owned_add ingress "$host" dspace no - 'http://127.0.0.1:18102' || return 1
+    msg_info "DSpace" "$(t "Repository address configured:") https://$host
+$(t "Check the external address before sharing it; tunnel and DNS may take time.")" 12 76
+}
+
+kei_dspace_free_off() {
+    local host url phrase data sharing local_ip local_ifc
+    host=$(tunnel_conf_get DSPACE_HOST 2>/dev/null)
+    [ -n "$host" ] || return 0
+    prompt_yes_no "DSpace" "$(t "Release only the DSpace free address? Koha and Tainacan keep their addresses and shared tunnel. The repository returns to the local network.")" 12 76 defaultno || return 0
+    read -r local_ip local_ifc < <(kei_lan_address)
+    if ! lan_ip_usable "$local_ip" || [ "$local_ifc" = - ]; then
+        msg_error "DSpace" "$(t "A local network address could not be chosen safely. Configure the repository address manually before releasing its free address.")" 12 76
+        return 3
+    fi
+    url="http://$local_ip:8100"
+    data=$(printf '{"url":"%s","mode":"apache"}' "$url")
+    phrase=$(ui_input "DSpace" "$(t "Recovery phrase for the verified safety backup:")" "" password) || return 1
+    [ -n "$phrase" ] || return 1
+    KEI_DSPACE_OPERATIONS_DATA="$data" KEI_BACKUP_PHRASE="$phrase" kei_dspace_runtime operations address --confirm || { unset phrase; return 1; }
+    unset phrase
+    if ! broker_request DELETE /v1/services/dspace yes; then
+        if [ "$BROKER_STATUS" = 401 ] && [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ] && [ -z "$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)" ]; then
+            # A retry after the sole library was deleted has no valid broker identity.
+            # Only this stale standalone client is cleared; no remote shared library is deleted.
+            sharing=alone
+        else
+            msg_error "DSpace" "$(t "The repository is local again, but the remote address was not released. Check the shared address credentials and retry; no shared library was deleted.")" 12 76
+            broker_cleanup; return 1
+        fi
+    else
+        sharing=$(python3 -I - "$BROKER_BODY" <<'PYSHARE'
+import json,sys
+x=json.load(open(sys.argv[1]));services=x.get('services')
+if not isinstance(services,str) or (not services and not x.get('job_id')):sys.exit(1)
+print('shared' if services else 'alone')
+PYSHARE
+        ) || { broker_cleanup; return 3; }
+    fi
+    broker_cleanup
+    kv_write "$TUNNEL_CONF" 644 DSPACE_HOST "" || return 1
+    kei_owned_del ingress "$host" dspace
+    if [ "$sharing" = alone ] && [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ] && [ -z "$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)" ]; then
+        # No service can attach remotely after the serialized deprovisioning transition.
+        # Stop/remove only the broker unit we generated, never an unrelated cloudflared unit.
+        if [ -f "$CLOUDFLARED_UNIT" ] && grep -Fqx "EnvironmentFile=$BROKER_ENV" "$CLOUDFLARED_UNIT"; then
+            systemctl disable --now cloudflared >/dev/null 2>&1 || true
+            rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV"
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        rm -f "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
+    fi
+    msg_info "DSpace" "$(t "DSpace now uses the local network. Other platforms and their tunnel were preserved.")" 10 76
+}
+
+kei_dspace_free() {
+    local host data
+    if [ "${1:-}" = off ]; then kei_dspace_free_off; return; fi
+    [ "${1:-}" = on ] || return 2
+    [ -f "$KEI_DSPACE_DIR/state.json" ] || return 3
+    local web_mode
+    read -r web_mode _ < <(kei_proxy_detect)
+    if [ "$web_mode" = external ]; then
+        msg_error "DSpace" "$(t "The free-address assistant currently requires the managed Apache proxy. Your existing web server was preserved. Use the institutional address/external HTTPS proxy option for now.")" 13 76
+        return 3
+    fi
+    if ! kei_dspace_free_check; then
+        msg_error "DSpace" "$(t "The address service does not offer repository addresses yet. Deploy the reviewed broker and migration 0004 first; nothing was changed.")" 12 76
+        return 3
+    fi
+    prompt_yes_no "DSpace" "$(t "Publish DSpace at a separate free repository address? The existing catalog and collection keep their addresses. A backup key and recovery phrase are required to apply the new URL. Continue?")" 13 76 defaultno || return 0
+    if tunnel_mode_is broker; then
+        if ! broker_request PUT /v1/services yes '{"dspace":true}'; then
+            msg_error "DSpace" "$(broker_error)" 12 76; broker_cleanup; return 1
+        fi
+        host=$(json_field "$BROKER_BODY" hostnames repository); broker_cleanup
+        [[ "$host" =~ ^[a-z0-9][a-z0-9.-]+$ ]] || return 3
+        kv_write "$TUNNEL_CONF" 644 DSPACE_HOST "$host" || return 1
+        # A failure is resumable by running this same task; never delete a shared library.
+        kei_dspace_free_publish
+    elif is_koha_installed || [ -f /etc/cloudflared/config.yml ]; then
+        msg_error "DSpace" "$(t "This server already has another publication method. Configure its shared free address first, or use an institutional HTTPS proxy.")" 12 76
+        return 3
+    elif [ -f "$BROKER_ENROLL" ]; then
+        broker_follow_request
+    else
+        broker_new_request dspace || return 1
+        if [ "$(kv_get "$BROKER_ENROLL" STATUS)" = approved ]; then broker_complete_request; else broker_follow_request; fi
+    fi
 }
 
 # kei_platform_release_web PLATFORM: the web part of kei_platform_release
@@ -15727,7 +15907,7 @@ kei_backup_status() {
 KEI_SET_KIND="koha-nexus-set"
 KEI_SET_FORMAT=1
 # The members a set may hold (anything else is refused before extracting).
-KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
+KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
 
 # kei_set_platforms: the platforms of this server a set can hold.
 kei_set_platforms() {
@@ -15865,6 +16045,9 @@ kei_set_backup() {
     local dest="${1:-}" want="${2:-}" mode="${3:-}" work rc why
     [ -n "$dest" ] && [ -d "$dest" ] && [ -w "$dest" ] || { echo "$(t "The folder does not exist or cannot be written:") $dest" >&2; return 2; }
     case "$mode" in ""|no-secrets) ;; *) return 2 ;; esac
+    case " ${want//,/ } " in *" dspace "*)
+        _kei_bk_has_key || { echo 'needs=key'; echo 'DSpace requires the shared backup encryption key.' >&2; return 7; } ;;
+    esac
     if [ "$mode" != no-secrets ] && why=$(kei_set_needs_choice "${want//,/ }"); then
         echo "$why" >&2
         echo "needs=key"
@@ -15883,10 +16066,11 @@ _kei_set_make() {
     want=${want//,/ }
     [ -n "$want" ] || { echo "$(t "No platform is installed: there is nothing to back up.")" >&2; return 3; }
     for p in $want; do
-        case "$p" in koha|tainacan) ;; *) echo "$(t "Unknown platform.")" >&2; return 2 ;; esac
+        case "$p" in koha|tainacan|dspace) ;; *) echo "$(t "Unknown platform.")" >&2; return 2 ;; esac
     done
     ts=$(date '+%Y%m%d-%H%M%S')
     mkdir -m 700 "$work/koha" "$work/tainacan" 2>/dev/null
+    case " $want " in *" dspace "*) mkdir -m 700 "$work/dspace" || return 1 ;; esac
     for p in $want; do
         t0=$(date '+%Y-%m-%d %H:%M:%S'); err=""; file=""; bytes=0; sha=""; secrets=none; recov=data-only
         declare -F kei_emit >/dev/null && [ -n "${KEI_TASK:-}" ] && kei_emit note "$(n="$p"; t "Backing up \${n}...")"
@@ -15930,10 +16114,21 @@ _kei_set_make() {
                     err=${err:-$(t "The Tainacan backup failed.")}
                 fi
                 rm -f "$work/.tn.err" ;;
+            dspace)
+                # The adapter holds the same platform lock as lifecycle and recovery.
+                # Its entire PostgreSQL/files/Solr package is already encrypted.
+                if out=$(kei_dspace_runtime backup-create --confirm 2>"$work/.ds.err"); then
+                    out=$(printf '%s' "$out" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["package"])') || out=""
+                    if [ -f "$out" ] && [ ! -L "$out" ] && cp -- "$out" "$work/dspace/"; then
+                        file="dspace/${out##*/}"; secrets=gpg; recov=full
+                    else err="The encrypted DSpace package could not be copied."; fi
+                else err="The DSpace backup failed; inspect its private diagnostic."; fi
+                [ -n "$file" ] || rm -f "$work/dspace/"*
+                rm -f "$work/.ds.err" ;;
         esac
         t1=$(date '+%Y-%m-%d %H:%M:%S')
         if [ -n "$file" ]; then
-            if [ "$p" = koha ]; then bytes=$(_kei_bk_size "$work/$file"); sha=$(_kei_bk_sha "$work/$file")
+            if [ "$p" != tainacan ]; then bytes=$(_kei_bk_size "$work/$file"); sha=$(_kei_bk_sha "$work/$file")
             else bytes=$(du -sb "$work/$file" | awk '{ print $1 }'); sha=$(_kei_bk_sha "$work/${file}manifest.json"); fi
             printf 'platform=%s\tok\t%s\t%s\t%s\t%s\n' "$p" "$t0" "$t1" "$file" "$recov"
         else
@@ -15942,7 +16137,7 @@ _kei_set_make() {
         fi
         rows+=("$p"$'\t'"$([ -n "$file" ] && echo ok || echo failed)"$'\t'"${err//$'\t'/ }"$'\t'"$file"$'\t'"$t0"$'\t'"$t1"$'\t'"$bytes"$'\t'"$sha"$'\t'"$secrets"$'\t'"$recov")
     done
-    if [ "$rc" != 0 ] && ! grep -q . < <(find "$work/koha" "$work/tainacan" -mindepth 1 -maxdepth 1 2>/dev/null); then
+    if [ "$rc" != 0 ] && ! grep -q . < <(find "$work/koha" "$work/tainacan" "$work/dspace" -mindepth 1 -maxdepth 1 2>/dev/null); then
         echo "$(t "No platform could be backed up: no set was written.")" >&2
         return 9
     fi
@@ -15956,7 +16151,7 @@ for line in sys.stdin:
                  "bytes": int(size or 0), "sha256": sha, "secrets": secrets,
                  "recoverability": recov if result == "ok" else "none"})
 complete = all(r["result"] == "ok" for r in rows)
-json.dump({"kind": kind, "format": int(fmt), "id": str(uuid.uuid4()), "created": created, "host": host,
+json.dump({"kind": kind, "format": 2 if any(r["id"] == "dspace" for r in rows) else int(fmt), "id": str(uuid.uuid4()), "created": created, "host": host,
            "panel_version": version, "complete": complete,
            "recoverability": "full" if complete and all(r["recoverability"] == "full" for r in rows) else "partial",
            "consistency": "per-platform",
@@ -15967,14 +16162,20 @@ print()' "$KEI_SET_KIND" "$KEI_SET_FORMAT" "$(hostname 2>/dev/null)" "${PANEL_VE
     # Only the files of the package (a leftover work file of the engine is not one).
     find "$work/tainacan" -mindepth 2 -maxdepth 2 -name '.*' -exec rm -rf {} + 2>/dev/null
     ( cd "$work" && find . -type f ! -path ./SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs -r -d '\n' sha256sum > SHA256SUMS ) || return 1
-    name="knx-set-$ts$([ "$rc" = 0 ] || echo -partial).tar"
+    local -a archive_parts=(koha tainacan)
+    local unique=""
+    if [ -d "$work/dspace" ]; then
+        archive_parts+=(dspace)
+        unique="-$(python3 -I -c 'import secrets;print(secrets.token_hex(4))')"
+    fi
+    name="knx-set-$ts$unique$([ "$rc" = 0 ] || echo -partial).tar"
     out="${dest%/}/$name"
     bytes=$(du -sb "$work" | awk '{ print $1 }')
     if [ "$(df -PB1 "$dest" | awk 'NR == 2 { print $4 }')" -lt "$((bytes + bytes / 20 + 1048576))" ]; then
         echo "$(d="$dest"; t "Not enough free disk in \${d} to write the set: the backups of each platform stay in their own folders.")" >&2
         return 5
     fi
-    ( umask 077; tar -C "$work" --owner=0 --group=0 --numeric-owner -cf "$out.part" manifest.json SHA256SUMS koha tainacan ) \
+    ( umask 077; tar -C "$work" --owner=0 --group=0 --numeric-owner -cf "$out.part" manifest.json SHA256SUMS "${archive_parts[@]}" ) \
         && mv -f "$out.part" "$out" || { rm -f "$out.part"; echo "$(t "The set could not be written.")" >&2; return 1; }
     log "backup set: $out"
     printf 'size=%s\ncomplete=%s\nrecoverability=%s\nfile=%s\n' "$(du -h "$out" | cut -f1)" "$([ "$rc" = 0 ] && echo yes || echo no)" \
@@ -16060,6 +16261,7 @@ if len(plain) < 262 or plain[257:262] != b"ustar":
 try:
     tf = tarfile.open(path, "r:*")
     names = []
+    seen = set()
     total = 0
     for m in tf:
         n = m.name[2:] if m.name.startswith("./") else m.name
@@ -16069,6 +16271,9 @@ try:
         total += m.size
         if free and total > free:
             out("kind", "unsafe"); out("why", "space\t"); sys.exit(0)
+        if n in seen or "\\" in n or "//" in n:
+            out("kind", "unsafe"); out("why", "duplicate-or-ambiguous-entry"); sys.exit(0)
+        seen.add(n)
         names.append((n, m))
 except Exception as e:
     out("kind", "unknown"); out("why", "unreadable\t%s" % e); sys.exit(0)
@@ -16102,17 +16307,21 @@ try:
     sums = read("SHA256SUMS").decode()
 except Exception as e:
     out("kind", "unsafe"); out("why", "manifest\t%s" % e); sys.exit(0)
-ok = isinstance(man, dict) and man.get("kind") == kind_set and man.get("format") == 1 \
+ok = isinstance(man, dict) and man.get("kind") == kind_set and man.get("format") in (1, 2) \
     and isinstance(man.get("platforms"), list) and isinstance(man.get("complete"), bool)
 plats = []
 if ok:
     for p in man["platforms"]:
-        if not (isinstance(p, dict) and p.get("id") in ("koha", "tainacan") and p.get("result") in ("ok", "failed")
+        if not (isinstance(p, dict) and p.get("id") in (("koha", "tainacan", "dspace") if man.get("format") == 2 else ("koha", "tainacan")) and p.get("result") in ("ok", "failed")
                 and isinstance(p.get("path", ""), str)):
             ok = False; break
         path_ok = p["result"] != "ok" or (members_re.match(p["path"]) and p["path"].startswith(p["id"] + "/")
                                           and p["path"] != p["id"] + "/")
         if not path_ok:
+            ok = False; break
+        if any(x["id"] == p["id"] for x in plats):
+            ok = False; break
+        if p["result"] == "ok" and p["path"].rstrip("/") not in {n.rstrip("/") for n in top}:
             ok = False; break
         plats.append(p)
 if not ok:
@@ -16122,8 +16331,14 @@ for line in sums.splitlines():
     mm = re.fullmatch(r"([0-9a-f]{64})  (\S.{0,300})", line)
     if not mm or not members_re.match(mm.group(2)):
         out("kind", "unsafe"); out("why", "sums\t"); sys.exit(0)
+    if mm.group(2) in want:
+        out("kind", "unsafe"); out("why", "duplicate-checksum"); sys.exit(0)
     want[mm.group(2)] = mm.group(1)
 files = {n: m for n, m in names if m.isfile() and n != "SHA256SUMS"}
+ds_files = {n for n in files if n.startswith("dspace/")}
+ds_declared = {p["path"] for p in plats if p["id"] == "dspace" and p["result"] == "ok"}
+if (man["format"] == 1 and ds_files) or (man["format"] == 2 and ds_files != ds_declared):
+    out("kind", "unsafe"); out("why", "undeclared-dspace-content"); sys.exit(0)
 integrity = "ok" if set(files) == set(want) else "failed"
 if integrity == "ok":
     for n, m in files.items():
@@ -16167,8 +16382,27 @@ kei_set_conflicts() {
                 if [ "$(_kei_tn_get status 2>/dev/null)" = installed ]; then
                     printf 'conflict=tainacan\t%s\n' "$(u="$(_kei_tn_get url)"; t "The Tainacan in use (\${u}) is replaced after a test in an isolated copy; its address and ports stay those of this server.")"
                 else printf 'conflict=tainacan\t%s\n' "$(t "Tainacan is not installed here: install it first, then restore.")"; fi ;;
+            dspace)
+                printf 'conflict=dspace\t%s\n' "$(t "DSpace is replaced only after a verified safety backup and isolated recovery test. The exact reviewed images, address and recovery phrase are required.")" ;;
         esac
     done
+}
+
+# Open an encrypted outer set into a private bounded staging directory.
+# Its inner manifest is still untrusted and must pass the normal reader.
+kei_set_open() {
+    local file="${1:-}" stage info limit
+    [ -f "$file" ] && [ ! -L "$file" ] && [ -n "${KEI_BACKUP_PHRASE:-}" ] || return 7
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+    limit=$(( $(_kei_bk_free_bytes) / 3 ))
+    [ "$limit" -gt 0 ] || { rm -rf "$stage"; return 4; }
+    if ! ( umask 077; _kei_bk_gpg_phrase "$KEI_BACKUP_PHRASE" --max-output "$limit" --decrypt < "$file" > "$stage/package.tar" ) 2>/dev/null; then
+        rm -rf "$stage"; return 7
+    fi
+    info=$(kei_set_inspect "$stage/package.tar") || { rm -rf "$stage"; return 4; }
+    if ! grep -qx 'kind=koha-nexus-set' <<<"$info" || ! grep -qx 'integrity=ok' <<<"$info"; then rm -rf "$stage"; return 4; fi
+    printf 'stage=%s\nopened=%s\n' "$stage" "$stage/package.tar"
 }
 
 # kei_set_unpack FILE: a checked set (or Tainacan package archive)
@@ -16177,18 +16411,42 @@ kei_set_conflicts() {
 # kei_set_inspect said it is safe, with no owner or mode from the archive;
 # the tree is checked again and every checksum verified.
 kei_set_unpack() {
-    local f="${1:-}" info kind stage
-    info=$(kei_set_inspect "$f" 2>/dev/null) || return 4
+    local f="${1:-}" info kind stage limit
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+    limit=$(_kei_bk_free_bytes)
+    # Copy from one non-symlink regular inode, bounded by available staging space.
+    # Inspection and extraction then read the same private copy even if the input changes.
+    if ! python3 -I - "$f" "$stage/.source.tar" "$limit" <<'PYCOPY'
+import os,stat,sys
+source,target,limit=sys.argv[1],sys.argv[2],int(sys.argv[3])//2
+if limit<=0:sys.exit(4)
+fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+with os.fdopen(fd,'rb') as src:
+    info=os.fstat(src.fileno())
+    if not stat.S_ISREG(info.st_mode) or info.st_size>limit:sys.exit(4)
+    with open(target,'xb') as out:
+        os.fchmod(out.fileno(),0o600);total=0
+        while True:
+            block=src.read(1024*1024)
+            if not block:break
+            total+=len(block)
+            if total>limit:sys.exit(4)
+            out.write(block)
+PYCOPY
+    then rm -rf "$stage"; return 4; fi
+    f="$stage/.source.tar"
+    info=$(kei_set_inspect "$f" 2>/dev/null) || { rm -rf "$stage"; return 4; }
     kind=$(printf '%s\n' "$info" | sed -n 's/^kind=//p' | head -n 1)
     case "$kind" in
         koha-nexus-set)
-            [ "$(printf '%s\n' "$info" | sed -n 's/^integrity=//p')" = ok ] || { echo "$(t "The set files do not match their checksums.")" >&2; return 4; } ;;
+            [ "$(printf '%s\n' "$info" | sed -n 's/^integrity=//p')" = ok ] || { rm -rf "$stage"; echo "$(t "The set files do not match their checksums.")" >&2; return 4; } ;;
         tainacan-archive) ;;
-        *) echo "$(t "This file is not a joint package of Koha.Nexus.")" >&2; return 4 ;;
+        *) rm -rf "$stage"; echo "$(t "This file is not a joint package of Koha.Nexus.")" >&2; return 4 ;;
     esac
-    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
-    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+
     if ! tar -C "$stage" -xf "$f" --no-same-owner --no-same-permissions --no-overwrite-dir 2>/dev/null \
+        || ! rm -f "$f" \
         || ! kei_bk_check_tree "$stage" >/dev/null \
         || { [ "$kind" = koha-nexus-set ] && ! ( cd "$stage" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ); }; then
         rm -rf "$stage"
@@ -16198,6 +16456,7 @@ kei_set_unpack() {
     chmod -R go-rwx "$stage"
     echo "stage=$stage"
     find "$stage/koha" -maxdepth 1 -type f -name '*.sql.*' -printf 'koha=%p\n' 2>/dev/null | head -n 1
+    find "$stage/dspace" -maxdepth 1 -type f -name 'knx-dspace-*.tar.gpg' -printf 'dspace=%p\n' 2>/dev/null | head -n 1
     find "$stage/tainacan" "$stage" -mindepth 1 -maxdepth 1 -type d -name 'knx-tainacan-*' 2>/dev/null | head -n 1 | while read -r p; do
         # The package is checked as a package too (its own manifest and checksums).
         if kei_backup_check "$p" tainacan >/dev/null 2>&1; then echo "tainacan=$p"; else echo "tainacan_bad=$p"; fi
@@ -45807,6 +46066,7 @@ kei_task() {
         dspace-panel) kei_dspace_runtime --protocol "$@" ;;
         dspace-cache) kei_dspace_runtime cache ;;
         dspace-prerequisites) kei_dspace_prerequisites "$@" ;;
+        dspace-free) require_systemd && kei_dspace_free "$@" ;;
         dspace-resource) kei_dspace_resource "$@" ;;
         tainacan-status)
             local k v
@@ -45850,12 +46110,13 @@ kei_task() {
             return 0 ;;
         platform-backup-run)      _kei_docker_task kei_backup_run "${1:-}" "${2:-manual}" ;;
         # The joint package (Koha + Tainacan) and the assisted restore.
-        set-backup|set-inspect|set-unpack)
+        set-backup|set-inspect|set-unpack|set-open)
             # Their KEY=VALUE lines become results; what went wrong, an error box.
             local line out err rc
             [ -n "${1:-}" ] || return 2
             out=$(mktemp) && err=$(mktemp) || return 1
             case "$name" in
+                set-open) kei_set_open "$1" > "$out" 2>"$err" ;;
                 set-backup)  kei_set_backup "$1" "${2:-}" "${3:-}" > "$out" 2>"$err" ;;
                 set-inspect) kei_set_inspect "$1" > "$out" 2>"$err" ;;
                 set-unpack)  kei_set_unpack "$1" > "$out" 2>"$err" ;;

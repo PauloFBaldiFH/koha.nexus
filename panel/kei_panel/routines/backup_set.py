@@ -27,11 +27,11 @@ from pathlib import Path
 
 from ..bridge import TaskOutcome
 from ..i18n import t
-from ..screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
+from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..screens.files import PathPickerScreen
 from .common import facts, run_task, show_failure
 
-NAMES = {"koha": "Koha", "tainacan": "Tainacan"}
+NAMES = {"koha": "Koha", "tainacan": "Tainacan", "dspace": "DSpace"}
 
 
 @dataclass
@@ -100,6 +100,8 @@ def secrets_text(part: Part) -> str:
             return t("its files, and its secrets (encryption key, SIP2 and panel logins) encrypted with the backup key")
         return t("database and files, WITHOUT its secrets: what Koha encrypted (staff two-factor secrets) "
                  "cannot be read on another installation")
+    if part.id == 'dspace':
+        return t('Entire PostgreSQL, configuration, files and Solr package encrypted with the backup key')
     return t("configuration encrypted with the backup key") if part.secrets == "gpg" \
         else t("configuration not encrypted (readable by root only)")
 
@@ -145,7 +147,9 @@ def summary(info: Inspected) -> str:
 # Joint backup
 # ----------------------------------------------------------------------
 async def set_backup(app) -> None:
-    title = t("📦  Joint backup (Koha + Tainacan)")
+    from ..backup_center import MEMBERS
+    selected = list(MEMBERS.get(getattr(app, 'backup_scope', 'both'), ('koha','tainacan')))
+    title = t("Joint backup") + ' · ' + ' + '.join(NAMES[p] for p in selected)
     info = await facts(app)
     home = info.get("real_home") or "/root"
     start = Path(home) / "backups"
@@ -158,15 +162,16 @@ async def set_backup(app) -> None:
         help_text=t("Choose the folder of this server where the joint package is saved.")))
     if folder is None:
         return
-    mode = await _secrets_choice(app, title)
+    mode = await _secrets_choice(app, title, selected)
     if mode is None:
         return
     if not await app.push_screen_wait(ConfirmScreen(title, t(
-            "One file with the data of Koha and of Tainacan, and a manifest with the checksums. Each platform "
-            "is captured in turn with its own consistent copy (Tainacan stops writing for a moment), and the "
-            "time of each capture is recorded: the two are not taken at the same instant. Make it now?"))):
+            "One file with the data of the selected platforms, and a manifest with the checksums. Each platform "
+            "is captured in turn with its own consistent copy (DSpace and Tainacan pause when selected), and the "
+            "time of each capture is recorded: they are not taken at the same instant. Make it now?"))):
         return
-    result = await run_task(app, title, "set-backup", str(folder), *(("", mode) if mode else ()))
+    args = (("",mode) if mode else ()) if selected == ['koha','tainacan'] else (','.join(selected),mode)
+    result = await run_task(app, title, "set-backup", str(folder), *args)
     out = result.value if isinstance(result.value, TaskOutcome) else None
     parts = parse_backup(out) if out else []
     file = out.results.get("file", "") if out else ""
@@ -198,13 +203,19 @@ async def set_backup(app) -> None:
             "platform can also be backed up on its own in the Backup center.") + "\n\n" + body, kind="error"))
 
 
-async def _secrets_choice(app, title: str) -> str | None:
+async def _secrets_choice(app, title: str, selected=None) -> str | None:
     """"" = with the secrets, "no-secrets" = the person chose data only,
     None = cancelled. Asked only when Koha is here and there is no backup
     key: its secrets are never left out in silence, and never go in clear."""
     from . import platforms as tn
 
-    if not app.platform_ready("koha"):
+    if selected and 'dspace' in selected:
+        if not (await tn.backup_state(app)).key:
+            if not await app.push_screen_wait(ConfirmScreen(title,t('DSpace backups require encryption. Configure the shared backup key now?'))):return None
+            await tn.backup_setup(app)
+            if not (await tn.backup_state(app)).key:return None
+        return ""
+    if not app.platform_ready("koha") or (selected and 'koha' not in selected):
         return ""
     if (await tn.backup_state(app)).key:
         return ""
@@ -353,6 +364,26 @@ async def restore_assisted(app) -> None:
         from . import backup
         await backup.restore(app, path)          # restore-check, the safety backup, its own questions
         return
+    if found.kind == 'unknown' and where == 'file':
+        encrypted=await app.push_screen_wait(ChoiceScreen(title,t('This file may be encrypted. Choose its recovery type; the contents will still be verified before any restoration.'),[('set',t('Encrypted platform set')),('dspace',t('Encrypted DSpace package'))]))
+        if encrypted=='dspace':
+            from . import dspace
+            await dspace.restore_path(app,path)
+            return
+        if encrypted=='set':
+            phrase=await app.push_screen_wait(InputScreen(title,t('Recovery phrase for the encrypted set:'),t('Recovery phrase:'),password=True))
+            if not phrase:return
+            opened=await run_task(app,title,'set-open',path,env={'KEI_BACKUP_PHRASE':phrase})
+            opened_out=opened.value if isinstance(opened.value,TaskOutcome) else None
+            if not opened_out or not opened_out.ok or not opened_out.results.get('opened'):
+                await show_failure(app,title,opened);return
+            try:
+                inspect=await app.bridge.task('set-inspect',opened_out.results['opened'])
+                await _restore_parts(app,title,opened_out.results['opened'],parse_inspect(inspect))
+            finally:
+                await app.bridge.task('set-cleanup',opened_out.results['stage'])
+            return
+        return
     if found.kind in ("unsafe", "unknown"):
         body = t("This file was refused before anything was extracted: ${why}. Nothing was changed.",
                  why=found.why or t("unsafe content")) if found.kind == "unsafe" else t(
@@ -380,7 +411,7 @@ async def _restore_parts(app, title: str, path: str, found: Inspected) -> None:
         return
     options = [(p, t("Restore only ${name}", name=NAMES[p])) for p in usable]
     if len(usable) > 1:
-        options.insert(0, ("both", t("Restore Koha and Tainacan")))
+        options.insert(0, ("both", t("Restore all selected platforms")))
     choice = await app.push_screen_wait(ChoiceScreen(title, body + "\n\n" + t(
         "Restoring without the recovery phrase brings the data back, and this installation keeps its own "
         "configuration (keys and passwords); a configuration encrypted in the backup is asked for or "
@@ -398,7 +429,13 @@ async def _restore_parts(app, title: str, path: str, found: Inspected) -> None:
         await show_failure(app, title, result)
         return
     try:
+        if 'dspace' in chosen:
+            from . import dspace
+            ds_path = out.results.get('dspace')
+            if not ds_path or not await dspace.restore_path(app,ds_path):
+                return  # no other platform is changed after a refused/cancelled DSpace recovery
         for pid in chosen:
+            if pid == 'dspace': continue
             if pid == "koha" and out.results.get("koha"):
                 from . import backup
                 if await backup.restore(app, out.results["koha"]) and _has_koha_extras(found):

@@ -141,7 +141,7 @@ koha_on_free_address() {
     # No: nothing is asked of the service, nothing changes.
     answer no
     run lib 'kei_tainacan_free on'
-    dialogs | grep -q "PROMPT The collection gets the address https://t-palotina-acervo.example.org, in the same tunnel as the catalog (https://t-palotina.example.org).* => no"
+    dialogs | grep -q "PROMPT The collection gets the address https://t-palotina-acervo.example.org, in the existing shared tunnel.* => no"
     never grep -q "^PUT " "$T/broker/broker.log"
     [ ! -e "$T/address.log" ] && [ -z "$(conf TAINACAN_HOST)" ]
 

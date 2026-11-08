@@ -128,7 +128,7 @@ def test_admin_password_is_hidden_and_only_sent_in_one_task_environment(monkeypa
 
 def test_postpone_and_close_never_configures_cloud_or_backup(monkeypatch):
     calls=mock_calls(monkeypatch,{'setup-status':{'setup':'open','steps':{'admin':'pending'}},'setup-mark':{'setup':'open'},'setup-close':{'setup':'none'},'status':{'url':'http://192.168.1.20:8100'}})
-    app=App(['later','close']);asyncio.run(dspace.assistant(app))
+    app=App(['later','later','later','close']);asyncio.run(dspace.assistant(app))
     args=[c[1] for c in calls]
     assert ('setup-mark','admin','later') in args and ('setup-close',) in args
     assert all(c[0]=='dspace-panel' for c in calls)
@@ -178,10 +178,10 @@ def test_failed_worker_never_continues_even_with_partial_success_payload(monkeyp
     assert 'Worker failed' in app.screens[0]._body
 
 
-def test_dspace_only_backup_scope_does_not_create_a_joint_scope():
+def test_dspace_only_has_individual_scope_and_three_installed_platforms_have_explicit_sets():
     from kei_panel import backup_center
     assert backup_center.scopes(False,False,True)==['dspace']
-    assert backup_center.scopes(True,True,True)==['koha','tainacan','dspace','both']
+    assert backup_center.scopes(True,True,True)==['koha','tainacan','dspace','both','koha-dspace','tainacan-dspace','all']
 
 
 @pytest.mark.parametrize('answer',[None,False])
@@ -239,3 +239,61 @@ def test_declining_recovery_plan_never_stops_the_repository(monkeypatch):
     app=App([package,'test-only recovery phrase',False])
     asyncio.run(dspace.backup_restore(app))
     assert [c[:2] for c in calls]==[('dspace-panel',('backup-list',)),('dspace-panel',('backup-plan',package))]
+
+
+def test_new_backup_sets_use_explicit_members_without_widening_legacy_scope():
+    from kei_panel import backup_center as b
+    assert b.MEMBERS['both']==('koha','tainacan')
+    assert b.scopes(True,False,True)==['koha','dspace','koha-dspace']
+    assert b.scopes(False,True,True)==['tainacan','dspace','tainacan-dspace']
+    assert b.MEMBERS['all']==('koha','tainacan','dspace')
+
+
+def test_operations_cancellation_never_applies_a_change(monkeypatch):
+    async def preview(*args,**kwargs):return {'safety_backup':True,'url':'https://repo.example.org','previous_url':'http://repo.local:8100','external_proxy_manual':False}
+    calls=[]
+    async def observe(app,command,*args,**kwargs):calls.append((command,args));return await preview()
+    monkeypatch.setattr(dspace,'call',observe)
+    app=App([False]);asyncio.run(dspace.operation(app,'address',{'url':'https://repo.example.org'}))
+    assert calls==[('operations',('address',))]
+
+
+def test_address_without_key_can_be_postponed_before_reserving_a_free_name(monkeypatch):
+    from kei_panel.routines import platforms, common
+    async def no_key(app):return SimpleNamespace(key=False)
+    calls=[]
+    async def interactive(*args,**kwargs):calls.append((args,kwargs))
+    monkeypatch.setattr(platforms,'backup_state',no_key)
+    monkeypatch.setattr(common,'run_interactive',interactive)
+    app=App(['free',False])
+    asyncio.run(dspace.address(app))
+    assert not calls
+
+
+def test_encrypted_plan_rows_report_upload_failure_separately():
+    from kei_panel import backup_center as b
+    data={'plans':[{'id':'nightly','members':['dspace'],'destination':'/backups','remote':'drive:Repo','time':'02:30','keep':7,
+                    'last':{'capture':'ok','copy':'failed','finished':1}}]}
+    rows=b.operation_plans(data,'dspace')
+    assert len(rows)==1 and rows[0].state=='bad' and 'encrypted' in rows[0].encrypted.lower()
+    assert b.operation_plans(data,'koha-dspace')==[]
+
+
+@pytest.mark.parametrize('size',[(80,24),(160,48)])
+def test_all_three_platforms_remain_reachable_in_the_shared_backup_selector(monkeypatch,size):
+    for name in ('KOHA','TAINACAN','DSPACE'):monkeypatch.setenv('KEI_PANEL_DEMO_'+name,'1')
+    async def exercise():
+        app=KohaPanelApp(PanelEnv(installer=None,lang='en',plain=True,demo=True))
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.8)
+            app.backup_scope='dspace';app.screen.action_show('backups')
+            await pilot.pause(1.8)
+            view=app.screen.query_one('#view-backups')
+            button=view.query_one('#scope-all')
+            button.focus()
+            await pilot.pause(.5)
+            assert button.region.intersection(view.region).width==button.region.width
+            await pilot.click('#scope-all')
+            await pilot.pause(.4)
+            assert view.scope=='all' and app.backup_scope=='all'
+    asyncio.run(exercise())

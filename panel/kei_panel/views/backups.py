@@ -21,7 +21,7 @@ from __future__ import annotations
 import time
 
 from textual.app import ComposeResult
-from textual.containers import Grid, Horizontal, Vertical
+from textual.containers import Grid, Horizontal, HorizontalScroll, Vertical
 from rich.text import Text
 from textual.widgets import Button, Label, Select, Static
 
@@ -61,7 +61,7 @@ class BackupCenterView(PlatformSectionView):
     # --- layout ---------------------------------------------------------------
     def heading(self) -> ComposeResult:
         yield from super().heading()
-        with Horizontal(id="bk-scopes", classes="sb-card-buttons"):
+        with HorizontalScroll(id="bk-scopes", classes="sb-card-buttons"):
             yield Label(t("Platform:"), classes="form-label")
             for scope in backup_center.SCOPES:
                 yield Button(t(backup_center.SCOPE_LABELS[scope]), id=f"scope-{scope}", classes="small")
@@ -78,11 +78,11 @@ class BackupCenterView(PlatformSectionView):
                     yield Select([(t(v), k) for k, v in CODECS.items()], value="gz", allow_blank=False,
                                  id="bk-codec", disabled=True)
                 yield Label(t(CODEC_NOTE), id="bk-codec-note", classes="ai-note")
-        yield Static(t("Koha and Tainacan as a set: the joint backup makes one file with the data of both, each "
+        yield Static(t("The selected platforms as a set: the joint backup makes one file with their data, each "
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
-                       "restore brings back one of them or both. The automatic backups of each are below."),
+                       "restore brings back one or several of them. The automatic backups of each are below."),
                      id="bk-both", classes="view-prompt", markup=False)
-        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Scheduling and joint packages for DSpace are not available yet."), id="bk-dspace", classes="view-prompt", markup=False)
+        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), id="bk-dspace", classes="view-prompt", markup=False)
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
@@ -134,7 +134,7 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-koha").display = self.scope == backup_center.KOHA
         self.query_one("#bk-tainacan").display = self.scope == backup_center.TAINACAN
         self.query_one("#bk-dspace").display = self.scope == backup_center.DSPACE
-        self.query_one("#bk-both").display = self.scope == backup_center.BOTH
+        self.query_one("#bk-both").display = len(backup_center.MEMBERS.get(self.scope, ())) > 1
         self.query_one("#bk-plans-title").display = bool(self.scope)
         self.query_one("#bk-plans").display = bool(self.scope)
         if self.facts is not None:
@@ -156,6 +156,10 @@ class BackupCenterView(PlatformSectionView):
     def card_shown(self, entry, facts: platforms.Facts) -> bool:
         # A platform's cards in its view; the set's in "both"; the assisted
         # restore wherever a platform is; the cloud connections always.
+        if entry.action in ('dspace-plan','dspace-plan-run'):
+            return 'dspace' in backup_center.MEMBERS.get(self.scope, ())
+        if entry.action == 'set-backup' and len(backup_center.MEMBERS.get(self.scope, ())) > 1:
+            return True
         if entry.requires and entry.requires != self.scope:
             return False
         if entry.scope and entry.scope != self.scope:
@@ -192,6 +196,9 @@ class BackupCenterView(PlatformSectionView):
                 rows = await self._load_tainacan(facts)
             elif self.scope == backup_center.BOTH:
                 rows = await self._load_koha() + await self._load_tainacan(facts) + await self._load_set()
+            if 'dspace' in backup_center.MEMBERS.get(self.scope, ()) and self.app.bridge.has_task('dspace-panel'):
+                from ..dspace import payload
+                rows += backup_center.operation_plans(payload(await self.app.bridge.task('dspace-panel','operations','plans')),self.scope)
         finally:
             self.query_one("#platform-loader").display = False
         self.facts = facts

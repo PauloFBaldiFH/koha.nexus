@@ -122,3 +122,31 @@ describe("provisioning by service", () => {
     expect(fake.snapshot().tunnels).toEqual([]);
   });
 });
+
+describe("DSpace publication remains a separate optional service", () => {
+  const REPOSITORY={koha:false,tainacan:false,dspace:true};
+  it("serializes the new service without changing legacy service records",()=>{
+    expect(parseServices("koha,tainacan")).toEqual(BOTH);
+    expect(parseServices("dspace")).toEqual(REPOSITORY);
+    expect(servicesText({...BOTH,dspace:true})).toBe("koha,tainacan,dspace");
+    expect(publishedHostnames("palotina-pr",env,REPOSITORY)).toEqual({repository:"t-palotina-pr-repositorio.example.org"});
+  });
+  it("uses a loopback origin distinct from Koha and Tainacan",()=>{
+    expect(steps.ingressFor(hosts,false,{...BOTH,dspace:true})).toContainEqual({hostname:hosts.repository,service:"http://127.0.0.1:18102"});
+    expect(steps.ingressFor(hosts,false,BOTH).some(r=>r.hostname===hosts.repository)).toBe(false);
+  });
+  it("adding and removing only DSpace preserves the shared tunnel and other DNS records",async()=>{
+    const first=await steps.provision(cf,{libraryId:LIB,hostnames:hosts,services:BOTH});
+    const old=names();
+    const added=await steps.provision(cf,{libraryId:LIB,hostnames:hosts,services:{...BOTH,dspace:true}});
+    expect(added.tunnelId).toBe(first.tunnelId);
+    expect(names()).toEqual([...old,hosts.repository].sort());
+    await steps.provision(cf,{libraryId:LIB,hostnames:hosts,services:BOTH});
+    expect(names()).toEqual(old);
+    expect(fake.snapshot().tunnels.filter((t:any)=>!t.deleted_at)).toHaveLength(1);
+  });
+  it("the longer suffix has explicit new-name limits",()=>{
+    expect(validateSlug("museu-repositorio",{prefix:"",staffSuffix:"-admin",repositorySuffix:"-repositorio",allowBlocked:true}).ok).toBe(false);
+    expect(maxSlugLength("","-admin","-acervo","-repositorio")).toBe(51);
+  });
+});

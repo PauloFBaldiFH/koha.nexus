@@ -143,18 +143,56 @@ export class Provisioner extends DurableObject<Env> {
     });
   }
 
+  /** Remove exactly DSpace, reading the latest services inside the per-library lock. */
+  async detachRepository(libraryId:string):Promise<{services:string; job_id?:string}> {
+    return this.serial(async()=>{
+      const lib=await this.library(libraryId);
+      if(lib?.status==="deprovisioning" && parseServices(lib.services).dspace && !parseServices(lib.services).koha && !parseServices(lib.services).tainacan){
+        const job=await this.env.DB.prepare("SELECT id,state FROM jobs WHERE library_id=? AND kind='deprovision' ORDER BY created_at DESC LIMIT 1").bind(libraryId).first<{id:string;state:string}>();
+        if(job){
+          if(job.state==="queued")await this.env.PROVISION_QUEUE.send({jobId:job.id});
+          return {services:"",job_id:job.id};
+        }
+      }
+      if(!lib || !lib.tunnel_id || !["active","suspended"].includes(lib.status))throw new Error("Library is not active");
+      const current=parseServices(lib.services);
+      if(!current.dspace)return {services:lib.services};
+      const next={...current,dspace:false};
+      if(!next.koha && !next.tainacan){
+        // No other service can attach between this decision and the state change.
+        const job=crypto.randomUUID(), t=now();
+        await this.env.DB.batch([
+          this.env.DB.prepare("UPDATE libraries SET status='deprovisioning',updated_at=? WHERE id=?").bind(t,libraryId),
+          this.env.DB.prepare("INSERT INTO jobs(id,library_id,kind,state,created_at,updated_at) VALUES(?,?,'deprovision','queued',?,?)").bind(job,libraryId,t,t),
+        ]);
+        await this.env.PROVISION_QUEUE.send({jobId:job});
+        return {services:"",job_id:job};
+      }
+      const text=[...(next.koha?["koha"]:[]),...(next.tainacan?["tainacan"]:[])].join(",");
+      try {
+        await steps.provision(cfApi(this.env),{libraryId,hostnames:libraryHosts(lib.slug,this.env),services:next,suspended:lib.status==="suspended"});
+      } catch(e) {
+        await steps.provision(cfApi(this.env),{libraryId,hostnames:libraryHosts(lib.slug,this.env),services:current,suspended:lib.status==="suspended"}).catch(()=>undefined);
+        throw e;
+      }
+      await this.env.DB.prepare("UPDATE libraries SET services=?,updated_at=? WHERE id=?").bind(text,now(),libraryId).run();
+      return {services:text};
+    });
+  }
+
   /**
    * What a library publishes changed (Tainacan added or taken out): the
    * ingress and the records follow the new services first, and only then the
    * row says so. On a failure the old services are applied again, so the
    * address never points somewhere the row does not say.
    */
-  async setServices(libraryId: string, services: string): Promise<{ collectionRecordId: string | null }> {
+  async setServices(libraryId: string, services: string, expected?:string): Promise<{ collectionRecordId: string | null }> {
     return this.serial(async () => {
       const lib = await this.library(libraryId);
       if (!lib || !lib.tunnel_id || (lib.status !== "active" && lib.status !== "suspended")) {
         throw new Error(`library is ${lib?.status ?? "unknown"}`);
       }
+      if (expected!==undefined && lib.services!==expected) throw new Error("Services changed concurrently; refresh and retry.");
       const apply = async (text: string) =>
         steps.provision(cfApi(this.env), {
           libraryId,

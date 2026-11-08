@@ -29,6 +29,9 @@ NAME_PREFIX = ""
 STAFF_SUFFIX = "-admin"
 # Tainacan's address: <slug>-acervo.koha.nexus (a library can publish Koha, Tainacan or both).
 TAINACAN_SUFFIX = "-acervo"
+# Enable only after migration 0004, broker tests and deliberate deployment.
+DSPACE_ENABLED = "false"
+DSPACE_SUFFIX = "-repositorio"
 # "true": every request is approved at once under the first free valid name.
 # "false": an admin approves each request (/admin/enrollments).
 AUTO_APPROVE = "true"

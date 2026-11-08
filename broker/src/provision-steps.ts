@@ -5,11 +5,13 @@
 
 import type { CloudflareApi, DnsRecord, IngressRule } from "./cloudflare";
 import { randomBytes, toBase64 } from "./crypto";
+import {DSPACE_ORIGIN_PORT} from "./names";
 import type { Hostnames, Services } from "./names";
 
 /** A library's names: Koha's two and Tainacan's (published or not, by services). */
 export interface LibraryHosts extends Hostnames {
   collection: string;
+  repository?: string;
 }
 
 const KOHA_ONLY: Services = { koha: true, tainacan: false };
@@ -76,6 +78,7 @@ export function ingressFor(h: Hostnames | LibraryHosts, suspended = false, servi
     rules.push({ hostname: h.opac, service: "http://localhost:80" }, { hostname: h.staff, service: "http://localhost:8080" });
   }
   if (services.tainacan && "collection" in h) rules.push({ hostname: h.collection, service: "http://localhost:80" });
+  if (services.dspace && "repository" in h && h.repository) rules.push({hostname:h.repository,service:`http://127.0.0.1:${DSPACE_ORIGIN_PORT}`});
   rules.push({ service: "http_status:404" });
   return rules;
 }
@@ -159,6 +162,10 @@ export async function provision(cf: CfClient, input: ProvisionInput): Promise<Pr
     if (services.tainacan) out.collectionRecordId = await ensureCname(cf, input.libraryId, h.collection, tunnelId);
     else await dropOurs(cf, input.libraryId, h.collection);
   }
+  if ("repository" in h && h.repository) {
+    if (services.dspace) await ensureCname(cf,input.libraryId,h.repository,tunnelId);
+    else await dropOurs(cf,input.libraryId,h.repository);
+  }
   return out;
 }
 
@@ -186,7 +193,7 @@ export interface DeprovisionInput {
 /** Removes our records for every name of the library and its tunnel. Safe to repeat. */
 export async function deprovision(cf: CfClient, input: DeprovisionInput): Promise<void> {
   const h = input.hostnames;
-  for (const name of [h.opac, h.staff, ...("collection" in h ? [h.collection] : [])]) {
+  for (const name of [h.opac, h.staff, ...("collection" in h ? [h.collection] : []), ...("repository" in h && h.repository ? [h.repository] : [])]) {
     await dropOurs(cf, input.libraryId, name);
   }
   const ids = new Set<string>();

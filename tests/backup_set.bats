@@ -447,3 +447,113 @@ PY
     [[ "$(history | tail -n 1)" == *'"result": "failed"'*"backup key"* ]]
     [ "$(ls "$T"/cloud/ | wc -l)" = 1 ]
 }
+
+@test "DS01 explicit DSpace capture uses format 2 and carries its encrypted package, legacy default stays two platforms" {
+    run lib "
+_kei_bk_has_key() { return 0; }
+kei_dspace_runtime() {
+    printf cipher > '$T/knx-dspace-20261108-000000-abcd1234.tar.gpg'
+    printf '{\"package\":\"$T/knx-dspace-20261108-000000-abcd1234.tar.gpg\"}'
+}
+kei_set_backup '$OUT' dspace"
+    [ "$status" -eq 0 ]
+    SET=$(field file "$output")
+    [[ "$output" == *$'platform=dspace\tok\t'* ]]
+    tar -tf "$SET" | grep -q '^dspace/knx-dspace-.*\.tar\.gpg$'
+    m=$(manifest "$SET")
+    python3 -I - "$m" <<'PY'
+import json,sys
+x=json.loads(sys.argv[1]);assert x['format']==2 and x['complete'] is True
+assert x['recoverability']=='full' and [r['id'] for r in x['platforms']]==['dspace']
+PY
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field integrity "$output")" = ok ]
+    [ "$(field platforms "$output")" = dspace ]
+    run lib "kei_set_unpack '$SET'"
+    [ "$status" -eq 0 ]
+    [ -f "$(field dspace "$output")" ]
+    run lib "kei_set_platforms"
+    [ "$output" = 'koha tainacan' ]
+}
+
+@test "DS02 missing DSpace encryption key refuses the whole set before any capture" {
+    run lib "_kei_bk_has_key() { return 1; }; create_safety_backup() { touch '$T/should-not-exist'; }; kei_set_backup '$OUT' koha,dspace no-secrets"
+    [ "$status" -eq 7 ]
+    [ ! -e "$T/should-not-exist" ]
+    [ "$(field needs "$output")" = key ]
+}
+
+@test "DS03 owned DSpace cron edits preserve foreign and manually modified files" {
+    run lib "
+cron() { :; }
+KEI_PANEL_COMMAND=/usr/local/bin/config.sh
+mkdir -p /etc/cron.d
+printf 'foreign-data\\n' > /etc/cron.d/koha-nexus-plan-foreign
+kei_dspace_resource plan-cron foreign 02:30 dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && grep -qx foreign-data /etc/cron.d/koha-nexus-plan-foreign
+"
+    [ "$status" -eq 0 ]
+    run lib "
+cron() { :; }
+install -m 755 /dev/null '$T/config.sh'
+KEI_PANEL_COMMAND='$T/config.sh'
+kei_dspace_resource plan-cron owned 02:30 koha,dspace || exit
+printf '# manual change\\n' >> /etc/cron.d/koha-nexus-plan-owned
+kei_dspace_resource plan-cron owned '' koha,dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && grep -qx '# manual change' /etc/cron.d/koha-nexus-plan-owned
+"
+    [ "$status" -eq 0 ]
+}
+
+@test "DS03b a plan is never scheduled for a panel command that is not installed" {
+    run lib "
+cron() { :; }
+KEI_PANEL_COMMAND='$T/missing/config.sh'
+mkdir -p /etc/cron.d
+kei_dspace_resource plan-cron absent 02:30 dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && [ ! -e /etc/cron.d/koha-nexus-plan-absent ]
+"
+    [ "$status" -eq 0 ]
+}
+
+@test "DS04 an explicit three-platform set contains each package and unpacks them selectively" {
+    lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
+    run lib "
+kei_dspace_runtime() {
+    printf cipher > '$T/knx-dspace-20261108-000000-abcd1234.tar.gpg'
+    printf '{\"package\":\"$T/knx-dspace-20261108-000000-abcd1234.tar.gpg\"}'
+}
+kei_set_backup '$OUT' koha,tainacan,dspace"
+    [ "$status" -eq 0 ]
+    SET=$(field file "$output")
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field platforms "$output")" = 'koha tainacan dspace' ]
+    [ "$(field complete "$output")" = yes ] && [ "$(field integrity "$output")" = ok ]
+    run lib "kei_set_unpack '$SET'"
+    [ "$status" -eq 0 ]
+    [ -f "$(field koha "$output")" ]
+    [ -d "$(field tainacan "$output")" ]
+    [ -f "$(field dspace "$output")" ]
+}
+
+@test "DS05 failed DSpace capture preserves the valid Koha/Tainacan packages as an explicit partial set" {
+    lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
+    run lib "kei_dspace_runtime() { return 1; }; kei_set_backup '$OUT' koha,tainacan,dspace"
+    [ "$status" -eq 9 ]
+    SET=$(field file "$output")
+    [ -f "$SET" ] && [ "$(field complete "$output")" = no ]
+    [[ "$output" == *$'platform=dspace\tfailed\t'* ]]
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field complete "$output")" = no ] && [ "$(field integrity "$output")" = ok ]
+    tar -tf "$SET" | grep -q '^koha/.*sql.gz$'
+    tar -tf "$SET" | grep -q '^tainacan/.*files.tar.gz$'
+    # An empty namespace directory is harmless; no failed payload is retained.
+    absent_count=$(tar -tf "$SET" | grep -c '^dspace/.\+' || true)
+    [ "$absent_count" -eq 0 ]
+}

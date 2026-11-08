@@ -46,6 +46,7 @@ export async function decideEnrollment(env: Env, userCode: string, approve: bool
     prefix: env.NAME_PREFIX,
     staffSuffix: env.STAFF_SUFFIX,
     collectionSuffix: collectionSuffix(env),
+    repositorySuffix: env.DSPACE_ENABLED === "true" ? (env.DSPACE_SUFFIX ?? "-repositorio") : "",
     allowBlocked: b.force === true,
   });
   if (!check.ok) throw new HttpError(400, `name "${slug}" rejected: ${check.reason}`);
