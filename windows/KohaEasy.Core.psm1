@@ -22,7 +22,9 @@ $script:Cfg = @{
     NetTask     = ('Koha - Network ({0})' -f $env:USERNAME)
     OldTaskPath = '\KohaEasy\'
     FirewallRule = 'Koha (web, local network)'
-    WebPorts    = @(80, 8080)
+    # 8100: DSpace's own port (its address must be the one every browser
+    # uses, this PC's included, so Windows has to let it through like Koha's).
+    WebPorts    = @(80, 8080, 8100)
     PanelPath   = '/usr/local/bin/koha-panel'
     StaffUrl    = 'http://localhost:8080/'
     OpacUrl     = 'http://localhost/'
@@ -37,7 +39,7 @@ $script:Cfg = @{
     ToastAppId  = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
     AppId       = 'KohaEasy.Koha'
     WindowPath  = '/usr/local/bin/koha-window'
-    LanSetup    = 2
+    LanSetup    = 3
 }
 
 # The Koha folder: KOHAEASY_ROOT when set; else the folder these scripts
@@ -1601,13 +1603,13 @@ function Invoke-KohaRunHeld {
 }
 
 # ----------------------------------------------------------------------
-# Other PCs of the library network (ports 80 and 8080)
+# Other PCs of the library network (ports 80, 8080 and DSpace's 8100)
 # ----------------------------------------------------------------------
 # Apache inside Debian listens on every address. What Windows adds, once,
 # with administrator rights (KohaEasy.ps1 SetupNetwork), for both network
 # modes, so a WSL that falls back from mirrored to NAT (or comes back)
 # needs nothing new:
-#   * a Windows Firewall rule for TCP 80 and 8080 from the local network;
+#   * a Windows Firewall rule for TCP 80, 8080 and 8100 from the local network;
 #   * the same ports in the Hyper-V firewall, which guards WSL in mirrored
 #     mode (Windows 11);
 #   * a task "Koha network" with the user's highest rights, started at each
@@ -1637,7 +1639,7 @@ function Test-KohaIPv4 {
     return $true
 }
 
-# Pure: the netsh commands that point ports 80 and 8080 of every Windows
+# Pure: the netsh commands that point ports 80, 8080 and 8100 of every Windows
 # address at Debian (delete first, so a changed address never stacks up).
 function Get-KohaPortProxyCommands {
     param([Parameter(Mandatory = $true)][string]$WslIp, [int[]]$Ports = $script:Cfg.WebPorts)
@@ -1670,7 +1672,7 @@ function Get-KohaPortProxyRules {
 }
 
 # Mirrored mode: Koha's forwarding from a time WSL ran in NAT mode is
-# removed, so ports 80 and 8080 of this PC go to Debian again.
+# removed, so ports 80, 8080 and 8100 of this PC go to Debian again.
 function Remove-KohaPortProxy {
     $ours = @(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($script:Cfg.WebPorts -contains $_.ListenPort) })
     foreach ($r in $ours) {

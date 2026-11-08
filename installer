@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.186"
+PANEL_VERSION=" 1.5.187"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12449,7 +12449,7 @@ kei_docker_audit() {
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
 KEI_DSPACE_OPERATIONS_SHA="b9a4b980d6f2a5f2e9ef2c35d883ae170bc92cf0f3983ae77d2cfbdecc13cac2"
-KEI_DSPACE_RUNTIME_SHA="7fdaed94032998e381a8d3f576c4ff21c8e6c9231a5c9e354f0fd55cea4a8b5d"
+KEI_DSPACE_RUNTIME_SHA="e1696046b7c49a034f9c94868cd40a50d59138554f3fc5f72212d533723d41b0"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"

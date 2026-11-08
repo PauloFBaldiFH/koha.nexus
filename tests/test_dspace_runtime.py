@@ -305,6 +305,39 @@ class RuntimeTests(unittest.TestCase):
         with patch.object(rt, 'docker', side_effect=ds.Refused('offline')):
             self.assertNotIn('Safe detail', json.dumps(rt.status()))
 
+    def test_startup_polls_leave_no_stale_installer_error(self):
+        # Paulo 2026-11-08: "Last installer error: /var/run/postgresql:5432 -
+        # no response" stayed after a ready install; it was the first
+        # pg_isready poll, made before PostgreSQL finished starting.
+        import subprocess
+        self.install()
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        rt._mutating = True
+        early = ds.OperationFailed('docker', subprocess.CompletedProcess([], 2, '/var/run/postgresql:5432 - no response', ''))
+        cores = json.dumps({'status': {c: {} for c in ds.CORES}})
+        replies = iter([early, 'accepting connections', cores])
+        def fake(*args, **kwargs):
+            reply = next(replies)
+            if isinstance(reply, Exception):
+                raise reply
+            return reply
+        with patch.object(ds, 'command', side_effect=fake), patch.object(ds.time, 'sleep'):
+            rt.dependencies()
+        self.assertFalse((self.root / 'last-error.log').exists())
+
+    def test_wait_that_runs_out_keeps_the_last_failure(self):
+        import subprocess
+        self.install()
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        rt._mutating = True
+        down = ds.OperationFailed('docker', subprocess.CompletedProcess([], 2, '/var/run/postgresql:5432 - no response', ''))
+        clock = iter([0, 1, 400])
+        with patch.object(ds, 'command', side_effect=down), patch.object(ds.time, 'sleep'), \
+                patch.object(ds.time, 'monotonic', side_effect=lambda: next(clock)):
+            with self.assertRaisesRegex(ds.Refused, 'PostgreSQL did not become ready'):
+                rt.dependencies()
+        self.assertIn('no response', (self.root / 'last-error.log').read_text())
+
     def test_health_uses_canonical_host_for_angular_ssrf_protection(self):
         self.install()
         rt = ds.Runtime(self.root, self.catalog, lab=True)
