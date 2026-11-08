@@ -221,23 +221,8 @@ def exercise(rt, output, recovery_capture=None):
                 wait_for_client(page)
                 expect(page.locator('#user-agreement-accept')).to_be_checked(timeout=60000)
             check(True, 'agreement survives three fully initialized browser reloads')
-            # The upstream submission guard reads the cached authenticated
-            # EPerson from its store. Use a fresh browser login after the
-            # independently verified UI save, rather than navigating with that
-            # old cache. Never set a consent cookie or patch agreement via API.
-            context.close()
-            context = browser.new_context(locale='en-US')
-            context.route('**/*', lambda route: route.continue_() if urlsplit(route.request.url).hostname in ('repository.kei.test', '127.0.0.1') else route.abort())
-            page = context.new_page(); page.set_default_timeout(60000)
-            page.on('response', observe_agreement)
-            stage = 'browser login'
-            page.goto(origin + '/login', wait_until='domcontentloaded')
-            wait_for_client(page)
-            page.locator('input[type=email]').fill(email)
-            page.locator('input[type=password]').fill(replacement)
-            page.locator('[data-test=login-button]').click()
-            page.wait_for_url(lambda url: '/login' not in url, timeout=60000)
-            consent = page.get_by_role('button', name="That's ok", exact=True)
+            # Continue in the same authenticated browser session. The reload
+            # checks above prove the saved consent is also reflected by the UI.
             stage = 'initial submission route'
             page.goto(origin + '/workspaceitems/' + wid + '/edit', wait_until='domcontentloaded')
             wait_for_client(page)

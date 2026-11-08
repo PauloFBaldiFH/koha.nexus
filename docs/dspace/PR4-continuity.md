@@ -93,3 +93,6 @@ campo exato de aceite; testes recusam incluir outros dados de perfil.
 99 testes locais stdlib passaram (incluindo oito novos de diagnóstico seguro).
 A validação com navegador real desta correção ainda precisa passar antes da
 mesclagem. O êxito de d5b9f4d acima registra a execução anterior, não aprova esta.
+
+O roteiro corrigido continua na mesma sessão autenticada após as três recargas;
+a tentativa anterior de contornar o problema com outro login foi retirada.
