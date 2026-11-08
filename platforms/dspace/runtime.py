@@ -349,7 +349,7 @@ class Runtime:
                 'images': images, 'release_sha256': self.release_hash, 'ports': ports,
                 'project': PROJECT, 'volumes': [PROJECT + '-' + n for n in VOLUMES],
                 'proxy': proxy, 'migration': old.get('migration', 'not-started'),
-                'notes': ['No default administrator is created; guided account setup is optional.', 'No backup/restore adapter is available yet.',
+                'notes': ['No default administrator is created; guided account setup is optional.', 'Encrypted recovery and explicit platform-set plans are available in the shared backup center.',
                           'Mail and self-registration stay disabled until explicitly configured.',
                           'Memory budget: backend 2 GiB, Solr 1 GiB, UI 1.5 GiB, PostgreSQL 1 GiB.',
                           'A reboot test is distinct from restarting containers.']}
