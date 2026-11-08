@@ -303,3 +303,12 @@ def test_the_joint_backup_row_and_its_last_run():
     assert schedules.set_last_run("2026-11-06 01:16:52|ok|full|failed|") == ("2026-11-06 01:16 · OK, cloud copy FAILED", "bad")
     assert schedules.set_last_run("2026-11-06 01:16:52|busy|||")[1] == "warn"
     assert schedules.set_last_run("") is None
+
+
+def test_dspace_plan_cron_is_read_only_and_filters_under_each_explicit_member():
+    files={'koha-nexus-plan-all':'# Managed by Koha.Nexus: backup plan all\n# Members=koha,tainacan,dspace\n30 2 * * * root KEI_DSPACE_OPERATIONS_DATA=\'{"id":"all"}\' /usr/local/bin/config.sh --task dspace operations plan-run --confirm >/dev/null 2>&1\n'}
+    rows=schedules.collect(files,'library',False)
+    assert len(rows)==1 and rows[0].platform=='koha+tainacan+dspace'
+    assert schedules.shown(rows,'dspace')==rows
+    assert schedules.shown(rows,'koha')==rows
+    assert schedules.platforms_offered(False,False,True)==['dspace','server']

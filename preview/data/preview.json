@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.183",
+ "panel_version": "1.5.184",
  "languages": [
   {
    "code": "en",
@@ -710,7 +710,10 @@
     "dspace-admin",
     "sec-dspace-maintenance",
     "sec-backups",
-    "dspace-help"
+    "dspace-address",
+    "dspace-upgrade",
+    "dspace-help",
+    "dspace-remove"
    ],
    "features": [],
    "media": [],
@@ -750,6 +753,8 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-plan",
+    "dspace-plan-run",
     "dspace-backup-key",
     "dspace-backup-create",
     "dspace-backup-test",
@@ -794,6 +799,7 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-plan",
     "sec-crons",
     "pbackup-schedule",
     "set-schedule"
@@ -1757,12 +1763,42 @@
    "status": "available",
    "media": []
   },
+  "dspace-address": {
+   "id": "dspace-address",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🌐  DSpace address and HTTPS",
+   "description": "",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-upgrade": {
+   "id": "dspace-upgrade",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🔄  Reviewed DSpace update",
+   "description": "",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "dspace-help": {
    "id": "dspace-help",
    "type": "entry",
    "section": "dspace",
    "label": "📖  DSpace first steps",
    "description": "Explains communities, collections, deposits and access policies, with the repository login address.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-remove": {
+   "id": "dspace-remove",
+   "type": "entry",
+   "section": "dspace",
+   "label": "🗑  Remove DSpace",
+   "description": "",
    "kind": "native",
    "status": "available",
    "media": []
@@ -1794,6 +1830,26 @@
    "label": "🩺  DSpace diagnosis & maintenance",
    "description": "",
    "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "dspace-plan": {
+   "id": "dspace-plan",
+   "type": "entry",
+   "section": "backups",
+   "label": "⏰  DSpace and platform-set plans",
+   "description": "",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-plan-run": {
+   "id": "dspace-plan-run",
+   "type": "entry",
+   "section": "backups",
+   "label": "▶  Run an encrypted backup plan",
+   "description": "",
+   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -7697,6 +7753,56 @@
    "ja": null,
    "ko": null
   },
+  "🌐  DSpace address and HTTPS": {
+   "en": "🌐  DSpace address and HTTPS",
+   "pt-BR": null,
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔄  Reviewed DSpace update": {
+   "en": "🔄  Reviewed DSpace update",
+   "pt-BR": null,
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
   "📖  DSpace first steps": {
    "en": "📖  DSpace first steps",
    "pt-BR": "📖  Primeiros passos do DSpace",
@@ -7725,6 +7831,31 @@
   "Explains communities, collections, deposits and access policies, with the repository login address.": {
    "en": "Explains communities, collections, deposits and access policies, with the repository login address.",
    "pt-BR": "Explica comunidades, coleções, depósitos e políticas de acesso, com o endereço de login do repositório.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🗑  Remove DSpace": {
+   "en": "🗑  Remove DSpace",
+   "pt-BR": null,
    "es": null,
    "fr": null,
    "it": null,
@@ -7896,6 +8027,56 @@
    "zh": "请选择备份操作：",
    "ja": "バックアップの操作を選んでください:",
    "ko": "백업 작업을 선택하세요:"
+  },
+  "⏰  DSpace and platform-set plans": {
+   "en": "⏰  DSpace and platform-set plans",
+   "pt-BR": null,
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "▶  Run an encrypted backup plan": {
+   "en": "▶  Run an encrypted backup plan",
+   "pt-BR": null,
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🔐  Set up the DSpace backup key": {
    "en": "🔐  Set up the DSpace backup key",
@@ -22897,164 +23078,164 @@
  "coverage": {
   "en": {
    "manual": 167,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
-   "strings": 509,
-   "strings_total": 509
+   "strings": 514,
+   "strings_total": 514
   },
   "pt-BR": {
    "manual": 167,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 503,
-   "strings_total": 509
+   "strings_total": 514
   },
   "es": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 514
   },
   "fr": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 514
   },
   "it": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 509
+   "strings_total": 514
   },
   "de": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 509
+   "strings_total": 514
   },
   "nl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "sv": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "pl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "cs": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "ru": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "uk": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "tr": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "tl": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "id": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "ar": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "fa": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "hi": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "bn": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "vi": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "zh": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "ja": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   },
   "ko": {
    "manual": 0,
-   "manual_total": 167,
+   "manual_total": 172,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 509
+   "strings_total": 514
   }
  }
 }

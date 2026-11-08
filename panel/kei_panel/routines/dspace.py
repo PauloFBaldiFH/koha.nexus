@@ -64,7 +64,7 @@ async def install(app):
     if current is None:
         return
     url = current.get('url') or await app.push_screen_wait(InputScreen(
-        TITLE, t('Use this server’s IP and a separate port (for example http://192.168.1.20:8100), or a DNS name already pointing here. Free addresses and managed HTTPS arrive later.'),
+        TITLE, t('Use this server’s IP and a separate port (for example http://192.168.1.20:8100), or a DNS name already pointing here. Address and HTTPS assistance remains available after installation.'),
         t('Repository address:'), validate=lambda v: '' if origin(v) else t('Enter one HTTP(S) address without credentials or a path.')))
     if not url:
         return
@@ -178,7 +178,7 @@ async def help(app):
         return
     url = origin(data.get('url'))
     await app.push_screen_wait(MessageScreen(t('DSpace first steps'), t(
-        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Encrypted individual backups and recovery are in the Backup center. Automated schedules, domain assistance and updates are not available in this experimental release.') + '\n\n' + url + '/login'))
+        'Sign in, then create a community and a collection. Deposit a document with its metadata and review its access policy before publishing. Private files require an authorized account.\n\nAdministrator management and diagnosis remain in the DSpace menu. Encrypted individual backups and recovery are in the Backup center. Explicit backup plans and cloud copies are in the shared Backup center. Address/HTTPS and reviewed same-version updates remain in the DSpace menu.') + '\n\n' + url + '/login'))
 
 
 async def assistant(app):
@@ -194,12 +194,13 @@ async def assistant(app):
             await admin(app)
         else:
             await call(app, 'setup-mark', 'admin', 'later')
-    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('Encrypted backups are available in the Backup center; domain assistance comes later. Keep the setup reminder? The local repository and administrator remain accessible from their menus.'), [('keep', t('Keep the reminder')), ('close', t('Do not remind me again'))]))
-    if choice is None:
-        return
-    await call(app, 'setup-mark', 'backup', 'later')
-    if choice == 'close':
-        await call(app, 'setup-close')
+    for step,label,routine in [('public','Configure the repository address and HTTPS now?',address),('backup','Configure an encrypted backup plan and cloud copy now?',plan)]:
+        choice=await app.push_screen_wait(ChoiceScreen(TITLE,t(label),[('now',t('Configure now')),('later',t('Do it later'))]))
+        if choice is None:return
+        if choice=='now':await routine(app)
+        else:await call(app,'setup-mark',step,'later')
+    choice=await app.push_screen_wait(ChoiceScreen(TITLE,t('Keep the setup reminder? All these actions remain available in the menus.'),[('keep',t('Keep the reminder')),('close',t('Do not remind me again'))]))
+    if choice=='close':await call(app,'setup-close')
     await help(app)
 
 
@@ -239,3 +240,105 @@ async def backup_test(app):
 
 async def backup_restore(app):
     await _recovery(app, True)
+
+
+async def operation(app, action, request, destructive=False):
+    env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(request)}
+    plan=await call(app,'operations',action,env=env)
+    if plan is None:return None
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,json.dumps(plan,ensure_ascii=False,indent=2),danger=destructive)):return None
+    if action in ('address','upgrade') or (action=='remove' and request.get('purge')):
+        phrase=await app.push_screen_wait(InputScreen(TITLE,t('The safety backup will be tested before applying this change. Enter the recovery phrase:'),t('Recovery phrase:'),password=True))
+        if not phrase:return None
+        env['KEI_BACKUP_PHRASE']=phrase
+    result=await call(app,'operations',action,'--confirm',env=env,cancellable=False)
+    if result is not None:
+        app.check_platforms()
+        await app.push_screen_wait(MessageScreen(TITLE,json.dumps(result,ensure_ascii=False,indent=2)))
+    return result
+
+
+async def plan(app):
+    from ..backup_center import MEMBERS
+    from ..screens.files import PathPickerScreen
+    selected=list(MEMBERS.get(getattr(app,'backup_scope','dspace'),('dspace',)))
+    if 'dspace' not in selected:selected=['dspace']
+    data=await call(app,'operations','plans')
+    if data is None:return
+    options=[('new',t('Create an explicit backup plan'))]+[(p['id'],p['id']+' · '+','.join(p['members'])) for p in data.get('plans',[])]
+    chosen=await app.push_screen_wait(ChoiceScreen(TITLE,t('Choose a plan. Editing never widens existing Koha/Tainacan schedules.'),options))
+    if not chosen:return
+    old=next((p for p in data.get('plans',[]) if p['id']==chosen),{})
+    name=old.get('id') or await app.push_screen_wait(InputScreen(TITLE,t('Name for this backup plan (lowercase letters, digits and hyphens).'),t('Plan name:'),validate=lambda v:'' if re.fullmatch(r'[a-z][a-z0-9-]{0,31}',v) else t('Invalid plan name.')))
+    if not name:return
+    folder=await app.push_screen_wait(PathPickerScreen(TITLE,old.get('destination','/var/backups'),mode='dir',help_text=t('Select an existing private directory owned by root.')))
+    if not folder:return
+    when=await app.push_screen_wait(InputScreen(TITLE,t('Daily server time HH:MM; empty disables this schedule.'),t('Time:'),value=old.get('time','02:30')))
+    if when is None:return
+    keep=await app.push_screen_wait(InputScreen(TITLE,t('Number of successful encrypted packages to keep (1 to 365).'),t('Retention:'),value=str(old.get('keep',7)),validate=lambda v:'' if v.isdigit() and 1<=int(v)<=365 else t('Choose 1 to 365.')))
+    if keep is None:return
+    from .. import cloud
+    remotes=cloud.parse_remotes((await app.bridge.task('cloud-list')).lists.get('remote',[])) if app.bridge.has_task('cloud-list') else []
+    remote=await app.push_screen_wait(ChoiceScreen(TITLE,t('Cloud copy (connections are managed in the shared Backup center).'),[('',t('Local only'))]+[(r.name,r.name) for r in remotes]))
+    if remote is None:return
+    target=''
+    if remote:
+        sub=await app.push_screen_wait(InputScreen(TITLE,t('Separate folder for this encrypted plan in the cloud.'),t('Cloud folder:'),value='KohaNexus/'+name))
+        if not sub:return
+        target=remote+':'+sub
+    await operation(app,'plan-save',dict(id=name,members=old.get('members',selected),time=when,keep=int(keep),destination=str(folder),remote=target))
+
+
+async def plan_run(app):
+    data=await call(app,'operations','plans')
+    if data is None:return
+    chosen=await app.push_screen_wait(ChoiceScreen(TITLE,t('Run a configured backup plan now?'),[(p['id'],p['id']+' · '+','.join(p['members'])) for p in data.get('plans',[])])) if data.get('plans') else None
+    if not chosen:return
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,t('Capture the explicitly selected platforms, encrypt the package and copy it to the configured cloud destination? Each platform pauses separately.'))):return
+    result=await call(app,'operations','plan-run','--confirm',env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps({'id':chosen})},cancellable=False)
+    if result:await app.push_screen_wait(MessageScreen(TITLE,json.dumps(result,ensure_ascii=False,indent=2)))
+
+
+async def address(app):
+    mode=await app.push_screen_wait(ChoiceScreen(TITLE,t('How will this repository be published?'),[('apache',t('Local network or institutional HTTP')),('external',t('Existing external HTTPS proxy')),('tls',t('Apache HTTPS with an existing certificate')),('free',t('Free koha.nexus address')),('free-off',t('Release only the repository free address'))]))
+    if not mode:return
+    if mode in ('free','free-off'):
+        from .common import run_interactive
+        await run_interactive(app,TITLE,'dspace-free','off' if mode=='free-off' else 'on')
+        return
+    url=await app.push_screen_wait(InputScreen(TITLE,t('Canonical public repository address, without a path.'),t('Address:'),validate=lambda v:'' if origin(v) else t('Enter one HTTP(S) origin.')))
+    if not url:return
+    request=dict(url=url,mode=mode)
+    if mode=='tls':
+        for key,label in [('certificate','Certificate PEM path:'),('key','Private key PEM path:')]:
+            path=await app.push_screen_wait(InputScreen(TITLE,t('Use the certificate already managed for this institution. The panel does not publish or request certificates automatically.'),t(label)))
+            if not path:return
+            request[key]=path
+    await operation(app,'address',request,True)
+
+
+async def upgrade(app):
+    from ..screens.files import PathPickerScreen
+    path=await app.push_screen_wait(PathPickerScreen(TITLE,'/etc/koha-nexus',mode='file',suffixes=('.json',),help_text=t('Choose the reviewed immutable image catalog for the recipe 3 to 4 update. Other migrations are refused.')))
+    if path:await operation(app,'upgrade',{'catalog':str(path)},True)
+
+
+async def remove(app):
+    choice=await app.push_screen_wait(ChoiceScreen(TITLE,t('Remove only DSpace. Shared Docker, Apache, tunnel and cloud connections remain.'),[('keep',t('Keep all repository data (recommended)')),('purge',t('Erase owned repository volumes after a verified safety backup'))]))
+    if not choice:return
+    request={'purge':choice=='purge'}
+    if choice=='purge':
+        erase=await app.push_screen_wait(InputScreen(TITLE,t('Type DSpace to confirm permanent removal of its data.'),t('Confirmation:')))
+        if erase!='DSpace':return
+        request['erase']=erase
+    await operation(app,'remove',request,True)
+
+
+async def restore_path(app,path):
+    phrase=await app.push_screen_wait(InputScreen(TITLE,t('DSpace always requires the recovery phrase; it cannot recover encrypted data without it.'),t('Recovery phrase:'),password=True))
+    if not phrase:return False
+    env={'KEI_BACKUP_PHRASE':phrase}
+    plan=await call(app,'backup-plan',path,env=env)
+    if plan is None:return False
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,json.dumps(plan,ensure_ascii=False,indent=2),danger=True)):return False
+    return await call(app,'backup-restore',path,'--confirm',env=env,cancellable=False) is not None

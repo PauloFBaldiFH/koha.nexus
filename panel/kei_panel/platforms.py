@@ -137,7 +137,7 @@ def dspace_mode(facts) -> str:
         return "absent"
     if state in ("installing", "failed") or (state == "starting" and data.get("phase") != "ready"):
         return "incomplete"
-    if state in ("degraded", "stopped", "unavailable", "starting"):
+    if state in ("degraded", "stopped", "unavailable", "starting", "data-kept"):
         return "failing"
     return "installed" if state == "installed" else "unknown"
 
@@ -149,7 +149,7 @@ def dspace_problem(facts) -> str:
         "incomplete": "DSpace installation is incomplete. Read the diagnosis before resuming; data and the migration journal are preserved.",
         "failing": "DSpace is stopped or unavailable. Diagnose first, then start its services; this does not require restoring a backup.",
         "unknown": "DSpace state is unknown. Refresh or update the panel before changing services.",
-        "installed": "Experimental DSpace: encrypted individual backups are in the Backup center. Scheduling and domain assistance arrive in subsequent stages. State and addresses are in the DSpace dashboard tab.",
+        "installed": "Experimental DSpace: encrypted individual backups are in the Backup center. Explicit schedules and cloud copies are in the same center; address/HTTPS and reviewed updates remain in the DSpace menu. State and addresses are in the DSpace dashboard tab.",
     }[mode])
 
 
@@ -728,7 +728,7 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
     if action.startswith("dspace-") or action == "setup-dspace":
         data = dspace_detail(facts.status)
         if action == "dspace-start":
-            return data.get("status") in ("stopped", "degraded", "unavailable") and data.get("phase") == "ready"
+            return data.get("status") in ("stopped", "degraded", "unavailable", "data-kept") and data.get("phase") == "ready"
         if action == "dspace-admin":
             return data.get("status") == "installed" and data.get("admin_available", True)
         if action == "dspace-stop":

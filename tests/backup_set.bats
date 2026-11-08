@@ -447,3 +447,39 @@ PY
     [[ "$(history | tail -n 1)" == *'"result": "failed"'*"backup key"* ]]
     [ "$(ls "$T"/cloud/ | wc -l)" = 1 ]
 }
+
+@test "DS01 explicit DSpace capture uses format 2 and carries its encrypted package, legacy default stays two platforms" {
+    run lib "
+_kei_bk_has_key() { return 0; }
+kei_dspace_runtime() {
+    printf cipher > '$T/knx-dspace-20261108-000000-abcd1234.tar.gpg'
+    printf '{\"package\":\"$T/knx-dspace-20261108-000000-abcd1234.tar.gpg\"}'
+}
+kei_set_backup '$OUT' dspace"
+    [ "$status" -eq 0 ]
+    SET=$(field file "$output")
+    [[ "$output" == *$'platform=dspace\tok\t'* ]]
+    tar -tf "$SET" | grep -q '^dspace/knx-dspace-.*\.tar\.gpg$'
+    m=$(manifest "$SET")
+    python3 -I - "$m" <<'PY'
+import json,sys
+x=json.loads(sys.argv[1]);assert x['format']==2 and x['complete'] is True
+assert x['recoverability']=='full' and [r['id'] for r in x['platforms']]==['dspace']
+PY
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field integrity "$output")" = ok ]
+    [ "$(field platforms "$output")" = dspace ]
+    run lib "kei_set_unpack '$SET'"
+    [ "$status" -eq 0 ]
+    [ -f "$(field dspace "$output")" ]
+    run lib "kei_set_platforms"
+    [ "$output" = 'koha tainacan' ]
+}
+
+@test "DS02 missing DSpace encryption key refuses the whole set before any capture" {
+    run lib "_kei_bk_has_key() { return 1; }; create_safety_backup() { touch '$T/should-not-exist'; }; kei_set_backup '$OUT' koha,dspace no-secrets"
+    [ "$status" -eq 7 ]
+    [ ! -e "$T/should-not-exist" ]
+    [ "$(field needs "$output")" = key ]
+}

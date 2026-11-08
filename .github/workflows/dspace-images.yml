@@ -11,6 +11,9 @@ on:
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
+      - 'tests/test_dspace_operations.py'
+      - 'tools/dspace_operations_test.py'
+      - 'tools/dspace_upgrade_test.py'
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/java/NexusSchemaGuardTest.java'
@@ -28,6 +31,9 @@ on:
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
+      - 'tests/test_dspace_operations.py'
+      - 'tools/dspace_operations_test.py'
+      - 'tools/dspace_upgrade_test.py'
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/java/NexusSchemaGuardTest.java'
@@ -73,6 +79,7 @@ jobs:
       - run: python -m unittest discover -s tests -p test_dspace_images.py -v
       - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v
+      - run: python -m unittest discover -s tests -p test_dspace_operations.py -v
       - run: python -m unittest discover -s tests -p test_dspace_browser_support.py -v
       - run: bash -n installer
       - name: Validate runtime shell scripts
@@ -184,10 +191,81 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  legacy-images:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, ui, solr]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - uses: actions/cache@v4
+        id: legacy-cache
+        with:
+          path: ${{ runner.temp }}/legacy-${{ matrix.image }}.tar.gz
+          key: dspace-historical-r3-858153cc-${{ runner.os }}-${{ runner.arch }}-${{ matrix.image }}
+      - name: Build actual recipe 3 from its pinned historical source export
+        if: steps.legacy-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/legacy-recipe"
+          git archive 858153cc730c17d410943836d222944149c24250 platforms/dspace tools/dspace_images.py LICENSE | tar -x -C "$RUNNER_TEMP/legacy-recipe"
+          python "$RUNNER_TEMP/legacy-recipe/tools/dspace_images.py" prepare "$RUNNER_TEMP/legacy-sources"
+          python "$RUNNER_TEMP/legacy-recipe/tools/dspace_images.py" build "$RUNNER_TEMP/legacy-sources" --image '${{ matrix.image }}' --metadata "$RUNNER_TEMP/legacy-${{ matrix.image }}.json"
+          docker save "nexus-dspace-${{ matrix.image }}:10.1-r3" | gzip -1 > "$RUNNER_TEMP/legacy-${{ matrix.image }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-dspace-${{ matrix.image }}-runtime
+          path: ${{ runner.temp }}/legacy-${{ matrix.image }}.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  upgrade:
+    needs: [images, legacy-images, dependencies]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*dspace-*-runtime'
+          path: ${{ runner.temp }}/dspace-runtime
+          merge-multiple: true
+      - name: Load both independently built reviewed image matrices
+        run: |
+          for archive in "$RUNNER_TEMP"/dspace-runtime/*.tar.gz; do docker load -i "$archive"; done
+      - name: Prepare disposable resource infrastructure
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 gnupg restic rclone
+          sudo systemctl start apache2
+      - name: Actual historical upgrade and rollback
+        run: >-
+          sudo env RUNNER_TEMP="$RUNNER_TEMP"
+          KEI_DOCKER_ISOLATION_CMD="/bin/bash $GITHUB_WORKSPACE/installer --task docker-isolation"
+          python3 tools/dspace_upgrade_test.py --disposable
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dspace-reviewed-upgrade
+          path: ${{ runner.temp }}/dspace-upgrade-acceptance.json
+          if-no-files-found: ignore
+
   installation:
     needs: [images, dependencies]
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -201,7 +279,7 @@ jobs:
       - name: Existing resource infrastructure on a disposable runner
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 python3-venv gnupg restic
+          sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 python3-venv gnupg restic rclone cron openssl
           sudo systemctl start apache2
       - name: Prepare real browser acceptance
         run: |
@@ -220,6 +298,7 @@ jobs:
           name: dspace-integrated-acceptance
           path: |
             ${{ runner.temp }}/dspace-acceptance.json
+            ${{ runner.temp }}/dspace-operations-acceptance.json
             ${{ runner.temp }}/dspace-recovery-acceptance.json
             ${{ runner.temp }}/dspace-browser-acceptance.json
             ${{ runner.temp }}/dspace-public-item.png

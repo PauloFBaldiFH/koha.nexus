@@ -140,6 +140,8 @@ def main():
         check('persistent' in rt.compose('exec', '-T', 'postgres', 'psql', '-U', 'dspace', '-d', 'dspace', '-Atc',
                                          'SELECT value FROM nexus_lifecycle_test'), 'data persist after Docker restart')
         check_files('files persist after Docker service restart')
+        from dspace_operations_test import exercise as operations_exercise
+        operations_exercise(rt,prepared,output)
         (output / 'dspace-acceptance.json').write_text(json.dumps(rt.diagnostic(), indent=2))
     except BaseException as error:
         # Only this disposable lab's generated credentials; never export raw inspect/config.

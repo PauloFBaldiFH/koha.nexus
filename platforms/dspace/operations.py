@@ -1,0 +1,380 @@
+"""Explicit DSpace operations. Reuses platform recovery and shared resource ownership.
+
+Schedules store a fixed member list; old Koha/Tainacan plans are never rewritten.
+No archived programs, shell fragments or floating image tags are executed.
+"""
+import contextlib
+import copy
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import shutil
+import stat
+import time
+from urllib.parse import urlsplit
+
+from runtime import BASE, LABELS, Refused, atomic, canonical_url, command, digest, local_docker_env, read_json
+from backup import Recovery, Error, sha as file_sha
+
+MEMBERS = ('koha', 'tainacan', 'dspace')
+IDENTIFIER = re.compile(r'[a-z][a-z0-9-]{0,31}')
+REMOTE = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[A-Za-z0-9_./-]{1,180}')
+
+
+def private(path, create=False):
+    path = Path(path).absolute()
+    if path.resolve() != path:
+        raise Refused('Use a canonical path without symbolic links.')
+    if create:
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = path.stat()
+    if not path.is_dir() or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        raise Refused('Choose a private directory owned by the operator (root for scheduled operations).')
+    return path
+
+
+def trusted_json(path):
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1:
+        raise Refused('An operation record has untrusted ownership or permissions.')
+    return read_json(path)
+
+
+def members(value):
+    if not isinstance(value, list) or not value or any(not isinstance(p,str) or p not in MEMBERS for p in value) or len(value) != len(set(value)):
+        raise Refused('Select each known platform at most once.')
+    if 'dspace' not in value:
+        raise Refused('Use the existing Koha/Tainacan plan editor for plans without DSpace.')
+    return [p for p in MEMBERS if p in value]
+
+
+def fields(text):
+    """Existing installer task protocol; values are data, never commands."""
+    result = {}
+    for line in text.splitlines():
+        if line.startswith('@@result '):
+            key, sep, value = line[9:].partition('=')
+            if sep: result[key] = value
+    return result
+
+
+class Operations:
+    def __init__(self, rt, phrase=None):
+        self.rt, self.phrase = rt, phrase
+        self.home = rt.root.parent.parent / 'backup-plans'
+        self.journal = rt.root / 'operations.json'
+
+    def driver(self, task, *args, timeout=21600):
+        if not self.rt.driver: raise Refused('Use the local installer resource driver.')
+        return command(['bash', self.rt.driver, '--task', task, *map(str, args)], timeout=timeout, env=dict(local_docker_env(), KEI_DSPACE_DIR=str(self.rt.root)))
+
+    def plan_path(self, name):
+        if not isinstance(name, str) or not IDENTIFIER.fullmatch(name): raise Refused('Invalid backup plan identifier.')
+        return self.home / (name + '.json')
+
+    def check_plan(self, data):
+        if not isinstance(data, dict): raise Refused('The plan must be an object.')
+        name = data.get('id'); self.plan_path(name)
+        selected = members(data.get('members'))
+        hour = data.get('time', '')
+        if hour and not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', hour): raise Refused('Use HH:MM or an empty time to disable the schedule.')
+        keep = data.get('keep', 7)
+        if isinstance(keep, bool) or not isinstance(keep, int) or not 1 <= keep <= 365: raise Refused('Keep 1 to 365 successful packages.')
+        dest = private(data.get('destination', ''))
+        if dest == self.rt.root or self.rt.root in dest.parents or dest in self.rt.root.parents:
+            raise Refused('Backups must be outside the platform configuration directory.')
+        remote = data.get('remote', '')
+        if not isinstance(remote, str) or (remote and (not REMOTE.fullmatch(remote) or '..' in remote.split('/') or any(x in remote for x in ('Backup_SQL_Koha', 'Backup_MARC_Koha')))):
+            raise Refused('Choose an existing rclone connection and a separate backup folder.')
+        if remote:
+            available = command(['rclone', 'listremotes'], timeout=30, env=local_docker_env()).splitlines()
+            if remote.split(':')[0] + ':' not in available: raise Refused('The chosen cloud connection does not exist.')
+        return dict(schema=1, id=name, members=selected, time=hour, keep=keep, destination=str(dest), remote=remote)
+
+    @contextlib.contextmanager
+    def plan_lock(self, name):
+        self.plan_path(name)
+        private(self.home, create=True)
+        fd = os.open(self.home / (name + '.lock'), os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'w') as out:
+            info = os.fstat(out.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_nlink != 1 or info.st_mode & 0o077:
+                raise Refused('Untrusted plan lock.')
+            try: fcntl.flock(out, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError: raise Refused('This backup plan is already running or being edited.')
+            yield
+
+    def plans(self):
+        rows = []
+        if not self.home.exists(): return {'plans': rows}
+        private(self.home)
+        for path in sorted(self.home.glob('*.json')):
+            if path.name.endswith('.history.json'): continue
+            data = trusted_json(path)
+            if data.get('schema') != 1 or self.plan_path(data.get('id')) != path: raise Refused('Unknown plan record.')
+            history = self.history(data['id'])
+            rows.append(dict(data, last=history[-1] if history else None))
+        return {'plans': rows}
+
+    def save_plan(self, request, confirm=False):
+        data = self.check_plan(request)
+        # A schedule cannot silently create a data-only backup.
+        Recovery(self.rt).crypto('check')
+        if not confirm: return dict(plan=data, writes='private plan, owned cron; no backup runs now', encrypted=True)
+        if os.geteuid() != 0: raise Refused('Save scheduled plans locally as root.')
+        self.driver('dspace-cache')
+        with self.plan_lock(data['id']):
+            path = self.plan_path(data['id'])
+            old = trusted_json(path) if path.exists() else None
+            atomic(path, json.dumps(data) + '\n')
+            try:
+                self.rt.core('plan-cron', data['id'], data['time'], ','.join(data['members']))
+            except BaseException:
+                if old is None: path.unlink()
+                else: atomic(path, json.dumps(old) + '\n')
+                raise
+        return {'saved': data, 'encrypted': True}
+
+    def history(self, name):
+        path = self.home / (name + '.history.json')
+        return trusted_json(path) if path.exists() else []
+
+    def run_plan(self, name):
+        if os.geteuid() != 0: raise Refused('Run scheduled backups locally as root.')
+        with self.plan_lock(name):
+            plan = self.check_plan(trusted_json(self.plan_path(name)))
+            recovery = Recovery(self.rt); recovery.crypto('check')
+            directory = private(Path(plan['destination']) / ('nexus-' + name), create=True)
+            history = self.history(name)
+            record = dict(started=time.time(), members=plan['members'], capture='failed', copy='not-requested', retention='not-run')
+            try:
+                with __import__('tempfile').TemporaryDirectory(prefix='.capture-', dir=directory) as temp:
+                    temp = Path(temp)
+                    if plan['members'] == ['dspace']:
+                        result = json.loads(self.driver('dspace', 'backup-create', '--confirm'))
+                        source = Path(result['package'])
+                        if source.is_symlink() or not source.is_file(): raise Refused('The DSpace backup was not published.')
+                        target = directory / source.name
+                        with open(source, 'rb') as src, open(temp / 'capture.part', 'xb') as dst: shutil.copyfileobj(src, dst)
+                    else:
+                        # The format-2 set contains existing platform packages, not references.
+                        try:
+                            output=self.driver('set-backup',temp,','.join(plan['members']))
+                        except __import__('runtime').OperationFailed as error:
+                            output=error.output
+                        result=fields(output)
+                        if not result.get('file'): raise Refused('No platform could be captured; no package was published.')
+                        record['partial']=result.get('complete')!='yes' or result.get('recoverability')!='full'
+                        source = Path(result['file'])
+                        if source.parent != temp or source.is_symlink(): raise Refused('Invalid capture destination.')
+                        target = directory / (source.name + '.gpg')
+                        recovery.crypto('encrypt', source, temp / 'capture.part')
+                    from backup import sync_path
+                    sync_path(temp / 'capture.part')
+                    if target.exists(): raise Refused('A backup with this name already exists.')
+                    os.replace(temp / 'capture.part', target); target.chmod(0o600); sync_path(directory)
+                    record.update(capture='partial' if record.get('partial') else 'ok', file=str(target), sha256=file_sha(target))
+                    atomic(target.with_suffix('.sha256'), record['sha256'] + '\n')
+                if record.get('partial'): raise Refused('A partial encrypted package was preserved; no upload or retention ran.')
+                if plan['remote']:
+                    record['copy'] = 'failed'
+                    remote = plan['remote'].rstrip('/') + '/' + target.name
+                    command(['rclone', 'copyto', str(target), remote], timeout=21600, env=local_docker_env())
+                    verified = json.loads(command(['rclone', 'lsjson', '--stat', remote], timeout=120, env=local_docker_env()))
+                    if verified.get('Size') != target.stat().st_size: raise Refused('The cloud copy size was not verified.')
+                    record.update(copy='ok', remote=remote)
+                history.append(record)
+                self.retention(plan, history)
+                record['retention'] = 'ok'
+                return dict(record, complete=True)
+            except BaseException:
+                record['complete'] = False
+                if not history or history[-1] is not record: history.append(record)
+                raise
+            finally:
+                record['finished'] = time.time()
+                atomic(self.home / (name + '.history.json'), json.dumps(history[-2000:]) + '\n')
+
+    def retention(self, plan, history):
+        """Only this plan's recorded immutable outputs; never prune unrelated directories."""
+        good = [r for r in history if r.get('capture') == 'ok' and r.get('copy') != 'failed' and not r.get('deleted')]
+        for row in good[:-plan['keep']]:
+            path = Path(row['file'])
+            expected = Path(plan['destination']) / ('nexus-' + plan['id'])
+            if path.parent != expected or not re.fullmatch(r'knx-(?:dspace|set)-[a-z0-9-]+\.tar\.gpg', path.name):
+                continue
+            if path.is_symlink() or (path.exists() and file_sha(path) != row['sha256']):
+                raise Refused('An old backup changed; automatic retention refused.')
+            # Remote deletion is intentionally exact and only after a newer copy succeeded.
+            if row.get('remote') and plan['remote'] and row['remote'] == plan['remote'].rstrip('/') + '/' + path.name:
+                command(['rclone', 'deletefile', row['remote']], timeout=300, env=local_docker_env())
+            path.unlink(missing_ok=True); path.with_suffix('.sha256').unlink(missing_ok=True)
+            row['deleted'] = True
+
+    def pending(self):
+        if self.journal.exists() and trusted_json(self.journal).get('phase') not in ('complete', 'rolled-back'):
+            raise Refused('An interrupted DSpace operation needs explicit operations-rollback before another mutation.')
+
+    def snapshot(self, operation):
+        self.pending()
+        data = dict(schema=1, operation=operation, phase='prepared', files={}, state=self.rt.state())
+        for name in ('local.cfg', 'compose.json'):
+            data['files'][name] = (self.rt.root / name).read_text()
+        catalog=self.rt.catalog_path
+        if catalog.exists():
+            if catalog.is_symlink():raise Refused('The image catalog must not be a symbolic link.')
+            data['catalog']={'path':str(catalog),'text':catalog.read_text()}
+        atomic(self.journal, json.dumps(data) + '\n')
+        return data
+
+    def commit_config(self):
+        self.rt.mark(files={n:digest(self.rt.root/n) for n in ('local.cfg','compose.json','db-password')})
+
+    def restart(self):
+        self.rt.compose('up','-d','--pull','never','--force-recreate','backend','ui',timeout=420)
+        self.rt.dependencies(); self.rt.health(); self.rt.core('audit')
+
+    def rollback(self):
+        if not self.journal.exists(): raise Refused('There is no saved operation to roll back.')
+        data = trusted_json(self.journal)
+        if data.get('phase') == 'complete': raise Refused('Completed operations are not automatically reversed.')
+        for name in ('local.cfg', 'compose.json'): atomic(self.rt.root/name, data['files'][name], gid=10001 if name=='local.cfg' else None, mode=0o440 if name=='local.cfg' else 0o600)
+        atomic(self.rt.root/'state.json', json.dumps(data['state'])+'\n')
+        if data.get('catalog'):
+            if data['catalog']['path']!=str(self.rt.catalog_path):raise Refused('Catalog rollback destination changed; inspect the journal.')
+            atomic(self.rt.catalog_path,data['catalog']['text'])
+        self.restart()
+        self.rt.core('proxy')
+        data['phase']='rolled-back'; atomic(self.journal,json.dumps(data)+'\n')
+        return {'rolled_back':True, 'data_volumes_preserved':True}
+
+    def address_plan(self, request):
+        self.pending()
+        Recovery(self.rt).checked()
+        url = canonical_url(request['url']); u=urlsplit(url)
+        mode=request.get('mode','apache')
+        if mode not in ('apache','external','tunnel','tls'): raise Refused('Unknown publication mode.')
+        port=request.get('origin_port',8100)
+        if isinstance(port,bool) or not isinstance(port,int) or not 1024<=port<=65535 or port in (8080,8090,18100,18101): raise Refused('Choose a separate unprivileged origin port.')
+        if mode in ('tunnel','tls','external') and u.scheme!='https': raise Refused('This publication mode requires a canonical HTTPS address.')
+        if mode=='apache' and u.scheme!='http': raise Refused('Select TLS, tunnel or an external HTTPS proxy.')
+        proxy_mode=self.rt.core('publication-plan').strip()
+        if proxy_mode=='external' and mode!='external':raise Refused('An external web server is active. Use its own HTTPS configuration; no Apache site was changed.')
+        cert=request.get('certificate',''); key=request.get('key','')
+        if mode=='tls':
+            for path in (cert,key):
+                if not isinstance(path,str) or not re.fullmatch(r'/[A-Za-z0-9_./-]+',path) or not Path(path).is_file(): raise Refused('Choose existing PEM certificate and private key files.')
+            command(['openssl','x509','-in',cert,'-noout','-checkhost',u.hostname],timeout=10)
+            command(['openssl','x509','-in',cert,'-noout','-checkend','86400'],timeout=10)
+            public=command(['openssl','x509','-in',cert,'-noout','-pubkey'],timeout=10)
+            actual=command(['openssl','pkey','-in',key,'-pubout'],timeout=10)
+            if public!=actual: raise Refused('Certificate and private key do not match.')
+        return dict(previous_url=self.rt.state()['url'],url=url,mode=mode,origin_port=port,certificate=cert,key=key,
+                    safety_backup=True,external_proxy_manual=mode=='external',identifier_changes=False)
+
+    def address(self, request, confirm=False):
+        plan=self.address_plan(request)
+        if not confirm: return plan
+        if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
+        if self.rt.state().get('url')==plan['url'] and self.rt.state().get('publication',{}).get('mode')==plan['mode']:return dict(plan,changed=False)
+        recovery=Recovery(self.rt,self.phrase)
+        package=recovery.capture()['package']
+        # Recoverability is proven before any canonical URL or configuration changes.
+        recovery.test(package)
+        saved=self.snapshot('address'); saved['safety_backup']=package
+        atomic(self.journal,json.dumps(saved)+'\n')
+        try:
+            cfg=(self.rt.root/'local.cfg').read_text()
+            values={'dspace.ui.url':plan['url'],'dspace.server.url':plan['url']+'/server','rest.cors.allowed-origins':plan['url']}
+            for key,value in values.items():
+                cfg,n=re.subn(r'(?m)^\s*'+re.escape(key)+r'\s*=.*$',key+' = '+value,cfg)
+                if n!=1: raise Refused('The canonical URL configuration needs manual review: '+key)
+            compose=read_json(self.rt.root/'compose.json'); env=compose['services']['ui']['environment']; u=urlsplit(plan['url'])
+            env.update(DSPACE_UI_BASEURL=plan['url'],DSPACE_REST_HOST=u.hostname,DSPACE_REST_PORT=str(u.port or (443 if u.scheme=='https' else 80)),DSPACE_REST_SSL=str(u.scheme=='https').lower())
+            atomic(self.rt.root/'local.cfg',cfg,0o440,gid=10001)
+            atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
+            self.rt.mark(url=plan['url'],publication={k:plan[k] for k in ('mode','origin_port','certificate','key')})
+            self.commit_config(); self.restart()
+            if plan['mode']!='external': self.rt.core('proxy')
+            self.rt.mark(proxy_status='external-proxy-required' if plan['mode']=='external' else 'apache-configured')
+            saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
+            return dict(plan,changed=True,safety_backup=package,verified='local API and SSR; external DNS/TLS still requires end-to-end verification')
+        except BaseException:
+            self.rollback(); raise
+
+    def upgrade(self, request, confirm=False):
+        self.pending()
+        state,compose=Recovery(self.rt).checked()
+        target=read_json(BASE/'release.json'); target_hash=digest(BASE/'release.json')
+        previous=target.get('previous_release',{})
+        if self.rt.release_hash!=previous.get('sha256') or target.get('recipe')!=4 or self.rt.release.get('recipe')!=3:
+            raise Refused('Only the reviewed recipe 3 to 4 update of DSpace 10.1 is supported.')
+        if target['sources']!=self.rt.release['sources'] or target['bases']!=self.rt.release['bases']:
+            raise Refused('Schema, runtime or database migrations require a separately reviewed procedure.')
+        catalog=Path(request['catalog']).absolute()
+        # Validate using an empty target directory, never silently select new images for an installed old release.
+        from runtime import Runtime
+        candidate=Runtime(self.rt.root.parent/'upgrade-candidate'/'dspace',catalog,self.rt.lab,self.rt.driver,release_lock=target_hash)
+        images=candidate.images()
+        plan=dict(from_recipe=3,to_recipe=4,release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True)
+        if not confirm:return plan
+        if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
+        candidate.check_images(images)  # before stopping a running service
+        recovery=Recovery(self.rt,self.phrase); package=recovery.capture()['package']; recovery.test(package)
+        saved=self.snapshot('upgrade'); saved['safety_backup']=package; atomic(self.journal,json.dumps(saved)+'\n')
+        try:
+            for name,image in images.items(): compose['services'][name]['image']=image
+            atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
+            atomic(self.rt.catalog_path,catalog.read_text())
+            self.rt.mark(release_sha256=target_hash,recipe=4)
+            self.commit_config(); self.restart()
+            saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
+            return dict(plan,updated=True,safety_backup=package)
+        except BaseException:
+            self.rollback();raise
+
+    def remove(self, request, confirm=False):
+        self.pending()
+        recovery=Recovery(self.rt,self.phrase); state,compose=recovery.checked()
+        purge=request.get('purge',False)
+        if not isinstance(purge,bool):raise Refused('Choose explicitly whether to erase data.')
+        volumes=recovery.volumes(compose) # ownership verified for every active volume
+        plan=dict(keep_data=not purge,volumes=list(volumes),shared_services_removed=False,backup_before_purge=purge)
+        if not confirm:return plan
+        if purge and request.get('erase')!='DSpace':raise Refused('Type DSpace to confirm permanent removal of its owned data.')
+        if purge:
+            package=recovery.capture()['package'];recovery.test(package);plan['safety_backup']=package
+        # Refuse to disconnect a remotely published service implicitly.
+        if state.get('publication',{}).get('mode')=='tunnel':raise Refused('Detach the DSpace tunnel address first; shared tunnel is preserved.')
+        for item in self.plans()['plans']:
+            if 'dspace' in item['members'] and item['time']:
+                item['time']='';item.pop('last',None)
+                self.save_plan(item,True)
+        self.rt.compose('stop','--timeout','90','ui','backend','solr','postgres',timeout=420)
+        self.rt.core('release-web')
+        # Compose down removes only registered project containers, no volumes/networks.
+        self.rt.compose('down','--timeout','90',timeout=420)
+        if purge:
+            for key in volumes:
+                name=compose['volumes'][key]['name']
+                self.rt.docker('volume','rm',name)
+                self.rt.core('forget-volume',name)
+        self.rt.mark(status='data-removed' if purge else 'data-kept',intended='stopped')
+        return dict(plan,removed=True)
+
+    def dispatch(self, action, request, confirm=False):
+        if action=='plans':return self.plans()
+        if action=='plan-save':return self.save_plan(request,confirm)
+        if action=='plan-run':
+            if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
+            return self.run_plan(request['id'])
+        if action in ('address','upgrade','remove','rollback'):
+            with self.rt.lock():
+                if action=='rollback':
+                    if not confirm:raise Refused('Explicit confirmation is required for rollback.')
+                    return self.rollback()
+                return getattr(self,action)(request,confirm)
+        raise Refused('Unknown DSpace operation.')

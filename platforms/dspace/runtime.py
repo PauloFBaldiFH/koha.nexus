@@ -732,15 +732,26 @@ class Runtime:
     def proxy_config(self):
         state = self.state()
         u = urlsplit(canonical_url(state['url']))
+        publication = state.get('publication', {})
+        mode = publication.get('mode', 'apache')
         port = u.port or (443 if u.scheme == 'https' else 80)
-        if u.scheme != 'http':
-            raise Refused('HTTPS must terminate at a configured external proxy in this experimental stage.')
-        listen = '' if port == 80 else 'Listen %s\n' % port
-        return (listen + '<VirtualHost *:%s>\n' % port +
+        if u.scheme != 'http' and mode not in ('tls', 'tunnel'):
+            raise Refused('Configure TLS or an external HTTPS proxy first.')
+        tls = ''
+        if mode == 'tunnel':
+            port = int(publication['origin_port'])
+            listen = 'Listen 127.0.0.1:%s\n' % port
+            bind = '127.0.0.1'
+        else:
+            listen = '' if port in (80,443) else 'Listen %s\n' % port
+            bind = '*'
+        if mode == 'tls':
+            tls = '  SSLEngine on\n  SSLCertificateFile %s\n  SSLCertificateKeyFile %s\n' % (publication['certificate'],publication['key'])
+        return (listen + '<VirtualHost %s:%s>\n' % (bind,port) + tls +
                 '  ServerName %s\n  ProxyRequests Off\n  ProxyPreserveHost On\n' % u.hostname +
                 '  RequestHeader unset Forwarded\n  RequestHeader unset X-Forwarded-For\n' +
                 '  RequestHeader unset X-Forwarded-Host\n  RequestHeader unset X-Forwarded-Port\n' +
-                '  RequestHeader set X-Forwarded-Proto "http"\n' +
+                '  RequestHeader set X-Forwarded-Proto "%s"\n' % u.scheme +
                 '  ProxyPass /server http://127.0.0.1:%s/server timeout=300\n' % int(state['ports']['backend']) +
                 '  ProxyPassReverse /server http://127.0.0.1:%s/server\n' % int(state['ports']['backend']) +
                 '  ProxyPass / http://127.0.0.1:%s/ timeout=300\n' % int(state['ports']['ui']) +
@@ -779,11 +790,15 @@ def main():
         child.add_argument('package')
         child.add_argument('--confirm', action='store_true')
     sub.add_parser('backup-list')
+    ops = sub.add_parser('operations')
+    ops.add_argument('action', choices=('plans','plan-save','plan-run','address','upgrade','remove','rollback'))
+    ops.add_argument('--confirm', action='store_true')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
     # Strip it before starting Docker or any resource helper. CLI users may
     # instead supply the same JSON object on protected standard input.
     secret_request = os.environ.pop('KEI_DSPACE_ADMIN_DATA', None)
+    operations_request = os.environ.pop('KEI_DSPACE_OPERATIONS_DATA', None)
     recovery_phrase = os.environ.pop('KEI_BACKUP_PHRASE', None)
     def interrupted(signum, _frame):
         raise Refused('Interrupted; data were preserved. Review the saved phase before resuming.')
@@ -793,9 +808,23 @@ def main():
         runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
                           progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True),
                           release_lock=args.release_lock)
+        if args.command in ('install','start','stop','admin-create','admin-password','backup-create','backup-test','backup-restore','backup-rollback'):
+            from operations import Operations
+            Operations(runtime).pending()
         if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
-        if args.command.startswith('backup-'):
+        if args.command == 'operations':
+            from operations import Operations
+            from backup import Error
+            raw = operations_request if operations_request is not None else (sys.stdin.read(16385) if args.action != 'plans' else '{}')
+            if len(raw) > 16384: raise Refused('Operation input is too large.')
+            request = json.loads(raw or '{}')
+            if not isinstance(request, dict): raise Refused('Operation input must be an object.')
+            try:
+                result = Operations(runtime, recovery_phrase).dispatch(args.action, request, args.confirm)
+            except Error as error:
+                raise Refused(str(error)) from None
+        elif args.command.startswith('backup-'):
             from backup import Recovery, Error
             recovery = Recovery(runtime, recovery_phrase)
             try:
@@ -859,5 +888,6 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.modules['runtime'] = sys.modules[__name__]  # helpers share this CLI's exception identity
     sys.modules['runtime'] = sys.modules[__name__]
     sys.exit(main())

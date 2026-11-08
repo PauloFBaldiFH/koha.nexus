@@ -95,7 +95,7 @@ class SchedulesView(SectionView):
 
     # --- filters ----------------------------------------------------------
     def _platform_choices(self) -> None:
-        offered = schedules.platforms_offered(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"))
+        offered = schedules.platforms_offered(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"), self.app.platform_ready("dspace"))
         if self.platform not in offered:
             self.platform = ""
         select = self.query_one("#sc-platform", Select)

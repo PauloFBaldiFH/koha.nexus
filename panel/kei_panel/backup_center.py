@@ -26,8 +26,11 @@ from .i18n import t
 
 KOHA, TAINACAN, BOTH = "koha", "tainacan", "both"
 DSPACE = "dspace"
-SCOPES = (KOHA, TAINACAN, DSPACE, BOTH)
-SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace"}
+KOHA_DSPACE, TAINACAN_DSPACE, ALL = "koha-dspace", "tainacan-dspace", "all"
+MEMBERS = {KOHA:(KOHA,), TAINACAN:(TAINACAN,), DSPACE:(DSPACE,), BOTH:(KOHA,TAINACAN),
+           KOHA_DSPACE:(KOHA,DSPACE), TAINACAN_DSPACE:(TAINACAN,DSPACE), ALL:(KOHA,TAINACAN,DSPACE)}
+SCOPES = (KOHA, TAINACAN, DSPACE, BOTH, KOHA_DSPACE, TAINACAN_DSPACE, ALL)
+SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace", KOHA_DSPACE: "Koha + DSpace", TAINACAN_DSPACE: "Tainacan + DSpace", ALL: "Koha + Tainacan + DSpace"}
 
 NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 
@@ -35,7 +38,8 @@ NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 def scopes(koha: bool, tainacan: bool, dspace: bool = False) -> list[str]:
     """The platforms the center offers: the installed ones, Koha first,
     and the two as a set when both are installed."""
-    return [s for s, on in ((KOHA, koha), (TAINACAN, tainacan), (DSPACE, dspace), (BOTH, koha and tainacan)) if on]
+    installed = {KOHA:koha, TAINACAN:tainacan, DSPACE:dspace}
+    return [scope for scope in SCOPES if all(installed[p] for p in MEMBERS[scope])]
 
 
 def pick_scope(wanted: str, offered: list[str]) -> str:
@@ -189,3 +193,18 @@ def tainacan_plans(backups, keep: str = "", remotes: list[cloud.Remote] | None =
     crypt = any(r.name == copy_remote and r.encrypted for r in (remotes or []))
     return [PlanRow(t("Tainacan backup"), " + ".join(where), schedule, retention,
                     tainacan_encryption(backups.key, backups.repo, crypt), last, state)]
+
+
+def operation_plans(data: dict, scope: str) -> list[PlanRow]:
+    rows=[]
+    for plan in data.get('plans',[]):
+        if tuple(plan.get('members',[])) != MEMBERS.get(scope): continue
+        last=plan.get('last') or {}
+        status='ok' if last.get('capture')=='ok' and last.get('copy')!='failed' else 'bad' if last else ''
+        stamp=last.get('finished')
+        import time
+        text=time.strftime('%Y-%m-%d %H:%M',time.localtime(stamp)) if isinstance(stamp,(int,float)) else t(NO_RECORD)
+        rows.append(PlanRow(plan['id'],plan['destination']+(' + '+plan['remote'] if plan.get('remote') else ''),
+            t('Daily at ${time}',time=plan['time']) if plan.get('time') else t('Off'),str(plan['keep']),
+            t('Entire package encrypted with the backup key'),text,status))
+    return rows

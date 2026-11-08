@@ -14,6 +14,9 @@ import { now } from "./env";
 import { pbkdf2, randomBytes, randomToken, sha256Hex, toBase64 } from "./crypto";
 import { HttpError, json, parseJson, str } from "./http";
 import {
+  repositoryFits,
+  REPOSITORY_SUFFIX,
+  DSPACE_ORIGIN_PORT,
   collectionFits,
   collectionSuffix,
   hostnamesFor,
@@ -66,13 +69,22 @@ export function readServices(value: unknown): Services {
       value.some((v) => typeof v !== "string" || !(SERVICE_NAMES as readonly string[]).includes(v))) {
     throw new HttpError(400, `services must be a list of ${SERVICE_NAMES.join(", ")}`);
   }
-  return { koha: value.includes("koha"), tainacan: value.includes("tainacan") };
+  return { koha: value.includes("koha"), tainacan: value.includes("tainacan"), ...(value.includes("dspace") ? {dspace:true} : {}) };
 }
 
 // What this broker can publish, for the installer to offer (or not) the
 // free address of Tainacan before asking anything.
-export function capabilities(env: Env): Response {
-  return json({ services: [...SERVICE_NAMES], collection_suffix: collectionSuffix(env) });
+export async function repositoryEnabled(env:Env):Promise<boolean> {
+  if (env.DSPACE_ENABLED !== "true") return false;
+  try {
+    const feature=await env.DB.prepare("SELECT value FROM broker_features WHERE name='dspace'").first<{value:string}>();
+    return feature?.value === "1";
+  } catch {return false;}
+}
+export async function capabilities(env: Env): Promise<Response> {
+  const enabled=await repositoryEnabled(env);
+  return json({services:SERVICE_NAMES.filter(n=>n!=="dspace"||enabled),collection_suffix:collectionSuffix(env),
+    ...(enabled ? {repository_suffix:env.DSPACE_SUFFIX ?? REPOSITORY_SUFFIX,repository_origin_port:DSPACE_ORIGIN_PORT} : {})});
 }
 
 export async function deviceStart(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
@@ -85,9 +97,11 @@ export async function deviceStart(request: Request, env: Env, body: ArrayBuffer)
   if (cnpj && cnpj.length !== 14) throw new HttpError(400, "cnpj must have 14 digits");
   const requested = str(b.requested_name, "requested_name", { max: 100, optional: true });
   const services = readServices(b.services);
+  const enabled=await repositoryEnabled(env);
+  if(services.dspace && !enabled) throw new HttpError(409,"repository addresses are not enabled on this broker");
 
-  const opts = { prefix: env.NAME_PREFIX, staffSuffix: env.STAFF_SUFFIX, collectionSuffix: collectionSuffix(env) };
-  const max = maxSlugLength(opts.prefix, opts.staffSuffix, opts.collectionSuffix);
+  const opts = { prefix: env.NAME_PREFIX, staffSuffix: env.STAFF_SUFFIX, collectionSuffix: collectionSuffix(env), repositorySuffix: enabled ? (env.DSPACE_SUFFIX ?? REPOSITORY_SUFFIX) : "" };
+  const max = maxSlugLength(opts.prefix, opts.staffSuffix, opts.collectionSuffix, opts.repositorySuffix);
   let slug = slugify(requested || institution).slice(0, max).replace(/-+$/, "");
 
   const deviceCode = randomToken(32);
@@ -383,25 +397,36 @@ export async function deleteStaffCredentials(request: Request, env: Env, body: A
 // the address is DELETE /v1/library).
 export async function putServices(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {
   const lib = await signedLibrary(request, env, body);
-  const b = parseJson<{ tainacan?: unknown }>(body);
-  if (typeof b.tainacan !== "boolean") throw new HttpError(400, "tainacan must be true or false");
+  const b = parseJson<{ tainacan?: unknown; dspace?: unknown }>(body);
+  if ((typeof b.tainacan !== "boolean" && typeof b.dspace !== "boolean") ||
+      (b.tainacan !== undefined && typeof b.tainacan !== "boolean") ||
+      (b.dspace !== undefined && typeof b.dspace !== "boolean")) throw new HttpError(400,"service choices must be boolean");
+  if (b.dspace === true && !await repositoryEnabled(env)) throw new HttpError(409,"repository addresses are not enabled");
   if (lib.status !== "active" && lib.status !== "suspended") throw new HttpError(409, `library is ${lib.status}`);
   const current = parseServices(lib.services);
-  const next = { ...current, tainacan: b.tainacan };
-  if (!next.koha && !next.tainacan) {
+  const next = { ...current, ...(b.tainacan!==undefined ? {tainacan:b.tainacan} : {}), ...(b.dspace!==undefined ? {dspace:b.dspace} : {}) };
+  if (!next.koha && !next.tainacan && !next.dspace) {
     throw new HttpError(409, "this address publishes only Tainacan: remove the address instead");
   }
   if (next.tainacan && !collectionFits(lib.slug, env)) {
     throw new HttpError(409, "this library's name is too long for a collection address");
   }
+  if (next.dspace && !repositoryFits(lib.slug,env)) throw new HttpError(409,"this library name is too long for a repository address");
   if (servicesText(next) !== servicesText(current)) {
-    await provisioner(env, lib.id).setServices(lib.id, servicesText(next));
-    await audit(env, `library:${lib.id}`, b.tainacan ? "services.tainacan_on" : "services.tainacan_off", lib.id);
+    await provisioner(env, lib.id).setServices(lib.id, servicesText(next), lib.services);
+    await audit(env, `library:${lib.id}`, b.dspace!==undefined ? (b.dspace ? "services.dspace_on" : "services.dspace_off") : (b.tainacan ? "services.tainacan_on" : "services.tainacan_off"), lib.id);
   }
   return json({
     services: SERVICE_NAMES.filter((n) => next[n]),
     hostnames: publishedHostnames(lib.slug, env, next),
   });
+}
+
+export async function detachRepository(request:Request,env:Env,body:ArrayBuffer):Promise<Response> {
+  const lib=await signedLibrary(request,env,body);
+  const result=await provisioner(env,lib.id).detachRepository(lib.id);
+  await audit(env,`library:${lib.id}`,"services.dspace_off",lib.id);
+  return json(result,result.job_id?202:200);
 }
 
 export async function rotateToken(request: Request, env: Env, body: ArrayBuffer): Promise<Response> {

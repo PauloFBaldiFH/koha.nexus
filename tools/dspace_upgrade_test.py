@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Review recipe 3 -> 4 against actual historical images, in an EMPTY disposable runner.
+
+No historical image is relabelled as a different release. Builds come from the
+pinned original repository export. This tests a same-DSpace-version image update,
+not a schema upgrade or migration from arbitrary upstream installations.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import subprocess
+import sys
+
+REPO=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(REPO/'platforms/dspace'))
+from runtime import Runtime, Refused, atomic, digest, read_json
+from operations import Operations
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--disposable',action='store_true');args=parser.parse_args()
+    root=Path('/var/lib/koha-nexus/platforms/dspace')
+    if not args.disposable or os.geteuid()!=0 or root.exists():parser.error('Requires root, --disposable and an empty dedicated runner.')
+    output=Path(os.environ['RUNNER_TEMP'])
+    old_catalog=output/'legacy-catalog.json';new_catalog=output/'current-catalog.json'
+    previous=digest(REPO/'platforms/dspace/release-r3.json')
+    images={}
+    for name in ('backend','ui','solr'):
+        image=json.loads(subprocess.check_output(['docker','--host=unix:///var/run/docker.sock','image','inspect','nexus-dspace-'+name+':10.1-r3'],text=True))[0]
+        assert image['Config']['Labels']['org.koha-nexus.dspace.release-lock']==previous
+        images[name]=image['Id']
+    old_catalog.write_text(json.dumps({'schema':1,'release_sha256':previous,'images':images}))
+    new_catalog.write_text(subprocess.check_output([sys.executable,str(REPO/'tools/dspace_catalog.py')],text=True))
+    rt=Runtime(root,old_catalog,lab=True,driver=str(REPO/'installer'),release_lock=previous)
+    rt.install('http://repository.kei.test:8100')
+    try:
+        email='upgrade@example.org';password=secrets.token_urlsafe(24)
+        rt.admin('create',dict(email=email,first='Nexus',last='Upgrade',language='en',password=password))
+        from dspace_browser_test import API
+        api=API(rt.state()['url']);api.login(email,password)
+        community=api.request('/core/communities','POST',{'metadata':{'dc.title':[{'value':'Nexus historical upgrade community'}]}})
+        collection=api.request('/core/collections?parent='+community['uuid'],'POST',{'metadata':{'dc.title':[{'value':'Nexus historical upgrade collection'}]}})
+        # The official import CLI creates an archived item and bitstream in recipe 3.
+        rt.compose('exec','-T','backend','sh','-ec','mkdir -p /dspace/imports/upgrade-fixture/item')
+        files={'dublin_core.xml':'<dublin_core><dcvalue element="title" qualifier="none">Historical upgrade document</dcvalue></dublin_core>',
+               'contents':'document.txt\n','document.txt':'historical document must survive the update\n'}
+        for name,text in files.items():rt.compose('exec','-T','backend','sh','-ec','cat > "$1"','fixture','/dspace/imports/upgrade-fixture/item/'+name,input_text=text)
+        rt.compose('run','--rm','--no-deps','-T','backend','cli','import','--add','--eperson',email,'--collection',collection['uuid'],
+            '--source','/dspace/imports/upgrade-fixture','--mapfile','/dspace/imports/upgrade-map',timeout=300)
+        rt.compose('run','--rm','--no-deps','-T','backend','cli','index-discovery','-b',timeout=300)
+        schema=rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc','SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
+        owned={k:v['name'] for k,v in read_json(root/'compose.json')['volumes'].items()}
+        from dspace_recovery_test import prepare, assert_history
+        recovery,_=prepare(rt)
+        op=Operations(rt,recovery.phrase)
+        # Exercise a real failed validation after changing images; rollback may not rewind repository data.
+        original_health=rt.health;calls=[0]
+        def fail_once():
+            calls[0]+=1
+            if calls[0]==2:raise Refused('Disposable injected post-update health failure')
+            return original_health()
+        # capture resumes invokes health, isolated clone uses its own probes, then update validates.
+        rt.health=fail_once
+        with rt.lock():
+            try:op.upgrade({'catalog':str(new_catalog)},True)
+            except Refused:pass
+            else:raise AssertionError('Injected failed update unexpectedly succeeded')
+        rt.health=original_health
+        assert rt.state()['release_sha256']==previous
+        assert op.journal.exists() and read_json(op.journal)['phase']=='rolled-back'
+        with rt.lock():result=op.upgrade({'catalog':str(new_catalog)},True)
+        assert result['updated'] and rt.state()['release_sha256']==digest(REPO/'platforms/dspace/release.json')
+        assert owned=={k:v['name'] for k,v in read_json(root/'compose.json')['volumes'].items()}
+        assert schema==rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc','SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
+        assert_history(rt)
+        current=API(rt.state()['url']);current.login(email,password)
+        assert current.request('/core/collections/'+collection['uuid'])['uuid']==collection['uuid']
+        # Official export proves the old bitstream contents, not just volume names.
+        rt.compose('exec','-T','backend','sh','-ec','find /dspace/assetstore -type f -print0 | xargs -0 sha256sum > /dspace/reports/upgrade-files.sha256')
+        expected=hashlib.sha256(files['document.txt'].encode()).hexdigest()
+        assert expected in rt.compose('exec','-T','backend','cat','/dspace/reports/upgrade-files.sha256')
+        (output/'dspace-upgrade-acceptance.json').write_text(json.dumps(dict(actual_recipe3_images=True,same_version_update=True,
+            failed_validation_rollback=True,administrator_and_collection_preserved=True,document_checksum_preserved=True,
+            schema_history_unchanged=True,old_volumes_preserved=True,major_version_migration=False)))
+        print('PASS: actual recipe 3 -> 4, injected failure rollback and historical document',flush=True)
+    finally:
+        rt.compose('down','--timeout','90',timeout=420)  # no volume pruning; disposable runner owns final cleanup
+    return 0
+
+if __name__=='__main__':sys.exit(main())

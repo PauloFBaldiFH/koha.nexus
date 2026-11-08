@@ -24,6 +24,9 @@ export interface Env {
   STAFF_SUFFIX: string;
   /** Tainacan's address: <slug><TAINACAN_SUFFIX>; unset = "-acervo". */
   TAINACAN_SUFFIX?: string;
+  DSPACE_SUFFIX?: string;
+  /** Enable new repository requests only after migration 0004 and a reviewed rollout. */
+  DSPACE_ENABLED?: string;
   AUTO_APPROVE: string;
   MAX_LIBRARIES_PER_DAY: string;
   PBKDF2_ITERATIONS: string;

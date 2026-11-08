@@ -21,6 +21,7 @@ Routine = Callable[[object], Awaitable[None]]
 ROUTINES: dict[str, Routine] = {
     **{"dspace-" + name: getattr(dspace, name) for name in ("install", "start", "stop", "diagnose", "logs", "admin", "help")},
     "setup-dspace": dspace.assistant,
+    **{"dspace-"+name.replace("_","-"):getattr(dspace,name) for name in ("plan","plan_run","address","upgrade","remove")},
     "dspace-backup-key": platforms.backup_setup,
     "dspace-backup-create": dspace.backup_create,
     "dspace-backup-test": dspace.backup_test,

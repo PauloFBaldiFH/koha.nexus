@@ -252,7 +252,10 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔐  Administrative access", "dspace-admin", kind="native", requires="dspace"),
         Entry("🩺  DSpace diagnosis & maintenance", "dspace-maintenance", kind="view"),
         Entry("💾  DSpace backups", "backups", kind="view", scope="dspace"),
+        Entry("🌐  DSpace address and HTTPS", "dspace-address", kind="native", requires="dspace"),
+        Entry("🔄  Reviewed DSpace update", "dspace-upgrade", kind="native", requires="dspace"),
         Entry("📖  DSpace first steps", "dspace-help", kind="native", requires="dspace"),
+        Entry("🗑  Remove DSpace", "dspace-remove", kind="native", zone="removal", requires="dspace"),
     ), view="platform-home", key="j", group="dspace"),
     Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
         Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native"),
@@ -270,6 +273,8 @@ SECTIONS: tuple[Section, ...] = (
     # (or none yet) can add one; what each platform sends, where, when and
     # for how long is its own plan.
     Section("backups", "💾  Backup center", "💾 Backup Center", "Choose a backup routine:", (
+        Entry("⏰  DSpace and platform-set plans", "dspace-plan", kind="native", requires="dspace"),
+        Entry("▶  Run an encrypted backup plan", "dspace-plan-run", kind="native", requires="dspace"),
         Entry("🔐  Set up the DSpace backup key", "dspace-backup-key", kind="native", requires="dspace"),
         Entry("💾  Create encrypted DSpace backup", "dspace-backup-create", kind="native", requires="dspace"),
         Entry("🧪  Test DSpace recovery", "dspace-backup-test", kind="native", requires="dspace"),
@@ -297,6 +302,7 @@ SECTIONS: tuple[Section, ...] = (
     # Every scheduled job of the server, from every source, read only
     # (views/schedules.py); the cards are the editors (Paulo, 2026-11-06).
     Section("schedules", "⏰  Schedules", "⏰ Schedules", entries=(
+        Entry("⏰  DSpace and platform-set plans", "dspace-plan", kind="native", requires="dspace"),
         Entry("✏  Koha's scheduled jobs", "crons", kind="view", requires="koha"),
         Entry("⏰  Schedule backups", "pbackup-schedule", kind="native", requires="tainacan"),
         Entry("⏰  Schedule the joint backup", "set-schedule", kind="native", requires="koha+tainacan"),
@@ -365,7 +371,7 @@ def section(section_id: str) -> Section:
 # installer tasks (--task), none is a classic --run routine. The task a card
 # needs from the installer in use, or its card is not drawn.
 PLATFORM_TASKS: dict[str, str] = {
-    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key")},
+    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key", "dspace-plan", "dspace-plan-run", "dspace-address", "dspace-upgrade", "dspace-remove")},
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
