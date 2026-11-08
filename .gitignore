@@ -3,3 +3,5 @@
 .env.*
 !.env.example
 sru-bridge/
+__pycache__/
+*.pyc
