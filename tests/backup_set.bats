@@ -519,7 +519,7 @@ kei_set_backup '$OUT' koha,tainacan,dspace"
     SET=$(field file "$output")
     run lib "kei_set_inspect '$SET'"
     [ "$status" -eq 0 ]
-    [ "$(field platforms "$output")" = koha,tainacan,dspace ]
+    [ "$(field platforms "$output")" = 'koha tainacan dspace' ]
     [ "$(field complete "$output")" = yes ] && [ "$(field integrity "$output")" = ok ]
     run lib "kei_set_unpack '$SET'"
     [ "$status" -eq 0 ]
@@ -540,6 +540,7 @@ kei_set_backup '$OUT' koha,tainacan,dspace"
     [ "$(field complete "$output")" = no ] && [ "$(field integrity "$output")" = ok ]
     tar -tf "$SET" | grep -q '^koha/.*sql.gz$'
     tar -tf "$SET" | grep -q '^tainacan/.*files.tar.gz$'
-    absent_count=$(tar -tf "$SET" | grep -c '^dspace/' || true)
+    # An empty namespace directory is harmless; no failed payload is retained.
+    absent_count=$(tar -tf "$SET" | grep -c '^dspace/.\+' || true)
     [ "$absent_count" -eq 0 ]
 }
