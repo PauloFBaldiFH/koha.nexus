@@ -62,3 +62,12 @@ os builds sem cache continuam sendo executados pelos jobs de imagens quando
 as receitas ainda não têm um arquivo idêntico em cache.
 
 O estudo de múltiplas instâncias é independente e não entra nesta alteração.
+
+## Limite das imagens locais
+
+O catálogo local identifica as imagens deste Docker, não uma cópia publicada
+em registro. Os pacotes de dados existentes não incluem as próprias imagens.
+Uma recuperação em outro servidor também precisa transportar as mesmas imagens
+com `docker save`/`docker load`; recompilar pode gerar IDs diferentes. Não apagar
+as imagens usadas por uma instalação ou seus backups. A publicação de imagens
+pré-compiladas pode simplificar isso depois, mas não bloqueia o teste local.

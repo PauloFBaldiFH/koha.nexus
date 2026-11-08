@@ -27,7 +27,11 @@ def main():
     if root.exists():
         parser.error('An installation directory already exists; this machine is not empty.')
     output = Path(os.environ['RUNNER_TEMP'])
-    catalog = output / 'dspace-test-images.json'
+    # Exercise the normal root-owned destination. RUNNER_TEMP belongs to the
+    # unprivileged runner and must not become a root-executed catalog directory.
+    catalog = Path('/etc/koha-nexus/dspace-images.json')
+    if catalog.exists():
+        parser.error('An image catalog already exists; this machine is not empty.')
     rt = module.Runtime(root, catalog, driver=str(REPO / 'installer'),
                         progress=lambda phase: print('::notice title=DSpace phase::' + phase, flush=True))
     def check(cond, message):
