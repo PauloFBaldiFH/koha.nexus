@@ -312,3 +312,17 @@ def test_dspace_plan_cron_is_read_only_and_filters_under_each_explicit_member():
     assert schedules.shown(rows,'dspace')==rows
     assert schedules.shown(rows,'koha')==rows
     assert schedules.platforms_offered(False,False,True)==['dspace','server']
+
+
+def test_dspace_plan_rows_show_their_last_run_and_never_call_a_failure_ok():
+    # The agreed pattern: each schedule shows system, short text, last run and status.
+    files={'koha-nexus-plan-all':'# Managed by Koha.Nexus: backup plan all\n# Members=koha,tainacan,dspace\n30 2 * * * root KEI_DSPACE_OPERATIONS_DATA=\'{"id":"all"}\' /usr/local/bin/config.sh --task dspace operations plan-run --confirm >/dev/null 2>&1\n'}
+    rows=schedules.collect(files,'library',False)
+    stamp=dt.datetime(2026,11,8,2,31).timestamp()
+    good=dict(started=stamp-60,finished=stamp,capture='ok',copy='ok',retention='ok')
+    last=schedules.operation_last_runs({'plans':[{'id':'all','last':good}]})
+    schedules.fill_times(rows,dt.datetime(2026,11,8,12,0),last)
+    assert rows[0].last=='2026-11-08 02:31 · OK' and rows[0].last_state=='ok'
+    for bad in (dict(good,capture='partial'),dict(good,copy='failed'),dict(good,retention='not-run')):
+        assert schedules.operation_last_runs({'plans':[{'id':'all','last':bad}]})['operations:koha-nexus-plan-all'][1]=='bad'
+    assert schedules.operation_last_runs({'plans':[{'id':'all','last':None}]})=={}

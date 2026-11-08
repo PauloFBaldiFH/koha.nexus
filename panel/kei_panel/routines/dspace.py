@@ -259,6 +259,7 @@ def operation_text(action, plan):
     if action=='upgrade':
         return '\n'.join([t('Reviewed update: DSpace 10.1, recipe ${old} to ${new}.',old=plan['from_recipe'],new=plan['to_recipe']),
             t('Database schema and persistent volumes remain unchanged. An encrypted safety backup is verified first.'),
+            t('After a successful update, backups made before it (including this safety backup) are refused by recovery on this installation: it requires the exact image matrix. A failed update rolls back automatically.') if plan.get('earlier_backups_restorable_after_update') is False else '',
             t('The repository pauses during this operation. Continue?')])
     if action=='remove':
         return '\n'.join([t('Keep all repository data and configuration.') if plan['keep_data'] else t('Erase the active owned repository volumes after verifying a safety backup. Backups and earlier recovery volumes remain.'),

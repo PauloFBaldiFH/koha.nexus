@@ -419,6 +419,26 @@ def set_last_run(value: str) -> tuple[str, str] | None:
     return f"{bits[0][:16]} · {text}", state
 
 
+def operation_last_runs(data: dict) -> dict[str, tuple[str, str]]:
+    """The DSpace/platform-set plans' own private history (operations plans):
+    keyed like their cron rows. A partial capture, failed copy or failed
+    retention is never shown as OK."""
+    import time
+    out: dict[str, tuple[str, str]] = {}
+    for plan in (data or {}).get("plans", []) or []:
+        last = plan.get("last") or {}
+        name = plan.get("id")
+        stamp = last.get("finished") or last.get("started")
+        if not isinstance(name, str) or not isinstance(stamp, (int, float)):
+            continue
+        good = (last.get("capture") == "ok" and last.get("copy") in ("ok", "not-requested")
+                and last.get("retention") == "ok")
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(stamp))
+        out["operations:koha-nexus-plan-" + name] = (f"{when} · " + (t("OK") if good else t("FAILED")),
+                                                     "ok" if good else "bad")
+    return out
+
+
 def last_runs(backup: dict, plans, history, tainacan_backups, joint: str = "") -> dict[str, tuple[str, str]]:
     """The runs a reliable record says happened: the nightly SQL backup's
     log, each cloud backup's lines in the backup logs, the newest complete

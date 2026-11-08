@@ -414,7 +414,10 @@ class Operations:
         from runtime import Runtime
         candidate=Runtime(self.rt.root.parent/'upgrade-candidate'/'dspace',catalog,self.rt.lab,self.rt.driver,release_lock=target_hash)
         images=candidate.images()
-        plan=dict(from_recipe=3,to_recipe=4,release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True)
+        plan=dict(from_recipe=3,to_recipe=4,release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True,
+                  # Recovery requires the exact installed image matrix (PR4); recipe 3 packages,
+                  # including this safety backup, are refused once recipe 4 is confirmed.
+                  earlier_backups_restorable_after_update=False)
         if not confirm:return plan
         if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
         recovery=Recovery(self.rt,self.phrase);recovery.recover_capture()

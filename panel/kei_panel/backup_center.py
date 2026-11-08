@@ -200,7 +200,8 @@ def operation_plans(data: dict, scope: str) -> list[PlanRow]:
     for plan in data.get('plans',[]):
         if tuple(plan.get('members',[])) != MEMBERS.get(scope): continue
         last=plan.get('last') or {}
-        status='ok' if last.get('capture')=='ok' and last.get('copy')!='failed' else 'bad' if last else ''
+        status=('ok' if last.get('capture')=='ok' and last.get('copy') in ('ok','not-requested') and last.get('retention')=='ok'
+                else 'bad' if last else '')
         stamp=last.get('finished')
         import time
         text=time.strftime('%Y-%m-%d %H:%M',time.localtime(stamp)) if isinstance(stamp,(int,float)) else t(NO_RECORD)
