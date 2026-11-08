@@ -308,7 +308,7 @@ jobs:
   publish:
     # A PR/push never publishes packages. Publication is a separate explicit action.
     if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
-    needs: [installation]
+    needs: [installation, upgrade]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

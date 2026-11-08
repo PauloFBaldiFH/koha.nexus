@@ -605,6 +605,14 @@ class Runtime:
         result.update(schema=1, platform='dspace', experimental=True, health='not-checked',
                       admin_available=state.get('release_sha256') == self.release_hash)
         result['public_access'] = 'not-checked'
+        journal=self.root/'operations.json'
+        if journal.exists():
+            from operations import trusted_json
+            operation=trusted_json(journal)
+            if operation.get('phase') not in ('complete','rolled-back'):
+                result['operation']={k:operation.get(k) for k in ('operation','phase')}
+                result['status']='degraded'
+                result['reason']='An interrupted operation requires explicit recovery; data were preserved.'
         try:
             ids = self.docker('ps', '-aq', '--filter', 'label=com.docker.compose.project=' + PROJECT).split()
             observed = {}
@@ -759,7 +767,7 @@ class Runtime:
                 '  ProxyPassReverse /server http://127.0.0.1:%s/server\n' % int(state['ports']['backend']) +
                 '  ProxyPass / http://127.0.0.1:%s/ timeout=300\n' % int(state['ports']['ui']) +
                 '  ProxyPassReverse / http://127.0.0.1:%s/\n' % int(state['ports']['ui']) +
-                '  <LocationMatch "^/server/(actuator|config)(/|$)">\n    Require all denied\n  </LocationMatch>\n' +
+                '  <LocationMatch "^/server/(actuator|config|oai)(/|$)">\n    Require all denied\n  </LocationMatch>\n' +
                 '</VirtualHost>\n')
 
 

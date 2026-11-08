@@ -7755,7 +7755,7 @@
   },
   "🌐  DSpace address and HTTPS": {
    "en": "🌐  DSpace address and HTTPS",
-   "pt-BR": null,
+   "pt-BR": "🌐  Endereço e HTTPS do DSpace",
    "es": null,
    "fr": null,
    "it": null,
@@ -7780,7 +7780,7 @@
   },
   "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.": {
    "en": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
-   "pt-BR": null,
+   "pt-BR": "Planeja o endereço local, HTTPS institucional ou gratuito do repositório sem alterar outra plataforma. HTTPS exige certificado/chave existentes ou proxy TLS externo. A mudança de URL faz e testa um backup cifrado antes.",
    "es": null,
    "fr": null,
    "it": null,
@@ -7805,7 +7805,7 @@
   },
   "🔄  Reviewed DSpace update": {
    "en": "🔄  Reviewed DSpace update",
-   "pt-BR": null,
+   "pt-BR": "🔄  Atualização homologada do DSpace",
    "es": null,
    "fr": null,
    "it": null,
@@ -7830,7 +7830,7 @@
   },
   "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.": {
    "en": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
-   "pt-BR": null,
+   "pt-BR": "Atualiza somente a receita 3 para 4 homologada do DSpace 10.1, com catálogo imutável de imagens. Testa o backup de segurança, preserva esquema e volumes e retorna à configuração anterior se a validação falhar.",
    "es": null,
    "fr": null,
    "it": null,
@@ -7905,7 +7905,7 @@
   },
   "🗑  Remove DSpace": {
    "en": "🗑  Remove DSpace",
-   "pt-BR": null,
+   "pt-BR": "🗑  Remover DSpace",
    "es": null,
    "fr": null,
    "it": null,
@@ -7930,7 +7930,7 @@
   },
   "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.": {
    "en": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",
-   "pt-BR": null,
+   "pt-BR": "Mantém os dados por padrão. Apagar os volumes ativos próprios exige confirmação digitada e backup de segurança testado. Preserva outras plataformas e infraestrutura compartilhada.",
    "es": null,
    "fr": null,
    "it": null,
@@ -8105,7 +8105,7 @@
   },
   "⏰  DSpace and platform-set plans": {
    "en": "⏰  DSpace and platform-set plans",
-   "pt-BR": null,
+   "pt-BR": "⏰  Planos do DSpace e conjuntos",
    "es": null,
    "fr": null,
    "it": null,
@@ -8130,7 +8130,7 @@
   },
   "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.": {
    "en": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.",
-   "pt-BR": null,
+   "pt-BR": "Cria ou edita plano com participantes fixos, horário diário, retenção e conexão de nuvem existente opcional. Planos antigos de Koha/Tainacan nunca passam a incluir DSpace implicitamente.",
    "es": null,
    "fr": null,
    "it": null,
@@ -8155,7 +8155,7 @@
   },
   "▶  Run an encrypted backup plan": {
    "en": "▶  Run an encrypted backup plan",
-   "pt-BR": null,
+   "pt-BR": "▶  Executar plano de backup cifrado",
    "es": null,
    "fr": null,
    "it": null,
@@ -8180,7 +8180,7 @@
   },
   "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.": {
    "en": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.",
-   "pt-BR": null,
+   "pt-BR": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos.",
    "es": null,
    "fr": null,
    "it": null,
@@ -23257,7 +23257,7 @@
    "manual": 172,
    "manual_total": 172,
    "manual_outdated": [],
-   "strings": 503,
+   "strings": 513,
    "strings_total": 519
   },
   "es": {

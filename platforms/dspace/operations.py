@@ -24,16 +24,32 @@ IDENTIFIER = re.compile(r'[a-z][a-z0-9-]{0,31}')
 REMOTE = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[A-Za-z0-9_./-]{1,180}')
 
 
-def private(path, create=False):
+def private(path, create=False, allow_read=False):
     path = Path(path).absolute()
-    if path.resolve() != path:
-        raise Refused('Use a canonical path without symbolic links.')
-    if create:
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    info = path.stat()
-    if not path.is_dir() or info.st_uid != os.geteuid() or info.st_mode & 0o077:
-        raise Refused('Choose a private directory owned by the operator (root for scheduled operations).')
+    try:
+        if path.resolve() != path:raise Refused('Use a canonical path without symbolic links.')
+    except (OSError,RuntimeError):raise Refused('Use a canonical path without symbolic links.') from None
+    operator=os.geteuid()
+    # Public-readable backup parents are fine; writable untrusted ancestors are not.
+    # Root's sticky /tmp is permitted, since other users cannot rename our root-owned child.
+    for ancestor in (path,*path.parents):
+        if not ancestor.exists():continue
+        info=ancestor.stat()
+        sticky=ancestor!=path and info.st_uid==0 and info.st_mode & stat.S_ISVTX
+        if info.st_uid not in (0,operator) or (info.st_mode & 0o022 and not sticky):
+            raise Refused('A backup path has an untrusted or writable parent; choose a server backup directory.')
+    if create:path.mkdir(mode=0o700,parents=True,exist_ok=True)
+    info=path.stat()
+    forbidden=0o022 if allow_read else 0o077
+    if not path.is_dir() or info.st_uid!=operator or info.st_mode & forbidden:
+        raise Refused('Choose a trusted backup folder; each plan uses its own private subfolder.')
     return path
+
+
+def cloud_env():
+    env=local_docker_env()
+    env.setdefault('RCLONE_CONFIG','/root/.config/rclone/rclone.conf')
+    return env
 
 
 def trusted_json(path):
@@ -83,14 +99,14 @@ class Operations:
         if hour and not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', hour): raise Refused('Use HH:MM or an empty time to disable the schedule.')
         keep = data.get('keep', 7)
         if isinstance(keep, bool) or not isinstance(keep, int) or not 1 <= keep <= 365: raise Refused('Keep 1 to 365 successful packages.')
-        dest = private(data.get('destination', ''))
+        dest = private(data.get('destination', ''), allow_read=True)
         if dest == self.rt.root or self.rt.root in dest.parents or dest in self.rt.root.parents:
             raise Refused('Backups must be outside the platform configuration directory.')
         remote = data.get('remote', '')
         if not isinstance(remote, str) or (remote and (not REMOTE.fullmatch(remote) or '..' in remote.split('/') or any(x in remote for x in ('Backup_SQL_Koha', 'Backup_MARC_Koha')))):
             raise Refused('Choose an existing rclone connection and a separate backup folder.')
         if remote:
-            available = command(['rclone', 'listremotes'], timeout=30, env=local_docker_env()).splitlines()
+            available = command(['rclone', 'listremotes'], timeout=30, env=cloud_env()).splitlines()
             if remote.split(':')[0] + ':' not in available: raise Refused('The chosen cloud connection does not exist.')
         return dict(schema=1, id=name, members=selected, time=hour, keep=keep, destination=str(dest), remote=remote)
 
@@ -182,8 +198,8 @@ class Operations:
                 if plan['remote']:
                     record['copy'] = 'failed'
                     remote = plan['remote'].rstrip('/') + '/' + target.name
-                    command(['rclone', 'copyto', str(target), remote], timeout=21600, env=local_docker_env())
-                    verified = json.loads(command(['rclone', 'lsjson', '--stat', remote], timeout=120, env=local_docker_env()))
+                    command(['rclone', 'copyto', str(target), remote], timeout=21600, env=cloud_env())
+                    verified = json.loads(command(['rclone', 'lsjson', '--stat', remote], timeout=120, env=cloud_env()))
                     if verified.get('Size') != target.stat().st_size: raise Refused('The cloud copy size was not verified.')
                     record.update(copy='ok', remote=remote)
                 history.append(record)
@@ -210,13 +226,13 @@ class Operations:
                 raise Refused('An old backup changed; automatic retention refused.')
             # Remote deletion is intentionally exact and only after a newer copy succeeded.
             if row.get('remote') and plan['remote'] and row['remote'] == plan['remote'].rstrip('/') + '/' + path.name:
-                command(['rclone', 'deletefile', row['remote']], timeout=300, env=local_docker_env())
+                command(['rclone', 'deletefile', row['remote']], timeout=300, env=cloud_env())
             path.unlink(missing_ok=True); path.with_suffix('.sha256').unlink(missing_ok=True)
             row['deleted'] = True
 
     def pending(self):
         if self.journal.exists() and trusted_json(self.journal).get('phase') not in ('complete', 'rolled-back'):
-            raise Refused('An interrupted DSpace operation needs explicit operations-rollback before another mutation.')
+            raise Refused('Interrupted DSpace operation. Resume the same removal, or use config.sh --task dspace operations rollback --confirm for an address/update rollback.')
 
     def snapshot(self, operation):
         self.pending()
@@ -271,16 +287,32 @@ class Operations:
             command(['openssl','x509','-in',cert,'-noout','-checkhost',u.hostname],timeout=10)
             command(['openssl','x509','-in',cert,'-noout','-checkend','86400'],timeout=10)
             public=command(['openssl','x509','-in',cert,'-noout','-pubkey'],timeout=10)
-            actual=command(['openssl','pkey','-in',key,'-pubout'],timeout=10)
+            actual=command(['openssl','pkey','-in',key,'-passin','pass:','-pubout'],timeout=10)
             if public!=actual: raise Refused('Certificate and private key do not match.')
-        return dict(previous_url=self.rt.state()['url'],url=url,mode=mode,origin_port=port,certificate=cert,key=key,
-                    safety_backup=True,external_proxy_manual=mode=='external',identifier_changes=False)
+        plan=dict(previous_url=self.rt.state()['url'],url=url,mode=mode,origin_port=port,certificate=cert,key=key,
+                    safety_backup=True,external_proxy_manual=mode=='external',identifier_changes=False,
+                    oai_publication='disabled pending live permission/index reconciliation acceptance')
+        if mode=='external':
+            proxy=request.get('proxy','nginx')
+            if proxy not in ('nginx','caddy'):raise Refused('Choose nginx or caddy for the external proxy instructions.')
+            ports=self.rt.state()['ports']
+            headers='proxy_set_header Host '+u.netloc+'; proxy_set_header X-Forwarded-Proto https; proxy_set_header Forwarded \"\"; proxy_set_header X-Forwarded-Host '+u.netloc+'; proxy_set_header X-Forwarded-Port '+str(u.port or 443)+'; proxy_set_header X-Forwarded-For $remote_addr;'
+            nginx=('location ~ ^/server/(actuator|config|oai)(/|$) { deny all; }\n'
+                'location /server { proxy_pass http://127.0.0.1:'+str(ports['backend'])+'; '+headers+' proxy_read_timeout 300s; }\n'
+                'location / { proxy_pass http://127.0.0.1:'+str(ports['ui'])+'; '+headers+' proxy_read_timeout 300s; }\n')
+            caddy=('@internal path /server/actuator* /server/config* /server/oai*\nrespond @internal 403\n'
+                'handle /server* {\n reverse_proxy 127.0.0.1:'+str(ports['backend'])+' {\n header_up Host '+u.netloc+'\n header_up X-Forwarded-Proto https\n }\n}\n'
+                'handle {\n reverse_proxy 127.0.0.1:'+str(ports['ui'])+' {\n header_up Host '+u.netloc+'\n header_up X-Forwarded-Proto https\n }\n}\n')
+            plan['external_proxy_snippet']=nginx if proxy=='nginx' else caddy
+        return plan
 
     def address(self, request, confirm=False):
         plan=self.address_plan(request)
         if not confirm: return plan
         if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
-        if self.rt.state().get('url')==plan['url'] and self.rt.state().get('publication',{}).get('mode')==plan['mode']:return dict(plan,changed=False)
+        if self.rt.state().get('url')==plan['url'] and self.rt.state().get('publication',{}).get('mode')==plan['mode']:
+            if plan['mode']!='external':self.rt.core('proxy');self.rt.health()
+            return dict(plan,changed=False,managed_proxy_checked=plan['mode']!='external')
         recovery=Recovery(self.rt,self.phrase)
         package=recovery.capture()['package']
         # Recoverability is proven before any canonical URL or configuration changes.

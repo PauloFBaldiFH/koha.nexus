@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:local": "wrangler deploy --dry-run --outdir .wrangler/e2e-build",
-    "test:e2e": "npm run build:local && node test/e2e/run.mjs",
+    "test:e2e": "npm run build:local && node test/e2e/run.mjs && node test/e2e/dspace.mjs",
     "db:migrate:local": "wrangler d1 migrations apply kei-broker --local",
     "db:migrate": "wrangler d1 migrations apply kei-broker --remote"
   },

@@ -29,9 +29,15 @@ class Policies(unittest.TestCase):
         link=self.base/'linked';link.symlink_to(self.dest)
         for key,value in [('id','../other'),('time','24:00'),('time','2:30'),('keep',0),('keep',True),('destination',str(link)),('remote','r:path/../secret')]:
             with self.subTest(key=key,value=value),self.assertRaises(runtime.Refused):self.o.check_plan(dict(self.plan,**{key:value}))
-    def test_public_directory_refused_without_chmod(self):
-        self.dest.chmod(0o755)
+    def test_writable_backup_parent_is_refused_without_chmod(self):
+        self.dest.chmod(0o777)
         with self.assertRaises(runtime.Refused):self.o.check_plan(self.plan)
+        self.assertEqual(self.dest.stat().st_mode&0o777,0o777)
+    def test_readable_backup_parent_gets_a_private_plan_subfolder(self):
+        self.dest.chmod(0o755)
+        result=self.o.check_plan(self.plan)
+        folder=ops.private(Path(result['destination'])/'nexus-nightly',create=True)
+        self.assertEqual(folder.stat().st_mode&0o777,0o700)
         self.assertEqual(self.dest.stat().st_mode&0o777,0o755)
     def test_preview_never_writes_a_plan_or_cron(self):
         with patch.object(ops.Recovery,'crypto'):
@@ -67,12 +73,12 @@ class Policies(unittest.TestCase):
         runtime.atomic(self.o.journal,json.dumps({'phase':'prepared'}))
         with self.assertRaises(runtime.Refused):self.o.pending()
     def test_cleartext_secrets_never_appear_in_preview(self):
-        self.rt.state.return_value={'url':'http://repo.local:8100'}
+        self.rt.state.return_value={'url':'http://repo.local:8100','ports':{'backend':18101,'ui':18100}}
         with patch.object(ops.Recovery,'checked'):
             plan=self.o.address_plan({'url':'https://repo.example.org','mode':'external'})
         self.assertTrue(plan['safety_backup']);self.assertNotIn('db-password',json.dumps(plan))
     def test_tunnel_origin_is_distinct_from_canonical_https(self):
-        self.rt.state.return_value={'url':'http://repo.local:8100'}
+        self.rt.state.return_value={'url':'http://repo.local:8100','ports':{'backend':18101,'ui':18100}}
         with patch.object(ops.Recovery,'checked'):
             plan=self.o.address_plan({'url':'https://repo.example.org','mode':'tunnel','origin_port':18102})
         self.assertEqual(plan['origin_port'],18102);self.assertEqual(plan['url'],'https://repo.example.org')
@@ -88,5 +94,58 @@ class Policies(unittest.TestCase):
         self.rt.docker.assert_not_called()
     def test_protocol_values_are_never_executed(self):
         self.assertEqual(ops.fields('@@result file=/tmp/a\nignore\n@@result complete=yes\n'),{'file':'/tmp/a','complete':'yes'})
+
+
+
+class AddressTransaction(unittest.TestCase):
+    """Real private files/journal; explicit service and encryption doubles."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)/'dspace';self.root.mkdir(mode=0o700)
+        self.rt=runtime.Runtime(self.root,Path(self.temp.name)/'catalog.json',lab=True,driver='/test/installer')
+        self.cfg='dspace.ui.url = http://repo.test:8100\ndspace.server.url = http://repo.test:8100/server\nrest.cors.allowed-origins = http://repo.test:8100\ninstitution.custom = preserved\n'
+        compose={'services':{'ui':{'environment':{}}},'volumes':{'assetstore':{'name':'original-owned-assets'}}}
+        for name,text in [('local.cfg',self.cfg),('db-password','not-exported'),('compose.json',json.dumps(compose))]:runtime.atomic(self.root/name,text)
+        runtime.atomic(self.root/'state.json',json.dumps(dict(phase='ready',migration='done',prepared=True,url='http://repo.test:8100',ports={'backend':18101,'ui':18100},release_sha256=self.rt.release_hash,files={n:runtime.digest(self.root/n) for n in ('local.cfg','db-password','compose.json')})))
+        self.rt.existing_resources=Mock();self.rt.core=Mock(return_value='apache-nexus')
+        self.rt.compose=Mock();self.rt.dependencies=Mock();self.rt.health=Mock()
+        self.op=ops.Operations(self.rt,'test-only phrase')
+        # UID/GID mechanics are exercised on the root CI runner; this test runs unprivileged.
+        self.atomic_patch=patch.object(ops,'atomic',side_effect=lambda p,text,mode=0o600,gid=None:runtime.atomic(p,text,mode))
+        self.atomic_patch.start();self.addCleanup(self.atomic_patch.stop)
+        for name,value in [('capture',{'package':'test-only-encrypted-package'}),('test',{'verified':True})]:
+            patcher=patch.object(ops.Recovery,name,return_value=value);patcher.start();self.addCleanup(patcher.stop)
+    def test_success_preserves_custom_config_volume_refs_and_records_only_completion(self):
+        result=self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertTrue(result['changed']);self.assertIn('institution.custom = preserved',(self.root/'local.cfg').read_text())
+        self.assertEqual(json.loads((self.root/'compose.json').read_text())['volumes']['assetstore']['name'],'original-owned-assets')
+        self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'complete')
+        self.assertEqual(self.rt.state()['files']['local.cfg'],runtime.digest(self.root/'local.cfg'))
+    def test_failed_health_check_rolls_back_actual_files_before_reporting_failure(self):
+        self.rt.health.side_effect=[runtime.Refused('Injected failed health'),None]
+        with self.assertRaises(runtime.Refused):self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertEqual((self.root/'local.cfg').read_text(),self.cfg)
+        self.assertEqual(self.rt.state()['url'],'http://repo.test:8100')
+        self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'rolled-back')
+    def test_failed_rollback_keeps_recovery_journal_and_blocks_other_mutation(self):
+        self.rt.health.side_effect=runtime.Refused('Service unavailable')
+        with self.assertRaises(runtime.Refused):self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'prepared')
+        with self.assertRaises(runtime.Refused):self.op.pending()
+    def test_no_recovery_phrase_stops_before_capture_or_mutation(self):
+        self.op.phrase=None
+        with self.assertRaises(runtime.Refused):self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertEqual((self.root/'local.cfg').read_text(),self.cfg);self.assertFalse(self.op.journal.exists())
+    def test_external_proxy_preview_never_writes_any_file(self):
+        self.rt.core.return_value='external'
+        before=runtime.digest(self.root/'local.cfg')
+        result=self.op.address_plan({'url':'https://repo.example.org','mode':'external','proxy':'nginx'})
+        self.assertIn('127.0.0.1:18101',result['external_proxy_snippet'])
+        self.assertEqual(runtime.digest(self.root/'local.cfg'),before);self.assertFalse(self.op.journal.exists())
+    def test_foreign_web_server_never_gets_an_apache_site(self):
+        self.rt.core.return_value='external'
+        with self.assertRaises(runtime.Refused):self.op.address_plan({'url':'http://repo.test:8101','mode':'apache'})
+        self.rt.compose.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()

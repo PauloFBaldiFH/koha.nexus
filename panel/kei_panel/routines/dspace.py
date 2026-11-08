@@ -247,7 +247,7 @@ def operation_text(action, plan):
     if action=='plan-save':
         data=plan['plan']
         return '\n'.join([t('Platforms: ${names}',names=' + '.join(x.title() if x!='dspace' else 'DSpace' for x in data['members'])),
-            t('Local folder: ${folder}',folder=data['destination']),t('Cloud copy: ${where}',where=data.get('remote') or t('Local only')),
+            t('Local folder: ${folder}',folder=data['destination'].rstrip('/')+'/nexus-'+data['id']),t('Cloud copy: ${where}',where=data.get('remote') or t('Local only')),
             t('Daily time: ${time}',time=data['time'] or t('Off')),t('Keep the newest ${n} successful packages.',n=data['keep']),
             t('The entire package is encrypted. Partial captures and failed uploads never delete the last good copy.'),
             t('Save this plan? No backup runs now.')])
@@ -271,6 +271,8 @@ async def operation(app, action, request, destructive=False):
     env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(request)}
     plan=await call(app,'operations',action,env=env)
     if plan is None:return None
+    if plan.get('external_proxy_snippet'):
+        await app.push_screen_wait(MessageScreen(TITLE,t('Add this snippet to the existing TLS site of the chosen domain, then verify its syntax. Existing proxy files and certificates are not modified by the panel.'),command=plan['external_proxy_snippet'],is_command=False))
     if not await app.push_screen_wait(ConfirmScreen(TITLE,operation_text(action,plan),danger=destructive)):return None
     if action in ('address','upgrade') or (action=='remove' and request.get('purge')):
         phrase=await app.push_screen_wait(InputScreen(TITLE,t('The safety backup will be tested before applying this change. Enter the recovery phrase:'),t('Recovery phrase:'),password=True))
@@ -297,7 +299,7 @@ async def plan(app):
     old=next((p for p in data.get('plans',[]) if p['id']==chosen),{})
     name=old.get('id') or await app.push_screen_wait(InputScreen(TITLE,t('Name for this backup plan (lowercase letters, digits and hyphens).'),t('Plan name:'),validate=lambda v:'' if re.fullmatch(r'[a-z][a-z0-9-]{0,31}',v) else t('Invalid plan name.')))
     if not name:return
-    folder=await app.push_screen_wait(PathPickerScreen(TITLE,old.get('destination','/var/backups'),mode='dir',help_text=t('Select an existing private directory owned by root.')))
+    folder=await app.push_screen_wait(PathPickerScreen(TITLE,old.get('destination','/var/backups'),mode='dir',help_text=t('Choose a server backup folder. A private subfolder is created for this plan.')))
     if not folder:return
     when=await app.push_screen_wait(InputScreen(TITLE,t('Daily server time HH:MM; empty disables this schedule.'),t('Time:'),value=old.get('time','02:30')))
     if when is None:return
@@ -335,6 +337,10 @@ async def address(app):
     url=await app.push_screen_wait(InputScreen(TITLE,t('Canonical public repository address, without a path.'),t('Address:'),validate=lambda v:'' if origin(v) else t('Enter one HTTP(S) origin.')))
     if not url:return
     request=dict(url=url,mode=mode)
+    if mode=='external':
+        proxy=await app.push_screen_wait(ChoiceScreen(TITLE,t('Existing external proxy:'),[('nginx','Nginx'),('caddy','Caddy')]))
+        if not proxy:return
+        request['proxy']=proxy
     if mode=='tls':
         for key,label in [('certificate','Certificate PEM path:'),('key','Private key PEM path:')]:
             path=await app.push_screen_wait(InputScreen(TITLE,t('Use the certificate already managed for this institution. The panel does not publish or request certificates automatically.'),t(label)))

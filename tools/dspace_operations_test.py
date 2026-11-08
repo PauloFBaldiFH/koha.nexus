@@ -17,7 +17,7 @@ def exercise(rt, prepared, output):
     custom='\n# institution test property\nnexus.custom.preserved = yes\n'
     with open(rt.root/'local.cfg','a') as stream:stream.write(custom)
     op.commit_config()
-    destination=output/'encrypted-plans';destination.mkdir(mode=0o700)
+    destination=Path('/var/backups/koha-nexus/operations-ci');destination.mkdir(mode=0o700,parents=True)
     # An rclone local backend is a real configured connection; no cloud account or internet is used.
     subprocess.run(['rclone','config','create','nexus-ci','local'],check=True,capture_output=True,timeout=30)
     remote=output/'cloud-copy';remote.mkdir(mode=0o700)

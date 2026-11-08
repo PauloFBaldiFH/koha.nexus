@@ -483,3 +483,26 @@ PY
     [ ! -e "$T/should-not-exist" ]
     [ "$(field needs "$output")" = key ]
 }
+
+@test "DS03 owned DSpace cron edits preserve foreign and manually modified files" {
+    run lib "
+cron() { :; }
+KEI_PANEL_COMMAND=/usr/local/bin/config.sh
+mkdir -p /etc/cron.d
+printf 'foreign-data\\n' > /etc/cron.d/koha-nexus-plan-foreign
+kei_dspace_resource plan-cron foreign 02:30 dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && grep -qx foreign-data /etc/cron.d/koha-nexus-plan-foreign
+"
+    [ "$status" -eq 0 ]
+    run lib "
+cron() { :; }
+KEI_PANEL_COMMAND=/usr/local/bin/config.sh
+kei_dspace_resource plan-cron owned 02:30 koha,dspace || exit
+printf '# manual change\\n' >> /etc/cron.d/koha-nexus-plan-owned
+kei_dspace_resource plan-cron owned '' koha,dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && grep -qx '# manual change' /etc/cron.d/koha-nexus-plan-owned
+"
+    [ "$status" -eq 0 ]
+}

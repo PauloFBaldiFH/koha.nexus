@@ -9843,6 +9843,10 @@ function_broker_staff_access() {
 }
 
 function_broker_leave() {
+    if [ -n "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ]; then
+        msg_error "$(t "Free address")" "$(t "DSpace still uses this shared tunnel. Release only its repository address in the DSpace menu first; no other address was changed.")" 12 76
+        return 1
+    fi
     local opac collection note=""
     opac=$(tunnel_conf_get OPAC_HOST)
     collection=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
@@ -12444,8 +12448,8 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="009f60e26946f95616e99635c39ef8436fec08a571de518bdc0b724ea3bb3a85"
-KEI_DSPACE_RUNTIME_SHA="da368b5a7bae1d5d8ccb7d2ee062a655c2dda96b06320250c02bab0635fccda9"
+KEI_DSPACE_OPERATIONS_SHA="1f85215447dcad8ea30a59658bb9a049a8bed5567a99215cfb5a92e325a7f6e6"
+KEI_DSPACE_RUNTIME_SHA="31a453a8ce75f386fee2d1df90dc6dbcf7d50c8f3faabc11ab85369a09c089b1"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
@@ -13928,8 +13932,13 @@ kei_tainacan_free_on() {
     fi
     if tunnel_mode_is broker; then
         opac=$(tunnel_conf_get OPAC_HOST)
-        preview="${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
-        prompt_yes_no "$(t "Free address")" "$(t "The collection gets the address https://\$preview, in the same tunnel as the catalog (https://\$opac). WordPress's links change to it; the collections, items and accounts do not change.")\n\n$(t "Continue?")" 13 76 || return 0
+        if [ -n "$opac" ]; then preview="${opac%%.*}${KEI_TN_FREE_SUFFIX}.${opac#*.}"
+        else
+            local repository label
+            repository=$(tunnel_conf_get DSPACE_HOST 2>/dev/null); label=${repository%%.*}; label=${label%-repositorio}
+            preview="${label}${KEI_TN_FREE_SUFFIX}.${repository#*.}"
+        fi
+        prompt_yes_no "$(t "Free address")" "$(t "The collection gets the address https://\$preview, in the existing shared tunnel. WordPress's links change to it; the collections, items and accounts do not change.")\n\n$(t "Continue?")" 13 76 || return 0
         clear
         display_explanation "Adding the collection to the free address..."
         if ! broker_request PUT /v1/services yes '{"tainacan":true}'; then
@@ -13973,8 +13982,8 @@ kei_tainacan_free_off() {
     host=$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)
     [ -n "$host" ] || { msg_info "$(t "Free address")" "$(t "The collection does not use a free address.")" 8 60; return 0; }
     opac=$(tunnel_conf_get OPAC_HOST 2>/dev/null)
-    if [ -n "$opac" ]; then
-        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network. The catalog keeps its address (https://\$opac).")\n\n$(t "Continue?")" 12 76 defaultno || return 0
+    if [ -n "$opac" ] || [ -n "$(tunnel_conf_get DSPACE_HOST 2>/dev/null)" ]; then
+        prompt_yes_no "$(t "Free address")" "$(t "The address https://\$host is released and Tainacan goes back to this server on the local network. Other platform addresses and the shared tunnel remain.")\n\n$(t "Continue?")" 12 76 defaultno || return 0
         clear
         display_explanation "Releasing the address..."
         if ! broker_request PUT /v1/services yes '{"tainacan":false}'; then
@@ -14047,11 +14056,16 @@ $(t "Check the external address before sharing it; tunnel and DNS may take time.
 }
 
 kei_dspace_free_off() {
-    local host url phrase data
+    local host url phrase data sharing local_ip local_ifc
     host=$(tunnel_conf_get DSPACE_HOST 2>/dev/null)
     [ -n "$host" ] || return 0
     prompt_yes_no "DSpace" "$(t "Release only the DSpace free address? Koha and Tainacan keep their addresses and shared tunnel. The repository returns to the local network.")" 12 76 defaultno || return 0
-    url="http://$(get_server_ip):8100"
+    read -r local_ip local_ifc < <(kei_lan_address)
+    if ! lan_ip_usable "$local_ip" || [ "$local_ifc" = - ]; then
+        msg_error "DSpace" "$(t "A local network address could not be chosen safely. Configure the repository address manually before releasing its free address.")" 12 76
+        return 3
+    fi
+    url="http://$local_ip:8100"
     data=$(printf '{"url":"%s","mode":"apache"}' "$url")
     phrase=$(ui_input "DSpace" "$(t "Recovery phrase for the verified safety backup:")" "" password) || return 1
     [ -n "$phrase" ] || return 1
@@ -14061,9 +14075,26 @@ kei_dspace_free_off() {
         msg_error "DSpace" "$(t "The repository is local again, but the remote address was not released. Retry this action; no shared library was deleted.")" 12 76
         broker_cleanup; return 1
     fi
+    sharing=$(python3 -I - "$BROKER_BODY" <<'PYSHARE'
+import json,sys
+x=json.load(open(sys.argv[1]));services=x.get('services')
+if not isinstance(services,str) or (not services and not x.get('job_id')):sys.exit(1)
+print('shared' if services else 'alone')
+PYSHARE
+    ) || { broker_cleanup; return 3; }
     broker_cleanup
     kv_write "$TUNNEL_CONF" 644 DSPACE_HOST "" || return 1
     kei_owned_del ingress "$host" dspace
+    if [ "$sharing" = alone ] && [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ] && [ -z "$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)" ]; then
+        # No service can attach remotely after the serialized deprovisioning transition.
+        # Stop/remove only the broker unit we generated, never an unrelated cloudflared unit.
+        if [ -f "$CLOUDFLARED_UNIT" ] && grep -Fqx "EnvironmentFile=$BROKER_ENV" "$CLOUDFLARED_UNIT"; then
+            systemctl disable --now cloudflared >/dev/null 2>&1 || true
+            rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV"
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        rm -f "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
+    fi
     msg_info "DSpace" "$(t "DSpace now uses the local network. Other platforms and their tunnel were preserved.")" 10 76
 }
 
@@ -16360,18 +16391,42 @@ kei_set_open() {
 # kei_set_inspect said it is safe, with no owner or mode from the archive;
 # the tree is checked again and every checksum verified.
 kei_set_unpack() {
-    local f="${1:-}" info kind stage
-    info=$(kei_set_inspect "$f" 2>/dev/null) || return 4
+    local f="${1:-}" info kind stage limit
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+    limit=$(_kei_bk_free_bytes)
+    # Copy from one non-symlink regular inode, bounded by available staging space.
+    # Inspection and extraction then read the same private copy even if the input changes.
+    if ! python3 -I - "$f" "$stage/.source.tar" "$limit" <<'PYCOPY'
+import os,stat,sys
+source,target,limit=sys.argv[1],sys.argv[2],int(sys.argv[3])//2
+if limit<=0:sys.exit(4)
+fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+with os.fdopen(fd,'rb') as src:
+    info=os.fstat(src.fileno())
+    if not stat.S_ISREG(info.st_mode) or info.st_size>limit:sys.exit(4)
+    with open(target,'xb') as out:
+        os.fchmod(out.fileno(),0o600);total=0
+        while True:
+            block=src.read(1024*1024)
+            if not block:break
+            total+=len(block)
+            if total>limit:sys.exit(4)
+            out.write(block)
+PYCOPY
+    then rm -rf "$stage"; return 4; fi
+    f="$stage/.source.tar"
+    info=$(kei_set_inspect "$f" 2>/dev/null) || { rm -rf "$stage"; return 4; }
     kind=$(printf '%s\n' "$info" | sed -n 's/^kind=//p' | head -n 1)
     case "$kind" in
         koha-nexus-set)
-            [ "$(printf '%s\n' "$info" | sed -n 's/^integrity=//p')" = ok ] || { echo "$(t "The set files do not match their checksums.")" >&2; return 4; } ;;
+            [ "$(printf '%s\n' "$info" | sed -n 's/^integrity=//p')" = ok ] || { rm -rf "$stage"; echo "$(t "The set files do not match their checksums.")" >&2; return 4; } ;;
         tainacan-archive) ;;
-        *) echo "$(t "This file is not a joint package of Koha.Nexus.")" >&2; return 4 ;;
+        *) rm -rf "$stage"; echo "$(t "This file is not a joint package of Koha.Nexus.")" >&2; return 4 ;;
     esac
-    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
-    stage=$(mktemp -d "$KEI_BK_ROOT/.set-restore.XXXXXX") && chmod 700 "$stage" || return 1
+
     if ! tar -C "$stage" -xf "$f" --no-same-owner --no-same-permissions --no-overwrite-dir 2>/dev/null \
+        || ! rm -f "$f" \
         || ! kei_bk_check_tree "$stage" >/dev/null \
         || { [ "$kind" = koha-nexus-set ] && ! ( cd "$stage" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ); }; then
         rm -rf "$stage"
