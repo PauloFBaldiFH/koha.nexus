@@ -442,22 +442,30 @@ class Runtime:
                     raise Refused('Unexpected runtime user: ' + name)
 
     def wait(self, label, fn, seconds=300):
+        # Polls fail while a service is still starting; only the last failure
+        # of a wait that runs out is kept, so a stale "no response" from the
+        # first poll never shows as the installer error of a ready install.
         deadline = time.monotonic() + seconds
+        last = None
         while time.monotonic() < deadline:
             try:
                 if fn():
                     return
-            except (Refused, OSError, ValueError):
-                pass
+            except (Refused, OSError, ValueError) as error:
+                last = error
             time.sleep(3)
+        if isinstance(last, OperationFailed):
+            self.save_error(last)
         raise Refused(label + ' did not become ready. Data were kept; inspect the diagnostic before resuming.')
 
     def dependencies(self):
-        self.wait('PostgreSQL', lambda: self.compose('exec', '-T', 'postgres', 'pg_isready', '-U', 'dspace', '-d', 'dspace'))
+        self.wait('PostgreSQL', lambda: self.compose('exec', '-T', 'postgres', 'pg_isready', '-U', 'dspace', '-d', 'dspace',
+                                                     log_failure=False))
         # A server replying is insufficient: require every real core to load successfully.
         def solr_ready():
             data = json.loads(self.compose('exec', '-T', 'solr', 'curl', '-fsS', '--max-time', '10',
-                                           'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json'))
+                                           'http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json',
+                                           log_failure=False))
             return not data.get('initFailures') and set(CORES) <= set(data.get('status', {}))
         self.wait('All seven Solr cores', solr_ready)
 

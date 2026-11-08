@@ -205,7 +205,7 @@ function Test-KohaMsixSources {
     }
     $rules = @(
         @('KohaEasy.Core.psm1', "(?m)^\s*StaffUrl\s*=\s*'http://localhost:8080/'", 'StaffUrl = http://localhost:8080/'),
-        @('KohaEasy.Core.psm1', '(?m)^\s*WebPorts\s*=\s*@\(80, 8080\)', 'WebPorts = @(80, 8080)'),
+        @('KohaEasy.Core.psm1', '(?m)^\s*WebPorts\s*=\s*@\(80, 8080, 8100\)', 'WebPorts = @(80, 8080, 8100)'),
         @('KohaEasy.Install.psm1', 'KOHA_MSIX_FIRST_RUN', 'conta Debian pedida de novo quando o Debian ainda não existe (KOHA_MSIX_FIRST_RUN)'),
         @('KohaEasy.Install.psm1', 'KOHA_MSIX_FINALIZE', 'fase Windows depois do painel (KOHA_MSIX_FINALIZE)'),
         @('KohaEasy.Install.psm1', '(?m)^function Initialize-KohaPanelDependencies\b', 'dependências do painel no primeiro terminal (Initialize-KohaPanelDependencies)'),
@@ -458,7 +458,7 @@ try {
     }
     $verifyCore = [System.IO.File]::ReadAllText($coreModulePath)
     if ($verifyCore -notmatch "StaffUrl\s*=\s*'http://localhost:8080/'" -or
-        $verifyCore -notmatch 'WebPorts\s*=\s*@\(80, 8080\)') {
+        $verifyCore -notmatch 'WebPorts\s*=\s*@\(80, 8080, 8100\)') {
         throw 'A configuracao Windows do staff nao usa exclusivamente a porta 8080.'
     }
 
