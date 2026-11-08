@@ -2,7 +2,7 @@
 """Versioned build inputs for DSpace. Engineering tool, never an installer.
 
 No shell evaluation, registry writes, host service changes, or migrations.
-The UI remains unsupported in the panel until later implementation stages.
+Also used by the experimental installer's automatic local image preparation.
 """
 from __future__ import annotations
 
@@ -293,7 +293,7 @@ def main() -> int:
                 run(*build_command(data, args.sources.resolve(), args.image, args.prefix,
                                    args.metadata.resolve(), settings if use_proxy else None))
         else:
-            print("DSpace experimental release lock: valid; installation remains disabled")
+            print("DSpace experimental release lock: valid; local image preparation is available")
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError, ET.ParseError) as error:
         parser.exit(1, f"DSpace image preparation failed: {error}\n")
     return 0

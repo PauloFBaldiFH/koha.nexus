@@ -28,18 +28,21 @@ def main():
         parser.error('An installation directory already exists; this machine is not empty.')
     output = Path(os.environ['RUNNER_TEMP'])
     catalog = output / 'dspace-test-images.json'
-    catalog.write_text(subprocess.check_output([sys.executable, str(REPO / 'tools/dspace_catalog.py')], text=True))
-    rt = module.Runtime(root, catalog, lab=True, driver=str(REPO / 'installer'),
+    rt = module.Runtime(root, catalog, driver=str(REPO / 'installer'),
                         progress=lambda phase: print('::notice title=DSpace phase::' + phase, flush=True))
     def check(cond, message):
         if not cond:
             raise AssertionError(message)
         print('PASS: ' + message, flush=True)
     check(not root.exists(), 'initially absent')
+    check(rt.availability().get('prepare_required'), 'normal installer offers automatic preparation without a catalog')
+    check(not root.exists(), 'checking availability does not prepare or install anything')
+    rt.prepare_images()
+    check(json.loads(catalog.read_text()).get('origin') == 'local-build', 'normal assistant prepares immutable local images without laboratory mode')
     # Core network, isolation, registry and Apache are the real installer functions.
     origin = 'http://repository.kei.test:8100'
     rt.plan(origin)
-    check(not root.exists(), 'plan has no persistent platform changes')
+    check(not rt.state(), 'plan does not initialize platform data')
     try:
         rt.install(origin)
         check(rt.status()['status'] == 'installed', 'all services running')

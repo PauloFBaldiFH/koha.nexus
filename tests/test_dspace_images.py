@@ -40,10 +40,10 @@ class DSpaceInputs(unittest.TestCase):
     def test_rejects_mismatched_frontend(self):
         self.assert_bad_lock(lambda d: d["sources"]["ui"].update(tag="dspace-9.4", version="9.4.0"))
 
-    def test_does_not_claim_arm_support_or_installation(self):
+    def test_experimental_installation_preserves_architecture_and_private_services(self):
         self.assertEqual(self.data["architectures"], ["linux/amd64"])
         contract = json.loads((images.BASE / "contract.json").read_text())
-        self.assertFalse(contract["installable"])
+        self.assertTrue(contract["installable"])
         self.assertEqual(contract["lifecycle"]["migration"], "explicit-cli-operation")
         self.assertIsNone(contract["services"]["solr"]["public_path"])
         self.assertIsNone(contract["services"]["postgres"]["public_path"])

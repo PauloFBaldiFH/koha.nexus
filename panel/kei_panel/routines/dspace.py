@@ -33,7 +33,7 @@ async def install(app):
     if available is None:
         return
     if not available.get('available'):
-        await app.push_screen_wait(MessageScreen(TITLE, t('DSpace needs a reviewed immutable image catalog before installation. No packages were installed.') + '\n\n' + str(available.get('reason', ''))))
+        await app.push_screen_wait(MessageScreen(TITLE, t('DSpace image configuration could not be used.') + '\n\n' + str(available.get('reason', ''))))
         return
     from .platforms import install_docker
     status = await app.bridge.status()
@@ -60,6 +60,12 @@ async def install(app):
             if result.cancelled or not result.ok or not isinstance(result.value, TaskOutcome) or not result.value.ok:
                 await show_failure(app, TITLE, result)
                 return
+    if available.get('prepare_required'):
+        if not await app.push_screen_wait(ConfirmScreen(TITLE, t(
+                'Prepare the experimental DSpace images on this server? This downloads the pinned sources and builds backend, interface and Solr. It can take 30–90 minutes or longer, uses additional disk and memory, and installs Git if missing. Existing Koha/Tainacan data are preserved. You can retry if preparation fails.'))):
+            return
+        if await call(app, 'prepare-images', '--confirm', cancellable=False) is None:
+            return
     current = await call(app, 'status')
     if current is None:
         return

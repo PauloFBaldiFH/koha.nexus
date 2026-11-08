@@ -3,8 +3,8 @@
 
 The installer supplies the existing resource driver (network/proxy/registry).
 No operation builds images, changes another platform, or deletes a data volume.
-Production installation fails closed until an operator supplies the reviewed
-immutable image catalog. Local image IDs require the explicit laboratory flag.
+Experimental installation can prepare the pinned images on the local server.
+Published catalogs and laboratory catalogs remain supported.
 """
 
 import argparse
@@ -275,7 +275,7 @@ class Runtime:
 
     def images(self):
         if not self.catalog_path.is_file():
-            raise Refused('Reviewed DSpace images are not published/configured yet; no installation was started.')
+            raise Refused('DSpace images need preparation; run the installation assistant or prepare-images --confirm.')
         data = read_json(self.catalog_path)
         if data.get('schema') != 1 or data.get('release_sha256') != self.release_hash:
             raise Refused('The image catalog does not match this exact DSpace release lock.')
@@ -285,7 +285,7 @@ class Runtime:
         for name, ref in images.items():
             published = isinstance(ref, str) and re.fullmatch(
                 r'ghcr\.io/paulofbaldifh/koha\.nexus/dspace-' + name + r'@sha256:[a-f0-9]{64}', ref)
-            local = self.lab and isinstance(ref, str) and re.fullmatch(r'sha256:[a-f0-9]{64}', ref)
+            local = (self.lab or data.get('origin') == 'local-build') and isinstance(ref, str) and re.fullmatch(r'sha256:[a-f0-9]{64}', ref)
             if not (published or local):
                 raise Refused('An immutable reviewed image is required for ' + name)
         return dict(images, postgres=self.release['bases']['postgres'])
@@ -645,12 +645,32 @@ class Runtime:
         return result
 
     def availability(self):
+        if not self.catalog_path.exists():
+            return {'available': True, 'experimental': True, 'prepare_required': True,
+                    'note': 'The installer will build the pinned experimental images locally. This can take 30–90 minutes or longer; allow additional build memory and disk space. No registry publication is required.'}
         try:
             images = self.images()
             return {'available': True, 'experimental': True, 'architecture': 'amd64',
                     'images': images, 'note': 'Reviewed image catalog present; installation still requires its environment plan.'}
         except Refused as error:
             return {'available': False, 'experimental': True, 'reason': str(error)}
+
+    def prepare_images(self):
+        if self.catalog_path.exists():
+            return {'prepared': True, 'images': self.images()}
+        if platform.machine() not in ('x86_64', 'amd64'):
+            raise Refused('The current DSpace recipe requires an amd64 server.')
+        if not self.driver:
+            raise Refused('Use the installation assistant or the local installer to prepare images.')
+        with self.lock():
+            if not self.catalog_path.exists():
+                print('Preparing experimental DSpace images. Build output follows; this may take more than an hour.', file=sys.stderr, flush=True)
+                try:
+                    subprocess.run(['bash', self.driver, '--task', 'dspace-resource', 'prepare-images', str(self.catalog_path)],
+                                   check=True, timeout=21600, env=dict(local_docker_env(), KEI_DSPACE_DIR=str(self.root)))
+                except (OSError, subprocess.SubprocessError):
+                    raise Refused('DSpace image preparation failed. Read the build log and retry installation; existing application data were preserved.') from None
+            return {'prepared': True, 'images': self.images()}
 
     def admin(self, operation, request=None):
         if self.state().get('migration') != 'done':
@@ -788,6 +808,7 @@ def main():
             cmd.add_argument('--retry-migration', action='store_true')
     for name in ('start', 'stop'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
+    sub.add_parser('prepare-images').add_argument('--confirm', action='store_true')
     for name in ('admin-create', 'admin-password'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
     sub.add_parser('setup-mark').add_argument('values', nargs=2)
@@ -822,7 +843,7 @@ def main():
         if args.command in ('install','start','stop','admin-create','admin-password','backup-create','backup-test','backup-restore','backup-rollback'):
             from operations import Operations
             Operations(runtime).pending()
-        if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password') and not args.confirm:
+        if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password', 'prepare-images') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
         if args.command == 'operations':
             from operations import Operations
@@ -855,9 +876,13 @@ def main():
                 raise Refused(str(error)) from None
         elif args.command == 'availability':
             result = runtime.availability()
+        elif args.command == 'prepare-images':
+            result = runtime.prepare_images()
         elif args.command == 'plan':
             result = runtime.plan(args.url)
         elif args.command == 'install':
+            if not runtime.catalog_path.exists():
+                runtime.prepare_images()
             result = runtime.install(args.url, args.retry_migration)
         elif args.command in ('start', 'stop'):
             result = runtime.control(args.command == 'start')
