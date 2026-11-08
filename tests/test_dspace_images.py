@@ -64,6 +64,23 @@ class DSpaceInputs(unittest.TestCase):
         self.assertIn("SOURCE_REVISION=" + self.data["sources"]["backend"]["commit"], cmd)
         self.assertIn("JAVA_IMAGE=" + self.data["bases"]["java"], cmd)
 
+    def test_local_copy_inputs_are_present_in_the_explicit_build_context(self):
+        import shlex
+        directory = images.BASE / 'images'
+        rules = (directory / '.dockerignore').read_text().splitlines()
+        self.assertEqual(rules[0], '*')
+        included = {line[1:] for line in rules if line.startswith('!')}
+        for dockerfile in directory.glob('*.Dockerfile'):
+            for line in dockerfile.read_text().splitlines():
+                if not line.startswith('COPY '): continue
+                tokens = shlex.split(line)[1:]
+                if any(token.startswith('--from=') for token in tokens): continue
+                sources = [token for token in tokens if not token.startswith('--')][:-1]
+                for source in sources:
+                    with self.subTest(image=dockerfile.name,source=source):
+                        self.assertIn(source,included,'COPY source is excluded by .dockerignore')
+                        self.assertTrue((directory/source).is_file())
+
     def test_rejects_tag_or_shell_in_prefix(self):
         for prefix in ("image:latest", "image;touch /tmp/unwanted", "$(id)"):
             with self.subTest(prefix=prefix), self.assertRaises(ValueError):
