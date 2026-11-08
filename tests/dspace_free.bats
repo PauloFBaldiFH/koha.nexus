@@ -111,3 +111,11 @@ absent() { if "$@"; then return 1; fi; return 0; }
     [ ! -e "$T/broker.env" ] && [ ! -e "$T/broker.key" ]
     grep -qx 'disable --now cloudflared' "$T/systemctl"
 }
+@test "DF08 shared identity recovery keeps the repository name before DSpace is installed" {
+    printf 'DSPACE_HOST=repository.example.org\n' >> "$T/tunnel.conf"
+    rm "$T/dspace/state.json"
+    run lib 'kei_dspace_free_publish'
+    [ "$status" -eq 0 ]
+    grep -qx 'DSPACE_HOST=repository.example.org' "$T/tunnel.conf"
+    [ ! -e "$T/runtime-args" ] && [ ! -e "$T/requests" ]
+}

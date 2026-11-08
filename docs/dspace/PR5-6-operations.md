@@ -20,7 +20,7 @@ Testes nativos de formatos, concorrência, falhas e preservação dos contratos 
 
 ## Estado
 
-Em implementação. Este documento registra o escopo; não afirma que os critérios acima já passaram.
+Implementação consolidada na branch remota. Validação local aprovada; aceite integrado da CI ainda pendente. Este documento não declara liberação para produção.
 
 ## Implementação entregue na branch
 
@@ -73,7 +73,7 @@ OAI-PMH não é publicado pelo proxy gerenciado nesta entrega experimental. A im
 
 - Python 3.13: 137 testes nativos, incluindo escrita real de arquivos privados, rollback por falha, diários, formato/integridade, propriedade e concorrência. Docker e cripto são explicitamente simulados nos testes de falha. A proteção de ancestrais foi executada fora do mapeamento de UID da sandbox local, sem relaxar a validação de root do produto.
 - Painel/documentação: 131 testes nas áreas alteradas. Avisos existentes de encerramento de workers/Textual continuam registrados; não são resultados de servidor.
-- Debian 12 descartável como root: os 17 testes de conjuntos, o teste adicional de preservação de cron e sete testes do cliente de endereço DSpace (25 no total), mais os nove testes antigos de endereço do Tainacan (34 no conjunto local). As capturas Koha/Tainacan deste arquivo usam os adaptadores de teste já declarados em `backup_set.bats`; não equivalem a instalar os três sistemas reais. Os testes do cliente de endereço usam respostas explícitas simuladas do broker e do runtime, cobrindo recusa, compartilhamento, falha e repetição de remoção.
+- Debian 12 descartável como root: 20 testes de conjuntos/cron, oito testes do cliente de endereço DSpace e os nove testes antigos de endereço do Tainacan (37 no conjunto local). As capturas Koha/Tainacan deste arquivo usam os adaptadores de teste já declarados em `backup_set.bats`; não equivalem a instalar os três sistemas reais. Os testes do cliente de endereço usam respostas explícitas simuladas do broker e do runtime, cobrindo recusa, compartilhamento, falha e repetição de remoção.
 - Broker: TypeScript, 72 testes unitários e 24 checks e2e existentes + 6 novos checks locais com Worker/D1/Durable Object, assinaturas reais e API Cloudflare simulada. Não há teste contra a conta Cloudflare de produção.
 - Capturas do painel em modo de demonstração: [80×24](captures/backup-center-80x24.svg) e [160×48](captures/backup-center-160x48.svg). Os estados e dados são simulados; a rolagem do seletor de conjuntos foi verificada no terminal pequeno.
 
@@ -84,3 +84,5 @@ A CI executa PostgreSQL, Solr, backend, UI, GPG, rclone e navegador reais. As re
 Continuam sem validação no servidor de Paulo: convivência e carga reais, rede, domínio/túnel conectado, contas e política institucional, acervo grande, reboot de VM/WSL e os testes da etapa T. A matriz de aplicação real desta etapa roda em Ubuntu 24.04; não declarar os mesmos testes DSpace completos em Debian 12/13 apenas pelos testes de infraestrutura. ARM permanece sem imagem/homologação. DSpace continua experimental.
 
 Não publicar imagens ou broker nem promover catálogo por causa desta documentação. A publicação de imagens continua exigindo dispatch explícito na main, depois dos testes de instalação e atualização. Não mesclar automaticamente.
+
+Continuidade e resultados a conferir: [CONTINUIDADE-PR5-6.md](CONTINUIDADE-PR5-6.md).

@@ -14044,6 +14044,9 @@ kei_dspace_free_publish() {
     local host phrase data out
     host=$(tunnel_conf_get DSPACE_HOST 2>/dev/null)
     [[ "$host" =~ ^[a-z0-9][a-z0-9.-]+$ ]] || return 2
+    # A shared recovery file can reserve this name before DSpace is installed.
+    # Reconnecting Koha/Tainacan must not attempt to configure an absent repository.
+    [ -f "$KEI_DSPACE_DIR/state.json" ] || return 0
     # No passwords or recovery phrases in arguments, status, tunnel.conf or logs.
     phrase=$(ui_input "DSpace" "$(t "Recovery phrase for the safety backup (required before changing the address):")" "" password) || return 1
     [ -n "$phrase" ] || return 1

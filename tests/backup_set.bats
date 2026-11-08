@@ -506,3 +506,40 @@ rc=\$?
 "
     [ "$status" -eq 0 ]
 }
+
+@test "DS04 an explicit three-platform set contains each package and unpacks them selectively" {
+    lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
+    run lib "
+kei_dspace_runtime() {
+    printf cipher > '$T/knx-dspace-20261108-000000-abcd1234.tar.gpg'
+    printf '{\"package\":\"$T/knx-dspace-20261108-000000-abcd1234.tar.gpg\"}'
+}
+kei_set_backup '$OUT' koha,tainacan,dspace"
+    [ "$status" -eq 0 ]
+    SET=$(field file "$output")
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field platforms "$output")" = koha,tainacan,dspace ]
+    [ "$(field complete "$output")" = yes ] && [ "$(field integrity "$output")" = ok ]
+    run lib "kei_set_unpack '$SET'"
+    [ "$status" -eq 0 ]
+    [ -f "$(field koha "$output")" ]
+    [ -d "$(field tainacan "$output")" ]
+    [ -f "$(field dspace "$output")" ]
+}
+
+@test "DS05 failed DSpace capture preserves the valid Koha/Tainacan packages as an explicit partial set" {
+    lib "KEI_BACKUP_PHRASE=TEST-PHRA-SE12-3456-7890-ABCD kei_backup_setup confirm" >/dev/null
+    run lib "kei_dspace_runtime() { return 1; }; kei_set_backup '$OUT' koha,tainacan,dspace"
+    [ "$status" -eq 9 ]
+    SET=$(field file "$output")
+    [ -f "$SET" ] && [ "$(field complete "$output")" = no ]
+    [[ "$output" == *$'platform=dspace\tfailed\t'* ]]
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field complete "$output")" = no ] && [ "$(field integrity "$output")" = ok ]
+    tar -tf "$SET" | grep -q '^koha/.*sql.gz$'
+    tar -tf "$SET" | grep -q '^tainacan/.*files.tar.gz$'
+    absent_count=$(tar -tf "$SET" | grep -c '^dspace/' || true)
+    [ "$absent_count" -eq 0 ]
+}
