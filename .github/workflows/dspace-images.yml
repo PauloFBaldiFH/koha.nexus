@@ -11,6 +11,7 @@ on:
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
+      - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
@@ -27,6 +28,7 @@ on:
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
+      - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
@@ -71,6 +73,7 @@ jobs:
       - run: python -m unittest discover -s tests -p test_dspace_images.py -v
       - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v
+      - run: python -m unittest discover -s tests -p test_dspace_browser_support.py -v
       - run: bash -n installer
       - name: Validate runtime shell scripts
         run: |

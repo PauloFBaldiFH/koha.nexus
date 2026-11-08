@@ -51,8 +51,8 @@ execução final. O código de produção não foi alterado por essa correção.
 
 ## Revisão e próximos passos
 
-Paulo escolheu abrir o PR manualmente pelo link. Não pedir novamente liberação
-de API. Não há criação automática de PR confirmada neste ambiente.
+Paulo abriu o PR manualmente: https://github.com/PauloFBaldiFH/koha.nexus/pull/354.
+Não pedir novamente liberação de API nem abrir outro PR.
 
 https://github.com/PauloFBaldiFH/koha.nexus/compare/main...feat/dspace-backup-restore?expand=1
 
@@ -74,3 +74,22 @@ material de rollback em falha e volumes antigos são preservados para revisão:
 não realizar limpeza genérica por nome/prefixo. O Compose ativo identifica os
 volumes em uso. Após editar runtime.py/backup.py, atualizar seus hashes no
 installer e executar `sha256sum installer > installer.sha256` antes dos testes.
+
+## Nova falha na execução do PR #354
+
+A execução 42428736161 falhou antes do backup: o aceite estava verdadeiro na
+primeira leitura, mas deixou de estar após os pedidos do navegador estabilizarem.
+Apenas reiniciar a sessão, como no aceite anterior, não eliminou essa corrida.
+
+O roteiro agora espera um marcador exclusivo da renderização no navegador
+(`ds-social`, condicionado a browserPlatform no AppComponent upstream), além da
+rede estabilizada, antes de interagir. Confere a transição aria-disabled de true
+para false, clica no rótulo visível e espera especificamente o PATCH de aceite.
+Confere uma única gravação, sem revogação, e três recargas com o aceite marcado.
+Nenhum termo é gravado por API, nenhum cookie de aceite é injetado e a asserção
+que detectou a perda permanece. O diagnóstico só extrai valores true/false do
+campo exato de aceite; testes recusam incluir outros dados de perfil.
+
+99 testes locais stdlib passaram (incluindo oito novos de diagnóstico seguro).
+A validação com navegador real desta correção ainda precisa passar antes da
+mesclagem. O êxito de d5b9f4d acima registra a execução anterior, não aprova esta.

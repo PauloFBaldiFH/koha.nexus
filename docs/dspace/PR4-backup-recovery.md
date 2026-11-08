@@ -52,6 +52,13 @@ argumentos, resultado ou arquivo do Nexus. Guarde o kit existente fora do host.
 O painel oferece DSpace individual na Central de backups e atalhos no grupo
 DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR6.
 
+## O PR #354 e a nova validação
+
+A execução anterior passou, mas a execução do PR detectou uma corrida no aceite
+dos termos, antes do backup (42428736161). O roteiro foi corrigido para aguardar
+a inicialização do Angular, exigir uma única gravação e verificar o aceite após
+três recargas. A nova rodada real está pendente; aguardar os checks do #354.
+
 ## Validação
 
 - 91 testes unitários de imagens/runtime/formato aprovados localmente em Python
