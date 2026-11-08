@@ -9,7 +9,7 @@ OUTPUT = ROOT / 'platforms/dspace/build-inputs.zip'
 FILES = ['LICENSE', 'tools/dspace_images.py', 'tools/dspace_catalog.py',
          'tools/dspace_smoke.py', 'tools/dspace_bootstrap.py'] + [
     'platforms/dspace/' + name for name in
-    ('release.json', 'release-r3.json', 'ui-dependencies.json', 'ui-cookie-metadata.patch')]
+    ('release.json', 'release-r3.json', 'contract.json', 'ui-dependencies.json', 'ui-cookie-metadata.patch')]
 FILES += [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / 'platforms/dspace/images').iterdir()) if p.is_file()]
 
 

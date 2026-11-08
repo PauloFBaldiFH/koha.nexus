@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
 import unittest
+import zipfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +19,33 @@ import runtime
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_extracted_kit_runs_solr_contract_check_without_the_checkout(self):
+        # Exercise the distributed tools, not imports resolving back into the
+        # repository. Docker responses alone are doubled; the contract read
+        # and release/patch validation are real and fail with the old ZIP.
+        with tempfile.TemporaryDirectory() as temp:
+            kit = Path(temp) / 'kit'
+            with zipfile.ZipFile(ROOT / 'platforms/dspace/build-inputs.zip') as archive:
+                archive.extractall(kit)
+            code = r'''
+import json, subprocess, sys
+from unittest.mock import patch
+sys.path.insert(0, sys.argv[1])
+import dspace_smoke
+def docker(*args, **kwargs):
+    text = ''
+    if args[0] == 'exec':
+        text = '8983' if 'id' in args else json.dumps({'status': {k: {} for k in
+            ('authority','oai','search','statistics','qaevent','suggestion','audit')}})
+    return subprocess.CompletedProcess(args, 0, text, '')
+with patch.object(dspace_smoke, 'docker', side_effect=docker):
+    dspace_smoke.smoke('solr', 'nexus-dspace')
+'''
+            result = subprocess.run([sys.executable, '-I', '-c', code, str(kit / 'tools')],
+                                    cwd=temp, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('solr: startup and image contract passed', result.stdout)
+
     def test_distributed_build_kit_is_bound_to_installer_and_reproducible(self):
         import dspace_build_bundle
         import io
