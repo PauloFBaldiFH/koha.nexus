@@ -617,5 +617,84 @@ class PreviousReleaseBinding(unittest.TestCase):
         with self.assertRaises(ds.Refused):rt.images()
 
 
+class BuildDirectoryLinks(unittest.TestCase):
+    """Servers upgraded from KohaEasy have /usr/local/lib/koha-nexus and
+    /etc/koha-nexus as root's own links (kei_brand_links); image preparation
+    must follow them, yet still refuse links into places others can change."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name).resolve()
+        (self.base / 'lib' / 'koha-easy-installer').mkdir(parents=True, mode=0o755)
+        (self.base / 'etc' / 'koha-easy-install').mkdir(parents=True, mode=0o755)
+        for d in (self.base, self.base / 'lib', self.base / 'etc'):d.chmod(0o755)
+        (self.base / 'lib' / 'koha-nexus').symlink_to('koha-easy-installer')
+        (self.base / 'etc' / 'koha-nexus').symlink_to(self.base / 'etc' / 'koha-easy-install')
+        text = (REPO / 'installer').read_text()
+        self.section = Path(self.tmp.name) / 'dspace.sh'
+        self.section.write_text(text[text.index('# DSPACE: experimental lifecycle'):text.index('# TAINACAN (WordPress')])
+
+    def run_bash(self, tail, **env):
+        env = dict(os.environ, _SCRIPT_DIR=str(REPO), _SCRIPT_PATH=str(REPO / 'installer'), **env)
+        return subprocess.run(['bash', '-c', 'source "$1"; ' + tail, 'links-test', str(self.section)],
+                              env=env, text=True, capture_output=True)
+
+    def trusted(self, path, *extra):
+        return self.run_bash('kei_dspace_trusted_path "$P" "$M"', P=str(path), M=' '.join(extra))
+
+    def test_brand_link_is_followed_and_canonical_directory_created_private(self):
+        result = self.trusted(self.base / 'lib' / 'koha-nexus' / 'dspace' / 'build-x', 'mkdir')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        real = self.base / 'lib' / 'koha-easy-installer' / 'dspace' / 'build-x'
+        self.assertEqual(result.stdout.strip(), str(real))
+        self.assertEqual(real.stat().st_mode & 0o777, 0o700)
+
+    def test_link_into_a_writable_directory_is_refused(self):
+        open_dir = self.base / 'open'
+        open_dir.mkdir(); open_dir.chmod(0o777)
+        (self.base / 'lib' / 'evil').symlink_to(open_dir)
+        result = self.trusted(self.base / 'lib' / 'evil' / 'build', 'mkdir')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('writable by another user', result.stderr)
+        self.assertFalse((open_dir / 'build').exists())
+
+    def test_link_inside_a_writable_directory_is_refused(self):
+        open_dir = self.base / 'open'
+        open_dir.mkdir(); open_dir.chmod(0o777)
+        (open_dir / 'hop').symlink_to(self.base / 'lib' / 'koha-easy-installer')
+        result = self.trusted(open_dir / 'hop' / 'build', 'mkdir')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.base / 'lib' / 'koha-easy-installer' / 'build').exists())
+
+    def test_link_loop_is_refused(self):
+        (self.base / 'lib' / 'a').symlink_to('b')
+        (self.base / 'lib' / 'b').symlink_to('a')
+        result = self.trusted(self.base / 'lib' / 'a' / 'x')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('too many symbolic links', result.stderr)
+
+    @unittest.skipUnless(os.geteuid() == 0, 'needs root to give a link to another user')
+    def test_link_owned_by_another_user_is_refused(self):
+        os.lchown(self.base / 'lib' / 'koha-nexus', 65534, 65534)
+        result = self.trusted(self.base / 'lib' / 'koha-nexus' / 'build', 'mkdir')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('not owned by root', result.stderr)
+
+    def test_prepare_images_hands_canonical_paths_to_the_build_kit(self):
+        stub = ('id() { echo 0; }; _kei_docker_running() { :; }; _kei_docker() { :; }; curl() { return 88; }; '
+                'python3() { case "$1" in */dspace_bootstrap.py) shift; echo "kit $*";; *) command python3 "$@";; esac; }; '
+                'kei_dspace_prepare_images "$T"')
+        result = self.run_bash(stub, T=str(self.base / 'etc' / 'koha-nexus' / 'dspace-images.json'),
+                               KEI_DSPACE_ADAPTER_DIR=str(self.base / 'lib' / 'koha-nexus' / 'dspace'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        build = self.base / 'lib' / 'koha-easy-installer' / 'dspace'
+        line = [l for l in result.stderr.splitlines() if l.startswith('kit ')][0]
+        self.assertIn('--catalog ' + str(self.base / 'etc' / 'koha-easy-install' / 'dspace-images.json'), line)
+        self.assertIn('--workspace ' + str(build), line)
+        self.assertNotIn('koha-nexus', line)
+        self.assertTrue(list(build.glob('build-*/kit/tools/dspace_bootstrap.py')))
+
+
 if __name__ == '__main__':
     unittest.main()

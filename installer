@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.185"
+PANEL_VERSION=" 1.5.186"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12455,6 +12455,54 @@ KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b574
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 KEI_DSPACE_BUILD_SHA="2e73bddbc34997ba983a8eac45c5f21eed5971fcd0a236449c5a2fd0edf886c4"
 
+# Prints the canonical form of a root-only path. A symbolic link on the way
+# is accepted only when root owns it and every directory it passes through
+# (before and after the link) is root's and not writable by others; root's
+# sticky /tmp is accepted as a parent. "mkdir" creates the directory
+# (0700). Anything else is refused, so a link never leads the build to a
+# place another user could change.
+kei_dspace_trusted_path() {
+    python3 - "$1" "${2:-}" <<'PY'
+import os, stat, sys
+from pathlib import Path, PurePosixPath
+def refuse(why): raise SystemExit('Untrusted DSpace build directory: ' + why + ' (' + sys.argv[1] + ')')
+me = os.geteuid()
+def check_dir(d, last=False):
+    try: s = os.stat(d)
+    except FileNotFoundError: return False
+    sticky = not last and s.st_uid == 0 and s.st_mode & stat.S_ISVTX
+    if not stat.S_ISDIR(s.st_mode): refuse(str(d) + ' is not a directory')
+    if s.st_uid not in (0, me) or (s.st_mode & 0o022 and not sticky): refuse(str(d) + ' is writable by another user')
+    return True
+if not sys.argv[1].startswith('/'): refuse('relative path')
+parts = list(PurePosixPath(sys.argv[1]).parts[1:])
+cur, hops, exists = Path('/'), 0, True
+check_dir(cur)
+while parts:
+    part = parts.pop(0)
+    if part in ('', '.'): continue
+    if part == '..': cur = cur.parent; continue
+    nxt = cur / part
+    if exists:
+        try: s = os.lstat(nxt)
+        except FileNotFoundError: exists = False
+    if exists and stat.S_ISLNK(s.st_mode):
+        hops += 1
+        if hops > 40: refuse('too many symbolic links')
+        if s.st_uid not in (0, me): refuse(str(nxt) + ' is a symbolic link not owned by root')
+        link = PurePosixPath(os.readlink(nxt))
+        if link.is_absolute(): cur, parts = Path('/'), list(link.parts[1:]) + parts
+        else: parts = list(link.parts) + parts
+        continue
+    cur = nxt
+    if exists: check_dir(cur, last=not parts)
+if sys.argv[2] == 'mkdir':
+    cur.mkdir(parents=True, exist_ok=True, mode=0o700)
+    check_dir(cur, last=True)
+print(cur)
+PY
+}
+
 # Experimental fallback: no manual image catalog or registry promotion needed.
 # Build from this installer's exact input kit, then use immutable local image IDs.
 kei_dspace_prepare_images() (
@@ -12463,19 +12511,12 @@ kei_dspace_prepare_images() (
     _kei_docker_running || return 3
     _kei_docker buildx version >/dev/null || { echo 'Docker Buildx is required to build DSpace images.' >&2; return 3; }
     command -v git >/dev/null 2>&1 || apt_install git >&2 || return 1
-    work="$KEI_DSPACE_ADAPTER_DIR/build-$KEI_DSPACE_BUILD_SHA"
-    # Refuse a foreign/symlinked workspace before fetching or executing inputs.
-    python3 - "$work" <<'PY'
-import os, pathlib, stat, sys
-p=pathlib.Path(sys.argv[1])
-if p.resolve()!=p: raise SystemExit('DSpace build directory contains symbolic links')
-for a in (p,*p.parents):
-    if a.exists():
-        s=a.stat()
-        if s.st_uid!=0 or s.st_mode & 0o022: raise SystemExit('Untrusted DSpace build directory')
-p.mkdir(parents=True,exist_ok=True,mode=0o700)
-PY
-    [ "$?" = 0 ] || return 3
+    # Refuse a foreign workspace before fetching or executing inputs. The
+    # koha.nexus names are root's own links (kei_brand_links), so the
+    # canonical paths are used from here on: the build kit then sees no link.
+    work=$(kei_dspace_trusted_path "$KEI_DSPACE_ADAPTER_DIR/build-$KEI_DSPACE_BUILD_SHA" mkdir) || return 3
+    target=$(kei_dspace_trusted_path "$(dirname "$target")") || return 3
+    target="$target/$(basename "$1")"
     archive="$work/inputs.zip"
     kit="$work/kit"
     if [ ! -f "$archive" ] || [ "$(sha256sum "$archive" | cut -d' ' -f1)" != "$KEI_DSPACE_BUILD_SHA" ]; then
