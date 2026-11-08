@@ -5,6 +5,9 @@ on:
     paths:
       - 'platforms/dspace/**'
       - 'tools/dspace_images.py'
+      - 'tools/dspace_bootstrap.py'
+      - 'tools/dspace_build_bundle.py'
+      - 'tests/test_dspace_bootstrap.py'
       - 'tools/dspace_smoke.py'
       - 'tools/dspace_catalog.py'
       - 'tools/dspace_install_test.py'
@@ -25,6 +28,9 @@ on:
     paths:
       - 'platforms/dspace/**'
       - 'tools/dspace_images.py'
+      - 'tools/dspace_bootstrap.py'
+      - 'tools/dspace_build_bundle.py'
+      - 'tests/test_dspace_bootstrap.py'
       - 'tools/dspace_smoke.py'
       - 'tools/dspace_catalog.py'
       - 'tools/dspace_install_test.py'
@@ -76,6 +82,8 @@ jobs:
           javac -d "$RUNNER_TEMP/schema-guard" platforms/dspace/images/NexusSchemaGuard.java tests/java/NexusSchemaGuardTest.java
           java -cp "$RUNNER_TEMP/schema-guard" NexusSchemaGuardTest
       - run: python tools/dspace_images.py validate
+      - run: python tools/dspace_build_bundle.py --check
+      - run: python -m unittest discover -s tests -p test_dspace_bootstrap.py -v
       - run: python -m unittest discover -s tests -p test_dspace_images.py -v
       - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v

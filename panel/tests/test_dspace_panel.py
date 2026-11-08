@@ -96,6 +96,20 @@ def test_missing_catalog_never_installs_dependencies_or_asks_for_address(monkeyp
     assert all(isinstance(s,MessageScreen) for s in app.screens)
 
 
+@pytest.mark.parametrize('confirm', [False, None, True])
+def test_experimental_preparation_is_offered_and_can_be_postponed(monkeypatch, confirm):
+    calls = mock_calls(monkeypatch, {
+        'availability': {'available': True, 'prepare_required': True},
+        'dspace-prerequisites': {}, 'prepare-images': {'prepared': True}})
+    app = App([confirm, None] if confirm else [confirm])
+    async def status(): return {'docker': {'installed': True}}
+    app.bridge = SimpleNamespace(status=status)
+    asyncio.run(dspace.install(app))
+    preparations = [c for c in calls if c[1] == ('prepare-images', '--confirm')]
+    assert bool(preparations) is bool(confirm)
+    assert not any(c[1][0] == 'install' for c in calls)
+
+
 @pytest.mark.parametrize('confirmed',[False,None])
 def test_declining_apache_confirmation_stops_install(monkeypatch,confirmed):
     calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':True}})

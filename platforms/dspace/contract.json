@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "dspace",
   "maturity": "experimental",
-  "installable": false,
+  "installable": true,
   "project": "kn-dspace",
   "network": "kn-dspace",
   "services": {
@@ -16,7 +16,7 @@
   "lifecycle": {
     "migration": "explicit-cli-operation",
     "startup_schema_guard": "release-and-flyway-history-receipt",
-    "backup": "not-implemented",
-    "restore": "not-implemented"
+    "backup": "encrypted-individual-and-explicit-sets",
+    "restore": "isolated-test-and-explicit-selective-restore"
   }
 }

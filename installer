@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.184"
+PANEL_VERSION=" 1.5.185"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12449,10 +12449,62 @@ kei_docker_audit() {
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
 KEI_DSPACE_OPERATIONS_SHA="b9a4b980d6f2a5f2e9ef2c35d883ae170bc92cf0f3983ae77d2cfbdecc13cac2"
-KEI_DSPACE_RUNTIME_SHA="3459ce67f12b23758bcf537cb2b47dbeabf95c9151b68ad7fb48128616166a09"
+KEI_DSPACE_RUNTIME_SHA="7fdaed94032998e381a8d3f576c4ff21c8e6c9231a5c9e354f0fd55cea4a8b5d"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
+KEI_DSPACE_BUILD_SHA="2e73bddbc34997ba983a8eac45c5f21eed5971fcd0a236449c5a2fd0edf886c4"
+
+# Experimental fallback: no manual image catalog or registry promotion needed.
+# Build from this installer's exact input kit, then use immutable local image IDs.
+kei_dspace_prepare_images() (
+    local target="${1:-}" kit work archive actual
+    [ "$(id -u)" = 0 ] && [[ "$target" = /* ]] || return 2
+    _kei_docker_running || return 3
+    _kei_docker buildx version >/dev/null || { echo 'Docker Buildx is required to build DSpace images.' >&2; return 3; }
+    command -v git >/dev/null 2>&1 || apt_install git >&2 || return 1
+    work="$KEI_DSPACE_ADAPTER_DIR/build-$KEI_DSPACE_BUILD_SHA"
+    # Refuse a foreign/symlinked workspace before fetching or executing inputs.
+    python3 - "$work" <<'PY'
+import os, pathlib, stat, sys
+p=pathlib.Path(sys.argv[1])
+if p.resolve()!=p: raise SystemExit('DSpace build directory contains symbolic links')
+for a in (p,*p.parents):
+    if a.exists():
+        s=a.stat()
+        if s.st_uid!=0 or s.st_mode & 0o022: raise SystemExit('Untrusted DSpace build directory')
+p.mkdir(parents=True,exist_ok=True,mode=0o700)
+PY
+    [ "$?" = 0 ] || return 3
+    archive="$work/inputs.zip"
+    kit="$work/kit"
+    if [ ! -f "$archive" ] || [ "$(sha256sum "$archive" | cut -d' ' -f1)" != "$KEI_DSPACE_BUILD_SHA" ]; then
+        if [ -f "${_SCRIPT_DIR}/platforms/dspace/build-inputs.zip" ] && \
+            [ "$(sha256sum "${_SCRIPT_DIR}/platforms/dspace/build-inputs.zip" | cut -d' ' -f1)" = "$KEI_DSPACE_BUILD_SHA" ]; then
+            cp "${_SCRIPT_DIR}/platforms/dspace/build-inputs.zip" "$archive.new" || return 1
+        else
+            curl -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 180 \
+                "${UPDATE_BASE:-${UPDATE_URL%installer}}platforms/dspace/build-inputs.zip" -o "$archive.new" || return 1
+        fi
+        actual=$(sha256sum "$archive.new" | cut -d' ' -f1)
+        [ "$actual" = "$KEI_DSPACE_BUILD_SHA" ] || { echo 'DSpace build kit checksum mismatch. Update the panel and retry.' >&2; return 5; }
+        mv -f "$archive.new" "$archive" || return 1
+    fi
+    # Re-extract verified bytes each time, rather than executing an edited cache.
+    python3 - "$archive" "$kit" <<'PY'
+import pathlib, shutil, sys, zipfile
+p=pathlib.Path(sys.argv[2])
+if p.exists(): shutil.rmtree(p)
+p.mkdir(mode=0o700)
+with zipfile.ZipFile(sys.argv[1]) as z:
+    for member in z.infolist():
+        name=pathlib.PurePosixPath(member.filename)
+        if name.is_absolute() or '..' in name.parts: raise SystemExit('Invalid build kit path')
+    z.extractall(p)
+PY
+    [ "$?" = 0 ] || return 1
+    python3 "$kit/tools/dspace_bootstrap.py" --catalog "$target" --workspace "$work/build" >&2
+)
 
 kei_dspace_runtime() (
     local tmp src cache file expected actual rc arg install=0 confirm=0
@@ -12544,6 +12596,7 @@ kei_dspace_resource() {
     [ "$(id -u)" = 0 ] || return 3
     shift || return 2
     case "$action" in
+        prepare-images) kei_dspace_prepare_images "${1:-}" ;;
         plan)
             kei_tainacan_parse_url "${1:-}" >/dev/null || return 2
             read -r mode _ < <(kei_proxy_detect)
