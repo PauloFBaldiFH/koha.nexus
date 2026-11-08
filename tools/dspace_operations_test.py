@@ -21,6 +21,12 @@ def exercise(rt, prepared, output):
     # An rclone local backend is a real configured connection; no cloud account or internet is used.
     subprocess.run(['rclone','config','create','nexus-ci','local'],check=True,capture_output=True,timeout=30,env=cloud_env())
     remote=output/'cloud-copy';remote.mkdir(mode=0o700)
+    # A real server has the panel at /usr/local/bin/config.sh (first run of the
+    # installer); the cron line runs that command. Install it the same way on
+    # this disposable runner instead of scheduling a missing program.
+    panel=Path('/usr/local/bin/config.sh')
+    if not panel.exists():
+        subprocess.run(['install','-m','755',str(Path(__file__).resolve().parents[1]/'installer'),str(panel)],check=True,timeout=30)
     data=dict(id='ci-repository',members=['dspace'],time='02:30',keep=1,destination=str(destination),remote='nexus-ci:'+str(remote))
     op.save_plan(data,True)
     from operations import fields

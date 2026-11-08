@@ -497,12 +497,25 @@ rc=\$?
     [ "$status" -eq 0 ]
     run lib "
 cron() { :; }
-KEI_PANEL_COMMAND=/usr/local/bin/config.sh
+install -m 755 /dev/null '$T/config.sh'
+KEI_PANEL_COMMAND='$T/config.sh'
 kei_dspace_resource plan-cron owned 02:30 koha,dspace || exit
 printf '# manual change\\n' >> /etc/cron.d/koha-nexus-plan-owned
 kei_dspace_resource plan-cron owned '' koha,dspace
 rc=\$?
 [ \"\$rc\" = 3 ] && grep -qx '# manual change' /etc/cron.d/koha-nexus-plan-owned
+"
+    [ "$status" -eq 0 ]
+}
+
+@test "DS03b a plan is never scheduled for a panel command that is not installed" {
+    run lib "
+cron() { :; }
+KEI_PANEL_COMMAND='$T/missing/config.sh'
+mkdir -p /etc/cron.d
+kei_dspace_resource plan-cron absent 02:30 dspace
+rc=\$?
+[ \"\$rc\" = 3 ] && [ ! -e /etc/cron.d/koha-nexus-plan-absent ]
 "
     [ "$status" -eq 0 ]
 }

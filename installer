@@ -12598,6 +12598,10 @@ kei_dspace_resource() {
                 command -v cron >/dev/null 2>&1 || apt-get install -y cron >/dev/null || return 1
                 h=${when%:*}; m=${when#*:}
                 [[ "$KEI_PANEL_COMMAND" =~ ^/[A-Za-z0-9_./-]+$ ]] || return 2
+                # cron runs this exact command: never schedule a plan that would
+                # fail every night with "command not found" (exit 127).
+                [ -f "$KEI_PANEL_COMMAND" ] && [ ! -L "$KEI_PANEL_COMMAND" ] && [ -x "$KEI_PANEL_COMMAND" ] \
+                    || { echo "The panel command $KEI_PANEL_COMMAND is not installed; open the panel once with sudo config.sh, then save the plan again." >&2; return 3; }
                 tmp=$(mktemp) || return 1
                 printf '# Managed by Koha.Nexus: backup plan %s\n# Members=%s\nSHELL=/bin/bash\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' "$name" "$members" > "$tmp"
                 printf '%d %d * * * root KEI_DSPACE_OPERATIONS_DATA=%s %s --task dspace operations plan-run --confirm >/dev/null 2>&1\n' "$((10#$m))" "$((10#$h))" "'{\"id\":\"$name\"}'" "$KEI_PANEL_COMMAND" >> "$tmp"
