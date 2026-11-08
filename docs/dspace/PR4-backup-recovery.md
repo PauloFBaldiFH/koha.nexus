@@ -1,6 +1,7 @@
 # PR4 — backup individual e recuperação do DSpace
 
-Base: PR3 (#353) mesclado. Aceite integrado final aprovado na CI em `d5b9f4d` (versão 1.5.183).
+Base: PR3 (#353) mesclado. Versão 1.5.183. Receita 4 e correção de cookies em validação na CI.
+O aceite de d5b9f4d pertence à receita 3; não aprova a nova matriz.
 
 O formato DSpace 1 é separado do formato 2 do motor Tainacan: usa dump custom do
 PostgreSQL e cópia fria de todos os volumes de arquivos e Solr. O pacote inteiro
@@ -68,7 +69,7 @@ seu lock histórico verificado para backup/recuperação; atualização do paine
 troca essas imagens. Novas instalações usam receita 4. A troca de uma matriz
 existente exige uma atualização deliberada, ainda fora desta etapa.
 
-## Validação
+## Validação anterior da receita 3
 
 - 91 testes unitários de imagens/runtime/formato aprovados localmente em Python
   3.12; incluem caminho inseguro, links, duplicatas, expansão, corrupção e falhas
