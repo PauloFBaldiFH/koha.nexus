@@ -162,5 +162,18 @@ class AddressTransaction(unittest.TestCase):
         with self.assertRaises(runtime.Refused):self.op.address_plan({'url':'http://repo.test:8101','mode':'apache'})
         self.rt.compose.assert_not_called()
 
+    def test_update_recreates_solr_before_restarting_its_writers(self):
+        events=[]
+        self.rt.compose.side_effect=lambda *args,**kwargs:events.append(args)
+        self.rt.dependencies.side_effect=lambda:events.append(('dependencies-ready',))
+        self.rt.health.side_effect=lambda:events.append(('application-ready',))
+        self.op.restart(dependencies=True)
+        self.assertEqual(events,[
+            ('stop','--timeout','90','ui','backend','solr'),
+            ('up','-d','--pull','never','--force-recreate','solr'),
+            ('dependencies-ready',),
+            ('up','-d','--pull','never','--force-recreate','backend','ui'),
+            ('application-ready',)])
+
 
 if __name__=='__main__':unittest.main()

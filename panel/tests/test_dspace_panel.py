@@ -258,6 +258,18 @@ def test_operations_cancellation_never_applies_a_change(monkeypatch):
     assert calls==[('operations',('address',))]
 
 
+def test_address_without_key_can_be_postponed_before_reserving_a_free_name(monkeypatch):
+    from kei_panel.routines import platforms, common
+    async def no_key(app):return SimpleNamespace(key=False)
+    calls=[]
+    async def interactive(*args,**kwargs):calls.append((args,kwargs))
+    monkeypatch.setattr(platforms,'backup_state',no_key)
+    monkeypatch.setattr(common,'run_interactive',interactive)
+    app=App(['free',False])
+    asyncio.run(dspace.address(app))
+    assert not calls
+
+
 def test_encrypted_plan_rows_report_upload_failure_separately():
     from kei_panel import backup_center as b
     data={'plans':[{'id':'nightly','members':['dspace'],'destination':'/backups','remote':'drive:Repo','time':'02:30','keep':7,

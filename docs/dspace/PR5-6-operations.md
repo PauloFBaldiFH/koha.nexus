@@ -71,8 +71,8 @@ OAI-PMH não é publicado pelo proxy gerenciado nesta entrega experimental. A im
 
 ## Testes registrados até a consolidação local
 
-- Python 3.13: 136 testes nativos, incluindo escrita real de arquivos privados, rollback por falha, diários, formato/integridade, propriedade e concorrência. Docker e cripto são explicitamente simulados nos testes de falha. A proteção de ancestrais foi executada fora do mapeamento de UID da sandbox local, sem relaxar a validação de root do produto.
-- Painel/documentação: 130 testes nas áreas alteradas. Avisos existentes de encerramento de workers/Textual continuam registrados; não são resultados de servidor.
+- Python 3.13: 137 testes nativos, incluindo escrita real de arquivos privados, rollback por falha, diários, formato/integridade, propriedade e concorrência. Docker e cripto são explicitamente simulados nos testes de falha. A proteção de ancestrais foi executada fora do mapeamento de UID da sandbox local, sem relaxar a validação de root do produto.
+- Painel/documentação: 131 testes nas áreas alteradas. Avisos existentes de encerramento de workers/Textual continuam registrados; não são resultados de servidor.
 - Debian 12 descartável como root: os 17 testes de conjuntos e o teste adicional de preservação de cron (18 no total). As capturas Koha/Tainacan deste arquivo usam os adaptadores de teste já declarados em `backup_set.bats`; não equivalem a instalar os três sistemas reais.
 - Broker: TypeScript, 72 testes unitários e 24 checks e2e existentes + 6 novos checks locais com Worker/D1/Durable Object, assinaturas reais e API Cloudflare simulada. Não há teste contra a conta Cloudflare de produção.
 - Capturas do painel em modo de demonstração: [80×24](captures/backup-center-80x24.svg) e [160×48](captures/backup-center-160x48.svg). Os estados e dados são simulados; a rolagem do seletor de conjuntos foi verificada no terminal pequeno.
