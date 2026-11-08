@@ -13,6 +13,7 @@ import re
 import secrets
 import shutil
 import stat
+import subprocess
 import time
 from urllib.parse import urlsplit
 
@@ -20,6 +21,7 @@ from runtime import BASE, LABELS, Refused, atomic, canonical_url, command, diges
 from backup import Recovery, Error, sha as file_sha
 
 MEMBERS = ('koha', 'tainacan', 'dspace')
+SCHEMA_RECEIPT = '/dspace/var/nexus-schema.sha256'
 IDENTIFIER = re.compile(r'[a-z][a-z0-9-]{0,31}')
 REMOTE = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[A-Za-z0-9_./-]{1,180}')
 
@@ -86,6 +88,21 @@ class Operations:
     def driver(self, task, *args, timeout=21600):
         if not self.rt.driver: raise Refused('Use the local installer resource driver.')
         return command(['bash', self.rt.driver, '--task', task, *map(str, args)], timeout=timeout, env=dict(local_docker_env(), KEI_DSPACE_DIR=str(self.rt.root)))
+
+    def results(self, task, *args, partial=False, timeout=21600):
+        """Results of an installer --task: kei_emit writes '@@result' lines to
+        stderr (the panel reads both streams), so stdout alone is always empty.
+        partial=True also returns the results of a task that exited non-zero."""
+        from runtime import OperationFailed
+        if not self.rt.driver: raise Refused('Use the local installer resource driver.')
+        env=dict(local_docker_env(), KEI_DSPACE_DIR=str(self.rt.root))
+        try:
+            proc=subprocess.run(['bash', self.rt.driver, '--task', task, *map(str, args)], text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, env=env)
+        except (OSError, subprocess.TimeoutExpired):
+            raise Refused('Operation unavailable or timed out: ' + task)
+        if proc.returncode and not partial: raise OperationFailed(task, proc)
+        return fields(proc.stdout + '\n' + proc.stderr)
 
     def plan_path(self, name):
         if not isinstance(name, str) or not IDENTIFIER.fullmatch(name): raise Refused('Invalid backup plan identifier.')
@@ -194,11 +211,8 @@ class Operations:
                         with open(source, 'rb') as src, open(temp / 'capture.part', 'xb') as dst: shutil.copyfileobj(src, dst)
                     else:
                         # The format-2 set contains existing platform packages, not references.
-                        try:
-                            output=self.driver('set-backup',temp,','.join(plan['members']))
-                        except __import__('runtime').OperationFailed as error:
-                            output=error.output
-                        result=fields(output)
+                        # A partial capture exits non-zero but still reports its file.
+                        result=self.results('set-backup',temp,','.join(plan['members']),partial=True)
                         if not result.get('file'): raise Refused('No platform could be captured; no package was published.')
                         record['partial']=result.get('complete')!='yes' or result.get('recoverability')!='full'
                         source = Path(result['file'])
@@ -266,7 +280,24 @@ class Operations:
     def commit_config(self):
         self.rt.mark(files={n:digest(self.rt.root/n) for n in ('local.cfg','compose.json','db-password')})
 
-    def restart(self, dependencies=False):
+    def schema_receipt(self):
+        """Prove the running history matches the installed image's guard, then read its receipt.
+
+        The receipt binds the database history to the release lock baked into
+        the backend image, so a reviewed image update must re-bind it and a
+        rollback must put back the exact previous receipt.
+        """
+        self.rt.compose('run','--rm','--no-deps','-T','--entrypoint','java','backend',
+                        '-cp','/usr/local/lib/nexus-dspace:/dspace/lib/*','NexusSchemaGuard','check',timeout=180)
+        text=self.rt.compose('run','--rm','--no-deps','-T','--entrypoint','cat','backend',SCHEMA_RECEIPT,timeout=120).strip()
+        if not re.fullmatch(r'[a-f0-9]{64}',text): raise Refused('Unexpected DSpace schema receipt; nothing was changed.')
+        return text
+
+    def restart(self, dependencies=False, schema=None):
+        """schema: 'record' re-binds the unchanged history to the new image's
+        release lock; a 64-hex value puts back that exact previous receipt."""
+        if schema is not None and (not dependencies or not (schema=='record' or re.fullmatch(r'[a-f0-9]{64}',schema))):
+            raise Refused('A schema receipt is only changed with the backend stopped, from a valid saved value.')
         if dependencies:
             # The reviewed update replaces the Solr image too. Drain its writers
             # before recreating it; otherwise Compose could leave recipe 3 running
@@ -274,6 +305,12 @@ class Operations:
             self.rt.compose('stop','--timeout','90','ui','backend','solr',timeout=420)
             self.rt.compose('up','-d','--pull','never','--force-recreate','solr',timeout=420)
         self.rt.dependencies()
+        if schema=='record':
+            self.rt.compose('run','--rm','--no-deps','-T','backend','schema-record',timeout=180)
+        elif schema is not None:
+            self.rt.compose('run','--rm','--no-deps','-T','--entrypoint','sh','backend','-ec',
+                            'umask 077; cat > "$1.restore"; mv -f "$1.restore" "$1"','receipt',SCHEMA_RECEIPT,
+                            input_text=schema+'\n',timeout=120)
         self.rt.compose('up','-d','--pull','never','--force-recreate','backend','ui',timeout=420)
         self.rt.health(); self.rt.core('audit')
 
@@ -287,7 +324,8 @@ class Operations:
         if data.get('catalog'):
             if data['catalog']['path']!=str(self.rt.catalog_path):raise Refused('Catalog rollback destination changed; inspect the journal.')
             atomic(self.rt.catalog_path,data['catalog']['text'])
-        self.restart(dependencies=data.get('operation')=='upgrade')
+        upgrade=data.get('operation')=='upgrade'
+        self.restart(dependencies=upgrade,schema=data.get('schema_receipt') if upgrade else None)
         self.rt.core('proxy')
         data['phase']='rolled-back'; atomic(self.journal,json.dumps(data)+'\n')
         return {'rolled_back':True, 'data_volumes_preserved':True}
@@ -382,13 +420,16 @@ class Operations:
         recovery=Recovery(self.rt,self.phrase);recovery.recover_capture()
         candidate.check_images(images)  # before stopping a running service
         package=recovery.capture()['package']; recovery.test(package)
-        saved=self.snapshot('upgrade'); saved['safety_backup']=package; atomic(self.journal,json.dumps(saved)+'\n')
+        # Checked by the installed image's own guard before anything changes.
+        receipt=self.schema_receipt()
+        saved=self.snapshot('upgrade'); saved['safety_backup']=package; saved['schema_receipt']=receipt
+        atomic(self.journal,json.dumps(saved)+'\n')
         try:
             for name,image in images.items(): compose['services'][name]['image']=image
             atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
             atomic(self.rt.catalog_path,catalog.read_text())
             self.rt.mark(release_sha256=target_hash,recipe=4)
-            self.commit_config(); self.restart(dependencies=True)
+            self.commit_config(); self.restart(dependencies=True,schema='record')
             saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
             return dict(plan,updated=True,safety_backup=package)
         except BaseException:

@@ -102,6 +102,15 @@ class Policies(unittest.TestCase):
         self.rt.docker.assert_not_called()
     def test_protocol_values_are_never_executed(self):
         self.assertEqual(ops.fields('@@result file=/tmp/a\nignore\n@@result complete=yes\n'),{'file':'/tmp/a','complete':'yes'})
+    @unittest.skipIf(Path('/var/lib/koha-nexus/backup').exists(),'needs a machine without the shared backup key')
+    def test_installer_task_results_come_from_the_real_protocol_stream(self):
+        # Real installer, no double: kei_result writes '@@result' to stderr.
+        # Reading stdout only made every scheduled joint plan report that no
+        # platform was captured, and the CI acceptance raise KeyError.
+        o=ops.Operations(Mock(root=self.root,driver=str(Path(__file__).resolve().parents[1]/'installer')))
+        with patch.dict(os.environ,{'KEI_LANG':'en'}):
+            self.assertEqual(o.results('set-backup',self.dest,'dspace',partial=True),{'needs':'key'})
+            with self.assertRaises(runtime.OperationFailed):o.results('set-backup',self.dest,'dspace')
 
 
 
@@ -174,6 +183,41 @@ class AddressTransaction(unittest.TestCase):
             ('dependencies-ready',),
             ('up','-d','--pull','never','--force-recreate','backend','ui'),
             ('application-ready',)])
+
+    def test_update_rebinds_schema_receipt_only_with_the_backend_stopped(self):
+        # The backend guard hashes the image release lock with the Flyway
+        # history; without a new receipt recipe 4 refuses to start (CI 504-free
+        # failure: 'DSpace REST API did not become ready').
+        events=[]
+        self.rt.compose.side_effect=lambda *args,**kwargs:events.append(args)
+        self.rt.dependencies.side_effect=lambda:events.append(('dependencies-ready',))
+        self.rt.health.side_effect=lambda:events.append(('application-ready',))
+        self.op.restart(dependencies=True,schema='record')
+        self.assertEqual(events[:4],[
+            ('stop','--timeout','90','ui','backend','solr'),
+            ('up','-d','--pull','never','--force-recreate','solr'),
+            ('dependencies-ready',),
+            ('run','--rm','--no-deps','-T','backend','schema-record')])
+        self.assertEqual(events[4][:5],('up','-d','--pull','never','--force-recreate'))
+        with self.assertRaises(runtime.Refused):self.op.restart(schema='record')
+    def test_update_rollback_puts_back_the_exact_previous_receipt(self):
+        receipt='a'*64;calls=[]
+        self.rt.compose.side_effect=lambda *args,**kwargs:calls.append((args,kwargs.get('input_text')))
+        saved=self.op.snapshot('upgrade');saved['schema_receipt']=receipt;runtime.atomic(self.op.journal,json.dumps(saved))
+        self.op.rollback()
+        restore=[c for c in calls if c[0][:6]==('run','--rm','--no-deps','-T','--entrypoint','sh')]
+        self.assertEqual(len(restore),1);self.assertEqual(restore[0][1],receipt+'\n')
+        self.assertIn(ops.SCHEMA_RECEIPT,restore[0][0])
+        order=[c[0][:2] for c in calls]
+        self.assertLess(order.index(('run','--rm')),order.index(('up','-d'),2))
+        self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'rolled-back')
+    def test_invalid_saved_receipt_is_never_written(self):
+        with self.assertRaises(runtime.Refused):self.op.restart(dependencies=True,schema='$(reboot)')
+        self.rt.compose.assert_not_called()
+    def test_old_update_journal_without_receipt_keeps_previous_behaviour(self):
+        saved=self.op.snapshot('upgrade');runtime.atomic(self.op.journal,json.dumps(saved))
+        self.op.rollback()
+        self.assertFalse(any(c.args[:1]==('run',) for c in self.rt.compose.call_args_list))
 
 
 if __name__=='__main__':unittest.main()

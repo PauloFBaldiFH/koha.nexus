@@ -16,7 +16,7 @@ import sys
 
 REPO=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(REPO/'platforms/dspace'))
-from runtime import Runtime, Refused, atomic, digest, read_json
+from runtime import Runtime, Refused, SERVICES, atomic, digest, read_json, redact
 from operations import Operations
 
 
@@ -95,6 +95,14 @@ def main():
             failed_validation_rollback=True,administrator_and_collection_preserved=True,document_checksum_preserved=True,
             schema_history_unchanged=True,old_volumes_preserved=True,major_version_migration=False)))
         print('PASS: actual recipe 3 -> 4, injected failure rollback and historical document',flush=True)
+    except BaseException:
+        # Disposable lab only: service logs with this lab's generated database
+        # password redacted, so a refused start (e.g. the schema guard) is visible.
+        password=(root/'db-password').read_text().strip() if (root/'db-password').exists() else ''
+        for service in SERVICES:
+            try:print('Disposable CI logs: '+service+'\n'+redact(rt.compose('logs','--no-color','--tail','60',service,log_failure=False),password),flush=True)
+            except Refused:pass
+        raise
     finally:
         rt.compose('down','--timeout','90',timeout=420)  # no volume pruning; disposable runner owns final cleanup
     return 0

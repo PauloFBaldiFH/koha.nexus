@@ -25,11 +25,11 @@ def exercise(rt, prepared, output):
     op.save_plan(data,True)
     from operations import fields
     set_dir=output/'real-dspace-set';set_dir.mkdir(mode=0o700)
-    actual=fields(op.driver('set-backup',set_dir,'dspace'))
+    actual=op.results('set-backup',set_dir,'dspace')
     assert actual['complete']=='yes' and actual['recoverability']=='full'
-    inspected=fields(op.driver('set-inspect',actual['file']))
+    inspected=op.results('set-inspect',actual['file'])
     assert inspected['platforms']=='dspace' and inspected['integrity']=='ok'
-    opened=fields(op.driver('set-unpack',actual['file']))
+    opened=op.results('set-unpack',actual['file'])
     try:
         with rt.lock():recovery.test(opened['dspace'])
     finally:op.driver('set-cleanup',opened['stage'])
