@@ -12438,9 +12438,10 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_RUNTIME_SHA="9fb7c30e17dacea695b8207094c01a8973581ca6387618e847ed7058a3b60009"
+KEI_DSPACE_RUNTIME_SHA="efa17e2f55783ff9621f40027b66696c418e4d20b68374cd29379639778d0e50"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
-KEI_DSPACE_RELEASE_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
+KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
+KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 
 kei_dspace_runtime() (
     local tmp src cache file expected actual rc arg install=0 confirm=0
@@ -12448,8 +12449,8 @@ kei_dspace_runtime() (
     tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
     trap 'rm -rf "$tmp"' EXIT
     cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA"
-    for file in runtime.py release.json backup.py; do
-        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; esac
+    for file in runtime.py release.json backup.py release-r3.json; do
+        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; esac
         src="${_SCRIPT_DIR}/platforms/dspace/$file"
         if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
             cp "$src" "$tmp/$file" || return 1
@@ -12470,7 +12471,7 @@ kei_dspace_runtime() (
     # offline even when config.sh has no checkout next to it.
     if { [ "$install:$confirm" = 1:1 ] || [ "${1:-}" = cache ]; } && [ "$(id -u)" = 0 ]; then
         mkdir -p "$cache" && chmod 700 "$cache" || return 1
-        for file in runtime.py release.json backup.py; do
+        for file in runtime.py release.json backup.py release-r3.json; do
             cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
                 && mv -f "$cache/$file.new" "$cache/$file" || return 1
         done

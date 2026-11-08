@@ -54,10 +54,19 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 
 ## O PR #354 e a nova validação
 
-A execução anterior passou, mas a execução do PR detectou uma corrida no aceite
-dos termos, antes do backup (42428736161). O roteiro foi corrigido para aguardar
-a inicialização do Angular, exigir uma única gravação e verificar o aceite após
-três recargas. A nova rodada real está pendente; aguardar os checks do #354.
+A CI do PR identificou uma falha real no salvamento de preferências de cookies
+da UI upstream: um EPerson antigo era comparado integralmente ao cache novo,
+gerando a remoção do aceite dos termos. A receita 4 aplica um patch verificado
+que limita essa gravação ao campo de cookies. O teste Node do build reproduz o
+problema sem o filtro e confere a preservação dos demais metadados com o filtro.
+
+108 testes stdlib e o teste Node passaram localmente. A preparação completa das
+fontes fixadas passou. A nova imagem e a rodada real ainda estão pendentes; os
+resultados de receita 3 abaixo são históricos, não aprovação da receita 4.
+Instalações existentes da receita 3 permanecem na mesma matriz. O runtime mantém
+seu lock histórico verificado para backup/recuperação; atualização do painel não
+troca essas imagens. Novas instalações usam receita 4. A troca de uma matriz
+existente exige uma atualização deliberada, ainda fora desta etapa.
 
 ## Validação
 

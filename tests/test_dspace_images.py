@@ -48,6 +48,13 @@ class DSpaceInputs(unittest.TestCase):
         self.assertIsNone(contract["services"]["solr"]["public_path"])
         self.assertIsNone(contract["services"]["postgres"]["public_path"])
 
+    def test_source_patch_and_previous_lock_are_bound_to_checked_files(self):
+        for key in ('ui_source_patch', 'previous_release'):
+            self.assert_bad_lock(lambda data, field=key: data[field].update(sha256='0' * 64))
+
+    def test_source_patch_cannot_select_another_filename(self):
+        self.assert_bad_lock(lambda data: data['ui_source_patch'].update(file='../unreviewed.patch'))
+
     def test_build_has_no_push_or_shell_and_uses_exact_pins(self):
         with patch.dict(os.environ, {}, clear=True):
             cmd = images.build_command(self.data, Path("/tmp/sources"), "backend", "nexus-dspace", Path("/tmp/out.json"))

@@ -3,6 +3,7 @@ ARG NODE_IMAGE
 FROM ${NODE_IMAGE} AS build
 WORKDIR /src
 COPY --from=ui-source / /src/
+COPY cookie-metadata.test.mjs /usr/local/share/nexus/cookie-metadata.test.mjs
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then \
       apt-get -o Acquire::https::CaInfo=/run/secrets/proxy_ca update; \
@@ -13,6 +14,7 @@ RUN --mount=type=secret,id=proxy_ca \
     set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     npm ci --strict-ssl=true; \
+    node /usr/local/share/nexus/cookie-metadata.test.mjs /src; \
     NODE_OPTIONS=--max-old-space-size=4096 npm run build:prod; \
     test -s dist/server/main.js
 
