@@ -148,8 +148,13 @@ jobs:
           fi
           tests/system/container.sh start "${{ matrix.image }}" kn-system
       - name: cloudflared (its own validation of the tunnel file)
+        timeout-minutes: 10
         run: |
-          curl -fsSL --retry 5 --retry-all-errors -o cloudflared.deb \
+          # GitHub release downloads can return repeated 504 responses. Allow
+          # a bounded recovery window; a failed download still fails this job.
+          curl -fsSL --retry 8 --retry-all-errors --retry-delay 30 \
+            --connect-timeout 20 --max-time 90 --retry-max-time 480 \
+            --remove-on-error -o cloudflared.deb \
             https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           # Not /tmp: Debian 13 mounts a tmpfs over it.
           docker cp cloudflared.deb kn-system:/root/cloudflared.deb

@@ -62,6 +62,16 @@ proxy, painel, broker e Tainacan. Corrigir a falha concreta preservando os
 critérios de aceite. Não remover gates, rotular imagens novas como antigas ou
 contar um teste simulado como validação real.
 
+Na execução do PR #355 sobre `5ac2f88`, os logs fornecidos por Paulo confirmam
+HTTP 504 do GitHub em dois downloads: Syft 1.42.3 no inventário da imagem Solr
+(`42473993293`) e cloudflared no job de sistema do proxy (`42473993440`). Não
+foram falhas de execução do DSpace nesses passos. A CI agora separa o download
+do Syft, fixado em 1.42.3, e permite uma segunda tentativa após 30 segundos;
+o inventário continua obrigatório. O curl do cloudflared passa a ter intervalo
+de 30 segundos e limites explícitos de tempo/tentativas, sem aceitar erro nem
+instalar download parcial. Esses ajustes toleram indisponibilidade transitória;
+não comprovam os testes integrados que foram pulados. Conferir a nova execução.
+
 ## Continua pendente fora da CI
 
 Servidor de Paulo, convivência/carga real das três plataformas, reboot de VM/WSL,

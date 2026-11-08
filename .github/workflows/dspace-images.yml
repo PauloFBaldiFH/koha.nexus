@@ -152,9 +152,27 @@ jobs:
           record = {"validation_commit": os.environ["GITHUB_SHA"], "image_archive_restored": os.environ["CACHE_RESTORED"] == "true"}
           (Path(os.environ["RUNNER_TEMP"]) / "dspace-results" / "validation.json").write_text(json.dumps(record, indent=2))
           PY
+      # Download separately so a transient GitHub 504 can be retried without
+      # treating a failed SBOM scan as successful. Both actions use the same
+      # version-keyed Actions tool cache.
+      - name: Download inventory tool
+        id: syft-download
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@v0
+        with:
+          syft-version: v1.42.3
+      - name: Wait before retrying inventory tool download
+        if: steps.syft-download.outcome == 'failure'
+        run: sleep 30
+      - name: Retry inventory tool download (required)
+        if: steps.syft-download.outcome == 'failure'
+        uses: anchore/sbom-action/download-syft@v0
+        with:
+          syft-version: v1.42.3
       - name: Generate component inventory
         uses: anchore/sbom-action@v0
         with:
+          syft-version: v1.42.3
           image: ${{ steps.record.outputs.tag }}
           artifact-name: dspace-${{ matrix.image }}-sbom.spdx.json
       - uses: actions/upload-artifact@v4
