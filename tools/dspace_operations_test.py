@@ -23,6 +23,16 @@ def exercise(rt, prepared, output):
     remote=output/'cloud-copy';remote.mkdir(mode=0o700)
     data=dict(id='ci-repository',members=['dspace'],time='02:30',keep=1,destination=str(destination),remote='nexus-ci:'+str(remote))
     op.save_plan(data,True)
+    from operations import fields
+    set_dir=output/'real-dspace-set';set_dir.mkdir(mode=0o700)
+    actual=fields(op.driver('set-backup',set_dir,'dspace'))
+    assert actual['complete']=='yes' and actual['recoverability']=='full'
+    inspected=fields(op.driver('set-inspect',actual['file']))
+    assert inspected['platforms']=='dspace' and inspected['integrity']=='ok'
+    opened=fields(op.driver('set-unpack',actual['file']))
+    try:
+        with rt.lock():recovery.test(opened['dspace'])
+    finally:op.driver('set-cleanup',opened['stage'])
     cron=Path('/etc/cron.d/koha-nexus-plan-ci-repository').read_text()
     assert '30 2 * * * root' in cron and '# Members=dspace' in cron
     # Execute exactly the command cron would execute (not a fake capture).
@@ -61,7 +71,7 @@ def exercise(rt, prepared, output):
     assert result['keep_data'] and all(json.loads(rt.docker('volume','inspect',name))[0]['Name']==name for name in owned)
     rt.control(True);assert_history(rt)
     (output/'dspace-operations-acceptance.json').write_text(json.dumps(dict(
-        real_scheduled_capture=True,real_encrypted_local_cloud_copy=True,upload_failure_preserves_good_backup=True,
+        real_format2_encrypted_member_recovery=True,real_scheduled_capture=True,real_encrypted_local_cloud_copy=True,upload_failure_preserves_good_backup=True,
         canonical_url_change=True,custom_configuration_preserved=True,real_tls_with_test_ca=True,
         keep_data_removal_and_restart=True,vm_reboot=False)))
     print('PASS: real DSpace schedule, encrypted cloud copy, URL/TLS and keep-data removal',flush=True)

@@ -242,11 +242,36 @@ async def backup_restore(app):
     await _recovery(app, True)
 
 
+def operation_text(action, plan):
+    """Describe the decision in operator language; full machine plans remain in the CLI."""
+    if action=='plan-save':
+        data=plan['plan']
+        return '\n'.join([t('Platforms: ${names}',names=' + '.join(x.title() if x!='dspace' else 'DSpace' for x in data['members'])),
+            t('Local folder: ${folder}',folder=data['destination']),t('Cloud copy: ${where}',where=data.get('remote') or t('Local only')),
+            t('Daily time: ${time}',time=data['time'] or t('Off')),t('Keep the newest ${n} successful packages.',n=data['keep']),
+            t('The entire package is encrypted. Partial captures and failed uploads never delete the last good copy.'),
+            t('Save this plan? No backup runs now.')])
+    if action=='address':
+        return '\n'.join([t('Current address: ${url}',url=plan['previous_url']),t('New address: ${url}',url=plan['url']),
+            t('An encrypted safety backup is tested before the address changes. Repository data and identifiers are preserved.'),
+            t('An external proxy must be configured separately.') if plan['external_proxy_manual'] else t('Only the managed repository web configuration changes.'),
+            t('The repository pauses during this operation. Continue?')])
+    if action=='upgrade':
+        return '\n'.join([t('Reviewed update: DSpace 10.1, recipe ${old} to ${new}.',old=plan['from_recipe'],new=plan['to_recipe']),
+            t('Database schema and persistent volumes remain unchanged. An encrypted safety backup is verified first.'),
+            t('The repository pauses during this operation. Continue?')])
+    if action=='remove':
+        return '\n'.join([t('Keep all repository data and configuration.') if plan['keep_data'] else t('Erase the active owned repository volumes after verifying a safety backup. Backups and earlier recovery volumes remain.'),
+            t('Plans containing DSpace are disabled. Plans of the other platforms remain unchanged.'),
+            t('Shared Docker, Apache, tunnel and cloud connections remain. Continue?')])
+    return t('Apply the reviewed operation?')
+
+
 async def operation(app, action, request, destructive=False):
     env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(request)}
     plan=await call(app,'operations',action,env=env)
     if plan is None:return None
-    if not await app.push_screen_wait(ConfirmScreen(TITLE,json.dumps(plan,ensure_ascii=False,indent=2),danger=destructive)):return None
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,operation_text(action,plan),danger=destructive)):return None
     if action in ('address','upgrade') or (action=='remove' and request.get('purge')):
         phrase=await app.push_screen_wait(InputScreen(TITLE,t('The safety backup will be tested before applying this change. Enter the recovery phrase:'),t('Recovery phrase:'),password=True))
         if not phrase:return None
@@ -254,7 +279,8 @@ async def operation(app, action, request, destructive=False):
     result=await call(app,'operations',action,'--confirm',env=env,cancellable=False)
     if result is not None:
         app.check_platforms()
-        await app.push_screen_wait(MessageScreen(TITLE,json.dumps(result,ensure_ascii=False,indent=2)))
+        detail = result.get('safety_backup') or result.get('package') or ''
+        await app.push_screen_wait(MessageScreen(TITLE,t('Operation completed. Check the repository before sharing its address.') + ('\n\n'+str(detail) if detail else '')))
     return result
 
 
@@ -296,7 +322,7 @@ async def plan_run(app):
     if not chosen:return
     if not await app.push_screen_wait(ConfirmScreen(TITLE,t('Capture the explicitly selected platforms, encrypt the package and copy it to the configured cloud destination? Each platform pauses separately.'))):return
     result=await call(app,'operations','plan-run','--confirm',env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps({'id':chosen})},cancellable=False)
-    if result:await app.push_screen_wait(MessageScreen(TITLE,json.dumps(result,ensure_ascii=False,indent=2)))
+    if result:await app.push_screen_wait(MessageScreen(TITLE,t('Encrypted backup created: ${file}',file=result.get('file',''))))
 
 
 async def address(app):

@@ -12444,8 +12444,8 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="036d927c7bce44888ee32d96e0386b98dfc8088024a2547db4b130b4084cc148"
-KEI_DSPACE_RUNTIME_SHA="861dcec81e8804775894d0c0fcaa12f5de13c8e6c18ef4f19a7aae392bd0b26b"
+KEI_DSPACE_OPERATIONS_SHA="009f60e26946f95616e99635c39ef8436fec08a571de518bdc0b724ea3bb3a85"
+KEI_DSPACE_RUNTIME_SHA="da368b5a7bae1d5d8ccb7d2ee062a655c2dda96b06320250c02bab0635fccda9"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
@@ -16072,6 +16072,7 @@ _kei_set_make() {
                         file="dspace/${out##*/}"; secrets=gpg; recov=full
                     else err="The encrypted DSpace package could not be copied."; fi
                 else err="The DSpace backup failed; inspect its private diagnostic."; fi
+                [ -n "$file" ] || rm -f "$work/dspace/"*
                 rm -f "$work/.ds.err" ;;
         esac
         t1=$(date '+%Y-%m-%d %H:%M:%S')
@@ -16283,6 +16284,10 @@ for line in sums.splitlines():
         out("kind", "unsafe"); out("why", "duplicate-checksum"); sys.exit(0)
     want[mm.group(2)] = mm.group(1)
 files = {n: m for n, m in names if m.isfile() and n != "SHA256SUMS"}
+ds_files = {n for n in files if n.startswith("dspace/")}
+ds_declared = {p["path"] for p in plats if p["id"] == "dspace" and p["result"] == "ok"}
+if (man["format"] == 1 and ds_files) or (man["format"] == 2 and ds_files != ds_declared):
+    out("kind", "unsafe"); out("why", "undeclared-dspace-content"); sys.exit(0)
 integrity = "ok" if set(files) == set(want) else "failed"
 if integrity == "ok":
     for n, m in files.items():
@@ -16326,6 +16331,8 @@ kei_set_conflicts() {
                 if [ "$(_kei_tn_get status 2>/dev/null)" = installed ]; then
                     printf 'conflict=tainacan\t%s\n' "$(u="$(_kei_tn_get url)"; t "The Tainacan in use (\${u}) is replaced after a test in an isolated copy; its address and ports stay those of this server.")"
                 else printf 'conflict=tainacan\t%s\n' "$(t "Tainacan is not installed here: install it first, then restore.")"; fi ;;
+            dspace)
+                printf 'conflict=dspace\t%s\n' "$(t "DSpace is replaced only after a verified safety backup and isolated recovery test. The exact reviewed images, address and recovery phrase are required.")" ;;
         esac
     done
 }

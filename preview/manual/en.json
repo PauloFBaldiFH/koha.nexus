@@ -3110,6 +3110,21 @@
   },
   "dspace-backup-restore": {
    "summary": "Makes a safety backup, verifies a recovery copy, then replaces active volume references while preserving previous data."
+  },
+  "dspace-address": {
+   "summary": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes."
+  },
+  "dspace-upgrade": {
+   "summary": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails."
+  },
+  "dspace-remove": {
+   "summary": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain."
+  },
+  "dspace-plan": {
+   "summary": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace."
+  },
+  "dspace-plan-run": {
+   "summary": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups."
   }
  }
 }

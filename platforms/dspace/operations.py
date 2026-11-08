@@ -240,6 +240,7 @@ class Operations:
     def rollback(self):
         if not self.journal.exists(): raise Refused('There is no saved operation to roll back.')
         data = trusted_json(self.journal)
+        if data.get('operation')=='remove':raise Refused('Removal is resumed with the same explicit removal request; erased volumes are recovered from its safety backup, not by configuration rollback.')
         if data.get('phase') == 'complete': raise Refused('Completed operations are not automatically reversed.')
         for name in ('local.cfg', 'compose.json'): atomic(self.rt.root/name, data['files'][name], gid=10001 if name=='local.cfg' else None, mode=0o440 if name=='local.cfg' else 0o600)
         atomic(self.rt.root/'state.json', json.dumps(data['state'])+'\n')
@@ -337,32 +338,56 @@ class Operations:
             self.rollback();raise
 
     def remove(self, request, confirm=False):
-        self.pending()
-        recovery=Recovery(self.rt,self.phrase); state,compose=recovery.checked()
         purge=request.get('purge',False)
         if not isinstance(purge,bool):raise Refused('Choose explicitly whether to erase data.')
-        volumes=recovery.volumes(compose) # ownership verified for every active volume
-        plan=dict(keep_data=not purge,volumes=list(volumes),shared_services_removed=False,backup_before_purge=purge)
+        pending=trusted_json(self.journal) if self.journal.exists() else {}
+        resumed=pending.get('operation')=='remove' and pending.get('phase')!='complete'
+        if resumed:
+            if purge!=pending['purge']:raise Refused('Resume the same removal choice recorded in the journal.')
+            state,compose=Recovery(self.rt,self.phrase).checked()
+            names=pending['volumes']
+        else:
+            self.pending()
+            recovery=Recovery(self.rt,self.phrase);state,compose=recovery.checked()
+            volumes=recovery.volumes(compose)
+            names={k:compose['volumes'][k]['name'] for k in volumes}
+        plan=dict(keep_data=not purge,volumes=list(names),shared_services_removed=False,backup_before_purge=purge,resume=resumed)
         if not confirm:return plan
         if purge and request.get('erase')!='DSpace':raise Refused('Type DSpace to confirm permanent removal of its owned data.')
-        if purge:
-            package=recovery.capture()['package'];recovery.test(package);plan['safety_backup']=package
-        # Refuse to disconnect a remotely published service implicitly.
         if state.get('publication',{}).get('mode')=='tunnel':raise Refused('Detach the DSpace tunnel address first; shared tunnel is preserved.')
+        if purge and not resumed:
+            if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
+            package=recovery.capture()['package'];recovery.test(package);plan['safety_backup']=package
+        if not resumed:
+            pending=dict(schema=1,operation='remove',phase='stopping',purge=purge,volumes=names,deleted=[],safety_backup=plan.get('safety_backup'))
+            atomic(self.journal,json.dumps(pending)+'\n')
         for item in self.plans()['plans']:
             if 'dspace' in item['members'] and item['time']:
                 item['time']='';item.pop('last',None)
                 self.save_plan(item,True)
         self.rt.compose('stop','--timeout','90','ui','backend','solr','postgres',timeout=420)
         self.rt.core('release-web')
-        # Compose down removes only registered project containers, no volumes/networks.
-        self.rt.compose('down','--timeout','90',timeout=420)
+        self.rt.compose('down','--timeout','90',timeout=420) # no volumes or shared network removed implicitly
         if purge:
-            for key in volumes:
-                name=compose['volumes'][key]['name']
-                self.rt.docker('volume','rm',name)
+            pending['phase']='erasing';atomic(self.journal,json.dumps(pending)+'\n')
+            for name in names.values():
+                if not re.fullmatch(r'kn-dspace(?:-rt-[0-9a-f]{20})?-[a-z-]+',name):raise Refused('Unexpected volume name in removal journal.')
+                if name in pending['deleted']:continue
+                present=set(self.rt.docker('volume','ls','--format','{{.Name}}').splitlines())
+                if name in present:
+                    obj=json.loads(self.rt.docker('volume','inspect',name))[0]
+                    if any((obj.get('Labels') or {}).get(k)!=v for k,v in LABELS.items()):raise Refused('A remaining volume has changed ownership.')
+                    self.rt.docker('volume','rm',name)
                 self.rt.core('forget-volume',name)
+                pending['deleted'].append(name);atomic(self.journal,json.dumps(pending)+'\n')
         self.rt.mark(status='data-removed' if purge else 'data-kept',intended='stopped')
+        pending['phase']='complete';atomic(self.journal,json.dumps(pending)+'\n')
+        if purge:
+            # Retain the private configuration/journal for audit and explicit disaster recovery,
+            # outside the active installation path. No backup or old recovered volume is erased.
+            archive=self.rt.root.parent/('dspace-removed-'+secrets.token_hex(10))
+            os.rename(self.rt.root,archive)
+            plan['configuration_archive']=str(archive)
         return dict(plan,removed=True)
 
     def dispatch(self, action, request, confirm=False):
@@ -372,7 +397,7 @@ class Operations:
             if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
             return self.run_plan(request['id'])
         if action in ('address','upgrade','remove','rollback'):
-            with self.rt.lock():
+            with self.rt.lock(allow_pending=action in ('rollback','remove')):
                 if action=='rollback':
                     if not confirm:raise Refused('Explicit confirmation is required for rollback.')
                     return self.rollback()

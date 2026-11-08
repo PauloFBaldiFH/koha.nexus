@@ -250,7 +250,7 @@ def test_new_backup_sets_use_explicit_members_without_widening_legacy_scope():
 
 
 def test_operations_cancellation_never_applies_a_change(monkeypatch):
-    async def preview(*args,**kwargs):return {'safety_backup':True,'url':'https://repo.example.org'}
+    async def preview(*args,**kwargs):return {'safety_backup':True,'url':'https://repo.example.org','previous_url':'http://repo.local:8100','external_proxy_manual':False}
     calls=[]
     async def observe(app,command,*args,**kwargs):calls.append((command,args));return await preview()
     monkeypatch.setattr(dspace,'call',observe)

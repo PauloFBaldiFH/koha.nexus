@@ -2669,6 +2669,21 @@
   },
   "dspace-backup-restore": {
    "summary": "Faz um backup de segurança, verifica uma cópia recuperada e troca os volumes ativos preservando os dados anteriores."
+  },
+  "dspace-address": {
+   "summary": "Planeja o endereço local, HTTPS institucional ou gratuito do repositório sem alterar outra plataforma. HTTPS exige certificado/chave existentes ou proxy TLS externo. A mudança de URL faz e testa um backup cifrado antes."
+  },
+  "dspace-upgrade": {
+   "summary": "Atualiza somente a receita 3 para 4 homologada do DSpace 10.1, com catálogo imutável de imagens. Testa o backup de segurança, preserva esquema e volumes e retorna à configuração anterior se a validação falhar."
+  },
+  "dspace-remove": {
+   "summary": "Mantém os dados por padrão. Apagar os volumes ativos próprios exige confirmação digitada e backup de segurança testado. Preserva outras plataformas e infraestrutura compartilhada."
+  },
+  "dspace-plan": {
+   "summary": "Cria ou edita plano com participantes fixos, horário diário, retenção e conexão de nuvem existente opcional. Planos antigos de Koha/Tainacan nunca passam a incluir DSpace implicitamente."
+  },
+  "dspace-plan-run": {
+   "summary": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos."
   }
  }
 }

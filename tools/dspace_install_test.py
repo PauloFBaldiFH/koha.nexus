@@ -6,7 +6,6 @@ No mocks; PostgreSQL, seven Solr cores, backend and SSR all run together.
 The --disposable flag authorizes removal ONLY of this test's labelled resources.
 """
 import argparse
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,9 +13,8 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('dspace_runtime', REPO / 'platforms/dspace/runtime.py')
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+sys.path.insert(0, str(REPO / 'platforms/dspace'))
+import runtime as module
 
 
 def main():

@@ -437,6 +437,11 @@ def all_actions() -> set[str]:
 # few words. English keys like the labels; pt.cache holds the PT-BR texts.
 # tests/test_menus.py checks every entry has one.
 DESCRIPTIONS: dict[str, str] = {
+    "dspace-address": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
+    "dspace-upgrade": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
+    "dspace-remove": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",
+    "dspace-plan": "Creates or edits a backup plan with fixed participants, daily time, retention and an optional existing cloud connection. Old Koha/Tainacan plans never silently include DSpace.",
+    "dspace-plan-run": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups.",
     "dspace-backup-key": "Configures the existing shared backup key and recovery kit for encrypted DSpace packages.",
     "dspace-backup-create": "Pauses the repository and encrypts PostgreSQL, private configuration, files and every cold Solr core.",
     "dspace-backup-test": "Recovers into independent volumes with no external network or public ports and checks records and file hashes.",

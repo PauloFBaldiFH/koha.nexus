@@ -237,10 +237,13 @@ class Runtime:
             self.progress(changes['phase'])
 
     @contextlib.contextmanager
-    def lock(self):
+    def lock(self, allow_pending=False):
         if os.geteuid() != 0:
             raise Refused('Run this operation locally as root.')
         self.state()  # validate the dedicated destination before mkdir/chmod
+        if not allow_pending:
+            from operations import Operations
+            Operations(self).pending()
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.root.is_symlink() or self.root.stat().st_uid != 0:
             raise Refused('The DSpace directory must be owned by root and not a symbolic link.')
@@ -888,6 +891,5 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.modules['runtime'] = sys.modules[__name__]  # helpers share this CLI's exception identity
     sys.modules['runtime'] = sys.modules[__name__]
     sys.exit(main())

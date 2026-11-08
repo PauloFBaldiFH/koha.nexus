@@ -6,15 +6,15 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('runtime', REPO / 'platforms/dspace/runtime.py')
-ds = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ds)
+sys.path.insert(0, str(REPO / 'platforms/dspace'))
+import runtime as ds
 
 
 class LabRuntime(ds.Runtime):
