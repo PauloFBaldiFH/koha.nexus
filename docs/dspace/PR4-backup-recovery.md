@@ -1,6 +1,6 @@
 # PR4 — backup individual e recuperação do DSpace
 
-Base: PR3 (#353) mesclado. Aceite integrado aprovado na CI em `20e3082`; ajustes finais em nova validação.
+Base: PR3 (#353) mesclado. Aceite integrado final aprovado na CI em `d5b9f4d` (versão 1.5.183).
 
 O formato DSpace 1 é separado do formato 2 do motor Tainacan: usa dump custom do
 PostgreSQL e cópia fria de todos os volumes de arquivos e Solr. O pacote inteiro
@@ -55,18 +55,24 @@ DSpace. Agendas/conjuntos ficam para PR5. Domínios/atualizações ficam para PR
 ## Validação
 
 - 91 testes unitários de imagens/runtime/formato aprovados localmente em Python
-  3.12; incluem caminho inseguro, links, duplicatas, expansão e corrupção.
-- Os 88 testes locais selecionados do painel, menus, manual e traduções passaram.
-  Cancelamentos, frase mascarada, plano de restauração e layouts 80×24/160×48 foram exercitados. Serviços reais: aceite integrado aprovado em `20e3082` (execução
-  [42422331580](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42422331580)),
-  incluindo restauração pública e privada e histórico Solr não vazio. Ajustes
-  finais de preservação de candidatos e metadados exigem nova execução.
-  Nada foi testado no servidor
-  de Paulo. Não anunciar recuperação homologada antes da CI real.
-- CI acrescenta captura pública e privada, restauração em volumes novos,
-  download público com SHA-256, recusa anônima do privado e download autorizado.
-- Reboot completo, Debian/WSL/ARM, acervo grande, destinos externos e integração
-  em conjuntos não estão comprovados nesta etapa.
+  3.12; incluem caminho inseguro, links, duplicatas, expansão, corrupção e falhas
+  de captura/promoção. O limite de decifragem também foi testado com GPG real.
+- 88 testes locais selecionados do painel, menus, manual e traduções aprovados.
+  Incluem cancelamentos, frase mascarada, plano antes da restauração e layouts
+  80×24/160×48. O painel também passou na CI em Python 3.9 e 3.13.
+- Aceite integrado final aprovado em `d5b9f4d`, execução
+  [42426430208](https://github.com/PauloFBaldiFH/koha.nexus/actions/runs/42426430208).
+  O job real terminou em 2026-11-08 às 00:10:50 UTC. Usou PostgreSQL, Solr,
+  DSpace, GPG e Chromium reais: depósito, capturas pública/privada, teste isolado,
+  restauração ativa de ambas, SHA-256 dos downloads, acesso privado negado ao
+  anônimo, download autorizado e histórico Solr não vazio preservado. O ciclo
+  de instalação/recriação/reinício de Docker do PR2 também passou.
+- Imagens, dependências e entradas Python 3.9/3.13 passaram nessa execução.
+  Regressões de Tainacan e infraestrutura compartilhada passaram no código
+  correspondente, antes das alterações exclusivas do roteiro de navegador.
+- Nada foi testado no servidor de Paulo. Reboot completo de VM, DSpace em
+  Debian/WSL/ARM, acervo grande, destinos externos e integração em conjuntos
+  não estão comprovados nesta etapa. DSpace continua experimental.
 
 A restauração ativa exige um destino com banco legível para o backup de segurança.
 Para perda/corrupção do banco atual, preparar outra instalação da mesma matriz
