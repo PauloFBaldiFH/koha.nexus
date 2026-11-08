@@ -52,6 +52,14 @@ class Policies(unittest.TestCase):
         with self.assertRaises(runtime.Refused):self.o.plans()
     def test_cloud_connection_must_already_exist(self):
         with patch.object(ops,'command',return_value='other:\n'),self.assertRaises(runtime.Refused):self.o.check_plan(dict(self.plan,remote='drive:DSpace'))
+    def test_disable_preview_does_not_need_the_cloud_connection_destination_or_key(self):
+        self.o.home.mkdir(mode=0o700)
+        data=dict(self.plan,schema=1,destination='/missing/offline-volume',remote='lost:folder')
+        runtime.atomic(self.o.plan_path('nightly'),json.dumps(data))
+        with patch.object(ops.Recovery,'crypto') as crypto,patch.object(ops,'command') as command:
+            result=self.o.disable_plan('nightly')
+        self.assertEqual(result['plan']['time'],'');crypto.assert_not_called();command.assert_not_called()
+        self.rt.core.assert_not_called()
     def test_reading_absent_plans_creates_nothing(self):
         self.assertEqual(self.o.plans(),{'plans':[]});self.assertFalse(self.o.home.exists())
     def test_retention_leaves_other_folders_and_changed_content(self):
@@ -136,6 +144,13 @@ class AddressTransaction(unittest.TestCase):
         self.op.phrase=None
         with self.assertRaises(runtime.Refused):self.op.address({'url':'http://repo.test:8101'},True)
         self.assertEqual((self.root/'local.cfg').read_text(),self.cfg);self.assertFalse(self.op.journal.exists())
+    def test_interrupted_restore_is_not_overwritten_by_a_new_address_backup(self):
+        journal=self.root/'backup-operation.json'
+        runtime.atomic(journal,json.dumps({'phase':'promoting','safety':'protected'}))
+        with self.assertRaises(ops.Error):self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertEqual(json.loads(journal.read_text())['safety'],'protected')
+        self.assertEqual((self.root/'local.cfg').read_text(),self.cfg)
+        self.assertFalse(self.op.journal.exists())
     def test_external_proxy_preview_never_writes_any_file(self):
         self.rt.core.return_value='external'
         before=runtime.digest(self.root/'local.cfg')

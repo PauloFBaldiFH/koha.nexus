@@ -802,7 +802,7 @@ def main():
         child.add_argument('--confirm', action='store_true')
     sub.add_parser('backup-list')
     ops = sub.add_parser('operations')
-    ops.add_argument('action', choices=('plans','plan-save','plan-run','address','upgrade','remove','rollback'))
+    ops.add_argument('action', choices=('plans','plan-save','plan-disable','plan-run','address','upgrade','remove','rollback'))
     ops.add_argument('--confirm', action='store_true')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.

@@ -147,6 +147,13 @@ export class Provisioner extends DurableObject<Env> {
   async detachRepository(libraryId:string):Promise<{services:string; job_id?:string}> {
     return this.serial(async()=>{
       const lib=await this.library(libraryId);
+      if(lib?.status==="deprovisioning" && parseServices(lib.services).dspace && !parseServices(lib.services).koha && !parseServices(lib.services).tainacan){
+        const job=await this.env.DB.prepare("SELECT id,state FROM jobs WHERE library_id=? AND kind='deprovision' ORDER BY created_at DESC LIMIT 1").bind(libraryId).first<{id:string;state:string}>();
+        if(job){
+          if(job.state==="queued")await this.env.PROVISION_QUEUE.send({jobId:job.id});
+          return {services:"",job_id:job.id};
+        }
+      }
       if(!lib || !lib.tunnel_id || !["active","suspended"].includes(lib.status))throw new Error("Library is not active");
       const current=parseServices(lib.services);
       if(!current.dspace)return {services:lib.services};

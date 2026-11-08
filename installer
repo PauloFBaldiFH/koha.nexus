@@ -12448,8 +12448,8 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="1f85215447dcad8ea30a59658bb9a049a8bed5567a99215cfb5a92e325a7f6e6"
-KEI_DSPACE_RUNTIME_SHA="31a453a8ce75f386fee2d1df90dc6dbcf7d50c8f3faabc11ab85369a09c089b1"
+KEI_DSPACE_OPERATIONS_SHA="5ecc8f3b4a8fdab5e5ad82f2e1a1aef2e0284171d7a023542b611bbeb160e89f"
+KEI_DSPACE_RUNTIME_SHA="aeda4147c80383bec022ef0cb7d991c12781312c4ea161a5e1d8e5eef34596f3"
 KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
@@ -14072,16 +14072,23 @@ kei_dspace_free_off() {
     KEI_DSPACE_OPERATIONS_DATA="$data" KEI_BACKUP_PHRASE="$phrase" kei_dspace_runtime operations address --confirm || { unset phrase; return 1; }
     unset phrase
     if ! broker_request DELETE /v1/services/dspace yes; then
-        msg_error "DSpace" "$(t "The repository is local again, but the remote address was not released. Retry this action; no shared library was deleted.")" 12 76
-        broker_cleanup; return 1
-    fi
-    sharing=$(python3 -I - "$BROKER_BODY" <<'PYSHARE'
+        if [ "$BROKER_STATUS" = 401 ] && [ -z "$(tunnel_conf_get OPAC_HOST 2>/dev/null)" ] && [ -z "$(tunnel_conf_get TAINACAN_HOST 2>/dev/null)" ]; then
+            # A retry after the sole library was deleted has no valid broker identity.
+            # Only this stale standalone client is cleared; no remote shared library is deleted.
+            sharing=alone
+        else
+            msg_error "DSpace" "$(t "The repository is local again, but the remote address was not released. Check the shared address credentials and retry; no shared library was deleted.")" 12 76
+            broker_cleanup; return 1
+        fi
+    else
+        sharing=$(python3 -I - "$BROKER_BODY" <<'PYSHARE'
 import json,sys
 x=json.load(open(sys.argv[1]));services=x.get('services')
 if not isinstance(services,str) or (not services and not x.get('job_id')):sys.exit(1)
 print('shared' if services else 'alone')
 PYSHARE
-    ) || { broker_cleanup; return 3; }
+        ) || { broker_cleanup; return 3; }
+    fi
     broker_cleanup
     kv_write "$TUNNEL_CONF" 644 DSPACE_HOST "" || return 1
     kei_owned_del ingress "$host" dspace
@@ -14103,6 +14110,12 @@ kei_dspace_free() {
     if [ "${1:-}" = off ]; then kei_dspace_free_off; return; fi
     [ "${1:-}" = on ] || return 2
     [ -f "$KEI_DSPACE_DIR/state.json" ] || return 3
+    local web_mode
+    read -r web_mode _ < <(kei_proxy_detect)
+    if [ "$web_mode" = external ]; then
+        msg_error "DSpace" "$(t "The free-address assistant currently requires the managed Apache proxy. Your existing web server was preserved. Use the institutional address/external HTTPS proxy option for now.")" 13 76
+        return 3
+    fi
     if ! kei_dspace_free_check; then
         msg_error "DSpace" "$(t "The address service does not offer repository addresses yet. Deploy the reviewed broker and migration 0004 first; nothing was changed.")" 12 76
         return 3

@@ -34,10 +34,14 @@ try{
   const before=broker.fake.snapshot(),tunnel=before.tunnels[0].id;
   const attached=await signed(shared,'PUT','/v1/services',{dspace:true});assert.equal(attached.status,200);assert.ok(attached.data.hostnames.repository.endsWith('-repositorio.example.org'));checks++;
   const detached=await signed(shared,'DELETE','/v1/services/dspace');assert.equal(detached.status,200);assert.equal(detached.data.services,'koha,tainacan');
+  assert.equal((await signed(shared,'DELETE','/v1/services/dspace')).status,200);
   const after=broker.fake.snapshot();assert.equal(after.tunnels[0].id,tunnel);assert.deepEqual(after.dns_records.map(x=>x.name).sort(),before.dns_records.map(x=>x.name).sort());checks++;
   const alone=await enroll('repository-alone',['dspace']);
   const info=await signed(alone,'GET','/v1/library');assert.deepEqual(info.data.services,['dspace']);assert.deepEqual(Object.keys(info.data.hostnames),['repository']);checks++;
-  const removed=await signed(alone,'DELETE','/v1/services/dspace');assert.equal(removed.status,202);assert.ok(await broker.settle());
+  const removed=await signed(alone,'DELETE','/v1/services/dspace');assert.equal(removed.status,202);
+  const retry=await signed(alone,'DELETE','/v1/services/dspace');assert.ok([202,401].includes(retry.status));
+  if(retry.status===202)assert.equal(retry.data.job_id,removed.data.job_id);
+  assert.ok(await broker.settle());
   assert.equal((await signed(shared,'GET','/v1/library')).data.status,'active');assert.equal(broker.fake.snapshot().tunnels.length,1);checks++;
   await broker.db.prepare("DELETE FROM broker_features WHERE name='dspace'").run();
   const old=await call('GET','/v1/capabilities');assert.ok(!old.data.services.includes('dspace'));

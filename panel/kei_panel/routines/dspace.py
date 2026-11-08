@@ -244,7 +244,7 @@ async def backup_restore(app):
 
 def operation_text(action, plan):
     """Describe the decision in operator language; full machine plans remain in the CLI."""
-    if action=='plan-save':
+    if action in ('plan-save','plan-disable'):
         data=plan['plan']
         return '\n'.join([t('Platforms: ${names}',names=' + '.join(x.title() if x!='dspace' else 'DSpace' for x in data['members'])),
             t('Local folder: ${folder}',folder=data['destination'].rstrip('/')+'/nexus-'+data['id']),t('Cloud copy: ${where}',where=data.get('remote') or t('Local only')),
@@ -297,6 +297,17 @@ async def plan(app):
     chosen=await app.push_screen_wait(ChoiceScreen(TITLE,t('Choose a plan. Editing never widens existing Koha/Tainacan schedules.'),options))
     if not chosen:return
     old=next((p for p in data.get('plans',[]) if p['id']==chosen),{})
+    if old:
+        how=await app.push_screen_wait(ChoiceScreen(TITLE,t('Edit this plan or disable its schedule? Disabling works even when a cloud connection or destination is unavailable.'),[('edit',t('Edit plan')),('off',t('Disable this schedule'))]))
+        if not how:return
+        if how=='off':
+            await operation(app,'plan-disable',{'id':chosen})
+            return
+    from . import platforms as tn
+    if not (await tn.backup_state(app)).key:
+        if not await app.push_screen_wait(ConfirmScreen(TITLE,t('DSpace backups require encryption. Configure the shared backup key now?'))):return
+        await tn.backup_setup(app)
+        if not (await tn.backup_state(app)).key:return
     name=old.get('id') or await app.push_screen_wait(InputScreen(TITLE,t('Name for this backup plan (lowercase letters, digits and hyphens).'),t('Plan name:'),validate=lambda v:'' if re.fullmatch(r'[a-z][a-z0-9-]{0,31}',v) else t('Invalid plan name.')))
     if not name:return
     folder=await app.push_screen_wait(PathPickerScreen(TITLE,old.get('destination','/var/backups'),mode='dir',help_text=t('Choose a server backup folder. A private subfolder is created for this plan.')))
@@ -330,9 +341,15 @@ async def plan_run(app):
 async def address(app):
     mode=await app.push_screen_wait(ChoiceScreen(TITLE,t('How will this repository be published?'),[('apache',t('Local network or institutional HTTP')),('external',t('Existing external HTTPS proxy')),('tls',t('Apache HTTPS with an existing certificate')),('free',t('Free koha.nexus address')),('free-off',t('Release only the repository free address'))]))
     if not mode:return
+    from . import platforms as tn
+    if not (await tn.backup_state(app)).key:
+        if not await app.push_screen_wait(ConfirmScreen(TITLE,t('An address change needs a verified encrypted safety backup. Configure the shared backup key now?'))):return
+        await tn.backup_setup(app)
+        if not (await tn.backup_state(app)).key:return
     if mode in ('free','free-off'):
         from .common import run_interactive
         await run_interactive(app,TITLE,'dspace-free','off' if mode=='free-off' else 'on')
+        app.check_platforms()
         return
     url=await app.push_screen_wait(InputScreen(TITLE,t('Canonical public repository address, without a path.'),t('Address:'),validate=lambda v:'' if origin(v) else t('Enter one HTTP(S) origin.')))
     if not url:return

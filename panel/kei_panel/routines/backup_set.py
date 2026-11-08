@@ -167,8 +167,8 @@ async def set_backup(app) -> None:
         return
     if not await app.push_screen_wait(ConfirmScreen(title, t(
             "One file with the data of the selected platforms, and a manifest with the checksums. Each platform "
-            "is captured in turn with its own consistent copy (Tainacan stops writing for a moment), and the "
-            "time of each capture is recorded: the two are not taken at the same instant. Make it now?"))):
+            "is captured in turn with its own consistent copy (DSpace and Tainacan pause when selected), and the "
+            "time of each capture is recorded: they are not taken at the same instant. Make it now?"))):
         return
     args = (("",mode) if mode else ()) if selected == ['koha','tainacan'] else (','.join(selected),mode)
     result = await run_task(app, title, "set-backup", str(folder), *args)

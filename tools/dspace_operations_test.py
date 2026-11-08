@@ -8,7 +8,7 @@ import tempfile
 
 
 def exercise(rt, prepared, output):
-    from operations import Operations
+    from operations import Operations, cloud_env
     from runtime import Refused, read_json
     from dspace_recovery_test import assert_history
     recovery,_=prepared
@@ -19,7 +19,7 @@ def exercise(rt, prepared, output):
     op.commit_config()
     destination=Path('/var/backups/koha-nexus/operations-ci');destination.mkdir(mode=0o700,parents=True)
     # An rclone local backend is a real configured connection; no cloud account or internet is used.
-    subprocess.run(['rclone','config','create','nexus-ci','local'],check=True,capture_output=True,timeout=30)
+    subprocess.run(['rclone','config','create','nexus-ci','local'],check=True,capture_output=True,timeout=30,env=cloud_env())
     remote=output/'cloud-copy';remote.mkdir(mode=0o700)
     data=dict(id='ci-repository',members=['dspace'],time='02:30',keep=1,destination=str(destination),remote='nexus-ci:'+str(remote))
     op.save_plan(data,True)
@@ -48,7 +48,8 @@ def exercise(rt, prepared, output):
     except Refused:pass
     else:raise AssertionError('Upload to unwritable /proc unexpectedly succeeded')
     assert artifact.exists() and op.history(data['id'])[-1]['copy']=='failed'
-    op.save_plan(dict(data,time=''),True)
+    subprocess.run(['rclone','config','delete','nexus-ci'],check=True,capture_output=True,timeout=30,env=cloud_env())
+    op.disable_plan(data['id'],True)
     assert not Path('/etc/cron.d/koha-nexus-plan-ci-repository').exists()
     # URL change preserves institution configuration and exact data volumes/images.
     with rt.lock():op.address({'url':'http://repository.kei.test:8101','mode':'apache'},True)

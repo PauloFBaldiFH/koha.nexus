@@ -154,6 +154,23 @@ class Operations:
                 raise
         return {'saved': data, 'encrypted': True}
 
+    def disable_plan(self, name, confirm=False):
+        private(self.home)
+        data=trusted_json(self.plan_path(name))
+        if data.get('schema')!=1 or data.get('id')!=name:raise Refused('Unknown backup plan.')
+        selected=members(data.get('members'))
+        data['time']=''
+        if not confirm:return {'plan':data,'writes':'owned cron removal only; no backup, key or cloud access'}
+        if os.geteuid()!=0:raise Refused('Disable scheduled plans locally as root.')
+        with self.plan_lock(name):
+            # Disabling remains possible when the destination, credentials or key are lost.
+            data=trusted_json(self.plan_path(name))
+            if data.get('schema')!=1 or data.get('id')!=name:raise Refused('Unknown backup plan.')
+            selected=members(data.get('members'));data['time']=''
+            self.rt.core('plan-cron',name,'',','.join(selected))
+            atomic(self.plan_path(name),json.dumps(data)+'\n')
+        return {'disabled':name,'plan':data}
+
     def history(self, name):
         path = self.home / (name + '.history.json')
         return trusted_json(path) if path.exists() else []
@@ -249,9 +266,16 @@ class Operations:
     def commit_config(self):
         self.rt.mark(files={n:digest(self.rt.root/n) for n in ('local.cfg','compose.json','db-password')})
 
-    def restart(self):
+    def restart(self, dependencies=False):
+        if dependencies:
+            # The reviewed update replaces the Solr image too. Drain its writers
+            # before recreating it; otherwise Compose could leave recipe 3 running
+            # while the declared matrix already says recipe 4.
+            self.rt.compose('stop','--timeout','90','ui','backend','solr',timeout=420)
+            self.rt.compose('up','-d','--pull','never','--force-recreate','solr',timeout=420)
+        self.rt.dependencies()
         self.rt.compose('up','-d','--pull','never','--force-recreate','backend','ui',timeout=420)
-        self.rt.dependencies(); self.rt.health(); self.rt.core('audit')
+        self.rt.health(); self.rt.core('audit')
 
     def rollback(self):
         if not self.journal.exists(): raise Refused('There is no saved operation to roll back.')
@@ -263,7 +287,7 @@ class Operations:
         if data.get('catalog'):
             if data['catalog']['path']!=str(self.rt.catalog_path):raise Refused('Catalog rollback destination changed; inspect the journal.')
             atomic(self.rt.catalog_path,data['catalog']['text'])
-        self.restart()
+        self.restart(dependencies=data.get('operation')=='upgrade')
         self.rt.core('proxy')
         data['phase']='rolled-back'; atomic(self.journal,json.dumps(data)+'\n')
         return {'rolled_back':True, 'data_volumes_preserved':True}
@@ -310,10 +334,10 @@ class Operations:
         plan=self.address_plan(request)
         if not confirm: return plan
         if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
+        recovery=Recovery(self.rt,self.phrase);recovery.recover_capture()
         if self.rt.state().get('url')==plan['url'] and self.rt.state().get('publication',{}).get('mode')==plan['mode']:
             if plan['mode']!='external':self.rt.core('proxy');self.rt.health()
             return dict(plan,changed=False,managed_proxy_checked=plan['mode']!='external')
-        recovery=Recovery(self.rt,self.phrase)
         package=recovery.capture()['package']
         # Recoverability is proven before any canonical URL or configuration changes.
         recovery.test(package)
@@ -355,15 +379,16 @@ class Operations:
         plan=dict(from_recipe=3,to_recipe=4,release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True)
         if not confirm:return plan
         if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
+        recovery=Recovery(self.rt,self.phrase);recovery.recover_capture()
         candidate.check_images(images)  # before stopping a running service
-        recovery=Recovery(self.rt,self.phrase); package=recovery.capture()['package']; recovery.test(package)
+        package=recovery.capture()['package']; recovery.test(package)
         saved=self.snapshot('upgrade'); saved['safety_backup']=package; atomic(self.journal,json.dumps(saved)+'\n')
         try:
             for name,image in images.items(): compose['services'][name]['image']=image
             atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
             atomic(self.rt.catalog_path,catalog.read_text())
             self.rt.mark(release_sha256=target_hash,recipe=4)
-            self.commit_config(); self.restart()
+            self.commit_config(); self.restart(dependencies=True)
             saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
             return dict(plan,updated=True,safety_backup=package)
         except BaseException:
@@ -387,6 +412,7 @@ class Operations:
         if not confirm:return plan
         if purge and request.get('erase')!='DSpace':raise Refused('Type DSpace to confirm permanent removal of its owned data.')
         if state.get('publication',{}).get('mode')=='tunnel':raise Refused('Detach the DSpace tunnel address first; shared tunnel is preserved.')
+        Recovery(self.rt,self.phrase).recover_capture()
         if purge and not resumed:
             if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
             package=recovery.capture()['package'];recovery.test(package);plan['safety_backup']=package
@@ -395,8 +421,7 @@ class Operations:
             atomic(self.journal,json.dumps(pending)+'\n')
         for item in self.plans()['plans']:
             if 'dspace' in item['members'] and item['time']:
-                item['time']='';item.pop('last',None)
-                self.save_plan(item,True)
+                self.disable_plan(item['id'],True)
         self.rt.compose('stop','--timeout','90','ui','backend','solr','postgres',timeout=420)
         self.rt.core('release-web')
         self.rt.compose('down','--timeout','90',timeout=420) # no volumes or shared network removed implicitly
@@ -425,6 +450,7 @@ class Operations:
     def dispatch(self, action, request, confirm=False):
         if action=='plans':return self.plans()
         if action=='plan-save':return self.save_plan(request,confirm)
+        if action=='plan-disable':return self.disable_plan(request['id'],confirm)
         if action=='plan-run':
             if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
             return self.run_plan(request['id'])

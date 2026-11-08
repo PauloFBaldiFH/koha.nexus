@@ -265,3 +265,23 @@ def test_encrypted_plan_rows_report_upload_failure_separately():
     rows=b.operation_plans(data,'dspace')
     assert len(rows)==1 and rows[0].state=='bad' and 'encrypted' in rows[0].encrypted.lower()
     assert b.operation_plans(data,'koha-dspace')==[]
+
+
+@pytest.mark.parametrize('size',[(80,24),(160,48)])
+def test_all_three_platforms_remain_reachable_in_the_shared_backup_selector(monkeypatch,size):
+    for name in ('KOHA','TAINACAN','DSPACE'):monkeypatch.setenv('KEI_PANEL_DEMO_'+name,'1')
+    async def exercise():
+        app=KohaPanelApp(PanelEnv(installer=None,lang='en',plain=True,demo=True))
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.8)
+            app.backup_scope='dspace';app.screen.action_show('backups')
+            await pilot.pause(1.8)
+            view=app.screen.query_one('#view-backups')
+            button=view.query_one('#scope-all')
+            button.focus()
+            await pilot.pause(.5)
+            assert button.region.intersection(view.region).width==button.region.width
+            await pilot.click('#scope-all')
+            await pilot.pause(.4)
+            assert view.scope=='all' and app.backup_scope=='all'
+    asyncio.run(exercise())

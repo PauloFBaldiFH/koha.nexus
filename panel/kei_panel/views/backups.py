@@ -61,7 +61,7 @@ class BackupCenterView(PlatformSectionView):
     # --- layout ---------------------------------------------------------------
     def heading(self) -> ComposeResult:
         yield from super().heading()
-        with Horizontal(id="bk-scopes", classes="sb-card-buttons"):
+        with HorizontalScroll(id="bk-scopes", classes="sb-card-buttons"):
             yield Label(t("Platform:"), classes="form-label")
             for scope in backup_center.SCOPES:
                 yield Button(t(backup_center.SCOPE_LABELS[scope]), id=f"scope-{scope}", classes="small")
@@ -80,7 +80,7 @@ class BackupCenterView(PlatformSectionView):
                 yield Label(t(CODEC_NOTE), id="bk-codec-note", classes="ai-note")
         yield Static(t("The selected platforms as a set: the joint backup makes one file with their data, each "
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
-                       "restore brings back one of them or both. The automatic backups of each are below."),
+                       "restore brings back one or several of them. The automatic backups of each are below."),
                      id="bk-both", classes="view-prompt", markup=False)
         yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), id="bk-dspace", classes="view-prompt", markup=False)
         with Vertical(id="bk-tainacan"):

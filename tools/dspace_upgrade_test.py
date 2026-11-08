@@ -35,6 +35,13 @@ def main():
     old_catalog.write_text(json.dumps({'schema':1,'release_sha256':previous,'images':images}))
     new_catalog.write_text(subprocess.check_output([sys.executable,str(REPO/'tools/dspace_catalog.py')],text=True))
     rt=Runtime(root,old_catalog,lab=True,driver=str(REPO/'installer'),release_lock=previous)
+    def assert_matrix():
+        current=read_json(root/'compose.json')
+        for name,service in current['services'].items():
+            cid=rt.compose('ps','-q',name).strip()
+            actual=json.loads(rt.docker('inspect',cid))[0]['Image']
+            expected=json.loads(rt.docker('image','inspect',service['image']))[0]['Id']
+            assert actual==expected, 'Running image matrix differs for '+name
     rt.install('http://repository.kei.test:8100')
     try:
         email='upgrade@example.org';password=secrets.token_urlsafe(24)
@@ -70,9 +77,11 @@ def main():
             else:raise AssertionError('Injected failed update unexpectedly succeeded')
         rt.health=original_health
         assert rt.state()['release_sha256']==previous
+        assert_matrix()
         assert op.journal.exists() and read_json(op.journal)['phase']=='rolled-back'
         with rt.lock():result=op.upgrade({'catalog':str(new_catalog)},True)
         assert result['updated'] and rt.state()['release_sha256']==digest(REPO/'platforms/dspace/release.json')
+        assert_matrix()
         assert owned=={k:v['name'] for k,v in read_json(root/'compose.json')['volumes'].items()}
         assert schema==rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc','SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
         assert_history(rt)
@@ -90,4 +99,14 @@ def main():
         rt.compose('down','--timeout','90',timeout=420)  # no volume pruning; disposable runner owns final cleanup
     return 0
 
-if __name__=='__main__':sys.exit(main())
+if __name__=='__main__':
+    try:sys.exit(main())
+    except Exception as error:
+        # Public frames identify the failed acceptance step without leaking
+        # CLI arguments, account passwords or raw service logs.
+        import traceback
+        frames=' > '.join(Path(frame.filename).name+':'+str(frame.lineno)+' '+frame.name
+                          for frame in traceback.extract_tb(error.__traceback__))
+        detail=type(error).__name__+' at '+frames
+        print('::error title=DSpace historical upgrade::'+detail.replace('%','%25').replace('\n','%0A'),flush=True)
+        raise
